@@ -1,2 +1,0 @@
-# istanbulite
-the istanbulite
