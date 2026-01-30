@@ -252,21 +252,42 @@ style="position: absolute; top: 0; left: 0; width: 100%; height: auto;">
   </footer>
 
 <script>
+const svg = document.querySelector('svg');
 const neighborhoods = document.querySelectorAll('svg g');
 const content = document.getElementById('neighborhood-content');
+const originalViewBox = svg.getAttribute('viewBox');
 
 neighborhoods.forEach(nb => {
   nb.classList.add('neighborhood');
 
-  nb.addEventListener('click', () => {
-    neighborhoods.forEach(n => n.classList.remove('active'));
+  nb.addEventListener('click', (e) => {
+    e.stopPropagation(); // prevent document click from firing
 
+    // Remove active from all
+    neighborhoods.forEach(n => n.classList.remove('active'));
     nb.classList.add('active');
 
+    // Zoom into neighborhood
+    const bbox = nb.getBBox();
+    const padding = 50; // adjust as needed
+    svg.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding*2} ${bbox.height + padding*2}`);
+
+    // Update content div
     const name = nb.getAttribute('data-name') || nb.id;
-    content.innerHTML = `<h2>${name.charAt(0).toUpperCase() + name.slice(1)}</h2>`;
+    content.innerHTML = `<h2>${name.charAt(0).toUpperCase() + name.slice(1)}</h2>
+                         <p>More info about ${name.charAt(0).toUpperCase() + name.slice(1)}...</p>`;
   });
 });
+
+// Reset zoom/content when clicking outside neighborhoods
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.neighborhood') && !e.target.closest('#neighborhood-content')) {
+    neighborhoods.forEach(nb => nb.classList.remove('active'));
+    svg.setAttribute('viewBox', originalViewBox);
+    content.innerHTML = `<h2>İstanbul</h2><p>Click a neighborhood.</p>`;
+  }
+});
 </script>
+
 </body>
 </html>
