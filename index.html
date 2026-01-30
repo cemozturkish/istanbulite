@@ -245,35 +245,44 @@
 const svg = document.querySelector('svg');
 const neighborhoods = document.querySelectorAll('svg g');
 const content = document.getElementById('neighborhood-content');
+const mapImage = document.querySelector('.map-wrapper img');
 const originalViewBox = svg.getAttribute('viewBox');
 
 neighborhoods.forEach(nb => {
-  nb.classList.add('neighborhood');
-
   nb.addEventListener('click', (e) => {
-    e.stopPropagation(); // prevent document click from firing
+    e.stopPropagation(); // so document click doesn't fire
 
+    // Remove active from all
     neighborhoods.forEach(n => n.classList.remove('active'));
     nb.classList.add('active');
 
+    // Zoom into neighborhood
     const bbox = nb.getBBox();
     const padding = 50;
     svg.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding*2} ${bbox.height + padding*2}`);
 
+    // Optional: slightly scale the image to match zoom
+    mapImage.style.transform = `scale(${Math.max(bbox.width / svg.clientWidth, bbox.height / svg.clientHeight) + 0.1})`;
+
+    // Update neighborhood content
     const name = nb.getAttribute('data-name') || nb.id;
     content.innerHTML = `<h2>${name.charAt(0).toUpperCase() + name.slice(1)}</h2>
                          <p>More info about ${name.charAt(0).toUpperCase() + name.slice(1)}...</p>`;
   });
 });
 
+// Reset zoom/content when clicking outside of neighborhoods
 document.addEventListener('click', (e) => {
+  // Only reset if the click is outside both the SVG neighborhoods and the content box
   if (!e.target.closest('.neighborhood') && !e.target.closest('#neighborhood-content')) {
     neighborhoods.forEach(nb => nb.classList.remove('active'));
     svg.setAttribute('viewBox', originalViewBox);
+    mapImage.style.transform = 'scale(1)'; // reset image zoom
     content.innerHTML = `<h2>İstanbul</h2><p>Click a neighborhood.</p>`;
   }
 });
 </script>
+
 
 </body>
 </html>
