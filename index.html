@@ -158,19 +158,7 @@
       pointer-events: auto; /* Re-enable clicks after login */
     }
 
-    /* Dateline bar */
-    .dateline-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 5px 32px;
-      border-bottom: 1px solid var(--ink);
-      font-size: 0.72rem;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--muted);
-      background: var(--paper);
-    }
+    /* Dateline bar - REMOVED */
 
     /* Header */
     header {
@@ -206,32 +194,11 @@
     }
     nav a:hover { color: var(--accent); }
 
-    .user-controls {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      font-size: 0.78rem;
-      color: var(--muted);
-    }
-
-    #logout-btn {
-      background: none;
-      border: 1px solid var(--muted);
-      padding: 4px 10px;
-      font-family: 'Tinos', serif;
-      font-size: 0.75rem;
-      cursor: pointer;
-      color: var(--muted);
-      letter-spacing: 1px;
-      transition: all 0.2s;
-    }
-    #logout-btn:hover { border-color: var(--accent); color: var(--accent); }
-
     /* Section rule */
     .section-rule {
       display: flex;
       align-items: center;
-      gap: 10px;
+      justify-content: space-between;
       padding: 7px 32px;
       border-bottom: 1px solid var(--ink);
       font-size: 0.7rem;
@@ -240,11 +207,12 @@
       text-transform: uppercase;
       background: var(--paper-dark);
     }
-    .section-rule::before, .section-rule::after {
-      content: '';
+    
+    .section-rule .divider {
       flex: 1;
       height: 1px;
       background: var(--ink);
+      margin: 0 15px;
     }
 
     /* Main layout */
@@ -442,27 +410,22 @@
 <!-- ══════════════ MAIN SITE ══════════════ -->
 <div id="main-site">
 
-  <div class="dateline-bar">
-    <span id="today-date"></span>
-    <span>Istanbul, Turkey</span>
-    <span id="user-email-display"></span>
-  </div>
-
   <header>
     <nav>
       <a href="kahvehane.html">Kahvehane</a>
     </nav>
     <div class="masthead">istanbulite.net</div>
-    <div class="user-controls">
-      <nav>
-        <a href="kutuphane.html">Kütüphane</a>
-        <a href="hane.html">Hane</a>
-      </nav>
-      <button id="logout-btn">Sign Out</button>
-    </div>
+    <nav>
+      <a href="kutuphane.html">Kütüphane</a>
+      <a href="hane.html">Hane</a>
+    </nav>
   </header>
 
-  <div class="section-rule">Click a Neighborhood on the Map</div>
+  <div class="section-rule">
+    <span id="current-date"></span>
+    <div class="divider"></div>
+    <span id="istanbul-time"></span>
+  </div>
 
   <main>
     <!-- Left Sidebar -->
@@ -557,9 +520,26 @@ const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ── Date ──
-document.getElementById('today-date').textContent =
-  new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+// ── Date and Time ──
+function updateDateTime() {
+  const now = new Date();
+  
+  // Full date
+  document.getElementById('current-date').textContent = 
+    now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  
+  // Istanbul time
+  const istanbulTime = now.toLocaleTimeString('en-US', { 
+    timeZone: 'Europe/Istanbul',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true 
+  });
+  document.getElementById('istanbul-time').textContent = `Istanbul ${istanbulTime}`;
+}
+
+updateDateTime();
+setInterval(updateDateTime, 60000); // Update every minute
 
 // ── Auth State ──
 let isSignUp = false;
@@ -572,7 +552,6 @@ async function checkSession() {
 function showSite(user) {
   document.getElementById('login-overlay').style.display = 'none';
   document.getElementById('main-site').classList.add('active');
-  document.getElementById('user-email-display').textContent = user.email;
 }
 
 // ── Login / Register ──
@@ -620,13 +599,6 @@ document.getElementById('auth-submit-btn').addEventListener('click', async () =>
   document.getElementById(id).addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('auth-submit-btn').click();
   });
-});
-
-// ── Logout ──
-document.getElementById('logout-btn').addEventListener('click', async () => {
-  await sb.auth.signOut();
-  document.getElementById('login-overlay').style.display = 'flex';
-  document.getElementById('main-site').classList.remove('active');
 });
 
 // ── Map Interactions ──
