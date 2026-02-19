@@ -1,1 +1,706 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kahvehane — istanbulite.net</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --ink: #1a1a18;
+      --paper: #f5f0e8;
+      --paper-dark: #ede8d8;
+      --accent: #8b0000;
+      --muted: #6b6b60;
+      --success: #2a6a2a;
+      --col-border: 1px solid #2a2a28;
+    }
 
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: 'Tinos', Georgia, serif;
+      background-color: var(--paper);
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      position: relative;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 28px 32px 24px;
+      background: var(--paper);
+      border-bottom: 4px double var(--ink);
+    }
+
+    .masthead {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'UnifrakturMaguntia', cursive;
+      font-size: 3.2rem;
+      color: var(--ink);
+      white-space: nowrap;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    
+    .masthead:hover { color: var(--accent); }
+
+    nav { 
+      display: flex; 
+      gap: 22px;
+      position: relative;
+      z-index: 11;
+    }
+    nav a {
+      text-decoration: none;
+      color: var(--ink);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--accent); }
+
+    /* Section title */
+    .page-title {
+      padding: 12px 32px;
+      border-bottom: 1px solid var(--ink);
+      background: var(--paper-dark);
+      text-align: center;
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    /* Main layout */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 0;
+      overflow: hidden;
+    }
+
+    .games-section {
+      padding: 24px;
+      border-right: var(--col-border);
+      overflow-y: auto;
+    }
+
+    .discussion-section {
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Game card */
+    .game-card {
+      background: white;
+      border: 2px solid var(--ink);
+      padding: 24px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .game-card::before {
+      content: '';
+      position: absolute;
+      inset: 5px;
+      border: 1px solid var(--ink);
+      pointer-events: none;
+    }
+
+    .game-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+
+    .game-subtitle {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 20px;
+      font-style: italic;
+    }
+
+    /* Kelime Oyunu (Word Game) */
+    .word-grid {
+      display: grid;
+      grid-template-rows: repeat(6, 1fr);
+      gap: 6px;
+      margin-bottom: 20px;
+    }
+
+    .word-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+
+    .letter-box {
+      aspect-ratio: 1;
+      border: 2px solid #ccc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: white;
+      transition: all 0.2s;
+    }
+
+    .letter-box.filled { border-color: var(--ink); }
+    .letter-box.correct { background: #6aaa64; border-color: #6aaa64; color: white; }
+    .letter-box.present { background: #c9b458; border-color: #c9b458; color: white; }
+    .letter-box.absent { background: #787c7e; border-color: #787c7e; color: white; }
+
+    .keyboard {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .keyboard-row {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+    }
+
+    .key {
+      padding: 12px;
+      min-width: 40px;
+      background: #d3d6da;
+      border: none;
+      border-radius: 4px;
+      font-family: 'Tinos', serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: background 0.2s;
+    }
+
+    .key:hover { background: #bbb; }
+    .key.wide { min-width: 65px; font-size: 0.75rem; }
+    .key.correct { background: #6aaa64; color: white; }
+    .key.present { background: #c9b458; color: white; }
+    .key.absent { background: #787c7e; color: white; }
+
+    .game-message {
+      text-align: center;
+      margin-top: 12px;
+      font-size: 0.95rem;
+      min-height: 24px;
+      font-weight: 700;
+    }
+    .game-message.win { color: var(--success); }
+    .game-message.lose { color: var(--accent); }
+
+    /* Discussion */
+    .discussion-header {
+      margin-bottom: 18px;
+    }
+
+    .discussion-header h2 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+
+    .discussion-header p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .neighborhood-selector {
+      margin-bottom: 18px;
+    }
+
+    .neighborhood-selector label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .neighborhood-selector select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #bbb;
+      background: white;
+      font-family: 'Tinos', serif;
+      font-size: 0.92rem;
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    .submit-form {
+      background: var(--paper-dark);
+      border: 1px solid var(--ink);
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .submit-form h3 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .submit-form textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 10px;
+      border: 1px solid #bbb;
+      background: white;
+      font-family: 'Tinos', serif;
+      font-size: 0.9rem;
+      resize: vertical;
+      margin-bottom: 10px;
+    }
+
+    .submit-form button {
+      width: 100%;
+      padding: 10px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Tinos', serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .submit-form button:hover { background: var(--accent); }
+
+    .submit-status {
+      font-size: 0.8rem;
+      text-align: center;
+      margin-top: 8px;
+      min-height: 18px;
+      font-style: italic;
+    }
+    .submit-status.ok { color: var(--success); }
+    .submit-status.err { color: var(--accent); }
+
+    .discussion-posts {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .post {
+      background: white;
+      border: 1px solid #ccc;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .post-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .post-neighborhood {
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent);
+    }
+
+    .post-content {
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      font-style: italic;
+      color: var(--muted);
+    }
+
+    footer {
+      text-align: center;
+      padding: 14px;
+      background: var(--paper-dark);
+      border-top: 2px solid var(--ink);
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--muted);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <header>
+    <nav>
+      <a href="index.html">Ana Sayfa</a>
+      <a href="kahvehane.html">Kahvehane</a>
+    </nav>
+    <a href="index.html" style="text-decoration:none;">
+      <div class="masthead">istanbulite.net</div>
+    </a>
+    <nav>
+      <a href="kutuphane.html">Kütüphane</a>
+      <a href="hane.html">Hane</a>
+    </nav>
+  </header>
+
+  <div class="page-title">Kahvehane</div>
+
+  <main>
+    <!-- Games Section -->
+    <section class="games-section">
+      <div class="game-card">
+        <div class="game-title">Kelime Oyunu</div>
+        <div class="game-subtitle">Günün 5 harfli kelimesini 6 denemede bul</div>
+        
+        <div class="word-grid" id="word-grid"></div>
+        
+        <div class="keyboard" id="keyboard"></div>
+        
+        <div class="game-message" id="game-message"></div>
+      </div>
+    </section>
+
+    <!-- Discussion Section -->
+    <section class="discussion-section">
+      <div class="discussion-header">
+        <h2>Mahalle Sohbeti</h2>
+        <p>Mahallenizi seçin ve konuşmaya başlayın. Gönderileriniz onaydan sonra görünür.</p>
+      </div>
+
+      <div class="neighborhood-selector">
+        <label>Mahalle Seç</label>
+        <select id="neighborhood-select">
+          <option value="">— Bir mahalle seçin —</option>
+          <option value="bakirkoy">Bakırköy</option>
+          <option value="bayrampasa">Bayrampaşa</option>
+          <option value="bahcelievler">Bahçelievler</option>
+          <option value="sisli">Şişli</option>
+          <option value="eyupsultan">Eyüpsultan</option>
+          <option value="gop">Gaziosmanpaşa</option>
+          <option value="esenler">Esenler</option>
+          <option value="bagcilar">Bağcılar</option>
+          <option value="basaksehir">Başakşehir</option>
+          <option value="kucukcekmece">Küçükçekmece</option>
+          <option value="sultangazi">Sultangazi</option>
+          <option value="uskudar">Üsküdar</option>
+          <option value="kadikoy">Kadıköy</option>
+          <option value="maltepe">Maltepe</option>
+          <option value="umraniye">Ümraniye</option>
+          <option value="cekmekoy">Çekmeköy</option>
+          <option value="beykoz">Beykoz</option>
+          <option value="sariyer">Sarıyer</option>
+          <option value="besiktas">Beşiktaş</option>
+          <option value="beyoglu">Beyoğlu</option>
+          <option value="gungoren">Güngören</option>
+          <option value="kagithane">Kağıthane</option>
+          <option value="atasehir">Ataşehir</option>
+          <option value="zeytinburnu">Zeytinburnu</option>
+          <option value="fatih">Fatih</option>
+        </select>
+      </div>
+
+      <div class="submit-form" id="submit-form" style="display:none;">
+        <h3>Mesaj Gönder</h3>
+        <textarea id="post-content" placeholder="Ne söylemek istersiniz?"></textarea>
+        <button id="submit-btn">Gönder</button>
+        <div class="submit-status" id="submit-status"></div>
+      </div>
+
+      <div class="discussion-posts" id="discussion-posts">
+        <div class="empty-state">Bir mahalle seçin</div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    &copy; 2026 ISTANBULITE
+  </footer>
+
+<script>
+// ══════════════════════════════════════════
+// CONFIGURATION
+// ══════════════════════════════════════════
+const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ══════════════════════════════════════════
+// WORD GAME (Turkish Wordle)
+// ══════════════════════════════════════════
+const WORD_LIST = ['KOLAY', 'SOKAK', 'HABER', 'KÖŞEK', 'ŞEHIR', 'PASTA', 'GÜZEL', 'KITAP', 'YEMEK', 'DÜNYA'];
+const TARGET_WORD = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
+let currentRow = 0;
+let currentGuess = '';
+let gameOver = false;
+const keyStates = {};
+
+// Turkish keyboard layout
+const KEYBOARD_LAYOUT = [
+  ['E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Ğ', 'Ü'],
+  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ş', 'İ'],
+  ['ENTER', 'Z', 'C', 'V', 'B', 'N', 'M', 'Ö', 'Ç', '←']
+];
+
+function initWordGrid() {
+  const grid = document.getElementById('word-grid');
+  for (let i = 0; i < 6; i++) {
+    const row = document.createElement('div');
+    row.className = 'word-row';
+    for (let j = 0; j < 5; j++) {
+      const box = document.createElement('div');
+      box.className = 'letter-box';
+      box.id = `box-${i}-${j}`;
+      row.appendChild(box);
+    }
+    grid.appendChild(row);
+  }
+}
+
+function initKeyboard() {
+  const keyboard = document.getElementById('keyboard');
+  KEYBOARD_LAYOUT.forEach(row => {
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'keyboard-row';
+    row.forEach(key => {
+      const btn = document.createElement('button');
+      btn.className = 'key' + (key.length > 1 ? ' wide' : '');
+      btn.textContent = key;
+      btn.onclick = () => handleKey(key);
+      btn.id = `key-${key}`;
+      rowDiv.appendChild(btn);
+    });
+    keyboard.appendChild(rowDiv);
+  });
+}
+
+function handleKey(key) {
+  if (gameOver) return;
+  
+  if (key === '←') {
+    if (currentGuess.length > 0) {
+      currentGuess = currentGuess.slice(0, -1);
+      updateDisplay();
+    }
+  } else if (key === 'ENTER') {
+    if (currentGuess.length === 5) {
+      submitGuess();
+    }
+  } else if (currentGuess.length < 5) {
+    currentGuess += key;
+    updateDisplay();
+  }
+}
+
+function updateDisplay() {
+  for (let i = 0; i < 5; i++) {
+    const box = document.getElementById(`box-${currentRow}-${i}`);
+    box.textContent = currentGuess[i] || '';
+    box.className = 'letter-box' + (currentGuess[i] ? ' filled' : '');
+  }
+}
+
+function submitGuess() {
+  const result = checkWord(currentGuess);
+  
+  for (let i = 0; i < 5; i++) {
+    const box = document.getElementById(`box-${currentRow}-${i}`);
+    const letter = currentGuess[i];
+    box.className = `letter-box filled ${result[i]}`;
+    
+    // Update keyboard
+    const keyBtn = document.getElementById(`key-${letter}`);
+    if (keyBtn) {
+      const currentState = keyStates[letter] || '';
+      if (result[i] === 'correct' || currentState !== 'correct') {
+        keyStates[letter] = result[i];
+        keyBtn.className = `key ${result[i]}`;
+      }
+    }
+  }
+  
+  if (currentGuess === TARGET_WORD) {
+    document.getElementById('game-message').textContent = '🎉 Tebrikler!';
+    document.getElementById('game-message').className = 'game-message win';
+    gameOver = true;
+  } else if (currentRow === 5) {
+    document.getElementById('game-message').textContent = `Kelime: ${TARGET_WORD}`;
+    document.getElementById('game-message').className = 'game-message lose';
+    gameOver = true;
+  } else {
+    currentRow++;
+    currentGuess = '';
+  }
+}
+
+function checkWord(guess) {
+  const result = Array(5).fill('absent');
+  const targetLetters = TARGET_WORD.split('');
+  const guessLetters = guess.split('');
+  
+  // Mark correct positions
+  guessLetters.forEach((letter, i) => {
+    if (letter === targetLetters[i]) {
+      result[i] = 'correct';
+      targetLetters[i] = null;
+    }
+  });
+  
+  // Mark present letters
+  guessLetters.forEach((letter, i) => {
+    if (result[i] === 'absent' && targetLetters.includes(letter)) {
+      result[i] = 'present';
+      targetLetters[targetLetters.indexOf(letter)] = null;
+    }
+  });
+  
+  return result;
+}
+
+// ══════════════════════════════════════════
+// DISCUSSIONS
+// ══════════════════════════════════════════
+const neighborhoodNames = {
+  bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler',
+  sisli:'Şişli', eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa',
+  esenler:'Esenler', bagcilar:'Bağcılar', basaksehir:'Başakşehir',
+  kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi', uskudar:'Üsküdar',
+  kadikoy:'Kadıköy', maltepe:'Maltepe', umraniye:'Ümraniye',
+  cekmekoy:'Çekmeköy', beykoz:'Beykoz', sariyer:'Sarıyer',
+  besiktas:'Beşiktaş', beyoglu:'Beyoğlu', gungoren:'Güngören',
+  kagithane:'Kağıthane', atasehir:'Ataşehir', zeytinburnu:'Zeytinburnu', fatih:'Fatih'
+};
+
+let selectedNeighborhood = '';
+
+document.getElementById('neighborhood-select').addEventListener('change', (e) => {
+  selectedNeighborhood = e.target.value;
+  if (selectedNeighborhood) {
+    document.getElementById('submit-form').style.display = 'block';
+    loadPosts();
+  } else {
+    document.getElementById('submit-form').style.display = 'none';
+    document.getElementById('discussion-posts').innerHTML = '<div class="empty-state">Bir mahalle seçin</div>';
+  }
+});
+
+async function loadPosts() {
+  const postsEl = document.getElementById('discussion-posts');
+  postsEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  
+  const { data, error } = await sb
+    .from('discussions')
+    .select('*')
+    .eq('neighborhood', selectedNeighborhood)
+    .eq('approved', true)
+    .order('created_at', { ascending: false });
+  
+  if (error || !data || data.length === 0) {
+    postsEl.innerHTML = '<div class="empty-state">Henüz mesaj yok. İlk yazan siz olun!</div>';
+    return;
+  }
+  
+  postsEl.innerHTML = data.map(post => `
+    <div class="post">
+      <div class="post-meta">
+        <span class="post-neighborhood">${neighborhoodNames[post.neighborhood]}</span>
+        <span>${new Date(post.created_at).toLocaleDateString('tr-TR')}</span>
+      </div>
+      <div class="post-content">${post.content}</div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('submit-btn').addEventListener('click', async () => {
+  const content = document.getElementById('post-content').value.trim();
+  const statusEl = document.getElementById('submit-status');
+  
+  if (!content) {
+    statusEl.textContent = 'Lütfen bir mesaj yazın';
+    statusEl.className = 'submit-status err';
+    return;
+  }
+  
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    statusEl.textContent = 'Mesaj göndermek için giriş yapın';
+    statusEl.className = 'submit-status err';
+    return;
+  }
+  
+  document.getElementById('submit-btn').disabled = true;
+  
+  const { error } = await sb.from('discussions').insert([{
+    neighborhood: selectedNeighborhood,
+    content: content,
+    user_id: user.id,
+    approved: false
+  }]);
+  
+  document.getElementById('submit-btn').disabled = false;
+  
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'submit-status err';
+  } else {
+    statusEl.textContent = 'Mesajınız onay bekliyor!';
+    statusEl.className = 'submit-status ok';
+    document.getElementById('post-content').value = '';
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+  }
+});
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+initWordGrid();
+initKeyboard();
+</script>
+</body>
+</html>
