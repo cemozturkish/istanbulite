@@ -21,11 +21,18 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html, body {
+      height: 100%;
+      overflow: hidden; /* No scrolling */
+    }
+
     body {
       font-family: 'Tinos', Georgia, serif;
       background-color: var(--paper);
       color: var(--ink);
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
 
     /* ── LOGIN OVERLAY ── */
@@ -247,6 +254,8 @@
       gap: 0;
       padding: 0;
       border-bottom: 2px solid var(--ink);
+      flex: 1; /* Fill remaining vertical space */
+      overflow: hidden; /* No scrolling inside */
     }
 
     .sidebar {
@@ -255,6 +264,7 @@
       display: flex;
       flex-direction: column;
       gap: 0;
+      overflow-y: auto; /* Allow sidebar content to scroll if needed */
     }
 
     .sidebar:last-child { border-right: none; border-left: var(--col-border); }
@@ -294,6 +304,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      overflow: hidden; /* No scrolling */
     }
 
     .map-section h2 {
@@ -303,17 +314,24 @@
       text-transform: uppercase;
       margin-bottom: 10px;
       color: var(--muted);
+      flex-shrink: 0;
     }
 
     .map-wrapper {
       position: relative;
       width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0; /* Important for flex children */
     }
 
     svg {
       width: 100%;
       height: auto;
       display: block;
+      flex-shrink: 0;
+      max-height: 60%; /* Keep map from taking too much space */
     }
 
     .neighborhood {
@@ -334,7 +352,10 @@
       border: 1px solid var(--ink);
       background: var(--paper-dark);
       min-height: 90px;
+      max-height: 200px;
       padding: 14px 16px;
+      overflow-y: auto;
+      flex-shrink: 0;
     }
 
     #neighborhood-panel h2 {
@@ -611,7 +632,6 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
 // ── Map Interactions ──
 const svg = document.querySelector('svg');
 const neighborhoods = document.querySelectorAll('.neighborhood');
-const originalViewBox = svg.getAttribute('viewBox');
 
 neighborhoods.forEach(nb => {
   nb.addEventListener('click', async (e) => {
@@ -619,10 +639,7 @@ neighborhoods.forEach(nb => {
     neighborhoods.forEach(n => n.classList.remove('active'));
     nb.classList.add('active');
 
-    // Zoom
-    const bbox = nb.getBBox();
-    const pad = 80;
-    svg.setAttribute('viewBox', `${bbox.x - pad} ${bbox.y - pad} ${bbox.width + pad*2} ${bbox.height + pad*2}`);
+    // No zoom - map stays at original size
 
     const name = nb.getAttribute('data-name') || nb.id;
     document.getElementById('nb-title').textContent = name;
@@ -654,7 +671,7 @@ neighborhoods.forEach(nb => {
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.neighborhood') && !e.target.closest('#neighborhood-panel')) {
     neighborhoods.forEach(nb => nb.classList.remove('active'));
-    svg.setAttribute('viewBox', originalViewBox);
+    // No zoom reset - map stays at original size
     document.getElementById('nb-title').textContent = 'Istanbul';
     document.getElementById('nb-prompt').style.display = 'block';
     document.getElementById('nb-articles-list').innerHTML = '';
