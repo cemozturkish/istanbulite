@@ -1,66 +1,637 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
   <meta charset="UTF-8">
-  <title>KÜTÜPHANE - ISTANBULITE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kütüphane — istanbulite.net</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
+    :root {
+      --ink: #1a1a18;
+      --paper: #f5f0e8;
+      --paper-dark: #ede8d8;
+      --accent: #8b0000;
+      --muted: #6b6b60;
+      --success: #2a6a2a;
+      --star: #f4a261;
+      --col-border: 1px solid #2a2a28;
     }
 
-    nav {
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: 'Tinos', Georgia, serif;
+      background-color: var(--paper);
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      position: relative;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background-color: #222;
-      color: white;
-      padding: 10px 20px;
+      padding: 28px 32px 24px;
+      background: var(--paper);
+      border-bottom: 4px double var(--ink);
     }
 
+    .masthead {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'UnifrakturMaguntia', cursive;
+      font-size: 3.2rem;
+      color: var(--ink);
+      white-space: nowrap;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    
+    .masthead:hover { color: var(--accent); }
+
+    nav { 
+      display: flex; 
+      gap: 22px;
+      position: relative;
+      z-index: 11;
+    }
     nav a {
-      color: white;
       text-decoration: none;
-      margin: 0 10px;
-      font-weight: bold;
+      color: var(--ink);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: color 0.2s;
     }
+    nav a:hover { color: var(--accent); }
 
-    nav .logo {
-      font-size: 24px;
+    /* Page title */
+    .page-title {
+      padding: 12px 32px;
+      border-bottom: 1px solid var(--ink);
+      background: var(--paper-dark);
       text-align: center;
-      flex-grow: 1;
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 2px;
     }
 
-    .article-full {
-      margin: 20px;
-      padding: 20px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
+    /* Main layout */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1.5fr;
+      gap: 0;
+      overflow: hidden;
     }
+
+    .articles-list {
+      padding: 24px;
+      border-right: var(--col-border);
+      overflow-y: auto;
+    }
+
+    .article-detail {
+      padding: 24px;
+      overflow-y: auto;
+    }
+
+    /* Article card */
+    .article-card {
+      background: white;
+      border: 1px solid #ccc;
+      padding: 16px;
+      margin-bottom: 14px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .article-card:hover { border-color: var(--accent); }
+    .article-card.active { border: 2px solid var(--accent); padding: 15px; }
+
+    .article-category {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+
+    .article-card h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+
+    .article-card .meta {
+      display: flex;
+      gap: 12px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .article-rating {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .star {
+      color: var(--star);
+      font-size: 1rem;
+    }
+
+    /* Article detail view */
+    .detail-header {
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid var(--ink);
+    }
+
+    .detail-category {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .detail-title {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 12px;
+    }
+
+    .detail-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .detail-body {
+      font-size: 1.05rem;
+      line-height: 1.7;
+      margin-bottom: 30px;
+    }
+
+    .detail-body p {
+      margin-bottom: 16px;
+    }
+
+    /* Rating section */
+    .rating-section {
+      background: var(--paper-dark);
+      border: 1px solid var(--ink);
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+
+    .rating-section h3 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .rating-display {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .rating-avg {
+      font-size: 2.5rem;
+      font-weight: 700;
+    }
+
+    .rating-stars {
+      display: flex;
+      gap: 4px;
+    }
+
+    .rating-count {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .rate-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .rate-btn {
+      padding: 8px 16px;
+      background: white;
+      border: 1px solid var(--ink);
+      font-family: 'Tinos', serif;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .rate-btn:hover { background: var(--star); color: white; border-color: var(--star); }
+
+    .rate-status {
+      margin-top: 10px;
+      font-size: 0.8rem;
+      text-align: center;
+      min-height: 18px;
+      font-style: italic;
+    }
+
+    /* Comments section */
+    .comments-section {
+      border-top: 2px solid var(--ink);
+      padding-top: 20px;
+    }
+
+    .comments-section h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .comment-form {
+      background: var(--paper-dark);
+      border: 1px solid var(--ink);
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .comment-form textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 10px;
+      border: 1px solid #bbb;
+      background: white;
+      font-family: 'Tinos', serif;
+      font-size: 0.9rem;
+      resize: vertical;
+      margin-bottom: 10px;
+    }
+
+    .comment-form button {
+      width: 100%;
+      padding: 10px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Tinos', serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .comment-form button:hover { background: var(--accent); }
+
+    .comment-status {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      text-align: center;
+      min-height: 18px;
+      font-style: italic;
+    }
+    .comment-status.ok { color: var(--success); }
+    .comment-status.err { color: var(--accent); }
+
+    .comments-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .comment {
+      background: white;
+      border: 1px solid #ccc;
+      padding: 14px;
+    }
+
+    .comment-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .comment-author {
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .comment-body {
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 30px;
+      font-style: italic;
+      color: var(--muted);
+      font-size: 1.1rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 14px;
+      background: var(--paper-dark);
+      border-top: 2px solid var(--ink);
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--muted);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
 
-<nav>
-  <a href="kahvehane.html">KAHVEHANE</a>
-  <div class="logo"><a href="index.html">ISTANBULITE</a></div>
-  <div>
-    <a href="kutuphane.html">KÜTÜPHANE</a>
-    <a href="hane.html">HANE</a>
-  </div>
-</nav>
+  <header>
+    <nav>
+      <a href="index.html">Ana Sayfa</a>
+      <a href="kahvehane.html">Kahvehane</a>
+    </nav>
+    <a href="index.html" style="text-decoration:none;">
+      <div class="masthead">istanbulite.net</div>
+    </a>
+    <nav>
+      <a href="kutuphane.html">Kütüphane</a>
+      <a href="hane.html">Hane</a>
+    </nav>
+  </header>
 
-<!-- Full article -->
-<div class="article-full" id="article1">
-  <h2>İstanbul’u depreme hazırlayacak üç isim cezaevinde tutuluyor</h2>
-  <p><em>Vesaire, 23/04/2025</em></p>
-  <p>Bugün İstanbul’da meydana gelen deprem, kentin depreme ne kadar hazırlıklı olduğu sorusunu tekrar gündeme getirdi. Devlet kurumlarının belediyelerle eşgüdüm halinde deprem önlemleri alması gerekiyor, İBB’de konunun uzmanı olan isimler ise cezaevinde tutuluyor.</p>
-  <p>Silivri açıklarında deprem</p>
-  <p>İstanbul’da çevre kentlerde de hissedilen şiddetli bir deprem meydana geldi. Merkez üssü Silivri açıkları olan depremin büyüklüğü 6,2 olarak ölçüldü. İlgili birimlere herhangi bir yıkım ihbarı gelmezken, İstanbul Valiliği yüksekten atlama nedeniyle İstanbul’da 151 kişinin yaralandığını bildirdi. Üniversitelerde ve okullarda eğitime iki gün ara verildi.</p>
-  <p>Silivri Cezaevi’nde tutuklu bulunan Ekrem İmamoğlu, “İstanbul Deprem Konseyi önerimiz mutlaka hayata geçirilmeli” dedi ve Kanal İstanbul tehdidine dikkat çekti.</p>
-  <p>...</p>
-</div>
+  <div class="page-title">Kütüphane</div>
 
+  <main>
+    <!-- Articles List -->
+    <section class="articles-list" id="articles-list">
+      <div class="empty-state"><span class="spinner"></span> Makaleler yükleniyor...</div>
+    </section>
+
+    <!-- Article Detail -->
+    <section class="article-detail" id="article-detail">
+      <div class="empty-state">Okumak için bir makale seçin</div>
+    </section>
+  </main>
+
+  <footer>
+    &copy; 2026 ISTANBULITE
+  </footer>
+
+<script>
+// ══════════════════════════════════════════
+// CONFIGURATION
+// ══════════════════════════════════════════
+const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentArticleId = null;
+
+// ══════════════════════════════════════════
+// LOAD ARTICLES
+// ══════════════════════════════════════════
+async function loadArticles() {
+  const listEl = document.getElementById('articles-list');
+  
+  const { data, error } = await sb
+    .from('library_articles')
+    .select('*')
+    .order('created_at', { ascending: false });
+  
+  if (error || !data || data.length === 0) {
+    listEl.innerHTML = '<div class="empty-state">Henüz makale eklenmedi</div>';
+    return;
+  }
+  
+  listEl.innerHTML = data.map(article => `
+    <div class="article-card" onclick="loadArticleDetail('${article.id}')">
+      <div class="article-category">${article.category || 'GENEL'}</div>
+      <h3>${article.title}</h3>
+      <div class="meta">
+        <div class="article-rating">
+          <span class="star">★</span>
+          <span>${article.avg_rating ? article.avg_rating.toFixed(1) : 'N/A'}</span>
+        </div>
+        <span>${new Date(article.created_at).toLocaleDateString('tr-TR')}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════════
+// LOAD ARTICLE DETAIL
+// ══════════════════════════════════════════
+async function loadArticleDetail(articleId) {
+  currentArticleId = articleId;
+  const detailEl = document.getElementById('article-detail');
+  detailEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  
+  // Highlight selected card
+  document.querySelectorAll('.article-card').forEach(card => card.classList.remove('active'));
+  event.target.closest('.article-card').classList.add('active');
+  
+  const { data: article, error } = await sb
+    .from('library_articles')
+    .select('*')
+    .eq('id', articleId)
+    .single();
+  
+  if (error || !article) {
+    detailEl.innerHTML = '<div class="empty-state">Makale yüklenemedi</div>';
+    return;
+  }
+  
+  // Load ratings
+  const { data: ratings } = await sb
+    .from('article_ratings')
+    .select('rating')
+    .eq('article_id', articleId);
+  
+  const avgRating = ratings && ratings.length > 0 
+    ? (ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length).toFixed(1)
+    : 'N/A';
+  const ratingCount = ratings ? ratings.length : 0;
+  
+  // Load comments
+  const { data: comments } = await sb
+    .from('article_comments')
+    .select('*')
+    .eq('article_id', articleId)
+    .eq('approved', true)
+    .order('created_at', { ascending: false });
+  
+  detailEl.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-category">${article.category || 'GENEL'}</div>
+      <h1 class="detail-title">${article.title}</h1>
+      <div class="detail-meta">
+        <span>${new Date(article.created_at).toLocaleDateString('tr-TR', {year:'numeric',month:'long',day:'numeric'})}</span>
+        ${article.author ? `<span>Yazar: ${article.author}</span>` : ''}
+      </div>
+    </div>
+    
+    <div class="detail-body">
+      ${article.content.split('\n').map(p => `<p>${p}</p>`).join('')}
+    </div>
+    
+    <div class="rating-section">
+      <h3>Makaleyi Değerlendir</h3>
+      <div class="rating-display">
+        <div class="rating-avg">${avgRating}</div>
+        <div>
+          <div class="rating-stars">
+            ${[1,2,3,4,5].map(n => `<span class="star">${n <= Math.round(avgRating) ? '★' : '☆'}</span>`).join('')}
+          </div>
+          <div class="rating-count">${ratingCount} değerlendirme</div>
+        </div>
+      </div>
+      <div class="rate-buttons">
+        ${[1,2,3,4,5].map(n => `<button class="rate-btn" onclick="rateArticle(${n})">★ ${n}</button>`).join('')}
+      </div>
+      <div class="rate-status" id="rate-status"></div>
+    </div>
+    
+    <div class="comments-section">
+      <h3>Yorumlar (${comments ? comments.length : 0})</h3>
+      
+      <div class="comment-form">
+        <textarea id="comment-text" placeholder="Yorumunuzu yazın..."></textarea>
+        <button onclick="submitComment()">Yorum Gönder</button>
+        <div class="comment-status" id="comment-status"></div>
+      </div>
+      
+      <div class="comments-list">
+        ${comments && comments.length > 0 ? comments.map(c => `
+          <div class="comment">
+            <div class="comment-header">
+              <span class="comment-author">Anonim</span>
+              <span>${new Date(c.created_at).toLocaleDateString('tr-TR')}</span>
+            </div>
+            <div class="comment-body">${c.content}</div>
+          </div>
+        `).join('') : '<div class="empty-state" style="padding:20px;">Henüz yorum yok</div>'}
+      </div>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════
+// RATE ARTICLE
+// ══════════════════════════════════════════
+async function rateArticle(rating) {
+  const statusEl = document.getElementById('rate-status');
+  
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    statusEl.textContent = 'Değerlendirme yapmak için giriş yapın';
+    statusEl.style.color = 'var(--accent)';
+    return;
+  }
+  
+  // Check if user already rated
+  const { data: existing } = await sb
+    .from('article_ratings')
+    .select('*')
+    .eq('article_id', currentArticleId)
+    .eq('user_id', user.id);
+  
+  if (existing && existing.length > 0) {
+    // Update existing rating
+    await sb
+      .from('article_ratings')
+      .update({ rating })
+      .eq('article_id', currentArticleId)
+      .eq('user_id', user.id);
+  } else {
+    // Insert new rating
+    await sb
+      .from('article_ratings')
+      .insert([{ article_id: currentArticleId, user_id: user.id, rating }]);
+  }
+  
+  statusEl.textContent = '✓ Değerlendirmeniz kaydedildi';
+  statusEl.style.color = 'var(--success)';
+  setTimeout(() => { loadArticleDetail(currentArticleId); }, 1000);
+}
+
+// ══════════════════════════════════════════
+// SUBMIT COMMENT
+// ══════════════════════════════════════════
+async function submitComment() {
+  const content = document.getElementById('comment-text').value.trim();
+  const statusEl = document.getElementById('comment-status');
+  
+  if (!content) {
+    statusEl.textContent = 'Lütfen bir yorum yazın';
+    statusEl.className = 'comment-status err';
+    return;
+  }
+  
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    statusEl.textContent = 'Yorum yapmak için giriş yapın';
+    statusEl.className = 'comment-status err';
+    return;
+  }
+  
+  const { error } = await sb
+    .from('article_comments')
+    .insert([{
+      article_id: currentArticleId,
+      user_id: user.id,
+      content: content,
+      approved: false
+    }]);
+  
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'comment-status err';
+  } else {
+    statusEl.textContent = 'Yorumunuz onay bekliyor!';
+    statusEl.className = 'comment-status ok';
+    document.getElementById('comment-text').value = '';
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+  }
+}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+loadArticles();
+</script>
 </body>
 </html>
