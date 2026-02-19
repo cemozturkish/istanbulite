@@ -1,283 +1,661 @@
-    <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
   <meta charset="UTF-8">
-  <title>ISTANBULITE</title>
-  <link rel="stylesheet" href="style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>istanbulite.net</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body {
-      font-family: Georgia, "Times New Roman", Times, serif;
-      margin: 0;
-      padding: 0;
-      background-color: #f9f9f9;
+    :root {
+      --ink: #1a1a18;
+      --paper: #f5f0e8;
+      --paper-dark: #ede8d8;
+      --rule: #2a2a28;
+      --accent: #8b0000;
+      --muted: #6b6b60;
+      --col-border: 1px solid #2a2a28;
     }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Tinos', Georgia, serif;
+      background-color: var(--paper);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    /* ── LOGIN OVERLAY ── */
+    #login-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--paper);
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+    }
+
+    #login-overlay .masthead-login {
+      font-family: 'UnifrakturMaguntia', cursive;
+      font-size: 3.5rem;
+      letter-spacing: 2px;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+
+    #login-overlay .tagline {
+      font-style: italic;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 30px;
+      letter-spacing: 1px;
+    }
+
+    .login-box {
+      border: 2px solid var(--ink);
+      padding: 36px 40px;
+      width: 360px;
+      background: var(--paper);
+      position: relative;
+    }
+
+    .login-box::before {
+      content: '';
+      position: absolute;
+      inset: 4px;
+      border: 1px solid var(--ink);
+      pointer-events: none;
+    }
+
+    .login-box h2 {
+      font-family: 'Tinos', serif;
+      font-size: 1rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      text-align: center;
+      margin-bottom: 24px;
+      padding-bottom: 14px;
+      border-bottom: var(--col-border);
+    }
+
+    .login-box input {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      border: 1px solid var(--ink);
+      background: #faf7f0;
+      font-family: 'Tinos', serif;
+      font-size: 0.95rem;
+      color: var(--ink);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .login-box input:focus {
+      border-color: var(--accent);
+    }
+
+    .login-box button {
+      width: 100%;
+      padding: 11px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Tinos', serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .login-box button:hover { background: var(--accent); }
+
+    .login-box .toggle-mode {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .login-box .toggle-mode span {
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .login-box .error-msg {
+      color: var(--accent);
+      font-size: 0.82rem;
+      text-align: center;
+      margin-bottom: 10px;
+      min-height: 18px;
+      font-style: italic;
+    }
+
+    /* ── MAIN SITE ── */
+    #main-site { display: none; }
+
+    /* Dateline bar */
+    .dateline-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 32px;
+      border-bottom: 1px solid var(--ink);
+      font-size: 0.72rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--paper);
+    }
+
+    /* Header */
     header {
       position: relative;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 20px 40px;
-      background-color: #fff;
-      border-bottom: 2px solid #ccc;
+      padding: 18px 32px 12px;
+      background: var(--paper);
+      border-bottom: 4px double var(--ink);
     }
-    header h1 {
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
-        margin: 0;
-        font-size: 2rem;
-        text-align: center;
-        pointer-events: none;
+
+    .masthead {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'UnifrakturMaguntia', cursive;
+      font-size: 3.2rem;
+      color: var(--ink);
+      white-space: nowrap;
+      pointer-events: none;
     }
-    nav {
-      display: flex;
-      gap: 20px;
-      font-weight: bold;
-      font-size: 1rem;
-    }
+
+    nav { display: flex; gap: 22px; }
     nav a {
       text-decoration: none;
-      color: #333;
+      color: var(--ink);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: color 0.2s;
     }
-    main {
+    nav a:hover { color: var(--accent); }
+
+    .user-controls {
       display: flex;
-      justify-content: center;
-      gap: 20px;
-      padding: 20px 40px;
+      align-items: center;
+      gap: 14px;
+      font-size: 0.78rem;
+      color: var(--muted);
     }
-    section.map-section {
-      flex: 2;
-      text-align: center;
-      background-color: #fff;
-      padding: 20px;
-      border: 1px solid #ccc;
+
+    #logout-btn {
+      background: none;
+      border: 1px solid var(--muted);
+      padding: 4px 10px;
+      font-family: 'Tinos', serif;
+      font-size: 0.75rem;
+      cursor: pointer;
+      color: var(--muted);
+      letter-spacing: 1px;
+      transition: all 0.2s;
     }
-    section.sidebar {
+    #logout-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Section rule */
+    .section-rule {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 32px;
+      border-bottom: 1px solid var(--ink);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      background: var(--paper-dark);
+    }
+    .section-rule::before, .section-rule::after {
+      content: '';
       flex: 1;
+      height: 1px;
+      background: var(--ink);
+    }
+
+    /* Main layout */
+    main {
+      display: grid;
+      grid-template-columns: 1fr 2.2fr 1fr;
+      gap: 0;
+      padding: 0;
+      border-bottom: 2px solid var(--ink);
+    }
+
+    .sidebar {
+      padding: 20px 18px;
+      border-right: var(--col-border);
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 0;
     }
+
+    .sidebar:last-child { border-right: none; border-left: var(--col-border); }
+
     .article {
-      background-color: #fff;
-      padding: 15px;
-      border: 1px solid #ccc;
+      padding: 14px 0;
+      border-bottom: 1px solid #bbb;
     }
+    .article:last-child { border-bottom: none; }
+
+    .article .kicker {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
     .article h3 {
-      margin: 0 0 10px 0;
-      font-size: 1.2rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 6px;
     }
+
     .article p {
-      margin: 0;
-      font-size: 0.95rem;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: #333;
     }
-    footer {
-      text-align: center;
-      padding: 20px;
-      background-color: #fff;
-      border-top: 2px solid #ccc;
-      font-size: 0.9rem;
-      color: #555;
+
+    /* Map section */
+    .map-section {
+      padding: 16px;
+      background: var(--paper);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .map-section h2 {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      color: var(--muted);
     }
 
     .map-wrapper {
       position: relative;
+      width: 100%;
     }
 
     svg {
       width: 100%;
       height: auto;
+      display: block;
     }
 
     .neighborhood {
       cursor: pointer;
+      fill: transparent;
+      stroke: var(--accent);
+      stroke-width: 2;
+      opacity: 0.6;
+      transition: opacity 0.2s;
     }
+
+    .neighborhood:hover { opacity: 1; fill: rgba(139,0,0,0.12); }
+    .neighborhood.active { opacity: 1; fill: rgba(139,0,0,0.2); stroke-width: 3; }
+
+    #neighborhood-panel {
+      width: 100%;
+      margin-top: 14px;
+      border: 1px solid var(--ink);
+      background: var(--paper-dark);
+      min-height: 90px;
+      padding: 14px 16px;
+    }
+
+    #neighborhood-panel h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+
+    .nb-articles { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+
+    .nb-article {
+      border-left: 3px solid var(--accent);
+      padding-left: 10px;
+    }
+
+    .nb-article h4 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .nb-article p {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+
+    .no-articles {
+      font-style: italic;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 16px;
+      background: var(--paper-dark);
+      border-top: 2px solid var(--ink);
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 1px;
+    }
+
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    /* Loading spinner */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--muted);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
-
 <body>
+
+<!-- ══════════════ LOGIN OVERLAY ══════════════ -->
+<div id="login-overlay">
+  <div class="masthead-login">istanbulite.net</div>
+  <div class="tagline">The neighborhood gazette of Istanbul</div>
+
+  <div class="login-box">
+    <h2 id="form-title">Sign In</h2>
+    <div class="error-msg" id="auth-error"></div>
+    <input type="email" id="auth-email" placeholder="Email address" autocomplete="email"/>
+    <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password"/>
+    <button id="auth-submit-btn">Enter</button>
+    <div class="toggle-mode">
+      <span id="toggle-link">Don't have an account? Register</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MAIN SITE ══════════════ -->
+<div id="main-site">
+
+  <div class="dateline-bar">
+    <span id="today-date"></span>
+    <span>Istanbul, Turkey</span>
+    <span id="user-email-display"></span>
+  </div>
+
   <header>
     <nav>
-      <a href="kahvehane.html">KAHVEHANE</a>
+      <a href="kahvehane.html">Kahvehane</a>
     </nav>
-    <h1>istanbulite.net</h1>
-    <nav>
-      <a href="kutuphane.html">KÜTÜPHANE</a>
-      <a href="hane.html">HANE</a>
-    </nav>
+    <div class="masthead">istanbulite.net</div>
+    <div class="user-controls">
+      <nav>
+        <a href="kutuphane.html">Kütüphane</a>
+        <a href="hane.html">Hane</a>
+      </nav>
+      <button id="logout-btn">Sign Out</button>
+    </div>
   </header>
 
+  <div class="section-rule">Click a Neighborhood on the Map</div>
+
   <main>
-    <section class="sidebar">
+    <!-- Left Sidebar -->
+    <section class="sidebar" id="left-sidebar">
       <div class="article">
+        <div class="kicker">World</div>
         <h3>Troop Casualties in Ukraine War Near 2 Million, Study Finds</h3>
         <p>The number of deaths, injuries and missing is approaching a grim milestone after nearly four years of fighting.</p>
       </div>
       <div class="article">
-        <h3>Top Story Left 2</h3>
-        <p>Placeholder for article content.</p>
+        <div class="kicker">Economy</div>
+        <h3>İstanbul'u depreme hazırlayacak üç isim cezaevinde tutuluyor</h3>
+        <p>Kahraman, Akgün, İmamoğlu</p>
       </div>
     </section>
 
-  <section class="map-section">
-<div class="map-wrapper" style="position: relative; width: 100%; max-width: 100%;">
-<!-- SVG Overlay for Clickable Neighborhoods with embedded background -->
-<svg viewBox="0 0 2739.5 2057.29" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background Map Image -->
-  <image href="assets/istanbul-map.png" x="0" y="0" width="2739.5" height="2057.29"/>
+    <!-- Map -->
+    <section class="map-section">
+      <h2>İstanbul Districts — Select to Read Local News</h2>
+      <div class="map-wrapper">
+        <svg viewBox="0 0 2739.5 2057.29" xmlns="http://www.w3.org/2000/svg">
+          <image href="assets/istanbul-map.png" x="0" y="0" width="2739.5" height="2057.29"/>
 
- <!-- Neighborhoods -->
-  <g id="bakirkoy" class="neighborhood">
-    <polyline id="bakirkoy-2" data-name="bakirkoy" points="7.5 1444.08 0 1560.36 187.31 1710.2 368.55 1662.41 424.31 1540.92 609.53 1544.9 720.43 1464.68 749.04 1288.06 253.03 1385.57 211.21 1309.89 115.8 1308 132 1444.08 7.5 1444.08"/>
-  </g>
-  <g id="bayrampasa" class="neighborhood">
-    <polyline id="bayrampasa-2" data-name="bayrampasa" points="614.76 566.04 685.8 754.32 693.43 929.96 769.8 975.78 798.69 1045.19 862.06 1014.89 937.81 1036.88 787.62 685.59 614.76 566.04"/>
-  </g>
-  <g id="bahcelievler" class="neighborhood">
-    <polyline id="bahceliever" points="690.72 1297.51 253.03 1385.57 211.21 1309.89 151.44 1152.48 164.47 1056.56 266.05 1143.1 433.49 1109.24 533.19 1156.27 588.25 1258.11 653.59 1160.03 690.72 1297.51"/>
-  </g>
-  <g id="sisli" class="neighborhood">
-    <g id="sisli-2" data-name="sisli">
-      <polygon points="1218.05 133.39 1250.78 7.53 1627.02 16.82 1627.02 316.77 1476.39 397.25 1367.17 404.8 1345.4 329.81 1258.31 334.65 1178.47 281.42 1200.43 251.69 1185.33 140.94 1218.05 133.39"/>
-      <polyline points="1497.24 518.39 1509.91 620.11 1398.62 591.08 1217.18 799.14 1439.35 952.19 1490.29 703.79 1564.45 720.01 1576.79 608.58 1497.24 518.39"/>
-    </g>
-  </g>
-  <g id="eyupsultan" class="neighborhood">
-    <g id="eyupsultan-2" data-name="eyupsultan">
-      <polyline points="656.88 9.29 1247.69 9.83 1212.18 133.66 1179.4 136.85 1198.07 237.46 1160.73 299.37 1187.59 354.91 1140.7 376.77 1245.41 472.83 1109.61 720.57 1090.02 713.5 1084.88 687.48 1075.92 695.09 1057.58 777.74 1005.04 686.34 890.31 681.33 911.25 275.7 662.84 16.82"/>
-      <polyline points="1056.04 782.23 908.01 795.67 854.08 852.08 937.2 1044.55 956.75 1051.75 1051.01 918.87 1004.5 824.86 1056.04 782.23"/>
-    </g>
-  </g>
-  <g id="gop" class="neighborhood">
-    <polyline id="gop-2" data-name="gop" points="621.04 563.89 682.08 502.85 897.47 461.96 885.37 685.98 997.67 692.89 1043.74 772.36 904.95 794.82 857.15 842.62 787.62 685.59"/>
-  </g>
-  <g id="esenler" class="neighborhood">
-    <polygon id="esenler-2" data-name="esenler" points="780.76 1111.16 718.97 1113.36 702.42 994.19 637.31 1014.06 615.25 962.19 524.76 936.82 480.63 755.85 506.01 652.13 426.56 721.65 354.84 697.37 437.59 369.65 603.11 564.41 685.8 754.32 691.38 937.37 762 974.88 789.59 1043.3 780.76 1111.16"/>
-  </g>
-  <g id="bagcilar" class="neighborhood">
-    <polyline id="bagcilar-2" data-name="bagcilar" points="206.52 660 164.47 1056.56 266.05 1143.1 430.94 1101.98 533.19 1156.27 503.13 1064.22 633.53 1020.41 617.01 966.92 522.97 943.63 475.6 755.5 499.96 658.05 429.58 727.07 206.52 660"/>
-  </g>
-  <g id="basaksehir" class="neighborhood">
-    <polygon id="basaksehir-2" data-name="basaksehir" points="7.5 9.29 154.68 9.29 433.32 361.92 345.84 702.12 206.52 660 190.32 770.16 7.5 731.28 7.5 9.29"/>
-  </g>
-  <g id="kucukcekmece" class="neighborhood">
-    <polygon id="kucukcekmece-2" data-name="kucukcekmece" points="7.5 1444.08 132 1444.08 115.8 1308 220.41 1308 151.44 1152.48 190.32 770.16 7.5 731.28 7.5 1444.08"/>
-  </g>
-  <g id="sultangazi" class="neighborhood">
-    <polygon id="sultangazi-2" data-name="sultangazi" points="656.88 9.29 916.08 277.68 899.99 455.88 679.56 498 614.76 566.04 154.68 9.29 656.88 9.29"/>
-  </g>
-  <g id="uskudar" class="neighborhood">
-    <polygon id="uskudar-2" data-name="uskudar" points="1518.66 1080.88 1830.23 833 1830.23 740.99 1867.41 693.19 1858.56 622.38 1934.68 579.89 2023.2 700.27 2078.07 974.67 2012.57 1006.53 2088.7 1194.18 1971.86 1206.57 1980.71 1326.95 1761.19 1166.28 1605.41 1326.95 1562.92 1282.7 1518.66 1080.88"/>
-  </g>
-  <g id="kadikoy" class="neighborhood">
-    <polygon id="kadikoy-2" data-name="kadikoy" points="1578.85 1378.29 1617.8 1488.05 1718.71 1472.12 1741.72 1523.46 1686.84 1594.27 1759.42 1604.89 1784.21 1573.02 1938.22 1647.38 2028.51 1725.27 2239.17 1640.3 2109.94 1414.76 1761.19 1166.28 1605.41 1326.95 1631.96 1358.82 1578.85 1378.29"/>
-  </g>
-  <g id="maltepe" class="neighborhood">
-    <polygon id="maltepe-2" data-name="maltepe" points="2739.5 1463.89 2564.43 1437.18 2514.35 1505.62 2352.43 1505.62 2239.17 1640.3 2074.59 1706.68 2360.77 2057.29 2739.5 2057.29 2739.5 1463.89"/>
-  </g>
-  <g id="umraniye" class="neighborhood">
-    <polygon id="umraniye-2" data-name="umraniye" points="2129.44 686.63 2110.15 733.48 2206.61 710.06 2297.57 816.17 2383.01 799.63 2429.86 940.2 2617.28 965 2739.5 1130.37 2739.5 1315.32 2239.17 1303.63 2088.7 1194.18 2012.57 1006.53 2078.07 974.67 2023.2 700.27 2129.44 686.63"/>
-  </g>
-  <g id="cekmekoy" class="neighborhood">
-    <polygon id="cekmekoy-2" data-name="cekmekoy" points="2739.5 742.25 2408.24 875.34 2429.86 940.2 2617.28 965 2739.5 1130.37 2739.5 742.25"/>
-  </g>
-  <g id="beykoz" class="neighborhood">
-    <polygon id="beykoz-2" data-name="beykoz" points="1992.52 9.29 2146.49 154.73 2125.49 222.38 2025.18 315.69 1943.53 341.35 1917.87 386.92 1934.68 579.89 2023.2 700.27 2129.44 686.63 2110.15 733.48 2206.61 710.06 2297.57 816.17 2383.01 799.63 2408.24 875.34 2739.5 742.25 2739.5 9.29 1992.52 9.29"/>
-  </g>
-  <g id="sariyer" class="neighborhood">
-    <polygon id="sariyer-2" data-name="sariyer" points="1621.06 9.29 1621.06 309.24 1558.49 346.32 1676.68 399.62 1637.28 442.31 1852.81 531.72 1822.68 404.26 1961.73 174.83 1866.71 9.29 1621.06 9.29"/>
-  </g>
-  <g id="besiktas" class="neighborhood">
-    <polygon id="besiktas-2" data-name="besiktas" points="1437.98 953.42 1484.33 696.25 1558.49 712.48 1578.85 603.56 1491.28 510.86 1470.43 389.72 1558.49 346.32 1676.68 399.62 1637.28 442.31 1852.81 531.72 1760.11 594.29 1783.28 675.4 1750.84 686.63 1743.89 731.28 1709.93 742.25 1688.27 833 1437.98 953.42"/>
-  </g>
-  <g id="beyoglu" class="neighborhood">
-    <polygon id="beyoglu-2" data-name="beyoglu" points="1084.01 709.2 1110.23 800.97 1061.53 814.08 1052.17 875.34 1110.23 917.79 1143.94 967.66 1224.47 1000.97 1241.33 1066.93 1282.53 1087.68 1373.5 1048.2 1437.98 953.42 1084.01 709.2"/>
-  </g>
-  <g id="gungoren" class="neighborhood">
-    <polygon id="gungoren-2" data-name="gungoren" points="699.47 1001.07 715.25 1119.44 778.38 1117.86 749.04 1288.06 697.89 1296.2 653.7 1147.85 587.42 1250.43 503.13 1064.22 699.47 1001.07"/>
-  </g>
-  <g id="kagithane" class="neighborhood">
-    <polygon id="kagithane-2" data-name="kagithane" points="1112.03 716.61 1211.22 791.61 1392.66 583.55 1503.95 612.58 1470.43 389.72 1361.21 397.27 1339.44 322.28 1252.35 327.11 1172.51 273.89 1160.42 295.66 1182.19 351.31 1138.65 375.5 1242.67 479.53 1112.03 716.61"/>
-  </g>
-  <g id="atasehir" class="neighborhood">
-    <polygon id="atasehir-2" data-name="atasehir" points="2739.5 1315.32 2239.17 1303.63 2088.7 1194.18 1971.86 1206.57 1980.71 1326.95 2109.94 1414.76 2239.17 1639.24 2352.43 1505.62 2514.35 1505.62 2564.43 1437.18 2739.5 1463.89 2739.5 1315.32"/>
-  </g>
-  <g id="zeytinburnu" class="neighborhood">
-    <polygon id="zeytinburnu-2" data-name="zeytinburnu" points="798.69 1045.19 862.06 1014.89 951.22 1052.78 899.99 1130.98 899.99 1414.76 874.96 1420.83 786.74 1499.31 720.43 1464.68 798.69 1045.19"/>
-  </g>
-  <g id="fatih" class="neighborhood">
-    <path id="fatih-2" data-name="fatih" d="M1053.98,910.62l-153.99,218.9v291.38s37.69-5.13,37.69-5.13l92.72-116.08,46.64,37.39,76.81-18.98v-35.16l170.09,4.46s83.4-60.83,41.15-142.31l-132.78-26.23-56.51-68.09-29.08-16.74-66.94-106.6"/>
-  </g>
-</svg>
+          <g id="bakirkoy" class="neighborhood" data-name="Bakırköy"><polyline points="7.5 1444.08 0 1560.36 187.31 1710.2 368.55 1662.41 424.31 1540.92 609.53 1544.9 720.43 1464.68 749.04 1288.06 253.03 1385.57 211.21 1309.89 115.8 1308 132 1444.08 7.5 1444.08"/></g>
+          <g id="bayrampasa" class="neighborhood" data-name="Bayrampaşa"><polyline points="614.76 566.04 685.8 754.32 693.43 929.96 769.8 975.78 798.69 1045.19 862.06 1014.89 937.81 1036.88 787.62 685.59 614.76 566.04"/></g>
+          <g id="bahcelievler" class="neighborhood" data-name="Bahçelievler"><polyline points="690.72 1297.51 253.03 1385.57 211.21 1309.89 151.44 1152.48 164.47 1056.56 266.05 1143.1 433.49 1109.24 533.19 1156.27 588.25 1258.11 653.59 1160.03 690.72 1297.51"/></g>
+          <g id="sisli" class="neighborhood" data-name="Şişli">
+            <polygon points="1218.05 133.39 1250.78 7.53 1627.02 16.82 1627.02 316.77 1476.39 397.25 1367.17 404.8 1345.4 329.81 1258.31 334.65 1178.47 281.42 1200.43 251.69 1185.33 140.94 1218.05 133.39"/>
+            <polyline points="1497.24 518.39 1509.91 620.11 1398.62 591.08 1217.18 799.14 1439.35 952.19 1490.29 703.79 1564.45 720.01 1576.79 608.58 1497.24 518.39"/>
+          </g>
+          <g id="eyupsultan" class="neighborhood" data-name="Eyüpsultan">
+            <polyline points="656.88 9.29 1247.69 9.83 1212.18 133.66 1179.4 136.85 1198.07 237.46 1160.73 299.37 1187.59 354.91 1140.7 376.77 1245.41 472.83 1109.61 720.57 1090.02 713.5 1084.88 687.48 1075.92 695.09 1057.58 777.74 1005.04 686.34 890.31 681.33 911.25 275.7 662.84 16.82"/>
+            <polyline points="1056.04 782.23 908.01 795.67 854.08 852.08 937.2 1044.55 956.75 1051.75 1051.01 918.87 1004.5 824.86 1056.04 782.23"/>
+          </g>
+          <g id="gop" class="neighborhood" data-name="Gaziosmanpaşa"><polyline points="621.04 563.89 682.08 502.85 897.47 461.96 885.37 685.98 997.67 692.89 1043.74 772.36 904.95 794.82 857.15 842.62 787.62 685.59"/></g>
+          <g id="esenler" class="neighborhood" data-name="Esenler"><polygon points="780.76 1111.16 718.97 1113.36 702.42 994.19 637.31 1014.06 615.25 962.19 524.76 936.82 480.63 755.85 506.01 652.13 426.56 721.65 354.84 697.37 437.59 369.65 603.11 564.41 685.8 754.32 691.38 937.37 762 974.88 789.59 1043.3 780.76 1111.16"/></g>
+          <g id="bagcilar" class="neighborhood" data-name="Bağcılar"><polyline points="206.52 660 164.47 1056.56 266.05 1143.1 430.94 1101.98 533.19 1156.27 503.13 1064.22 633.53 1020.41 617.01 966.92 522.97 943.63 475.6 755.5 499.96 658.05 429.58 727.07 206.52 660"/></g>
+          <g id="basaksehir" class="neighborhood" data-name="Başakşehir"><polygon points="7.5 9.29 154.68 9.29 433.32 361.92 345.84 702.12 206.52 660 190.32 770.16 7.5 731.28 7.5 9.29"/></g>
+          <g id="kucukcekmece" class="neighborhood" data-name="Küçükçekmece"><polygon points="7.5 1444.08 132 1444.08 115.8 1308 220.41 1308 151.44 1152.48 190.32 770.16 7.5 731.28 7.5 1444.08"/></g>
+          <g id="sultangazi" class="neighborhood" data-name="Sultangazi"><polygon points="656.88 9.29 916.08 277.68 899.99 455.88 679.56 498 614.76 566.04 154.68 9.29 656.88 9.29"/></g>
+          <g id="uskudar" class="neighborhood" data-name="Üsküdar"><polygon points="1518.66 1080.88 1830.23 833 1830.23 740.99 1867.41 693.19 1858.56 622.38 1934.68 579.89 2023.2 700.27 2078.07 974.67 2012.57 1006.53 2088.7 1194.18 1971.86 1206.57 1980.71 1326.95 1761.19 1166.28 1605.41 1326.95 1562.92 1282.7 1518.66 1080.88"/></g>
+          <g id="kadikoy" class="neighborhood" data-name="Kadıköy"><polygon points="1578.85 1378.29 1617.8 1488.05 1718.71 1472.12 1741.72 1523.46 1686.84 1594.27 1759.42 1604.89 1784.21 1573.02 1938.22 1647.38 2028.51 1725.27 2239.17 1640.3 2109.94 1414.76 1761.19 1166.28 1605.41 1326.95 1631.96 1358.82 1578.85 1378.29"/></g>
+          <g id="maltepe" class="neighborhood" data-name="Maltepe"><polygon points="2739.5 1463.89 2564.43 1437.18 2514.35 1505.62 2352.43 1505.62 2239.17 1640.3 2074.59 1706.68 2360.77 2057.29 2739.5 2057.29 2739.5 1463.89"/></g>
+          <g id="umraniye" class="neighborhood" data-name="Ümraniye"><polygon points="2129.44 686.63 2110.15 733.48 2206.61 710.06 2297.57 816.17 2383.01 799.63 2429.86 940.2 2617.28 965 2739.5 1130.37 2739.5 1315.32 2239.17 1303.63 2088.7 1194.18 2012.57 1006.53 2078.07 974.67 2023.2 700.27 2129.44 686.63"/></g>
+          <g id="cekmekoy" class="neighborhood" data-name="Çekmeköy"><polygon points="2739.5 742.25 2408.24 875.34 2429.86 940.2 2617.28 965 2739.5 1130.37 2739.5 742.25"/></g>
+          <g id="beykoz" class="neighborhood" data-name="Beykoz"><polygon points="1992.52 9.29 2146.49 154.73 2125.49 222.38 2025.18 315.69 1943.53 341.35 1917.87 386.92 1934.68 579.89 2023.2 700.27 2129.44 686.63 2110.15 733.48 2206.61 710.06 2297.57 816.17 2383.01 799.63 2408.24 875.34 2739.5 742.25 2739.5 9.29 1992.52 9.29"/></g>
+          <g id="sariyer" class="neighborhood" data-name="Sarıyer"><polygon points="1621.06 9.29 1621.06 309.24 1558.49 346.32 1676.68 399.62 1637.28 442.31 1852.81 531.72 1822.68 404.26 1961.73 174.83 1866.71 9.29 1621.06 9.29"/></g>
+          <g id="besiktas" class="neighborhood" data-name="Beşiktaş"><polygon points="1437.98 953.42 1484.33 696.25 1558.49 712.48 1578.85 603.56 1491.28 510.86 1470.43 389.72 1558.49 346.32 1676.68 399.62 1637.28 442.31 1852.81 531.72 1760.11 594.29 1783.28 675.4 1750.84 686.63 1743.89 731.28 1709.93 742.25 1688.27 833 1437.98 953.42"/></g>
+          <g id="beyoglu" class="neighborhood" data-name="Beyoğlu"><polygon points="1084.01 709.2 1110.23 800.97 1061.53 814.08 1052.17 875.34 1110.23 917.79 1143.94 967.66 1224.47 1000.97 1241.33 1066.93 1282.53 1087.68 1373.5 1048.2 1437.98 953.42 1084.01 709.2"/></g>
+          <g id="gungoren" class="neighborhood" data-name="Güngören"><polygon points="699.47 1001.07 715.25 1119.44 778.38 1117.86 749.04 1288.06 697.89 1296.2 653.7 1147.85 587.42 1250.43 503.13 1064.22 699.47 1001.07"/></g>
+          <g id="kagithane" class="neighborhood" data-name="Kağıthane"><polygon points="1112.03 716.61 1211.22 791.61 1392.66 583.55 1503.95 612.58 1470.43 389.72 1361.21 397.27 1339.44 322.28 1252.35 327.11 1172.51 273.89 1160.42 295.66 1182.19 351.31 1138.65 375.5 1242.67 479.53 1112.03 716.61"/></g>
+          <g id="atasehir" class="neighborhood" data-name="Ataşehir"><polygon points="2739.5 1315.32 2239.17 1303.63 2088.7 1194.18 1971.86 1206.57 1980.71 1326.95 2109.94 1414.76 2239.17 1639.24 2352.43 1505.62 2514.35 1505.62 2564.43 1437.18 2739.5 1463.89 2739.5 1315.32"/></g>
+          <g id="zeytinburnu" class="neighborhood" data-name="Zeytinburnu"><polygon points="798.69 1045.19 862.06 1014.89 951.22 1052.78 899.99 1130.98 899.99 1414.76 874.96 1420.83 786.74 1499.31 720.43 1464.68 798.69 1045.19"/></g>
+          <g id="fatih" class="neighborhood" data-name="Fatih"><path d="M1053.98,910.62l-153.99,218.9v291.38s37.69-5.13,37.69-5.13l92.72-116.08,46.64,37.39,76.81-18.98v-35.16l170.09,4.46s83.4-60.83,41.15-142.31l-132.78-26.23-56.51-68.09-29.08-16.74-66.94-106.6"/></g>
+        </svg>
 
-<div id="neighborhood-content">
-  <h2>İstanbul</h2>
-  <p>Click a neighborhood.</p>
-</div>
-</div>
-</section>
+        <div id="neighborhood-panel">
+          <h2 id="nb-title">Istanbul</h2>
+          <p class="no-articles" id="nb-prompt">Hover over a neighborhood and click to read local news.</p>
+          <div class="nb-articles" id="nb-articles-list"></div>
+        </div>
+      </div>
+    </section>
 
+    <!-- Right Sidebar -->
     <section class="sidebar">
       <div class="article">
-        <h3>İstanbul’u depreme hazırlayacak üç isim cezaevinde tutuluyor</h3>
-        <p>Kahraman, Akgün, İmamoğlu</p>
-      </div>
-      <div class="article">
+        <div class="kicker">Politics</div>
         <h3>İran rejiminin VUR emri verdiği iddia ediliyor</h3>
         <p>Sağlık Bakanlığının iddiası yaklaşık 30 bin protestocunun öldürüldüğü yönünde.</p>
+      </div>
+      <div class="article">
+        <div class="kicker">Culture</div>
+        <h3>Top Story Right 2</h3>
+        <p>Placeholder for article content.</p>
       </div>
     </section>
   </main>
 
   <footer>
-    &copy; 2026 ISTANBULITE - All rights reserved
+    &copy; 2026 ISTANBULITE — All rights reserved &nbsp;|&nbsp; <a href="admin.html">Admin</a>
   </footer>
+</div>
 
 <script>
-const svg = document.querySelector('svg');
-const neighborhoods = document.querySelectorAll('svg g');
-const content = document.getElementById('neighborhood-content');
-const mapImage = document.querySelector('.map-wrapper img');
-const originalViewBox = svg.getAttribute('viewBox');
+// ══════════════════════════════════════════
+// CONFIGURATION — Replace with your values
+// ══════════════════════════════════════════
+const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
 
-neighborhoods.forEach(nb => {
-  nb.addEventListener('click', (e) => {
-    e.stopPropagation(); // so document click doesn't fire
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Remove active from all
-    neighborhoods.forEach(n => n.classList.remove('active'));
-    nb.classList.add('active');
+// ── Date ──
+document.getElementById('today-date').textContent =
+  new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
-    // Zoom into neighborhood
-    const bbox = nb.getBBox();
-    const padding = 50;
-    svg.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding*2} ${bbox.height + padding*2}`);
+// ── Auth State ──
+let isSignUp = false;
 
-    // Optional: slightly scale the image to match zoom
-    mapImage.style.transform = `scale(${Math.max(bbox.width / svg.clientWidth, bbox.height / svg.clientHeight) + 0.1})`;
+async function checkSession() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) showSite(session.user);
+}
 
-    // Update neighborhood content
-    const name = nb.getAttribute('data-name') || nb.id;
-    content.innerHTML = `<h2>${name.charAt(0).toUpperCase() + name.slice(1)}</h2>
-                         <p>More info about ${name.charAt(0).toUpperCase() + name.slice(1)}...</p>`;
+function showSite(user) {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('main-site').style.display = 'block';
+  document.getElementById('user-email-display').textContent = user.email;
+}
+
+// ── Login / Register ──
+document.getElementById('toggle-link').addEventListener('click', () => {
+  isSignUp = !isSignUp;
+  document.getElementById('form-title').textContent = isSignUp ? 'Create Account' : 'Sign In';
+  document.getElementById('auth-submit-btn').textContent = isSignUp ? 'Register' : 'Enter';
+  document.getElementById('toggle-link').textContent = isSignUp
+    ? 'Already have an account? Sign In'
+    : "Don't have an account? Register";
+  document.getElementById('auth-error').textContent = '';
+});
+
+document.getElementById('auth-submit-btn').addEventListener('click', async () => {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-error');
+  const btn = document.getElementById('auth-submit-btn');
+
+  if (!email || !password) { errEl.textContent = 'Please fill in all fields.'; return; }
+
+  btn.textContent = ''; btn.appendChild(Object.assign(document.createElement('span'), {className:'spinner'}));
+
+  let result;
+  if (isSignUp) {
+    result = await sb.auth.signUp({ email, password });
+  } else {
+    result = await sb.auth.signInWithPassword({ email, password });
+  }
+
+  btn.textContent = isSignUp ? 'Register' : 'Enter';
+
+  if (result.error) {
+    errEl.textContent = result.error.message;
+  } else if (isSignUp && !result.data.session) {
+    errEl.style.color = '#2a6a2a';
+    errEl.textContent = 'Check your email to confirm your account.';
+  } else {
+    showSite(result.data.user);
+  }
+});
+
+// Allow Enter key
+['auth-email','auth-password'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('auth-submit-btn').click();
   });
 });
 
-// Reset zoom/content when clicking outside of neighborhoods
+// ── Logout ──
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  document.getElementById('login-overlay').style.display = 'flex';
+  document.getElementById('main-site').style.display = 'none';
+});
+
+// ── Map Interactions ──
+const svg = document.querySelector('svg');
+const neighborhoods = document.querySelectorAll('.neighborhood');
+const originalViewBox = svg.getAttribute('viewBox');
+
+neighborhoods.forEach(nb => {
+  nb.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    neighborhoods.forEach(n => n.classList.remove('active'));
+    nb.classList.add('active');
+
+    // Zoom
+    const bbox = nb.getBBox();
+    const pad = 80;
+    svg.setAttribute('viewBox', `${bbox.x - pad} ${bbox.y - pad} ${bbox.width + pad*2} ${bbox.height + pad*2}`);
+
+    const name = nb.getAttribute('data-name') || nb.id;
+    document.getElementById('nb-title').textContent = name;
+    document.getElementById('nb-prompt').style.display = 'none';
+
+    const listEl = document.getElementById('nb-articles-list');
+    listEl.innerHTML = '<span class="spinner"></span>';
+
+    // Fetch articles from Supabase
+    const { data, error } = await sb
+      .from('articles')
+      .select('*')
+      .eq('neighborhood', nb.id)
+      .order('created_at', { ascending: false });
+
+    if (error || !data || data.length === 0) {
+      listEl.innerHTML = '<p class="no-articles">No local news for this neighborhood yet.</p>';
+    } else {
+      listEl.innerHTML = data.map(a => `
+        <div class="nb-article">
+          <h4>${a.title}</h4>
+          ${a.summary ? `<p>${a.summary}</p>` : ''}
+        </div>
+      `).join('');
+    }
+  });
+});
+
 document.addEventListener('click', (e) => {
-  // Only reset if the click is outside both the SVG neighborhoods and the content box
-  if (!e.target.closest('.neighborhood') && !e.target.closest('#neighborhood-content')) {
+  if (!e.target.closest('.neighborhood') && !e.target.closest('#neighborhood-panel')) {
     neighborhoods.forEach(nb => nb.classList.remove('active'));
     svg.setAttribute('viewBox', originalViewBox);
-    mapImage.style.transform = 'scale(1)'; // reset image zoom
-    content.innerHTML = `<h2>İstanbul</h2><p>Click a neighborhood.</p>`;
+    document.getElementById('nb-title').textContent = 'Istanbul';
+    document.getElementById('nb-prompt').style.display = 'block';
+    document.getElementById('nb-articles-list').innerHTML = '';
   }
 });
+
+// ── Init ──
+checkSession();
 </script>
-
-
 </body>
 </html>
