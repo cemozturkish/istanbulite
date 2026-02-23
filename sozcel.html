@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sözcel — istanbulite.net</title>
+  <style>
+    :root {
+      --ink: #1a1a18;
+      --paper: #f5f0e8;
+      --paper-dark: #ede8d8;
+      --accent: #8b0000;
+      --muted: #6b6b60;
+      --success: #6aaa64;
+      --present: #c9b458;
+      --absent: #787c7e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: 'Tinos', Georgia, serif;
+      background-color: var(--paper);
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      position: relative;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 28px 32px 24px;
+      background: var(--paper);
+      border-bottom: 4px double var(--ink);
+    }
+
+    .masthead {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'UnifrakturMaguntia', cursive;
+      font-size: 3.2rem;
+      color: var(--ink);
+      white-space: nowrap;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    
+    .masthead:hover { color: var(--accent); }
+
+    .back-btn {
+      text-decoration: none;
+      color: var(--ink);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: color 0.2s;
+      z-index: 11;
+    }
+    .back-btn:hover { color: var(--accent); }
+
+    .game-title-bar {
+      padding: 12px 32px;
+      border-bottom: 1px solid var(--ink);
+      background: var(--paper-dark);
+      text-align: center;
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      overflow-y: auto;
+    }
+
+    .game-container {
+      max-width: 500px;
+      width: 100%;
+    }
+
+    .word-grid {
+      display: grid;
+      grid-template-rows: repeat(6, 1fr);
+      gap: 8px;
+      margin-bottom: 30px;
+    }
+
+    .word-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+
+    .letter-box {
+      aspect-ratio: 1;
+      border: 2px solid #ccc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: white;
+      transition: all 0.3s;
+    }
+
+    .letter-box.filled { border-color: var(--ink); }
+    .letter-box.correct { background: var(--success); border-color: var(--success); color: white; }
+    .letter-box.present { background: var(--present); border-color: var(--present); color: white; }
+    .letter-box.absent { background: var(--absent); border-color: var(--absent); color: white; }
+
+    .keyboard {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .keyboard-row {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+    }
+
+    .key {
+      padding: 14px;
+      min-width: 43px;
+      background: #d3d6da;
+      border: none;
+      border-radius: 4px;
+      font-family: 'Tinos', serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: background 0.2s;
+    }
+
+    .key:hover { background: #bbb; }
+    .key.wide { min-width: 70px; font-size: 0.8rem; }
+    .key.correct { background: var(--success); color: white; }
+    .key.present { background: var(--present); color: white; }
+    .key.absent { background: var(--absent); color: white; }
+
+    .game-message {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 1.1rem;
+      min-height: 30px;
+      font-weight: 700;
+    }
+    .game-message.win { color: var(--success); }
+    .game-message.lose { color: var(--accent); }
+
+    .reset-info {
+      text-align: center;
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    footer {
+      text-align: center;
+      padding: 14px;
+      background: var(--paper-dark);
+      border-top: 2px solid var(--ink);
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="kahvehane.html" class="back-btn">← Kahvehane</a>
+    <a href="index.html" style="text-decoration:none;">
+      <div class="masthead">istanbulite.net</div>
+    </a>
+    <div style="width: 120px;"></div>
+  </header>
+
+  <div class="game-title-bar">Sözcel</div>
+
+  <main>
+    <div class="game-container">
+      <div class="word-grid" id="word-grid"></div>
+      <div class="keyboard" id="keyboard"></div>
+      <div class="game-message" id="game-message"></div>
+      <div class="reset-info" id="reset-info"></div>
+    </div>
+  </main>
+
+  <footer>
+    &copy; 2026 ISTANBULITE
+  </footer>
+
+<script>
+// Daily seed based on Istanbul midnight
+function getDailySeed() {
+  const now = new Date();
+  const istanbulTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  const year = istanbulTime.getFullYear();
+  const month = istanbulTime.getMonth() + 1;
+  const day = istanbulTime.getDate();
+  return `${year}-${month}-${day}`;
+}
+
+function getTimeUntilMidnight() {
+  const now = new Date();
+  const istanbulTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  const tomorrow = new Date(istanbulTime);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  
+  const diff = tomorrow - istanbulTime;
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  
+  return `Yeni oyun ${hours} saat ${minutes} dakika sonra`;
+}
+
+const WORD_LIST = [
+  'KOLAY', 'SOKAK', 'HABER', 'KÖŞEK', 'ŞEHIR', 'PASTA', 'GÜZEL', 'KITAP', 
+  'YEMEK', 'DÜNYA', 'BAHÇE', 'ÇANTA', 'DENIZ', 'GÜNEŞ', 'İSTEK', 'KALEM', 
+  'LIMON', 'MEYVE', 'NEFES', 'ÖĞLEN', 'PAZAR', 'RÜZGR', 'SABAH', 'TABAK',
+  'ÜLKEK', 'VAPUR', 'YAĞMR', 'ZAMAN', 'AKŞAM', 'BIÇAK', 'CADDE', 'DÖNER'
+];
+
+function seededRandom(seed) {
+  let x = 0;
+  for (let i = 0; i < seed.length; i++) {
+    x = ((x << 5) - x) + seed.charCodeAt(i);
+    x = x & x;
+  }
+  return Math.abs(x % WORD_LIST.length);
+}
+
+const dailySeed = getDailySeed();
+const TARGET_WORD = WORD_LIST[seededRandom(dailySeed)];
+
+let currentRow = 0;
+let currentGuess = '';
+let gameOver = false;
+const keyStates = {};
+
+const KEYBOARD_LAYOUT = [
+  ['E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Ğ', 'Ü'],
+  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ş', 'İ'],
+  ['GİR', 'Z', 'C', 'V', 'B', 'N', 'M', 'Ö', 'Ç', '←']
+];
+
+function initWordGrid() {
+  const grid = document.getElementById('word-grid');
+  for (let i = 0; i < 6; i++) {
+    const row = document.createElement('div');
+    row.className = 'word-row';
+    for (let j = 0; j < 5; j++) {
+      const box = document.createElement('div');
+      box.className = 'letter-box';
+      box.id = `box-${i}-${j}`;
+      row.appendChild(box);
+    }
+    grid.appendChild(row);
+  }
+}
+
+function initKeyboard() {
+  const keyboard = document.getElementById('keyboard');
+  KEYBOARD_LAYOUT.forEach(row => {
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'keyboard-row';
+    row.forEach(key => {
+      const btn = document.createElement('button');
+      btn.className = 'key' + (key.length > 1 ? ' wide' : '');
+      btn.textContent = key;
+      btn.onclick = () => handleKey(key);
+      btn.id = `key-${key}`;
+      rowDiv.appendChild(btn);
+    });
+    keyboard.appendChild(rowDiv);
+  });
+}
+
+function handleKey(key) {
+  if (gameOver) return;
+  
+  if (key === '←') {
+    if (currentGuess.length > 0) {
+      currentGuess = currentGuess.slice(0, -1);
+      updateDisplay();
+    }
+  } else if (key === 'GİR') {
+    if (currentGuess.length === 5) {
+      submitGuess();
+    }
+  } else if (currentGuess.length < 5) {
+    currentGuess += key;
+    updateDisplay();
+  }
+}
+
+function updateDisplay() {
+  for (let i = 0; i < 5; i++) {
+    const box = document.getElementById(`box-${currentRow}-${i}`);
+    box.textContent = currentGuess[i] || '';
+    box.className = 'letter-box' + (currentGuess[i] ? ' filled' : '');
+  }
+}
+
+function submitGuess() {
+  const result = checkWord(currentGuess);
+  
+  for (let i = 0; i < 5; i++) {
+    const box = document.getElementById(`box-${currentRow}-${i}`);
+    const letter = currentGuess[i];
+    box.className = `letter-box filled ${result[i]}`;
+    
+    const keyBtn = document.getElementById(`key-${letter}`);
+    if (keyBtn) {
+      const currentState = keyStates[letter] || '';
+      if (result[i] === 'correct' || currentState !== 'correct') {
+        keyStates[letter] = result[i];
+        keyBtn.className = `key ${result[i]}`;
+      }
+    }
+  }
+  
+  if (currentGuess === TARGET_WORD) {
+    document.getElementById('game-message').textContent = '🎉 Tebrikler!';
+    document.getElementById('game-message').className = 'game-message win';
+    document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+    gameOver = true;
+  } else if (currentRow === 5) {
+    document.getElementById('game-message').textContent = `Kelime: ${TARGET_WORD}`;
+    document.getElementById('game-message').className = 'game-message lose';
+    document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+    gameOver = true;
+  } else {
+    currentRow++;
+    currentGuess = '';
+  }
+}
+
+function checkWord(guess) {
+  const result = Array(5).fill('absent');
+  const targetLetters = TARGET_WORD.split('');
+  const guessLetters = guess.split('');
+  
+  guessLetters.forEach((letter, i) => {
+    if (letter === targetLetters[i]) {
+      result[i] = 'correct';
+      targetLetters[i] = null;
+    }
+  });
+  
+  guessLetters.forEach((letter, i) => {
+    if (result[i] === 'absent' && targetLetters.includes(letter)) {
+      result[i] = 'present';
+      targetLetters[targetLetters.indexOf(letter)] = null;
+    }
+  });
+  
+  return result;
+}
+
+initWordGrid();
+initKeyboard();
+</script>
+</body>
+</html>
