@@ -110,6 +110,21 @@
       border-color: var(--accent);
     }
 
+    /* Neighborhood select in signup form */
+    .login-box select {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      border: 1px solid var(--ink);
+      background: #faf7f0;
+      font-family: 'Tinos', serif;
+      font-size: 0.95rem;
+      color: var(--ink);
+      outline: none;
+      cursor: pointer;
+    }
+    .login-box select:focus { border-color: var(--accent); }
+
     .login-box button {
       width: 100%;
       padding: 11px;
@@ -319,12 +334,21 @@
     }
 
     .neighborhood:hover { opacity: 1; fill: rgba(139,0,0,0.12); }
-    .neighborhood.active { 
-      opacity: 1; 
-      fill: rgba(101, 67, 33, 0.3); 
-      stroke: #654321; 
+    .neighborhood.active {
+      opacity: 1;
+      fill: rgba(101, 67, 33, 0.3);
+      stroke: #654321;
       stroke-width: 2;
     }
+    /* User's home neighborhood — always highlighted */
+    .neighborhood.home {
+      fill: rgba(139, 0, 0, 0.22);
+      stroke: var(--accent);
+      stroke-width: 4;
+      opacity: 1;
+    }
+    .neighborhood.home:hover { fill: rgba(139, 0, 0, 0.38); }
+    .neighborhood.home.active { fill: rgba(101, 67, 33, 0.4); stroke: #654321; }
 
     #neighborhood-panel {
       width: 100%;
@@ -419,6 +443,37 @@
     <div class="error-msg" id="auth-error"></div>
     <input type="email" id="auth-email" placeholder="Email address" autocomplete="email"/>
     <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password"/>
+    <!-- Shown only in signup mode -->
+    <div id="neighborhood-field" style="display:none;">
+      <select id="auth-neighborhood">
+        <option value="">— Semtinizi seçin —</option>
+        <option value="atasehir">Ataşehir</option>
+        <option value="bagcilar">Bağcılar</option>
+        <option value="bahcelievler">Bahçelievler</option>
+        <option value="bakirkoy">Bakırköy</option>
+        <option value="basaksehir">Başakşehir</option>
+        <option value="bayrampasa">Bayrampaşa</option>
+        <option value="besiktas">Beşiktaş</option>
+        <option value="beyoglu">Beyoğlu</option>
+        <option value="beykoz">Beykoz</option>
+        <option value="cekmekoy">Çekmeköy</option>
+        <option value="esenler">Esenler</option>
+        <option value="eyupsultan">Eyüpsultan</option>
+        <option value="fatih">Fatih</option>
+        <option value="gop">Gaziosmanpaşa</option>
+        <option value="gungoren">Güngören</option>
+        <option value="kadikoy">Kadıköy</option>
+        <option value="kagithane">Kağıthane</option>
+        <option value="kucukcekmece">Küçükçekmece</option>
+        <option value="maltepe">Maltepe</option>
+        <option value="sariyer">Sarıyer</option>
+        <option value="sisli">Şişli</option>
+        <option value="sultangazi">Sultangazi</option>
+        <option value="umraniye">Ümraniye</option>
+        <option value="uskudar">Üsküdar</option>
+        <option value="zeytinburnu">Zeytinburnu</option>
+      </select>
+    </div>
     <button id="auth-submit-btn">Enter</button>
     <div class="toggle-mode">
       <span id="toggle-link">Don't have an account? Register</span>
@@ -572,6 +627,12 @@ async function checkSession() {
 function showSite(user) {
   document.getElementById('login-overlay').style.display = 'none';
   document.getElementById('main-site').classList.add('active');
+  // Highlight the user's home neighborhood on the map
+  const homeNb = user?.user_metadata?.neighborhood;
+  if (homeNb) {
+    const nbEl = document.getElementById(homeNb);
+    if (nbEl) nbEl.classList.add('home');
+  }
 }
 
 // ── Login / Register ──
@@ -583,6 +644,7 @@ document.getElementById('toggle-link').addEventListener('click', () => {
     ? 'Already have an account? Sign In'
     : "Don't have an account? Register";
   document.getElementById('auth-error').textContent = '';
+  document.getElementById('neighborhood-field').style.display = isSignUp ? 'block' : 'none';
 });
 
 document.getElementById('auth-submit-btn').addEventListener('click', async () => {
@@ -597,7 +659,13 @@ document.getElementById('auth-submit-btn').addEventListener('click', async () =>
 
   let result;
   if (isSignUp) {
-    result = await sb.auth.signUp({ email, password });
+    const neighborhood = document.getElementById('auth-neighborhood').value;
+    if (!neighborhood) {
+      btn.textContent = 'Register';
+      errEl.textContent = 'Lütfen semtinizi seçin.';
+      return;
+    }
+    result = await sb.auth.signUp({ email, password, options: { data: { neighborhood } } });
   } else {
     result = await sb.auth.signInWithPassword({ email, password });
   }
