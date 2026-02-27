@@ -134,6 +134,14 @@
       stroke: #654321;
       stroke-width: 2;
     }
+    .neighborhood.home {
+      fill: rgba(139, 0, 0, 0.22);
+      stroke: var(--accent);
+      stroke-width: 4;
+      opacity: 1;
+    }
+    .neighborhood.home:hover { fill: rgba(139, 0, 0, 0.38); }
+    .neighborhood.home.active { fill: rgba(101, 67, 33, 0.4); stroke: #654321; }
 
     .map-label {
       text-align: center;
@@ -252,6 +260,18 @@
       font-size: 0.92rem;
       color: var(--ink);
       cursor: pointer;
+    }
+
+    /* Static home neighborhood badge (replaces dropdown for posting) */
+    .home-nb-badge {
+      display: inline-block;
+      padding: 8px 14px;
+      background: var(--accent);
+      color: var(--paper);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
     }
 
     .submit-form {
@@ -424,39 +444,12 @@
     <section class="discussion-section">
       <div class="discussion-header">
         <h2>Semt Sohbeti</h2>
-        <p>Tüm semtlerden son konuşmalar. Mesaj göndermek için semt seçin.</p>
+        <p>Tüm semtlerden son konuşmaları okuyabilirsiniz. Mesaj göndermek yalnızca kendi semtiniz için mümkündür.</p>
       </div>
 
       <div class="neighborhood-selector">
-        <label>Mesaj Göndermek İçin Semt Seç</label>
-        <select id="neighborhood-select">
-          <option value="">— Sadece okuyorum —</option>
-          <option value="bakirkoy">Bakırköy</option>
-          <option value="bayrampasa">Bayrampaşa</option>
-          <option value="bahcelievler">Bahçelievler</option>
-          <option value="sisli">Şişli</option>
-          <option value="eyupsultan">Eyüpsultan</option>
-          <option value="gop">Gaziosmanpaşa</option>
-          <option value="esenler">Esenler</option>
-          <option value="bagcilar">Bağcılar</option>
-          <option value="basaksehir">Başakşehir</option>
-          <option value="kucukcekmece">Küçükçekmece</option>
-          <option value="sultangazi">Sultangazi</option>
-          <option value="uskudar">Üsküdar</option>
-          <option value="kadikoy">Kadıköy</option>
-          <option value="maltepe">Maltepe</option>
-          <option value="umraniye">Ümraniye</option>
-          <option value="cekmekoy">Çekmeköy</option>
-          <option value="beykoz">Beykoz</option>
-          <option value="sariyer">Sarıyer</option>
-          <option value="besiktas">Beşiktaş</option>
-          <option value="beyoglu">Beyoğlu</option>
-          <option value="gungoren">Güngören</option>
-          <option value="kagithane">Kağıthane</option>
-          <option value="atasehir">Ataşehir</option>
-          <option value="zeytinburnu">Zeytinburnu</option>
-          <option value="fatih">Fatih</option>
-        </select>
+        <label>Semtiniz</label>
+        <div id="home-nb-badge" class="home-nb-badge">Yükleniyor...</div>
       </div>
 
       <div class="submit-form" id="submit-form" style="display:none;">
@@ -516,8 +509,31 @@ const neighborhoodNames = {
 
 let selectedNeighborhood = '';
 let activeMapNeighborhood = null;
+let homeNeighborhood = null;
 
-loadPosts();
+async function init() {
+  // Require auth
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+
+  homeNeighborhood = session.user.user_metadata?.neighborhood || null;
+
+  if (homeNeighborhood) {
+    selectedNeighborhood = homeNeighborhood;
+    const nbName = neighborhoodNames[homeNeighborhood] || homeNeighborhood;
+    document.getElementById('home-nb-badge').textContent = nbName;
+    document.getElementById('submit-form').style.display = 'block';
+    // Highlight home neighborhood on map
+    const nbEl = document.getElementById(homeNeighborhood);
+    if (nbEl) nbEl.classList.add('home');
+  } else {
+    document.getElementById('home-nb-badge').textContent = 'Semt seçilmedi';
+  }
+
+  loadPosts();
+}
+
+init();
 
 // ── Map Interaction — filter discussions by neighborhood ──
 const mapNeighborhoods = document.querySelectorAll('.neighborhood');
@@ -541,11 +557,6 @@ document.addEventListener('click', (e) => {
     activeMapNeighborhood = null;
     loadPosts();
   }
-});
-
-document.getElementById('neighborhood-select').addEventListener('change', (e) => {
-  selectedNeighborhood = e.target.value;
-  document.getElementById('submit-form').style.display = selectedNeighborhood ? 'block' : 'none';
 });
 
 async function loadPosts(neighborhoodFilter = null) {

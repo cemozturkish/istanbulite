@@ -141,6 +141,14 @@
       stroke: #654321;
       stroke-width: 2;
     }
+    .neighborhood.home {
+      fill: rgba(139, 0, 0, 0.22);
+      stroke: var(--accent);
+      stroke-width: 4;
+      opacity: 1;
+    }
+    .neighborhood.home:hover { fill: rgba(139, 0, 0, 0.38); }
+    .neighborhood.home.active { fill: rgba(101, 67, 33, 0.4); stroke: #654321; }
 
     .map-label {
       text-align: center;
@@ -348,15 +356,29 @@ const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+const neighborhoodNames = {
+  bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler',
+  sisli:'Şişli', eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa',
+  esenler:'Esenler', bagcilar:'Bağcılar', basaksehir:'Başakşehir',
+  kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi', uskudar:'Üsküdar',
+  kadikoy:'Kadıköy', maltepe:'Maltepe', umraniye:'Ümraniye',
+  cekmekoy:'Çekmeköy', beykoz:'Beykoz', sariyer:'Sarıyer',
+  besiktas:'Beşiktaş', beyoglu:'Beyoğlu', gungoren:'Güngören',
+  kagithane:'Kağıthane', atasehir:'Ataşehir', zeytinburnu:'Zeytinburnu', fatih:'Fatih'
+};
+
 async function loadProfile() {
   const { data: { session } } = await sb.auth.getSession();
-  
+
   if (!session) {
     window.location.href = 'index.html';
     return;
   }
 
   const user = session.user;
+  const homeNb = user.user_metadata?.neighborhood || null;
+  const homeNbName = homeNb ? (neighborhoodNames[homeNb] || homeNb) : '—';
+
   const joinedDate = new Date(user.created_at).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -371,12 +393,12 @@ async function loadProfile() {
         <div class="info-value">${user.email}</div>
       </div>
       <div class="info-row">
-        <div class="info-label">Member Since</div>
-        <div class="info-value">${joinedDate}</div>
+        <div class="info-label">Semtim</div>
+        <div class="info-value">${homeNbName}</div>
       </div>
       <div class="info-row">
-        <div class="info-label">User ID</div>
-        <div class="info-value" style="font-size:0.82rem;word-break:break-all;">${user.id}</div>
+        <div class="info-label">Member Since</div>
+        <div class="info-value">${joinedDate}</div>
       </div>
     </div>
     <button class="btn-signout" id="signout-btn">Sign Out</button>
@@ -386,30 +408,25 @@ async function loadProfile() {
     await sb.auth.signOut();
     window.location.href = 'index.html';
   });
+
+  // Highlight home neighborhood on the map
+  if (homeNb) {
+    const nbEl = document.getElementById(homeNb);
+    if (nbEl) nbEl.classList.add('home');
+    document.getElementById('map-label').textContent = homeNbName;
+  }
 }
 
 loadProfile();
 
-// ── Map Interaction — select home neighborhood ──
+// Map clicks show the neighborhood name but don't change the home
 const mapNeighborhoods = document.querySelectorAll('.neighborhood');
-
-// Restore saved home neighborhood
-const savedNb = localStorage.getItem('homeNeighborhood');
-if (savedNb) {
-  const nbEl = document.getElementById(savedNb);
-  if (nbEl) nbEl.classList.add('active');
-  document.getElementById('map-label').textContent = localStorage.getItem('homeNeighborhoodName') || 'İstanbul';
-}
-
 mapNeighborhoods.forEach(nb => {
   nb.addEventListener('click', (e) => {
     e.stopPropagation();
     mapNeighborhoods.forEach(n => n.classList.remove('active'));
     nb.classList.add('active');
-    const name = nb.getAttribute('data-name') || nb.id;
-    document.getElementById('map-label').textContent = name;
-    localStorage.setItem('homeNeighborhood', nb.id);
-    localStorage.setItem('homeNeighborhoodName', name);
+    document.getElementById('map-label').textContent = nb.getAttribute('data-name') || nb.id;
   });
 });
 </script>
