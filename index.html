@@ -403,6 +403,103 @@
       vertical-align: middle;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── QUESTIONNAIRE OVERLAY ── */
+    #questionnaire-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.97);
+      backdrop-filter: blur(3px);
+      z-index: 998;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+    }
+
+    .q-box {
+      border: 2px solid var(--ink);
+      padding: 36px 40px;
+      width: 420px;
+      background: var(--paper);
+      text-align: center;
+    }
+
+    .q-box::before {
+      content: '';
+      position: absolute;
+      inset: 4px;
+      border: 1px solid var(--ink);
+      pointer-events: none;
+    }
+
+    .q-box { position: relative; }
+
+    .q-box h2 {
+      font-family: 'Inter', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1.4;
+      margin-bottom: 24px;
+    }
+
+    .q-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .q-btn {
+      padding: 11px 32px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .q-btn:hover { background: #555555; }
+
+    .q-btn-outline {
+      padding: 11px 32px;
+      background: var(--paper);
+      color: var(--ink);
+      border: 2px solid var(--ink);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .q-btn-outline:hover { background: var(--paper-dark); }
+
+    .q-message {
+      font-size: 0.85rem;
+      color: var(--muted);
+      font-style: italic;
+      line-height: 1.5;
+    }
+
+    .q-select {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      border: 1px solid var(--ink);
+      background: #f5f5f5;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      color: var(--ink);
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -419,6 +516,11 @@
     <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password"/>
     <button id="auth-submit-btn">Enter</button>
   </div>
+</div>
+
+<!-- ══════════════ QUESTIONNAIRE OVERLAY ══════════════ -->
+<div id="questionnaire-overlay">
+  <div class="q-box" id="q-step"></div>
 </div>
 
 <!-- ══════════════ MAIN SITE ══════════════ -->
@@ -550,13 +652,120 @@ async function checkSession() {
 
 function showSite(user) {
   document.getElementById('login-overlay').style.display = 'none';
+
+  // Check if user has completed the onboarding questionnaire
+  const meta = user?.user_metadata || {};
+  if (!meta.dogum_yeri && meta.dogum_yeri !== 'istanbul_disi') {
+    showQuestionnaire(user);
+    return;
+  }
+
+  activateSite(user);
+}
+
+function activateSite(user) {
+  document.getElementById('questionnaire-overlay').style.display = 'none';
   document.getElementById('main-site').classList.add('active');
-  // Highlight the user's home neighborhood on the map
   const homeNb = user?.user_metadata?.neighborhood;
   if (homeNb) {
     const nbEl = document.getElementById(homeNb);
     if (nbEl) nbEl.classList.add('home');
   }
+}
+
+// ── Onboarding Questionnaire ──
+const districtNames = {
+  bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler',
+  sisli:'Şişli', eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa',
+  esenler:'Esenler', bagcilar:'Bağcılar', basaksehir:'Başakşehir',
+  kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi', uskudar:'Üsküdar',
+  kadikoy:'Kadıköy', maltepe:'Maltepe', umraniye:'Ümraniye',
+  cekmekoy:'Çekmeköy', beykoz:'Beykoz', sariyer:'Sarıyer',
+  besiktas:'Beşiktaş', beyoglu:'Beyoğlu', gungoren:'Güngören',
+  kagithane:'Kağıthane', atasehir:'Ataşehir', zeytinburnu:'Zeytinburnu', fatih:'Fatih'
+};
+
+function showQuestionnaire(user) {
+  const overlay = document.getElementById('questionnaire-overlay');
+  overlay.style.display = 'flex';
+  stepLivesInIstanbul(user);
+}
+
+// Step 1: Do you live in Istanbul?
+function stepLivesInIstanbul(user) {
+  const box = document.getElementById('q-step');
+  box.innerHTML = `
+    <h2>İstanbul'da mı yaşıyorsun?</h2>
+    <div class="q-buttons">
+      <button class="q-btn" id="q-yes-lives">Evet</button>
+      <button class="q-btn-outline" id="q-no-lives">Hayır</button>
+    </div>
+  `;
+  document.getElementById('q-yes-lives').addEventListener('click', () => stepBornInIstanbul(user));
+  document.getElementById('q-no-lives').addEventListener('click', () => stepNotInIstanbul());
+}
+
+// Dead end: not in Istanbul
+function stepNotInIstanbul() {
+  const box = document.getElementById('q-step');
+  box.innerHTML = `
+    <h2>ISTANBULITE şu anda sadece İstanbul'da yaşayanlara hizmet vermektedir.</h2>
+  `;
+}
+
+// Step 2: Were you born in Istanbul?
+function stepBornInIstanbul(user) {
+  const box = document.getElementById('q-step');
+  box.innerHTML = `
+    <h2>İstanbul doğumlu musun?</h2>
+    <div class="q-buttons">
+      <button class="q-btn" id="q-yes-born">Evet</button>
+      <button class="q-btn-outline" id="q-no-born">Hayır</button>
+    </div>
+  `;
+  document.getElementById('q-yes-born').addEventListener('click', () => stepSelectDistrict(user));
+  document.getElementById('q-no-born').addEventListener('click', () => saveAndContinue(user, 'istanbul_disi'));
+}
+
+// Step 3: Which district were you born in?
+function stepSelectDistrict(user) {
+  const box = document.getElementById('q-step');
+  const options = Object.entries(districtNames)
+    .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
+    .map(([id, name]) => `<option value="${id}">${name}</option>`)
+    .join('');
+  box.innerHTML = `
+    <h2>Hangi ilçede doğdun?</h2>
+    <select class="q-select" id="q-district">
+      <option value="">— İlçe seçin —</option>
+      ${options}
+    </select>
+    <div class="q-buttons">
+      <button class="q-btn" id="q-confirm-district">Devam</button>
+    </div>
+  `;
+  document.getElementById('q-confirm-district').addEventListener('click', () => {
+    const val = document.getElementById('q-district').value;
+    if (!val) return;
+    saveAndContinue(user, val);
+  });
+}
+
+// Save to Supabase and proceed
+async function saveAndContinue(user, dogumYeri) {
+  const box = document.getElementById('q-step');
+  box.innerHTML = '<span class="spinner"></span>';
+
+  const { data, error } = await sb.auth.updateUser({
+    data: { dogum_yeri: dogumYeri }
+  });
+
+  if (error) {
+    box.innerHTML = '<p class="q-message">Bir hata oluştu. Lütfen sayfayı yenileyin.</p>';
+    return;
+  }
+
+  activateSite(data.user);
 }
 
 // ── Login ──
