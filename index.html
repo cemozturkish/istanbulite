@@ -138,6 +138,65 @@
       font-style: italic;
     }
 
+    .form-toggle {
+      font-size: 0.8rem;
+      text-align: center;
+      margin-top: 14px;
+      color: var(--muted);
+    }
+    .form-toggle a {
+      color: var(--ink);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .form-toggle a:hover { text-decoration: underline; }
+
+    .q-label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+      margin-top: 10px;
+      text-align: left;
+    }
+
+    .q-buttons-inline {
+      margin-bottom: 10px;
+      justify-content: flex-start;
+    }
+
+    .q-btn-sm, .q-btn-sm-outline {
+      padding: 7px 20px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .q-btn-sm {
+      background: var(--paper);
+      color: var(--ink);
+      border: 2px solid var(--ink);
+    }
+    .q-btn-sm.selected {
+      background: var(--ink);
+      color: var(--paper);
+    }
+    .q-btn-sm-outline {
+      background: var(--paper);
+      color: var(--ink);
+      border: 2px solid var(--ink);
+    }
+    .q-btn-sm-outline.selected {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
     /* ── MAIN SITE ── */
     #main-site {
       pointer-events: none;
@@ -509,12 +568,45 @@
   <div class="masthead-login">istanbulite.net</div>
   <div class="tagline">Istanbul's community platform</div>
 
-  <div class="login-box">
-    <h2 id="form-title">Sign In</h2>
+  <!-- Sign In Form -->
+  <div class="login-box" id="signin-form">
+    <h2>Giriş Yap</h2>
     <div class="error-msg" id="auth-error"></div>
-    <input type="email" id="auth-email" placeholder="Email address" autocomplete="email"/>
-    <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password"/>
-    <button id="auth-submit-btn">Enter</button>
+    <input type="email" id="auth-email" placeholder="E-posta adresi" autocomplete="email"/>
+    <input type="password" id="auth-password" placeholder="Şifre" autocomplete="current-password"/>
+    <button id="auth-submit-btn">Giriş</button>
+    <p class="form-toggle">Hesabın yok mu? <a href="#" id="show-signup">Kayıt Ol</a></p>
+  </div>
+
+  <!-- Sign Up Form -->
+  <div class="login-box" id="signup-form" style="display:none;">
+    <h2>Kayıt Ol</h2>
+    <div class="error-msg" id="signup-error"></div>
+    <input type="text" id="signup-name" placeholder="Ad" autocomplete="given-name"/>
+    <input type="text" id="signup-lastname" placeholder="Soyad" autocomplete="family-name"/>
+    <input type="email" id="signup-email" placeholder="E-posta adresi" autocomplete="email"/>
+    <input type="password" id="signup-password" placeholder="Şifre" autocomplete="new-password"/>
+
+    <label class="q-label">Hangi ilçede yaşıyorsun?</label>
+    <select class="q-select" id="signup-living-district">
+      <option value="">— İlçe seçin —</option>
+    </select>
+
+    <label class="q-label">İstanbul doğumlu musun?</label>
+    <div class="q-buttons q-buttons-inline" id="signup-born-btns">
+      <button type="button" class="q-btn-sm" id="signup-born-yes">Evet</button>
+      <button type="button" class="q-btn-sm-outline" id="signup-born-no">Hayır</button>
+    </div>
+
+    <div id="signup-birth-district-wrap" style="display:none;">
+      <label class="q-label">Hangi ilçede doğdun?</label>
+      <select class="q-select" id="signup-birth-district">
+        <option value="">— İlçe seçin —</option>
+      </select>
+    </div>
+
+    <button id="signup-submit-btn">Kayıt Ol</button>
+    <p class="form-toggle">Zaten hesabın var mı? <a href="#" id="show-signin">Giriş Yap</a></p>
   </div>
 </div>
 
@@ -655,7 +747,7 @@ function showSite(user) {
 
   // Check if user has completed the onboarding questionnaire
   const meta = user?.user_metadata || {};
-  if (!meta.dogum_yeri && meta.dogum_yeri !== 'istanbul_disi') {
+  if (!meta.yasadigi_ilce || !meta.dogum_yeri) {
     showQuestionnaire(user);
     return;
   }
@@ -701,7 +793,7 @@ function stepLivesInIstanbul(user) {
       <button class="q-btn-outline" id="q-no-lives">Hayır</button>
     </div>
   `;
-  document.getElementById('q-yes-lives').addEventListener('click', () => stepBornInIstanbul(user));
+  document.getElementById('q-yes-lives').addEventListener('click', () => stepLivingDistrict(user));
   document.getElementById('q-no-lives').addEventListener('click', () => stepNotInIstanbul());
 }
 
@@ -713,8 +805,32 @@ function stepNotInIstanbul() {
   `;
 }
 
-// Step 2: Were you born in Istanbul?
-function stepBornInIstanbul(user) {
+// Step 2: Which district do you live in?
+function stepLivingDistrict(user) {
+  const box = document.getElementById('q-step');
+  const options = Object.entries(districtNames)
+    .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
+    .map(([id, name]) => `<option value="${id}">${name}</option>`)
+    .join('');
+  box.innerHTML = `
+    <h2>Hangi ilçede yaşıyorsun?</h2>
+    <select class="q-select" id="q-living-district">
+      <option value="">— İlçe seçin —</option>
+      ${options}
+    </select>
+    <div class="q-buttons">
+      <button class="q-btn" id="q-confirm-living">Devam</button>
+    </div>
+  `;
+  document.getElementById('q-confirm-living').addEventListener('click', () => {
+    const val = document.getElementById('q-living-district').value;
+    if (!val) return;
+    stepBornInIstanbul(user, val);
+  });
+}
+
+// Step 3: Were you born in Istanbul?
+function stepBornInIstanbul(user, yasadigiIlce) {
   const box = document.getElementById('q-step');
   box.innerHTML = `
     <h2>İstanbul doğumlu musun?</h2>
@@ -723,12 +839,12 @@ function stepBornInIstanbul(user) {
       <button class="q-btn-outline" id="q-no-born">Hayır</button>
     </div>
   `;
-  document.getElementById('q-yes-born').addEventListener('click', () => stepSelectDistrict(user));
-  document.getElementById('q-no-born').addEventListener('click', () => saveAndContinue(user, 'istanbul_disi'));
+  document.getElementById('q-yes-born').addEventListener('click', () => stepBirthDistrict(user, yasadigiIlce));
+  document.getElementById('q-no-born').addEventListener('click', () => saveAndContinue(user, yasadigiIlce, 'istanbul_disi'));
 }
 
-// Step 3: Which district were you born in?
-function stepSelectDistrict(user) {
+// Step 4: Which district were you born in?
+function stepBirthDistrict(user, yasadigiIlce) {
   const box = document.getElementById('q-step');
   const options = Object.entries(districtNames)
     .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
@@ -736,28 +852,28 @@ function stepSelectDistrict(user) {
     .join('');
   box.innerHTML = `
     <h2>Hangi ilçede doğdun?</h2>
-    <select class="q-select" id="q-district">
+    <select class="q-select" id="q-birth-district">
       <option value="">— İlçe seçin —</option>
       ${options}
     </select>
     <div class="q-buttons">
-      <button class="q-btn" id="q-confirm-district">Devam</button>
+      <button class="q-btn" id="q-confirm-birth">Devam</button>
     </div>
   `;
-  document.getElementById('q-confirm-district').addEventListener('click', () => {
-    const val = document.getElementById('q-district').value;
+  document.getElementById('q-confirm-birth').addEventListener('click', () => {
+    const val = document.getElementById('q-birth-district').value;
     if (!val) return;
-    saveAndContinue(user, val);
+    saveAndContinue(user, yasadigiIlce, val);
   });
 }
 
 // Save to Supabase and proceed
-async function saveAndContinue(user, dogumYeri) {
+async function saveAndContinue(user, yasadigiIlce, dogumYeri) {
   const box = document.getElementById('q-step');
   box.innerHTML = '<span class="spinner"></span>';
 
   const { data, error } = await sb.auth.updateUser({
-    data: { dogum_yeri: dogumYeri }
+    data: { yasadigi_ilce: yasadigiIlce, dogum_yeri: dogumYeri }
   });
 
   if (error) {
@@ -768,20 +884,18 @@ async function saveAndContinue(user, dogumYeri) {
   activateSite(data.user);
 }
 
-// ── Login ──
+// ── Sign In ──
 document.getElementById('auth-submit-btn').addEventListener('click', async () => {
   const email = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
   const errEl = document.getElementById('auth-error');
   const btn = document.getElementById('auth-submit-btn');
 
-  if (!email || !password) { errEl.textContent = 'Please fill in all fields.'; return; }
+  if (!email || !password) { errEl.textContent = 'Lütfen tüm alanları doldurun.'; return; }
 
   btn.textContent = ''; btn.appendChild(Object.assign(document.createElement('span'), {className:'spinner'}));
-
   const result = await sb.auth.signInWithPassword({ email, password });
-
-  btn.textContent = 'Enter';
+  btn.textContent = 'Giriş';
 
   if (result.error) {
     errEl.textContent = result.error.message;
@@ -790,10 +904,109 @@ document.getElementById('auth-submit-btn').addEventListener('click', async () =>
   }
 });
 
-// Allow Enter key
 ['auth-email','auth-password'].forEach(id => {
   document.getElementById(id).addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('auth-submit-btn').click();
+  });
+});
+
+// ── Toggle Sign In / Sign Up ──
+document.getElementById('show-signup').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('signin-form').style.display = 'none';
+  document.getElementById('signup-form').style.display = '';
+  populateSignupDropdowns();
+});
+
+document.getElementById('show-signin').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('signup-form').style.display = 'none';
+  document.getElementById('signin-form').style.display = '';
+});
+
+// ── Sign Up ──
+let signupBornInIstanbul = null;
+
+function populateSignupDropdowns() {
+  const options = Object.entries(districtNames)
+    .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
+    .map(([id, name]) => `<option value="${id}">${name}</option>`)
+    .join('');
+  const livingSelect = document.getElementById('signup-living-district');
+  const birthSelect = document.getElementById('signup-birth-district');
+  if (livingSelect.options.length <= 1) livingSelect.innerHTML += options;
+  if (birthSelect.options.length <= 1) birthSelect.innerHTML += options;
+}
+
+document.getElementById('signup-born-yes').addEventListener('click', () => {
+  signupBornInIstanbul = true;
+  document.getElementById('signup-born-yes').classList.add('selected');
+  document.getElementById('signup-born-no').classList.remove('selected');
+  document.getElementById('signup-birth-district-wrap').style.display = '';
+});
+
+document.getElementById('signup-born-no').addEventListener('click', () => {
+  signupBornInIstanbul = false;
+  document.getElementById('signup-born-no').classList.add('selected');
+  document.getElementById('signup-born-yes').classList.remove('selected');
+  document.getElementById('signup-birth-district-wrap').style.display = 'none';
+});
+
+document.getElementById('signup-submit-btn').addEventListener('click', async () => {
+  const name = document.getElementById('signup-name').value.trim();
+  const lastname = document.getElementById('signup-lastname').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  const livingDistrict = document.getElementById('signup-living-district').value;
+  const errEl = document.getElementById('signup-error');
+  const btn = document.getElementById('signup-submit-btn');
+
+  if (!name || !lastname || !email || !password) {
+    errEl.textContent = 'Lütfen tüm alanları doldurun.'; return;
+  }
+  if (!livingDistrict) {
+    errEl.textContent = 'Lütfen yaşadığınız ilçeyi seçin.'; return;
+  }
+  if (signupBornInIstanbul === null) {
+    errEl.textContent = 'Lütfen İstanbul doğumlu olup olmadığınızı belirtin.'; return;
+  }
+
+  let dogumYeri = 'istanbul_disi';
+  if (signupBornInIstanbul) {
+    dogumYeri = document.getElementById('signup-birth-district').value;
+    if (!dogumYeri) {
+      errEl.textContent = 'Lütfen doğduğunuz ilçeyi seçin.'; return;
+    }
+  }
+
+  btn.textContent = ''; btn.appendChild(Object.assign(document.createElement('span'), {className:'spinner'}));
+
+  const result = await sb.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        display_name: name + ' ' + lastname,
+        first_name: name,
+        last_name: lastname,
+        yasadigi_ilce: livingDistrict,
+        dogum_yeri: dogumYeri
+      }
+    }
+  });
+
+  btn.textContent = 'Kayıt Ol';
+
+  if (result.error) {
+    errEl.textContent = result.error.message;
+  } else if (result.data.user) {
+    showSite(result.data.user);
+  }
+});
+
+['signup-name','signup-lastname','signup-email','signup-password'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('signup-submit-btn').click();
   });
 });
 
