@@ -755,7 +755,19 @@ function showSite(user) {
   const hasBirth = meta.dogum_yeri;
 
   if (!hasLiving || !hasBirth) {
-    showQuestionnaire(user);
+    // Re-fetch fresh user data in case metadata was updated but local session is stale
+    sb.auth.getUser().then(({ data }) => {
+      const freshMeta = data?.user?.user_metadata || {};
+      const freshLiving = freshMeta.yasadigi_ilce || freshMeta.neighborhood;
+      const freshBirth = freshMeta.dogum_yeri;
+      if (freshLiving && freshBirth) {
+        activateSite(data.user);
+      } else {
+        showQuestionnaire(data?.user || user);
+      }
+    }).catch(() => {
+      showQuestionnaire(user);
+    });
     return;
   }
 
@@ -894,16 +906,34 @@ async function saveAndContinue(user, yasadigiIlce, dogumYeri) {
   const box = document.getElementById('q-step');
   box.innerHTML = '<span class="spinner"></span>';
 
-  const { data, error } = await sb.auth.updateUser({
-    data: { yasadigi_ilce: yasadigiIlce, dogum_yeri: dogumYeri }
-  });
+  try {
+    const { data, error } = await sb.auth.updateUser({
+      data: { yasadigi_ilce: yasadigiIlce, dogum_yeri: dogumYeri }
+    });
 
-  if (error) {
-    box.innerHTML = '<p class="q-message">Bir hata oluştu. Lütfen sayfayı yenileyin.</p>';
-    return;
+    if (error) {
+      console.error('updateUser error:', error);
+      box.innerHTML = `
+        <p class="q-message">Bir hata oluştu: ${error.message}</p>
+        <div class="q-buttons" style="margin-top:16px;">
+          <button class="q-btn" id="q-retry">Tekrar Dene</button>
+        </div>
+      `;
+      document.getElementById('q-retry').addEventListener('click', () => saveAndContinue(user, yasadigiIlce, dogumYeri));
+      return;
+    }
+
+    activateSite(data.user);
+  } catch (err) {
+    console.error('saveAndContinue exception:', err);
+    box.innerHTML = `
+      <p class="q-message">Bağlantı hatası. Lütfen tekrar deneyin.</p>
+      <div class="q-buttons" style="margin-top:16px;">
+        <button class="q-btn" id="q-retry">Tekrar Dene</button>
+      </div>
+    `;
+    document.getElementById('q-retry').addEventListener('click', () => saveAndContinue(user, yasadigiIlce, dogumYeri));
   }
-
-  activateSite(data.user);
 }
 
 // ── Sign In ──
