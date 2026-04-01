@@ -465,103 +465,6 @@
       vertical-align: middle;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── QUESTIONNAIRE OVERLAY ── */
-    #questionnaire-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(255, 255, 255, 0.97);
-      backdrop-filter: blur(3px);
-      z-index: 998;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 0;
-    }
-
-    .q-box {
-      border: 2px solid var(--ink);
-      padding: 36px 40px;
-      width: 420px;
-      background: var(--paper);
-      text-align: center;
-    }
-
-    .q-box::before {
-      content: '';
-      position: absolute;
-      inset: 4px;
-      border: 1px solid var(--ink);
-      pointer-events: none;
-    }
-
-    .q-box { position: relative; }
-
-    .q-box h2 {
-      font-family: 'Inter', sans-serif;
-      font-size: 1rem;
-      font-weight: 700;
-      line-height: 1.4;
-      margin-bottom: 24px;
-    }
-
-    .q-buttons {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-    }
-
-    .q-btn {
-      padding: 11px 32px;
-      background: var(--ink);
-      color: var(--paper);
-      border: none;
-      font-family: 'Inter', sans-serif;
-      font-size: 0.9rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .q-btn:hover { background: #555555; }
-
-    .q-btn-outline {
-      padding: 11px 32px;
-      background: var(--paper);
-      color: var(--ink);
-      border: 2px solid var(--ink);
-      font-family: 'Inter', sans-serif;
-      font-size: 0.9rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .q-btn-outline:hover { background: var(--paper-dark); }
-
-    .q-message {
-      font-size: 0.85rem;
-      color: var(--muted);
-      font-style: italic;
-      line-height: 1.5;
-    }
-
-    .q-select {
-      width: 100%;
-      padding: 10px 12px;
-      margin-bottom: 16px;
-      border: 1px solid var(--ink);
-      background: #f5f5f5;
-      font-family: 'Inter', sans-serif;
-      font-size: 0.95rem;
-      color: var(--ink);
-      cursor: pointer;
-    }
   </style>
 </head>
 <body>
@@ -611,11 +514,6 @@
     <button id="signup-submit-btn">Kayıt Ol</button>
     <p class="form-toggle">Zaten hesabın var mı? <a href="#" id="show-signin">Giriş Yap</a></p>
   </div>
-</div>
-
-<!-- ══════════════ QUESTIONNAIRE OVERLAY ══════════════ -->
-<div id="questionnaire-overlay">
-  <div class="q-box" id="q-step"></div>
 </div>
 
 <!-- ══════════════ MAIN SITE ══════════════ -->
@@ -747,243 +645,12 @@ async function checkSession() {
 
 function showSite(user) {
   document.getElementById('login-overlay').style.display = 'none';
-
-  const meta = user?.user_metadata || {};
-  // Use existing 'neighborhood' as fallback for yasadigi_ilce (legacy accounts)
-  const hasLiving = meta.yasadigi_ilce || meta.neighborhood;
-  const hasBirth = meta.dogum_yeri;
-
-  // If user has a living district (even from legacy 'neighborhood'), let them in
-  // Birth data is optional — questionnaire will be offered but not blocking
-  if (hasLiving && !hasBirth) {
-    // They can use the site; offer questionnaire non-blockingly later
-    activateSite(user);
-    return;
-  }
-
-  if (!hasLiving) {
-    // Re-fetch fresh user data to check if metadata was already saved server-side
-    sb.auth.getUser().then(({ data, error }) => {
-      if (error) {
-        // Token issue — try refreshing the session first
-        return sb.auth.refreshSession().then(({ data: refreshData }) => {
-          if (refreshData?.session) {
-            return sb.auth.getUser();
-          }
-          throw new Error('No session');
-        });
-      }
-      return { data, error: null };
-    }).then(({ data }) => {
-      const freshMeta = data?.user?.user_metadata || {};
-      const freshLiving = freshMeta.yasadigi_ilce || freshMeta.neighborhood;
-      const freshBirth = freshMeta.dogum_yeri;
-      if (freshLiving && freshBirth) {
-        activateSite(data.user);
-      } else {
-        showQuestionnaire(data?.user || user);
-      }
-    }).catch(() => {
-      showQuestionnaire(user);
-    });
-    return;
-  }
-
-  activateSite(user);
-}
-
-function activateSite(user) {
-  document.getElementById('questionnaire-overlay').style.display = 'none';
   document.getElementById('main-site').classList.add('active');
-  // Use yasadigi_ilce first, fall back to legacy neighborhood field
+  // Highlight home neighborhood on map
   const homeNb = user?.user_metadata?.yasadigi_ilce || user?.user_metadata?.neighborhood;
   if (homeNb) {
     const nbEl = document.getElementById(homeNb);
     if (nbEl) nbEl.classList.add('home');
-  }
-}
-
-// ── Onboarding Questionnaire ──
-const districtNames = {
-  bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler',
-  sisli:'Şişli', eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa',
-  esenler:'Esenler', bagcilar:'Bağcılar', basaksehir:'Başakşehir',
-  kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi', uskudar:'Üsküdar',
-  kadikoy:'Kadıköy', maltepe:'Maltepe', umraniye:'Ümraniye',
-  cekmekoy:'Çekmeköy', beykoz:'Beykoz', sariyer:'Sarıyer',
-  besiktas:'Beşiktaş', beyoglu:'Beyoğlu', gungoren:'Güngören',
-  kagithane:'Kağıthane', atasehir:'Ataşehir', zeytinburnu:'Zeytinburnu', fatih:'Fatih'
-};
-
-function showQuestionnaire(user) {
-  const overlay = document.getElementById('questionnaire-overlay');
-  overlay.style.display = 'flex';
-  const meta = user?.user_metadata || {};
-
-  // Skip to the first unanswered question
-  const existingLiving = meta.yasadigi_ilce || meta.neighborhood || null;
-  const existingBirth = meta.dogum_yeri || null;
-
-  if (existingLiving && !existingBirth) {
-    // Already have living district, just need birth info
-    stepBornInIstanbul(user, existingLiving);
-  } else if (!existingLiving && !existingBirth) {
-    stepLivesInIstanbul(user);
-  } else if (!existingLiving && existingBirth) {
-    // Has birth but not living — start from living question
-    stepLivesInIstanbul(user);
-  } else {
-    // Both exist — shouldn't reach here, but just in case
-    activateSite(user);
-  }
-}
-
-// Allow skipping questionnaire if updateUser keeps failing (e.g. token issues)
-// Uses local fallback so user can at least use the site
-function skipQuestionnaire(user) {
-  console.warn('Skipping questionnaire due to auth issues');
-  activateSite(user);
-}
-
-// Step 1: Do you live in Istanbul?
-function stepLivesInIstanbul(user) {
-  const box = document.getElementById('q-step');
-  box.innerHTML = `
-    <h2>İstanbul'da mı yaşıyorsun?</h2>
-    <div class="q-buttons">
-      <button class="q-btn" id="q-yes-lives">Evet</button>
-      <button class="q-btn-outline" id="q-no-lives">Hayır</button>
-    </div>
-  `;
-  document.getElementById('q-yes-lives').addEventListener('click', () => stepLivingDistrict(user));
-  document.getElementById('q-no-lives').addEventListener('click', () => stepNotInIstanbul());
-}
-
-// Dead end: not in Istanbul
-function stepNotInIstanbul() {
-  const box = document.getElementById('q-step');
-  box.innerHTML = `
-    <h2>ISTANBULITE şu anda sadece İstanbul'da yaşayanlara hizmet vermektedir.</h2>
-  `;
-}
-
-// Step 2: Which district do you live in?
-function stepLivingDistrict(user) {
-  const box = document.getElementById('q-step');
-  const options = Object.entries(districtNames)
-    .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
-    .map(([id, name]) => `<option value="${id}">${name}</option>`)
-    .join('');
-  box.innerHTML = `
-    <h2>Hangi ilçede yaşıyorsun?</h2>
-    <select class="q-select" id="q-living-district">
-      <option value="">— İlçe seçin —</option>
-      ${options}
-    </select>
-    <div class="q-buttons">
-      <button class="q-btn" id="q-confirm-living">Devam</button>
-    </div>
-  `;
-  document.getElementById('q-confirm-living').addEventListener('click', () => {
-    const val = document.getElementById('q-living-district').value;
-    if (!val) return;
-    stepBornInIstanbul(user, val);
-  });
-}
-
-// Step 3: Were you born in Istanbul?
-function stepBornInIstanbul(user, yasadigiIlce) {
-  const box = document.getElementById('q-step');
-  box.innerHTML = `
-    <h2>İstanbul doğumlu musun?</h2>
-    <div class="q-buttons">
-      <button class="q-btn" id="q-yes-born">Evet</button>
-      <button class="q-btn-outline" id="q-no-born">Hayır</button>
-    </div>
-  `;
-  document.getElementById('q-yes-born').addEventListener('click', () => stepBirthDistrict(user, yasadigiIlce));
-  document.getElementById('q-no-born').addEventListener('click', () => saveAndContinue(user, yasadigiIlce, 'istanbul_disi'));
-}
-
-// Step 4: Which district were you born in?
-function stepBirthDistrict(user, yasadigiIlce) {
-  const box = document.getElementById('q-step');
-  const options = Object.entries(districtNames)
-    .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
-    .map(([id, name]) => `<option value="${id}">${name}</option>`)
-    .join('');
-  box.innerHTML = `
-    <h2>Hangi ilçede doğdun?</h2>
-    <select class="q-select" id="q-birth-district">
-      <option value="">— İlçe seçin —</option>
-      ${options}
-    </select>
-    <div class="q-buttons">
-      <button class="q-btn" id="q-confirm-birth">Devam</button>
-    </div>
-  `;
-  document.getElementById('q-confirm-birth').addEventListener('click', () => {
-    const val = document.getElementById('q-birth-district').value;
-    if (!val) return;
-    saveAndContinue(user, yasadigiIlce, val);
-  });
-}
-
-// Save to Supabase and proceed
-async function saveAndContinue(user, yasadigiIlce, dogumYeri) {
-  const box = document.getElementById('q-step');
-  box.innerHTML = '<span class="spinner"></span>';
-
-  try {
-    // Ensure we have a valid session token
-    let { data: sessionData } = await sb.auth.getSession();
-    if (!sessionData?.session) {
-      const { data: refreshData } = await sb.auth.refreshSession();
-      sessionData = refreshData;
-    }
-    if (!sessionData?.session) {
-      // No valid session — offer skip button so user can still use the site
-      box.innerHTML = `
-        <p class="q-message">Oturum bulunamadı. Tekrar giriş yapın veya devam edin.</p>
-        <div class="q-buttons" style="margin-top:16px;">
-          <button class="q-btn" id="q-skip-btn">Devam Et</button>
-        </div>
-      `;
-      document.getElementById('q-skip-btn').addEventListener('click', () => skipQuestionnaire(user));
-      return;
-    }
-
-    const { data, error } = await sb.auth.updateUser({
-      data: { yasadigi_ilce: yasadigiIlce, dogum_yeri: dogumYeri }
-    });
-
-    if (error) {
-      console.error('updateUser error:', error);
-      // If bearer token error, offer skip to let user proceed
-      box.innerHTML = `
-        <p class="q-message">Bir hata oluştu: ${error.message}</p>
-        <div class="q-buttons" style="margin-top:16px;">
-          <button class="q-btn" id="q-retry">Tekrar Dene</button>
-          <button class="q-btn-outline" id="q-skip-btn">Atla</button>
-        </div>
-      `;
-      document.getElementById('q-retry').addEventListener('click', () => saveAndContinue(user, yasadigiIlce, dogumYeri));
-      document.getElementById('q-skip-btn').addEventListener('click', () => skipQuestionnaire(user));
-      return;
-    }
-
-    activateSite(data.user);
-  } catch (err) {
-    console.error('saveAndContinue exception:', err);
-    box.innerHTML = `
-      <p class="q-message">Bağlantı hatası.</p>
-      <div class="q-buttons" style="margin-top:16px;">
-        <button class="q-btn" id="q-retry">Tekrar Dene</button>
-        <button class="q-btn-outline" id="q-skip-btn">Atla</button>
-      </div>
-    `;
-    document.getElementById('q-retry').addEventListener('click', () => saveAndContinue(user, yasadigiIlce, dogumYeri));
-    document.getElementById('q-skip-btn').addEventListener('click', () => skipQuestionnaire(user));
   }
 }
 
@@ -1026,6 +693,18 @@ document.getElementById('show-signin').addEventListener('click', (e) => {
   document.getElementById('signup-form').style.display = 'none';
   document.getElementById('signin-form').style.display = '';
 });
+
+// ── District names (used by sign-up form) ──
+const districtNames = {
+  bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler',
+  sisli:'Şişli', eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa',
+  esenler:'Esenler', bagcilar:'Bağcılar', basaksehir:'Başakşehir',
+  kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi', uskudar:'Üsküdar',
+  kadikoy:'Kadıköy', maltepe:'Maltepe', umraniye:'Ümraniye',
+  cekmekoy:'Çekmeköy', beykoz:'Beykoz', sariyer:'Sarıyer',
+  besiktas:'Beşiktaş', beyoglu:'Beyoğlu', gungoren:'Güngören',
+  kagithane:'Kağıthane', atasehir:'Ataşehir', zeytinburnu:'Zeytinburnu', fatih:'Fatih'
+};
 
 // ── Sign Up ──
 let signupBornInIstanbul = null;
