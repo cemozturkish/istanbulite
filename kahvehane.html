@@ -135,21 +135,24 @@
       pointer-events: all;
     }
 
-    .neighborhood:hover { opacity: 1; fill: rgba(0,0,0,0.08); }
+    /* Hover: lighter gray */
+    .neighborhood:hover { opacity: 1; fill: rgba(0,0,0,0.10); }
+    /* Clicked/active: dark gray */
     .neighborhood.active {
       opacity: 1;
-      fill: rgba(0,0,0,0.15);
+      fill: rgba(0,0,0,0.25);
       stroke: #333333;
       stroke-width: 2;
     }
+    /* Home neighborhood: darkest, always visible */
     .neighborhood.home {
-      fill: rgba(0,0,0,0.12);
-      stroke: var(--accent);
-      stroke-width: 4;
+      fill: rgba(0,0,0,0.40);
+      stroke: var(--ink);
+      stroke-width: 3;
       opacity: 1;
     }
-    .neighborhood.home:hover { fill: rgba(0,0,0,0.20); }
-    .neighborhood.home.active { fill: rgba(0,0,0,0.22); stroke: #333333; }
+    .neighborhood.home:hover { fill: rgba(0,0,0,0.45); }
+    .neighborhood.home.active { fill: rgba(0,0,0,0.45); stroke: var(--ink); }
 
     .map-label {
       text-align: center;
@@ -188,37 +191,43 @@
     .games-section {
       order: 3;
       padding: 0;
-      overflow-y: auto;
+      overflow: hidden;
       border-left: var(--col-border);
       display: flex;
       flex-direction: column;
+      min-height: 0;
     }
 
     .games-section-inner {
-      padding: 20px 20px 24px;
+      padding: 16px 16px 16px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
+      flex: 1;
+      min-height: 0;
+      justify-content: center;
     }
 
     .games-section h2 {
-      font-size: 1.1rem;
+      font-size: 0.95rem;
       font-weight: 700;
-      margin-bottom: 6px;
+      margin-bottom: 2px;
       text-align: center;
       letter-spacing: 2px;
+      flex-shrink: 0;
     }
 
     .game-link {
       display: block;
       background: white;
       border: 2px solid var(--ink);
-      padding: 20px;
+      padding: 14px;
       text-align: center;
       text-decoration: none;
       color: var(--ink);
       transition: all 0.2s;
       position: relative;
+      flex-shrink: 0;
     }
 
     .game-link::before {
@@ -235,13 +244,13 @@
     }
 
     .game-link-title {
-      font-size: 1.1rem;
+      font-size: 1rem;
       font-weight: 700;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
 
     .game-link-subtitle {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       color: var(--muted);
       font-style: italic;
     }
@@ -514,7 +523,9 @@ async function init() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = 'index.html'; return; }
 
-  homeNeighborhood = session.user.user_metadata?.neighborhood || null;
+  // Use yasadigi_ilce first, fall back to legacy neighborhood field
+  homeNeighborhood = session.user.user_metadata?.yasadigi_ilce
+    || session.user.user_metadata?.neighborhood || null;
 
   if (homeNeighborhood) {
     selectedNeighborhood = homeNeighborhood;
@@ -545,6 +556,13 @@ mapNeighborhoods.forEach(nb => {
     document.getElementById('map-label').textContent = name;
     document.getElementById('discussion-label').textContent = name;
     activeMapNeighborhood = nb.id;
+    // Only show comment form when viewing own neighborhood
+    const form = document.getElementById('submit-form');
+    if (homeNeighborhood && nb.id === homeNeighborhood) {
+      form.style.display = 'block';
+    } else {
+      form.style.display = 'none';
+    }
     loadPosts(nb.id);
   });
 });
@@ -560,6 +578,8 @@ document.addEventListener('click', (e) => {
     document.getElementById('map-label').textContent = 'İstanbul';
     document.getElementById('discussion-label').textContent = 'Tüm İstanbul';
     activeMapNeighborhood = null;
+    // Show comment form when back to all-Istanbul view
+    if (homeNeighborhood) document.getElementById('submit-form').style.display = 'block';
     loadPosts();
   }
 });
@@ -621,7 +641,7 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   document.getElementById('submit-btn').disabled = true;
   
   const { error } = await sb.from('discussions').insert([{
-    neighborhood: selectedNeighborhood,
+    neighborhood: homeNeighborhood,
     content: content,
     user_id: user.id,
     approved: false

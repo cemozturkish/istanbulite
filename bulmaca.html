@@ -245,21 +245,7 @@
     </section>
 
     <section class="clues-section">
-      <div class="clues">
-        <h3>Yatay</h3>
-        <div class="clue-list">
-          <div class="clue"><span class="clue-number">1.</span><span>Türkiye'nin başkenti</span></div>
-          <div class="clue"><span class="clue-number">4.</span><span>Sabah içilen sıcak içecek</span></div>
-          <div class="clue"><span class="clue-number">5.</span><span>Denizde yaşayan canlı</span></div>
-        </div>
-
-        <h3>Dikey</h3>
-        <div class="clue-list">
-          <div class="clue"><span class="clue-number">1.</span><span>Yaz mevsiminde sıcak hava</span></div>
-          <div class="clue"><span class="clue-number">2.</span><span>Kitap okunan yer</span></div>
-          <div class="clue"><span class="clue-number">3.</span><span>Gece gökyüzünde parlayan</span></div>
-        </div>
-      </div>
+      <div class="clues" id="clues-container"></div>
     </section>
   </main>
 
@@ -268,16 +254,195 @@
   </footer>
 
 <script>
-const PUZZLE = [
-  ['A', 'N', 'K', 'A', 'R'],
-  ['I', null, 'I', null, 'A'],
-  ['R', null, 'T', null, 'K'],
-  [null, 'Ç', 'A', 'Y', null],
-  ['B', 'A', 'L', 'I', 'K']
+// Daily seed for puzzle rotation
+function getDailySeed() {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
+}
+
+function getTimeUntilMidnight() {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  const tomorrow = new Date(ist);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  const diff = tomorrow - ist;
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return `Yeni bulmaca ${hours} saat ${minutes} dakika sonra`;
+}
+
+// Multiple puzzles for daily rotation
+const PUZZLES = [
+  {
+    grid: [
+      ['A', 'N', 'K', 'A', 'R'],
+      ['I', null, 'I', null, 'A'],
+      ['R', null, 'T', null, 'K'],
+      [null, 'Ç', 'A', 'Y', null],
+      ['B', 'A', 'L', 'I', 'K']
+    ],
+    clues: {
+      across: [
+        { num: 1, clue: "Türkiye'nin başkenti" },
+        { num: 4, clue: 'Sabah içilen sıcak içecek' },
+        { num: 5, clue: 'Denizde yaşayan canlı' }
+      ],
+      down: [
+        { num: 1, clue: 'Yaz mevsiminde sıcak hava' },
+        { num: 2, clue: 'Kitap okunan yer' },
+        { num: 3, clue: 'Gece gökyüzünde parlayan' }
+      ]
+    }
+  },
+  {
+    grid: [
+      ['D', 'E', 'N', 'İ', 'Z'],
+      ['Ü', null, 'E', null, 'A'],
+      ['N', null, 'F', null, 'M'],
+      [null, 'G', 'E', 'C', 'E'],
+      ['A', 'Y', 'S', 'E', null]
+    ],
+    clues: {
+      across: [
+        { num: 1, clue: 'Tuzlu su kütlesi' },
+        { num: 4, clue: 'Güneşin battığı zaman' },
+        { num: 5, clue: 'Türk kadın ismi' }
+      ],
+      down: [
+        { num: 1, clue: 'Rüyaların görüldüğü yer' },
+        { num: 2, clue: 'Soluk alıp verme' },
+        { num: 3, clue: 'Yılın dönemleri' }
+      ]
+    }
+  },
+  {
+    grid: [
+      ['S', 'A', 'B', 'A', 'H'],
+      ['E', null, 'A', null, 'A'],
+      ['S', null, 'H', null, 'V'],
+      [null, 'K', 'Ç', 'E', null],
+      ['E', 'K', 'İ', 'N', null]
+    ],
+    clues: {
+      across: [
+        { num: 1, clue: 'Günün başlangıcı' },
+        { num: 4, clue: 'Nehir kenarındaki bitki örtüsü' },
+        { num: 5, clue: 'Tarlada yetişen ürün' }
+      ],
+      down: [
+        { num: 1, clue: 'Duyulan algı' },
+        { num: 2, clue: 'Meyve ve sebze yetişen yer' },
+        { num: 3, clue: 'Gökyüzündeki su' }
+      ]
+    }
+  },
+  {
+    grid: [
+      ['K', 'A', 'L', 'E', 'M'],
+      ['A', null, 'İ', null, 'A'],
+      ['P', null, 'M', null, 'S'],
+      [null, 'Y', 'O', 'L', null],
+      ['A', 'R', 'N', 'A', null]
+    ],
+    clues: {
+      across: [
+        { num: 1, clue: 'Yazı yazılan araç' },
+        { num: 4, clue: 'Gidilen güzergah' },
+        { num: 5, clue: 'Spor müsabakası yapılan yer' }
+      ],
+      down: [
+        { num: 1, clue: 'Gemi bağlanan yer' },
+        { num: 2, clue: 'Ekşi sarı meyve' },
+        { num: 3, clue: 'Ahşap malzeme' }
+      ]
+    }
+  },
+  {
+    grid: [
+      ['P', 'A', 'S', 'T', 'A'],
+      ['A', null, 'O', null, 'Ş'],
+      ['R', null, 'K', null, 'K'],
+      [null, 'T', 'A', 'Ş', null],
+      ['K', 'U', 'K', 'U', null]
+    ],
+    clues: {
+      across: [
+        { num: 1, clue: 'İtalyan yemeği' },
+        { num: 4, clue: 'Sert kayaç parçası' },
+        { num: 5, clue: 'Kuş türü, sesi ile bilinir' }
+      ],
+      down: [
+        { num: 1, clue: 'Paranın birimi' },
+        { num: 2, clue: 'Caddedeki yol' },
+        { num: 3, clue: 'Sevgi, tutku' }
+      ]
+    }
+  },
+  {
+    grid: [
+      ['V', 'A', 'P', 'U', 'R'],
+      ['A', null, 'A', null, 'Ü'],
+      ['T', null, 'Z', null, 'Z'],
+      [null, 'D', 'A', 'Ğ', null],
+      ['İ', 'N', 'R', 'E', null]
+    ],
+    clues: {
+      across: [
+        { num: 1, clue: 'Denizde yolcu taşıyan araç' },
+        { num: 4, clue: 'Yüksek arazi' },
+        { num: 5, clue: 'Kuyu veya mağara' }
+      ],
+      down: [
+        { num: 1, clue: 'Yurt, memleket' },
+        { num: 2, clue: 'Alışveriş merkezi' },
+        { num: 3, clue: 'Esinti' }
+      ]
+    }
+  },
+  {
+    grid: [
+      ['G', 'Ü', 'N', 'E', 'Ş'],
+      ['İ', null, 'E', null, 'E'],
+      ['T', null, 'F', null, 'H'],
+      [null, 'İ', 'E', 'Ş', null],
+      ['D', 'A', 'S', 'K', null]
+    ],
+    clues: {
+      across: [
+        { num: 1, clue: 'Gökyüzündeki yıldız' },
+        { num: 4, clue: 'Karşılıklı ilişki' },
+        { num: 5, clue: 'Okul mobilyası' }
+      ],
+      down: [
+        { num: 1, clue: 'Müzik aleti çalan' },
+        { num: 2, clue: 'Soluk alma' },
+        { num: 3, clue: 'Kent, il' }
+      ]
+    }
+  }
 ];
 
+function seededRandom(seed) {
+  let x = 0;
+  for (let i = 0; i < seed.length; i++) {
+    x = ((x << 5) - x) + seed.charCodeAt(i);
+    x = x & x;
+  }
+  return Math.abs(x % PUZZLES.length);
+}
+
+const dailySeed = getDailySeed();
+const puzzleIndex = seededRandom(dailySeed);
+const todayPuzzle = PUZZLES[puzzleIndex];
+const PUZZLE = todayPuzzle.grid;
+const CLUES = todayPuzzle.clues;
+
 let activeCell = null;
+let gameCompleted = false;
 const userAnswers = Array(5).fill(null).map(() => Array(5).fill(''));
+const SAVE_KEY = 'bulmaca_state_' + dailySeed;
 
 function createGrid() {
   const grid = document.getElementById('crossword-grid');
@@ -339,13 +504,15 @@ function updateCell(letter) {
 }
 
 document.addEventListener('keydown', (e) => {
-  if (!activeCell) return;
-  
+  if (!activeCell || gameCompleted) return;
+
   if (e.key.length === 1 && e.key.match(/[a-zçğıöşüA-ZÇĞİÖŞÜ]/)) {
     updateCell(e.key.toUpperCase());
     moveToNext();
+    saveState();
   } else if (e.key === 'Backspace') {
     updateCell('');
+    saveState();
   }
 });
 
@@ -372,14 +539,68 @@ function moveToNext() {
   }
 }
 
+// Render clues dynamically
+function renderClues() {
+  const container = document.getElementById('clues-container');
+  let html = '<h3>Yatay</h3><div class="clue-list">';
+  CLUES.across.forEach(c => {
+    html += `<div class="clue"><span class="clue-number">${c.num}.</span><span>${c.clue}</span></div>`;
+  });
+  html += '</div><h3>Dikey</h3><div class="clue-list">';
+  CLUES.down.forEach(c => {
+    html += `<div class="clue"><span class="clue-number">${c.num}.</span><span>${c.clue}</span></div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// Save state to localStorage
+function saveState() {
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ userAnswers, gameCompleted }));
+}
+
+// Restore state from localStorage
+function restoreState() {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) return false;
+  try {
+    const state = JSON.parse(raw);
+    if (!state.userAnswers) return false;
+    // Restore answers into grid
+    const cells = document.querySelectorAll('.crossword-cell');
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 5; col++) {
+        if (PUZZLE[row][col] !== null) {
+          userAnswers[row][col] = state.userAnswers[row][col] || '';
+          const cell = cells[row * 5 + col];
+          const textNode = Array.from(cell.childNodes).find(n => n.nodeType === 3);
+          if (textNode) { textNode.textContent = userAnswers[row][col]; }
+          else if (userAnswers[row][col]) { cell.appendChild(document.createTextNode(userAnswers[row][col])); }
+          // If completed, mark correct cells
+          if (state.gameCompleted && userAnswers[row][col] === PUZZLE[row][col]) {
+            cell.classList.add('correct');
+          }
+        }
+      }
+    }
+    gameCompleted = state.gameCompleted || false;
+    if (gameCompleted) {
+      document.getElementById('game-message').textContent = 'Tebrikler! Tamamladınız!';
+      document.getElementById('game-message').style.color = 'var(--success)';
+    }
+    return true;
+  } catch (e) { return false; }
+}
+
 document.getElementById('check-btn').addEventListener('click', () => {
+  if (gameCompleted) return;
   let allCorrect = true;
   const cells = document.querySelectorAll('.crossword-cell:not(.black)');
-  
+
   cells.forEach(cell => {
     const row = parseInt(cell.dataset.row);
     const col = parseInt(cell.dataset.col);
-    
+
     if (userAnswers[row][col] === PUZZLE[row][col]) {
       cell.classList.add('correct');
     } else {
@@ -387,21 +608,24 @@ document.getElementById('check-btn').addEventListener('click', () => {
       cell.classList.remove('correct');
     }
   });
-  
+
   const msgEl = document.getElementById('game-message');
-  // Track score in localStorage
-  localStorage.setItem('bulmaca_played', parseInt(localStorage.getItem('bulmaca_played') || '0') + 1);
   if (allCorrect) {
-    msgEl.textContent = '🎉 Tebrikler! Tamamladınız!';
+    msgEl.textContent = 'Tebrikler! Tamamladınız!';
     msgEl.style.color = 'var(--success)';
+    gameCompleted = true;
+    // Track score in localStorage (only once per puzzle)
+    localStorage.setItem('bulmaca_played', parseInt(localStorage.getItem('bulmaca_played') || '0') + 1);
     localStorage.setItem('bulmaca_wins', parseInt(localStorage.getItem('bulmaca_wins') || '0') + 1);
   } else {
     msgEl.textContent = 'Bazı cevaplar yanlış!';
     msgEl.style.color = 'var(--accent)';
   }
+  saveState();
 });
 
 document.getElementById('clear-btn').addEventListener('click', () => {
+  if (gameCompleted) return;
   userAnswers.forEach((row, i) => row.forEach((_, j) => userAnswers[i][j] = ''));
   document.querySelectorAll('.crossword-cell:not(.black)').forEach(cell => {
     const textNode = Array.from(cell.childNodes).find(n => n.nodeType === 3);
@@ -409,9 +633,12 @@ document.getElementById('clear-btn').addEventListener('click', () => {
     cell.classList.remove('correct');
   });
   document.getElementById('game-message').textContent = '';
+  saveState();
 });
 
 createGrid();
+renderClues();
+restoreState();
 </script>
 </body>
 </html>
