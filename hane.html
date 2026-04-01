@@ -226,6 +226,68 @@
       color: var(--ink);
     }
 
+    .info-select {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      padding: 8px 10px;
+      background: #f5f5f5;
+      border: 1px solid var(--ink);
+      color: var(--ink);
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .born-toggle {
+      display: flex;
+      gap: 6px;
+    }
+
+    .born-btn {
+      flex: 1;
+      padding: 8px 10px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      border: 2px solid var(--ink);
+      background: var(--paper);
+      color: var(--ink);
+      transition: all 0.2s;
+    }
+
+    .born-btn.selected {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .save-profile-btn {
+      grid-column: 1 / -1;
+      padding: 10px 24px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .save-profile-btn:hover { background: #555555; }
+
+    .save-status {
+      grid-column: 1 / -1;
+      font-size: 0.75rem;
+      text-align: center;
+      min-height: 16px;
+      font-style: italic;
+      color: var(--muted);
+    }
+
     /* Right panel: game scores */
     .profile-right {
       border-left: var(--col-border);
@@ -418,22 +480,9 @@ async function loadProfile() {
   const avatarUrl = user.user_metadata?.avatar_url || null;
   const displayName = user.user_metadata?.display_name || user.email.split('@')[0];
 
-  // Living district from onboarding questionnaire (fallback to legacy neighborhood)
-  const yasadigiIlce = user.user_metadata?.yasadigi_ilce || user.user_metadata?.neighborhood || null;
-  const yasadigiIlceDisplay = yasadigiIlce && neighborhoodNames[yasadigiIlce]
-    ? neighborhoodNames[yasadigiIlce]
-    : (yasadigiIlce || '—');
-
-  // Birth place from onboarding questionnaire
-  const dogumYeri = user.user_metadata?.dogum_yeri || null;
-  let dogumYeriDisplay = '—';
-  if (dogumYeri === 'istanbul_disi') {
-    dogumYeriDisplay = 'İstanbul Dışı';
-  } else if (dogumYeri && neighborhoodNames[dogumYeri]) {
-    dogumYeriDisplay = neighborhoodNames[dogumYeri];
-  } else if (dogumYeri) {
-    dogumYeriDisplay = dogumYeri;
-  }
+  // Current values from metadata (with legacy fallback)
+  const yasadigiIlce = user.user_metadata?.yasadigi_ilce || user.user_metadata?.neighborhood || '';
+  const dogumYeri = user.user_metadata?.dogum_yeri || '';
 
   const joinedDate = new Date(user.created_at).toLocaleDateString('tr-TR', {
     year: 'numeric',
@@ -450,6 +499,21 @@ async function loadProfile() {
   const avatarContent = avatarUrl
     ? `<img src="${avatarUrl}" alt="Profile">`
     : displayName.charAt(0).toUpperCase();
+
+  // Build district dropdown options sorted alphabetically in Turkish
+  const districtOptions = Object.entries(neighborhoodNames)
+    .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
+    .map(([id, name]) => `<option value="${id}"${id === yasadigiIlce ? ' selected' : ''}>${name}</option>`)
+    .join('');
+
+  const birthDistrictOptions = Object.entries(neighborhoodNames)
+    .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
+    .map(([id, name]) => `<option value="${id}"${id === dogumYeri ? ' selected' : ''}>${name}</option>`)
+    .join('');
+
+  // Determine born-in-Istanbul state
+  const bornInIstanbul = dogumYeri && dogumYeri !== 'istanbul_disi';
+  const bornOutside = dogumYeri === 'istanbul_disi';
 
   // Render into 3-column layout
   document.querySelector('.profile-left').innerHTML = `
@@ -469,14 +533,6 @@ async function loadProfile() {
           <div class="info-value">${user.email}</div>
         </div>
         <div class="info-row">
-          <div class="info-label">Yaşadığı İlçe</div>
-          <div class="info-value">${yasadigiIlceDisplay}</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">Doğum Yeri</div>
-          <div class="info-value">${dogumYeriDisplay}</div>
-        </div>
-        <div class="info-row">
           <div class="info-label">Üyelik Tarihi</div>
           <div class="info-value">${joinedDate}</div>
         </div>
@@ -484,6 +540,36 @@ async function loadProfile() {
           <div class="info-label">Son Görülme</div>
           <div class="info-value">${lastSeenText}</div>
         </div>
+      </div>
+    </div>
+    <div class="info-section">
+      <div class="info-section-title">İstanbul Bilgileri</div>
+      <div class="info-grid">
+        <div class="info-row">
+          <div class="info-label">Yaşadığı İlçe</div>
+          <select class="info-select" id="edit-yasadigi">
+            <option value="">— İlçe seçin —</option>
+            ${districtOptions}
+          </select>
+        </div>
+        <div class="info-row">
+          <div class="info-label">İstanbul Doğumlu</div>
+          <div class="born-toggle">
+            <button type="button" class="born-btn${bornInIstanbul ? ' selected' : ''}" id="born-yes">Evet</button>
+            <button type="button" class="born-btn${bornOutside ? ' selected' : ''}" id="born-no">Hayır</button>
+          </div>
+        </div>
+        <div class="info-row" id="birth-district-row" style="display:${bornInIstanbul ? 'flex' : 'none'};">
+          <div class="info-label">Doğum Yeri İlçe</div>
+          <select class="info-select" id="edit-dogum">
+            <option value="">— İlçe seçin —</option>
+            ${birthDistrictOptions}
+          </select>
+        </div>
+        <div class="info-row" style="display:flex; align-items:flex-end;">
+          <button class="save-profile-btn" id="save-profile-btn">Kaydet</button>
+        </div>
+        <div class="save-status" id="save-status"></div>
       </div>
     </div>
   `;
@@ -503,6 +589,71 @@ async function loadProfile() {
       </div>
     </div>
   `;
+
+  // Born in Istanbul toggle
+  let bornInIstanbulState = bornInIstanbul; // true if born in Istanbul district
+  document.getElementById('born-yes').addEventListener('click', () => {
+    bornInIstanbulState = true;
+    document.getElementById('born-yes').classList.add('selected');
+    document.getElementById('born-no').classList.remove('selected');
+    document.getElementById('birth-district-row').style.display = 'flex';
+  });
+  document.getElementById('born-no').addEventListener('click', () => {
+    bornInIstanbulState = false;
+    document.getElementById('born-no').classList.add('selected');
+    document.getElementById('born-yes').classList.remove('selected');
+    document.getElementById('birth-district-row').style.display = 'none';
+  });
+
+  // Save profile handler
+  document.getElementById('save-profile-btn').addEventListener('click', async () => {
+    const statusEl = document.getElementById('save-status');
+    const btn = document.getElementById('save-profile-btn');
+    const newYasadigi = document.getElementById('edit-yasadigi').value;
+    let newDogum = '';
+
+    if (!newYasadigi) {
+      statusEl.textContent = 'Lütfen yaşadığınız ilçeyi seçin.';
+      statusEl.style.color = 'var(--accent)';
+      return;
+    }
+
+    if (bornInIstanbulState) {
+      newDogum = document.getElementById('edit-dogum').value;
+      if (!newDogum) {
+        statusEl.textContent = 'Lütfen doğduğunuz ilçeyi seçin.';
+        statusEl.style.color = 'var(--accent)';
+        return;
+      }
+    } else if (bornInIstanbulState === false) {
+      newDogum = 'istanbul_disi';
+    } else {
+      // Neither selected
+      statusEl.textContent = 'Lütfen İstanbul doğumlu olup olmadığınızı belirtin.';
+      statusEl.style.color = 'var(--accent)';
+      return;
+    }
+
+    btn.textContent = 'Kaydediliyor...';
+    btn.disabled = true;
+    statusEl.textContent = '';
+
+    const { error } = await sb.auth.updateUser({
+      data: { yasadigi_ilce: newYasadigi, dogum_yeri: newDogum }
+    });
+
+    btn.textContent = 'Kaydet';
+    btn.disabled = false;
+
+    if (error) {
+      statusEl.textContent = 'Hata: ' + error.message;
+      statusEl.style.color = 'var(--accent)';
+    } else {
+      statusEl.textContent = 'Kaydedildi!';
+      statusEl.style.color = 'var(--muted)';
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    }
+  });
 
   // Sign out handler
   document.getElementById('signout-btn').addEventListener('click', async () => {
