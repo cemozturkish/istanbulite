@@ -293,6 +293,78 @@ let currentGuess = '';
 let gameOver = false;
 const keyStates = {};
 
+// State persistence functions
+const SAVE_KEY = 'sozcel_state_' + dailySeed;
+
+function saveState() {
+  const state = { currentRow, currentGuess, gameOver, guesses: [], keyStates };
+  // Save all submitted rows
+  for (let r = 0; r < currentRow; r++) {
+    let word = '';
+    for (let c = 0; c < 5; c++) {
+      word += document.getElementById(`box-${r}-${c}`).textContent;
+    }
+    state.guesses.push(word);
+  }
+  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+}
+
+function restoreState() {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) return false;
+  try {
+    const state = JSON.parse(raw);
+    if (!state.guesses || state.guesses.length === 0) return false;
+
+    // Replay each saved guess
+    state.guesses.forEach((word, rowIdx) => {
+      currentRow = rowIdx;
+      currentGuess = word;
+      // Fill the row
+      for (let i = 0; i < 5; i++) {
+        const box = document.getElementById(`box-${rowIdx}-${i}`);
+        box.textContent = word[i] || '';
+        box.className = 'letter-box filled';
+      }
+      // Check and color
+      const result = checkWord(word);
+      for (let i = 0; i < 5; i++) {
+        const box = document.getElementById(`box-${rowIdx}-${i}`);
+        box.className = `letter-box filled ${result[i]}`;
+        const letter = word[i];
+        const keyBtn = document.getElementById(`key-${letter}`);
+        if (keyBtn) {
+          const cur = keyStates[letter] || '';
+          if (result[i] === 'correct') { keyStates[letter] = 'correct'; keyBtn.className = 'key correct'; }
+          else if (result[i] === 'present' && cur !== 'correct') { keyStates[letter] = 'present'; keyBtn.className = 'key present'; }
+          else if (!cur) { keyStates[letter] = 'absent'; keyBtn.className = 'key absent'; }
+        }
+      }
+    });
+
+    // Restore final state
+    gameOver = state.gameOver;
+    if (gameOver) {
+      const lastGuess = state.guesses[state.guesses.length - 1];
+      if (lastGuess === TARGET_WORD) {
+        document.getElementById('game-message').textContent = 'Tebrikler!';
+        document.getElementById('game-message').className = 'game-message win';
+      } else {
+        document.getElementById('game-message').textContent = `Kelime: ${TARGET_WORD}`;
+        document.getElementById('game-message').className = 'game-message lose';
+      }
+      document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+      currentRow = state.guesses.length;
+    } else {
+      currentRow = state.guesses.length;
+      currentGuess = '';
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 const KEYBOARD_LAYOUT = [
   ['E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Ğ', 'Ü'],
   ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ş', 'İ'],
@@ -409,7 +481,7 @@ function submitGuess() {
   // Check win/lose after animations
   setTimeout(() => {
     if (currentGuess === TARGET_WORD) {
-      document.getElementById('game-message').textContent = '🎉 Tebrikler!';
+      document.getElementById('game-message').textContent = 'Tebrikler!';
       document.getElementById('game-message').className = 'game-message win';
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
@@ -417,6 +489,7 @@ function submitGuess() {
       localStorage.setItem('sozcel_played', parseInt(localStorage.getItem('sozcel_played') || '0') + 1);
       localStorage.setItem('sozcel_wins', parseInt(localStorage.getItem('sozcel_wins') || '0') + 1);
       localStorage.setItem('sozcel_streak', parseInt(localStorage.getItem('sozcel_streak') || '0') + 1);
+      saveState();
     } else if (currentRow === 5) {
       document.getElementById('game-message').textContent = `Kelime: ${TARGET_WORD}`;
       document.getElementById('game-message').className = 'game-message lose';
@@ -425,9 +498,11 @@ function submitGuess() {
       // Track score in localStorage
       localStorage.setItem('sozcel_played', parseInt(localStorage.getItem('sozcel_played') || '0') + 1);
       localStorage.setItem('sozcel_streak', '0');
+      saveState();
     } else {
       currentRow++;
       currentGuess = '';
+      saveState();
     }
   }, 500);
 }
@@ -461,6 +536,7 @@ function checkWord(guess) {
 
 initWordGrid();
 initKeyboard();
+restoreState();
 </script>
 </body>
 </html>
