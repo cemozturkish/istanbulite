@@ -7,6 +7,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sözcel — istanbulite.net</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --ink: #000000;
@@ -370,6 +371,40 @@
   </footer>
 
 <script>
+// ── Supabase init ──
+const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── Get user neighborhood from session ──
+let userNeighborhood = '';
+(async () => {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      userNeighborhood = session.user.user_metadata?.yasadigi_ilce
+        || session.user.user_metadata?.neighborhood || '';
+    }
+  } catch(e) {}
+})();
+
+// ── Record game result to Supabase ──
+async function recordGameResult(game, date, attempts, won, neighborhood) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    await sb.from('game_results').insert([{
+      user_id: session.user.id,
+      game: game,
+      date: date,
+      attempts: attempts,
+      won: won,
+      neighborhood: neighborhood
+    }]);
+  } catch (e) { /* table may not exist yet */ }
+}
+
 // Date display
 (function() {
   const now = new Date();
@@ -615,6 +650,7 @@ function submitGuess() {
       localStorage.setItem('sozcel_wins', parseInt(localStorage.getItem('sozcel_wins') || '0') + 1);
       localStorage.setItem('sozcel_streak', parseInt(localStorage.getItem('sozcel_streak') || '0') + 1);
       recordGuessDistribution(rowSnap + 1);
+      recordGameResult('sozcel', dailySeed, rowSnap + 1, true, userNeighborhood);
       saveState();
       renderStats();
     } else if (rowSnap === 5) {
@@ -624,6 +660,7 @@ function submitGuess() {
       gameOver = true;
       localStorage.setItem('sozcel_played', parseInt(localStorage.getItem('sozcel_played') || '0') + 1);
       localStorage.setItem('sozcel_streak', '0');
+      recordGameResult('sozcel', dailySeed, 7, false, userNeighborhood);
       saveState();
       renderStats();
     } else {
@@ -661,8 +698,60 @@ function checkWord(guess) {
   return result;
 }
 
+// ── Load community stats from Supabase, fall back to seeded data ──
+async function loadCommunityStats() {
+  try {
+    const { data, error } = await sb.from('game_results')
+      .select('attempts, won, neighborhood')
+      .eq('game', 'sozcel')
+      .eq('date', dailySeed);
+
+    if (error || !data || data.length === 0) throw new Error('no data');
+
+    // Build real distribution
+    const dist = [0, 0, 0, 0, 0, 0, 0]; // attempts 1-6 + failed
+    data.forEach(r => {
+      if (r.won && r.attempts >= 1 && r.attempts <= 6) {
+        dist[r.attempts - 1]++;
+      } else {
+        dist[6]++;
+      }
+    });
+
+    // Build district success rates
+    const districtMap = {};
+    data.forEach(r => {
+      if (!r.neighborhood) return;
+      if (!districtMap[r.neighborhood]) districtMap[r.neighborhood] = { wins: 0, total: 0 };
+      districtMap[r.neighborhood].total++;
+      if (r.won) districtMap[r.neighborhood].wins++;
+    });
+
+    const neighborhoodNames = {
+      bakirkoy:'Bakırköy', besiktas:'Beşiktaş', kadikoy:'Kadıköy',
+      uskudar:'Üsküdar', fatih:'Fatih', beyoglu:'Beyoğlu',
+      sisli:'Şişli', sariyer:'Sarıyer', maltepe:'Maltepe', atasehir:'Ataşehir',
+      umraniye:'Ümraniye', kagithane:'Kağıthane', bahcelievler:'Bahçelievler',
+      bagcilar:'Bağcılar', eyupsultan:'Eyüpsultan', bayrampasa:'Bayrampaşa',
+      basaksehir:'Başakşehir', gungoren:'Güngören', esenler:'Esenler',
+      gop:'Gaziosmanpaşa', kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi',
+      beykoz:'Beykoz', cekmekoy:'Çekmeköy', zeytinburnu:'Zeytinburnu'
+    };
+
+    const topDistricts = Object.entries(districtMap)
+      .map(([k, v]) => ({ name: neighborhoodNames[k] || k, pct: Math.round(v.wins / v.total * 100) }))
+      .sort((a, b) => b.pct - a.pct)
+      .slice(0, 5);
+
+    return { dist, topDistricts, isReal: true };
+  } catch (e) {
+    // Fall back to deterministic seeded data
+    return { dist: generateCommunityDist(), topDistricts: generateTopDistricts(), isReal: false };
+  }
+}
+
 // ── Stats rendering ──
-function renderStats() {
+async function renderStats() {
   const played = parseInt(localStorage.getItem('sozcel_played') || '0');
   const wins = parseInt(localStorage.getItem('sozcel_wins') || '0');
   const streak = parseInt(localStorage.getItem('sozcel_streak') || '0');
@@ -721,19 +810,12 @@ function renderStats() {
     `).join('')}
   `;
 
-  // Right panel: community stats (seeded from daily seed for consistency)
-  // Since we don't have a backend table for community stats, generate deterministic
-  // but realistic-looking data from the daily seed
-  const communityDist = generateCommunityDist();
+  // Right panel: community stats from Supabase (falls back to seeded data)
+  const community = await loadCommunityStats();
+  const communityDist = community.dist;
   const totalCommunity = communityDist.reduce((a, b) => a + b, 0);
   const maxCommunityDist = Math.max(...communityDist, 1);
-
-  const neighborhoodNames = {
-    bakirkoy:'Bakırköy', besiktas:'Beşiktaş', kadikoy:'Kadıköy',
-    uskudar:'Üsküdar', fatih:'Fatih', beyoglu:'Beyoğlu',
-    sisli:'Şişli', sariyer:'Sarıyer', maltepe:'Maltepe', atasehir:'Ataşehir'
-  };
-  const topDistricts = generateTopDistricts();
+  const topDistricts = community.topDistricts;
 
   document.getElementById('stats-right').innerHTML = `
     <div>
