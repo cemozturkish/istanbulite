@@ -271,8 +271,8 @@
       position: absolute;
       cursor: grab;
       user-select: none;
-      font-size: 2rem;
-      line-height: 1;
+      width: 80px;
+      height: auto;
       filter: grayscale(100%);
       transition: filter 0.2s;
     }
@@ -296,7 +296,9 @@
     }
 
     .tray-sticker {
-      font-size: 1.6rem;
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
       cursor: pointer;
       filter: grayscale(100%);
       opacity: 0.7;
@@ -480,41 +482,10 @@ const neighborhoodNames = {
   kagithane:'Kağıthane', atasehir:'Ataşehir', zeytinburnu:'Zeytinburnu', fatih:'Fatih'
 };
 
-// Sticker definitions — each has emoji, label, and which district unlocks it (null = universal)
+// Sticker definitions — image-based stickers, unlocked by birth district
 const STICKERS = [
-  // Universal stickers (everyone gets these)
-  { emoji: '☕', label: 'Çay', district: null },
-  { emoji: '🥯', label: 'Simit', district: null },
-  { emoji: '🐈', label: 'Kedi', district: null },
-  { emoji: '🕌', label: 'Cami', district: null },
-  { emoji: '⛴️', label: 'Vapur', district: null },
-  { emoji: '🌊', label: 'Deniz', district: null },
-  // District-specific stickers
-  { emoji: '🏰', label: 'Kız Kulesi', district: 'uskudar' },
-  { emoji: '🌉', label: 'Boğaz Köprüsü', district: 'besiktas' },
-  { emoji: '🎣', label: 'Balıkçı', district: 'beykoz' },
-  { emoji: '🏟️', label: 'Stadyum', district: 'kadikoy' },
-  { emoji: '🎭', label: 'Tiyatro', district: 'beyoglu' },
-  { emoji: '⚓', label: 'Liman', district: 'bakirkoy' },
-  { emoji: '🌳', label: 'Orman', district: 'sariyer' },
-  { emoji: '🏛️', label: 'Saray', district: 'fatih' },
-  { emoji: '🛍️', label: 'Çarşı', district: 'sisli' },
-  { emoji: '🎡', label: 'Lunapark', district: 'basaksehir' },
-  { emoji: '🏔️', label: 'Tepe', district: 'cekmekoy' },
-  { emoji: '🌅', label: 'Gün Batımı', district: 'maltepe' },
-  { emoji: '🏗️', label: 'İnşaat', district: 'umraniye' },
-  { emoji: '🎪', label: 'Festival', district: 'kagithane' },
-  { emoji: '🌿', label: 'Bahçe', district: 'bahcelievler' },
-  { emoji: '🚂', label: 'Tren', district: 'zeytinburnu' },
-  { emoji: '🏘️', label: 'Mahalle', district: 'eyupsultan' },
-  { emoji: '🏋️', label: 'Spor', district: 'atasehir' },
-  { emoji: '🎵', label: 'Müzik', district: 'bagcilar' },
-  { emoji: '🍖', label: 'Kebap', district: 'sultangazi' },
-  { emoji: '🛒', label: 'Pazar', district: 'gungoren' },
-  { emoji: '🌙', label: 'Hilal', district: 'bayrampasa' },
-  { emoji: '🏠', label: 'Ev', district: 'esenler' },
-  { emoji: '🚌', label: 'Otobüs', district: 'gop' },
-  { emoji: '🏊', label: 'Havuz', district: 'kucukcekmece' },
+  { src: 'assets/galatakulesisticker.png', label: 'Galata Kulesi', district: 'beyoglu' },
+  { src: 'assets/kizkulesisticker.png', label: 'Kız Kulesi', district: 'uskudar' },
 ];
 
 function getGameScores() {
@@ -561,10 +532,17 @@ async function loadProfile() {
     return;
   }
 
+  // Check if viewing another user's profile via ?user=ID
+  const urlParams = new URLSearchParams(window.location.search);
+  const viewingUserId = urlParams.get('user');
+  const isViewingOther = viewingUserId && viewingUserId !== session.user.id;
+
   const user = session.user;
   const meta = user.user_metadata || {};
   const avatarUrl = meta.avatar_url || null;
-  const displayName = meta.display_name || user.email.split('@')[0];
+  const firstName = meta.first_name || '';
+  const lastName = meta.last_name || '';
+  const displayName = firstName ? `${firstName} ${lastName}`.trim() : (meta.display_name || user.email.split('@')[0]);
   const yasadigiIlce = meta.yasadigi_ilce || meta.neighborhood || '';
   const dogumYeri = meta.dogum_yeri || '';
 
@@ -591,26 +569,43 @@ async function loadProfile() {
   else if (dogumYeri) dogumDisplay = dogumYeri;
 
   // ── LEFT: identity + district edit ──
-  document.querySelector('.profile-left').innerHTML = `
-    <div class="avatar" id="avatar-display">${avatarContent}</div>
-    <button class="avatar-upload" id="avatar-btn">Fotoğraf Değiştir</button>
-    <input type="file" id="avatar-input" accept="image/*" style="display:none;">
-    <div class="display-name">${displayName}</div>
-    <div class="district-select-wrap">
-      <div class="district-label">Yaşadığı İlçe</div>
-      <select class="district-select" id="edit-yasadigi">
-        <option value="">— İlçe seçin —</option>
-        ${districtOptions}
-      </select>
-    </div>
-    <div class="district-select-wrap">
-      <div class="district-label">Doğum Yeri</div>
-      <div class="district-display">${dogumDisplay}</div>
-    </div>
-    <button class="save-btn" id="save-btn">Kaydet</button>
-    <div class="save-msg" id="save-msg"></div>
-    <button class="btn-signout" id="signout-btn">Çıkış Yap</button>
-  `;
+  if (isViewingOther) {
+    // Viewing another user — show read-only sticker board only
+    document.querySelector('.profile-left').innerHTML = `
+      <div style="text-align:center;padding:20px;">
+        <div style="font-size:0.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Profil</div>
+        <div style="font-weight:700;font-size:1rem;">Kullanıcı Panosu</div>
+      </div>
+    `;
+  } else {
+    document.querySelector('.profile-left').innerHTML = `
+      <div class="avatar" id="avatar-display">${avatarContent}</div>
+      <button class="avatar-upload" id="avatar-btn">Fotoğraf Değiştir</button>
+      <input type="file" id="avatar-input" accept="image/*" style="display:none;">
+      <div class="district-select-wrap">
+        <div class="district-label">Ad</div>
+        <input class="district-select" id="edit-firstname" type="text" value="${firstName}" placeholder="Adınız" style="border:1px solid var(--ink);padding:6px 8px;font-family:'Inter',sans-serif;font-size:0.8rem;">
+      </div>
+      <div class="district-select-wrap">
+        <div class="district-label">Soyad</div>
+        <input class="district-select" id="edit-lastname" type="text" value="${lastName}" placeholder="Soyadınız" style="border:1px solid var(--ink);padding:6px 8px;font-family:'Inter',sans-serif;font-size:0.8rem;">
+      </div>
+      <div class="district-select-wrap">
+        <div class="district-label">Yaşadığı İlçe</div>
+        <select class="district-select" id="edit-yasadigi">
+          <option value="">— İlçe seçin —</option>
+          ${districtOptions}
+        </select>
+      </div>
+      <div class="district-select-wrap">
+        <div class="district-label">Doğum Yeri</div>
+        <div class="district-display">${dogumDisplay}</div>
+      </div>
+      <button class="save-btn" id="save-btn">Kaydet</button>
+      <div class="save-msg" id="save-msg"></div>
+      <button class="btn-signout" id="signout-btn">Çıkış Yap</button>
+    `;
+  }
 
   // ── CENTER: sticker board ──
   const boardStickers = loadBoardStickers(user.id);
@@ -629,38 +624,47 @@ async function loadProfile() {
   unlockedDistricts.add(null); // universal stickers always unlocked
   if (dogumYeri && dogumYeri !== 'istanbul_disi') unlockedDistricts.add(dogumYeri);
 
-  // Render sticker tray
+  // Render sticker tray (image-based stickers)
   const tray = document.getElementById('sticker-tray');
-  STICKERS.forEach((s, idx) => {
-    const span = document.createElement('span');
-    span.className = 'tray-sticker';
-    span.textContent = s.emoji;
-    const isUnlocked = unlockedDistricts.has(s.district);
-    if (!isUnlocked) {
-      span.classList.add('locked');
-      span.title = s.label + ' — ' + (neighborhoodNames[s.district] || '') + ' doğumluya özel';
-    } else {
-      span.title = s.label;
-      span.addEventListener('click', () => {
-        addStickerToBoard(user.id, idx);
-      });
-    }
-    tray.appendChild(span);
-  });
+  if (tray && !isViewingOther) {
+    STICKERS.forEach((s, idx) => {
+      const img = document.createElement('img');
+      img.className = 'tray-sticker';
+      img.src = s.src;
+      img.alt = s.label;
+      const isUnlocked = unlockedDistricts.has(s.district);
+      if (!isUnlocked) {
+        img.classList.add('locked');
+        img.title = s.label + ' — ' + (neighborhoodNames[s.district] || '') + ' doğumluya özel';
+      } else {
+        img.title = s.label;
+        img.addEventListener('click', () => {
+          addStickerToBoard(user.id, idx);
+        });
+      }
+      tray.appendChild(img);
+    });
+  }
 
   // Render placed stickers
   const board = document.getElementById('sticker-board');
   boardStickers.forEach((bs, i) => {
-    placeSticker(board, bs, i, user.id);
+    placeSticker(board, bs, i, user.id, isViewingOther);
   });
 
-  // Edit mode toggle
-  let editMode = false;
-  document.getElementById('edit-board-btn').addEventListener('click', () => {
-    editMode = !editMode;
-    document.getElementById('sticker-tray').classList.toggle('active', editMode);
-    document.getElementById('edit-board-btn').textContent = editMode ? 'Bitti' : 'Düzenle';
-  });
+  // Edit mode toggle (only on own profile)
+  if (!isViewingOther) {
+    let editMode = false;
+    document.getElementById('edit-board-btn').addEventListener('click', () => {
+      editMode = !editMode;
+      document.getElementById('sticker-tray').classList.toggle('active', editMode);
+      document.getElementById('edit-board-btn').textContent = editMode ? 'Bitti' : 'Düzenle';
+    });
+  } else {
+    // Hide edit button when viewing another user
+    const editBtn = document.getElementById('edit-board-btn');
+    if (editBtn) editBtn.style.display = 'none';
+  }
 
   function addStickerToBoard(userId, stickerIdx) {
     const stored = loadBoardStickers(userId);
@@ -671,18 +675,26 @@ async function loadProfile() {
     };
     stored.push(newSticker);
     saveBoardStickers(userId, stored);
-    placeSticker(board, newSticker, stored.length - 1, userId);
+    placeSticker(board, newSticker, stored.length - 1, userId, false);
   }
 
-  function placeSticker(boardEl, stickerData, index, userId) {
+  function placeSticker(boardEl, stickerData, index, userId, readOnly) {
     const s = STICKERS[stickerData.idx];
     if (!s) return;
-    const el = document.createElement('span');
+    const el = document.createElement('img');
     el.className = 'sticker';
-    el.textContent = s.emoji;
+    el.src = s.src;
+    el.alt = s.label;
     el.title = s.label;
+    el.draggable = false;
     el.style.left = stickerData.x + '%';
     el.style.top = stickerData.y + '%';
+
+    if (readOnly) {
+      el.style.cursor = 'default';
+      boardEl.appendChild(el);
+      return;
+    }
 
     // Drag to reposition
     let dragging = false, startX, startY, startLeft, startTop;
@@ -727,117 +739,133 @@ async function loadProfile() {
       saveBoardStickers(userId, stored);
       // Re-render board
       boardEl.innerHTML = '';
-      stored.forEach((bs, i) => placeSticker(boardEl, bs, i, userId));
+      stored.forEach((bs, i) => placeSticker(boardEl, bs, i, userId, false));
     });
 
     boardEl.appendChild(el);
   }
 
   // ── RIGHT: stats & account info ──
-  document.querySelector('.profile-right').innerHTML = `
-    <div>
-      <div class="right-section-title">Hesap</div>
-      <div class="info-row">
-        <div class="info-label">E-posta</div>
-        <div class="info-value">${user.email}</div>
+  if (isViewingOther) {
+    // When viewing another user, show minimal info
+    document.querySelector('.profile-right').innerHTML = `
+      <div style="text-align:center;padding:20px;color:var(--muted);font-style:italic;font-size:0.8rem;">
+        Bu kullanıcının panosu
       </div>
-      <div class="info-row">
-        <div class="info-label">Üyelik</div>
-        <div class="info-value">${joinedDate}</div>
+    `;
+  } else {
+    document.querySelector('.profile-right').innerHTML = `
+      <div>
+        <div class="right-section-title">Hesap</div>
+        <div class="info-row">
+          <div class="info-label">E-posta</div>
+          <div class="info-value">${user.email}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Üyelik</div>
+          <div class="info-value">${joinedDate}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Son Görülme</div>
+          <div class="info-value">${lastSeenText}</div>
+        </div>
       </div>
-      <div class="info-row">
-        <div class="info-label">Son Görülme</div>
-        <div class="info-value">${lastSeenText}</div>
+      <div>
+        <div class="right-section-title">Oyun Skorları</div>
+        <div class="score-card">
+          <div class="game-name">Bulmaca</div>
+          <div class="score-value">${scores.bulmacaWins}</div>
+          <div class="score-detail">${scores.bulmacaPlayed} oyun</div>
+        </div>
+        <div class="score-card">
+          <div class="game-name">Sözcel</div>
+          <div class="score-value">${scores.sozcelWins}</div>
+          <div class="score-detail">${scores.sozcelPlayed > 0 ? scores.sozcelStreak + ' seri' : 'Henüz oynanmadı'}</div>
+        </div>
       </div>
-    </div>
-    <div>
-      <div class="right-section-title">Oyun Skorları</div>
-      <div class="score-card">
-        <div class="game-name">Bulmaca</div>
-        <div class="score-value">${scores.bulmacaWins}</div>
-        <div class="score-detail">${scores.bulmacaPlayed} oyun</div>
-      </div>
-      <div class="score-card">
-        <div class="game-name">Sözcel</div>
-        <div class="score-value">${scores.sozcelWins}</div>
-        <div class="score-detail">${scores.sozcelPlayed > 0 ? scores.sozcelStreak + ' seri' : 'Henüz oynanmadı'}</div>
-      </div>
-    </div>
-  `;
+    `;
+  }
 
-  // ── Save living district ──
-  document.getElementById('save-btn').addEventListener('click', async () => {
-    const msgEl = document.getElementById('save-msg');
-    const btn = document.getElementById('save-btn');
-    const newYasadigi = document.getElementById('edit-yasadigi').value;
+  // ── Save profile (name + district) ──
+  if (!isViewingOther) {
+    document.getElementById('save-btn').addEventListener('click', async () => {
+      const msgEl = document.getElementById('save-msg');
+      const btn = document.getElementById('save-btn');
+      const newYasadigi = document.getElementById('edit-yasadigi').value;
+      const newFirstName = document.getElementById('edit-firstname').value.trim();
+      const newLastName = document.getElementById('edit-lastname').value.trim();
 
-    if (!newYasadigi) {
-      msgEl.textContent = 'Lütfen bir ilçe seçin.';
-      msgEl.style.color = 'var(--accent)';
-      return;
-    }
-
-    btn.textContent = 'Kaydediliyor...';
-    btn.disabled = true;
-    msgEl.textContent = '';
-
-    // Use direct fetch to Supabase auth endpoint as fallback
-    try {
-      const { data: { session: currentSession } } = await sb.auth.getSession();
-      if (!currentSession) {
-        await sb.auth.refreshSession();
+      if (!newYasadigi) {
+        msgEl.textContent = 'Lütfen bir ilçe seçin.';
+        msgEl.style.color = 'var(--accent)';
+        return;
       }
 
-      const { error } = await sb.auth.updateUser({
-        data: { yasadigi_ilce: newYasadigi }
-      });
+      btn.textContent = 'Kaydediliyor...';
+      btn.disabled = true;
+      msgEl.textContent = '';
 
-      if (error) throw error;
+      try {
+        const { data: { session: currentSession } } = await sb.auth.getSession();
+        if (!currentSession) {
+          await sb.auth.refreshSession();
+        }
 
-      btn.textContent = 'Kaydet';
-      btn.disabled = false;
-      msgEl.textContent = 'Kaydedildi!';
-      msgEl.style.color = 'var(--muted)';
-      setTimeout(() => { msgEl.textContent = ''; }, 3000);
-    } catch (err) {
-      btn.textContent = 'Kaydet';
-      btn.disabled = false;
-      // Fallback: save to localStorage so the rest of the site can use it
-      localStorage.setItem('yasadigi_ilce_local', newYasadigi);
-      msgEl.textContent = 'Yerel olarak kaydedildi.';
-      msgEl.style.color = 'var(--muted)';
-      setTimeout(() => { msgEl.textContent = ''; }, 3000);
-    }
-  });
+        const { error } = await sb.auth.updateUser({
+          data: {
+            yasadigi_ilce: newYasadigi,
+            first_name: newFirstName,
+            last_name: newLastName
+          }
+        });
 
-  // Sign out
-  document.getElementById('signout-btn').addEventListener('click', async () => {
-    await sb.auth.signOut();
-    window.location.href = 'index.html';
-  });
+        if (error) throw error;
 
-  // Avatar upload
-  document.getElementById('avatar-btn').addEventListener('click', () => {
-    document.getElementById('avatar-input').click();
-  });
-
-  document.getElementById('avatar-input').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 200 * 1024) {
-      alert('Fotoğraf 200KB\'den küçük olmalı.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      const base64 = evt.target.result;
-      const { error } = await sb.auth.updateUser({ data: { avatar_url: base64 } });
-      if (!error) {
-        document.getElementById('avatar-display').innerHTML = `<img src="${base64}" alt="Profile">`;
+        btn.textContent = 'Kaydet';
+        btn.disabled = false;
+        msgEl.textContent = 'Kaydedildi!';
+        msgEl.style.color = 'var(--muted)';
+        setTimeout(() => { msgEl.textContent = ''; }, 3000);
+      } catch (err) {
+        btn.textContent = 'Kaydet';
+        btn.disabled = false;
+        localStorage.setItem('yasadigi_ilce_local', newYasadigi);
+        msgEl.textContent = 'Yerel olarak kaydedildi.';
+        msgEl.style.color = 'var(--muted)';
+        setTimeout(() => { msgEl.textContent = ''; }, 3000);
       }
-    };
-    reader.readAsDataURL(file);
-  });
+    });
+  }
+
+  // Sign out & avatar (only for own profile)
+  if (!isViewingOther) {
+    document.getElementById('signout-btn').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      window.location.href = 'index.html';
+    });
+
+    document.getElementById('avatar-btn').addEventListener('click', () => {
+      document.getElementById('avatar-input').click();
+    });
+
+    document.getElementById('avatar-input').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 200 * 1024) {
+        alert('Fotoğraf 200KB\'den küçük olmalı.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        const base64 = evt.target.result;
+        const { error } = await sb.auth.updateUser({ data: { avatar_url: base64 } });
+        if (!error) {
+          document.getElementById('avatar-display').innerHTML = `<img src="${base64}" alt="Profile">`;
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
 }
 
 loadProfile();

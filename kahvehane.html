@@ -517,6 +517,27 @@ const neighborhoodNames = {
 let selectedNeighborhood = '';
 let activeMapNeighborhood = null;
 let homeNeighborhood = null;
+let currentUserFirstName = '';
+
+// Turkish ablative suffix: -den/-dan/-ten/-tan with vowel harmony
+function getAblativeSuffix(name) {
+  if (!name) return "'den";
+  const lastChar = name.charAt(name.length - 1).toLowerCase();
+  const voiceless = 'pçtkfhsş';
+  const backVowels = 'aıou';
+  // Find last vowel for harmony
+  let lastVowel = '';
+  for (let i = name.length - 1; i >= 0; i--) {
+    const c = name.charAt(i).toLowerCase();
+    if ('aeıioöuü'.includes(c)) { lastVowel = c; break; }
+  }
+  const isBack = backVowels.includes(lastVowel);
+  const isVoiceless = voiceless.includes(lastChar);
+  if (isVoiceless && isBack) return "'tan";
+  if (isVoiceless) return "'ten";
+  if (isBack) return "'dan";
+  return "'den";
+}
 
 async function init() {
   // Require auth
@@ -527,6 +548,7 @@ async function init() {
   homeNeighborhood = session.user.user_metadata?.yasadigi_ilce
     || session.user.user_metadata?.neighborhood
     || localStorage.getItem('yasadigi_ilce_local') || null;
+  currentUserFirstName = session.user.user_metadata?.first_name || '';
 
   if (homeNeighborhood) {
     selectedNeighborhood = homeNeighborhood;
@@ -605,15 +627,27 @@ async function loadPosts(neighborhoodFilter = null) {
     return;
   }
   
-  postsEl.innerHTML = data.map(post => `
-    <div class="post">
-      <div class="post-meta">
-        <span class="post-neighborhood">${neighborhoodNames[post.neighborhood]}</span>
-        <span>${new Date(post.created_at).toLocaleDateString('tr-TR')}</span>
+  postsEl.innerHTML = data.map(post => {
+    // Display author as "[neighborhood]'den/dan [first name]"
+    const nbName = neighborhoodNames[post.neighborhood] || post.neighborhood;
+    const authorFirst = post.author_first_name || '';
+    const suffix = getAblativeSuffix(nbName);
+    const authorDisplay = authorFirst
+      ? `${nbName}${suffix} ${authorFirst}`
+      : nbName;
+    const authorLink = post.user_id
+      ? `<a href="hane.html?user=${post.user_id}" style="text-decoration:none;color:inherit;" title="Profili görüntüle">${authorDisplay}</a>`
+      : authorDisplay;
+    return `
+      <div class="post">
+        <div class="post-meta">
+          <span class="post-neighborhood">${authorLink}</span>
+          <span>${new Date(post.created_at).toLocaleDateString('tr-TR')}</span>
+        </div>
+        <div class="post-content">${post.content}</div>
       </div>
-      <div class="post-content">${post.content}</div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 document.getElementById('submit-btn').addEventListener('click', async () => {
@@ -645,6 +679,7 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
     neighborhood: homeNeighborhood,
     content: content,
     user_id: user.id,
+    author_first_name: currentUserFirstName,
     approved: false
   }]);
   
