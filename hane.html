@@ -537,7 +537,9 @@ async function loadProfile() {
   const viewingUserId = urlParams.get('user');
   const isViewingOther = viewingUserId && viewingUserId !== session.user.id;
 
-  const user = session.user;
+  // Fetch fresh user data from server (getSession can return stale cache)
+  const { data: { user: freshUser }, error: userError } = await sb.auth.getUser();
+  const user = freshUser || session.user;
   const meta = user.user_metadata || {};
   const avatarUrl = meta.avatar_url || null;
   const firstName = meta.first_name || '';
@@ -639,6 +641,7 @@ async function loadProfile() {
       } else {
         img.title = s.label;
         img.addEventListener('click', () => {
+          if (img.dataset.placed === 'true') return;
           addStickerToBoard(user.id, idx);
         });
       }
@@ -653,12 +656,16 @@ async function loadProfile() {
   });
 
   // Edit mode toggle (only on own profile)
+  let editMode = false;
   if (!isViewingOther) {
-    let editMode = false;
     document.getElementById('edit-board-btn').addEventListener('click', () => {
       editMode = !editMode;
       document.getElementById('sticker-tray').classList.toggle('active', editMode);
       document.getElementById('edit-board-btn').textContent = editMode ? 'Bitti' : 'Düzenle';
+      // Update sticker cursors based on edit mode
+      board.querySelectorAll('.sticker').forEach(s => {
+        s.style.cursor = editMode ? 'grab' : 'default';
+      });
     });
   } else {
     // Hide edit button when viewing another user
@@ -666,7 +673,35 @@ async function loadProfile() {
     if (editBtn) editBtn.style.display = 'none';
   }
 
+  // Check which stickers are already placed (for limiting to one use each)
+  function getUsedStickerIndices(userId) {
+    return new Set(loadBoardStickers(userId).map(s => s.idx));
+  }
+
+  function updateTrayAvailability(userId) {
+    const used = getUsedStickerIndices(userId);
+    if (!tray) return;
+    tray.querySelectorAll('.tray-sticker').forEach((img, idx) => {
+      if (img.classList.contains('locked')) return; // already locked by district
+      if (used.has(idx)) {
+        img.style.opacity = '0.3';
+        img.style.cursor = 'not-allowed';
+        img.dataset.placed = 'true';
+      } else {
+        img.style.opacity = '';
+        img.style.cursor = 'pointer';
+        img.dataset.placed = 'false';
+      }
+    });
+  }
+
+  updateTrayAvailability(user.id);
+
   function addStickerToBoard(userId, stickerIdx) {
+    // Prevent adding the same sticker twice
+    const used = getUsedStickerIndices(userId);
+    if (used.has(stickerIdx)) return;
+
     const stored = loadBoardStickers(userId);
     const newSticker = {
       idx: stickerIdx,
@@ -676,6 +711,7 @@ async function loadProfile() {
     stored.push(newSticker);
     saveBoardStickers(userId, stored);
     placeSticker(board, newSticker, stored.length - 1, userId, false);
+    updateTrayAvailability(userId);
   }
 
   function placeSticker(boardEl, stickerData, index, userId, readOnly) {
@@ -689,16 +725,18 @@ async function loadProfile() {
     el.draggable = false;
     el.style.left = stickerData.x + '%';
     el.style.top = stickerData.y + '%';
+    // Only show grab cursor in edit mode
+    el.style.cursor = (readOnly || !editMode) ? 'default' : 'grab';
 
     if (readOnly) {
-      el.style.cursor = 'default';
       boardEl.appendChild(el);
       return;
     }
 
-    // Drag to reposition
+    // Drag to reposition — only in edit mode
     let dragging = false, startX, startY, startLeft, startTop;
     el.addEventListener('mousedown', (e) => {
+      if (!editMode) return;
       e.preventDefault();
       dragging = true;
       el.classList.add('dragging');
@@ -720,7 +758,6 @@ async function loadProfile() {
         el.classList.remove('dragging');
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        // Save new position
         const stored = loadBoardStickers(userId);
         if (stored[index]) {
           stored[index].x = parseFloat(el.style.left);
@@ -732,14 +769,15 @@ async function loadProfile() {
       document.addEventListener('mouseup', onUp);
     });
 
-    // Double-click to remove
+    // Double-click to remove — only in edit mode
     el.addEventListener('dblclick', () => {
+      if (!editMode) return;
       const stored = loadBoardStickers(userId);
       stored.splice(index, 1);
       saveBoardStickers(userId, stored);
-      // Re-render board
       boardEl.innerHTML = '';
       stored.forEach((bs, i) => placeSticker(boardEl, bs, i, userId, false));
+      updateTrayAvailability(userId);
     });
 
     boardEl.appendChild(el);

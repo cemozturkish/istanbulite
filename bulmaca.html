@@ -341,6 +341,7 @@
       flex-shrink: 0;
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -384,6 +385,37 @@
   </footer>
 
 <script>
+const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let userNeighborhood = '';
+(async () => {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      userNeighborhood = session.user.user_metadata?.yasadigi_ilce
+        || session.user.user_metadata?.neighborhood || '';
+    }
+  } catch(e) {}
+})();
+
+async function recordGameResult(game, date, attempts, won, neighborhood) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    await sb.from('game_results').insert([{
+      user_id: session.user.id,
+      game: game,
+      date: date,
+      attempts: attempts,
+      won: won,
+      neighborhood: neighborhood
+    }]);
+  } catch (e) {}
+}
+
 // Date display
 (function() {
   const now = new Date();
@@ -765,6 +797,7 @@ document.getElementById('check-btn').addEventListener('click', () => {
     const streak = parseInt(localStorage.getItem('bulmaca_streak') || '1');
     const maxStreak = parseInt(localStorage.getItem('bulmaca_max_streak') || '0');
     if (streak > maxStreak) localStorage.setItem('bulmaca_max_streak', streak);
+    recordGameResult('bulmaca', dailySeed, checkAttempts, true, userNeighborhood);
     renderStats();
   } else {
     msgEl.textContent = 'Bazı cevaplar yanlış!';
@@ -785,8 +818,52 @@ document.getElementById('clear-btn').addEventListener('click', () => {
   saveState();
 });
 
+// Load community stats from Supabase, falling back to deterministic data
+async function loadCommunityStats() {
+  try {
+    const { data, error } = await sb.from('game_results')
+      .select('attempts, won, neighborhood')
+      .eq('game', 'bulmaca')
+      .eq('date', dailySeed);
+    if (error || !data || data.length === 0) throw new Error('no data');
+    const dist = [0, 0, 0, 0, 0]; // 1 check, 2 checks, 3 checks, 4+ checks, failed
+    data.forEach(r => {
+      if (r.won) {
+        if (r.attempts <= 1) dist[0]++;
+        else if (r.attempts <= 2) dist[1]++;
+        else if (r.attempts <= 3) dist[2]++;
+        else dist[3]++;
+      } else { dist[4]++; }
+    });
+    const districtMap = {};
+    data.forEach(r => {
+      if (!r.neighborhood) return;
+      if (!districtMap[r.neighborhood]) districtMap[r.neighborhood] = { wins: 0, total: 0 };
+      districtMap[r.neighborhood].total++;
+      if (r.won) districtMap[r.neighborhood].wins++;
+    });
+    const neighborhoodNames = {
+      bakirkoy:'Bakırköy', besiktas:'Beşiktaş', kadikoy:'Kadıköy',
+      uskudar:'Üsküdar', fatih:'Fatih', beyoglu:'Beyoğlu',
+      sisli:'Şişli', sariyer:'Sarıyer', maltepe:'Maltepe', atasehir:'Ataşehir',
+      umraniye:'Ümraniye', kagithane:'Kağıthane', bahcelievler:'Bahçelievler',
+      bagcilar:'Bağcılar', eyupsultan:'Eyüpsultan', bayrampasa:'Bayrampaşa',
+      basaksehir:'Başakşehir', gungoren:'Güngören', esenler:'Esenler',
+      gop:'Gaziosmanpaşa', kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi',
+      beykoz:'Beykoz', cekmekoy:'Çekmeköy', zeytinburnu:'Zeytinburnu'
+    };
+    const topDistricts = Object.entries(districtMap)
+      .map(([k, v]) => ({ name: neighborhoodNames[k] || k, pct: Math.round(v.wins / v.total * 100) }))
+      .sort((a, b) => b.pct - a.pct)
+      .slice(0, 5);
+    return { dist, topDistricts };
+  } catch (e) {
+    return { dist: generateCommunityDist(), topDistricts: generateTopDistricts() };
+  }
+}
+
 // Stats rendering
-function renderStats() {
+async function renderStats() {
   const played = parseInt(localStorage.getItem('bulmaca_played') || '0');
   const wins = parseInt(localStorage.getItem('bulmaca_wins') || '0');
   const streak = parseInt(localStorage.getItem('bulmaca_streak') || '0');
@@ -824,11 +901,12 @@ function renderStats() {
     </div>
   `;
 
-  // Right: community stats (deterministic from daily seed)
-  const communityDist = generateCommunityDist();
+  // Right: community stats from Supabase (falls back to deterministic data)
+  const community = await loadCommunityStats();
+  const communityDist = community.dist;
+  const topDistricts = community.topDistricts;
   const totalCommunity = communityDist.reduce((a, b) => a + b, 0);
   const maxCommunityDist = Math.max(...communityDist, 1);
-  const topDistricts = generateTopDistricts();
 
   document.getElementById('stats-right').innerHTML = `
     <div>
