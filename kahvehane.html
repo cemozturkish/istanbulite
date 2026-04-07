@@ -738,32 +738,31 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   document.getElementById('submit-btn').disabled = true;
 
   try {
-    const { error } = await sb.from('discussions').insert([{
+    const insertData = {
       neighborhood: postNeighborhood,
       content: content,
       user_id: session.user.id,
-      author_first_name: currentUserFirstName,
+      author_first_name: currentUserFirstName || 'Anonim',
       approved: isAdmin ? true : false
-    }]);
+    };
+
+    const { data: insertResult, error } = await sb.from('discussions').insert([insertData]).select();
 
     document.getElementById('submit-btn').disabled = false;
 
     if (error) {
-      console.error('Discussion insert error:', error);
-      statusEl.textContent = 'Hata: ' + (error.message || error.code || JSON.stringify(error));
+      statusEl.textContent = 'Hata: ' + (error.message || error.code || error.details || JSON.stringify(error));
       statusEl.className = 'submit-status err';
     } else {
       statusEl.textContent = isAdmin ? 'Mesajınız yayınlandı!' : 'Mesajınız onay bekliyor!';
       statusEl.className = 'submit-status ok';
       document.getElementById('post-content').value = '';
-      // Reload posts to show the new message (if admin, it's auto-approved)
       if (isAdmin) loadPosts(activeMapNeighborhood || null);
       setTimeout(() => { statusEl.textContent = ''; }, 3000);
     }
   } catch (err) {
-    console.error('Discussion insert exception:', err);
     document.getElementById('submit-btn').disabled = false;
-    statusEl.textContent = 'Bağlantı hatası: ' + (err.message || err);
+    statusEl.textContent = 'Hata: ' + (err.name || '') + ' ' + (err.message || String(err));
     statusEl.className = 'submit-status err';
   }
 });
