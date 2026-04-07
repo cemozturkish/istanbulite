@@ -37,9 +37,32 @@
       overflow: hidden;
     }
 
-    header {
+    .section-rule {
       grid-column: 2;
       grid-row: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 32px;
+      border-bottom: 1px solid var(--ink);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      background: var(--paper-dark);
+    }
+    .datetime-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .datetime-block .date-line { }
+    .datetime-block .day-line { }
+    .datetime-block .time-line { }
+
+    header {
+      grid-column: 2;
+      grid-row: 2;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -66,29 +89,6 @@
     }
     nav a:hover { color: var(--accent); }
     nav a.active { color: var(--ink); }
-
-    .section-rule {
-      grid-column: 2;
-      grid-row: 2;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 6px 32px;
-      border-bottom: 1px solid var(--ink);
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      background: var(--paper-dark);
-    }
-    .datetime-block {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    .datetime-block .date-line { }
-    .datetime-block .day-line { padding-left: 20px; }
-    .datetime-block .time-line { padding-left: 50px; }
 
     .col-left {
       grid-column: 1;
@@ -127,14 +127,16 @@
       min-height: 0;
     }
 
-    /* ── Left: identity ── */
+    /* ── Profile identity bar (inside center column) ── */
     .profile-left {
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
       align-items: center;
-      justify-content: center;
-      padding: 24px;
-      gap: 10px;
+      padding: 16px 24px;
+      gap: 16px;
+      border-bottom: var(--col-border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
     }
 
     .avatar {
@@ -255,6 +257,14 @@
       flex: 1;
     }
 
+    #sticker-area {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
     .board-header {
       font-size: 0.65rem;
       font-weight: 700;
@@ -295,7 +305,7 @@
       position: absolute;
       cursor: grab;
       user-select: none;
-      width: 80px;
+      width: 120px;
       height: auto;
       filter: grayscale(100%);
       transition: filter 0.2s;
@@ -320,8 +330,8 @@
     }
 
     .tray-sticker {
-      width: 48px;
-      height: 48px;
+      width: 64px;
+      height: 64px;
       object-fit: contain;
       cursor: pointer;
       filter: grayscale(100%);
@@ -477,10 +487,15 @@
 
   <aside class="col-left">
     <div class="nb-highlight" id="user-nb-badge"></div>
-    <div class="profile-left">
-      <div class="loading"><span class="spinner"></span></div>
-    </div>
   </aside>
+
+  <div class="section-rule">
+    <div class="datetime-block">
+      <div class="date-line" id="date-line"></div>
+      <div class="day-line" id="day-line"></div>
+      <div class="time-line" id="time-line"></div>
+    </div>
+  </div>
 
   <header>
     <nav>
@@ -491,17 +506,14 @@
     </nav>
   </header>
 
-  <div class="section-rule">
-    <div class="datetime-block">
-      <div class="date-line" id="date-line"></div>
-      <div class="day-line" id="day-line"></div>
-      <div class="time-line" id="time-line"></div>
-    </div>
-  </div>
-
   <main>
     <div class="profile-center">
-      <div class="loading" style="flex:1;display:flex;align-items:center;justify-content:center;"><span class="spinner"></span></div>
+      <div class="profile-left" id="profile-left-area">
+        <div class="loading"><span class="spinner"></span></div>
+      </div>
+      <div id="sticker-area">
+        <div class="loading" style="display:flex;align-items:center;justify-content:center;padding:20px;"><span class="spinner"></span></div>
+      </div>
     </div>
   </main>
 
@@ -605,10 +617,10 @@ async function loadProfile() {
   const user = freshUser || session.user;
   const meta = user.user_metadata || {};
   const avatarUrl = meta.avatar_url || null;
-  const firstName = meta.first_name || '';
-  const lastName = meta.last_name || '';
+  const firstName = meta.first_name || localStorage.getItem('first_name_local') || '';
+  const lastName = meta.last_name || localStorage.getItem('last_name_local') || '';
   const displayName = firstName ? `${firstName} ${lastName}`.trim() : (meta.display_name || user.email.split('@')[0]);
-  const yasadigiIlce = meta.yasadigi_ilce || meta.neighborhood || '';
+  const yasadigiIlce = meta.yasadigi_ilce || meta.neighborhood || localStorage.getItem('yasadigi_ilce_local') || '';
   const dogumYeri = meta.dogum_yeri || '';
 
   // Update neighborhood badge in left column
@@ -639,17 +651,15 @@ async function loadProfile() {
   else if (dogumYeri && neighborhoodNames[dogumYeri]) dogumDisplay = neighborhoodNames[dogumYeri];
   else if (dogumYeri) dogumDisplay = dogumYeri;
 
-  // ── LEFT: identity + district edit ──
+  // ── PROFILE BAR (inside center column) ──
+  const profileLeftEl = document.getElementById('profile-left-area');
   if (isViewingOther) {
-    // Viewing another user — show read-only sticker board only
-    document.querySelector('.profile-left').innerHTML = `
-      <div style="text-align:center;padding:20px;">
-        <div style="font-size:0.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Profil</div>
-        <div style="font-weight:700;font-size:1rem;">Kullanıcı Panosu</div>
-      </div>
+    profileLeftEl.innerHTML = `
+      <div style="font-size:0.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);">Profil</div>
+      <div style="font-weight:700;font-size:1rem;">Kullanıcı Panosu</div>
     `;
   } else {
-    document.querySelector('.profile-left').innerHTML = `
+    profileLeftEl.innerHTML = `
       <div class="avatar" id="avatar-display">${avatarContent}</div>
       <button class="avatar-upload" id="avatar-btn">Fotoğraf Değiştir</button>
       <input type="file" id="avatar-input" accept="image/*" style="display:none;">
@@ -678,10 +688,10 @@ async function loadProfile() {
     `;
   }
 
-  // ── CENTER: sticker board ──
+  // ── STICKER BOARD (inside center column, below profile bar) ──
   const boardStickers = loadBoardStickers(user.id);
 
-  document.querySelector('.profile-center').innerHTML = `
+  document.getElementById('sticker-area').innerHTML = `
     <div class="board-header">
       <span>Profil Panosu</span>
       <button class="edit-toggle" id="edit-board-btn">Düzenle</button>
@@ -706,7 +716,7 @@ async function loadProfile() {
       const isUnlocked = unlockedDistricts.has(s.district);
       if (!isUnlocked) {
         img.classList.add('locked');
-        img.title = s.label + ' — ' + (neighborhoodNames[s.district] || '') + ' doğumluya özel';
+        img.title = '🔒 ' + s.label + ' — Bu çıkartma sadece ' + (neighborhoodNames[s.district] || '') + ' doğumlulara özel. Açmak için doğum yerinizin ' + (neighborhoodNames[s.district] || '') + ' olması gerekir.';
       } else {
         img.title = s.label;
         img.addEventListener('click', () => {
@@ -928,6 +938,14 @@ async function loadProfile() {
 
         if (error) throw error;
 
+        // Refresh session so cached metadata is updated
+        await sb.auth.refreshSession();
+
+        // Also save to localStorage as backup
+        localStorage.setItem('yasadigi_ilce_local', newYasadigi);
+        localStorage.setItem('first_name_local', newFirstName);
+        localStorage.setItem('last_name_local', newLastName);
+
         btn.textContent = 'Kaydet';
         btn.disabled = false;
         msgEl.textContent = 'Kaydedildi!';
@@ -936,7 +954,10 @@ async function loadProfile() {
       } catch (err) {
         btn.textContent = 'Kaydet';
         btn.disabled = false;
+        // Save to localStorage as fallback
         localStorage.setItem('yasadigi_ilce_local', newYasadigi);
+        localStorage.setItem('first_name_local', newFirstName);
+        localStorage.setItem('last_name_local', newLastName);
         msgEl.textContent = 'Yerel olarak kaydedildi.';
         msgEl.style.color = 'var(--muted)';
         setTimeout(() => { msgEl.textContent = ''; }, 3000);
