@@ -543,6 +543,7 @@ setInterval(updateDateTime, 60000);
 
 const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
+const ADMIN_EMAIL = 'cemwozturk@gmail.com';
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -562,6 +563,7 @@ let selectedNeighborhood = '';
 let activeMapNeighborhood = null;
 let homeNeighborhood = null;
 let currentUserFirstName = '';
+let isAdmin = false;
 
 // Turkish ablative suffix: -den/-dan/-ten/-tan with vowel harmony
 function getAblativeSuffix(name) {
@@ -593,6 +595,7 @@ async function init() {
     || session.user.user_metadata?.neighborhood
     || localStorage.getItem('yasadigi_ilce_local') || null;
   currentUserFirstName = session.user.user_metadata?.first_name || '';
+  isAdmin = session.user.email === ADMIN_EMAIL;
 
   if (homeNeighborhood) {
     selectedNeighborhood = homeNeighborhood;
@@ -606,6 +609,11 @@ async function init() {
     if (nbEl) nbEl.classList.add('home');
   } else {
     document.getElementById('home-nb-badge').textContent = 'Semt seçilmedi';
+  }
+
+  // Admin can always post — show the form even without a home neighborhood
+  if (isAdmin) {
+    document.getElementById('submit-form').style.display = 'block';
   }
 
   loadPosts();
@@ -625,10 +633,12 @@ mapNeighborhoods.forEach(nb => {
     document.getElementById('map-label').textContent = name;
     document.getElementById('discussion-label').textContent = name;
     activeMapNeighborhood = nb.id;
-    // Only show comment form when viewing own neighborhood
+    selectedNeighborhood = nb.id;
+    // Admin can post to any neighborhood; regular users only to their own
     const form = document.getElementById('submit-form');
-    if (homeNeighborhood && nb.id === homeNeighborhood) {
+    if (isAdmin || (homeNeighborhood && nb.id === homeNeighborhood)) {
       form.style.display = 'block';
+      document.getElementById('home-nb-badge').textContent = neighborhoodNames[nb.id] || nb.id;
     } else {
       form.style.display = 'none';
     }
@@ -648,7 +658,12 @@ document.addEventListener('click', (e) => {
     document.getElementById('discussion-label').textContent = 'Tüm İstanbul';
     activeMapNeighborhood = null;
     // Show comment form when back to all-Istanbul view
-    if (homeNeighborhood) document.getElementById('submit-form').style.display = 'block';
+    selectedNeighborhood = homeNeighborhood;
+    if (homeNeighborhood) {
+      document.getElementById('submit-form').style.display = 'block';
+      document.getElementById('home-nb-badge').textContent = neighborhoodNames[homeNeighborhood] || homeNeighborhood;
+    }
+    if (isAdmin) document.getElementById('submit-form').style.display = 'block';
     loadPosts();
   }
 });
@@ -700,7 +715,8 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   const content = document.getElementById('post-content').value.trim();
   const statusEl = document.getElementById('submit-status');
   
-  if (!selectedNeighborhood) {
+  const postNeighborhood = selectedNeighborhood || homeNeighborhood;
+  if (!postNeighborhood) {
     statusEl.textContent = 'Lütfen bir semt seçin';
     statusEl.className = 'submit-status err';
     return;
@@ -723,11 +739,11 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
 
   try {
     const { error } = await sb.from('discussions').insert([{
-      neighborhood: homeNeighborhood,
+      neighborhood: postNeighborhood,
       content: content,
       user_id: session.user.id,
       author_first_name: currentUserFirstName,
-      approved: false
+      approved: isAdmin ? true : false
     }]);
 
     document.getElementById('submit-btn').disabled = false;
