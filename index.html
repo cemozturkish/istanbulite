@@ -469,6 +469,28 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* Flashing neighborhood with breaking news */
+    @keyframes flash-nb {
+      0%, 100% { fill: rgba(0,0,0,0.05); }
+      50% { fill: rgba(0,0,0,0.35); }
+    }
+    .neighborhood.flashing-news {
+      animation: flash-nb 1.2s ease-in-out infinite;
+      stroke: var(--ink);
+      stroke-width: 3;
+      opacity: 1;
+    }
+    .neighborhood.flashing-news:hover {
+      animation: none;
+      fill: rgba(0,0,0,0.25);
+    }
+    .neighborhood.flashing-news.active {
+      animation: none;
+      fill: rgba(0,0,0,0.30);
+      stroke: var(--ink);
+      stroke-width: 3;
+    }
+
     /* ── MOBILE RESPONSIVE ── */
     @media (max-width: 768px) {
       html, body {
@@ -857,15 +879,32 @@ neighborhoods.forEach(nb => {
       .eq('neighborhood', nb.id)
       .order('created_at', { ascending: false });
 
-    if (error || !data || data.length === 0) {
-      listEl.innerHTML = '<p class="no-articles">No local news for this neighborhood yet.</p>';
-    } else {
-      listEl.innerHTML = data.map(a => `
+    // Build article list from Supabase + flashing news
+    let articles = '';
+
+    // Add flashing/breaking news first if this neighborhood has one
+    if (flashingNews[nb.id]) {
+      articles += `
+        <div class="nb-article" style="border-left-color: var(--ink); border-left-width: 4px;">
+          <h4 style="font-size: 0.85rem;">${flashingNews[nb.id].title}</h4>
+          <p style="font-weight: 700; font-size: 0.65rem; letter-spacing: 1px; text-transform: uppercase;">Son Dakika</p>
+        </div>
+      `;
+    }
+
+    if (!error && data && data.length > 0) {
+      articles += data.map(a => `
         <div class="nb-article">
           <h4>${a.title}</h4>
           ${a.summary ? `<p>${a.summary}</p>` : ''}
         </div>
       `).join('');
+    }
+
+    if (!articles) {
+      listEl.innerHTML = '<p class="no-articles">No local news for this neighborhood yet.</p>';
+    } else {
+      listEl.innerHTML = articles;
     }
   });
 });
@@ -878,6 +917,22 @@ document.addEventListener('click', (e) => {
     document.getElementById('nb-prompt').style.display = '';
     document.getElementById('nb-articles-list').innerHTML = '';
   }
+});
+
+// ── Flashing News (breaking news on specific neighborhoods) ──
+const flashingNews = {
+  uskudar: {
+    title: 'Üsküdar Belediyesi\'ne operasyon: 20 kişi gözaltına alındı'
+  },
+  besiktas: {
+    title: 'İstanbul\'daki İsrail Konsolosluğu önünde çatışma: 3 terörist etkisiz hale getirildi'
+  }
+};
+
+// Apply flashing class to neighborhoods with breaking news
+Object.keys(flashingNews).forEach(nbId => {
+  const el = document.getElementById(nbId);
+  if (el) el.classList.add('flashing-news');
 });
 
 // ── Init ──
