@@ -721,24 +721,30 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
 
   document.getElementById('submit-btn').disabled = true;
 
-  const { error } = await sb.from('discussions').insert([{
-    neighborhood: homeNeighborhood,
-    content: content,
-    user_id: session.user.id,
-    author_first_name: currentUserFirstName,
-    approved: false
-  }]);
-  
-  document.getElementById('submit-btn').disabled = false;
-  
-  if (error) {
-    statusEl.textContent = error.message;
+  try {
+    const { error } = await sb.from('discussions').insert([{
+      neighborhood: homeNeighborhood,
+      content: content,
+      user_id: session.user.id,
+      author_first_name: currentUserFirstName,
+      approved: false
+    }]);
+
+    document.getElementById('submit-btn').disabled = false;
+
+    if (error) {
+      statusEl.textContent = 'Hata: ' + error.message;
+      statusEl.className = 'submit-status err';
+    } else {
+      statusEl.textContent = 'Mesajınız onay bekliyor!';
+      statusEl.className = 'submit-status ok';
+      document.getElementById('post-content').value = '';
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    }
+  } catch (err) {
+    document.getElementById('submit-btn').disabled = false;
+    statusEl.textContent = 'Bağlantı hatası. Lütfen tekrar deneyin.';
     statusEl.className = 'submit-status err';
-  } else {
-    statusEl.textContent = 'Mesajınız onay bekliyor!';
-    statusEl.className = 'submit-status ok';
-    document.getElementById('post-content').value = '';
-    setTimeout(() => { statusEl.textContent = ''; }, 3000);
   }
 });
 </script>
