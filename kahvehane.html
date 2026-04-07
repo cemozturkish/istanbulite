@@ -749,17 +749,21 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
     document.getElementById('submit-btn').disabled = false;
 
     if (error) {
-      statusEl.textContent = 'Hata: ' + error.message;
+      console.error('Discussion insert error:', error);
+      statusEl.textContent = 'Hata: ' + (error.message || error.code || JSON.stringify(error));
       statusEl.className = 'submit-status err';
     } else {
-      statusEl.textContent = 'Mesajınız onay bekliyor!';
+      statusEl.textContent = isAdmin ? 'Mesajınız yayınlandı!' : 'Mesajınız onay bekliyor!';
       statusEl.className = 'submit-status ok';
       document.getElementById('post-content').value = '';
+      // Reload posts to show the new message (if admin, it's auto-approved)
+      if (isAdmin) loadPosts(activeMapNeighborhood || null);
       setTimeout(() => { statusEl.textContent = ''; }, 3000);
     }
   } catch (err) {
+    console.error('Discussion insert exception:', err);
     document.getElementById('submit-btn').disabled = false;
-    statusEl.textContent = 'Bağlantı hatası. Lütfen tekrar deneyin.';
+    statusEl.textContent = 'Bağlantı hatası: ' + (err.message || err);
     statusEl.className = 'submit-status err';
   }
 });
