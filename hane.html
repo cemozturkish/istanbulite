@@ -811,10 +811,16 @@ async function loadProfile() {
   const user = freshUser || session.user;
   const meta = user.user_metadata || {};
   const avatarUrl = meta.avatar_url || null;
-  const firstName = meta.first_name || localStorage.getItem('first_name_local') || '';
-  const lastName = meta.last_name || localStorage.getItem('last_name_local') || '';
+  // When viewing own profile, prefer localStorage values (most-recent local save)
+  // over user_metadata, since metadata can briefly lag behind after an updateUser call.
+  // When viewing someone else's profile, always use the metadata we fetched.
+  const lsFirstName = !isViewingOther ? localStorage.getItem('first_name_local') : null;
+  const lsLastName = !isViewingOther ? localStorage.getItem('last_name_local') : null;
+  const lsYasadigi = !isViewingOther ? localStorage.getItem('yasadigi_ilce_local') : null;
+  const firstName = (lsFirstName !== null && lsFirstName !== '') ? lsFirstName : (meta.first_name || '');
+  const lastName = (lsLastName !== null && lsLastName !== '') ? lsLastName : (meta.last_name || '');
   const displayName = firstName ? `${firstName} ${lastName}`.trim() : (meta.display_name || user.email.split('@')[0]);
-  const yasadigiIlce = meta.yasadigi_ilce || meta.neighborhood || localStorage.getItem('yasadigi_ilce_local') || '';
+  const yasadigiIlce = (lsYasadigi !== null && lsYasadigi !== '') ? lsYasadigi : (meta.yasadigi_ilce || meta.neighborhood || '');
   const dogumYeri = meta.dogum_yeri || '';
 
   // Update neighborhood badge in left column
@@ -1115,46 +1121,55 @@ async function loadProfile() {
         return;
       }
 
+      // 1. Save to localStorage FIRST, synchronously — guarantees the value
+      //    is available on the next page load even if the network call below fails.
+      localStorage.setItem('yasadigi_ilce_local', newYasadigi);
+      localStorage.setItem('first_name_local', newFirstName);
+      localStorage.setItem('last_name_local', newLastName);
+
       btn.textContent = 'Kaydediliyor...';
       btn.disabled = true;
       msgEl.textContent = '';
 
+      // 2. Merge with existing metadata so we don't accidentally clobber
+      //    unrelated fields (avatar_url, dogum_yeri, etc.) that Supabase
+      //    would otherwise leave alone but some clients may mis-handle.
+      const mergedMetadata = {
+        ...(user.user_metadata || {}),
+        yasadigi_ilce: newYasadigi,
+        first_name: newFirstName,
+        last_name: newLastName
+      };
+
       try {
-        const { data: { session: currentSession } } = await sb.auth.getSession();
-        if (!currentSession) {
-          await sb.auth.refreshSession();
-        }
-
-        const { error } = await sb.auth.updateUser({
-          data: {
-            yasadigi_ilce: newYasadigi,
-            first_name: newFirstName,
-            last_name: newLastName
-          }
-        });
-
+        const { data, error } = await sb.auth.updateUser({ data: mergedMetadata });
         if (error) throw error;
 
-        // Refresh session so cached metadata is updated
-        await sb.auth.refreshSession();
+        // 3. Verify the server actually persisted the change by re-fetching
+        //    the user. If the server returns stale or missing data, we treat
+        //    it as a failure and keep the localStorage fallback.
+        const { data: verifyData, error: verifyError } = await sb.auth.getUser();
+        if (verifyError) throw verifyError;
 
-        // Also save to localStorage as backup
-        localStorage.setItem('yasadigi_ilce_local', newYasadigi);
-        localStorage.setItem('first_name_local', newFirstName);
-        localStorage.setItem('last_name_local', newLastName);
+        const serverMeta = verifyData?.user?.user_metadata || {};
+        const persisted =
+          serverMeta.first_name === newFirstName &&
+          serverMeta.last_name === newLastName &&
+          serverMeta.yasadigi_ilce === newYasadigi;
 
         btn.textContent = 'Kaydet';
         btn.disabled = false;
-        msgEl.textContent = 'Kaydedildi!';
+        if (persisted) {
+          msgEl.textContent = 'Kaydedildi!';
+        } else {
+          msgEl.textContent = 'Yerel olarak kaydedildi.';
+        }
         msgEl.style.color = 'var(--muted)';
         setTimeout(() => { msgEl.textContent = ''; }, 3000);
       } catch (err) {
+        console.error('Profile save error:', err);
         btn.textContent = 'Kaydet';
         btn.disabled = false;
-        // Save to localStorage as fallback
-        localStorage.setItem('yasadigi_ilce_local', newYasadigi);
-        localStorage.setItem('first_name_local', newFirstName);
-        localStorage.setItem('last_name_local', newLastName);
         msgEl.textContent = 'Yerel olarak kaydedildi.';
         msgEl.style.color = 'var(--muted)';
         setTimeout(() => { msgEl.textContent = ''; }, 3000);
