@@ -415,7 +415,7 @@
 
       body {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr auto;
         grid-template-rows: auto auto 1fr;
         overflow: hidden;
         padding-bottom: 56px; /* reserve space for fixed bottom tab bar */
@@ -534,7 +534,7 @@
         border-radius: 4px;
       }
 
-      /* Right column below map: games stacked vertically */
+      /* Right column below map: square game buttons stacked vertically */
       .col-right {
         grid-column: 2;
         grid-row: 3;
@@ -544,6 +544,7 @@
         border-top: 1px solid #e5e5e5;
         display: flex;
         flex-direction: column;
+        width: auto;
       }
       .games-section {
         display: flex;
@@ -553,36 +554,55 @@
         overflow: hidden;
       }
       .games-section-inner {
-        padding: 8px 10px;
-        gap: 8px;
+        padding: 8px;
+        gap: 6px;
         display: flex;
         flex-direction: column;
         flex: 1;
         min-height: 0;
         overflow: hidden;
       }
-      .games-section h2 {
-        font-size: 10px;
-        letter-spacing: 1.2px;
-        flex-shrink: 0;
-        margin: 0 0 2px 0;
-      }
+      .games-section h2 { display: none; }
       .game-link {
-        padding: 8px 10px;
-        border-radius: 4px;
-        flex: 1;
+        padding: 0;
+        border-radius: 6px;
+        width: clamp(88px, 20vw, 128px);
+        aspect-ratio: 1;
         display: flex;
         flex-direction: column;
+        align-items: center;
         justify-content: center;
-        min-height: 0;
+        text-align: center;
+        flex-shrink: 0;
+        position: relative;
       }
       .game-link::before { inset: 3px; }
       .game-link-title {
         font-size: 12px;
-        margin-bottom: 2px;
+        margin-bottom: 3px;
+        font-weight: 700;
       }
       .game-link-subtitle {
-        font-size: 10px;
+        font-size: 9px;
+        padding: 0 4px;
+        line-height: 1.2;
+      }
+      /* Played state: grayed out and disabled */
+      .game-link.played {
+        opacity: 0.45;
+        filter: grayscale(1);
+        pointer-events: none;
+      }
+      .game-link.played::after {
+        content: 'OYNANDI';
+        position: absolute;
+        bottom: 6px;
+        left: 0;
+        right: 0;
+        font-size: 8px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: #000000;
       }
 
       /* Bottom tab bar — fixed at bottom */
@@ -705,17 +725,17 @@
       <div class="games-section-inner">
         <h2>Günün Oyunları</h2>
 
-        <a href="sozcel.html" class="game-link">
+        <a href="sozcel.html" class="game-link" data-game="sozcel">
           <div class="game-link-title">Sözcel</div>
           <div class="game-link-subtitle">Türkçe Wordle</div>
         </a>
 
-        <a href="baglantilar.html" class="game-link">
+        <a href="baglantilar.html" class="game-link" data-game="baglantilar">
           <div class="game-link-title">Bağlantılar</div>
           <div class="game-link-subtitle">Türkçe Connections</div>
         </a>
 
-        <a href="bulmaca.html" class="game-link">
+        <a href="bulmaca.html" class="game-link" data-game="bulmaca">
           <div class="game-link-title">Bulmaca</div>
           <div class="game-link-subtitle">Mini Çapraz Bulmaca</div>
         </a>
@@ -816,6 +836,31 @@ async function init() {
   }
 
   loadPosts();
+  markPlayedGames(session.user.id);
+}
+
+// Today's date in Europe/Istanbul, matching the dailySeed format used by each game
+function getTodaySeed() {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
+}
+
+// Query game_results for today's plays by the current user and gray out played games
+async function markPlayedGames(userId) {
+  const today = getTodaySeed();
+  try {
+    const { data, error } = await sb
+      .from('game_results')
+      .select('game')
+      .eq('user_id', userId)
+      .eq('date', today);
+    if (error) return;
+    const playedGames = new Set((data || []).map(r => r.game));
+    document.querySelectorAll('.game-link[data-game]').forEach(el => {
+      if (playedGames.has(el.dataset.game)) el.classList.add('played');
+    });
+  } catch (e) { /* table may not exist yet — ignore */ }
 }
 
 init();
