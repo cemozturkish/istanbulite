@@ -757,14 +757,83 @@ const STICKERS = [
   { src: 'assets/kizkulesisticker.png', label: 'Kız Kulesi', district: 'uskudar' },
 ];
 
-function getGameScores() {
-  return {
-    bulmacaWins: parseInt(localStorage.getItem('bulmaca_wins') || '0'),
-    bulmacaPlayed: parseInt(localStorage.getItem('bulmaca_played') || '0'),
-    sozcelWins: parseInt(localStorage.getItem('sozcel_wins') || '0'),
-    sozcelPlayed: parseInt(localStorage.getItem('sozcel_played') || '0'),
-    sozcelStreak: parseInt(localStorage.getItem('sozcel_streak') || '0'),
-  };
+// Read game scores from Supabase's game_results table, aggregating per game.
+// Falls back to localStorage if the query fails (table missing, offline, etc.).
+async function getGameScores(userId) {
+  try {
+    const { data, error } = await sb
+      .from('game_results')
+      .select('game, won, date')
+      .eq('user_id', userId);
+    if (error) throw error;
+    // Only count "real" results — rows with attempts>0 OR won=true — as plays.
+    // But since we insert a "started" row with won:false for all engagements,
+    // we count the highest status per (game, date): if any row for that date
+    // has won=true, count it as a win; otherwise count as a play.
+    const byGameDate = {};
+    (data || []).forEach(r => {
+      const key = r.game + '|' + r.date;
+      if (!byGameDate[key]) byGameDate[key] = { game: r.game, won: false };
+      if (r.won) byGameDate[key].won = true;
+    });
+    const agg = {
+      bulmacaPlayed: 0, bulmacaWins: 0,
+      sozcelPlayed: 0, sozcelWins: 0,
+      baglantilarPlayed: 0, baglantilarWins: 0,
+    };
+    Object.values(byGameDate).forEach(entry => {
+      if (entry.game === 'bulmaca') {
+        agg.bulmacaPlayed++;
+        if (entry.won) agg.bulmacaWins++;
+      } else if (entry.game === 'sozcel') {
+        agg.sozcelPlayed++;
+        if (entry.won) agg.sozcelWins++;
+      } else if (entry.game === 'baglantilar') {
+        agg.baglantilarPlayed++;
+        if (entry.won) agg.baglantilarWins++;
+      }
+    });
+    agg.sozcelStreak = parseInt(localStorage.getItem('sozcel_streak') || '0');
+    return agg;
+  } catch (e) {
+    return {
+      bulmacaWins: parseInt(localStorage.getItem('bulmaca_wins') || '0'),
+      bulmacaPlayed: parseInt(localStorage.getItem('bulmaca_played') || '0'),
+      sozcelWins: parseInt(localStorage.getItem('sozcel_wins') || '0'),
+      sozcelPlayed: parseInt(localStorage.getItem('sozcel_played') || '0'),
+      sozcelStreak: parseInt(localStorage.getItem('sozcel_streak') || '0'),
+      baglantilarWins: parseInt(localStorage.getItem('baglantilar_wins') || '0'),
+      baglantilarPlayed: parseInt(localStorage.getItem('baglantilar_played') || '0'),
+    };
+  }
+}
+
+// Render the Oyun Skorları section. Called once synchronously with zeroed
+// scores (so the layout settles) and again after the Supabase query resolves.
+function renderScoresSection(scores) {
+  const el = document.getElementById('scores-section');
+  if (!el) return;
+  const sozcelDetail = scores.sozcelPlayed > 0
+    ? (scores.sozcelStreak || 0) + ' seri'
+    : 'Henüz oynanmadı';
+  el.innerHTML = `
+    <div class="right-section-title">Oyun Skorları</div>
+    <div class="score-card">
+      <div class="game-name">Bulmaca</div>
+      <div class="score-value">${scores.bulmacaWins || 0}</div>
+      <div class="score-detail">${scores.bulmacaPlayed || 0} oyun</div>
+    </div>
+    <div class="score-card">
+      <div class="game-name">Sözcel</div>
+      <div class="score-value">${scores.sozcelWins || 0}</div>
+      <div class="score-detail">${sozcelDetail}</div>
+    </div>
+    <div class="score-card">
+      <div class="game-name">Bağlantılar</div>
+      <div class="score-value">${scores.baglantilarWins || 0}</div>
+      <div class="score-detail">${scores.baglantilarPlayed || 0} oyun</div>
+    </div>
+  `;
 }
 
 function formatLastSeen(dateStr) {
@@ -833,7 +902,17 @@ async function loadProfile() {
     year: 'numeric', month: 'long', day: 'numeric'
   });
   const lastSeenText = formatLastSeen(user.last_sign_in_at);
-  const scores = getGameScores();
+  // Scores are loaded async from Supabase — provide a zeroed object first
+  // then hydrate the score cards once the query resolves.
+  const scores = {
+    bulmacaWins: 0, bulmacaPlayed: 0,
+    sozcelWins: 0, sozcelPlayed: 0, sozcelStreak: 0,
+    baglantilarWins: 0, baglantilarPlayed: 0,
+  };
+  getGameScores(user.id).then(s => {
+    Object.assign(scores, s);
+    renderScoresSection(scores);
+  });
 
   const avatarContent = avatarUrl
     ? `<img src="${avatarUrl}" alt="Profile">`
@@ -1090,20 +1169,12 @@ async function loadProfile() {
           <div class="info-value">${lastSeenText}</div>
         </div>
       </div>
-      <div>
+      <div id="scores-section">
         <div class="right-section-title">Oyun Skorları</div>
-        <div class="score-card">
-          <div class="game-name">Bulmaca</div>
-          <div class="score-value">${scores.bulmacaWins}</div>
-          <div class="score-detail">${scores.bulmacaPlayed} oyun</div>
-        </div>
-        <div class="score-card">
-          <div class="game-name">Sözcel</div>
-          <div class="score-value">${scores.sozcelWins}</div>
-          <div class="score-detail">${scores.sozcelPlayed > 0 ? scores.sozcelStreak + ' seri' : 'Henüz oynanmadı'}</div>
-        </div>
+        <div class="loading" style="padding:8px;font-size:11px;"><span class="spinner"></span></div>
       </div>
     `;
+    renderScoresSection(scores);
   }
 
   // ── Save profile (name + district) ──

@@ -359,6 +359,9 @@
     .district-rank .rank-pct { color: var(--muted); font-weight: 700; }
 
     /* ── MOBILE RESPONSIVE ── */
+    /* Back button hidden on desktop (overridden in mobile @media below) */
+    .game-back-btn { display: none; }
+
     @media (max-width: 768px) {
       html, body {
         height: 100vh;
@@ -458,9 +461,6 @@
       .clue-number { min-width: 14px; }
 
     }
-
-    /* Back button hidden on desktop */
-    .game-back-btn { display: none; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -826,12 +826,33 @@ document.addEventListener('keydown', (e) => {
   if (e.key.length === 1 && e.key.match(/[a-zçğıöşüA-ZÇĞİÖŞÜ]/)) {
     updateCell(e.key.toUpperCase());
     moveToNext();
+    markAsPlayed();
     saveState();
   } else if (e.key === 'Backspace') {
     updateCell('');
     saveState();
   }
 });
+
+// Record an "in progress" game_results row on first interaction so Kahvehane
+// can show the game as played even when the user doesn't finish it today.
+async function markAsPlayed() {
+  const flagKey = 'bulmaca_started_' + dailySeed;
+  if (localStorage.getItem(flagKey)) return;
+  localStorage.setItem(flagKey, '1');
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    await sb.from('game_results').insert([{
+      user_id: session.user.id,
+      game: 'bulmaca',
+      date: dailySeed,
+      attempts: 0,
+      won: false,
+      neighborhood: userNeighborhood
+    }]);
+  } catch (e) { /* table may not exist yet */ }
+}
 
 function moveToNext() {
   if (!activeCell) return;

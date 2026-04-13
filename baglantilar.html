@@ -378,6 +378,9 @@
     .district-rank .rank-pct { color: var(--muted); font-weight: 700; }
 
     /* ── MOBILE RESPONSIVE ── */
+    /* Back button hidden on desktop (overridden in mobile @media below) */
+    .game-back-btn { display: none; }
+
     @media (max-width: 768px) {
       html, body {
         height: 100vh;
@@ -479,9 +482,6 @@
       .reset-info { font-size: 10px; }
 
     }
-
-    /* Back button hidden on desktop */
-    .game-back-btn { display: none; }
   </style>
 </head>
 <body>
@@ -770,6 +770,27 @@ function toggleWord(word) {
   }
   renderWords();
   document.getElementById('submit-btn').disabled = selectedWords.length !== 4;
+  markAsPlayed();
+}
+
+// Record an "in progress" game_results row on first interaction so Kahvehane
+// can show the game as played even when the user doesn't finish it today.
+async function markAsPlayed() {
+  const flagKey = 'baglantilar_started_' + dailySeed;
+  if (localStorage.getItem(flagKey)) return;
+  localStorage.setItem(flagKey, '1');
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    await sb.from('game_results').insert([{
+      user_id: session.user.id,
+      game: 'baglantilar',
+      date: dailySeed,
+      attempts: 0,
+      won: false,
+      neighborhood: userNeighborhood
+    }]);
+  } catch (e) { /* table may not exist yet */ }
 }
 
 // ── Check guess ──
