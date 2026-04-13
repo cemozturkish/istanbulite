@@ -1008,10 +1008,22 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
     return;
   }
   
-  const { data: { session } } = await sb.auth.getSession();
+  // Explicitly refresh the session first — stale tokens sometimes produce
+  // "TypeError: Load failed" on Safari instead of a clean 401, and re-reading
+  // the session from storage guarantees we send a fresh access_token.
+  let session = null;
+  try {
+    const refreshed = await sb.auth.refreshSession();
+    session = refreshed.data?.session || null;
+  } catch (_) {}
+  if (!session) {
+    const got = await sb.auth.getSession();
+    session = got.data?.session || null;
+  }
   if (!session) {
     statusEl.textContent = 'Mesaj göndermek için giriş yapın';
     statusEl.className = 'submit-status err';
+    showToast('Oturum bulunamadı — lütfen tekrar giriş yapın', 'err');
     return;
   }
 
@@ -1025,13 +1037,16 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
     approved: isAdmin ? true : false
   };
 
-  // Insert directly via PostgREST instead of supabase-js. We hit Load-failed
-  // TypeErrors from the SDK on Safari — going direct gives us the real HTTP
-  // status on failure and sidesteps any SDK-level fetch quirk.
-  try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/discussions`, {
+  // Attempt the insert up to 3 times with a short delay between retries.
+  // Safari occasionally returns "TypeError: Load failed" on the first POST
+  // after a long idle (preflight cache poisoning / keepalive races); a
+  // quick retry usually succeeds.
+  async function attemptInsert() {
+    return fetch(`${SUPABASE_URL}/rest/v1/discussions`, {
       method: 'POST',
       mode: 'cors',
+      credentials: 'omit',
+      cache: 'no-store',
       headers: {
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${session.access_token}`,
@@ -1040,60 +1055,59 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
       },
       body: JSON.stringify(insertData)
     });
+  }
 
-    document.getElementById('submit-btn').disabled = false;
-
-    if (!response.ok) {
-      let detail = '';
-      try {
-        const body = await response.text();
-        detail = body.slice(0, 300);
-      } catch (_) {}
-      const msg = `Hata: HTTP ${response.status} ${response.statusText} ${detail}`.trim();
-      statusEl.textContent = msg;
-      statusEl.className = 'submit-status err';
-      showToast(msg, 'err');
-      return;
-    }
-
-    const msg = isAdmin ? 'Mesajınız yayınlandı!' : 'Mesajınız onay bekliyor!';
-    statusEl.textContent = msg;
-    statusEl.className = 'submit-status ok';
-    document.getElementById('post-content').value = '';
-    showToast(msg, 'ok');
-    if (isAdmin) loadPosts(activeMapNeighborhood || null);
-    setTimeout(() => { statusEl.textContent = ''; }, 3000);
-  } catch (err) {
-    document.getElementById('submit-btn').disabled = false;
-    // Fallback: try the supabase-js client. If both fail we show whichever
-    // error is more informative.
-    let sdkErr = null;
+  let lastErr = null;
+  let response = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const res = await sb.from('discussions').insert(insertData);
-      if (!res.error) {
-        const msg = isAdmin ? 'Mesajınız yayınlandı!' : 'Mesajınız onay bekliyor!';
-        statusEl.textContent = msg;
-        statusEl.className = 'submit-status ok';
-        document.getElementById('post-content').value = '';
-        showToast(msg, 'ok');
-        if (isAdmin) loadPosts(activeMapNeighborhood || null);
-        return;
+      response = await attemptInsert();
+      lastErr = null;
+      break;
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[kahvehane insert attempt ${attempt}/3 failed]`, err);
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 400 * attempt));
       }
-      sdkErr = res.error;
-    } catch (err2) {
-      sdkErr = err2;
     }
-    const parts = [
-      err && (err.name || 'Error'),
-      err && err.message,
-      sdkErr && (sdkErr.message || sdkErr.code || JSON.stringify(sdkErr))
-    ].filter(Boolean);
-    const msg = 'Hata: ' + parts.join(' / ');
+  }
+
+  document.getElementById('submit-btn').disabled = false;
+
+  if (!response) {
+    // All attempts threw — this is a transport-layer failure (CORS preflight,
+    // tracking blocker, captive portal, offline, etc.)
+    const sessionSnippet = session?.user?.id ? session.user.id.slice(0, 8) : 'no-user';
+    const expiresAt = session?.expires_at ? new Date(session.expires_at * 1000).toISOString().slice(11, 19) : 'n/a';
+    const msg = `Hata: ${lastErr?.name || 'Error'} — ${lastErr?.message || String(lastErr)} [uid:${sessionSnippet} exp:${expiresAt}]`;
     statusEl.textContent = msg;
     statusEl.className = 'submit-status err';
     showToast(msg, 'err');
-    console.error('[kahvehane submit failed]', { fetchError: err, sdkError: sdkErr, insertData });
+    console.error('[kahvehane submit failed — all attempts]', { lastErr, insertData, session });
+    return;
   }
+
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const body = await response.text();
+      detail = body.slice(0, 300);
+    } catch (_) {}
+    const msg = `Hata: HTTP ${response.status} ${response.statusText} ${detail}`.trim();
+    statusEl.textContent = msg;
+    statusEl.className = 'submit-status err';
+    showToast(msg, 'err');
+    return;
+  }
+
+  const okMsg = isAdmin ? 'Mesajınız yayınlandı!' : 'Mesajınız onay bekliyor!';
+  statusEl.textContent = okMsg;
+  statusEl.className = 'submit-status ok';
+  document.getElementById('post-content').value = '';
+  showToast(okMsg, 'ok');
+  if (isAdmin) loadPosts(activeMapNeighborhood || null);
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
 });
 
 // Fixed-position toast so users always see the submit outcome, even when the
