@@ -1017,41 +1017,82 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
 
   document.getElementById('submit-btn').disabled = true;
 
-  try {
-    const insertData = {
-      neighborhood: String(postNeighborhood),
-      content: String(content),
-      user_id: String(session.user.id),
-      author_first_name: String(currentUserFirstName || 'Anonim'),
-      approved: isAdmin ? true : false
-    };
+  const insertData = {
+    neighborhood: String(postNeighborhood),
+    content: String(content),
+    user_id: String(session.user.id),
+    author_first_name: String(currentUserFirstName || 'Anonim'),
+    approved: isAdmin ? true : false
+  };
 
-    // Try insert; if it fails, show the full error for debugging
-    const res = await sb.from('discussions').insert(insertData);
-    const error = res.error;
+  // Insert directly via PostgREST instead of supabase-js. We hit Load-failed
+  // TypeErrors from the SDK on Safari — going direct gives us the real HTTP
+  // status on failure and sidesteps any SDK-level fetch quirk.
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/discussions`, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(insertData)
+    });
 
     document.getElementById('submit-btn').disabled = false;
 
-    if (error) {
-      const msg = 'Hata: ' + (error.message || error.code || error.details || JSON.stringify(error));
+    if (!response.ok) {
+      let detail = '';
+      try {
+        const body = await response.text();
+        detail = body.slice(0, 300);
+      } catch (_) {}
+      const msg = `Hata: HTTP ${response.status} ${response.statusText} ${detail}`.trim();
       statusEl.textContent = msg;
       statusEl.className = 'submit-status err';
       showToast(msg, 'err');
-    } else {
-      const msg = isAdmin ? 'Mesajınız yayınlandı!' : 'Mesajınız onay bekliyor!';
-      statusEl.textContent = msg;
-      statusEl.className = 'submit-status ok';
-      document.getElementById('post-content').value = '';
-      showToast(msg, 'ok');
-      if (isAdmin) loadPosts(activeMapNeighborhood || null);
-      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+      return;
     }
+
+    const msg = isAdmin ? 'Mesajınız yayınlandı!' : 'Mesajınız onay bekliyor!';
+    statusEl.textContent = msg;
+    statusEl.className = 'submit-status ok';
+    document.getElementById('post-content').value = '';
+    showToast(msg, 'ok');
+    if (isAdmin) loadPosts(activeMapNeighborhood || null);
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
   } catch (err) {
     document.getElementById('submit-btn').disabled = false;
-    const msg = 'Hata: ' + (err.name || '') + ' ' + (err.message || String(err));
+    // Fallback: try the supabase-js client. If both fail we show whichever
+    // error is more informative.
+    let sdkErr = null;
+    try {
+      const res = await sb.from('discussions').insert(insertData);
+      if (!res.error) {
+        const msg = isAdmin ? 'Mesajınız yayınlandı!' : 'Mesajınız onay bekliyor!';
+        statusEl.textContent = msg;
+        statusEl.className = 'submit-status ok';
+        document.getElementById('post-content').value = '';
+        showToast(msg, 'ok');
+        if (isAdmin) loadPosts(activeMapNeighborhood || null);
+        return;
+      }
+      sdkErr = res.error;
+    } catch (err2) {
+      sdkErr = err2;
+    }
+    const parts = [
+      err && (err.name || 'Error'),
+      err && err.message,
+      sdkErr && (sdkErr.message || sdkErr.code || JSON.stringify(sdkErr))
+    ].filter(Boolean);
+    const msg = 'Hata: ' + parts.join(' / ');
     statusEl.textContent = msg;
     statusEl.className = 'submit-status err';
     showToast(msg, 'err');
+    console.error('[kahvehane submit failed]', { fetchError: err, sdkError: sdkErr, insertData });
   }
 });
 
