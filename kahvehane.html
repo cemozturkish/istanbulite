@@ -351,6 +351,27 @@
     .submit-status.ok { color: var(--success); }
     .submit-status.err { color: var(--accent); }
 
+    /* Fixed toast — always visible above everything so submit outcome is seen */
+    .global-toast {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: calc(100% - 24px);
+      padding: 10px 14px;
+      background: #000000;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      z-index: 9999;
+      display: none;
+      text-align: center;
+    }
+    .global-toast.ok { background: #333333; }
+    .global-toast.err { background: #000000; }
+
     .discussion-posts {
       flex: 1;
       overflow-y: auto;
@@ -464,41 +485,38 @@
         text-align: center;
       }
 
-      /* Left column below map: discussion + submit form stacked */
+      /* Left column below map: simple block scroll so submit-form is always
+         reachable even when the map pushes content toward the tab bar. */
       .col-left {
         grid-column: 1;
         grid-row: 3;
         min-height: 0;
-        overflow: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
         border-right: 1px solid #e5e5e5;
         border-top: 1px solid #e5e5e5;
-        display: flex;
-        flex-direction: column;
+        display: block;
       }
       .col-left .nb-highlight {
         padding: 6px 12px;
         font-size: 10px;
         letter-spacing: 1.2px;
-        flex-shrink: 0;
       }
       .discussion-section {
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        min-height: 0;
-        flex: 1;
+        display: block;
       }
       .discussion-label {
         padding: 5px 12px;
         font-size: 9px;
         letter-spacing: 1.2px;
-        flex-shrink: 0;
+        position: sticky;
+        top: 0;
+        background: #ffffff;
+        z-index: 2;
       }
       .discussion-posts {
         padding: 6px 10px;
-        overflow: hidden;
-        flex: 1;
-        min-height: 0;
+        overflow: visible;
       }
       .post {
         padding: 5px 8px;
@@ -513,9 +531,9 @@
         line-height: 1.35;
       }
       .submit-form {
-        padding: 6px 10px;
-        flex-shrink: 0;
+        padding: 8px 10px 12px;
         border-top: 1px solid #e5e5e5;
+        background: #ffffff;
       }
       .submit-form-header {
         font-size: 10px;
@@ -822,7 +840,6 @@ async function init() {
     document.getElementById('home-nb-badge').textContent = nbName;
     const badgeEl = document.getElementById('user-nb-badge');
     if (badgeEl) badgeEl.textContent = nbName;
-    document.getElementById('submit-form').style.display = 'block';
     // Highlight home neighborhood on map
     const nbEl = document.getElementById(homeNeighborhood);
     if (nbEl) nbEl.classList.add('home');
@@ -830,10 +847,10 @@ async function init() {
     document.getElementById('home-nb-badge').textContent = 'Semt seçilmedi';
   }
 
-  // Admin can always post — show the form even without a home neighborhood
-  if (isAdmin) {
-    document.getElementById('submit-form').style.display = 'block';
-  }
+  // The submit form is always visible once the user is authenticated — the
+  // submit handler validates neighborhood and content before inserting, so
+  // hiding the form only makes it impossible for users to see the guidance.
+  document.getElementById('submit-form').style.display = 'block';
 
   loadPosts();
   markPlayedGames(session.user.id);
@@ -895,14 +912,16 @@ mapNeighborhoods.forEach(nb => {
     document.getElementById('map-label').textContent = name;
     document.getElementById('discussion-label').textContent = name;
     activeMapNeighborhood = nb.id;
-    selectedNeighborhood = nb.id;
-    // Admin can post to any neighborhood; regular users only to their own
-    const form = document.getElementById('submit-form');
-    if (isAdmin || (homeNeighborhood && nb.id === homeNeighborhood)) {
-      form.style.display = 'block';
+    // Admin can post to any neighborhood; regular users only to their own.
+    // Keep the form visible either way so the user can read the guidance and
+    // see errors; the submit handler enforces the rule.
+    const canPostHere = isAdmin || (homeNeighborhood && nb.id === homeNeighborhood);
+    if (canPostHere) {
+      selectedNeighborhood = nb.id;
       document.getElementById('home-nb-badge').textContent = neighborhoodNames[nb.id] || nb.id;
-    } else {
-      form.style.display = 'none';
+    } else if (homeNeighborhood) {
+      selectedNeighborhood = homeNeighborhood;
+      document.getElementById('home-nb-badge').textContent = neighborhoodNames[homeNeighborhood] || homeNeighborhood;
     }
     loadPosts(nb.id);
   });
@@ -919,13 +938,12 @@ document.addEventListener('click', (e) => {
     document.getElementById('map-label').textContent = 'İstanbul';
     document.getElementById('discussion-label').textContent = 'Tüm İstanbul';
     activeMapNeighborhood = null;
-    // Show comment form when back to all-Istanbul view
+    // Back to all-Istanbul view: reset selection to home neighborhood. Form
+    // visibility is handled once in init() and stays visible.
     selectedNeighborhood = homeNeighborhood;
     if (homeNeighborhood) {
-      document.getElementById('submit-form').style.display = 'block';
       document.getElementById('home-nb-badge').textContent = neighborhoodNames[homeNeighborhood] || homeNeighborhood;
     }
-    if (isAdmin) document.getElementById('submit-form').style.display = 'block';
     loadPosts();
   }
 });
@@ -1015,21 +1033,43 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
     document.getElementById('submit-btn').disabled = false;
 
     if (error) {
-      statusEl.textContent = 'Hata: ' + (error.message || error.code || error.details || JSON.stringify(error));
+      const msg = 'Hata: ' + (error.message || error.code || error.details || JSON.stringify(error));
+      statusEl.textContent = msg;
       statusEl.className = 'submit-status err';
+      showToast(msg, 'err');
     } else {
-      statusEl.textContent = isAdmin ? 'Mesajınız yayınlandı!' : 'Mesajınız onay bekliyor!';
+      const msg = isAdmin ? 'Mesajınız yayınlandı!' : 'Mesajınız onay bekliyor!';
+      statusEl.textContent = msg;
       statusEl.className = 'submit-status ok';
       document.getElementById('post-content').value = '';
+      showToast(msg, 'ok');
       if (isAdmin) loadPosts(activeMapNeighborhood || null);
       setTimeout(() => { statusEl.textContent = ''; }, 3000);
     }
   } catch (err) {
     document.getElementById('submit-btn').disabled = false;
-    statusEl.textContent = 'Hata: ' + (err.name || '') + ' ' + (err.message || String(err));
+    const msg = 'Hata: ' + (err.name || '') + ' ' + (err.message || String(err));
+    statusEl.textContent = msg;
     statusEl.className = 'submit-status err';
+    showToast(msg, 'err');
   }
 });
+
+// Fixed-position toast so users always see the submit outcome, even when the
+// status element inside the form is scrolled out of view on mobile.
+function showToast(text, kind) {
+  let toast = document.getElementById('global-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'global-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = text;
+  toast.className = 'global-toast ' + (kind || '');
+  toast.style.display = 'block';
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => { toast.style.display = 'none'; }, 5000);
+}
 </script>
 </body>
 </html>
