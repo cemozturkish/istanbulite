@@ -846,21 +846,39 @@ function getTodaySeed() {
   return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
 }
 
-// Query game_results for today's plays by the current user and gray out played games
+// Mark games played today as gray. Uses Supabase game_results as the source of
+// truth, but also falls back to per-game localStorage flags written by each
+// game's markAsPlayed() — this keeps the indicator working even if the
+// game_results table is missing, RLS blocks the read, or the insert failed.
 async function markPlayedGames(userId) {
   const today = getTodaySeed();
+  const playedGames = new Set();
+
+  // Local fallback: flags set by each game when the user first interacts
+  const localFlags = {
+    bulmaca: 'bulmaca_started_' + today,
+    sozcel: 'sozcel_started_' + today,
+    baglantilar: 'baglantilar_started_' + today
+  };
+  for (const [game, key] of Object.entries(localFlags)) {
+    if (localStorage.getItem(key)) playedGames.add(game);
+  }
+
+  // Remote source of truth — merge with local flags
   try {
     const { data, error } = await sb
       .from('game_results')
       .select('game')
       .eq('user_id', userId)
       .eq('date', today);
-    if (error) return;
-    const playedGames = new Set((data || []).map(r => r.game));
-    document.querySelectorAll('.game-link[data-game]').forEach(el => {
-      if (playedGames.has(el.dataset.game)) el.classList.add('played');
-    });
+    if (!error && data) {
+      data.forEach(r => playedGames.add(r.game));
+    }
   } catch (e) { /* table may not exist yet — ignore */ }
+
+  document.querySelectorAll('.game-link[data-game]').forEach(el => {
+    if (playedGames.has(el.dataset.game)) el.classList.add('played');
+  });
 }
 
 init();
