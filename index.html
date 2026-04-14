@@ -8,6 +8,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Mobile swipe pagination: pre-body, set initial offscreen state so bottom panes don't flash at origin before sliding in -->
+  <script>
+    (function(){
+      try {
+        var _d = sessionStorage.getItem('ist-page-enter-dir');
+        if (_d && window.innerWidth <= 768) {
+          document.documentElement.classList.add('ist-entering-' + _d);
+        }
+      } catch(e) {}
+    })();
+  </script>
   <style>
     :root {
       --ink: #000000;
@@ -666,6 +677,31 @@
         text-decoration: none;
       }
       nav a.active { color: #000000; }
+
+      /* ── Mobile swipe pagination: bottom panes slide; map stays static ── */
+      .col-left, .col-right {
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform;
+        backface-visibility: hidden;
+      }
+      html.ist-entering-forward .col-left,
+      html.ist-entering-forward .col-right {
+        transform: translateX(100vw);
+        transition: none;
+      }
+      html.ist-entering-backward .col-left,
+      html.ist-entering-backward .col-right {
+        transform: translateX(-100vw);
+        transition: none;
+      }
+      .col-left.ist-exiting-left,
+      .col-right.ist-exiting-left {
+        transform: translateX(-100vw);
+      }
+      .col-left.ist-exiting-right,
+      .col-right.ist-exiting-right {
+        transform: translateX(100vw);
+      }
     }
   </style>
 </head>
@@ -809,6 +845,105 @@
 </div>
 
 <script>
+// ══════════════════════════════════════════
+// Mobile swipe pagination
+// Swipe horizontally on the area below the map to navigate between
+// Anahane → Kahvehane → Kütüphane → Hane. The map stays static;
+// only the bottom panes slide. Tab-bar clicks use the same animation.
+// ══════════════════════════════════════════
+(function initMobileSwipePagination() {
+  const PAGES = ['index.html', 'kahvehane.html', 'kutuphane.html', 'hane.html'];
+  const DURATION = 300;
+  const MIN_DX = 50;
+  const MAX_TIME = 700;
+
+  function isMobile() { return window.innerWidth <= 768; }
+  function currentIdx() {
+    const path = (location.pathname.split('/').pop() || 'index.html');
+    const idx = PAGES.indexOf(path);
+    return idx === -1 ? 0 : idx;
+  }
+  function getPanes() {
+    return Array.from(document.querySelectorAll('.col-left, .col-right'));
+  }
+
+  function playEnter() {
+    const root = document.documentElement;
+    const dir = root.classList.contains('ist-entering-forward') ? 'forward'
+              : root.classList.contains('ist-entering-backward') ? 'backward' : null;
+    try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
+    if (!dir) return;
+    // Double rAF so the initial transform has painted before we release it.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        root.classList.remove('ist-entering-' + dir);
+      });
+    });
+  }
+
+  let navigating = false;
+  function navigate(targetIdx, dir) {
+    if (navigating) return;
+    if (targetIdx < 0 || targetIdx >= PAGES.length) return;
+    const curr = currentIdx();
+    if (targetIdx === curr) return;
+    navigating = true;
+    try { sessionStorage.setItem('ist-page-enter-dir', dir); } catch(e) {}
+    const exitClass = dir === 'forward' ? 'ist-exiting-left' : 'ist-exiting-right';
+    getPanes().forEach(p => p.classList.add(exitClass));
+    setTimeout(() => { location.href = PAGES[targetIdx]; }, DURATION - 30);
+  }
+
+  // Intercept tab-bar clicks so they use the same animation.
+  document.addEventListener('click', (e) => {
+    if (!isMobile()) return;
+    const link = e.target.closest('nav a');
+    if (!link) return;
+    const href = link.getAttribute('href');
+    const targetIdx = PAGES.indexOf(href);
+    const curr = currentIdx();
+    if (targetIdx === -1 || targetIdx === curr) return;
+    e.preventDefault();
+    navigate(targetIdx, targetIdx > curr ? 'forward' : 'backward');
+  }, true);
+
+  // Swipe detection — only when the touch starts at or below the bottom panes.
+  let sx = 0, sy = 0, st = 0, active = false;
+  document.addEventListener('touchstart', (e) => {
+    if (!isMobile() || e.touches.length !== 1) return;
+    const pane = document.querySelector('.col-left') || document.querySelector('.col-right');
+    if (!pane) return;
+    const y = e.touches[0].clientY;
+    const top = pane.getBoundingClientRect().top;
+    if (y < top) return; // touch started in the map area — don't hijack
+    sx = e.touches[0].clientX;
+    sy = y;
+    st = Date.now();
+    active = true;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (!active) return;
+    active = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx;
+    const dy = t.clientY - sy;
+    const dt = Date.now() - st;
+    if (dt > MAX_TIME) return;
+    if (Math.abs(dx) < MIN_DX) return;
+    if (Math.abs(dx) < Math.abs(dy) * 1.2) return; // vertical-dominant: let it scroll
+    const curr = currentIdx();
+    if (dx < 0) navigate(curr + 1, 'forward');
+    else        navigate(curr - 1, 'backward');
+  }, { passive: true });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', playEnter);
+  } else {
+    playEnter();
+  }
+})();
+
 // ══════════════════════════════════════════
 // CONFIGURATION — Replace with your values
 // ══════════════════════════════════════════
