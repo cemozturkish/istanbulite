@@ -692,13 +692,40 @@
         transform: translateX(-100vw);
         transition: none;
       }
-      .col-left.ist-exiting-left,
-      .col-right.ist-exiting-left {
+      .col-left.ist-exiting-forward,
+      .col-right.ist-exiting-forward {
         transform: translateX(-100vw);
       }
-      .col-left.ist-exiting-right,
-      .col-right.ist-exiting-right {
+      .col-left.ist-exiting-backward,
+      .col-right.ist-exiting-backward {
         transform: translateX(100vw);
+      }
+    }
+
+    /* ── Desktop swipe pagination: columns slide vertically; map stays static ── */
+    @media (min-width: 769px) {
+      .col-left, .col-right {
+        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform;
+        backface-visibility: hidden;
+      }
+      html.ist-entering-forward .col-left,
+      html.ist-entering-forward .col-right {
+        transform: translateY(100vh);
+        transition: none;
+      }
+      html.ist-entering-backward .col-left,
+      html.ist-entering-backward .col-right {
+        transform: translateY(-100vh);
+        transition: none;
+      }
+      .col-left.ist-exiting-forward,
+      .col-right.ist-exiting-forward {
+        transform: translateY(-100vh);
+      }
+      .col-left.ist-exiting-backward,
+      .col-right.ist-exiting-backward {
+        transform: translateY(100vh);
       }
     }
   </style>
@@ -841,13 +868,13 @@
     if (targetIdx === curr) return;
     navigating = true;
     try { sessionStorage.setItem('ist-page-enter-dir', dir); } catch(e) {}
-    const exitClass = dir === 'forward' ? 'ist-exiting-left' : 'ist-exiting-right';
+    const exitClass = dir === 'forward' ? 'ist-exiting-forward' : 'ist-exiting-backward';
     getPanes().forEach(p => p.classList.add(exitClass));
     setTimeout(() => { location.href = PAGES[targetIdx]; }, DURATION - 30);
   }
 
+  // Intercept tab-bar clicks so they use the same animation (mobile + desktop).
   document.addEventListener('click', (e) => {
-    if (!isMobile()) return;
     const link = e.target.closest('nav a');
     if (!link) return;
     const href = link.getAttribute('href');
@@ -858,6 +885,7 @@
     navigate(targetIdx, targetIdx > curr ? 'forward' : 'backward');
   }, true);
 
+  // ── Mobile: horizontal touch-swipe on the area below the map ──
   let sx = 0, sy = 0, st = 0, active = false;
   document.addEventListener('touchstart', (e) => {
     if (!isMobile() || e.touches.length !== 1) return;
@@ -886,6 +914,48 @@
     if (dx < 0) navigate(curr + 1, 'forward');
     else        navigate(curr - 1, 'backward');
   }, { passive: true });
+
+  // ── Desktop: vertical wheel-based swipe on the columns ──
+  let wheelAccum = 0, wheelTs = 0;
+  const WHEEL_THRESHOLD = 180;
+  const WHEEL_RESET_MS = 220;
+  function canScrollInDir(target, col, dy) {
+    let el = target;
+    while (el && el !== col.parentElement && el !== document.body) {
+      if (el.scrollHeight > el.clientHeight + 1) {
+        const atTop = el.scrollTop < 0.5;
+        const atBottom = el.scrollTop + el.clientHeight > el.scrollHeight - 0.5;
+        if (dy > 0 && !atBottom) return true;
+        if (dy < 0 && !atTop) return true;
+      }
+      el = el.parentElement;
+    }
+    return false;
+  }
+  document.addEventListener('wheel', (e) => {
+    if (isMobile()) return;
+    if (navigating) { e.preventDefault(); return; }
+    const col = e.target.closest && e.target.closest('.col-left, .col-right');
+    if (!col) { wheelAccum = 0; return; }
+    const dy = e.deltaY;
+    if (Math.abs(dy) < 1) return;
+    if (canScrollInDir(e.target, col, dy)) {
+      wheelAccum = 0;
+      return;
+    }
+    e.preventDefault();
+    const now = Date.now();
+    if (now - wheelTs > WHEEL_RESET_MS) wheelAccum = 0;
+    wheelTs = now;
+    wheelAccum += dy;
+    if (Math.abs(wheelAccum) >= WHEEL_THRESHOLD) {
+      const curr = currentIdx();
+      const accum = wheelAccum;
+      wheelAccum = 0;
+      if (accum > 0) navigate(curr + 1, 'forward');
+      else           navigate(curr - 1, 'backward');
+    }
+  }, { passive: false });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', playEnter);
