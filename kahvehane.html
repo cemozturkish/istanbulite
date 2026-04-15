@@ -243,7 +243,7 @@
       gap: 10px;
       flex: 1;
       min-height: 0;
-      justify-content: center;
+      overflow-y: auto;
     }
 
     .games-section h2 {
@@ -253,6 +253,79 @@
       text-align: center;
       letter-spacing: 2px;
       flex-shrink: 0;
+    }
+
+    /* ── Weekly scoreboard (top 5 winners of the last 7 days) ── */
+    .scoreboard {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid #cccccc;
+      flex-shrink: 0;
+    }
+    .scoreboard h2 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      text-align: center;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .scoreboard-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .scoreboard-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: var(--paper);
+      border: 1px solid #cccccc;
+      font-size: 0.75rem;
+    }
+    .scoreboard-item.top {
+      background: var(--paper-dark);
+      border-color: var(--ink);
+    }
+    .scoreboard-rank {
+      font-weight: 700;
+      color: var(--ink);
+      min-width: 18px;
+      font-size: 0.8rem;
+    }
+    .scoreboard-player {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .scoreboard-name {
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .scoreboard-nb {
+      color: var(--muted);
+      font-size: 0.7rem;
+    }
+    .scoreboard-score {
+      font-weight: 700;
+      color: var(--ink);
+      font-size: 0.85rem;
+      min-width: 22px;
+      text-align: right;
+    }
+    .scoreboard-empty {
+      font-size: 0.7rem;
+      color: var(--muted);
+      font-style: italic;
+      text-align: center;
+      padding: 10px 4px;
+      list-style: none;
     }
 
     .game-link {
@@ -592,6 +665,8 @@
         overflow: hidden;
       }
       .games-section h2 { display: none; }
+      /* Hide the weekly scoreboard on mobile — keeps the game-button row compact */
+      .scoreboard { display: none; }
       .game-link {
         padding: 0;
         border-radius: 6px;
@@ -836,6 +911,15 @@
           <div class="game-link-title">Bulmaca</div>
           <div class="game-link-subtitle">Mini Çapraz Bulmaca</div>
         </a>
+
+        <!-- Weekly scoreboard: top 5 winners over the last 7 days. Each game
+             win (won=true in game_results) counts as one point. -->
+        <div class="scoreboard">
+          <h2>Haftanın Skor Tahtası</h2>
+          <ol class="scoreboard-list" id="scoreboard-list">
+            <li class="scoreboard-empty">Yükleniyor...</li>
+          </ol>
+        </div>
       </div>
     </section>
   </aside>
@@ -1070,6 +1154,7 @@ async function init() {
 
   loadPosts();
   markPlayedGames(session.user.id);
+  loadScoreboard();
 }
 
 // Today's date in Europe/Istanbul, matching the dailySeed format used by each game
@@ -1112,6 +1197,121 @@ async function markPlayedGames(userId) {
   document.querySelectorAll('.game-link[data-game]').forEach(el => {
     if (playedGames.has(el.dataset.game)) el.classList.add('played');
   });
+}
+
+// ── Weekly scoreboard ──
+// Aggregates `won=true` rows in game_results over the last 7 days (Istanbul
+// time). Each win counts as 1 point. User first names are pulled from the
+// discussions table (the only place user_id -> first_name is queryable —
+// there is no profiles table). Users who have never posted show as "Anonim".
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+  ));
+}
+
+// game_results.date is stored as un-padded "YYYY-M-D" which is not
+// lexicographically sortable, so we parse it into a Date for filtering.
+function parseGameDate(s) {
+  if (!s || typeof s !== 'string') return null;
+  const parts = s.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+async function loadScoreboard() {
+  const listEl = document.getElementById('scoreboard-list');
+  if (!listEl) return;
+
+  let results = null;
+  try {
+    const { data, error } = await sb
+      .from('game_results')
+      .select('user_id, neighborhood, date, won')
+      .eq('won', true);
+    if (error) throw error;
+    results = data;
+  } catch (e) {
+    listEl.innerHTML = '<li class="scoreboard-empty">Skorlar yüklenemedi</li>';
+    return;
+  }
+
+  if (!results || results.length === 0) {
+    listEl.innerHTML = '<li class="scoreboard-empty">Bu hafta henüz skor yok</li>';
+    return;
+  }
+
+  // Window: last 7 days (today + previous 6), Istanbul time, inclusive.
+  const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - 6);
+
+  const weekly = results.filter(r => {
+    const d = parseGameDate(r.date);
+    return d && d >= cutoff;
+  });
+
+  if (weekly.length === 0) {
+    listEl.innerHTML = '<li class="scoreboard-empty">Bu hafta henüz skor yok</li>';
+    return;
+  }
+
+  // Group by user: 1 point per win, remember the neighborhood from their
+  // most recent win (later dates overwrite, so admins who later change
+  // neighborhood still show correctly).
+  const scores = new Map();
+  weekly.forEach(r => {
+    if (!r.user_id) return;
+    const prev = scores.get(r.user_id) || { score: 0, neighborhood: null, lastDate: null };
+    prev.score += 1;
+    const d = parseGameDate(r.date);
+    if (r.neighborhood && (!prev.lastDate || (d && d >= prev.lastDate))) {
+      prev.neighborhood = r.neighborhood;
+      prev.lastDate = d;
+    }
+    scores.set(r.user_id, prev);
+  });
+
+  // Resolve display names from the discussions table.
+  const userIds = Array.from(scores.keys());
+  const nameMap = new Map();
+  try {
+    const { data: posts } = await sb
+      .from('discussions')
+      .select('user_id, author_first_name')
+      .in('user_id', userIds);
+    if (posts) {
+      posts.forEach(p => {
+        if (p.user_id && p.author_first_name && !nameMap.has(p.user_id)) {
+          nameMap.set(p.user_id, p.author_first_name);
+        }
+      });
+    }
+  } catch (e) { /* name lookup is best-effort */ }
+
+  const top = Array.from(scores.entries())
+    .map(([uid, v]) => ({
+      uid,
+      score: v.score,
+      neighborhood: v.neighborhood,
+      name: nameMap.get(uid) || 'Anonim'
+    }))
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'tr'))
+    .slice(0, 5);
+
+  listEl.innerHTML = top.map((p, i) => {
+    const nbName = neighborhoodNames[p.neighborhood] || p.neighborhood || '';
+    const topClass = i === 0 ? ' top' : '';
+    return (
+      `<li class="scoreboard-item${topClass}">` +
+        `<span class="scoreboard-rank">${i + 1}.</span>` +
+        `<span class="scoreboard-player">` +
+          `<span class="scoreboard-name">${escapeHtml(p.name)}</span>` +
+          (nbName ? `<span class="scoreboard-nb"> — ${escapeHtml(nbName)}</span>` : '') +
+        `</span>` +
+        `<span class="scoreboard-score">${p.score}</span>` +
+      `</li>`
+    );
+  }).join('');
 }
 
 init();
