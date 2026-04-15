@@ -676,55 +676,71 @@
       }
       nav a.active { color: #000000; }
 
-      /* ── Mobile swipe pagination: bottom panes slide; map stays static ── */
-      .col-left, .col-right {
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      /* ── Mobile swipe pagination: full page (map + datetime + columns) slides; fixed bottom nav stays ── */
+      .col-left, .col-right, main, .section-rule {
+        transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: transform;
         backface-visibility: hidden;
       }
       html.ist-entering-forward .col-left,
-      html.ist-entering-forward .col-right {
+      html.ist-entering-forward .col-right,
+      html.ist-entering-forward main,
+      html.ist-entering-forward .section-rule {
         transform: translateX(100vw);
         transition: none;
       }
       html.ist-entering-backward .col-left,
-      html.ist-entering-backward .col-right {
+      html.ist-entering-backward .col-right,
+      html.ist-entering-backward main,
+      html.ist-entering-backward .section-rule {
         transform: translateX(-100vw);
         transition: none;
       }
-      .col-left.ist-exiting-forward,
-      .col-right.ist-exiting-forward {
+      body.ist-exiting-forward .col-left,
+      body.ist-exiting-forward .col-right,
+      body.ist-exiting-forward main,
+      body.ist-exiting-forward .section-rule {
         transform: translateX(-100vw);
       }
-      .col-left.ist-exiting-backward,
-      .col-right.ist-exiting-backward {
+      body.ist-exiting-backward .col-left,
+      body.ist-exiting-backward .col-right,
+      body.ist-exiting-backward main,
+      body.ist-exiting-backward .section-rule {
         transform: translateX(100vw);
       }
     }
 
-    /* ── Desktop swipe pagination: columns slide vertically; map stays static ── */
+    /* ── Desktop swipe pagination: full page (map + datetime + columns) slides vertically; nav stays ── */
     @media (min-width: 769px) {
-      .col-left, .col-right {
-        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      .col-left, .col-right, main, .section-rule {
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: transform;
         backface-visibility: hidden;
       }
       html.ist-entering-forward .col-left,
-      html.ist-entering-forward .col-right {
+      html.ist-entering-forward .col-right,
+      html.ist-entering-forward main,
+      html.ist-entering-forward .section-rule {
         transform: translateY(100vh);
         transition: none;
       }
       html.ist-entering-backward .col-left,
-      html.ist-entering-backward .col-right {
+      html.ist-entering-backward .col-right,
+      html.ist-entering-backward main,
+      html.ist-entering-backward .section-rule {
         transform: translateY(-100vh);
         transition: none;
       }
-      .col-left.ist-exiting-forward,
-      .col-right.ist-exiting-forward {
+      body.ist-exiting-forward .col-left,
+      body.ist-exiting-forward .col-right,
+      body.ist-exiting-forward main,
+      body.ist-exiting-forward .section-rule {
         transform: translateY(-100vh);
       }
-      .col-left.ist-exiting-backward,
-      .col-right.ist-exiting-backward {
+      body.ist-exiting-backward .col-left,
+      body.ist-exiting-backward .col-right,
+      body.ist-exiting-backward main,
+      body.ist-exiting-backward .section-rule {
         transform: translateY(100vh);
       }
     }
@@ -826,14 +842,16 @@
 
 <script>
 // ══════════════════════════════════════════
-// Mobile swipe pagination
-// Swipe horizontally on the area below the map to navigate between
-// Anahane → Kahvehane → Kütüphane → Hane. The map stays static;
-// only the bottom panes slide. Tab-bar clicks use the same animation.
+// Swipe pagination
+// Navigate Anahane → Kahvehane → Kütüphane → Hane with a full-page slide.
+// The entire page (map, datetime bar, both columns) translates as one unit;
+// only the nav bar stays fixed. Mobile = horizontal touch swipe, desktop =
+// vertical wheel swipe; CSS picks the axis per media query. Tab-bar clicks
+// trigger the same animation.
 // ══════════════════════════════════════════
-(function initMobileSwipePagination() {
+(function initSwipePagination() {
   const PAGES = ['index.html', 'kahvehane.html', 'kutuphane.html', 'hane.html'];
-  const DURATION = 300;
+  const DURATION = 400;
   const MIN_DX = 50;
   const MAX_TIME = 700;
 
@@ -843,16 +861,13 @@
     const idx = PAGES.indexOf(path);
     return idx === -1 ? 0 : idx;
   }
-  function getPanes() {
-    return Array.from(document.querySelectorAll('.col-left, .col-right'));
-  }
-
   function playEnter() {
     const root = document.documentElement;
     const dir = root.classList.contains('ist-entering-forward') ? 'forward'
               : root.classList.contains('ist-entering-backward') ? 'backward' : null;
     try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
     if (!dir) return;
+    // Double rAF so the initial transform has painted before we release it.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         root.classList.remove('ist-entering-' + dir);
@@ -869,7 +884,7 @@
     navigating = true;
     try { sessionStorage.setItem('ist-page-enter-dir', dir); } catch(e) {}
     const exitClass = dir === 'forward' ? 'ist-exiting-forward' : 'ist-exiting-backward';
-    getPanes().forEach(p => p.classList.add(exitClass));
+    document.body.classList.add(exitClass);
     setTimeout(() => { location.href = PAGES[targetIdx]; }, DURATION - 30);
   }
 
@@ -885,17 +900,13 @@
     navigate(targetIdx, targetIdx > curr ? 'forward' : 'backward');
   }, true);
 
-  // ── Mobile: horizontal touch-swipe on the area below the map ──
+  // ── Mobile: horizontal touch-swipe anywhere on main-site (except the nav bar) ──
   let sx = 0, sy = 0, st = 0, active = false;
   document.addEventListener('touchstart', (e) => {
     if (!isMobile() || e.touches.length !== 1) return;
-    const pane = document.querySelector('.col-left') || document.querySelector('.col-right');
-    if (!pane) return;
-    const y = e.touches[0].clientY;
-    const top = pane.getBoundingClientRect().top;
-    if (y < top) return;
+    if (e.target.closest && e.target.closest('nav')) return; // let nav-bar taps through
     sx = e.touches[0].clientX;
-    sy = y;
+    sy = e.touches[0].clientY;
     st = Date.now();
     active = true;
   }, { passive: true });
@@ -909,19 +920,22 @@
     const dt = Date.now() - st;
     if (dt > MAX_TIME) return;
     if (Math.abs(dx) < MIN_DX) return;
-    if (Math.abs(dx) < Math.abs(dy) * 1.2) return;
+    if (Math.abs(dx) < Math.abs(dy) * 1.2) return; // vertical-dominant: let it scroll
     const curr = currentIdx();
     if (dx < 0) navigate(curr + 1, 'forward');
     else        navigate(curr - 1, 'backward');
   }, { passive: true });
 
-  // ── Desktop: vertical wheel-based swipe on the columns ──
+  // ── Desktop: vertical wheel-based swipe anywhere on the page ──
+  // Respects native scrolling: only triggers navigation when there's no
+  // more content to scroll in that direction. Wheel delta is accumulated
+  // so a single flick doesn't accidentally navigate.
   let wheelAccum = 0, wheelTs = 0;
   const WHEEL_THRESHOLD = 180;
   const WHEEL_RESET_MS = 220;
-  function canScrollInDir(target, col, dy) {
+  function canScrollInDir(target, dy) {
     let el = target;
-    while (el && el !== col.parentElement && el !== document.body) {
+    while (el && el !== document.body && el !== document.documentElement) {
       if (el.scrollHeight > el.clientHeight + 1) {
         const atTop = el.scrollTop < 0.5;
         const atBottom = el.scrollTop + el.clientHeight > el.scrollHeight - 0.5;
@@ -935,14 +949,14 @@
   document.addEventListener('wheel', (e) => {
     if (isMobile()) return;
     if (navigating) { e.preventDefault(); return; }
-    const col = e.target.closest && e.target.closest('.col-left, .col-right');
-    if (!col) { wheelAccum = 0; return; }
+    if (e.target.closest && e.target.closest('nav')) { wheelAccum = 0; return; }
     const dy = e.deltaY;
     if (Math.abs(dy) < 1) return;
-    if (canScrollInDir(e.target, col, dy)) {
+    if (canScrollInDir(e.target, dy)) {
       wheelAccum = 0;
-      return;
+      return; // let a nested scroll container scroll normally
     }
+    // At a scroll boundary — suppress overscroll and accumulate toward navigation.
     e.preventDefault();
     const now = Date.now();
     if (now - wheelTs > WHEEL_RESET_MS) wheelAccum = 0;
