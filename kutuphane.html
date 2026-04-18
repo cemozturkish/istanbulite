@@ -998,10 +998,130 @@
     setTimeout(() => { location.href = PAGES[targetIdx]; }, DURATION - 30);
   }
 
-  // Intercept tab-bar clicks for both paths:
-  //   - VT: record direction in sessionStorage, then let the click proceed
-  //     naturally so the browser triggers its cross-document transition.
-  //   - Non-VT: prevent default and run the manual slide-out fallback.
+  // Chain-slide through intermediate tabs when the user jumps 2+ away.
+  // Fetch each hop in parallel (warmed by <link rel="prefetch">), extract
+  // its .col-left / .col-right, stack the clones in a fixed overlay, then
+  // translate the stack to reveal each frame in sequence. The final hop
+  // ends with a real navigation so the destination's scripts run normally;
+  // we strip the direction class and kill the cross-document VT animation
+  // so there's no double-animation on arrival.
+  async function multiHopSlide(curr, target) {
+    if (navigating) return;
+    const dir = target > curr ? 'forward' : 'backward';
+    const step = dir === 'forward' ? 1 : -1;
+    const hopIdxs = [];
+    for (let i = curr + step; i !== target + step; i += step) hopIdxs.push(i);
+    if (hopIdxs.length === 0) return;
+    navigating = true;
+
+    const fetches = hopIdxs.map(i => fetch(PAGES[i]).then(r => r.text()).catch(() => null));
+    const leftEl = document.querySelector('.col-left');
+    const rightEl = document.querySelector('.col-right');
+    if (!leftEl || !rightEl) { recordDir(dir); location.href = PAGES[target]; return; }
+    const leftRect = leftEl.getBoundingClientRect();
+    const rightRect = rightEl.getBoundingClientRect();
+    const mobile = window.innerWidth <= 768;
+
+    const htmls = await Promise.all(fetches);
+    if (htmls.some(h => h == null)) {
+      navigating = false;
+      recordDir(dir);
+      location.href = PAGES[target];
+      return;
+    }
+    const parser = new DOMParser();
+    const fragments = htmls.map(html => {
+      const doc = parser.parseFromString(html, 'text/html');
+      return {
+        left: doc.querySelector('.col-left'),
+        right: doc.querySelector('.col-right'),
+      };
+    });
+
+    function buildStack(origEl, origRect, key) {
+      const wrap = document.createElement('div');
+      Object.assign(wrap.style, {
+        position: 'fixed',
+        left: origRect.left + 'px',
+        top: origRect.top + 'px',
+        width: origRect.width + 'px',
+        height: origRect.height + 'px',
+        overflow: 'hidden',
+        pointerEvents: 'none',
+        zIndex: '90',
+        background: '#ffffff',
+      });
+      const stack = document.createElement('div');
+      Object.assign(stack.style, {
+        position: 'absolute',
+        inset: '0',
+        willChange: 'transform',
+      });
+      wrap.appendChild(stack);
+
+      function placeFrame(node, i) {
+        Object.assign(node.style, {
+          position: 'absolute',
+          top: '0',
+          left: '0',
+          width: '100%',
+          height: '100%',
+          margin: '0',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+        });
+        node.style.viewTransitionName = 'none';
+        const ax = mobile ? 'translateX' : 'translateY';
+        const pct = (dir === 'forward' ? i : -i) * 100;
+        node.style.transform = ax + '(' + pct + '%)';
+        stack.appendChild(node);
+      }
+      const frame0 = origEl.cloneNode(true);
+      placeFrame(frame0, 0);
+      fragments.forEach((frag, i) => {
+        const src = frag[key];
+        const node = src ? src.cloneNode(true) : document.createElement('div');
+        placeFrame(node, i + 1);
+      });
+      return { wrap, stack };
+    }
+
+    const leftStack = buildStack(leftEl, leftRect, 'left');
+    const rightStack = buildStack(rightEl, rightRect, 'right');
+    document.body.appendChild(leftStack.wrap);
+    document.body.appendChild(rightStack.wrap);
+
+    leftEl.style.visibility = 'hidden';
+    rightEl.style.visibility = 'hidden';
+    leftEl.style.viewTransitionName = 'none';
+    rightEl.style.viewTransitionName = 'none';
+
+    const hops = hopIdxs.length;
+    const perHop = hops === 2 ? 260 : 220;
+    const totalMs = perHop * hops;
+    const axis = mobile ? 'X' : 'Y';
+    const endPct = dir === 'forward' ? -hops * 100 : hops * 100;
+    const keyframes = [
+      { transform: 'translate' + axis + '(0%)' },
+      { transform: 'translate' + axis + '(' + endPct + '%)' },
+    ];
+    const opts = { duration: totalMs, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' };
+    const a1 = leftStack.stack.animate(keyframes, opts);
+    const a2 = rightStack.stack.animate(keyframes, opts);
+
+    try { await Promise.all([a1.finished, a2.finished]); } catch (e) {}
+
+    try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
+    document.documentElement.classList.remove('vt-forward', 'vt-backward');
+    const killVT = document.createElement('style');
+    killVT.textContent = '::view-transition-group(*),::view-transition-image-pair(*),::view-transition-old(*),::view-transition-new(*){animation:none !important;}';
+    document.head.appendChild(killVT);
+
+    location.href = PAGES[target];
+  }
+
+  // Intercept tab-bar clicks: direct-neighbor hops ride the built-in VT;
+  // jumps of 2+ go through multiHopSlide so intermediate tabs flash past.
   document.addEventListener('click', (e) => {
     const link = e.target.closest('nav a');
     if (!link) return;
@@ -1010,10 +1130,13 @@
     const curr = currentIdx();
     if (targetIdx === -1 || targetIdx === curr) return;
     const dir = targetIdx > curr ? 'forward' : 'backward';
-    if (supportsVT) {
-      recordDir(dir);
+    const dist = Math.abs(targetIdx - curr);
+    if (supportsVT && dist >= 2) {
+      e.preventDefault();
+      multiHopSlide(curr, targetIdx);
       return;
     }
+    if (supportsVT) { recordDir(dir); return; }
     e.preventDefault();
     navigate(targetIdx, dir);
   }, true);
