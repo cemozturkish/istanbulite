@@ -19,6 +19,7 @@
         var _d = sessionStorage.getItem('ist-page-enter-dir');
         if (_d) {
           document.documentElement.classList.add('ist-entering-' + _d);
+          document.documentElement.classList.add('vt-' + _d);
         }
       } catch(e) {}
     })();
@@ -763,49 +764,49 @@
     .col-right { view-transition-name: ist-col-right; }
 
     @media (min-width: 769px) {
-      @keyframes ist-vt-out-up { to { transform: translateY(-100vh); } }
-      @keyframes ist-vt-in-up { from { transform: translateY(100vh); } }
-      @keyframes ist-vt-out-down { to { transform: translateY(100vh); } }
-      @keyframes ist-vt-in-down { from { transform: translateY(-100vh); } }
+      @keyframes ist-vt-out-up { from { transform: translateY(0); } to { transform: translateY(-100vh); } }
+      @keyframes ist-vt-in-up { from { transform: translateY(100vh); } to { transform: translateY(0); } }
+      @keyframes ist-vt-out-down { from { transform: translateY(0); } to { transform: translateY(100vh); } }
+      @keyframes ist-vt-in-down { from { transform: translateY(-100vh); } to { transform: translateY(0); } }
 
-      html:active-view-transition-type(forward)::view-transition-old(ist-col-left),
-      html:active-view-transition-type(forward)::view-transition-old(ist-col-right) {
+      html.vt-forward::view-transition-old(ist-col-left),
+      html.vt-forward::view-transition-old(ist-col-right) {
         animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-up;
       }
-      html:active-view-transition-type(forward)::view-transition-new(ist-col-left),
-      html:active-view-transition-type(forward)::view-transition-new(ist-col-right) {
+      html.vt-forward::view-transition-new(ist-col-left),
+      html.vt-forward::view-transition-new(ist-col-right) {
         animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-up;
       }
-      html:active-view-transition-type(backward)::view-transition-old(ist-col-left),
-      html:active-view-transition-type(backward)::view-transition-old(ist-col-right) {
+      html.vt-backward::view-transition-old(ist-col-left),
+      html.vt-backward::view-transition-old(ist-col-right) {
         animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-down;
       }
-      html:active-view-transition-type(backward)::view-transition-new(ist-col-left),
-      html:active-view-transition-type(backward)::view-transition-new(ist-col-right) {
+      html.vt-backward::view-transition-new(ist-col-left),
+      html.vt-backward::view-transition-new(ist-col-right) {
         animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-down;
       }
     }
 
     @media (max-width: 768px) {
-      @keyframes ist-vt-out-left { to { transform: translateX(-100vw); } }
-      @keyframes ist-vt-in-left { from { transform: translateX(100vw); } }
-      @keyframes ist-vt-out-right { to { transform: translateX(100vw); } }
-      @keyframes ist-vt-in-right { from { transform: translateX(-100vw); } }
+      @keyframes ist-vt-out-left { from { transform: translateX(0); } to { transform: translateX(-100vw); } }
+      @keyframes ist-vt-in-left { from { transform: translateX(100vw); } to { transform: translateX(0); } }
+      @keyframes ist-vt-out-right { from { transform: translateX(0); } to { transform: translateX(100vw); } }
+      @keyframes ist-vt-in-right { from { transform: translateX(-100vw); } to { transform: translateX(0); } }
 
-      html:active-view-transition-type(forward)::view-transition-old(ist-col-left),
-      html:active-view-transition-type(forward)::view-transition-old(ist-col-right) {
+      html.vt-forward::view-transition-old(ist-col-left),
+      html.vt-forward::view-transition-old(ist-col-right) {
         animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-left;
       }
-      html:active-view-transition-type(forward)::view-transition-new(ist-col-left),
-      html:active-view-transition-type(forward)::view-transition-new(ist-col-right) {
+      html.vt-forward::view-transition-new(ist-col-left),
+      html.vt-forward::view-transition-new(ist-col-right) {
         animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-left;
       }
-      html:active-view-transition-type(backward)::view-transition-old(ist-col-left),
-      html:active-view-transition-type(backward)::view-transition-old(ist-col-right) {
+      html.vt-backward::view-transition-old(ist-col-left),
+      html.vt-backward::view-transition-old(ist-col-right) {
         animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-right;
       }
-      html:active-view-transition-type(backward)::view-transition-new(ist-col-left),
-      html:active-view-transition-type(backward)::view-transition-new(ist-col-right) {
+      html.vt-backward::view-transition-new(ist-col-left),
+      html.vt-backward::view-transition-new(ist-col-right) {
         animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-right;
       }
     }
@@ -881,33 +882,36 @@
     try { return new URL(url).pathname.split('/').pop() || 'index.html'; }
     catch(e) { return ''; }
   }
-  function dirBetween(fromUrl, toUrl) {
-    const f = PAGES.indexOf(pageFromUrl(fromUrl));
-    const t = PAGES.indexOf(pageFromUrl(toUrl));
-    if (f === -1 || t === -1 || f === t) return null;
-    return t > f ? 'forward' : 'backward';
+  function recordDir(dir) {
+    try { sessionStorage.setItem('ist-page-enter-dir', dir); } catch(e) {}
   }
 
-  // Tell the browser which direction to animate by setting a VT type.
-  // The CSS uses :active-view-transition-type(forward|backward) to pick
-  // the matching slide keyframes.
+  // Tell the browser which direction to animate by setting a VT type AND
+  // toggling a class on <html>. The class is the reliable hook; some
+  // browsers don't match :active-view-transition-type() consistently, so
+  // our CSS targets html.vt-forward / html.vt-backward instead.
   if (supportsVT) {
     window.addEventListener('pageswap', (e) => {
-      if (!e.viewTransition || !e.activation) return;
-      const dir = dirBetween(e.activation.from && e.activation.from.url, e.activation.entry.url);
+      if (!e.viewTransition) return;
+      const dir = sessionStorage.getItem('ist-page-enter-dir');
       if (dir) e.viewTransition.types.add(dir);
     });
     window.addEventListener('pagereveal', (e) => {
       if (!e.viewTransition) return;
-      const nav = window.navigation && navigation.activation;
-      if (!nav || !nav.from) return;
-      const dir = dirBetween(nav.from.url, nav.entry.url);
+      const root = document.documentElement;
+      const dir = root.classList.contains('vt-forward') ? 'forward'
+                : root.classList.contains('vt-backward') ? 'backward' : null;
       if (dir) e.viewTransition.types.add(dir);
+      e.viewTransition.finished.finally(() => {
+        root.classList.remove('vt-forward', 'vt-backward');
+        try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
+      });
     });
   }
 
-  // Fallback entry animation (runs only when VT isn't supported).
-  function playEnter() {
+  // Fallback entry cleanup (runs on every load; releases the offscreen
+  // transform that the pre-body script applied for non-VT browsers).
+  function handleIncoming() {
     const root = document.documentElement;
     const dir = root.classList.contains('ist-entering-forward') ? 'forward'
               : root.classList.contains('ist-entering-backward') ? 'backward' : null;
@@ -928,31 +932,33 @@
     const curr = currentIdx();
     if (targetIdx === curr) return;
     navigating = true;
+    recordDir(dir);
     if (supportsVT) {
       // The browser will trigger a view transition on this navigation.
       location.href = PAGES[targetIdx];
       return;
     }
-    try { sessionStorage.setItem('ist-page-enter-dir', dir); } catch(e) {}
     const exitClass = dir === 'forward' ? 'ist-exiting-forward' : 'ist-exiting-backward';
     document.body.classList.add(exitClass);
     setTimeout(() => { location.href = PAGES[targetIdx]; }, DURATION - 30);
   }
 
-  // Only intercept tab-bar clicks when VT is unsupported; with VT, a
-  // normal link navigation already triggers the cross-document transition.
-  if (!supportsVT) {
-    document.addEventListener('click', (e) => {
-      const link = e.target.closest('nav a');
-      if (!link) return;
-      const href = link.getAttribute('href');
-      const targetIdx = PAGES.indexOf(href);
-      const curr = currentIdx();
-      if (targetIdx === -1 || targetIdx === curr) return;
-      e.preventDefault();
-      navigate(targetIdx, targetIdx > curr ? 'forward' : 'backward');
-    }, true);
-  }
+  // Always intercept tab-bar clicks to record the direction (both VT and
+  // non-VT paths need it). With VT, we let the link proceed naturally so
+  // the browser runs its cross-document transition; without VT, we
+  // preventDefault and run the manual slide.
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('nav a');
+    if (!link) return;
+    const href = link.getAttribute('href');
+    const targetIdx = PAGES.indexOf(href);
+    const curr = currentIdx();
+    if (targetIdx === -1 || targetIdx === curr) return;
+    const dir = targetIdx > curr ? 'forward' : 'backward';
+    if (supportsVT) { recordDir(dir); return; }
+    e.preventDefault();
+    navigate(targetIdx, dir);
+  }, true);
 
   // ── Mobile: horizontal touch-swipe anywhere on main-site (except the nav bar) ──
   let sx = 0, sy = 0, st = 0, active = false;
@@ -1026,9 +1032,9 @@
   }, { passive: false });
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', playEnter);
+    document.addEventListener('DOMContentLoaded', handleIncoming);
   } else {
-    playEnter();
+    handleIncoming();
   }
 })();
 
