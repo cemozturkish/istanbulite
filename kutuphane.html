@@ -4,6 +4,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Prefetch sibling tabs so the View Transitions API can swap instantly -->
+  <link rel="prefetch" href="index.html">
+  <link rel="prefetch" href="kahvehane.html">
+  <link rel="prefetch" href="hane.html">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kütüphane — istanbulite.net</title>
@@ -771,6 +775,74 @@
         transform: translateY(100vh);
       }
     }
+
+    /* ══════════════════════════════════════════════
+       View Transitions API — cross-document slide
+       The browser snapshots the outgoing page and holds
+       it visible until the new page is ready, so there's
+       no white flash between reloads. Only the columns
+       animate; the map, nav, and datetime bar stay put
+       because their content is identical across tabs.
+       ══════════════════════════════════════════════ */
+    @view-transition { navigation: auto; }
+
+    /* Suppress the default root crossfade — columns handle motion */
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation: none;
+      mix-blend-mode: normal;
+    }
+
+    .col-left { view-transition-name: ist-col-left; }
+    .col-right { view-transition-name: ist-col-right; }
+
+    @media (min-width: 769px) {
+      @keyframes ist-vt-out-up { to { transform: translateY(-100vh); } }
+      @keyframes ist-vt-in-up { from { transform: translateY(100vh); } }
+      @keyframes ist-vt-out-down { to { transform: translateY(100vh); } }
+      @keyframes ist-vt-in-down { from { transform: translateY(-100vh); } }
+
+      html:active-view-transition-type(forward)::view-transition-old(ist-col-left),
+      html:active-view-transition-type(forward)::view-transition-old(ist-col-right) {
+        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-up;
+      }
+      html:active-view-transition-type(forward)::view-transition-new(ist-col-left),
+      html:active-view-transition-type(forward)::view-transition-new(ist-col-right) {
+        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-up;
+      }
+      html:active-view-transition-type(backward)::view-transition-old(ist-col-left),
+      html:active-view-transition-type(backward)::view-transition-old(ist-col-right) {
+        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-down;
+      }
+      html:active-view-transition-type(backward)::view-transition-new(ist-col-left),
+      html:active-view-transition-type(backward)::view-transition-new(ist-col-right) {
+        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-down;
+      }
+    }
+
+    @media (max-width: 768px) {
+      @keyframes ist-vt-out-left { to { transform: translateX(-100vw); } }
+      @keyframes ist-vt-in-left { from { transform: translateX(100vw); } }
+      @keyframes ist-vt-out-right { to { transform: translateX(100vw); } }
+      @keyframes ist-vt-in-right { from { transform: translateX(-100vw); } }
+
+      html:active-view-transition-type(forward)::view-transition-old(ist-col-left),
+      html:active-view-transition-type(forward)::view-transition-old(ist-col-right) {
+        animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-left;
+      }
+      html:active-view-transition-type(forward)::view-transition-new(ist-col-left),
+      html:active-view-transition-type(forward)::view-transition-new(ist-col-right) {
+        animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-left;
+      }
+      html:active-view-transition-type(backward)::view-transition-old(ist-col-left),
+      html:active-view-transition-type(backward)::view-transition-old(ist-col-right) {
+        animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-right;
+      }
+      html:active-view-transition-type(backward)::view-transition-new(ist-col-left),
+      html:active-view-transition-type(backward)::view-transition-new(ist-col-right) {
+        animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-right;
+      }
+    }
   </style>
 </head>
 <body>
@@ -853,6 +925,10 @@
   const DURATION = 400;
   const MIN_DX = 50;
   const MAX_TIME = 700;
+  // Prefer the View Transitions API when available — it snapshots the
+  // outgoing page and holds it until the new one is rendered, which
+  // eliminates the white flash the manual slide-out can't hide.
+  const supportsVT = 'startViewTransition' in document;
 
   function isMobile() { return window.innerWidth <= 768; }
   function currentIdx() {
@@ -860,6 +936,36 @@
     const idx = PAGES.indexOf(path);
     return idx === -1 ? 0 : idx;
   }
+  function pageFromUrl(url) {
+    try { return new URL(url).pathname.split('/').pop() || 'index.html'; }
+    catch(e) { return ''; }
+  }
+  function dirBetween(fromUrl, toUrl) {
+    const f = PAGES.indexOf(pageFromUrl(fromUrl));
+    const t = PAGES.indexOf(pageFromUrl(toUrl));
+    if (f === -1 || t === -1 || f === t) return null;
+    return t > f ? 'forward' : 'backward';
+  }
+
+  // Tell the browser which direction to animate by setting a VT type.
+  // The CSS uses :active-view-transition-type(forward|backward) to pick
+  // the matching slide keyframes.
+  if (supportsVT) {
+    window.addEventListener('pageswap', (e) => {
+      if (!e.viewTransition || !e.activation) return;
+      const dir = dirBetween(e.activation.from && e.activation.from.url, e.activation.entry.url);
+      if (dir) e.viewTransition.types.add(dir);
+    });
+    window.addEventListener('pagereveal', (e) => {
+      if (!e.viewTransition) return;
+      const nav = window.navigation && navigation.activation;
+      if (!nav || !nav.from) return;
+      const dir = dirBetween(nav.from.url, nav.entry.url);
+      if (dir) e.viewTransition.types.add(dir);
+    });
+  }
+
+  // Fallback entry animation (runs only when VT isn't supported).
   function playEnter() {
     const root = document.documentElement;
     const dir = root.classList.contains('ist-entering-forward') ? 'forward'
@@ -881,23 +987,31 @@
     const curr = currentIdx();
     if (targetIdx === curr) return;
     navigating = true;
+    if (supportsVT) {
+      // The browser will trigger a view transition on this navigation.
+      location.href = PAGES[targetIdx];
+      return;
+    }
     try { sessionStorage.setItem('ist-page-enter-dir', dir); } catch(e) {}
     const exitClass = dir === 'forward' ? 'ist-exiting-forward' : 'ist-exiting-backward';
     document.body.classList.add(exitClass);
     setTimeout(() => { location.href = PAGES[targetIdx]; }, DURATION - 30);
   }
 
-  // Intercept tab-bar clicks so they use the same animation (mobile + desktop).
-  document.addEventListener('click', (e) => {
-    const link = e.target.closest('nav a');
-    if (!link) return;
-    const href = link.getAttribute('href');
-    const targetIdx = PAGES.indexOf(href);
-    const curr = currentIdx();
-    if (targetIdx === -1 || targetIdx === curr) return;
-    e.preventDefault();
-    navigate(targetIdx, targetIdx > curr ? 'forward' : 'backward');
-  }, true);
+  // Only intercept tab-bar clicks when VT is unsupported; with VT, a
+  // normal link navigation already triggers the cross-document transition.
+  if (!supportsVT) {
+    document.addEventListener('click', (e) => {
+      const link = e.target.closest('nav a');
+      if (!link) return;
+      const href = link.getAttribute('href');
+      const targetIdx = PAGES.indexOf(href);
+      const curr = currentIdx();
+      if (targetIdx === -1 || targetIdx === curr) return;
+      e.preventDefault();
+      navigate(targetIdx, targetIdx > curr ? 'forward' : 'backward');
+    }, true);
+  }
 
   // ── Mobile: horizontal touch-swipe anywhere on main-site (except the nav bar) ──
   let sx = 0, sy = 0, st = 0, active = false;
