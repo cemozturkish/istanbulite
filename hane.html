@@ -12,6 +12,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hane — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- SPA guard: direct loads redirect to the shell; iframe loads with
+       ?embed=1 flag this document so nav is hidden and the tab's own
+       swipe/click pagination stays dormant (the shell drives routing). -->
+  <script>
+    (function(){
+      var embed = new URLSearchParams(location.search).get('embed') === '1';
+      if (!embed) { location.replace('index.html#hane'); return; }
+      document.documentElement.classList.add('embedded');
+    })();
+  </script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis) -->
   <script>
     (function(){
@@ -763,6 +773,10 @@
     .col-left { view-transition-name: ist-col-left; }
     .col-right { view-transition-name: ist-col-right; }
 
+    /* SPA embed mode: shell supplies the nav; hide this tab's own. */
+    html.embedded nav,
+    html.embedded header { display: none !important; }
+
     @media (min-width: 769px) {
       @keyframes ist-vt-out-up { from { transform: translateY(0); } to { transform: translateY(-100vh); } }
       @keyframes ist-vt-in-up { from { transform: translateY(100vh); } to { transform: translateY(0); } }
@@ -863,6 +877,8 @@
 // trigger the same animation.
 // ══════════════════════════════════════════
 (function initSwipePagination() {
+  // In SPA embed mode the shell drives routing — skip all self-navigation.
+  if (document.documentElement.classList.contains('embedded')) return;
   const PAGES = ['index.html', 'kahvehane.html', 'kutuphane.html', 'hane.html'];
   const DURATION = 400;
   const MIN_DX = 50;

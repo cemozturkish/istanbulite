@@ -1,61 +1,34 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Prefetch sibling tabs so the View Transitions API can swap instantly -->
-  <link rel="prefetch" href="kahvehane.html">
-  <link rel="prefetch" href="kutuphane.html">
-  <link rel="prefetch" href="hane.html">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>istanbulite.net</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis). Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot. -->
-  <script>
-    (function(){
-      try {
-        var _d = sessionStorage.getItem('ist-page-enter-dir');
-        if (_d) {
-          document.documentElement.classList.add('ist-entering-' + _d);
-          document.documentElement.classList.add('vt-' + _d);
-        }
-      } catch(e) {}
-    })();
-  </script>
   <style>
     :root {
       --ink: #000000;
       --paper: #ffffff;
       --paper-dark: #f0f0f0;
-      --rule: #cccccc;
       --accent: #333333;
       --muted: #888888;
-      --col-border: 1px solid #cccccc;
+      --border: #cccccc;
+      --hover: #e0e0e0;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html, body {
-      height: 100%;
-      width: 100%;
-      overflow: hidden;
-      position: fixed;
-    }
-
+    html, body { height: 100%; overflow: hidden; }
     body {
       font-family: 'Inter', -apple-system, sans-serif;
-      background-color: var(--paper);
+      background: var(--paper);
       color: var(--ink);
-      display: flex;
-      flex-direction: column;
     }
 
-    /* ── LOGIN OVERLAY ── */
+    /* ── Login overlay ── */
     #login-overlay {
-      position: fixed;
-      inset: 0;
+      position: fixed; inset: 0;
       background: rgba(255, 255, 255, 0.97);
       backdrop-filter: blur(3px);
       z-index: 999;
@@ -63,1468 +36,291 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 0;
+      padding: 24px;
     }
-
+    #login-overlay.hidden { display: none; }
     #login-overlay .masthead-login {
-      font-family: 'Inter', sans-serif;
-      font-weight: 700;
-      font-size: 3.5rem;
-      letter-spacing: 2px;
+      font-size: 3rem;
+      font-weight: 300;
+      letter-spacing: 4px;
       color: var(--ink);
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
-
     #login-overlay .tagline {
-      font-style: italic;
-      font-size: 0.85rem;
-      color: var(--muted);
-      margin-bottom: 30px;
-      letter-spacing: 1px;
-    }
-
-    .login-box {
-      border: 2px solid var(--ink);
-      padding: 36px 40px;
-      width: 360px;
-      background: var(--paper);
-      position: relative;
-    }
-
-    .login-box::before {
-      content: '';
-      position: absolute;
-      inset: 4px;
-      border: 1px solid var(--ink);
-      pointer-events: none;
-    }
-
-    .login-box h2 {
-      font-family: 'Inter', sans-serif;
-      font-size: 1rem;
-      font-weight: 700;
-      text-transform: uppercase;
+      font-size: 0.7rem;
       letter-spacing: 3px;
-      text-align: center;
-      margin-bottom: 24px;
-      padding-bottom: 14px;
-      border-bottom: var(--col-border);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 40px;
     }
-
+    .login-box {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 320px;
+      max-width: 100%;
+    }
     .login-box input {
-      width: 100%;
       padding: 10px 12px;
-      margin-bottom: 14px;
-      border: 1px solid var(--ink);
-      background: #f5f5f5;
       font-family: 'Inter', sans-serif;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
+      border: 1px solid var(--ink);
+      background: var(--paper);
       color: var(--ink);
-      outline: none;
-      transition: border-color 0.2s;
     }
-
-    .login-box input:focus {
-      border-color: var(--accent);
-    }
-
     .login-box button {
-      width: 100%;
-      padding: 11px;
+      padding: 10px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
       background: var(--ink);
       color: var(--paper);
       border: none;
-      font-family: 'Inter', sans-serif;
-      font-size: 0.95rem;
-      font-weight: 700;
+      cursor: pointer;
+    }
+    .login-box button:hover { background: var(--accent); }
+    .login-box .error-msg {
+      font-size: 0.75rem;
+      color: #cc0000;
+      font-style: italic;
+      text-align: center;
+      min-height: 16px;
+    }
+
+    /* ── Shell ── */
+    #shell {
+      display: none;
+      height: 100vh;
+      width: 100vw;
+      position: relative;
+      overflow: hidden;
+    }
+    #shell.active { display: block; }
+
+    #strip-wrap {
+      position: absolute;
+      inset: 0 0 48px 0;
+      overflow: hidden;
+    }
+    #strip {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 400%;
+      transition: transform 420ms cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: transform;
+    }
+    .tab-slot {
+      width: 100%;
+      height: 25%;
+      flex: 0 0 25%;
+      position: relative;
+      background: var(--paper);
+    }
+    .tab-slot iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+      background: var(--paper);
+    }
+    .tab-slot .slot-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 0.7rem;
       letter-spacing: 2px;
       text-transform: uppercase;
-      cursor: pointer;
-      transition: background 0.2s;
+      pointer-events: none;
     }
 
-    .login-box button:hover { background: #555555; }
-
-    .login-box .error-msg {
-      color: var(--accent);
-      font-size: 0.82rem;
-      text-align: center;
-      margin-bottom: 10px;
-      min-height: 18px;
-      font-style: italic;
+    #shell-nav {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 48px;
+      display: flex;
+      border-top: 1px solid var(--border);
+      background: var(--paper);
+      z-index: 10;
     }
-
-    .form-toggle {
-      font-size: 0.8rem;
-      text-align: center;
-      margin-top: 14px;
-      color: var(--muted);
-    }
-    .form-toggle a {
-      color: var(--ink);
-      font-weight: 700;
+    #shell-nav a {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       text-decoration: none;
-    }
-    .form-toggle a:hover { text-decoration: underline; }
-
-    .q-label {
-      display: block;
+      color: var(--muted);
       font-size: 0.75rem;
       font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 6px;
-      margin-top: 10px;
-      text-align: left;
-    }
-
-    .q-buttons-inline {
-      margin-bottom: 10px;
-      justify-content: flex-start;
-    }
-
-    .q-btn-sm, .q-btn-sm-outline {
-      padding: 7px 20px;
-      font-family: 'Inter', sans-serif;
-      font-size: 0.8rem;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .q-btn-sm {
-      background: var(--paper);
-      color: var(--ink);
-      border: 2px solid var(--ink);
-    }
-    .q-btn-sm.selected {
-      background: var(--ink);
-      color: var(--paper);
-    }
-    .q-btn-sm-outline {
-      background: var(--paper);
-      color: var(--ink);
-      border: 2px solid var(--ink);
-    }
-    .q-btn-sm-outline.selected {
-      background: var(--ink);
-      color: var(--paper);
-    }
-
-    /* ── MAIN SITE ── */
-    #main-site {
-      pointer-events: none;
-      display: grid;
-      grid-template-columns: 1fr 2.2fr 1fr;
-      grid-template-rows: auto auto 1fr;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    #main-site.active {
-      pointer-events: auto;
-    }
-
-    .section-rule {
-      grid-column: 2;
-      grid-row: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 6px 32px;
-      border-bottom: 1px solid var(--ink);
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      background: var(--paper-dark);
-    }
-    .datetime-block {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .datetime-block .date-line { }
-    .datetime-block .day-line { }
-    .datetime-block .time-line { }
-
-    header {
-      grid-column: 2;
-      grid-row: 2;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 10px 0;
-      background: var(--paper);
-      border-bottom: 4px double var(--ink);
-    }
-
-    nav {
-      display: flex;
-      width: 100%;
-    }
-    nav a {
-      flex: 1;
-      text-align: center;
-      text-decoration: none;
-      color: var(--muted);
-      font-size: 0.8rem;
-      font-weight: 700;
       letter-spacing: 2px;
       text-transform: uppercase;
-      transition: color 0.2s;
-      padding: 2px 0;
+      transition: color 0.2s, background 0.2s;
     }
-    nav a:hover { color: var(--accent); }
-    nav a.active { color: var(--ink); }
+    #shell-nav a:hover { color: var(--accent); background: var(--paper-dark); }
+    #shell-nav a.active { color: var(--paper); background: var(--ink); }
 
-    .col-left {
-      grid-column: 1;
-      grid-row: 1 / -1;
-      border-right: var(--col-border);
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-    }
-    .col-left .nb-highlight {
-      padding: 8px 12px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      background: var(--ink);
-      color: var(--paper);
-      text-align: center;
-      flex-shrink: 0;
-    }
-    .col-right {
-      grid-column: 3;
-      grid-row: 1 / -1;
-      border-left: var(--col-border);
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-    }
-
-    main {
-      grid-column: 2;
-      grid-row: 3;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      min-height: 0;
-    }
-
-    /* ── MAP PANEL (center) ── */
-    .map-panel {
-      display: flex;
-      flex-direction: column;
-      padding: 12px;
-      overflow: hidden;
-      background: var(--paper);
-      flex: 1;
-      min-height: 0;
-    }
-
-    .map-panel svg {
-      width: 100%;
-      height: auto;
-      display: block;
-      flex: 1;
-      pointer-events: painted;
-      min-height: 0;
-    }
-
-    .neighborhood {
-      cursor: pointer;
-      fill: transparent;
-      stroke: var(--accent);
-      stroke-width: 2;
-      opacity: 0.6;
-      transition: opacity 0.2s, fill 0.2s;
-      pointer-events: all;
-    }
-
-    /* Hover: lighter gray */
-    .neighborhood:hover { opacity: 1; fill: rgba(0,0,0,0.10); }
-    /* Clicked/active: dark gray */
-    .neighborhood.active {
-      opacity: 1;
-      fill: rgba(0,0,0,0.25);
-      stroke: #333333;
-      stroke-width: 2;
-    }
-    /* Home neighborhood: darkest, always visible */
-    .neighborhood.home {
-      fill: rgba(0,0,0,0.40);
-      stroke: var(--ink);
-      stroke-width: 3;
-      opacity: 1;
-    }
-    .neighborhood.home:hover { fill: rgba(0,0,0,0.45); }
-    .neighborhood.home.active { fill: rgba(0,0,0,0.45); stroke: var(--ink); }
-
-    .map-label {
-      text-align: center;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--ink);
-      padding: 5px 8px;
-      background: var(--paper-dark);
-      border: 1px solid var(--ink);
-      margin-top: 8px;
-      flex-shrink: 0;
-    }
-
-    /* ── LEFT SIDEBAR (articles) ── */
-    .sidebar-left {
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      flex: 1;
-    }
-
-    .sidebar-label {
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      padding: 8px 16px;
-      background: var(--paper-dark);
-      border-bottom: var(--col-border);
-      color: var(--ink);
-      flex-shrink: 0;
-    }
-
-    .article {
-      padding: 14px 16px;
-      border-bottom: 1px solid #bbb;
-    }
-    .article:last-child { border-bottom: none; }
-
-    .article .kicker {
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 4px;
-    }
-
-    .article h3 {
-      font-size: 1.05rem;
-      font-weight: 700;
-      line-height: 1.3;
-      margin-bottom: 6px;
-    }
-
-    .article p {
-      font-size: 0.85rem;
-      line-height: 1.5;
-      color: #333;
-    }
-
-    /* ── RIGHT SIDEBAR (neighborhood info) ── */
-    .sidebar-right {
-      padding: 0;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .sidebar-right-inner {
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .nb-articles {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .nb-article {
-      border-left: 3px solid #333333;
-      padding-left: 6px;
-    }
-
-    .nb-article h4 {
-      font-size: 0.8rem;
-      font-weight: 700;
-      line-height: 1.15;
-    }
-
-    .nb-article p {
-      font-size: 0.72rem;
-      color: var(--muted);
-      margin-top: 1px;
-      line-height: 1.2;
-    }
-
-    .no-articles {
-      font-style: italic;
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-
-    /* Loading spinner */
-    .spinner {
-      display: inline-block;
-      width: 14px; height: 14px;
-      border: 2px solid var(--muted);
-      border-top-color: var(--ink);
-      border-radius: 50%;
-      animation: spin 0.6s linear infinite;
-      vertical-align: middle;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Flashing neighborhood with breaking news */
-    @keyframes flash-nb {
-      0%, 100% { fill: rgba(0,0,0,0.05); }
-      50% { fill: rgba(0,0,0,0.35); }
-    }
-    .neighborhood.flashing-news {
-      animation: flash-nb 1.2s ease-in-out infinite;
-      stroke: var(--ink);
-      stroke-width: 3;
-      opacity: 1;
-    }
-    .neighborhood.flashing-news:hover {
-      animation: none;
-      fill: rgba(0,0,0,0.25);
-    }
-    .neighborhood.flashing-news.active {
-      animation: none;
-      fill: rgba(0,0,0,0.30);
-      stroke: var(--ink);
-      stroke-width: 3;
-    }
-
-    /* ── MOBILE RESPONSIVE ── */
     @media (max-width: 768px) {
-      html, body {
-        height: 100vh;
-        height: 100dvh;
-        overflow: hidden;
-        position: fixed;
-        width: 100%;
-      }
-
+      #strip { flex-direction: row; width: 400%; height: 100%; }
+      .tab-slot { width: 25%; height: 100%; flex: 0 0 25%; }
       #login-overlay .masthead-login { font-size: 2rem; }
-      .login-box { width: 90vw; max-width: 360px; padding: 24px 20px; }
-      .q-buttons-inline { display: flex; gap: 8px; }
-
-      #main-site {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto auto 1fr;
-        height: 100%;
-        overflow: hidden;
-        padding-bottom: 56px; /* reserve space for fixed bottom tab bar */
-      }
-
-      .col-left, .col-right, header, .section-rule, main {
-        grid-column: unset; grid-row: unset;
-      }
-
-      /* Compact top brand bar */
-      .section-rule {
-        grid-column: 1 / -1;
-        grid-row: 1;
-        padding: 9px 16px;
-        border-bottom: 1px solid #e5e5e5;
-        background: #ffffff;
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 1.8px;
-      }
-      .datetime-block { flex-direction: row; gap: 8px; }
-      .datetime-block .day-line { display: none; }
-
-      /* Map: fills horizontally, height determined by aspect ratio */
-      main {
-        grid-column: 1 / -1;
-        grid-row: 2;
-        overflow: hidden;
-        display: block;
-      }
-      .map-panel {
-        padding: 0;
-        display: block;
-        overflow: hidden;
-      }
-      .map-panel svg {
-        display: block;
-        width: 100%;
-        height: auto;
-      }
-      .map-label {
-        margin: 4px 0 6px 0;
-        padding: 4px 14px;
-        font-size: 11px;
-        letter-spacing: 1px;
-        text-align: center;
-      }
-
-      /* Left column below map: news feed */
-      .col-left {
-        grid-column: 1;
-        grid-row: 3;
-        min-height: 0;
-        overflow: hidden;
-        border-right: 1px solid #e5e5e5;
-        border-top: 1px solid #e5e5e5;
-        display: flex;
-        flex-direction: column;
-      }
-      .col-left .nb-highlight {
-        padding: 6px 12px;
-        font-size: 10px;
-        letter-spacing: 1.2px;
-        flex-shrink: 0;
-      }
-      .sidebar-left {
-        overflow: hidden;
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-      }
-      .sidebar-label {
-        padding: 5px 12px;
-        font-size: 9px;
-        letter-spacing: 1.2px;
-        flex-shrink: 0;
-      }
-      .article {
-        padding: 6px 12px;
-      }
-      .article .kicker {
-        font-size: 9px;
-        margin-bottom: 2px;
-        letter-spacing: 1px;
-      }
-      .article h3 {
-        font-size: 11px;
-        margin-bottom: 3px;
-        line-height: 1.25;
-      }
-      .article p {
-        font-size: 10px;
-        line-height: 1.35;
-      }
-
-      /* Right column below map: neighborhood articles */
-      .col-right {
-        grid-column: 2;
-        grid-row: 3;
-        min-height: 0;
-        overflow: hidden;
-        border-left: none;
-        border-top: 1px solid #e5e5e5;
-        display: flex;
-        flex-direction: column;
-      }
-      .sidebar-right-inner {
-        padding: 8px 12px;
-        gap: 6px;
-        overflow: hidden;
-      }
-      .nb-article h4 { font-size: 11px; }
-      .nb-article p { font-size: 10px; line-height: 1.35; }
-      .no-articles { font-size: 11px; padding: 14px 8px; }
-
-      /* Bottom tab bar — fixed at bottom */
-      header {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 56px;
-        padding: 0;
-        margin: 0;
-        border-top: 1px solid #e5e5e5;
-        border-bottom: none;
-        background: #ffffff;
-        z-index: 100;
-        box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
-        display: flex;
-        align-items: stretch;
-      }
-      nav {
-        display: flex;
-        width: 100%;
-        height: 100%;
-        gap: 0;
-        padding: 0;
-        flex-wrap: nowrap;
-        justify-content: stretch;
-      }
-      nav a {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.8px;
-        text-transform: uppercase;
-        color: #888888;
-        padding: 0;
-        border: none;
-        text-decoration: none;
-      }
-      nav a.active { color: #000000; }
-
-      /* ── Mobile swipe pagination: only left/right columns slide; map, datetime bar, and nav stay ── */
-      .col-left, .col-right {
-        transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
-        will-change: transform;
-        backface-visibility: hidden;
-      }
-      html.ist-entering-forward .col-left,
-      html.ist-entering-forward .col-right {
-        transform: translateX(100vw);
-        transition: none;
-      }
-      html.ist-entering-backward .col-left,
-      html.ist-entering-backward .col-right {
-        transform: translateX(-100vw);
-        transition: none;
-      }
-      body.ist-exiting-forward .col-left,
-      body.ist-exiting-forward .col-right {
-        transform: translateX(-100vw);
-      }
-      body.ist-exiting-backward .col-left,
-      body.ist-exiting-backward .col-right {
-        transform: translateX(100vw);
-      }
-    }
-
-    /* ── Desktop swipe pagination: only left/right columns slide vertically; map, datetime bar, and nav stay ── */
-    @media (min-width: 769px) {
-      .col-left, .col-right {
-        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        will-change: transform;
-        backface-visibility: hidden;
-      }
-      html.ist-entering-forward .col-left,
-      html.ist-entering-forward .col-right {
-        transform: translateY(100vh);
-        transition: none;
-      }
-      html.ist-entering-backward .col-left,
-      html.ist-entering-backward .col-right {
-        transform: translateY(-100vh);
-        transition: none;
-      }
-      body.ist-exiting-forward .col-left,
-      body.ist-exiting-forward .col-right {
-        transform: translateY(-100vh);
-      }
-      body.ist-exiting-backward .col-left,
-      body.ist-exiting-backward .col-right {
-        transform: translateY(100vh);
-      }
-    }
-
-    /* ══════════════════════════════════════════════
-       View Transitions API — cross-document slide
-       The browser snapshots the outgoing page and holds
-       it visible until the new page is ready, so there's
-       no white flash between reloads. Only the columns
-       animate; the map, nav, and datetime bar stay put
-       because their content is identical across tabs.
-       Direction comes from a class on <html> seeded by
-       the outgoing page via sessionStorage, so the class
-       is present before VT captures the new snapshot.
-       ══════════════════════════════════════════════ */
-    @view-transition { navigation: auto; }
-
-    /* Suppress the default root crossfade — columns handle motion */
-    ::view-transition-old(root),
-    ::view-transition-new(root) {
-      animation: none;
-      mix-blend-mode: normal;
-    }
-
-    .col-left { view-transition-name: ist-col-left; }
-    .col-right { view-transition-name: ist-col-right; }
-
-    @media (min-width: 769px) {
-      @keyframes ist-vt-out-up { from { transform: translateY(0); } to { transform: translateY(-100vh); } }
-      @keyframes ist-vt-in-up { from { transform: translateY(100vh); } to { transform: translateY(0); } }
-      @keyframes ist-vt-out-down { from { transform: translateY(0); } to { transform: translateY(100vh); } }
-      @keyframes ist-vt-in-down { from { transform: translateY(-100vh); } to { transform: translateY(0); } }
-
-      html.vt-forward::view-transition-old(ist-col-left),
-      html.vt-forward::view-transition-old(ist-col-right) {
-        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-up;
-      }
-      html.vt-forward::view-transition-new(ist-col-left),
-      html.vt-forward::view-transition-new(ist-col-right) {
-        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-up;
-      }
-      html.vt-backward::view-transition-old(ist-col-left),
-      html.vt-backward::view-transition-old(ist-col-right) {
-        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-down;
-      }
-      html.vt-backward::view-transition-new(ist-col-left),
-      html.vt-backward::view-transition-new(ist-col-right) {
-        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-down;
-      }
-    }
-
-    @media (max-width: 768px) {
-      @keyframes ist-vt-out-left { from { transform: translateX(0); } to { transform: translateX(-100vw); } }
-      @keyframes ist-vt-in-left { from { transform: translateX(100vw); } to { transform: translateX(0); } }
-      @keyframes ist-vt-out-right { from { transform: translateX(0); } to { transform: translateX(100vw); } }
-      @keyframes ist-vt-in-right { from { transform: translateX(-100vw); } to { transform: translateX(0); } }
-
-      html.vt-forward::view-transition-old(ist-col-left),
-      html.vt-forward::view-transition-old(ist-col-right) {
-        animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-left;
-      }
-      html.vt-forward::view-transition-new(ist-col-left),
-      html.vt-forward::view-transition-new(ist-col-right) {
-        animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-left;
-      }
-      html.vt-backward::view-transition-old(ist-col-left),
-      html.vt-backward::view-transition-old(ist-col-right) {
-        animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-right;
-      }
-      html.vt-backward::view-transition-new(ist-col-left),
-      html.vt-backward::view-transition-new(ist-col-right) {
-        animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-right;
-      }
     }
   </style>
 </head>
 <body>
 
-<!-- ══════════════ LOGIN OVERLAY ══════════════ -->
 <div id="login-overlay">
-  <div class="masthead-login">istanbulite.net</div>
-  <div class="tagline">Istanbul's community platform</div>
-
-  <!-- Sign In Form -->
-  <div class="login-box" id="signin-form">
-    <h2>Giriş Yap</h2>
-    <div class="error-msg" id="auth-error"></div>
-    <input type="email" id="auth-email" placeholder="E-posta adresi" autocomplete="email"/>
-    <input type="password" id="auth-password" placeholder="Şifre" autocomplete="current-password"/>
-    <button id="auth-submit-btn">Giriş</button>
-    <p class="form-toggle">Hesabın yok mu? <a href="#" id="show-signup">Kayıt Ol</a></p>
-  </div>
-
-  <!-- Sign Up Form -->
-  <div class="login-box" id="signup-form" style="display:none;">
-    <h2>Kayıt Ol</h2>
-    <div class="error-msg" id="signup-error"></div>
-    <input type="text" id="signup-name" placeholder="Ad" autocomplete="given-name"/>
-    <input type="text" id="signup-lastname" placeholder="Soyad" autocomplete="family-name"/>
-    <input type="email" id="signup-email" placeholder="E-posta adresi" autocomplete="email"/>
-    <input type="password" id="signup-password" placeholder="Şifre" autocomplete="new-password"/>
-
-    <label class="q-label">Hangi ilçede yaşıyorsun?</label>
-    <select class="q-select" id="signup-living-district">
-      <option value="">— İlçe seçin —</option>
-    </select>
-
-    <label class="q-label">İstanbul doğumlu musun?</label>
-    <div class="q-buttons q-buttons-inline" id="signup-born-btns">
-      <button type="button" class="q-btn-sm" id="signup-born-yes">Evet</button>
-      <button type="button" class="q-btn-sm-outline" id="signup-born-no">Hayır</button>
-    </div>
-
-    <div id="signup-birth-district-wrap" style="display:none;">
-      <label class="q-label">Hangi ilçede doğdun?</label>
-      <select class="q-select" id="signup-birth-district">
-        <option value="">— İlçe seçin —</option>
-      </select>
-    </div>
-
-    <button id="signup-submit-btn">Kayıt Ol</button>
-    <p class="form-toggle">Zaten hesabın var mı? <a href="#" id="show-signin">Giriş Yap</a></p>
-  </div>
+  <div class="masthead-login">istanbulite</div>
+  <div class="tagline">İstanbul Toplumu</div>
+  <form class="login-box" id="signin-form" autocomplete="on">
+    <input type="email" id="signin-email" placeholder="E-posta" required autocomplete="email">
+    <input type="password" id="signin-password" placeholder="Şifre" required autocomplete="current-password">
+    <button type="submit">Giriş</button>
+    <div class="error-msg" id="signin-error"></div>
+  </form>
 </div>
 
-<!-- ══════════════ MAIN SITE ══════════════ -->
-<div id="main-site">
-
-  <aside class="col-left">
-    <div class="nb-highlight" id="user-nb-badge"></div>
-    <section class="sidebar-left" id="left-sidebar">
-      <div class="sidebar-label">Haberler</div>
-      <div class="article">
-        <div class="kicker">World</div>
-        <h3>Troop Casualties in Ukraine War Near 2 Million, Study Finds</h3>
-        <p>The number of deaths, injuries and missing is approaching a grim milestone after nearly four years of fighting.</p>
-      </div>
-      <div class="article">
-        <div class="kicker">Economy</div>
-        <h3>İstanbul'u depreme hazırlayacak üç isim cezaevinde tutuluyor</h3>
-        <p>Kahraman, Akgün, İmamoğlu</p>
-      </div>
-    </section>
-  </aside>
-
-  <div class="section-rule">
-    <div class="datetime-block">
-      <div class="date-line" id="date-line"></div>
-      <div class="day-line" id="day-line"></div>
-      <div class="time-line" id="time-line"></div>
+<div id="shell">
+  <div id="strip-wrap">
+    <div id="strip">
+      <section class="tab-slot" data-tab="anahane"><div class="slot-loading">Yükleniyor…</div></section>
+      <section class="tab-slot" data-tab="kahvehane"><div class="slot-loading">Yükleniyor…</div></section>
+      <section class="tab-slot" data-tab="kutuphane"><div class="slot-loading">Yükleniyor…</div></section>
+      <section class="tab-slot" data-tab="hane"><div class="slot-loading">Yükleniyor…</div></section>
     </div>
   </div>
-
-  <header>
-    <nav>
-      <a href="index.html" class="active">Anahane</a>
-      <a href="kahvehane.html">Kahvehane</a>
-      <a href="kutuphane.html">Kütüphane</a>
-      <a href="hane.html">Hane</a>
-    </nav>
-  </header>
-
-  <main>
-    <section class="map-panel">
-      <svg viewBox="0 0 2739.5 2057.29" xmlns="http://www.w3.org/2000/svg">
-          <image href="assets/istanbul-map.png" x="0" y="0" width="2739.5" height="2057.29"/>
-
-          <g id="bakirkoy" class="neighborhood" data-name="Bakırköy"><polyline points="7.5 1444.08 0 1560.36 187.31 1710.2 368.55 1662.41 424.31 1540.92 609.53 1544.9 720.43 1464.68 749.04 1288.06 253.03 1385.57 211.21 1309.89 115.8 1308 132 1444.08 7.5 1444.08"/></g>
-          <g id="bayrampasa" class="neighborhood" data-name="Bayrampaşa"><polyline points="614.76 566.04 685.8 754.32 693.43 929.96 769.8 975.78 798.69 1045.19 862.06 1014.89 937.81 1036.88 787.62 685.59 614.76 566.04"/></g>
-          <g id="bahcelievler" class="neighborhood" data-name="Bahçelievler"><polyline points="690.72 1297.51 253.03 1385.57 211.21 1309.89 151.44 1152.48 164.47 1056.56 266.05 1143.1 433.49 1109.24 533.19 1156.27 588.25 1258.11 653.59 1160.03 690.72 1297.51"/></g>
-          <g id="sisli" class="neighborhood" data-name="Şişli">
-            <polygon points="1218.05 133.39 1250.78 7.53 1627.02 16.82 1627.02 316.77 1476.39 397.25 1367.17 404.8 1345.4 329.81 1258.31 334.65 1178.47 281.42 1200.43 251.69 1185.33 140.94 1218.05 133.39"/>
-            <polyline points="1497.24 518.39 1509.91 620.11 1398.62 591.08 1217.18 799.14 1439.35 952.19 1490.29 703.79 1564.45 720.01 1576.79 608.58 1497.24 518.39"/>
-          </g>
-          <g id="eyupsultan" class="neighborhood" data-name="Eyüpsultan">
-            <polyline points="656.88 9.29 1247.69 9.83 1212.18 133.66 1179.4 136.85 1198.07 237.46 1160.73 299.37 1187.59 354.91 1140.7 376.77 1245.41 472.83 1109.61 720.57 1090.02 713.5 1084.88 687.48 1075.92 695.09 1057.58 777.74 1005.04 686.34 890.31 681.33 911.25 275.7 662.84 16.82"/>
-            <polyline points="1056.04 782.23 908.01 795.67 854.08 852.08 937.2 1044.55 956.75 1051.75 1051.01 918.87 1004.5 824.86 1056.04 782.23"/>
-          </g>
-          <g id="gop" class="neighborhood" data-name="Gaziosmanpaşa"><polyline points="621.04 563.89 682.08 502.85 897.47 461.96 885.37 685.98 997.67 692.89 1043.74 772.36 904.95 794.82 857.15 842.62 787.62 685.59"/></g>
-          <g id="esenler" class="neighborhood" data-name="Esenler"><polygon points="780.76 1111.16 718.97 1113.36 702.42 994.19 637.31 1014.06 615.25 962.19 524.76 936.82 480.63 755.85 506.01 652.13 426.56 721.65 354.84 697.37 437.59 369.65 603.11 564.41 685.8 754.32 691.38 937.37 762 974.88 789.59 1043.3 780.76 1111.16"/></g>
-          <g id="bagcilar" class="neighborhood" data-name="Bağcılar"><polyline points="206.52 660 164.47 1056.56 266.05 1143.1 430.94 1101.98 533.19 1156.27 503.13 1064.22 633.53 1020.41 617.01 966.92 522.97 943.63 475.6 755.5 499.96 658.05 429.58 727.07 206.52 660"/></g>
-          <g id="basaksehir" class="neighborhood" data-name="Başakşehir"><polygon points="7.5 9.29 154.68 9.29 433.32 361.92 345.84 702.12 206.52 660 190.32 770.16 7.5 731.28 7.5 9.29"/></g>
-          <g id="kucukcekmece" class="neighborhood" data-name="Küçükçekmece"><polygon points="7.5 1444.08 132 1444.08 115.8 1308 220.41 1308 151.44 1152.48 190.32 770.16 7.5 731.28 7.5 1444.08"/></g>
-          <g id="sultangazi" class="neighborhood" data-name="Sultangazi"><polygon points="656.88 9.29 916.08 277.68 899.99 455.88 679.56 498 614.76 566.04 154.68 9.29 656.88 9.29"/></g>
-          <g id="uskudar" class="neighborhood" data-name="Üsküdar"><polygon points="1518.66 1080.88 1830.23 833 1830.23 740.99 1867.41 693.19 1858.56 622.38 1934.68 579.89 2023.2 700.27 2078.07 974.67 2012.57 1006.53 2088.7 1194.18 1971.86 1206.57 1980.71 1326.95 1761.19 1166.28 1605.41 1326.95 1562.92 1282.7 1518.66 1080.88"/></g>
-          <g id="kadikoy" class="neighborhood" data-name="Kadıköy"><polygon points="1578.85 1378.29 1617.8 1488.05 1718.71 1472.12 1741.72 1523.46 1686.84 1594.27 1759.42 1604.89 1784.21 1573.02 1938.22 1647.38 2028.51 1725.27 2239.17 1640.3 2109.94 1414.76 1761.19 1166.28 1605.41 1326.95 1631.96 1358.82 1578.85 1378.29"/></g>
-          <g id="maltepe" class="neighborhood" data-name="Maltepe"><polygon points="2739.5 1463.89 2564.43 1437.18 2514.35 1505.62 2352.43 1505.62 2239.17 1640.3 2074.59 1706.68 2360.77 2057.29 2739.5 2057.29 2739.5 1463.89"/></g>
-          <g id="umraniye" class="neighborhood" data-name="Ümraniye"><polygon points="2129.44 686.63 2110.15 733.48 2206.61 710.06 2297.57 816.17 2383.01 799.63 2429.86 940.2 2617.28 965 2739.5 1130.37 2739.5 1315.32 2239.17 1303.63 2088.7 1194.18 2012.57 1006.53 2078.07 974.67 2023.2 700.27 2129.44 686.63"/></g>
-          <g id="cekmekoy" class="neighborhood" data-name="Çekmeköy"><polygon points="2739.5 742.25 2408.24 875.34 2429.86 940.2 2617.28 965 2739.5 1130.37 2739.5 742.25"/></g>
-          <g id="beykoz" class="neighborhood" data-name="Beykoz"><polygon points="1992.52 9.29 2146.49 154.73 2125.49 222.38 2025.18 315.69 1943.53 341.35 1917.87 386.92 1934.68 579.89 2023.2 700.27 2129.44 686.63 2110.15 733.48 2206.61 710.06 2297.57 816.17 2383.01 799.63 2408.24 875.34 2739.5 742.25 2739.5 9.29 1992.52 9.29"/></g>
-          <g id="sariyer" class="neighborhood" data-name="Sarıyer"><polygon points="1621.06 9.29 1621.06 309.24 1558.49 346.32 1676.68 399.62 1637.28 442.31 1852.81 531.72 1822.68 404.26 1961.73 174.83 1866.71 9.29 1621.06 9.29"/></g>
-          <g id="besiktas" class="neighborhood" data-name="Beşiktaş"><polygon points="1437.98 953.42 1484.33 696.25 1558.49 712.48 1578.85 603.56 1491.28 510.86 1470.43 389.72 1558.49 346.32 1676.68 399.62 1637.28 442.31 1852.81 531.72 1760.11 594.29 1783.28 675.4 1750.84 686.63 1743.89 731.28 1709.93 742.25 1688.27 833 1437.98 953.42"/></g>
-          <g id="beyoglu" class="neighborhood" data-name="Beyoğlu"><polygon points="1084.01 709.2 1110.23 800.97 1061.53 814.08 1052.17 875.34 1110.23 917.79 1143.94 967.66 1224.47 1000.97 1241.33 1066.93 1282.53 1087.68 1373.5 1048.2 1437.98 953.42 1084.01 709.2"/></g>
-          <g id="gungoren" class="neighborhood" data-name="Güngören"><polygon points="699.47 1001.07 715.25 1119.44 778.38 1117.86 749.04 1288.06 697.89 1296.2 653.7 1147.85 587.42 1250.43 503.13 1064.22 699.47 1001.07"/></g>
-          <g id="kagithane" class="neighborhood" data-name="Kağıthane"><polygon points="1112.03 716.61 1211.22 791.61 1392.66 583.55 1503.95 612.58 1470.43 389.72 1361.21 397.27 1339.44 322.28 1252.35 327.11 1172.51 273.89 1160.42 295.66 1182.19 351.31 1138.65 375.5 1242.67 479.53 1112.03 716.61"/></g>
-          <g id="atasehir" class="neighborhood" data-name="Ataşehir"><polygon points="2739.5 1315.32 2239.17 1303.63 2088.7 1194.18 1971.86 1206.57 1980.71 1326.95 2109.94 1414.76 2239.17 1639.24 2352.43 1505.62 2514.35 1505.62 2564.43 1437.18 2739.5 1463.89 2739.5 1315.32"/></g>
-          <g id="zeytinburnu" class="neighborhood" data-name="Zeytinburnu"><polygon points="798.69 1045.19 862.06 1014.89 951.22 1052.78 899.99 1130.98 899.99 1414.76 874.96 1420.83 786.74 1499.31 720.43 1464.68 798.69 1045.19"/></g>
-          <g id="fatih" class="neighborhood" data-name="Fatih"><path d="M1053.98,910.62l-153.99,218.9v291.38s37.69-5.13,37.69-5.13l92.72-116.08,46.64,37.39,76.81-18.98v-35.16l170.09,4.46s83.4-60.83,41.15-142.31l-132.78-26.23-56.51-68.09-29.08-16.74-66.94-106.6"/></g>
-        </svg>
-
-      <div class="map-label" id="map-label">İstanbul</div>
-    </section>
-  </main>
-
-  <aside class="col-right">
-    <section class="sidebar-right">
-      <div class="sidebar-label" id="nb-title">İstanbul</div>
-      <div class="sidebar-right-inner">
-        <div class="nb-articles" id="nb-articles-list"></div>
-        <p class="no-articles" id="nb-prompt">Okumak için bir mahalle seçin</p>
-      </div>
-    </section>
-  </aside>
+  <nav id="shell-nav">
+    <a href="#anahane" data-tab="anahane">Anahane</a>
+    <a href="#kahvehane" data-tab="kahvehane">Kahvehane</a>
+    <a href="#kutuphane" data-tab="kutuphane">Kütüphane</a>
+    <a href="#hane" data-tab="hane">Hane</a>
+  </nav>
 </div>
 
 <script>
-// ══════════════════════════════════════════
-// Swipe pagination
-// Navigate Anahane → Kahvehane → Kütüphane → Hane with a sliding transition.
-// Only the left and right columns translate; the map, datetime bar, and nav
-// bar stay fixed so the center of the screen is visually stable across pages.
-// Mobile = horizontal touch swipe, desktop = vertical wheel swipe; CSS picks
-// the axis per media query. Tab-bar clicks trigger the same animation.
-// ══════════════════════════════════════════
-(function initSwipePagination() {
-  const PAGES = ['index.html', 'kahvehane.html', 'kutuphane.html', 'hane.html'];
-  const DURATION = 400;
-  const MIN_DX = 50;
-  const MAX_TIME = 700;
-  // Prefer the View Transitions API when available — it snapshots the
-  // outgoing page and holds it until the new one is rendered, which
-  // eliminates the white flash the manual slide-out can't hide.
-  const supportsVT = 'startViewTransition' in document;
+// ══════════════════════════════════════════════════════════════
+// SPA shell: hosts the 4 tabs as iframes in a sliding strip so
+// cross-tab navigation (including multi-step jumps) animates
+// smoothly through intermediate tabs. Each tab is its own full
+// document (anahane.html / kahvehane.html / kutuphane.html /
+// hane.html) loaded with ?embed=1 so the tab's built-in nav bar
+// and swipe-pagination stay dormant while the shell drives
+// routing via the hash.
+// ══════════════════════════════════════════════════════════════
 
-  function isMobile() { return window.innerWidth <= 768; }
-  function currentIdx() {
-    const path = (location.pathname.split('/').pop() || 'index.html');
-    const idx = PAGES.indexOf(path);
-    return idx === -1 ? 0 : idx;
-  }
-  function recordDir(dir) {
-    // Seed the direction for the incoming page. The pre-body script
-    // reads this and sets vt-<dir> on <html> before VT captures the
-    // new snapshot, so the CSS slide keyframes can match.
-    try { sessionStorage.setItem('ist-page-enter-dir', dir); } catch(e) {}
-  }
-
-  // Back up: if the outgoing page is swapped before the new page mounts
-  // its pagereveal handler (or if navigation.activation isn't populated
-  // yet), also set types at pageswap so the outgoing snapshot phase is
-  // correctly tagged.
-  if (supportsVT) {
-    window.addEventListener('pageswap', (e) => {
-      if (!e.viewTransition) return;
-      const dir = sessionStorage.getItem('ist-page-enter-dir');
-      if (dir) e.viewTransition.types.add(dir);
-    });
-    window.addEventListener('pagereveal', (e) => {
-      if (!e.viewTransition) return;
-      const root = document.documentElement;
-      const dir = root.classList.contains('vt-forward') ? 'forward'
-                : root.classList.contains('vt-backward') ? 'backward' : null;
-      if (dir) e.viewTransition.types.add(dir);
-      // Remove the direction class once the animation completes so it
-      // doesn't bleed into a later same-document render.
-      e.viewTransition.finished.finally(() => {
-        root.classList.remove('vt-forward', 'vt-backward');
-      });
-    });
-  }
-
-  // Entry handler — runs on every page load. Cleans up direction state
-  // and, for non-VT browsers, releases the manual offscreen transform.
-  function handleIncoming() {
-    const root = document.documentElement;
-    const dir = root.classList.contains('ist-entering-forward') ? 'forward'
-              : root.classList.contains('ist-entering-backward') ? 'backward' : null;
-    try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
-    if (!dir) return;
-    // Double rAF so the initial transform has painted before we release it.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        root.classList.remove('ist-entering-' + dir);
-      });
-    });
-  }
-
-  let navigating = false;
-  function navigate(targetIdx, dir) {
-    if (navigating) return;
-    if (targetIdx < 0 || targetIdx >= PAGES.length) return;
-    const curr = currentIdx();
-    if (targetIdx === curr) return;
-    navigating = true;
-    recordDir(dir);
-    if (supportsVT) {
-      // The browser will trigger a view transition on this navigation.
-      location.href = PAGES[targetIdx];
-      return;
-    }
-    const exitClass = dir === 'forward' ? 'ist-exiting-forward' : 'ist-exiting-backward';
-    document.body.classList.add(exitClass);
-    setTimeout(() => { location.href = PAGES[targetIdx]; }, DURATION - 30);
-  }
-
-  // Chain-slide through intermediate tabs when the user jumps 2+ away.
-  // Fetch each hop in parallel (warmed by <link rel="prefetch">), extract
-  // its .col-left / .col-right, stack the clones in a fixed overlay, then
-  // translate the stack to reveal each frame in sequence. The final hop
-  // ends with a real navigation so the destination's scripts run normally;
-  // we strip the direction class and kill the cross-document VT animation
-  // so there's no double-animation on arrival.
-  async function multiHopSlide(curr, target) {
-    if (navigating) return;
-    const dir = target > curr ? 'forward' : 'backward';
-    const step = dir === 'forward' ? 1 : -1;
-    const hopIdxs = [];
-    for (let i = curr + step; i !== target + step; i += step) hopIdxs.push(i);
-    if (hopIdxs.length === 0) return;
-    navigating = true;
-
-    const fetches = hopIdxs.map(i => fetch(PAGES[i]).then(r => r.text()).catch(() => null));
-    const leftEl = document.querySelector('.col-left');
-    const rightEl = document.querySelector('.col-right');
-    if (!leftEl || !rightEl) { recordDir(dir); location.href = PAGES[target]; return; }
-    const leftRect = leftEl.getBoundingClientRect();
-    const rightRect = rightEl.getBoundingClientRect();
-    const mobile = window.innerWidth <= 768;
-
-    const htmls = await Promise.all(fetches);
-    if (htmls.some(h => h == null)) {
-      navigating = false;
-      recordDir(dir);
-      location.href = PAGES[target];
-      return;
-    }
-    const parser = new DOMParser();
-    const fragments = htmls.map(html => {
-      const doc = parser.parseFromString(html, 'text/html');
-      return {
-        left: doc.querySelector('.col-left'),
-        right: doc.querySelector('.col-right'),
-      };
-    });
-
-    function buildStack(origEl, origRect, key) {
-      const wrap = document.createElement('div');
-      Object.assign(wrap.style, {
-        position: 'fixed',
-        left: origRect.left + 'px',
-        top: origRect.top + 'px',
-        width: origRect.width + 'px',
-        height: origRect.height + 'px',
-        overflow: 'hidden',
-        pointerEvents: 'none',
-        zIndex: '90',
-        background: '#ffffff',
-      });
-      const stack = document.createElement('div');
-      Object.assign(stack.style, {
-        position: 'absolute',
-        inset: '0',
-        willChange: 'transform',
-      });
-      wrap.appendChild(stack);
-
-      function placeFrame(node, i) {
-        Object.assign(node.style, {
-          position: 'absolute',
-          top: '0',
-          left: '0',
-          width: '100%',
-          height: '100%',
-          margin: '0',
-          boxSizing: 'border-box',
-          overflow: 'hidden',
-        });
-        node.style.viewTransitionName = 'none';
-        const ax = mobile ? 'translateX' : 'translateY';
-        const pct = (dir === 'forward' ? i : -i) * 100;
-        node.style.transform = ax + '(' + pct + '%)';
-        stack.appendChild(node);
-      }
-      const frame0 = origEl.cloneNode(true);
-      placeFrame(frame0, 0);
-      fragments.forEach((frag, i) => {
-        const src = frag[key];
-        const node = src ? src.cloneNode(true) : document.createElement('div');
-        placeFrame(node, i + 1);
-      });
-      return { wrap, stack };
-    }
-
-    const leftStack = buildStack(leftEl, leftRect, 'left');
-    const rightStack = buildStack(rightEl, rightRect, 'right');
-    document.body.appendChild(leftStack.wrap);
-    document.body.appendChild(rightStack.wrap);
-
-    leftEl.style.visibility = 'hidden';
-    rightEl.style.visibility = 'hidden';
-    leftEl.style.viewTransitionName = 'none';
-    rightEl.style.viewTransitionName = 'none';
-
-    const hops = hopIdxs.length;
-    const perHop = hops === 2 ? 260 : 220;
-    const totalMs = perHop * hops;
-    const axis = mobile ? 'X' : 'Y';
-    const endPct = dir === 'forward' ? -hops * 100 : hops * 100;
-    const keyframes = [
-      { transform: 'translate' + axis + '(0%)' },
-      { transform: 'translate' + axis + '(' + endPct + '%)' },
-    ];
-    const opts = { duration: totalMs, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' };
-    const a1 = leftStack.stack.animate(keyframes, opts);
-    const a2 = rightStack.stack.animate(keyframes, opts);
-
-    try { await Promise.all([a1.finished, a2.finished]); } catch (e) {}
-
-    try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
-    document.documentElement.classList.remove('vt-forward', 'vt-backward');
-    const killVT = document.createElement('style');
-    killVT.textContent = '::view-transition-group(*),::view-transition-image-pair(*),::view-transition-old(*),::view-transition-new(*){animation:none !important;}';
-    document.head.appendChild(killVT);
-
-    location.href = PAGES[target];
-  }
-
-  // Intercept tab-bar clicks: direct-neighbor hops ride the built-in VT;
-  // jumps of 2+ go through multiHopSlide so intermediate tabs flash past.
-  document.addEventListener('click', (e) => {
-    const link = e.target.closest('nav a');
-    if (!link) return;
-    const href = link.getAttribute('href');
-    const targetIdx = PAGES.indexOf(href);
-    const curr = currentIdx();
-    if (targetIdx === -1 || targetIdx === curr) return;
-    const dir = targetIdx > curr ? 'forward' : 'backward';
-    const dist = Math.abs(targetIdx - curr);
-    if (supportsVT && dist >= 2) {
-      e.preventDefault();
-      multiHopSlide(curr, targetIdx);
-      return;
-    }
-    if (supportsVT) { recordDir(dir); return; }
-    e.preventDefault();
-    navigate(targetIdx, dir);
-  }, true);
-
-  // ── Mobile: horizontal touch-swipe anywhere on main-site (except the nav bar) ──
-  let sx = 0, sy = 0, st = 0, active = false;
-  document.addEventListener('touchstart', (e) => {
-    if (!isMobile() || e.touches.length !== 1) return;
-    if (e.target.closest && e.target.closest('nav')) return; // let nav-bar taps through
-    sx = e.touches[0].clientX;
-    sy = e.touches[0].clientY;
-    st = Date.now();
-    active = true;
-  }, { passive: true });
-
-  document.addEventListener('touchend', (e) => {
-    if (!active) return;
-    active = false;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - sx;
-    const dy = t.clientY - sy;
-    const dt = Date.now() - st;
-    if (dt > MAX_TIME) return;
-    if (Math.abs(dx) < MIN_DX) return;
-    if (Math.abs(dx) < Math.abs(dy) * 1.2) return; // vertical-dominant: let it scroll
-    const curr = currentIdx();
-    if (dx < 0) navigate(curr + 1, 'forward');
-    else        navigate(curr - 1, 'backward');
-  }, { passive: true });
-
-  // ── Desktop: vertical wheel-based swipe anywhere on the page ──
-  // Respects native scrolling: only triggers navigation when there's no
-  // more content to scroll in that direction. Wheel delta is accumulated
-  // so a single flick doesn't accidentally navigate.
-  let wheelAccum = 0, wheelTs = 0;
-  const WHEEL_THRESHOLD = 180;
-  const WHEEL_RESET_MS = 220;
-  function canScrollInDir(target, dy) {
-    let el = target;
-    while (el && el !== document.body && el !== document.documentElement) {
-      if (el.scrollHeight > el.clientHeight + 1) {
-        const atTop = el.scrollTop < 0.5;
-        const atBottom = el.scrollTop + el.clientHeight > el.scrollHeight - 0.5;
-        if (dy > 0 && !atBottom) return true;
-        if (dy < 0 && !atTop) return true;
-      }
-      el = el.parentElement;
-    }
-    return false;
-  }
-  document.addEventListener('wheel', (e) => {
-    if (isMobile()) return;
-    if (navigating) { e.preventDefault(); return; }
-    if (e.target.closest && e.target.closest('nav')) { wheelAccum = 0; return; }
-    const dy = e.deltaY;
-    if (Math.abs(dy) < 1) return;
-    if (canScrollInDir(e.target, dy)) {
-      wheelAccum = 0;
-      return; // let a nested scroll container scroll normally
-    }
-    // At a scroll boundary — suppress overscroll and accumulate toward navigation.
-    e.preventDefault();
-    const now = Date.now();
-    if (now - wheelTs > WHEEL_RESET_MS) wheelAccum = 0;
-    wheelTs = now;
-    wheelAccum += dy;
-    if (Math.abs(wheelAccum) >= WHEEL_THRESHOLD) {
-      const curr = currentIdx();
-      const accum = wheelAccum;
-      wheelAccum = 0;
-      if (accum > 0) navigate(curr + 1, 'forward');
-      else           navigate(curr - 1, 'backward');
-    }
-  }, { passive: false });
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', handleIncoming);
-  } else {
-    handleIncoming();
-  }
-})();
-
-// ══════════════════════════════════════════
-// CONFIGURATION — Replace with your values
-// ══════════════════════════════════════════
 const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
-
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ── Date and Time ──
-function updateDateTime() {
-  const now = new Date();
-  const opts = { timeZone: 'Europe/Istanbul' };
-  const day = now.toLocaleDateString('tr-TR', { ...opts, day: 'numeric' });
-  const month = now.toLocaleDateString('tr-TR', { ...opts, month: 'long' });
-  const year = now.toLocaleDateString('tr-TR', { ...opts, year: 'numeric' });
-  const weekday = now.toLocaleDateString('tr-TR', { ...opts, weekday: 'long' });
-  const time = now.toLocaleTimeString('tr-TR', { ...opts, hour: '2-digit', minute: '2-digit', hour12: false });
-  document.getElementById('date-line').textContent = (day + ' ' + month + ' ' + year).toUpperCase();
-  document.getElementById('day-line').textContent = weekday.toUpperCase();
-  document.getElementById('time-line').textContent = time;
-}
-updateDateTime();
-setInterval(updateDateTime, 60000);
+const TABS = ['anahane', 'kahvehane', 'kutuphane', 'hane'];
+const TAB_URLS = {
+  anahane: 'anahane.html?embed=1',
+  kahvehane: 'kahvehane.html?embed=1',
+  kutuphane: 'kutuphane.html?embed=1',
+  hane: 'hane.html?embed=1',
+};
 
-// ── Auth State ──
+const loginOverlay = document.getElementById('login-overlay');
+const shell = document.getElementById('shell');
+const strip = document.getElementById('strip');
+const signinForm = document.getElementById('signin-form');
+const signinError = document.getElementById('signin-error');
+
+function currentTab() {
+  const h = (location.hash || '#anahane').slice(1);
+  return TABS.includes(h) ? h : 'anahane';
+}
+
+function showTab(name, animate) {
+  const idx = TABS.indexOf(name);
+  if (idx < 0) return;
+  const axis = window.innerWidth <= 768 ? 'X' : 'Y';
+  strip.style.transition = animate ? 'transform 420ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none';
+  strip.style.transform = 'translate' + axis + '(-' + (idx * 25) + '%)';
+  document.querySelectorAll('#shell-nav a').forEach(a => {
+    a.classList.toggle('active', a.dataset.tab === name);
+  });
+  ensureIframe(name);
+}
+
+function ensureIframe(tab) {
+  const slot = document.querySelector('.tab-slot[data-tab="' + tab + '"]');
+  if (!slot || slot.querySelector('iframe')) return;
+  const iframe = document.createElement('iframe');
+  iframe.src = TAB_URLS[tab];
+  iframe.title = tab;
+  iframe.setAttribute('loading', 'eager');
+  iframe.addEventListener('load', () => {
+    const loading = slot.querySelector('.slot-loading');
+    if (loading) loading.remove();
+  });
+  slot.appendChild(iframe);
+}
+
+function mountAllIframes() {
+  TABS.forEach(ensureIframe);
+}
+
+// Nav clicks → update hash, which drives showTab via hashchange.
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('#shell-nav a[data-tab]');
+  if (!a) return;
+  e.preventDefault();
+  const name = a.dataset.tab;
+  if (currentTab() === name) return;
+  history.pushState(null, '', '#' + name);
+  showTab(name, true);
+});
+
+window.addEventListener('hashchange', () => showTab(currentTab(), true));
+window.addEventListener('resize', () => showTab(currentTab(), false));
+
+// Iframes can ask the shell to navigate via postMessage, e.g. from
+// a profile button or a map link that should switch tabs.
+window.addEventListener('message', (e) => {
+  if (!e.data || e.data.type !== 'ist-nav') return;
+  const tab = e.data.tab;
+  if (!TABS.includes(tab)) return;
+  if (currentTab() === tab) return;
+  history.pushState(null, '', '#' + tab);
+  showTab(tab, true);
+});
+
+// ── Auth ──
+async function enterShell() {
+  loginOverlay.classList.add('hidden');
+  shell.classList.add('active');
+  showTab(currentTab(), false);
+  mountAllIframes();
+}
+
 async function checkSession() {
   const { data: { session } } = await sb.auth.getSession();
-  if (session) showSite(session.user);
+  if (session) enterShell();
 }
 
-function showSite(user) {
-  document.getElementById('login-overlay').style.display = 'none';
-  document.getElementById('main-site').classList.add('active');
-  // Highlight home neighborhood on map
-  const homeNb = user?.user_metadata?.yasadigi_ilce || user?.user_metadata?.neighborhood || localStorage.getItem('yasadigi_ilce_local');
-  if (homeNb) {
-    const nbEl = document.getElementById(homeNb);
-    if (nbEl) nbEl.classList.add('home');
-    const badgeEl = document.getElementById('user-nb-badge');
-    if (badgeEl) badgeEl.textContent = districtNames[homeNb] || homeNb;
-  }
-}
-
-// ── Sign In ──
-document.getElementById('auth-submit-btn').addEventListener('click', async () => {
-  const email = document.getElementById('auth-email').value.trim();
-  const password = document.getElementById('auth-password').value;
-  const errEl = document.getElementById('auth-error');
-  const btn = document.getElementById('auth-submit-btn');
-
-  if (!email || !password) { errEl.textContent = 'Lütfen tüm alanları doldurun.'; return; }
-
-  btn.textContent = ''; btn.appendChild(Object.assign(document.createElement('span'), {className:'spinner'}));
-  const result = await sb.auth.signInWithPassword({ email, password });
-  btn.textContent = 'Giriş';
-
-  if (result.error) {
-    errEl.textContent = result.error.message;
-  } else {
-    showSite(result.data.user);
-  }
-});
-
-['auth-email','auth-password'].forEach(id => {
-  document.getElementById(id).addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('auth-submit-btn').click();
-  });
-});
-
-// ── Toggle Sign In / Sign Up ──
-document.getElementById('show-signup').addEventListener('click', (e) => {
+signinForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  document.getElementById('signin-form').style.display = 'none';
-  document.getElementById('signup-form').style.display = '';
-  populateSignupDropdowns();
+  signinError.textContent = '';
+  const email = document.getElementById('signin-email').value;
+  const password = document.getElementById('signin-password').value;
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { signinError.textContent = error.message; return; }
+  enterShell();
 });
 
-document.getElementById('show-signin').addEventListener('click', (e) => {
-  e.preventDefault();
-  document.getElementById('signup-form').style.display = 'none';
-  document.getElementById('signin-form').style.display = '';
+// If an iframe signs the user out, full-reload so we return to login.
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT') location.reload();
 });
 
-// ── District names (used by sign-up form) ──
-const districtNames = {
-  bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler',
-  sisli:'Şişli', eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa',
-  esenler:'Esenler', bagcilar:'Bağcılar', basaksehir:'Başakşehir',
-  kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi', uskudar:'Üsküdar',
-  kadikoy:'Kadıköy', maltepe:'Maltepe', umraniye:'Ümraniye',
-  cekmekoy:'Çekmeköy', beykoz:'Beykoz', sariyer:'Sarıyer',
-  besiktas:'Beşiktaş', beyoglu:'Beyoğlu', gungoren:'Güngören',
-  kagithane:'Kağıthane', atasehir:'Ataşehir', zeytinburnu:'Zeytinburnu', fatih:'Fatih'
-};
-
-// ── Sign Up ──
-let signupBornInIstanbul = null;
-
-function populateSignupDropdowns() {
-  const options = Object.entries(districtNames)
-    .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
-    .map(([id, name]) => `<option value="${id}">${name}</option>`)
-    .join('');
-  const livingSelect = document.getElementById('signup-living-district');
-  const birthSelect = document.getElementById('signup-birth-district');
-  if (livingSelect.options.length <= 1) livingSelect.innerHTML += options;
-  if (birthSelect.options.length <= 1) birthSelect.innerHTML += options;
-}
-
-document.getElementById('signup-born-yes').addEventListener('click', () => {
-  signupBornInIstanbul = true;
-  document.getElementById('signup-born-yes').classList.add('selected');
-  document.getElementById('signup-born-no').classList.remove('selected');
-  document.getElementById('signup-birth-district-wrap').style.display = '';
-});
-
-document.getElementById('signup-born-no').addEventListener('click', () => {
-  signupBornInIstanbul = false;
-  document.getElementById('signup-born-no').classList.add('selected');
-  document.getElementById('signup-born-yes').classList.remove('selected');
-  document.getElementById('signup-birth-district-wrap').style.display = 'none';
-});
-
-document.getElementById('signup-submit-btn').addEventListener('click', async () => {
-  const name = document.getElementById('signup-name').value.trim();
-  const lastname = document.getElementById('signup-lastname').value.trim();
-  const email = document.getElementById('signup-email').value.trim();
-  const password = document.getElementById('signup-password').value;
-  const livingDistrict = document.getElementById('signup-living-district').value;
-  const errEl = document.getElementById('signup-error');
-  const btn = document.getElementById('signup-submit-btn');
-
-  if (!name || !lastname || !email || !password) {
-    errEl.textContent = 'Lütfen tüm alanları doldurun.'; return;
-  }
-  if (!livingDistrict) {
-    errEl.textContent = 'Lütfen yaşadığınız ilçeyi seçin.'; return;
-  }
-  if (signupBornInIstanbul === null) {
-    errEl.textContent = 'Lütfen İstanbul doğumlu olup olmadığınızı belirtin.'; return;
-  }
-
-  let dogumYeri = 'istanbul_disi';
-  if (signupBornInIstanbul) {
-    dogumYeri = document.getElementById('signup-birth-district').value;
-    if (!dogumYeri) {
-      errEl.textContent = 'Lütfen doğduğunuz ilçeyi seçin.'; return;
-    }
-  }
-
-  btn.textContent = ''; btn.appendChild(Object.assign(document.createElement('span'), {className:'spinner'}));
-
-  const result = await sb.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        display_name: name + ' ' + lastname,
-        first_name: name,
-        last_name: lastname,
-        yasadigi_ilce: livingDistrict,
-        dogum_yeri: dogumYeri
-      }
-    }
-  });
-
-  btn.textContent = 'Kayıt Ol';
-
-  if (result.error) {
-    errEl.textContent = result.error.message;
-  } else if (result.data.user) {
-    showSite(result.data.user);
-  }
-});
-
-['signup-name','signup-lastname','signup-email','signup-password'].forEach(id => {
-  document.getElementById(id).addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('signup-submit-btn').click();
-  });
-});
-
-// ── Map Interactions ──
-const svg = document.querySelector('svg');
-const neighborhoods = document.querySelectorAll('.neighborhood');
-
-neighborhoods.forEach(nb => {
-  nb.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    neighborhoods.forEach(n => n.classList.remove('active'));
-    nb.classList.add('active');
-
-    // No zoom - map stays at original size
-
-    const name = nb.getAttribute('data-name') || nb.id;
-    document.getElementById('nb-title').textContent = name;
-    document.getElementById('map-label').textContent = name;
-    document.getElementById('nb-prompt').style.display = 'none';
-
-    const listEl = document.getElementById('nb-articles-list');
-    listEl.innerHTML = '<span class="spinner"></span>';
-
-    // Fetch articles from Supabase
-    const { data, error } = await sb
-      .from('articles')
-      .select('*')
-      .eq('neighborhood', nb.id)
-      .order('created_at', { ascending: false });
-
-    // Build article list from Supabase + flashing news
-    let articles = '';
-
-    // Add flashing/breaking news first if this neighborhood has one
-    if (flashingNews[nb.id]) {
-      articles += `
-        <div class="nb-article" style="border-left-color: var(--ink); border-left-width: 4px;">
-          <h4 style="font-size: 0.85rem;">${flashingNews[nb.id].title}</h4>
-          <p style="font-weight: 700; font-size: 0.65rem; letter-spacing: 1px; text-transform: uppercase;">Son Dakika</p>
-        </div>
-      `;
-    }
-
-    if (!error && data && data.length > 0) {
-      articles += data.map(a => `
-        <div class="nb-article">
-          <h4>${a.title}</h4>
-          ${a.summary ? `<p>${a.summary}</p>` : ''}
-        </div>
-      `).join('');
-    }
-
-    if (!articles) {
-      listEl.innerHTML = '<p class="no-articles">No local news for this neighborhood yet.</p>';
-    } else {
-      listEl.innerHTML = articles;
-    }
-  });
-});
-
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.neighborhood') && !e.target.closest('#neighborhood-panel')) {
-    neighborhoods.forEach(nb => nb.classList.remove('active'));
-    document.getElementById('nb-title').textContent = 'İstanbul';
-    document.getElementById('map-label').textContent = 'İstanbul';
-    document.getElementById('nb-prompt').style.display = '';
-    document.getElementById('nb-articles-list').innerHTML = '';
-  }
-});
-
-// ── Flashing News (breaking news on specific neighborhoods) ──
-const flashingNews = {
-  uskudar: {
-    title: 'Üsküdar Belediyesi\'ne operasyon: 20 kişi gözaltına alındı'
-  },
-  besiktas: {
-    title: 'İstanbul\'daki İsrail Konsolosluğu önünde çatışma: 3 terörist etkisiz hale getirildi'
-  }
-};
-
-// Apply flashing class to neighborhoods with breaking news
-Object.keys(flashingNews).forEach(nbId => {
-  const el = document.getElementById(nbId);
-  if (el) el.classList.add('flashing-news');
-});
-
-// ── Init ──
 checkSession();
 </script>
+
 </body>
 </html>
