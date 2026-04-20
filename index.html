@@ -89,44 +89,65 @@
       min-height: 16px;
     }
 
-    /* ── Shell ── */
+    /* ── Shell ──
+       3-column grid mirrors each tab's own 1fr 2.2fr 1fr layout. The
+       left and right columns each contain a vertical strip of 4
+       iframes (one per tab) that slide on tab change. The middle
+       column stacks 4 iframes absolutely; only the active one is
+       visible — swapped instantly so the map/datetime stay static
+       during the side-strip slide. */
     #shell {
       display: none;
+      grid-template-columns: 1fr 2.2fr 1fr;
       height: 100vh;
       width: 100vw;
+      overflow: hidden;
+    }
+    #shell.active { display: grid; }
+
+    .shell-col {
       position: relative;
       overflow: hidden;
+      background: var(--paper);
     }
-    #shell.active { display: block; }
 
-    #strip-wrap {
+    .shell-left .strip,
+    .shell-right .strip {
       position: absolute;
-      inset: 0 0 48px 0;
-      overflow: hidden;
-    }
-    #strip {
+      inset: 0;
       display: flex;
       flex-direction: column;
-      width: 100%;
       height: 400%;
-      transition: transform 420ms cubic-bezier(0.4, 0, 0.2, 1);
       will-change: transform;
+      transition: transform 420ms cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .tab-slot {
-      width: 100%;
-      height: 25%;
+    .shell-left .strip > section,
+    .shell-right .strip > section {
       flex: 0 0 25%;
+      height: 25%;
       position: relative;
       background: var(--paper);
     }
-    .tab-slot iframe {
+
+    .shell-middle > .middle-slot {
+      position: absolute;
+      inset: 0;
+      visibility: hidden;
+    }
+    .shell-middle > .middle-slot.active {
+      visibility: visible;
+    }
+
+    section > iframe,
+    .middle-slot > iframe {
       width: 100%;
       height: 100%;
       border: 0;
       display: block;
       background: var(--paper);
     }
-    .tab-slot .slot-loading {
+
+    .slot-loading {
       position: absolute;
       inset: 0;
       display: flex;
@@ -137,37 +158,6 @@
       letter-spacing: 2px;
       text-transform: uppercase;
       pointer-events: none;
-    }
-
-    #shell-nav {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 48px;
-      display: flex;
-      border-top: 1px solid var(--border);
-      background: var(--paper);
-      z-index: 10;
-    }
-    #shell-nav a {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-decoration: none;
-      color: var(--muted);
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      transition: color 0.2s, background 0.2s;
-    }
-    #shell-nav a:hover { color: var(--accent); background: var(--paper-dark); }
-    #shell-nav a.active { color: var(--paper); background: var(--ink); }
-
-    @media (max-width: 768px) {
-      #strip { flex-direction: row; width: 400%; height: 100%; }
-      .tab-slot { width: 25%; height: 100%; flex: 0 0 25%; }
-      #login-overlay .masthead-login { font-size: 2rem; }
     }
   </style>
 </head>
@@ -185,31 +175,40 @@
 </div>
 
 <div id="shell">
-  <div id="strip-wrap">
-    <div id="strip">
-      <section class="tab-slot" data-tab="anahane"><div class="slot-loading">Yükleniyor…</div></section>
-      <section class="tab-slot" data-tab="kahvehane"><div class="slot-loading">Yükleniyor…</div></section>
-      <section class="tab-slot" data-tab="kutuphane"><div class="slot-loading">Yükleniyor…</div></section>
-      <section class="tab-slot" data-tab="hane"><div class="slot-loading">Yükleniyor…</div></section>
+  <div class="shell-col shell-left">
+    <div class="strip" id="strip-left">
+      <section data-tab="anahane"><div class="slot-loading">…</div></section>
+      <section data-tab="kahvehane"><div class="slot-loading">…</div></section>
+      <section data-tab="kutuphane"><div class="slot-loading">…</div></section>
+      <section data-tab="hane"><div class="slot-loading">…</div></section>
     </div>
   </div>
-  <nav id="shell-nav">
-    <a href="#anahane" data-tab="anahane">Anahane</a>
-    <a href="#kahvehane" data-tab="kahvehane">Kahvehane</a>
-    <a href="#kutuphane" data-tab="kutuphane">Kütüphane</a>
-    <a href="#hane" data-tab="hane">Hane</a>
-  </nav>
+
+  <div class="shell-col shell-middle" id="shell-middle">
+    <div class="middle-slot" data-tab="anahane"><div class="slot-loading">…</div></div>
+    <div class="middle-slot" data-tab="kahvehane"><div class="slot-loading">…</div></div>
+    <div class="middle-slot" data-tab="kutuphane"><div class="slot-loading">…</div></div>
+    <div class="middle-slot" data-tab="hane"><div class="slot-loading">…</div></div>
+  </div>
+
+  <div class="shell-col shell-right">
+    <div class="strip" id="strip-right">
+      <section data-tab="anahane"><div class="slot-loading">…</div></section>
+      <section data-tab="kahvehane"><div class="slot-loading">…</div></section>
+      <section data-tab="kutuphane"><div class="slot-loading">…</div></section>
+      <section data-tab="hane"><div class="slot-loading">…</div></section>
+    </div>
+  </div>
 </div>
 
 <script>
 // ══════════════════════════════════════════════════════════════
-// SPA shell: hosts the 4 tabs as iframes in a sliding strip so
-// cross-tab navigation (including multi-step jumps) animates
-// smoothly through intermediate tabs. Each tab is its own full
-// document (anahane.html / kahvehane.html / kutuphane.html /
-// hane.html) loaded with ?embed=1 so the tab's built-in nav bar
-// and swipe-pagination stay dormant while the shell drives
-// routing via the hash.
+// SPA shell: each tab is split across three iframes (?embed=left,
+// ?embed=middle, ?embed=right). Left + right iframes live in
+// sliding strips that animate on tab change. Middle iframes stack
+// and swap instantly so the map / datetime / nav stay static
+// during the side slide. Nav clicks inside the middle iframe are
+// forwarded to this shell via postMessage (see each tab file).
 // ══════════════════════════════════════════════════════════════
 
 const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
@@ -218,16 +217,18 @@ const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const TABS = ['anahane', 'kahvehane', 'kutuphane', 'hane'];
-const TAB_URLS = {
-  anahane: 'anahane.html?embed=1',
-  kahvehane: 'kahvehane.html?embed=1',
-  kutuphane: 'kutuphane.html?embed=1',
-  hane: 'hane.html?embed=1',
+const TAB_FILES = {
+  anahane: 'anahane.html',
+  kahvehane: 'kahvehane.html',
+  kutuphane: 'kutuphane.html',
+  hane: 'hane.html',
 };
 
 const loginOverlay = document.getElementById('login-overlay');
 const shell = document.getElementById('shell');
-const strip = document.getElementById('strip');
+const stripLeft = document.getElementById('strip-left');
+const stripRight = document.getElementById('strip-right');
+const shellMiddle = document.getElementById('shell-middle');
 const signinForm = document.getElementById('signin-form');
 const signinError = document.getElementById('signin-error');
 
@@ -239,49 +240,45 @@ function currentTab() {
 function showTab(name, animate) {
   const idx = TABS.indexOf(name);
   if (idx < 0) return;
-  const axis = window.innerWidth <= 768 ? 'X' : 'Y';
-  strip.style.transition = animate ? 'transform 420ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none';
-  strip.style.transform = 'translate' + axis + '(-' + (idx * 25) + '%)';
-  document.querySelectorAll('#shell-nav a').forEach(a => {
-    a.classList.toggle('active', a.dataset.tab === name);
+  const t = animate ? 'transform 420ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none';
+  [stripLeft, stripRight].forEach(strip => {
+    strip.style.transition = t;
+    strip.style.transform = 'translateY(-' + (idx * 25) + '%)';
   });
-  ensureIframe(name);
+  shellMiddle.querySelectorAll('.middle-slot').forEach(slot => {
+    slot.classList.toggle('active', slot.dataset.tab === name);
+  });
+  ensureIframes(name);
 }
 
-function ensureIframe(tab) {
-  const slot = document.querySelector('.tab-slot[data-tab="' + tab + '"]');
-  if (!slot || slot.querySelector('iframe')) return;
-  const iframe = document.createElement('iframe');
-  iframe.src = TAB_URLS[tab];
-  iframe.title = tab;
-  iframe.setAttribute('loading', 'eager');
-  iframe.addEventListener('load', () => {
-    const loading = slot.querySelector('.slot-loading');
-    if (loading) loading.remove();
+function ensureIframes(tab) {
+  ['left', 'middle', 'right'].forEach(mode => {
+    const container = mode === 'middle'
+      ? shellMiddle.querySelector('.middle-slot[data-tab="' + tab + '"]')
+      : document.querySelector('#strip-' + mode + ' > section[data-tab="' + tab + '"]');
+    if (!container || container.querySelector('iframe')) return;
+    const iframe = document.createElement('iframe');
+    iframe.src = TAB_FILES[tab] + '?embed=' + mode;
+    iframe.title = tab + '-' + mode;
+    iframe.setAttribute('loading', 'eager');
+    iframe.addEventListener('load', () => {
+      const loading = container.querySelector('.slot-loading');
+      if (loading) loading.remove();
+    });
+    container.appendChild(iframe);
   });
-  slot.appendChild(iframe);
 }
 
 function mountAllIframes() {
-  TABS.forEach(ensureIframe);
+  TABS.forEach(ensureIframes);
 }
 
-// Nav clicks → update hash, which drives showTab via hashchange.
-document.addEventListener('click', (e) => {
-  const a = e.target.closest('#shell-nav a[data-tab]');
-  if (!a) return;
-  e.preventDefault();
-  const name = a.dataset.tab;
-  if (currentTab() === name) return;
-  history.pushState(null, '', '#' + name);
-  showTab(name, true);
-});
-
+// Hash drives routing; internal pushState calls trigger hashchange.
 window.addEventListener('hashchange', () => showTab(currentTab(), true));
 window.addEventListener('resize', () => showTab(currentTab(), false));
 
-// Iframes can ask the shell to navigate via postMessage, e.g. from
-// a profile button or a map link that should switch tabs.
+// Middle iframes forward their nav clicks here so we can slide
+// the left/right strips without reloading the middle itself.
 window.addEventListener('message', (e) => {
   if (!e.data || e.data.type !== 'ist-nav') return;
   const tab = e.data.tab;

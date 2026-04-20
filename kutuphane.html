@@ -12,15 +12,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kütüphane — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- SPA guard: direct loads redirect to the shell; iframe loads with
-       ?embed=1 flag this document so nav is hidden and the tab's own
-       swipe/click pagination stays dormant (the shell drives routing). -->
+  <!-- SPA guard: direct loads redirect to the shell. Iframe loads with
+       ?embed=left|middle|right flag this document so only that panel is
+       visible and the tab's own swipe/click pagination stays dormant
+       (the shell drives routing). -->
   <script>
     (function(){
-      var embed = new URLSearchParams(location.search).get('embed') === '1';
-      if (!embed) { location.replace('index.html#kutuphane'); return; }
-      document.documentElement.classList.add('embedded');
+      var embed = new URLSearchParams(location.search).get('embed');
+      if (['left','middle','right'].indexOf(embed) < 0) {
+        location.replace('index.html#kutuphane'); return;
+      }
+      var h = document.documentElement;
+      h.classList.add('embedded');
+      h.classList.add('embed-' + embed);
     })();
+  </script>
+  <!-- Nav hijack: inside the shell's middle iframe, nav clicks are
+       forwarded to the shell via postMessage so it can slide the
+       left/right strips instead of reloading the iframe. -->
+  <script>
+    if (document.documentElement.classList.contains('embed-middle')) {
+      document.addEventListener('click', function(e){
+        var a = e.target.closest && e.target.closest('nav a[href]');
+        if (!a) return;
+        var href = a.getAttribute('href') || '';
+        var map = {
+          'index.html': 'anahane', '#anahane': 'anahane',
+          'anahane.html': 'anahane',
+          'kahvehane.html': 'kahvehane', '#kahvehane': 'kahvehane',
+          'kutuphane.html': 'kutuphane', '#kutuphane': 'kutuphane',
+          'hane.html': 'hane', '#hane': 'hane'
+        };
+        var tab = map[href];
+        if (!tab) return;
+        e.preventDefault();
+        window.parent.postMessage({ type: 'ist-nav', tab: tab }, '*');
+      });
+    }
   </script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis). Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot. -->
   <script>
@@ -810,9 +838,28 @@
     .col-left { view-transition-name: ist-col-left; }
     .col-right { view-transition-name: ist-col-right; }
 
-    /* SPA embed mode: shell supplies the nav; hide this tab's own. */
-    html.embedded nav,
-    html.embedded header { display: none !important; }
+    /* SPA embed modes: the shell loads this document three times in
+       iframes (?embed=left|middle|right). Each mode shows only its
+       panel; the grid collapses so the visible column fills the
+       viewport. Middle still shows its nav+header — the shell
+       intercepts clicks via postMessage. */
+    html.embed-left body { grid-template-columns: 1fr 0 0 !important; }
+    html.embed-left .col-right,
+    html.embed-left .section-rule,
+    html.embed-left header,
+    html.embed-left main { display: none !important; }
+    html.embed-left .col-left { border-right: none; }
+
+    html.embed-middle body { grid-template-columns: 0 1fr 0 !important; }
+    html.embed-middle .col-left,
+    html.embed-middle .col-right { display: none !important; }
+
+    html.embed-right body { grid-template-columns: 0 0 1fr !important; }
+    html.embed-right .col-left,
+    html.embed-right .section-rule,
+    html.embed-right header,
+    html.embed-right main { display: none !important; }
+    html.embed-right .col-right { border-left: none; }
 
     @media (min-width: 769px) {
       @keyframes ist-vt-out-up { from { transform: translateY(0); } to { transform: translateY(-100vh); } }
