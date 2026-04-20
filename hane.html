@@ -1,4 +1,1731 @@
 <!DOCTYPE html>
-<html lang="tr"><head><meta charset="UTF-8"><title>istanbulite</title>
-<script>location.replace('index.html#hane')</script>
-</head><body></body></html>
+<html lang="tr">
+<head>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Prefetch sibling tabs so the View Transitions API can swap instantly -->
+  <link rel="prefetch" href="index.html">
+  <link rel="prefetch" href="kahvehane.html">
+  <link rel="prefetch" href="kutuphane.html">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hane — istanbulite.net</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis) -->
+  <script>
+    (function(){
+      try {
+        var _d = sessionStorage.getItem('ist-page-enter-dir');
+        if (_d) {
+          document.documentElement.classList.add('ist-entering-' + _d);
+          document.documentElement.classList.add('vt-' + _d);
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <style>
+    :root {
+      --ink: #000000;
+      --paper: #ffffff;
+      --paper-dark: #f0f0f0;
+      --rule: #cccccc;
+      --accent: #333333;
+      --muted: #888888;
+      --col-border: 1px solid #cccccc;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background-color: var(--paper);
+      color: var(--ink);
+      display: grid;
+      grid-template-columns: 1fr 2.2fr 1fr;
+      grid-template-rows: auto auto 1fr;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .section-rule {
+      grid-column: 2;
+      grid-row: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 32px;
+      border-bottom: 1px solid var(--ink);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      background: var(--paper-dark);
+    }
+    .datetime-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .datetime-block .date-line { }
+    .datetime-block .day-line { }
+    .datetime-block .time-line { }
+
+    header {
+      grid-column: 2;
+      grid-row: 2;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px 0;
+      background: var(--paper);
+      border-bottom: 4px double var(--ink);
+    }
+
+    nav {
+      display: flex;
+      width: 100%;
+    }
+    nav a {
+      flex: 1;
+      text-align: center;
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: color 0.2s;
+      padding: 2px 0;
+    }
+    nav a:hover { color: var(--accent); }
+    nav a.active { color: var(--ink); }
+
+    .col-left {
+      grid-column: 1;
+      grid-row: 1 / -1;
+      border-right: var(--col-border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .col-left .nb-highlight {
+      padding: 8px 12px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: var(--ink);
+      color: var(--paper);
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .col-right {
+      grid-column: 3;
+      grid-row: 1 / -1;
+      border-left: var(--col-border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    main {
+      grid-column: 2;
+      grid-row: 3;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ── Profile identity section (left column) ── */
+    .profile-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 3px solid var(--ink);
+      background: var(--paper-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      color: var(--muted);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    .display-name {
+      font-weight: 700;
+      font-size: 1rem;
+      text-align: center;
+      word-break: break-word;
+    }
+
+    .avatar-upload {
+      font-size: 0.65rem;
+      color: var(--accent);
+      cursor: pointer;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 700;
+      border: none;
+      background: none;
+      font-family: 'Inter', sans-serif;
+    }
+    .avatar-upload:hover { text-decoration: underline; }
+
+    .district-select-wrap {
+      width: 100%;
+      margin-top: 6px;
+    }
+
+    .district-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .district-select {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.8rem;
+      padding: 6px 8px;
+      background: #f5f5f5;
+      border: 1px solid var(--ink);
+      color: var(--ink);
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .district-display {
+      font-size: 0.8rem;
+      padding: 6px 8px;
+      background: var(--paper-dark);
+      border: 1px solid #ccc;
+      color: var(--ink);
+    }
+
+    .save-btn {
+      width: 100%;
+      padding: 8px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .save-btn:hover { background: var(--accent); }
+    .save-btn:disabled { background: var(--muted); cursor: default; }
+
+    .save-msg {
+      font-size: 0.7rem;
+      text-align: center;
+      min-height: 14px;
+      font-style: italic;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .btn-signout {
+      padding: 8px 20px;
+      background: var(--accent);
+      color: var(--paper);
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .btn-signout:hover { background: #555555; }
+
+    /* Signout wrapper (bottom of right column on desktop, below everything on mobile) */
+    .profile-signout-wrap {
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+      border-top: 1px solid #ddd;
+      margin-top: auto;
+    }
+
+    /* ── Center: profile board ── */
+    .profile-center {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    #sticker-area {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .board-header {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      padding: 8px 16px;
+      background: var(--paper-dark);
+      border-bottom: var(--col-border);
+      color: var(--ink);
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .board-header .edit-toggle {
+      font-size: 0.6rem;
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: 1px;
+      border: none;
+      background: none;
+      font-family: 'Inter', sans-serif;
+      text-transform: uppercase;
+    }
+    .board-header .edit-toggle:hover { color: var(--ink); }
+
+    .sticker-board {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: var(--paper);
+      min-height: 0;
+    }
+
+    .sticker {
+      position: absolute;
+      cursor: grab;
+      user-select: none;
+      width: 120px;
+      height: auto;
+      filter: grayscale(100%);
+      transition: filter 0.2s;
+    }
+    .sticker:hover { filter: grayscale(60%); }
+    .sticker.dragging { cursor: grabbing; z-index: 100; filter: grayscale(0%); }
+
+    /* Sticker tray (shown in edit mode) */
+    .sticker-tray {
+      display: none;
+      padding: 10px 16px;
+      background: var(--paper-dark);
+      border-top: var(--col-border);
+      flex-shrink: 0;
+      overflow-x: auto;
+      white-space: nowrap;
+      gap: 8px;
+    }
+
+    .sticker-tray.active {
+      display: flex;
+    }
+
+    .tray-sticker {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+      cursor: pointer;
+      filter: grayscale(100%);
+      opacity: 0.7;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      padding: 4px;
+      border: 2px solid transparent;
+    }
+    .tray-sticker:hover { filter: grayscale(40%); opacity: 1; }
+    .tray-sticker.locked {
+      opacity: 0.2;
+      cursor: not-allowed;
+      filter: grayscale(100%);
+    }
+    .tray-sticker.locked:hover { opacity: 0.2; filter: grayscale(100%); }
+
+    /* ── Right: stats & info ── */
+    .profile-right {
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      overflow-y: auto;
+      gap: 16px;
+    }
+
+    .right-section-title {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .info-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-bottom: 8px;
+    }
+    .info-row:last-child { margin-bottom: 0; }
+
+    .info-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .info-value {
+      font-size: 0.8rem;
+      color: var(--ink);
+    }
+
+    .score-card {
+      border: 1px solid #ccc;
+      padding: 10px;
+      background: var(--paper);
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .score-card:last-child { margin-bottom: 0; }
+
+    .score-card .game-name {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .score-card .score-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1;
+    }
+
+    .score-card .score-detail {
+      font-size: 0.65rem;
+      color: var(--muted);
+      margin-top: 2px;
+      font-style: italic;
+    }
+
+    .loading {
+      text-align: center;
+      font-style: italic;
+      color: var(--muted);
+      padding: 60px 40px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--muted);
+      border-top-color: var(--ink);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── MOBILE RESPONSIVE ── */
+    @media (max-width: 768px) {
+      html {
+        height: 100vh;
+        height: 100dvh;
+      }
+      body {
+        height: 100vh;
+        height: 100dvh;
+        display: block;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-bottom: 56px; /* reserve space for fixed bottom tab bar */
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .col-left, .col-right, header, .section-rule, main {
+        grid-column: unset; grid-row: unset;
+      }
+
+      /* Compact top brand bar */
+      .section-rule {
+        padding: 9px 16px;
+        border-bottom: 1px solid #e5e5e5;
+        background: #ffffff;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 1.8px;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .datetime-block { flex-direction: row; gap: 8px; }
+      .datetime-block .day-line { display: none; }
+
+      /* Hide sticker board entirely — page IS the profile badge */
+      main { display: none !important; }
+
+      /* Profile badge: single scrollable column combining col-left + col-right */
+      .col-left {
+        border: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 16px 20px 20px 20px;
+        background: #ffffff;
+      }
+      .col-right {
+        border: none;
+        background: #ffffff;
+        display: block;
+      }
+
+      .col-left .nb-highlight {
+        width: 100%;
+        text-align: center;
+        padding: 4px 0 10px 0;
+        font-size: 10px;
+        letter-spacing: 1.5px;
+        flex-shrink: 0;
+        border-bottom: 1px solid #e5e5e5;
+        margin-bottom: 14px;
+      }
+
+      /* Stack profile-left vertically, center all items */
+      .profile-left {
+        padding: 0;
+        gap: 10px;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        max-width: 320px;
+        overflow: visible;
+      }
+
+      /* Large centered avatar on top */
+      .avatar {
+        width: 110px;
+        height: 110px;
+        border-width: 3px;
+        font-size: 2.4rem;
+        flex-shrink: 0;
+        margin-bottom: 2px;
+      }
+      .avatar-upload {
+        font-size: 10px;
+        margin-bottom: 6px;
+      }
+
+      /* Name/details below avatar, full width */
+      .display-name {
+        font-size: 18px;
+        text-align: center;
+        font-weight: 700;
+        margin: 2px 0 8px 0;
+      }
+      .district-select-wrap {
+        width: 100%;
+        margin-top: 0;
+      }
+      .district-label {
+        font-size: 9px;
+        margin-bottom: 3px;
+        letter-spacing: 1.2px;
+        text-align: left;
+      }
+      .district-select, .district-display {
+        width: 100%;
+        font-size: 12px;
+        padding: 7px 10px;
+        border-radius: 4px;
+      }
+      .save-btn {
+        width: 100%;
+        padding: 9px 12px;
+        font-size: 12px;
+        margin-top: 8px;
+        border-radius: 4px;
+      }
+      .save-msg {
+        font-size: 10px;
+        min-height: 14px;
+        margin-top: 4px;
+        text-align: center;
+      }
+
+      /* Scores & account info in profile-right — compact below profile-left */
+      .profile-right {
+        padding: 12px 20px 14px 20px;
+        gap: 10px;
+        overflow: visible;
+        display: flex;
+        flex-direction: column;
+        border-top: 1px solid #e5e5e5;
+        background: #ffffff;
+      }
+      .profile-signout-wrap {
+        padding: 14px 20px 20px 20px;
+        display: flex;
+        justify-content: center;
+        border-top: 1px solid #e5e5e5;
+        background: #ffffff;
+      }
+      .profile-signout-wrap .btn-signout {
+        width: 100%;
+        max-width: 320px;
+        padding: 11px 16px;
+        font-size: 12px;
+        border-radius: 4px;
+      }
+      .right-section-title {
+        font-size: 10px;
+        margin-bottom: 6px;
+        padding-bottom: 3px;
+        letter-spacing: 1.2px;
+      }
+      .info-row {
+        margin-bottom: 5px;
+        gap: 2px;
+      }
+      .info-label {
+        font-size: 9px;
+        letter-spacing: 1px;
+      }
+      .info-value {
+        font-size: 12px;
+      }
+      .score-card {
+        padding: 8px 10px;
+        margin-bottom: 6px;
+        border-radius: 4px;
+      }
+      .score-card .game-name {
+        font-size: 9px;
+        margin-bottom: 2px;
+        letter-spacing: 1px;
+      }
+      .score-card .score-value { font-size: 16px; }
+      .score-card .score-detail {
+        font-size: 10px;
+        margin-top: 1px;
+      }
+      .loading { padding: 14px; font-size: 12px; }
+
+      /* Bottom tab bar — fixed at bottom */
+      header {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 56px;
+        padding: 0;
+        margin: 0;
+        border-top: 1px solid #e5e5e5;
+        border-bottom: none;
+        background: #ffffff;
+        z-index: 100;
+        box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+        display: flex;
+        align-items: stretch;
+      }
+      nav {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        gap: 0;
+        padding: 0;
+        flex-wrap: nowrap;
+        justify-content: stretch;
+      }
+      nav a {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        color: #888888;
+        padding: 0;
+        border: none;
+        text-decoration: none;
+      }
+      nav a.active { color: #000000; }
+
+      /* ── Mobile swipe pagination: full page (map + datetime + columns) slides; fixed bottom nav stays ── */
+      .col-left, .col-right {
+        transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform;
+        backface-visibility: hidden;
+      }
+      html.ist-entering-forward .col-left,
+      html.ist-entering-forward .col-right {
+        transform: translateX(100vw);
+        transition: none;
+      }
+      html.ist-entering-backward .col-left,
+      html.ist-entering-backward .col-right {
+        transform: translateX(-100vw);
+        transition: none;
+      }
+      body.ist-exiting-forward .col-left,
+      body.ist-exiting-forward .col-right {
+        transform: translateX(-100vw);
+      }
+      body.ist-exiting-backward .col-left,
+      body.ist-exiting-backward .col-right {
+        transform: translateX(100vw);
+      }
+    }
+
+    /* ── Desktop swipe pagination: full page (map + datetime + columns) slides vertically; nav stays ── */
+    @media (min-width: 769px) {
+      .col-left, .col-right {
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform;
+        backface-visibility: hidden;
+      }
+      html.ist-entering-forward .col-left,
+      html.ist-entering-forward .col-right {
+        transform: translateY(100vh);
+        transition: none;
+      }
+      html.ist-entering-backward .col-left,
+      html.ist-entering-backward .col-right {
+        transform: translateY(-100vh);
+        transition: none;
+      }
+      body.ist-exiting-forward .col-left,
+      body.ist-exiting-forward .col-right {
+        transform: translateY(-100vh);
+      }
+      body.ist-exiting-backward .col-left,
+      body.ist-exiting-backward .col-right {
+        transform: translateY(100vh);
+      }
+    }
+
+    /* ══════════════════════════════════════════════
+       View Transitions API — cross-document slide
+       The browser snapshots the outgoing page and holds
+       it visible until the new page is ready, so there's
+       no white flash between reloads. Only the columns
+       animate; the map, nav, and datetime bar stay put
+       because their content is identical across tabs.
+       ══════════════════════════════════════════════ */
+    @view-transition { navigation: auto; }
+
+    /* Suppress the default root crossfade — columns handle motion */
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation: none;
+      mix-blend-mode: normal;
+    }
+
+    .col-left { view-transition-name: ist-col-left; }
+    .col-right { view-transition-name: ist-col-right; }
+
+    @media (min-width: 769px) {
+      @keyframes ist-vt-out-up { from { transform: translateY(0); } to { transform: translateY(-100vh); } }
+      @keyframes ist-vt-in-up { from { transform: translateY(100vh); } to { transform: translateY(0); } }
+      @keyframes ist-vt-out-down { from { transform: translateY(0); } to { transform: translateY(100vh); } }
+      @keyframes ist-vt-in-down { from { transform: translateY(-100vh); } to { transform: translateY(0); } }
+
+      html.vt-forward::view-transition-old(ist-col-left),
+      html.vt-forward::view-transition-old(ist-col-right) {
+        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-up;
+      }
+      html.vt-forward::view-transition-new(ist-col-left),
+      html.vt-forward::view-transition-new(ist-col-right) {
+        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-up;
+      }
+      html.vt-backward::view-transition-old(ist-col-left),
+      html.vt-backward::view-transition-old(ist-col-right) {
+        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-down;
+      }
+      html.vt-backward::view-transition-new(ist-col-left),
+      html.vt-backward::view-transition-new(ist-col-right) {
+        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-down;
+      }
+    }
+
+    @media (max-width: 768px) {
+      @keyframes ist-vt-out-left { from { transform: translateX(0); } to { transform: translateX(-100vw); } }
+      @keyframes ist-vt-in-left { from { transform: translateX(100vw); } to { transform: translateX(0); } }
+      @keyframes ist-vt-out-right { from { transform: translateX(0); } to { transform: translateX(100vw); } }
+      @keyframes ist-vt-in-right { from { transform: translateX(-100vw); } to { transform: translateX(0); } }
+
+      html.vt-forward::view-transition-old(ist-col-left),
+      html.vt-forward::view-transition-old(ist-col-right) {
+        animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-left;
+      }
+      html.vt-forward::view-transition-new(ist-col-left),
+      html.vt-forward::view-transition-new(ist-col-right) {
+        animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-left;
+      }
+      html.vt-backward::view-transition-old(ist-col-left),
+      html.vt-backward::view-transition-old(ist-col-right) {
+        animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-right;
+      }
+      html.vt-backward::view-transition-new(ist-col-left),
+      html.vt-backward::view-transition-new(ist-col-right) {
+        animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-right;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <aside class="col-left">
+    <div class="nb-highlight" id="user-nb-badge"></div>
+    <div class="profile-left" id="profile-left-area">
+      <div class="loading"><span class="spinner"></span></div>
+    </div>
+  </aside>
+
+  <div class="section-rule">
+    <div class="datetime-block">
+      <div class="date-line" id="date-line"></div>
+      <div class="day-line" id="day-line"></div>
+      <div class="time-line" id="time-line"></div>
+    </div>
+  </div>
+
+  <header>
+    <nav>
+      <a href="index.html">Anahane</a>
+      <a href="kahvehane.html">Kahvehane</a>
+      <a href="kutuphane.html">Kütüphane</a>
+      <a href="hane.html" class="active">Hane</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="profile-center">
+      <div id="sticker-area">
+        <div class="loading" style="display:flex;align-items:center;justify-content:center;padding:20px;"><span class="spinner"></span></div>
+      </div>
+    </div>
+  </main>
+
+  <aside class="col-right">
+    <div class="profile-right">
+      <div class="loading"><span class="spinner"></span></div>
+    </div>
+    <div class="profile-signout-wrap" id="profile-signout-wrap"></div>
+  </aside>
+
+<script>
+// ══════════════════════════════════════════
+// Swipe pagination
+// Navigate Anahane → Kahvehane → Kütüphane → Hane with a full-page slide.
+// The entire page (map, datetime bar, both columns) translates as one unit;
+// only the nav bar stays fixed. Mobile = horizontal touch swipe, desktop =
+// vertical wheel swipe; CSS picks the axis per media query. Tab-bar clicks
+// trigger the same animation.
+// ══════════════════════════════════════════
+(function initSwipePagination() {
+  const PAGES = ['index.html', 'kahvehane.html', 'kutuphane.html', 'hane.html'];
+  const DURATION = 400;
+  const MIN_DX = 50;
+  const MAX_TIME = 700;
+  // Prefer the View Transitions API when available — it snapshots the
+  // outgoing page and holds it until the new one is rendered, which
+  // eliminates the white flash the manual slide-out can't hide.
+  const supportsVT = 'startViewTransition' in document;
+
+  function isMobile() { return window.innerWidth <= 768; }
+  function currentIdx() {
+    const path = (location.pathname.split('/').pop() || 'index.html');
+    const idx = PAGES.indexOf(path);
+    return idx === -1 ? 0 : idx;
+  }
+  function pageFromUrl(url) {
+    try { return new URL(url).pathname.split('/').pop() || 'index.html'; }
+    catch(e) { return ''; }
+  }
+  function recordDir(dir) {
+    try { sessionStorage.setItem('ist-page-enter-dir', dir); } catch(e) {}
+  }
+
+  // Tell the browser which direction to animate by setting a VT type AND
+  // toggling a class on <html>. The class is the reliable hook; some
+  // browsers don't match :active-view-transition-type() consistently, so
+  // our CSS targets html.vt-forward / html.vt-backward instead.
+  if (supportsVT) {
+    window.addEventListener('pageswap', (e) => {
+      if (!e.viewTransition) return;
+      const dir = sessionStorage.getItem('ist-page-enter-dir');
+      if (dir) e.viewTransition.types.add(dir);
+    });
+    window.addEventListener('pagereveal', (e) => {
+      if (!e.viewTransition) return;
+      const root = document.documentElement;
+      const dir = root.classList.contains('vt-forward') ? 'forward'
+                : root.classList.contains('vt-backward') ? 'backward' : null;
+      if (dir) e.viewTransition.types.add(dir);
+      e.viewTransition.finished.finally(() => {
+        root.classList.remove('vt-forward', 'vt-backward');
+        try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
+      });
+    });
+  }
+
+  // Fallback entry cleanup (runs on every load; releases the offscreen
+  // transform that the pre-body script applied for non-VT browsers).
+  function handleIncoming() {
+    const root = document.documentElement;
+    const dir = root.classList.contains('ist-entering-forward') ? 'forward'
+              : root.classList.contains('ist-entering-backward') ? 'backward' : null;
+    try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
+    if (!dir) return;
+    // Double rAF so the initial transform has painted before we release it.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        root.classList.remove('ist-entering-' + dir);
+      });
+    });
+  }
+
+  let navigating = false;
+  function navigate(targetIdx, dir) {
+    if (navigating) return;
+    if (targetIdx < 0 || targetIdx >= PAGES.length) return;
+    const curr = currentIdx();
+    if (targetIdx === curr) return;
+    navigating = true;
+    recordDir(dir);
+    if (supportsVT) {
+      // The browser will trigger a view transition on this navigation.
+      location.href = PAGES[targetIdx];
+      return;
+    }
+    const exitClass = dir === 'forward' ? 'ist-exiting-forward' : 'ist-exiting-backward';
+    document.body.classList.add(exitClass);
+    setTimeout(() => { location.href = PAGES[targetIdx]; }, DURATION - 30);
+  }
+
+  // Chain-slide through intermediate tabs when the user jumps 2+ away.
+  // Fetch each hop in parallel (warmed by <link rel="prefetch">), extract
+  // its .col-left / .col-right, stack the clones in a fixed overlay, then
+  // translate the stack to reveal each frame in sequence. The final hop
+  // ends with a real navigation so the destination's scripts run normally;
+  // we strip the direction class and kill the cross-document VT animation
+  // so there's no double-animation on arrival.
+  async function multiHopSlide(curr, target) {
+    if (navigating) return;
+    const dir = target > curr ? 'forward' : 'backward';
+    const step = dir === 'forward' ? 1 : -1;
+    const hopIdxs = [];
+    for (let i = curr + step; i !== target + step; i += step) hopIdxs.push(i);
+    if (hopIdxs.length === 0) return;
+    navigating = true;
+
+    const fetches = hopIdxs.map(i => fetch(PAGES[i]).then(r => r.text()).catch(() => null));
+    const leftEl = document.querySelector('.col-left');
+    const rightEl = document.querySelector('.col-right');
+    if (!leftEl || !rightEl) { recordDir(dir); location.href = PAGES[target]; return; }
+    const leftRect = leftEl.getBoundingClientRect();
+    const rightRect = rightEl.getBoundingClientRect();
+    const mobile = window.innerWidth <= 768;
+
+    const htmls = await Promise.all(fetches);
+    if (htmls.some(h => h == null)) {
+      navigating = false;
+      recordDir(dir);
+      location.href = PAGES[target];
+      return;
+    }
+    const parser = new DOMParser();
+    const fragments = htmls.map(html => {
+      const doc = parser.parseFromString(html, 'text/html');
+      return {
+        left: doc.querySelector('.col-left'),
+        right: doc.querySelector('.col-right'),
+      };
+    });
+
+    function buildStack(origEl, origRect, key) {
+      const wrap = document.createElement('div');
+      Object.assign(wrap.style, {
+        position: 'fixed',
+        left: origRect.left + 'px',
+        top: origRect.top + 'px',
+        width: origRect.width + 'px',
+        height: origRect.height + 'px',
+        overflow: 'hidden',
+        pointerEvents: 'none',
+        zIndex: '90',
+        background: '#ffffff',
+      });
+      const stack = document.createElement('div');
+      Object.assign(stack.style, {
+        position: 'absolute',
+        inset: '0',
+        willChange: 'transform',
+      });
+      wrap.appendChild(stack);
+
+      function placeFrame(node, i) {
+        Object.assign(node.style, {
+          position: 'absolute',
+          top: '0',
+          left: '0',
+          width: '100%',
+          height: '100%',
+          margin: '0',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+        });
+        node.style.viewTransitionName = 'none';
+        const ax = mobile ? 'translateX' : 'translateY';
+        const pct = (dir === 'forward' ? i : -i) * 100;
+        node.style.transform = ax + '(' + pct + '%)';
+        stack.appendChild(node);
+      }
+      const frame0 = origEl.cloneNode(true);
+      placeFrame(frame0, 0);
+      fragments.forEach((frag, i) => {
+        const src = frag[key];
+        const node = src ? src.cloneNode(true) : document.createElement('div');
+        placeFrame(node, i + 1);
+      });
+      return { wrap, stack };
+    }
+
+    const leftStack = buildStack(leftEl, leftRect, 'left');
+    const rightStack = buildStack(rightEl, rightRect, 'right');
+    document.body.appendChild(leftStack.wrap);
+    document.body.appendChild(rightStack.wrap);
+
+    leftEl.style.visibility = 'hidden';
+    rightEl.style.visibility = 'hidden';
+    leftEl.style.viewTransitionName = 'none';
+    rightEl.style.viewTransitionName = 'none';
+
+    const hops = hopIdxs.length;
+    const perHop = hops === 2 ? 260 : 220;
+    const totalMs = perHop * hops;
+    const axis = mobile ? 'X' : 'Y';
+    const endPct = dir === 'forward' ? -hops * 100 : hops * 100;
+    const keyframes = [
+      { transform: 'translate' + axis + '(0%)' },
+      { transform: 'translate' + axis + '(' + endPct + '%)' },
+    ];
+    const opts = { duration: totalMs, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' };
+    const a1 = leftStack.stack.animate(keyframes, opts);
+    const a2 = rightStack.stack.animate(keyframes, opts);
+
+    try { await Promise.all([a1.finished, a2.finished]); } catch (e) {}
+
+    try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
+    document.documentElement.classList.remove('vt-forward', 'vt-backward');
+    const killVT = document.createElement('style');
+    killVT.textContent = '::view-transition-group(*),::view-transition-image-pair(*),::view-transition-old(*),::view-transition-new(*){animation:none !important;}';
+    document.head.appendChild(killVT);
+
+    location.href = PAGES[target];
+  }
+
+  // Intercept tab-bar clicks: direct-neighbor hops ride the built-in VT;
+  // jumps of 2+ go through multiHopSlide so intermediate tabs flash past.
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('nav a');
+    if (!link) return;
+    const href = link.getAttribute('href');
+    const targetIdx = PAGES.indexOf(href);
+    const curr = currentIdx();
+    if (targetIdx === -1 || targetIdx === curr) return;
+    const dir = targetIdx > curr ? 'forward' : 'backward';
+    const dist = Math.abs(targetIdx - curr);
+    if (supportsVT && dist >= 2) {
+      e.preventDefault();
+      multiHopSlide(curr, targetIdx);
+      return;
+    }
+    if (supportsVT) { recordDir(dir); return; }
+    e.preventDefault();
+    navigate(targetIdx, dir);
+  }, true);
+
+  // ── Mobile: horizontal touch-swipe anywhere on main-site (except the nav bar) ──
+  let sx = 0, sy = 0, st = 0, active = false;
+  document.addEventListener('touchstart', (e) => {
+    if (!isMobile() || e.touches.length !== 1) return;
+    if (e.target.closest && e.target.closest('nav')) return; // let nav-bar taps through
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+    st = Date.now();
+    active = true;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (!active) return;
+    active = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx;
+    const dy = t.clientY - sy;
+    const dt = Date.now() - st;
+    if (dt > MAX_TIME) return;
+    if (Math.abs(dx) < MIN_DX) return;
+    if (Math.abs(dx) < Math.abs(dy) * 1.2) return; // vertical-dominant: let it scroll
+    const curr = currentIdx();
+    if (dx < 0) navigate(curr + 1, 'forward');
+    else        navigate(curr - 1, 'backward');
+  }, { passive: true });
+
+  // ── Desktop: vertical wheel-based swipe anywhere on the page ──
+  // Respects native scrolling: only triggers navigation when there's no
+  // more content to scroll in that direction. Wheel delta is accumulated
+  // so a single flick doesn't accidentally navigate.
+  let wheelAccum = 0, wheelTs = 0;
+  const WHEEL_THRESHOLD = 180;
+  const WHEEL_RESET_MS = 220;
+  function canScrollInDir(target, dy) {
+    let el = target;
+    while (el && el !== document.body && el !== document.documentElement) {
+      if (el.scrollHeight > el.clientHeight + 1) {
+        const atTop = el.scrollTop < 0.5;
+        const atBottom = el.scrollTop + el.clientHeight > el.scrollHeight - 0.5;
+        if (dy > 0 && !atBottom) return true;
+        if (dy < 0 && !atTop) return true;
+      }
+      el = el.parentElement;
+    }
+    return false;
+  }
+  document.addEventListener('wheel', (e) => {
+    if (isMobile()) return;
+    if (navigating) { e.preventDefault(); return; }
+    if (e.target.closest && e.target.closest('nav')) { wheelAccum = 0; return; }
+    const dy = e.deltaY;
+    if (Math.abs(dy) < 1) return;
+    if (canScrollInDir(e.target, dy)) {
+      wheelAccum = 0;
+      return; // let a nested scroll container scroll normally
+    }
+    // At a scroll boundary — suppress overscroll and accumulate toward navigation.
+    e.preventDefault();
+    const now = Date.now();
+    if (now - wheelTs > WHEEL_RESET_MS) wheelAccum = 0;
+    wheelTs = now;
+    wheelAccum += dy;
+    if (Math.abs(wheelAccum) >= WHEEL_THRESHOLD) {
+      const curr = currentIdx();
+      const accum = wheelAccum;
+      wheelAccum = 0;
+      if (accum > 0) navigate(curr + 1, 'forward');
+      else           navigate(curr - 1, 'backward');
+    }
+  }, { passive: false });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', handleIncoming);
+  } else {
+    handleIncoming();
+  }
+})();
+
+// Date/time display
+function updateDateTime() {
+  const now = new Date();
+  const opts = { timeZone: 'Europe/Istanbul' };
+  const day = now.toLocaleDateString('tr-TR', { ...opts, day: 'numeric' });
+  const month = now.toLocaleDateString('tr-TR', { ...opts, month: 'long' });
+  const year = now.toLocaleDateString('tr-TR', { ...opts, year: 'numeric' });
+  const weekday = now.toLocaleDateString('tr-TR', { ...opts, weekday: 'long' });
+  const time = now.toLocaleTimeString('tr-TR', { ...opts, hour: '2-digit', minute: '2-digit', hour12: false });
+  document.getElementById('date-line').textContent = (day + ' ' + month + ' ' + year).toUpperCase();
+  document.getElementById('day-line').textContent = weekday.toUpperCase();
+  document.getElementById('time-line').textContent = time;
+}
+updateDateTime();
+setInterval(updateDateTime, 60000);
+
+const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const neighborhoodNames = {
+  bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler',
+  sisli:'Şişli', eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa',
+  esenler:'Esenler', bagcilar:'Bağcılar', basaksehir:'Başakşehir',
+  kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi', uskudar:'Üsküdar',
+  kadikoy:'Kadıköy', maltepe:'Maltepe', umraniye:'Ümraniye',
+  cekmekoy:'Çekmeköy', beykoz:'Beykoz', sariyer:'Sarıyer',
+  besiktas:'Beşiktaş', beyoglu:'Beyoğlu', gungoren:'Güngören',
+  kagithane:'Kağıthane', atasehir:'Ataşehir', zeytinburnu:'Zeytinburnu', fatih:'Fatih'
+};
+
+// Sticker definitions — image-based stickers, unlocked by birth district
+const STICKERS = [
+  { src: 'assets/galatakulesisticker.png', label: 'Galata Kulesi', district: 'beyoglu' },
+  { src: 'assets/kizkulesisticker.png', label: 'Kız Kulesi', district: 'uskudar' },
+];
+
+// Read game scores from Supabase's game_results table, aggregating per game.
+// Falls back to localStorage if the query fails (table missing, offline, etc.).
+async function getGameScores(userId) {
+  try {
+    const { data, error } = await sb
+      .from('game_results')
+      .select('game, won, date')
+      .eq('user_id', userId);
+    if (error) throw error;
+    // Only count "real" results — rows with attempts>0 OR won=true — as plays.
+    // But since we insert a "started" row with won:false for all engagements,
+    // we count the highest status per (game, date): if any row for that date
+    // has won=true, count it as a win; otherwise count as a play.
+    const byGameDate = {};
+    (data || []).forEach(r => {
+      const key = r.game + '|' + r.date;
+      if (!byGameDate[key]) byGameDate[key] = { game: r.game, won: false };
+      if (r.won) byGameDate[key].won = true;
+    });
+    const agg = {
+      bulmacaPlayed: 0, bulmacaWins: 0,
+      sozcelPlayed: 0, sozcelWins: 0,
+      baglantilarPlayed: 0, baglantilarWins: 0,
+    };
+    Object.values(byGameDate).forEach(entry => {
+      if (entry.game === 'bulmaca') {
+        agg.bulmacaPlayed++;
+        if (entry.won) agg.bulmacaWins++;
+      } else if (entry.game === 'sozcel') {
+        agg.sozcelPlayed++;
+        if (entry.won) agg.sozcelWins++;
+      } else if (entry.game === 'baglantilar') {
+        agg.baglantilarPlayed++;
+        if (entry.won) agg.baglantilarWins++;
+      }
+    });
+    agg.sozcelStreak = parseInt(localStorage.getItem('sozcel_streak') || '0');
+    return agg;
+  } catch (e) {
+    return {
+      bulmacaWins: parseInt(localStorage.getItem('bulmaca_wins') || '0'),
+      bulmacaPlayed: parseInt(localStorage.getItem('bulmaca_played') || '0'),
+      sozcelWins: parseInt(localStorage.getItem('sozcel_wins') || '0'),
+      sozcelPlayed: parseInt(localStorage.getItem('sozcel_played') || '0'),
+      sozcelStreak: parseInt(localStorage.getItem('sozcel_streak') || '0'),
+      baglantilarWins: parseInt(localStorage.getItem('baglantilar_wins') || '0'),
+      baglantilarPlayed: parseInt(localStorage.getItem('baglantilar_played') || '0'),
+    };
+  }
+}
+
+// Render the Oyun Skorları section. Called once synchronously with zeroed
+// scores (so the layout settles) and again after the Supabase query resolves.
+function renderScoresSection(scores) {
+  const el = document.getElementById('scores-section');
+  if (!el) return;
+  const sozcelDetail = scores.sozcelPlayed > 0
+    ? (scores.sozcelStreak || 0) + ' seri'
+    : 'Henüz oynanmadı';
+  el.innerHTML = `
+    <div class="right-section-title">Oyun Skorları</div>
+    <div class="score-card">
+      <div class="game-name">Bulmaca</div>
+      <div class="score-value">${scores.bulmacaWins || 0}</div>
+      <div class="score-detail">${scores.bulmacaPlayed || 0} oyun</div>
+    </div>
+    <div class="score-card">
+      <div class="game-name">Sözcel</div>
+      <div class="score-value">${scores.sozcelWins || 0}</div>
+      <div class="score-detail">${sozcelDetail}</div>
+    </div>
+    <div class="score-card">
+      <div class="game-name">Bağlantılar</div>
+      <div class="score-value">${scores.baglantilarWins || 0}</div>
+      <div class="score-detail">${scores.baglantilarPlayed || 0} oyun</div>
+    </div>
+  `;
+}
+
+function formatLastSeen(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'Şimdi çevrimiçi';
+  if (diffMins < 60) return `${diffMins} dk önce`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} saat önce`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays} gün önce`;
+  return d.toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// ── Sticker board persistence (localStorage, keyed by user id) ──
+function loadBoardStickers(userId) {
+  try {
+    return JSON.parse(localStorage.getItem('hane_stickers_' + userId)) || [];
+  } catch { return []; }
+}
+
+function saveBoardStickers(userId, stickers) {
+  localStorage.setItem('hane_stickers_' + userId, JSON.stringify(stickers));
+}
+
+async function loadProfile() {
+  const { data: { session } } = await sb.auth.getSession();
+
+  if (!session) {
+    window.location.href = 'index.html';
+    return;
+  }
+
+  // Check if viewing another user's profile via ?user=ID
+  const urlParams = new URLSearchParams(window.location.search);
+  const viewingUserId = urlParams.get('user');
+  const isViewingOther = viewingUserId && viewingUserId !== session.user.id;
+
+  // Fetch fresh user data from server (getSession can return stale cache)
+  const { data: { user: freshUser }, error: userError } = await sb.auth.getUser();
+  const user = freshUser || session.user;
+  const meta = user.user_metadata || {};
+  const avatarUrl = meta.avatar_url || null;
+  // When viewing own profile, prefer localStorage values (most-recent local save)
+  // over user_metadata, since metadata can briefly lag behind after an updateUser call.
+  // When viewing someone else's profile, always use the metadata we fetched.
+  const lsFirstName = !isViewingOther ? localStorage.getItem('first_name_local') : null;
+  const lsLastName = !isViewingOther ? localStorage.getItem('last_name_local') : null;
+  const lsYasadigi = !isViewingOther ? localStorage.getItem('yasadigi_ilce_local') : null;
+  const firstName = (lsFirstName !== null && lsFirstName !== '') ? lsFirstName : (meta.first_name || '');
+  const lastName = (lsLastName !== null && lsLastName !== '') ? lsLastName : (meta.last_name || '');
+  const displayName = firstName ? `${firstName} ${lastName}`.trim() : (meta.display_name || user.email.split('@')[0]);
+  const yasadigiIlce = (lsYasadigi !== null && lsYasadigi !== '') ? lsYasadigi : (meta.yasadigi_ilce || meta.neighborhood || '');
+  const dogumYeri = meta.dogum_yeri || '';
+
+  // Update neighborhood badge in left column
+  const badgeEl = document.getElementById('user-nb-badge');
+  if (badgeEl && yasadigiIlce) {
+    badgeEl.textContent = neighborhoodNames[yasadigiIlce] || yasadigiIlce;
+  }
+
+  const joinedDate = new Date(user.created_at).toLocaleDateString('tr-TR', {
+    year: 'numeric', month: 'long', day: 'numeric'
+  });
+  const lastSeenText = formatLastSeen(user.last_sign_in_at);
+  // Scores are loaded async from Supabase — provide a zeroed object first
+  // then hydrate the score cards once the query resolves.
+  const scores = {
+    bulmacaWins: 0, bulmacaPlayed: 0,
+    sozcelWins: 0, sozcelPlayed: 0, sozcelStreak: 0,
+    baglantilarWins: 0, baglantilarPlayed: 0,
+  };
+  getGameScores(user.id).then(s => {
+    Object.assign(scores, s);
+    renderScoresSection(scores);
+  });
+
+  const avatarContent = avatarUrl
+    ? `<img src="${avatarUrl}" alt="Profile">`
+    : displayName.charAt(0).toUpperCase();
+
+  // Build living district dropdown
+  const districtOptions = Object.entries(neighborhoodNames)
+    .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
+    .map(([id, name]) => `<option value="${id}"${id === yasadigiIlce ? ' selected' : ''}>${name}</option>`)
+    .join('');
+
+  // Birth place display (read-only)
+  let dogumDisplay = '—';
+  if (dogumYeri === 'istanbul_disi') dogumDisplay = 'İstanbul Dışı';
+  else if (dogumYeri && neighborhoodNames[dogumYeri]) dogumDisplay = neighborhoodNames[dogumYeri];
+  else if (dogumYeri) dogumDisplay = dogumYeri;
+
+  // ── PROFILE BAR (inside center column) ──
+  const profileLeftEl = document.getElementById('profile-left-area');
+  if (isViewingOther) {
+    profileLeftEl.innerHTML = `
+      <div style="font-size:0.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);">Profil</div>
+      <div style="font-weight:700;font-size:1rem;">Kullanıcı Panosu</div>
+    `;
+  } else {
+    profileLeftEl.innerHTML = `
+      <div class="avatar" id="avatar-display">${avatarContent}</div>
+      <button class="avatar-upload" id="avatar-btn">Fotoğraf Değiştir</button>
+      <input type="file" id="avatar-input" accept="image/*" style="display:none;">
+      <div class="district-select-wrap">
+        <div class="district-label">Ad</div>
+        <input class="district-select" id="edit-firstname" type="text" value="${firstName}" placeholder="Adınız" style="border:1px solid var(--ink);padding:6px 8px;font-family:'Inter',sans-serif;font-size:0.8rem;">
+      </div>
+      <div class="district-select-wrap">
+        <div class="district-label">Soyad</div>
+        <input class="district-select" id="edit-lastname" type="text" value="${lastName}" placeholder="Soyadınız" style="border:1px solid var(--ink);padding:6px 8px;font-family:'Inter',sans-serif;font-size:0.8rem;">
+      </div>
+      <div class="district-select-wrap">
+        <div class="district-label">Yaşadığı İlçe</div>
+        <select class="district-select" id="edit-yasadigi">
+          <option value="">— İlçe seçin —</option>
+          ${districtOptions}
+        </select>
+      </div>
+      <div class="district-select-wrap">
+        <div class="district-label">Doğum Yeri</div>
+        <div class="district-display">${dogumDisplay}</div>
+      </div>
+      <button class="save-btn" id="save-btn">Kaydet</button>
+      <div class="save-msg" id="save-msg"></div>
+    `;
+    // Render signout in its dedicated wrapper (bottom of page on mobile, bottom of right column on desktop)
+    document.getElementById('profile-signout-wrap').innerHTML = `
+      <button class="btn-signout" id="signout-btn">Çıkış Yap</button>
+    `;
+  }
+
+  // ── STICKER BOARD (inside center column, below profile bar) ──
+  const boardStickers = loadBoardStickers(user.id);
+
+  document.getElementById('sticker-area').innerHTML = `
+    <div class="board-header">
+      <span>Profil Panosu</span>
+      <button class="edit-toggle" id="edit-board-btn">Düzenle</button>
+    </div>
+    <div class="sticker-board" id="sticker-board"></div>
+    <div class="sticker-tray" id="sticker-tray"></div>
+  `;
+
+  // Determine which stickers are unlocked for this user
+  const unlockedDistricts = new Set();
+  unlockedDistricts.add(null); // universal stickers always unlocked
+  if (dogumYeri && dogumYeri !== 'istanbul_disi') unlockedDistricts.add(dogumYeri);
+
+  // Render sticker tray (image-based stickers)
+  const tray = document.getElementById('sticker-tray');
+  if (tray && !isViewingOther) {
+    STICKERS.forEach((s, idx) => {
+      const img = document.createElement('img');
+      img.className = 'tray-sticker';
+      img.src = s.src;
+      img.alt = s.label;
+      const isUnlocked = unlockedDistricts.has(s.district);
+      if (!isUnlocked) {
+        img.classList.add('locked');
+        img.title = '🔒 ' + s.label + ' — Bu çıkartma sadece ' + (neighborhoodNames[s.district] || '') + ' doğumlulara özel. Açmak için doğum yerinizin ' + (neighborhoodNames[s.district] || '') + ' olması gerekir.';
+      } else {
+        img.title = s.label;
+        img.addEventListener('click', () => {
+          if (img.dataset.placed === 'true') return;
+          addStickerToBoard(user.id, idx);
+        });
+      }
+      tray.appendChild(img);
+    });
+  }
+
+  // Render placed stickers
+  const board = document.getElementById('sticker-board');
+  boardStickers.forEach((bs, i) => {
+    placeSticker(board, bs, i, user.id, isViewingOther);
+  });
+
+  // Edit mode toggle (only on own profile)
+  let editMode = false;
+  if (!isViewingOther) {
+    document.getElementById('edit-board-btn').addEventListener('click', () => {
+      editMode = !editMode;
+      document.getElementById('sticker-tray').classList.toggle('active', editMode);
+      document.getElementById('edit-board-btn').textContent = editMode ? 'Bitti' : 'Düzenle';
+      // Update sticker cursors based on edit mode
+      board.querySelectorAll('.sticker').forEach(s => {
+        s.style.cursor = editMode ? 'grab' : 'default';
+      });
+    });
+  } else {
+    // Hide edit button when viewing another user
+    const editBtn = document.getElementById('edit-board-btn');
+    if (editBtn) editBtn.style.display = 'none';
+  }
+
+  // Check which stickers are already placed (for limiting to one use each)
+  function getUsedStickerIndices(userId) {
+    return new Set(loadBoardStickers(userId).map(s => s.idx));
+  }
+
+  function updateTrayAvailability(userId) {
+    const used = getUsedStickerIndices(userId);
+    if (!tray) return;
+    tray.querySelectorAll('.tray-sticker').forEach((img, idx) => {
+      if (img.classList.contains('locked')) return; // already locked by district
+      if (used.has(idx)) {
+        img.style.opacity = '0.3';
+        img.style.cursor = 'not-allowed';
+        img.dataset.placed = 'true';
+      } else {
+        img.style.opacity = '';
+        img.style.cursor = 'pointer';
+        img.dataset.placed = 'false';
+      }
+    });
+  }
+
+  updateTrayAvailability(user.id);
+
+  function addStickerToBoard(userId, stickerIdx) {
+    // Prevent adding the same sticker twice
+    const used = getUsedStickerIndices(userId);
+    if (used.has(stickerIdx)) return;
+
+    const stored = loadBoardStickers(userId);
+    const newSticker = {
+      idx: stickerIdx,
+      x: 40 + Math.random() * 20,
+      y: 30 + Math.random() * 30
+    };
+    stored.push(newSticker);
+    saveBoardStickers(userId, stored);
+    placeSticker(board, newSticker, stored.length - 1, userId, false);
+    updateTrayAvailability(userId);
+  }
+
+  function placeSticker(boardEl, stickerData, index, userId, readOnly) {
+    const s = STICKERS[stickerData.idx];
+    if (!s) return;
+    const el = document.createElement('img');
+    el.className = 'sticker';
+    el.src = s.src;
+    el.alt = s.label;
+    el.title = s.label;
+    el.draggable = false;
+    el.style.left = stickerData.x + '%';
+    el.style.top = stickerData.y + '%';
+    // Only show grab cursor in edit mode
+    el.style.cursor = (readOnly || !editMode) ? 'default' : 'grab';
+
+    if (readOnly) {
+      boardEl.appendChild(el);
+      return;
+    }
+
+    // Drag to reposition — only in edit mode
+    let dragging = false, startX, startY, startLeft, startTop;
+    el.addEventListener('mousedown', (e) => {
+      if (!editMode) return;
+      e.preventDefault();
+      dragging = true;
+      el.classList.add('dragging');
+      const rect = boardEl.getBoundingClientRect();
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = parseFloat(el.style.left);
+      startTop = parseFloat(el.style.top);
+
+      function onMove(ev) {
+        if (!dragging) return;
+        const dx = (ev.clientX - startX) / rect.width * 100;
+        const dy = (ev.clientY - startY) / rect.height * 100;
+        el.style.left = Math.max(0, Math.min(95, startLeft + dx)) + '%';
+        el.style.top = Math.max(0, Math.min(90, startTop + dy)) + '%';
+      }
+      function onUp() {
+        dragging = false;
+        el.classList.remove('dragging');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        const stored = loadBoardStickers(userId);
+        if (stored[index]) {
+          stored[index].x = parseFloat(el.style.left);
+          stored[index].y = parseFloat(el.style.top);
+          saveBoardStickers(userId, stored);
+        }
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    // Double-click to remove — only in edit mode
+    el.addEventListener('dblclick', () => {
+      if (!editMode) return;
+      const stored = loadBoardStickers(userId);
+      stored.splice(index, 1);
+      saveBoardStickers(userId, stored);
+      boardEl.innerHTML = '';
+      stored.forEach((bs, i) => placeSticker(boardEl, bs, i, userId, false));
+      updateTrayAvailability(userId);
+    });
+
+    boardEl.appendChild(el);
+  }
+
+  // ── RIGHT: stats & account info ──
+  if (isViewingOther) {
+    // When viewing another user, show minimal info
+    document.querySelector('.profile-right').innerHTML = `
+      <div style="text-align:center;padding:20px;color:var(--muted);font-style:italic;font-size:0.8rem;">
+        Bu kullanıcının panosu
+      </div>
+    `;
+  } else {
+    document.querySelector('.profile-right').innerHTML = `
+      <div>
+        <div class="right-section-title">Hesap</div>
+        <div class="info-row">
+          <div class="info-label">E-posta</div>
+          <div class="info-value">${user.email}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Üyelik</div>
+          <div class="info-value">${joinedDate}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Son Görülme</div>
+          <div class="info-value">${lastSeenText}</div>
+        </div>
+      </div>
+      <div id="scores-section">
+        <div class="right-section-title">Oyun Skorları</div>
+        <div class="loading" style="padding:8px;font-size:11px;"><span class="spinner"></span></div>
+      </div>
+    `;
+    renderScoresSection(scores);
+  }
+
+  // ── Save profile (name + district) ──
+  if (!isViewingOther) {
+    document.getElementById('save-btn').addEventListener('click', async () => {
+      const msgEl = document.getElementById('save-msg');
+      const btn = document.getElementById('save-btn');
+      const newYasadigi = document.getElementById('edit-yasadigi').value;
+      const newFirstName = document.getElementById('edit-firstname').value.trim();
+      const newLastName = document.getElementById('edit-lastname').value.trim();
+
+      if (!newYasadigi) {
+        msgEl.textContent = 'Lütfen bir ilçe seçin.';
+        msgEl.style.color = 'var(--accent)';
+        return;
+      }
+
+      // 1. Save to localStorage FIRST, synchronously — guarantees the value
+      //    is available on the next page load even if the network call below fails.
+      localStorage.setItem('yasadigi_ilce_local', newYasadigi);
+      localStorage.setItem('first_name_local', newFirstName);
+      localStorage.setItem('last_name_local', newLastName);
+
+      btn.textContent = 'Kaydediliyor...';
+      btn.disabled = true;
+      msgEl.textContent = '';
+
+      // 2. Merge with existing metadata so we don't accidentally clobber
+      //    unrelated fields (avatar_url, dogum_yeri, etc.) that Supabase
+      //    would otherwise leave alone but some clients may mis-handle.
+      const mergedMetadata = {
+        ...(user.user_metadata || {}),
+        yasadigi_ilce: newYasadigi,
+        first_name: newFirstName,
+        last_name: newLastName
+      };
+
+      try {
+        const { data, error } = await sb.auth.updateUser({ data: mergedMetadata });
+        if (error) throw error;
+
+        // 3. Verify the server actually persisted the change by re-fetching
+        //    the user. If the server returns stale or missing data, we treat
+        //    it as a failure and keep the localStorage fallback.
+        const { data: verifyData, error: verifyError } = await sb.auth.getUser();
+        if (verifyError) throw verifyError;
+
+        const serverMeta = verifyData?.user?.user_metadata || {};
+        const persisted =
+          serverMeta.first_name === newFirstName &&
+          serverMeta.last_name === newLastName &&
+          serverMeta.yasadigi_ilce === newYasadigi;
+
+        btn.textContent = 'Kaydet';
+        btn.disabled = false;
+        if (persisted) {
+          msgEl.textContent = 'Kaydedildi!';
+        } else {
+          msgEl.textContent = 'Yerel olarak kaydedildi.';
+        }
+        msgEl.style.color = 'var(--muted)';
+        setTimeout(() => { msgEl.textContent = ''; }, 3000);
+      } catch (err) {
+        console.error('Profile save error:', err);
+        btn.textContent = 'Kaydet';
+        btn.disabled = false;
+        msgEl.textContent = 'Yerel olarak kaydedildi.';
+        msgEl.style.color = 'var(--muted)';
+        setTimeout(() => { msgEl.textContent = ''; }, 3000);
+      }
+    });
+  }
+
+  // Sign out & avatar (only for own profile)
+  if (!isViewingOther) {
+    document.getElementById('signout-btn').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      window.location.href = 'index.html';
+    });
+
+    document.getElementById('avatar-btn').addEventListener('click', () => {
+      document.getElementById('avatar-input').click();
+    });
+
+    document.getElementById('avatar-input').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 200 * 1024) {
+        alert('Fotoğraf 200KB\'den küçük olmalı.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        const base64 = evt.target.result;
+        const { error } = await sb.auth.updateUser({ data: { avatar_url: base64 } });
+        if (!error) {
+          document.getElementById('avatar-display').innerHTML = `<img src="${base64}" alt="Profile">`;
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+}
+
+loadProfile();
+</script>
+</body>
+</html>
