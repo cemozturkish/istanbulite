@@ -37,27 +37,39 @@
     })();
   </script>
   <!-- Nav hijack: inside the shell's middle iframe, nav clicks are
-       forwarded to the shell via postMessage so it can slide the
-       left/right strips instead of reloading the iframe. -->
+       forwarded to the shell via postMessage. All other links (games,
+       profile, etc.) escape to the top window so they take over the
+       full page instead of loading inside the iframe slot. -->
   <script>
-    if (document.documentElement.classList.contains('embed-middle')) {
-      document.addEventListener('click', function(e){
-        var a = e.target.closest && e.target.closest('nav a[href]');
+    (function(){
+      var doc = document;
+      var isMid = doc.documentElement.classList.contains('embed-middle');
+      doc.addEventListener('click', function(e){
+        var a = e.target.closest && e.target.closest('a[href]');
         if (!a) return;
         var href = a.getAttribute('href') || '';
-        var map = {
-          'index.html': 'anahane', '#anahane': 'anahane',
-          'anahane.html': 'anahane',
-          'kahvehane.html': 'kahvehane', '#kahvehane': 'kahvehane',
-          'kutuphane.html': 'kutuphane', '#kutuphane': 'kutuphane',
-          'hane.html': 'hane', '#hane': 'hane'
-        };
-        var tab = map[href];
-        if (!tab) return;
-        e.preventDefault();
-        window.parent.postMessage({ type: 'ist-nav', tab: tab }, '*');
+        if (!href || href.charAt(0) === '#' || href.indexOf('javascript:') === 0) return;
+        if (a.closest('nav')) {
+          if (!isMid) return;
+          var map = {
+            'index.html': 'anahane', '#anahane': 'anahane',
+            'anahane.html': 'anahane',
+            'kahvehane.html': 'kahvehane', '#kahvehane': 'kahvehane',
+            'kutuphane.html': 'kutuphane', '#kutuphane': 'kutuphane',
+            'hane.html': 'hane', '#hane': 'hane'
+          };
+          var tab = map[href];
+          if (!tab) return;
+          e.preventDefault();
+          try { window.parent.postMessage({ type: 'ist-nav', tab: tab }, '*'); } catch (_) {}
+          return;
+        }
+        if (window.top !== window.self) {
+          e.preventDefault();
+          try { window.top.location.href = href; } catch (_) { window.location.href = href; }
+        }
       });
-    }
+    })();
   </script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis). Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot. -->
   <script>
