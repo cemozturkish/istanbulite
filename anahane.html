@@ -11,6 +11,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>istanbulite.net</title>
+  <!-- Shell always iframes this page; any in-page link should escape to
+       the top frame so it doesn't orphan a non-embed URL inside an
+       iframe slot (back from that would re-enter the embed guard with
+       no param and recurse into the shell). -->
+  <base target="_top">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- SPA guard: direct loads redirect to the shell. Iframe loads with
        ?embed=left|middle|right flag this document so only that panel is
@@ -20,6 +25,10 @@
     (function(){
       var embed = new URLSearchParams(location.search).get('embed');
       if (['left','middle','right'].indexOf(embed) < 0) {
+        if (window.top !== window.self) {
+          try { window.top.location.href = 'index.html#anahane'; } catch (_) {}
+          return;
+        }
         location.replace('index.html#anahane'); return;
       }
       var h = document.documentElement;
