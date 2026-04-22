@@ -26,19 +26,22 @@
       color: var(--ink);
     }
 
-    /* ── Login overlay ── */
+    /* ── Login overlay ──
+       Hidden until the async session check confirms no session, so
+       authenticated reloads don't flash the login form for a frame. */
     #login-overlay {
       position: fixed; inset: 0;
       background: rgba(255, 255, 255, 0.97);
       backdrop-filter: blur(3px);
       z-index: 999;
-      display: flex;
+      display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       padding: 24px;
     }
-    #login-overlay.hidden { display: none; }
+    #login-overlay.show { display: flex; }
+    #login-overlay.hidden { display: none !important; }
     #login-overlay .masthead-login {
       font-size: 3rem;
       font-weight: 300;
@@ -299,6 +302,7 @@ async function enterShell() {
 async function checkSession() {
   const { data: { session } } = await sb.auth.getSession();
   if (session) enterShell();
+  else loginOverlay.classList.add('show');
 }
 
 signinForm.addEventListener('submit', async (e) => {
