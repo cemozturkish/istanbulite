@@ -1863,23 +1863,42 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
     approved: isAdmin ? true : false
   };
 
-  // Attempt the insert up to 3 times with a short delay between retries.
-  // Safari occasionally returns "TypeError: Load failed" on the first POST
-  // after a long idle (preflight cache poisoning / keepalive races); a
-  // quick retry usually succeeds.
-  async function attemptInsert() {
-    return fetch(`${SUPABASE_URL}/rest/v1/discussions`, {
-      method: 'POST',
-      mode: 'cors',
-      credentials: 'omit',
-      cache: 'no-store',
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify(insertData)
+  // Use XMLHttpRequest instead of fetch: Safari's fetch implementation
+  // surfaces a generic "TypeError: Load failed" with no diagnostic info on
+  // POSTs from inside SPA-shell iframes (keepalive/connection-coalescing
+  // bug). XHR uses a separate transport path that works reliably in the
+  // same context. Retry up to 3 times for transient network blips.
+  function attemptInsert() {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${SUPABASE_URL}/rest/v1/discussions`, true);
+      xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
+      xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Prefer', 'return=minimal');
+      xhr.timeout = 15000;
+      xhr.onload = () => resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        statusText: xhr.statusText,
+        body: xhr.responseText || ''
+      });
+      xhr.onerror = () => {
+        const e = new Error('XHR network error');
+        e.name = 'NetworkError';
+        reject(e);
+      };
+      xhr.ontimeout = () => {
+        const e = new Error('XHR timed out after 15s');
+        e.name = 'TimeoutError';
+        reject(e);
+      };
+      xhr.onabort = () => {
+        const e = new Error('XHR aborted');
+        e.name = 'AbortError';
+        reject(e);
+      };
+      xhr.send(JSON.stringify(insertData));
     });
   }
 
@@ -1902,11 +1921,13 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   document.getElementById('submit-btn').disabled = false;
 
   if (!response) {
-    // All attempts threw — this is a transport-layer failure (CORS preflight,
-    // tracking blocker, captive portal, offline, etc.)
+    // All attempts threw — transport-layer failure (offline, content blocker,
+    // captive portal, etc.). Surface session + embed-mode info so we can tell
+    // if this is iframe-specific from the reported message.
     const sessionSnippet = session?.user?.id ? session.user.id.slice(0, 8) : 'no-user';
     const expiresAt = session?.expires_at ? new Date(session.expires_at * 1000).toISOString().slice(11, 19) : 'n/a';
-    const msg = `Hata: ${lastErr?.name || 'Error'} — ${lastErr?.message || String(lastErr)} [uid:${sessionSnippet} exp:${expiresAt}]`;
+    const embedMode = new URLSearchParams(location.search).get('embed') || 'none';
+    const msg = `Hata: ${lastErr?.name || 'Error'} — ${lastErr?.message || String(lastErr)} [uid:${sessionSnippet} exp:${expiresAt} embed:${embedMode}]`;
     statusEl.textContent = msg;
     statusEl.className = 'submit-status err';
     showToast(msg, 'err');
@@ -1915,11 +1936,7 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   }
 
   if (!response.ok) {
-    let detail = '';
-    try {
-      const body = await response.text();
-      detail = body.slice(0, 300);
-    } catch (_) {}
+    const detail = (response.body || '').slice(0, 300);
     const msg = `Hata: HTTP ${response.status} ${response.statusText} ${detail}`.trim();
     statusEl.textContent = msg;
     statusEl.className = 'submit-status err';
