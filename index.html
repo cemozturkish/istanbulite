@@ -31,8 +31,7 @@
        authenticated reloads don't flash the login form for a frame. */
     #login-overlay {
       position: fixed; inset: 0;
-      background: rgba(255, 255, 255, 0.97);
-      backdrop-filter: blur(3px);
+      background: var(--paper);
       z-index: 999;
       display: none;
       flex-direction: column;
@@ -43,53 +42,85 @@
     #login-overlay.show { display: flex; }
     #login-overlay.hidden { display: none !important; }
     #login-overlay .masthead-login {
-      font-size: 3rem;
-      font-weight: 300;
-      letter-spacing: 4px;
+      font-size: 2rem;
+      font-weight: 400;
+      letter-spacing: 1px;
       color: var(--ink);
-      margin-bottom: 8px;
+      margin-bottom: 48px;
     }
-    #login-overlay .tagline {
-      font-size: 0.7rem;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 40px;
-    }
-    .login-box {
-      display: flex;
+    .login-panel {
+      display: none;
       flex-direction: column;
-      gap: 10px;
-      width: 320px;
+      gap: 12px;
+      width: 280px;
       max-width: 100%;
     }
-    .login-box input {
-      padding: 10px 12px;
+    .login-panel.active { display: flex; }
+    .login-panel input {
+      padding: 10px 0;
       font-family: 'Inter', sans-serif;
       font-size: 0.9rem;
-      border: 1px solid var(--ink);
-      background: var(--paper);
+      font-weight: 400;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      background: transparent;
       color: var(--ink);
+      outline: none;
+      transition: border-color 160ms;
     }
-    .login-box button {
-      padding: 10px;
+    .login-panel input:focus { border-bottom-color: var(--ink); }
+    .login-panel input::placeholder { color: var(--muted); font-weight: 300; }
+    .login-panel .primary-btn {
+      margin-top: 16px;
+      padding: 11px;
       font-family: 'Inter', sans-serif;
-      font-size: 0.8rem;
-      font-weight: 700;
+      font-size: 0.7rem;
+      font-weight: 600;
       letter-spacing: 2px;
       text-transform: uppercase;
       background: var(--ink);
       color: var(--paper);
       border: none;
       cursor: pointer;
+      transition: background 160ms;
     }
-    .login-box button:hover { background: var(--accent); }
-    .login-box .error-msg {
-      font-size: 0.75rem;
-      color: #cc0000;
-      font-style: italic;
+    .login-panel .primary-btn:hover { background: var(--accent); }
+    .login-panel .text-btn {
+      margin-top: 4px;
+      padding: 6px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 400;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      background: transparent;
+      color: var(--muted);
+      border: none;
+      cursor: pointer;
+      transition: color 160ms;
+    }
+    .login-panel .text-btn:hover { color: var(--ink); }
+    .login-panel .error-msg {
+      font-size: 0.7rem;
+      color: var(--muted);
       text-align: center;
-      min-height: 16px;
+      min-height: 14px;
+      letter-spacing: 0.5px;
+    }
+    .login-panel .kefil-note {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-align: center;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .login-panel .kefil-confirmed {
+      font-size: 0.7rem;
+      color: var(--ink);
+      text-align: center;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
     }
 
     /* ── Shell ──
@@ -168,12 +199,34 @@
 
 <div id="login-overlay">
   <div class="masthead-login">istanbulite</div>
-  <div class="tagline">İstanbul Toplumu</div>
-  <form class="login-box" id="signin-form" autocomplete="on">
+
+  <!-- Sign-in panel -->
+  <form class="login-panel active" id="signin-form" autocomplete="on">
     <input type="email" id="signin-email" placeholder="E-posta" required autocomplete="email">
     <input type="password" id="signin-password" placeholder="Şifre" required autocomplete="current-password">
-    <button type="submit">Giriş</button>
+    <button type="submit" class="primary-btn">Giriş Yap</button>
     <div class="error-msg" id="signin-error"></div>
+    <button type="button" class="text-btn" id="show-kefil">Kayıt Ol</button>
+  </form>
+
+  <!-- Referral code prompt -->
+  <form class="login-panel" id="kefil-form" autocomplete="off">
+    <div class="kefil-note">Kayıt için kefil kodu</div>
+    <input type="text" id="kefil-code" placeholder="Kefil Kodu" required autocapitalize="characters" autocomplete="off">
+    <button type="submit" class="primary-btn">Devam</button>
+    <div class="error-msg" id="kefil-error"></div>
+    <button type="button" class="text-btn" data-back="signin">Geri</button>
+  </form>
+
+  <!-- Sign-up panel (shown after kefil verified) -->
+  <form class="login-panel" id="signup-form" autocomplete="off">
+    <div class="kefil-confirmed" id="kefil-confirmed"></div>
+    <input type="text" id="signup-name" placeholder="İsim" required>
+    <input type="email" id="signup-email" placeholder="E-posta" required autocomplete="email">
+    <input type="password" id="signup-password" placeholder="Şifre" required autocomplete="new-password" minlength="6">
+    <button type="submit" class="primary-btn">Kayıt Ol</button>
+    <div class="error-msg" id="signup-error"></div>
+    <button type="button" class="text-btn" data-back="signin">Geri</button>
   </form>
 </div>
 
@@ -234,6 +287,30 @@ const stripRight = document.getElementById('strip-right');
 const shellMiddle = document.getElementById('shell-middle');
 const signinForm = document.getElementById('signin-form');
 const signinError = document.getElementById('signin-error');
+const kefilForm = document.getElementById('kefil-form');
+const kefilError = document.getElementById('kefil-error');
+const kefilConfirmed = document.getElementById('kefil-confirmed');
+const signupForm = document.getElementById('signup-form');
+const signupError = document.getElementById('signup-error');
+
+// Referral state — populated after a kefil code is verified
+let verifiedKefil = null; // { id, display_name, neighborhood, code }
+
+function showPanel(name) {
+  document.querySelectorAll('.login-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById(name + '-form');
+  if (panel) panel.classList.add('active');
+}
+
+document.getElementById('show-kefil').addEventListener('click', () => {
+  kefilError.textContent = '';
+  document.getElementById('kefil-code').value = '';
+  showPanel('kefil');
+});
+
+document.querySelectorAll('[data-back]').forEach(btn => {
+  btn.addEventListener('click', () => showPanel(btn.dataset.back));
+});
 
 function currentTab() {
   const h = (location.hash || '#anahane').slice(1);
@@ -313,6 +390,71 @@ signinForm.addEventListener('submit', async (e) => {
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) { signinError.textContent = error.message; return; }
   enterShell();
+});
+
+// Format the kefil display string, e.g. "BAKIRKÖY'DEN CEM"
+function formatKefilLabel(profile) {
+  const name = (profile.display_name || '').trim().toUpperCase();
+  const hood = (profile.neighborhood || '').trim().toUpperCase();
+  if (hood && name) return hood + "'DEN " + name;
+  return name || hood || '';
+}
+
+// Verify referral code against profiles table.
+// Each profile has a unique `referral_code` column; entering it
+// links the new signup to that profile as their kefil.
+kefilForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  kefilError.textContent = '';
+  const code = document.getElementById('kefil-code').value.trim().toUpperCase();
+  if (!code) return;
+  const { data, error } = await sb
+    .from('profiles')
+    .select('id, display_name, neighborhood, referral_code')
+    .eq('referral_code', code)
+    .maybeSingle();
+  if (error) { kefilError.textContent = 'Kod doğrulanamadı.'; return; }
+  if (!data) { kefilError.textContent = 'Geçersiz kefil kodu.'; return; }
+  verifiedKefil = data;
+  kefilConfirmed.textContent = 'Kefil: ' + formatKefilLabel(data);
+  signupError.textContent = '';
+  showPanel('signup');
+});
+
+signupForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  signupError.textContent = '';
+  if (!verifiedKefil) { showPanel('kefil'); return; }
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+
+  const { data, error } = await sb.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        display_name: name,
+        kefil_id: verifiedKefil.id,
+        kefil_label: formatKefilLabel(verifiedKefil),
+      },
+    },
+  });
+  if (error) { signupError.textContent = error.message; return; }
+
+  // Persist the referral link on the new profile. The admin assigns
+  // the user's neighborhood and unique referral_code separately.
+  if (data.user) {
+    await sb.from('profiles').upsert({
+      id: data.user.id,
+      display_name: name,
+      kefil_id: verifiedKefil.id,
+      kefil_label: formatKefilLabel(verifiedKefil),
+    });
+  }
+
+  if (data.session) enterShell();
+  else { signupError.textContent = 'Kayıt alındı. Onay sonrası giriş yapabilirsiniz.'; showPanel('signin'); }
 });
 
 // If an iframe signs the user out, full-reload so we return to login.
