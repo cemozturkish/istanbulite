@@ -222,7 +222,10 @@
   <!-- Sign-up panel (shown after kefil verified) -->
   <form class="login-panel" id="signup-form" autocomplete="off">
     <div class="kefil-confirmed" id="kefil-confirmed"></div>
-    <input type="text" id="signup-name" placeholder="İsim" required>
+    <input type="text" id="signup-first-name" placeholder="Ad" required>
+    <input type="text" id="signup-last-name" placeholder="Soyad" required>
+    <input type="tel" id="signup-phone" placeholder="Telefon" required>
+  <input type="text" id="signup-birth-place" placeholder="Doğum Yeri" required>
     <select id="signup-neighborhood" required>
   <option value="">Mahalle Seç</option>
   <option value="kadikoy">Kadıköy</option>
@@ -434,10 +437,13 @@ signupForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   signupError.textContent = '';
   if (!verifiedKefil) { showPanel('kefil'); return; }
-  const name = document.getElementById('signup-name').value.trim();
-  const email = document.getElementById('signup-email').value.trim();
-  const password = document.getElementById('signup-password').value;
-  const neighborhood = document.getElementById('signup-neighborhood').value;
+    const firstName = document.getElementById('signup-first-name').value.trim();
+    const lastName = document.getElementById('signup-last-name').value.trim();
+    const phone = document.getElementById('signup-phone').value.trim();
+    const birthPlace = document.getElementById('signup-birth-place').value.trim();
+    const neighborhood = document.getElementById('signup-neighborhood').value;
+    const email = document.getElementById('signup-email').value.trim();
+    const password = document.getElementById('signup-password').value;
 
   const { data, error } = await sb.auth.signUp({
     email,
@@ -455,13 +461,17 @@ signupForm.addEventListener('submit', async (e) => {
   // Persist the referral link on the new profile. The admin assigns
   // the user's neighborhood and unique referral_code separately.
   if (data.user) {
-    await sb.from('profiles').upsert({
-      id: data.user.id,
-      display_name: name,
-      neighborhood: neighborhood,
-      kefil_id: verifiedKefil.id,
-      kefil_label: formatKefilLabel(verifiedKefil),
-    });
+   await sb.from('profiles').upsert({
+  id: data.user.id,
+  first_name: firstName,
+  last_name: lastName,
+  phone: phone,
+  email: email,
+  neighborhood: neighborhood,
+  birth_place: birthPlace,
+  kefil_id: verifiedKefil.id,
+  kefil_label: formatKefilLabel(verifiedKefil),
+});
   }
 
   if (data.session) enterShell();
