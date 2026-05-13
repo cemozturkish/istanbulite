@@ -1505,19 +1505,30 @@ async function loadProfile() {
   // Fetch fresh user data from server (getSession can return stale cache)
   const { data: { user: freshUser }, error: userError } = await sb.auth.getUser();
   const user = freshUser || session.user;
-  const meta = user.user_metadata || {};
-  const avatarUrl = meta.avatar_url || null;
-  // When viewing own profile, prefer localStorage values (most-recent local save)
-  // over user_metadata, since metadata can briefly lag behind after an updateUser call.
-  // When viewing someone else's profile, always use the metadata we fetched.
-  const lsFirstName = !isViewingOther ? localStorage.getItem('first_name_local') : null;
-  const lsLastName = !isViewingOther ? localStorage.getItem('last_name_local') : null;
-  const lsYasadigi = !isViewingOther ? localStorage.getItem('yasadigi_ilce_local') : null;
-  const firstName = (lsFirstName !== null && lsFirstName !== '') ? lsFirstName : (meta.first_name || '');
-  const lastName = (lsLastName !== null && lsLastName !== '') ? lsLastName : (meta.last_name || '');
-  const displayName = firstName ? `${firstName} ${lastName}`.trim() : (meta.display_name || user.email.split('@')[0]);
-  const yasadigiIlce = (lsYasadigi !== null && lsYasadigi !== '') ? lsYasadigi : (meta.yasadigi_ilce || meta.neighborhood || '');
-  const dogumYeri = meta.dogum_yeri || '';
+ const profileUserId = isViewingOther ? viewingUserId : user.id;
+
+const { data: profile, error: profileError } = await sb
+  .from('profiles')
+  .select('*')
+  .eq('id', profileUserId)
+  .single();
+
+if (profileError) {
+  console.error(profileError);
+}
+
+const avatarUrl = profile?.avatar_url || null;
+
+const firstName = profile?.first_name || '';
+const lastName = profile?.last_name || '';
+
+const displayName =
+  `${firstName} ${lastName}`.trim() ||
+  user.email.split('@')[0];
+
+const yasadigiIlce = profile?.neighborhood || '';
+const dogumYeri = profile?.birth_place || '';
+const phone = profile?.phone || '';
 
   // Update neighborhood badge in left column
   const badgeEl = document.getElementById('user-nb-badge');
