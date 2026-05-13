@@ -1830,61 +1830,41 @@ const phone = profile?.phone || '';
         return;
       }
 
-      // 1. Save to localStorage FIRST, synchronously — guarantees the value
-      //    is available on the next page load even if the network call below fails.
-      localStorage.setItem('yasadigi_ilce_local', newYasadigi);
-      localStorage.setItem('first_name_local', newFirstName);
-      localStorage.setItem('last_name_local', newLastName);
+     btn.textContent = 'Kaydediliyor...';
+btn.disabled = true;
+msgEl.textContent = '';
 
-      btn.textContent = 'Kaydediliyor...';
-      btn.disabled = true;
-      msgEl.textContent = '';
+try {
+  const { error } = await sb
+    .from('profiles')
+    .update({
+      first_name: newFirstName,
+      last_name: newLastName,
+      neighborhood: newYasadigi
+    })
+    .eq('id', user.id);
 
-      // 2. Merge with existing metadata so we don't accidentally clobber
-      //    unrelated fields (avatar_url, dogum_yeri, etc.) that Supabase
-      //    would otherwise leave alone but some clients may mis-handle.
-      const mergedMetadata = {
-        ...(user.user_metadata || {}),
-        yasadigi_ilce: newYasadigi,
-        first_name: newFirstName,
-        last_name: newLastName
-      };
+  if (error) throw error;
 
-      try {
-        const { data, error } = await sb.auth.updateUser({ data: mergedMetadata });
-        if (error) throw error;
+  btn.textContent = 'Kaydet';
+  btn.disabled = false;
 
-        // 3. Verify the server actually persisted the change by re-fetching
-        //    the user. If the server returns stale or missing data, we treat
-        //    it as a failure and keep the localStorage fallback.
-        const { data: verifyData, error: verifyError } = await sb.auth.getUser();
-        if (verifyError) throw verifyError;
+  msgEl.textContent = 'Kaydedildi!';
+  msgEl.style.color = 'var(--muted)';
 
-        const serverMeta = verifyData?.user?.user_metadata || {};
-        const persisted =
-          serverMeta.first_name === newFirstName &&
-          serverMeta.last_name === newLastName &&
-          serverMeta.yasadigi_ilce === newYasadigi;
+  setTimeout(() => {
+    msgEl.textContent = '';
+  }, 3000);
 
-        btn.textContent = 'Kaydet';
-        btn.disabled = false;
-        if (persisted) {
-          msgEl.textContent = 'Kaydedildi!';
-        } else {
-          msgEl.textContent = 'Yerel olarak kaydedildi.';
-        }
-        msgEl.style.color = 'var(--muted)';
-        setTimeout(() => { msgEl.textContent = ''; }, 3000);
-      } catch (err) {
-        console.error('Profile save error:', err);
-        btn.textContent = 'Kaydet';
-        btn.disabled = false;
-        msgEl.textContent = 'Yerel olarak kaydedildi.';
-        msgEl.style.color = 'var(--muted)';
-        setTimeout(() => { msgEl.textContent = ''; }, 3000);
-      }
-    });
-  }
+} catch (err) {
+  console.error('Profile save error:', err);
+
+  btn.textContent = 'Kaydet';
+  btn.disabled = false;
+
+  msgEl.textContent = 'Kaydedilemedi.';
+  msgEl.style.color = 'var(--accent)';
+} 
 
   // Sign out & avatar (only for own profile)
   if (!isViewingOther) {
