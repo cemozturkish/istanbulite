@@ -186,6 +186,38 @@
       width: 100%;
     }
 
+    .admin-body.users-mode {
+      grid-template-columns: 1fr;
+      max-width: 520px;
+    }
+
+    .admin-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 8px 24px 0;
+      max-width: 1100px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .admin-tab {
+      padding: 8px 16px;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .admin-tab.active {
+      background: var(--ink);
+      color: var(--paper);
+      border-color: var(--ink);
+    }
+
     .panel {
       background: var(--paper);
       border: 1px solid var(--ink);
@@ -433,7 +465,12 @@
     </div>
   </header>
 
-  <div class="admin-body">
+  <div class="admin-tabs">
+    <button class="admin-tab active" data-tab="articles">Articles</button>
+    <button class="admin-tab" data-tab="users">Users</button>
+  </div>
+
+  <div class="admin-body" id="articles-tab">
 
     <!-- LEFT: Add / Edit Form -->
     <div class="panel">
@@ -529,6 +566,38 @@
     </div>
 
   </div>
+
+  <div class="admin-body users-mode" id="users-tab" style="display:none;">
+    <div class="panel">
+      <div class="panel-title">Create User Account</div>
+
+      <label>First Name</label>
+      <input type="text" id="u-first-name" placeholder="Ad"/>
+
+      <label>Last Name</label>
+      <input type="text" id="u-last-name" placeholder="Soyad"/>
+
+      <label>Phone</label>
+      <input type="tel" id="u-phone" placeholder="+90..."/>
+
+      <label>Email (magic-link invite sent here)</label>
+      <input type="email" id="u-email" placeholder="user@example.com"/>
+
+      <label>Neighborhood (current residence)</label>
+      <select id="u-neighborhood"><option value="">— Select District —</option></select>
+
+      <label>Birth Neighborhood</label>
+      <select id="u-birth-neighborhood"><option value="">— Select District —</option></select>
+
+      <label>Birth Place (optional, free text)</label>
+      <input type="text" id="u-birth-place" placeholder="e.g. Ankara, Berlin..."/>
+
+      <div class="form-actions" style="margin-top:14px;">
+        <button class="btn btn-primary" id="u-submit-btn">Send Invite</button>
+      </div>
+      <div class="status-msg" id="u-form-status"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -548,6 +617,7 @@ async function checkAdmin() {
   if (session && session.user.email === ADMIN_EMAIL) {
     showAdminPanel(session.user);
     loadArticles();
+    loadUsersTabNeighborhoods();
   }
 }
 
@@ -575,6 +645,71 @@ document.getElementById('adm-login-btn').addEventListener('click', async () => {
   }
   showAdminPanel(data.user);
   loadArticles();
+  loadUsersTabNeighborhoods();
+});
+
+// ── Tab switching ──
+document.querySelectorAll('.admin-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.admin-tab').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('articles-tab').style.display = (tab === 'articles') ? '' : 'none';
+    document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
+  });
+});
+
+// ── Users tab: populate neighborhood dropdowns ──
+async function loadUsersTabNeighborhoods() {
+  const { data, error } = await sb.from('neighborhoods').select('id, name_tr').order('name_tr');
+  if (error || !data) return;
+  const resSel = document.getElementById('u-neighborhood');
+  const birthSel = document.getElementById('u-birth-neighborhood');
+  data.forEach(n => {
+    const birthOpt = document.createElement('option');
+    birthOpt.value = n.id;
+    birthOpt.textContent = n.name_tr;
+    birthSel.appendChild(birthOpt);
+    if (n.id !== 'istanbul_disi') {
+      const resOpt = document.createElement('option');
+      resOpt.value = n.id;
+      resOpt.textContent = n.name_tr;
+      resSel.appendChild(resOpt);
+    }
+  });
+}
+
+// ── Users tab: create user via Edge Function ──
+document.getElementById('u-submit-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('u-submit-btn');
+  const statusEl = document.getElementById('u-form-status');
+  const payload = {
+    first_name: document.getElementById('u-first-name').value.trim(),
+    last_name: document.getElementById('u-last-name').value.trim(),
+    phone: document.getElementById('u-phone').value.trim(),
+    email: document.getElementById('u-email').value.trim(),
+    neighborhood: document.getElementById('u-neighborhood').value,
+    birth_neighborhood: document.getElementById('u-birth-neighborhood').value,
+    birth_place: document.getElementById('u-birth-place').value.trim(),
+  };
+  if (!payload.first_name || !payload.last_name || !payload.phone || !payload.email
+      || !payload.neighborhood || !payload.birth_neighborhood) {
+    statusEl.textContent = 'Please fill all required fields.';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  statusEl.textContent = '';
+  const { data, error } = await sb.functions.invoke('admin-create-user', { body: payload });
+  btn.disabled = false;
+  btn.textContent = 'Send Invite';
+  if (error || (data && data.error)) {
+    statusEl.textContent = 'Failed: ' + (error?.message || data?.error || 'Unknown error');
+    return;
+  }
+  statusEl.textContent = 'Invite sent to ' + payload.email;
+  ['u-first-name','u-last-name','u-phone','u-email','u-birth-place'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('u-neighborhood').value = '';
+  document.getElementById('u-birth-neighborhood').value = '';
 });
 
 ['adm-email','adm-password'].forEach(id => {
