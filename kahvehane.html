@@ -875,6 +875,107 @@
         animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-right;
       }
     }
+
+    /* ── Profile popup ── */
+    .profile-popup-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .profile-popup-overlay.open { display: flex; }
+    .profile-popup {
+      background: var(--paper);
+      border: 1px solid var(--ink);
+      width: 360px;
+      max-width: calc(100vw - 40px);
+      max-height: calc(100vh - 80px);
+      overflow: auto;
+      padding: 24px;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+    }
+    .profile-popup .close-btn {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+      padding: 4px 8px;
+    }
+    .profile-popup .close-btn:hover { color: var(--ink); }
+    .profile-popup .pp-avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: var(--paper-dark);
+      border: 1px solid #cccccc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.2rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin: 0 auto 14px;
+      overflow: hidden;
+    }
+    .profile-popup .pp-avatar img {
+      width: 100%; height: 100%; object-fit: cover;
+    }
+    .profile-popup .pp-name {
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .profile-popup .pp-meta {
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 16px;
+    }
+    .profile-popup .pp-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-top: 1px solid #e5e5e5;
+      font-size: 0.8rem;
+    }
+    .profile-popup .pp-row .pp-label {
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 0.65rem;
+      letter-spacing: 1.5px;
+      align-self: center;
+    }
+    .profile-popup .pp-row .pp-value {
+      color: var(--ink);
+      font-weight: 500;
+      text-align: right;
+    }
+    .profile-popup .pp-loading,
+    .profile-popup .pp-error {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 30px 0;
+    }
+    .author-link {
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+    }
+    .author-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -1615,7 +1716,7 @@ async function loadPosts(neighborhoodFilter = null) {
       ? `${nbName}${suffix} ${authorFirst}`
       : nbName;
     const authorLink = post.user_id
-      ? `<a href="hane.html?user=${post.user_id}" style="text-decoration:none;color:inherit;" title="Profili görüntüle">${authorDisplay}</a>`
+      ? `<span class="author-link" data-user-id="${post.user_id}" title="Profili görüntüle">${authorDisplay}</span>`
       : authorDisplay;
     return `
       <div class="post">
@@ -1780,6 +1881,78 @@ function showToast(text, kind) {
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => { toast.style.display = 'none'; }, 5000);
 }
+
+// ── Profile popup: opens when an author name is clicked ──
+(function initProfilePopup() {
+  const overlay = document.createElement('div');
+  overlay.className = 'profile-popup-overlay';
+  overlay.innerHTML = `
+    <div class="profile-popup" role="dialog" aria-modal="true">
+      <button class="close-btn" type="button" aria-label="Kapat">×</button>
+      <div class="pp-body"><div class="pp-loading">Yükleniyor…</div></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const popup = overlay.querySelector('.profile-popup');
+  const body = overlay.querySelector('.pp-body');
+
+  function close() { overlay.classList.remove('open'); }
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  overlay.querySelector('.close-btn').addEventListener('click', close);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) close();
+  });
+
+  function fmtDate(s) {
+    if (!s) return '—';
+    try {
+      return new Date(s).toLocaleDateString('tr-TR', { year:'numeric', month:'long', day:'numeric' });
+    } catch { return '—'; }
+  }
+
+  function nbLabel(id) {
+    if (!id) return '—';
+    if (id === 'istanbul_disi') return 'İstanbul Dışı';
+    return neighborhoodNames[id] || id;
+  }
+
+  async function open(userId) {
+    overlay.classList.add('open');
+    body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
+    const { data, error } = await sb
+      .from('profiles')
+      .select('id, first_name, last_name, neighborhood, birth_neighborhood, birth_place, avatar_url, joined_at')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error || !data) {
+      body.innerHTML = '<div class="pp-error">Profil yüklenemedi.</div>';
+      return;
+    }
+    const fullName = `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'İsimsiz Üye';
+    const initial = (fullName.charAt(0) || '?').toUpperCase();
+    const avatar = data.avatar_url
+      ? `<img src="${data.avatar_url}" alt="">`
+      : initial;
+    const birth = data.birth_neighborhood === 'istanbul_disi' && data.birth_place
+      ? data.birth_place
+      : nbLabel(data.birth_neighborhood);
+    body.innerHTML = `
+      <div class="pp-avatar">${avatar}</div>
+      <div class="pp-name">${fullName}</div>
+      <div class="pp-meta">${nbLabel(data.neighborhood)}</div>
+      <div class="pp-row"><span class="pp-label">Doğum Yeri</span><span class="pp-value">${birth}</span></div>
+      <div class="pp-row"><span class="pp-label">Üyelik</span><span class="pp-value">${fmtDate(data.joined_at)}</span></div>
+    `;
+  }
+
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('.author-link');
+    if (!link) return;
+    const id = link.getAttribute('data-user-id');
+    if (id) open(id);
+  });
+})();
 </script>
 </body>
 </html>
