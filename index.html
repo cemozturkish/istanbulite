@@ -225,15 +225,13 @@
     <input type="text" id="signup-first-name" placeholder="Ad" required>
     <input type="text" id="signup-last-name" placeholder="Soyad" required>
     <input type="tel" id="signup-phone" placeholder="Telefon" required>
-  <input type="text" id="signup-birth-place" placeholder="Doğum Yeri" required>
     <select id="signup-neighborhood" required>
-  <option value="">Mahalle Seç</option>
-  <option value="kadikoy">Kadıköy</option>
-  <option value="besiktas">Beşiktaş</option>
-  <option value="uskudar">Üsküdar</option>
-  <option value="beyoglu">Beyoğlu</option>
-  <option value="bakirkoy">Bakırköy</option>
-</select>
+      <option value="">Yaşadığın Mahalle</option>
+    </select>
+    <select id="signup-birth-neighborhood" required>
+      <option value="">Doğduğun Mahalle</option>
+    </select>
+    <input type="text" id="signup-birth-place" placeholder="Doğum Yeri (opsiyonel)">
     <input type="email" id="signup-email" placeholder="E-posta" required autocomplete="email">
     <input type="password" id="signup-password" placeholder="Şifre" required autocomplete="new-password" minlength="6">
     <button type="submit" class="primary-btn">Kayıt Ol</button>
@@ -406,29 +404,54 @@ signinForm.addEventListener('submit', async (e) => {
 
 // Format the kefil display string, e.g. "BAKIRKÖY'DEN CEM"
 function formatKefilLabel(profile) {
-  const name = (profile.display_name || '').trim().toUpperCase();
-  const hood = (profile.neighborhood || '').trim().toUpperCase();
-  if (hood && name) return hood + "'DEN " + name;
-  return name || hood || '';
+  const name = ((profile.first_name || '') + ' ' + (profile.last_name || '')).trim().toUpperCase();
+  const hoodId = (profile.neighborhood || '').trim();
+  const hoodName = (NEIGHBORHOOD_NAMES[hoodId] || hoodId).toUpperCase();
+  if (hoodName && name) return hoodName + "'DEN " + name;
+  return name || hoodName || '';
 }
 
-// Verify referral code against profiles table.
-// Each profile has a unique `referral_code` column; entering it
-// links the new signup to that profile as their kefil.
+// Populate the neighborhood dropdowns from the neighborhoods table.
+// Current-residence excludes 'istanbul_disi' (you must live in Istanbul);
+// birth-neighborhood includes it.
+const NEIGHBORHOOD_NAMES = {};
+async function loadNeighborhoods() {
+  const { data, error } = await sb
+    .from('neighborhoods')
+    .select('id, name_tr')
+    .order('name_tr');
+  if (error || !data) return;
+  const residenceSel = document.getElementById('signup-neighborhood');
+  const birthSel = document.getElementById('signup-birth-neighborhood');
+  data.forEach(n => {
+    NEIGHBORHOOD_NAMES[n.id] = n.name_tr;
+    const birthOpt = document.createElement('option');
+    birthOpt.value = n.id;
+    birthOpt.textContent = n.name_tr;
+    birthSel.appendChild(birthOpt);
+    if (n.id !== 'istanbul_disi') {
+      const resOpt = document.createElement('option');
+      resOpt.value = n.id;
+      resOpt.textContent = n.name_tr;
+      residenceSel.appendChild(resOpt);
+    }
+  });
+}
+loadNeighborhoods();
+
+// Verify referral code via SECURITY DEFINER RPC so we don't expose
+// the profiles table to anonymous readers.
 kefilForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   kefilError.textContent = '';
   const code = document.getElementById('kefil-code').value.trim().toUpperCase();
   if (!code) return;
-  const { data, error } = await sb
-    .from('profiles')
-    .select('id, display_name, neighborhood, referral_code')
-    .eq('referral_code', code)
-    .maybeSingle();
+  const { data, error } = await sb.rpc('verify_kefil_code', { code });
   if (error) { kefilError.textContent = 'Kod doğrulanamadı.'; return; }
-  if (!data) { kefilError.textContent = 'Geçersiz kefil kodu.'; return; }
-  verifiedKefil = data;
-  kefilConfirmed.textContent = 'Kefil: ' + formatKefilLabel(data);
+  const profile = Array.isArray(data) ? data[0] : data;
+  if (!profile) { kefilError.textContent = 'Geçersiz kefil kodu.'; return; }
+  verifiedKefil = { ...profile, code };
+  kefilConfirmed.textContent = 'Kefil: ' + formatKefilLabel(profile);
   signupError.textContent = '';
   showPanel('signup');
 });
@@ -437,31 +460,33 @@ signupForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   signupError.textContent = '';
   if (!verifiedKefil) { showPanel('kefil'); return; }
-    const firstName = document.getElementById('signup-first-name').value.trim();
-    const lastName = document.getElementById('signup-last-name').value.trim();
-    const phone = document.getElementById('signup-phone').value.trim();
-    const birthPlace = document.getElementById('signup-birth-place').value.trim();
-    const neighborhood = document.getElementById('signup-neighborhood').value;
-    const email = document.getElementById('signup-email').value.trim();
-    const password = document.getElementById('signup-password').value;
+  const firstName = document.getElementById('signup-first-name').value.trim();
+  const lastName = document.getElementById('signup-last-name').value.trim();
+  const phone = document.getElementById('signup-phone').value.trim();
+  const birthPlace = document.getElementById('signup-birth-place').value.trim();
+  const neighborhood = document.getElementById('signup-neighborhood').value;
+  const birthNeighborhood = document.getElementById('signup-birth-neighborhood').value;
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
 
-const { data, error } = await sb.auth.signUp({
-  email,
-  password,
-  options: {
-    data: {
-      first_name: firstName,
-      last_name: lastName,
-      phone: phone,
-      neighborhood: neighborhood,
-      birth_place: birthPlace
+  // The handle_new_user trigger reads this metadata, validates the
+  // referral code, and atomically creates the matching profile row.
+  const { data, error } = await sb.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+        phone,
+        neighborhood,
+        birth_neighborhood: birthNeighborhood,
+        birth_place: birthPlace || null,
+        referral_code: verifiedKefil.code,
+      },
     },
-  },
-});
+  });
   if (error) { signupError.textContent = error.message; return; }
-
-  // Persist the referral link on the new profile. The admin assigns
-  // the user's neighborhood and unique referral_code separately.
 
   if (data.session) enterShell();
   else { signupError.textContent = 'Kayıt alındı. Onay sonrası giriş yapabilirsiniz.'; showPanel('signin'); }
