@@ -1329,8 +1329,13 @@ const { data: profile, error: profileError } = await sb
   .single();
 
 if (profileError) {
-  console.error(profileError);
+  console.error('[hane loadProfile]', profileError);
 }
+
+// Accounts that predate the handle_new_user trigger don't have a profiles
+// row. Surface this clearly instead of silently rendering empty fields and
+// then accepting "saves" that update zero rows.
+const profileMissing = !isViewingOther && !profile;
 
 const avatarUrl = profile?.avatar_url || null;
 
@@ -1650,16 +1655,29 @@ btn.disabled = true;
 msgEl.textContent = '';
 
 try {
-  const { error } = await sb
+  // Build payload. `neighborhood` is admin-controlled — the
+  // protect_profile_columns trigger silently reverts it for non-admin users,
+  // so we only send it for the admin to avoid pretending it was saved.
+  const payload = {
+    first_name: newFirstName,
+    last_name: newLastName,
+  };
+  const isAdminUser = user.email === 'cemwozturk@gmail.com';
+  if (isAdminUser) payload.neighborhood = newYasadigi;
+
+  // .select() forces PostgREST to return the updated rows, so we can
+  // detect a 0-row write (missing profile row or RLS denial) instead of
+  // silently telling the user "Kaydedildi!".
+  const { data, error } = await sb
     .from('profiles')
-    .update({
-      first_name: newFirstName,
-      last_name: newLastName,
-      neighborhood: newYasadigi
-    })
-    .eq('id', user.id);
+    .update(payload)
+    .eq('id', user.id)
+    .select('id, first_name, last_name, neighborhood');
 
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
+  }
 
   btn.textContent = 'Kaydet';
   btn.disabled = false;
@@ -1677,7 +1695,7 @@ try {
         btn.textContent = 'Kaydet';
         btn.disabled = false;
 
-        msgEl.textContent = 'Kaydedilemedi.';
+        msgEl.textContent = err && err.message ? err.message : 'Kaydedilemedi.';
         msgEl.style.color = 'var(--accent)';
       }
     });
@@ -1702,14 +1720,22 @@ try {
       const reader = new FileReader();
       reader.onload = async (evt) => {
         const base64 = evt.target.result;
-        const { error } = await sb
+        const { data, error } = await sb
           .from('profiles')
           .update({ avatar_url: base64 })
-          .eq('id', user.id);
+          .eq('id', user.id)
+          .select('id');
 
-        if (!error) {
-          document.getElementById('avatar-display').innerHTML = `<img src="${base64}" alt="Profile">`;
+        if (error) {
+          console.error('[hane avatar save]', error);
+          alert('Fotoğraf kaydedilemedi: ' + error.message);
+          return;
         }
+        if (!data || data.length === 0) {
+          alert('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
+          return;
+        }
+        document.getElementById('avatar-display').innerHTML = `<img src="${base64}" alt="Profile">`;
       };
       reader.readAsDataURL(file);
     });
