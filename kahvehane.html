@@ -498,6 +498,46 @@
       color: var(--muted);
     }
 
+    .load-more-wrap {
+      display: flex;
+      justify-content: center;
+      padding: 8px 0 16px;
+    }
+    .load-more-btn {
+      background: var(--paper);
+      border: 1px solid var(--ink);
+      padding: 8px 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      color: var(--ink);
+      font-family: 'Inter', sans-serif;
+    }
+    .load-more-btn:hover { background: var(--hover, #e0e0e0); }
+    .load-more-btn:disabled { opacity: 0.6; cursor: default; }
+
+    .post-delete {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.7rem;
+      padding: 0 4px;
+      margin-left: 6px;
+      font-family: 'Inter', sans-serif;
+    }
+    .post-delete:hover { color: var(--accent); }
+
+    .submit-form .submit-form-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-style: italic;
+      padding: 12px;
+      text-align: center;
+    }
+
     .spinner {
       display: inline-block;
       width: 14px; height: 14px;
@@ -1001,6 +1041,7 @@
         </div>
         <textarea id="post-content" placeholder="Ne söylemek istersiniz?"></textarea>
         <button id="submit-btn">Gönder</button>
+        <div class="submit-form-note" id="submit-form-note" style="display:none;"></div>
         <div class="submit-status" id="submit-status"></div>
       </div>
     </section>
@@ -1450,12 +1491,30 @@ async function init() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = 'index.html'; return; }
 
-  // Use yasadigi_ilce first, fall back to legacy neighborhood field, then localStorage
-  homeNeighborhood = session.user.user_metadata?.yasadigi_ilce
-    || session.user.user_metadata?.neighborhood
-    || localStorage.getItem('yasadigi_ilce_local') || null;
-  currentUserFirstName = session.user.user_metadata?.first_name || '';
   isAdmin = session.user.email === ADMIN_EMAIL;
+
+  // Source of truth for current neighborhood is profiles.neighborhood — the
+  // RLS policy on neighborhood_comments enforces the same value when posting.
+  // Fall back to user_metadata only if the profile read fails for some reason.
+  let profileNb = null;
+  let profileFirst = '';
+  try {
+    const { data: prof } = await sb
+      .from('profiles')
+      .select('neighborhood, first_name')
+      .eq('id', session.user.id)
+      .maybeSingle();
+    if (prof) {
+      profileNb = prof.neighborhood || null;
+      profileFirst = prof.first_name || '';
+    }
+  } catch (_) {}
+
+  homeNeighborhood = profileNb
+    || session.user.user_metadata?.neighborhood
+    || session.user.user_metadata?.yasadigi_ilce
+    || localStorage.getItem('yasadigi_ilce_local') || null;
+  currentUserFirstName = profileFirst || session.user.user_metadata?.first_name || '';
 
   if (homeNeighborhood) {
     selectedNeighborhood = homeNeighborhood;
@@ -1470,14 +1529,43 @@ async function init() {
     document.getElementById('home-nb-badge').textContent = 'Semt seçilmedi';
   }
 
-  // The submit form is always visible once the user is authenticated — the
-  // submit handler validates neighborhood and content before inserting, so
-  // hiding the form only makes it impossible for users to see the guidance.
-  document.getElementById('submit-form').style.display = 'block';
+  updateSubmitFormVisibility();
 
   loadPosts();
   markPlayedGames(session.user.id);
   loadScoreboard();
+}
+
+// Resident-only: the submit form is shown only when the user is posting to
+// their own residence neighborhood (RLS would reject otherwise). Admin can
+// post anywhere. When the user has clicked a non-resident neighborhood we
+// swap in a note explaining the restriction.
+function updateSubmitFormVisibility() {
+  const formEl = document.getElementById('submit-form');
+  if (!formEl) return;
+  const target = activeMapNeighborhood || homeNeighborhood;
+  const canPost = isAdmin || (homeNeighborhood && target === homeNeighborhood);
+  const noteEl = document.getElementById('submit-form-note');
+
+  if (canPost && target) {
+    formEl.style.display = 'block';
+    if (noteEl) noteEl.style.display = 'none';
+    document.getElementById('post-content').style.display = '';
+    document.getElementById('submit-btn').style.display = '';
+    const badge = document.getElementById('home-nb-badge');
+    if (badge) badge.textContent = neighborhoodNames[target] || target;
+  } else {
+    formEl.style.display = 'block';
+    document.getElementById('post-content').style.display = 'none';
+    document.getElementById('submit-btn').style.display = 'none';
+    if (noteEl) {
+      noteEl.style.display = 'block';
+      const targetName = neighborhoodNames[target] || target || 'bu semt';
+      noteEl.textContent = homeNeighborhood
+        ? `Sadece kendi semtinize (${neighborhoodNames[homeNeighborhood] || homeNeighborhood}) yazabilirsiniz. ${targetName} sakinleri burada yazıyor.`
+        : 'Yazmak için bir semte yerleşmeniz gerekir.';
+    }
+  }
 }
 
 // Today's date in Europe/Istanbul, matching the dailySeed format used by each game
@@ -1594,19 +1682,17 @@ async function loadScoreboard() {
     scores.set(r.user_id, prev);
   });
 
-  // Resolve display names from the discussions table.
+  // Resolve display names from the profiles table.
   const userIds = Array.from(scores.keys());
   const nameMap = new Map();
   try {
-    const { data: posts } = await sb
-      .from('discussions')
-      .select('user_id, author_first_name')
-      .in('user_id', userIds);
-    if (posts) {
-      posts.forEach(p => {
-        if (p.user_id && p.author_first_name && !nameMap.has(p.user_id)) {
-          nameMap.set(p.user_id, p.author_first_name);
-        }
+    if (userIds.length > 0) {
+      const { data: profs } = await sb
+        .from('profiles')
+        .select('id, first_name')
+        .in('id', userIds);
+      (profs || []).forEach(p => {
+        if (p.first_name) nameMap.set(p.id, p.first_name);
       });
     }
   } catch (e) { /* name lookup is best-effort */ }
@@ -1651,17 +1737,8 @@ mapNeighborhoods.forEach(nb => {
     document.getElementById('map-label').textContent = name;
     document.getElementById('discussion-label').textContent = name;
     activeMapNeighborhood = nb.id;
-    // Admin can post to any neighborhood; regular users only to their own.
-    // Keep the form visible either way so the user can read the guidance and
-    // see errors; the submit handler enforces the rule.
-    const canPostHere = isAdmin || (homeNeighborhood && nb.id === homeNeighborhood);
-    if (canPostHere) {
-      selectedNeighborhood = nb.id;
-      document.getElementById('home-nb-badge').textContent = neighborhoodNames[nb.id] || nb.id;
-    } else if (homeNeighborhood) {
-      selectedNeighborhood = homeNeighborhood;
-      document.getElementById('home-nb-badge').textContent = neighborhoodNames[homeNeighborhood] || homeNeighborhood;
-    }
+    selectedNeighborhood = (isAdmin || nb.id === homeNeighborhood) ? nb.id : homeNeighborhood;
+    updateSubmitFormVisibility();
     loadPosts(nb.id);
   });
 });
@@ -1677,58 +1754,156 @@ document.addEventListener('click', (e) => {
     document.getElementById('map-label').textContent = 'İstanbul';
     document.getElementById('discussion-label').textContent = 'Tüm İstanbul';
     activeMapNeighborhood = null;
-    // Back to all-Istanbul view: reset selection to home neighborhood. Form
-    // visibility is handled once in init() and stays visible.
     selectedNeighborhood = homeNeighborhood;
-    if (homeNeighborhood) {
-      document.getElementById('home-nb-badge').textContent = neighborhoodNames[homeNeighborhood] || homeNeighborhood;
-    }
+    updateSubmitFormVisibility();
     loadPosts();
   }
 });
 
+// ── Paginated comment feed ──
+// Reads `neighborhood_comments` 20 at a time, with a "Load more" button.
+// Resets when the filter changes (map click / clear).
+const PAGE_SIZE = 20;
+let feedState = { filter: null, offset: 0, done: false, currentUserId: null };
+
 async function loadPosts(neighborhoodFilter = null) {
+  feedState = { filter: neighborhoodFilter, offset: 0, done: false, currentUserId: feedState.currentUserId };
   const postsEl = document.getElementById('discussion-posts');
   postsEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
 
-  let query = sb
-    .from('discussions')
-    .select('*')
-    .eq('approved', true)
-    .order('created_at', { ascending: false })
-    .limit(50);
+  const { data: { session } } = await sb.auth.getSession();
+  feedState.currentUserId = session?.user?.id || null;
 
-  if (neighborhoodFilter) query = query.eq('neighborhood', neighborhoodFilter);
-
-  const { data, error } = await query;
-  
-  if (error || !data || data.length === 0) {
+  const rows = await fetchPostsPage(neighborhoodFilter, 0);
+  if (!rows) {
+    postsEl.innerHTML = '<div class="empty-state">Mesajlar yüklenemedi.</div>';
+    return;
+  }
+  if (rows.length === 0) {
     postsEl.innerHTML = '<div class="empty-state">Henüz mesaj yok. İlk yazan siz olun!</div>';
     return;
   }
-  
-  postsEl.innerHTML = data.map(post => {
-    // Display author as "[neighborhood]'den/dan [first name]"
+  postsEl.innerHTML = '';
+  appendPosts(rows);
+  feedState.offset = rows.length;
+  feedState.done = rows.length < PAGE_SIZE;
+  renderLoadMore();
+}
+
+async function fetchPostsPage(neighborhoodFilter, offset) {
+  let query = sb
+    .from('neighborhood_comments')
+    .select('id, author_id, neighborhood, body, created_at')
+    .order('created_at', { ascending: false })
+    .range(offset, offset + PAGE_SIZE - 1);
+  if (neighborhoodFilter) query = query.eq('neighborhood', neighborhoodFilter);
+  const { data, error } = await query;
+  if (error) {
+    console.error('[kahvehane loadPosts]', error);
+    return null;
+  }
+  if (!data || data.length === 0) return [];
+  // Resolve first names in one batched query
+  const ids = Array.from(new Set(data.map(p => p.author_id).filter(Boolean)));
+  const nameMap = new Map();
+  if (ids.length > 0) {
+    const { data: profs } = await sb
+      .from('profiles')
+      .select('id, first_name')
+      .in('id', ids);
+    (profs || []).forEach(p => nameMap.set(p.id, p.first_name || ''));
+  }
+  return data.map(p => ({ ...p, _authorFirstName: nameMap.get(p.author_id) || '' }));
+}
+
+function appendPosts(rows) {
+  const postsEl = document.getElementById('discussion-posts');
+  const html = rows.map(post => {
     const nbName = neighborhoodNames[post.neighborhood] || post.neighborhood;
-    const authorFirst = post.author_first_name || '';
     const suffix = getAblativeSuffix(nbName);
-    const authorDisplay = authorFirst
-      ? `${nbName}${suffix} ${authorFirst}`
+    const authorDisplay = post._authorFirstName
+      ? `${nbName}${suffix} ${post._authorFirstName}`
       : nbName;
-    const authorLink = post.user_id
-      ? `<span class="author-link" data-user-id="${post.user_id}" title="Profili görüntüle">${authorDisplay}</span>`
+    const authorLink = post.author_id
+      ? `<span class="author-link" data-user-id="${post.author_id}" title="Profili görüntüle">${authorDisplay}</span>`
       : authorDisplay;
+    const isMine = post.author_id && post.author_id === feedState.currentUserId;
+    const canDelete = isMine || isAdmin;
+    const deleteBtn = canDelete
+      ? `<button class="post-delete" data-delete-id="${post.id}" title="Mesajı sil">Sil</button>`
+      : '';
     return `
-      <div class="post">
+      <div class="post" data-post-id="${post.id}">
         <div class="post-meta">
           <span class="post-neighborhood">${authorLink}</span>
-          <span>${new Date(post.created_at).toLocaleDateString('tr-TR')}</span>
+          <span>${new Date(post.created_at).toLocaleDateString('tr-TR')} ${deleteBtn}</span>
         </div>
-        <div class="post-content">${post.content}</div>
+        <div class="post-content">${escapeHtml(post.body)}</div>
       </div>
     `;
   }).join('');
+  // Insert before any existing load-more wrapper so it stays at the bottom
+  const lm = postsEl.querySelector('.load-more-wrap');
+  if (lm) lm.insertAdjacentHTML('beforebegin', html);
+  else postsEl.insertAdjacentHTML('beforeend', html);
 }
+
+function renderLoadMore() {
+  const postsEl = document.getElementById('discussion-posts');
+  const existing = postsEl.querySelector('.load-more-wrap');
+  if (feedState.done) {
+    if (existing) existing.remove();
+    return;
+  }
+  if (existing) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'load-more-wrap';
+  wrap.innerHTML = `<button class="load-more-btn" id="load-more-btn" type="button">Daha fazla</button>`;
+  postsEl.appendChild(wrap);
+}
+
+async function handleLoadMore() {
+  const btn = document.getElementById('load-more-btn');
+  if (!btn || feedState.done) return;
+  btn.disabled = true;
+  btn.textContent = 'Yükleniyor…';
+  const rows = await fetchPostsPage(feedState.filter, feedState.offset);
+  if (rows === null) {
+    btn.disabled = false;
+    btn.textContent = 'Tekrar dene';
+    return;
+  }
+  appendPosts(rows);
+  feedState.offset += rows.length;
+  feedState.done = rows.length < PAGE_SIZE;
+  if (feedState.done) {
+    const wrap = btn.closest('.load-more-wrap');
+    if (wrap) wrap.remove();
+  } else {
+    btn.disabled = false;
+    btn.textContent = 'Daha fazla';
+  }
+}
+
+document.getElementById('discussion-posts').addEventListener('click', async (e) => {
+  const loadMoreBtn = e.target.closest('#load-more-btn');
+  if (loadMoreBtn) { handleLoadMore(); return; }
+  const delBtn = e.target.closest('.post-delete');
+  if (delBtn) {
+    const id = delBtn.getAttribute('data-delete-id');
+    if (!id) return;
+    if (!confirm('Mesaj silinsin mi?')) return;
+    delBtn.disabled = true;
+    const { error } = await sb.from('neighborhood_comments').delete().eq('id', id);
+    if (error) {
+      delBtn.disabled = false;
+      alert('Silinemedi: ' + error.message);
+      return;
+    }
+    const postEl = delBtn.closest('.post');
+    if (postEl) postEl.remove();
+  }
+});
 
 document.getElementById('submit-btn').addEventListener('click', async () => {
   const content = document.getElementById('post-content').value.trim();
@@ -1766,14 +1941,20 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
     return;
   }
 
+  // Residency guard mirrors the RLS policy: only post to your own neighborhood
+  // (admin override). The DB will reject any attempt to bypass this.
+  if (!isAdmin && postNeighborhood !== homeNeighborhood) {
+    statusEl.textContent = 'Sadece kendi semtinize yazabilirsiniz.';
+    statusEl.className = 'submit-status err';
+    return;
+  }
+
   document.getElementById('submit-btn').disabled = true;
 
   const insertData = {
     neighborhood: String(postNeighborhood),
-    content: String(content),
-    user_id: String(session.user.id),
-    author_first_name: String(currentUserFirstName || 'Anonim'),
-    approved: isAdmin ? true : false
+    body: String(content),
+    author_id: String(session.user.id)
   };
 
   // Use XMLHttpRequest instead of fetch: Safari's fetch implementation
@@ -1784,7 +1965,7 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   function attemptInsert() {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${SUPABASE_URL}/rest/v1/discussions`, true);
+      xhr.open('POST', `${SUPABASE_URL}/rest/v1/neighborhood_comments`, true);
       xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
       xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
       xhr.setRequestHeader('Content-Type', 'application/json');
@@ -1857,12 +2038,12 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
     return;
   }
 
-  const okMsg = isAdmin ? 'Mesajınız yayınlandı!' : 'Mesajınız onay bekliyor!';
+  const okMsg = 'Mesajınız yayınlandı!';
   statusEl.textContent = okMsg;
   statusEl.className = 'submit-status ok';
   document.getElementById('post-content').value = '';
   showToast(okMsg, 'ok');
-  if (isAdmin) loadPosts(activeMapNeighborhood || null);
+  loadPosts(activeMapNeighborhood || null);
   setTimeout(() => { statusEl.textContent = ''; }, 3000);
 });
 
