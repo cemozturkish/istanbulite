@@ -4,73 +4,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Prefetch sibling tabs so the View Transitions API can swap instantly -->
-  <link rel="prefetch" href="index.html">
-  <link rel="prefetch" href="kahvehane.html">
-  <link rel="prefetch" href="kutuphane.html">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hane — istanbulite.net</title>
-  <!-- Shell always iframes this page; any in-page link should escape to
-       the top frame so it doesn't orphan a non-embed URL inside an
-       iframe slot (back from that would re-enter the embed guard with
-       no param and recurse into the shell). -->
-  <base target="_top">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- SPA guard: direct loads redirect to the shell. Iframe loads with
-       ?embed=left|middle|right flag this document so only that panel is
-       visible and the tab's own swipe/click pagination stays dormant
-       (the shell drives routing). -->
-  <script>
-    (function(){
-      var embed = new URLSearchParams(location.search).get('embed');
-      if (['left','middle','right'].indexOf(embed) < 0) {
-        if (window.top !== window.self) {
-          try { window.top.location.href = 'index.html#hane'; } catch (_) {}
-          return;
-        }
-        location.replace('index.html#hane'); return;
-      }
-      var h = document.documentElement;
-      h.classList.add('embedded');
-      h.classList.add('embed-' + embed);
-    })();
-  </script>
-  <!-- Nav hijack: inside the shell's middle iframe, nav clicks are
-       forwarded to the shell via postMessage. All other links (games,
-       profile, etc.) escape to the top window so they take over the
-       full page instead of loading inside the iframe slot. -->
-  <script>
-    (function(){
-      var doc = document;
-      var isMid = doc.documentElement.classList.contains('embed-middle');
-      doc.addEventListener('click', function(e){
-        var a = e.target.closest && e.target.closest('a[href]');
-        if (!a) return;
-        var href = a.getAttribute('href') || '';
-        if (!href || href.charAt(0) === '#' || href.indexOf('javascript:') === 0) return;
-        if (a.closest('nav')) {
-          if (!isMid) return;
-          var map = {
-            'index.html': 'anahane', '#anahane': 'anahane',
-            'anahane.html': 'anahane',
-            'kahvehane.html': 'kahvehane', '#kahvehane': 'kahvehane',
-            'kutuphane.html': 'kutuphane', '#kutuphane': 'kutuphane',
-            'hane.html': 'hane', '#hane': 'hane'
-          };
-          var tab = map[href];
-          if (!tab) return;
-          e.preventDefault();
-          try { window.parent.postMessage({ type: 'ist-nav', tab: tab }, '*'); } catch (_) {}
-          return;
-        }
-        if (window.top !== window.self) {
-          e.preventDefault();
-          try { window.top.location.href = href; } catch (_) { window.location.href = href; }
-        }
-      });
-    })();
-  </script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis) -->
   <script>
     (function(){
@@ -822,102 +759,6 @@
     .col-left { view-transition-name: ist-col-left; }
     .col-right { view-transition-name: ist-col-right; }
 
-    /* SPA embed modes: the shell loads this document three times in
-       iframes (?embed=left|middle|right). Each mode shows only its
-       panel; the grid collapses so the visible column fills the
-       viewport. Middle still shows its nav+header — the shell
-       intercepts clicks via postMessage. */
-
-    /* Force desktop layout inside every embed iframe. The shell sizes
-       each iframe under 768px so the mobile breakpoint would otherwise
-       misfire. CLAUDE.md specifies the site is desktop-only. */
-    html.embedded body {
-      position: static !important;
-      padding-bottom: 0 !important;
-      display: grid !important;
-      grid-template-columns: 1fr 2.2fr 1fr !important;
-      grid-template-rows: auto auto 1fr !important;
-    }
-    html.embedded .col-left  {
-      grid-column: 1 !important; grid-row: 1 / -1 !important;
-      border-top: none !important;
-      border-right: 1px solid #cccccc !important;
-      display: flex !important; flex-direction: column !important;
-      overflow: hidden !important;
-    }
-    html.embedded .col-right {
-      grid-column: 3 !important; grid-row: 1 / -1 !important;
-      border-top: none !important;
-      border-left: 1px solid #cccccc !important;
-      display: flex !important; flex-direction: column !important;
-      overflow-y: auto !important;
-    }
-    html.embedded .section-rule { grid-column: 2 !important; grid-row: 1 !important; }
-    html.embedded header {
-      grid-column: 2 !important; grid-row: 2 !important;
-      position: static !important;
-      height: auto !important;
-      box-shadow: none !important;
-      border-top: none !important;
-      border-bottom: 4px double var(--ink) !important;
-    }
-    html.embedded main {
-      grid-column: 2 !important; grid-row: 3 !important;
-      display: flex !important; flex-direction: column !important;
-      overflow: hidden !important;
-    }
-    html.embedded .datetime-block { flex-direction: column !important; gap: 0 !important; }
-    html.embedded .datetime-block .day-line { display: block !important; }
-
-    /* Restore desktop text sizing inside the iframe (mobile breakpoint
-       was shrinking nav + section labels). */
-    html.embedded .section-rule {
-      padding: 6px 32px !important;
-      font-size: 0.7rem !important;
-      letter-spacing: 3px !important;
-      background: var(--paper-dark) !important;
-      border-bottom: 1px solid var(--ink) !important;
-    }
-    html.embedded nav {
-      display: flex !important;
-      width: 100% !important;
-      height: auto !important;
-      gap: 0 !important;
-      padding: 0 !important;
-    }
-    html.embedded nav a {
-      flex: 1 !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      font-size: 0.95rem !important;
-      letter-spacing: 2px !important;
-      text-transform: uppercase !important;
-      color: var(--muted) !important;
-      padding: 4px 0 !important;
-      border: none !important;
-      text-decoration: none !important;
-    }
-    html.embedded nav a.active { color: var(--ink) !important; }
-
-    html.embed-left body { grid-template-columns: 1fr 0 0 !important; }
-    html.embed-left .col-right,
-    html.embed-left .section-rule,
-    html.embed-left header,
-    html.embed-left main { display: none !important; }
-    html.embed-left .col-left { border-right: none; }
-
-    html.embed-middle body { grid-template-columns: 0 1fr 0 !important; }
-    html.embed-middle .col-left,
-    html.embed-middle .col-right { display: none !important; }
-
-    html.embed-right body { grid-template-columns: 0 0 1fr !important; }
-    html.embed-right .col-left,
-    html.embed-right .section-rule,
-    html.embed-right header,
-    html.embed-right main { display: none !important; }
-    html.embed-right .col-right { border-left: none; }
-
     @media (min-width: 769px) {
       @keyframes ist-vt-out-up { from { transform: translateY(0); } to { transform: translateY(-100vh); } }
       @keyframes ist-vt-in-up { from { transform: translateY(100vh); } to { transform: translateY(0); } }
@@ -966,30 +807,6 @@
       }
     }
   </style>
-  <!-- Embed mode: the iframe column width (<768px) would otherwise
-       trigger every mobile @media block in this document. Neutralize
-       max-width: 768px rules and force min-width: 769px rules on so
-       the iframe always renders the desktop layout. CLAUDE.md says
-       the site is desktop-only. -->
-  <script>
-    (function(){
-      if (!document.documentElement.classList.contains('embedded')) return;
-      try {
-        var sheets = document.styleSheets;
-        for (var i = 0; i < sheets.length; i++) {
-          var rules;
-          try { rules = sheets[i].cssRules; } catch (_) { continue; }
-          for (var j = 0; j < rules.length; j++) {
-            var r = rules[j];
-            if (r.type !== 4) continue;
-            var mt = r.conditionText || (r.media && r.media.mediaText) || '';
-            if (/max-width:\s*768px/.test(mt)) r.media.mediaText = 'not all';
-            else if (/min-width:\s*769px/.test(mt)) r.media.mediaText = 'all';
-          }
-        }
-      } catch (_) {}
-    })();
-  </script>
 </head>
 <body>
 
@@ -1042,8 +859,6 @@
 // trigger the same animation.
 // ══════════════════════════════════════════
 (function initSwipePagination() {
-  // In SPA embed mode the shell drives routing — skip all self-navigation.
-  if (document.documentElement.classList.contains('embedded')) return;
   const PAGES = ['index.html', 'kahvehane.html', 'kutuphane.html', 'hane.html'];
   const DURATION = 400;
   const MIN_DX = 50;
