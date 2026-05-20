@@ -804,17 +804,15 @@ function submitGuess() {
     }, i * 100);
   }
 
-  setTimeout(() => {
+  setTimeout(async () => {
     if (guessSnap === TARGET_WORD) {
       document.getElementById('game-message').textContent = 'Tebrikler!';
       document.getElementById('game-message').className = 'game-message win';
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
-      localStorage.setItem('sozcel_played', parseInt(localStorage.getItem('sozcel_played') || '0') + 1);
-      localStorage.setItem('sozcel_wins', parseInt(localStorage.getItem('sozcel_wins') || '0') + 1);
-      localStorage.setItem('sozcel_streak', parseInt(localStorage.getItem('sozcel_streak') || '0') + 1);
-      recordGuessDistribution(rowSnap + 1);
-      recordGameResult('sozcel', dailySeed, rowSnap + 1, true, userNeighborhood);
+      // Insert the winning row first so renderStats() (which reads from
+      // Supabase) reflects this game immediately.
+      await recordGameResult('sozcel', dailySeed, rowSnap + 1, true, userNeighborhood);
       saveState();
       renderStats();
     } else if (rowSnap === 5) {
@@ -822,9 +820,7 @@ function submitGuess() {
       document.getElementById('game-message').className = 'game-message lose';
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
-      localStorage.setItem('sozcel_played', parseInt(localStorage.getItem('sozcel_played') || '0') + 1);
-      localStorage.setItem('sozcel_streak', '0');
-      recordGameResult('sozcel', dailySeed, 7, false, userNeighborhood);
+      await recordGameResult('sozcel', dailySeed, 7, false, userNeighborhood);
       saveState();
       renderStats();
     } else {
@@ -862,77 +858,130 @@ function checkWord(guess) {
   return result;
 }
 
-// ── Load community stats from Supabase, fall back to seeded data ──
+// ── Personal stats from Supabase ──
+// Dedupe per (user, date): a date is "played" if any row exists, "won" if
+// any row has won=true. For winning dates we keep the smallest `attempts`
+// value as that day's score (used for the personal guess distribution).
+async function loadPersonalStats() {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return null;
+    const { data, error } = await sb.from('game_results')
+      .select('date, attempts, won')
+      .eq('user_id', session.user.id)
+      .eq('game', 'sozcel');
+    if (error) return null;
+    const byDate = new Map();
+    (data || []).forEach(r => {
+      const prev = byDate.get(r.date) || { date: r.date, won: false, attempts: null };
+      if (r.won) {
+        prev.won = true;
+        if (prev.attempts === null || r.attempts < prev.attempts) prev.attempts = r.attempts;
+      }
+      byDate.set(r.date, prev);
+    });
+    const entries = Array.from(byDate.values());
+    const played = entries.length;
+    const wins = entries.filter(e => e.won).length;
+    // Guess distribution: attempts 1-6 -> indices 0-5; failures (no won row) -> index 6.
+    const dist = [0, 0, 0, 0, 0, 0, 0];
+    entries.forEach(e => {
+      if (e.won && e.attempts >= 1 && e.attempts <= 6) dist[e.attempts - 1]++;
+      else dist[6]++;
+    });
+    // Streaks. Compare Istanbul-local YYYY-M-D seeds (matches dailySeed format).
+    const winDateSet = new Set(entries.filter(e => e.won).map(e => e.date));
+    function seedForOffset(off) {
+      const now = new Date();
+      const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+      ist.setDate(ist.getDate() - off);
+      return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
+    }
+    // Current streak: count back from today; if today wasn't won, start at yesterday.
+    let currentStreak = 0;
+    let offset = winDateSet.has(seedForOffset(0)) ? 0 : 1;
+    while (winDateSet.has(seedForOffset(offset))) { currentStreak++; offset++; }
+    // Max streak: longest run of consecutive winning days.
+    const DAY = 86400000;
+    const winTimes = entries.filter(e => e.won).map(e => {
+      const [y, m, d] = e.date.split('-').map(Number);
+      return Date.UTC(y, m - 1, d);
+    }).sort((a, b) => a - b);
+    let maxStreak = 0, cur = 0, prev = null;
+    for (const t of winTimes) {
+      cur = (prev !== null && t - prev === DAY) ? cur + 1 : 1;
+      if (cur > maxStreak) maxStreak = cur;
+      prev = t;
+    }
+    return { played, wins, currentStreak, maxStreak, dist };
+  } catch (e) { return null; }
+}
+
+// ── Community stats from Supabase. Returns null when no data for today. ──
 async function loadCommunityStats() {
   try {
     const { data, error } = await sb.from('game_results')
-      .select('attempts, won, neighborhood')
+      .select('user_id, attempts, won, neighborhood')
       .eq('game', 'sozcel')
       .eq('date', dailySeed);
 
-    if (error || !data || data.length === 0) throw new Error('no data');
+    if (error || !data || data.length === 0) return null;
 
-    // Build real distribution
-    const dist = [0, 0, 0, 0, 0, 0, 0]; // attempts 1-6 + failed
+    // Dedupe per user: one entry per player for today.
+    const byUser = new Map();
     data.forEach(r => {
-      if (r.won && r.attempts >= 1 && r.attempts <= 6) {
-        dist[r.attempts - 1]++;
-      } else {
-        dist[6]++;
+      const prev = byUser.get(r.user_id) || { won: false, attempts: null, neighborhood: r.neighborhood };
+      if (r.neighborhood) prev.neighborhood = r.neighborhood;
+      if (r.won) {
+        prev.won = true;
+        if (prev.attempts === null || r.attempts < prev.attempts) prev.attempts = r.attempts;
+      }
+      byUser.set(r.user_id, prev);
+    });
+
+    const dist = [0, 0, 0, 0, 0, 0, 0]; // attempts 1-6 + failed
+    const districtMap = {};
+    byUser.forEach(e => {
+      if (e.won && e.attempts >= 1 && e.attempts <= 6) dist[e.attempts - 1]++;
+      else dist[6]++;
+      if (e.neighborhood) {
+        if (!districtMap[e.neighborhood]) districtMap[e.neighborhood] = { wins: 0, total: 0 };
+        districtMap[e.neighborhood].total++;
+        if (e.won) districtMap[e.neighborhood].wins++;
       }
     });
 
-    // Build district success rates
-    const districtMap = {};
-    data.forEach(r => {
-      if (!r.neighborhood) return;
-      if (!districtMap[r.neighborhood]) districtMap[r.neighborhood] = { wins: 0, total: 0 };
-      districtMap[r.neighborhood].total++;
-      if (r.won) districtMap[r.neighborhood].wins++;
-    });
-
-    const neighborhoodNames = {
-      bakirkoy:'Bakırköy', besiktas:'Beşiktaş', kadikoy:'Kadıköy',
-      uskudar:'Üsküdar', fatih:'Fatih', beyoglu:'Beyoğlu',
-      sisli:'Şişli', sariyer:'Sarıyer', maltepe:'Maltepe', atasehir:'Ataşehir',
-      umraniye:'Ümraniye', kagithane:'Kağıthane', bahcelievler:'Bahçelievler',
-      bagcilar:'Bağcılar', eyupsultan:'Eyüpsultan', bayrampasa:'Bayrampaşa',
-      basaksehir:'Başakşehir', gungoren:'Güngören', esenler:'Esenler',
-      gop:'Gaziosmanpaşa', kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi',
-      beykoz:'Beykoz', cekmekoy:'Çekmeköy', zeytinburnu:'Zeytinburnu'
-    };
-
     const topDistricts = Object.entries(districtMap)
-      .map(([k, v]) => ({ name: neighborhoodNames[k] || k, pct: Math.round(v.wins / v.total * 100) }))
-      .sort((a, b) => b.pct - a.pct)
+      .map(([k, v]) => ({ name: neighborhoodNames[k] || k, pct: Math.round(v.wins / v.total * 100), total: v.total }))
+      .sort((a, b) => b.pct - a.pct || b.total - a.total)
       .slice(0, 5);
 
-    return { dist, topDistricts, isReal: true };
+    return { dist, topDistricts };
   } catch (e) {
-    // Fall back to deterministic seeded data
-    return { dist: generateCommunityDist(), topDistricts: generateTopDistricts(), isReal: false };
+    return null;
   }
 }
 
 // ── Stats rendering ──
 async function renderStats() {
-  const played = parseInt(localStorage.getItem('sozcel_played') || '0');
-  const wins = parseInt(localStorage.getItem('sozcel_wins') || '0');
-  const streak = parseInt(localStorage.getItem('sozcel_streak') || '0');
-  const maxStreak = parseInt(localStorage.getItem('sozcel_max_streak') || '0');
+  // Supabase is the source of truth. Cache the last successful payload in
+  // localStorage so first paint isn't blank on flaky networks.
+  const cacheKey = 'sozcel_stats_cache';
+  let personal = await loadPersonalStats();
+  if (personal) {
+    localStorage.setItem(cacheKey, JSON.stringify(personal));
+  } else {
+    try { personal = JSON.parse(localStorage.getItem(cacheKey) || 'null'); } catch { personal = null; }
+  }
+  const played = personal ? personal.played : 0;
+  const wins = personal ? personal.wins : 0;
+  const streak = personal ? personal.currentStreak : 0;
+  const displayMaxStreak = personal ? Math.max(personal.maxStreak, personal.currentStreak) : 0;
   const winPct = played > 0 ? Math.round(wins / played * 100) : 0;
 
-  // Update max streak
-  if (streak > maxStreak) {
-    localStorage.setItem('sozcel_max_streak', streak);
-  }
-  const displayMaxStreak = Math.max(streak, maxStreak);
-
-  // Personal guess distribution (stored as sozcel_dist_1 through sozcel_dist_6)
-  const dist = [];
-  for (let i = 1; i <= 6; i++) {
-    dist.push(parseInt(localStorage.getItem('sozcel_dist_' + i) || '0'));
-  }
+  // Personal guess distribution: indices 0..5 = attempts 1..6 (index 6 = failed, not shown).
+  const distFull = personal ? personal.dist : [0,0,0,0,0,0,0];
+  const dist = distFull.slice(0, 6);
   const maxDist = Math.max(...dist, 1);
 
   // Left panel: personal stats
@@ -974,14 +1023,22 @@ async function renderStats() {
     `).join('')}
   `;
 
-  // Right panel: community stats from Supabase (falls back to seeded data)
+  // Right panel: community stats from Supabase (no fake fallback).
   const community = await loadCommunityStats();
+  const rightEl = document.getElementById('stats-right');
+  if (!community) {
+    rightEl.innerHTML = `
+      <div><div class="panel-title">Günün İstatistikleri</div></div>
+      <div class="stat-row"><span class="stat-label">Henüz veri yok</span></div>
+    `;
+    return;
+  }
   const communityDist = community.dist;
   const totalCommunity = communityDist.reduce((a, b) => a + b, 0);
   const maxCommunityDist = Math.max(...communityDist, 1);
   const topDistricts = community.topDistricts;
 
-  document.getElementById('stats-right').innerHTML = `
+  rightEl.innerHTML = `
     <div>
       <div class="panel-title">Günün İstatistikleri</div>
     </div>
@@ -1001,57 +1058,15 @@ async function renderStats() {
     <div style="margin-top:8px;">
       <div class="panel-title">En Başarılı İlçeler</div>
     </div>
-    ${topDistricts.map((d, i) => `
-      <div class="district-rank">
-        <span class="rank-name">${i + 1}. ${d.name}</span>
-        <span class="rank-pct">${d.pct}%</span>
-      </div>
-    `).join('')}
+    ${topDistricts.length === 0
+      ? `<div class="stat-row"><span class="stat-label">Henüz veri yok</span></div>`
+      : topDistricts.map((d, i) => `
+        <div class="district-rank">
+          <span class="rank-name">${i + 1}. ${d.name}</span>
+          <span class="rank-pct">${d.pct}%</span>
+        </div>
+      `).join('')}
   `;
-}
-
-// Generate deterministic community stats from daily seed
-function generateCommunityDist() {
-  let hash = 0;
-  for (let i = 0; i < dailySeed.length; i++) {
-    hash = ((hash << 5) - hash) + dailySeed.charCodeAt(i);
-    hash = hash & hash;
-  }
-  // Distribution: 1st try rare, 3rd-4th most common, 6th and fail less
-  const base = [3, 12, 25, 28, 18, 9, 5];
-  return base.map((b, i) => {
-    const noise = ((hash >> (i * 4)) & 0xF) - 8;
-    return Math.max(1, b + noise);
-  });
-}
-
-function generateTopDistricts() {
-  const names = {
-    bakirkoy:'Bakırköy', besiktas:'Beşiktaş', kadikoy:'Kadıköy',
-    uskudar:'Üsküdar', fatih:'Fatih', beyoglu:'Beyoğlu',
-    sisli:'Şişli', sariyer:'Sarıyer', maltepe:'Maltepe', atasehir:'Ataşehir',
-    umraniye:'Ümraniye', kagithane:'Kağıthane', bahcelievler:'Bahçelievler',
-    bagcilar:'Bağcılar', eyupsultan:'Eyüpsultan'
-  };
-  const keys = Object.keys(names);
-  let hash = 0;
-  for (let i = 0; i < dailySeed.length; i++) {
-    hash = ((hash << 3) - hash) + dailySeed.charCodeAt(i);
-    hash = hash & hash;
-  }
-  // Shuffle deterministically and pick top 5
-  const shuffled = keys.map((k, i) => ({
-    name: names[k],
-    pct: 60 + Math.abs((hash >> (i * 2)) % 35)
-  })).sort((a, b) => b.pct - a.pct).slice(0, 5);
-  return shuffled;
-}
-
-// ── Track guess distribution ──
-function recordGuessDistribution(row) {
-  // row is 1-indexed (1 = first guess, 6 = sixth, 7 = fail)
-  const key = 'sozcel_dist_' + Math.min(row, 6);
-  localStorage.setItem(key, parseInt(localStorage.getItem(key) || '0') + 1);
 }
 
 // ── Init ──

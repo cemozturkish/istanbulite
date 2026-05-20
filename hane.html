@@ -1202,20 +1202,33 @@ const STICKERS = [
 // Read game scores from Supabase's game_results table, aggregating per game.
 // Falls back to localStorage if the query fails (table missing, offline, etc.).
 async function getGameScores(userId) {
+  // Compute per-game current streak from the set of winning dates: count back
+  // from today (or yesterday, if today wasn't won) over consecutive days.
+  function currentStreakFor(winDates) {
+    function seedForOffset(off) {
+      const now = new Date();
+      const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+      ist.setDate(ist.getDate() - off);
+      return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
+    }
+    let streak = 0;
+    let offset = winDates.has(seedForOffset(0)) ? 0 : 1;
+    while (winDates.has(seedForOffset(offset))) { streak++; offset++; }
+    return streak;
+  }
   try {
     const { data, error } = await sb
       .from('game_results')
       .select('game, won, date')
       .eq('user_id', userId);
     if (error) throw error;
-    // Only count "real" results — rows with attempts>0 OR won=true — as plays.
-    // But since we insert a "started" row with won:false for all engagements,
-    // we count the highest status per (game, date): if any row for that date
-    // has won=true, count it as a win; otherwise count as a play.
+    // Dedupe per (game, date): a date counts as "played" if any row exists,
+    // and as "won" if any row has won=true. (We insert a "started" row on
+    // first interaction with attempts=0, won=false.)
     const byGameDate = {};
     (data || []).forEach(r => {
       const key = r.game + '|' + r.date;
-      if (!byGameDate[key]) byGameDate[key] = { game: r.game, won: false };
+      if (!byGameDate[key]) byGameDate[key] = { game: r.game, date: r.date, won: false };
       if (r.won) byGameDate[key].won = true;
     });
     const agg = {
@@ -1223,29 +1236,28 @@ async function getGameScores(userId) {
       sozcelPlayed: 0, sozcelWins: 0,
       baglantilarPlayed: 0, baglantilarWins: 0,
     };
+    const winDatesByGame = { bulmaca: new Set(), sozcel: new Set(), baglantilar: new Set() };
     Object.values(byGameDate).forEach(entry => {
       if (entry.game === 'bulmaca') {
         agg.bulmacaPlayed++;
-        if (entry.won) agg.bulmacaWins++;
+        if (entry.won) { agg.bulmacaWins++; winDatesByGame.bulmaca.add(entry.date); }
       } else if (entry.game === 'sozcel') {
         agg.sozcelPlayed++;
-        if (entry.won) agg.sozcelWins++;
+        if (entry.won) { agg.sozcelWins++; winDatesByGame.sozcel.add(entry.date); }
       } else if (entry.game === 'baglantilar') {
         agg.baglantilarPlayed++;
-        if (entry.won) agg.baglantilarWins++;
+        if (entry.won) { agg.baglantilarWins++; winDatesByGame.baglantilar.add(entry.date); }
       }
     });
-    agg.sozcelStreak = parseInt(localStorage.getItem('sozcel_streak') || '0');
+    agg.sozcelStreak = currentStreakFor(winDatesByGame.sozcel);
+    agg.bulmacaStreak = currentStreakFor(winDatesByGame.bulmaca);
+    agg.baglantilarStreak = currentStreakFor(winDatesByGame.baglantilar);
     return agg;
   } catch (e) {
     return {
-      bulmacaWins: parseInt(localStorage.getItem('bulmaca_wins') || '0'),
-      bulmacaPlayed: parseInt(localStorage.getItem('bulmaca_played') || '0'),
-      sozcelWins: parseInt(localStorage.getItem('sozcel_wins') || '0'),
-      sozcelPlayed: parseInt(localStorage.getItem('sozcel_played') || '0'),
-      sozcelStreak: parseInt(localStorage.getItem('sozcel_streak') || '0'),
-      baglantilarWins: parseInt(localStorage.getItem('baglantilar_wins') || '0'),
-      baglantilarPlayed: parseInt(localStorage.getItem('baglantilar_played') || '0'),
+      bulmacaWins: 0, bulmacaPlayed: 0, bulmacaStreak: 0,
+      sozcelWins: 0, sozcelPlayed: 0, sozcelStreak: 0,
+      baglantilarWins: 0, baglantilarPlayed: 0, baglantilarStreak: 0,
     };
   }
 }
@@ -1255,25 +1267,28 @@ async function getGameScores(userId) {
 function renderScoresSection(scores) {
   const el = document.getElementById('scores-section');
   if (!el) return;
-  const sozcelDetail = scores.sozcelPlayed > 0
-    ? (scores.sozcelStreak || 0) + ' seri'
-    : 'Henüz oynanmadı';
+  // Detail line: show current streak if there is one, otherwise total games.
+  function detailFor(played, streak) {
+    if (played === 0) return 'Henüz oynanmadı';
+    if (streak && streak > 0) return streak + ' seri';
+    return played + ' oyun';
+  }
   el.innerHTML = `
     <div class="right-section-title">Oyun Skorları</div>
     <div class="score-card">
       <div class="game-name">Bulmaca</div>
       <div class="score-value">${scores.bulmacaWins || 0}</div>
-      <div class="score-detail">${scores.bulmacaPlayed || 0} oyun</div>
+      <div class="score-detail">${detailFor(scores.bulmacaPlayed || 0, scores.bulmacaStreak || 0)}</div>
     </div>
     <div class="score-card">
       <div class="game-name">Sözcel</div>
       <div class="score-value">${scores.sozcelWins || 0}</div>
-      <div class="score-detail">${sozcelDetail}</div>
+      <div class="score-detail">${detailFor(scores.sozcelPlayed || 0, scores.sozcelStreak || 0)}</div>
     </div>
     <div class="score-card">
       <div class="game-name">Bağlantılar</div>
       <div class="score-value">${scores.baglantilarWins || 0}</div>
-      <div class="score-detail">${scores.baglantilarPlayed || 0} oyun</div>
+      <div class="score-detail">${detailFor(scores.baglantilarPlayed || 0, scores.baglantilarStreak || 0)}</div>
     </div>
   `;
 }
