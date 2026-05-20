@@ -1522,16 +1522,23 @@ async function init() {
     document.getElementById('home-nb-badge').textContent = nbName;
     const badgeEl = document.getElementById('user-nb-badge');
     if (badgeEl) badgeEl.textContent = nbName;
-    // Highlight home neighborhood on map
+    // Highlight home neighborhood on map and activate it so the composer
+    // is shown by default for the user's own neighborhood.
     const nbEl = document.getElementById(homeNeighborhood);
-    if (nbEl) nbEl.classList.add('home');
+    if (nbEl) {
+      nbEl.classList.add('home');
+      nbEl.classList.add('active');
+    }
+    activeMapNeighborhood = homeNeighborhood;
+    document.getElementById('map-label').textContent = nbName;
+    document.getElementById('discussion-label').textContent = nbName;
   } else {
     document.getElementById('home-nb-badge').textContent = 'Semt seçilmedi';
   }
 
   updateSubmitFormVisibility();
 
-  loadPosts();
+  loadPosts(homeNeighborhood || null);
   markPlayedGames(session.user.id);
   loadScoreboard();
 }
@@ -1543,11 +1550,11 @@ async function init() {
 function updateSubmitFormVisibility() {
   const formEl = document.getElementById('submit-form');
   if (!formEl) return;
-  const target = activeMapNeighborhood || homeNeighborhood;
-  const canPost = isAdmin || (homeNeighborhood && target === homeNeighborhood);
+  const target = activeMapNeighborhood;
+  const canPost = !!target && (isAdmin || target === homeNeighborhood);
   const noteEl = document.getElementById('submit-form-note');
 
-  if (canPost && target) {
+  if (canPost) {
     formEl.style.display = 'block';
     if (noteEl) noteEl.style.display = 'none';
     document.getElementById('post-content').style.display = '';
@@ -1555,16 +1562,9 @@ function updateSubmitFormVisibility() {
     const badge = document.getElementById('home-nb-badge');
     if (badge) badge.textContent = neighborhoodNames[target] || target;
   } else {
-    formEl.style.display = 'block';
-    document.getElementById('post-content').style.display = 'none';
-    document.getElementById('submit-btn').style.display = 'none';
-    if (noteEl) {
-      noteEl.style.display = 'block';
-      const targetName = neighborhoodNames[target] || target || 'bu semt';
-      noteEl.textContent = homeNeighborhood
-        ? `Sadece kendi semtinize (${neighborhoodNames[homeNeighborhood] || homeNeighborhood}) yazabilirsiniz. ${targetName} sakinleri burada yazıyor.`
-        : 'Yazmak için bir semte yerleşmeniz gerekir.';
-    }
+    // Hide the composer entirely when viewing Tüm İstanbul or a neighborhood
+    // the user isn't from — no "jump back" to the home neighborhood.
+    formEl.style.display = 'none';
   }
 }
 
@@ -1790,10 +1790,28 @@ async function loadPosts(neighborhoodFilter = null) {
   renderLoadMore();
 }
 
+// Posts older than this disappear from the feed.
+const POST_TTL_MS = (23 * 60 + 59) * 60 * 1000;
+
+function formatRelativeTime(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 0) return 'az önce';
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return 'az önce';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} dakika önce`;
+  const hr = Math.floor(min / 60);
+  const remMin = min - hr * 60;
+  if (remMin === 0) return `${hr} saat önce`;
+  return `${hr} saat ${remMin} dakika önce`;
+}
+
 async function fetchPostsPage(neighborhoodFilter, offset) {
+  const cutoff = new Date(Date.now() - POST_TTL_MS).toISOString();
   let query = sb
     .from('neighborhood_comments')
     .select('id, author_id, neighborhood, body, created_at')
+    .gte('created_at', cutoff)
     .order('created_at', { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1);
   if (neighborhoodFilter) query = query.eq('neighborhood', neighborhoodFilter);
@@ -1833,10 +1851,10 @@ function appendPosts(rows) {
       ? `<button class="post-delete" data-delete-id="${post.id}" title="Mesajı sil">Sil</button>`
       : '';
     return `
-      <div class="post" data-post-id="${post.id}">
+      <div class="post" data-post-id="${post.id}" data-created-at="${post.created_at}">
         <div class="post-meta">
           <span class="post-neighborhood">${authorLink}</span>
-          <span>${new Date(post.created_at).toLocaleDateString('tr-TR')} ${deleteBtn}</span>
+          <span><span class="post-time">${formatRelativeTime(post.created_at)}</span> ${deleteBtn}</span>
         </div>
         <div class="post-content">${escapeHtml(post.body)}</div>
       </div>
@@ -1904,6 +1922,29 @@ document.getElementById('discussion-posts').addEventListener('click', async (e) 
     if (postEl) postEl.remove();
   }
 });
+
+// Refresh relative-time labels every 30s and drop expired posts.
+setInterval(() => {
+  const postsEl = document.getElementById('discussion-posts');
+  if (!postsEl) return;
+  const now = Date.now();
+  postsEl.querySelectorAll('.post[data-created-at]').forEach(el => {
+    const created = new Date(el.getAttribute('data-created-at')).getTime();
+    if (now - created >= POST_TTL_MS) {
+      el.remove();
+      return;
+    }
+    const timeEl = el.querySelector('.post-time');
+    if (timeEl) timeEl.textContent = formatRelativeTime(el.getAttribute('data-created-at'));
+  });
+  if (!postsEl.querySelector('.post')) {
+    const lm = postsEl.querySelector('.load-more-wrap');
+    if (lm) lm.remove();
+    if (!postsEl.innerHTML.trim()) {
+      postsEl.innerHTML = '<div class="empty-state">Henüz mesaj yok. İlk yazan siz olun!</div>';
+    }
+  }
+}, 30000);
 
 document.getElementById('submit-btn').addEventListener('click', async () => {
   const content = document.getElementById('post-content').value.trim();
