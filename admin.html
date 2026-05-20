@@ -468,6 +468,7 @@
 
   <div class="admin-tabs">
     <button class="admin-tab active" data-tab="articles">Articles</button>
+    <button class="admin-tab" data-tab="library">Library</button>
     <button class="admin-tab" data-tab="users">Users</button>
   </div>
 
@@ -568,6 +569,62 @@
 
   </div>
 
+  <div class="admin-body" id="library-tab" style="display:none;">
+
+    <!-- LEFT: Add / Edit Library Article -->
+    <div class="panel">
+      <div class="panel-title" id="lib-form-mode-label">Add Library Article</div>
+
+      <label>Source</label>
+      <select id="lib-source">
+        <option value="">— Select Source —</option>
+        <option value="economist">The Economist</option>
+        <option value="nytimes">New York Times</option>
+        <option value="ft">Financial Times</option>
+      </select>
+
+      <label>Title</label>
+      <input type="text" id="lib-title" placeholder="Article title..."/>
+
+      <label>One-sentence summary</label>
+      <textarea id="lib-summary" placeholder="Shown in the article list..."></textarea>
+
+      <label>Body (optional)</label>
+      <textarea id="lib-body" placeholder="Full article text shown when opened..." style="min-height:120px;"></textarea>
+
+      <label>Source URL (optional)</label>
+      <input type="text" id="lib-url" placeholder="https://..."/>
+
+      <input type="hidden" id="lib-editing-id"/>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="lib-submit-btn">Publish Article</button>
+        <button class="btn btn-secondary" id="lib-cancel-edit-btn" style="display:none;">Cancel Edit</button>
+      </div>
+      <div class="status-msg" id="lib-form-status"></div>
+    </div>
+
+    <!-- RIGHT: Library Articles List -->
+    <div class="panel">
+      <div class="panel-title">Library Articles</div>
+
+      <div class="filter-row">
+        <select id="lib-filter-source">
+          <option value="">All Sources</option>
+          <option value="economist">The Economist</option>
+          <option value="nytimes">New York Times</option>
+          <option value="ft">Financial Times</option>
+        </select>
+        <button id="lib-filter-btn">Filter</button>
+      </div>
+
+      <div class="articles-list" id="lib-articles-list">
+        <div class="empty-state"><span class="spinner"></span></div>
+      </div>
+    </div>
+
+  </div>
+
   <div class="admin-body users-mode" id="users-tab" style="display:none;">
     <div class="panel">
       <div class="panel-title">Create User Account</div>
@@ -655,7 +712,9 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     const tab = btn.dataset.tab;
     document.querySelectorAll('.admin-tab').forEach(b => b.classList.toggle('active', b === btn));
     document.getElementById('articles-tab').style.display = (tab === 'articles') ? '' : 'none';
+    document.getElementById('library-tab').style.display = (tab === 'library') ? '' : 'none';
     document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
+    if (tab === 'library') loadLibraryArticles(document.getElementById('lib-filter-source').value);
   });
 });
 
@@ -844,6 +903,176 @@ async function deleteArticle(id) {
   const { error } = await sb.from('articles').delete().eq('id', id);
   if (error) { alert('Error deleting: ' + error.message); return; }
   loadArticles(document.getElementById('filter-nb').value);
+}
+
+// ══════════════════════════════════════════
+// Library articles (Kütüphane source feeds)
+// ══════════════════════════════════════════
+const LIB_SOURCE_NAMES = {
+  economist: 'The Economist',
+  nytimes: 'New York Times',
+  ft: 'Financial Times',
+};
+
+async function loadLibraryArticles(filterSource = '') {
+  const listEl = document.getElementById('lib-articles-list');
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+
+  let query = sb.from('library_articles').select('*')
+    .order('source')
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: false });
+  if (filterSource) query = query.eq('source', filterSource);
+
+  const { data, error } = await query;
+  if (error) { listEl.innerHTML = `<div class="empty-state">Error loading library articles.</div>`; return; }
+  if (!data || data.length === 0) { listEl.innerHTML = '<div class="empty-state">No library articles yet.</div>'; return; }
+
+  // Group by source so up/down only reorders within the same source.
+  const bySource = {};
+  data.forEach(a => { (bySource[a.source] = bySource[a.source] || []).push(a); });
+
+  const sections = Object.keys(bySource).map(src => {
+    const items = bySource[src];
+    const cards = items.map((a, i) => `
+      <div class="article-card" data-id="${a.id}">
+        <div class="a-neighborhood">${LIB_SOURCE_NAMES[a.source] || a.source} · #${i + 1}</div>
+        <h4>${escapeHtml(a.title)}</h4>
+        ${a.summary ? `<p>${escapeHtml(a.summary)}</p>` : ''}
+        <div class="card-actions">
+          <button class="btn-edit" data-act="up" data-id="${a.id}" ${i === 0 ? 'disabled style="opacity:0.4;cursor:default;"' : ''}>↑</button>
+          <button class="btn-edit" data-act="down" data-id="${a.id}" ${i === items.length - 1 ? 'disabled style="opacity:0.4;cursor:default;"' : ''}>↓</button>
+          <button class="btn-edit" data-act="edit" data-id="${a.id}">Edit</button>
+          <button class="btn-del"  data-act="del"  data-id="${a.id}">Delete</button>
+        </div>
+      </div>
+    `).join('');
+    return `<div style="margin-bottom:6px;font-size:0.7rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);">${LIB_SOURCE_NAMES[src] || src}</div>${cards}`;
+  }).join('');
+
+  listEl.innerHTML = sections;
+
+  // Wire actions
+  listEl.querySelectorAll('button[data-act]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const act = btn.dataset.act;
+      const row = data.find(x => x.id === id);
+      if (!row) return;
+      if (act === 'edit') editLibraryArticle(row);
+      else if (act === 'del') deleteLibraryArticle(id);
+      else if (act === 'up' || act === 'down') reorderLibraryArticle(row, act, bySource[row.source]);
+    });
+  });
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.getElementById('lib-filter-btn').addEventListener('click', () => {
+  loadLibraryArticles(document.getElementById('lib-filter-source').value);
+});
+
+document.getElementById('lib-submit-btn').addEventListener('click', async () => {
+  const id = document.getElementById('lib-editing-id').value;
+  const source = document.getElementById('lib-source').value;
+  const title = document.getElementById('lib-title').value.trim();
+  const summary = document.getElementById('lib-summary').value.trim();
+  const body = document.getElementById('lib-body').value.trim();
+  const url = document.getElementById('lib-url').value.trim();
+  const statusEl = document.getElementById('lib-form-status');
+  const btn = document.getElementById('lib-submit-btn');
+
+  if (!source || !title) {
+    statusEl.textContent = 'Please select a source and enter a title.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  let result;
+  if (id) {
+    result = await sb.from('library_articles')
+      .update({ source, title, summary, body, url })
+      .eq('id', id);
+  } else {
+    // New articles go to the end of their source's list.
+    const { data: tail } = await sb.from('library_articles')
+      .select('position').eq('source', source)
+      .order('position', { ascending: false }).limit(1);
+    const nextPos = (tail && tail[0] ? tail[0].position : -1) + 1;
+    result = await sb.from('library_articles')
+      .insert([{ source, title, summary, body, url, position: nextPos }]);
+  }
+
+  btn.textContent = id ? 'Update Article' : 'Publish Article';
+
+  if (result.error) {
+    statusEl.textContent = result.error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = id ? 'Library article updated!' : 'Library article published!';
+  statusEl.className = 'status-msg ok';
+  resetLibraryForm();
+  loadLibraryArticles(document.getElementById('lib-filter-source').value);
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+function resetLibraryForm() {
+  document.getElementById('lib-editing-id').value = '';
+  document.getElementById('lib-source').value = '';
+  document.getElementById('lib-title').value = '';
+  document.getElementById('lib-summary').value = '';
+  document.getElementById('lib-body').value = '';
+  document.getElementById('lib-url').value = '';
+  document.getElementById('lib-submit-btn').textContent = 'Publish Article';
+  document.getElementById('lib-form-mode-label').textContent = 'Add Library Article';
+  document.getElementById('lib-cancel-edit-btn').style.display = 'none';
+}
+
+document.getElementById('lib-cancel-edit-btn').addEventListener('click', resetLibraryForm);
+
+function editLibraryArticle(row) {
+  document.getElementById('lib-editing-id').value = row.id;
+  document.getElementById('lib-source').value = row.source;
+  document.getElementById('lib-title').value = row.title;
+  document.getElementById('lib-summary').value = row.summary || '';
+  document.getElementById('lib-body').value = row.body || '';
+  document.getElementById('lib-url').value = row.url || '';
+  document.getElementById('lib-submit-btn').textContent = 'Update Article';
+  document.getElementById('lib-form-mode-label').textContent = 'Editing Library Article';
+  document.getElementById('lib-cancel-edit-btn').style.display = 'inline-block';
+  document.querySelector('#library-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteLibraryArticle(id) {
+  if (!confirm('Delete this library article? This cannot be undone.')) return;
+  const { error } = await sb.from('library_articles').delete().eq('id', id);
+  if (error) { alert('Error deleting: ' + error.message); return; }
+  loadLibraryArticles(document.getElementById('lib-filter-source').value);
+}
+
+// Swap positions with the neighbour in the same source.
+async function reorderLibraryArticle(row, direction, sourceList) {
+  const i = sourceList.findIndex(x => x.id === row.id);
+  const j = direction === 'up' ? i - 1 : i + 1;
+  if (j < 0 || j >= sourceList.length) return;
+  const other = sourceList[j];
+
+  // Swap positions. If they happen to be equal (e.g. legacy rows all at 0),
+  // assign a sensible spread first.
+  let pa = row.position;
+  let pb = other.position;
+  if (pa === pb) { pa = i; pb = j; }
+
+  const { error: e1 } = await sb.from('library_articles').update({ position: pb }).eq('id', row.id);
+  const { error: e2 } = await sb.from('library_articles').update({ position: pa }).eq('id', other.id);
+  if (e1 || e2) { alert('Reorder failed: ' + (e1?.message || e2?.message)); return; }
+  loadLibraryArticles(document.getElementById('lib-filter-source').value);
 }
 
 checkAdmin();

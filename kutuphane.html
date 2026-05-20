@@ -1432,109 +1432,85 @@ updateDateTime();
 setInterval(updateDateTime, 60000);
 
 // ── Kütüphane: source tabs → article list → article detail ──
-// Stub data; replace with a real backend feed when available.
-const LIBRARY_SOURCES = {
-  economist: {
-    name: 'The Economist',
-    articles: [
-      {
-        title: 'The world this week',
-        summary: 'A weekly digest of the most important political and business news from around the globe.',
-        body: 'The Economist\'s weekly digest summarises the headlines that shaped the past seven days, from shifting alliances in Europe to the latest moves in central banking.',
-        url: 'https://www.economist.com/the-world-this-week',
-      },
-      {
-        title: 'How AI is reshaping the global economy',
-        summary: 'Productivity gains, labour-market upheaval, and the new geography of compute.',
-        body: 'Artificial intelligence is no longer confined to the tech sector. From shipping to insurance to legal services, organisations are rewiring their workflows around large models — and the consequences for growth and inequality are only beginning to take shape.',
-        url: 'https://www.economist.com',
-      },
-    ],
-  },
-  nytimes: {
-    name: 'The New York Times',
-    articles: [
-      {
-        title: 'Today\'s top stories',
-        summary: 'A curated front page covering politics, world affairs, business, and culture.',
-        body: 'The New York Times front page brings together breaking news and longer-form reporting from a global newsroom.',
-        url: 'https://www.nytimes.com',
-      },
-      {
-        title: 'The Daily',
-        summary: 'A morning podcast that unpacks one big story from the day\'s news.',
-        body: 'Each episode of The Daily takes a single subject and explores it through reporting and interviews with the journalists covering it.',
-        url: 'https://www.nytimes.com/column/the-daily',
-      },
-    ],
-  },
-  ft: {
-    name: 'Financial Times',
-    articles: [
-      {
-        title: 'Markets briefing',
-        summary: 'A snapshot of equities, bonds, currencies, and commodities at the start of the trading day.',
-        body: 'The Financial Times opens each morning with a tour of the major asset classes, flagging the moves and themes traders need to know before the bell.',
-        url: 'https://www.ft.com/markets',
-      },
-      {
-        title: 'Lex',
-        summary: 'Concise commentary on companies, sectors, and the deals reshaping them.',
-        body: 'Lex is the FT\'s daily commentary column, prized for its short, sharply argued takes on corporate strategy and valuation.',
-        url: 'https://www.ft.com/lex',
-      },
-    ],
-  },
+// Reads from public.library_articles (see db/library_articles.sql).
+const LIB_SOURCE_NAMES = {
+  economist: 'The Economist',
+  nytimes: 'New York Times',
+  ft: 'Financial Times',
 };
 
-function renderSourceList(sourceId) {
+function libEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function fetchLibrarySource(sourceId) {
+  const { data, error } = await sb.from('library_articles')
+    .select('*').eq('source', sourceId)
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('[kutuphane library fetch]', error);
+    return [];
+  }
+  return data || [];
+}
+
+async function renderSourceList(sourceId) {
   const area = document.getElementById('article-area');
-  const source = LIBRARY_SOURCES[sourceId];
-  if (!area || !source) return;
+  const name = LIB_SOURCE_NAMES[sourceId];
+  if (!area || !name) return;
   document.querySelectorAll('.source-tab').forEach(t => {
     t.classList.toggle('active', t.dataset.source === sourceId);
   });
-  if (!source.articles.length) {
+  area.innerHTML = `
+    <div class="article-list">
+      <div class="source-heading">${name}</div>
+      <div class="empty-state"><span class="spinner"></span></div>
+    </div>
+  `;
+  const articles = await fetchLibrarySource(sourceId);
+  if (!articles.length) {
     area.innerHTML = `
       <div class="article-list">
-        <div class="source-heading">${source.name}</div>
+        <div class="source-heading">${name}</div>
         <div class="empty-state">Henüz makale yok.</div>
       </div>
     `;
     return;
   }
-  const items = source.articles.map((a, i) => `
-    <div class="article-item" data-idx="${i}">
-      <div class="item-title">${a.title}</div>
-      <div class="item-summary">${a.summary}</div>
+  const items = articles.map(a => `
+    <div class="article-item" data-id="${a.id}">
+      <div class="item-title">${libEsc(a.title)}</div>
+      <div class="item-summary">${libEsc(a.summary || '')}</div>
     </div>
   `).join('');
   area.innerHTML = `
     <div class="article-list">
-      <div class="source-heading">${source.name}</div>
+      <div class="source-heading">${name}</div>
       ${items}
     </div>
   `;
   area.querySelectorAll('.article-item').forEach(el => {
     el.addEventListener('click', () => {
-      const idx = parseInt(el.dataset.idx, 10);
-      renderArticleDetail(sourceId, idx);
+      const id = el.dataset.id;
+      const article = articles.find(x => x.id === id);
+      if (article) renderArticleDetail(sourceId, article);
     });
   });
 }
 
-function renderArticleDetail(sourceId, idx) {
+function renderArticleDetail(sourceId, article) {
   const area = document.getElementById('article-area');
-  const source = LIBRARY_SOURCES[sourceId];
-  const article = source && source.articles[idx];
+  const name = LIB_SOURCE_NAMES[sourceId];
   if (!area || !article) return;
   area.innerHTML = `
     <div class="article-detail">
-      <button class="back-btn" id="back-to-list">← ${source.name}</button>
-      <div class="detail-source">${source.name}</div>
-      <div class="detail-title">${article.title}</div>
-      <div class="detail-summary">${article.summary}</div>
-      <div class="detail-body">${article.body || ''}</div>
+      <button class="back-btn" id="back-to-list">← ${name}</button>
+      <div class="detail-source">${name}</div>
+      <div class="detail-title">${libEsc(article.title)}</div>
+      ${article.summary ? `<div class="detail-summary">${libEsc(article.summary)}</div>` : ''}
+      ${article.body ? `<div class="detail-body">${libEsc(article.body).replace(/\n/g, '<br>')}</div>` : ''}
       ${article.url ? `<a class="detail-link" href="${article.url}" target="_blank" rel="noopener">Kaynakta Oku ↗</a>` : ''}
     </div>
   `;
