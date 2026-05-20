@@ -1522,16 +1522,23 @@ async function init() {
     document.getElementById('home-nb-badge').textContent = nbName;
     const badgeEl = document.getElementById('user-nb-badge');
     if (badgeEl) badgeEl.textContent = nbName;
-    // Highlight home neighborhood on map
+    // Highlight home neighborhood on map and activate it so the composer
+    // is shown by default for the user's own neighborhood.
     const nbEl = document.getElementById(homeNeighborhood);
-    if (nbEl) nbEl.classList.add('home');
+    if (nbEl) {
+      nbEl.classList.add('home');
+      nbEl.classList.add('active');
+    }
+    activeMapNeighborhood = homeNeighborhood;
+    document.getElementById('map-label').textContent = nbName;
+    document.getElementById('discussion-label').textContent = nbName;
   } else {
     document.getElementById('home-nb-badge').textContent = 'Semt seçilmedi';
   }
 
   updateSubmitFormVisibility();
 
-  loadPosts();
+  loadPosts(homeNeighborhood || null);
   markPlayedGames(session.user.id);
   loadScoreboard();
 }
@@ -1543,11 +1550,11 @@ async function init() {
 function updateSubmitFormVisibility() {
   const formEl = document.getElementById('submit-form');
   if (!formEl) return;
-  const target = activeMapNeighborhood || homeNeighborhood;
-  const canPost = isAdmin || (homeNeighborhood && target === homeNeighborhood);
+  const target = activeMapNeighborhood;
+  const canPost = !!target && (isAdmin || target === homeNeighborhood);
   const noteEl = document.getElementById('submit-form-note');
 
-  if (canPost && target) {
+  if (canPost) {
     formEl.style.display = 'block';
     if (noteEl) noteEl.style.display = 'none';
     document.getElementById('post-content').style.display = '';
@@ -1555,16 +1562,9 @@ function updateSubmitFormVisibility() {
     const badge = document.getElementById('home-nb-badge');
     if (badge) badge.textContent = neighborhoodNames[target] || target;
   } else {
-    formEl.style.display = 'block';
-    document.getElementById('post-content').style.display = 'none';
-    document.getElementById('submit-btn').style.display = 'none';
-    if (noteEl) {
-      noteEl.style.display = 'block';
-      const targetName = neighborhoodNames[target] || target || 'bu semt';
-      noteEl.textContent = homeNeighborhood
-        ? `Sadece kendi semtinize (${neighborhoodNames[homeNeighborhood] || homeNeighborhood}) yazabilirsiniz. ${targetName} sakinleri burada yazıyor.`
-        : 'Yazmak için bir semte yerleşmeniz gerekir.';
-    }
+    // Hide the composer entirely when viewing Tüm İstanbul or a neighborhood
+    // the user isn't from — no "jump back" to the home neighborhood.
+    formEl.style.display = 'none';
   }
 }
 
