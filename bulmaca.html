@@ -569,6 +569,61 @@ async function recordGameResult(game, date, attempts, won, neighborhood) {
   } catch (e) {}
 }
 
+// ── Personal stats from Supabase ──
+// For bulmaca, `attempts` = number of check-button presses on the winning
+// submission. Lower is better. Dedupe per (user, date): keep the smallest
+// attempts among winning rows as the day's score.
+async function loadPersonalStats() {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return null;
+    const { data, error } = await sb.from('game_results')
+      .select('date, attempts, won')
+      .eq('user_id', session.user.id)
+      .eq('game', 'bulmaca');
+    if (error) return null;
+    const byDate = new Map();
+    (data || []).forEach(r => {
+      const prev = byDate.get(r.date) || { date: r.date, won: false, attempts: null };
+      if (r.won) {
+        prev.won = true;
+        if (prev.attempts === null || r.attempts < prev.attempts) prev.attempts = r.attempts;
+      }
+      byDate.set(r.date, prev);
+    });
+    const entries = Array.from(byDate.values());
+    const played = entries.length;
+    const wins = entries.filter(e => e.won).length;
+    const winDateSet = new Set(entries.filter(e => e.won).map(e => e.date));
+    function seedForOffset(off) {
+      const now = new Date();
+      const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+      ist.setDate(ist.getDate() - off);
+      return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
+    }
+    let currentStreak = 0;
+    let offset = winDateSet.has(seedForOffset(0)) ? 0 : 1;
+    while (winDateSet.has(seedForOffset(offset))) { currentStreak++; offset++; }
+    const DAY = 86400000;
+    const winTimes = entries.filter(e => e.won).map(e => {
+      const [y, m, d] = e.date.split('-').map(Number);
+      return Date.UTC(y, m - 1, d);
+    }).sort((a, b) => a - b);
+    let maxStreak = 0, cur = 0, prev = null;
+    for (const t of winTimes) {
+      cur = (prev !== null && t - prev === DAY) ? cur + 1 : 1;
+      if (cur > maxStreak) maxStreak = cur;
+      prev = t;
+    }
+    // Today's check count: max attempts among today's rows (each check writes).
+    // Until the puzzle is completed only the "started" row (attempts=0) exists,
+    // so this stays meaningful only after a win.
+    const todayEntry = byDate.get(dailySeed);
+    const todayChecks = (todayEntry && todayEntry.attempts !== null) ? todayEntry.attempts : 0;
+    return { played, wins, currentStreak, maxStreak, todayChecks };
+  } catch (e) { return null; }
+}
+
 // Date display
 function updateDateTime() {
   const now = new Date();
@@ -940,7 +995,7 @@ function restoreState() {
 }
 
 // Check & clear buttons
-document.getElementById('check-btn').addEventListener('click', () => {
+document.getElementById('check-btn').addEventListener('click', async () => {
   if (gameCompleted) return;
   checkAttempts++;
   let allCorrect = true;
@@ -963,25 +1018,9 @@ document.getElementById('check-btn').addEventListener('click', () => {
     msgEl.style.color = 'var(--success)';
     document.getElementById('reset-info').textContent = getTimeUntilMidnight();
     gameCompleted = true;
-    // Track stats
-    localStorage.setItem('bulmaca_played', parseInt(localStorage.getItem('bulmaca_played') || '0') + 1);
-    localStorage.setItem('bulmaca_wins', parseInt(localStorage.getItem('bulmaca_wins') || '0') + 1);
-    localStorage.setItem('bulmaca_checks_' + dailySeed, checkAttempts);
-    // Streak tracking
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yKey = `${yesterday.getFullYear()}-${yesterday.getMonth()+1}-${yesterday.getDate()}`;
-    const lastWin = localStorage.getItem('bulmaca_last_win_date') || '';
-    if (lastWin === yKey) {
-      localStorage.setItem('bulmaca_streak', parseInt(localStorage.getItem('bulmaca_streak') || '0') + 1);
-    } else if (lastWin !== dailySeed) {
-      localStorage.setItem('bulmaca_streak', '1');
-    }
-    localStorage.setItem('bulmaca_last_win_date', dailySeed);
-    const streak = parseInt(localStorage.getItem('bulmaca_streak') || '1');
-    const maxStreak = parseInt(localStorage.getItem('bulmaca_max_streak') || '0');
-    if (streak > maxStreak) localStorage.setItem('bulmaca_max_streak', streak);
-    recordGameResult('bulmaca', dailySeed, checkAttempts, true, userNeighborhood);
+    // Insert the winning row first so renderStats() (Supabase-backed)
+    // reflects this game immediately. Streaks are derived from row data.
+    await recordGameResult('bulmaca', dailySeed, checkAttempts, true, userNeighborhood);
     renderStats();
   } else {
     msgEl.textContent = 'Bazı cevaplar yanlış!';
@@ -1002,29 +1041,39 @@ document.getElementById('clear-btn').addEventListener('click', () => {
   saveState();
 });
 
-// Load community stats from Supabase, falling back to deterministic data
+// Load community stats from Supabase. Returns null when no data for today.
 async function loadCommunityStats() {
   try {
     const { data, error } = await sb.from('game_results')
-      .select('attempts, won, neighborhood')
+      .select('user_id, attempts, won, neighborhood')
       .eq('game', 'bulmaca')
       .eq('date', dailySeed);
-    if (error || !data || data.length === 0) throw new Error('no data');
-    const dist = [0, 0, 0, 0, 0]; // 1 check, 2 checks, 3 checks, 4+ checks, failed
+    if (error || !data || data.length === 0) return null;
+    // Dedupe per user: best (lowest) attempts among winning rows.
+    const byUser = new Map();
     data.forEach(r => {
+      const prev = byUser.get(r.user_id) || { won: false, attempts: null, neighborhood: r.neighborhood };
+      if (r.neighborhood) prev.neighborhood = r.neighborhood;
       if (r.won) {
-        if (r.attempts <= 1) dist[0]++;
-        else if (r.attempts <= 2) dist[1]++;
-        else if (r.attempts <= 3) dist[2]++;
+        prev.won = true;
+        if (prev.attempts === null || r.attempts < prev.attempts) prev.attempts = r.attempts;
+      }
+      byUser.set(r.user_id, prev);
+    });
+    const dist = [0, 0, 0, 0, 0]; // 1 check, 2 checks, 3 checks, 4+ checks, failed
+    const districtMap = {};
+    byUser.forEach(e => {
+      if (e.won) {
+        if (e.attempts <= 1) dist[0]++;
+        else if (e.attempts <= 2) dist[1]++;
+        else if (e.attempts <= 3) dist[2]++;
         else dist[3]++;
       } else { dist[4]++; }
-    });
-    const districtMap = {};
-    data.forEach(r => {
-      if (!r.neighborhood) return;
-      if (!districtMap[r.neighborhood]) districtMap[r.neighborhood] = { wins: 0, total: 0 };
-      districtMap[r.neighborhood].total++;
-      if (r.won) districtMap[r.neighborhood].wins++;
+      if (e.neighborhood) {
+        if (!districtMap[e.neighborhood]) districtMap[e.neighborhood] = { wins: 0, total: 0 };
+        districtMap[e.neighborhood].total++;
+        if (e.won) districtMap[e.neighborhood].wins++;
+      }
     });
     const neighborhoodNames = {
       bakirkoy:'Bakırköy', besiktas:'Beşiktaş', kadikoy:'Kadıköy',
@@ -1037,23 +1086,32 @@ async function loadCommunityStats() {
       beykoz:'Beykoz', cekmekoy:'Çekmeköy', zeytinburnu:'Zeytinburnu'
     };
     const topDistricts = Object.entries(districtMap)
-      .map(([k, v]) => ({ name: neighborhoodNames[k] || k, pct: Math.round(v.wins / v.total * 100) }))
-      .sort((a, b) => b.pct - a.pct)
+      .map(([k, v]) => ({ name: neighborhoodNames[k] || k, pct: Math.round(v.wins / v.total * 100), total: v.total }))
+      .sort((a, b) => b.pct - a.pct || b.total - a.total)
       .slice(0, 5);
     return { dist, topDistricts };
   } catch (e) {
-    return { dist: generateCommunityDist(), topDistricts: generateTopDistricts() };
+    return null;
   }
 }
 
 // Stats rendering
 async function renderStats() {
-  const played = parseInt(localStorage.getItem('bulmaca_played') || '0');
-  const wins = parseInt(localStorage.getItem('bulmaca_wins') || '0');
-  const streak = parseInt(localStorage.getItem('bulmaca_streak') || '0');
-  const maxStreak = parseInt(localStorage.getItem('bulmaca_max_streak') || '0');
+  // Supabase is the source of truth. Cache the last payload so first paint
+  // isn't blank on slow networks.
+  const cacheKey = 'bulmaca_stats_cache';
+  let personal = await loadPersonalStats();
+  if (personal) {
+    localStorage.setItem(cacheKey, JSON.stringify(personal));
+  } else {
+    try { personal = JSON.parse(localStorage.getItem(cacheKey) || 'null'); } catch { personal = null; }
+  }
+  const played = personal ? personal.played : 0;
+  const wins = personal ? personal.wins : 0;
+  const streak = personal ? personal.currentStreak : 0;
+  const maxStreak = personal ? Math.max(personal.maxStreak, personal.currentStreak) : 0;
   const winPct = played > 0 ? Math.round(wins / played * 100) : 0;
-  const todayChecks = parseInt(localStorage.getItem('bulmaca_checks_' + dailySeed) || '0');
+  const todayChecks = personal ? personal.todayChecks : 0;
 
   document.getElementById('stats-left').innerHTML = `
     <div>
@@ -1077,7 +1135,7 @@ async function renderStats() {
     </div>
     <div class="stat-row">
       <span class="stat-label">En Uzun Seri</span>
-      <span class="stat-val">${Math.max(streak, maxStreak)}</span>
+      <span class="stat-val">${maxStreak}</span>
     </div>
     <div class="stat-row">
       <span class="stat-label">Bugün Kontrol</span>
@@ -1085,14 +1143,22 @@ async function renderStats() {
     </div>
   `;
 
-  // Right: community stats from Supabase (falls back to deterministic data)
+  // Right: community stats from Supabase (no fake fallback).
   const community = await loadCommunityStats();
+  const rightEl = document.getElementById('stats-right');
+  if (!community) {
+    rightEl.innerHTML = `
+      <div><div class="panel-title">Günün İstatistikleri</div></div>
+      <div class="stat-row"><span class="stat-label">Henüz veri yok</span></div>
+    `;
+    return;
+  }
   const communityDist = community.dist;
   const topDistricts = community.topDistricts;
   const totalCommunity = communityDist.reduce((a, b) => a + b, 0);
   const maxCommunityDist = Math.max(...communityDist, 1);
 
-  document.getElementById('stats-right').innerHTML = `
+  rightEl.innerHTML = `
     <div>
       <div class="panel-title">Günün İstatistikleri</div>
     </div>
@@ -1112,48 +1178,15 @@ async function renderStats() {
     <div style="margin-top:8px;">
       <div class="panel-title">En Başarılı İlçeler</div>
     </div>
-    ${topDistricts.map((d, i) => `
-      <div class="district-rank">
-        <span class="rank-name">${i + 1}. ${d.name}</span>
-        <span class="rank-pct">${d.pct}%</span>
-      </div>
-    `).join('')}
+    ${topDistricts.length === 0
+      ? `<div class="stat-row"><span class="stat-label">Henüz veri yok</span></div>`
+      : topDistricts.map((d, i) => `
+        <div class="district-rank">
+          <span class="rank-name">${i + 1}. ${d.name}</span>
+          <span class="rank-pct">${d.pct}%</span>
+        </div>
+      `).join('')}
   `;
-}
-
-// Deterministic community stats from daily seed
-function generateCommunityDist() {
-  let hash = 0;
-  for (let i = 0; i < dailySeed.length; i++) {
-    hash = ((hash << 5) - hash) + dailySeed.charCodeAt(i);
-    hash = hash & hash;
-  }
-  // Distribution: 1 check, 2 checks, 3 checks, 4+ checks, failed
-  const base = [8, 22, 30, 25, 15];
-  return base.map((b, i) => {
-    const noise = ((hash >> (i * 4)) & 0xF) - 8;
-    return Math.max(1, b + noise);
-  });
-}
-
-function generateTopDistricts() {
-  const names = {
-    bakirkoy:'Bakırköy', besiktas:'Beşiktaş', kadikoy:'Kadıköy',
-    uskudar:'Üsküdar', fatih:'Fatih', beyoglu:'Beyoğlu',
-    sisli:'Şişli', sariyer:'Sarıyer', maltepe:'Maltepe', atasehir:'Ataşehir',
-    umraniye:'Ümraniye', kagithane:'Kağıthane', bahcelievler:'Bahçelievler',
-    bagcilar:'Bağcılar', eyupsultan:'Eyüpsultan'
-  };
-  const keys = Object.keys(names);
-  let hash = 0;
-  for (let i = 0; i < dailySeed.length; i++) {
-    hash = ((hash << 3) - hash) + dailySeed.charCodeAt(i);
-    hash = hash & hash;
-  }
-  return keys.map((k, i) => ({
-    name: names[k],
-    pct: 55 + Math.abs((hash >> (i * 2)) % 40)
-  })).sort((a, b) => b.pct - a.pct).slice(0, 5);
 }
 
 // Init
