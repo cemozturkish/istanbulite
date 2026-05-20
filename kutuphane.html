@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kütüphane — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis). Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot. -->
+  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis) -->
   <script>
     (function(){
       try {
@@ -25,10 +25,9 @@
       --ink: #000000;
       --paper: #ffffff;
       --paper-dark: #f0f0f0;
+      --rule: #cccccc;
       --accent: #333333;
       --muted: #888888;
-      --success: #555555;
-      --star: #888888;
       --col-border: 1px solid #cccccc;
     }
 
@@ -109,8 +108,7 @@
       border-right: var(--col-border);
       display: flex;
       flex-direction: column;
-      overflow: hidden;
-      background: var(--paper);
+      overflow-y: auto;
     }
     .col-left .nb-highlight {
       padding: 8px 12px;
@@ -141,358 +139,491 @@
       min-height: 0;
     }
 
-    /* ── MAP PANEL ── */
-    .map-panel {
+    /* ── Profile identity section (left column) ── */
+    .profile-left {
       display: flex;
       flex-direction: column;
-      padding: 12px;
-      overflow: hidden;
-      background: var(--paper);
-      flex: 1;
-      min-height: 0;
-    }
-
-    .map-panel svg {
-      width: 100%;
-      height: auto;
-      display: block;
-      flex: 1;
-      pointer-events: painted;
-      min-height: 0;
-    }
-
-    .neighborhood {
-      cursor: pointer;
-      fill: transparent;
-      stroke: var(--accent);
-      stroke-width: 2;
-      opacity: 0.6;
-      transition: opacity 0.2s, fill 0.2s;
-      pointer-events: all;
-    }
-
-    .neighborhood:hover { opacity: 1; fill: rgba(0,0,0,0.08); }
-    .neighborhood.home {
-      fill: rgba(0,0,0,0.40);
-      stroke: var(--ink);
-      stroke-width: 3;
-      opacity: 1;
-    }
-    .neighborhood.home:hover { fill: rgba(0,0,0,0.45); }
-    .neighborhood.active {
-      opacity: 1;
-      fill: rgba(0,0,0,0.15);
-      stroke: #333333;
-      stroke-width: 2;
-    }
-    /* Home neighborhood: darkest, always visible */
-    .neighborhood.home {
-      fill: rgba(0,0,0,0.40);
-      stroke: var(--ink);
-      stroke-width: 3;
-      opacity: 1;
-    }
-    .neighborhood.home:hover { fill: rgba(0,0,0,0.45); }
-    .neighborhood.home.active { fill: rgba(0,0,0,0.45); stroke: var(--ink); }
-
-    .map-label {
-      text-align: center;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--ink);
-      padding: 5px 8px;
-      background: var(--paper-dark);
-      border: 1px solid var(--ink);
-      margin-top: 8px;
+      align-items: center;
+      padding: 16px;
+      gap: 10px;
       flex-shrink: 0;
     }
 
-    .articles-list {
-      padding: 24px;
-      overflow-y: auto;
-      flex: 1;
+    .avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 3px solid var(--ink);
+      background: var(--paper-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      color: var(--muted);
+      overflow: hidden;
+      flex-shrink: 0;
     }
 
-    .article-detail {
-      padding: 24px;
-      overflow-y: auto;
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    .display-name {
+      font-weight: 700;
+      font-size: 1rem;
+      text-align: center;
+      word-break: break-word;
     }
 
-    /* Article card */
-    .article-card {
-      background: white;
-      border: 1px solid #ccc;
-      padding: 16px;
-      margin-bottom: 14px;
-      cursor: pointer;
-      transition: border-color 0.2s;
-    }
-
-    .article-card:hover { border-color: var(--accent); }
-    .article-card.active { border: 2px solid var(--accent); padding: 15px; }
-
-    .article-category {
+    .avatar-upload {
       font-size: 0.65rem;
+      color: var(--accent);
+      cursor: pointer;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 700;
+      border: none;
+      background: none;
+      font-family: 'Inter', sans-serif;
+    }
+    .avatar-upload:hover { text-decoration: underline; }
+
+    .district-select-wrap {
+      width: 100%;
+      margin-top: 6px;
+    }
+
+    .district-label {
+      font-size: 0.6rem;
       font-weight: 700;
       letter-spacing: 2px;
       text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 6px;
-    }
-
-    .article-card h3 {
-      font-size: 1.05rem;
-      font-weight: 700;
-      margin-bottom: 6px;
-      line-height: 1.3;
-    }
-
-    .article-card .meta {
-      display: flex;
-      gap: 12px;
-      font-size: 0.75rem;
       color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .district-select {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.8rem;
+      padding: 6px 8px;
+      background: #f5f5f5;
+      border: 1px solid var(--ink);
+      color: var(--ink);
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .district-display {
+      font-size: 0.8rem;
+      padding: 6px 8px;
+      background: var(--paper-dark);
+      border: 1px solid #ccc;
+      color: var(--ink);
+    }
+
+    .save-btn {
+      width: 100%;
+      padding: 8px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .save-btn:hover { background: var(--accent); }
+    .save-btn:disabled { background: var(--muted); cursor: default; }
+
+    .save-msg {
+      font-size: 0.7rem;
+      text-align: center;
+      min-height: 14px;
+      font-style: italic;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .btn-signout {
+      padding: 8px 20px;
+      background: var(--accent);
+      color: var(--paper);
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
       margin-top: 8px;
     }
+    .btn-signout:hover { background: #555555; }
 
-    .article-rating {
+    /* Signout wrapper (bottom of right column on desktop, below everything on mobile) */
+    .profile-signout-wrap {
+      padding: 16px;
       display: flex;
+      justify-content: center;
+      border-top: 1px solid #ddd;
+      margin-top: auto;
+    }
+
+    /* ── Center: profile board ── */
+    .profile-center {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    #sticker-area {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .board-header {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      padding: 8px 16px;
+      background: var(--paper-dark);
+      border-bottom: var(--col-border);
+      color: var(--ink);
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 4px;
     }
 
-    .star {
-      color: var(--star);
-      font-size: 1rem;
+    .board-header .edit-toggle {
+      font-size: 0.6rem;
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: 1px;
+      border: none;
+      background: none;
+      font-family: 'Inter', sans-serif;
+      text-transform: uppercase;
+    }
+    .board-header .edit-toggle:hover { color: var(--ink); }
+
+    .sticker-board {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: var(--paper);
+      min-height: 0;
     }
 
-    /* Article detail view */
-    .detail-header {
-      margin-bottom: 24px;
-      padding-bottom: 20px;
-      border-bottom: 2px solid var(--ink);
+    .sticker {
+      position: absolute;
+      cursor: grab;
+      user-select: none;
+      width: 120px;
+      height: auto;
+      filter: grayscale(100%);
+      transition: filter 0.2s;
+    }
+    .sticker:hover { filter: grayscale(60%); }
+    .sticker.dragging { cursor: grabbing; z-index: 100; filter: grayscale(0%); }
+
+    /* Sticker tray (shown in edit mode) */
+    .sticker-tray {
+      display: none;
+      padding: 10px 16px;
+      background: var(--paper-dark);
+      border-top: var(--col-border);
+      flex-shrink: 0;
+      overflow-x: auto;
+      white-space: nowrap;
+      gap: 8px;
     }
 
-    .detail-category {
-      font-size: 0.7rem;
+    .sticker-tray.active {
+      display: flex;
+    }
+
+    .tray-sticker {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+      cursor: pointer;
+      filter: grayscale(100%);
+      opacity: 0.7;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      padding: 4px;
+      border: 2px solid transparent;
+    }
+    .tray-sticker:hover { filter: grayscale(40%); opacity: 1; }
+    .tray-sticker.locked {
+      opacity: 0.2;
+      cursor: not-allowed;
+      filter: grayscale(100%);
+    }
+    .tray-sticker.locked:hover { opacity: 0.2; filter: grayscale(100%); }
+
+    /* ── Right: stats & info ── */
+    .profile-right {
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      overflow-y: auto;
+      gap: 16px;
+    }
+
+    .right-section-title {
+      font-size: 0.6rem;
       font-weight: 700;
       letter-spacing: 3px;
       text-transform: uppercase;
       color: var(--accent);
       margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #ddd;
     }
 
-    .detail-title {
-      font-size: 2rem;
-      font-weight: 700;
-      line-height: 1.2;
-      margin-bottom: 12px;
-    }
-
-    .detail-meta {
+    .info-row {
       display: flex;
-      gap: 16px;
-      font-size: 0.82rem;
-      color: var(--muted);
+      flex-direction: column;
+      gap: 2px;
+      margin-bottom: 8px;
     }
+    .info-row:last-child { margin-bottom: 0; }
 
-    .detail-body {
-      font-size: 1.05rem;
-      line-height: 1.7;
-      margin-bottom: 30px;
-    }
-
-    .detail-body p {
-      margin-bottom: 16px;
-    }
-
-    /* Rating section */
-    .rating-section {
-      background: var(--paper-dark);
-      border: 1px solid var(--ink);
-      padding: 20px;
-      margin-bottom: 30px;
-    }
-
-    .rating-section h3 {
-      font-size: 0.85rem;
+    .info-label {
+      font-size: 0.6rem;
       font-weight: 700;
       letter-spacing: 2px;
       text-transform: uppercase;
-      margin-bottom: 14px;
-    }
-
-    .rating-display {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .rating-avg {
-      font-size: 2.5rem;
-      font-weight: 700;
-    }
-
-    .rating-stars {
-      display: flex;
-      gap: 4px;
-    }
-
-    .rating-count {
-      font-size: 0.8rem;
       color: var(--muted);
     }
 
-    .rate-buttons {
-      display: flex;
-      gap: 8px;
-    }
-
-    .rate-btn {
-      padding: 8px 16px;
-      background: white;
-      border: 1px solid var(--ink);
-      font-family: 'Inter', sans-serif;
-      font-size: 1.2rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .rate-btn:hover { background: var(--star); color: white; border-color: var(--star); }
-
-    .rate-status {
-      margin-top: 10px;
+    .info-value {
       font-size: 0.8rem;
-      text-align: center;
-      min-height: 18px;
-      font-style: italic;
-    }
-
-    /* Comments section */
-    .comments-section {
-      border-top: 2px solid var(--ink);
-      padding-top: 20px;
-    }
-
-    .comments-section h3 {
-      font-size: 1.1rem;
-      font-weight: 700;
-      margin-bottom: 16px;
-    }
-
-    .comment-form {
-      background: var(--paper-dark);
-      border: 1px solid var(--ink);
-      padding: 16px;
-      margin-bottom: 20px;
-    }
-
-    .comment-form textarea {
-      width: 100%;
-      min-height: 80px;
-      padding: 10px;
-      border: 1px solid #bbb;
-      background: white;
-      font-family: 'Inter', sans-serif;
-      font-size: 0.9rem;
-      resize: vertical;
-      margin-bottom: 10px;
-    }
-
-    .comment-form button {
-      width: 100%;
-      padding: 10px;
-      background: var(--ink);
-      color: var(--paper);
-      border: none;
-      font-family: 'Inter', sans-serif;
-      font-size: 0.85rem;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      cursor: pointer;
-    }
-
-    .comment-form button:hover { background: var(--accent); }
-
-    .comment-status {
-      margin-top: 8px;
-      font-size: 0.8rem;
-      text-align: center;
-      min-height: 18px;
-      font-style: italic;
-    }
-    .comment-status.ok { color: var(--success); }
-    .comment-status.err { color: var(--accent); }
-
-    .comments-list {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    .comment {
-      background: white;
-      border: 1px solid #ccc;
-      padding: 14px;
-    }
-
-    .comment-header {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 0.75rem;
-      color: var(--muted);
-    }
-
-    .comment-author {
-      font-weight: 700;
       color: var(--ink);
     }
 
-    .comment-body {
-      font-size: 0.92rem;
-      line-height: 1.5;
+    .score-card {
+      border: 1px solid #ccc;
+      padding: 10px;
+      background: var(--paper);
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .score-card:last-child { margin-bottom: 0; }
+
+    .score-card .game-name {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
     }
 
-    .empty-state {
+    .score-card .score-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1;
+    }
+
+    .score-card .score-detail {
+      font-size: 0.65rem;
+      color: var(--muted);
+      margin-top: 2px;
+      font-style: italic;
+    }
+
+    .loading {
       text-align: center;
-      padding: 60px 30px;
       font-style: italic;
       color: var(--muted);
-      font-size: 1.1rem;
+      padding: 60px 40px;
     }
 
     .spinner {
       display: inline-block;
       width: 14px; height: 14px;
       border: 2px solid var(--muted);
-      border-top-color: var(--accent);
+      border-top-color: var(--ink);
       border-radius: 50%;
       animation: spin 0.6s linear infinite;
       vertical-align: middle;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── Library shelf (left column) ── */
+    .library-shelf {
+      padding: 16px;
+      flex: 1;
+      overflow-y: auto;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    /* ── Article display (center) ── */
+    .article-area {
+      flex: 1;
+      padding: 32px 40px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .article-area .empty-state {
+      text-align: center;
+      font-style: italic;
+      color: var(--muted);
+      padding: 80px 20px;
+      font-size: 0.85rem;
+    }
+
+    /* ── Profile library card (top of right column) ── */
+    .library-card {
+      border-bottom: 1px solid #ddd;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: var(--paper);
+      flex-shrink: 0;
+    }
+    .library-card .card-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .library-card .avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 2px solid var(--ink);
+      background: var(--paper-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      color: var(--muted);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .library-card .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .library-card .card-id { flex: 1; min-width: 0; }
+    .library-card .card-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+      word-break: break-word;
+    }
+    .library-card .card-meta {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 2px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .library-card .edit-btn,
+    .library-card .save-btn,
+    .library-card .cancel-btn {
+      padding: 6px 12px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .library-card .edit-btn:hover,
+    .library-card .save-btn:hover { background: var(--accent); }
+    .library-card .cancel-btn {
+      background: var(--paper);
+      color: var(--ink);
+      border: 1px solid var(--ink);
+    }
+    .library-card .cancel-btn:hover { background: var(--paper-dark); }
+    .library-card .save-btn:disabled { background: var(--muted); cursor: default; }
+    .library-card .edit-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .library-card .edit-row > * { flex: 1; }
+    .library-card .card-edit {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .library-card .field-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .library-card .field-input,
+    .library-card .field-select {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.8rem;
+      padding: 6px 8px;
+      background: #f5f5f5;
+      border: 1px solid var(--ink);
+      color: var(--ink);
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .library-card .field-display {
+      font-size: 0.8rem;
+      padding: 6px 8px;
+      background: var(--paper-dark);
+      border: 1px solid #ccc;
+      color: var(--ink);
+    }
+    .library-card .avatar-upload {
+      font-size: 0.6rem;
+      color: var(--accent);
+      cursor: pointer;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 700;
+      border: none;
+      background: none;
+      font-family: 'Inter', sans-serif;
+      padding: 0;
+      text-align: left;
+    }
+    .library-card .avatar-upload:hover { text-decoration: underline; }
+    .library-card .save-msg {
+      font-size: 0.7rem;
+      min-height: 14px;
+      font-style: italic;
+      color: var(--muted);
+      text-align: center;
+    }
+
     /* ── MOBILE RESPONSIVE ── */
     @media (max-width: 768px) {
-      html, body {
+      html {
         height: 100vh;
         height: 100dvh;
-        overflow: hidden;
-        position: fixed;
-        width: 100%;
       }
-
       body {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto auto 1fr;
-        overflow: hidden;
+        height: 100vh;
+        height: 100dvh;
+        display: block;
+        overflow-y: auto;
+        overflow-x: hidden;
         padding-bottom: 56px; /* reserve space for fixed bottom tab bar */
+        -webkit-overflow-scrolling: touch;
       }
 
       .col-left, .col-right, header, .section-rule, main {
@@ -501,182 +632,167 @@
 
       /* Compact top brand bar */
       .section-rule {
-        grid-column: 1 / -1;
-        grid-row: 1;
         padding: 9px 16px;
         border-bottom: 1px solid #e5e5e5;
         background: #ffffff;
         font-size: 10px;
         font-weight: 700;
         letter-spacing: 1.8px;
+        position: sticky;
+        top: 0;
+        z-index: 10;
       }
       .datetime-block { flex-direction: row; gap: 8px; }
       .datetime-block .day-line { display: none; }
 
-      /* Map: fills horizontally, height determined by aspect ratio */
-      main {
-        grid-column: 1 / -1;
-        grid-row: 2;
-        overflow: hidden;
+      /* Hide sticker board entirely — page IS the profile badge */
+      main { display: none !important; }
+
+      /* Profile badge: single scrollable column combining col-left + col-right */
+      .col-left {
+        border: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 16px 20px 20px 20px;
+        background: #ffffff;
+      }
+      .col-right {
+        border: none;
+        background: #ffffff;
         display: block;
       }
-      .map-panel {
-        padding: 0;
-        display: block;
-        overflow: hidden;
-      }
-      .map-panel svg {
-        display: block;
+
+      .col-left .nb-highlight {
         width: 100%;
-        height: auto;
+        text-align: center;
+        padding: 4px 0 10px 0;
+        font-size: 10px;
+        letter-spacing: 1.5px;
+        flex-shrink: 0;
+        border-bottom: 1px solid #e5e5e5;
+        margin-bottom: 14px;
       }
-      .map-label {
-        margin: 4px 0 6px 0;
-        padding: 4px 14px;
-        font-size: 11px;
-        letter-spacing: 1px;
+
+      /* Stack profile-left vertically, center all items */
+      .profile-left {
+        padding: 0;
+        gap: 10px;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        max-width: 320px;
+        overflow: visible;
+      }
+
+      /* Large centered avatar on top */
+      .avatar {
+        width: 110px;
+        height: 110px;
+        border-width: 3px;
+        font-size: 2.4rem;
+        flex-shrink: 0;
+        margin-bottom: 2px;
+      }
+      .avatar-upload {
+        font-size: 10px;
+        margin-bottom: 6px;
+      }
+
+      /* Name/details below avatar, full width */
+      .display-name {
+        font-size: 18px;
+        text-align: center;
+        font-weight: 700;
+        margin: 2px 0 8px 0;
+      }
+      .district-select-wrap {
+        width: 100%;
+        margin-top: 0;
+      }
+      .district-label {
+        font-size: 9px;
+        margin-bottom: 3px;
+        letter-spacing: 1.2px;
+        text-align: left;
+      }
+      .district-select, .district-display {
+        width: 100%;
+        font-size: 12px;
+        padding: 7px 10px;
+        border-radius: 4px;
+      }
+      .save-btn {
+        width: 100%;
+        padding: 9px 12px;
+        font-size: 12px;
+        margin-top: 8px;
+        border-radius: 4px;
+      }
+      .save-msg {
+        font-size: 10px;
+        min-height: 14px;
+        margin-top: 4px;
         text-align: center;
       }
 
-      /* Left column below map: article list */
-      .col-left {
-        grid-column: 1;
-        grid-row: 3;
-        min-height: 0;
-        overflow: hidden;
-        border-right: 1px solid #e5e5e5;
-        border-top: 1px solid #e5e5e5;
+      /* Scores & account info in profile-right — compact below profile-left */
+      .profile-right {
+        padding: 12px 20px 14px 20px;
+        gap: 10px;
+        overflow: visible;
         display: flex;
         flex-direction: column;
+        border-top: 1px solid #e5e5e5;
+        background: #ffffff;
       }
-      .col-left .nb-highlight {
-        padding: 6px 12px;
+      .profile-signout-wrap {
+        padding: 14px 20px 20px 20px;
+        display: flex;
+        justify-content: center;
+        border-top: 1px solid #e5e5e5;
+        background: #ffffff;
+      }
+      .profile-signout-wrap .btn-signout {
+        width: 100%;
+        max-width: 320px;
+        padding: 11px 16px;
+        font-size: 12px;
+        border-radius: 4px;
+      }
+      .right-section-title {
         font-size: 10px;
+        margin-bottom: 6px;
+        padding-bottom: 3px;
         letter-spacing: 1.2px;
-        flex-shrink: 0;
       }
-      .articles-list {
-        padding: 6px 12px;
-        overflow: hidden;
-        flex: 1;
-        min-height: 0;
+      .info-row {
+        margin-bottom: 5px;
+        gap: 2px;
       }
-      .article-card {
+      .info-label {
+        font-size: 9px;
+        letter-spacing: 1px;
+      }
+      .info-value {
+        font-size: 12px;
+      }
+      .score-card {
         padding: 8px 10px;
         margin-bottom: 6px;
         border-radius: 4px;
       }
-      .article-category {
+      .score-card .game-name {
         font-size: 9px;
-        margin-bottom: 3px;
+        margin-bottom: 2px;
         letter-spacing: 1px;
       }
-      .article-card h3 {
-        font-size: 12px;
-        margin-bottom: 3px;
-        line-height: 1.25;
-      }
-      .article-card .meta {
+      .score-card .score-value { font-size: 16px; }
+      .score-card .score-detail {
         font-size: 10px;
-        gap: 8px;
-        margin-top: 3px;
+        margin-top: 1px;
       }
-
-      /* Right column below map: article detail */
-      .col-right {
-        grid-column: 2;
-        grid-row: 3;
-        min-height: 0;
-        overflow: hidden;
-        border-left: none;
-        border-top: 1px solid #e5e5e5;
-      }
-      .article-detail {
-        padding: 8px 12px;
-        overflow: hidden;
-      }
-      .detail-header {
-        margin-bottom: 6px;
-        padding-bottom: 6px;
-      }
-      .detail-category {
-        font-size: 9px;
-        margin-bottom: 3px;
-        letter-spacing: 1px;
-      }
-      .detail-title {
-        font-size: 14px;
-        margin-bottom: 4px;
-        line-height: 1.25;
-      }
-      .detail-meta {
-        font-size: 10px;
-        gap: 8px;
-      }
-      .detail-body {
-        font-size: 11px;
-        line-height: 1.4;
-        margin-bottom: 8px;
-      }
-      .detail-body p { margin-bottom: 5px; }
-      .rating-section {
-        padding: 6px 8px;
-        margin-bottom: 6px;
-        border-radius: 4px;
-      }
-      .rating-section h3 {
-        font-size: 10px;
-        margin-bottom: 5px;
-        letter-spacing: 1px;
-      }
-      .rating-display { gap: 8px; margin-bottom: 5px; }
-      .rating-avg { font-size: 16px; }
-      .rating-count { font-size: 10px; }
-      .rate-btn {
-        padding: 6px 10px;
-        font-size: 12px;
-        min-width: 32px;
-        border-radius: 4px;
-      }
-      .rate-buttons { flex-wrap: wrap; gap: 5px; }
-      .comments-section { padding-top: 6px; }
-      .comments-section h3 {
-        font-size: 11px;
-        margin-bottom: 5px;
-      }
-      .comment-form {
-        padding: 6px;
-        margin-bottom: 6px;
-      }
-      .comment-form textarea {
-        min-height: 32px;
-        padding: 6px;
-        font-size: 12px;
-        margin-bottom: 5px;
-        border-radius: 4px;
-      }
-      .comment-form button {
-        padding: 8px;
-        font-size: 11px;
-        border-radius: 4px;
-      }
-      .comment {
-        padding: 6px;
-        margin-bottom: 5px;
-        border-radius: 4px;
-      }
-      .comment-header {
-        font-size: 10px;
-        margin-bottom: 3px;
-      }
-      .comment-body {
-        font-size: 11px;
-        line-height: 1.4;
-      }
-      .empty-state {
-        padding: 16px 10px;
-        font-size: 12px;
-      }
+      .loading { padding: 14px; font-size: 12px; }
 
       /* Bottom tab bar — fixed at bottom */
       header {
@@ -780,9 +896,6 @@
        no white flash between reloads. Only the columns
        animate; the map, nav, and datetime bar stay put
        because their content is identical across tabs.
-       Direction comes from a class on <html> seeded by
-       the outgoing page via sessionStorage, so the class
-       is present before VT captures the new snapshot.
        ══════════════════════════════════════════════ */
     @view-transition { navigation: auto; }
 
@@ -795,7 +908,6 @@
 
     .col-left { view-transition-name: ist-col-left; }
     .col-right { view-transition-name: ist-col-right; }
-
 
     @media (min-width: 769px) {
       @keyframes ist-vt-out-up { from { transform: translateY(0); } to { transform: translateY(-100vh); } }
@@ -848,6 +960,11 @@
 </head>
 <body>
 
+  <aside class="col-left">
+    <div class="nb-highlight" id="user-nb-badge"></div>
+    <div class="library-shelf" id="library-shelf"></div>
+  </aside>
+
   <div class="section-rule">
     <div class="datetime-block">
       <div class="date-line" id="date-line"></div>
@@ -856,60 +973,28 @@
     </div>
   </div>
 
-  <aside class="col-left">
-    <div class="nb-highlight" id="user-nb-badge"></div>
-    <section class="articles-list" id="articles-list">
-      <div class="empty-state"><span class="spinner"></span> Makaleler yükleniyor...</div>
-    </section>
-  </aside>
-
   <header>
     <nav>
       <a href="index.html">Anahane</a>
       <a href="kahvehane.html">Kahvehane</a>
       <a href="kutuphane.html" class="active">Kütüphane</a>
-      <a href="hane.html">Hane</a>
     </nav>
   </header>
 
   <main>
-    <section class="map-panel">
-      <svg viewBox="0 0 2739.5 2057.29" xmlns="http://www.w3.org/2000/svg">
-        <image href="assets/istanbul-map.png" x="0" y="0" width="2739.5" height="2057.29"/>
-        <g id="bakirkoy" class="neighborhood" data-name="Bakırköy"><polyline points="7.5 1444.08 0 1560.36 187.31 1710.2 368.55 1662.41 424.31 1540.92 609.53 1544.9 720.43 1464.68 749.04 1288.06 253.03 1385.57 211.21 1309.89 115.8 1308 132 1444.08 7.5 1444.08"/></g>
-        <g id="bayrampasa" class="neighborhood" data-name="Bayrampaşa"><polyline points="614.76 566.04 685.8 754.32 693.43 929.96 769.8 975.78 798.69 1045.19 862.06 1014.89 937.81 1036.88 787.62 685.59 614.76 566.04"/></g>
-        <g id="bahcelievler" class="neighborhood" data-name="Bahçelievler"><polyline points="690.72 1297.51 253.03 1385.57 211.21 1309.89 151.44 1152.48 164.47 1056.56 266.05 1143.1 433.49 1109.24 533.19 1156.27 588.25 1258.11 653.59 1160.03 690.72 1297.51"/></g>
-        <g id="sisli" class="neighborhood" data-name="Şişli"><polygon points="1218.05 133.39 1250.78 7.53 1627.02 16.82 1627.02 316.77 1476.39 397.25 1367.17 404.8 1345.4 329.81 1258.31 334.65 1178.47 281.42 1200.43 251.69 1185.33 140.94 1218.05 133.39"/><polyline points="1497.24 518.39 1509.91 620.11 1398.62 591.08 1217.18 799.14 1439.35 952.19 1490.29 703.79 1564.45 720.01 1576.79 608.58 1497.24 518.39"/></g>
-        <g id="eyupsultan" class="neighborhood" data-name="Eyüpsultan"><polyline points="656.88 9.29 1247.69 9.83 1212.18 133.66 1179.4 136.85 1198.07 237.46 1160.73 299.37 1187.59 354.91 1140.7 376.77 1245.41 472.83 1109.61 720.57 1090.02 713.5 1084.88 687.48 1075.92 695.09 1057.58 777.74 1005.04 686.34 890.31 681.33 911.25 275.7 662.84 16.82"/><polyline points="1056.04 782.23 908.01 795.67 854.08 852.08 937.2 1044.55 956.75 1051.75 1051.01 918.87 1004.5 824.86 1056.04 782.23"/></g>
-        <g id="gop" class="neighborhood" data-name="Gaziosmanpaşa"><polyline points="621.04 563.89 682.08 502.85 897.47 461.96 885.37 685.98 997.67 692.89 1043.74 772.36 904.95 794.82 857.15 842.62 787.62 685.59"/></g>
-        <g id="esenler" class="neighborhood" data-name="Esenler"><polygon points="780.76 1111.16 718.97 1113.36 702.42 994.19 637.31 1014.06 615.25 962.19 524.76 936.82 480.63 755.85 506.01 652.13 426.56 721.65 354.84 697.37 437.59 369.65 603.11 564.41 685.8 754.32 691.38 937.37 762 974.88 789.59 1043.3 780.76 1111.16"/></g>
-        <g id="bagcilar" class="neighborhood" data-name="Bağcılar"><polyline points="206.52 660 164.47 1056.56 266.05 1143.1 430.94 1101.98 533.19 1156.27 503.13 1064.22 633.53 1020.41 617.01 966.92 522.97 943.63 475.6 755.5 499.96 658.05 429.58 727.07 206.52 660"/></g>
-        <g id="basaksehir" class="neighborhood" data-name="Başakşehir"><polygon points="7.5 9.29 154.68 9.29 433.32 361.92 345.84 702.12 206.52 660 190.32 770.16 7.5 731.28 7.5 9.29"/></g>
-        <g id="kucukcekmece" class="neighborhood" data-name="Küçükçekmece"><polygon points="7.5 1444.08 132 1444.08 115.8 1308 220.41 1308 151.44 1152.48 190.32 770.16 7.5 731.28 7.5 1444.08"/></g>
-        <g id="sultangazi" class="neighborhood" data-name="Sultangazi"><polygon points="656.88 9.29 916.08 277.68 899.99 455.88 679.56 498 614.76 566.04 154.68 9.29 656.88 9.29"/></g>
-        <g id="uskudar" class="neighborhood" data-name="Üsküdar"><polygon points="1518.66 1080.88 1830.23 833 1830.23 740.99 1867.41 693.19 1858.56 622.38 1934.68 579.89 2023.2 700.27 2078.07 974.67 2012.57 1006.53 2088.7 1194.18 1971.86 1206.57 1980.71 1326.95 1761.19 1166.28 1605.41 1326.95 1562.92 1282.7 1518.66 1080.88"/></g>
-        <g id="kadikoy" class="neighborhood" data-name="Kadıköy"><polygon points="1578.85 1378.29 1617.8 1488.05 1718.71 1472.12 1741.72 1523.46 1686.84 1594.27 1759.42 1604.89 1784.21 1573.02 1938.22 1647.38 2028.51 1725.27 2239.17 1640.3 2109.94 1414.76 1761.19 1166.28 1605.41 1326.95 1631.96 1358.82 1578.85 1378.29"/></g>
-        <g id="maltepe" class="neighborhood" data-name="Maltepe"><polygon points="2739.5 1463.89 2564.43 1437.18 2514.35 1505.62 2352.43 1505.62 2239.17 1640.3 2074.59 1706.68 2360.77 2057.29 2739.5 2057.29 2739.5 1463.89"/></g>
-        <g id="umraniye" class="neighborhood" data-name="Ümraniye"><polygon points="2129.44 686.63 2110.15 733.48 2206.61 710.06 2297.57 816.17 2383.01 799.63 2429.86 940.2 2617.28 965 2739.5 1130.37 2739.5 1315.32 2239.17 1303.63 2088.7 1194.18 2012.57 1006.53 2078.07 974.67 2023.2 700.27 2129.44 686.63"/></g>
-        <g id="cekmekoy" class="neighborhood" data-name="Çekmeköy"><polygon points="2739.5 742.25 2408.24 875.34 2429.86 940.2 2617.28 965 2739.5 1130.37 2739.5 742.25"/></g>
-        <g id="beykoz" class="neighborhood" data-name="Beykoz"><polygon points="1992.52 9.29 2146.49 154.73 2125.49 222.38 2025.18 315.69 1943.53 341.35 1917.87 386.92 1934.68 579.89 2023.2 700.27 2129.44 686.63 2110.15 733.48 2206.61 710.06 2297.57 816.17 2383.01 799.63 2408.24 875.34 2739.5 742.25 2739.5 9.29 1992.52 9.29"/></g>
-        <g id="sariyer" class="neighborhood" data-name="Sarıyer"><polygon points="1621.06 9.29 1621.06 309.24 1558.49 346.32 1676.68 399.62 1637.28 442.31 1852.81 531.72 1822.68 404.26 1961.73 174.83 1866.71 9.29 1621.06 9.29"/></g>
-        <g id="besiktas" class="neighborhood" data-name="Beşiktaş"><polygon points="1437.98 953.42 1484.33 696.25 1558.49 712.48 1578.85 603.56 1491.28 510.86 1470.43 389.72 1558.49 346.32 1676.68 399.62 1637.28 442.31 1852.81 531.72 1760.11 594.29 1783.28 675.4 1750.84 686.63 1743.89 731.28 1709.93 742.25 1688.27 833 1437.98 953.42"/></g>
-        <g id="beyoglu" class="neighborhood" data-name="Beyoğlu"><polygon points="1084.01 709.2 1110.23 800.97 1061.53 814.08 1052.17 875.34 1110.23 917.79 1143.94 967.66 1224.47 1000.97 1241.33 1066.93 1282.53 1087.68 1373.5 1048.2 1437.98 953.42 1084.01 709.2"/></g>
-        <g id="gungoren" class="neighborhood" data-name="Güngören"><polygon points="699.47 1001.07 715.25 1119.44 778.38 1117.86 749.04 1288.06 697.89 1296.2 653.7 1147.85 587.42 1250.43 503.13 1064.22 699.47 1001.07"/></g>
-        <g id="kagithane" class="neighborhood" data-name="Kağıthane"><polygon points="1112.03 716.61 1211.22 791.61 1392.66 583.55 1503.95 612.58 1470.43 389.72 1361.21 397.27 1339.44 322.28 1252.35 327.11 1172.51 273.89 1160.42 295.66 1182.19 351.31 1138.65 375.5 1242.67 479.53 1112.03 716.61"/></g>
-        <g id="atasehir" class="neighborhood" data-name="Ataşehir"><polygon points="2739.5 1315.32 2239.17 1303.63 2088.7 1194.18 1971.86 1206.57 1980.71 1326.95 2109.94 1414.76 2239.17 1639.24 2352.43 1505.62 2514.35 1505.62 2564.43 1437.18 2739.5 1463.89 2739.5 1315.32"/></g>
-        <g id="zeytinburnu" class="neighborhood" data-name="Zeytinburnu"><polygon points="798.69 1045.19 862.06 1014.89 951.22 1052.78 899.99 1130.98 899.99 1414.76 874.96 1420.83 786.74 1499.31 720.43 1464.68 798.69 1045.19"/></g>
-        <g id="fatih" class="neighborhood" data-name="Fatih"><path d="M1053.98,910.62l-153.99,218.9v291.38s37.69-5.13,37.69-5.13l92.72-116.08,46.64,37.39,76.81-18.98v-35.16l170.09,4.46s83.4-60.83,41.15-142.31l-132.78-26.23-56.51-68.09-29.08-16.74-66.94-106.6"/></g>
-      </svg>
-      <div class="map-label" id="map-label">İstanbul</div>
-    </section>
+    <div class="article-area" id="article-area">
+      <div class="empty-state">Okumak için soldaki listeden bir makale seçin.</div>
+    </div>
   </main>
 
   <aside class="col-right">
-    <section class="article-detail" id="article-detail">
-      <div class="empty-state">Okumak için bir makale seçin</div>
-    </section>
+    <div class="library-card" id="library-card">
+      <div class="loading"><span class="spinner"></span></div>
+    </div>
+    <div class="profile-right">
+      <div class="loading"><span class="spinner"></span></div>
+    </div>
+    <div class="profile-signout-wrap" id="profile-signout-wrap"></div>
   </aside>
 
 <script>
@@ -922,7 +1007,7 @@
 // trigger the same animation.
 // ══════════════════════════════════════════
 (function initSwipePagination() {
-  const PAGES = ['index.html', 'kahvehane.html', 'kutuphane.html', 'hane.html'];
+  const PAGES = ['index.html', 'kahvehane.html', 'kutuphane.html'];
   const DURATION = 400;
   const MIN_DX = 50;
   const MAX_TIME = 700;
@@ -937,13 +1022,18 @@
     const idx = PAGES.indexOf(path);
     return idx === -1 ? 0 : idx;
   }
+  function pageFromUrl(url) {
+    try { return new URL(url).pathname.split('/').pop() || 'index.html'; }
+    catch(e) { return ''; }
+  }
   function recordDir(dir) {
-    // Seed the direction for the incoming page. The pre-body script
-    // reads this and sets vt-<dir> on <html> before VT captures the
-    // new snapshot, so the CSS slide keyframes can match.
     try { sessionStorage.setItem('ist-page-enter-dir', dir); } catch(e) {}
   }
 
+  // Tell the browser which direction to animate by setting a VT type AND
+  // toggling a class on <html>. The class is the reliable hook; some
+  // browsers don't match :active-view-transition-type() consistently, so
+  // our CSS targets html.vt-forward / html.vt-backward instead.
   if (supportsVT) {
     window.addEventListener('pageswap', (e) => {
       if (!e.viewTransition) return;
@@ -958,12 +1048,13 @@
       if (dir) e.viewTransition.types.add(dir);
       e.viewTransition.finished.finally(() => {
         root.classList.remove('vt-forward', 'vt-backward');
+        try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
       });
     });
   }
 
-  // Entry handler — runs on every page load. Cleans up direction state
-  // and, for non-VT browsers, releases the manual offscreen transform.
+  // Fallback entry cleanup (runs on every load; releases the offscreen
+  // transform that the pre-body script applied for non-VT browsers).
   function handleIncoming() {
     const root = document.documentElement;
     const dir = root.classList.contains('ist-entering-forward') ? 'forward'
@@ -987,6 +1078,7 @@
     navigating = true;
     recordDir(dir);
     if (supportsVT) {
+      // The browser will trigger a view transition on this navigation.
       location.href = PAGES[targetIdx];
       return;
     }
@@ -1232,20 +1324,11 @@ function updateDateTime() {
 updateDateTime();
 setInterval(updateDateTime, 60000);
 
-// ══════════════════════════════════════════
-// CONFIGURATION
-// ══════════════════════════════════════════
 const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// ── Auth gate: invite-only site; no session → bounce to login ──
-(async function requireSession() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) { window.location.href = 'index.html'; return; }
-})();
 
 const neighborhoodNames = {
   bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler',
@@ -1258,272 +1341,544 @@ const neighborhoodNames = {
   kagithane:'Kağıthane', atasehir:'Ataşehir', zeytinburnu:'Zeytinburnu', fatih:'Fatih'
 };
 
-// Highlight user's home neighborhood
-(async () => {
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) {
-      const homeNb = session.user.user_metadata?.yasadigi_ilce
-        || session.user.user_metadata?.neighborhood || '';
-      if (homeNb) {
-        const nbEl = document.getElementById(homeNb);
-        if (nbEl) nbEl.classList.add('home');
-        const badgeEl = document.getElementById('user-nb-badge');
-        if (badgeEl) badgeEl.textContent = neighborhoodNames[homeNb] || homeNb;
-      }
+// Sticker definitions — image-based stickers, unlocked by birth district
+const STICKERS = [
+  { src: 'assets/galatakulesisticker.png', label: 'Galata Kulesi', district: 'beyoglu' },
+  { src: 'assets/kizkulesisticker.png', label: 'Kız Kulesi', district: 'uskudar' },
+];
+
+// Read game scores from Supabase's game_results table, aggregating per game.
+// Falls back to localStorage if the query fails (table missing, offline, etc.).
+async function getGameScores(userId) {
+  // Compute per-game current streak from the set of winning dates: count back
+  // from today (or yesterday, if today wasn't won) over consecutive days.
+  function currentStreakFor(winDates) {
+    function seedForOffset(off) {
+      const now = new Date();
+      const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+      ist.setDate(ist.getDate() - off);
+      return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
     }
-  } catch(e) {}
-})();
-
-let currentArticleId = null;
-
-// ══════════════════════════════════════════
-// HIGHLIGHT HOME NEIGHBORHOOD
-// ══════════════════════════════════════════
-(async function highlightHome() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) return;
-  const homeNb = session.user.user_metadata?.yasadigi_ilce
-    || session.user.user_metadata?.neighborhood
-    || localStorage.getItem('yasadigi_ilce_local');
-  if (homeNb) {
-    const nbEl = document.getElementById(homeNb);
-    if (nbEl) nbEl.classList.add('home');
+    let streak = 0;
+    let offset = winDates.has(seedForOffset(0)) ? 0 : 1;
+    while (winDates.has(seedForOffset(offset))) { streak++; offset++; }
+    return streak;
   }
-})();
-
-// ══════════════════════════════════════════
-// LOAD ARTICLES
-// ══════════════════════════════════════════
-async function loadArticles() {
-  const listEl = document.getElementById('articles-list');
-  
-  const { data, error } = await sb
-    .from('library_articles')
-    .select('*')
-    .order('created_at', { ascending: false });
-  
-  if (error || !data || data.length === 0) {
-    listEl.innerHTML = '<div class="empty-state">Henüz makale eklenmedi</div>';
-    return;
+  try {
+    const { data, error } = await sb
+      .from('game_results')
+      .select('game, won, date')
+      .eq('user_id', userId);
+    if (error) throw error;
+    // Dedupe per (game, date): a date counts as "played" if any row exists,
+    // and as "won" if any row has won=true. (We insert a "started" row on
+    // first interaction with attempts=0, won=false.)
+    const byGameDate = {};
+    (data || []).forEach(r => {
+      const key = r.game + '|' + r.date;
+      if (!byGameDate[key]) byGameDate[key] = { game: r.game, date: r.date, won: false };
+      if (r.won) byGameDate[key].won = true;
+    });
+    const agg = {
+      bulmacaPlayed: 0, bulmacaWins: 0,
+      sozcelPlayed: 0, sozcelWins: 0,
+      baglantilarPlayed: 0, baglantilarWins: 0,
+    };
+    const winDatesByGame = { bulmaca: new Set(), sozcel: new Set(), baglantilar: new Set() };
+    Object.values(byGameDate).forEach(entry => {
+      if (entry.game === 'bulmaca') {
+        agg.bulmacaPlayed++;
+        if (entry.won) { agg.bulmacaWins++; winDatesByGame.bulmaca.add(entry.date); }
+      } else if (entry.game === 'sozcel') {
+        agg.sozcelPlayed++;
+        if (entry.won) { agg.sozcelWins++; winDatesByGame.sozcel.add(entry.date); }
+      } else if (entry.game === 'baglantilar') {
+        agg.baglantilarPlayed++;
+        if (entry.won) { agg.baglantilarWins++; winDatesByGame.baglantilar.add(entry.date); }
+      }
+    });
+    agg.sozcelStreak = currentStreakFor(winDatesByGame.sozcel);
+    agg.bulmacaStreak = currentStreakFor(winDatesByGame.bulmaca);
+    agg.baglantilarStreak = currentStreakFor(winDatesByGame.baglantilar);
+    return agg;
+  } catch (e) {
+    return {
+      bulmacaWins: 0, bulmacaPlayed: 0, bulmacaStreak: 0,
+      sozcelWins: 0, sozcelPlayed: 0, sozcelStreak: 0,
+      baglantilarWins: 0, baglantilarPlayed: 0, baglantilarStreak: 0,
+    };
   }
-  
-  listEl.innerHTML = data.map(article => `
-    <div class="article-card" onclick="loadArticleDetail('${article.id}')">
-      <div class="article-category">${article.category || 'GENEL'}</div>
-      <h3>${article.title}</h3>
-      <div class="meta">
-        <div class="article-rating">
-          <span class="star">★</span>
-          <span>${article.avg_rating ? article.avg_rating.toFixed(1) : 'N/A'}</span>
-        </div>
-        <span>${new Date(article.created_at).toLocaleDateString('tr-TR')}</span>
-      </div>
-    </div>
-  `).join('');
 }
 
-// ══════════════════════════════════════════
-// LOAD ARTICLE DETAIL
-// ══════════════════════════════════════════
-async function loadArticleDetail(articleId) {
-  currentArticleId = articleId;
-  const detailEl = document.getElementById('article-detail');
-  detailEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
-  
-  // Highlight selected card
-  document.querySelectorAll('.article-card').forEach(card => card.classList.remove('active'));
-  event.target.closest('.article-card').classList.add('active');
-  
-  const { data: article, error } = await sb
-    .from('library_articles')
-    .select('*')
-    .eq('id', articleId)
-    .single();
-  
-  if (error || !article) {
-    detailEl.innerHTML = '<div class="empty-state">Makale yüklenemedi</div>';
-    return;
+// Render the Oyun Skorları section. Called once synchronously with zeroed
+// scores (so the layout settles) and again after the Supabase query resolves.
+function renderScoresSection(scores) {
+  const el = document.getElementById('scores-section');
+  if (!el) return;
+  // Detail line: show current streak if there is one, otherwise total games.
+  function detailFor(played, streak) {
+    if (played === 0) return 'Henüz oynanmadı';
+    if (streak && streak > 0) return streak + ' seri';
+    return played + ' oyun';
   }
-  
-  // Load ratings
-  const { data: ratings } = await sb
-    .from('article_ratings')
-    .select('rating')
-    .eq('article_id', articleId);
-  
-  const avgRating = ratings && ratings.length > 0 
-    ? (ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length).toFixed(1)
-    : 'N/A';
-  const ratingCount = ratings ? ratings.length : 0;
-  
-  // Load comments
-  const { data: comments } = await sb
-    .from('article_comments')
-    .select('*')
-    .eq('article_id', articleId)
-    .eq('approved', true)
-    .order('created_at', { ascending: false });
-  
-  detailEl.innerHTML = `
-    <div class="detail-header">
-      <div class="detail-category">${article.category || 'GENEL'}</div>
-      <h1 class="detail-title">${article.title}</h1>
-      <div class="detail-meta">
-        <span>${new Date(article.created_at).toLocaleDateString('tr-TR', {year:'numeric',month:'long',day:'numeric'})}</span>
-        ${article.author ? `<span>Yazar: ${article.author}</span>` : ''}
-      </div>
+  el.innerHTML = `
+    <div class="right-section-title">Oyun Skorları</div>
+    <div class="score-card">
+      <div class="game-name">Bulmaca</div>
+      <div class="score-value">${scores.bulmacaWins || 0}</div>
+      <div class="score-detail">${detailFor(scores.bulmacaPlayed || 0, scores.bulmacaStreak || 0)}</div>
     </div>
-    
-    <div class="detail-body">
-      ${article.content.split('\n').map(p => `<p>${p}</p>`).join('')}
+    <div class="score-card">
+      <div class="game-name">Sözcel</div>
+      <div class="score-value">${scores.sozcelWins || 0}</div>
+      <div class="score-detail">${detailFor(scores.sozcelPlayed || 0, scores.sozcelStreak || 0)}</div>
     </div>
-    
-    <div class="rating-section">
-      <h3>Makaleyi Değerlendir</h3>
-      <div class="rating-display">
-        <div class="rating-avg">${avgRating}</div>
-        <div>
-          <div class="rating-stars">
-            ${[1,2,3,4,5].map(n => `<span class="star">${n <= Math.round(avgRating) ? '★' : '☆'}</span>`).join('')}
-          </div>
-          <div class="rating-count">${ratingCount} değerlendirme</div>
-        </div>
-      </div>
-      <div class="rate-buttons">
-        ${[1,2,3,4,5].map(n => `<button class="rate-btn" onclick="rateArticle(${n})">★ ${n}</button>`).join('')}
-      </div>
-      <div class="rate-status" id="rate-status"></div>
-    </div>
-    
-    <div class="comments-section">
-      <h3>Yorumlar (${comments ? comments.length : 0})</h3>
-      
-      <div class="comment-form">
-        <textarea id="comment-text" placeholder="Yorumunuzu yazın..."></textarea>
-        <button onclick="submitComment()">Yorum Gönder</button>
-        <div class="comment-status" id="comment-status"></div>
-      </div>
-      
-      <div class="comments-list">
-        ${comments && comments.length > 0 ? comments.map(c => `
-          <div class="comment">
-            <div class="comment-header">
-              <span class="comment-author">Anonim</span>
-              <span>${new Date(c.created_at).toLocaleDateString('tr-TR')}</span>
-            </div>
-            <div class="comment-body">${c.content}</div>
-          </div>
-        `).join('') : '<div class="empty-state" style="padding:20px;">Henüz yorum yok</div>'}
-      </div>
+    <div class="score-card">
+      <div class="game-name">Bağlantılar</div>
+      <div class="score-value">${scores.baglantilarWins || 0}</div>
+      <div class="score-detail">${detailFor(scores.baglantilarPlayed || 0, scores.baglantilarStreak || 0)}</div>
     </div>
   `;
 }
 
-// ══════════════════════════════════════════
-// RATE ARTICLE
-// ══════════════════════════════════════════
-async function rateArticle(rating) {
-  const statusEl = document.getElementById('rate-status');
-  
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) {
-    statusEl.textContent = 'Değerlendirme yapmak için giriş yapın';
-    statusEl.style.color = 'var(--accent)';
-    return;
-  }
-  
-  // Check if user already rated
-  const { data: existing } = await sb
-    .from('article_ratings')
-    .select('*')
-    .eq('article_id', currentArticleId)
-    .eq('user_id', user.id);
-  
-  if (existing && existing.length > 0) {
-    // Update existing rating
-    await sb
-      .from('article_ratings')
-      .update({ rating })
-      .eq('article_id', currentArticleId)
-      .eq('user_id', user.id);
-  } else {
-    // Insert new rating
-    await sb
-      .from('article_ratings')
-      .insert([{ article_id: currentArticleId, user_id: user.id, rating }]);
-  }
-  
-  statusEl.textContent = '✓ Değerlendirmeniz kaydedildi';
-  statusEl.style.color = 'var(--success)';
-  setTimeout(() => { loadArticleDetail(currentArticleId); }, 1000);
+function formatLastSeen(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'Şimdi çevrimiçi';
+  if (diffMins < 60) return `${diffMins} dk önce`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} saat önce`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays} gün önce`;
+  return d.toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-// ══════════════════════════════════════════
-// SUBMIT COMMENT
-// ══════════════════════════════════════════
-async function submitComment() {
-  const content = document.getElementById('comment-text').value.trim();
-  const statusEl = document.getElementById('comment-status');
-  
-  if (!content) {
-    statusEl.textContent = 'Lütfen bir yorum yazın';
-    statusEl.className = 'comment-status err';
-    return;
-  }
-  
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) {
-    statusEl.textContent = 'Yorum yapmak için giriş yapın';
-    statusEl.className = 'comment-status err';
-    return;
-  }
-  
-  const { error } = await sb
-    .from('article_comments')
-    .insert([{
-      article_id: currentArticleId,
-      user_id: user.id,
-      content: content,
-      approved: false
-    }]);
-  
-  if (error) {
-    statusEl.textContent = error.message;
-    statusEl.className = 'comment-status err';
-  } else {
-    statusEl.textContent = 'Yorumunuz onay bekliyor!';
-    statusEl.className = 'comment-status ok';
-    document.getElementById('comment-text').value = '';
-    setTimeout(() => { statusEl.textContent = ''; }, 3000);
-  }
+// ── Sticker board persistence (localStorage, keyed by user id) ──
+function loadBoardStickers(userId) {
+  try {
+    return JSON.parse(localStorage.getItem('hane_stickers_' + userId)) || [];
+  } catch { return []; }
 }
 
-// ══════════════════════════════════════════
-// MAP INTERACTION — neighborhood context for library
-// ══════════════════════════════════════════
-const mapNeighborhoods = document.querySelectorAll('.neighborhood');
+function saveBoardStickers(userId, stickers) {
+  localStorage.setItem('hane_stickers_' + userId, JSON.stringify(stickers));
+}
 
-mapNeighborhoods.forEach(nb => {
-  nb.addEventListener('click', (e) => {
-    e.stopPropagation();
-    mapNeighborhoods.forEach(n => n.classList.remove('active'));
-    nb.classList.add('active');
-    document.getElementById('map-label').textContent = nb.getAttribute('data-name') || nb.id;
+// Generate an 8-char uppercase referral code (matches the format the
+// handle_new_user trigger uses for new accounts).
+function generateReferralCode() {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let out = '';
+  for (let i = 0; i < 8; i++) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return out;
+}
+
+// One-shot bootstrap UI: lets the admin create their own profiles row
+// in-app. Shown when the auth user is the admin and has no profiles row
+// (typically the original admin account that predates handle_new_user).
+function renderProfileBootstrap(user) {
+  const stickerArea = document.getElementById('article-area');
+  const right = document.querySelector('.profile-right');
+  const card = document.getElementById('library-card');
+  if (card) card.innerHTML = '';
+  if (right) right.innerHTML = '';
+
+  const districtOptions = Object.entries(neighborhoodNames)
+    .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
+    .map(([id, name]) => `<option value="${id}">${name}</option>`)
+    .join('');
+
+  stickerArea.innerHTML = `
+    <div style="max-width:520px;margin:40px auto;padding:24px;border:1px solid var(--ink);background:#fff;font-family:'Inter',sans-serif;">
+      <div style="font-size:0.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Profil Kurulumu</div>
+      <div style="font-size:1.1rem;font-weight:700;margin-bottom:6px;">Profilinizi oluşturun</div>
+      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:18px;line-height:1.4;">
+        Bu hesabın profiles tablosunda satırı yok. Bilgileri girin; profil oluşturulduktan sonra normal düzenleme akışı çalışacak.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <label style="font-size:0.7rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);">Ad
+          <input id="bs-firstname" type="text" style="display:block;width:100%;margin-top:4px;padding:8px;border:1px solid var(--ink);font-family:inherit;font-size:0.9rem;">
+        </label>
+        <label style="font-size:0.7rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);">Soyad
+          <input id="bs-lastname" type="text" style="display:block;width:100%;margin-top:4px;padding:8px;border:1px solid var(--ink);font-family:inherit;font-size:0.9rem;">
+        </label>
+        <label style="font-size:0.7rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);">Yaşadığı İlçe
+          <select id="bs-neighborhood" style="display:block;width:100%;margin-top:4px;padding:8px;border:1px solid var(--ink);font-family:inherit;font-size:0.9rem;">
+            <option value="">— Seçin —</option>
+            ${districtOptions}
+          </select>
+        </label>
+        <label style="font-size:0.7rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);">Doğum Yeri
+          <select id="bs-birth" style="display:block;width:100%;margin-top:4px;padding:8px;border:1px solid var(--ink);font-family:inherit;font-size:0.9rem;">
+            <option value="">— Seçin —</option>
+            ${districtOptions}
+            <option value="istanbul_disi">İstanbul Dışı</option>
+          </select>
+        </label>
+        <label id="bs-birthplace-wrap" style="display:none;font-size:0.7rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);">Doğum Yeri (Şehir)
+          <input id="bs-birthplace" type="text" style="display:block;width:100%;margin-top:4px;padding:8px;border:1px solid var(--ink);font-family:inherit;font-size:0.9rem;">
+        </label>
+        <button id="bs-create" style="margin-top:8px;padding:10px;background:var(--ink);color:#fff;border:none;font-family:inherit;font-size:0.8rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;">Oluştur</button>
+        <div id="bs-msg" style="font-size:0.8rem;min-height:1.2em;"></div>
+      </div>
+    </div>
+  `;
+
+  const birthSelect = document.getElementById('bs-birth');
+  const birthPlaceWrap = document.getElementById('bs-birthplace-wrap');
+  birthSelect.addEventListener('change', () => {
+    birthPlaceWrap.style.display = birthSelect.value === 'istanbul_disi' ? 'block' : 'none';
   });
-});
 
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.neighborhood') && !e.target.closest('.map-label')) {
-    mapNeighborhoods.forEach(n => n.classList.remove('active'));
-    document.getElementById('map-label').textContent = 'İstanbul';
+  document.getElementById('bs-create').addEventListener('click', async () => {
+    const btn = document.getElementById('bs-create');
+    const msg = document.getElementById('bs-msg');
+    const firstName = document.getElementById('bs-firstname').value.trim();
+    const lastName = document.getElementById('bs-lastname').value.trim();
+    const neighborhood = document.getElementById('bs-neighborhood').value;
+    const birth = document.getElementById('bs-birth').value;
+    const birthPlace = document.getElementById('bs-birthplace').value.trim();
+
+    if (!neighborhood) { msg.textContent = 'Yaşadığı ilçeyi seçin.'; msg.style.color = 'var(--accent)'; return; }
+    if (!birth) { msg.textContent = 'Doğum yerini seçin.'; msg.style.color = 'var(--accent)'; return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Oluşturuluyor...';
+    msg.textContent = '';
+
+    // Retry on referral_code unique-constraint collision (extremely unlikely
+    // at this size, but the trigger does the same).
+    let lastErr = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const payload = {
+        id: user.id,
+        email: user.email,
+        first_name: firstName || null,
+        last_name: lastName || null,
+        neighborhood,
+        birth_neighborhood: birth,
+        birth_place: birth === 'istanbul_disi' ? (birthPlace || null) : null,
+        referral_code: generateReferralCode(),
+      };
+      const { data, error } = await sb
+        .from('profiles')
+        .insert(payload)
+        .select('id');
+      if (!error && data && data.length > 0) {
+        msg.textContent = 'Profil oluşturuldu. Yenileniyor...';
+        msg.style.color = 'var(--muted)';
+        setTimeout(() => window.location.reload(), 600);
+        return;
+      }
+      lastErr = error;
+      // 23505 = unique_violation. Retry with a new referral_code.
+      if (error && error.code === '23505' && /referral_code/i.test(error.message || '')) continue;
+      break;
+    }
+    btn.disabled = false;
+    btn.textContent = 'Oluştur';
+    console.error('[hane bootstrap] insert failed', lastErr);
+    msg.textContent = 'Oluşturulamadı: ' + (lastErr?.message || 'bilinmeyen hata');
+    msg.style.color = 'var(--accent)';
+  });
+}
+
+async function loadProfile() {
+  const { data: { session } } = await sb.auth.getSession();
+
+  if (!session) {
+    window.location.href = 'index.html';
+    return;
   }
-});
 
-// ══════════════════════════════════════════
-// INIT
-// ══════════════════════════════════════════
-loadArticles();
+  // Check if viewing another user's profile via ?user=ID
+  const urlParams = new URLSearchParams(window.location.search);
+  const viewingUserId = urlParams.get('user');
+  const isViewingOther = viewingUserId && viewingUserId !== session.user.id;
+
+  // Fetch fresh user data from server (getSession can return stale cache)
+  const { data: { user: freshUser }, error: userError } = await sb.auth.getUser();
+  const user = freshUser || session.user;
+ const profileUserId = isViewingOther ? viewingUserId : user.id;
+
+const { data: profile, error: profileError } = await sb
+  .from('profiles')
+  .select('*')
+  .eq('id', profileUserId)
+  .single();
+
+if (profileError) {
+  console.error('[hane loadProfile]', profileError);
+}
+
+// Accounts that predate the handle_new_user trigger don't have a profiles
+// row. Surface this clearly instead of silently rendering empty fields and
+// then accepting "saves" that update zero rows.
+const profileMissing = !isViewingOther && !profile;
+const isAdminUser = user.email === 'cemwozturk@gmail.com';
+console.log('[hane loadProfile] auth user.id =', user.id, 'profile =', profile, 'profileError =', profileError, 'session role =', session?.user?.role, 'access_token len =', session?.access_token?.length);
+if (profileMissing) {
+  console.warn('[hane] No profiles row for auth user', user.id);
+  if (isAdminUser) {
+    renderProfileBootstrap(user);
+    return;
+  }
+  const banner = document.createElement('div');
+  banner.textContent = 'Profil kaydı bulunamadı. Bu hesabın profiles tablosunda satırı yok — yöneticiyle iletişime geçin.';
+  Object.assign(banner.style, {
+    position: 'fixed', top: '0', left: '0', right: '0',
+    background: '#000', color: '#fff', padding: '10px 16px',
+    fontSize: '0.8rem', fontFamily: "'Inter', sans-serif",
+    textAlign: 'center', zIndex: '9999', letterSpacing: '0.5px'
+  });
+  document.body.appendChild(banner);
+}
+
+const avatarUrl = profile?.avatar_url || null;
+
+const firstName = profile?.first_name || '';
+const lastName = profile?.last_name || '';
+
+const displayName =
+  `${firstName} ${lastName}`.trim() ||
+  user.email.split('@')[0];
+
+const yasadigiIlce = profile?.neighborhood || '';
+const dogumYeri = profile?.birth_place || '';
+const phone = profile?.phone || '';
+
+  // Update neighborhood badge in left column
+  const badgeEl = document.getElementById('user-nb-badge');
+  if (badgeEl && yasadigiIlce) {
+    badgeEl.textContent = neighborhoodNames[yasadigiIlce] || yasadigiIlce;
+  }
+
+  const joinedDate = new Date(user.created_at).toLocaleDateString('tr-TR', {
+    year: 'numeric', month: 'long', day: 'numeric'
+  });
+  const lastSeenText = formatLastSeen(user.last_sign_in_at);
+  // Scores are loaded async from Supabase — provide a zeroed object first
+  // then hydrate the score cards once the query resolves.
+  const scores = {
+    bulmacaWins: 0, bulmacaPlayed: 0,
+    sozcelWins: 0, sozcelPlayed: 0, sozcelStreak: 0,
+    baglantilarWins: 0, baglantilarPlayed: 0,
+  };
+  getGameScores(user.id).then(s => {
+    Object.assign(scores, s);
+    renderScoresSection(scores);
+  });
+
+  const avatarContent = avatarUrl
+    ? `<img src="${avatarUrl}" alt="Profile">`
+    : displayName.charAt(0).toUpperCase();
+
+  // Build living district dropdown
+  const districtOptions = Object.entries(neighborhoodNames)
+    .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
+    .map(([id, name]) => `<option value="${id}"${id === yasadigiIlce ? ' selected' : ''}>${name}</option>`)
+    .join('');
+
+  // Birth place display (read-only)
+  let dogumDisplay = '—';
+  if (dogumYeri === 'istanbul_disi') dogumDisplay = 'İstanbul Dışı';
+  else if (dogumYeri && neighborhoodNames[dogumYeri]) dogumDisplay = neighborhoodNames[dogumYeri];
+  else if (dogumYeri) dogumDisplay = dogumYeri;
+
+  // ── PROFILE LIBRARY CARD (top of right column) ──
+  const cardEl = document.getElementById('library-card');
+  const yasadigiDisplay = yasadigiIlce ? (neighborhoodNames[yasadigiIlce] || yasadigiIlce) : '—';
+
+  function renderCardView() {
+    cardEl.innerHTML = `
+      <div class="card-top">
+        <div class="avatar" id="avatar-display">${avatarContent}</div>
+        <div class="card-id">
+          <div class="card-name">${displayName}</div>
+          <div class="card-meta">${yasadigiDisplay}</div>
+        </div>
+      </div>
+      ${isViewingOther ? '' : '<button class="edit-btn" id="edit-profile-btn">Düzenle</button>'}
+    `;
+    if (!isViewingOther) {
+      document.getElementById('edit-profile-btn').addEventListener('click', renderCardEdit);
+    }
+  }
+
+  function renderCardEdit() {
+    cardEl.innerHTML = `
+      <div class="card-top">
+        <div class="avatar" id="avatar-display">${avatarContent}</div>
+        <div class="card-id">
+          <button class="avatar-upload" id="avatar-btn">Fotoğraf Değiştir</button>
+          <input type="file" id="avatar-input" accept="image/*" style="display:none;">
+        </div>
+      </div>
+      <div class="card-edit">
+        <div>
+          <div class="field-label">Ad</div>
+          <input class="field-input" id="edit-firstname" type="text" value="${firstName}" placeholder="Adınız">
+        </div>
+        <div>
+          <div class="field-label">Soyad</div>
+          <input class="field-input" id="edit-lastname" type="text" value="${lastName}" placeholder="Soyadınız">
+        </div>
+        <div>
+          <div class="field-label">Yaşadığı İlçe</div>
+          <select class="field-select" id="edit-yasadigi">
+            <option value="">— İlçe seçin —</option>
+            ${districtOptions}
+          </select>
+        </div>
+        <div>
+          <div class="field-label">Doğum Yeri</div>
+          <div class="field-display">${dogumDisplay}</div>
+        </div>
+      </div>
+      <div class="edit-row">
+        <button class="cancel-btn" id="cancel-btn">İptal</button>
+        <button class="save-btn" id="save-btn">Kaydet</button>
+      </div>
+      <div class="save-msg" id="save-msg"></div>
+    `;
+    document.getElementById('cancel-btn').addEventListener('click', renderCardView);
+    document.getElementById('save-btn').addEventListener('click', handleSave);
+    document.getElementById('avatar-btn').addEventListener('click', () => {
+      document.getElementById('avatar-input').click();
+    });
+    document.getElementById('avatar-input').addEventListener('change', handleAvatarChange);
+  }
+
+  async function handleSave() {
+    const msgEl = document.getElementById('save-msg');
+    const btn = document.getElementById('save-btn');
+    const newYasadigi = document.getElementById('edit-yasadigi').value;
+    const newFirstName = document.getElementById('edit-firstname').value.trim();
+    const newLastName = document.getElementById('edit-lastname').value.trim();
+
+    if (!newYasadigi) {
+      msgEl.textContent = 'Lütfen bir ilçe seçin.';
+      msgEl.style.color = 'var(--accent)';
+      return;
+    }
+
+    btn.textContent = 'Kaydediliyor...';
+    btn.disabled = true;
+    msgEl.textContent = '';
+
+    try {
+      // `neighborhood` is admin-controlled — the protect_profile_columns trigger
+      // silently reverts it for non-admin users, so only send it for the admin.
+      const payload = {
+        first_name: newFirstName,
+        last_name: newLastName,
+      };
+      const isAdminUser = user.email === 'cemwozturk@gmail.com';
+      if (isAdminUser) payload.neighborhood = newYasadigi;
+
+      const { data, error } = await sb
+        .from('profiles')
+        .update(payload)
+        .eq('id', user.id)
+        .select('id, first_name, last_name, neighborhood');
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
+      }
+
+      setTimeout(() => window.location.reload(), 400);
+    } catch (err) {
+      console.error('Profile save error:', err);
+      btn.textContent = 'Kaydet';
+      btn.disabled = false;
+      msgEl.textContent = err && err.message ? err.message : 'Kaydedilemedi.';
+      msgEl.style.color = 'var(--accent)';
+    }
+  }
+
+  async function handleAvatarChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 200 * 1024) {
+      alert('Fotoğraf 200KB\'den küçük olmalı.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const base64 = evt.target.result;
+      const { data, error } = await sb
+        .from('profiles')
+        .update({ avatar_url: base64 })
+        .eq('id', user.id)
+        .select('id');
+
+      if (error) {
+        console.error('[kutuphane avatar save]', error);
+        alert('Fotoğraf kaydedilemedi: ' + error.message);
+        return;
+      }
+      if (!data || data.length === 0) {
+        alert('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
+        return;
+      }
+      const av = document.getElementById('avatar-display');
+      if (av) av.innerHTML = `<img src="${base64}" alt="Profile">`;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  renderCardView();
+
+  if (!isViewingOther) {
+    document.getElementById('profile-signout-wrap').innerHTML = `
+      <button class="btn-signout" id="signout-btn">Çıkış Yap</button>
+    `;
+    document.getElementById('signout-btn').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      window.location.href = 'index.html';
+    });
+  }
+
+  // ── RIGHT: stats & account info ──
+  if (isViewingOther) {
+    document.querySelector('.profile-right').innerHTML = `
+      <div style="text-align:center;padding:20px;color:var(--muted);font-style:italic;font-size:0.8rem;">
+        Bu kullanıcının kartı
+      </div>
+    `;
+  } else {
+    document.querySelector('.profile-right').innerHTML = `
+      <div>
+        <div class="right-section-title">Hesap</div>
+        <div class="info-row">
+          <div class="info-label">E-posta</div>
+          <div class="info-value">${user.email}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Üyelik</div>
+          <div class="info-value">${joinedDate}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Son Görülme</div>
+          <div class="info-value">${lastSeenText}</div>
+        </div>
+      </div>
+      <div id="scores-section">
+        <div class="right-section-title">Oyun Skorları</div>
+        <div class="loading" style="padding:8px;font-size:11px;"><span class="spinner"></span></div>
+      </div>
+    `;
+    renderScoresSection(scores);
+  }
+}
+
+loadProfile();
 </script>
 </body>
 </html>
