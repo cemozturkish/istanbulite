@@ -48,22 +48,24 @@ create policy "library_articles read for authenticated"
   to authenticated
   using (true);
 
--- Admin-only writes.
+-- Admin-only writes. Uses the JWT email claim directly so the policy
+-- works even if public.is_admin() isn't SECURITY DEFINER (it reads
+-- auth.users, which the authenticated role can't access).
 drop policy if exists "library_articles insert admin" on public.library_articles;
 create policy "library_articles insert admin"
   on public.library_articles for insert
   to authenticated
-  with check (public.is_admin());
+  with check ((auth.jwt() ->> 'email') = 'cemwozturk@gmail.com');
 
 drop policy if exists "library_articles update admin" on public.library_articles;
 create policy "library_articles update admin"
   on public.library_articles for update
   to authenticated
-  using (public.is_admin())
-  with check (public.is_admin());
+  using ((auth.jwt() ->> 'email') = 'cemwozturk@gmail.com')
+  with check ((auth.jwt() ->> 'email') = 'cemwozturk@gmail.com');
 
 drop policy if exists "library_articles delete admin" on public.library_articles;
 create policy "library_articles delete admin"
   on public.library_articles for delete
   to authenticated
-  using (public.is_admin());
+  using ((auth.jwt() ->> 'email') = 'cemwozturk@gmail.com');
