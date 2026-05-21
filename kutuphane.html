@@ -586,6 +586,105 @@
       padding-bottom: 2px;
     }
     .article-detail .detail-link:hover { color: var(--accent); border-color: var(--accent); }
+    .article-detail .detail-byline {
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    /* ── Comments ── */
+    .article-comments {
+      margin-top: 36px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border, #cccccc);
+    }
+    .comments-heading {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+    .comments-list { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; }
+    .comment-row {
+      padding: 10px 12px;
+      background: var(--paper-dark);
+      border-left: 3px solid var(--ink);
+    }
+    .comment-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+      flex-wrap: wrap;
+    }
+    .comment-meta .comment-author { font-weight: 700; color: var(--ink); letter-spacing: 0.5px; }
+    .comment-meta .comment-when { letter-spacing: 0.5px; }
+    .comment-delete {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.65rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      padding: 0;
+    }
+    .comment-delete:hover { color: var(--accent); text-decoration: underline; }
+    .comment-body {
+      font-size: 0.88rem;
+      color: var(--ink);
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .comment-composer textarea {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      padding: 10px 12px;
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      color: var(--ink);
+      resize: vertical;
+      min-height: 64px;
+      outline: none;
+    }
+    .comment-composer textarea:focus { border-color: var(--accent); }
+    .composer-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .composer-msg {
+      font-size: 0.75rem;
+      color: var(--accent);
+      font-style: italic;
+    }
+    .composer-submit {
+      padding: 8px 18px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .composer-submit:hover { background: var(--accent); }
+    .composer-submit:disabled { background: var(--muted); cursor: default; }
 
     /* ── Profile library card (top of right column) ── */
     .library-card {
@@ -1500,21 +1599,138 @@ async function renderSourceList(sourceId) {
   });
 }
 
+function formatLibDate(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('tr-TR', { year:'numeric', month:'long', day:'numeric' });
+  } catch { return ''; }
+}
+
 function renderArticleDetail(sourceId, article) {
   const area = document.getElementById('article-area');
   const name = LIB_SOURCE_NAMES[sourceId];
   if (!area || !article) return;
+  const byline = [
+    article.author ? libEsc(article.author) : null,
+    article.published_at ? libEsc(formatLibDate(article.published_at)) : null,
+  ].filter(Boolean).join(' · ');
   area.innerHTML = `
     <div class="article-detail">
       <button class="back-btn" id="back-to-list">← ${name}</button>
       <div class="detail-source">${name}</div>
       <div class="detail-title">${libEsc(article.title)}</div>
+      ${byline ? `<div class="detail-byline">${byline}</div>` : ''}
       ${article.summary ? `<div class="detail-summary">${libEsc(article.summary)}</div>` : ''}
       ${article.body ? `<div class="detail-body">${libEsc(article.body).replace(/\n/g, '<br>')}</div>` : ''}
       ${article.url ? `<a class="detail-link" href="${article.url}" target="_blank" rel="noopener">Kaynakta Oku ↗</a>` : ''}
+
+      <section class="article-comments" id="article-comments">
+        <h3 class="comments-heading">Yorumlar</h3>
+        <div class="comments-list" id="comments-list">
+          <div class="empty-state" style="padding:12px;"><span class="spinner"></span></div>
+        </div>
+        <form class="comment-composer" id="comment-composer">
+          <textarea id="comment-body" maxlength="5000" placeholder="Yorumunuzu yazın..." rows="3"></textarea>
+          <div class="composer-row">
+            <span class="composer-msg" id="composer-msg"></span>
+            <button type="submit" class="composer-submit" id="comment-submit">Gönder</button>
+          </div>
+        </form>
+      </section>
     </div>
   `;
   document.getElementById('back-to-list').addEventListener('click', () => renderSourceList(sourceId));
+  loadComments(article.id);
+  document.getElementById('comment-composer').addEventListener('submit', (e) => {
+    e.preventDefault();
+    submitComment(article.id);
+  });
+}
+
+async function loadComments(articleId) {
+  const listEl = document.getElementById('comments-list');
+  if (!listEl) return;
+  const { data: { session } } = await sb.auth.getSession();
+  const currentUid = session?.user?.id;
+
+  const { data: comments, error } = await sb.from('library_article_comments')
+    .select('*').eq('article_id', articleId)
+    .order('created_at', { ascending: true });
+  if (error) { listEl.innerHTML = `<div class="empty-state" style="padding:12px;">Yorumlar yüklenemedi.</div>`; return; }
+  if (!comments || !comments.length) {
+    listEl.innerHTML = '<div class="empty-state" style="padding:12px;">Henüz yorum yok.</div>';
+    return;
+  }
+
+  const authorIds = [...new Set(comments.map(c => c.author_id))];
+  const { data: authors } = await sb.from('profiles_public')
+    .select('id, first_name, last_name, neighborhood')
+    .in('id', authorIds);
+  const authorMap = {};
+  (authors || []).forEach(p => { authorMap[p.id] = p; });
+
+  listEl.innerHTML = comments.map(c => {
+    const a = authorMap[c.author_id] || {};
+    const name = ((a.first_name || '') + ' ' + (a.last_name || '')).trim() || 'Üye';
+    const nb = a.neighborhood ? (' · ' + libEsc(a.neighborhood)) : '';
+    const when = formatRelative(c.created_at);
+    const own = currentUid && c.author_id === currentUid;
+    return `
+      <div class="comment-row">
+        <div class="comment-meta">
+          <span class="comment-author">${libEsc(name)}</span>
+          <span class="comment-when">${when}${nb}</span>
+          ${own ? `<button class="comment-delete" data-id="${c.id}" type="button">Sil</button>` : ''}
+        </div>
+        <div class="comment-body">${libEsc(c.body).replace(/\n/g, '<br>')}</div>
+      </div>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('.comment-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Yorumu sil?')) return;
+      const { error } = await sb.from('library_article_comments').delete().eq('id', btn.dataset.id);
+      if (error) { alert('Silinemedi: ' + error.message); return; }
+      loadComments(articleId);
+    });
+  });
+}
+
+function formatRelative(iso) {
+  const d = new Date(iso);
+  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 1) return 'şimdi';
+  if (mins < 60) return mins + ' dk önce';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + ' saat önce';
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return days + ' gün önce';
+  return d.toLocaleDateString('tr-TR', { year:'numeric', month:'short', day:'numeric' });
+}
+
+async function submitComment(articleId) {
+  const ta = document.getElementById('comment-body');
+  const btn = document.getElementById('comment-submit');
+  const msg = document.getElementById('composer-msg');
+  const body = ta.value.trim();
+  if (!body) { msg.textContent = 'Boş bırakılamaz.'; return; }
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { msg.textContent = 'Önce giriş yapın.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Gönderiliyor...';
+  msg.textContent = '';
+
+  const { error } = await sb.from('library_article_comments')
+    .insert([{ article_id: articleId, author_id: session.user.id, body }]);
+
+  btn.disabled = false;
+  btn.textContent = 'Gönder';
+
+  if (error) { msg.textContent = 'Hata: ' + error.message; return; }
+  ta.value = '';
+  loadComments(articleId);
 }
 
 document.querySelectorAll('.source-tab').forEach(tab => {
