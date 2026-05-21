@@ -1,4 +1,4 @@
-# CLAUDE.md — Istanbulite Codebase Guide
+# CLAUDE.md — ISTANBULITE Codebase Guide
 
 This file provides context for AI assistants working in this repository.
 
@@ -6,7 +6,7 @@ This file provides context for AI assistants working in this repository.
 
 ## Project Overview
 
-**Istanbulite** (istanbulite.net) is a private, referral-gated community platform for people in Istanbul. Accounts are created either by the admin directly or via referral self-signup, where a prospective user must enter the unique kefil code of an existing member. Each account is tied to a specific Istanbul neighborhood (current residence), and also records the user's birth neighborhood — both customize their experience across the site. The platform lets members connect with each other, maintain customizable profile pages, and engage with neighborhood-specific content including news and discussion. While the site includes news and political content, it is not a newspaper — it is fundamentally a social/community platform.
+**Istanbulite** (istanbulite.net) is a private, referral-gated community platform for people that live in Istanbul. Accounts are created either by the admin directly or via referral self-signup, where a prospective user must enter the unique kefil code of an existing member while signing up. Each account is tied to a specific Istanbul neighborhood (current residence), and also records the user's birth neighborhood — both customize their experience across the site. The platform lets members connect with each other but not directly DM, because this app essentially tries to reduce users' screen time and not increase it. The news, discussions, and events posted up on this website are supposed to remind the users that there is a life outside that they have to go get it, it's not supposed to create a life inside the internet. This is why users can not DM each other, but can see each others' profiles and acknowledge such people with such opinions exist. Users can maintain customizable profile pages and engage with neighborhood-specific content including news and discussion. While the site includes news and political content, it is not a newspaper — it is fundamentally a social/community platform. However, it draws from newspaper aesthetic.
 
 **Live site:** https://istanbulite.net
 **Hosting:** GitHub Pages with custom domain (CNAME)
@@ -14,19 +14,14 @@ This file provides context for AI assistants working in this repository.
 
 ---
 
-## Architecture
-
-This is a **pure static site** — no build tools, no bundler, no Node.js, no package.json. Everything is plain HTML, CSS, and vanilla JavaScript, deployed directly via GitHub Pages.
-
 ```
 /home/user/istanbulite/
 ├── index.html          # Main site: login screen + interactive Istanbul map
 ├── admin.html          # Admin dashboard (admin-only)
-├── kahvehane.html      # Community/discussion page (Coffeehouse)
-├── kutuphane.html      # Archive/library page
-├── hane.html           # Home/household section
-├── baglantilar.html    # Links/connections page
-├── bulmaca.html        # Interactive crossword puzzle game
+├── kahvehane.html      # Community/discussion page and the games (Coffeehouse)
+├── kutuphane.html      # Articles and profile display
+├── baglantilar.html    # Turkish Mini Crossword
+├── bulmaca.html        # Turkish Connections-style game
 ├── sozcel.html         # Turkish Wordle-style word guessing game
 ├── style.css           # Legacy global stylesheet (mostly unused; prefer inline <style>)
 ├── main.js             # Empty placeholder (unused)
@@ -47,41 +42,11 @@ This is a **pure static site** — no build tools, no bundler, no Node.js, no pa
 | Logic | Vanilla JavaScript (ES6+) |
 | Map | SVG with clickable polygon regions |
 | Backend | Supabase (auth + REST API + PostgreSQL) |
-| Supabase SDK | `@supabase/supabase-js@2` via CDN (jsdelivr.net) |
-| Fonts | To be updated — moving away from newspaper-style fonts (Tinos, UnifrakturMaguntia) |
+| Supabase SDK | `@supabase/supabase-js@2` via CDN (jsdelivr.net) | |
 | Hosting | GitHub Pages |
 
 ---
 
-## Design Direction
-
-### Visual Style: Grayscale / Monochrome
-
-The site uses a **strictly grayscale palette** — only shades between pure white (`#ffffff`) and pure black (`#000000`). No warm tones (browns, creams, reds), no accent colors. The aesthetic should feel clean, modern, and minimal — not like a newspaper.
-
-**CSS Custom Properties (design tokens):**
-```css
---ink: #000000           /* Main text — black */
---paper: #ffffff         /* Primary background — white */
---paper-dark: #f0f0f0   /* Secondary background — light gray */
---accent: #333333        /* Emphasis/highlight — dark gray */
---muted: #888888         /* Secondary/muted text — medium gray */
---border: #cccccc        /* Borders and dividers — light gray */
---success: #555555       /* Success feedback — dark gray */
---hover: #e0e0e0         /* Hover states — very light gray */
-```
-
-### Font Direction
-
-The sign-in screen and overall site need **new fonts** — move away from Tinos (serif) and UnifrakturMaguntia (Gothic/decorative). Choose clean, modern fonts appropriate for a community platform, not a newspaper. Sans-serif is preferred.
-
-### Key Principles
-- **No newspaper aesthetic.** No serif masthead, no column-based news layouts, no "printed gazette" feel.
-- **Grayscale only.** Every color must be a shade between white and black. No browns, reds, creams, yellows, or any chromatic color.
-- **Clean and modern.** The design should feel like a contemporary web app / community platform.
-- **No responsive design:** The site is desktop-only. Do not introduce responsive breakpoints unless explicitly asked.
-
----
 
 ## Account & User Model
 
@@ -90,6 +55,7 @@ The sign-in screen and overall site need **new fonts** — move away from Tinos 
 There is no fully public registration. Accounts are created in one of two ways:
 
 1. **Admin-created:** The admin (cemwozturk@gmail.com) creates an account directly; the admin becomes the `referred_by` (kefil).
+
 2. **Referral self-signup:** A prospective user enters a valid **kefil code** (the unique `referral_code` of an existing member) before being allowed to fill out the signup form. The DB trigger `public.handle_new_user` validates the code and links `referred_by` to the kefil's profile atomically with the `auth.users` insert — there is no way to create one without the other.
 
 Every profile has a unique `referral_code` (8-char uppercase, generated by the trigger) that the user can share to invite others.
@@ -209,16 +175,6 @@ sb.from('articles').delete().eq('id', id)
 
 ---
 
-## Styling Conventions
-
-Each page uses **inline `<style>` tags** for CSS isolation. The global `style.css` is legacy and largely unused — do not add new styles there.
-
-**Grayscale enforcement:** All colors must be shades of gray (white to black). Do not introduce any chromatic colors (no reds, browns, blues, greens, yellows, etc.) unless explicitly asked.
-
-**Font direction:** Use clean, modern sans-serif fonts. Do not use Tinos, UnifrakturMaguntia, or other serif/decorative fonts. The sign-in screen fonts especially need to feel contemporary, not old-fashioned.
-
----
-
 ## Page-by-Page Summary
 
 ### `index.html` — Main Site
@@ -237,17 +193,20 @@ Each page uses **inline `<style>` tags** for CSS isolation. The global `style.cs
 ### `kahvehane.html` — Coffeehouse
 - Community discussion section
 - Partially implemented; structure and styles complete
+- Users can only comment on their own neighborhood, but can view and read all
+- This is where the NYTimes-like games are, there are three of them:
+- Sözcel: Turkish Wordle
+- Bağlantılar: Turkish Connections
+- Bulmaca: Turkish Crossword
+- The games change every day and the scores are kept track of
 
 ### `kutuphane.html` — Library
 - Content archive
 - Partially implemented
+- This is where the articles where everyone can read, like, and comment on are
 
-### `hane.html` — Home
-- Smallest page; basic structure only
-
-### `baglantilar.html` — Links
-- External links / partner resources
-- Multi-column layout
+### `baglantilar.html` — Connections
+- Turkish Connections variant
 
 ### `bulmaca.html` — Crossword
 - Fully functional interactive crossword puzzle
@@ -292,11 +251,10 @@ git diff            # Check changes before committing
 3. **No build tools:** Do not add npm, webpack, vite, or any bundler.
 4. **Vanilla DOM:** Use `document.querySelector`, `innerHTML`, `addEventListener` — standard DOM APIs.
 5. **CSS variables:** Use the grayscale design tokens (`--ink`, `--paper`, `--accent`, etc.) for consistency.
-6. **Grayscale only:** Never introduce chromatic colors. All UI elements must use shades between white and black.
-7. **Turkish language:** UI labels and content are primarily in Turkish. Match existing patterns.
-8. **Supabase SDK v2:** All database and auth calls go through `const sb = supabase.createClient(...)`.
-9. **Inline comments:** Add comments in English above significant code blocks.
-10. **Commit style:** Short, imperative commit messages (e.g. "Add profile page layout", "Fix map hover state").
+6. **Turkish language:** UI labels and content are primarily in Turkish. Match existing patterns.
+7. **Supabase SDK v2:** All database and auth calls go through `const sb = supabase.createClient(...)`.
+8. **Inline comments:** Add comments in English above significant code blocks.
+9. **Commit style:** Short, imperative commit messages (e.g. "Add profile page layout", "Fix map hover state").
 
 ---
 
@@ -306,7 +264,7 @@ git diff            # Check changes before committing
 - The **admin email** is visible in `admin.html` — this is acceptable because Supabase authentication still requires the correct password.
 - Never store private service role keys in client-side code.
 - Do not disable Supabase RLS policies.
-- **No self-signup:** Users cannot create their own accounts. Only the admin provisions accounts.
+- **No self-signup:** Users cannot create their own accounts without a kefil code.
 
 ---
 
