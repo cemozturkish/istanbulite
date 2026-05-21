@@ -810,14 +810,6 @@
       letter-spacing: 1px;
       text-transform: uppercase;
     }
-    .library-card .card-kefil {
-      font-size: 0.65rem;
-      color: var(--muted);
-      margin-top: 4px;
-      letter-spacing: 2px;
-      font-family: 'Courier New', monospace;
-      text-transform: uppercase;
-    }
     .copy-kefil-btn {
       font-size: 0.6rem;
       padding: 2px 7px;
@@ -2305,6 +2297,12 @@ if (profileError) {
   console.error('[hane loadProfile]', profileError);
 }
 
+// Count how many members this user has referred (been kefil to)
+const { count: kefaletCount } = await sb
+  .from('profiles')
+  .select('*', { count: 'exact', head: true })
+  .eq('referred_by', profileUserId);
+
 // Accounts that predate the handle_new_user trigger don't have a profiles
 // row. Surface this clearly instead of silently rendering empty fields and
 // then accepting "saves" that update zero rows.
@@ -2385,16 +2383,12 @@ const referralCode = profile?.referral_code || '';
   const yasadigiDisplay = yasadigiIlce ? (neighborhoodNames[yasadigiIlce] || yasadigiIlce) : '—';
 
   function renderCardView() {
-    const kefilSnippet = referralCode
-      ? `<div class="card-kefil">KEFİL KODU: ${referralCode}<button class="copy-kefil-btn" onclick="navigator.clipboard.writeText('${referralCode}').then(()=>{this.textContent='Kopyalandı';setTimeout(()=>this.textContent='Kopyala',1500)})">Kopyala</button></div>`
-      : '';
     cardEl.innerHTML = `
       <div class="card-top">
         <div class="avatar" id="avatar-display">${avatarContent}</div>
         <div class="card-id">
           <div class="card-name">${displayName}</div>
           <div class="card-meta">${yasadigiDisplay}</div>
-          ${kefilSnippet}
         </div>
       </div>
       ${isViewingOther ? '' : '<button class="edit-btn" id="edit-profile-btn">Düzenle</button>'}
@@ -2542,8 +2536,16 @@ const referralCode = profile?.referral_code || '';
   // ── RIGHT: stats & account info ──
   if (isViewingOther) {
     document.querySelector('.profile-right').innerHTML = `
-      <div style="text-align:center;padding:20px;color:var(--muted);font-style:italic;font-size:0.8rem;">
-        Bu kullanıcının kartı
+      <div>
+        <div class="right-section-title">Kefalet</div>
+        ${referralCode ? `<div class="info-row">
+          <div class="info-label">Kefalet Kodu</div>
+          <div class="info-value" style="font-family:'Courier New',monospace;letter-spacing:2px;">${referralCode}<button class="copy-kefil-btn" style="margin-left:8px;" onclick="navigator.clipboard.writeText('${referralCode}').then(()=>{this.textContent='Kopyalandı';setTimeout(()=>this.textContent='Kopyala',1500)})">Kopyala</button></div>
+        </div>` : ''}
+        <div class="info-row">
+          <div class="info-label">Kefil Olduğu</div>
+          <div class="info-value">${kefaletCount ?? 0} kişi</div>
+        </div>
       </div>
     `;
   } else {
@@ -2563,9 +2565,13 @@ const referralCode = profile?.referral_code || '';
           <div class="info-value">${lastSeenText}</div>
         </div>
         ${referralCode ? `<div class="info-row">
-          <div class="info-label">Kefil Kodu</div>
+          <div class="info-label">Kefalet Kodu</div>
           <div class="info-value" style="font-family:'Courier New',monospace;letter-spacing:2px;">${referralCode}<button class="copy-kefil-btn" style="margin-left:8px;" onclick="navigator.clipboard.writeText('${referralCode}').then(()=>{this.textContent='Kopyalandı';setTimeout(()=>this.textContent='Kopyala',1500)})">Kopyala</button></div>
         </div>` : ''}
+        <div class="info-row">
+          <div class="info-label">Kefil Olduğu</div>
+          <div class="info-value">${kefaletCount ?? 0} kişi</div>
+        </div>
       </div>
       <div id="scores-section">
         <div class="right-section-title">Oyun Skorları</div>
