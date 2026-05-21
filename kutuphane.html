@@ -1223,6 +1223,55 @@
         animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-right;
       }
     }
+    .profile-popup-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      display: none; align-items: center; justify-content: center; z-index: 1000;
+    }
+    .profile-popup-overlay.open { display: flex; }
+    .profile-popup {
+      background: var(--paper); border: 1px solid var(--ink);
+      width: 360px; max-width: calc(100vw - 40px); max-height: calc(100vh - 80px);
+      overflow: auto; padding: 24px; position: relative; font-family: 'Inter', sans-serif;
+    }
+    .profile-popup .close-btn {
+      position: absolute; top: 8px; right: 10px; background: none; border: none;
+      font-size: 1.4rem; cursor: pointer; color: var(--muted); line-height: 1; padding: 4px 8px;
+    }
+    .profile-popup .close-btn:hover { color: var(--ink); }
+    .profile-popup .pp-avatar {
+      width: 96px; height: 96px; border-radius: 50%;
+      background: var(--paper-dark); border: 1px solid #ccc;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.2rem; font-weight: 600; color: var(--accent);
+      margin: 0 auto 14px; overflow: hidden;
+    }
+    .profile-popup .pp-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .profile-popup .pp-name {
+      text-align: center; font-size: 1.1rem; font-weight: 700;
+      letter-spacing: 0.5px; margin-bottom: 4px;
+    }
+    .profile-popup .pp-meta {
+      text-align: center; font-size: 0.72rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 16px;
+    }
+    .profile-popup .pp-row {
+      display: flex; justify-content: space-between;
+      padding: 8px 0; border-top: 1px solid #e5e5e5; font-size: 0.8rem;
+    }
+    .profile-popup .pp-row .pp-label {
+      color: var(--muted); text-transform: uppercase;
+      font-size: 0.65rem; letter-spacing: 1.5px; align-self: center;
+    }
+    .profile-popup .pp-row .pp-value { color: var(--ink); font-weight: 500; text-align: right; }
+    .profile-popup .pp-loading, .profile-popup .pp-error {
+      text-align: center; color: var(--muted); font-size: 0.85rem; padding: 30px 0;
+    }
+    .kefil-link {
+      background: none; border: none; cursor: pointer;
+      font-family: inherit; font-size: inherit; color: inherit;
+      font-weight: 600; padding: 0; text-decoration: underline; text-underline-offset: 2px;
+    }
+    .kefil-link:hover { color: var(--accent); }
   </style>
 </head>
 <body>
@@ -2230,8 +2279,7 @@ function renderProfileBootstrap(user) {
         first_name: firstName || null,
         last_name: lastName || null,
         neighborhood,
-        birth_neighborhood: birth,
-        birth_place: birth === 'istanbul_disi' ? (birthPlace || null) : null,
+        birth_place: birth,
         referral_code: generateReferralCode(),
       };
       const { data, error } = await sb
@@ -2290,6 +2338,17 @@ const { count: kefaletCount } = await sb
   .from('profiles')
   .select('*', { count: 'exact', head: true })
   .eq('referred_by', profileUserId);
+
+// Resolve the name of the person who referred this user (their kefil)
+let kefilOfUser = null;
+if (profile?.referred_by) {
+  const { data: kp } = await sb
+    .from('profiles')
+    .select('id, first_name, last_name')
+    .eq('id', profile.referred_by)
+    .maybeSingle();
+  if (kp) kefilOfUser = kp;
+}
 
 // Accounts that predate the handle_new_user trigger don't have a profiles
 // row. Surface this clearly instead of silently rendering empty fields and
@@ -2526,6 +2585,10 @@ const referralCode = profile?.referral_code || '';
     document.querySelector('.profile-right').innerHTML = `
       <div>
         <div class="right-section-title">Kefalet</div>
+        ${kefilOfUser ? `<div class="info-row">
+          <div class="info-label">KEFİL</div>
+          <div class="info-value"><button class="kefil-link" data-user-id="${kefilOfUser.id}">${(`${kefilOfUser.first_name || ''} ${kefilOfUser.last_name || ''}`).trim() || 'İsimsiz Üye'}</button></div>
+        </div>` : ''}
         ${referralCode ? `<div class="info-row">
           <div class="info-label">Kefalet Kodu</div>
           <div class="info-value" style="font-family:'Courier New',monospace;letter-spacing:2px;">${referralCode}<button class="copy-kefil-btn" style="margin-left:8px;" onclick="navigator.clipboard.writeText('${referralCode}').then(()=>{this.textContent='Kopyalandı';setTimeout(()=>this.textContent='Kopyala',1500)})">Kopyala</button></div>
@@ -2552,6 +2615,10 @@ const referralCode = profile?.referral_code || '';
           <div class="info-label">Son Görülme</div>
           <div class="info-value">${lastSeenText}</div>
         </div>
+        ${kefilOfUser ? `<div class="info-row">
+          <div class="info-label">KEFİL</div>
+          <div class="info-value"><button class="kefil-link" data-user-id="${kefilOfUser.id}">${(`${kefilOfUser.first_name || ''} ${kefilOfUser.last_name || ''}`).trim() || 'İsimsiz Üye'}</button></div>
+        </div>` : ''}
         ${referralCode ? `<div class="info-row">
           <div class="info-label">Kefalet Kodu</div>
           <div class="info-value" style="font-family:'Courier New',monospace;letter-spacing:2px;">${referralCode}<button class="copy-kefil-btn" style="margin-left:8px;" onclick="navigator.clipboard.writeText('${referralCode}').then(()=>{this.textContent='Kopyalandı';setTimeout(()=>this.textContent='Kopyala',1500)})">Kopyala</button></div>
@@ -2571,6 +2638,93 @@ const referralCode = profile?.referral_code || '';
 }
 
 loadProfile();
+
+// ── Profile popup — opens on any .kefil-link click, navigates in-place for the chain ──
+(function() {
+  const overlay = document.createElement('div');
+  overlay.className = 'profile-popup-overlay';
+  overlay.innerHTML = `
+    <div class="profile-popup" role="dialog" aria-modal="true">
+      <button class="close-btn" type="button" aria-label="Kapat">×</button>
+      <div class="pp-body"><div class="pp-loading">Yükleniyor…</div></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const body = overlay.querySelector('.pp-body');
+
+  function close() { overlay.classList.remove('open'); }
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  overlay.querySelector('.close-btn').addEventListener('click', close);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) close();
+  });
+
+  function nbLabel(id) {
+    if (!id) return '—';
+    if (id === 'istanbul_disi') return 'İstanbul Dışı';
+    return neighborhoodNames[id] || id;
+  }
+
+  function fmtDate(s) {
+    if (!s) return '—';
+    try { return new Date(s).toLocaleDateString('tr-TR', { year:'numeric', month:'long', day:'numeric' }); }
+    catch { return '—'; }
+  }
+
+  async function open(userId) {
+    overlay.classList.add('open');
+    body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
+
+    const { data: prof, error } = await sb
+      .from('profiles')
+      .select('id, first_name, last_name, neighborhood, birth_place, avatar_url, joined_at, referred_by, referral_code')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error || !prof) {
+      body.innerHTML = '<div class="pp-error">Profil yüklenemedi.</div>';
+      return;
+    }
+
+    let kefilName = null, kefilId = null;
+    if (prof.referred_by) {
+      const { data: kp } = await sb
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .eq('id', prof.referred_by)
+        .maybeSingle();
+      if (kp) {
+        kefilName = (`${kp.first_name || ''} ${kp.last_name || ''}`).trim() || 'İsimsiz Üye';
+        kefilId = kp.id;
+      }
+    }
+
+    const fullName = (`${prof.first_name || ''} ${prof.last_name || ''}`).trim() || 'İsimsiz Üye';
+    const avatar = prof.avatar_url
+      ? `<img src="${prof.avatar_url}" alt="">`
+      : (fullName.charAt(0) || '?').toUpperCase();
+    const birth = nbLabel(prof.birth_place);
+
+    body.innerHTML = `
+      <div class="pp-avatar">${avatar}</div>
+      <div class="pp-name">${fullName}</div>
+      <div class="pp-meta">${nbLabel(prof.neighborhood)}</div>
+      <div class="pp-row"><span class="pp-label">Doğum Yeri</span><span class="pp-value">${birth}</span></div>
+      <div class="pp-row"><span class="pp-label">Üyelik</span><span class="pp-value">${fmtDate(prof.joined_at)}</span></div>
+      ${prof.referral_code ? `<div class="pp-row"><span class="pp-label">Kefalet Kodu</span><span class="pp-value" style="font-family:'Courier New',monospace;letter-spacing:2px;">${prof.referral_code}</span></div>` : ''}
+      ${kefilName ? `<div class="pp-row"><span class="pp-label">KEFİL</span><span class="pp-value"><button class="kefil-link" data-user-id="${kefilId}">${kefilName}</button></span></div>` : ''}
+    `;
+  }
+
+  // Delegate all .kefil-link clicks to open the popup
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.kefil-link');
+    if (!btn) return;
+    const id = btn.getAttribute('data-user-id');
+    if (id) open(id);
+  });
+})();
 </script>
 </body>
 </html>
