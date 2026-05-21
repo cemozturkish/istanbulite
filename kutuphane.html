@@ -489,6 +489,15 @@
       background: var(--paper-dark);
       border-left-color: var(--ink);
     }
+    .country-label {
+      padding: 14px 18px 4px 18px;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .country-label:first-child { padding-top: 4px; }
 
     /* ── Article display (center) ── */
     .article-area {
@@ -579,6 +588,14 @@
       color: var(--paper);
     }
     .reaction-btn .rx-count { font-weight: 700; }
+    .rx-total {
+      align-self: center;
+      font-size: 0.7rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-left: 8px;
+    }
     .article-item {
       padding: 16px 0;
       border-bottom: 1px solid var(--border, #cccccc);
@@ -1229,13 +1246,18 @@
   <aside class="col-left">
     <div class="nb-highlight" id="user-nb-badge"></div>
     <div class="library-shelf" id="library-shelf">
-      <button class="source-tab" data-source="economist">The Economist</button>
-      <button class="source-tab" data-source="nytimes">New York Times</button>
+      <div class="country-label">United Kingdom</div>
       <button class="source-tab" data-source="ft">Financial Times</button>
-      <button class="source-tab" data-source="codastory">Coda Story</button>
-      <button class="source-tab" data-source="european_correspondent">European Correspondent</button>
-      <button class="source-tab" data-source="telegraph">Telegraph</button>
+      <button class="source-tab" data-source="economist">The Economist</button>
+      <button class="source-tab" data-source="telegraph">The Telegraph</button>
+      <div class="country-label">United States</div>
+      <button class="source-tab" data-source="nytimes">New York Times</button>
+      <div class="country-label">Qatar</div>
       <button class="source-tab" data-source="aljazeera">Al Jazeera</button>
+      <div class="country-label">Georgia</div>
+      <button class="source-tab" data-source="codastory">Coda Story</button>
+      <div class="country-label">Belgium</div>
+      <button class="source-tab" data-source="european_correspondent">European Correspondent</button>
     </div>
   </aside>
 
@@ -1616,6 +1638,7 @@ const LIB_SORT_OPTIONS = [
   { value: 'liked', label: 'En çok beğenilen' },
   { value: 'disliked', label: 'En çok beğenilmeyen' },
   { value: 'commented', label: 'En çok konuşulan' },
+  { value: 'contested', label: 'En tartışmalı' },
 ];
 let currentSort = 'newest';
 
@@ -1660,6 +1683,14 @@ function sortKey(a) {
   return new Date(a.published_at || a.created_at || 0).getTime();
 }
 
+// Contested score: 0 when one side dominates, 1 at a perfect 50/50.
+// Articles with no reactions score 0 so they sink to the bottom.
+function contestedScore(likes, dislikes) {
+  const total = likes + dislikes;
+  if (total === 0) return 0;
+  return 1 - Math.abs(likes - dislikes) / total;
+}
+
 function applySort(articles, stats, sort) {
   const copy = articles.slice();
   if (sort === 'newest') copy.sort((a, b) => sortKey(b) - sortKey(a));
@@ -1667,7 +1698,25 @@ function applySort(articles, stats, sort) {
   else if (sort === 'liked') copy.sort((a, b) => (stats.likes[b.id] || 0) - (stats.likes[a.id] || 0) || sortKey(b) - sortKey(a));
   else if (sort === 'disliked') copy.sort((a, b) => (stats.dislikes[b.id] || 0) - (stats.dislikes[a.id] || 0) || sortKey(b) - sortKey(a));
   else if (sort === 'commented') copy.sort((a, b) => (stats.comments[b.id] || 0) - (stats.comments[a.id] || 0) || sortKey(b) - sortKey(a));
+  else if (sort === 'contested') {
+    copy.sort((a, b) => {
+      const ca = contestedScore(stats.likes[a.id] || 0, stats.dislikes[a.id] || 0);
+      const cb = contestedScore(stats.likes[b.id] || 0, stats.dislikes[b.id] || 0);
+      if (cb !== ca) return cb - ca;
+      // Tiebreaker: more total reactions wins, then newest.
+      const ta = (stats.likes[a.id] || 0) + (stats.dislikes[a.id] || 0);
+      const tb = (stats.likes[b.id] || 0) + (stats.dislikes[b.id] || 0);
+      return (tb - ta) || (sortKey(b) - sortKey(a));
+    });
+  }
   return copy;
+}
+
+function formatReactionPct(likes, dislikes) {
+  const total = likes + dislikes;
+  if (total === 0) return { likeLabel: '—', dislikeLabel: '—' };
+  const likePct = Math.round((likes / total) * 100);
+  return { likeLabel: likePct + '%', dislikeLabel: (100 - likePct) + '%' };
 }
 
 async function renderSourceList(sourceId) {
@@ -1707,10 +1756,13 @@ async function renderSourceList(sourceId) {
       a.author ? libEsc(a.author) : null,
       a.published_at ? libEsc(formatLibDate(a.published_at)) : null,
     ].filter(Boolean).join(' · ');
+    const likes = stats.likes[a.id] || 0;
+    const dislikes = stats.dislikes[a.id] || 0;
+    const { likeLabel, dislikeLabel } = formatReactionPct(likes, dislikes);
     const counts = `
       <span class="item-counts">
-        <span title="Beğenenler">👍 ${stats.likes[a.id] || 0}</span>
-        <span title="Beğenmeyenler">👎 ${stats.dislikes[a.id] || 0}</span>
+        <span title="Beğenenler">👍 ${likeLabel}</span>
+        <span title="Beğenmeyenler">👎 ${dislikeLabel}</span>
         <span title="Yorumlar">💬 ${stats.comments[a.id] || 0}</span>
       </span>
     `;
@@ -1778,12 +1830,13 @@ function renderArticleDetail(sourceId, article) {
       <div class="reaction-bar" id="reaction-bar">
         <button class="reaction-btn" data-rx="like" id="rx-like">
           <span class="rx-icon">👍</span>
-          <span class="rx-count" id="rx-like-count">0</span>
+          <span class="rx-count" id="rx-like-count">—</span>
         </button>
         <button class="reaction-btn" data-rx="dislike" id="rx-dislike">
           <span class="rx-icon">👎</span>
-          <span class="rx-count" id="rx-dislike-count">0</span>
+          <span class="rx-count" id="rx-dislike-count">—</span>
         </button>
+        <span class="rx-total" id="rx-total">Henüz oy yok</span>
       </div>
 
       <section class="article-comments" id="article-comments">
@@ -1829,8 +1882,12 @@ async function loadReactions(articleId) {
   const likeEl = document.getElementById('rx-like');
   const dislikeEl = document.getElementById('rx-dislike');
   if (!likeEl || !dislikeEl) return;
-  document.getElementById('rx-like-count').textContent = likes;
-  document.getElementById('rx-dislike-count').textContent = dislikes;
+  const { likeLabel, dislikeLabel } = formatReactionPct(likes, dislikes);
+  const total = likes + dislikes;
+  document.getElementById('rx-like-count').textContent = likeLabel;
+  document.getElementById('rx-dislike-count').textContent = dislikeLabel;
+  const totalEl = document.getElementById('rx-total');
+  if (totalEl) totalEl.textContent = total > 0 ? `${total} oy` : 'Henüz oy yok';
   likeEl.classList.toggle('active', mine === 'like');
   dislikeEl.classList.toggle('active', mine === 'dislike');
 }
