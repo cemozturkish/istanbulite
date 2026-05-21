@@ -505,16 +505,80 @@
       font-size: 0.85rem;
     }
     .article-list { display: flex; flex-direction: column; gap: 0; }
+    .article-list .list-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 12px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid var(--border, #cccccc);
+    }
     .article-list .source-heading {
       font-size: 0.7rem;
       font-weight: 700;
       letter-spacing: 3px;
       text-transform: uppercase;
       color: var(--muted);
-      padding-bottom: 12px;
-      margin-bottom: 8px;
-      border-bottom: 1px solid var(--border, #cccccc);
     }
+    .sort-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .sort-control select {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      background: var(--paper);
+      border: 1px solid var(--border, #cccccc);
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .article-item .item-byline {
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+      margin: 2px 0 4px 0;
+    }
+    .article-item .item-counts {
+      display: inline-flex;
+      gap: 12px;
+      margin-top: 6px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+    .reaction-bar {
+      display: flex;
+      gap: 10px;
+      margin: 18px 0 8px 0;
+    }
+    .reaction-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: var(--paper);
+      border: 1px solid var(--border, #cccccc);
+      color: var(--ink);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .reaction-btn:hover { background: var(--paper-dark); }
+    .reaction-btn.active {
+      border-color: var(--ink);
+      background: var(--ink);
+      color: var(--paper);
+    }
+    .reaction-btn .rx-count { font-weight: 700; }
     .article-item {
       padding: 16px 0;
       border-bottom: 1px solid var(--border, #cccccc);
@@ -1168,6 +1232,10 @@
       <button class="source-tab" data-source="economist">The Economist</button>
       <button class="source-tab" data-source="nytimes">New York Times</button>
       <button class="source-tab" data-source="ft">Financial Times</button>
+      <button class="source-tab" data-source="codastory">Coda Story</button>
+      <button class="source-tab" data-source="european_correspondent">European Correspondent</button>
+      <button class="source-tab" data-source="telegraph">Telegraph</button>
+      <button class="source-tab" data-source="aljazeera">Al Jazeera</button>
     </div>
   </aside>
 
@@ -1536,7 +1604,20 @@ const LIB_SOURCE_NAMES = {
   economist: 'The Economist',
   nytimes: 'New York Times',
   ft: 'Financial Times',
+  codastory: 'Coda Story',
+  european_correspondent: 'The European Correspondent',
+  telegraph: 'The Telegraph',
+  aljazeera: 'Al Jazeera',
 };
+
+const LIB_SORT_OPTIONS = [
+  { value: 'newest', label: 'Yeni → Eski' },
+  { value: 'oldest', label: 'Eski → Yeni' },
+  { value: 'liked', label: 'En çok beğenilen' },
+  { value: 'disliked', label: 'En çok beğenilmeyen' },
+  { value: 'commented', label: 'En çok konuşulan' },
+];
+let currentSort = 'newest';
 
 function libEsc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g,
@@ -1555,6 +1636,40 @@ async function fetchLibrarySource(sourceId) {
   return data || [];
 }
 
+// Pull reaction counts + comment counts for a given set of article ids
+// so the client can sort by liked / disliked / commented without an RPC.
+async function fetchArticleStats(articleIds) {
+  if (!articleIds.length) return { likes: {}, dislikes: {}, comments: {} };
+  const [rxRes, cmRes] = await Promise.all([
+    sb.from('library_article_reactions').select('article_id, reaction').in('article_id', articleIds),
+    sb.from('library_article_comments').select('article_id').in('article_id', articleIds),
+  ]);
+  const likes = {}, dislikes = {}, comments = {};
+  (rxRes.data || []).forEach(r => {
+    if (r.reaction === 'like') likes[r.article_id] = (likes[r.article_id] || 0) + 1;
+    else if (r.reaction === 'dislike') dislikes[r.article_id] = (dislikes[r.article_id] || 0) + 1;
+  });
+  (cmRes.data || []).forEach(c => {
+    comments[c.article_id] = (comments[c.article_id] || 0) + 1;
+  });
+  return { likes, dislikes, comments };
+}
+
+function sortKey(a) {
+  // Newest/oldest prefer published_at, fall back to created_at.
+  return new Date(a.published_at || a.created_at || 0).getTime();
+}
+
+function applySort(articles, stats, sort) {
+  const copy = articles.slice();
+  if (sort === 'newest') copy.sort((a, b) => sortKey(b) - sortKey(a));
+  else if (sort === 'oldest') copy.sort((a, b) => sortKey(a) - sortKey(b));
+  else if (sort === 'liked') copy.sort((a, b) => (stats.likes[b.id] || 0) - (stats.likes[a.id] || 0) || sortKey(b) - sortKey(a));
+  else if (sort === 'disliked') copy.sort((a, b) => (stats.dislikes[b.id] || 0) - (stats.dislikes[a.id] || 0) || sortKey(b) - sortKey(a));
+  else if (sort === 'commented') copy.sort((a, b) => (stats.comments[b.id] || 0) - (stats.comments[a.id] || 0) || sortKey(b) - sortKey(a));
+  return copy;
+}
+
 async function renderSourceList(sourceId) {
   const area = document.getElementById('article-area');
   const name = LIB_SOURCE_NAMES[sourceId];
@@ -1564,32 +1679,68 @@ async function renderSourceList(sourceId) {
   });
   area.innerHTML = `
     <div class="article-list">
-      <div class="source-heading">${name}</div>
+      <div class="list-head">
+        <div class="source-heading">${name}</div>
+        <label class="sort-control">
+          <span>Sırala</span>
+          <select id="sort-select">
+            ${LIB_SORT_OPTIONS.map(o => `<option value="${o.value}"${o.value === currentSort ? ' selected' : ''}>${o.label}</option>`).join('')}
+          </select>
+        </label>
+      </div>
       <div class="empty-state"><span class="spinner"></span></div>
     </div>
   `;
+  document.getElementById('sort-select').addEventListener('change', (e) => {
+    currentSort = e.target.value;
+    renderSourceList(sourceId);
+  });
   const articles = await fetchLibrarySource(sourceId);
   if (!articles.length) {
-    area.innerHTML = `
-      <div class="article-list">
-        <div class="source-heading">${name}</div>
-        <div class="empty-state">Henüz makale yok.</div>
-      </div>
-    `;
+    area.querySelector('.empty-state').textContent = 'Henüz makale yok.';
     return;
   }
-  const items = articles.map(a => `
-    <div class="article-item" data-id="${a.id}">
-      <div class="item-title">${libEsc(a.title)}</div>
-      <div class="item-summary">${libEsc(a.summary || '')}</div>
-    </div>
-  `).join('');
+  const stats = await fetchArticleStats(articles.map(a => a.id));
+  const sorted = applySort(articles, stats, currentSort);
+  const items = sorted.map(a => {
+    const meta = [
+      a.author ? libEsc(a.author) : null,
+      a.published_at ? libEsc(formatLibDate(a.published_at)) : null,
+    ].filter(Boolean).join(' · ');
+    const counts = `
+      <span class="item-counts">
+        <span title="Beğenenler">👍 ${stats.likes[a.id] || 0}</span>
+        <span title="Beğenmeyenler">👎 ${stats.dislikes[a.id] || 0}</span>
+        <span title="Yorumlar">💬 ${stats.comments[a.id] || 0}</span>
+      </span>
+    `;
+    return `
+      <div class="article-item" data-id="${a.id}">
+        <div class="item-title">${libEsc(a.title)}</div>
+        ${meta ? `<div class="item-byline">${meta}</div>` : ''}
+        <div class="item-summary">${libEsc(a.summary || '')}</div>
+        ${counts}
+      </div>
+    `;
+  }).join('');
   area.innerHTML = `
     <div class="article-list">
-      <div class="source-heading">${name}</div>
+      <div class="list-head">
+        <div class="source-heading">${name}</div>
+        <label class="sort-control">
+          <span>Sırala</span>
+          <select id="sort-select">
+            ${LIB_SORT_OPTIONS.map(o => `<option value="${o.value}"${o.value === currentSort ? ' selected' : ''}>${o.label}</option>`).join('')}
+          </select>
+        </label>
+      </div>
       ${items}
     </div>
   `;
+  document.getElementById('sort-select').addEventListener('change', (e) => {
+    currentSort = e.target.value;
+    renderSourceList(sourceId);
+  });
   area.querySelectorAll('.article-item').forEach(el => {
     el.addEventListener('click', () => {
       const id = el.dataset.id;
@@ -1624,6 +1775,17 @@ function renderArticleDetail(sourceId, article) {
       ${article.body ? `<div class="detail-body">${libEsc(article.body).replace(/\n/g, '<br>')}</div>` : ''}
       ${article.url ? `<a class="detail-link" href="${article.url}" target="_blank" rel="noopener">Kaynakta Oku ↗</a>` : ''}
 
+      <div class="reaction-bar" id="reaction-bar">
+        <button class="reaction-btn" data-rx="like" id="rx-like">
+          <span class="rx-icon">👍</span>
+          <span class="rx-count" id="rx-like-count">0</span>
+        </button>
+        <button class="reaction-btn" data-rx="dislike" id="rx-dislike">
+          <span class="rx-icon">👎</span>
+          <span class="rx-count" id="rx-dislike-count">0</span>
+        </button>
+      </div>
+
       <section class="article-comments" id="article-comments">
         <h3 class="comments-heading">Yorumlar</h3>
         <div class="comments-list" id="comments-list">
@@ -1641,10 +1803,57 @@ function renderArticleDetail(sourceId, article) {
   `;
   document.getElementById('back-to-list').addEventListener('click', () => renderSourceList(sourceId));
   loadComments(article.id);
+  loadReactions(article.id);
   document.getElementById('comment-composer').addEventListener('submit', (e) => {
     e.preventDefault();
     submitComment(article.id);
   });
+  document.querySelectorAll('#reaction-bar .reaction-btn').forEach(btn => {
+    btn.addEventListener('click', () => toggleReaction(article.id, btn.dataset.rx));
+  });
+}
+
+async function loadReactions(articleId) {
+  const { data: { session } } = await sb.auth.getSession();
+  const myUid = session?.user?.id;
+
+  const { data, error } = await sb.from('library_article_reactions')
+    .select('user_id, reaction').eq('article_id', articleId);
+  if (error) { console.error('[reactions]', error); return; }
+  let likes = 0, dislikes = 0, mine = null;
+  (data || []).forEach(r => {
+    if (r.reaction === 'like') likes++;
+    else if (r.reaction === 'dislike') dislikes++;
+    if (myUid && r.user_id === myUid) mine = r.reaction;
+  });
+  const likeEl = document.getElementById('rx-like');
+  const dislikeEl = document.getElementById('rx-dislike');
+  if (!likeEl || !dislikeEl) return;
+  document.getElementById('rx-like-count').textContent = likes;
+  document.getElementById('rx-dislike-count').textContent = dislikes;
+  likeEl.classList.toggle('active', mine === 'like');
+  dislikeEl.classList.toggle('active', mine === 'dislike');
+}
+
+async function toggleReaction(articleId, reaction) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { alert('Önce giriş yapın.'); return; }
+  const uid = session.user.id;
+
+  // Find current reaction (if any).
+  const { data: existing } = await sb.from('library_article_reactions')
+    .select('reaction').eq('article_id', articleId).eq('user_id', uid).maybeSingle();
+
+  if (existing && existing.reaction === reaction) {
+    // Toggle off.
+    await sb.from('library_article_reactions').delete()
+      .eq('article_id', articleId).eq('user_id', uid);
+  } else {
+    // Insert or switch via upsert.
+    await sb.from('library_article_reactions')
+      .upsert({ article_id: articleId, user_id: uid, reaction }, { onConflict: 'article_id,user_id' });
+  }
+  loadReactions(articleId);
 }
 
 async function loadComments(articleId) {
