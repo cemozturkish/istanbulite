@@ -32,9 +32,9 @@
       /* Semantic aliases */
       --border: var(--rule);
       --danger: var(--ink-red);
-      /* Sözcel keeps its tile-tone overrides */
-      --success: #444444;
-      --present: #999999;
+      /* Sözcel tile colors */
+      --success: #ab6d59;
+      --present: #e3a376;
       --absent: #cccccc;
       /* Border shortcuts */
       --col-border: 1px solid var(--rule);
@@ -259,7 +259,7 @@
     .letter-box.absent {
       background: var(--absent);
       border-color: var(--absent);
-      color: white;
+      color: var(--ink);
       animation: flip 0.5s ease;
     }
 
@@ -302,7 +302,7 @@
     .key.wide { min-width: 42px; font-size: 0.6rem; }
     .key.correct { background: var(--success); color: white; }
     .key.present { background: var(--present); color: white; }
-    .key.absent { background: var(--absent); color: white; }
+    .key.absent { background: var(--absent); color: var(--ink); }
 
     .game-message {
       text-align: center;
@@ -372,6 +372,106 @@
     .district-rank:last-child { border-bottom: none; }
     .district-rank .rank-name { font-weight: 600; }
     .district-rank .rank-pct { color: var(--muted); font-weight: 700; }
+
+    /* ── Result popup ── */
+    .result-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 500;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .result-overlay.open { display: flex; }
+    .result-card {
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      width: min(360px, calc(100vw - 32px));
+      padding: 32px 24px 24px;
+      position: relative;
+      text-align: center;
+      font-family: 'Inter', sans-serif;
+    }
+    .result-close {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+      padding: 4px 8px;
+    }
+    .result-close:hover { color: var(--ink); }
+    .result-icon-box {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 60px;
+      height: 60px;
+      background: var(--ink);
+      color: var(--paper);
+      font-size: 2rem;
+      margin: 0 auto 16px;
+    }
+    .result-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .result-subtitle {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 18px;
+      line-height: 1.5;
+    }
+    .result-emoji-grid {
+      font-size: 1.4rem;
+      line-height: 1.7;
+      letter-spacing: 2px;
+      margin-bottom: 20px;
+      font-family: 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif;
+    }
+    .result-share-btn {
+      width: 100%;
+      padding: 13px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .result-share-btn:hover { background: var(--accent); }
+    .result-next-info {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 12px;
+      font-style: italic;
+    }
+    .share-toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #000;
+      color: #fff;
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      z-index: 9999;
+      white-space: nowrap;
+      display: none;
+    }
 
     /* ── MOBILE RESPONSIVE ── */
     /* Back button hidden on desktop (overridden in mobile @media below) */
@@ -508,6 +608,20 @@
     <section class="stats-right" id="stats-right"></section>
   </aside>
 
+  <!-- Post-game result popup -->
+  <div class="result-overlay" id="result-overlay">
+    <div class="result-card">
+      <button class="result-close" id="result-close" type="button" aria-label="Kapat">×</button>
+      <div class="result-icon-box" id="result-icon-box">★</div>
+      <div class="result-title" id="result-title">Tebrikler!</div>
+      <div class="result-subtitle" id="result-subtitle"></div>
+      <div class="result-emoji-grid" id="result-emoji-grid"></div>
+      <button class="result-share-btn" id="result-share-btn" type="button">PAYLAŞ</button>
+      <div class="result-next-info" id="result-next-info"></div>
+    </div>
+  </div>
+  <div class="share-toast" id="share-toast"></div>
+
 <script>
 // ── Supabase init ──
 const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
@@ -628,6 +742,7 @@ let currentRow = 0;
 let currentGuess = '';
 let gameOver = false;
 const keyStates = {};
+const guessResults = []; // result arrays per row, used to build the share emoji grid
 
 const SAVE_KEY = 'sozcel_state_' + dailySeed;
 
@@ -663,6 +778,7 @@ function restoreState() {
         box.className = 'letter-box filled';
       }
       const result = checkWord(word);
+      guessResults.push(result);
       for (let i = 0; i < 5; i++) {
         const box = document.getElementById(`box-${rowIdx}-${i}`);
         box.className = `letter-box filled ${result[i]}`;
@@ -680,7 +796,8 @@ function restoreState() {
     gameOver = state.gameOver;
     if (gameOver) {
       const lastGuess = state.guesses[state.guesses.length - 1];
-      if (lastGuess === TARGET_WORD) {
+      const wasWon = lastGuess === TARGET_WORD;
+      if (wasWon) {
         document.getElementById('game-message').textContent = 'Tebrikler!';
         document.getElementById('game-message').className = 'game-message win';
       } else {
@@ -689,6 +806,7 @@ function restoreState() {
       }
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       currentRow = state.guesses.length;
+      setTimeout(() => showResultPopup(wasWon), 400);
     } else {
       currentRow = state.guesses.length;
       currentGuess = '';
@@ -809,6 +927,7 @@ function submitGuess() {
   const guessSnap = currentGuess;
   const rowSnap = currentRow;
   const result = checkWord(guessSnap);
+  guessResults.push(result);
 
   for (let i = 0; i < 5; i++) {
     setTimeout(() => {
@@ -832,11 +951,10 @@ function submitGuess() {
       document.getElementById('game-message').className = 'game-message win';
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
-      // Insert the winning row first so renderStats() (which reads from
-      // Supabase) reflects this game immediately.
       await recordGameResult('sozcel', dailySeed, rowSnap + 1, true, userNeighborhood);
       saveState();
       renderStats();
+      setTimeout(() => showResultPopup(true), 700);
     } else if (rowSnap === 5) {
       document.getElementById('game-message').textContent = `Kelime: ${TARGET_WORD}`;
       document.getElementById('game-message').className = 'game-message lose';
@@ -845,6 +963,7 @@ function submitGuess() {
       await recordGameResult('sozcel', dailySeed, 7, false, userNeighborhood);
       saveState();
       renderStats();
+      setTimeout(() => showResultPopup(false), 700);
     } else {
       currentRow++;
       currentGuess = '';
@@ -1090,6 +1209,64 @@ async function renderStats() {
       `).join('')}
   `;
 }
+
+// ── Result popup ──
+function buildShareText() {
+  const won = guessResults.length > 0 && guessResults[guessResults.length - 1].every(r => r === 'correct');
+  const score = won ? guessResults.length : 'X';
+  const grid = guessResults.map(result =>
+    result.map(r => r === 'correct' ? '🟫' : r === 'present' ? '🟧' : '⬜').join('')
+  ).join('\n');
+  return `Sözcel ${score}/6\n\n${grid}\n\nistanbulite.net`;
+}
+
+function showResultPopup(won) {
+  const overlay = document.getElementById('result-overlay');
+  if (!overlay) return;
+  const score = won ? guessResults.length : 'X';
+  document.getElementById('result-icon-box').textContent = won ? '★' : '✕';
+  document.getElementById('result-icon-box').style.background = won ? 'var(--success)' : 'var(--ink)';
+  document.getElementById('result-title').textContent = won ? 'Tebrikler!' : 'Bugünlük Bu Kadar';
+  document.getElementById('result-subtitle').textContent = won
+    ? `Kelimeyi ${score}. tahminde buldunuz.`
+    : `Bugünkü kelime: ${TARGET_WORD}`;
+  document.getElementById('result-emoji-grid').innerHTML = guessResults.map(result =>
+    result.map(r => r === 'correct' ? '🟫' : r === 'present' ? '🟧' : '⬜').join('')
+  ).join('<br>');
+  document.getElementById('result-next-info').textContent = getTimeUntilMidnight();
+  overlay.classList.add('open');
+}
+
+function showShareToast(msg) {
+  const toast = document.getElementById('share-toast');
+  if (!toast) return;
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  clearTimeout(showShareToast._t);
+  showShareToast._t = setTimeout(() => { toast.style.display = 'none'; }, 2500);
+}
+
+(function initResultPopup() {
+  const overlay = document.getElementById('result-overlay');
+  const closeBtn = document.getElementById('result-close');
+  const shareBtn = document.getElementById('result-share-btn');
+  if (!overlay) return;
+  if (closeBtn) closeBtn.addEventListener('click', () => overlay.classList.remove('open'));
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('open'); });
+  if (shareBtn) shareBtn.addEventListener('click', async () => {
+    const text = buildShareText();
+    try {
+      if (navigator.share) {
+        await navigator.share({ text });
+      } else {
+        await navigator.clipboard.writeText(text);
+        showShareToast('Kopyalandı!');
+      }
+    } catch (e) {
+      try { await navigator.clipboard.writeText(text); showShareToast('Kopyalandı!'); } catch {}
+    }
+  });
+})();
 
 // ── Init ──
 initWordGrid();
