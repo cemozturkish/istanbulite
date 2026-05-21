@@ -478,37 +478,32 @@
     <div class="panel">
       <div class="panel-title" id="form-mode-label">Add New Article</div>
 
-      <label>Type</label>
-      <select id="f-type">
-        <option value="neighborhood">Neighborhood (shown on map)</option>
-        <option value="library:economist">Library — The Economist</option>
-        <option value="library:nytimes">Library — New York Times</option>
-        <option value="library:ft">Library — Financial Times</option>
+      <label>Source</label>
+      <select id="f-source">
+        <option value="economist">The Economist</option>
+        <option value="nytimes">New York Times</option>
+        <option value="ft">Financial Times</option>
       </select>
 
-      <div id="f-nb-wrap">
-        <label>Neighborhood</label>
-        <select id="f-neighborhood">
-          <option value="">— Select District —</option>
-        </select>
-      </div>
-
-      <label>Headline</label>
+      <label>Title</label>
       <input type="text" id="f-title" placeholder="Article title..."/>
 
-      <label>Summary / Lead paragraph</label>
-      <textarea id="f-summary" placeholder="Short summary or opening paragraph..."></textarea>
+      <label>Author</label>
+      <input type="text" id="f-author" placeholder="e.g. Jane Doe"/>
 
-      <div id="f-body-wrap" style="display:none;">
-        <label>Body (optional, library only)</label>
-        <textarea id="f-body" placeholder="Full article text shown when opened..." style="min-height:120px;"></textarea>
-      </div>
+      <label>Date Published</label>
+      <input type="date" id="f-published"/>
 
-      <label>Full Article URL (optional)</label>
+      <label>One-sentence summary</label>
+      <textarea id="f-summary" placeholder="Shown in the article list..."></textarea>
+
+      <label>Body (optional)</label>
+      <textarea id="f-body" placeholder="Full article text shown when opened..." style="min-height:120px;"></textarea>
+
+      <label>Source URL (optional)</label>
       <input type="text" id="f-url" placeholder="https://..."/>
 
       <input type="hidden" id="f-editing-id"/>
-      <input type="hidden" id="f-editing-table"/>
 
       <div class="btn-row">
         <button class="btn btn-primary" id="submit-btn">Publish Article</button>
@@ -523,11 +518,10 @@
 
       <div class="filter-row">
         <select id="filter-scope">
-          <option value="all">All Articles</option>
-          <option value="neighborhood">Neighborhood</option>
-          <option value="library:economist">Library — The Economist</option>
-          <option value="library:nytimes">Library — New York Times</option>
-          <option value="library:ft">Library — Financial Times</option>
+          <option value="all">All Sources</option>
+          <option value="economist">The Economist</option>
+          <option value="nytimes">New York Times</option>
+          <option value="ft">Financial Times</option>
         </select>
         <button id="filter-btn">Filter</button>
       </div>
@@ -710,10 +704,9 @@ async function loadAllNeighborhoodDropdowns() {
   if (error || !data) return;
   const resSel = document.getElementById('u-neighborhood');
   const birthSel = document.getElementById('u-birth-neighborhood');
-  const fNb = document.getElementById('f-neighborhood');
   const nNb = document.getElementById('n-neighborhood');
   data.forEach(n => {
-    [birthSel, fNb, nNb].forEach(sel => {
+    [birthSel, nNb].forEach(sel => {
       const opt = document.createElement('option');
       opt.value = n.id;
       opt.textContent = n.name_tr;
@@ -792,84 +785,41 @@ document.getElementById('signout-btn').addEventListener('click', async () => {
 // title, summary, body, url, position }. `kind` is the table name
 // so edit/delete know where to write.
 
-function parseFormType(v) {
-  // "neighborhood" | "library:economist" | "library:nytimes" | "library:ft"
-  if (v === 'neighborhood') return { kind: 'articles', source: null };
-  if (v && v.startsWith('library:')) return { kind: 'library_articles', source: v.slice(8) };
-  return { kind: 'articles', source: null };
-}
-
-function updateFormFields() {
-  const t = document.getElementById('f-type').value;
-  const isLib = t.startsWith('library:');
-  document.getElementById('f-nb-wrap').style.display = isLib ? 'none' : '';
-  document.getElementById('f-body-wrap').style.display = isLib ? '' : 'none';
-}
-document.getElementById('f-type').addEventListener('change', updateFormFields);
-
 async function loadArticles(scope = 'all') {
   const listEl = document.getElementById('articles-list');
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
 
-  // Pull both tables in parallel, filter client-side by scope.
-  const showNb = scope === 'all' || scope === 'neighborhood';
-  const showLib = scope === 'all' || scope.startsWith('library:');
-  const libSource = scope.startsWith('library:') ? scope.slice(8) : null;
+  let query = sb.from('library_articles').select('*')
+    .order('source').order('position', { ascending: true }).order('created_at', { ascending: false });
+  if (scope !== 'all') query = query.eq('source', scope);
 
-  const [nbRes, libRes] = await Promise.all([
-    showNb
-      ? sb.from('articles').select('*').order('created_at', { ascending: false })
-      : Promise.resolve({ data: [], error: null }),
-    showLib
-      ? (libSource
-          ? sb.from('library_articles').select('*').eq('source', libSource)
-              .order('position', { ascending: true }).order('created_at', { ascending: false })
-          : sb.from('library_articles').select('*')
-              .order('source').order('position', { ascending: true }).order('created_at', { ascending: false }))
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-  if (nbRes.error || libRes.error) {
-    listEl.innerHTML = `<div class="empty-state">Error loading articles.</div>`;
-    return;
-  }
+  const { data, error } = await query;
+  if (error) { listEl.innerHTML = `<div class="empty-state">Error loading articles.</div>`; return; }
+  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No articles yet.</div>'; return; }
 
-  const nbRows = (nbRes.data || []).map(a => ({ ...a, kind: 'articles' }));
-  const libRows = (libRes.data || []).map(a => ({ ...a, kind: 'library_articles' }));
+  const bySource = {};
+  data.forEach(a => { (bySource[a.source] = bySource[a.source] || []).push(a); });
 
-  // Group: neighborhood section first, then each library source.
-  const sections = [];
-  if (showNb && nbRows.length) {
-    sections.push({ label: 'Neighborhood', rows: nbRows });
-  }
-  if (showLib) {
-    const bySource = {};
-    libRows.forEach(a => { (bySource[a.source] = bySource[a.source] || []).push(a); });
-    Object.keys(bySource).forEach(src => {
-      sections.push({ label: LIB_SOURCE_NAMES[src] || src, rows: bySource[src], librarySource: src });
-    });
-  }
-
-  if (!sections.length) {
-    listEl.innerHTML = '<div class="empty-state">No articles yet.</div>';
-    return;
-  }
+  const sections = Object.keys(bySource).map(src => ({
+    label: LIB_SOURCE_NAMES[src] || src,
+    rows: bySource[src],
+    source: src,
+  }));
 
   listEl.innerHTML = sections.map(section => {
     const cards = section.rows.map((a, i) => {
-      const tag = a.kind === 'articles'
-        ? (NEIGHBORHOOD_NAMES[a.neighborhood] || a.neighborhood)
-        : `${LIB_SOURCE_NAMES[a.source] || a.source} · #${i + 1}`;
-      const reorderBtns = a.kind === 'library_articles'
-        ? `<button class="btn-edit" data-act="up"   data-id="${a.id}" ${i === 0 ? 'disabled style="opacity:0.4;cursor:default;"' : ''}>↑</button>
-           <button class="btn-edit" data-act="down" data-id="${a.id}" ${i === section.rows.length - 1 ? 'disabled style="opacity:0.4;cursor:default;"' : ''}>↓</button>`
-        : '';
+      const meta = [
+        a.author ? escapeHtml(a.author) : null,
+        a.published_at ? new Date(a.published_at).toLocaleDateString('tr-TR', { year:'numeric', month:'short', day:'numeric' }) : null,
+      ].filter(Boolean).join(' · ');
       return `
         <div class="article-card" data-id="${a.id}">
-          <div class="a-neighborhood">${escapeHtml(tag)}</div>
+          <div class="a-neighborhood">${escapeHtml(section.label)} · #${i + 1}${meta ? ' · ' + meta : ''}</div>
           <h4>${escapeHtml(a.title)}</h4>
           ${a.summary ? `<p>${escapeHtml(a.summary)}</p>` : ''}
           <div class="card-actions">
-            ${reorderBtns}
+            <button class="btn-edit" data-act="up"   data-id="${a.id}" ${i === 0 ? 'disabled style="opacity:0.4;cursor:default;"' : ''}>↑</button>
+            <button class="btn-edit" data-act="down" data-id="${a.id}" ${i === section.rows.length - 1 ? 'disabled style="opacity:0.4;cursor:default;"' : ''}>↓</button>
             <button class="btn-edit" data-act="edit" data-id="${a.id}">Edit</button>
             <button class="btn-del"  data-act="del"  data-id="${a.id}">Delete</button>
           </div>
@@ -879,18 +829,17 @@ async function loadArticles(scope = 'all') {
     return `<div style="margin:6px 0;font-size:0.7rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);">${escapeHtml(section.label)}</div>${cards}`;
   }).join('');
 
-  const allRows = [...nbRows, ...libRows];
   listEl.querySelectorAll('button[data-act]').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.id;
       const act = btn.dataset.act;
-      const row = allRows.find(x => x.id === id);
+      const row = data.find(x => x.id === id);
       if (!row) return;
-      if (act === 'edit') editAnyArticle(row);
-      else if (act === 'del') deleteAnyArticle(row);
+      if (act === 'edit') editArticle(row);
+      else if (act === 'del') deleteArticle(row);
       else if (act === 'up' || act === 'down') {
-        const section = sections.find(s => s.librarySource === row.source);
-        if (section) reorderLibraryArticle(row, act, section.rows);
+        const section = sections.find(s => s.source === row.source);
+        if (section) reorderArticle(row, act, section.rows);
       }
     });
   });
@@ -903,24 +852,19 @@ document.getElementById('filter-btn').addEventListener('click', () => {
 // ── Submit (insert/update) ──
 document.getElementById('submit-btn').addEventListener('click', async () => {
   const editingId = document.getElementById('f-editing-id').value;
-  const editingTable = document.getElementById('f-editing-table').value;
-  const typeVal = document.getElementById('f-type').value;
-  const { kind, source } = parseFormType(typeVal);
-  const neighborhood = document.getElementById('f-neighborhood').value;
+  const source = document.getElementById('f-source').value;
   const title = document.getElementById('f-title').value.trim();
+  const author = document.getElementById('f-author').value.trim() || null;
+  const publishedRaw = document.getElementById('f-published').value;
+  const published_at = publishedRaw ? new Date(publishedRaw).toISOString() : null;
   const summary = document.getElementById('f-summary').value.trim();
   const body = document.getElementById('f-body').value.trim();
   const url = document.getElementById('f-url').value.trim();
   const statusEl = document.getElementById('form-status');
   const btn = document.getElementById('submit-btn');
 
-  if (!title) {
-    statusEl.textContent = 'Please enter a title.';
-    statusEl.className = 'status-msg err';
-    return;
-  }
-  if (kind === 'articles' && !neighborhood) {
-    statusEl.textContent = 'Please select a neighborhood.';
+  if (!title || !source) {
+    statusEl.textContent = 'Please select a source and enter a title.';
     statusEl.className = 'status-msg err';
     return;
   }
@@ -930,26 +874,16 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
 
   let result;
   if (editingId) {
-    // Editing — write back to the same table; switching type mid-edit isn't supported.
-    if (editingTable === 'articles') {
-      result = await sb.from('articles')
-        .update({ neighborhood, title, summary, url, updated_at: new Date().toISOString() })
-        .eq('id', editingId);
-    } else {
-      result = await sb.from('library_articles')
-        .update({ source, title, summary, body, url })
-        .eq('id', editingId);
-    }
-  } else if (kind === 'articles') {
-    result = await sb.from('articles').insert([{ neighborhood, title, summary, url }]);
+    result = await sb.from('library_articles')
+      .update({ source, title, summary, body, url, author, published_at })
+      .eq('id', editingId);
   } else {
-    // Library: new rows go to the end of their source's list.
     const { data: tail } = await sb.from('library_articles')
       .select('position').eq('source', source)
       .order('position', { ascending: false }).limit(1);
     const nextPos = (tail && tail[0] ? tail[0].position : -1) + 1;
     result = await sb.from('library_articles')
-      .insert([{ source, title, summary, body, url, position: nextPos }]);
+      .insert([{ source, title, summary, body, url, author, published_at, position: nextPos }]);
   }
 
   btn.textContent = editingId ? 'Update Article' : 'Publish Article';
@@ -968,52 +902,45 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
 
 function resetForm() {
   document.getElementById('f-editing-id').value = '';
-  document.getElementById('f-editing-table').value = '';
-  document.getElementById('f-type').value = 'neighborhood';
-  document.getElementById('f-neighborhood').value = '';
+  document.getElementById('f-source').value = 'economist';
   document.getElementById('f-title').value = '';
+  document.getElementById('f-author').value = '';
+  document.getElementById('f-published').value = '';
   document.getElementById('f-summary').value = '';
   document.getElementById('f-body').value = '';
   document.getElementById('f-url').value = '';
-  document.getElementById('f-type').disabled = false;
   document.getElementById('submit-btn').textContent = 'Publish Article';
   document.getElementById('form-mode-label').textContent = 'Add New Article';
   document.getElementById('cancel-edit-btn').style.display = 'none';
-  updateFormFields();
 }
 
 document.getElementById('cancel-edit-btn').addEventListener('click', resetForm);
 
-function editAnyArticle(row) {
+function editArticle(row) {
   document.getElementById('f-editing-id').value = row.id;
-  document.getElementById('f-editing-table').value = row.kind;
-  if (row.kind === 'articles') {
-    document.getElementById('f-type').value = 'neighborhood';
-    document.getElementById('f-neighborhood').value = row.neighborhood || '';
-  } else {
-    document.getElementById('f-type').value = 'library:' + row.source;
-    document.getElementById('f-neighborhood').value = '';
-  }
-  document.getElementById('f-type').disabled = true; // can't switch table on edit
+  document.getElementById('f-source').value = row.source;
   document.getElementById('f-title').value = row.title || '';
+  document.getElementById('f-author').value = row.author || '';
+  document.getElementById('f-published').value = row.published_at
+    ? new Date(row.published_at).toISOString().slice(0, 10)
+    : '';
   document.getElementById('f-summary').value = row.summary || '';
   document.getElementById('f-body').value = row.body || '';
   document.getElementById('f-url').value = row.url || '';
   document.getElementById('submit-btn').textContent = 'Update Article';
   document.getElementById('form-mode-label').textContent = 'Editing Article';
   document.getElementById('cancel-edit-btn').style.display = 'inline-block';
-  updateFormFields();
   document.querySelector('#articles-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-async function deleteAnyArticle(row) {
+async function deleteArticle(row) {
   if (!confirm('Delete this article? This cannot be undone.')) return;
-  const { error } = await sb.from(row.kind).delete().eq('id', row.id);
+  const { error } = await sb.from('library_articles').delete().eq('id', row.id);
   if (error) { alert('Error deleting: ' + error.message); return; }
   loadArticles(document.getElementById('filter-scope').value);
 }
 
-async function reorderLibraryArticle(row, direction, sourceList) {
+async function reorderArticle(row, direction, sourceList) {
   const i = sourceList.findIndex(x => x.id === row.id);
   const j = direction === 'up' ? i - 1 : i + 1;
   if (j < 0 || j >= sourceList.length) return;
