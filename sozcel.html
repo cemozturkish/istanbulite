@@ -267,6 +267,12 @@
       0%, 100% { transform: rotateX(0); }
       50% { transform: rotateX(90deg); }
     }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+    .word-row.shake { animation: shake 0.4s ease; }
 
     .keyboard {
       display: flex;
@@ -717,6 +723,83 @@ function getTimeUntilMidnight() {
   return `Yeni oyun ${hours} saat ${minutes} dakika sonra`;
 }
 
+const VALID_WORDS = new Set([
+  // ── A ──
+  'AÇLIK','ACELE','ACIMA','AHBAP','AHVAL','AKTİF','ALAKA','ALARM',
+  'ALBÜM','ALKIŞ','ALTIN','ALTUN','AMELE','AMPUL','ANANE','ANCAK',
+  'ANLAM','ARABA','ARMUT','ASLAN','AKREP','ATAMA','AYRAN',
+  // ── B ──
+  'BACAK','BAHÇE','BAKIŞ','BAKLA','BALIK','BANKA','BARIŞ','BAVUL',
+  'BAYAT','BEBEK','BEDEN','BELGİ','BELKİ','BENİM','BİBER','BIÇAK',
+  'BİÇİM','BİLEK','BİLGİ','BİLET','BİZİM','BÖLÜM','BOYUN','BÖCEK',
+  'BÖREK','BUÇUK','BULGU','BULUT','BUGÜN','BURUN','BÜYÜK','BAKIR',
+  'BİRİM','BÜLBÜL','BALET','BUZUL',
+  // ── C / Ç ──
+  'CADDE','CEKET','CESUR','CİDDİ','CIMRI',
+  'ÇANTA','ÇATAL','ÇAYIR','ÇELİK','ÇİÇEK','ÇİMEN','ÇİZGİ',
+  'ÇIKIŞ','ÇOBAN','ÇORBA','ÇORAP','ÇUKUR','ÇÖZÜM','ÇÖKÜŞ',
+  // ── D ──
+  'DAİRE','DAMAT','DEMİR','DENİZ','DEĞER','DELİK','DERİN','DİKİŞ',
+  'DİLEK','DOĞRU','DOĞUM','DOMUZ','DOSYA','DÖNER','DUDAK','DUMAN',
+  'DURAK','DUVAR','DÜĞME','DÜĞÜN','DÜNYA','DÖNÜŞ',
+  // ── E ──
+  'EKMEK','EKLEM','EKRAN','ENGEL','ERKEK','ESNAF','EVLAT','EVREN',
+  'EYLEM',
+  // ── F ──
+  'FAKİR','FAZLA','FİKİR','FİLİZ','FİYAT','FIRÇA','FIRIN',
+  // ── G / Ğ ──
+  'GARİP','GEÇİŞ','GELİŞ','GENEL','GENİŞ','GİDİŞ','GİRİŞ','GÖĞÜS',
+  'GÖLET','GÖLGE','GÖREV','GÖRÜŞ','GÜLÜŞ','GÜÇLÜ','GÜNEŞ','GÜMÜŞ',
+  'GÜNAH','GURUR','GÜVEN','GÜZEL',
+  // ── H ──
+  'HAFİF','HAKİM','HAMSI','HASTA','HAVUÇ','HAVUZ','HAYAL','HABER',
+  'HEKİM','HELVA','HEMEN','HESAP','HIZLI','HURMA','HÜZÜN','HUZUR',
+  // ── İ ──
+  'İMKAN','İNCİR','İNSAN','İSTEK',
+  // ── K ──
+  'KADIN','KAHVE','KALEM','KALIP','KAPAK','KARGA','KARAR','KARIN',
+  'KASAP','KAŞIK','KAVAL','KAVUN','KAZAK','KEBAP','KEDER','KEFİL',
+  'KİRAZ','KİRPİ','KİTAP','KİLİM','KIRPI','KISIM','KIBIR','KOLAY',
+  'KOLYE','KOMİK','KOMŞU','KORKU','KOYUN','KÖPEK','KÖPRÜ','KÖRPE',
+  'KÖYLÜ','KUMAŞ','KURAL','KUŞAK','KÜÇÜK','KULAK',
+  // ── L ──
+  'LAMBA','LİDER','LİMON','LOKUM',
+  // ── M ──
+  'MANGO','MARTI','MASAL','MANTI','MAYIS','MESAJ','METRO','MEYVE',
+  'MEZUN','MİDYE','MUTLU','MÜZİK',
+  // ── N ──
+  'NAMAZ','NAZAR','NEDEN','NEFES','NEHİR','NİSAN','NİŞAN','NOHUT',
+  'NAZİK','NOKTA',
+  // ── O / Ö ──
+  'OĞLAN','OKUMA','OPERA','ORMAN','ÖRDEK','ÖZGÜN','ÖZLEM','ÖĞLEN',
+  // ── P ──
+  'PANEL','PASTA','PAZAR','PEMBE','PERDE','PİLAV','PLAKA',
+  // ── R ──
+  'RADYO','RAKİP','RAKAM','REÇEL','REZİL','RESİM','ROBOT',
+  // ── S / Ş ──
+  'SABAH','SABIR','SAHİL','SAHNE','SAKIN','SALÇA','SALON','SATIM',
+  'SAVAŞ','SAYFA','SAYGI','SAKAR','SAĞIR','SEÇİM','SENİN','SERÇE',
+  'SERGİ','SERİN','SEVGİ','SİMİT','SİNİR','SİYAH','SİLAH','SINAV',
+  'SINIF','SICAK','SIGIR','SOĞAN','SOKAK','SOMON','SORUN','SONUÇ',
+  'SÜLÜN','SIFIR',
+  'ŞAHİN','ŞAPKA','ŞARAP','ŞEHİR','ŞEKİL','ŞEKER','ŞİMDİ','ŞİRİN',
+  'ŞARKI',
+  // ── T ──
+  'TABAK','TAHİN','TAKIM','TAKSİ','TABLO','TALİH','TALEP','TANGO',
+  'TATLI','TAVAN','TAVUK','TEKNE','TEMEL','TENİS','TERZİ','TEYZE',
+  'TİLKİ','TOPAL','TORUN','TUĞLA','TUHAF','TURŞU','TUTKU','TÜNEL',
+  // ── U / Ü ──
+  'UMMAN','UZMAN','ÜSTAT','ÜZGÜN',
+  // ── V ──
+  'VALİZ','VAPUR','VATAN','VERİM','VİŞNE','VİRAN','VİRÜS',
+  // ── Y ──
+  'YAKIN','YARGI','YARIN','YAŞAM','YATAK','YAVAŞ','YAZAR','YAZMA',
+  'YEŞİL','YEMEK','YETKİ','YILAN','YUNUS','YÜZDE','YÜZÜK','YÜRÜŞ',
+  // ── Z ──
+  'ZAFER','ZAMAN','ZARİF','ZEHİR','ZEMİN','ZİRVE','ZİYAN','ZAYIF',
+]);
+
+// Seed the set with all answer words so they always pass validation
 const WORD_LIST = [
   'KOLAY', 'SOKAK', 'HABER', 'KÖŞEK', 'ŞEHİR', 'PASTA', 'GÜZEL', 'KİTAP',
   'YEMEK', 'DÜNYA', 'BAHÇE', 'ÇANTA', 'DENİZ', 'GÜNEŞ', 'İSTEK', 'KALEM',
@@ -734,6 +817,9 @@ function seededRandom(seed) {
   }
   return Math.abs(x % WORD_LIST.length);
 }
+
+// Ensure every possible answer is always accepted
+WORD_LIST.forEach(w => VALID_WORDS.add(w));
 
 const dailySeed = getDailySeed();
 const TARGET_WORD = WORD_LIST[seededRandom(dailySeed)];
@@ -886,6 +972,18 @@ function handleKey(key) {
     }
   } else if (key === 'GİR') {
     if (currentGuess.length === 5) {
+      if (!VALID_WORDS.has(currentGuess)) {
+        const row = document.getElementById('word-grid').children[currentRow];
+        if (row) {
+          row.classList.add('shake');
+          row.addEventListener('animationend', () => row.classList.remove('shake'), { once: true });
+        }
+        const msgEl = document.getElementById('game-message');
+        msgEl.textContent = 'Kelime listede yok';
+        msgEl.className = 'game-message';
+        setTimeout(() => { if (msgEl.textContent === 'Kelime listede yok') msgEl.textContent = ''; }, 1500);
+        return;
+      }
       submitGuess();
     }
   } else if (currentGuess.length < 5) {
