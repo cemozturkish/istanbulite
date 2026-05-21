@@ -369,6 +369,49 @@
     .btn-del { background: #c0392b; color: white; }
     .btn-del:hover { background: #922b21; }
 
+    .sources-block {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #ccc;
+    }
+    .sources-label {
+      font-size: 0.7rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .src-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 0;
+      border-bottom: 1px solid #eee;
+      font-size: 0.8rem;
+    }
+    .src-row .src-info { flex: 1; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+    .src-row .src-headline { color: var(--muted); font-style: italic; }
+    .src-row a { color: var(--ink); }
+    .src-row .btn-del { padding: 0 8px; font-size: 0.9rem; line-height: 1; }
+    .src-form {
+      display: grid;
+      grid-template-columns: 1fr 2fr 2fr auto;
+      gap: 6px;
+      margin-top: 8px;
+      align-items: center;
+    }
+    .src-form input {
+      padding: 5px 8px;
+      font-size: 0.8rem;
+      border: 1px solid #ccc;
+      font-family: 'Inter', sans-serif;
+    }
+    .src-form button { white-space: nowrap; padding: 6px 10px; font-size: 0.75rem; }
+    .src-status { grid-column: 1 / -1; margin: 0; font-size: 0.75rem; }
+    @media (max-width: 600px) {
+      .src-form { grid-template-columns: 1fr; }
+    }
+
     .empty-state {
       font-style: italic;
       color: var(--muted);
@@ -553,13 +596,14 @@
       <label>Body (optional)</label>
       <textarea id="n-body" placeholder="A sentence or two of detail..."></textarea>
 
-      <label>URL (optional)</label>
-      <input type="text" id="n-url" placeholder="https://..."/>
-
-      <label>Neighborhood (optional — pulses on the map)</label>
-      <select id="n-neighborhood">
-        <option value="">— None (general) —</option>
+      <label>Category</label>
+      <select id="n-category">
+        <option value="turkiye">Türkiye</option>
+        <option value="istanbul">İstanbul</option>
       </select>
+      <p style="margin-top:-4px;font-size:0.7rem;color:var(--muted);font-style:italic;">
+        Picking a neighborhood also pulses it on the map.
+      </p>
 
       <div class="btn-row">
         <button class="btn btn-primary" id="n-submit-btn">Post Breaking News</button>
@@ -713,19 +757,23 @@ async function loadAllNeighborhoodDropdowns() {
   if (error || !data) return;
   const resSel = document.getElementById('u-neighborhood');
   const birthSel = document.getElementById('u-birth-neighborhood');
-  const nNb = document.getElementById('n-neighborhood');
+  const nCat = document.getElementById('n-category');
   data.forEach(n => {
-    [birthSel, nNb].forEach(sel => {
-      const opt = document.createElement('option');
-      opt.value = n.id;
-      opt.textContent = n.name_tr;
-      sel.appendChild(opt);
-    });
+    const opt = document.createElement('option');
+    opt.value = n.id;
+    opt.textContent = n.name_tr;
+    birthSel.appendChild(opt);
     if (n.id !== 'istanbul_disi') {
       const resOpt = document.createElement('option');
       resOpt.value = n.id;
       resOpt.textContent = n.name_tr;
       resSel.appendChild(resOpt);
+
+      // Category dropdown gets Istanbul districts (no istanbul_disi).
+      const catOpt = document.createElement('option');
+      catOpt.value = n.id;
+      catOpt.textContent = n.name_tr;
+      nCat.appendChild(catOpt);
     }
   });
 }
@@ -967,28 +1015,55 @@ async function reorderArticle(row, direction, sourceList) {
 // ══════════════════════════════════════════
 // Breaking news tab
 // ══════════════════════════════════════════
+function categoryLabel(cat) {
+  if (cat === 'turkiye') return 'TÜRKİYE';
+  if (cat === 'istanbul') return 'İSTANBUL';
+  return (NEIGHBORHOOD_NAMES[cat] || cat || 'GENERAL').toLocaleUpperCase('tr-TR');
+}
+
 async function loadBreakingNews() {
   const listEl = document.getElementById('news-list');
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('breaking_news')
-    .select('*').gte('created_at', cutoff)
+    .select('*, breaking_news_sources(*)').gte('created_at', cutoff)
     .order('created_at', { ascending: false });
   if (error) { listEl.innerHTML = '<div class="empty-state">Error loading news.</div>'; return; }
   if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No active breaking news.</div>'; return; }
 
   listEl.innerHTML = data.map(n => {
     const ago = formatAgo(n.created_at);
-    const tag = n.neighborhood
-      ? (NEIGHBORHOOD_NAMES[n.neighborhood] || n.neighborhood)
-      : 'General';
+    const cat = n.category || n.neighborhood || 'turkiye';
+    const sources = (n.breaking_news_sources || [])
+      .slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const sourcesHtml = sources.map(s => `
+      <div class="src-row" data-src-id="${s.id}">
+        <div class="src-info">
+          <strong>${escapeHtml(s.name)}</strong>
+          <span class="src-headline">${escapeHtml(s.headline)}</span>
+          <a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">↗</a>
+        </div>
+        <button class="btn-del" data-act="del-src" data-id="${s.id}" data-news-id="${n.id}">×</button>
+      </div>
+    `).join('');
     return `
       <div class="article-card" data-id="${n.id}">
-        <div class="a-neighborhood">${escapeHtml(tag)} · ${ago}</div>
+        <div class="a-neighborhood">${escapeHtml(categoryLabel(cat))} · ${ago}</div>
         <h4>${escapeHtml(n.title)}</h4>
         ${n.body ? `<p>${escapeHtml(n.body)}</p>` : ''}
+        <div class="sources-block">
+          <div class="sources-label">Kaynaklar (${sources.length})</div>
+          ${sourcesHtml}
+          <div class="src-form">
+            <input type="text" class="src-name" placeholder="Kaynak adı (ör. Cumhuriyet)"/>
+            <input type="text" class="src-headline" placeholder="Bu kaynaktaki başlık"/>
+            <input type="text" class="src-url" placeholder="https://..."/>
+            <button class="btn btn-secondary" data-act="add-src" data-news-id="${n.id}">+ Kaynak Ekle</button>
+            <div class="src-status status-msg"></div>
+          </div>
+        </div>
         <div class="card-actions">
-          <button class="btn-del" data-act="del-news" data-id="${n.id}">Delete</button>
+          <button class="btn-del" data-act="del-news" data-id="${n.id}">Delete News</button>
         </div>
       </div>
     `;
@@ -997,6 +1072,46 @@ async function loadBreakingNews() {
   listEl.querySelectorAll('button[data-act="del-news"]').forEach(btn => {
     btn.addEventListener('click', () => deleteBreakingNews(btn.dataset.id));
   });
+  listEl.querySelectorAll('button[data-act="del-src"]').forEach(btn => {
+    btn.addEventListener('click', () => deleteSource(btn.dataset.id));
+  });
+  listEl.querySelectorAll('button[data-act="add-src"]').forEach(btn => {
+    btn.addEventListener('click', () => addSource(btn));
+  });
+}
+
+async function addSource(btn) {
+  const card = btn.closest('.article-card');
+  const newsId = btn.dataset.newsId;
+  const nameEl = card.querySelector('.src-name');
+  const headlineEl = card.querySelector('.src-headline');
+  const urlEl = card.querySelector('.src-url');
+  const statusEl = card.querySelector('.src-status');
+  const name = nameEl.value.trim();
+  const headline = headlineEl.value.trim();
+  const url = urlEl.value.trim();
+  if (!name || !headline || !url) {
+    statusEl.textContent = 'Adı, başlığı ve bağlantıyı doldurun.';
+    statusEl.className = 'src-status status-msg err';
+    return;
+  }
+  btn.disabled = true;
+  const { error } = await sb.from('breaking_news_sources')
+    .insert([{ news_id: newsId, name, headline, url }]);
+  btn.disabled = false;
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'src-status status-msg err';
+    return;
+  }
+  loadBreakingNews();
+}
+
+async function deleteSource(id) {
+  if (!confirm('Delete this source?')) return;
+  const { error } = await sb.from('breaking_news_sources').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadBreakingNews();
 }
 
 function formatAgo(iso) {
@@ -1014,10 +1129,17 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   const title = document.getElementById('n-title').value.trim();
   const body = document.getElementById('n-body').value.trim();
   const url = document.getElementById('n-url').value.trim();
-  const neighborhood = document.getElementById('n-neighborhood').value || null;
+  const category = document.getElementById('n-category').value;
+  // Pulse the map only when the category is an actual neighborhood id.
+  const neighborhood = (category !== 'turkiye' && category !== 'istanbul') ? category : null;
 
   if (!title) {
     statusEl.textContent = 'Please enter a headline.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  if (!category) {
+    statusEl.textContent = 'Please pick a category.';
     statusEl.className = 'status-msg err';
     return;
   }
@@ -1025,7 +1147,7 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>';
 
-  const { error } = await sb.from('breaking_news').insert([{ title, body: body || null, url: url || null, neighborhood }]);
+  const { error } = await sb.from('breaking_news').insert([{ title, body: body || null, url: url || null, neighborhood, category }]);
   btn.disabled = false;
   btn.textContent = 'Post Breaking News';
 
@@ -1037,7 +1159,7 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   statusEl.textContent = 'Breaking news posted!';
   statusEl.className = 'status-msg ok';
   ['n-title','n-body','n-url'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('n-neighborhood').value = '';
+  document.getElementById('n-category').value = 'turkiye';
   loadBreakingNews();
   setTimeout(() => { statusEl.textContent = ''; }, 3000);
 });
