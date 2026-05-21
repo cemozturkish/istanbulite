@@ -424,6 +424,57 @@
       color: #333;
     }
 
+    .article.expandable { cursor: pointer; }
+    .article.expandable:hover { background: rgba(0,0,0,0.03); }
+    .article .meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .article .ago {
+      font-size: 0.65rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted, #777);
+      font-style: italic;
+    }
+    .article .sources {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #ccc;
+      display: none;
+    }
+    .article.expanded .sources { display: block; }
+    .article .src-item {
+      padding: 6px 0;
+      border-bottom: 1px dotted #ddd;
+      font-size: 0.78rem;
+    }
+    .article .src-item:last-child { border-bottom: none; }
+    .article .src-item .src-name {
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-size: 0.65rem;
+      display: block;
+      color: var(--muted, #555);
+      margin-bottom: 2px;
+    }
+    .article .src-item a {
+      color: var(--ink);
+      text-decoration: none;
+      border-bottom: 1px solid var(--ink);
+      line-height: 1.4;
+    }
+    .article .src-item a:hover { opacity: 0.7; }
+    .article .sources-empty {
+      font-size: 0.75rem;
+      font-style: italic;
+      color: var(--muted, #777);
+    }
+
     /* ── RIGHT SIDEBAR (neighborhood info) ── */
     .sidebar-right {
       padding: 0;
@@ -1539,6 +1590,42 @@ function escapeText(s) {
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+const NB_NAMES_TR = {
+  bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler',
+  sisli:'Şişli', eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa',
+  esenler:'Esenler', bagcilar:'Bağcılar', basaksehir:'Başakşehir',
+  kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi', uskudar:'Üsküdar',
+  kadikoy:'Kadıköy', maltepe:'Maltepe', umraniye:'Ümraniye',
+  cekmekoy:'Çekmeköy', beykoz:'Beykoz', sariyer:'Sarıyer',
+  besiktas:'Beşiktaş', beyoglu:'Beyoğlu', gungoren:'Güngören',
+  kagithane:'Kağıthane', atasehir:'Ataşehir', zeytinburnu:'Zeytinburnu', fatih:'Fatih'
+};
+
+function categoryLabelTR(n) {
+  const c = n.category || n.neighborhood || 'turkiye';
+  if (c === 'turkiye') return 'TÜRKİYE';
+  if (c === 'istanbul') return 'İSTANBUL';
+  return (NB_NAMES_TR[c] || c).toLocaleUpperCase('tr-TR');
+}
+
+function formatAgoTR(iso) {
+  const d = new Date(iso);
+  const secs = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (secs < 60) return 'az önce';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return mins + ' dk önce';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + ' sa önce';
+  const days = Math.floor(hrs / 24);
+  return days + ' gün önce';
+}
+
+function safeUrl(u) {
+  const s = String(u || '').trim();
+  if (/^https?:\/\//i.test(s)) return s;
+  return null;
+}
+
 function renderBreakingNewsFeed(rows) {
   const feed = document.getElementById('breaking-news-feed');
   if (!feed) return;
@@ -1547,33 +1634,58 @@ function renderBreakingNewsFeed(rows) {
     return;
   }
   feed.innerHTML = rows.map(n => {
-    const nbName = n.neighborhood
-      ? (({
-          bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler',
-          sisli:'Şişli', eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa',
-          esenler:'Esenler', bagcilar:'Bağcılar', basaksehir:'Başakşehir',
-          kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi', uskudar:'Üsküdar',
-          kadikoy:'Kadıköy', maltepe:'Maltepe', umraniye:'Ümraniye',
-          cekmekoy:'Çekmeköy', beykoz:'Beykoz', sariyer:'Sarıyer',
-          besiktas:'Beşiktaş', beyoglu:'Beyoğlu', gungoren:'Güngören',
-          kagithane:'Kağıthane', atasehir:'Ataşehir', zeytinburnu:'Zeytinburnu', fatih:'Fatih'
-        })[n.neighborhood] || n.neighborhood)
-      : 'Genel';
+    const sources = (n.breaking_news_sources || [])
+      .slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const sourcesHtml = sources.length
+      ? sources.map(s => {
+          const url = safeUrl(s.url);
+          const inner = `
+            <span class="src-name">${escapeText(s.name)}</span>
+            ${escapeText(s.headline)}
+          `;
+          return `<div class="src-item">${
+            url
+              ? `<a href="${escapeText(url)}" target="_blank" rel="noopener">${inner}</a>`
+              : inner
+          }</div>`;
+        }).join('')
+      : '<div class="sources-empty">Henüz kaynak eklenmedi.</div>';
     return `
-      <div class="article">
-        <div class="kicker">${escapeText(nbName)}</div>
+      <div class="article expandable" data-news-id="${escapeText(n.id)}">
+        <div class="meta-row">
+          <div class="kicker">${escapeText(categoryLabelTR(n))}</div>
+          <div class="ago" data-iso="${escapeText(n.created_at)}">${escapeText(formatAgoTR(n.created_at))}</div>
+        </div>
         <h3>${escapeText(n.title)}</h3>
         ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
-        ${n.url ? `<p><a href="${n.url}" target="_blank" rel="noopener" style="color:var(--ink);">Devamı ↗</a></p>` : ''}
+        <div class="sources">
+          <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Kaynaklar</div>
+          ${sourcesHtml}
+        </div>
       </div>
     `;
   }).join('');
+
+  feed.querySelectorAll('.article.expandable').forEach(el => {
+    el.addEventListener('click', (e) => {
+      // Let source links open without toggling.
+      if (e.target.closest('a')) return;
+      el.classList.toggle('expanded');
+    });
+  });
 }
+
+// Tick the "X dk önce" labels every minute so they stay current.
+setInterval(() => {
+  document.querySelectorAll('#breaking-news-feed .ago[data-iso]').forEach(el => {
+    el.textContent = formatAgoTR(el.dataset.iso);
+  });
+}, 60000);
 
 async function loadBreakingNews() {
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('breaking_news')
-    .select('*').gte('created_at', cutoff)
+    .select('*, breaking_news_sources(*)').gte('created_at', cutoff)
     .order('created_at', { ascending: false });
   if (error) { console.error('[anahane breaking_news]', error); return; }
   const rows = data || [];

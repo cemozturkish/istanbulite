@@ -16,6 +16,12 @@ create table if not exists public.breaking_news (
   created_at timestamptz not null default now()
 );
 
+-- Category: 'turkiye' | 'istanbul' | <neighborhood id>. When the value
+-- is a neighborhood id, `neighborhood` is set to the same value so the
+-- map-pulse logic keeps working.
+alter table public.breaking_news
+  add column if not exists category text not null default 'turkiye';
+
 create index if not exists breaking_news_created_at_idx
   on public.breaking_news (created_at desc);
 
