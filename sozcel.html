@@ -679,8 +679,46 @@
     }
 
     /* ── MOBILE RESPONSIVE ── */
-    /* Back button hidden on desktop (overridden in mobile @media below) */
-    .game-back-btn { display: none; }
+    /* Desktop back button: floating top-left inside main, matches game-ctrl-btn */
+    .game-back-btn {
+      position: absolute;
+      top: 10px;
+      left: 14px;
+      z-index: 50;
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink);
+      text-decoration: none;
+      line-height: 1;
+      transition: background 0.15s;
+    }
+    .game-back-btn:hover { background: var(--paper-dark); }
+
+    /* Played games are dimmed in the side nav */
+    .game-link.played {
+      opacity: 0.55;
+      filter: grayscale(1);
+    }
+    .game-link.played::after {
+      content: 'OYNANDI';
+      position: absolute;
+      bottom: 4px;
+      left: 0;
+      right: 0;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--ink);
+    }
 
     @media (max-width: 768px) {
       html, body {
@@ -791,8 +829,6 @@
 </head>
 <body>
 
-  <a href="kahvehane.html" class="game-back-btn" aria-label="Geri">&larr;</a>
-
   <aside class="col-left">
     <div class="nb-highlight" id="user-nb-badge"></div>
     <section class="stats-left" id="stats-left"></section>
@@ -815,6 +851,7 @@
   </header>
 
   <main>
+    <a href="kahvehane.html" class="game-back-btn" aria-label="Geri" title="Geri">←</a>
     <div class="game-controls">
       <button class="game-ctrl-btn" id="share-btn" type="button" aria-label="Paylaş" title="Paylaş" disabled>↗</button>
       <button class="game-ctrl-btn" id="help-btn" type="button" aria-label="Nasıl oynanır" title="Nasıl oynanır">?</button>
@@ -2199,12 +2236,39 @@ function showShareToast(msg) {
   }
 })();
 
+// ── Mark games already played today (dimmed in side nav) ──
+async function markPlayedGames() {
+  const today = dailySeed;
+  const played = new Set();
+  const localFlags = {
+    sozcel: 'sozcel_started_' + today,
+    baglantilar: 'baglantilar_started_' + today,
+    bulmaca: 'bulmaca_started_' + today
+  };
+  for (const [g, key] of Object.entries(localFlags)) {
+    if (localStorage.getItem(key)) played.add(g);
+  }
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      const { data, error } = await sb.from('game_results')
+        .select('game').eq('user_id', session.user.id).eq('date', today);
+      if (!error && data) data.forEach(r => played.add(r.game));
+    }
+  } catch (e) {}
+  document.querySelectorAll('.game-link[data-game]').forEach(el => {
+    if (el.classList.contains('active')) return;
+    if (played.has(el.dataset.game)) el.classList.add('played');
+  });
+}
+
 // ── Init ──
 initWordGrid();
 initKeyboard();
 restoreState();
 renderStats();
 loadScoreboard();
+markPlayedGames();
 
 // ── Disable browser zoom (Ctrl+wheel, Ctrl+=/-/0, pinch gestures) ──
 window.addEventListener('wheel', (e) => {
