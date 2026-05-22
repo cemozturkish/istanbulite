@@ -156,6 +156,7 @@
       flex-direction: column;
       overflow: hidden;
       min-height: 0;
+      position: relative;
     }
 
     /* Left: personal + community stats (compact) */
@@ -231,7 +232,59 @@
       overflow: hidden;
       min-height: 0;
       gap: 6px;
+      flex: 1;
     }
+
+    /* Floating top-right controls (desktop): share + help */
+    .game-controls {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      display: flex;
+      gap: 6px;
+      z-index: 50;
+    }
+    .game-ctrl-btn {
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+      padding: 0;
+      line-height: 1;
+      transition: background 0.15s;
+    }
+    .game-ctrl-btn:hover { background: var(--paper-dark); }
+    .game-ctrl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Help popup reuses the result-overlay styling but with body text */
+    .help-body {
+      text-align: left;
+      font-size: 0.82rem;
+      line-height: 1.55;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+    .help-body p { margin-bottom: 10px; }
+    .help-body .swatch {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      vertical-align: -2px;
+      margin-right: 6px;
+      border: 1px solid #ccc;
+    }
+    .help-body .swatch.correct { background: var(--success); border-color: var(--success); }
+    .help-body .swatch.present { background: var(--present); border-color: var(--present); }
+    .help-body .swatch.absent { background: var(--absent); border-color: var(--absent); }
 
     .word-grid {
       display: flex;
@@ -653,6 +706,20 @@
       /* Hide everything except the game itself for immersive fullscreen */
       .section-rule, .col-left, .col-right, header { display: none !important; }
 
+      /* On mobile, move share/help next to the back button instead of overlapping the game */
+      .game-controls {
+        top: 10px;
+        right: 10px;
+      }
+      .game-ctrl-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 16px;
+        border-radius: 50%;
+        background: #ffffff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      }
+
       /* Floating back button (top-left) */
       .game-back-btn {
         display: flex;
@@ -748,6 +815,10 @@
   </header>
 
   <main>
+    <div class="game-controls">
+      <button class="game-ctrl-btn" id="share-btn" type="button" aria-label="Paylaş" title="Paylaş" disabled>↗</button>
+      <button class="game-ctrl-btn" id="help-btn" type="button" aria-label="Nasıl oynanır" title="Nasıl oynanır">?</button>
+    </div>
     <section class="game-panel">
       <div class="word-grid" id="word-grid"></div>
       <div class="game-message" id="game-message"></div>
@@ -799,6 +870,24 @@
     </div>
   </div>
   <div class="share-toast" id="share-toast"></div>
+
+  <!-- How-to-play popup -->
+  <div class="result-overlay" id="help-overlay">
+    <div class="result-card">
+      <button class="result-close" id="help-close" type="button" aria-label="Kapat">×</button>
+      <div class="result-title" style="margin-bottom:14px;">Nasıl Oynanır</div>
+      <div class="help-body">
+        <p>Gizli beş harfli Türkçe sözcüğü <strong>altı denemede</strong> bulun.</p>
+        <p>Her tahminin ardından kutular renklenir:</p>
+        <p>
+          <span class="swatch correct"></span> Harf doğru ve doğru yerde.<br>
+          <span class="swatch present"></span> Harf sözcükte var ama yanlış yerde.<br>
+          <span class="swatch absent"></span> Harf sözcükte yok.
+        </p>
+        <p>Her gün yeni bir sözcük gelir. Türkçe <strong>İ/I</strong> ayrımına dikkat edin.</p>
+      </div>
+    </div>
+  </div>
 
 <script>
 // ── Supabase init ──
@@ -1064,7 +1153,9 @@ function restoreState() {
       }
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       currentRow = state.guesses.length;
-      setTimeout(() => showResultPopup(wasWon), 400);
+      // Do NOT auto-open the result popup on revisit — the share button stays
+      // available in the top-right for the user to reopen it manually.
+      enableShareButton(wasWon);
     } else {
       currentRow = state.guesses.length;
       currentGuess = '';
@@ -1224,7 +1315,10 @@ function submitGuess() {
       await recordGameResult('sozcel', dailySeed, rowSnap + 1, true, userNeighborhood);
       saveState();
       renderStats();
-      setTimeout(() => showResultPopup(true), 700);
+      enableShareButton(true);
+      // Longer pause lets the user see the final row flip + win message before
+      // the popup covers it. The popup auto-opens only on first completion.
+      setTimeout(() => showResultPopup(true), 1500);
     } else if (rowSnap === 5) {
       document.getElementById('game-message').textContent = `Kelime: ${TARGET_WORD}`;
       document.getElementById('game-message').className = 'game-message lose';
@@ -1233,7 +1327,8 @@ function submitGuess() {
       await recordGameResult('sozcel', dailySeed, 7, false, userNeighborhood);
       saveState();
       renderStats();
-      setTimeout(() => showResultPopup(false), 700);
+      enableShareButton(false);
+      setTimeout(() => showResultPopup(false), 1500);
     } else {
       currentRow++;
       currentGuess = '';
@@ -1533,6 +1628,16 @@ async function loadScoreboard() {
   }).join('');
 }
 
+// Tracks whether the player won, so the manual share button (top-right) can
+// reopen the same result card after the game is over.
+let lastResultWon = false;
+
+function enableShareButton(won) {
+  lastResultWon = !!won;
+  const btn = document.getElementById('share-btn');
+  if (btn) btn.disabled = false;
+}
+
 // ── Result popup ──
 function buildShareText() {
   const won = guessResults.length > 0 && guessResults[guessResults.length - 1].every(r => r === 'correct');
@@ -1589,6 +1694,29 @@ function showShareToast(msg) {
       try { await navigator.clipboard.writeText(text); showShareToast('Kopyalandı!'); } catch {}
     }
   });
+})();
+
+// ── Top-right share + help buttons ──
+(function initTopControls() {
+  const shareBtn = document.getElementById('share-btn');
+  if (shareBtn) shareBtn.addEventListener('click', () => {
+    if (shareBtn.disabled) return;
+    showResultPopup(lastResultWon);
+  });
+  const helpOverlay = document.getElementById('help-overlay');
+  const helpBtn = document.getElementById('help-btn');
+  const helpClose = document.getElementById('help-close');
+  if (helpBtn && helpOverlay) {
+    helpBtn.addEventListener('click', () => helpOverlay.classList.add('open'));
+  }
+  if (helpClose && helpOverlay) {
+    helpClose.addEventListener('click', () => helpOverlay.classList.remove('open'));
+  }
+  if (helpOverlay) {
+    helpOverlay.addEventListener('click', (e) => {
+      if (e.target === helpOverlay) helpOverlay.classList.remove('open');
+    });
+  }
 })();
 
 // ── Init ──
