@@ -511,6 +511,11 @@ const neighborhoodNames = {
     if (session) {
       userNeighborhood = session.user.user_metadata?.yasadigi_ilce
         || session.user.user_metadata?.neighborhood || '';
+      // Accounts created by admin don't have user_metadata — fall back to profiles table.
+      if (!userNeighborhood) {
+        const { data: p } = await sb.from('profiles').select('neighborhood').eq('id', session.user.id).maybeSingle();
+        if (p?.neighborhood) userNeighborhood = p.neighborhood;
+      }
       if (userNeighborhood) {
         const badgeEl = document.getElementById('user-nb-badge');
         if (badgeEl) badgeEl.textContent = neighborhoodNames[userNeighborhood] || userNeighborhood;
@@ -524,7 +529,7 @@ async function recordGameResult(game, date, attempts, won, neighborhood) {
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return;
-    await sb.from('game_results').insert([{
+    const { error } = await sb.from('game_results').insert([{
       user_id: session.user.id,
       game: game,
       date: date,
@@ -532,7 +537,8 @@ async function recordGameResult(game, date, attempts, won, neighborhood) {
       won: won,
       neighborhood: neighborhood
     }]);
-  } catch (e) { /* table may not exist yet */ }
+    if (error) console.error('[sozcel game_results]', error);
+  } catch (e) { console.error('[sozcel game_results]', e); }
 }
 
 // Date/time display
@@ -764,7 +770,7 @@ async function markAsPlayed() {
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return;
-    await sb.from('game_results').insert([{
+    const { error } = await sb.from('game_results').insert([{
       user_id: session.user.id,
       game: 'sozcel',
       date: dailySeed,
@@ -772,7 +778,8 @@ async function markAsPlayed() {
       won: false,
       neighborhood: userNeighborhood
     }]);
-  } catch (e) { /* table may not exist yet */ }
+    if (error) console.error('[sozcel markAsPlayed]', error);
+  } catch (e) { console.error('[sozcel markAsPlayed]', e); }
 }
 
 function updateDisplay() {
