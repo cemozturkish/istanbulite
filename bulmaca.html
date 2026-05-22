@@ -152,6 +152,7 @@
       flex-direction: column;
       overflow: hidden;
       min-height: 0;
+      position: relative;
     }
 
     /* Left: personal + community stats (compact) */
@@ -503,7 +504,43 @@
 
     /* ── MOBILE RESPONSIVE ── */
     /* Back button hidden on desktop (overridden in mobile @media below) */
-    .game-back-btn { display: none; }
+    /* Desktop back button: floating top-left inside main */
+    .game-back-btn {
+      position: absolute;
+      top: 10px;
+      left: 14px;
+      z-index: 50;
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink);
+      text-decoration: none;
+      line-height: 1;
+      transition: background 0.15s;
+    }
+    .game-back-btn:hover { background: var(--paper-dark); }
+
+    /* Side nav: started today (light gray) vs completed today (dark gray) */
+    .game-link.started {
+      background: #e5e5e5;
+      color: var(--accent);
+    }
+    .game-link.started .game-link-subtitle { color: var(--muted); }
+    .game-link.completed {
+      background: #9a9a9a;
+      color: #1a1a1a;
+      border-color: #5a5a5a;
+    }
+    .game-link.completed::before { border-color: #5a5a5a; }
+    .game-link.completed .game-link-subtitle { color: #3a3a3a; }
 
     @media (max-width: 768px) {
       html, body {
@@ -609,8 +646,6 @@
 </head>
 <body>
 
-  <a href="kahvehane.html" class="game-back-btn" aria-label="Geri">&larr;</a>
-
   <aside class="col-left">
     <div class="nb-highlight" id="user-nb-badge"></div>
     <section class="stats-left" id="stats-left"></section>
@@ -633,6 +668,7 @@
   </header>
 
   <main>
+    <a href="kahvehane.html" class="game-back-btn" aria-label="Geri" title="Geri">←</a>
     <section class="game-panel">
       <div class="crossword-grid" id="crossword-grid"></div>
       <div class="controls">
@@ -1400,12 +1436,45 @@ async function loadScoreboard() {
   }).join('');
 }
 
+// Mark games as started (light gray) or completed (dark gray) in side nav
+async function markPlayedGames() {
+  const today = dailySeed;
+  const started = new Set();
+  const completed = new Set();
+  const localFlags = {
+    sozcel: 'sozcel_started_' + today,
+    baglantilar: 'baglantilar_started_' + today,
+    bulmaca: 'bulmaca_started_' + today
+  };
+  for (const [g, key] of Object.entries(localFlags)) {
+    if (localStorage.getItem(key)) started.add(g);
+  }
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      const { data, error } = await sb.from('game_results')
+        .select('game, attempts').eq('user_id', session.user.id).eq('date', today);
+      if (!error && data) data.forEach(r => {
+        if ((r.attempts || 0) >= 1) completed.add(r.game);
+        else started.add(r.game);
+      });
+    }
+  } catch (e) {}
+  document.querySelectorAll('.game-link[data-game]').forEach(el => {
+    if (el.classList.contains('active')) return;
+    const g = el.dataset.game;
+    if (completed.has(g)) el.classList.add('completed');
+    else if (started.has(g)) el.classList.add('started');
+  });
+}
+
 // Init
 createGrid();
 renderClues();
 restoreState();
 renderStats();
 loadScoreboard();
+markPlayedGames();
 </script>
 </body>
 </html>
