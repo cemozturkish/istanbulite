@@ -389,6 +389,20 @@
       font-style: italic;
     }
 
+    /* Started today (light gray) vs completed today (dark gray) */
+    .game-link.started {
+      background: #e5e5e5;
+      color: var(--accent);
+    }
+    .game-link.started .game-link-subtitle { color: var(--muted); }
+    .game-link.completed {
+      background: #9a9a9a;
+      color: #1a1a1a;
+      border-color: #5a5a5a;
+    }
+    .game-link.completed::before { border-color: #5a5a5a; }
+    .game-link.completed .game-link-subtitle { color: #3a3a3a; }
+
     /* Home neighborhood badge shown in the post form */
     .home-nb-badge {
       display: inline-block;
@@ -759,22 +773,6 @@
         font-size: 9px;
         padding: 0 4px;
         line-height: 1.2;
-      }
-      /* Played state: grayed out but still clickable to review results */
-      .game-link.played {
-        opacity: 0.55;
-        filter: grayscale(1);
-      }
-      .game-link.played::after {
-        content: 'OYNANDI';
-        position: absolute;
-        bottom: 6px;
-        left: 0;
-        right: 0;
-        font-size: 8px;
-        font-weight: 700;
-        letter-spacing: 1px;
-        color: #000000;
       }
 
       /* Bottom tab bar — fixed at bottom */
@@ -1601,38 +1599,42 @@ function getTodaySeed() {
   return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
 }
 
-// Mark games played today as gray. Uses Supabase game_results as the source of
-// truth, but also falls back to per-game localStorage flags written by each
-// game's markAsPlayed() — this keeps the indicator working even if the
-// game_results table is missing, RLS blocks the read, or the insert failed.
+// Color games by status: started today (light gray) vs completed today (dark
+// gray). A game_results row with attempts >= 1 means the game ended; attempts=0
+// is the in-progress marker written by each game's markAsPlayed(). LocalStorage
+// flags also mark a game as started in case the Supabase write fails.
 async function markPlayedGames(userId) {
   const today = getTodaySeed();
-  const playedGames = new Set();
+  const started = new Set();
+  const completed = new Set();
 
-  // Local fallback: flags set by each game when the user first interacts
   const localFlags = {
     bulmaca: 'bulmaca_started_' + today,
     sozcel: 'sozcel_started_' + today,
     baglantilar: 'baglantilar_started_' + today
   };
   for (const [game, key] of Object.entries(localFlags)) {
-    if (localStorage.getItem(key)) playedGames.add(game);
+    if (localStorage.getItem(key)) started.add(game);
   }
 
-  // Remote source of truth — merge with local flags
   try {
     const { data, error } = await sb
       .from('game_results')
-      .select('game')
+      .select('game, attempts')
       .eq('user_id', userId)
       .eq('date', today);
     if (!error && data) {
-      data.forEach(r => playedGames.add(r.game));
+      data.forEach(r => {
+        if ((r.attempts || 0) >= 1) completed.add(r.game);
+        else started.add(r.game);
+      });
     }
   } catch (e) { /* table may not exist yet — ignore */ }
 
   document.querySelectorAll('.game-link[data-game]').forEach(el => {
-    if (playedGames.has(el.dataset.game)) el.classList.add('played');
+    const g = el.dataset.game;
+    if (completed.has(g)) el.classList.add('completed');
+    else if (started.has(g)) el.classList.add('started');
   });
 }
 

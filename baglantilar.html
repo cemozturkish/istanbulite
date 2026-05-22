@@ -564,21 +564,19 @@
     }
     .game-back-btn:hover { background: var(--paper-dark); }
 
-    .game-link.played {
-      opacity: 0.55;
-      filter: grayscale(1);
+    /* Side nav: started today (light gray) vs completed today (dark gray) */
+    .game-link.started {
+      background: #e5e5e5;
+      color: var(--accent);
     }
-    .game-link.played::after {
-      content: 'OYNANDI';
-      position: absolute;
-      bottom: 4px;
-      left: 0;
-      right: 0;
-      font-size: 8px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      color: var(--ink);
+    .game-link.started .game-link-subtitle { color: var(--muted); }
+    .game-link.completed {
+      background: #9a9a9a;
+      color: #1a1a1a;
+      border-color: #5a5a5a;
     }
+    .game-link.completed::before { border-color: #5a5a5a; }
+    .game-link.completed .game-link-subtitle { color: #3a3a3a; }
 
     @media (max-width: 768px) {
       html, body {
@@ -1380,29 +1378,35 @@ async function loadScoreboard() {
   }).join('');
 }
 
-// ── Mark games already played today (dimmed in side nav) ──
+// ── Mark games as started (light gray) or completed (dark gray) in side nav ──
 async function markPlayedGames() {
   const today = dailySeed;
-  const played = new Set();
+  const started = new Set();
+  const completed = new Set();
   const localFlags = {
     sozcel: 'sozcel_started_' + today,
     baglantilar: 'baglantilar_started_' + today,
     bulmaca: 'bulmaca_started_' + today
   };
   for (const [g, key] of Object.entries(localFlags)) {
-    if (localStorage.getItem(key)) played.add(g);
+    if (localStorage.getItem(key)) started.add(g);
   }
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (session) {
       const { data, error } = await sb.from('game_results')
-        .select('game').eq('user_id', session.user.id).eq('date', today);
-      if (!error && data) data.forEach(r => played.add(r.game));
+        .select('game, attempts').eq('user_id', session.user.id).eq('date', today);
+      if (!error && data) data.forEach(r => {
+        if ((r.attempts || 0) >= 1) completed.add(r.game);
+        else started.add(r.game);
+      });
     }
   } catch (e) {}
   document.querySelectorAll('.game-link[data-game]').forEach(el => {
     if (el.classList.contains('active')) return;
-    if (played.has(el.dataset.game)) el.classList.add('played');
+    const g = el.dataset.game;
+    if (completed.has(g)) el.classList.add('completed');
+    else if (started.has(g)) el.classList.add('started');
   });
 }
 
