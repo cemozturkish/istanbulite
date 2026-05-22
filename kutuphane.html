@@ -520,6 +520,57 @@
       color: var(--muted);
     }
     .country-label:first-child { padding-top: 4px; }
+    .source-tab {
+      white-space: normal;
+      line-height: 1.25;
+    }
+
+    /* ── Counter strip (bottom of left column) ── */
+    .counter-strip {
+      border-top: 4px double var(--ink);
+      padding: 8px 0 16px 0;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .counter-card {
+      padding: 12px 18px;
+      border-bottom: 1px dashed var(--hairline);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .counter-card:last-child { border-bottom: none; }
+    .counter-label {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      line-height: 1.3;
+    }
+    .counter-value {
+      font-family: 'Courier New', monospace;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: 0.5px;
+    }
+    .counter-value .cv-days {
+      font-size: 1.35rem;
+    }
+    .counter-value .cv-suffix {
+      font-size: 0.7rem;
+      color: var(--accent);
+      margin-left: 4px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .shelf-loading {
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+    }
 
     /* ── Article display (center) ── */
     .article-area {
@@ -1001,6 +1052,24 @@
         border-left-color: transparent;
         border-bottom-color: #000000;
       }
+      .counter-strip {
+        flex-direction: row;
+        border-top: none;
+        border-left: 1px solid var(--rule);
+        padding: 0;
+      }
+      .counter-card {
+        flex-shrink: 0;
+        padding: 8px 14px;
+        border-bottom: none;
+        border-right: 1px dashed var(--hairline);
+        min-width: 140px;
+        justify-content: center;
+      }
+      .counter-card:last-child { border-right: none; }
+      .counter-label { font-size: 8px; letter-spacing: 1px; }
+      .counter-value .cv-days { font-size: 1rem; }
+      .counter-value .cv-suffix { font-size: 0.55rem; }
 
       /* Article area — visible, expands with content */
       main {
@@ -1309,19 +1378,9 @@
   <aside class="col-left">
     <div class="nb-highlight" id="user-nb-badge"></div>
     <div class="library-shelf" id="library-shelf">
-      <div class="country-label">United Kingdom</div>
-      <button class="source-tab" data-source="ft">Financial Times</button>
-      <button class="source-tab" data-source="economist">The Economist</button>
-      <button class="source-tab" data-source="telegraph">The Telegraph</button>
-      <div class="country-label">United States</div>
-      <button class="source-tab" data-source="nytimes">New York Times</button>
-      <div class="country-label">Qatar</div>
-      <button class="source-tab" data-source="aljazeera">Al Jazeera</button>
-      <div class="country-label">Georgia</div>
-      <button class="source-tab" data-source="codastory">Coda Story</button>
-      <div class="country-label">Belgium</div>
-      <button class="source-tab" data-source="european_correspondent">European Correspondent</button>
+      <div class="shelf-loading"><span class="spinner"></span></div>
     </div>
+    <div class="counter-strip" id="counter-strip"></div>
   </aside>
 
   <header>
@@ -1685,17 +1744,12 @@ function updateTabStripOffset() {
 updateTabStripOffset();
 window.addEventListener('resize', updateTabStripOffset);
 
-// ── Kütüphane: source tabs → article list → article detail ──
-// Reads from public.library_articles (see db/library_articles.sql).
-const LIB_SOURCE_NAMES = {
-  economist: 'The Economist',
-  nytimes: 'New York Times',
-  ft: 'Financial Times',
-  codastory: 'Coda Story',
-  european_correspondent: 'The European Correspondent',
-  telegraph: 'The Telegraph',
-  aljazeera: 'Al Jazeera',
-};
+// ── Kütüphane: topic tabs → article list → article detail ──
+// Reads articles, categories, and counters from public.library_articles,
+// public.library_categories, public.library_counters (see db/library_categories_v4.sql).
+let LIB_CATEGORIES = []; // [{ id, label_tr, position }]
+let LIB_CATEGORY_LABELS = {}; // { id: label_tr }
+let activeCategoryId = null;
 
 const LIB_SORT_OPTIONS = [
   { value: 'newest', label: 'Yeni → Eski' },
@@ -1712,9 +1766,9 @@ function libEsc(s) {
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-async function fetchLibrarySource(sourceId) {
+async function fetchLibraryCategory(categoryId) {
   const { data, error } = await sb.from('library_articles')
-    .select('*').eq('source', sourceId)
+    .select('*').eq('category', categoryId)
     .order('position', { ascending: true })
     .order('created_at', { ascending: false });
   if (error) {
@@ -1722,6 +1776,96 @@ async function fetchLibrarySource(sourceId) {
     return [];
   }
   return data || [];
+}
+
+async function loadLibraryCategories() {
+  const { data, error } = await sb.from('library_categories')
+    .select('*').order('position', { ascending: true });
+  if (error) {
+    console.error('[kutuphane categories fetch]', error);
+    return [];
+  }
+  LIB_CATEGORIES = data || [];
+  LIB_CATEGORY_LABELS = {};
+  LIB_CATEGORIES.forEach(c => { LIB_CATEGORY_LABELS[c.id] = c.label_tr; });
+  return LIB_CATEGORIES;
+}
+
+function renderCategoryTabs() {
+  const shelf = document.getElementById('library-shelf');
+  if (!shelf) return;
+  if (!LIB_CATEGORIES.length) {
+    shelf.innerHTML = '<div class="shelf-loading">Kategori yok.</div>';
+    return;
+  }
+  shelf.innerHTML = LIB_CATEGORIES.map(c => `
+    <button class="source-tab${c.id === activeCategoryId ? ' active' : ''}" data-category="${libEsc(c.id)}">${libEsc(c.label_tr)}</button>
+  `).join('');
+  shelf.querySelectorAll('.source-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      activeCategoryId = tab.dataset.category;
+      renderCategoryList(activeCategoryId);
+    });
+  });
+}
+
+// ── Counter strip: live-ticking sidebar counters from library_counters ──
+let COUNTERS = [];
+let counterTickInterval = null;
+
+async function loadCounters() {
+  const { data, error } = await sb.from('library_counters')
+    .select('*').order('position', { ascending: true });
+  if (error) {
+    console.error('[kutuphane counters fetch]', error);
+    COUNTERS = [];
+    return;
+  }
+  COUNTERS = data || [];
+}
+
+function renderCounterStrip() {
+  const strip = document.getElementById('counter-strip');
+  if (!strip) return;
+  if (!COUNTERS.length) {
+    strip.innerHTML = '';
+    return;
+  }
+  strip.innerHTML = COUNTERS.map((c, i) => `
+    <div class="counter-card" data-counter-id="${libEsc(c.id)}">
+      <div class="counter-label">${libEsc(c.label_tr)}</div>
+      <div class="counter-value" id="counter-val-${i}"></div>
+    </div>
+  `).join('');
+  tickCounters();
+  if (counterTickInterval) clearInterval(counterTickInterval);
+  // Refresh once a minute — counters tick at day granularity, so finer
+  // updates would just spin the CPU without changing the rendered text.
+  counterTickInterval = setInterval(tickCounters, 60000);
+}
+
+function tickCounters() {
+  const now = Date.now();
+  COUNTERS.forEach((c, i) => {
+    const el = document.getElementById('counter-val-' + i);
+    if (!el) return;
+    el.innerHTML = formatElapsed(c.start_date, now);
+  });
+}
+
+function formatElapsed(startDateStr, now) {
+  if (!startDateStr) return '<span class="cv-suffix">—</span>';
+  // Treat the start_date as Istanbul-local midnight so the counter
+  // ticks over at midnight there, not UTC.
+  const start = new Date(startDateStr + 'T00:00:00+03:00').getTime();
+  const diffMs = now - start;
+  if (diffMs < 0) return '<span class="cv-suffix">Henüz başlamadı</span>';
+  const totalDays = Math.floor(diffMs / 86400000);
+  const totalHours = Math.floor(diffMs / 3600000);
+  if (totalDays >= 1) {
+    return `<span class="cv-days">${totalDays}</span><span class="cv-suffix">gün</span>`;
+  }
+  return `<span class="cv-days">${totalHours}</span><span class="cv-suffix">saat</span>`;
 }
 
 // Pull reaction counts + comment counts for a given set of article ids
@@ -1784,12 +1928,13 @@ function formatReactionPct(likes, dislikes) {
   return { likeLabel: likePct + '%', dislikeLabel: (100 - likePct) + '%' };
 }
 
-async function renderSourceList(sourceId) {
+async function renderCategoryList(categoryId) {
   const area = document.getElementById('article-area');
-  const name = LIB_SOURCE_NAMES[sourceId];
+  const name = LIB_CATEGORY_LABELS[categoryId];
   if (!area || !name) return;
+  activeCategoryId = categoryId;
   document.querySelectorAll('.source-tab').forEach(t => {
-    t.classList.toggle('active', t.dataset.source === sourceId);
+    t.classList.toggle('active', t.dataset.category === categoryId);
   });
   area.innerHTML = `
     <div class="article-list">
@@ -1807,9 +1952,9 @@ async function renderSourceList(sourceId) {
   `;
   document.getElementById('sort-select').addEventListener('change', (e) => {
     currentSort = e.target.value;
-    renderSourceList(sourceId);
+    renderCategoryList(categoryId);
   });
-  const articles = await fetchLibrarySource(sourceId);
+  const articles = await fetchLibraryCategory(categoryId);
   if (!articles.length) {
     area.querySelector('.empty-state').textContent = 'Henüz makale yok.';
     return;
@@ -1856,13 +2001,13 @@ async function renderSourceList(sourceId) {
   `;
   document.getElementById('sort-select').addEventListener('change', (e) => {
     currentSort = e.target.value;
-    renderSourceList(sourceId);
+    renderCategoryList(categoryId);
   });
   area.querySelectorAll('.article-item').forEach(el => {
     el.addEventListener('click', () => {
       const id = el.dataset.id;
       const article = articles.find(x => x.id === id);
-      if (article) renderArticleDetail(sourceId, article);
+      if (article) renderArticleDetail(categoryId, article);
     });
   });
 }
@@ -1874,9 +2019,9 @@ function formatLibDate(iso) {
   } catch { return ''; }
 }
 
-function renderArticleDetail(sourceId, article) {
+function renderArticleDetail(categoryId, article) {
   const area = document.getElementById('article-area');
-  const name = LIB_SOURCE_NAMES[sourceId];
+  const name = LIB_CATEGORY_LABELS[categoryId];
   if (!area || !article) return;
   const byline = [
     article.author ? libEsc(article.author) : null,
@@ -1918,7 +2063,7 @@ function renderArticleDetail(sourceId, article) {
       </section>
     </div>
   `;
-  document.getElementById('back-to-list').addEventListener('click', () => renderSourceList(sourceId));
+  document.getElementById('back-to-list').addEventListener('click', () => renderCategoryList(categoryId));
   loadComments(article.id);
   loadReactions(article.id);
   document.getElementById('comment-composer').addEventListener('submit', (e) => {
@@ -2060,9 +2205,17 @@ async function submitComment(articleId) {
   loadComments(articleId);
 }
 
-document.querySelectorAll('.source-tab').forEach(tab => {
-  tab.addEventListener('click', () => renderSourceList(tab.dataset.source));
-});
+// Categories and counters are loaded after the supabase client is ready
+// (see the bootstrap call at the end of this script).
+async function bootstrapLibraryNav() {
+  await Promise.all([loadLibraryCategories(), loadCounters()]);
+  renderCategoryTabs();
+  renderCounterStrip();
+  if (LIB_CATEGORIES.length && !activeCategoryId) {
+    activeCategoryId = LIB_CATEGORIES[0].id;
+    renderCategoryList(activeCategoryId);
+  }
+}
 
 const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
@@ -2656,6 +2809,7 @@ const referralCode = profile?.referral_code || '';
 }
 
 loadProfile();
+bootstrapLibraryNav();
 
 // ── Profile popup — opens on any .kefil-link click, navigates in-place for the chain ──
 (function() {
