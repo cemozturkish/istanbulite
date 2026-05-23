@@ -932,10 +932,44 @@ function saveState() {
     allWords: allWords
   };
   localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  saveStateRemote(state);
 }
 
-function restoreState() {
-  const raw = localStorage.getItem(SAVE_KEY);
+// Mirror to Supabase so the board syncs across devices.
+async function saveStateRemote(state) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    const { error } = await sb.from('game_state').upsert({
+      user_id: session.user.id,
+      game: 'baglantilar',
+      date: dailySeed,
+      state,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id,game,date' });
+    if (error) console.error('[baglantilar saveStateRemote]', error);
+  } catch (e) { console.error('[baglantilar saveStateRemote]', e); }
+}
+
+async function restoreState() {
+  let raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        const { data } = await sb.from('game_state')
+          .select('state')
+          .eq('user_id', session.user.id)
+          .eq('game', 'baglantilar')
+          .eq('date', dailySeed)
+          .maybeSingle();
+        if (data && data.state) {
+          raw = JSON.stringify(data.state);
+          localStorage.setItem(SAVE_KEY, raw);
+        }
+      }
+    } catch (e) { console.error('[baglantilar restoreState remote]', e); }
+  }
   if (!raw) return false;
   try {
     const state = JSON.parse(raw);
@@ -1419,13 +1453,15 @@ async function markPlayedGames() {
 
 // ── Init ──
 renderWords();
-const restored = restoreState();
-if (!restored) {
-  renderWords();
-}
-renderStats();
-loadScoreboard();
-markPlayedGames();
+(async () => {
+  const restored = await restoreState();
+  if (!restored) {
+    renderWords();
+  }
+  renderStats();
+  loadScoreboard();
+  markPlayedGames();
+})();
 </script>
 </body>
 </html>
