@@ -534,6 +534,7 @@
     <button class="admin-tab active" data-tab="articles">Articles</button>
     <button class="admin-tab" data-tab="library">Library Setup</button>
     <button class="admin-tab" data-tab="news">Breaking News</button>
+    <button class="admin-tab" data-tab="events">Events</button>
     <button class="admin-tab" data-tab="users">Users</button>
   </div>
 
@@ -698,6 +699,48 @@
 
   </div>
 
+  <div class="admin-body" id="events-tab" style="display:none;">
+
+    <!-- LEFT: Add / Edit Event -->
+    <div class="panel">
+      <div class="panel-title" id="ev-form-mode-label">Add New Event</div>
+
+      <label>Title</label>
+      <input type="text" id="ev-title" placeholder="Event title..."/>
+
+      <label>Date &amp; Time</label>
+      <input type="datetime-local" id="ev-date" style="width:100%;padding:9px 12px;border:1px solid #bbb;background:#f5f5f5;font-family:inherit;font-size:0.92rem;"/>
+
+      <label>Location (optional)</label>
+      <input type="text" id="ev-location" placeholder="Venue or address..."/>
+
+      <label>Neighborhood (optional — leave blank for city-wide)</label>
+      <select id="ev-neighborhood">
+        <option value="">— City-wide —</option>
+      </select>
+
+      <label>Description (optional)</label>
+      <textarea id="ev-description" placeholder="A brief description..."></textarea>
+
+      <input type="hidden" id="ev-editing-id"/>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="ev-submit-btn">Add Event</button>
+        <button class="btn btn-secondary" id="ev-cancel-btn" style="display:none;">Cancel Edit</button>
+      </div>
+      <div class="status-msg" id="ev-form-status"></div>
+    </div>
+
+    <!-- RIGHT: Events List -->
+    <div class="panel">
+      <div class="panel-title">Upcoming Events</div>
+      <div class="articles-list" id="events-list">
+        <div class="empty-state"><span class="spinner"></span></div>
+      </div>
+    </div>
+
+  </div>
+
   <div class="admin-body" id="users-tab" style="display:none;">
 
     <!-- LEFT: Create User -->
@@ -814,9 +857,11 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('articles-tab').style.display = (tab === 'articles') ? '' : 'none';
     document.getElementById('library-tab').style.display = (tab === 'library') ? '' : 'none';
     document.getElementById('news-tab').style.display = (tab === 'news') ? '' : 'none';
+    document.getElementById('events-tab').style.display = (tab === 'events') ? '' : 'none';
     document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
     if (tab === 'library') { loadLibCategories(); loadCounters(); }
     if (tab === 'news') loadBreakingNews();
+    if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
     if (tab === 'users') loadUsersList();
   });
 });
@@ -1518,6 +1563,146 @@ async function loadUsersList() {
       </div>
     `;
   }).join('');
+}
+
+// ══════════════════════════════════════════
+// Events tab
+// ══════════════════════════════════════════
+let evNeighborhoodsLoaded = false;
+
+async function loadEventsNeighborhoods() {
+  if (evNeighborhoodsLoaded) return;
+  const sel = document.getElementById('ev-neighborhood');
+  const { data, error } = await sb.from('neighborhoods').select('id, name_tr').order('name_tr');
+  if (error || !data) return;
+  data.forEach(n => {
+    if (n.id === 'istanbul_disi') return;
+    const opt = document.createElement('option');
+    opt.value = n.id;
+    opt.textContent = n.name_tr;
+    sel.appendChild(opt);
+  });
+  evNeighborhoodsLoaded = true;
+}
+
+function formatEventDt(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('tr-TR', { year:'numeric', month:'short', day:'numeric' })
+    + ' ' + d.toLocaleTimeString('tr-TR', { hour:'2-digit', minute:'2-digit', hour12:false });
+}
+
+async function loadEventsList() {
+  const listEl = document.getElementById('events-list');
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const { data, error } = await sb.from('events')
+    .select('*').order('event_date', { ascending: true });
+  if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
+  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No events yet.</div>'; return; }
+
+  const now = Date.now();
+  listEl.innerHTML = data.map(ev => {
+    const past = new Date(ev.event_date).getTime() < now;
+    const nbLabel = NEIGHBORHOOD_NAMES[ev.neighborhood] || (ev.neighborhood ? ev.neighborhood : 'İstanbul');
+    const meta = [nbLabel, ev.location].filter(Boolean).join(' · ');
+    return `
+      <div class="article-card" data-id="${ev.id}" style="${past ? 'opacity:0.5;' : ''}">
+        <div class="a-neighborhood">${escapeHtml(formatEventDt(ev.event_date))}${past ? ' · GEÇMİŞ' : ''}</div>
+        <h4>${escapeHtml(ev.title)}</h4>
+        ${meta ? `<p>${escapeHtml(meta)}</p>` : ''}
+        ${ev.description ? `<p>${escapeHtml(ev.description)}</p>` : ''}
+        <div class="card-actions">
+          <button class="btn-edit" data-act="ev-edit" data-id="${ev.id}">Edit</button>
+          <button class="btn-del"  data-act="ev-del"  data-id="${ev.id}">Delete</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('button[data-act]').forEach(btn => {
+    const ev = data.find(x => x.id === btn.dataset.id);
+    if (!ev) return;
+    if (btn.dataset.act === 'ev-edit') btn.addEventListener('click', () => editEvent(ev));
+    if (btn.dataset.act === 'ev-del') btn.addEventListener('click', () => deleteEvent(ev.id));
+  });
+}
+
+function editEvent(ev) {
+  document.getElementById('ev-editing-id').value = ev.id;
+  document.getElementById('ev-title').value = ev.title || '';
+  // datetime-local needs format YYYY-MM-DDTHH:MM
+  document.getElementById('ev-date').value = ev.event_date
+    ? new Date(ev.event_date).toISOString().slice(0, 16)
+    : '';
+  document.getElementById('ev-location').value = ev.location || '';
+  document.getElementById('ev-neighborhood').value = ev.neighborhood || '';
+  document.getElementById('ev-description').value = ev.description || '';
+  document.getElementById('ev-submit-btn').textContent = 'Update Event';
+  document.getElementById('ev-form-mode-label').textContent = 'Editing Event';
+  document.getElementById('ev-cancel-btn').style.display = 'inline-block';
+  document.querySelector('#events-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetEventForm() {
+  document.getElementById('ev-editing-id').value = '';
+  document.getElementById('ev-title').value = '';
+  document.getElementById('ev-date').value = '';
+  document.getElementById('ev-location').value = '';
+  document.getElementById('ev-neighborhood').value = '';
+  document.getElementById('ev-description').value = '';
+  document.getElementById('ev-submit-btn').textContent = 'Add Event';
+  document.getElementById('ev-form-mode-label').textContent = 'Add New Event';
+  document.getElementById('ev-cancel-btn').style.display = 'none';
+}
+
+document.getElementById('ev-cancel-btn').addEventListener('click', resetEventForm);
+
+document.getElementById('ev-submit-btn').addEventListener('click', async () => {
+  const editingId = document.getElementById('ev-editing-id').value;
+  const title = document.getElementById('ev-title').value.trim();
+  const dateVal = document.getElementById('ev-date').value;
+  const location = document.getElementById('ev-location').value.trim() || null;
+  const neighborhood = document.getElementById('ev-neighborhood').value || null;
+  const description = document.getElementById('ev-description').value.trim() || null;
+  const statusEl = document.getElementById('ev-form-status');
+  const btn = document.getElementById('ev-submit-btn');
+
+  if (!title || !dateVal) {
+    statusEl.textContent = 'Title and date are required.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  const event_date = new Date(dateVal).toISOString();
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  let result;
+  if (editingId) {
+    result = await sb.from('events').update({ title, event_date, location, neighborhood, description }).eq('id', editingId);
+  } else {
+    result = await sb.from('events').insert([{ title, event_date, location, neighborhood, description }]);
+  }
+
+  btn.textContent = editingId ? 'Update Event' : 'Add Event';
+
+  if (result.error) {
+    statusEl.textContent = result.error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = editingId ? 'Event updated!' : 'Event added!';
+  statusEl.className = 'status-msg ok';
+  resetEventForm();
+  loadEventsList();
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+async function deleteEvent(id) {
+  if (!confirm('Delete this event?')) return;
+  const { error } = await sb.from('events').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadEventsList();
 }
 
 checkAdmin();
