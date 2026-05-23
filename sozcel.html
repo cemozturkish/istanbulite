@@ -2220,10 +2220,48 @@ function saveState() {
     state.guesses.push(word);
   }
   localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  // Mirror to Supabase so the board syncs across devices.
+  saveStateRemote(state);
 }
 
-function restoreState() {
-  const raw = localStorage.getItem(SAVE_KEY);
+// Upsert the board state to Supabase. Fire-and-forget; localStorage remains
+// the synchronous source of truth on this device.
+async function saveStateRemote(state) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    const { error } = await sb.from('game_state').upsert({
+      user_id: session.user.id,
+      game: 'sozcel',
+      date: dailySeed,
+      state,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id,game,date' });
+    if (error) console.error('[sozcel saveStateRemote]', error);
+  } catch (e) { console.error('[sozcel saveStateRemote]', e); }
+}
+
+async function restoreState() {
+  let raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) {
+    // No local progress — pull from Supabase in case the user played on
+    // another device today.
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        const { data } = await sb.from('game_state')
+          .select('state')
+          .eq('user_id', session.user.id)
+          .eq('game', 'sozcel')
+          .eq('date', dailySeed)
+          .maybeSingle();
+        if (data && data.state) {
+          raw = JSON.stringify(data.state);
+          localStorage.setItem(SAVE_KEY, raw);
+        }
+      }
+    } catch (e) { console.error('[sozcel restoreState remote]', e); }
+  }
   if (!raw) return false;
   try {
     const state = JSON.parse(raw);
@@ -2873,7 +2911,7 @@ initWordGrid();
 initKeyboard();
 (async () => {
   TARGET_WORD = await pickDailyTarget(dailySeed);
-  restoreState();
+  await restoreState();
   renderStats();
   loadScoreboard();
   markPlayedGames();
