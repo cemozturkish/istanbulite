@@ -304,7 +304,7 @@
       border-right: var(--col-border);
       display: flex;
       flex-direction: column;
-      overflow-y: auto;
+      overflow: hidden;
     }
     .col-left .nb-highlight {
       padding: 8px 12px;
@@ -402,9 +402,41 @@
     .sidebar-left {
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+      flex: 1;
+      min-height: 0;
+    }
+
+    #breaking-news-feed {
       overflow-y: auto;
       flex: 1;
+      min-height: 0;
     }
+
+    /* ── News filter tabs ── */
+    .news-filter-row {
+      display: flex;
+      border-bottom: var(--col-border);
+      flex-shrink: 0;
+    }
+    .news-filter-btn {
+      flex: 1;
+      padding: 5px 4px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: var(--paper);
+      color: var(--muted);
+      border: none;
+      border-right: var(--col-border);
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+    }
+    .news-filter-btn:last-child { border-right: none; }
+    .news-filter-btn.active { color: var(--ink); background: var(--paper-dark); }
+    .news-filter-btn:hover:not(.active) { color: var(--accent); }
 
     .sidebar-label {
       font-size: 0.7rem;
@@ -718,11 +750,13 @@
       .sidebar-right-inner {
         padding: 8px 12px;
         gap: 6px;
-        overflow: hidden;
       }
-      .nb-article h4 { font-size: 11px; }
-      .nb-article p { font-size: 10px; line-height: 1.35; }
       .no-articles { font-size: 11px; padding: 14px 8px; }
+      .news-filter-btn { font-size: 9px; padding: 4px 2px; letter-spacing: 0.5px; }
+      .event-item { padding: 6px 10px; }
+      .event-item .ev-date { font-size: 9px; }
+      .event-item .ev-title { font-size: 10px; }
+      .event-item .ev-meta { font-size: 9px; }
 
       /* Bottom tab bar — fixed at bottom */
       header {
@@ -866,6 +900,32 @@
       }
     }
 
+    /* ── Events (right column) ── */
+    .event-item {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--whisper);
+    }
+    .event-item:last-child { border-bottom: none; }
+    .event-item .ev-date {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 3px;
+    }
+    .event-item .ev-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 3px;
+    }
+    .event-item .ev-meta {
+      font-size: 0.68rem;
+      color: var(--muted);
+      line-height: 1.3;
+    }
+
     @media (max-width: 768px) {
       @keyframes ist-vt-out-left { from { transform: translateX(0); } to { transform: translateX(-100vw); } }
       @keyframes ist-vt-in-left { from { transform: translateX(100vw); } to { transform: translateX(0); } }
@@ -947,6 +1007,12 @@
     <div class="nb-highlight" id="user-nb-badge"></div>
     <section class="sidebar-left" id="left-sidebar">
       <div class="sidebar-label">Son Dakika</div>
+      <div class="news-filter-row">
+        <button class="news-filter-btn active" data-filter="all">Tümü</button>
+        <button class="news-filter-btn" data-filter="istanbul">İSTANBUL</button>
+        <button class="news-filter-btn" data-filter="turkiye">TÜRKİYE</button>
+        <button class="news-filter-btn" data-filter="mahalle">MAHALLE</button>
+      </div>
       <div id="breaking-news-feed">
         <p class="no-articles" style="padding:12px;">Aktif haber yok.</p>
       </div>
@@ -1013,10 +1079,9 @@
 
   <aside class="col-right">
     <section class="sidebar-right">
-      <div class="sidebar-label" id="nb-title">İstanbul</div>
-      <div class="sidebar-right-inner">
-        <div class="nb-articles" id="nb-articles-list"></div>
-        <p class="no-articles" id="nb-prompt">Okumak için bir mahalle seçin</p>
+      <div class="sidebar-label">Etkinlikler</div>
+      <div id="events-panel">
+        <p class="no-articles" style="padding:12px;">Yaklaşan etkinlik yok.</p>
       </div>
     </section>
   </aside>
@@ -1365,15 +1430,20 @@ async function checkSession() {
   showSite(session.user);
 }
 
-function showSite(user) {
+async function showSite(user) {
   document.getElementById('login-overlay').style.display = 'none';
   document.getElementById('main-site').classList.add('active');
   // Capture user id so seenKey() can scope per-user.
   window.__currentUser = user;
-  // Re-evaluate which neighborhoods should flash for this user.
   loadBreakingNews();
-  // Highlight home neighborhood on map
-  const homeNb = user?.user_metadata?.yasadigi_ilce || user?.user_metadata?.neighborhood || localStorage.getItem('yasadigi_ilce_local');
+  loadEvents();
+  // Highlight home neighborhood: try metadata first, then profiles table
+  // (admin-created accounts may not have neighborhood in user_metadata).
+  let homeNb = user?.user_metadata?.yasadigi_ilce || user?.user_metadata?.neighborhood;
+  if (!homeNb && user?.id) {
+    const { data: profile } = await sb.from('profiles').select('neighborhood').eq('id', user.id).single();
+    homeNb = profile?.neighborhood;
+  }
   if (homeNb) {
     const nbEl = document.getElementById(homeNb);
     if (nbEl) nbEl.classList.add('home');
@@ -1525,69 +1595,20 @@ const svg = document.querySelector('svg');
 const neighborhoods = document.querySelectorAll('.neighborhood');
 
 neighborhoods.forEach(nb => {
-  nb.addEventListener('click', async (e) => {
+  nb.addEventListener('click', (e) => {
     e.stopPropagation();
     neighborhoods.forEach(n => n.classList.remove('active'));
     nb.classList.add('active');
-
-    // No zoom - map stays at original size
-
     const name = nb.getAttribute('data-name') || nb.id;
-    document.getElementById('nb-title').textContent = name;
     document.getElementById('map-label').textContent = name;
-    document.getElementById('nb-prompt').style.display = 'none';
-
-    const listEl = document.getElementById('nb-articles-list');
-    listEl.innerHTML = '<span class="spinner"></span>';
-
-    // Capture breaking-news item BEFORE we mark it seen, so it's
-    // still shown at the top of this neighborhood's panel once.
-    const breaking = flashingNews[nb.id];
     markNewsSeenForNeighborhood(nb.id);
-
-    // Fetch articles from Supabase
-    const { data, error } = await sb
-      .from('articles')
-      .select('*')
-      .eq('neighborhood', nb.id)
-      .order('created_at', { ascending: false });
-
-    let articles = '';
-
-    if (breaking) {
-      articles += `
-        <div class="nb-article" style="border-left-color: var(--ink); border-left-width: 4px;">
-          <h4 style="font-size: 0.85rem;">${escapeText(breaking.title)}</h4>
-          ${breaking.body ? `<p>${escapeText(breaking.body)}</p>` : ''}
-          <p style="font-weight: 700; font-size: 0.65rem; letter-spacing: 1px; text-transform: uppercase;">Son Dakika</p>
-        </div>
-      `;
-    }
-
-    if (!error && data && data.length > 0) {
-      articles += data.map(a => `
-        <div class="nb-article">
-          <h4>${a.title}</h4>
-          ${a.summary ? `<p>${a.summary}</p>` : ''}
-        </div>
-      `).join('');
-    }
-
-    if (!articles) {
-      listEl.innerHTML = '<p class="no-articles">No local news for this neighborhood yet.</p>';
-    } else {
-      listEl.innerHTML = articles;
-    }
   });
 });
 
 document.addEventListener('click', (e) => {
-  if (!e.target.closest('.neighborhood') && !e.target.closest('#neighborhood-panel')) {
+  if (!e.target.closest('.neighborhood')) {
     neighborhoods.forEach(nb => nb.classList.remove('active'));
-    document.getElementById('nb-title').textContent = 'İstanbul';
     document.getElementById('map-label').textContent = 'İstanbul';
-    document.getElementById('nb-prompt').style.display = '';
-    document.getElementById('nb-articles-list').innerHTML = '';
   }
 });
 
@@ -1597,6 +1618,8 @@ document.addEventListener('click', (e) => {
 // user* has clicked it; "seen" state is local to the browser
 // (localStorage key: ist-news-seen-<userId>).
 let flashingNews = {}; // nbId -> { id, title, body, url, created_at }
+let allBreakingNews = []; // cached for client-side filter
+let activeNewsFilter = 'all';
 
 function seenKey() {
   // Capture current user once available; fallback to anonymous bucket.
@@ -1723,32 +1746,82 @@ setInterval(() => {
   });
 }, 60000);
 
+function applyNewsFilter(filter) {
+  activeNewsFilter = filter;
+  document.querySelectorAll('.news-filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === filter);
+  });
+  let rows = allBreakingNews;
+  if (filter === 'istanbul') rows = allBreakingNews.filter(n => n.category === 'istanbul');
+  else if (filter === 'turkiye') rows = allBreakingNews.filter(n => n.category === 'turkiye');
+  else if (filter === 'mahalle') rows = allBreakingNews.filter(n => n.category !== 'istanbul' && n.category !== 'turkiye');
+  renderBreakingNewsFeed(rows);
+}
+
+document.querySelectorAll('.news-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => applyNewsFilter(btn.dataset.filter));
+});
+
 async function loadBreakingNews() {
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('breaking_news')
     .select('*, breaking_news_sources(*)').gte('created_at', cutoff)
     .order('created_at', { ascending: false });
   if (error) { console.error('[anahane breaking_news]', error); return; }
-  const rows = data || [];
+  allBreakingNews = data || [];
 
-  renderBreakingNewsFeed(rows);
+  applyNewsFilter(activeNewsFilter);
 
-  // Pulse neighborhoods with unseen news. Keep the freshest unseen item
-  // per neighborhood — clicking the district marks it seen.
+  // Pulse neighborhoods with unseen news.
   const seen = loadSeenSet();
   flashingNews = {};
-  // Clear any stale flashing classes from a previous render.
   document.querySelectorAll('.neighborhood.flashing-news').forEach(el => el.classList.remove('flashing-news'));
-  rows.forEach(n => {
+  allBreakingNews.forEach(n => {
     if (!n.neighborhood) return;
     if (seen.has(n.id)) return;
-    if (flashingNews[n.neighborhood]) return; // keep freshest (we ordered desc)
+    if (flashingNews[n.neighborhood]) return;
     flashingNews[n.neighborhood] = n;
   });
   Object.keys(flashingNews).forEach(nbId => {
     const el = document.getElementById(nbId);
     if (el) el.classList.add('flashing-news');
   });
+}
+
+// ── Events (right column) ──────────────────
+function formatEventDateTR(iso) {
+  const d = new Date(iso);
+  const opts = { timeZone: 'Europe/Istanbul' };
+  const day = d.toLocaleDateString('tr-TR', { ...opts, weekday: 'long', day: 'numeric', month: 'long' });
+  const time = d.toLocaleTimeString('tr-TR', { ...opts, hour: '2-digit', minute: '2-digit', hour12: false });
+  return (day + ' · ' + time).toLocaleUpperCase('tr-TR');
+}
+
+async function loadEvents() {
+  const panel = document.getElementById('events-panel');
+  if (!panel) return;
+  const now = new Date().toISOString();
+  const { data, error } = await sb.from('events')
+    .select('*')
+    .gte('event_date', now)
+    .order('event_date', { ascending: true })
+    .limit(30);
+  if (error || !data || !data.length) {
+    panel.innerHTML = '<p class="no-articles" style="padding:12px;">Yaklaşan etkinlik yok.</p>';
+    return;
+  }
+  panel.innerHTML = data.map(ev => {
+    const nbLabel = ev.neighborhood ? (NB_NAMES_TR[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
+    const meta = [nbLabel, ev.location].filter(Boolean).join(' · ');
+    return `
+      <div class="event-item">
+        <div class="ev-date">${escapeText(formatEventDateTR(ev.event_date))}</div>
+        <div class="ev-title">${escapeText(ev.title)}</div>
+        ${meta ? `<div class="ev-meta">${escapeText(meta)}</div>` : ''}
+        ${ev.description ? `<div class="ev-meta">${escapeText(ev.description)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
 }
 
 // loadBreakingNews() is called from showSite() once the user is known
