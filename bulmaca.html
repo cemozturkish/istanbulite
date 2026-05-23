@@ -1169,11 +1169,46 @@ function renderClues() {
 
 // Save/restore state
 function saveState() {
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ userAnswers, gameCompleted, checkAttempts }));
+  const state = { userAnswers, gameCompleted, checkAttempts };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  saveStateRemote(state);
 }
 
-function restoreState() {
-  const raw = localStorage.getItem(SAVE_KEY);
+// Mirror to Supabase so the board syncs across devices.
+async function saveStateRemote(state) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    const { error } = await sb.from('game_state').upsert({
+      user_id: session.user.id,
+      game: 'bulmaca',
+      date: dailySeed,
+      state,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id,game,date' });
+    if (error) console.error('[bulmaca saveStateRemote]', error);
+  } catch (e) { console.error('[bulmaca saveStateRemote]', e); }
+}
+
+async function restoreState() {
+  let raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        const { data } = await sb.from('game_state')
+          .select('state')
+          .eq('user_id', session.user.id)
+          .eq('game', 'bulmaca')
+          .eq('date', dailySeed)
+          .maybeSingle();
+        if (data && data.state) {
+          raw = JSON.stringify(data.state);
+          localStorage.setItem(SAVE_KEY, raw);
+        }
+      }
+    } catch (e) { console.error('[bulmaca restoreState remote]', e); }
+  }
   if (!raw) return false;
   try {
     const state = JSON.parse(raw);
@@ -1478,10 +1513,12 @@ async function markPlayedGames() {
 // Init
 createGrid();
 renderClues();
-restoreState();
-renderStats();
-loadScoreboard();
-markPlayedGames();
+(async () => {
+  await restoreState();
+  renderStats();
+  loadScoreboard();
+  markPlayedGames();
+})();
 </script>
 </body>
 </html>
