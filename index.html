@@ -319,6 +319,7 @@ signupForm.addEventListener('submit', async (e) => {
 
   // The handle_new_user trigger reads this metadata, validates the
   // referral code, and atomically creates the matching profile row.
+  // birth_place is the FK column (renamed from birth_neighborhood in DB).
   const { data, error } = await sb.auth.signUp({
     email,
     password,
@@ -328,12 +329,16 @@ signupForm.addEventListener('submit', async (e) => {
         last_name: lastName,
         phone,
         neighborhood,
-        birth_neighborhood: birthPlace,
+        birth_place: birthPlace,
         referral_code: verifiedKefil.code,
       },
     },
   });
-  if (error) { signupError.textContent = error.message; return; }
+  if (error) {
+    const detail = [error.message, error.code, error.details, error.hint].filter(Boolean).join(' | ');
+    signupError.textContent = detail;
+    return;
+  }
 
   if (data.session) enterSite();
   else { signupError.textContent = 'Kayıt alındı. Onay sonrası giriş yapabilirsiniz.'; showPanel('signin'); }
