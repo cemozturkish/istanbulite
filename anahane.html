@@ -1669,6 +1669,10 @@ document.getElementById('signup-submit-btn').addEventListener('click', async () 
 const svg = document.querySelector('svg');
 const neighborhoods = document.querySelectorAll('.neighborhood');
 
+// Currently-selected neighborhood scopes the news feed and events to that
+// district. null means show everything (subject to the news filter tabs).
+let activeNeighborhood = null;
+
 neighborhoods.forEach(nb => {
   nb.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1677,6 +1681,9 @@ neighborhoods.forEach(nb => {
     const name = nb.getAttribute('data-name') || nb.id;
     document.getElementById('map-label').textContent = name;
     markNewsSeenForNeighborhood(nb.id);
+    activeNeighborhood = nb.id;
+    applyNewsFilter(activeNewsFilter);
+    renderEvents();
   });
 });
 
@@ -1684,6 +1691,11 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('.neighborhood')) {
     neighborhoods.forEach(nb => nb.classList.remove('active'));
     document.getElementById('map-label').textContent = 'İstanbul';
+    if (activeNeighborhood !== null) {
+      activeNeighborhood = null;
+      applyNewsFilter(activeNewsFilter);
+      renderEvents();
+    }
   }
 });
 
@@ -1830,6 +1842,8 @@ function applyNewsFilter(filter) {
   if (filter === 'istanbul') rows = allBreakingNews.filter(n => n.category === 'istanbul');
   else if (filter === 'turkiye') rows = allBreakingNews.filter(n => n.category === 'turkiye');
   else if (filter === 'mahalle') rows = allBreakingNews.filter(n => n.category !== 'istanbul' && n.category !== 'turkiye');
+  // When a district is selected on the map, narrow further to its news.
+  if (activeNeighborhood) rows = rows.filter(n => n.neighborhood === activeNeighborhood);
   renderBreakingNewsFeed(rows);
 }
 
@@ -1876,20 +1890,30 @@ function eventDateParts(iso) {
   return { day, mon: MONTH_ABBR_TR[month - 1] || '', weekday, time };
 }
 
+let allEvents = [];
+
 async function loadEvents() {
-  const panel = document.getElementById('events-panel');
-  if (!panel) return;
   const now = new Date().toISOString();
   const { data, error } = await sb.from('events')
     .select('*')
     .gte('event_date', now)
     .order('event_date', { ascending: true })
     .limit(30);
-  if (error || !data || !data.length) {
+  if (error) { console.error('[anahane events]', error); allEvents = []; }
+  else allEvents = data || [];
+  renderEvents();
+}
+
+function renderEvents() {
+  const panel = document.getElementById('events-panel');
+  if (!panel) return;
+  let rows = allEvents;
+  if (activeNeighborhood) rows = rows.filter(ev => ev.neighborhood === activeNeighborhood);
+  if (!rows.length) {
     panel.innerHTML = '<p class="no-articles" style="padding:12px 18px;">Yaklaşan etkinlik yok.</p>';
     return;
   }
-  panel.innerHTML = data.map(ev => {
+  panel.innerHTML = rows.map(ev => {
     const nbLabel = ev.neighborhood ? (NB_NAMES_TR[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
     const parts = eventDateParts(ev.event_date);
     const timeBits = [parts.weekday, parts.time, ev.location].filter(Boolean).join(' · ');
