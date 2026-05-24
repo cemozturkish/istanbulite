@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-const CHROME_PATH = '/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome';
+const CHROME_PATH = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 async function screenshot(htmlFile, outputFile, width = 1440, height = 900) {
   const browser = await puppeteer.launch({
