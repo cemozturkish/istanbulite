@@ -1891,8 +1891,10 @@ function eventDateParts(iso) {
 }
 
 let allEvents = [];
+let eventsRequestSeq = 0;
 
 async function loadEvents() {
+  const reqId = ++eventsRequestSeq;
   const now = new Date().toISOString();
   // Scope the query to the selected neighborhood so the 30-row cap
   // doesn't hide matching rows that sit past the global top-30 window.
@@ -1903,6 +1905,9 @@ async function loadEvents() {
     .limit(30);
   if (activeNeighborhood) query = query.eq('neighborhood', activeNeighborhood);
   const { data, error } = await query;
+  // Drop responses from superseded requests so a slow older fetch
+  // can't clobber a newer one with stale rows.
+  if (reqId !== eventsRequestSeq) return;
   if (error) { console.error('[anahane events]', error); allEvents = []; }
   else allEvents = data || [];
   renderEvents();
