@@ -942,7 +942,11 @@ document.getElementById('u-submit-btn').addEventListener('click', async () => {
   btn.disabled = false;
   btn.textContent = 'Send Invite';
   if (error || (data && data.error)) {
-    statusEl.textContent = 'Failed: ' + (error?.message || data?.error || 'Unknown error');
+    let errMsg = error?.message || data?.error || 'Unknown error';
+    if (error?.context) {
+      try { const b = await error.context.json(); errMsg = b.error || b.message || errMsg; } catch (_) {}
+    }
+    statusEl.textContent = 'Failed: ' + errMsg;
     return;
   }
   statusEl.textContent = 'Invite sent to ' + payload.email;
