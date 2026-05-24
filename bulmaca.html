@@ -679,6 +679,105 @@
       .clue-number { min-width: 20px; }
 
     }
+
+    /* ── Profile popup ── */
+    .profile-popup-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(31,27,20,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .profile-popup-overlay.open { display: flex; }
+    .profile-popup {
+      background: var(--paper);
+      border: 1px solid var(--brown-3);
+      width: 360px;
+      max-width: calc(100vw - 40px);
+      max-height: calc(100vh - 80px);
+      overflow: auto;
+      padding: 24px;
+      position: relative;
+      font-family: 'Inter', sans-serif;
+    }
+    .profile-popup .close-btn {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+      padding: 4px 8px;
+    }
+    .profile-popup .close-btn:hover { color: var(--ink); }
+    .profile-popup .pp-avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: var(--paper-card);
+      border: 1px solid var(--rule);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.2rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin: 0 auto 14px;
+      overflow: hidden;
+    }
+    .profile-popup .pp-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .profile-popup .pp-name {
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .profile-popup .pp-meta {
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 16px;
+    }
+    .profile-popup .pp-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-top: 1px solid var(--hairline);
+      font-size: 0.8rem;
+    }
+    .profile-popup .pp-row .pp-label {
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 0.65rem;
+      letter-spacing: 1.5px;
+      align-self: center;
+    }
+    .profile-popup .pp-row .pp-value {
+      color: var(--ink);
+      font-weight: 500;
+      text-align: right;
+    }
+    .profile-popup .pp-loading,
+    .profile-popup .pp-error {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 30px 0;
+    }
+    .author-link {
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+    }
+    .author-link:hover { text-decoration: underline; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1508,7 +1607,7 @@ async function loadScoreboard() {
     return `<li class="scoreboard-item${topClass}">` +
       `<span class="scoreboard-rank">${i + 1}.</span>` +
       `<span class="scoreboard-player">` +
-        `<span class="scoreboard-name">${escapeHtml(p.name)}</span>` +
+        `<span class="scoreboard-name author-link" data-user-id="${p.uid}">${escapeHtml(p.name)}</span>` +
         (nbName ? `<span class="scoreboard-nb"> — ${escapeHtml(nbName)}</span>` : '') +
       `</span>` +
       `<span class="scoreboard-score">${p.score}</span>` +
@@ -1556,6 +1655,84 @@ renderClues();
   renderStats();
   loadScoreboard();
   markPlayedGames();
+})();
+
+// ── Profile popup: opens when an author name is clicked ──
+(function initProfilePopup() {
+  const overlay = document.createElement('div');
+  overlay.className = 'profile-popup-overlay';
+  overlay.innerHTML = `
+    <div class="profile-popup" role="dialog" aria-modal="true">
+      <button class="close-btn" type="button" aria-label="Kapat">×</button>
+      <div class="pp-body"><div class="pp-loading">Yükleniyor…</div></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const body = overlay.querySelector('.pp-body');
+  function close() { overlay.classList.remove('open'); }
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  overlay.querySelector('.close-btn').addEventListener('click', close);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) close();
+  });
+
+  function fmtDate(s) {
+    if (!s) return '—';
+    try {
+      return new Date(s).toLocaleDateString('tr-TR', { year:'numeric', month:'long', day:'numeric' });
+    } catch { return '—'; }
+  }
+  function nbLabel(id) {
+    if (!id) return '—';
+    if (id === 'istanbul_disi') return 'İstanbul Dışı';
+    return (typeof neighborhoodNames !== 'undefined' && neighborhoodNames[id]) || id;
+  }
+
+  async function open(userId) {
+    overlay.classList.add('open');
+    body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
+    const { data, error } = await sb
+      .from('profiles')
+      .select('id, first_name, last_name, neighborhood, birth_place, avatar_url, joined_at, referred_by')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error || !data) {
+      body.innerHTML = '<div class="pp-error">Profil yüklenemedi.</div>';
+      return;
+    }
+    let kefilName = null, kefilId = null;
+    if (data.referred_by) {
+      const { data: kp } = await sb
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .eq('id', data.referred_by)
+        .maybeSingle();
+      if (kp) {
+        kefilName = (`${kp.first_name || ''} ${kp.last_name || ''}`).trim() || 'İsimsiz Üye';
+        kefilId = kp.id;
+      }
+    }
+    const fullName = `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'İsimsiz Üye';
+    const initial = (fullName.charAt(0) || '?').toUpperCase();
+    const avatar = data.avatar_url ? `<img src="${data.avatar_url}" alt="">` : initial;
+    const birth = nbLabel(data.birth_place);
+    body.innerHTML = `
+      <div class="pp-avatar">${avatar}</div>
+      <div class="pp-name">${fullName}</div>
+      <div class="pp-meta">${nbLabel(data.neighborhood)}</div>
+      <div class="pp-row"><span class="pp-label">Doğum Yeri</span><span class="pp-value">${birth}</span></div>
+      <div class="pp-row"><span class="pp-label">Üyelik</span><span class="pp-value">${fmtDate(data.joined_at)}</span></div>
+      ${kefilName ? `<div class="pp-row"><span class="pp-label">KEFİL</span><span class="pp-value"><span class="author-link" data-user-id="${kefilId}">${kefilName}</span></span></div>` : ''}
+    `;
+  }
+
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('.author-link');
+    if (!link) return;
+    const id = link.getAttribute('data-user-id');
+    if (id) open(id);
+  });
 })();
 </script>
 </body>
