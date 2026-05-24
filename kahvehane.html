@@ -1663,6 +1663,10 @@ function escapeHtml(s) {
     {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
   ));
 }
+function capitalizeName(s) {
+  if (!s) return '';
+  return s.trim().split(/\s+/).map(w => w ? w.charAt(0).toLocaleUpperCase('tr-TR') + w.slice(1).toLocaleLowerCase('tr-TR') : '').join(' ');
+}
 
 // game_results.date is stored as un-padded "YYYY-M-D" which is not
 // lexicographically sortable, so we parse it into a Date for filtering.
@@ -1735,7 +1739,7 @@ async function loadScoreboard() {
         .select('id, first_name')
         .in('id', userIds);
       (profs || []).forEach(p => {
-        if (p.first_name) nameMap.set(p.id, p.first_name);
+        if (p.first_name) nameMap.set(p.id, capitalizeName(p.first_name));
       });
     }
   } catch (e) { /* name lookup is best-effort */ }
@@ -1874,7 +1878,7 @@ async function fetchPostsPage(neighborhoodFilter, offset) {
       .from('profiles')
       .select('id, first_name')
       .in('id', ids);
-    (profs || []).forEach(p => nameMap.set(p.id, p.first_name || ''));
+    (profs || []).forEach(p => nameMap.set(p.id, capitalizeName(p.first_name || '')));
   }
   return data.map(p => ({ ...p, _authorFirstName: nameMap.get(p.author_id) || '' }));
 }
@@ -2205,12 +2209,12 @@ function showToast(text, kind) {
         .eq('id', data.referred_by)
         .maybeSingle();
       if (kp) {
-        kefilName = (`${kp.first_name || ''} ${kp.last_name || ''}`).trim() || 'İsimsiz Üye';
+        kefilName = capitalizeName(`${kp.first_name || ''} ${kp.last_name || ''}`.trim()) || 'İsimsiz Üye';
         kefilId = kp.id;
       }
     }
 
-    const fullName = `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'İsimsiz Üye';
+    const fullName = capitalizeName(`${data.first_name || ''} ${data.last_name || ''}`.trim()) || 'İsimsiz Üye';
     const initial = (fullName.charAt(0) || '?').toUpperCase();
     const avatar = data.avatar_url
       ? `<img src="${data.avatar_url}" alt="">`
