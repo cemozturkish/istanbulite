@@ -1859,6 +1859,10 @@ function libEsc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g,
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+function capitalizeName(s) {
+  if (!s) return '';
+  return s.trim().split(/\s+/).map(w => w ? w.charAt(0).toLocaleUpperCase('tr-TR') + w.slice(1).toLocaleLowerCase('tr-TR') : '').join(' ');
+}
 
 async function fetchLibraryCategory(categoryId) {
   const { data, error } = await sb.from('library_articles')
@@ -2240,7 +2244,7 @@ async function loadComments(articleId) {
 
   listEl.innerHTML = comments.map(c => {
     const a = authorMap[c.author_id] || {};
-    const name = ((a.first_name || '') + ' ' + (a.last_name || '')).trim() || 'Üye';
+    const name = capitalizeName(((a.first_name || '') + ' ' + (a.last_name || '')).trim()) || 'Üye';
     const nb = a.neighborhood ? (' · ' + libEsc(a.neighborhood)) : '';
     const when = formatRelative(c.created_at);
     const own = currentUid && c.author_id === currentUid;
@@ -2530,8 +2534,8 @@ function renderProfileBootstrap(user) {
   document.getElementById('bs-create').addEventListener('click', async () => {
     const btn = document.getElementById('bs-create');
     const msg = document.getElementById('bs-msg');
-    const firstName = document.getElementById('bs-firstname').value.trim();
-    const lastName = document.getElementById('bs-lastname').value.trim();
+    const firstName = capitalizeName(document.getElementById('bs-firstname').value.trim());
+    const lastName = capitalizeName(document.getElementById('bs-lastname').value.trim());
     const neighborhood = document.getElementById('bs-neighborhood').value;
     const birth = document.getElementById('bs-birth').value;
     const birthPlace = document.getElementById('bs-birthplace').value.trim();
@@ -2767,8 +2771,8 @@ const referralCode = profile?.referral_code || '';
     const msgEl = document.getElementById('save-msg');
     const btn = document.getElementById('save-btn');
     const newYasadigi = document.getElementById('edit-yasadigi').value;
-    const newFirstName = document.getElementById('edit-firstname').value.trim();
-    const newLastName = document.getElementById('edit-lastname').value.trim();
+    const newFirstName = capitalizeName(document.getElementById('edit-firstname').value.trim());
+    const newLastName = capitalizeName(document.getElementById('edit-lastname').value.trim());
 
     if (!newYasadigi) {
       msgEl.textContent = 'Lütfen bir ilçe seçin.';
@@ -2861,7 +2865,7 @@ const referralCode = profile?.referral_code || '';
         <div class="right-section-title">Kefalet</div>
         ${kefilOfUser ? `<div class="info-row">
           <div class="info-label">KEFİL</div>
-          <div class="info-value"><button class="kefil-link" data-user-id="${kefilOfUser.id}">${(`${kefilOfUser.first_name || ''} ${kefilOfUser.last_name || ''}`).trim() || 'İsimsiz Üye'}</button></div>
+          <div class="info-value"><button class="kefil-link" data-user-id="${kefilOfUser.id}">${capitalizeName((`${kefilOfUser.first_name || ''} ${kefilOfUser.last_name || ''}`).trim()) || 'İsimsiz Üye'}</button></div>
         </div>` : ''}
         <div class="info-row">
           <div class="info-label">Kefil Olduğu</div>
@@ -2887,7 +2891,7 @@ const referralCode = profile?.referral_code || '';
         </div>
         ${kefilOfUser ? `<div class="info-row">
           <div class="info-label">KEFİL</div>
-          <div class="info-value"><button class="kefil-link" data-user-id="${kefilOfUser.id}">${(`${kefilOfUser.first_name || ''} ${kefilOfUser.last_name || ''}`).trim() || 'İsimsiz Üye'}</button></div>
+          <div class="info-value"><button class="kefil-link" data-user-id="${kefilOfUser.id}">${capitalizeName((`${kefilOfUser.first_name || ''} ${kefilOfUser.last_name || ''}`).trim()) || 'İsimsiz Üye'}</button></div>
         </div>` : ''}
         ${referralCode ? `<div class="info-row">
           <div class="info-label">Kefalet Kodu</div>
@@ -2966,12 +2970,12 @@ bootstrapLibraryNav();
         .eq('id', prof.referred_by)
         .maybeSingle();
       if (kp) {
-        kefilName = (`${kp.first_name || ''} ${kp.last_name || ''}`).trim() || 'İsimsiz Üye';
+        kefilName = capitalizeName((`${kp.first_name || ''} ${kp.last_name || ''}`).trim()) || 'İsimsiz Üye';
         kefilId = kp.id;
       }
     }
 
-    const fullName = (`${prof.first_name || ''} ${prof.last_name || ''}`).trim() || 'İsimsiz Üye';
+    const fullName = capitalizeName((`${prof.first_name || ''} ${prof.last_name || ''}`).trim()) || 'İsimsiz Üye';
     const avatar = prof.avatar_url
       ? `<img src="${prof.avatar_url}" alt="">`
       : (fullName.charAt(0) || '?').toUpperCase();
