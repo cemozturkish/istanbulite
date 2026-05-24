@@ -519,8 +519,8 @@
     }
 
     .article.expandable { cursor: pointer; }
-    .article.expandable:hover { background: var(--paper); }
-    .article.expanded { background: var(--paper); }
+    .article.expandable:hover { background: #e3dbc6; }
+    .article.expanded { background: #e3dbc6; }
     .article .meta-row {
       display: flex;
       justify-content: space-between;
@@ -977,6 +977,21 @@
       color: var(--accent);
       line-height: 1.35;
     }
+    .event-item.expandable { cursor: pointer; }
+    .event-item.expandable:hover { background: #e3dbc6; }
+    .event-item.expanded { background: #e3dbc6; }
+    .event-item .ev-details {
+      grid-column: 1 / -1;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #ccc;
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: var(--accent);
+      display: none;
+    }
+    .event-item.expanded .ev-details { display: block; }
 
     @media (max-width: 768px) {
       @keyframes ist-vt-out-left { from { transform: translateX(0); } to { transform: translateX(-100vw); } }
@@ -1879,7 +1894,7 @@ async function loadEvents() {
     const parts = eventDateParts(ev.event_date);
     const timeBits = [parts.weekday, parts.time, ev.location].filter(Boolean).join(' · ');
     return `
-      <div class="event-item">
+      <div class="event-item expandable">
         <div class="ev-date-block">
           <div class="ev-day">${parts.day}</div>
           <div class="ev-mon">${parts.mon}</div>
@@ -1888,11 +1903,22 @@ async function loadEvents() {
           <div class="ev-kicker">${escapeText(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
           <div class="ev-title">${escapeText(ev.title)}</div>
           ${timeBits ? `<div class="ev-meta">${escapeText(timeBits)}</div>` : ''}
-          ${ev.description ? `<div class="ev-meta">${escapeText(ev.description)}</div>` : ''}
         </div>
+        ${ev.description ? `<div class="ev-details">${escapeText(ev.description)}</div>` : ''}
       </div>
     `;
   }).join('');
+
+  panel.querySelectorAll('.event-item.expandable').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('a')) return;
+      const wasExpanded = el.classList.contains('expanded');
+      panel.querySelectorAll('.event-item.expandable.expanded').forEach(other => {
+        if (other !== el) other.classList.remove('expanded');
+      });
+      el.classList.toggle('expanded', !wasExpanded);
+    });
+  });
 }
 
 // loadBreakingNews() is called from showSite() once the user is known
