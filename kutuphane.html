@@ -1846,16 +1846,42 @@ window.addEventListener('resize', updateTabStripOffset);
 
 // Mobile: move library-card and counter-strip above the tab strip.
 // Elements are physically relocated so JS that populates them by id still works.
-function mobileReorderElements() {
-  if (window.innerWidth > 768) return;
+(function () {
+  const MOBILE_BP = 768;
   const mobileTop = document.getElementById('mobile-top');
-  const card = document.getElementById('library-card');
+  const card  = document.getElementById('library-card');
   const strip = document.getElementById('counter-strip');
   if (!mobileTop || !card || !strip) return;
-  mobileTop.appendChild(card);
-  mobileTop.appendChild(strip);
-}
-mobileReorderElements();
+
+  // Capture original DOM positions before any moves.
+  const cardParent  = card.parentNode;
+  const cardBefore  = card.nextSibling;
+  const stripParent = strip.parentNode;
+  const stripBefore = strip.nextSibling;
+
+  let inMobile = null;
+
+  function applyLayout() {
+    const mobile = window.innerWidth <= MOBILE_BP;
+    if (mobile === inMobile) return;
+    inMobile = mobile;
+    if (mobile) {
+      mobileTop.appendChild(card);
+      mobileTop.appendChild(strip);
+    } else {
+      cardParent.insertBefore(card, cardBefore);
+      stripParent.insertBefore(strip, stripBefore);
+    }
+  }
+
+  applyLayout();
+
+  let raf = null;
+  window.addEventListener('resize', () => {
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(applyLayout);
+  });
+}());
 
 // ── Kütüphane: topic tabs → article list → article detail ──
 // Reads articles, categories, and counters from public.library_articles,
