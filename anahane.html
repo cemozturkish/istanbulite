@@ -8,6 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="i18n.js"></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis). Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot. -->
   <script>
     (function(){
@@ -1186,17 +1187,17 @@
   <aside class="col-left">
     <section class="sidebar-left" id="left-sidebar">
       <div class="sidebar-banner">
-        <div class="sidebar-label">Son Dakika</div>
+        <div class="sidebar-label" data-i18n="home.breaking">Son Dakika</div>
         <div class="sidebar-sublabel" id="user-nb-sublabel"></div>
       </div>
       <div class="news-filter-row">
-        <button class="news-filter-btn active" data-filter="all">Tümü</button>
+        <button class="news-filter-btn active" data-filter="all" data-i18n="home.filter.all">Tümü</button>
         <button class="news-filter-btn" data-filter="istanbul">İSTANBUL</button>
         <button class="news-filter-btn" data-filter="turkiye">TÜRKİYE</button>
         <button class="news-filter-btn" data-filter="mahalle">MAHALLE</button>
       </div>
       <div id="breaking-news-feed">
-        <p class="no-articles" style="padding:12px;">Aktif haber yok.</p>
+        <p class="no-articles" style="padding:12px;" data-i18n="home.breaking.empty">Aktif haber yok.</p>
       </div>
     </section>
 
@@ -1294,11 +1295,11 @@
   <aside class="col-right">
     <section class="sidebar-right">
       <div class="sidebar-banner">
-        <div class="sidebar-label">Etkinlikler</div>
-        <div class="sidebar-sublabel">Bu hafta</div>
+        <div class="sidebar-label" data-i18n="home.events">Etkinlikler</div>
+        <div class="sidebar-sublabel" data-i18n="home.events.thisweek">Bu hafta</div>
       </div>
       <div id="events-panel">
-        <p class="no-articles" style="padding:12px;">Yaklaşan etkinlik yok.</p>
+        <p class="no-articles" style="padding:12px;" data-i18n="home.events.empty">Yaklaşan etkinlik yok.</p>
       </div>
     </section>
   </aside>
@@ -1628,11 +1629,13 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 function updateDateTime() {
   const now = new Date();
   const opts = { timeZone: 'Europe/Istanbul' };
-  const day = now.toLocaleDateString('tr-TR', { ...opts, day: 'numeric' });
-  const month = now.toLocaleDateString('tr-TR', { ...opts, month: 'long' });
-  const year = now.toLocaleDateString('tr-TR', { ...opts, year: 'numeric' });
-  const weekday = now.toLocaleDateString('tr-TR', { ...opts, weekday: 'long' });
-  const time = now.toLocaleTimeString('tr-TR', { ...opts, hour: '2-digit', minute: '2-digit', hour12: false });
+  const en = I18N.isEnglish();
+  const locale = en ? 'en-US' : 'tr-TR';
+  const day = now.toLocaleDateString(locale, { ...opts, day: 'numeric' });
+  const month = now.toLocaleDateString(locale, { ...opts, month: 'long' });
+  const year = now.toLocaleDateString(locale, { ...opts, year: 'numeric' });
+  const weekday = now.toLocaleDateString(locale, { ...opts, weekday: 'long' });
+  const time = now.toLocaleTimeString(locale, { ...opts, hour: '2-digit', minute: '2-digit', hour12: en });
   document.getElementById('date-line').textContent = (day + ' ' + month + ' ' + year).toUpperCase();
   document.getElementById('day-line').textContent = weekday.toUpperCase();
   document.getElementById('time-line').textContent = time;
@@ -1652,6 +1655,8 @@ async function showSite(user) {
   document.getElementById('main-site').classList.add('active');
   // Capture user id so seenKey() can scope per-user.
   window.__currentUser = user;
+  I18N.syncFromSupabase(sb, user.id);
+  I18N.onChange(() => { renderEvents(); applyNewsFilter(activeNewsFilter || 'all'); updateDateTime(); });
   loadBreakingNews();
   loadEvents();
   // Highlight home neighborhood: try metadata first, then profiles table
@@ -1914,13 +1919,14 @@ function categoryLabelTR(n) {
 function formatAgoTR(iso) {
   const d = new Date(iso);
   const secs = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (secs < 60) return 'az önce';
+  const en = I18N.isEnglish();
+  if (secs < 60) return en ? 'just now' : 'az önce';
   const mins = Math.floor(secs / 60);
-  if (mins < 60) return mins + ' dk önce';
+  if (mins < 60) return en ? `${mins}m ago` : `${mins} dk önce`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return hrs + ' sa önce';
+  if (hrs < 24) return en ? `${hrs}h ago` : `${hrs} sa önce`;
   const days = Math.floor(hrs / 24);
-  return days + ' gün önce';
+  return en ? `${days}d ago` : `${days} gün önce`;
 }
 
 function safeUrl(u) {
@@ -1933,7 +1939,7 @@ function renderBreakingNewsFeed(rows) {
   const feed = document.getElementById('breaking-news-feed');
   if (!feed) return;
   if (!rows.length) {
-    feed.innerHTML = '<p class="no-articles" style="padding:12px;">Aktif haber yok.</p>';
+    feed.innerHTML = `<p class="no-articles" style="padding:12px;">${I18N.t('home.breaking.empty')}</p>`;
     return;
   }
   feed.innerHTML = rows.map(n => {
@@ -2036,15 +2042,19 @@ async function loadBreakingNews() {
 
 // ── Events (right column) ──────────────────
 const MONTH_ABBR_TR = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
+const MONTH_ABBR_EN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
 function eventDateParts(iso) {
   const d = new Date(iso);
   const tz = 'Europe/Istanbul';
+  const en = I18N.isEnglish();
+  const locale = en ? 'en-US' : 'tr-TR';
   const day = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, day: 'numeric' }), 10);
   const month = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, month: 'numeric' }), 10);
-  const weekday = d.toLocaleDateString('tr-TR', { timeZone: tz, weekday: 'long' });
-  const time = d.toLocaleTimeString('tr-TR', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
-  return { day, mon: MONTH_ABBR_TR[month - 1] || '', weekday, time };
+  const weekday = d.toLocaleDateString(locale, { timeZone: tz, weekday: 'long' });
+  const time = d.toLocaleTimeString(locale, { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: en });
+  const monAbbr = (en ? MONTH_ABBR_EN : MONTH_ABBR_TR)[month - 1] || '';
+  return { day, mon: monAbbr, weekday, time };
 }
 
 let allEvents = [];
@@ -2076,7 +2086,7 @@ function renderEvents() {
   let rows = allEvents;
   if (activeNeighborhood) rows = rows.filter(ev => ev.neighborhood === activeNeighborhood);
   if (!rows.length) {
-    panel.innerHTML = '<p class="no-articles" style="padding:12px 18px;">Yaklaşan etkinlik yok.</p>';
+    panel.innerHTML = `<p class="no-articles" style="padding:12px 18px;">${I18N.t('home.events.empty')}</p>`;
     return;
   }
   panel.innerHTML = rows.map(ev => {
@@ -2152,9 +2162,7 @@ async function loadDoviz() {
   set('doviz-xau', (usdTRY / u.xau / TROY_GRAM).toFixed(2) + ' ₺');
   set('doviz-xag', (usdTRY / u.xag / TROY_GRAM).toFixed(2) + ' ₺');
   if (tsEl) {
-    tsEl.textContent = new Date().toLocaleTimeString('tr-TR', {
-      timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit', hour12: false,
-    });
+    tsEl.textContent = I18N.formatTime(new Date(), { timeZone: 'Europe/Istanbul' });
   }
 }
 loadDoviz();
