@@ -10,6 +10,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
   <title>Sözcel — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="i18n.js"></script>
   <style>
     :root {
       /* Core ink & paper — warm cream newspaper palette */
@@ -1025,16 +1026,16 @@
   <div class="result-overlay" id="help-overlay">
     <div class="result-card">
       <button class="result-close" id="help-close" type="button" aria-label="Kapat">×</button>
-      <div class="result-title" style="margin-bottom:14px;">Nasıl Oynanır</div>
+      <div class="result-title" style="margin-bottom:14px;" data-i18n="games.howto">Nasıl Oynanır</div>
       <div class="help-body">
-        <p>Gizli beş harfli Türkçe sözcüğü <strong>altı denemede</strong> bulun.</p>
-        <p>Her tahminin ardından kutular renklenir:</p>
+        <p data-i18n="sozcel.help.intro">Gizli beş harfli Türkçe sözcüğü <strong>altı denemede</strong> bulun.</p>
+        <p data-i18n="sozcel.help.colors">Her tahminin ardından kutular renklenir:</p>
         <p>
-          <span class="swatch correct"></span> Harf doğru ve doğru yerde.<br>
-          <span class="swatch present"></span> Harf sözcükte var ama yanlış yerde.<br>
-          <span class="swatch absent"></span> Harf sözcükte yok.
+          <span class="swatch correct"></span> <span data-i18n="sozcel.help.green2">Harf doğru ve doğru yerde.</span><br>
+          <span class="swatch present"></span> <span data-i18n="sozcel.help.yellow2">Harf sözcükte var ama yanlış yerde.</span><br>
+          <span class="swatch absent"></span> <span data-i18n="sozcel.help.gray2">Harf sözcükte yok.</span>
         </p>
-        <p>Her gün yeni bir sözcük gelir. Türkçe <strong>İ/I</strong> ayrımına dikkat edin.</p>
+        <p data-i18n="sozcel.help.daily">Her gün yeni bir sözcük gelir. Türkçe <strong>İ/I</strong> ayrımına dikkat edin.</p>
       </div>
     </div>
   </div>
@@ -1062,6 +1063,7 @@ const neighborhoodNames = {
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (session) {
+      I18N.syncFromSupabase(sb, session.user.id);
       userNeighborhood = session.user.user_metadata?.yasadigi_ilce
         || session.user.user_metadata?.neighborhood || '';
       // Accounts created by admin don't have user_metadata — fall back to profiles table.
@@ -1137,7 +1139,7 @@ function getTimeUntilMidnight() {
   const diff = tomorrow - ist;
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  return `Yeni oyun ${hours} saat ${minutes} dakika sonra`;
+  return I18N.formatCountdown(hours, minutes);
 }
 
 const VALID_WORDS = new Set([
@@ -2807,14 +2809,14 @@ async function renderStats() {
 
   // Left panel: personal stats (compact) + community stats (compact)
   document.getElementById('stats-left').innerHTML = `
-    <div><div class="panel-title">Kişisel İstatistikler</div></div>
+    <div><div class="panel-title">${I18N.t('games.personal')}</div></div>
     <div class="stat-tiles">
-      <div class="stat-tile"><div class="num">${streak}</div><div class="label">Seri</div></div>
-      <div class="stat-tile"><div class="num">${displayMaxStreak}</div><div class="label">En Uzun</div></div>
-      <div class="stat-tile"><div class="num">${played}</div><div class="label">Oynanan</div></div>
-      <div class="stat-tile"><div class="num">${winPct}%</div><div class="label">Kazanma</div></div>
+      <div class="stat-tile"><div class="num">${streak}</div><div class="label">${I18N.t('games.streak')}</div></div>
+      <div class="stat-tile"><div class="num">${displayMaxStreak}</div><div class="label">${I18N.t('games.longest')}</div></div>
+      <div class="stat-tile"><div class="num">${played}</div><div class="label">${I18N.t('games.played')}</div></div>
+      <div class="stat-tile"><div class="num">${winPct}%</div><div class="label">${I18N.t('games.winrate')}</div></div>
     </div>
-    <div style="margin-top:4px;"><div class="panel-title">Tahmin Dağılımı</div></div>
+    <div style="margin-top:4px;"><div class="panel-title">${I18N.t('games.distribution')}</div></div>
     ${dist.map((d, i) => `
       <div class="dist-bar-wrap">
         <span class="dist-label">${i + 1}</span>

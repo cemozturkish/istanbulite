@@ -786,6 +786,7 @@
     .author-link:hover { text-decoration: underline; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="i18n.js"></script>
 </head>
 <body>
 
@@ -892,6 +893,7 @@ const neighborhoodNames = {
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (session) {
+      I18N.syncFromSupabase(sb, session.user.id);
       userNeighborhood = session.user.user_metadata?.yasadigi_ilce
         || session.user.user_metadata?.neighborhood || '';
       // Accounts created by admin don't have user_metadata — fall back to profiles table.
@@ -982,11 +984,13 @@ async function loadPersonalStats() {
 function updateDateTime() {
   const now = new Date();
   const opts = { timeZone: 'Europe/Istanbul' };
-  const day = now.toLocaleDateString('tr-TR', { ...opts, day: 'numeric' });
-  const month = now.toLocaleDateString('tr-TR', { ...opts, month: 'long' });
-  const year = now.toLocaleDateString('tr-TR', { ...opts, year: 'numeric' });
-  const weekday = now.toLocaleDateString('tr-TR', { ...opts, weekday: 'long' });
-  const time = now.toLocaleTimeString('tr-TR', { ...opts, hour: '2-digit', minute: '2-digit', hour12: false });
+  const en = I18N.isEnglish();
+  const locale = en ? 'en-US' : 'tr-TR';
+  const day = now.toLocaleDateString(locale, { ...opts, day: 'numeric' });
+  const month = now.toLocaleDateString(locale, { ...opts, month: 'long' });
+  const year = now.toLocaleDateString(locale, { ...opts, year: 'numeric' });
+  const weekday = now.toLocaleDateString(locale, { ...opts, weekday: 'long' });
+  const time = now.toLocaleTimeString(locale, { ...opts, hour: '2-digit', minute: '2-digit', hour12: en });
 
   document.getElementById('date-line').textContent = (day + ' ' + month + ' ' + year).toUpperCase();
   document.getElementById('day-line').textContent = weekday.toUpperCase();
@@ -1011,7 +1015,7 @@ function getTimeUntilMidnight() {
   const diff = tomorrow - ist;
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  return `Yeni bulmaca ${hours} saat ${minutes} dakika sonra`;
+  return I18N.formatCountdown(hours, minutes, { prefixTr: 'Yeni bulmaca', prefixEn: 'New puzzle in' });
 }
 
 // Multiple puzzles for daily rotation
@@ -1533,12 +1537,12 @@ async function renderStats() {
   }
 
   document.getElementById('stats-left').innerHTML = `
-    <div><div class="panel-title">Kişisel İstatistikler</div></div>
+    <div><div class="panel-title">${I18N.t('games.personal')}</div></div>
     <div class="stat-tiles">
-      <div class="stat-tile"><div class="num">${streak}</div><div class="label">Seri</div></div>
-      <div class="stat-tile"><div class="num">${maxStreak}</div><div class="label">En Uzun</div></div>
-      <div class="stat-tile"><div class="num">${played}</div><div class="label">Oynanan</div></div>
-      <div class="stat-tile"><div class="num">${winPct}%</div><div class="label">Kazanma</div></div>
+      <div class="stat-tile"><div class="num">${streak}</div><div class="label">${I18N.t('games.streak')}</div></div>
+      <div class="stat-tile"><div class="num">${maxStreak}</div><div class="label">${I18N.t('games.longest')}</div></div>
+      <div class="stat-tile"><div class="num">${played}</div><div class="label">${I18N.t('games.played')}</div></div>
+      <div class="stat-tile"><div class="num">${winPct}%</div><div class="label">${I18N.t('games.winrate')}</div></div>
     </div>
     <div class="stat-row">
       <span class="stat-label">Bugün Kontrol</span>
@@ -1688,7 +1692,7 @@ renderClues();
   function fmtDate(s) {
     if (!s) return '—';
     try {
-      return new Date(s).toLocaleDateString('tr-TR', { year:'numeric', month:'long', day:'numeric' });
+      return I18N.formatDate(s, { year:'numeric', month:'long', day:'numeric' });
     } catch { return '—'; }
   }
   function nbLabel(id) {
@@ -1729,9 +1733,9 @@ renderClues();
       <div class="pp-avatar">${avatar}</div>
       <div class="pp-name">${fullName}</div>
       <div class="pp-meta">${nbLabel(data.neighborhood)}</div>
-      <div class="pp-row"><span class="pp-label">Doğum Yeri</span><span class="pp-value">${birth}</span></div>
-      <div class="pp-row"><span class="pp-label">Üyelik</span><span class="pp-value">${fmtDate(data.joined_at)}</span></div>
-      ${kefilName ? `<div class="pp-row"><span class="pp-label">KEFİL</span><span class="pp-value"><span class="author-link" data-user-id="${kefilId}">${kefilName}</span></span></div>` : ''}
+      <div class="pp-row"><span class="pp-label">${I18N.t('profile.birthplace')}</span><span class="pp-value">${birth}</span></div>
+      <div class="pp-row"><span class="pp-label">${I18N.t('profile.membership')}</span><span class="pp-value">${fmtDate(data.joined_at)}</span></div>
+      ${kefilName ? `<div class="pp-row"><span class="pp-label">${I18N.t('profile.kefil')}</span><span class="pp-value"><span class="author-link" data-user-id="${kefilId}">${kefilName}</span></span></div>` : ''}
     `;
   }
 

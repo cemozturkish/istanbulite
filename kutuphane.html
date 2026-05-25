@@ -10,6 +10,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kütüphane — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="i18n.js"></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis) -->
   <script>
     (function(){
@@ -1868,11 +1869,13 @@
 function updateDateTime() {
   const now = new Date();
   const opts = { timeZone: 'Europe/Istanbul' };
-  const day = now.toLocaleDateString('tr-TR', { ...opts, day: 'numeric' });
-  const month = now.toLocaleDateString('tr-TR', { ...opts, month: 'long' });
-  const year = now.toLocaleDateString('tr-TR', { ...opts, year: 'numeric' });
-  const weekday = now.toLocaleDateString('tr-TR', { ...opts, weekday: 'long' });
-  const time = now.toLocaleTimeString('tr-TR', { ...opts, hour: '2-digit', minute: '2-digit', hour12: false });
+  const en = I18N.isEnglish();
+  const locale = en ? 'en-US' : 'tr-TR';
+  const day = now.toLocaleDateString(locale, { ...opts, day: 'numeric' });
+  const month = now.toLocaleDateString(locale, { ...opts, month: 'long' });
+  const year = now.toLocaleDateString(locale, { ...opts, year: 'numeric' });
+  const weekday = now.toLocaleDateString(locale, { ...opts, weekday: 'long' });
+  const time = now.toLocaleTimeString(locale, { ...opts, hour: '2-digit', minute: '2-digit', hour12: en });
   document.getElementById('date-line').textContent = (day + ' ' + month + ' ' + year).toUpperCase();
   document.getElementById('day-line').textContent = weekday.toUpperCase();
   document.getElementById('time-line').textContent = time;
@@ -2056,10 +2059,10 @@ function formatElapsed(startDateStr, now) {
   const hours = Math.floor((totalMins % 1440) / 60);
   const mins = totalMins % 60;
   return `
-    <span class="cv-days">${years}</span><span class="cv-suffix">yıl</span>
-    <span class="cv-days">${days}</span><span class="cv-suffix">gün</span>
-    <span class="cv-days">${hours}</span><span class="cv-suffix">saat</span>
-    <span class="cv-days">${mins}</span><span class="cv-suffix">dakika</span>
+    <span class="cv-days">${years}</span><span class="cv-suffix">${I18N.t('profile.years')}</span>
+    <span class="cv-days">${days}</span><span class="cv-suffix">${I18N.t('profile.days')}</span>
+    <span class="cv-days">${hours}</span><span class="cv-suffix">${I18N.t('profile.hours')}</span>
+    <span class="cv-days">${mins}</span><span class="cv-suffix">${I18N.t('profile.minutes')}</span>
   `;
 }
 
@@ -2210,7 +2213,7 @@ async function renderCategoryList(categoryId) {
 function formatLibDate(iso) {
   if (!iso) return '';
   try {
-    return new Date(iso).toLocaleDateString('tr-TR', { year:'numeric', month:'long', day:'numeric' });
+    return I18N.formatDate(iso, { year:'numeric', month:'long', day:'numeric' });
   } catch { return ''; }
 }
 
@@ -2367,13 +2370,14 @@ async function loadComments(articleId) {
 function formatRelative(iso) {
   const d = new Date(iso);
   const mins = Math.floor((Date.now() - d.getTime()) / 60000);
-  if (mins < 1) return 'şimdi';
-  if (mins < 60) return mins + ' dk önce';
+  const en = I18N.isEnglish();
+  if (mins < 1) return en ? 'now' : 'şimdi';
+  if (mins < 60) return en ? `${mins}m ago` : `${mins} dk önce`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return hrs + ' saat önce';
+  if (hrs < 24) return en ? `${hrs}h ago` : `${hrs} saat önce`;
   const days = Math.floor(hrs / 24);
-  if (days < 7) return days + ' gün önce';
-  return d.toLocaleDateString('tr-TR', { year:'numeric', month:'short', day:'numeric' });
+  if (days < 7) return en ? `${days}d ago` : `${days} gün önce`;
+  return I18N.formatDate(d, { year:'numeric', month:'short', day:'numeric' });
 }
 
 async function submitComment(articleId) {
@@ -2537,13 +2541,14 @@ function formatLastSeen(dateStr) {
   const now = new Date();
   const diffMs = now - d;
   const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'Şimdi çevrimiçi';
-  if (diffMins < 60) return `${diffMins} dk önce`;
+  const en = I18N.isEnglish();
+  if (diffMins < 1) return en ? 'Online now' : 'Şimdi çevrimiçi';
+  if (diffMins < 60) return en ? `${diffMins}m ago` : `${diffMins} dk önce`;
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours} saat önce`;
+  if (diffHours < 24) return en ? `${diffHours}h ago` : `${diffHours} saat önce`;
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays} gün önce`;
-  return d.toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
+  if (diffDays < 7) return en ? `${diffDays}d ago` : `${diffDays} gün önce`;
+  return I18N.formatDate(d, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 // ── Sticker board persistence (localStorage, keyed by user id) ──
@@ -2761,6 +2766,9 @@ const referralCode = profile?.referral_code || '';
 const languagePref = profile?.language_pref || 'default';
 const themePref = profile?.theme_pref || 'system';
 
+// Apply the saved language immediately so labels render in the right tongue.
+I18N.setLang(languagePref);
+
 const LANG_VALUES = ['more_english', 'default', 'more_turkish'];
 const THEME_VALUES = ['light', 'system', 'dark'];
 
@@ -2770,7 +2778,7 @@ const THEME_VALUES = ['light', 'system', 'dark'];
     badgeEl.textContent = neighborhoodNames[yasadigiIlce] || yasadigiIlce;
   }
 
-  const joinedDate = new Date(user.created_at).toLocaleDateString('tr-TR', {
+  const joinedDate = I18N.formatDate(user.created_at, {
     year: 'numeric', month: 'long', day: 'numeric'
   });
   const lastSeenText = formatLastSeen(user.last_sign_in_at);
@@ -2815,7 +2823,7 @@ const THEME_VALUES = ['light', 'system', 'dark'];
           <div class="card-meta">${yasadigiDisplay}</div>
         </div>
       </div>
-      ${isViewingOther ? '' : '<button class="edit-btn" id="edit-profile-btn">Düzenle</button>'}
+      ${isViewingOther ? '' : `<button class="edit-btn" id="edit-profile-btn">${I18N.t('profile.edit')}</button>`}
     `;
     if (!isViewingOther) {
       document.getElementById('edit-profile-btn').addEventListener('click', renderCardEdit);
@@ -2827,32 +2835,32 @@ const THEME_VALUES = ['light', 'system', 'dark'];
       <div class="card-top">
         <div class="avatar" id="avatar-display">${avatarContent}</div>
         <div class="card-id">
-          <button class="avatar-upload" id="avatar-btn">Fotoğraf Değiştir</button>
+          <button class="avatar-upload" id="avatar-btn">${I18N.t('profile.changephoto')}</button>
           <input type="file" id="avatar-input" accept="image/*" style="display:none;">
         </div>
       </div>
       <div class="card-edit">
         <div>
-          <div class="field-label">Ad</div>
-          <input class="field-input" id="edit-firstname" type="text" value="${firstName}" placeholder="Adınız">
+          <div class="field-label">${I18N.t('profile.firstname')}</div>
+          <input class="field-input" id="edit-firstname" type="text" value="${firstName}" placeholder="${I18N.t('profile.firstname')}">
         </div>
         <div>
-          <div class="field-label">Soyad</div>
-          <input class="field-input" id="edit-lastname" type="text" value="${lastName}" placeholder="Soyadınız">
+          <div class="field-label">${I18N.t('profile.lastname')}</div>
+          <input class="field-input" id="edit-lastname" type="text" value="${lastName}" placeholder="${I18N.t('profile.lastname')}">
         </div>
         <div>
-          <div class="field-label">Yaşadığı İlçe</div>
+          <div class="field-label">${I18N.t('profile.district')}</div>
           <select class="field-select" id="edit-yasadigi">
-            <option value="">— İlçe seçin —</option>
+            <option value="">— ${I18N.t('profile.district')} —</option>
             ${districtOptions}
           </select>
         </div>
         <div>
-          <div class="field-label">Doğum Yeri</div>
+          <div class="field-label">${I18N.t('profile.birthplace')}</div>
           <div class="field-display">${dogumDisplay}</div>
         </div>
         <div>
-          <div class="field-label">Dil Tercihi</div>
+          <div class="field-label">${I18N.t('profile.langpref')}</div>
           <input class="pref-slider" id="edit-language" type="range" min="0" max="2" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
           <div class="pref-ticks" id="edit-language-ticks">
             <span data-idx="0">Daha İngilizce</span>
@@ -2861,7 +2869,7 @@ const THEME_VALUES = ['light', 'system', 'dark'];
           </div>
         </div>
         <div>
-          <div class="field-label">Görünüm</div>
+          <div class="field-label">${I18N.t('profile.appearance')}</div>
           <input class="pref-slider" id="edit-theme" type="range" min="0" max="2" step="1" value="${THEME_VALUES.indexOf(themePref)}">
           <div class="pref-ticks" id="edit-theme-ticks">
             <span data-idx="0">Açık</span>
@@ -2871,8 +2879,8 @@ const THEME_VALUES = ['light', 'system', 'dark'];
         </div>
       </div>
       <div class="edit-row">
-        <button class="cancel-btn" id="cancel-btn">İptal</button>
-        <button class="save-btn" id="save-btn">Kaydet</button>
+        <button class="cancel-btn" id="cancel-btn">${I18N.t('profile.cancel')}</button>
+        <button class="save-btn" id="save-btn">${I18N.t('profile.save')}</button>
       </div>
       <div class="save-msg" id="save-msg"></div>
     `;
@@ -2919,7 +2927,7 @@ const THEME_VALUES = ['light', 'system', 'dark'];
       return;
     }
 
-    btn.textContent = 'Kaydediliyor...';
+    btn.textContent = I18N.t('profile.saving');
     btn.disabled = true;
     msgEl.textContent = '';
 
@@ -2952,7 +2960,7 @@ const THEME_VALUES = ['light', 'system', 'dark'];
       setTimeout(() => window.location.reload(), 400);
     } catch (err) {
       console.error('Profile save error:', err);
-      btn.textContent = 'Kaydet';
+      btn.textContent = I18N.t('profile.save');
       btn.disabled = false;
       msgEl.textContent = err && err.message ? err.message : 'Kaydedilemedi.';
       msgEl.style.color = 'var(--accent)';
@@ -2994,7 +3002,7 @@ const THEME_VALUES = ['light', 'system', 'dark'];
 
   if (!isViewingOther) {
     document.getElementById('profile-signout-wrap').innerHTML = `
-      <button class="btn-signout" id="signout-btn">Çıkış Yap</button>
+      <button class="btn-signout" id="signout-btn">${I18N.t('profile.signout')}</button>
     `;
     document.getElementById('signout-btn').addEventListener('click', async () => {
       await sb.auth.signOut();
@@ -3006,48 +3014,48 @@ const THEME_VALUES = ['light', 'system', 'dark'];
   if (isViewingOther) {
     document.querySelector('.profile-right').innerHTML = `
       <div>
-        <div class="right-section-title">Kefalet</div>
+        <div class="right-section-title">${I18N.t('profile.kefil')}</div>
         ${kefilOfUser ? `<div class="info-row">
-          <div class="info-label">KEFİL</div>
-          <div class="info-value"><button class="kefil-link" data-user-id="${kefilOfUser.id}">${capitalizeName((`${kefilOfUser.first_name || ''} ${kefilOfUser.last_name || ''}`).trim()) || 'İsimsiz Üye'}</button></div>
+          <div class="info-label">${I18N.t('profile.kefil')}</div>
+          <div class="info-value"><button class="kefil-link" data-user-id="${kefilOfUser.id}">${capitalizeName((`${kefilOfUser.first_name || ''} ${kefilOfUser.last_name || ''}`).trim()) || I18N.t('profile.unnamed')}</button></div>
         </div>` : ''}
         <div class="info-row">
-          <div class="info-label">Kefil Olduğu</div>
-          <div class="info-value">${kefaletCount ?? 0} kişi</div>
+          <div class="info-label">${I18N.t('profile.sponsoredcount')}</div>
+          <div class="info-value">${kefaletCount ?? 0} ${I18N.t('profile.people')}</div>
         </div>
       </div>
     `;
   } else {
     document.querySelector('.profile-right').innerHTML = `
       <div>
-        <div class="right-section-title">Hesap</div>
+        <div class="right-section-title">${I18N.t('profile.account')}</div>
         <div class="info-row">
-          <div class="info-label">E-posta</div>
+          <div class="info-label">${I18N.t('profile.email')}</div>
           <div class="info-value">${user.email}</div>
         </div>
         <div class="info-row">
-          <div class="info-label">Üyelik</div>
+          <div class="info-label">${I18N.t('profile.membership')}</div>
           <div class="info-value">${joinedDate}</div>
         </div>
         <div class="info-row">
-          <div class="info-label">Son Görülme</div>
+          <div class="info-label">${I18N.t('profile.lastseen')}</div>
           <div class="info-value">${lastSeenText}</div>
         </div>
         ${kefilOfUser ? `<div class="info-row">
-          <div class="info-label">KEFİL</div>
-          <div class="info-value"><button class="kefil-link" data-user-id="${kefilOfUser.id}">${capitalizeName((`${kefilOfUser.first_name || ''} ${kefilOfUser.last_name || ''}`).trim()) || 'İsimsiz Üye'}</button></div>
+          <div class="info-label">${I18N.t('profile.kefil')}</div>
+          <div class="info-value"><button class="kefil-link" data-user-id="${kefilOfUser.id}">${capitalizeName((`${kefilOfUser.first_name || ''} ${kefilOfUser.last_name || ''}`).trim()) || I18N.t('profile.unnamed')}</button></div>
         </div>` : ''}
         ${referralCode ? `<div class="info-row">
-          <div class="info-label">Kefalet Kodu</div>
-          <div class="info-value" style="font-family:'Courier New',monospace;letter-spacing:2px;">${referralCode}<button class="copy-kefil-btn" style="margin-left:8px;" onclick="navigator.clipboard.writeText('${referralCode}').then(()=>{this.textContent='Kopyalandı';setTimeout(()=>this.textContent='Kopyala',1500)})">Kopyala</button></div>
+          <div class="info-label">${I18N.t('profile.referralcode')}</div>
+          <div class="info-value" style="font-family:'Courier New',monospace;letter-spacing:2px;">${referralCode}<button class="copy-kefil-btn" style="margin-left:8px;" onclick="navigator.clipboard.writeText('${referralCode}').then(()=>{const c=I18N.t('profile.copied');const k=I18N.t('profile.copy');this.textContent=c;setTimeout(()=>this.textContent=k,1500)})">${I18N.t('profile.copy')}</button></div>
         </div>` : ''}
         <div class="info-row">
-          <div class="info-label">Kefil Olduğu</div>
-          <div class="info-value">${kefaletCount ?? 0} kişi</div>
+          <div class="info-label">${I18N.t('profile.sponsoredcount')}</div>
+          <div class="info-value">${kefaletCount ?? 0} ${I18N.t('profile.people')}</div>
         </div>
       </div>
       <div id="scores-section">
-        <div class="right-section-title">Oyun Skorları</div>
+        <div class="right-section-title">${I18N.t('profile.gamescores')}</div>
         <div class="loading" style="padding:8px;font-size:11px;"><span class="spinner"></span></div>
       </div>
     `;
@@ -3087,7 +3095,7 @@ bootstrapLibraryNav();
 
   function fmtDate(s) {
     if (!s) return '—';
-    try { return new Date(s).toLocaleDateString('tr-TR', { year:'numeric', month:'long', day:'numeric' }); }
+    try { return I18N.formatDate(s, { year:'numeric', month:'long', day:'numeric' }); }
     catch { return '—'; }
   }
 
@@ -3129,9 +3137,9 @@ bootstrapLibraryNav();
       <div class="pp-avatar">${avatar}</div>
       <div class="pp-name">${fullName}</div>
       <div class="pp-meta">${nbLabel(prof.neighborhood)}</div>
-      <div class="pp-row"><span class="pp-label">Doğum Yeri</span><span class="pp-value">${birth}</span></div>
-      <div class="pp-row"><span class="pp-label">Üyelik</span><span class="pp-value">${fmtDate(prof.joined_at)}</span></div>
-      ${kefilName ? `<div class="pp-row"><span class="pp-label">KEFİL</span><span class="pp-value"><button class="kefil-link" data-user-id="${kefilId}">${kefilName}</button></span></div>` : ''}
+      <div class="pp-row"><span class="pp-label">${I18N.t('profile.birthplace')}</span><span class="pp-value">${birth}</span></div>
+      <div class="pp-row"><span class="pp-label">${I18N.t('profile.membership')}</span><span class="pp-value">${fmtDate(prof.joined_at)}</span></div>
+      ${kefilName ? `<div class="pp-row"><span class="pp-label">${I18N.t('profile.kefil')}</span><span class="pp-value"><button class="kefil-link" data-user-id="${kefilId}">${kefilName}</button></span></div>` : ''}
     `;
   }
 
