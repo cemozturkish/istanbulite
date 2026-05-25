@@ -1680,6 +1680,14 @@ const neighborhoods = document.querySelectorAll('.neighborhood');
 // district. null means show everything (subject to the news filter tabs).
 let activeNeighborhood = null;
 
+// Resolve what the map label should currently read when nothing is
+// being hovered: the active neighborhood's name, or 'İstanbul'.
+function baseMapLabel() {
+  if (!activeNeighborhood) return 'İstanbul';
+  const active = document.getElementById(activeNeighborhood);
+  return (active && active.getAttribute('data-name')) || activeNeighborhood;
+}
+
 neighborhoods.forEach(nb => {
   nb.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1691,6 +1699,13 @@ neighborhoods.forEach(nb => {
     activeNeighborhood = nb.id;
     applyNewsFilter(activeNewsFilter);
     loadEvents();
+  });
+  nb.addEventListener('mouseenter', () => {
+    const name = nb.getAttribute('data-name') || nb.id;
+    document.getElementById('map-label').textContent = name;
+  });
+  nb.addEventListener('mouseleave', () => {
+    document.getElementById('map-label').textContent = baseMapLabel();
   });
 });
 
