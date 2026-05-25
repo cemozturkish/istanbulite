@@ -985,6 +985,55 @@
       border: 1px solid var(--rule);
       color: var(--ink);
     }
+    .library-card .pref-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--rule);
+      outline: none;
+      margin: 8px 0 4px;
+      padding: 0;
+      cursor: pointer;
+    }
+    .library-card .pref-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      background: var(--ink);
+      border: 2px solid var(--paper);
+      box-shadow: 0 0 0 1px var(--ink);
+      border-radius: 50%;
+      cursor: grab;
+    }
+    .library-card .pref-slider::-webkit-slider-thumb:active { cursor: grabbing; }
+    .library-card .pref-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      background: var(--ink);
+      border: 2px solid var(--paper);
+      box-shadow: 0 0 0 1px var(--ink);
+      border-radius: 50%;
+      cursor: grab;
+    }
+    .library-card .pref-ticks {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.55rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .library-card .pref-ticks span {
+      flex: 1;
+      text-align: center;
+    }
+    .library-card .pref-ticks span:first-child { text-align: left; }
+    .library-card .pref-ticks span:last-child { text-align: right; }
+    .library-card .pref-ticks span.active { color: var(--ink); }
     .library-card .avatar-upload {
       font-size: 0.6rem;
       color: var(--accent);
@@ -2709,6 +2758,11 @@ const yasadigiIlce = profile?.neighborhood || '';
 const dogumYeri = profile?.birth_place || '';
 const phone = profile?.phone || '';
 const referralCode = profile?.referral_code || '';
+const languagePref = profile?.language_pref || 'default';
+const themePref = profile?.theme_pref || 'system';
+
+const LANG_VALUES = ['more_english', 'default', 'more_turkish'];
+const THEME_VALUES = ['light', 'system', 'dark'];
 
   // Update neighborhood badge in left column
   const badgeEl = document.getElementById('user-nb-badge');
@@ -2797,6 +2851,24 @@ const referralCode = profile?.referral_code || '';
           <div class="field-label">Doğum Yeri</div>
           <div class="field-display">${dogumDisplay}</div>
         </div>
+        <div>
+          <div class="field-label">Dil Tercihi</div>
+          <input class="pref-slider" id="edit-language" type="range" min="0" max="2" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
+          <div class="pref-ticks" id="edit-language-ticks">
+            <span data-idx="0">Daha İngilizce</span>
+            <span data-idx="1">Olduğu Gibi</span>
+            <span data-idx="2">Daha Türkçe</span>
+          </div>
+        </div>
+        <div>
+          <div class="field-label">Görünüm</div>
+          <input class="pref-slider" id="edit-theme" type="range" min="0" max="2" step="1" value="${THEME_VALUES.indexOf(themePref)}">
+          <div class="pref-ticks" id="edit-theme-ticks">
+            <span data-idx="0">Açık</span>
+            <span data-idx="1">Sistem</span>
+            <span data-idx="2">Koyu</span>
+          </div>
+        </div>
       </div>
       <div class="edit-row">
         <button class="cancel-btn" id="cancel-btn">İptal</button>
@@ -2810,6 +2882,28 @@ const referralCode = profile?.referral_code || '';
       document.getElementById('avatar-input').click();
     });
     document.getElementById('avatar-input').addEventListener('change', handleAvatarChange);
+
+    // Highlight active tick label as the user drags either slider
+    function syncTicks(sliderId, ticksId) {
+      const slider = document.getElementById(sliderId);
+      const ticks = document.getElementById(ticksId);
+      const update = () => {
+        const v = parseInt(slider.value, 10);
+        ticks.querySelectorAll('span').forEach(s => {
+          s.classList.toggle('active', parseInt(s.dataset.idx, 10) === v);
+        });
+      };
+      slider.addEventListener('input', update);
+      ticks.querySelectorAll('span').forEach(s => {
+        s.addEventListener('click', () => {
+          slider.value = s.dataset.idx;
+          slider.dispatchEvent(new Event('input'));
+        });
+      });
+      update();
+    }
+    syncTicks('edit-language', 'edit-language-ticks');
+    syncTicks('edit-theme', 'edit-theme-ticks');
   }
 
   async function handleSave() {
@@ -2832,9 +2926,14 @@ const referralCode = profile?.referral_code || '';
     try {
       // `neighborhood` is admin-controlled — the protect_profile_columns trigger
       // silently reverts it for non-admin users, so only send it for the admin.
+      const newLanguage = LANG_VALUES[parseInt(document.getElementById('edit-language').value, 10)] || 'default';
+      const newTheme = THEME_VALUES[parseInt(document.getElementById('edit-theme').value, 10)] || 'system';
+
       const payload = {
         first_name: newFirstName,
         last_name: newLastName,
+        language_pref: newLanguage,
+        theme_pref: newTheme,
       };
       const isAdminUser = user.email === 'cemwozturk@gmail.com';
       if (isAdminUser) payload.neighborhood = newYasadigi;
