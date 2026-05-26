@@ -1780,6 +1780,14 @@ init();
 // ── Map Interaction — clicking a neighborhood filters the discussion feed ──
 const mapNeighborhoods = document.querySelectorAll('.neighborhood');
 
+// Resolve what the map label should show when nothing is being hovered:
+// the active neighborhood's name, or 'İstanbul' if none is active.
+function baseMapLabel() {
+  if (!activeMapNeighborhood) return 'İstanbul';
+  const active = document.getElementById(activeMapNeighborhood);
+  return (active && active.getAttribute('data-name')) || activeMapNeighborhood;
+}
+
 mapNeighborhoods.forEach(nb => {
   nb.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1792,6 +1800,13 @@ mapNeighborhoods.forEach(nb => {
     selectedNeighborhood = (isAdmin || nb.id === homeNeighborhood) ? nb.id : homeNeighborhood;
     updateSubmitFormVisibility();
     loadPosts(nb.id);
+  });
+  nb.addEventListener('mouseenter', () => {
+    const name = nb.getAttribute('data-name') || nb.id;
+    document.getElementById('map-label').textContent = name;
+  });
+  nb.addEventListener('mouseleave', () => {
+    document.getElementById('map-label').textContent = baseMapLabel();
   });
 });
 
