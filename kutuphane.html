@@ -1277,19 +1277,34 @@
       }
       #mobile-top .library-card .card-name { font-size: 0.85rem; }
       #mobile-top .library-card .card-meta { font-size: 0.62rem; }
-      /* counter strip — own row with double-rule separator */
-      #mobile-top #counter-strip {
+      /* Two-column section below profile: countdowns left, articles right */
+      #mobile-two-col {
+        display: grid;
+        grid-template-columns: 2fr 3fr;
+        align-items: start;
         border-top: 1px solid var(--rule);
-        border-left: none;
-        border-bottom: 1px solid var(--hairline);
+      }
+      #mobile-col-counts {
+        border-right: 1px solid var(--hairline);
+        background: var(--paper-card);
+      }
+      #mobile-col-counts .counter-strip {
         display: flex;
-        flex-direction: row;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
+        flex-direction: column;
+        border-top: none;
+        border-left: none;
+        overflow: visible;
         padding: 0;
       }
-      #mobile-top #counter-strip::-webkit-scrollbar { display: none; }
+      #mobile-col-counts .counter-card {
+        min-width: 0;
+        padding: 10px 10px;
+        border-right: none;
+      }
+      #mobile-col-counts .counter-label { font-size: 7px; letter-spacing: 0.8px; }
+      #mobile-col-counts .counter-value { font-size: 0.72rem; }
+      #mobile-col-counts .counter-value .cv-days { font-size: 0.72rem; }
+      #mobile-col-counts .counter-value .cv-suffix { font-size: 0.72rem; margin: 0 3px 0 2px; }
 
       /* Bottom tab bar */
       .section-rule > .masthead,
@@ -1527,8 +1542,14 @@
     </div>
   </div>
 
-  <!-- Mobile-only: compact profile + countdowns injected here by mobileReorderElements() -->
+  <!-- Mobile-only: compact profile injected here by mobileReorderElements() -->
   <div id="mobile-top"></div>
+
+  <!-- Mobile-only: two-column layout (countdowns | articles) filled by mobileReorderElements() -->
+  <div id="mobile-two-col">
+    <div id="mobile-col-counts"></div>
+    <div id="mobile-col-articles"></div>
+  </div>
 
   <aside class="col-left">
     <div class="library-shelf" id="library-shelf">
@@ -1892,20 +1913,27 @@ function updateTabStripOffset() {
 updateTabStripOffset();
 window.addEventListener('resize', updateTabStripOffset);
 
-// Mobile: move library-card and counter-strip above the tab strip.
+// Mobile: move profile card to top, then arrange countdowns + articles in two columns.
 // Elements are physically relocated so JS that populates them by id still works.
 (function () {
   const MOBILE_BP = 768;
-  const mobileTop = document.getElementById('mobile-top');
-  const card  = document.getElementById('library-card');
-  const strip = document.getElementById('counter-strip');
-  if (!mobileTop || !card || !strip) return;
+  const mobileTop        = document.getElementById('mobile-top');
+  const mobileColCounts  = document.getElementById('mobile-col-counts');
+  const mobileColArticles = document.getElementById('mobile-col-articles');
+  const card    = document.getElementById('library-card');
+  const strip   = document.getElementById('counter-strip');
+  const colLeft = document.querySelector('aside.col-left');
+  const mainEl  = document.querySelector('main');
+  const colRight = document.querySelector('aside.col-right');
+
+  if (!mobileTop || !mobileColCounts || !mobileColArticles) return;
+  if (!card || !strip || !colLeft || !mainEl || !colRight) return;
 
   // Capture original DOM positions before any moves.
   const cardParent  = card.parentNode;
   const cardBefore  = card.nextSibling;
-  const stripParent = strip.parentNode;
-  const stripBefore = strip.nextSibling;
+  const stripParent = strip.parentNode; // = colLeft
+  const stripBefore = strip.nextSibling; // = null (last child of colLeft)
 
   let inMobile = null;
 
@@ -1915,10 +1943,16 @@ window.addEventListener('resize', updateTabStripOffset);
     inMobile = mobile;
     if (mobile) {
       mobileTop.appendChild(card);
-      mobileTop.appendChild(strip);
+      mobileColCounts.appendChild(strip);
+      mobileColArticles.appendChild(colLeft);
+      mobileColArticles.appendChild(mainEl);
     } else {
+      // Restore card and strip to their original parents (col-right, col-left)
       cardParent.insertBefore(card, cardBefore);
       stripParent.insertBefore(strip, stripBefore);
+      // Restore col-left and main to body in original order before col-right
+      document.body.insertBefore(mainEl, colRight);
+      document.body.insertBefore(colLeft, mainEl);
     }
   }
 
