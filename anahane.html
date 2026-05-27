@@ -2163,6 +2163,9 @@ const DOVIZ_REFRESH_MS = 5 * 60 * 1000;
 
 async function loadDoviz() {
   const tsEl = document.getElementById('doviz-ts');
+  // Cache-bust so the interval actually pulls fresh data; the fawaz feed
+  // refreshes ~daily but jsdelivr/browser would otherwise serve a stale copy.
+  const bust = `?t=${Date.now()}`;
   const endpoints = [
     'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json',
     'https://latest.currency-api.pages.dev/v1/currencies/usd.json',
@@ -2170,7 +2173,7 @@ async function loadDoviz() {
   let data = null;
   for (const url of endpoints) {
     try {
-      const res = await fetch(url);
+      const res = await fetch(url + bust, { cache: 'no-store' });
       if (res.ok) { data = await res.json(); break; }
     } catch {}
   }
