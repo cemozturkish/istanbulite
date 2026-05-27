@@ -646,6 +646,15 @@
       stroke-width: 2;
     }
 
+    /* Flashing news card in feed when its neighborhood is selected */
+    @keyframes flash-card {
+      0%, 100% { background: var(--paper-card); box-shadow: inset 3px 0 0 transparent; }
+      50% { background: var(--paper-banner); box-shadow: inset 3px 0 0 var(--ink-red); }
+    }
+    .article.flashing-news-card {
+      animation: flash-card 1.2s ease-in-out infinite;
+    }
+
     /* ── MOBILE RESPONSIVE ── */
     @media (max-width: 768px) {
       html, body {
@@ -1835,6 +1844,8 @@ neighborhoods.forEach(nb => {
     nb.classList.add('active');
     const name = nb.getAttribute('data-name') || nb.id;
     document.getElementById('map-label').textContent = name;
+    const flashedItem = flashingNews[nb.id];
+    flashingNewsCardId = flashedItem ? flashedItem.id : null;
     markNewsSeenForNeighborhood(nb.id);
     activeNeighborhood = nb.id;
     applyNewsFilter(activeNewsFilter);
@@ -1855,6 +1866,7 @@ document.addEventListener('click', (e) => {
     document.getElementById('map-label').textContent = 'İstanbul';
     if (activeNeighborhood !== null) {
       activeNeighborhood = null;
+      flashingNewsCardId = null;
       applyNewsFilter(activeNewsFilter);
       loadEvents();
     }
@@ -1869,6 +1881,7 @@ document.addEventListener('click', (e) => {
 let flashingNews = {}; // nbId -> { id, title, body, url, created_at }
 let allBreakingNews = []; // cached for client-side filter
 let activeNewsFilter = 'all';
+let flashingNewsCardId = null; // news id whose card should flash while its neighborhood is active
 
 function seenKey() {
   // Capture current user once available; fallback to anonymous bucket.
@@ -1891,6 +1904,12 @@ function markNewsSeenForNeighborhood(nbId) {
   const el = document.getElementById(nbId);
   if (el) el.classList.remove('flashing-news');
   delete flashingNews[nbId];
+}
+
+function applyFlashingNewsCard() {
+  if (!flashingNewsCardId) return;
+  const card = document.querySelector(`#breaking-news-feed [data-news-id="${CSS.escape(flashingNewsCardId)}"]`);
+  if (card) card.classList.add('flashing-news-card');
 }
 
 function escapeText(s) {
@@ -1987,6 +2006,8 @@ function renderBreakingNewsFeed(rows) {
       el.classList.toggle('expanded', !wasExpanded);
     });
   });
+
+  applyFlashingNewsCard();
 }
 
 // Tick the "X dk önce" labels every minute so they stay current.
