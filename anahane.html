@@ -9,6 +9,8 @@
   <title>istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="i18n.js"></script>
+  <link rel="stylesheet" href="profile-card.css">
+  <script src="profile-card.js" defer></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis). Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot. -->
   <script>
     (function(){
@@ -672,7 +674,7 @@
       #main-site {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto auto 1fr auto;
+        grid-template-rows: auto auto auto 1fr auto;
         height: 100%;
         overflow: hidden;
         padding-bottom: 56px; /* reserve space for fixed bottom tab bar */
@@ -682,10 +684,18 @@
         grid-column: unset; grid-row: unset;
       }
 
+      /* Mobile profile card sits at the very top */
+      #ist-pc-mount {
+        grid-column: 1 / -1;
+        grid-row: 1;
+        overflow-y: auto;
+        max-height: 50vh;
+      }
+
       /* Compact top brand bar */
       .section-rule {
         grid-column: 1 / -1;
-        grid-row: 1;
+        grid-row: 2;
         padding: 10px 14px 8px 14px;
         border-bottom: 1px solid var(--rule);
         background: var(--paper);
@@ -697,7 +707,7 @@
       /* Map: fills horizontally, height determined by aspect ratio */
       main {
         grid-column: 1 / -1;
-        grid-row: 2;
+        grid-row: 3;
         overflow: hidden;
         display: block;
       }
@@ -722,7 +732,7 @@
       /* Left column below map: news feed */
       .col-left {
         grid-column: 1;
-        grid-row: 3;
+        grid-row: 4;
         min-height: 0;
         overflow: hidden;
         background: var(--paper-warm);
@@ -765,7 +775,7 @@
       /* Right column below map: neighborhood articles */
       .col-right {
         grid-column: 2;
-        grid-row: 3;
+        grid-row: 4;
         min-height: 0;
         overflow: hidden;
         background: var(--paper-warm);
@@ -784,7 +794,7 @@
       /* Döviz bar — full-width row above tab bar */
       #doviz-panel {
         grid-column: 1 / -1;
-        grid-row: 4;
+        grid-row: 5;
         border-top: 1px solid var(--rule);
         border-left: none;
       }
@@ -1192,6 +1202,9 @@
 
 <!-- ══════════════ MAIN SITE ══════════════ -->
 <div id="main-site">
+
+  <!-- Mobile-only compact profile card (mounted by profile-card.js) -->
+  <div id="ist-pc-mount"></div>
 
   <aside class="col-left">
     <section class="sidebar-left" id="left-sidebar">
@@ -1666,6 +1679,8 @@ async function showSite(user) {
   // Capture user id so seenKey() can scope per-user.
   window.__currentUser = user;
   I18N.syncFromSupabase(sb, user.id);
+  // Mount the shared mobile profile card.
+  if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N });
   I18N.onChange(() => { renderEvents(); applyNewsFilter(activeNewsFilter || 'all'); updateDateTime(); });
   loadBreakingNews();
   loadEvents();

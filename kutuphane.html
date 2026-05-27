@@ -11,6 +11,8 @@
   <title>Kütüphane — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="i18n.js"></script>
+  <link rel="stylesheet" href="profile-card.css">
+  <script src="profile-card.js" defer></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis) -->
   <script>
     (function(){
@@ -1241,6 +1243,14 @@
         border-top: none;
       }
 
+      /* Existing library-card and HESAP column are replaced by the shared
+         #ist-pc-mount widget on mobile. When viewing another user's profile
+         (?user=ID), keep the legacy layout instead. */
+      body:not(.ist-viewing-other) #mobile-top,
+      body:not(.ist-viewing-other) .col-right,
+      body:not(.ist-viewing-other) .profile-signout-wrap { display: none !important; }
+      body.ist-viewing-other #ist-pc-mount { display: none !important; }
+
       /* ── Mobile top: compact profile card + countdowns ── */
       #mobile-top {
         background: var(--paper-card);
@@ -1534,6 +1544,9 @@
   </style>
 </head>
 <body>
+
+  <!-- Mobile-only compact profile card (mounted by profile-card.js) -->
+  <div id="ist-pc-mount"></div>
 
   <div class="section-rule">
     <div class="masthead">istanbulite<span class="tld">.net</span></div>
@@ -1932,6 +1945,12 @@ window.addEventListener('resize', updateTabStripOffset);
 // Elements are physically relocated so JS that populates them by id still works.
 (function () {
   const MOBILE_BP = 768;
+  // When viewing another user's profile (?user=ID), tag the body early so the
+  // legacy mobile layout takes effect synchronously instead of waiting for
+  // loadProfile() to set the class.
+  if (new URLSearchParams(window.location.search).get('user')) {
+    document.body.classList.add('ist-viewing-other');
+  }
   const mobileTop         = document.getElementById('mobile-top');
   const mobileTwoCol      = document.getElementById('mobile-two-col');
   const mobileColCounts   = document.getElementById('mobile-col-counts');
@@ -1954,11 +1973,14 @@ window.addEventListener('resize', updateTabStripOffset);
     if (mobile === inMobile) return;
     inMobile = mobile;
     if (mobile) {
-      // 1. Profile card → top bar
-      mobileTop.appendChild(card);
-      // 2. HESAP section (col-right minus card) → right after top bar, before col-left
-      document.body.insertBefore(colRight, colLeft);
-      // 3. Countdown strip → left column; article tabs (col-left) → right column
+      // When viewing another user, fall back to the legacy layout: move the
+      // library-card and col-right to the top. Otherwise the shared
+      // #ist-pc-mount widget renders the self-profile card and HESAP info, and
+      // we leave the library-card / col-right hidden via CSS.
+      if (document.body.classList.contains('ist-viewing-other')) {
+        mobileTop.appendChild(card);
+        document.body.insertBefore(colRight, colLeft);
+      }
       mobileColCounts.appendChild(strip);
       mobileColArticles.appendChild(colLeft);
     } else {
@@ -1966,10 +1988,6 @@ window.addEventListener('resize', updateTabStripOffset);
       document.body.insertBefore(colLeft, mobileTwoCol);
       // Restore: counter-strip back into col-left
       colLeft.appendChild(strip);
-      // Restore: library-card back into col-right
-      colRight.insertBefore(card, cardBefore);
-      // Restore: col-right back to end of body (after main)
-      document.body.appendChild(colRight);
     }
   }
 
@@ -2745,6 +2763,10 @@ async function loadProfile() {
   const viewingUserId = urlParams.get('user');
   const isViewingOther = viewingUserId && viewingUserId !== session.user.id;
 
+  // When viewing another user's profile, fall back to the legacy mobile layout
+  // (library-card + HESAP visible) instead of the shared self-profile widget.
+  if (isViewingOther) document.body.classList.add('ist-viewing-other');
+
   // Fetch fresh user data from server (getSession can return stale cache)
   const { data: { user: freshUser }, error: userError } = await sb.auth.getUser();
   const user = freshUser || session.user;
@@ -3109,6 +3131,17 @@ const THEME_VALUES = ['light', 'system', 'dark'];
 
 loadProfile();
 bootstrapLibraryNav();
+
+// Mount the shared mobile profile card (hidden on desktop via CSS).
+// profile-card.js is deferred, so wait until it's loaded.
+function __mountIstPc() {
+  if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N });
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', __mountIstPc);
+} else {
+  __mountIstPc();
+}
 
 // ── Profile popup — opens on any .kefil-link click, navigates in-place for the chain ──
 (function() {
