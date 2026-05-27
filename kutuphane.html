@@ -1545,18 +1545,18 @@
   <!-- Mobile-only: compact profile injected here by mobileReorderElements() -->
   <div id="mobile-top"></div>
 
-  <!-- Mobile-only: two-column layout (countdowns | articles) filled by mobileReorderElements() -->
-  <div id="mobile-two-col">
-    <div id="mobile-col-counts"></div>
-    <div id="mobile-col-articles"></div>
-  </div>
-
   <aside class="col-left">
     <div class="library-shelf" id="library-shelf">
       <div class="shelf-loading"><span class="spinner"></span></div>
     </div>
     <div class="counter-strip" id="counter-strip"></div>
   </aside>
+
+  <!-- Mobile-only: two-column layout (countdowns | article content) filled by mobileReorderElements() -->
+  <div id="mobile-two-col">
+    <div id="mobile-col-counts"></div>
+    <div id="mobile-col-articles"></div>
+  </div>
 
   <main>
     <div class="article-area" id="article-area">
@@ -1913,27 +1913,27 @@ function updateTabStripOffset() {
 updateTabStripOffset();
 window.addEventListener('resize', updateTabStripOffset);
 
-// Mobile: move profile card to top, then arrange countdowns + articles in two columns.
+// Mobile: profile card to top; counter-strip to left column, article area to right column.
+// col-left (tab strip) stays full-width and sticky above the two-column section.
 // Elements are physically relocated so JS that populates them by id still works.
 (function () {
   const MOBILE_BP = 768;
-  const mobileTop        = document.getElementById('mobile-top');
-  const mobileColCounts  = document.getElementById('mobile-col-counts');
+  const mobileTop         = document.getElementById('mobile-top');
+  const mobileColCounts   = document.getElementById('mobile-col-counts');
   const mobileColArticles = document.getElementById('mobile-col-articles');
   const card    = document.getElementById('library-card');
   const strip   = document.getElementById('counter-strip');
-  const colLeft = document.querySelector('aside.col-left');
   const mainEl  = document.querySelector('main');
   const colRight = document.querySelector('aside.col-right');
 
   if (!mobileTop || !mobileColCounts || !mobileColArticles) return;
-  if (!card || !strip || !colLeft || !mainEl || !colRight) return;
+  if (!card || !strip || !mainEl || !colRight) return;
 
   // Capture original DOM positions before any moves.
   const cardParent  = card.parentNode;
   const cardBefore  = card.nextSibling;
-  const stripParent = strip.parentNode; // = colLeft
-  const stripBefore = strip.nextSibling; // = null (last child of colLeft)
+  const stripParent = strip.parentNode; // = col-left aside
+  const stripBefore = strip.nextSibling; // = null (last child of col-left)
 
   let inMobile = null;
 
@@ -1944,15 +1944,13 @@ window.addEventListener('resize', updateTabStripOffset);
     if (mobile) {
       mobileTop.appendChild(card);
       mobileColCounts.appendChild(strip);
-      mobileColArticles.appendChild(colLeft);
       mobileColArticles.appendChild(mainEl);
     } else {
-      // Restore card and strip to their original parents (col-right, col-left)
+      // Restore card and strip to col-right and col-left
       cardParent.insertBefore(card, cardBefore);
       stripParent.insertBefore(strip, stripBefore);
-      // Restore col-left and main to body in original order before col-right
+      // Restore main before col-right
       document.body.insertBefore(mainEl, colRight);
-      document.body.insertBefore(colLeft, mainEl);
     }
   }
 
