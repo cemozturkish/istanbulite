@@ -11,6 +11,8 @@
   <title>Kahvehane — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="i18n.js"></script>
+  <link rel="stylesheet" href="profile-card.css">
+  <script src="profile-card.js" defer></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis). Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot. -->
   <script>
     (function(){
@@ -612,7 +614,7 @@
       body {
         display: grid;
         grid-template-columns: 1fr auto;
-        grid-template-rows: auto auto 1fr;
+        grid-template-rows: auto auto auto 1fr;
         overflow: hidden;
         padding-bottom: 56px; /* reserve space for fixed bottom tab bar */
       }
@@ -621,10 +623,17 @@
         grid-column: unset; grid-row: unset;
       }
 
+      #ist-pc-mount {
+        grid-column: 1 / -1;
+        grid-row: 1;
+        overflow-y: auto;
+        max-height: 50vh;
+      }
+
       /* Compact top brand bar */
       .section-rule {
         grid-column: 1 / -1;
-        grid-row: 1;
+        grid-row: 2;
         padding: 10px 14px 8px 14px;
         border-bottom: 1px solid var(--rule);
         background: var(--paper);
@@ -636,7 +645,7 @@
       /* Map: fills horizontally, height determined by aspect ratio */
       main {
         grid-column: 1 / -1;
-        grid-row: 2;
+        grid-row: 3;
         overflow: hidden;
         display: block;
       }
@@ -662,7 +671,7 @@
          reachable even when the map pushes content toward the tab bar. */
       .col-left {
         grid-column: 1;
-        grid-row: 3;
+        grid-row: 4;
         min-height: 0;
         overflow: hidden;
         border-right: 1px solid var(--rule);
@@ -734,7 +743,7 @@
       /* Right column below map: square game buttons stacked vertically */
       .col-right {
         grid-column: 2;
-        grid-row: 3;
+        grid-row: 4;
         min-height: 0;
         overflow: hidden;
         border-left: none;
@@ -1059,6 +1068,9 @@
   </style>
 </head>
 <body>
+
+  <!-- Mobile-only compact profile card (mounted by profile-card.js) -->
+  <div id="ist-pc-mount"></div>
 
   <div class="section-rule">
     <div class="masthead">istanbulite<span class="tld">.net</span></div>
@@ -1535,6 +1547,8 @@ async function init() {
 
   I18N.syncFromSupabase(sb, session.user.id);
   isAdmin = session.user.email === ADMIN_EMAIL;
+  // Mount the shared mobile profile card.
+  if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N });
 
   // Source of truth for current neighborhood is profiles.neighborhood — the
   // RLS policy on neighborhood_comments enforces the same value when posting.
