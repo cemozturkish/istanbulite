@@ -8,10 +8,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
-  <title>Bulmaca — istanbulite.net</title>
+  <title>Tümcel — istanbulite.net</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="i18n.js"></script>
   <style>
     :root {
-      /* Core ink & paper — warm cream newspaper palette */
       --ink: #4C382A;
       --ink-deep: #4C382A;
       --paper: #eddbd0;
@@ -22,29 +23,30 @@
       --paper-dark: #d8c0b1;
       --hover: #d8c0b1;
       --field-bg: #e8d3c8;
-      /* Warm neutrals */
       --accent: #4C3B31;
       --accent-2: #775E4C;
       --muted: #867264;
       --rule: #b8a08a;
       --hairline: #c5ad9a;
       --whisper: #d4bbad;
-      /* Newspaper accents */
       --ink-red: #a4322b;
       --brown-1: #b8947a;
       --brown-2: #866955;
       --brown-3: #775742;
       --brown-4: #4C3B31;
-      /* Semantic aliases */
       --border: var(--rule);
       --success: var(--accent-2);
       --danger: var(--ink-red);
-      /* Border shortcuts */
       --col-border: 1px solid var(--rule);
       --row-border: 1px solid var(--hairline);
       --hairline-border: 1px solid var(--whisper);
       --rule-strong: 1px solid var(--ink);
       --rule-double: 4px double var(--ink);
+      /* Difficulty tier fills — warm palette */
+      --cat1: #c98e6a;
+      --cat2: #8a9a6b;
+      --cat3: #6e8aa3;
+      --cat4: #9a7aa3;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -128,7 +130,6 @@
     nav a:hover { color: var(--ink); }
     nav a.active { color: var(--ink); font-weight: 700; }
 
-    /* ── Left column ── */
     .col-left {
       grid-column: 1;
       grid-row: 2 / -1;
@@ -148,10 +149,8 @@
       text-align: center;
       flex-shrink: 0;
       font-family: 'Inter', sans-serif;
-      border-bottom: 1px solid var(--rule);
     }
 
-    /* ── Right column ── */
     .col-right {
       grid-column: 3;
       grid-row: 2 / -1;
@@ -171,7 +170,6 @@
       position: relative;
     }
 
-    /* Left: personal + community stats (compact) */
     .stats-left {
       display: flex;
       flex-direction: column;
@@ -187,7 +185,7 @@
       text-transform: uppercase;
       color: var(--accent);
       padding-bottom: 3px;
-      border-bottom: 1px solid var(--rule);
+      border-bottom: 1px solid var(--hairline);
       font-family: 'Inter', sans-serif;
     }
 
@@ -200,7 +198,7 @@
       text-align: center;
       padding: 4px 2px;
       background: var(--paper-card);
-      border: 1px solid var(--hairline);
+      font-family: 'Inter', sans-serif;
     }
     .stat-tile .num {
       font-size: 1.05rem;
@@ -234,78 +232,124 @@
     .stats-left .dist-pct { font-size: 0.55rem; min-width: 24px; }
     .stats-left .district-rank { font-size: 0.65rem; padding: 1px 0; }
 
-    /* Center: game */
     .game-panel {
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 10px 16px;
-      overflow-y: auto;
+      padding: 10px 20px;
+      overflow: hidden;
       min-height: 0;
       gap: 8px;
-      flex: 1;
+      background: var(--paper);
     }
 
-    .crossword-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 2px;
-      max-width: 220px;
+    .game-container {
+      max-width: 600px;
       width: 100%;
-      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 100%;
+      min-height: 0;
     }
 
-    .crossword-cell {
-      aspect-ratio: 1;
-      border: 1.5px solid var(--rule);
+    .instructions {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .mistakes {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .solved-groups {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .solved-group {
+      padding: 10px 12px;
+      border-radius: 4px;
+      color: var(--ink-deep);
+      font-family: 'Inter', sans-serif;
+      animation: slideIn 0.3s ease;
+    }
+
+    .solved-group.cat1 { background: var(--cat1); }
+    .solved-group.cat2 { background: var(--cat2); }
+    .solved-group.cat3 { background: var(--cat3); }
+    .solved-group.cat4 { background: var(--cat4); }
+
+    .solved-quote {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-style: italic;
+      font-size: 0.88rem;
+      line-height: 1.45;
+      margin-bottom: 5px;
+    }
+
+    .solved-source {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      opacity: 0.85;
+    }
+
+    .words-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .word-card {
+      padding: 10px 6px;
+      background: var(--paper-card);
+      border: 2px solid var(--rule);
+      color: var(--ink);
+      text-align: center;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+      font-family: 'Inter', sans-serif;
+      line-height: 1.3;
+      min-height: 52px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: 'Inter', sans-serif;
-      font-size: clamp(0.8rem, 2.5vh, 1.2rem);
-      font-weight: 700;
-      text-transform: uppercase;
-      background: var(--paper);
-      color: var(--ink);
-      cursor: pointer;
-      position: relative;
-      user-select: none;
     }
 
-    .crossword-cell.black {
-      background: var(--ink);
+    .word-card:hover {
       border-color: var(--ink);
-      cursor: default;
+      transform: translateY(-2px);
     }
 
-    .crossword-cell.active {
-      background: var(--brown-1);
-    }
-
-    .crossword-cell.correct {
-      background: var(--paper-card);
-    }
-
-    .cell-number {
-      position: absolute;
-      top: 2px;
-      left: 3px;
-      font-size: 0.5rem;
-      color: var(--accent);
-      font-family: 'Inter', sans-serif;
+    .word-card.selected {
+      background: var(--brown-3);
+      color: var(--paper);
+      border-color: var(--brown-4);
     }
 
     .controls {
       display: flex;
       gap: 8px;
-      flex-shrink: 0;
+      justify-content: center;
     }
 
     .btn {
-      padding: 8px 16px;
+      padding: 10px 20px;
       font-family: 'Inter', sans-serif;
-      font-size: 0.75rem;
+      font-size: 0.85rem;
       font-weight: 700;
       letter-spacing: 1px;
       text-transform: uppercase;
@@ -317,16 +361,24 @@
     .btn-primary {
       background: var(--ink);
       color: var(--paper);
-      border: 1px solid var(--ink);
     }
-    .btn-primary:hover { background: var(--accent); }
 
-    .game-message {
+    .btn-primary:hover { background: var(--accent); }
+    .btn-primary:disabled { background: var(--rule); cursor: not-allowed; }
+
+    .btn-secondary {
+      background: var(--paper-card);
+      color: var(--ink);
+      border: 1px solid var(--rule);
+    }
+
+    .btn-secondary:hover { background: var(--paper-banner); }
+
+    .game-status {
       text-align: center;
-      font-size: 0.85rem;
+      font-size: 0.9rem;
+      min-height: 22px;
       font-weight: 700;
-      min-height: 18px;
-      flex-shrink: 0;
     }
 
     .reset-info {
@@ -335,55 +387,6 @@
       color: var(--muted);
       font-style: italic;
       flex-shrink: 0;
-    }
-
-    .clues-wrap {
-      width: 100%;
-      max-width: 360px;
-      flex-shrink: 0;
-    }
-
-    .clues-wrap h3 {
-      font-size: 0.75rem;
-      font-weight: 700;
-      margin-bottom: 4px;
-      padding: 4px 8px;
-      background: var(--paper-banner);
-      border-bottom: 1px solid var(--rule);
-      letter-spacing: 1px;
-      font-family: 'Inter', sans-serif;
-      text-transform: uppercase;
-    }
-
-    .clue-list {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      margin-bottom: 10px;
-      background: var(--paper-card);
-      padding: 6px 8px;
-      border: 1px solid var(--hairline);
-    }
-
-    .clue {
-      display: flex;
-      gap: 4px;
-      font-size: 0.78rem;
-      line-height: 1.3;
-      padding: 2px 4px;
-      border-left: 3px solid transparent;
-    }
-
-    .clue.active {
-      background: var(--hover);
-      border-left-color: var(--ink-red);
-    }
-
-    .clue-number {
-      font-family: 'Inter', sans-serif;
-      font-weight: 700;
-      color: var(--ink-red);
-      min-width: 16px;
     }
 
     .dist-bar-wrap {
@@ -402,8 +405,9 @@
     .dist-bar-outer {
       flex: 1;
       height: 14px;
-      background: var(--paper-dark);
+      background: var(--paper-card);
       border: 1px solid var(--hairline);
+      position: relative;
     }
     .dist-bar-inner {
       height: 100%;
@@ -427,7 +431,6 @@
     .district-rank .rank-name { font-weight: 600; }
     .district-rank .rank-pct { color: var(--muted); font-weight: 700; }
 
-    /* ── Right: games nav (mirrors Kahvehane) ── */
     .games-section {
       padding: 0;
       overflow: hidden;
@@ -452,10 +455,7 @@
       text-align: center;
       letter-spacing: 2px;
       flex-shrink: 0;
-      background: var(--paper-banner);
-      padding: 6px 0;
       font-family: 'Inter', sans-serif;
-      text-transform: uppercase;
     }
     .game-link {
       display: block;
@@ -468,6 +468,7 @@
       transition: all 0.2s;
       position: relative;
       flex-shrink: 0;
+      font-family: 'Inter', sans-serif;
     }
     .game-link::before {
       content: '';
@@ -477,13 +478,24 @@
       pointer-events: none;
     }
     .game-link:hover {
-      background: var(--hover);
+      background: var(--paper-banner);
       transform: translateX(-4px);
     }
-    .game-link.active { background: var(--brown-4); color: var(--paper); }
+    .game-link.active {
+      background: var(--brown-4);
+      color: var(--paper);
+    }
     .game-link.active::before { border-color: var(--paper); }
-    .game-link-title { font-size: 1rem; font-weight: 700; margin-bottom: 4px; font-family: 'Inter', sans-serif; }
-    .game-link-subtitle { font-size: 0.75rem; color: var(--muted); font-style: italic; }
+    .game-link-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .game-link-subtitle {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-style: italic;
+    }
     .game-link.active .game-link-subtitle { color: var(--whisper); }
     .scoreboard {
       margin-top: 14px;
@@ -498,9 +510,6 @@
       text-align: center;
       letter-spacing: 2px;
       text-transform: uppercase;
-      background: var(--paper-banner);
-      padding: 6px 0;
-      font-family: 'Inter', sans-serif;
     }
     .scoreboard-list {
       list-style: none;
@@ -516,11 +525,20 @@
       gap: 8px;
       padding: 6px 10px;
       background: var(--paper-card);
-      border: 1px solid var(--hairline);
+      border: 1px solid var(--rule);
       font-size: 0.75rem;
+      font-family: 'Inter', sans-serif;
     }
-    .scoreboard-item.top { background: var(--paper-banner); border-color: var(--ink); }
-    .scoreboard-rank { font-weight: 700; color: var(--ink); min-width: 18px; font-size: 0.8rem; }
+    .scoreboard-item.top {
+      background: var(--paper-banner);
+      border-color: var(--ink);
+    }
+    .scoreboard-rank {
+      font-weight: 700;
+      color: var(--ink);
+      min-width: 18px;
+      font-size: 0.8rem;
+    }
     .scoreboard-player {
       flex: 1;
       min-width: 0;
@@ -546,9 +564,7 @@
       list-style: none;
     }
 
-    /* ── MOBILE RESPONSIVE ── */
-    /* Back button hidden on desktop (overridden in mobile @media below) */
-    /* Desktop back button: floating top-left inside main */
+    /* Floating back button */
     .game-back-btn {
       position: absolute;
       top: 10px;
@@ -570,9 +586,8 @@
       line-height: 1;
       transition: background 0.15s;
     }
-    .game-back-btn:hover { background: var(--hover); }
+    .game-back-btn:hover { background: var(--paper-banner); }
 
-    /* Side nav: started today (light tint) vs completed today (darker tint) */
     .game-link.started {
       background: var(--paper-dark);
       color: var(--accent);
@@ -586,107 +601,30 @@
     .game-link.completed::before { border-color: var(--brown-4); }
     .game-link.completed .game-link-subtitle { color: var(--whisper); }
 
-    @media (max-width: 768px) {
-      html, body {
-        height: 100vh;
-        height: 100dvh;
-        overflow: hidden;
-        position: fixed;
-        width: 100%;
-      }
+    /* Shake on wrong guess */
+    @keyframes shake {
+      0%, 100% { transform: translateX(0) translateY(-2px); }
+      20% { transform: translateX(-5px) translateY(-2px); }
+      40% { transform: translateX(5px) translateY(-2px); }
+      60% { transform: translateX(-5px) translateY(-2px); }
+      80% { transform: translateX(5px) translateY(-2px); }
+    }
+    @keyframes shake-base {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-5px); }
+      40% { transform: translateX(5px); }
+      60% { transform: translateX(-5px); }
+      80% { transform: translateX(5px); }
+    }
+    .word-card.shake { animation: shake-base 0.35s ease; }
 
-      body {
-        display: flex;
-        flex-direction: column;
-        grid-template-columns: unset;
-        grid-template-rows: unset;
-        overflow: hidden;
-      }
-
-      .col-left, .col-right, header, .section-rule, main {
-        grid-column: unset; grid-row: unset;
-      }
-
-      /* Hide everything except the game itself for immersive fullscreen */
-      .section-rule, .col-left, .col-right, header { display: none !important; }
-
-      /* Floating back button (top-left) */
-      .game-back-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        width: 38px;
-        height: 38px;
-        background: var(--paper);
-        border: 1px solid var(--ink);
-        border-radius: 50%;
-        color: var(--ink);
-        font-size: 18px;
-        font-weight: 700;
-        text-decoration: none;
-        z-index: 200;
-        box-shadow: 0 2px 8px rgba(31,27,20,0.15);
-      }
-      .game-back-btn:hover { background: var(--hover); }
-
-      /* Main: fullscreen game area */
-      main {
-        flex: 1 1 auto;
-        min-height: 0;
-        width: 100%;
-        height: 100dvh;
-        overflow-y: auto;
-        overflow-x: hidden;
-        display: flex;
-        flex-direction: column;
-        -webkit-overflow-scrolling: touch;
-      }
-      .game-panel {
-        padding: 60px 12px 24px 12px;
-        gap: 18px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        flex: 1;
-      }
-      .crossword-grid {
-        max-width: min(62vh, 92vw);
-        gap: 4px;
-      }
-      .crossword-cell {
-        border-width: 2.5px;
-        font-size: clamp(1.4rem, 4.2vh, 2.2rem);
-      }
-      .cell-number { font-size: 13px; top: 2px; left: 3px; }
-      .controls { gap: 12px; }
-      .btn {
-        padding: 13px 22px;
-        font-size: 15px;
-        letter-spacing: 0.5px;
-        border-radius: 5px;
-      }
-      .game-message { font-size: 16px; min-height: 20px; }
-      .reset-info { font-size: 13px; }
-      .clues-wrap {
-        max-width: 100%;
-        overflow: hidden;
-      }
-      .clues-wrap h3 {
-        font-size: 14px;
-        margin-bottom: 6px;
-        padding-bottom: 4px;
-        letter-spacing: 1px;
-      }
-      .clue-list { gap: 5px; margin-bottom: 10px; }
-      .clue { font-size: 15px; line-height: 1.35; gap: 6px; }
-      .clue-number { min-width: 20px; }
-
+    /* Slide in for solved groups */
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    /* ── Profile popup ── */
+    /* Profile popup */
     .profile-popup-overlay {
       position: fixed;
       inset: 0;
@@ -784,9 +722,106 @@
       color: inherit;
     }
     .author-link:hover { text-decoration: underline; }
+
+    @media (max-width: 768px) {
+      html, body {
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+        position: fixed;
+        width: 100%;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        grid-template-columns: unset;
+        grid-template-rows: unset;
+        overflow: hidden;
+      }
+
+      .col-left, .col-right, header, .section-rule, main {
+        grid-column: unset; grid-row: unset;
+      }
+
+      .section-rule, .col-left, .col-right, header { display: none !important; }
+
+      .game-back-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        width: 38px;
+        height: 38px;
+        background: var(--paper);
+        border: 1px solid var(--ink);
+        border-radius: 50%;
+        color: var(--ink);
+        font-size: 18px;
+        font-weight: 700;
+        text-decoration: none;
+        z-index: 200;
+        box-shadow: 0 2px 8px rgba(31,27,20,0.15);
+      }
+      .game-back-btn:hover { background: var(--paper-banner); }
+
+      main {
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+        height: 100dvh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+        -webkit-overflow-scrolling: touch;
+      }
+      .game-panel {
+        padding: 56px 16px 20px 16px;
+        gap: 10px;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+      }
+      .game-container {
+        overflow: hidden;
+        gap: 6px;
+      }
+      .instructions { font-size: 11px; }
+      .mistakes { font-size: 11px; font-weight: 700; }
+      .words-grid { gap: 6px; }
+      .word-card {
+        padding: 8px 4px;
+        font-size: 10px;
+        border-width: 2px;
+        border-radius: 4px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 52px;
+        line-height: 1.25;
+      }
+      .solved-groups { gap: 5px; }
+      .solved-group {
+        padding: 7px 10px;
+        border-radius: 4px;
+      }
+      .solved-quote { font-size: 0.78rem; margin-bottom: 3px; }
+      .solved-source { font-size: 0.52rem; }
+      .controls { gap: 6px; }
+      .btn {
+        padding: 8px 14px;
+        font-size: 11px;
+        letter-spacing: 0.5px;
+        border-radius: 4px;
+      }
+      .game-status { font-size: 12px; min-height: 14px; }
+      .reset-info { font-size: 10px; }
+    }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="i18n.js"></script>
 </head>
 <body>
 
@@ -816,14 +851,26 @@
   <main>
     <a href="kahvehane.html" class="game-back-btn" aria-label="Geri" title="Geri">←</a>
     <section class="game-panel">
-      <div class="crossword-grid" id="crossword-grid"></div>
-      <div class="controls">
-        <button class="btn btn-primary" id="check-btn">Kontrol Et</button>
-        <button class="btn btn-primary" id="clear-btn">Temizle</button>
+      <div class="game-container">
+        <div class="instructions">
+          4 parça seç — aynı alıntıya ait olduklarını düşündüklerini bul. 4 alıntı var!
+        </div>
+
+        <div class="mistakes" id="mistakes">Kalan hak: 4</div>
+
+        <div class="solved-groups" id="solved-groups"></div>
+
+        <div class="words-grid" id="words-grid"></div>
+
+        <div class="controls">
+          <button class="btn btn-secondary" id="shuffle-btn">Karıştır</button>
+          <button class="btn btn-secondary" id="deselect-btn">Temizle</button>
+          <button class="btn btn-primary" id="submit-btn" disabled>Gönder</button>
+        </div>
+
+        <div class="game-status" id="game-status"></div>
+        <div class="reset-info" id="reset-info"></div>
       </div>
-      <div class="game-message" id="game-message"></div>
-      <div class="reset-info" id="reset-info"></div>
-      <div class="clues-wrap" id="clues-container"></div>
     </section>
   </main>
 
@@ -837,12 +884,12 @@
           <div class="game-link-subtitle">Türkçe Wordle</div>
         </a>
 
-        <a href="tumcel.html" class="game-link" data-game="tumcel">
+        <a href="tumcel.html" class="game-link active" data-game="tumcel">
           <div class="game-link-title">Tümcel</div>
           <div class="game-link-subtitle">Türkçe Alıntı Bulmacası</div>
         </a>
 
-        <a href="bulmaca.html" class="game-link active" data-game="bulmaca">
+        <a href="bulmaca.html" class="game-link" data-game="bulmaca">
           <div class="game-link-title">Bulmaca</div>
           <div class="game-link-subtitle">Mini Çapraz Bulmaca</div>
         </a>
@@ -858,7 +905,6 @@
   </aside>
 
 <script>
-// ── Disable browser zoom (Ctrl+wheel, Ctrl+=/-/0, pinch gestures) ──
 window.addEventListener('wheel', (e) => {
   if (e.ctrlKey) e.preventDefault();
 }, { passive: false });
@@ -896,39 +942,360 @@ const neighborhoodNames = {
       I18N.syncFromSupabase(sb, session.user.id);
       userNeighborhood = session.user.user_metadata?.yasadigi_ilce
         || session.user.user_metadata?.neighborhood || '';
-      // Accounts created by admin don't have user_metadata — fall back to profiles table.
       if (!userNeighborhood) {
         const { data: p } = await sb.from('profiles').select('neighborhood').eq('id', session.user.id).maybeSingle();
         if (p?.neighborhood) userNeighborhood = p.neighborhood;
       }
+      if (userNeighborhood) {
+        const badgeEl = document.getElementById('user-nb-badge');
+        if (badgeEl) badgeEl.textContent = neighborhoodNames[userNeighborhood] || userNeighborhood;
+      }
     }
   } catch(e) {}
-  if (userNeighborhood) {
-    const badgeEl = document.getElementById('user-nb-badge');
-    if (badgeEl) badgeEl.textContent = neighborhoodNames[userNeighborhood] || userNeighborhood;
-  }
 })();
 
 async function recordGameResult(game, date, attempts, won, neighborhood) {
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return;
-    const { error } = await sb.from('game_results').insert([{
+    await sb.from('game_results').insert([{
       user_id: session.user.id,
-      game: game,
-      date: date,
-      attempts: attempts,
-      won: won,
-      neighborhood: neighborhood
+      game, date, attempts, won, neighborhood
     }]);
-    if (error) console.error('[bulmaca game_results]', error);
-  } catch (e) { console.error('[bulmaca game_results]', e); }
+  } catch (e) {}
 }
 
-// ── Personal stats from Supabase ──
-// For bulmaca, `attempts` = number of check-button presses on the winning
-// submission. Lower is better. Dedupe per (user, date): keep the smallest
-// attempts among winning rows as the day's score.
+function updateDateTime() {
+  const now = new Date();
+  const opts = { timeZone: 'Europe/Istanbul' };
+  const en = I18N.isEnglish();
+  const locale = en ? 'en-US' : 'tr-TR';
+  const day = now.toLocaleDateString(locale, { ...opts, day: 'numeric' });
+  const month = now.toLocaleDateString(locale, { ...opts, month: 'long' });
+  const year = now.toLocaleDateString(locale, { ...opts, year: 'numeric' });
+  const weekday = now.toLocaleDateString(locale, { ...opts, weekday: 'long' });
+  const time = now.toLocaleTimeString(locale, { ...opts, hour: '2-digit', minute: '2-digit', hour12: en });
+  document.getElementById('date-line').textContent = (day + ' ' + month + ' ' + year).toUpperCase();
+  document.getElementById('day-line').textContent = weekday.toUpperCase();
+  document.getElementById('time-line').textContent = time;
+}
+updateDateTime();
+setInterval(updateDateTime, 60000);
+
+function getDailySeed() {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
+}
+
+function getTimeUntilMidnight() {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  const tomorrow = new Date(ist);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  const diff = tomorrow - ist;
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return I18N.formatCountdown(hours, minutes);
+}
+
+const dailySeed = getDailySeed();
+
+// ── Puzzle data ──
+let todaysPuzzle = null; // { puzzle_date, quotes: [{source, color, fragments:[4]}] }
+let allFragments = [];   // { text, quoteIndex, fragIndex }
+let selectedFragments = [];
+let solvedQuotes = [];   // quoteIndex values
+let mistakes = 4;
+let gameOver = false;
+
+async function loadTodaysPuzzle() {
+  try {
+    const { data, error } = await sb
+      .from('tumcel_puzzles')
+      .select('*')
+      .eq('puzzle_date', dailySeed)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data;
+  } catch (e) { return null; }
+}
+
+function initGame(puzzle) {
+  todaysPuzzle = puzzle;
+  allFragments = [];
+  puzzle.quotes.forEach((quote, qi) => {
+    (quote.fragments || []).forEach((frag, fi) => {
+      allFragments.push({ text: frag, quoteIndex: qi, fragIndex: fi });
+    });
+  });
+  allFragments = shuffleArray([...allFragments]);
+}
+
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── Render ──
+function renderFragments() {
+  const grid = document.getElementById('words-grid');
+  grid.innerHTML = '';
+  allFragments.forEach(frag => {
+    const card = document.createElement('div');
+    const isSelected = selectedFragments.includes(frag);
+    card.className = 'word-card' + (isSelected ? ' selected' : '');
+    card.textContent = frag.text;
+    card.onclick = () => toggleFragment(frag);
+    grid.appendChild(card);
+  });
+}
+
+function toggleFragment(frag) {
+  if (gameOver) return;
+  const idx = selectedFragments.indexOf(frag);
+  if (idx !== -1) {
+    selectedFragments.splice(idx, 1);
+  } else if (selectedFragments.length < 4) {
+    selectedFragments.push(frag);
+  }
+  renderFragments();
+  document.getElementById('submit-btn').disabled = selectedFragments.length !== 4;
+  markAsPlayed();
+}
+
+async function markAsPlayed() {
+  const flagKey = 'tumcel_started_' + dailySeed;
+  if (localStorage.getItem(flagKey)) return;
+  localStorage.setItem(flagKey, '1');
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    await sb.from('game_results').insert([{
+      user_id: session.user.id,
+      game: 'tumcel',
+      date: dailySeed,
+      attempts: 0,
+      won: false,
+      neighborhood: userNeighborhood
+    }]);
+  } catch (e) {}
+}
+
+// ── Check guess ──
+async function checkGuess() {
+  if (gameOver || selectedFragments.length !== 4) return;
+  const statusEl = document.getElementById('game-status');
+
+  const qIdx = selectedFragments[0].quoteIndex;
+  const allSame = selectedFragments.every(f => f.quoteIndex === qIdx);
+
+  if (allSame) {
+    solvedQuotes.push(qIdx);
+    allFragments = allFragments.filter(f => f.quoteIndex !== qIdx);
+
+    const quote = todaysPuzzle.quotes[qIdx];
+    const solvedDiv = document.getElementById('solved-groups');
+    const groupDiv = document.createElement('div');
+    groupDiv.className = `solved-group ${quote.color}`;
+    // Sort selected fragments by their correct order index before assembling
+    const ordered = [...selectedFragments].sort((a, b) => a.fragIndex - b.fragIndex);
+    groupDiv.innerHTML = `
+      <div class="solved-quote">${ordered.map(f => escapeHtml(f.text)).join(' ')}</div>
+      <div class="solved-source">${escapeHtml(quote.source)}</div>
+    `;
+    solvedDiv.appendChild(groupDiv);
+
+    selectedFragments = [];
+    renderFragments();
+
+    if (solvedQuotes.length === 4) {
+      statusEl.textContent = 'Tebrikler! Hepsini buldun!';
+      statusEl.style.color = 'var(--success)';
+      document.getElementById('submit-btn').disabled = true;
+      document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+      gameOver = true;
+      await recordGameResult('tumcel', dailySeed, 4 - mistakes, true, userNeighborhood);
+      saveState();
+      renderStats();
+    } else {
+      saveState();
+    }
+    return;
+  }
+
+  // Wrong guess — shake selected tiles
+  document.querySelectorAll('.word-card.selected').forEach(card => {
+    card.classList.remove('shake');
+    void card.offsetWidth; // force reflow to restart animation
+    card.classList.add('shake');
+    setTimeout(() => card.classList.remove('shake'), 400);
+  });
+
+  mistakes--;
+  document.getElementById('mistakes').textContent = `Kalan hak: ${mistakes}`;
+
+  if (mistakes === 0) {
+    statusEl.textContent = 'Oyun bitti!';
+    statusEl.style.color = 'var(--accent)';
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+    gameOver = true;
+    revealUnsolvedQuotes();
+    await recordGameResult('tumcel', dailySeed, 4, false, userNeighborhood);
+    saveState();
+    renderStats();
+  } else {
+    statusEl.textContent = 'Yanlış tahmin!';
+    statusEl.style.color = 'var(--accent)';
+    setTimeout(() => { statusEl.textContent = ''; }, 2000);
+    saveState();
+  }
+
+  selectedFragments = [];
+  renderFragments();
+  document.getElementById('submit-btn').disabled = true;
+}
+
+function revealUnsolvedQuotes() {
+  const solvedDiv = document.getElementById('solved-groups');
+  todaysPuzzle.quotes.forEach((quote, qi) => {
+    if (solvedQuotes.includes(qi)) return;
+    const groupDiv = document.createElement('div');
+    groupDiv.className = `solved-group ${quote.color}`;
+    groupDiv.style.opacity = '0.5';
+    groupDiv.innerHTML = `
+      <div class="solved-quote">${(quote.fragments || []).map(f => escapeHtml(f)).join(' ')}</div>
+      <div class="solved-source">${escapeHtml(quote.source)}</div>
+    `;
+    solvedDiv.appendChild(groupDiv);
+  });
+}
+
+// ── Controls ──
+document.getElementById('submit-btn').addEventListener('click', checkGuess);
+
+document.getElementById('shuffle-btn').addEventListener('click', () => {
+  allFragments = shuffleArray([...allFragments]);
+  renderFragments();
+});
+
+document.getElementById('deselect-btn').addEventListener('click', () => {
+  selectedFragments = [];
+  renderFragments();
+  document.getElementById('submit-btn').disabled = true;
+});
+
+// ── State persistence ──
+const SAVE_KEY = 'tumcel_state_' + dailySeed;
+
+function saveState() {
+  const state = {
+    solvedQuotes,
+    mistakes,
+    gameOver,
+    fragmentOrder: allFragments.map(f => ({ quoteIndex: f.quoteIndex, fragIndex: f.fragIndex }))
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  saveStateRemote(state);
+}
+
+async function saveStateRemote(state) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    await sb.from('game_state').upsert({
+      user_id: session.user.id,
+      game: 'tumcel',
+      date: dailySeed,
+      state,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id,game,date' });
+  } catch (e) {}
+}
+
+async function restoreState() {
+  if (!todaysPuzzle) return false;
+  let raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        const { data } = await sb.from('game_state')
+          .select('state')
+          .eq('user_id', session.user.id)
+          .eq('game', 'tumcel')
+          .eq('date', dailySeed)
+          .maybeSingle();
+        if (data?.state) {
+          raw = JSON.stringify(data.state);
+          localStorage.setItem(SAVE_KEY, raw);
+        }
+      }
+    } catch (e) {}
+  }
+  if (!raw) return false;
+  try {
+    const state = JSON.parse(raw);
+    if (!state.solvedQuotes || state.solvedQuotes.length === 0) return false;
+
+    solvedQuotes = state.solvedQuotes;
+    mistakes = state.mistakes;
+    gameOver = state.gameOver;
+
+    if (state.fragmentOrder) {
+      allFragments = state.fragmentOrder
+        .filter(f => !solvedQuotes.includes(f.quoteIndex))
+        .map(f => ({
+          text: todaysPuzzle.quotes[f.quoteIndex]?.fragments[f.fragIndex] || '',
+          quoteIndex: f.quoteIndex,
+          fragIndex: f.fragIndex
+        }))
+        .filter(f => f.text);
+    }
+
+    const solvedDiv = document.getElementById('solved-groups');
+    solvedQuotes.forEach(qi => {
+      const quote = todaysPuzzle.quotes[qi];
+      if (!quote) return;
+      const groupDiv = document.createElement('div');
+      groupDiv.className = `solved-group ${quote.color}`;
+      groupDiv.innerHTML = `
+        <div class="solved-quote">${(quote.fragments || []).map(f => escapeHtml(f)).join(' ')}</div>
+        <div class="solved-source">${escapeHtml(quote.source)}</div>
+      `;
+      solvedDiv.appendChild(groupDiv);
+    });
+
+    document.getElementById('mistakes').textContent = `Kalan hak: ${mistakes}`;
+
+    if (gameOver) {
+      if (solvedQuotes.length === 4) {
+        document.getElementById('game-status').textContent = 'Tebrikler! Hepsini buldun!';
+        document.getElementById('game-status').style.color = 'var(--success)';
+      } else {
+        document.getElementById('game-status').textContent = 'Oyun bitti!';
+        document.getElementById('game-status').style.color = 'var(--accent)';
+        revealUnsolvedQuotes();
+      }
+      document.getElementById('submit-btn').disabled = true;
+      document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+    }
+
+    return true;
+  } catch (e) { return false; }
+}
+
+// ── Personal stats ──
 async function loadPersonalStats() {
   try {
     const { data: { session } } = await sb.auth.getSession();
@@ -936,7 +1303,7 @@ async function loadPersonalStats() {
     const { data, error } = await sb.from('game_results')
       .select('date, attempts, won')
       .eq('user_id', session.user.id)
-      .eq('game', 'bulmaca');
+      .eq('game', 'tumcel');
     if (error) return null;
     const byDate = new Map();
     (data || []).forEach(r => {
@@ -950,6 +1317,11 @@ async function loadPersonalStats() {
     const entries = Array.from(byDate.values());
     const played = entries.length;
     const wins = entries.filter(e => e.won).length;
+    const dist = [0, 0, 0, 0, 0];
+    entries.forEach(e => {
+      if (e.won && e.attempts >= 0 && e.attempts <= 3) dist[e.attempts]++;
+      else dist[4]++;
+    });
     const winDateSet = new Set(entries.filter(e => e.won).map(e => e.date));
     function seedForOffset(off) {
       const now = new Date();
@@ -971,479 +1343,18 @@ async function loadPersonalStats() {
       if (cur > maxStreak) maxStreak = cur;
       prev = t;
     }
-    // Today's check count: max attempts among today's rows (each check writes).
-    // Until the puzzle is completed only the "started" row (attempts=0) exists,
-    // so this stays meaningful only after a win.
-    const todayEntry = byDate.get(dailySeed);
-    const todayChecks = (todayEntry && todayEntry.attempts !== null) ? todayEntry.attempts : 0;
-    return { played, wins, currentStreak, maxStreak, todayChecks };
+    return { played, wins, currentStreak, maxStreak, dist };
   } catch (e) { return null; }
 }
 
-// Date display
-function updateDateTime() {
-  const now = new Date();
-  const opts = { timeZone: 'Europe/Istanbul' };
-  const en = I18N.isEnglish();
-  const locale = en ? 'en-US' : 'tr-TR';
-  const day = now.toLocaleDateString(locale, { ...opts, day: 'numeric' });
-  const month = now.toLocaleDateString(locale, { ...opts, month: 'long' });
-  const year = now.toLocaleDateString(locale, { ...opts, year: 'numeric' });
-  const weekday = now.toLocaleDateString(locale, { ...opts, weekday: 'long' });
-  const time = now.toLocaleTimeString(locale, { ...opts, hour: '2-digit', minute: '2-digit', hour12: en });
-
-  document.getElementById('date-line').textContent = (day + ' ' + month + ' ' + year).toUpperCase();
-  document.getElementById('day-line').textContent = weekday.toUpperCase();
-  document.getElementById('time-line').textContent = time;
-}
-updateDateTime();
-setInterval(updateDateTime, 60000);
-
-// Daily seed for puzzle rotation
-function getDailySeed() {
-  const now = new Date();
-  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-  return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
-}
-
-function getTimeUntilMidnight() {
-  const now = new Date();
-  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-  const tomorrow = new Date(ist);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
-  const diff = tomorrow - ist;
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  return I18N.formatCountdown(hours, minutes, { prefixTr: 'Yeni bulmaca', prefixEn: 'New puzzle in' });
-}
-
-// Multiple puzzles for daily rotation
-const PUZZLES = [
-  {
-    grid: [
-      ['A', 'N', 'K', 'A', 'R'],
-      ['I', null, 'I', null, 'A'],
-      ['R', null, 'T', null, 'K'],
-      [null, 'Ç', 'A', 'Y', null],
-      ['B', 'A', 'L', 'I', 'K']
-    ],
-    clues: {
-      across: [
-        { num: 1, clue: "Türkiye'nin başkenti" },
-        { num: 4, clue: 'Sabah içilen sıcak içecek' },
-        { num: 5, clue: 'Denizde yaşayan canlı' }
-      ],
-      down: [
-        { num: 1, clue: 'Yaz mevsiminde sıcak hava' },
-        { num: 2, clue: 'Kitap okunan yer' },
-        { num: 3, clue: 'Gece gökyüzünde parlayan' }
-      ]
-    }
-  },
-  {
-    grid: [
-      ['D', 'E', 'N', 'İ', 'Z'],
-      ['Ü', null, 'E', null, 'A'],
-      ['N', null, 'F', null, 'M'],
-      [null, 'G', 'E', 'C', 'E'],
-      ['A', 'Y', 'S', 'E', null]
-    ],
-    clues: {
-      across: [
-        { num: 1, clue: 'Tuzlu su kütlesi' },
-        { num: 4, clue: 'Güneşin battığı zaman' },
-        { num: 5, clue: 'Türk kadın ismi' }
-      ],
-      down: [
-        { num: 1, clue: 'Rüyaların görüldüğü yer' },
-        { num: 2, clue: 'Soluk alıp verme' },
-        { num: 3, clue: 'Yılın dönemleri' }
-      ]
-    }
-  },
-  {
-    grid: [
-      ['S', 'A', 'B', 'A', 'H'],
-      ['E', null, 'A', null, 'A'],
-      ['S', null, 'H', null, 'V'],
-      [null, 'K', 'Ç', 'E', null],
-      ['E', 'K', 'İ', 'N', null]
-    ],
-    clues: {
-      across: [
-        { num: 1, clue: 'Günün başlangıcı' },
-        { num: 4, clue: 'Nehir kenarındaki bitki örtüsü' },
-        { num: 5, clue: 'Tarlada yetişen ürün' }
-      ],
-      down: [
-        { num: 1, clue: 'Duyulan algı' },
-        { num: 2, clue: 'Meyve ve sebze yetişen yer' },
-        { num: 3, clue: 'Gökyüzündeki su' }
-      ]
-    }
-  },
-  {
-    grid: [
-      ['K', 'A', 'L', 'E', 'M'],
-      ['A', null, 'İ', null, 'A'],
-      ['P', null, 'M', null, 'S'],
-      [null, 'Y', 'O', 'L', null],
-      ['A', 'R', 'N', 'A', null]
-    ],
-    clues: {
-      across: [
-        { num: 1, clue: 'Yazı yazılan araç' },
-        { num: 4, clue: 'Gidilen güzergah' },
-        { num: 5, clue: 'Spor müsabakası yapılan yer' }
-      ],
-      down: [
-        { num: 1, clue: 'Gemi bağlanan yer' },
-        { num: 2, clue: 'Ekşi sarı meyve' },
-        { num: 3, clue: 'Ahşap malzeme' }
-      ]
-    }
-  },
-  {
-    grid: [
-      ['P', 'A', 'S', 'T', 'A'],
-      ['A', null, 'O', null, 'Ş'],
-      ['R', null, 'K', null, 'K'],
-      [null, 'T', 'A', 'Ş', null],
-      ['K', 'U', 'K', 'U', null]
-    ],
-    clues: {
-      across: [
-        { num: 1, clue: 'İtalyan yemeği' },
-        { num: 4, clue: 'Sert kayaç parçası' },
-        { num: 5, clue: 'Kuş türü, sesi ile bilinir' }
-      ],
-      down: [
-        { num: 1, clue: 'Paranın birimi' },
-        { num: 2, clue: 'Caddedeki yol' },
-        { num: 3, clue: 'Sevgi, tutku' }
-      ]
-    }
-  },
-  {
-    grid: [
-      ['V', 'A', 'P', 'U', 'R'],
-      ['A', null, 'A', null, 'Ü'],
-      ['T', null, 'Z', null, 'Z'],
-      [null, 'D', 'A', 'Ğ', null],
-      ['İ', 'N', 'R', 'E', null]
-    ],
-    clues: {
-      across: [
-        { num: 1, clue: 'Denizde yolcu taşıyan araç' },
-        { num: 4, clue: 'Yüksek arazi' },
-        { num: 5, clue: 'Kuyu veya mağara' }
-      ],
-      down: [
-        { num: 1, clue: 'Yurt, memleket' },
-        { num: 2, clue: 'Alışveriş merkezi' },
-        { num: 3, clue: 'Esinti' }
-      ]
-    }
-  },
-  {
-    grid: [
-      ['G', 'Ü', 'N', 'E', 'Ş'],
-      ['İ', null, 'E', null, 'E'],
-      ['T', null, 'F', null, 'H'],
-      [null, 'İ', 'E', 'Ş', null],
-      ['D', 'A', 'S', 'K', null]
-    ],
-    clues: {
-      across: [
-        { num: 1, clue: 'Gökyüzündeki yıldız' },
-        { num: 4, clue: 'Karşılıklı ilişki' },
-        { num: 5, clue: 'Okul mobilyası' }
-      ],
-      down: [
-        { num: 1, clue: 'Müzik aleti çalan' },
-        { num: 2, clue: 'Soluk alma' },
-        { num: 3, clue: 'Kent, il' }
-      ]
-    }
-  }
-];
-
-function seededRandom(seed) {
-  let x = 0;
-  for (let i = 0; i < seed.length; i++) {
-    x = ((x << 5) - x) + seed.charCodeAt(i);
-    x = x & x;
-  }
-  return Math.abs(x % PUZZLES.length);
-}
-
-const dailySeed = getDailySeed();
-const puzzleIndex = seededRandom(dailySeed);
-const todayPuzzle = PUZZLES[puzzleIndex];
-const PUZZLE = todayPuzzle.grid;
-const CLUES = todayPuzzle.clues;
-
-let activeCell = null;
-let gameCompleted = false;
-let checkAttempts = 0;
-const userAnswers = Array(5).fill(null).map(() => Array(5).fill(''));
-const SAVE_KEY = 'bulmaca_state_' + dailySeed;
-
-function createGrid() {
-  const grid = document.getElementById('crossword-grid');
-
-  for (let row = 0; row < 5; row++) {
-    for (let col = 0; col < 5; col++) {
-      const cell = document.createElement('div');
-
-      if (PUZZLE[row][col] === null) {
-        cell.className = 'crossword-cell black';
-      } else {
-        cell.className = 'crossword-cell';
-        cell.dataset.row = row;
-        cell.dataset.col = col;
-
-        if ((row === 0 && col === 0) ||
-            (row === 0 && col === 2) ||
-            (row === 1 && col === 0) ||
-            (row === 3 && col === 1) ||
-            (row === 4 && col === 0)) {
-          const num = document.createElement('span');
-          num.className = 'cell-number';
-          if (row === 0 && col === 0) num.textContent = '1';
-          if (row === 0 && col === 2) num.textContent = '3';
-          if (row === 1 && col === 0) num.textContent = '2';
-          if (row === 3 && col === 1) num.textContent = '4';
-          if (row === 4 && col === 0) num.textContent = '5';
-          cell.appendChild(num);
-        }
-
-        cell.onclick = () => selectCell(row, col);
-      }
-
-      grid.appendChild(cell);
-    }
-  }
-}
-
-function selectCell(row, col) {
-  document.querySelectorAll('.crossword-cell').forEach(c => c.classList.remove('active'));
-  activeCell = { row, col };
-  const cells = document.querySelectorAll('.crossword-cell');
-  cells[row * 5 + col].classList.add('active');
-}
-
-function updateCell(letter) {
-  if (!activeCell) return;
-  const { row, col } = activeCell;
-  userAnswers[row][col] = letter;
-
-  const cells = document.querySelectorAll('.crossword-cell');
-  const cell = cells[row * 5 + col];
-  const textNode = Array.from(cell.childNodes).find(n => n.nodeType === 3);
-  if (textNode) {
-    textNode.textContent = letter;
-  } else {
-    cell.appendChild(document.createTextNode(letter));
-  }
-}
-
-document.addEventListener('keydown', (e) => {
-  if (!activeCell || gameCompleted) return;
-
-  if (e.key.length === 1 && e.key.match(/[a-zçğıöşüA-ZÇĞİÖŞÜ]/)) {
-    updateCell(e.key.toUpperCase());
-    moveToNext();
-    markAsPlayed();
-    saveState();
-  } else if (e.key === 'Backspace') {
-    updateCell('');
-    saveState();
-  }
-});
-
-// Record an "in progress" game_results row on first interaction so Kahvehane
-// can show the game as played even when the user doesn't finish it today.
-async function markAsPlayed() {
-  const flagKey = 'bulmaca_started_' + dailySeed;
-  if (localStorage.getItem(flagKey)) return;
-  localStorage.setItem(flagKey, '1');
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) return;
-    const { error } = await sb.from('game_results').insert([{
-      user_id: session.user.id,
-      game: 'bulmaca',
-      date: dailySeed,
-      attempts: 0,
-      won: false,
-      neighborhood: userNeighborhood
-    }]);
-    if (error) console.error('[bulmaca markAsPlayed]', error);
-  } catch (e) { console.error('[bulmaca markAsPlayed]', e); }
-}
-
-function moveToNext() {
-  if (!activeCell) return;
-  let { row, col } = activeCell;
-
-  col++;
-  if (col >= 5) { col = 0; row++; }
-
-  if (row < 5) {
-    while (PUZZLE[row][col] === null) {
-      col++;
-      if (col >= 5) { col = 0; row++; }
-      if (row >= 5) return;
-    }
-    selectCell(row, col);
-  }
-}
-
-// Render clues
-function renderClues() {
-  const container = document.getElementById('clues-container');
-  let html = '<h3>Yatay</h3><div class="clue-list">';
-  CLUES.across.forEach(c => {
-    html += `<div class="clue"><span class="clue-number">${c.num}.</span><span>${c.clue}</span></div>`;
-  });
-  html += '</div><h3>Dikey</h3><div class="clue-list">';
-  CLUES.down.forEach(c => {
-    html += `<div class="clue"><span class="clue-number">${c.num}.</span><span>${c.clue}</span></div>`;
-  });
-  html += '</div>';
-  container.innerHTML = html;
-}
-
-// Save/restore state
-function saveState() {
-  const state = { userAnswers, gameCompleted, checkAttempts };
-  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-  saveStateRemote(state);
-}
-
-// Mirror to Supabase so the board syncs across devices.
-async function saveStateRemote(state) {
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) return;
-    const { error } = await sb.from('game_state').upsert({
-      user_id: session.user.id,
-      game: 'bulmaca',
-      date: dailySeed,
-      state,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id,game,date' });
-    if (error) console.error('[bulmaca saveStateRemote]', error);
-  } catch (e) { console.error('[bulmaca saveStateRemote]', e); }
-}
-
-async function restoreState() {
-  let raw = localStorage.getItem(SAVE_KEY);
-  if (!raw) {
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      if (session) {
-        const { data } = await sb.from('game_state')
-          .select('state')
-          .eq('user_id', session.user.id)
-          .eq('game', 'bulmaca')
-          .eq('date', dailySeed)
-          .maybeSingle();
-        if (data && data.state) {
-          raw = JSON.stringify(data.state);
-          localStorage.setItem(SAVE_KEY, raw);
-        }
-      }
-    } catch (e) { console.error('[bulmaca restoreState remote]', e); }
-  }
-  if (!raw) return false;
-  try {
-    const state = JSON.parse(raw);
-    if (!state.userAnswers) return false;
-    const cells = document.querySelectorAll('.crossword-cell');
-    for (let row = 0; row < 5; row++) {
-      for (let col = 0; col < 5; col++) {
-        if (PUZZLE[row][col] !== null) {
-          userAnswers[row][col] = state.userAnswers[row][col] || '';
-          const cell = cells[row * 5 + col];
-          const textNode = Array.from(cell.childNodes).find(n => n.nodeType === 3);
-          if (textNode) { textNode.textContent = userAnswers[row][col]; }
-          else if (userAnswers[row][col]) { cell.appendChild(document.createTextNode(userAnswers[row][col])); }
-          if (state.gameCompleted && userAnswers[row][col] === PUZZLE[row][col]) {
-            cell.classList.add('correct');
-          }
-        }
-      }
-    }
-    checkAttempts = state.checkAttempts || 0;
-    gameCompleted = state.gameCompleted || false;
-    if (gameCompleted) {
-      document.getElementById('game-message').textContent = 'Tebrikler! Tamamladınız!';
-      document.getElementById('game-message').style.color = 'var(--success)';
-      document.getElementById('reset-info').textContent = getTimeUntilMidnight();
-    }
-    return true;
-  } catch (e) { return false; }
-}
-
-// Check & clear buttons
-document.getElementById('check-btn').addEventListener('click', async () => {
-  if (gameCompleted) return;
-  checkAttempts++;
-  let allCorrect = true;
-  const cells = document.querySelectorAll('.crossword-cell:not(.black)');
-
-  cells.forEach(cell => {
-    const row = parseInt(cell.dataset.row);
-    const col = parseInt(cell.dataset.col);
-    if (userAnswers[row][col] === PUZZLE[row][col]) {
-      cell.classList.add('correct');
-    } else {
-      allCorrect = false;
-      cell.classList.remove('correct');
-    }
-  });
-
-  const msgEl = document.getElementById('game-message');
-  if (allCorrect) {
-    msgEl.textContent = 'Tebrikler! Tamamladınız!';
-    msgEl.style.color = 'var(--success)';
-    document.getElementById('reset-info').textContent = getTimeUntilMidnight();
-    gameCompleted = true;
-    // Insert the winning row first so renderStats() (Supabase-backed)
-    // reflects this game immediately. Streaks are derived from row data.
-    await recordGameResult('bulmaca', dailySeed, checkAttempts, true, userNeighborhood);
-    renderStats();
-  } else {
-    msgEl.textContent = 'Bazı cevaplar yanlış!';
-    msgEl.style.color = 'var(--accent)';
-  }
-  saveState();
-});
-
-document.getElementById('clear-btn').addEventListener('click', () => {
-  if (gameCompleted) return;
-  userAnswers.forEach((row, i) => row.forEach((_, j) => userAnswers[i][j] = ''));
-  document.querySelectorAll('.crossword-cell:not(.black)').forEach(cell => {
-    const textNode = Array.from(cell.childNodes).find(n => n.nodeType === 3);
-    if (textNode) textNode.textContent = '';
-    cell.classList.remove('correct');
-  });
-  document.getElementById('game-message').textContent = '';
-  saveState();
-});
-
-// Load community stats from Supabase. Returns null when no data for today.
+// ── Community stats ──
 async function loadCommunityStats() {
   try {
     const { data, error } = await sb.from('game_results')
       .select('user_id, attempts, won, neighborhood')
-      .eq('game', 'bulmaca')
+      .eq('game', 'tumcel')
       .eq('date', dailySeed);
     if (error || !data || data.length === 0) return null;
-    // Dedupe per user: best (lowest) attempts among winning rows.
     const byUser = new Map();
     data.forEach(r => {
       const prev = byUser.get(r.user_id) || { won: false, attempts: null, neighborhood: r.neighborhood };
@@ -1454,15 +1365,11 @@ async function loadCommunityStats() {
       }
       byUser.set(r.user_id, prev);
     });
-    const dist = [0, 0, 0, 0, 0]; // 1 check, 2 checks, 3 checks, 4+ checks, failed
+    const dist = [0, 0, 0, 0, 0];
     const districtMap = {};
     byUser.forEach(e => {
-      if (e.won) {
-        if (e.attempts <= 1) dist[0]++;
-        else if (e.attempts <= 2) dist[1]++;
-        else if (e.attempts <= 3) dist[2]++;
-        else dist[3]++;
-      } else { dist[4]++; }
+      if (e.won && e.attempts >= 0 && e.attempts <= 3) dist[e.attempts]++;
+      else dist[4]++;
       if (e.neighborhood) {
         if (!districtMap[e.neighborhood]) districtMap[e.neighborhood] = { wins: 0, total: 0 };
         districtMap[e.neighborhood].total++;
@@ -1474,16 +1381,12 @@ async function loadCommunityStats() {
       .sort((a, b) => b.pct - a.pct || b.total - a.total)
       .slice(0, 5);
     return { dist, topDistricts };
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
-// Stats rendering
+// ── Render stats ──
 async function renderStats() {
-  // Supabase is the source of truth. Cache the last payload so first paint
-  // isn't blank on slow networks.
-  const cacheKey = 'bulmaca_stats_cache';
+  const cacheKey = 'tumcel_stats_cache';
   let personal = await loadPersonalStats();
   if (personal) {
     localStorage.setItem(cacheKey, JSON.stringify(personal));
@@ -1493,9 +1396,11 @@ async function renderStats() {
   const played = personal ? personal.played : 0;
   const wins = personal ? personal.wins : 0;
   const streak = personal ? personal.currentStreak : 0;
-  const maxStreak = personal ? Math.max(personal.maxStreak, personal.currentStreak) : 0;
+  const displayMaxStreak = personal ? Math.max(personal.maxStreak, personal.currentStreak) : 0;
   const winPct = played > 0 ? Math.round(wins / played * 100) : 0;
-  const todayChecks = personal ? personal.todayChecks : 0;
+  const dist = personal ? personal.dist : [0, 0, 0, 0, 0];
+  const maxDist = Math.max(...dist, 1);
+  const distLabels = ['0 hata', '1 hata', '2 hata', '3 hata', 'Kaybetti'];
 
   const community = await loadCommunityStats();
   let communityHtml = '';
@@ -1506,17 +1411,17 @@ async function renderStats() {
     `;
   } else {
     const communityDist = community.dist;
-    const topDistricts = community.topDistricts;
     const totalCommunity = communityDist.reduce((a, b) => a + b, 0);
     const maxCommunityDist = Math.max(...communityDist, 1);
-    const labels = ['1 denemede', '2 denemede', '3 denemede', '4+ denemede', 'Bitiremedi'];
+    const topDistricts = community.topDistricts;
+    const communityLabels = ['0 hata', '1 hata', '2 hata', '3 hata', 'Kaybetti'];
     communityHtml = `
       <div><div class="panel-title">Günün İstatistikleri</div></div>
       ${communityDist.map((d, i) => {
         const pct = totalCommunity > 0 ? Math.round(d / totalCommunity * 100) : 0;
         return `
           <div class="dist-bar-wrap">
-            <span class="dist-label" style="min-width:56px;text-align:left;font-size:0.55rem;">${labels[i]}</span>
+            <span class="dist-label" style="min-width:46px;text-align:left;font-size:0.55rem;">${communityLabels[i]}</span>
             <div class="dist-bar-outer">
               <div class="dist-bar-inner" style="width:${d > 0 ? Math.max(d / maxCommunityDist * 100, 3) : 0}%"></div>
             </div>
@@ -1540,31 +1445,33 @@ async function renderStats() {
     <div><div class="panel-title">${I18N.t('games.personal')}</div></div>
     <div class="stat-tiles">
       <div class="stat-tile"><div class="num">${streak}</div><div class="label">${I18N.t('games.streak')}</div></div>
-      <div class="stat-tile"><div class="num">${maxStreak}</div><div class="label">${I18N.t('games.longest')}</div></div>
+      <div class="stat-tile"><div class="num">${displayMaxStreak}</div><div class="label">${I18N.t('games.longest')}</div></div>
       <div class="stat-tile"><div class="num">${played}</div><div class="label">${I18N.t('games.played')}</div></div>
       <div class="stat-tile"><div class="num">${winPct}%</div><div class="label">${I18N.t('games.winrate')}</div></div>
     </div>
-    <div class="stat-row">
-      <span class="stat-label">Bugün Kontrol</span>
-      <span class="stat-val">${todayChecks > 0 ? todayChecks : '—'}</span>
-    </div>
+    <div style="margin-top:4px;"><div class="panel-title">Hata Dağılımı</div></div>
+    ${dist.map((d, i) => `
+      <div class="dist-bar-wrap">
+        <span class="dist-label" style="min-width:46px;text-align:left;font-size:0.55rem;">${distLabels[i]}</span>
+        <div class="dist-bar-outer">
+          <div class="dist-bar-inner" style="width:${d > 0 ? Math.max(d / maxDist * 100, 5) : 0}%"></div>
+        </div>
+        <span class="dist-pct">${d}</span>
+      </div>
+    `).join('')}
     <div style="margin-top:6px;"></div>
     ${communityHtml}
   `;
 }
 
-// ── Weekly scoreboard (mirrors Kahvehane) ──
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => (
-    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
-  ));
-}
+// ── Weekly scoreboard ──
 function parseGameDate(s) {
   if (!s || typeof s !== 'string') return null;
   const parts = s.split('-').map(Number);
   if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
   return new Date(parts[0], parts[1] - 1, parts[2]);
 }
+
 async function loadScoreboard() {
   const listEl = document.getElementById('scoreboard-list');
   if (!listEl) return;
@@ -1627,7 +1534,7 @@ async function loadScoreboard() {
   }).join('');
 }
 
-// Mark games as started (light gray) or completed (dark gray) in side nav
+// ── Mark games as started/completed in side nav ──
 async function markPlayedGames() {
   const today = dailySeed;
   const started = new Set();
@@ -1659,17 +1566,32 @@ async function markPlayedGames() {
   });
 }
 
-// Init
-createGrid();
-renderClues();
+// ── Init ──
 (async () => {
-  await restoreState();
+  const puzzle = await loadTodaysPuzzle();
+  if (!puzzle) {
+    document.getElementById('words-grid').innerHTML = '';
+    document.getElementById('mistakes').textContent = '';
+    const statusEl = document.getElementById('game-status');
+    statusEl.textContent = 'Bugünkü bulmaca henüz hazır değil.';
+    statusEl.style.color = 'var(--muted)';
+    statusEl.style.fontWeight = '400';
+    document.getElementById('submit-btn').disabled = true;
+    renderStats();
+    loadScoreboard();
+    markPlayedGames();
+    return;
+  }
+
+  initGame(puzzle);
+  const restored = await restoreState();
+  if (!restored) renderFragments();
   renderStats();
   loadScoreboard();
   markPlayedGames();
 })();
 
-// ── Profile popup: opens when an author name is clicked ──
+// ── Profile popup ──
 (function initProfilePopup() {
   const overlay = document.createElement('div');
   overlay.className = 'profile-popup-overlay';
@@ -1691,9 +1613,8 @@ renderClues();
 
   function fmtDate(s) {
     if (!s) return '—';
-    try {
-      return I18N.formatDate(s, { year:'numeric', month:'long', day:'numeric' });
-    } catch { return '—'; }
+    try { return I18N.formatDate(s, { year:'numeric', month:'long', day:'numeric' }); }
+    catch { return '—'; }
   }
   function nbLabel(id) {
     if (!id) return '—';
