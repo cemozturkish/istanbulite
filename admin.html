@@ -1995,7 +1995,93 @@ async function saveSozcelDay(iso) {
 // ══════════════════════════════════════════
 // Tümcel: daily puzzle manager
 // ══════════════════════════════════════════
+// Pending member suggestions cached for the tab. Refreshed each time the
+// Tümcel tab is opened or the form is reset.
+let _tumcelPendingSuggestions = [];
+let _tumcelProfilesById = {};
+
+async function loadTumcelSuggestionPickers() {
+  const { data: suggestions } = await sb
+    .from('tumcel_quote_suggestions')
+    .select('id, body, source, suggested_by, suggested_at')
+    .eq('status', 'pending')
+    .order('suggested_at', { ascending: true });
+  _tumcelPendingSuggestions = suggestions || [];
+
+  const ids = [...new Set(_tumcelPendingSuggestions.map(s => s.suggested_by))];
+  _tumcelProfilesById = {};
+  if (ids.length > 0) {
+    const { data: profs } = await sb
+      .from('profiles')
+      .select('id, first_name, last_name, neighborhood')
+      .in('id', ids);
+    (profs || []).forEach(p => { _tumcelProfilesById[p.id] = p; });
+  }
+
+  function label(s) {
+    const p = _tumcelProfilesById[s.suggested_by];
+    const name = p ? ((`${p.first_name || ''} ${p.last_name || ''}`).trim() || 'İsimsiz') : 'üye';
+    const nb = p && p.neighborhood ? (NEIGHBORHOOD_NAMES[p.neighborhood] || p.neighborhood) : '';
+    const where = nb ? ` (${nb})` : '';
+    const short = s.body.length > 60 ? s.body.slice(0, 60) + '…' : s.body;
+    return `${name}${where}: “${short}” — ${s.source}`;
+  }
+
+  for (let i = 1; i <= 4; i++) {
+    const colorEl = document.getElementById(`tc-color-${i}`);
+    if (!colorEl) continue;
+    const headerRow = colorEl.closest('div');
+    // Insert the picker block once, just after the color row.
+    let pickWrap = document.getElementById(`tc-pick-wrap-${i}`);
+    if (!pickWrap) {
+      pickWrap = document.createElement('div');
+      pickWrap.id = `tc-pick-wrap-${i}`;
+      pickWrap.style.cssText = 'margin:8px 0;';
+      pickWrap.innerHTML = `
+        <label style="margin-top:0;">Öneriden seç (boş bırakırsan tümcül sen olursun)</label>
+        <select id="tc-pick-${i}"></select>
+        <div id="tc-suggested-body-${i}" style="display:none;margin-top:6px;padding:8px;background:var(--paper);border:1px solid var(--rule);font-family:'Source Serif 4',Georgia,serif;font-style:italic;font-size:0.85rem;line-height:1.4;"></div>
+        <input type="hidden" id="tc-suggestion-id-${i}"/>
+        <input type="hidden" id="tc-tumcul-id-${i}"/>
+      `;
+      headerRow.after(pickWrap);
+      const sel = pickWrap.querySelector(`#tc-pick-${i}`);
+      sel.addEventListener('change', () => onTumcelPickChange(i));
+    }
+    // Always refresh the options
+    const sel = document.getElementById(`tc-pick-${i}`);
+    const currentVal = sel.value;
+    sel.innerHTML = `<option value="">— Serbest giriş —</option>` +
+      _tumcelPendingSuggestions.map(s =>
+        `<option value="${s.id}" data-body="${escapeHtml(s.body)}" data-source="${escapeHtml(s.source)}" data-by="${escapeHtml(s.suggested_by)}">${escapeHtml(label(s))}</option>`
+      ).join('');
+    // Try to preserve selection when refreshing
+    if (currentVal && [...sel.options].some(o => o.value === currentVal)) sel.value = currentVal;
+  }
+}
+
+function onTumcelPickChange(i) {
+  const sel = document.getElementById(`tc-pick-${i}`);
+  const opt = sel.options[sel.selectedIndex];
+  const id = sel.value || '';
+  const body = opt.getAttribute('data-body') || '';
+  const source = opt.getAttribute('data-source') || '';
+  const by = opt.getAttribute('data-by') || '';
+  document.getElementById(`tc-suggestion-id-${i}`).value = id;
+  document.getElementById(`tc-tumcul-id-${i}`).value = by;
+  const helper = document.getElementById(`tc-suggested-body-${i}`);
+  if (id) {
+    document.getElementById(`tc-source-${i}`).value = source;
+    helper.style.display = 'block';
+    helper.textContent = '“' + body + '”';
+  } else {
+    helper.style.display = 'none';
+    helper.textContent = '';
+  }
+}
+
 async function loadTumcelPuzzles() {
+  await loadTumcelSuggestionPickers();
   const listEl = document.getElementById('tc-list');
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   const { data, error } = await sb
@@ -2044,6 +2130,21 @@ function fillTumcelForm(puzzle) {
       const el = document.getElementById(`tc-frag-${n}-${j + 1}`);
       if (el) el.value = f;
     });
+    const sIdEl = document.getElementById(`tc-suggestion-id-${n}`);
+    const tIdEl = document.getElementById(`tc-tumcul-id-${n}`);
+    const pickEl = document.getElementById(`tc-pick-${n}`);
+    if (sIdEl) sIdEl.value = q.suggestion_id || '';
+    if (tIdEl) tIdEl.value = q.tumcul_id || '';
+    if (pickEl) {
+      // Try to select the suggestion in the dropdown if it's still pending.
+      if (q.suggestion_id && [...pickEl.options].some(o => o.value === q.suggestion_id)) {
+        pickEl.value = q.suggestion_id;
+      } else {
+        pickEl.value = '';
+      }
+    }
+    const helper = document.getElementById(`tc-suggested-body-${n}`);
+    if (helper) { helper.style.display = 'none'; helper.textContent = ''; }
   });
   document.getElementById('tc-form-mode-label').textContent = 'Edit Tümcel Puzzle';
   document.getElementById('tc-cancel-btn').style.display = 'inline-block';
@@ -2064,6 +2165,14 @@ function resetTumcelForm() {
       const el = document.getElementById(`tc-frag-${i}-${j}`);
       if (el) el.value = '';
     }
+    const pickEl = document.getElementById(`tc-pick-${i}`);
+    if (pickEl) pickEl.value = '';
+    const sIdEl = document.getElementById(`tc-suggestion-id-${i}`);
+    if (sIdEl) sIdEl.value = '';
+    const tIdEl = document.getElementById(`tc-tumcul-id-${i}`);
+    if (tIdEl) tIdEl.value = '';
+    const helper = document.getElementById(`tc-suggested-body-${i}`);
+    if (helper) { helper.style.display = 'none'; helper.textContent = ''; }
   }
   document.getElementById('tc-form-mode-label').textContent = 'New Tümcel Puzzle';
   document.getElementById('tc-cancel-btn').style.display = 'none';
@@ -2085,6 +2194,7 @@ document.getElementById('tc-submit-btn').addEventListener('click', async () => {
   }
 
   const quotes = [];
+  const pickedSuggestionIds = [];
   for (let i = 1; i <= 4; i++) {
     const source = (document.getElementById(`tc-source-${i}`).value || '').trim();
     const color = document.getElementById(`tc-color-${i}`).value;
@@ -2097,7 +2207,17 @@ document.getElementById('tc-submit-btn').addEventListener('click', async () => {
       statusEl.className = 'status-msg err';
       return;
     }
-    quotes.push({ source, color, fragments });
+    const sIdEl = document.getElementById(`tc-suggestion-id-${i}`);
+    const tIdEl = document.getElementById(`tc-tumcul-id-${i}`);
+    const suggestion_id = sIdEl && sIdEl.value ? sIdEl.value : null;
+    let tumcul_id = tIdEl && tIdEl.value ? tIdEl.value : null;
+    if (!tumcul_id) {
+      // Free entry → admin becomes tümcül
+      const { data: { session } } = await sb.auth.getSession();
+      tumcul_id = session && session.user ? session.user.id : null;
+    }
+    if (suggestion_id) pickedSuggestionIds.push(suggestion_id);
+    quotes.push({ source, color, fragments, tumcul_id, suggestion_id });
   }
 
   statusEl.textContent = '';
@@ -2120,6 +2240,13 @@ document.getElementById('tc-submit-btn').addEventListener('click', async () => {
     statusEl.textContent = result.error.message;
     statusEl.className = 'status-msg err';
     return;
+  }
+  // Lock picked suggestions so the suggester can submit a new one and the
+  // picked quote stays globally reserved.
+  if (pickedSuggestionIds.length > 0) {
+    await sb.from('tumcel_quote_suggestions')
+      .update({ status: 'picked' })
+      .in('id', pickedSuggestionIds);
   }
   statusEl.textContent = editingDate ? 'Güncellendi!' : 'Kaydedildi!';
   statusEl.className = 'status-msg ok';
