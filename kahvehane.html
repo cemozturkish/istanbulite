@@ -419,6 +419,40 @@
     .game-link.completed::before { border-color: var(--brown-4); }
     .game-link.completed .game-link-subtitle { color: var(--paper-card); }
 
+    .game-link.locked {
+      cursor: not-allowed;
+      opacity: 0.45;
+      color: var(--muted);
+      border-color: var(--rule);
+    }
+    .game-link.locked::before { border-color: var(--rule); }
+    .game-link.locked .game-link-subtitle { color: var(--muted); }
+    .game-link.locked:hover {
+      background: var(--paper-warm);
+      transform: none;
+    }
+
+    #game-lock-toast {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: var(--paper);
+      padding: 12px 18px;
+      border: 2px solid var(--ink);
+      font-size: 0.82rem;
+      line-height: 1.4;
+      text-align: center;
+      max-width: 280px;
+      width: max-content;
+      z-index: 9999;
+      opacity: 0;
+      transition: opacity 0.25s;
+      pointer-events: none;
+    }
+    #game-lock-toast.visible { opacity: 1; }
+
     /* Home neighborhood badge shown in the post form */
     .home-nb-badge {
       display: inline-block;
@@ -1592,6 +1626,7 @@ async function init() {
 
   loadPosts(homeNeighborhood || null);
   markPlayedGames(session.user.id);
+  checkGameLocks(session.user.id);
   loadScoreboard();
 }
 
@@ -1782,6 +1817,60 @@ async function loadScoreboard() {
     );
   }).join('');
 }
+
+// ── Game lock checks ──
+// Tümcel requires 15 all-time Sözcel wins. Bulmaca requires at least 1 Tümcel win.
+// Locks are applied by adding the `.locked` class to the game-link element; clicks
+// on locked games are intercepted and a toast warning is shown instead.
+
+let _lockToastTimer = null;
+function showLockToast(msg) {
+  const el = document.getElementById('game-lock-toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(_lockToastTimer);
+  _lockToastTimer = setTimeout(() => el.classList.remove('visible'), 3500);
+}
+
+async function checkGameLocks(userId) {
+  let sozcelWins = 0;
+  let tumcelWon = false;
+  try {
+    const { data, error } = await sb
+      .from('game_results')
+      .select('game, won')
+      .eq('user_id', userId)
+      .in('game', ['sozcel', 'tumcel'])
+      .eq('won', true);
+    if (!error && data) {
+      sozcelWins = data.filter(r => r.game === 'sozcel').length;
+      tumcelWon = data.some(r => r.game === 'tumcel');
+    }
+  } catch (_) {}
+
+  const tumcelLink = document.querySelector('.game-link[data-game="tumcel"]');
+  const bulmacaLink = document.querySelector('.game-link[data-game="bulmaca"]');
+
+  if (tumcelLink && sozcelWins < 15) {
+    tumcelLink.classList.add('locked');
+    tumcelLink.dataset.lockMsg = `Tümcel'i oynayabilmek için Sözcel'de en az 15 sözcük bulmuş olman gerekiyor. (Şu an: ${sozcelWins}/15)`;
+  }
+  if (bulmacaLink && !tumcelWon) {
+    bulmacaLink.classList.add('locked');
+    bulmacaLink.dataset.lockMsg = 'Bulmaca\'yı oynayabilmek için önce Tümcel\'i kazanman gerekiyor.';
+  }
+}
+
+// Intercept clicks on locked game links — show toast, don't navigate.
+document.querySelectorAll('.game-link[data-game]').forEach(el => {
+  el.addEventListener('click', (e) => {
+    if (el.classList.contains('locked')) {
+      e.preventDefault();
+      showLockToast(el.dataset.lockMsg || 'Bu oyun şu an kilitli.');
+    }
+  });
+});
 
 init();
 
@@ -2266,5 +2355,8 @@ function showToast(text, kind) {
   });
 })();
 </script>
+
+<div id="game-lock-toast"></div>
+
 </body>
 </html>
