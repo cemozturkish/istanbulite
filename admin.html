@@ -2102,7 +2102,7 @@ async function saveSozcelDay(iso) {
   const definition = serializeDictEditor(iso);
 
   if (!/^[A-ZÇĞİÖŞÜ]{5}$/.test(word)) {
-    statusEl.textContent = 'Word must be exactly 5 Turkish letters.';
+    statusEl.textContent = 'Kelime tam 5 Türkçe harften oluşmalı.';
     statusEl.className = 'status-msg err';
     return;
   }
@@ -2117,48 +2117,28 @@ async function saveSozcelDay(iso) {
     .maybeSingle();
 
   let dbError;
-  let suggestionId = null;
-
   if (existing) {
-    // Row exists — only touch word + definition, leave sozcul_id as-is.
-    // This avoids the auth.users permission issue that fires on upsert.
+    // Update word + definition only — leave sozcul_id as-is.
     const { error } = await sb
       .from('sozcel_used_answers')
       .update({ word, definition })
       .eq('used_on', iso);
     dbError = error;
   } else {
-    // New row — resolve sozcul_id from a member suggestion if possible.
-    let sozculId = null;
-    const { data: suggestion } = await sb
-      .from('sozcel_word_suggestions')
-      .select('id, suggested_by')
-      .eq('word', word)
-      .maybeSingle();
-    if (suggestion && suggestion.suggested_by) {
-      sozculId = suggestion.suggested_by;
-      suggestionId = suggestion.id;
-    } else {
-      const { data: { session } } = await sb.auth.getSession();
-      sozculId = session && session.user ? session.user.id : null;
-    }
+    // Insert without sozcul_id to avoid FK permission issues.
+    // The game's pickDailyTarget() will assign sozcul_id on first play.
     const { error } = await sb
       .from('sozcel_used_answers')
-      .insert({ used_on: iso, word, sozcul_id: sozculId, definition });
+      .insert({ used_on: iso, word, definition });
     dbError = error;
   }
 
   if (dbError) {
-    statusEl.textContent = 'Error: ' + dbError.message;
+    statusEl.textContent = 'Hata: ' + dbError.message;
     statusEl.className = 'status-msg err';
     return;
   }
-  if (suggestionId) {
-    await sb.from('sozcel_word_suggestions')
-      .update({ status: 'picked' })
-      .eq('id', suggestionId);
-  }
-  statusEl.textContent = `Saved ${word} for ${iso}${suggestionId ? ' (sözcül assigned from suggestion)' : ''}.`;
+  statusEl.textContent = `${word} — ${iso} kaydedildi.`;
   statusEl.className = 'status-msg ok';
 }
 
