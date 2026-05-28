@@ -2,12 +2,15 @@
 // Shared mobile profile card widget.
 // Included by anahane.html, kahvehane.html, and kutuphane.html.
 //
-// Renders a compact card (avatar + name + neighborhood + DÜZENLE)
-// at the top of the page on mobile. Clicking DÜZENLE expands an
-// inline panel containing the edit form AND the HESAP (account
-// info + game scores) section in one go.
+// Renders a compact card (avatar + name + neighborhood + action button)
+// at the top of the page on mobile.
 //
-// Usage: IstProfileCard.mount({ sb, I18N });
+// Page-specific behaviour (set via opts.page):
+//   'anahane'   → AYARLAR button → language/theme sliders + ÇIKIŞ YAP
+//   'kutuphane' → DÜZENLE button → read-only HESAP info + game scores
+//   'kahvehane' → no button, no panel
+//
+// Usage: IstProfileCard.mount({ sb, I18N, page });
 // Assumes a <div id="ist-pc-mount"> exists in the page.
 // ══════════════════════════════════════════════════════════════
 (function (global) {
@@ -106,12 +109,12 @@
   async function mount(opts) {
     const sb = opts.sb;
     const I18N = opts.I18N;
+    const page = opts.page || 'anahane'; // 'anahane' | 'kahvehane' | 'kutuphane'
     const container = document.getElementById('ist-pc-mount');
     if (!container || !sb) return;
 
     // Only show on mobile — bail early on desktop to save Supabase calls.
     if (window.innerWidth > 768) {
-      // Listen for resize: if user rotates / resizes into mobile, mount then.
       let mounted = false;
       const onResize = () => {
         if (!mounted && window.innerWidth <= 768) {
@@ -156,7 +159,6 @@
       const languagePref = profile?.language_pref || 'default';
       const themePref = profile?.theme_pref || 'system';
       const avatarUrl = profile?.avatar_url || null;
-      const isAdmin = user.email === ADMIN_EMAIL;
 
       const yasadigiDisplay = yasadigi ? (NB_NAMES[yasadigi] || yasadigi) : '—';
       const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
@@ -164,12 +166,6 @@
       const lastSeenText = formatLastSeen(user.last_sign_in_at, I18N);
 
       const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
-
-      const districtOptions = Object.entries(NB_NAMES)
-        .filter(([id]) => id !== 'istanbul_disi')
-        .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
-        .map(([id, name]) => `<option value="${id}"${id === yasadigi ? ' selected' : ''}>${esc(name)}</option>`)
-        .join('');
 
       function avatarHTML() {
         return avatarUrl
@@ -204,39 +200,14 @@
         `;
       }
 
-      function panelHTML() {
-        const kefilLabel = kefilOfUser
-          ? esc(capitalizeName(`${kefilOfUser.first_name||''} ${kefilOfUser.last_name||''}`.trim()) || t('profile.unnamed'))
-          : '';
+      // ── AYARLAR panel (anahane): language/theme sliders + sign out ──
+      function ayarlarPanelHTML() {
         return `
           <div class="ist-pc-panel" id="ist-pc-panel">
           <div class="ist-pc-panel-inner">
-            <button type="button" class="ist-pc-panel-close" id="ist-pc-panel-close" aria-label="${esc(t('profile.cancel'))}">×</button>
-            <div class="ist-pc-section-title">${esc(t('profile.edit') || 'Düzenle')}</div>
+            <button type="button" class="ist-pc-panel-close" id="ist-pc-panel-close" aria-label="Kapat">×</button>
+            <div class="ist-pc-section-title">Ayarlar</div>
 
-            <div class="ist-pc-field">
-              <button type="button" class="ist-pc-avatar-btn" id="ist-pc-avatar-btn">${esc(t('profile.changephoto'))}</button>
-              <input type="file" id="ist-pc-avatar-input" accept="image/*" style="display:none;">
-            </div>
-
-            <div class="ist-pc-field">
-              <div class="ist-pc-label">${esc(t('profile.firstname'))}</div>
-              <input class="ist-pc-input" id="ist-pc-firstname" type="text" value="${esc(firstName)}">
-            </div>
-            <div class="ist-pc-field">
-              <div class="ist-pc-label">${esc(t('profile.lastname'))}</div>
-              <input class="ist-pc-input" id="ist-pc-lastname" type="text" value="${esc(lastName)}">
-            </div>
-            <div class="ist-pc-field">
-              <div class="ist-pc-label">${esc(t('profile.district'))}</div>
-              ${isAdmin
-                ? `<select class="ist-pc-select" id="ist-pc-yasadigi">${districtOptions}</select>`
-                : `<div class="ist-pc-display">${esc(yasadigiDisplay)}</div>`}
-            </div>
-            <div class="ist-pc-field">
-              <div class="ist-pc-label">${esc(t('profile.birthplace'))}</div>
-              <div class="ist-pc-display">${esc(dogumDisplay)}</div>
-            </div>
             <div class="ist-pc-field">
               <div class="ist-pc-label">${esc(t('profile.langpref'))}</div>
               <input class="ist-pc-slider" id="ist-pc-language" type="range" min="0" max="2" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
@@ -246,6 +217,7 @@
                 <span data-idx="2">Daha Türkçe</span>
               </div>
             </div>
+
             <div class="ist-pc-field">
               <div class="ist-pc-label">${esc(t('profile.appearance'))}</div>
               <input class="ist-pc-slider" id="ist-pc-theme" type="range" min="0" max="2" step="1" value="${THEME_VALUES.indexOf(themePref)}">
@@ -257,12 +229,43 @@
             </div>
 
             <div class="ist-pc-actions">
-              <button type="button" class="ist-pc-cancel" id="ist-pc-cancel">${esc(t('profile.cancel'))}</button>
               <button type="button" class="ist-pc-save" id="ist-pc-save">${esc(t('profile.save'))}</button>
             </div>
             <div class="ist-pc-msg" id="ist-pc-msg"></div>
 
+            <button type="button" class="ist-pc-signout" id="ist-pc-signout">${esc(t('profile.signout'))}</button>
+          </div>
+          </div>
+        `;
+      }
+
+      // ── DÜZENLE panel (kutuphane): read-only account info + game scores ──
+      function duzenlePanelHTML() {
+        const kefilLabel = kefilOfUser
+          ? esc(capitalizeName(`${kefilOfUser.first_name||''} ${kefilOfUser.last_name||''}`.trim()) || t('profile.unnamed'))
+          : '';
+        return `
+          <div class="ist-pc-panel" id="ist-pc-panel">
+          <div class="ist-pc-panel-inner">
+            <button type="button" class="ist-pc-panel-close" id="ist-pc-panel-close" aria-label="Kapat">×</button>
             <div class="ist-pc-section-title">${esc(t('profile.account'))}</div>
+
+            <div class="ist-pc-info-row">
+              <div class="ist-pc-info-label">${esc(t('profile.firstname'))}</div>
+              <div class="ist-pc-info-value">${esc(firstName || '—')}</div>
+            </div>
+            <div class="ist-pc-info-row">
+              <div class="ist-pc-info-label">${esc(t('profile.lastname'))}</div>
+              <div class="ist-pc-info-value">${esc(lastName || '—')}</div>
+            </div>
+            <div class="ist-pc-info-row">
+              <div class="ist-pc-info-label">${esc(t('profile.district'))}</div>
+              <div class="ist-pc-info-value">${esc(yasadigiDisplay)}</div>
+            </div>
+            <div class="ist-pc-info-row">
+              <div class="ist-pc-info-label">${esc(t('profile.birthplace'))}</div>
+              <div class="ist-pc-info-value">${esc(dogumDisplay)}</div>
+            </div>
             <div class="ist-pc-info-row">
               <div class="ist-pc-info-label">${esc(t('profile.email'))}</div>
               <div class="ist-pc-info-value">${esc(user.email)}</div>
@@ -300,12 +303,17 @@
 
             <div class="ist-pc-section-title">${esc(t('profile.gamescores') || 'Oyun Skorları')}</div>
             <div id="ist-pc-scores-mount">${scoresHTML({})}</div>
-
-            <button type="button" class="ist-pc-signout" id="ist-pc-signout">${esc(t('profile.signout'))}</button>
           </div>
           </div>
         `;
       }
+
+      // Button label by page
+      const toggleLabel = page === 'kutuphane' ? (t('profile.edit') || 'DÜZENLE')
+                        : page === 'anahane'   ? 'AYARLAR'
+                        : '';
+
+      const hasPanel = page === 'anahane' || page === 'kutuphane';
 
       container.innerHTML = `
         <div class="ist-pc" id="ist-pc-root">
@@ -315,11 +323,14 @@
               <div class="ist-pc-name">${esc(displayName)}</div>
               <div class="ist-pc-meta">${esc(yasadigiDisplay)}</div>
             </div>
-            <button type="button" class="ist-pc-toggle" id="ist-pc-toggle">${esc(t('profile.edit'))}</button>
+            ${hasPanel ? `<button type="button" class="ist-pc-toggle" id="ist-pc-toggle">${esc(toggleLabel)}</button>` : ''}
           </div>
-          ${panelHTML()}
+          ${page === 'anahane'   ? ayarlarPanelHTML() : ''}
+          ${page === 'kutuphane' ? duzenlePanelHTML() : ''}
         </div>
       `;
+
+      if (!hasPanel) return;
 
       const root = document.getElementById('ist-pc-root');
       const toggleBtn = document.getElementById('ist-pc-toggle');
@@ -332,7 +343,7 @@
       }
       function closePanel() {
         root.classList.remove('open');
-        toggleBtn.textContent = t('profile.edit');
+        toggleBtn.textContent = toggleLabel;
         document.body.style.overflow = '';
       }
 
@@ -341,131 +352,89 @@
         else openPanel();
       });
 
-      document.getElementById('ist-pc-cancel').addEventListener('click', closePanel);
       document.getElementById('ist-pc-panel-close').addEventListener('click', closePanel);
 
-      // Click on the backdrop (outside the inner panel) closes the modal.
       panel.addEventListener('click', (e) => {
         if (e.target === panel) closePanel();
       });
 
-      // Escape key closes the modal.
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && root.classList.contains('open')) closePanel();
       });
 
-      document.getElementById('ist-pc-signout').addEventListener('click', async () => {
-        await sb.auth.signOut();
-        window.location.href = 'index.html';
-      });
-
-      const copyBtn = document.getElementById('ist-pc-copy');
-      if (copyBtn) {
-        copyBtn.addEventListener('click', () => {
-          navigator.clipboard.writeText(referralCode);
-          const orig = copyBtn.textContent;
-          copyBtn.textContent = t('profile.copied');
-          setTimeout(() => copyBtn.textContent = orig, 1500);
-        });
-      }
-
-      // Sliders: highlight active tick + click-to-set
-      function syncTicks(sliderId, ticksId) {
-        const slider = document.getElementById(sliderId);
-        const ticks = document.getElementById(ticksId);
-        if (!slider || !ticks) return;
-        const update = () => {
-          const v = parseInt(slider.value, 10);
-          ticks.querySelectorAll('span').forEach(s => {
-            s.classList.toggle('active', parseInt(s.dataset.idx, 10) === v);
-          });
-        };
-        slider.addEventListener('input', update);
-        ticks.querySelectorAll('span').forEach(s => {
-          s.addEventListener('click', () => {
-            slider.value = s.dataset.idx;
-            slider.dispatchEvent(new Event('input'));
-          });
-        });
-        update();
-      }
-      syncTicks('ist-pc-language', 'ist-pc-language-ticks');
-      syncTicks('ist-pc-theme', 'ist-pc-theme-ticks');
-
-      // Avatar upload
-      const avatarBtn = document.getElementById('ist-pc-avatar-btn');
-      const avatarInput = document.getElementById('ist-pc-avatar-input');
-      avatarBtn.addEventListener('click', () => avatarInput.click());
-      avatarInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (file.size > 200 * 1024) {
-          alert("Fotoğraf 200KB'den küçük olmalı.");
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = async (evt) => {
-          const base64 = evt.target.result;
-          const { data, error } = await sb
-            .from('profiles')
-            .update({ avatar_url: base64 })
-            .eq('id', user.id)
-            .select('id');
-          if (error || !data || data.length === 0) {
-            alert('Fotoğraf kaydedilemedi.');
-            return;
-          }
-          document.getElementById('ist-pc-avatar').innerHTML = `<img src="${esc(base64)}" alt="">`;
-        };
-        reader.readAsDataURL(file);
-      });
-
-      // Save handler
-      document.getElementById('ist-pc-save').addEventListener('click', async () => {
-        const msgEl = document.getElementById('ist-pc-msg');
-        const btn = document.getElementById('ist-pc-save');
-        const newFirst = capitalizeName(document.getElementById('ist-pc-firstname').value.trim());
-        const newLast = capitalizeName(document.getElementById('ist-pc-lastname').value.trim());
-        const newLang = LANG_VALUES[parseInt(document.getElementById('ist-pc-language').value, 10)] || 'default';
-        const newTheme = THEME_VALUES[parseInt(document.getElementById('ist-pc-theme').value, 10)] || 'system';
-
-        btn.textContent = t('profile.saving');
-        btn.disabled = true;
-        msgEl.textContent = '';
-
-        try {
-          const payload = {
-            first_name: newFirst,
-            last_name: newLast,
-            language_pref: newLang,
-            theme_pref: newTheme,
+      if (page === 'anahane') {
+        // Sliders + save (language and theme only)
+        function syncTicks(sliderId, ticksId) {
+          const slider = document.getElementById(sliderId);
+          const ticks = document.getElementById(ticksId);
+          if (!slider || !ticks) return;
+          const update = () => {
+            const v = parseInt(slider.value, 10);
+            ticks.querySelectorAll('span').forEach(s => {
+              s.classList.toggle('active', parseInt(s.dataset.idx, 10) === v);
+            });
           };
-          if (isAdmin) {
-            const yEl = document.getElementById('ist-pc-yasadigi');
-            if (yEl && yEl.value) payload.neighborhood = yEl.value;
-          }
-          const { data, error } = await sb
-            .from('profiles')
-            .update(payload)
-            .eq('id', user.id)
-            .select('id');
-          if (error) throw error;
-          if (!data || data.length === 0) {
-            throw new Error('Profil bulunamadı.');
-          }
-          setTimeout(() => window.location.reload(), 400);
-        } catch (err) {
-          btn.textContent = t('profile.save');
-          btn.disabled = false;
-          msgEl.textContent = err.message || 'Kaydedilemedi.';
+          slider.addEventListener('input', update);
+          ticks.querySelectorAll('span').forEach(s => {
+            s.addEventListener('click', () => {
+              slider.value = s.dataset.idx;
+              slider.dispatchEvent(new Event('input'));
+            });
+          });
+          update();
         }
-      });
+        syncTicks('ist-pc-language', 'ist-pc-language-ticks');
+        syncTicks('ist-pc-theme', 'ist-pc-theme-ticks');
 
-      // Hydrate scores async
-      getGameScores(sb, user.id).then(scores => {
-        const m = document.getElementById('ist-pc-scores-mount');
-        if (m) m.innerHTML = scoresHTML(scores);
-      });
+        document.getElementById('ist-pc-save').addEventListener('click', async () => {
+          const msgEl = document.getElementById('ist-pc-msg');
+          const btn = document.getElementById('ist-pc-save');
+          const newLang = LANG_VALUES[parseInt(document.getElementById('ist-pc-language').value, 10)] || 'default';
+          const newTheme = THEME_VALUES[parseInt(document.getElementById('ist-pc-theme').value, 10)] || 'system';
+
+          btn.textContent = t('profile.saving');
+          btn.disabled = true;
+          msgEl.textContent = '';
+
+          try {
+            const { data, error } = await sb
+              .from('profiles')
+              .update({ language_pref: newLang, theme_pref: newTheme })
+              .eq('id', user.id)
+              .select('id');
+            if (error) throw error;
+            if (!data || data.length === 0) throw new Error('Profil bulunamadı.');
+            setTimeout(() => window.location.reload(), 400);
+          } catch (err) {
+            btn.textContent = t('profile.save');
+            btn.disabled = false;
+            msgEl.textContent = err.message || 'Kaydedilemedi.';
+          }
+        });
+
+        document.getElementById('ist-pc-signout').addEventListener('click', async () => {
+          await sb.auth.signOut();
+          window.location.href = 'index.html';
+        });
+      }
+
+      if (page === 'kutuphane') {
+        const copyBtn = document.getElementById('ist-pc-copy');
+        if (copyBtn) {
+          copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(referralCode);
+            const orig = copyBtn.textContent;
+            copyBtn.textContent = t('profile.copied');
+            setTimeout(() => copyBtn.textContent = orig, 1500);
+          });
+        }
+
+        // Hydrate scores async
+        getGameScores(sb, user.id).then(scores => {
+          const m = document.getElementById('ist-pc-scores-mount');
+          if (m) m.innerHTML = scoresHTML(scores);
+        });
+      }
     }
   }
 
