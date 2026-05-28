@@ -140,7 +140,8 @@
       border-right: var(--col-border);
       display: flex;
       flex-direction: column;
-      overflow-y: auto;
+      overflow: hidden;
+      min-height: 0;
     }
     .col-left .nb-highlight {
       padding: 12px 18px;
@@ -179,10 +180,141 @@
     .stats-left {
       display: flex;
       flex-direction: column;
-      padding: 10px 12px;
-      overflow-y: auto;
-      gap: 8px;
+      padding: 8px 10px;
+      gap: 6px;
+      flex: 0 0 auto;
+      overflow: hidden;
     }
+    .stats-row-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      align-items: start;
+    }
+    .stats-row-2col > .stats-col {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    .stats-row-2col .panel-title {
+      font-size: 0.5rem;
+      letter-spacing: 1.5px;
+      margin-bottom: 2px;
+    }
+    .stats-row-2col .dist-bar-wrap {
+      font-size: 0.55rem;
+      margin-bottom: 1px;
+      gap: 3px;
+    }
+    .stats-row-2col .dist-label {
+      min-width: 10px;
+      font-size: 0.5rem;
+    }
+    .stats-row-2col .dist-bar-outer { height: 8px; }
+    .stats-row-2col .dist-pct {
+      font-size: 0.5rem;
+      min-width: 18px;
+    }
+
+    /* Word suggestion section in the left column */
+    .suggest-section {
+      padding: 10px 12px;
+      border-top: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .suggest-section .panel-title { margin-bottom: 4px; }
+    .suggest-section .suggest-hint {
+      font-size: 0.62rem;
+      color: var(--muted);
+      font-style: italic;
+      line-height: 1.35;
+    }
+    .suggest-section .suggest-form {
+      display: flex;
+      gap: 4px;
+    }
+    .suggest-section input[type="text"] {
+      flex: 1;
+      min-width: 0;
+      padding: 6px 8px;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ink);
+      outline: none;
+    }
+    .suggest-section input[type="text"]:focus { border-color: var(--accent); }
+    .suggest-section button {
+      padding: 6px 10px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .suggest-section button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .suggest-section .suggest-status {
+      font-size: 0.62rem;
+      min-height: 14px;
+      font-style: italic;
+    }
+    .suggest-section .suggest-status.ok { color: var(--success); }
+    .suggest-section .suggest-status.err { color: var(--ink-red); }
+    .suggest-section .my-suggestions {
+      margin-top: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+    }
+    .suggest-section .my-suggestions .mine-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.62rem;
+      padding: 2px 0;
+      border-bottom: 1px solid var(--whisper);
+    }
+    .suggest-section .my-suggestions .mine-row:last-child { border-bottom: none; }
+    .suggest-section .my-suggestions .mine-word {
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .suggest-section .my-suggestions .mine-status { color: var(--muted); }
+    .suggest-section .my-suggestions .mine-status.picked { color: var(--success); font-weight: 700; }
+
+    /* Günün Sözcülü display below the game */
+    .sozcul-line {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+      text-align: center;
+      padding: 6px 12px;
+      border-top: 1px solid var(--hairline);
+      flex-shrink: 0;
+      min-height: 18px;
+    }
+    .sozcul-line .sozcul-tag { color: var(--muted); margin-right: 6px; }
+    .sozcul-line .sozcul-name { color: var(--ink-red); cursor: pointer; }
+    .sozcul-line .sozcul-name:hover { text-decoration: underline; }
 
     .panel-title {
       font-size: 0.55rem;
@@ -944,6 +1076,16 @@
   <aside class="col-left">
     <div class="nb-highlight" id="user-nb-badge"></div>
     <section class="stats-left" id="stats-left"></section>
+    <section class="suggest-section" id="suggest-section">
+      <div class="panel-title">Sözcük Öner</div>
+      <div class="suggest-hint">5 harfli bir Türkçe sözcük önerin. Yöneticinin seçtiği gün, sözcüğü ilk öneren üye günün sözcülü olur.</div>
+      <div class="suggest-form">
+        <input type="text" id="suggest-input" maxlength="5" placeholder="5 HARF" autocomplete="off"/>
+        <button type="button" id="suggest-btn">Öner</button>
+      </div>
+      <div class="suggest-status" id="suggest-status"></div>
+      <div class="my-suggestions" id="my-suggestions"></div>
+    </section>
   </aside>
 
   <div class="section-rule">
@@ -975,6 +1117,7 @@
       <div class="game-message" id="game-message"></div>
       <div class="reset-info" id="reset-info"></div>
       <div class="keyboard" id="keyboard"></div>
+      <div class="sozcul-line" id="sozcul-line"></div>
     </section>
   </main>
 
@@ -2767,67 +2910,70 @@ async function renderStats() {
   const dist = distFull.slice(0, 6);
   const maxDist = Math.max(...dist, 1);
 
-  // Community stats fetched in parallel; rendered compactly under the personal block.
+  // Community stats fetched in parallel; rendered side-by-side with personal distribution.
   const community = await loadCommunityStats();
-  let communityHtml = '';
-  if (!community) {
-    communityHtml = `
-      <div><div class="panel-title">Günün İstatistikleri</div></div>
-      <div class="stat-row"><span class="stat-label">Henüz veri yok</span></div>
-    `;
-  } else {
-    const communityDist = community.dist;
-    const totalCommunity = communityDist.reduce((a, b) => a + b, 0);
-    const maxCommunityDist = Math.max(...communityDist, 1);
-    const topDistricts = community.topDistricts;
-    communityHtml = `
-      <div><div class="panel-title">Günün İstatistikleri</div></div>
-      ${communityDist.map((d, i) => {
+  const communityDist = community ? community.dist : [0,0,0,0,0,0,0];
+  const totalCommunity = communityDist.reduce((a, b) => a + b, 0);
+  const maxCommunityDist = Math.max(...communityDist, 1);
+  const topDistricts = community ? community.topDistricts : [];
+
+  const communityColHtml = community
+    ? communityDist.map((d, i) => {
         const pct = totalCommunity > 0 ? Math.round(d / totalCommunity * 100) : 0;
-        const label = i < 6 ? (i + 1) + '. tahmin' : 'Bilemedi';
+        const label = i < 6 ? (i + 1) : 'X';
         return `
           <div class="dist-bar-wrap">
-            <span class="dist-label" style="min-width:50px;text-align:left;font-size:0.55rem;">${label}</span>
+            <span class="dist-label">${label}</span>
             <div class="dist-bar-outer">
               <div class="dist-bar-inner" style="width:${d > 0 ? Math.max(d / maxCommunityDist * 100, 3) : 0}%"></div>
             </div>
             <span class="dist-pct">${pct}%</span>
           </div>
         `;
-      }).join('')}
-      <div style="margin-top:4px;"><div class="panel-title">En Başarılı İlçeler</div></div>
-      ${topDistricts.length === 0
-        ? `<div class="stat-row"><span class="stat-label">Henüz veri yok</span></div>`
-        : topDistricts.map((d, i) => `
-          <div class="district-rank">
-            <span class="rank-name">${i + 1}. ${d.name}</span>
-            <span class="rank-pct">${d.pct}%</span>
-          </div>
-        `).join('')}
-    `;
-  }
+      }).join('')
+    : `<div class="stat-row"><span class="stat-label">Henüz veri yok</span></div>`;
 
-  // Left panel: personal stats (compact) + community stats (compact)
+  const topDistrictsHtml = `
+    <div style="margin-top:6px;"><div class="panel-title">En Başarılı İlçeler</div></div>
+    ${topDistricts.length === 0
+      ? `<div class="stat-row"><span class="stat-label">Henüz veri yok</span></div>`
+      : topDistricts.map((d, i) => `
+        <div class="district-rank">
+          <span class="rank-name">${i + 1}. ${d.name}</span>
+          <span class="rank-pct">${d.pct}%</span>
+        </div>
+      `).join('')}
+  `;
+
+  // Left panel: stat tiles on top, then Tahmin Dağılımı side-by-side with
+  // Günün İstatistikleri (both clipped to the height of the personal
+  // distribution), then En Başarılı İlçeler.
   document.getElementById('stats-left').innerHTML = `
-    <div><div class="panel-title">${I18N.t('games.personal')}</div></div>
     <div class="stat-tiles">
       <div class="stat-tile"><div class="num">${streak}</div><div class="label">${I18N.t('games.streak')}</div></div>
       <div class="stat-tile"><div class="num">${displayMaxStreak}</div><div class="label">${I18N.t('games.longest')}</div></div>
       <div class="stat-tile"><div class="num">${played}</div><div class="label">${I18N.t('games.played')}</div></div>
       <div class="stat-tile"><div class="num">${winPct}%</div><div class="label">${I18N.t('games.winrate')}</div></div>
     </div>
-    <div style="margin-top:4px;"><div class="panel-title">${I18N.t('games.distribution')}</div></div>
-    ${dist.map((d, i) => `
-      <div class="dist-bar-wrap">
-        <span class="dist-label">${i + 1}</span>
-        <div class="dist-bar-outer">
-          <div class="dist-bar-inner" style="width:${d > 0 ? Math.max(d / maxDist * 100, 5) : 0}%"></div>
-        </div>
-        <span class="dist-pct">${d}</span>
+    <div class="stats-row-2col">
+      <div class="stats-col">
+        <div class="panel-title">${I18N.t('games.distribution')}</div>
+        ${dist.map((d, i) => `
+          <div class="dist-bar-wrap">
+            <span class="dist-label">${i + 1}</span>
+            <div class="dist-bar-outer">
+              <div class="dist-bar-inner" style="width:${d > 0 ? Math.max(d / maxDist * 100, 5) : 0}%"></div>
+            </div>
+            <span class="dist-pct">${d}</span>
+          </div>
+        `).join('')}
       </div>
-    `).join('')}
-    <div style="margin-top:6px;"></div>
-    ${communityHtml}
+      <div class="stats-col">
+        <div class="panel-title">Günün İstatistikleri</div>
+        ${communityColHtml}
+      </div>
+    </div>
+    ${topDistrictsHtml}
   `;
 }
 
@@ -3039,7 +3185,141 @@ initKeyboard();
   renderStats();
   loadScoreboard();
   markPlayedGames();
+  loadSozculOfTheDay();
+  initSuggestionForm();
+  loadMySuggestions();
 })();
+
+// ── Günün Sözcülü: shows whoever's suggestion the admin picked today,
+// or the admin themselves if nobody suggested it. ──
+function turkishLocative(name) {
+  if (!name) return '';
+  const upper = name.toLocaleUpperCase('tr-TR');
+  const backVowels = new Set(['A', 'I', 'O', 'U']);
+  const frontVowels = new Set(['E', 'İ', 'Ö', 'Ü']);
+  let lastVowel = null;
+  for (let i = upper.length - 1; i >= 0; i--) {
+    if (backVowels.has(upper[i]) || frontVowels.has(upper[i])) { lastVowel = upper[i]; break; }
+  }
+  const lastChar = upper[upper.length - 1];
+  const voiceless = new Set(['P', 'Ç', 'T', 'K', 'S', 'Ş', 'H', 'F']);
+  const suffixVowel = lastVowel && backVowels.has(lastVowel) ? 'A' : 'E';
+  const d = voiceless.has(lastChar) ? 'T' : 'D';
+  return upper + d + suffixVowel + 'N';
+}
+
+async function loadSozculOfTheDay() {
+  const el = document.getElementById('sozcul-line');
+  if (!el) return;
+  try {
+    const today = getIstanbulDateISO();
+    const { data, error } = await sb
+      .from('sozcel_used_answers')
+      .select('sozcul_id')
+      .eq('used_on', today)
+      .maybeSingle();
+    if (error || !data || !data.sozcul_id) { el.innerHTML = ''; return; }
+    const { data: prof } = await sb
+      .from('profiles')
+      .select('id, first_name, neighborhood')
+      .eq('id', data.sozcul_id)
+      .maybeSingle();
+    if (!prof) { el.innerHTML = ''; return; }
+    const firstName = (prof.first_name || 'İSİMSİZ').toLocaleUpperCase('tr-TR');
+    const nbId = prof.neighborhood;
+    const nbName = (typeof neighborhoodNames !== 'undefined' && neighborhoodNames[nbId]) || nbId || '';
+    const label = nbName ? `${turkishLocative(nbName)} ${firstName}` : firstName;
+    el.innerHTML = `<span class="sozcul-tag">Günün Sözcülü:</span><span class="sozcul-name author-link" data-user-id="${prof.id}">${escapeHtml(label)}</span>`;
+  } catch (e) {
+    el.innerHTML = '';
+  }
+}
+
+// ── Word suggestion form ──
+function initSuggestionForm() {
+  const input = document.getElementById('suggest-input');
+  const btn = document.getElementById('suggest-btn');
+  const statusEl = document.getElementById('suggest-status');
+  if (!input || !btn) return;
+
+  input.addEventListener('input', () => {
+    input.value = input.value.toLocaleUpperCase('tr-TR').replace(/[^A-ZÇĞİÖŞÜ]/g, '').slice(0, 5);
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); btn.click(); }
+  });
+
+  btn.addEventListener('click', async () => {
+    const word = input.value.toLocaleUpperCase('tr-TR');
+    statusEl.textContent = '';
+    statusEl.className = 'suggest-status';
+    if (!/^[A-ZÇĞİÖŞÜ]{5}$/.test(word)) {
+      statusEl.textContent = 'Sözcük 5 Türkçe harf olmalı.';
+      statusEl.className = 'suggest-status err';
+      return;
+    }
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      statusEl.textContent = 'Önce giriş yapın.';
+      statusEl.className = 'suggest-status err';
+      return;
+    }
+    btn.disabled = true;
+    const { error } = await sb
+      .from('sozcel_word_suggestions')
+      .insert({ word, suggested_by: session.user.id });
+    btn.disabled = false;
+    if (error) {
+      // Unique violation = already suggested by this user
+      if (String(error.code) === '23505' || /duplicate/i.test(error.message || '')) {
+        statusEl.textContent = 'Bu sözcüğü zaten önerdiniz.';
+      } else {
+        statusEl.textContent = 'Hata: ' + error.message;
+      }
+      statusEl.className = 'suggest-status err';
+      return;
+    }
+    input.value = '';
+    statusEl.textContent = 'Önerildi.';
+    statusEl.className = 'suggest-status ok';
+    loadMySuggestions();
+  });
+}
+
+async function loadMySuggestions() {
+  const wrap = document.getElementById('my-suggestions');
+  if (!wrap) return;
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { wrap.innerHTML = ''; return; }
+    const { data: mine, error } = await sb
+      .from('sozcel_word_suggestions')
+      .select('word, suggested_at')
+      .eq('suggested_by', session.user.id)
+      .order('suggested_at', { ascending: false })
+      .limit(20);
+    if (error || !mine || mine.length === 0) { wrap.innerHTML = ''; return; }
+    const words = mine.map(r => r.word);
+    const { data: picks } = await sb
+      .from('sozcel_used_answers')
+      .select('word, used_on, sozcul_id')
+      .in('word', words)
+      .eq('sozcul_id', session.user.id);
+    const pickedMap = {};
+    (picks || []).forEach(p => { pickedMap[p.word] = p.used_on; });
+    wrap.innerHTML = mine.map(r => {
+      const picked = pickedMap[r.word];
+      return `
+        <div class="mine-row">
+          <span class="mine-word">${escapeHtml(r.word)}</span>
+          <span class="mine-status${picked ? ' picked' : ''}">${picked ? 'Seçildi · ' + picked : 'Beklemede'}</span>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    wrap.innerHTML = '';
+  }
+}
 
 // ── Disable browser zoom (Ctrl+wheel, Ctrl+=/-/0, pinch gestures) ──
 window.addEventListener('wheel', (e) => {
@@ -3116,9 +3396,10 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
     const initial = (fullName.charAt(0) || '?').toUpperCase();
     const avatar = data.avatar_url ? `<img src="${data.avatar_url}" alt="">` : initial;
     const birth = nbLabel(data.birth_place);
+    const upperName = fullName.toLocaleUpperCase('tr-TR');
     body.innerHTML = `
       <div class="pp-avatar">${avatar}</div>
-      <div class="pp-name">${fullName}</div>
+      <div class="pp-name">${upperName}</div>
       <div class="pp-meta">${nbLabel(data.neighborhood)}</div>
       <div class="pp-row"><span class="pp-label">Doğum Yeri</span><span class="pp-value">${birth}</span></div>
       <div class="pp-row"><span class="pp-label">Üyelik</span><span class="pp-value">${fmtDate(data.joined_at)}</span></div>
