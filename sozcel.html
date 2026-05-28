@@ -297,6 +297,38 @@
     }
     .suggest-section .my-suggestions .mine-status { color: var(--muted); }
     .suggest-section .my-suggestions .mine-status.picked { color: var(--success); font-weight: 700; }
+    .suggest-section .pending-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      background: var(--paper-dark);
+      border: 1px solid var(--rule);
+    }
+    .suggest-section .pending-row .pending-word {
+      flex: 1;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--ink);
+    }
+    .suggest-section .pending-row .pending-label {
+      font-size: 0.55rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-right: 4px;
+    }
+    .suggest-section .pending-row button {
+      padding: 5px 9px;
+      background: transparent;
+      color: var(--ink-red);
+      border: 1px solid var(--ink-red);
+      font-size: 0.6rem;
+    }
+    .suggest-section .pending-row button:hover { background: var(--ink-red); color: var(--paper); }
 
     /* Günün Sözcülü display below the game */
     .sozcul-line {
@@ -1078,11 +1110,8 @@
     <section class="stats-left" id="stats-left"></section>
     <section class="suggest-section" id="suggest-section">
       <div class="panel-title">Sözcük Öner</div>
-      <div class="suggest-hint">5 harfli bir Türkçe sözcük önerin. Yöneticinin seçtiği gün, sözcüğü ilk öneren üye günün sözcülü olur.</div>
-      <div class="suggest-form">
-        <input type="text" id="suggest-input" maxlength="5" placeholder="5 HARF" autocomplete="off"/>
-        <button type="button" id="suggest-btn">Öner</button>
-      </div>
+      <div class="suggest-hint">Bekleyen tek bir öneri tutabilirsiniz. Vazgeçip yenisini önerebilirsiniz. Bir sözcüğü başka bir üye önerdiyse aynı sözcük tekrar önerilemez.</div>
+      <div id="suggest-body"></div>
       <div class="suggest-status" id="suggest-status"></div>
       <div class="my-suggestions" id="my-suggestions"></div>
     </section>
@@ -3236,54 +3265,122 @@ async function loadSozculOfTheDay() {
 }
 
 // ── Word suggestion form ──
+// One pending suggestion per user. Cancel deletes it. A word can be
+// suggested only once globally (pending or already picked).
 function initSuggestionForm() {
+  renderSuggestionPanel();
+}
+
+function setSuggestStatus(text, kind) {
+  const statusEl = document.getElementById('suggest-status');
+  if (!statusEl) return;
+  statusEl.textContent = text || '';
+  statusEl.className = 'suggest-status' + (kind ? ' ' + kind : '');
+}
+
+async function getMyPending() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return { session: null, pending: null };
+  const { data } = await sb
+    .from('sozcel_word_suggestions')
+    .select('id, word, status')
+    .eq('suggested_by', session.user.id)
+    .eq('status', 'pending')
+    .maybeSingle();
+  return { session, pending: data || null };
+}
+
+async function renderSuggestionPanel() {
+  const body = document.getElementById('suggest-body');
+  if (!body) return;
+  const { session, pending } = await getMyPending();
+  if (!session) {
+    body.innerHTML = `<div class="suggest-hint">Öneri için giriş yapın.</div>`;
+    return;
+  }
+  if (pending) {
+    body.innerHTML = `
+      <div class="pending-row">
+        <span class="pending-label">Beklemede</span>
+        <span class="pending-word">${escapeHtml(pending.word)}</span>
+        <button type="button" id="suggest-cancel-btn" data-id="${pending.id}">Vazgeç</button>
+      </div>
+    `;
+    document.getElementById('suggest-cancel-btn').addEventListener('click', cancelPending);
+  } else {
+    body.innerHTML = `
+      <div class="suggest-form">
+        <input type="text" id="suggest-input" maxlength="5" placeholder="5 HARF" autocomplete="off"/>
+        <button type="button" id="suggest-btn">Öner</button>
+      </div>
+    `;
+    const input = document.getElementById('suggest-input');
+    const btn = document.getElementById('suggest-btn');
+    input.addEventListener('input', () => {
+      input.value = input.value.toLocaleUpperCase('tr-TR').replace(/[^A-ZÇĞİÖŞÜ]/g, '').slice(0, 5);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); btn.click(); }
+    });
+    btn.addEventListener('click', submitSuggestion);
+  }
+  loadMySuggestions();
+}
+
+async function cancelPending(e) {
+  const id = e.currentTarget.getAttribute('data-id');
+  if (!id) return;
+  setSuggestStatus('', null);
+  const { error } = await sb.from('sozcel_word_suggestions').delete().eq('id', id);
+  if (error) {
+    setSuggestStatus('Vazgeçilemedi: ' + error.message, 'err');
+    return;
+  }
+  setSuggestStatus('Vazgeçildi.', 'ok');
+  renderSuggestionPanel();
+}
+
+async function submitSuggestion() {
   const input = document.getElementById('suggest-input');
   const btn = document.getElementById('suggest-btn');
-  const statusEl = document.getElementById('suggest-status');
   if (!input || !btn) return;
-
-  input.addEventListener('input', () => {
-    input.value = input.value.toLocaleUpperCase('tr-TR').replace(/[^A-ZÇĞİÖŞÜ]/g, '').slice(0, 5);
-  });
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); btn.click(); }
-  });
-
-  btn.addEventListener('click', async () => {
-    const word = input.value.toLocaleUpperCase('tr-TR');
-    statusEl.textContent = '';
-    statusEl.className = 'suggest-status';
-    if (!/^[A-ZÇĞİÖŞÜ]{5}$/.test(word)) {
-      statusEl.textContent = 'Sözcük 5 Türkçe harf olmalı.';
-      statusEl.className = 'suggest-status err';
-      return;
-    }
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) {
-      statusEl.textContent = 'Önce giriş yapın.';
-      statusEl.className = 'suggest-status err';
-      return;
-    }
-    btn.disabled = true;
-    const { error } = await sb
-      .from('sozcel_word_suggestions')
-      .insert({ word, suggested_by: session.user.id });
-    btn.disabled = false;
-    if (error) {
-      // Unique violation = already suggested by this user
-      if (String(error.code) === '23505' || /duplicate/i.test(error.message || '')) {
-        statusEl.textContent = 'Bu sözcüğü zaten önerdiniz.';
+  const word = input.value.toLocaleUpperCase('tr-TR');
+  setSuggestStatus('', null);
+  if (!/^[A-ZÇĞİÖŞÜ]{5}$/.test(word)) {
+    setSuggestStatus('Sözcük 5 Türkçe harf olmalı.', 'err');
+    return;
+  }
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    setSuggestStatus('Önce giriş yapın.', 'err');
+    return;
+  }
+  btn.disabled = true;
+  const { error } = await sb
+    .from('sozcel_word_suggestions')
+    .insert({ word, suggested_by: session.user.id });
+  btn.disabled = false;
+  if (error) {
+    if (String(error.code) === '23505' || /duplicate/i.test(error.message || '')) {
+      // Could be the global word-unique index or the one-pending-per-user
+      // index. Check which to give the right message.
+      const { data: existing } = await sb
+        .from('sozcel_word_suggestions')
+        .select('suggested_by')
+        .eq('word', word)
+        .maybeSingle();
+      if (existing && existing.suggested_by && existing.suggested_by !== session.user.id) {
+        setSuggestStatus('Bu sözcüğü başka bir üye zaten önerdi.', 'err');
       } else {
-        statusEl.textContent = 'Hata: ' + error.message;
+        setSuggestStatus('Bekleyen bir öneriniz zaten var. Önce vazgeçin.', 'err');
       }
-      statusEl.className = 'suggest-status err';
-      return;
+    } else {
+      setSuggestStatus('Hata: ' + error.message, 'err');
     }
-    input.value = '';
-    statusEl.textContent = 'Önerildi.';
-    statusEl.className = 'suggest-status ok';
-    loadMySuggestions();
-  });
+    return;
+  }
+  setSuggestStatus('Önerildi.', 'ok');
+  renderSuggestionPanel();
 }
 
 async function loadMySuggestions() {
@@ -3292,30 +3389,20 @@ async function loadMySuggestions() {
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { wrap.innerHTML = ''; return; }
-    const { data: mine, error } = await sb
-      .from('sozcel_word_suggestions')
-      .select('word, suggested_at')
-      .eq('suggested_by', session.user.id)
-      .order('suggested_at', { ascending: false })
-      .limit(20);
-    if (error || !mine || mine.length === 0) { wrap.innerHTML = ''; return; }
-    const words = mine.map(r => r.word);
+    // Past wins: picked suggestions where this user is credited as sözcül.
     const { data: picks } = await sb
       .from('sozcel_used_answers')
-      .select('word, used_on, sozcul_id')
-      .in('word', words)
-      .eq('sozcul_id', session.user.id);
-    const pickedMap = {};
-    (picks || []).forEach(p => { pickedMap[p.word] = p.used_on; });
-    wrap.innerHTML = mine.map(r => {
-      const picked = pickedMap[r.word];
-      return `
-        <div class="mine-row">
-          <span class="mine-word">${escapeHtml(r.word)}</span>
-          <span class="mine-status${picked ? ' picked' : ''}">${picked ? 'Seçildi · ' + picked : 'Beklemede'}</span>
-        </div>
-      `;
-    }).join('');
+      .select('word, used_on')
+      .eq('sozcul_id', session.user.id)
+      .order('used_on', { ascending: false })
+      .limit(10);
+    if (!picks || picks.length === 0) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = picks.map(p => `
+      <div class="mine-row">
+        <span class="mine-word">${escapeHtml(p.word)}</span>
+        <span class="mine-status picked">Sözcül · ${p.used_on}</span>
+      </div>
+    `).join('');
   } catch (e) {
     wrap.innerHTML = '';
   }
