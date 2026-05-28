@@ -1834,15 +1834,33 @@ async function saveSozcelDay(iso) {
   }
 
   input.value = word;
+
+  // Sözcül: the earliest member to have suggested this word, or — if nobody
+  // suggested it — the admin themselves.
+  let sozculId = null;
+  const { data: suggestion } = await sb
+    .from('sozcel_word_suggestions')
+    .select('suggested_by, suggested_at')
+    .eq('word', word)
+    .order('suggested_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (suggestion && suggestion.suggested_by) {
+    sozculId = suggestion.suggested_by;
+  } else {
+    const { data: { session } } = await sb.auth.getSession();
+    sozculId = session && session.user ? session.user.id : null;
+  }
+
   const { error } = await sb
     .from('sozcel_used_answers')
-    .upsert({ used_on: iso, word }, { onConflict: 'used_on' });
+    .upsert({ used_on: iso, word, sozcul_id: sozculId }, { onConflict: 'used_on' });
   if (error) {
     statusEl.textContent = 'Error: ' + error.message;
     statusEl.className = 'status-msg err';
     return;
   }
-  statusEl.textContent = `Saved ${word} for ${iso}.`;
+  statusEl.textContent = `Saved ${word} for ${iso}${sozculId ? ' (sözcül assigned)' : ''}.`;
   statusEl.className = 'status-msg ok';
 }
 
