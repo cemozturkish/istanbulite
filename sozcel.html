@@ -826,24 +826,65 @@
       text-align: left;
       border-top: 1px solid var(--hairline);
       border-bottom: 1px solid var(--hairline);
-      padding: 10px 12px;
+      padding: 12px 14px;
       margin-bottom: 14px;
     }
-    .result-dict-entry .dict-headword {
+    .dict-headword {
       font-family: 'Source Serif 4', Georgia, serif;
-      font-size: 1rem;
+      font-size: 1.1rem;
       font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
       color: var(--ink);
-      margin-bottom: 4px;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
     }
-    .result-dict-entry .dict-def {
+    .dict-etymology {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 0.75rem;
+      font-style: italic;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .dict-meaning {
+      margin-bottom: 6px;
+    }
+    .dict-meaning:last-child { margin-bottom: 0; }
+    .dict-meaning-header {
       font-family: 'Source Serif 4', Georgia, serif;
       font-size: 0.82rem;
       line-height: 1.5;
-      color: var(--ink);
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    .dict-meaning-num {
+      color: var(--ink-red);
+      font-weight: 700;
+      font-size: 0.8rem;
+      flex-shrink: 0;
+    }
+    .dict-meaning-cls {
       font-style: italic;
+      color: var(--accent-2);
+      font-size: 0.75rem;
+      flex-shrink: 0;
+    }
+    .dict-meaning-text {
+      color: var(--ink);
+    }
+    .dict-meaning-quote {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 0.77rem;
+      font-style: italic;
+      color: var(--muted);
+      padding-left: 16px;
+      margin-top: 2px;
+      line-height: 1.4;
+    }
+    .dict-meaning-attr {
+      font-style: normal;
+      font-weight: 700;
+      color: var(--accent);
     }
     .result-share-btn {
       width: 100%;
@@ -1211,10 +1252,7 @@
       <div class="result-title" id="result-title">Tebrikler!</div>
       <div class="result-subtitle" id="result-subtitle"></div>
       <div class="result-emoji-grid" id="result-emoji-grid"></div>
-      <div class="result-dict-entry" id="result-dict-entry" style="display:none;">
-        <div class="dict-headword" id="dict-headword"></div>
-        <div class="dict-def" id="dict-def"></div>
-      </div>
+      <div class="result-dict-entry" id="result-dict-entry" style="display:none;"></div>
       <button class="result-share-btn" id="result-share-btn" type="button">PAYLAŞ</button>
       <div class="result-next-info" id="result-next-info"></div>
     </div>
@@ -3126,6 +3164,43 @@ function enableShareButton(won) {
 }
 
 // ── Result popup ──
+function renderDictEntry(raw, word) {
+  let dict = null;
+  if (raw && typeof raw === 'string') {
+    try { dict = JSON.parse(raw); } catch (_) {
+      // plain text fallback — wrap as a single definition
+      dict = { defs: [{ text: raw }] };
+    }
+  } else if (raw && typeof raw === 'object') {
+    dict = raw;
+  }
+  if (!dict) return '';
+
+  const esc = s => String(s == null ? '' : s)
+    .replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  let html = `<div class="dict-headword">${esc(word)}</div>`;
+  if (dict.root) {
+    html += `<div class="dict-etymology">${esc(dict.root)}</div>`;
+  }
+  const defs = dict.defs || [];
+  html += defs.map((d, i) => {
+    const clsLabel = [d.cls, d.extra].filter(Boolean).join(', ');
+    let out = `<div class="dict-meaning">
+      <div class="dict-meaning-header">
+        ${defs.length > 1 ? `<span class="dict-meaning-num">${i + 1}.</span>` : ''}
+        ${clsLabel ? `<span class="dict-meaning-cls">${esc(clsLabel)}</span>` : ''}
+        <span class="dict-meaning-text">${esc(d.text)}</span>
+      </div>`;
+    if (d.quote) {
+      out += `<div class="dict-meaning-quote">"${esc(d.quote)}"${d.attr ? ` <span class="dict-meaning-attr">— ${esc(d.attr)}</span>` : ''}</div>`;
+    }
+    out += `</div>`;
+    return out;
+  }).join('');
+  return html;
+}
+
 function buildShareText() {
   const won = guessResults.length > 0 && guessResults[guessResults.length - 1].every(r => r === 'correct');
   const score = won ? guessResults.length : 'X';
@@ -3149,12 +3224,14 @@ function showResultPopup(won) {
     result.map(r => r === 'correct' ? '🟫' : r === 'present' ? '🟧' : '⬜').join('')
   ).join('<br>');
   const dictEntry = document.getElementById('result-dict-entry');
-  if (TODAY_DEFINITION && dictEntry) {
-    document.getElementById('dict-headword').textContent = TARGET_WORD;
-    document.getElementById('dict-def').textContent = TODAY_DEFINITION;
-    dictEntry.style.display = '';
-  } else if (dictEntry) {
-    dictEntry.style.display = 'none';
+  if (dictEntry) {
+    const html = renderDictEntry(TODAY_DEFINITION, TARGET_WORD);
+    if (html) {
+      dictEntry.innerHTML = html;
+      dictEntry.style.display = '';
+    } else {
+      dictEntry.style.display = 'none';
+    }
   }
   document.getElementById('result-next-info').textContent = getTimeUntilMidnight();
   overlay.classList.add('open');
