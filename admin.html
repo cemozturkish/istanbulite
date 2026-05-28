@@ -1901,29 +1901,35 @@ async function loadSozcelSchedule() {
   const dates = Array.from({ length: 7 }, (_, i) => sozcelIstanbulDateISO(i));
   const { data, error } = await sb
     .from('sozcel_used_answers')
-    .select('used_on, word')
+    .select('used_on, word, definition')
     .in('used_on', dates);
   if (error) {
     wrap.innerHTML = `<div class="empty-state">Error loading: ${escapeHtml(error.message)}</div>`;
     return;
   }
   const byDate = {};
-  (data || []).forEach(r => { byDate[r.used_on] = r.word; });
+  (data || []).forEach(r => { byDate[r.used_on] = { word: r.word, definition: r.definition || '' }; });
 
   wrap.innerHTML = dates.map((iso, i) => {
     const locked = i === 0;
-    const word = byDate[iso] || '';
+    const word = (byDate[iso] && byDate[iso].word) || '';
+    const definition = (byDate[iso] && byDate[iso].definition) || '';
     return `
-      <div class="article-card" style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;">
-        <div>
-          <div class="a-neighborhood">${escapeHtml(sozcelFormatLabel(iso, i))}</div>
-          <div style="font-size:0.7rem;color:var(--muted);font-family:'Inter',sans-serif;">${iso}</div>
+      <div class="article-card" style="display:grid;grid-template-columns:1fr;gap:8px;">
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;">
+          <div>
+            <div class="a-neighborhood">${escapeHtml(sozcelFormatLabel(iso, i))}</div>
+            <div style="font-size:0.7rem;color:var(--muted);font-family:'Inter',sans-serif;">${iso}</div>
+          </div>
+          <input type="text" data-date="${iso}" value="${escapeHtml(word)}" maxlength="5"
+            placeholder="5 harf" style="width:130px;text-transform:uppercase;letter-spacing:2px;font-weight:700;"
+            ${locked ? 'disabled' : ''}/>
+          <button class="btn btn-primary" data-save="${iso}" style="flex:0 0 auto;padding:9px 14px;${locked ? 'opacity:0.4;cursor:not-allowed;' : ''}"
+            ${locked ? 'disabled' : ''}>Save</button>
         </div>
-        <input type="text" data-date="${iso}" value="${escapeHtml(word)}" maxlength="5"
-          placeholder="5 harf" style="width:130px;text-transform:uppercase;letter-spacing:2px;font-weight:700;"
-          ${locked ? 'disabled' : ''}/>
-        <button class="btn btn-primary" data-save="${iso}" style="flex:0 0 auto;padding:9px 14px;${locked ? 'opacity:0.4;cursor:not-allowed;' : ''}"
-          ${locked ? 'disabled' : ''}>Save</button>
+        <textarea data-def="${iso}" rows="2" placeholder="Sözlük tanımı (isteğe bağlı)…"
+          style="font-family:'Source Serif 4',Georgia,serif;font-size:0.85rem;font-style:italic;resize:vertical;min-height:48px;${locked ? 'opacity:0.5;' : ''}"
+          ${locked ? 'disabled' : ''}>${escapeHtml(definition)}</textarea>
       </div>
     `;
   }).join('');
@@ -1936,9 +1942,11 @@ async function loadSozcelSchedule() {
 async function saveSozcelDay(iso) {
   const statusEl = document.getElementById('sozcel-status');
   const input = document.querySelector(`#sozcel-schedule input[data-date="${iso}"]`);
+  const defInput = document.querySelector(`#sozcel-schedule textarea[data-def="${iso}"]`);
   if (!input) return;
   const raw = (input.value || '').trim();
   const word = raw.toLocaleUpperCase('tr-TR');
+  const definition = defInput ? (defInput.value || '').trim() || null : null;
 
   // Re-check the lock against the live Istanbul date — prevents saving to a
   // day that rolled over while the page was open.
@@ -1975,7 +1983,7 @@ async function saveSozcelDay(iso) {
 
   const { error } = await sb
     .from('sozcel_used_answers')
-    .upsert({ used_on: iso, word, sozcul_id: sozculId }, { onConflict: 'used_on' });
+    .upsert({ used_on: iso, word, sozcul_id: sozculId, definition }, { onConflict: 'used_on' });
   if (error) {
     statusEl.textContent = 'Error: ' + error.message;
     statusEl.className = 'status-msg err';

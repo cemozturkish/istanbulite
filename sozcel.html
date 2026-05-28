@@ -817,10 +817,33 @@
     }
     .result-emoji-grid {
       font-size: 1.4rem;
-      line-height: 1.7;
+      line-height: 1.1;
       letter-spacing: 2px;
-      margin-bottom: 20px;
+      margin-bottom: 14px;
       font-family: 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif;
+    }
+    .result-dict-entry {
+      text-align: left;
+      border-top: 1px solid var(--hairline);
+      border-bottom: 1px solid var(--hairline);
+      padding: 10px 12px;
+      margin-bottom: 14px;
+    }
+    .result-dict-entry .dict-headword {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+    .result-dict-entry .dict-def {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: var(--ink);
+      font-style: italic;
     }
     .result-share-btn {
       width: 100%;
@@ -1188,6 +1211,10 @@
       <div class="result-title" id="result-title">Tebrikler!</div>
       <div class="result-subtitle" id="result-subtitle"></div>
       <div class="result-emoji-grid" id="result-emoji-grid"></div>
+      <div class="result-dict-entry" id="result-dict-entry" style="display:none;">
+        <div class="dict-headword" id="dict-headword"></div>
+        <div class="dict-def" id="dict-def"></div>
+      </div>
       <button class="result-share-btn" id="result-share-btn" type="button">PAYLAŞ</button>
       <div class="result-next-info" id="result-next-info"></div>
     </div>
@@ -2457,10 +2484,13 @@ async function pickDailyTarget(seed) {
     const today = getIstanbulDateISO();
     const { data: existing } = await sb
       .from('sozcel_used_answers')
-      .select('word')
+      .select('word, definition')
       .eq('used_on', today)
       .maybeSingle();
-    if (existing && existing.word) return existing.word;
+    if (existing && existing.word) {
+      TODAY_DEFINITION = existing.definition || null;
+      return existing.word;
+    }
 
     const { data: usedRows, error: usedErr } = await sb
       .from('sozcel_used_answers')
@@ -2476,10 +2506,14 @@ async function pickDailyTarget(seed) {
     // first, re-fetch so every client agrees on today's answer.
     const { data: settled } = await sb
       .from('sozcel_used_answers')
-      .select('word')
+      .select('word, definition')
       .eq('used_on', today)
       .maybeSingle();
-    return (settled && settled.word) || pick;
+    if (settled && settled.word) {
+      TODAY_DEFINITION = settled.definition || null;
+      return settled.word;
+    }
+    return pick;
   } catch (e) {
     return WORD_LIST[seededRandom(seed)];
   }
@@ -2487,6 +2521,7 @@ async function pickDailyTarget(seed) {
 
 const dailySeed = getDailySeed();
 let TARGET_WORD = null;
+let TODAY_DEFINITION = null;
 
 let currentRow = 0;
 let currentGuess = '';
@@ -3113,6 +3148,14 @@ function showResultPopup(won) {
   document.getElementById('result-emoji-grid').innerHTML = guessResults.map(result =>
     result.map(r => r === 'correct' ? '🟫' : r === 'present' ? '🟧' : '⬜').join('')
   ).join('<br>');
+  const dictEntry = document.getElementById('result-dict-entry');
+  if (TODAY_DEFINITION && dictEntry) {
+    document.getElementById('dict-headword').textContent = TARGET_WORD;
+    document.getElementById('dict-def').textContent = TODAY_DEFINITION;
+    dictEntry.style.display = '';
+  } else if (dictEntry) {
+    dictEntry.style.display = 'none';
+  }
   document.getElementById('result-next-info').textContent = getTimeUntilMidnight();
   overlay.classList.add('open');
 }
