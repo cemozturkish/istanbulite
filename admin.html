@@ -551,6 +551,7 @@
     <button class="admin-tab" data-tab="library">Library Setup</button>
     <button class="admin-tab" data-tab="news">Breaking News</button>
     <button class="admin-tab" data-tab="events">Events</button>
+    <button class="admin-tab" data-tab="sozcel">Sözcel</button>
     <button class="admin-tab" data-tab="users">Users</button>
   </div>
 
@@ -758,6 +759,22 @@
 
   </div>
 
+  <div class="admin-body" id="sozcel-tab" style="display:none; grid-template-columns: 1fr; max-width: 720px;">
+
+    <!-- Sözcel daily word scheduler -->
+    <div class="panel">
+      <div class="panel-title">Sözcel — Daily Word Schedule</div>
+      <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
+        Pick the answer word for each of the next 7 days. Words must be exactly 5 Turkish letters. Today is locked once the new day begins (Europe/Istanbul time).
+      </p>
+      <div id="sozcel-schedule" style="display:flex;flex-direction:column;gap:10px;">
+        <div class="empty-state"><span class="spinner"></span></div>
+      </div>
+      <div class="status-msg" id="sozcel-status"></div>
+    </div>
+
+  </div>
+
   <div class="admin-body" id="users-tab" style="display:none;">
 
     <!-- LEFT: Create User -->
@@ -879,10 +896,12 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('library-tab').style.display = (tab === 'library') ? '' : 'none';
     document.getElementById('news-tab').style.display = (tab === 'news') ? '' : 'none';
     document.getElementById('events-tab').style.display = (tab === 'events') ? '' : 'none';
+    document.getElementById('sozcel-tab').style.display = (tab === 'sozcel') ? 'grid' : 'none';
     document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
     if (tab === 'library') { loadLibCategories(); loadCounters(); }
     if (tab === 'news') loadBreakingNews();
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
+    if (tab === 'sozcel') loadSozcelSchedule();
     if (tab === 'users') loadUsersList();
   });
 });
@@ -1729,6 +1748,102 @@ async function deleteEvent(id) {
   const { error } = await sb.from('events').delete().eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   loadEventsList();
+}
+
+// ── Sözcel: daily word scheduler ──
+function sozcelIstanbulDateISO(offsetDays = 0) {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  ist.setDate(ist.getDate() + offsetDays);
+  const y = ist.getFullYear();
+  const m = String(ist.getMonth() + 1).padStart(2, '0');
+  const d = String(ist.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function sozcelFormatLabel(iso, offset) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const weekday = dt.toLocaleDateString('tr-TR', { weekday: 'long', timeZone: 'UTC' });
+  const day = dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  const tag = offset === 0 ? ' · Bugün (kilitli)' : offset === 1 ? ' · Yarın' : '';
+  return `${weekday.charAt(0).toLocaleUpperCase('tr-TR') + weekday.slice(1)}, ${day}${tag}`;
+}
+
+async function loadSozcelSchedule() {
+  const wrap = document.getElementById('sozcel-schedule');
+  const statusEl = document.getElementById('sozcel-status');
+  statusEl.textContent = '';
+  statusEl.className = 'status-msg';
+  wrap.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+
+  const dates = Array.from({ length: 7 }, (_, i) => sozcelIstanbulDateISO(i));
+  const { data, error } = await sb
+    .from('sozcel_used_answers')
+    .select('used_on, word')
+    .in('used_on', dates);
+  if (error) {
+    wrap.innerHTML = `<div class="empty-state">Error loading: ${escapeHtml(error.message)}</div>`;
+    return;
+  }
+  const byDate = {};
+  (data || []).forEach(r => { byDate[r.used_on] = r.word; });
+
+  wrap.innerHTML = dates.map((iso, i) => {
+    const locked = i === 0;
+    const word = byDate[iso] || '';
+    return `
+      <div class="article-card" style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;">
+        <div>
+          <div class="a-neighborhood">${escapeHtml(sozcelFormatLabel(iso, i))}</div>
+          <div style="font-size:0.7rem;color:var(--muted);font-family:'Inter',sans-serif;">${iso}</div>
+        </div>
+        <input type="text" data-date="${iso}" value="${escapeHtml(word)}" maxlength="5"
+          placeholder="5 harf" style="width:130px;text-transform:uppercase;letter-spacing:2px;font-weight:700;"
+          ${locked ? 'disabled' : ''}/>
+        <button class="btn btn-primary" data-save="${iso}" style="flex:0 0 auto;padding:9px 14px;${locked ? 'opacity:0.4;cursor:not-allowed;' : ''}"
+          ${locked ? 'disabled' : ''}>Save</button>
+      </div>
+    `;
+  }).join('');
+
+  wrap.querySelectorAll('button[data-save]').forEach(btn => {
+    btn.addEventListener('click', () => saveSozcelDay(btn.dataset.save));
+  });
+}
+
+async function saveSozcelDay(iso) {
+  const statusEl = document.getElementById('sozcel-status');
+  const input = document.querySelector(`#sozcel-schedule input[data-date="${iso}"]`);
+  if (!input) return;
+  const raw = (input.value || '').trim();
+  const word = raw.toLocaleUpperCase('tr-TR');
+
+  // Re-check the lock against the live Istanbul date — prevents saving to a
+  // day that rolled over while the page was open.
+  if (iso <= sozcelIstanbulDateISO(0)) {
+    statusEl.textContent = 'That day is already active — cannot edit.';
+    statusEl.className = 'status-msg err';
+    loadSozcelSchedule();
+    return;
+  }
+  if (!/^[A-ZÇĞİÖŞÜ]{5}$/.test(word)) {
+    statusEl.textContent = 'Word must be exactly 5 Turkish letters.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  input.value = word;
+  const { error } = await sb
+    .from('sozcel_used_answers')
+    .upsert({ used_on: iso, word }, { onConflict: 'used_on' });
+  if (error) {
+    statusEl.textContent = 'Error: ' + error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = `Saved ${word} for ${iso}.`;
+  statusEl.className = 'status-msg ok';
 }
 
 checkAdmin();
