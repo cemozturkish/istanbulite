@@ -1835,18 +1835,18 @@ async function saveSozcelDay(iso) {
 
   input.value = word;
 
-  // Sözcül: the earliest member to have suggested this word, or — if nobody
-  // suggested it — the admin themselves.
+  // Sözcül: the member who suggested this word (one per word, enforced by
+  // the DB). Falls back to the admin if nobody has suggested it.
   let sozculId = null;
+  let suggestionId = null;
   const { data: suggestion } = await sb
     .from('sozcel_word_suggestions')
-    .select('suggested_by, suggested_at')
+    .select('id, suggested_by')
     .eq('word', word)
-    .order('suggested_at', { ascending: true })
-    .limit(1)
     .maybeSingle();
   if (suggestion && suggestion.suggested_by) {
     sozculId = suggestion.suggested_by;
+    suggestionId = suggestion.id;
   } else {
     const { data: { session } } = await sb.auth.getSession();
     sozculId = session && session.user ? session.user.id : null;
@@ -1860,7 +1860,14 @@ async function saveSozcelDay(iso) {
     statusEl.className = 'status-msg err';
     return;
   }
-  statusEl.textContent = `Saved ${word} for ${iso}${sozculId ? ' (sözcül assigned)' : ''}.`;
+  // Lock the suggestion as 'picked' so the suggester can submit a new word
+  // and the picked word stays globally reserved.
+  if (suggestionId) {
+    await sb.from('sozcel_word_suggestions')
+      .update({ status: 'picked' })
+      .eq('id', suggestionId);
+  }
+  statusEl.textContent = `Saved ${word} for ${iso}${suggestionId ? ' (sözcül assigned from suggestion)' : ''}.`;
   statusEl.className = 'status-msg ok';
 }
 
