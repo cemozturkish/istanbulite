@@ -209,7 +209,9 @@
           ? esc(capitalizeName(`${kefilOfUser.first_name||''} ${kefilOfUser.last_name||''}`.trim()) || t('profile.unnamed'))
           : '';
         return `
-          <div class="ist-pc-panel">
+          <div class="ist-pc-panel" id="ist-pc-panel">
+          <div class="ist-pc-panel-inner">
+            <button type="button" class="ist-pc-panel-close" id="ist-pc-panel-close" aria-label="${esc(t('profile.cancel'))}">×</button>
             <div class="ist-pc-section-title">${esc(t('profile.edit') || 'Düzenle')}</div>
 
             <div class="ist-pc-field">
@@ -301,6 +303,7 @@
 
             <button type="button" class="ist-pc-signout" id="ist-pc-signout">${esc(t('profile.signout'))}</button>
           </div>
+          </div>
         `;
       }
 
@@ -320,15 +323,35 @@
 
       const root = document.getElementById('ist-pc-root');
       const toggleBtn = document.getElementById('ist-pc-toggle');
+      const panel = document.getElementById('ist-pc-panel');
 
-      toggleBtn.addEventListener('click', () => {
-        const open = root.classList.toggle('open');
-        toggleBtn.textContent = open ? t('profile.cancel') : t('profile.edit');
-      });
-
-      document.getElementById('ist-pc-cancel').addEventListener('click', () => {
+      function openPanel() {
+        root.classList.add('open');
+        toggleBtn.textContent = t('profile.cancel');
+        document.body.style.overflow = 'hidden';
+      }
+      function closePanel() {
         root.classList.remove('open');
         toggleBtn.textContent = t('profile.edit');
+        document.body.style.overflow = '';
+      }
+
+      toggleBtn.addEventListener('click', () => {
+        if (root.classList.contains('open')) closePanel();
+        else openPanel();
+      });
+
+      document.getElementById('ist-pc-cancel').addEventListener('click', closePanel);
+      document.getElementById('ist-pc-panel-close').addEventListener('click', closePanel);
+
+      // Click on the backdrop (outside the inner panel) closes the modal.
+      panel.addEventListener('click', (e) => {
+        if (e.target === panel) closePanel();
+      });
+
+      // Escape key closes the modal.
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && root.classList.contains('open')) closePanel();
       });
 
       document.getElementById('ist-pc-signout').addEventListener('click', async () => {
