@@ -1106,6 +1106,8 @@ async function recordGameResult(game, date, attempts, won, neighborhood) {
       user_id: session.user.id,
       game, date, attempts, won, neighborhood
     }]);
+    // Refresh nav locks: a win can unlock the next gated game.
+    if (won && typeof applyGameLocks === 'function') applyGameLocks(sb);
   } catch (e) {}
 }
 
@@ -1712,6 +1714,14 @@ async function markPlayedGames() {
 
 // ── Init ──
 (async () => {
+  // Enforce game-lock gating BEFORE loading the puzzle or wiring up the UI —
+  // a direct URL / bookmark load of a still-locked game must bounce to
+  // kahvehane without giving the user a chance to play.
+  if (typeof applyGameLocks === 'function') {
+    const bounced = await applyGameLocks(sb);
+    if (bounced) return;
+  }
+
   const puzzle = await loadTodaysPuzzle();
   if (!puzzle) {
     document.getElementById('words-grid').innerHTML = '';
@@ -1724,7 +1734,6 @@ async function markPlayedGames() {
     renderStats();
     loadScoreboard();
     markPlayedGames();
-    if (typeof applyGameLocks === 'function') applyGameLocks(sb);
     return;
   }
 
