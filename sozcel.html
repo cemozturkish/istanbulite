@@ -3988,10 +3988,11 @@ async function markPlayedGames() {
 // ── Init ──
 initWordGrid();
 initKeyboard();
+// Apply game-lock gating in parallel — the pre-lock on DOMContentLoaded
+// already makes gated nav links unclickable until this resolves, so init
+// doesn't need to block on the DB roundtrip.
+if (typeof applyGameLocks === 'function') applyGameLocks(sb);
 (async () => {
-  // Apply game-lock gating FIRST so the right-column nav can't be clicked
-  // through while the slow init (target fetch + state restore + stats) runs.
-  if (typeof applyGameLocks === 'function') await applyGameLocks(sb);
   TARGET_WORD = await pickDailyTarget(dailySeed);
   if (!TARGET_WORD) {
     // Sunday with no scheduled word and no 6-letter pool yet — show a
