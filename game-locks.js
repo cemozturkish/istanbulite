@@ -162,4 +162,21 @@
 
   window.applyGameLocks = applyGameLocks;
   document.addEventListener('DOMContentLoaded', consumeBounceMessage);
+
+  // Pre-lock every gated game-link as soon as the DOM is ready, regardless of
+  // user state. applyGameLocks will unlock the ones the user qualifies for
+  // once the DB roundtrip completes. This closes the window where the page
+  // was rendered, the script tag had loaded, but applyGameLocks hadn't yet
+  // resolved — clicking a gated link in that window otherwise sneaks past
+  // the gate entirely.
+  document.addEventListener('DOMContentLoaded', () => {
+    injectStyles();
+    wireClicks();
+    GATES.forEach(g => {
+      const link = document.querySelector(`.game-link[data-game="${g.game}"]`);
+      if (!link || link.classList.contains('active')) return;
+      link.classList.add('locked');
+      link.dataset.lockMsg = 'Yükleniyor…';
+    });
+  });
 })();
