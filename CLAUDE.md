@@ -255,6 +255,7 @@ git diff            # Check changes before committing
 7. **Supabase SDK v2:** All database and auth calls go through `const sb = supabase.createClient(...)`.
 8. **Inline comments:** Add comments in English above significant code blocks.
 9. **Commit style:** Short, imperative commit messages (e.g. "Add profile page layout", "Fix map hover state").
+10. **Cross-cutting changes touch the game pages too.** When changing anything that lives on more than one page — nav, profile popup, scoreboard, lock rules, header layout, theme tokens — explicitly check **sozcel.html, tumcel.html, bulmaca.html, baglantilar.html** as well as anahane / kahvehane / kutuphane. The game pages are the easiest to forget and their right-column game nav must stay in sync. Shared logic that risks drift belongs in a dedicated `*.js` (see `game-locks.js`, `profile-card.js`) rather than copy-pasted into each page.
 
 ---
 
