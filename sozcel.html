@@ -756,6 +756,15 @@
       padding: 10px 4px;
       list-style: none;
     }
+    .scoreboard-countdown {
+      font-size: 0.58rem;
+      color: var(--muted);
+      text-align: center;
+      padding: 6px 4px 0;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 1px;
+      font-style: italic;
+    }
 
     /* ── Result popup ── */
     .result-overlay {
@@ -1251,6 +1260,7 @@
           <ol class="scoreboard-list" id="scoreboard-list">
             <li class="scoreboard-empty">Yükleniyor...</li>
           </ol>
+          <div class="scoreboard-countdown" id="scoreboard-countdown"></div>
         </div>
       </div>
     </section>
@@ -1362,7 +1372,11 @@ function updateDateTime() {
   document.getElementById('time-line').textContent = time;
 }
 updateDateTime();
-setInterval(updateDateTime, 60000);
+setInterval(() => {
+  updateDateTime();
+  const cdEl = document.getElementById('scoreboard-countdown');
+  if (cdEl && cdEl.textContent) cdEl.textContent = getTimeUntilWeekReset();
+}, 60000);
 
 // ── Turkish letter normalization ──
 // Treat İ/I and ı/i correctly for Turkish
@@ -3745,13 +3759,41 @@ function parseGameDate(s) {
   if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
   return new Date(parts[0], parts[1] - 1, parts[2]);
 }
+
+// Points awarded per game: 20/12/8/6/4/2 for win in 1–6 guesses; 1 for playing without winning.
+function gamePoints(attempts, won) {
+  if (won) {
+    const pts = [20, 12, 8, 6, 4, 2];
+    return pts[attempts - 1] ?? 2;
+  }
+  return attempts >= 1 ? 1 : 0;
+}
+
+// Returns time until next Monday 00:00 Istanbul (= end of current scoring week).
+function getTimeUntilWeekReset() {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  const dayOfWeek = ist.getDay(); // 0=Sun, 1=Mon … 6=Sat
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+  const nextMonday = new Date(ist.getFullYear(), ist.getMonth(), ist.getDate() + daysUntilMonday);
+  const diff = nextMonday - ist;
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (days > 0) return `Sıfırlanmaya: ${days}g ${hours}sa ${minutes}dk`;
+  if (hours > 0) return `Sıfırlanmaya: ${hours}sa ${minutes}dk`;
+  return `Sıfırlanmaya: ${minutes}dk`;
+}
+
 async function loadScoreboard() {
   const listEl = document.getElementById('scoreboard-list');
   if (!listEl) return;
   let results = null;
   try {
     const { data, error } = await sb.from('game_results')
-      .select('user_id, neighborhood, date, won').eq('won', true);
+      .select('user_id, neighborhood, date, won, attempts')
+      .eq('game', 'sozcel')
+      .gte('attempts', 1);
     if (error) throw error;
     results = data;
   } catch (e) {
@@ -3762,24 +3804,37 @@ async function loadScoreboard() {
     listEl.innerHTML = '<li class="scoreboard-empty">Bu hafta henüz skor yok</li>';
     return;
   }
+  // Weekly cutoff: Monday 00:00 of the current Istanbul week.
   const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-  const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - 6);
+  const dow = nowIst.getDay(); // 0=Sun … 6=Sat
+  const daysFromMonday = dow === 0 ? 6 : dow - 1;
+  const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - daysFromMonday);
   const weekly = results.filter(r => { const d = parseGameDate(r.date); return d && d >= cutoff; });
   if (weekly.length === 0) {
     listEl.innerHTML = '<li class="scoreboard-empty">Bu hafta henüz skor yok</li>';
     return;
   }
-  const scores = new Map();
+  // Deduplicate per (user, date): keep the best (highest-scoring) result per day.
+  const byUserDate = new Map();
   weekly.forEach(r => {
     if (!r.user_id) return;
-    const prev = scores.get(r.user_id) || { score: 0, neighborhood: null, lastDate: null };
-    prev.score += 1;
-    const d = parseGameDate(r.date);
-    if (r.neighborhood && (!prev.lastDate || (d && d >= prev.lastDate))) {
-      prev.neighborhood = r.neighborhood;
+    const key = r.user_id + '|' + r.date;
+    const pts = gamePoints(r.attempts, r.won);
+    const existing = byUserDate.get(key);
+    if (!existing || pts > existing.pts) {
+      byUserDate.set(key, { user_id: r.user_id, neighborhood: r.neighborhood, date: r.date, pts });
+    }
+  });
+  const scores = new Map();
+  byUserDate.forEach(entry => {
+    const prev = scores.get(entry.user_id) || { score: 0, neighborhood: null, lastDate: null };
+    prev.score += entry.pts;
+    const d = parseGameDate(entry.date);
+    if (entry.neighborhood && (!prev.lastDate || (d && d >= prev.lastDate))) {
+      prev.neighborhood = entry.neighborhood;
       prev.lastDate = d;
     }
-    scores.set(r.user_id, prev);
+    scores.set(entry.user_id, prev);
   });
   const userIds = Array.from(scores.keys());
   const nameMap = new Map();
@@ -3806,6 +3861,8 @@ async function loadScoreboard() {
       `<span class="scoreboard-score">${p.score}</span>` +
     `</li>`;
   }).join('');
+  const countdownEl = document.getElementById('scoreboard-countdown');
+  if (countdownEl) countdownEl.textContent = getTimeUntilWeekReset();
 }
 
 // Turkish ablative suffix with vowel harmony + voiceless-consonant rule.
@@ -3897,9 +3954,10 @@ function showResultPopup(won) {
   document.getElementById('result-icon-box').textContent = won ? '★' : '✕';
   document.getElementById('result-icon-box').style.background = won ? 'var(--success)' : 'var(--ink)';
   document.getElementById('result-title').textContent = won ? 'Tebrikler!' : 'Bugünlük Bu Kadar';
+  const pts = gamePoints(won ? guessResults.length : 7, won);
   document.getElementById('result-subtitle').textContent = won
-    ? `Kelimeyi ${score}. tahminde buldunuz.`
-    : `Bugünkü kelime: ${TARGET_WORD}`;
+    ? `Kelimeyi ${score}. tahminde buldunuz. +${pts} puan`
+    : `Bugünkü kelime: ${TARGET_WORD} — +${pts} puan`;
   document.getElementById('result-emoji-grid').innerHTML = guessResults.map(result =>
     result.map(r => r === 'correct' ? '🟫' : r === 'present' ? '🟧' : '⬜').join('')
   ).join('<br>');
