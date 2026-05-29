@@ -519,8 +519,11 @@
       border: 1px solid var(--hairline);
       font-size: 0.75rem;
     }
-    .scoreboard-item.top { background: var(--paper-banner); border-color: var(--ink); }
-    .scoreboard-rank { font-weight: 700; color: var(--ink); min-width: 18px; font-size: 0.8rem; }
+    .scoreboard-item { color: var(--brown-1); }
+    .scoreboard-item.r1 { background: var(--paper-dark); border-color: var(--ink); color: var(--brown-4); }
+    .scoreboard-item.r2 { color: var(--brown-3); }
+    .scoreboard-item.r3 { color: var(--brown-2); }
+    .scoreboard-rank { font-weight: 700; color: inherit; min-width: 18px; font-size: 0.8rem; }
     .scoreboard-player {
       flex: 1;
       min-width: 0;
@@ -528,11 +531,10 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .scoreboard-name { font-weight: 700; color: var(--ink); }
-    .scoreboard-nb { color: var(--muted); font-size: 0.7rem; }
+    .scoreboard-name { color: inherit; }
     .scoreboard-score {
       font-weight: 700;
-      color: var(--ink);
+      color: inherit;
       font-size: 0.85rem;
       min-width: 22px;
       text-align: right;
@@ -831,7 +833,7 @@
   <aside class="col-right">
     <section class="games-section">
       <div class="games-section-inner">
-        <h2>Günün Oyunları</h2>
+        <h2 style="text-transform: uppercase;">Günün Oyunları</h2>
 
         <a href="sozcel.html" class="game-link" data-game="sozcel">
           <div class="game-link-title">Sözcel</div>
@@ -1617,17 +1619,37 @@ async function loadScoreboard() {
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'tr'))
     .slice(0, 5);
   listEl.innerHTML = top.map((p, i) => {
-    const nbName = neighborhoodNames[p.neighborhood] || p.neighborhood || '';
-    const topClass = i === 0 ? ' top' : '';
-    return `<li class="scoreboard-item${topClass}">` +
+    const nbName = (neighborhoodNames[p.neighborhood] || p.neighborhood || '').toLocaleUpperCase('tr-TR');
+    const rankClass = ' r' + (i + 1);
+    const suffix = getAblativeSuffix(nbName);
+    const playerLabel = nbName ? `${nbName}${suffix} ${escapeHtml(p.name)}` : escapeHtml(p.name);
+    return `<li class="scoreboard-item${rankClass}">` +
       `<span class="scoreboard-rank">${i + 1}.</span>` +
       `<span class="scoreboard-player">` +
-        `<span class="scoreboard-name author-link" data-user-id="${p.uid}">${escapeHtml(p.name)}</span>` +
-        (nbName ? `<span class="scoreboard-nb"> — ${escapeHtml(nbName)}</span>` : '') +
+        `<span class="scoreboard-name author-link" data-user-id="${p.uid}">${playerLabel}</span>` +
       `</span>` +
       `<span class="scoreboard-score">${p.score}</span>` +
     `</li>`;
   }).join('');
+}
+
+// Turkish ablative suffix (vowel harmony + voiceless-consonant rule).
+function getAblativeSuffix(name) {
+  if (!name) return "'den";
+  const lastChar = name.charAt(name.length - 1).toLowerCase();
+  const voiceless = 'pçtkfhsş';
+  const backVowels = 'aıou';
+  let lastVowel = '';
+  for (let i = name.length - 1; i >= 0; i--) {
+    const c = name.charAt(i).toLowerCase();
+    if ('aeıioöuü'.includes(c)) { lastVowel = c; break; }
+  }
+  const isBack = backVowels.includes(lastVowel);
+  const isVoiceless = voiceless.includes(lastChar);
+  if (isVoiceless && isBack) return "'tan";
+  if (isVoiceless) return "'ten";
+  if (isBack) return "'dan";
+  return "'den";
 }
 
 // Mark games as started (light gray) or completed (dark gray) in side nav
