@@ -1314,7 +1314,7 @@ function getTimeUntilMidnight() {
   return I18N.formatCountdown(hours, minutes);
 }
 
-const VALID_WORDS = new Set([
+const VALID_WORDS_5 = new Set([
   'ABACI','ABADİ','ABALI','ABANA','ABANİ','ABAZA','ABAŞO','ABBAS','ABDAL','ABECE',
   'ABHAZ','ABLAK','ABONE','ABOSA','ABRAŞ','ABULİ','ABİDE','ABİYE','ACABA','ACARA',
   'ACELE','ACEMİ','ACEZE','ACICA','ACILI','ACIMA','ACUBE','ACUZE','ACİBE','ADALE',
@@ -1871,7 +1871,7 @@ const VALID_WORDS = new Set([
 ]);
 
 // Seed the set with all answer words so they always pass validation
-const WORD_LIST = [
+const WORD_LIST_5 = [
   'ABACI','ABADİ','ABALI','ABANİ','ABAZA','ABAŞO','ABBAS','ABDAL','ABECE','ABHAZ',
   'ABLAK','ABONE','ABOSA','ABRAŞ','ABULİ','ABİDE','ABİYE','ACABA','ACELE','ACEMİ',
   'ACEZE','ACICA','ACILI','ACIMA','ACUBE','ACUZE','ACİBE','ADALE','ADALI','ADAMA',
@@ -2434,10 +2434,22 @@ function seededIndex(seed, n) {
   }
   return Math.abs(x % n);
 }
-function seededRandom(seed) { return seededIndex(seed, WORD_LIST.length); }
+// 6-letter Turkish word list — populated from turkce_kelime_listesi_6.txt
+// when it lands in the repo. Until then Sunday games rely on the admin
+// scheduling a target word; the auto-pick fallback will report that
+// no word is available.
+const WORD_LIST_6 = [];
+const VALID_WORDS_6 = new Set();
+WORD_LIST_6.forEach(w => VALID_WORDS_6.add(w));
 
-// Ensure every possible answer is always accepted
-WORD_LIST.forEach(w => VALID_WORDS.add(w));
+// Bind the active list/set for today's word length.
+const WORD_LIST = WORD_LENGTH === 6 ? WORD_LIST_6 : WORD_LIST_5;
+const VALID_WORDS = WORD_LENGTH === 6 ? VALID_WORDS_6 : VALID_WORDS_5;
+
+function seededRandom(seed) { return seededIndex(seed, WORD_LIST.length || 1); }
+
+// Ensure every possible answer is always accepted as a guess.
+WORD_LIST_5.forEach(w => VALID_WORDS_5.add(w));
 
 // Istanbul-local ISO date (YYYY-MM-DD) for the sozcel_used_answers table.
 function getIstanbulDateISO() {
@@ -2460,7 +2472,15 @@ async function pickDailyTarget(seed) {
       .select('word')
       .eq('used_on', today)
       .maybeSingle();
+    // Trust the admin/scheduled word regardless of length — if its length
+    // doesn't match today's expected WORD_LENGTH the game will refuse to
+    // start, surfacing the mismatch to the admin.
     if (existing && existing.word) return existing.word;
+
+    // Auto-pick from today's pool. If the pool is empty (e.g. Sunday with
+    // no 6-letter list yet) bail out and let the caller render an empty
+    // state.
+    if (!WORD_LIST || WORD_LIST.length === 0) return null;
 
     const { data: usedRows, error: usedErr } = await sb
       .from('sozcel_used_answers')
@@ -2470,10 +2490,7 @@ async function pickDailyTarget(seed) {
     const candidates = WORD_LIST.filter(w => !used.has(w));
     const pool = candidates.length > 0 ? candidates : WORD_LIST;
     const pick = pool[seededIndex(seed, pool.length)];
-    // Best-effort record; ignore conflicts from concurrent inserts.
     await sb.from('sozcel_used_answers').insert({ used_on: today, word: pick });
-    // If the insert raced and someone else recorded a different word
-    // first, re-fetch so every client agrees on today's answer.
     const { data: settled } = await sb
       .from('sozcel_used_answers')
       .select('word')
@@ -2481,12 +2498,22 @@ async function pickDailyTarget(seed) {
       .maybeSingle();
     return (settled && settled.word) || pick;
   } catch (e) {
+    if (!WORD_LIST || WORD_LIST.length === 0) return null;
     return WORD_LIST[seededRandom(seed)];
   }
 }
 
 const dailySeed = getDailySeed();
 let TARGET_WORD = null;
+
+// Sundays use 6-letter words; all other days are 5-letter. The day-of-week
+// is evaluated in Europe/Istanbul time so it matches the daily roll-over.
+function sozcelWordLengthFor(date) {
+  const now = date || new Date();
+  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  return ist.getDay() === 0 ? 6 : 5;
+}
+const WORD_LENGTH = sozcelWordLengthFor();
 
 let currentRow = 0;
 let currentGuess = '';
@@ -2504,7 +2531,7 @@ function saveState() {
   const lastSavedRow = gameOver ? currentRow + 1 : currentRow;
   for (let r = 0; r < lastSavedRow; r++) {
     let word = '';
-    for (let c = 0; c < 5; c++) {
+    for (let c = 0; c < WORD_LENGTH; c++) {
       word += document.getElementById(`box-${r}-${c}`).textContent;
     }
     state.guesses.push(word);
@@ -2560,14 +2587,14 @@ async function restoreState() {
     state.guesses.forEach((word, rowIdx) => {
       currentRow = rowIdx;
       currentGuess = word;
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < WORD_LENGTH; i++) {
         const box = document.getElementById(`box-${rowIdx}-${i}`);
         box.textContent = word[i] || '';
         box.className = 'letter-box filled';
       }
       const result = checkWord(word);
       guessResults.push(result);
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < WORD_LENGTH; i++) {
         const box = document.getElementById(`box-${rowIdx}-${i}`);
         box.className = `letter-box filled ${result[i]}`;
         const letter = word[i];
@@ -2614,10 +2641,14 @@ const KEYBOARD_LAYOUT = [
 
 function initWordGrid() {
   const grid = document.getElementById('word-grid');
+  // Scale the grid width with WORD_LENGTH so 6-letter Sundays don't squash the
+  // tiles. The base is ~48px per box, also clamped to fit vertically.
+  grid.style.width = `min(${48 * WORD_LENGTH}px, ${7.6 * WORD_LENGTH}vh)`;
   for (let i = 0; i < 6; i++) {
     const row = document.createElement('div');
     row.className = 'word-row';
-    for (let j = 0; j < 5; j++) {
+    row.style.gridTemplateColumns = `repeat(${WORD_LENGTH}, 1fr)`;
+    for (let j = 0; j < WORD_LENGTH; j++) {
       const box = document.createElement('div');
       box.className = 'letter-box';
       box.id = `box-${i}-${j}`;
@@ -2675,7 +2706,7 @@ function handleKey(key) {
       updateDisplay();
     }
   } else if (key === 'GİR') {
-    if (currentGuess.length === 5) {
+    if (currentGuess.length === WORD_LENGTH) {
       if (!VALID_WORDS.has(currentGuess)) {
         const row = document.getElementById('word-grid').children[currentRow];
         if (row) {
@@ -2690,7 +2721,7 @@ function handleKey(key) {
       }
       submitGuess();
     }
-  } else if (currentGuess.length < 5) {
+  } else if (currentGuess.length < WORD_LENGTH) {
     currentGuess += key;
     updateDisplay();
     markAsPlayed();
@@ -2719,7 +2750,7 @@ async function markAsPlayed() {
 }
 
 function updateDisplay() {
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < WORD_LENGTH; i++) {
     const box = document.getElementById(`box-${currentRow}-${i}`);
     box.textContent = currentGuess[i] || '';
     box.className = 'letter-box' + (currentGuess[i] ? ' filled' : '');
@@ -2739,7 +2770,7 @@ function submitGuess() {
     gameOver = true;
   }
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < WORD_LENGTH; i++) {
     setTimeout(() => {
       const box = document.getElementById(`box-${rowSnap}-${i}`);
       const letter = guessSnap[i];
@@ -2787,7 +2818,7 @@ function submitGuess() {
 }
 
 function checkWord(guess) {
-  const result = Array(5).fill('absent');
+  const result = Array(WORD_LENGTH).fill('absent');
   const targetLetters = TARGET_WORD.split('');
   const guessLetters = guess.split('');
 
@@ -3210,7 +3241,27 @@ initWordGrid();
 initKeyboard();
 (async () => {
   TARGET_WORD = await pickDailyTarget(dailySeed);
-  await restoreState();
+  if (!TARGET_WORD) {
+    // Sunday with no scheduled word and no 6-letter pool yet — show a
+    // friendly empty state and disable input.
+    const msg = document.getElementById('game-message');
+    if (msg) {
+      msg.textContent = 'Bugünkü sözcük henüz hazır değil.';
+      msg.className = 'game-message';
+    }
+    gameOver = true;
+  } else if (TARGET_WORD.length !== WORD_LENGTH) {
+    // Scheduled word doesn't match today's expected length. Don't let the
+    // user start a game we can't render correctly.
+    const msg = document.getElementById('game-message');
+    if (msg) {
+      msg.textContent = `Bugünkü sözcük ${WORD_LENGTH} harf olmalıydı; yöneticiyle iletişime geçin.`;
+      msg.className = 'game-message lose';
+    }
+    gameOver = true;
+  } else {
+    await restoreState();
+  }
   renderStats();
   loadScoreboard();
   markPlayedGames();

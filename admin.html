@@ -766,7 +766,7 @@
     <div class="panel">
       <div class="panel-title">Sözcel — Daily Word Schedule</div>
       <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-        Pick the answer word for each of the next 7 days. Words must be exactly 5 Turkish letters. Today is locked once the new day begins (Europe/Istanbul time).
+        Pick the answer word for each of the next 7 days. Weekdays are 5 letters; Sundays are 6 letters (the row's label and input width reflect this). Today is locked once the new day begins (Europe/Istanbul time).
       </p>
       <div id="sozcel-schedule" style="display:flex;flex-direction:column;gap:10px;">
         <div class="empty-state"><span class="spinner"></span></div>
@@ -1887,8 +1887,17 @@ function sozcelFormatLabel(iso, offset) {
   const dt = new Date(Date.UTC(y, m - 1, d));
   const weekday = dt.toLocaleDateString('tr-TR', { weekday: 'long', timeZone: 'UTC' });
   const day = dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', timeZone: 'UTC' });
-  const tag = offset === 0 ? ' · Bugün (kilitli)' : offset === 1 ? ' · Yarın' : '';
-  return `${weekday.charAt(0).toLocaleUpperCase('tr-TR') + weekday.slice(1)}, ${day}${tag}`;
+  const dayTag = offset === 0 ? ' · Bugün (kilitli)' : offset === 1 ? ' · Yarın' : '';
+  const len = sozcelLengthForISO(iso);
+  const lenTag = len === 6 ? ' · 6 harf' : '';
+  return `${weekday.charAt(0).toLocaleUpperCase('tr-TR') + weekday.slice(1)}, ${day}${dayTag}${lenTag}`;
+}
+
+// Sunday = 6 letters, every other day = 5.
+function sozcelLengthForISO(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCDay() === 0 ? 6 : 5;
 }
 
 async function loadSozcelSchedule() {
@@ -1913,14 +1922,15 @@ async function loadSozcelSchedule() {
   wrap.innerHTML = dates.map((iso, i) => {
     const locked = i === 0;
     const word = byDate[iso] || '';
+    const len = sozcelLengthForISO(iso);
     return `
       <div class="article-card" style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;">
         <div>
           <div class="a-neighborhood">${escapeHtml(sozcelFormatLabel(iso, i))}</div>
           <div style="font-size:0.7rem;color:var(--muted);font-family:'Inter',sans-serif;">${iso}</div>
         </div>
-        <input type="text" data-date="${iso}" value="${escapeHtml(word)}" maxlength="5"
-          placeholder="5 harf" style="width:130px;text-transform:uppercase;letter-spacing:2px;font-weight:700;"
+        <input type="text" data-date="${iso}" value="${escapeHtml(word)}" maxlength="${len}"
+          placeholder="${len} harf" style="width:140px;text-transform:uppercase;letter-spacing:2px;font-weight:700;"
           ${locked ? 'disabled' : ''}/>
         <button class="btn btn-primary" data-save="${iso}" style="flex:0 0 auto;padding:9px 14px;${locked ? 'opacity:0.4;cursor:not-allowed;' : ''}"
           ${locked ? 'disabled' : ''}>Save</button>
@@ -1948,8 +1958,10 @@ async function saveSozcelDay(iso) {
     loadSozcelSchedule();
     return;
   }
-  if (!/^[A-ZÇĞİÖŞÜ]{5}$/.test(word)) {
-    statusEl.textContent = 'Word must be exactly 5 Turkish letters.';
+  const expectedLen = sozcelLengthForISO(iso);
+  const lenRegex = new RegExp(`^[A-ZÇĞİÖŞÜ]{${expectedLen}}$`);
+  if (!lenRegex.test(word)) {
+    statusEl.textContent = `Word must be exactly ${expectedLen} Turkish letters.`;
     statusEl.className = 'status-msg err';
     return;
   }
