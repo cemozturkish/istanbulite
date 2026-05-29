@@ -1,7 +1,7 @@
 // Shared game-lock logic.
 // Add `<script src="game-locks.js"></script>` to any page with a
-// `.game-link[data-game="…"]` nav (sozcel, tumcel, bulmaca, baglantilar,
-// kahvehane). Then call `applyGameLocks(sb)` once `sb` is initialised.
+// `.game-link[data-game="…"]` nav (sozcel, tumcel, bulmaca, kahvehane).
+// Then call `applyGameLocks(sb)` once `sb` is initialised.
 //
 // To gate a new game in the future, extend GATES below — every page that
 // includes this script picks up the new rule automatically.

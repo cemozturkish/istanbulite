@@ -20,8 +20,8 @@ This file provides context for AI assistants working in this repository.
 ├── admin.html          # Admin dashboard (admin-only)
 ├── kahvehane.html      # Community/discussion page and the games (Coffeehouse)
 ├── kutuphane.html      # Articles and profile display
-├── baglantilar.html    # Turkish Mini Crossword
-├── bulmaca.html        # Turkish Connections-style game
+├── tumcel.html         # Turkish quote-fragment Connections-style game (replaced Bağlantılar)
+├── bulmaca.html        # Turkish mini crossword
 ├── sozcel.html         # Turkish Wordle-style word guessing game
 ├── style.css           # Legacy global stylesheet (mostly unused; prefer inline <style>)
 ├── main.js             # Empty placeholder (unused)
@@ -196,8 +196,8 @@ sb.from('articles').delete().eq('id', id)
 - Users can only comment on their own neighborhood, but can view and read all
 - This is where the NYTimes-like games are, there are three of them:
 - Sözcel: Turkish Wordle
-- Bağlantılar: Turkish Connections
-- Bulmaca: Turkish Crossword
+- Tümcel: Turkish quote-fragment Connections (replaced Bağlantılar)
+- Bulmaca: Turkish crossword
 - The games change every day and the scores are kept track of
 
 ### `kutuphane.html` — Library
@@ -205,8 +205,9 @@ sb.from('articles').delete().eq('id', id)
 - Partially implemented
 - This is where the articles where everyone can read, like, and comment on are
 
-### `baglantilar.html` — Connections
-- Turkish Connections variant
+### `tumcel.html` — Tümcel
+- Connections-style game where 16 sentence fragments must be regrouped into 4 quotes
+- Replaced the earlier Bağlantılar game; that file has been deleted
 
 ### `bulmaca.html` — Crossword
 - Fully functional interactive crossword puzzle
@@ -255,7 +256,7 @@ git diff            # Check changes before committing
 7. **Supabase SDK v2:** All database and auth calls go through `const sb = supabase.createClient(...)`.
 8. **Inline comments:** Add comments in English above significant code blocks.
 9. **Commit style:** Short, imperative commit messages (e.g. "Add profile page layout", "Fix map hover state").
-10. **Cross-cutting changes touch the game pages too.** When changing anything that lives on more than one page — nav, profile popup, scoreboard, lock rules, header layout, theme tokens — explicitly check **sozcel.html, tumcel.html, bulmaca.html, baglantilar.html** as well as anahane / kahvehane / kutuphane. The game pages are the easiest to forget and their right-column game nav must stay in sync. Shared logic that risks drift belongs in a dedicated `*.js` (see `game-locks.js`, `profile-card.js`) rather than copy-pasted into each page.
+10. **Cross-cutting changes touch the game pages too.** When changing anything that lives on more than one page — nav, profile popup, scoreboard, lock rules, header layout, theme tokens — explicitly check **sozcel.html, tumcel.html, bulmaca.html** as well as anahane / kahvehane / kutuphane. The game pages are the easiest to forget and their right-column game nav must stay in sync. Shared logic that risks drift belongs in a dedicated `*.js` (see `game-locks.js`, `profile-card.js`) rather than copy-pasted into each page. **There is no `baglantilar.html`** — Bağlantılar was retired and replaced by Tümcel; do not recreate that file or add `baglantilar` to the games list. The `'baglantilar'` value lingering in the `game_results.game` CHECK constraint is for historical rows only; no new code should write it.
 
 ---
 

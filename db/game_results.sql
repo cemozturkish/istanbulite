@@ -1,6 +1,9 @@
 -- =====================================================================
 -- game_results — per-user, per-game, per-day result rows for Kahvehane
--- games (sozcel, bulmaca, baglantilar). This is the source of truth for:
+-- games (sozcel, bulmaca, tumcel). 'baglantilar' is kept in the CHECK
+-- list for back-compat with rows written before Bağlantılar was retired
+-- and replaced by Tümcel — no new code writes that value. This is the
+-- source of truth for:
 --   * Each game's left-panel personal stats (played / wins / streak / dist)
 --   * Each game's right-panel community stats (Günün İstatistikleri,
 --     En Başarılı İlçeler)
@@ -23,7 +26,7 @@
 create table if not exists public.game_results (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  game text not null check (game in ('sozcel', 'bulmaca', 'baglantilar')),
+  game text not null check (game in ('sozcel', 'bulmaca', 'tumcel', 'baglantilar')),
   date text not null,                        -- "YYYY-M-D" Istanbul-local
   attempts integer not null default 0,       -- semantics depend on game
   won boolean not null default false,
