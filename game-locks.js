@@ -118,11 +118,24 @@
       }
     } catch (_) {}
 
+    // Bounce direct/bookmark loads of a gated game the user hasn't unlocked.
+    // The active link tells us which page we're on. Sending them back to
+    // kahvehane both surfaces the lock state and prevents the game UI from
+    // writing game_results.
+    const activeLink = document.querySelector('.game-link.active[data-game]');
+    if (activeLink) {
+      const gate = GATES.find(g => g.game === activeLink.dataset.game);
+      if (gate && !gate.requires(stats)) {
+        try { sessionStorage.setItem('game_lock_bounce_msg', gate.message(stats)); } catch (_) {}
+        window.location.replace('kahvehane.html');
+        return true;
+      }
+    }
+
     GATES.forEach(g => {
       const link = document.querySelector(`.game-link[data-game="${g.game}"]`);
       if (!link) return;
-      // Never lock the page the user is already on — they got there somehow
-      // and locking the breadcrumb is just confusing.
+      // Don't lock the breadcrumb to the page the user is already on.
       if (link.classList.contains('active')) return;
       if (g.requires(stats)) {
         link.classList.remove('locked');
@@ -134,5 +147,19 @@
     });
   }
 
+  // On any page, surface a bounce message left behind by a redirect from a
+  // gated game. Idempotent and harmless if no message is present.
+  function consumeBounceMessage() {
+    try {
+      const msg = sessionStorage.getItem('game_lock_bounce_msg');
+      if (!msg) return;
+      sessionStorage.removeItem('game_lock_bounce_msg');
+      // Give the page a moment to settle so the toast isn't immediately
+      // overlapped by other init UI.
+      setTimeout(() => showToast(msg), 200);
+    } catch (_) {}
+  }
+
   window.applyGameLocks = applyGameLocks;
+  document.addEventListener('DOMContentLoaded', consumeBounceMessage);
 })();

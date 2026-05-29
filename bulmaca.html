@@ -923,6 +923,8 @@ async function recordGameResult(game, date, attempts, won, neighborhood) {
       neighborhood: neighborhood
     }]);
     if (error) console.error('[bulmaca game_results]', error);
+    // Refresh nav locks so a freshly-eligible link becomes clickable.
+    if (won && typeof applyGameLocks === 'function') applyGameLocks(sb);
   } catch (e) { console.error('[bulmaca game_results]', e); }
 }
 
@@ -1661,14 +1663,20 @@ async function markPlayedGames() {
 }
 
 // Init
-createGrid();
-renderClues();
 (async () => {
+  // Gate FIRST: a direct URL / bookmark load of a still-locked Bulmaca must
+  // bounce to kahvehane before the puzzle wires up and game_results can be
+  // written.
+  if (typeof applyGameLocks === 'function') {
+    const bounced = await applyGameLocks(sb);
+    if (bounced) return;
+  }
+  createGrid();
+  renderClues();
   await restoreState();
   renderStats();
   loadScoreboard();
   markPlayedGames();
-  if (typeof applyGameLocks === 'function') applyGameLocks(sb);
 })();
 
 // ── Profile popup: opens when an author name is clicked ──
