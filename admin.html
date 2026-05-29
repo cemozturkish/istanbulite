@@ -449,6 +449,30 @@
       .src-form { grid-template-columns: 1fr; }
     }
 
+    .news-edit-form {
+      display: none;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--rule);
+      flex-direction: column;
+      gap: 8px;
+    }
+    .news-edit-form.open { display: flex; }
+    .news-edit-form input,
+    .news-edit-form textarea,
+    .news-edit-form select {
+      padding: 6px 8px;
+      font-size: 0.85rem;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      font-family: 'Inter', sans-serif;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .news-edit-form textarea { resize: vertical; min-height: 60px; font-family: 'Inter', sans-serif; }
+    .news-edit-form .btn-row { display: flex; gap: 6px; }
+    .news-edit-form .ne-status { font-size: 0.75rem; }
+
     .empty-state {
       font-style: italic;
       color: var(--muted);
@@ -1658,6 +1682,9 @@ async function loadBreakingNews() {
   if (error) { listEl.innerHTML = '<div class="empty-state">Error loading news.</div>'; return; }
   if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No active breaking news.</div>'; return; }
 
+  // Grab category options from the post form (already populated with neighborhoods).
+  const catOptions = document.getElementById('n-category').innerHTML;
+
   listEl.innerHTML = data.map(n => {
     const ago = formatAgo(n.created_at);
     const cat = n.category || n.neighborhood || 'turkiye';
@@ -1690,21 +1717,88 @@ async function loadBreakingNews() {
           </div>
         </div>
         <div class="card-actions">
-          <button class="btn-del" data-act="del-news" data-id="${n.id}">Delete News</button>
+          <button class="btn-edit" data-act="edit-news" data-id="${n.id}">Düzenle</button>
+          <button class="btn-del" data-act="del-news" data-id="${n.id}">Sil</button>
+        </div>
+        <div class="news-edit-form" data-id="${n.id}">
+          <input type="text" class="ne-title" value="${escapeHtml(n.title)}"/>
+          <textarea class="ne-body" rows="3">${escapeHtml(n.body || '')}</textarea>
+          <select class="ne-category">${catOptions}</select>
+          <div class="btn-row">
+            <button class="btn btn-primary" data-act="save-edit" data-id="${n.id}">Kaydet</button>
+            <button class="btn btn-secondary" data-act="cancel-edit" data-id="${n.id}">İptal</button>
+          </div>
+          <div class="ne-status status-msg"></div>
         </div>
       </div>
     `;
   }).join('');
 
-  listEl.querySelectorAll('button[data-act="del-news"]').forEach(btn => {
-    btn.addEventListener('click', () => deleteBreakingNews(btn.dataset.id));
+  // Set the correct selected category on each edit form.
+  data.forEach(n => {
+    const cat = n.category || n.neighborhood || 'turkiye';
+    const form = listEl.querySelector(`.news-edit-form[data-id="${n.id}"]`);
+    if (form) form.querySelector('.ne-category').value = cat;
   });
-  listEl.querySelectorAll('button[data-act="del-src"]').forEach(btn => {
-    btn.addEventListener('click', () => deleteSource(btn.dataset.id));
-  });
-  listEl.querySelectorAll('button[data-act="add-src"]').forEach(btn => {
-    btn.addEventListener('click', () => addSource(btn));
-  });
+}
+
+// Single delegated listener — set up once, survives every re-render.
+document.getElementById('news-list').addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const act = btn.dataset.act;
+  const card = btn.closest('.article-card');
+  if (act === 'del-news') deleteBreakingNews(btn.dataset.id);
+  else if (act === 'del-src') deleteSource(btn.dataset.id);
+  else if (act === 'add-src') addSource(btn);
+  else if (act === 'edit-news') showNewsEditForm(card);
+  else if (act === 'cancel-edit') hideNewsEditForm(card);
+  else if (act === 'save-edit') saveNewsEdit(btn.dataset.id, card);
+});
+
+function showNewsEditForm(card) {
+  card.querySelector('.card-actions').style.display = 'none';
+  card.querySelector('.news-edit-form').classList.add('open');
+  card.querySelector('.ne-title').focus();
+}
+
+function hideNewsEditForm(card) {
+  card.querySelector('.news-edit-form').classList.remove('open');
+  card.querySelector('.card-actions').style.display = '';
+}
+
+async function saveNewsEdit(newsId, card) {
+  const form = card.querySelector('.news-edit-form');
+  const title = form.querySelector('.ne-title').value.trim();
+  const body = form.querySelector('.ne-body').value.trim();
+  const category = form.querySelector('.ne-category').value;
+  const statusEl = form.querySelector('.ne-status');
+  const saveBtn = form.querySelector('[data-act="save-edit"]');
+
+  if (!title) {
+    statusEl.textContent = 'Başlık boş bırakılamaz.';
+    statusEl.className = 'ne-status status-msg err';
+    return;
+  }
+
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '<span class="spinner"></span>';
+  statusEl.textContent = '';
+
+  const neighborhood = (category !== 'turkiye' && category !== 'istanbul' && category !== 'dunya') ? category : null;
+  const { error } = await sb.from('breaking_news')
+    .update({ title, body: body || null, category, neighborhood })
+    .eq('id', newsId);
+
+  saveBtn.disabled = false;
+  saveBtn.textContent = 'Kaydet';
+
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'ne-status status-msg err';
+    return;
+  }
+  loadBreakingNews();
 }
 
 async function addSource(btn) {
@@ -1717,25 +1811,42 @@ async function addSource(btn) {
   const name = nameEl.value.trim();
   const headline = headlineEl.value.trim();
   const url = urlEl.value.trim();
+
+  statusEl.textContent = '';
+  statusEl.className = 'src-status status-msg';
+
   if (!name || !headline || !url) {
-    statusEl.textContent = 'Adı, başlığı ve bağlantıyı doldurun.';
+    statusEl.textContent = 'Kaynak adı, başlık ve bağlantının üçü de zorunlu.';
     statusEl.className = 'src-status status-msg err';
     return;
   }
+
+  const origText = btn.textContent;
   btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
   const { error } = await sb.from('breaking_news_sources')
     .insert([{ news_id: newsId, name, headline, url }]);
-  btn.disabled = false;
+
   if (error) {
+    btn.disabled = false;
+    btn.textContent = origText;
     statusEl.textContent = error.message;
     statusEl.className = 'src-status status-msg err';
     return;
   }
-  loadBreakingNews();
+
+  // Clear inputs and show brief confirmation before re-rendering.
+  nameEl.value = '';
+  headlineEl.value = '';
+  urlEl.value = '';
+  btn.textContent = '✓ Eklendi';
+  statusEl.textContent = '';
+  setTimeout(() => loadBreakingNews(), 500);
 }
 
 async function deleteSource(id) {
-  if (!confirm('Delete this source?')) return;
+  if (!confirm('Bu kaynağı sil?')) return;
   const { error } = await sb.from('breaking_news_sources').delete().eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   loadBreakingNews();
