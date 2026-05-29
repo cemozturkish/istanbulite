@@ -5,7 +5,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="i18n.js"></script>
@@ -677,7 +677,7 @@
         grid-template-rows: auto auto auto 1fr auto;
         height: 100%;
         overflow: hidden;
-        padding-bottom: 56px; /* reserve space for fixed bottom tab bar */
+        padding-bottom: calc(56px + env(safe-area-inset-bottom)); /* reserve space for fixed bottom tab bar */
       }
 
       .col-left, .col-right, header, .section-rule, main {
@@ -809,7 +809,7 @@
         left: 0;
         right: 0;
         height: 56px;
-        padding: 0;
+        padding: 0 0 env(safe-area-inset-bottom);
         margin: 0;
         border-top: 1px solid var(--rule);
         border-bottom: none;
@@ -1149,6 +1149,20 @@
       .doviz-sym { font-size: 9px; width: auto; }
       .doviz-val { font-size: 9px; }
     }
+
+    /* ── Small-phone overrides (≤ 400px, e.g. iPhone 15) ── */
+    @media (max-width: 400px) {
+      /* Widen the left (news) column slightly so the 5 filter tabs have room */
+      #main-site {
+        grid-template-columns: 58fr 42fr;
+      }
+      /* Remove letter-spacing and trim padding so tab labels fit at ~45px each */
+      .news-filter-btn {
+        letter-spacing: 0;
+        font-size: 8.5px;
+        padding: 4px 1px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1259,9 +1273,9 @@
     <div class="masthead">istanbulite<span class="tld">.net</span></div>
     <header>
       <nav>
-        <a href="index.html" class="active">Anahane</a>
-        <a href="kahvehane.html">Kahvehane</a>
         <a href="kutuphane.html">Kütüphane</a>
+        <a href="anahane.html" class="active">Hane</a>
+        <a href="kahvehane.html">Kahvehane</a>
       </nav>
     </header>
     <div class="datetime-block">
@@ -1338,7 +1352,7 @@
 // the axis per media query. Tab-bar clicks trigger the same animation.
 // ══════════════════════════════════════════
 (function initSwipePagination() {
-  const PAGES = ['index.html', 'kahvehane.html', 'kutuphane.html'];
+  const PAGES = ['kutuphane.html', 'anahane.html', 'kahvehane.html'];
   const DURATION = 400;
   const MIN_DX = 50;
   const MAX_TIME = 700;
@@ -1680,7 +1694,7 @@ async function showSite(user) {
   window.__currentUser = user;
   I18N.syncFromSupabase(sb, user.id);
   // Mount the shared mobile profile card.
-  if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N });
+  if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N, page: 'anahane' });
   I18N.onChange(() => { renderEvents(); applyNewsFilter(activeNewsFilter || 'all'); updateDateTime(); });
   loadBreakingNews();
   loadEvents();

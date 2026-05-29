@@ -468,6 +468,103 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── Dict editor (Sözcel tab) ── */
+    .dict-editor {
+      border-top: 1px solid var(--hairline);
+      margin-top: 4px;
+    }
+    .dict-editor-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 6px 0;
+      cursor: pointer;
+      text-align: left;
+    }
+    .dict-editor-toggle .toggle-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .dict-editor-toggle .toggle-preview {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 0.72rem;
+      font-style: italic;
+      color: var(--accent-2);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .dict-editor-toggle .toggle-arrow {
+      font-size: 0.7rem;
+      color: var(--muted);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .dict-editor-toggle.open .toggle-arrow { transform: rotate(180deg); }
+    .dict-editor-body {
+      display: none;
+      padding-top: 8px;
+    }
+    .dict-editor-body.open { display: block; }
+    .dict-editor-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .dict-def-row {
+      background: var(--paper);
+      border: 1px solid var(--whisper);
+      padding: 8px 10px;
+      margin-bottom: 6px;
+    }
+    .dict-def-row .def-num {
+      color: var(--ink-red);
+      font-weight: 700;
+      font-size: 0.85rem;
+      min-width: 20px;
+      flex-shrink: 0;
+    }
+    .dict-def-row select,
+    .dict-def-row input,
+    .dict-def-row textarea {
+      padding: 5px 8px;
+      font-size: 0.82rem;
+      border: 1px solid var(--whisper);
+      background: var(--field-bg);
+      margin-top: 0;
+    }
+    .dict-def-row textarea {
+      width: 100%;
+      min-height: 44px;
+      resize: vertical;
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-style: italic;
+    }
+    .dict-quote-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .add-def-btn {
+      width: 100%;
+      padding: 6px;
+      font-size: 0.72rem;
+      margin-top: 4px;
+    }
+
     /* ── MOBILE RESPONSIVE ── */
     @media (max-width: 768px) {
       html, body {
@@ -1900,6 +1997,121 @@ function sozcelLengthForISO(iso) {
   return dt.getUTCDay() === 0 ? 6 : 5;
 }
 
+const WORD_CLASSES = ['isim', 'fiil', 'sıfat', 'zarf', 'bağlaç', 'edat', 'zamir', 'ünlem'];
+
+function buildDefRowHtml(idx, d, locked) {
+  const cls = (d && d.cls) || 'isim';
+  const extra = (d && d.extra) || '';
+  const text = (d && d.text) || '';
+  const quote = (d && d.quote) || '';
+  const attr = (d && d.attr) || '';
+  const opts = WORD_CLASSES.map(c =>
+    `<option value="${c}"${cls === c ? ' selected' : ''}>${c}</option>`
+  ).join('');
+  const dis = locked ? ' disabled' : '';
+  return `
+    <div class="dict-def-row">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <span class="def-num">${idx + 1}.</span>
+        <select class="def-cls"${dis} style="width:auto;">${opts}</select>
+        <input type="text" class="def-extra" placeholder="din bilimi, müzik, …"
+          value="${escapeHtml(extra)}"${dis} style="flex:1;"/>
+        ${!locked ? `<button type="button" class="btn-del remove-def-btn" style="padding:2px 10px;line-height:1.6;flex-shrink:0;">×</button>` : ''}
+      </div>
+      <textarea class="def-text" rows="2" placeholder="Tanım…"${dis}>${escapeHtml(text)}</textarea>
+      <div class="dict-quote-row">
+        <input type="text" class="def-quote" placeholder='"Alıntı cümlesi…"'
+          value="${escapeHtml(quote)}"${dis} style="font-style:italic;"/>
+        <input type="text" class="def-attr" placeholder="Yazar / Atıf"
+          value="${escapeHtml(attr)}"${dis}/>
+      </div>
+    </div>`;
+}
+
+function buildDictEditorHtml(iso, dictData, locked) {
+  const root = (dictData && dictData.root) || '';
+  const note = (dictData && dictData.note) || '';
+  const defs = (dictData && dictData.defs) || [];
+  const dis = locked ? ' disabled' : '';
+  const hasData = !!(note || root || defs.length);
+  const openClass = hasData ? ' open' : '';
+
+  // Build a short preview for the collapsed header
+  const preview = note || (defs[0] && defs[0].text) || '';
+
+  return `
+    <div class="dict-editor" data-iso="${escapeHtml(iso)}">
+      <button type="button" class="dict-editor-toggle${openClass}" data-dict-toggle="${escapeHtml(iso)}">
+        <span class="toggle-label">Sözlük</span>
+        <span class="toggle-preview">${escapeHtml(preview)}</span>
+        <span class="toggle-arrow">▼</span>
+      </button>
+      <div class="dict-editor-body${openClass}" id="dict-body-${escapeHtml(iso)}">
+        <div style="margin-bottom:8px;">
+          <div class="dict-editor-label" style="margin-bottom:4px;">Günün Notu (isteğe bağlı)</div>
+          <input type="text" class="dict-note" placeholder="örn. Bugün Atatürk'ü Anma Günü"
+            value="${escapeHtml(note)}"${dis} style="width:100%;padding:5px 8px;font-size:0.85rem;"/>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span class="dict-editor-label">Köken</span>
+          <input type="text" class="dict-root" placeholder="örn. Arapça niyyet"
+            value="${escapeHtml(root)}"${dis} style="flex:1;padding:5px 8px;font-style:italic;font-size:0.85rem;"/>
+        </div>
+        <div class="dict-defs-list" id="dict-defs-${escapeHtml(iso)}">
+          ${defs.map((d, i) => buildDefRowHtml(i, d, locked)).join('')}
+        </div>
+        ${!locked ? `<button type="button" class="btn btn-secondary add-def-btn" data-iso="${escapeHtml(iso)}">+ Anlam Ekle</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function updateDefNumbers(listEl) {
+  listEl.querySelectorAll('.dict-def-row .def-num').forEach((el, i) => {
+    el.textContent = (i + 1) + '.';
+  });
+}
+
+function serializeDictEditor(iso) {
+  const editor = document.querySelector(`.dict-editor[data-iso="${iso}"]`);
+  if (!editor) return null;
+  const note = (editor.querySelector('.dict-note').value || '').trim() || null;
+  const root = (editor.querySelector('.dict-root').value || '').trim() || null;
+  const defs = [...editor.querySelectorAll('.dict-def-row')].map(row => ({
+    cls: row.querySelector('.def-cls').value,
+    extra: (row.querySelector('.def-extra').value || '').trim() || null,
+    text: (row.querySelector('.def-text').value || '').trim(),
+    quote: (row.querySelector('.def-quote').value || '').trim() || null,
+    attr: (row.querySelector('.def-attr').value || '').trim() || null,
+  })).filter(d => d.text);
+  if (!note && !root && !defs.length) return null;
+  return JSON.stringify({ note, root, defs });
+}
+
+// Event delegation for dict editor toggle, add/remove buttons
+document.addEventListener('click', e => {
+  const toggleBtn = e.target.closest('[data-dict-toggle]');
+  if (toggleBtn) {
+    const iso = toggleBtn.dataset.dictToggle;
+    const body = document.getElementById(`dict-body-${iso}`);
+    if (!body) return;
+    const open = body.classList.toggle('open');
+    toggleBtn.classList.toggle('open', open);
+    return;
+  }
+  if (e.target.classList.contains('add-def-btn')) {
+    const iso = e.target.dataset.iso;
+    const listEl = document.getElementById(`dict-defs-${iso}`);
+    if (!listEl) return;
+    const idx = listEl.querySelectorAll('.dict-def-row').length;
+    listEl.insertAdjacentHTML('beforeend', buildDefRowHtml(idx, null, false));
+  }
+  if (e.target.classList.contains('remove-def-btn')) {
+    const row = e.target.closest('.dict-def-row');
+    const listEl = row && row.closest('.dict-defs-list');
+    if (row && listEl) { row.remove(); updateDefNumbers(listEl); }
+  }
+});
+
 async function loadSozcelSchedule() {
   const wrap = document.getElementById('sozcel-schedule');
   const statusEl = document.getElementById('sozcel-status');
@@ -1910,30 +2122,39 @@ async function loadSozcelSchedule() {
   const dates = Array.from({ length: 7 }, (_, i) => sozcelIstanbulDateISO(i));
   const { data, error } = await sb
     .from('sozcel_used_answers')
-    .select('used_on, word')
+    .select('used_on, word, definition')
     .in('used_on', dates);
   if (error) {
     wrap.innerHTML = `<div class="empty-state">Error loading: ${escapeHtml(error.message)}</div>`;
     return;
   }
   const byDate = {};
-  (data || []).forEach(r => { byDate[r.used_on] = r.word; });
+  (data || []).forEach(r => {
+    let dictData = null;
+    if (r.definition) {
+      try { dictData = JSON.parse(r.definition); } catch (_) {
+        dictData = { defs: [{ text: r.definition }] };
+      }
+    }
+    byDate[r.used_on] = { word: r.word || '', dictData };
+  });
 
   wrap.innerHTML = dates.map((iso, i) => {
-    const locked = i === 0;
-    const word = byDate[iso] || '';
+    const word = (byDate[iso] && byDate[iso].word) || '';
+    const dictData = (byDate[iso] && byDate[iso].dictData) || null;
     const len = sozcelLengthForISO(iso);
     return `
-      <div class="article-card" style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;">
-        <div>
-          <div class="a-neighborhood">${escapeHtml(sozcelFormatLabel(iso, i))}</div>
-          <div style="font-size:0.7rem;color:var(--muted);font-family:'Inter',sans-serif;">${iso}</div>
+      <div class="article-card" style="display:grid;gap:10px;">
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;">
+          <div>
+            <div class="a-neighborhood">${escapeHtml(sozcelFormatLabel(iso, i))}</div>
+            <div style="font-size:0.7rem;color:var(--muted);font-family:'Inter',sans-serif;">${iso}</div>
+          </div>
+          <input type="text" data-date="${iso}" value="${escapeHtml(word)}" maxlength="${len}"
+            placeholder="${len} harf" style="width:140px;text-transform:uppercase;letter-spacing:2px;font-weight:700;"/>
+          <button class="btn btn-primary" data-save="${iso}" style="flex:0 0 auto;padding:9px 14px;">Kaydet</button>
         </div>
-        <input type="text" data-date="${iso}" value="${escapeHtml(word)}" maxlength="${len}"
-          placeholder="${len} harf" style="width:140px;text-transform:uppercase;letter-spacing:2px;font-weight:700;"
-          ${locked ? 'disabled' : ''}/>
-        <button class="btn btn-primary" data-save="${iso}" style="flex:0 0 auto;padding:9px 14px;${locked ? 'opacity:0.4;cursor:not-allowed;' : ''}"
-          ${locked ? 'disabled' : ''}>Save</button>
+        ${buildDictEditorHtml(iso, dictData, false)}
       </div>
     `;
   }).join('');
@@ -1949,58 +2170,48 @@ async function saveSozcelDay(iso) {
   if (!input) return;
   const raw = (input.value || '').trim();
   const word = raw.toLocaleUpperCase('tr-TR');
+  const definition = serializeDictEditor(iso);
 
-  // Re-check the lock against the live Istanbul date — prevents saving to a
-  // day that rolled over while the page was open.
-  if (iso <= sozcelIstanbulDateISO(0)) {
-    statusEl.textContent = 'That day is already active — cannot edit.';
-    statusEl.className = 'status-msg err';
-    loadSozcelSchedule();
-    return;
-  }
   const expectedLen = sozcelLengthForISO(iso);
   const lenRegex = new RegExp(`^[A-ZÇĞİÖŞÜ]{${expectedLen}}$`);
   if (!lenRegex.test(word)) {
-    statusEl.textContent = `Word must be exactly ${expectedLen} Turkish letters.`;
+    statusEl.textContent = `Kelime tam ${expectedLen} Türkçe harften oluşmalı.`;
     statusEl.className = 'status-msg err';
     return;
   }
 
   input.value = word;
 
-  // Sözcül: the member who suggested this word (one per word, enforced by
-  // the DB). Falls back to the admin if nobody has suggested it.
-  let sozculId = null;
-  let suggestionId = null;
-  const { data: suggestion } = await sb
-    .from('sozcel_word_suggestions')
-    .select('id, suggested_by')
-    .eq('word', word)
+  // Check if a row already exists for this date.
+  const { data: existing } = await sb
+    .from('sozcel_used_answers')
+    .select('used_on')
+    .eq('used_on', iso)
     .maybeSingle();
-  if (suggestion && suggestion.suggested_by) {
-    sozculId = suggestion.suggested_by;
-    suggestionId = suggestion.id;
+
+  let dbError;
+  if (existing) {
+    // Update word + definition only — leave sozcul_id as-is.
+    const { error } = await sb
+      .from('sozcel_used_answers')
+      .update({ word, definition })
+      .eq('used_on', iso);
+    dbError = error;
   } else {
-    const { data: { session } } = await sb.auth.getSession();
-    sozculId = session && session.user ? session.user.id : null;
+    // Insert without sozcul_id to avoid FK permission issues.
+    // The game's pickDailyTarget() will assign sozcul_id on first play.
+    const { error } = await sb
+      .from('sozcel_used_answers')
+      .insert({ used_on: iso, word, definition });
+    dbError = error;
   }
 
-  const { error } = await sb
-    .from('sozcel_used_answers')
-    .upsert({ used_on: iso, word, sozcul_id: sozculId }, { onConflict: 'used_on' });
-  if (error) {
-    statusEl.textContent = 'Error: ' + error.message;
+  if (dbError) {
+    statusEl.textContent = 'Hata: ' + dbError.message;
     statusEl.className = 'status-msg err';
     return;
   }
-  // Lock the suggestion as 'picked' so the suggester can submit a new word
-  // and the picked word stays globally reserved.
-  if (suggestionId) {
-    await sb.from('sozcel_word_suggestions')
-      .update({ status: 'picked' })
-      .eq('id', suggestionId);
-  }
-  statusEl.textContent = `Saved ${word} for ${iso}${suggestionId ? ' (sözcül assigned from suggestion)' : ''}.`;
+  statusEl.textContent = `${word} — ${iso} kaydedildi.`;
   statusEl.className = 'status-msg ok';
 }
 

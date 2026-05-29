@@ -158,7 +158,7 @@
       const h = hours > 0 ? `${hours}h ` : '';
       return `${prefix} ${h}${minutes}m`;
     }
-    const prefix = o.prefixTr || 'Yeni oyun';
+    const prefix = o.prefixTr || 'Yeni sözcük';
     const h = hours > 0 ? `${hours} saat ` : '';
     return `${prefix} ${h}${minutes} dakika sonra`;
   }
