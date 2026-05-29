@@ -75,7 +75,7 @@
     const empty = {
       bulmacaWins: 0, bulmacaPlayed: 0, bulmacaStreak: 0,
       sozcelWins: 0, sozcelPlayed: 0, sozcelStreak: 0,
-      baglantilarWins: 0, baglantilarPlayed: 0, baglantilarStreak: 0,
+      tumcelWins: 0, tumcelPlayed: 0, tumcelStreak: 0,
     };
     try {
       const { data, error } = await sb
@@ -90,7 +90,7 @@
         if (r.won) byGameDate[key].won = true;
       });
       const agg = { ...empty };
-      const winDatesByGame = { bulmaca: new Set(), sozcel: new Set(), baglantilar: new Set() };
+      const winDatesByGame = { bulmaca: new Set(), sozcel: new Set(), tumcel: new Set() };
       Object.values(byGameDate).forEach(entry => {
         const g = entry.game;
         if (!(g in winDatesByGame)) return;
@@ -99,7 +99,7 @@
       });
       agg.sozcelStreak = currentStreakFor(winDatesByGame.sozcel);
       agg.bulmacaStreak = currentStreakFor(winDatesByGame.bulmaca);
-      agg.baglantilarStreak = currentStreakFor(winDatesByGame.baglantilar);
+      agg.tumcelStreak = currentStreakFor(winDatesByGame.tumcel);
       return agg;
     } catch (e) {
       return empty;
@@ -192,9 +192,9 @@
               <div class="ist-pc-score-detail">${detail(scores.sozcelPlayed||0, scores.sozcelStreak||0)}</div>
             </div>
             <div class="ist-pc-score-card">
-              <div class="ist-pc-score-game">Bağlantılar</div>
-              <div class="ist-pc-score-value">${scores.baglantilarWins || 0}</div>
-              <div class="ist-pc-score-detail">${detail(scores.baglantilarPlayed||0, scores.baglantilarStreak||0)}</div>
+              <div class="ist-pc-score-game">Tümcel</div>
+              <div class="ist-pc-score-value">${scores.tumcelWins || 0}</div>
+              <div class="ist-pc-score-detail">${detail(scores.tumcelPlayed||0, scores.tumcelStreak||0)}</div>
             </div>
           </div>
         `;
