@@ -364,6 +364,15 @@
       padding: 10px 4px;
       list-style: none;
     }
+    .scoreboard-countdown {
+      font-size: 0.58rem;
+      color: var(--muted);
+      text-align: center;
+      padding: 4px 4px 6px;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 1px;
+      font-style: italic;
+    }
 
     .game-link {
       display: block;
@@ -1179,10 +1188,9 @@
           <div class="game-link-subtitle">Mini Çapraz Bulmaca</div>
         </a>
 
-        <!-- Weekly scoreboard: top 5 winners over the last 7 days. Each game
-             win (won=true in game_results) counts as one point. -->
         <div class="scoreboard">
           <h2>Haftanın Skor Tahtası</h2>
+          <div class="scoreboard-countdown" id="scoreboard-countdown"></div>
           <ol class="scoreboard-list" id="scoreboard-list">
             <li class="scoreboard-empty">Yükleniyor...</li>
           </ol>
@@ -1511,7 +1519,11 @@ function updateDateTime() {
   document.getElementById('time-line').textContent = time;
 }
 updateDateTime();
-setInterval(updateDateTime, 60000);
+setInterval(() => {
+  updateDateTime();
+  const cdEl = document.getElementById('scoreboard-countdown');
+  if (cdEl && cdEl.textContent) cdEl.textContent = getTimeUntilWeekReset();
+}, 60000);
 
 const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
@@ -1688,10 +1700,6 @@ async function markPlayedGames(userId) {
 }
 
 // ── Weekly scoreboard ──
-// Aggregates `won=true` rows in game_results over the last 7 days (Istanbul
-// time). Each win counts as 1 point. User first names are pulled from the
-// discussions table (the only place user_id -> first_name is queryable —
-// there is no profiles table). Users who have never posted show as "Anonim".
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => (
     {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
@@ -1702,13 +1710,37 @@ function capitalizeName(s) {
   return s.trim().split(/\s+/).map(w => w ? w.charAt(0).toLocaleUpperCase('tr-TR') + w.slice(1).toLocaleLowerCase('tr-TR') : '').join(' ');
 }
 
-// game_results.date is stored as un-padded "YYYY-M-D" which is not
-// lexicographically sortable, so we parse it into a Date for filtering.
+// game_results.date is stored as un-padded "YYYY-M-D".
 function parseGameDate(s) {
   if (!s || typeof s !== 'string') return null;
   const parts = s.split('-').map(Number);
   if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
   return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+// Points awarded per Sözcel game: 20/12/8/6/4/2 for win in 1–6 guesses; 1 for playing without winning.
+function gamePoints(attempts, won) {
+  if (won) {
+    const pts = [20, 12, 8, 6, 4, 2];
+    return pts[attempts - 1] ?? 2;
+  }
+  return attempts >= 1 ? 1 : 0;
+}
+
+// Time until next Monday 00:00 Istanbul (= end of current scoring week).
+function getTimeUntilWeekReset() {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  const dayOfWeek = ist.getDay(); // 0=Sun … 6=Sat
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+  const nextMonday = new Date(ist.getFullYear(), ist.getMonth(), ist.getDate() + daysUntilMonday);
+  const diff = nextMonday - ist;
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (days > 0) return `Sıfırlanmaya: ${days}g ${hours}sa ${minutes}dk`;
+  if (hours > 0) return `Sıfırlanmaya: ${hours}sa ${minutes}dk`;
+  return `Sıfırlanmaya: ${minutes}dk`;
 }
 
 async function loadScoreboard() {
@@ -1719,8 +1751,9 @@ async function loadScoreboard() {
   try {
     const { data, error } = await sb
       .from('game_results')
-      .select('user_id, neighborhood, date, won')
-      .eq('won', true);
+      .select('user_id, neighborhood, date, won, attempts')
+      .eq('game', 'sozcel')
+      .gte('attempts', 1);
     if (error) throw error;
     results = data;
   } catch (e) {
@@ -1733,9 +1766,11 @@ async function loadScoreboard() {
     return;
   }
 
-  // Window: last 7 days (today + previous 6), Istanbul time, inclusive.
+  // Weekly cutoff: Monday 00:00 of the current Istanbul week.
   const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-  const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - 6);
+  const dow = nowIst.getDay(); // 0=Sun … 6=Sat
+  const daysFromMonday = dow === 0 ? 6 : dow - 1;
+  const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - daysFromMonday);
 
   const weekly = results.filter(r => {
     const d = parseGameDate(r.date);
@@ -1747,20 +1782,28 @@ async function loadScoreboard() {
     return;
   }
 
-  // Group by user: 1 point per win, remember the neighborhood from their
-  // most recent win (later dates overwrite, so admins who later change
-  // neighborhood still show correctly).
-  const scores = new Map();
+  // Deduplicate per (user, date): keep the best (highest-scoring) result per day.
+  const byUserDate = new Map();
   weekly.forEach(r => {
     if (!r.user_id) return;
-    const prev = scores.get(r.user_id) || { score: 0, neighborhood: null, lastDate: null };
-    prev.score += 1;
-    const d = parseGameDate(r.date);
-    if (r.neighborhood && (!prev.lastDate || (d && d >= prev.lastDate))) {
-      prev.neighborhood = r.neighborhood;
+    const key = r.user_id + '|' + r.date;
+    const pts = gamePoints(r.attempts, r.won);
+    const existing = byUserDate.get(key);
+    if (!existing || pts > existing.pts) {
+      byUserDate.set(key, { user_id: r.user_id, neighborhood: r.neighborhood, date: r.date, pts });
+    }
+  });
+
+  const scores = new Map();
+  byUserDate.forEach(entry => {
+    const prev = scores.get(entry.user_id) || { score: 0, neighborhood: null, lastDate: null };
+    prev.score += entry.pts;
+    const d = parseGameDate(entry.date);
+    if (entry.neighborhood && (!prev.lastDate || (d && d >= prev.lastDate))) {
+      prev.neighborhood = entry.neighborhood;
       prev.lastDate = d;
     }
-    scores.set(r.user_id, prev);
+    scores.set(entry.user_id, prev);
   });
 
   // Resolve display names from the profiles table.
@@ -1803,6 +1846,9 @@ async function loadScoreboard() {
       `</li>`
     );
   }).join('');
+
+  const countdownEl = document.getElementById('scoreboard-countdown');
+  if (countdownEl) countdownEl.textContent = getTimeUntilWeekReset();
 }
 
 // Game-lock rules live in game-locks.js (applyGameLocks). Adding a new gated
