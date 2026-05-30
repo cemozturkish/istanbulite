@@ -3504,10 +3504,12 @@ function submitGuess() {
       document.getElementById('game-message').className = 'game-message win';
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
+      // Check before inserting — count = 0 means no one has won today yet.
+      const isFirstWinner = await checkFirstWinner(dailySeed);
       await recordGameResult('sozcel', dailySeed, rowSnap + 1, true, userNeighborhood);
       saveState();
       renderStats();
-      enableShareButton(true);
+      enableShareButton(true, isFirstWinner);
       // Longer pause lets the user see the final row flip + win message before
       // the popup covers it. The popup auto-opens only on first completion.
       setTimeout(() => showResultPopup(true), 1500);
@@ -3791,7 +3793,7 @@ async function loadScoreboard() {
   let results = null;
   try {
     const { data, error } = await sb.from('game_results')
-      .select('user_id, neighborhood, date, won, attempts')
+      .select('user_id, neighborhood, date, won, attempts, created_at')
       .eq('game', 'sozcel')
       .gte('attempts', 1);
     if (error) throw error;
@@ -3814,12 +3816,22 @@ async function loadScoreboard() {
     listEl.innerHTML = '<li class="scoreboard-empty">Bu hafta henüz skor yok</li>';
     return;
   }
+  // Find the first winner per date (earliest created_at among won=true rows).
+  const firstWinnerByDate = new Map();
+  weekly.filter(r => r.won).forEach(r => {
+    const existing = firstWinnerByDate.get(r.date);
+    if (!existing || r.created_at < existing.created_at) {
+      firstWinnerByDate.set(r.date, { user_id: r.user_id, created_at: r.created_at });
+    }
+  });
+
   // Deduplicate per (user, date): keep the best (highest-scoring) result per day.
   const byUserDate = new Map();
   weekly.forEach(r => {
     if (!r.user_id) return;
     const key = r.user_id + '|' + r.date;
-    const pts = gamePoints(r.attempts, r.won);
+    const isFirst = firstWinnerByDate.get(r.date)?.user_id === r.user_id;
+    const pts = gamePoints(r.attempts, r.won) + (isFirst ? 10 : 0);
     const existing = byUserDate.get(key);
     if (!existing || pts > existing.pts) {
       byUserDate.set(key, { user_id: r.user_id, neighborhood: r.neighborhood, date: r.date, pts });
@@ -3889,11 +3901,26 @@ function getAblativeSuffix(name) {
 // Tracks whether the player won, so the manual share button (top-right) can
 // reopen the same result card after the game is over.
 let lastResultWon = false;
+let lastResultIsFirstWinner = false;
 
-function enableShareButton(won) {
+function enableShareButton(won, isFirstWinner) {
   lastResultWon = !!won;
+  lastResultIsFirstWinner = !!isFirstWinner;
   const btn = document.getElementById('share-btn');
   if (btn) btn.disabled = false;
+}
+
+// Returns true if no other player has already won today's Sözcel.
+async function checkFirstWinner(date) {
+  try {
+    const { count, error } = await sb.from('game_results')
+      .select('*', { count: 'exact', head: true })
+      .eq('game', 'sozcel')
+      .eq('date', date)
+      .eq('won', true);
+    if (error) return false;
+    return count === 0;
+  } catch (e) { return false; }
 }
 
 // ── Result popup ──
@@ -3944,7 +3971,8 @@ function buildShareText() {
   const grid = guessResults.map(result =>
     result.map(r => r === 'correct' ? '🟫' : r === 'present' ? '🟧' : '⬜').join('')
   ).join('\n');
-  return `Sözcel ${score}/6\n\n${grid}\n\nistanbulite.net`;
+  const bonus = won && lastResultIsFirstWinner ? ' ⭐ İlk Çözücü +10' : '';
+  return `Sözcel ${score}/6${bonus}\n\n${grid}\n\nistanbulite.net`;
 }
 
 function showResultPopup(won) {
@@ -3953,11 +3981,18 @@ function showResultPopup(won) {
   const score = won ? guessResults.length : 'X';
   document.getElementById('result-icon-box').textContent = won ? '★' : '✕';
   document.getElementById('result-icon-box').style.background = won ? 'var(--success)' : 'var(--ink)';
-  document.getElementById('result-title').textContent = won ? 'Tebrikler!' : 'Bugünlük Bu Kadar';
-  const pts = gamePoints(won ? guessResults.length : 7, won);
-  document.getElementById('result-subtitle').textContent = won
-    ? `Kelimeyi ${score}. tahminde buldunuz. +${pts} puan`
-    : `Bugünkü kelime: ${TARGET_WORD} — +${pts} puan`;
+  const isFirst = won && lastResultIsFirstWinner;
+  document.getElementById('result-title').textContent = isFirst ? 'Günün İlk Çözücüsü!' : (won ? 'Tebrikler!' : 'Bugünlük Bu Kadar');
+  const basePts = gamePoints(won ? guessResults.length : 7, won);
+  const totalPts = basePts + (isFirst ? 10 : 0);
+  const subtitleEl = document.getElementById('result-subtitle');
+  if (won) {
+    subtitleEl.innerHTML = isFirst
+      ? `Kelimeyi ${score}. tahminde buldunuz.<br><strong>+${basePts} puan &nbsp;+&nbsp; 10 ilk çözücü bonusu = ${totalPts} puan</strong>`
+      : `Kelimeyi ${score}. tahminde buldunuz. +${totalPts} puan`;
+  } else {
+    subtitleEl.textContent = `Bugünkü kelime: ${TARGET_WORD} — +${totalPts} puan`;
+  }
   document.getElementById('result-emoji-grid').innerHTML = guessResults.map(result =>
     result.map(r => r === 'correct' ? '🟫' : r === 'present' ? '🟧' : '⬜').join('')
   ).join('<br>');

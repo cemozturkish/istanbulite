@@ -1751,7 +1751,7 @@ async function loadScoreboard() {
   try {
     const { data, error } = await sb
       .from('game_results')
-      .select('user_id, neighborhood, date, won, attempts')
+      .select('user_id, neighborhood, date, won, attempts, created_at')
       .eq('game', 'sozcel')
       .gte('attempts', 1);
     if (error) throw error;
@@ -1782,12 +1782,22 @@ async function loadScoreboard() {
     return;
   }
 
+  // Find the first winner per date (earliest created_at among won=true rows).
+  const firstWinnerByDate = new Map();
+  weekly.filter(r => r.won).forEach(r => {
+    const existing = firstWinnerByDate.get(r.date);
+    if (!existing || r.created_at < existing.created_at) {
+      firstWinnerByDate.set(r.date, { user_id: r.user_id, created_at: r.created_at });
+    }
+  });
+
   // Deduplicate per (user, date): keep the best (highest-scoring) result per day.
   const byUserDate = new Map();
   weekly.forEach(r => {
     if (!r.user_id) return;
     const key = r.user_id + '|' + r.date;
-    const pts = gamePoints(r.attempts, r.won);
+    const isFirst = firstWinnerByDate.get(r.date)?.user_id === r.user_id;
+    const pts = gamePoints(r.attempts, r.won) + (isFirst ? 10 : 0);
     const existing = byUserDate.get(key);
     if (!existing || pts > existing.pts) {
       byUserDate.set(key, { user_id: r.user_id, neighborhood: r.neighborhood, date: r.date, pts });
