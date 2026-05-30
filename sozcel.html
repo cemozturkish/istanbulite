@@ -3149,11 +3149,11 @@ function sozcelWordLengthFor(date) {
   const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
   return ist.getDay() === 0 ? 6 : 5;
 }
-const WORD_LENGTH = sozcelWordLengthFor();
+let WORD_LENGTH = sozcelWordLengthFor();
 
 // Bind the active list/set for today's word length.
-const WORD_LIST = WORD_LENGTH === 6 ? WORD_LIST_6 : WORD_LIST_5;
-const VALID_WORDS = WORD_LENGTH === 6 ? VALID_WORDS_6 : VALID_WORDS_5;
+let WORD_LIST = WORD_LENGTH === 6 ? WORD_LIST_6 : WORD_LIST_5;
+let VALID_WORDS = WORD_LENGTH === 6 ? VALID_WORDS_6 : VALID_WORDS_5;
 
 function seededRandom(seed) { return seededIndex(seed, WORD_LIST.length || 1); }
 
@@ -4117,14 +4117,13 @@ if (typeof applyGameLocks === 'function') applyGameLocks(sb);
     }
     gameOver = true;
   } else if (TARGET_WORD.length !== WORD_LENGTH) {
-    // Scheduled word doesn't match today's expected length. Don't let the
-    // user start a game we can't render correctly.
-    const msg = document.getElementById('game-message');
-    if (msg) {
-      msg.textContent = `Bugünkü sözcük ${WORD_LENGTH} harf olmalıydı; yöneticiyle iletişime geçin.`;
-      msg.className = 'game-message lose';
-    }
-    gameOver = true;
+    // Scheduled word length differs from the day rule — trust the scheduled
+    // word and adapt the game to its actual length.
+    WORD_LENGTH = TARGET_WORD.length;
+    WORD_LIST   = WORD_LENGTH === 6 ? WORD_LIST_6 : WORD_LIST_5;
+    VALID_WORDS = WORD_LENGTH === 6 ? VALID_WORDS_6 : VALID_WORDS_5;
+    initWordGrid();
+    await restoreState();
   } else {
     await restoreState();
   }
