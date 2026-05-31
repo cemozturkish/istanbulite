@@ -3227,22 +3227,14 @@ let currentGuess = '';
 let gameOver = false;
 const keyStates = {};
 const guessResults = []; // result arrays per row, used to build the share emoji grid
+const submittedGuesses = []; // authoritative list of submitted guess strings (never read from DOM)
 
 const SAVE_KEY = 'sozcel_state_' + dailySeed;
 
 function saveState() {
-  const state = { currentRow, currentGuess, gameOver, guesses: [] };
-  // When the game ends on a winning/losing guess, currentRow is NOT incremented
-  // (only the "wrong, try again" branch increments it), so we must explicitly
-  // include the current row in the save when gameOver is true.
-  const lastSavedRow = gameOver ? currentRow + 1 : currentRow;
-  for (let r = 0; r < lastSavedRow; r++) {
-    let word = '';
-    for (let c = 0; c < WORD_LENGTH; c++) {
-      word += document.getElementById(`box-${r}-${c}`).textContent;
-    }
-    state.guesses.push(word);
-  }
+  // Use the JS-tracked array as the authoritative source — never read from
+  // the DOM, which can be empty on mobile due to rendering timing issues.
+  const state = { currentRow, currentGuess, gameOver, guesses: submittedGuesses.slice() };
   localStorage.setItem(SAVE_KEY, JSON.stringify(state));
   // Mirror to Supabase so the board syncs across devices.
   saveStateRemote(state);
@@ -3291,9 +3283,14 @@ async function restoreState() {
     const state = JSON.parse(raw);
     if (!state.guesses || state.guesses.length === 0) return false;
 
-    state.guesses.forEach((word, rowIdx) => {
+    // Filter out any corrupted entries (empty or wrong-length guesses) that
+    // could sneak in from older saves where saveState read from the DOM.
+    const validGuesses = state.guesses.filter(w => typeof w === 'string' && w.length === WORD_LENGTH);
+
+    validGuesses.forEach((word, rowIdx) => {
       currentRow = rowIdx;
       currentGuess = word;
+      submittedGuesses.push(word);
       for (let i = 0; i < WORD_LENGTH; i++) {
         const box = document.getElementById(`box-${rowIdx}-${i}`);
         box.textContent = word[i] || '';
@@ -3317,7 +3314,7 @@ async function restoreState() {
 
     gameOver = state.gameOver;
     if (gameOver) {
-      const lastGuess = state.guesses[state.guesses.length - 1];
+      const lastGuess = validGuesses[validGuesses.length - 1];
       const wasWon = lastGuess === TARGET_WORD;
       if (wasWon) {
         document.getElementById('game-message').textContent = 'Tebrikler!';
@@ -3327,12 +3324,12 @@ async function restoreState() {
         document.getElementById('game-message').className = 'game-message lose';
       }
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
-      currentRow = state.guesses.length;
+      currentRow = validGuesses.length;
       // Do NOT auto-open the result popup on revisit — the share button stays
       // available in the top-right for the user to reopen it manually.
       enableShareButton(wasWon);
     } else {
-      currentRow = state.guesses.length;
+      currentRow = validGuesses.length;
       currentGuess = '';
     }
     return true;
@@ -3470,6 +3467,7 @@ function submitGuess() {
   const rowSnap = currentRow;
   const result = checkWord(guessSnap);
   guessResults.push(result);
+  submittedGuesses.push(guessSnap);
 
   // Set gameOver immediately (not inside the setTimeout) so that pressing Enter
   // during the flip animation can't submit a phantom 7th guess.
