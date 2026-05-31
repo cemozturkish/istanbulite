@@ -75,7 +75,7 @@
       background-color: var(--paper);
       color: var(--ink);
       display: grid;
-      grid-template-columns: 1fr 2.2fr 1fr;
+      grid-template-columns: 1.1fr 2.4fr;
       grid-template-rows: auto 1fr;
       height: 100vh;
       overflow: hidden;
@@ -161,14 +161,7 @@
       text-align: left;
       flex-shrink: 0;
     }
-    .col-right {
-      grid-column: 3;
-      grid-row: 2;
-      border-left: var(--col-border);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
+    .col-right { display: none; }
 
     main {
       grid-column: 2;
@@ -610,7 +603,58 @@
       color: var(--muted);
     }
 
-    /* ── Article display (center) ── */
+    /* ── Shelves (center) — 6 horizontal rectangle buttons styled like bookshelves ── */
+    .shelves {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 24px 32px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .shelf-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--paper-warm);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      padding: 22px 24px;
+      text-align: center;
+      text-decoration: none;
+      color: var(--ink);
+      transition: background 0.2s, transform 0.2s;
+      position: relative;
+      flex-shrink: 0;
+      cursor: pointer;
+      font-family: 'Source Serif 4', Georgia, serif;
+    }
+    .shelf-btn::before {
+      content: '';
+      position: absolute;
+      inset: 4px;
+      border: 1px solid var(--ink);
+      pointer-events: none;
+    }
+    .shelf-btn:hover {
+      background: var(--paper-dark);
+      transform: translateX(-4px);
+    }
+    .shelf-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    .shelf-subtitle {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-top: 4px;
+    }
+
+    /* ── Article display (center) — retained but unused ── */
     .article-area {
       flex: 1;
       padding: 32px 40px;
@@ -1092,50 +1136,17 @@
       .datetime-block { gap: 8px; font-size: 9px; letter-spacing: 1.5px; }
       .datetime-block .day-line, .datetime-block .sep:nth-of-type(2) { display: none; }
 
-      /* Source tab strip — horizontal, sticky below date bar */
+      /* col-left holds profile + countdowns + signout; render as a normal
+         vertical block on mobile (no more horizontal source-tab strip). */
       .col-left {
         border: none;
         border-bottom: 1px solid var(--hairline);
-        background: var(--paper-banner);
-        overflow-x: auto;
-        overflow-y: hidden;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        display: flex;
-        flex-direction: row;
-        align-items: stretch;
-        padding: 0;
-        position: sticky;
-        /* top is set by JS to match section-rule height */
-        z-index: 9;
-      }
-      .col-left::-webkit-scrollbar { display: none; }
-      .col-left .nb-highlight { display: none; }
-      .library-shelf {
-        display: flex;
-        flex-direction: row;
-        padding: 0;
-        flex: none;
-        overflow: visible;
-      }
-      .country-label { display: none; }
-      .source-tab {
-        white-space: nowrap;
-        flex-shrink: 0;
-        padding: 10px 14px;
-        font-size: 10px;
-        letter-spacing: 1px;
-        border-left: none;
-        border-bottom: 2px solid transparent;
-        border-radius: 0;
-      }
-      .source-tab:hover { background: none; }
-      .source-tab.active {
-        color: var(--ink);
         background: var(--paper-card);
-        border-left-color: transparent;
-        border-bottom-color: var(--ink);
+        display: flex;
+        flex-direction: column;
+        padding: 0;
       }
+      .col-left .nb-highlight { display: none; }
       .counter-strip {
         flex-direction: row;
         border-top: none;
@@ -1155,12 +1166,23 @@
       .counter-value .cv-days { font-size: 0.8rem; }
       .counter-value .cv-suffix { font-size: 0.8rem; }
 
-      /* Article area — visible, expands with content */
+      /* Shelves area — visible, expands with content */
       main {
         display: block;
         overflow: visible;
         min-height: 0;
       }
+      .shelves {
+        padding: 16px;
+        gap: 10px;
+        overflow-y: visible;
+        flex: none;
+      }
+      .shelf-btn {
+        padding: 18px 18px;
+        border-bottom-width: 4px;
+      }
+      .shelf-title { font-size: 0.9rem; letter-spacing: 2px; }
       .article-area {
         padding: 16px;
         overflow-y: visible;
@@ -1248,7 +1270,8 @@
          (?user=ID), keep the legacy layout instead. */
       body:not(.ist-viewing-other) #mobile-top,
       body:not(.ist-viewing-other) .col-right,
-      body:not(.ist-viewing-other) .profile-signout-wrap { display: none !important; }
+      body:not(.ist-viewing-other) .profile-signout-wrap,
+      body:not(.ist-viewing-other) .col-left { display: none !important; }
       body.ist-viewing-other #ist-pc-mount { display: none !important; }
 
       /* ── Mobile top: compact profile card + countdowns ── */
@@ -1287,14 +1310,13 @@
       }
       #mobile-top .library-card .card-name { font-size: 0.85rem; }
       #mobile-top .library-card .card-meta { font-size: 0.62rem; }
-      /* Two-column section: countdowns left, article category tabs right */
+      /* Countdowns strip (article-tabs column retired) */
       #mobile-two-col {
-        display: grid;
-        grid-template-columns: 2fr 3fr;
-        align-items: start;
+        display: block;
         border-top: 1px solid var(--rule);
-        overflow: hidden; /* prevent grid from widening the page */
+        overflow: hidden;
       }
+      #mobile-col-articles { display: none; }
       #mobile-col-counts,
       #mobile-col-articles {
         min-width: 0; /* grid items must be allowed to shrink below content width */
@@ -1570,33 +1592,34 @@
   <div id="mobile-top"></div>
 
   <aside class="col-left">
-    <div class="library-shelf" id="library-shelf">
-      <div class="shelf-loading"><span class="spinner"></span></div>
-    </div>
-    <div class="counter-strip" id="counter-strip"></div>
-  </aside>
-
-  <!-- Mobile-only: two-column layout (countdowns | article content) filled by mobileReorderElements() -->
-  <div id="mobile-two-col">
-    <div id="mobile-col-counts"></div>
-    <div id="mobile-col-articles"></div>
-  </div>
-
-  <main>
-    <div class="article-area" id="article-area">
-      <div class="empty-state">Okumak için soldaki listeden bir makale seçin.</div>
-    </div>
-  </main>
-
-  <aside class="col-right">
     <div class="library-card" id="library-card">
       <div class="loading"><span class="spinner"></span></div>
     </div>
     <div class="profile-right">
       <div class="loading"><span class="spinner"></span></div>
     </div>
+    <div class="counter-strip" id="counter-strip"></div>
     <div class="profile-signout-wrap" id="profile-signout-wrap"></div>
   </aside>
+
+  <!-- Mobile-only: two-column layout (countdowns | shelves) filled by mobileReorderElements() -->
+  <div id="mobile-two-col">
+    <div id="mobile-col-counts"></div>
+    <div id="mobile-col-articles"></div>
+  </div>
+
+  <main>
+    <div class="shelves" id="shelves">
+      <a class="shelf-btn" data-shelf="1"><div><div class="shelf-title">Raf 1</div></div></a>
+      <a class="shelf-btn" data-shelf="2"><div><div class="shelf-title">Raf 2</div></div></a>
+      <a class="shelf-btn" data-shelf="3"><div><div class="shelf-title">Raf 3</div></div></a>
+      <a class="shelf-btn" data-shelf="4"><div><div class="shelf-title">Raf 4</div></div></a>
+      <a class="shelf-btn" data-shelf="5"><div><div class="shelf-title">Raf 5</div></div></a>
+      <a class="shelf-btn" data-shelf="6"><div><div class="shelf-title">Raf 6</div></div></a>
+    </div>
+  </main>
+
+  <aside class="col-right" hidden></aside>
 
 <script>
 // ══════════════════════════════════════════
@@ -1961,10 +1984,7 @@ window.addEventListener('resize', updateTabStripOffset);
   const colRight = document.querySelector('aside.col-right');
 
   if (!mobileTop || !mobileTwoCol || !mobileColCounts || !mobileColArticles) return;
-  if (!card || !strip || !colLeft || !colRight) return;
-
-  // Capture original positions before any moves.
-  const cardBefore  = card.nextSibling; // = .profile-right div (stays in col-right always)
+  if (!card || !strip || !colLeft) return;
 
   let inMobile = null;
 
@@ -1973,21 +1993,19 @@ window.addEventListener('resize', updateTabStripOffset);
     if (mobile === inMobile) return;
     inMobile = mobile;
     if (mobile) {
-      // When viewing another user, fall back to the legacy layout: move the
-      // library-card and col-right to the top. Otherwise the shared
-      // #ist-pc-mount widget renders the self-profile card and HESAP info, and
-      // we leave the library-card / col-right hidden via CSS.
+      // When viewing another user, surface the legacy profile card at the top.
+      // (Self-view uses #ist-pc-mount, mounted by profile-card.js.)
       if (document.body.classList.contains('ist-viewing-other')) {
         mobileTop.appendChild(card);
-        document.body.insertBefore(colRight, colLeft);
       }
+      // Pull the countdowns out of col-left so they get their own row;
+      // the profile/account info stays in col-left.
       mobileColCounts.appendChild(strip);
-      mobileColArticles.appendChild(colLeft);
     } else {
-      // Restore: col-left back to body before mobile-two-col
-      document.body.insertBefore(colLeft, mobileTwoCol);
-      // Restore: counter-strip back into col-left
+      // Restore countdowns back into col-left, after profile-right.
       colLeft.appendChild(strip);
+      const signoutWrap = document.getElementById('profile-signout-wrap');
+      if (signoutWrap) colLeft.appendChild(signoutWrap);
     }
   }
 
@@ -2475,13 +2493,8 @@ async function submitComment(articleId) {
 // Categories and counters are loaded after the supabase client is ready
 // (see the bootstrap call at the end of this script).
 async function bootstrapLibraryNav() {
-  await Promise.all([loadLibraryCategories(), loadCounters()]);
-  renderCategoryTabs();
+  await loadCounters();
   renderCounterStrip();
-  if (LIB_CATEGORIES.length && !activeCategoryId) {
-    activeCategoryId = LIB_CATEGORIES[0].id;
-    renderCategoryList(activeCategoryId);
-  }
 }
 
 const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
