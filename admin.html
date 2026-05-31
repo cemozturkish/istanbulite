@@ -683,8 +683,8 @@
     <div class="panel">
       <div class="panel-title" id="form-mode-label">Add New Article</div>
 
-      <label>Category</label>
-      <select id="f-category">
+      <label>Shelf</label>
+      <select id="f-shelf">
         <option value="">— loading… —</option>
       </select>
 
@@ -700,14 +700,31 @@
       <label>Date Published</label>
       <input type="date" id="f-published"/>
 
+      <label>Reading Deadline (optional)</label>
+      <input type="datetime-local" id="f-deadline" style="width:100%;padding:9px 12px;border:1px solid var(--rule);background:var(--field-bg);font-family:'Inter',sans-serif;font-size:0.92rem;"/>
+
       <label>One-sentence summary</label>
       <textarea id="f-summary" placeholder="Shown in the article list..."></textarea>
 
-      <label>Body (optional)</label>
-      <textarea id="f-body" placeholder="Full article text shown when opened..." style="min-height:120px;"></textarea>
+      <label>Body</label>
+      <p style="font-size:0.72rem;color:var(--muted);font-style:italic;line-height:1.4;margin:0 0 6px;">
+        Put <code>---</code> on its own line to start a new section (checkpoint).
+        Wrap a phrase in <code>[[word::definition]]</code> to add a vocab tooltip.
+      </p>
+      <textarea id="f-body" placeholder="Full article text shown when opened..." style="min-height:160px;"></textarea>
 
       <label>Source URL (optional)</label>
       <input type="text" id="f-url" placeholder="https://..."/>
+
+      <label>Poll (optional)</label>
+      <p style="font-size:0.72rem;color:var(--muted);font-style:italic;line-height:1.4;margin:0 0 6px;">
+        Shown after the article. Leave the question blank to skip.
+      </p>
+      <input type="text" id="f-poll-question" placeholder="Poll question..."/>
+      <input type="text" id="f-poll-opt-0" placeholder="Option 1" style="margin-top:6px;"/>
+      <input type="text" id="f-poll-opt-1" placeholder="Option 2" style="margin-top:6px;"/>
+      <input type="text" id="f-poll-opt-2" placeholder="Option 3 (optional)" style="margin-top:6px;"/>
+      <input type="text" id="f-poll-opt-3" placeholder="Option 4 (optional)" style="margin-top:6px;"/>
 
       <input type="hidden" id="f-editing-id"/>
 
@@ -724,7 +741,7 @@
 
       <div class="filter-row">
         <select id="filter-scope">
-          <option value="all">All Categories</option>
+          <option value="all">All Shelves</option>
         </select>
         <button id="filter-btn">Filter</button>
       </div>
@@ -738,32 +755,15 @@
 
   <div class="admin-body" id="library-tab" style="display:none;">
 
-    <!-- LEFT: Categories -->
+    <!-- LEFT: Shelves -->
     <div class="panel">
-      <div class="panel-title">Topic Categories</div>
+      <div class="panel-title">Shelves (Rafs)</div>
       <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
-        These show in the Kütüphane left nav as tabs. Reorder with ↑↓, edit to rename, delete to remove. The slug ID is used to link articles to a category — change it only if you have no articles filed under it yet.
+        Six fixed shelves anchor the Kütüphane right column. Give each shelf a name, an optional subtitle, and a closing deadline (the countdown shown to readers). Empty shelves render as "Coming Soon".
       </p>
 
-      <label>Slug ID</label>
-      <input type="text" id="lc-id" placeholder="e.g. bizden_baskalarina"/>
-
-      <label>Label (Turkish)</label>
-      <input type="text" id="lc-label" placeholder="Display label"/>
-
-      <input type="hidden" id="lc-editing-id"/>
-
-      <div class="btn-row">
-        <button class="btn btn-primary" id="lc-submit-btn">Add Category</button>
-        <button class="btn btn-secondary" id="lc-cancel-btn" style="display:none;">Cancel Edit</button>
-      </div>
-      <div class="status-msg" id="lc-form-status"></div>
-
-      <div style="margin-top:18px;">
-        <div class="panel-title" style="margin-top:8px;">Existing Categories</div>
-        <div class="articles-list" id="lc-list">
-          <div class="empty-state"><span class="spinner"></span></div>
-        </div>
+      <div id="shelves-list">
+        <div class="empty-state"><span class="spinner"></span></div>
       </div>
     </div>
 
@@ -1072,7 +1072,7 @@ async function checkAdmin() {
   const { data: { session } } = await sb.auth.getSession();
   if (session && session.user.email === ADMIN_EMAIL) {
     showAdminPanel(session.user);
-    refreshCategoryDropdowns().then(loadArticles);
+    refreshShelfDropdowns().then(loadArticles);
     loadUsersTabNeighborhoods();
   }
 }
@@ -1100,7 +1100,7 @@ document.getElementById('adm-login-btn').addEventListener('click', async () => {
     return;
   }
   showAdminPanel(data.user);
-  refreshCategoryDropdowns().then(loadArticles);
+  refreshShelfDropdowns().then(loadArticles);
   loadUsersTabNeighborhoods();
 });
 
@@ -1115,9 +1115,9 @@ const NEIGHBORHOOD_NAMES = {
   kagithane:'Kağıthane', atasehir:'Ataşehir', zeytinburnu:'Zeytinburnu', fatih:'Fatih',
   istanbul_disi: 'İstanbul Dışı'
 };
-// Loaded from public.library_categories at boot — empty until then.
-let LIB_CATEGORY_LIST = [];
-let LIB_CATEGORY_LABELS = {};
+// Loaded from public.library_shelves at boot — empty until then.
+let SHELVES = [];
+let SHELF_LABELS = {};
 function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g,
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1139,7 +1139,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('sozcel-tab').style.display = (tab === 'sozcel') ? 'grid' : 'none';
     document.getElementById('tumcel-tab').style.display = (tab === 'tumcel') ? 'grid' : 'none';
     document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
-    if (tab === 'library') { loadLibCategories(); loadCounters(); }
+    if (tab === 'library') { loadShelves(); loadCounters(); }
     if (tab === 'news') loadBreakingNews();
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
     if (tab === 'sozcel') loadSozcelSchedule();
@@ -1247,23 +1247,30 @@ async function loadArticles(scope = 'all') {
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
 
   let query = sb.from('library_articles').select('*')
-    .order('category').order('position', { ascending: true }).order('created_at', { ascending: false });
-  if (scope !== 'all') query = query.eq('category', scope);
+    .order('shelf_id').order('position', { ascending: true }).order('created_at', { ascending: false });
+  if (scope !== 'all') query = query.eq('shelf_id', Number(scope));
 
   const { data, error } = await query;
   if (error) { listEl.innerHTML = `<div class="empty-state">Error loading articles.</div>`; return; }
   if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No articles yet.</div>'; return; }
 
-  const byCategory = {};
+  const byShelf = {};
   data.forEach(a => {
-    const key = a.category || '(uncategorized)';
-    (byCategory[key] = byCategory[key] || []).push(a);
+    const key = a.shelf_id == null ? '(unfiled)' : String(a.shelf_id);
+    (byShelf[key] = byShelf[key] || []).push(a);
   });
 
-  const sections = Object.keys(byCategory).map(cat => ({
-    label: LIB_CATEGORY_LABELS[cat] || cat,
-    rows: byCategory[cat],
-    category: cat,
+  // Sort shelves numerically; '(unfiled)' goes last.
+  const orderedKeys = Object.keys(byShelf).sort((a, b) => {
+    if (a === '(unfiled)') return 1;
+    if (b === '(unfiled)') return -1;
+    return Number(a) - Number(b);
+  });
+
+  const sections = orderedKeys.map(key => ({
+    label: key === '(unfiled)' ? '(unfiled)' : `Raf ${key} — ${SHELF_LABELS[Number(key)] || `Raf ${key}`}`,
+    rows: byShelf[key],
+    shelfKey: key,
   }));
 
   listEl.innerHTML = sections.map(section => {
@@ -1272,6 +1279,7 @@ async function loadArticles(scope = 'all') {
         a.source ? escapeHtml(a.source) : null,
         a.author ? escapeHtml(a.author) : null,
         a.published_at ? new Date(a.published_at).toLocaleDateString('tr-TR', { year:'numeric', month:'short', day:'numeric' }) : null,
+        a.deadline ? 'deadline ' + new Date(a.deadline).toLocaleString('tr-TR', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : null,
       ].filter(Boolean).join(' · ');
       return `
         <div class="article-card" data-id="${a.id}">
@@ -1299,33 +1307,41 @@ async function loadArticles(scope = 'all') {
       if (act === 'edit') editArticle(row);
       else if (act === 'del') deleteArticle(row);
       else if (act === 'up' || act === 'down') {
-        const section = sections.find(s => s.category === (row.category || '(uncategorized)'));
+        const key = row.shelf_id == null ? '(unfiled)' : String(row.shelf_id);
+        const section = sections.find(s => s.shelfKey === key);
         if (section) reorderArticle(row, act, section.rows);
       }
     });
   });
 }
 
-// Load categories and populate the article form + filter dropdowns.
-async function refreshCategoryDropdowns() {
-  const { data, error } = await sb.from('library_categories')
-    .select('*').order('position', { ascending: true });
-  if (error) { console.error('[admin categories]', error); return; }
-  LIB_CATEGORY_LIST = data || [];
-  LIB_CATEGORY_LABELS = {};
-  LIB_CATEGORY_LIST.forEach(c => { LIB_CATEGORY_LABELS[c.id] = c.label_tr; });
+// Load the six shelves and populate the article-form + filter dropdowns.
+// The shelves table seeds rows 1–6; if a shelf is unnamed it shows as "Raf N".
+async function refreshShelfDropdowns() {
+  const { data, error } = await sb.from('library_shelves')
+    .select('*').order('id', { ascending: true });
+  if (error) { console.error('[admin shelves]', error); return; }
+  SHELVES = data || [];
+  SHELF_LABELS = {};
+  SHELVES.forEach(s => {
+    const label = (s.name_tr && s.name_tr.trim()) ? s.name_tr.trim() : `Raf ${s.id}`;
+    SHELF_LABELS[s.id] = label;
+  });
 
-  const opts = LIB_CATEGORY_LIST.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.label_tr)}</option>`).join('');
-  const formSel = document.getElementById('f-category');
+  const opts = SHELVES.map(s => {
+    const name = (s.name_tr && s.name_tr.trim()) ? s.name_tr.trim() : '(unnamed)';
+    return `<option value="${s.id}">Raf ${s.id} — ${escapeHtml(name)}</option>`;
+  }).join('');
+  const formSel = document.getElementById('f-shelf');
   if (formSel) {
     const prev = formSel.value;
-    formSel.innerHTML = '<option value="">— Select a category —</option>' + opts;
+    formSel.innerHTML = '<option value="">— Select a shelf —</option>' + opts;
     if (prev) formSel.value = prev;
   }
   const filterSel = document.getElementById('filter-scope');
   if (filterSel) {
     const prev = filterSel.value;
-    filterSel.innerHTML = '<option value="all">All Categories</option>' + opts;
+    filterSel.innerHTML = '<option value="all">All Shelves</option>' + opts;
     if (prev) filterSel.value = prev;
   }
 }
@@ -1334,23 +1350,39 @@ document.getElementById('filter-btn').addEventListener('click', () => {
   loadArticles(document.getElementById('filter-scope').value);
 });
 
+// Read the 4 poll-option inputs and assemble a { question, options } object,
+// or null if the question is blank or fewer than 2 options were filled in.
+function readPollForm() {
+  const q = document.getElementById('f-poll-question').value.trim();
+  if (!q) return null;
+  const opts = [0, 1, 2, 3]
+    .map(i => document.getElementById('f-poll-opt-' + i).value.trim())
+    .filter(v => v.length > 0);
+  if (opts.length < 2) return null;
+  return { question: q, options: opts };
+}
+
 // ── Submit (insert/update) ──
 document.getElementById('submit-btn').addEventListener('click', async () => {
   const editingId = document.getElementById('f-editing-id').value;
-  const category = document.getElementById('f-category').value;
+  const shelfRaw = document.getElementById('f-shelf').value;
+  const shelf_id = shelfRaw ? Number(shelfRaw) : null;
   const source = document.getElementById('f-source').value.trim() || null;
   const title = document.getElementById('f-title').value.trim();
   const author = document.getElementById('f-author').value.trim() || null;
   const publishedRaw = document.getElementById('f-published').value;
   const published_at = publishedRaw ? new Date(publishedRaw).toISOString() : null;
+  const deadlineRaw = document.getElementById('f-deadline').value;
+  const deadline = deadlineRaw ? new Date(deadlineRaw).toISOString() : null;
   const summary = document.getElementById('f-summary').value.trim();
   const body = document.getElementById('f-body').value.trim();
   const url = document.getElementById('f-url').value.trim();
+  const poll = readPollForm();
   const statusEl = document.getElementById('form-status');
   const btn = document.getElementById('submit-btn');
 
-  if (!title || !category) {
-    statusEl.textContent = 'Please select a category and enter a title.';
+  if (!title || !shelf_id) {
+    statusEl.textContent = 'Please pick a shelf and enter a title.';
     statusEl.className = 'status-msg err';
     return;
   }
@@ -1358,18 +1390,22 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   statusEl.textContent = ''; statusEl.className = 'status-msg';
   btn.innerHTML = '<span class="spinner"></span>';
 
+  // Poll questions written before the column existed would 400 the request;
+  // build the payload without `poll` if no question is set, so older schemas
+  // (pre-v5 migration) don't break.
+  const payload = { shelf_id, source, title, summary, body, url, author, published_at, deadline };
+  if (poll !== null) payload.poll = poll;
+  else if (editingId) payload.poll = null; // explicitly clear on update
+
   let result;
   if (editingId) {
-    result = await sb.from('library_articles')
-      .update({ category, source, title, summary, body, url, author, published_at })
-      .eq('id', editingId);
+    result = await sb.from('library_articles').update(payload).eq('id', editingId);
   } else {
     const { data: tail } = await sb.from('library_articles')
-      .select('position').eq('category', category)
+      .select('position').eq('shelf_id', shelf_id)
       .order('position', { ascending: false }).limit(1);
     const nextPos = (tail && tail[0] ? tail[0].position : -1) + 1;
-    result = await sb.from('library_articles')
-      .insert([{ category, source, title, summary, body, url, author, published_at, position: nextPos }]);
+    result = await sb.from('library_articles').insert([{ ...payload, position: nextPos }]);
   }
 
   btn.textContent = editingId ? 'Update Article' : 'Publish Article';
@@ -1388,14 +1424,17 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
 
 function resetForm() {
   document.getElementById('f-editing-id').value = '';
-  document.getElementById('f-category').value = '';
+  document.getElementById('f-shelf').value = '';
   document.getElementById('f-source').value = '';
   document.getElementById('f-title').value = '';
   document.getElementById('f-author').value = '';
   document.getElementById('f-published').value = '';
+  document.getElementById('f-deadline').value = '';
   document.getElementById('f-summary').value = '';
   document.getElementById('f-body').value = '';
   document.getElementById('f-url').value = '';
+  document.getElementById('f-poll-question').value = '';
+  ['f-poll-opt-0','f-poll-opt-1','f-poll-opt-2','f-poll-opt-3'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('submit-btn').textContent = 'Publish Article';
   document.getElementById('form-mode-label').textContent = 'Add New Article';
   document.getElementById('cancel-edit-btn').style.display = 'none';
@@ -1405,20 +1444,37 @@ document.getElementById('cancel-edit-btn').addEventListener('click', resetForm);
 
 function editArticle(row) {
   document.getElementById('f-editing-id').value = row.id;
-  document.getElementById('f-category').value = row.category || '';
+  document.getElementById('f-shelf').value = row.shelf_id != null ? String(row.shelf_id) : '';
   document.getElementById('f-source').value = row.source || '';
   document.getElementById('f-title').value = row.title || '';
   document.getElementById('f-author').value = row.author || '';
   document.getElementById('f-published').value = row.published_at
     ? new Date(row.published_at).toISOString().slice(0, 10)
     : '';
+  // datetime-local wants a local-formatted string without the timezone suffix.
+  document.getElementById('f-deadline').value = row.deadline
+    ? toLocalDatetimeInput(row.deadline)
+    : '';
   document.getElementById('f-summary').value = row.summary || '';
   document.getElementById('f-body').value = row.body || '';
   document.getElementById('f-url').value = row.url || '';
+  const poll = row.poll || null;
+  document.getElementById('f-poll-question').value = poll && poll.question ? poll.question : '';
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('f-poll-opt-' + i).value = (poll && Array.isArray(poll.options) && poll.options[i]) ? poll.options[i] : '';
+  }
   document.getElementById('submit-btn').textContent = 'Update Article';
   document.getElementById('form-mode-label').textContent = 'Editing Article';
   document.getElementById('cancel-edit-btn').style.display = 'inline-block';
   document.querySelector('#articles-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Format an ISO timestamp for a <input type="datetime-local"> — strip the
+// timezone and seconds so the browser doesn't reject it.
+function toLocalDatetimeInput(iso) {
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 async function deleteArticle(row) {
@@ -1445,116 +1501,97 @@ async function reorderArticle(row, direction, sourceList) {
 }
 
 // ══════════════════════════════════════════
-// Library Setup: Categories + Counters CRUD
+// Library Setup: Shelves + Counters CRUD
 // ══════════════════════════════════════════
-async function loadLibCategories() {
-  const listEl = document.getElementById('lc-list');
+// Render the 6 fixed shelves as inline-editable rows: each shelf has a
+// name, an optional subtitle, and a deadline. There's no add/delete —
+// the rows are seeded by db/library_shelves_v5.sql.
+async function loadShelves() {
+  const listEl = document.getElementById('shelves-list');
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
-  const { data, error } = await sb.from('library_categories')
-    .select('*').order('position', { ascending: true });
-  if (error) { listEl.innerHTML = '<div class="empty-state">Error loading categories.</div>'; return; }
-  LIB_CATEGORY_LIST = data || [];
-  LIB_CATEGORY_LABELS = {};
-  LIB_CATEGORY_LIST.forEach(c => { LIB_CATEGORY_LABELS[c.id] = c.label_tr; });
-  // Re-sync the article form dropdowns so newly added/edited categories show up.
-  refreshCategoryDropdowns();
-  if (!LIB_CATEGORY_LIST.length) {
-    listEl.innerHTML = '<div class="empty-state">No categories yet.</div>';
+  const { data, error } = await sb.from('library_shelves')
+    .select('*').order('id', { ascending: true });
+  if (error) {
+    listEl.innerHTML = '<div class="empty-state">Error loading shelves: ' + escapeHtml(error.message) + '</div>';
     return;
   }
-  listEl.innerHTML = LIB_CATEGORY_LIST.map((c, i) => `
-    <div class="article-card" data-id="${escapeHtml(c.id)}">
-      <div class="a-neighborhood">#${i + 1} · ${escapeHtml(c.id)}</div>
-      <h4>${escapeHtml(c.label_tr)}</h4>
-      <div class="card-actions">
-        <button class="btn-edit" data-act="lc-up"   data-id="${escapeHtml(c.id)}" ${i === 0 ? 'disabled style="opacity:0.4;cursor:default;"' : ''}>↑</button>
-        <button class="btn-edit" data-act="lc-down" data-id="${escapeHtml(c.id)}" ${i === LIB_CATEGORY_LIST.length - 1 ? 'disabled style="opacity:0.4;cursor:default;"' : ''}>↓</button>
-        <button class="btn-edit" data-act="lc-edit" data-id="${escapeHtml(c.id)}">Edit</button>
-        <button class="btn-del"  data-act="lc-del"  data-id="${escapeHtml(c.id)}">Delete</button>
+  SHELVES = data || [];
+  SHELF_LABELS = {};
+  SHELVES.forEach(s => {
+    const label = (s.name_tr && s.name_tr.trim()) ? s.name_tr.trim() : `Raf ${s.id}`;
+    SHELF_LABELS[s.id] = label;
+  });
+  // Keep article-form dropdowns in sync when the admin renames a shelf.
+  refreshShelfDropdowns();
+
+  if (!SHELVES.length) {
+    listEl.innerHTML = '<div class="empty-state">Shelves not seeded. Run db/library_shelves_v5.sql.</div>';
+    return;
+  }
+
+  listEl.innerHTML = SHELVES.map(s => {
+    const deadline = s.deadline ? toLocalDatetimeInput(s.deadline) : '';
+    return `
+      <div class="article-card" data-shelf="${s.id}" style="display:flex;flex-direction:column;gap:8px;">
+        <div class="a-neighborhood">Raf ${s.id}</div>
+        <label style="font-size:0.7rem;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;">Name</label>
+        <input class="sh-name" type="text" value="${escapeHtml(s.name_tr || '')}" placeholder="Shelf name shown to readers"/>
+        <label style="font-size:0.7rem;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;">Subtitle (optional)</label>
+        <input class="sh-subtitle" type="text" value="${escapeHtml(s.subtitle_tr || '')}" placeholder="Short description"/>
+        <label style="font-size:0.7rem;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;">Deadline (countdown to)</label>
+        <input class="sh-deadline" type="datetime-local" value="${deadline}" style="padding:9px 12px;border:1px solid var(--rule);background:var(--field-bg);font-family:'Inter',sans-serif;font-size:0.92rem;"/>
+        <div class="card-actions">
+          <button class="btn-edit" data-act="sh-save" data-shelf="${s.id}">Save</button>
+          <button class="btn-del" data-act="sh-clear-deadline" data-shelf="${s.id}">Clear Deadline</button>
+        </div>
+        <div class="status-msg sh-status"></div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
+
   listEl.querySelectorAll('button[data-act]').forEach(btn => {
-    btn.addEventListener('click', () => onCategoryAction(btn.dataset.act, btn.dataset.id));
+    btn.addEventListener('click', () => onShelfAction(btn.dataset.act, Number(btn.dataset.shelf)));
   });
 }
 
-async function onCategoryAction(act, id) {
-  const row = LIB_CATEGORY_LIST.find(c => c.id === id);
-  if (!row) return;
-  if (act === 'lc-edit') {
-    document.getElementById('lc-editing-id').value = row.id;
-    document.getElementById('lc-id').value = row.id;
-    document.getElementById('lc-id').disabled = true; // ID is the FK target; renaming would orphan articles
-    document.getElementById('lc-label').value = row.label_tr;
-    document.getElementById('lc-submit-btn').textContent = 'Update Category';
-    document.getElementById('lc-cancel-btn').style.display = 'inline-block';
-  } else if (act === 'lc-del') {
-    if (!confirm(`Delete category "${row.label_tr}"? Articles filed under it will become uncategorized.`)) return;
-    const { error } = await sb.from('library_categories').delete().eq('id', row.id);
-    if (error) { alert('Delete failed: ' + error.message); return; }
-    loadLibCategories();
-  } else if (act === 'lc-up' || act === 'lc-down') {
-    const i = LIB_CATEGORY_LIST.findIndex(c => c.id === row.id);
-    const j = act === 'lc-up' ? i - 1 : i + 1;
-    if (j < 0 || j >= LIB_CATEGORY_LIST.length) return;
-    const other = LIB_CATEGORY_LIST[j];
-    let pa = row.position, pb = other.position;
-    if (pa === pb) { pa = i; pb = j; }
-    const [r1, r2] = await Promise.all([
-      sb.from('library_categories').update({ position: pb }).eq('id', row.id),
-      sb.from('library_categories').update({ position: pa }).eq('id', other.id),
-    ]);
-    if (r1.error || r2.error) { alert('Reorder failed: ' + (r1.error?.message || r2.error?.message)); return; }
-    loadLibCategories();
-  }
-}
+async function onShelfAction(act, shelfId) {
+  const card = document.querySelector(`#shelves-list [data-shelf="${shelfId}"]`);
+  if (!card) return;
+  const statusEl = card.querySelector('.sh-status');
+  statusEl.textContent = '';
+  statusEl.className = 'status-msg';
 
-document.getElementById('lc-submit-btn').addEventListener('click', async () => {
-  const editingId = document.getElementById('lc-editing-id').value;
-  const id = document.getElementById('lc-id').value.trim();
-  const label = document.getElementById('lc-label').value.trim();
-  const statusEl = document.getElementById('lc-form-status');
-  if (!id || !label) {
-    statusEl.textContent = 'Fill in both fields.';
-    statusEl.className = 'status-msg err';
-    return;
+  if (act === 'sh-save') {
+    const name = card.querySelector('.sh-name').value.trim();
+    const subtitle = card.querySelector('.sh-subtitle').value.trim();
+    const deadlineRaw = card.querySelector('.sh-deadline').value;
+    const deadline = deadlineRaw ? new Date(deadlineRaw).toISOString() : null;
+    const { error } = await sb.from('library_shelves')
+      .update({ name_tr: name, subtitle_tr: subtitle, deadline })
+      .eq('id', shelfId);
+    if (error) {
+      statusEl.textContent = error.message;
+      statusEl.className = 'status-msg err';
+      return;
+    }
+    statusEl.textContent = 'Saved.';
+    statusEl.className = 'status-msg ok';
+    setTimeout(() => { statusEl.textContent = ''; }, 2000);
+    // Refresh in-memory cache + article-form dropdown labels.
+    refreshShelfDropdowns();
+  } else if (act === 'sh-clear-deadline') {
+    card.querySelector('.sh-deadline').value = '';
+    const { error } = await sb.from('library_shelves')
+      .update({ deadline: null }).eq('id', shelfId);
+    if (error) {
+      statusEl.textContent = error.message;
+      statusEl.className = 'status-msg err';
+      return;
+    }
+    statusEl.textContent = 'Deadline cleared.';
+    statusEl.className = 'status-msg ok';
+    setTimeout(() => { statusEl.textContent = ''; }, 2000);
   }
-  if (!/^[a-z0-9_]+$/.test(id)) {
-    statusEl.textContent = 'Slug must be lowercase letters, numbers, or underscores.';
-    statusEl.className = 'status-msg err';
-    return;
-  }
-  let result;
-  if (editingId) {
-    result = await sb.from('library_categories').update({ label_tr: label }).eq('id', editingId);
-  } else {
-    const { data: tail } = await sb.from('library_categories')
-      .select('position').order('position', { ascending: false }).limit(1);
-    const nextPos = (tail && tail[0] ? tail[0].position : -1) + 1;
-    result = await sb.from('library_categories').insert([{ id, label_tr: label, position: nextPos }]);
-  }
-  if (result.error) {
-    statusEl.textContent = result.error.message;
-    statusEl.className = 'status-msg err';
-    return;
-  }
-  statusEl.textContent = editingId ? 'Updated.' : 'Added.';
-  statusEl.className = 'status-msg ok';
-  resetCategoryForm();
-  loadLibCategories();
-  setTimeout(() => { statusEl.textContent = ''; }, 2500);
-});
-
-document.getElementById('lc-cancel-btn').addEventListener('click', resetCategoryForm);
-
-function resetCategoryForm() {
-  document.getElementById('lc-editing-id').value = '';
-  document.getElementById('lc-id').value = '';
-  document.getElementById('lc-id').disabled = false;
-  document.getElementById('lc-label').value = '';
-  document.getElementById('lc-submit-btn').textContent = 'Add Category';
-  document.getElementById('lc-cancel-btn').style.display = 'none';
 }
 
 // ── Counters ──
