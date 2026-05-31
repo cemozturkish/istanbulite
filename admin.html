@@ -668,8 +668,7 @@
   </header>
 
   <div class="admin-tabs">
-    <button class="admin-tab active" data-tab="articles">Articles</button>
-    <button class="admin-tab" data-tab="library">Library Setup</button>
+    <button class="admin-tab active" data-tab="kutuphane">Kütüphane</button>
     <button class="admin-tab" data-tab="news">Breaking News</button>
     <button class="admin-tab" data-tab="events">Events</button>
     <button class="admin-tab" data-tab="sozcel">Sözcel</button>
@@ -677,120 +676,138 @@
     <button class="admin-tab" data-tab="users">Users</button>
   </div>
 
-  <div class="admin-body" id="articles-tab">
+  <div class="admin-body" id="kutuphane-tab">
 
-    <!-- LEFT: Add / Edit Form -->
+    <!-- LEFT PANEL: swaps between shelves-grid (index) and shelf settings + article form (editor) -->
     <div class="panel">
-      <div class="panel-title" id="form-mode-label">Add New Article</div>
-
-      <label>Shelf</label>
-      <select id="f-shelf">
-        <option value="">— loading… —</option>
-      </select>
-
-      <label>Source / Byline (optional)</label>
-      <input type="text" id="f-source" placeholder="e.g. The Economist"/>
-
-      <label>Title</label>
-      <input type="text" id="f-title" placeholder="Article title..."/>
-
-      <label>Author</label>
-      <input type="text" id="f-author" placeholder="e.g. Jane Doe"/>
-
-      <label>Date Published</label>
-      <input type="date" id="f-published"/>
-
-      <label>Reading Deadline (optional)</label>
-      <input type="datetime-local" id="f-deadline" style="width:100%;padding:9px 12px;border:1px solid var(--rule);background:var(--field-bg);font-family:'Inter',sans-serif;font-size:0.92rem;"/>
-
-      <label>One-sentence summary</label>
-      <textarea id="f-summary" placeholder="Shown in the article list..."></textarea>
-
-      <label>Body</label>
-      <p style="font-size:0.72rem;color:var(--muted);font-style:italic;line-height:1.4;margin:0 0 6px;">
-        Put <code>---</code> on its own line to start a new section (checkpoint).
-        Wrap a phrase in <code>[[word::definition]]</code> to add a vocab tooltip.
-      </p>
-      <textarea id="f-body" placeholder="Full article text shown when opened..." style="min-height:160px;"></textarea>
-
-      <label>Source URL (optional)</label>
-      <input type="text" id="f-url" placeholder="https://..."/>
-
-      <label>Poll (optional)</label>
-      <p style="font-size:0.72rem;color:var(--muted);font-style:italic;line-height:1.4;margin:0 0 6px;">
-        Shown after the article. Leave the question blank to skip.
-      </p>
-      <input type="text" id="f-poll-question" placeholder="Poll question..."/>
-      <input type="text" id="f-poll-opt-0" placeholder="Option 1" style="margin-top:6px;"/>
-      <input type="text" id="f-poll-opt-1" placeholder="Option 2" style="margin-top:6px;"/>
-      <input type="text" id="f-poll-opt-2" placeholder="Option 3 (optional)" style="margin-top:6px;"/>
-      <input type="text" id="f-poll-opt-3" placeholder="Option 4 (optional)" style="margin-top:6px;"/>
-
-      <input type="hidden" id="f-editing-id"/>
-
-      <div class="btn-row">
-        <button class="btn btn-primary" id="submit-btn">Publish Article</button>
-        <button class="btn btn-secondary" id="cancel-edit-btn" style="display:none;">Cancel Edit</button>
+      <!-- INDEX: 6 shelf cards -->
+      <div id="shelves-index-block">
+        <div class="panel-title">Kütüphane — Shelves (Rafs)</div>
+        <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+          Click a shelf to set its name, deadline, and add the articles inside. Empty shelves render as "Coming Soon" to readers.
+        </p>
+        <div id="shelves-grid">
+          <div class="empty-state"><span class="spinner"></span></div>
+        </div>
       </div>
-      <div class="status-msg" id="form-status"></div>
+
+      <!-- EDITOR: shelf settings + (collapsed) article form -->
+      <div id="shelf-edit-block" style="display:none;">
+        <button class="btn btn-secondary" id="kut-back-btn" style="margin-bottom:12px;">← Back to Shelves</button>
+        <div class="panel-title" id="shelf-edit-title">Edit Raf</div>
+
+        <label>Shelf Name</label>
+        <input type="text" id="se-name" placeholder="Shelf name shown to readers"/>
+
+        <label>Subtitle (optional)</label>
+        <input type="text" id="se-subtitle" placeholder="Short description"/>
+
+        <label>Deadline (countdown to)</label>
+        <input type="datetime-local" id="se-deadline"/>
+
+        <input type="hidden" id="se-shelf-id"/>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="se-save-btn">Save Shelf</button>
+          <button class="btn btn-secondary" id="se-clear-deadline-btn">Clear Deadline</button>
+        </div>
+        <div class="status-msg" id="se-status"></div>
+
+        <!-- Article form (toggled by Add/Edit clicks on the right panel) -->
+        <div id="article-form-block" style="display:none; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--hairline);">
+          <div class="panel-title" id="form-mode-label" style="margin-top:0;">Add New Article</div>
+
+          <label>Source / Byline (optional)</label>
+          <input type="text" id="f-source" placeholder="e.g. The Economist"/>
+
+          <label>Title</label>
+          <input type="text" id="f-title" placeholder="Article title..."/>
+
+          <label>Author</label>
+          <input type="text" id="f-author" placeholder="e.g. Jane Doe"/>
+
+          <label>Date Published</label>
+          <input type="date" id="f-published"/>
+
+          <label>Reading Deadline (optional)</label>
+          <input type="datetime-local" id="f-deadline"/>
+
+          <label>One-sentence summary</label>
+          <textarea id="f-summary" placeholder="Shown in the article list..."></textarea>
+
+          <label>Body</label>
+          <p style="font-size:0.72rem;color:var(--muted);font-style:italic;line-height:1.4;margin:0 0 6px;">
+            Put <code>---</code> on its own line to start a new section (checkpoint).
+            Wrap a phrase in <code>[[word::definition]]</code> to add a vocab tooltip.
+          </p>
+          <textarea id="f-body" placeholder="Full article text shown when opened..." style="min-height:160px;"></textarea>
+
+          <label>Source URL (optional)</label>
+          <input type="text" id="f-url" placeholder="https://..."/>
+
+          <label>Poll (optional)</label>
+          <p style="font-size:0.72rem;color:var(--muted);font-style:italic;line-height:1.4;margin:0 0 6px;">
+            Shown after the article. Leave the question blank to skip.
+          </p>
+          <input type="text" id="f-poll-question" placeholder="Poll question..."/>
+          <input type="text" id="f-poll-opt-0" placeholder="Option 1" style="margin-top:6px;"/>
+          <input type="text" id="f-poll-opt-1" placeholder="Option 2" style="margin-top:6px;"/>
+          <input type="text" id="f-poll-opt-2" placeholder="Option 3 (optional)" style="margin-top:6px;"/>
+          <input type="text" id="f-poll-opt-3" placeholder="Option 4 (optional)" style="margin-top:6px;"/>
+
+          <input type="hidden" id="f-editing-id"/>
+
+          <div class="btn-row">
+            <button class="btn btn-primary" id="submit-btn">Publish Article</button>
+            <button class="btn btn-secondary" id="cancel-edit-btn">Cancel</button>
+          </div>
+          <div class="status-msg" id="form-status"></div>
+        </div>
+      </div>
     </div>
 
-    <!-- RIGHT: Articles List -->
+    <!-- RIGHT PANEL: swaps between Sidebar Counters (index) and shelf article path (editor) -->
     <div class="panel">
-      <div class="panel-title">Published Articles</div>
 
-      <div class="filter-row">
-        <select id="filter-scope">
-          <option value="all">All Shelves</option>
-        </select>
-        <button id="filter-btn">Filter</button>
+      <!-- INDEX: sidebar counters -->
+      <div id="counters-block">
+        <div class="panel-title">Sidebar Counters</div>
+        <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+          Counters render under the profile column and tick from the chosen start date.
+        </p>
+
+        <label>Label (Turkish)</label>
+        <input type="text" id="ct-label" placeholder="e.g. Ekrem İmamoğlu'nun tutuklanalı geçen süre"/>
+
+        <label>Start Date</label>
+        <input type="date" id="ct-date" style="width:100%;padding:9px 12px;border:1px solid var(--rule);background:var(--field-bg);font-family:'Inter',sans-serif;font-size:0.92rem;"/>
+
+        <input type="hidden" id="ct-editing-id"/>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="ct-submit-btn">Add Counter</button>
+          <button class="btn btn-secondary" id="ct-cancel-btn" style="display:none;">Cancel Edit</button>
+        </div>
+        <div class="status-msg" id="ct-form-status"></div>
+
+        <div style="margin-top:18px;">
+          <div class="panel-title" style="margin-top:8px;">Existing Counters</div>
+          <div class="articles-list" id="ct-list">
+            <div class="empty-state"><span class="spinner"></span></div>
+          </div>
+        </div>
       </div>
 
-      <div class="articles-list" id="articles-list">
-        <div class="empty-state"><span class="spinner"></span></div>
-      </div>
-    </div>
-
-  </div>
-
-  <div class="admin-body" id="library-tab" style="display:none;">
-
-    <!-- LEFT: Shelves -->
-    <div class="panel">
-      <div class="panel-title">Shelves (Rafs)</div>
-      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
-        Six fixed shelves anchor the Kütüphane right column. Give each shelf a name, an optional subtitle, and a closing deadline (the countdown shown to readers). Empty shelves render as "Coming Soon".
-      </p>
-
-      <div id="shelves-list">
-        <div class="empty-state"><span class="spinner"></span></div>
-      </div>
-    </div>
-
-    <!-- RIGHT: Counters -->
-    <div class="panel">
-      <div class="panel-title">Sidebar Counters</div>
-      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
-        Counters render under the topic tabs and tick from the chosen start date.
-      </p>
-
-      <label>Label (Turkish)</label>
-      <input type="text" id="ct-label" placeholder="e.g. Ekrem İmamoğlu'nun tutuklanalı geçen süre"/>
-
-      <label>Start Date</label>
-      <input type="date" id="ct-date" style="width:100%;padding:9px 12px;border:1px solid var(--rule);background:var(--field-bg);font-family:'Inter',sans-serif;font-size:0.92rem;"/>
-
-      <input type="hidden" id="ct-editing-id"/>
-
-      <div class="btn-row">
-        <button class="btn btn-primary" id="ct-submit-btn">Add Counter</button>
-        <button class="btn btn-secondary" id="ct-cancel-btn" style="display:none;">Cancel Edit</button>
-      </div>
-      <div class="status-msg" id="ct-form-status"></div>
-
-      <div style="margin-top:18px;">
-        <div class="panel-title" style="margin-top:8px;">Existing Counters</div>
-        <div class="articles-list" id="ct-list">
+      <!-- EDITOR: this shelf's article path -->
+      <div id="shelf-articles-block" style="display:none;">
+        <div class="panel-title" id="shelf-articles-title">Articles</div>
+        <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:10px;">
+          Each article is a step on this shelf's path. Reorder, edit, or add new ones below.
+        </p>
+        <div class="btn-row" style="margin-bottom:12px;">
+          <button class="btn btn-primary" id="add-article-btn">+ Add Article</button>
+        </div>
+        <div class="articles-list" id="articles-list">
           <div class="empty-state"><span class="spinner"></span></div>
         </div>
       </div>
@@ -1072,7 +1089,7 @@ async function checkAdmin() {
   const { data: { session } } = await sb.auth.getSession();
   if (session && session.user.email === ADMIN_EMAIL) {
     showAdminPanel(session.user);
-    refreshShelfDropdowns().then(loadArticles);
+    showKutuphaneIndex();
     loadUsersTabNeighborhoods();
   }
 }
@@ -1100,7 +1117,7 @@ document.getElementById('adm-login-btn').addEventListener('click', async () => {
     return;
   }
   showAdminPanel(data.user);
-  refreshShelfDropdowns().then(loadArticles);
+  showKutuphaneIndex();
   loadUsersTabNeighborhoods();
 });
 
@@ -1132,14 +1149,13 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.tab;
     document.querySelectorAll('.admin-tab').forEach(b => b.classList.toggle('active', b === btn));
-    document.getElementById('articles-tab').style.display = (tab === 'articles') ? '' : 'none';
-    document.getElementById('library-tab').style.display = (tab === 'library') ? '' : 'none';
+    document.getElementById('kutuphane-tab').style.display = (tab === 'kutuphane') ? '' : 'none';
     document.getElementById('news-tab').style.display = (tab === 'news') ? '' : 'none';
     document.getElementById('events-tab').style.display = (tab === 'events') ? '' : 'none';
     document.getElementById('sozcel-tab').style.display = (tab === 'sozcel') ? 'grid' : 'none';
     document.getElementById('tumcel-tab').style.display = (tab === 'tumcel') ? 'grid' : 'none';
     document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
-    if (tab === 'library') { loadShelves(); loadCounters(); }
+    if (tab === 'kutuphane') showKutuphaneIndex();
     if (tab === 'news') loadBreakingNews();
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
     if (tab === 'sozcel') loadSozcelSchedule();
@@ -1242,113 +1258,203 @@ document.getElementById('signout-btn').addEventListener('click', async () => {
 // title, summary, body, url, position }. `kind` is the table name
 // so edit/delete know where to write.
 
-async function loadArticles(scope = 'all') {
+// ══════════════════════════════════════════
+// Kütüphane tab: shelves index ⇄ shelf editor
+// ══════════════════════════════════════════
+// Which shelf is currently being edited. Null = index view.
+let currentShelfId = null;
+let currentShelfArticles = [];
+
+// Show the index view: 6 shelf cards on the left, sidebar counters on the right.
+function showKutuphaneIndex() {
+  currentShelfId = null;
+  document.getElementById('shelves-index-block').style.display = '';
+  document.getElementById('shelf-edit-block').style.display = 'none';
+  document.getElementById('counters-block').style.display = '';
+  document.getElementById('shelf-articles-block').style.display = 'none';
+  closeArticleForm();
+  loadShelfCards();
+  loadCounters();
+}
+
+// Render the 6 shelves as clickable cards in the index. Each card shows
+// the name, subtitle, deadline, and article count — click to open the editor.
+async function loadShelfCards() {
+  const gridEl = document.getElementById('shelves-grid');
+  gridEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const [shelvesRes, countsRes] = await Promise.all([
+    sb.from('library_shelves').select('*').order('id', { ascending: true }),
+    sb.from('library_articles').select('shelf_id'),
+  ]);
+  if (shelvesRes.error) {
+    gridEl.innerHTML = '<div class="empty-state">Error loading shelves: ' + escapeHtml(shelvesRes.error.message) + '</div>';
+    return;
+  }
+  SHELVES = shelvesRes.data || [];
+  SHELF_LABELS = {};
+  SHELVES.forEach(s => {
+    SHELF_LABELS[s.id] = (s.name_tr && s.name_tr.trim()) ? s.name_tr.trim() : `Raf ${s.id}`;
+  });
+
+  const counts = {};
+  (countsRes.data || []).forEach(r => {
+    if (r.shelf_id != null) counts[r.shelf_id] = (counts[r.shelf_id] || 0) + 1;
+  });
+
+  if (!SHELVES.length) {
+    gridEl.innerHTML = '<div class="empty-state">Shelves not seeded. Run db/library_shelves_v5.sql.</div>';
+    return;
+  }
+
+  gridEl.innerHTML = SHELVES.map(s => {
+    const name = (s.name_tr && s.name_tr.trim()) ? escapeHtml(s.name_tr.trim()) : '<span style="color:var(--muted);font-style:italic;">(unnamed)</span>';
+    const subtitle = s.subtitle_tr ? escapeHtml(s.subtitle_tr) : '';
+    const deadline = s.deadline
+      ? new Date(s.deadline).toLocaleString('tr-TR', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
+      : 'no deadline';
+    const count = counts[s.id] || 0;
+    return `
+      <div class="article-card" data-shelf="${s.id}" style="cursor:pointer;">
+        <div class="a-neighborhood">Raf ${s.id} · ${count} article${count === 1 ? '' : 's'} · ${escapeHtml(deadline)}</div>
+        <h4>${name}</h4>
+        ${subtitle ? `<p>${subtitle}</p>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  gridEl.querySelectorAll('.article-card').forEach(card => {
+    card.addEventListener('click', () => openShelfEditor(Number(card.dataset.shelf)));
+  });
+}
+
+// Switch to the shelf editor: shelf metadata on the left, article path on the right.
+async function openShelfEditor(shelfId) {
+  currentShelfId = shelfId;
+  document.getElementById('shelves-index-block').style.display = 'none';
+  document.getElementById('shelf-edit-block').style.display = '';
+  document.getElementById('counters-block').style.display = 'none';
+  document.getElementById('shelf-articles-block').style.display = '';
+  closeArticleForm();
+
+  const shelf = SHELVES.find(s => s.id === shelfId);
+  document.getElementById('shelf-edit-title').textContent =
+    shelf && shelf.name_tr ? `Edit — ${shelf.name_tr}` : `Edit Raf ${shelfId}`;
+  document.getElementById('shelf-articles-title').textContent =
+    shelf && shelf.name_tr ? `${shelf.name_tr} · Articles` : `Raf ${shelfId} · Articles`;
+  document.getElementById('se-shelf-id').value = String(shelfId);
+  document.getElementById('se-name').value = shelf ? (shelf.name_tr || '') : '';
+  document.getElementById('se-subtitle').value = shelf ? (shelf.subtitle_tr || '') : '';
+  document.getElementById('se-deadline').value = (shelf && shelf.deadline) ? toLocalDatetimeInput(shelf.deadline) : '';
+  document.getElementById('se-status').textContent = '';
+
+  loadArticlesForShelf(shelfId);
+}
+
+// Render the list of articles in this shelf as a vertical "path" of cards.
+async function loadArticlesForShelf(shelfId) {
   const listEl = document.getElementById('articles-list');
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
-
-  let query = sb.from('library_articles').select('*')
-    .order('shelf_id').order('position', { ascending: true }).order('created_at', { ascending: false });
-  if (scope !== 'all') query = query.eq('shelf_id', Number(scope));
-
-  const { data, error } = await query;
-  if (error) { listEl.innerHTML = `<div class="empty-state">Error loading articles.</div>`; return; }
-  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No articles yet.</div>'; return; }
-
-  const byShelf = {};
-  data.forEach(a => {
-    const key = a.shelf_id == null ? '(unfiled)' : String(a.shelf_id);
-    (byShelf[key] = byShelf[key] || []).push(a);
-  });
-
-  // Sort shelves numerically; '(unfiled)' goes last.
-  const orderedKeys = Object.keys(byShelf).sort((a, b) => {
-    if (a === '(unfiled)') return 1;
-    if (b === '(unfiled)') return -1;
-    return Number(a) - Number(b);
-  });
-
-  const sections = orderedKeys.map(key => ({
-    label: key === '(unfiled)' ? '(unfiled)' : `Raf ${key} — ${SHELF_LABELS[Number(key)] || `Raf ${key}`}`,
-    rows: byShelf[key],
-    shelfKey: key,
-  }));
-
-  listEl.innerHTML = sections.map(section => {
-    const cards = section.rows.map((a, i) => {
-      const meta = [
-        a.source ? escapeHtml(a.source) : null,
-        a.author ? escapeHtml(a.author) : null,
-        a.published_at ? new Date(a.published_at).toLocaleDateString('tr-TR', { year:'numeric', month:'short', day:'numeric' }) : null,
-        a.deadline ? 'deadline ' + new Date(a.deadline).toLocaleString('tr-TR', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : null,
-      ].filter(Boolean).join(' · ');
-      return `
-        <div class="article-card" data-id="${a.id}">
-          <div class="a-neighborhood">${escapeHtml(section.label)} · #${i + 1}${meta ? ' · ' + meta : ''}</div>
-          <h4>${escapeHtml(a.title)}</h4>
-          ${a.summary ? `<p>${escapeHtml(a.summary)}</p>` : ''}
-          <div class="card-actions">
-            <button class="btn-edit" data-act="up"   data-id="${a.id}" ${i === 0 ? 'disabled style="opacity:0.4;cursor:default;"' : ''}>↑</button>
-            <button class="btn-edit" data-act="down" data-id="${a.id}" ${i === section.rows.length - 1 ? 'disabled style="opacity:0.4;cursor:default;"' : ''}>↓</button>
-            <button class="btn-edit" data-act="edit" data-id="${a.id}">Edit</button>
-            <button class="btn-del"  data-act="del"  data-id="${a.id}">Delete</button>
-          </div>
+  const { data, error } = await sb.from('library_articles').select('*')
+    .eq('shelf_id', shelfId)
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: false });
+  if (error) { listEl.innerHTML = '<div class="empty-state">Error loading articles.</div>'; return; }
+  currentShelfArticles = data || [];
+  if (!currentShelfArticles.length) {
+    listEl.innerHTML = '<div class="empty-state">No articles yet. Click + Add Article to start the path.</div>';
+    return;
+  }
+  listEl.innerHTML = currentShelfArticles.map((a, i) => {
+    const meta = [
+      a.author ? escapeHtml(a.author) : null,
+      a.published_at ? new Date(a.published_at).toLocaleDateString('tr-TR', { year:'numeric', month:'short', day:'numeric' }) : null,
+      a.deadline ? 'deadline ' + new Date(a.deadline).toLocaleString('tr-TR', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : null,
+    ].filter(Boolean).join(' · ');
+    return `
+      <div class="article-card" data-id="${a.id}">
+        <div class="a-neighborhood">Step ${i + 1}${meta ? ' · ' + meta : ''}</div>
+        <h4>${escapeHtml(a.title)}</h4>
+        ${a.summary ? `<p>${escapeHtml(a.summary)}</p>` : ''}
+        <div class="card-actions">
+          <button class="btn-edit" data-act="up"   data-id="${a.id}" ${i === 0 ? 'disabled style="opacity:0.4;cursor:default;"' : ''}>↑</button>
+          <button class="btn-edit" data-act="down" data-id="${a.id}" ${i === currentShelfArticles.length - 1 ? 'disabled style="opacity:0.4;cursor:default;"' : ''}>↓</button>
+          <button class="btn-edit" data-act="edit" data-id="${a.id}">Edit</button>
+          <button class="btn-del"  data-act="del"  data-id="${a.id}">Delete</button>
         </div>
-      `;
-    }).join('');
-    return `<div style="margin:6px 0;font-size:0.7rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);">${escapeHtml(section.label)}</div>${cards}`;
+      </div>
+    `;
   }).join('');
 
   listEl.querySelectorAll('button[data-act]').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.id;
       const act = btn.dataset.act;
-      const row = data.find(x => x.id === id);
+      const row = currentShelfArticles.find(x => x.id === id);
       if (!row) return;
       if (act === 'edit') editArticle(row);
       else if (act === 'del') deleteArticle(row);
-      else if (act === 'up' || act === 'down') {
-        const key = row.shelf_id == null ? '(unfiled)' : String(row.shelf_id);
-        const section = sections.find(s => s.shelfKey === key);
-        if (section) reorderArticle(row, act, section.rows);
-      }
+      else if (act === 'up' || act === 'down') reorderArticle(row, act, currentShelfArticles);
     });
   });
 }
 
-// Load the six shelves and populate the article-form + filter dropdowns.
-// The shelves table seeds rows 1–6; if a shelf is unnamed it shows as "Raf N".
-async function refreshShelfDropdowns() {
-  const { data, error } = await sb.from('library_shelves')
-    .select('*').order('id', { ascending: true });
-  if (error) { console.error('[admin shelves]', error); return; }
-  SHELVES = data || [];
-  SHELF_LABELS = {};
-  SHELVES.forEach(s => {
-    const label = (s.name_tr && s.name_tr.trim()) ? s.name_tr.trim() : `Raf ${s.id}`;
-    SHELF_LABELS[s.id] = label;
-  });
+// Back-to-index button + shelf save handlers.
+document.getElementById('kut-back-btn').addEventListener('click', showKutuphaneIndex);
 
-  const opts = SHELVES.map(s => {
-    const name = (s.name_tr && s.name_tr.trim()) ? s.name_tr.trim() : '(unnamed)';
-    return `<option value="${s.id}">Raf ${s.id} — ${escapeHtml(name)}</option>`;
-  }).join('');
-  const formSel = document.getElementById('f-shelf');
-  if (formSel) {
-    const prev = formSel.value;
-    formSel.innerHTML = '<option value="">— Select a shelf —</option>' + opts;
-    if (prev) formSel.value = prev;
+document.getElementById('se-save-btn').addEventListener('click', async () => {
+  const shelfId = Number(document.getElementById('se-shelf-id').value);
+  const name = document.getElementById('se-name').value.trim();
+  const subtitle = document.getElementById('se-subtitle').value.trim();
+  const deadlineRaw = document.getElementById('se-deadline').value;
+  const deadline = deadlineRaw ? new Date(deadlineRaw).toISOString() : null;
+  const statusEl = document.getElementById('se-status');
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  const { error } = await sb.from('library_shelves')
+    .update({ name_tr: name, subtitle_tr: subtitle, deadline })
+    .eq('id', shelfId);
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'status-msg err';
+    return;
   }
-  const filterSel = document.getElementById('filter-scope');
-  if (filterSel) {
-    const prev = filterSel.value;
-    filterSel.innerHTML = '<option value="all">All Shelves</option>' + opts;
-    if (prev) filterSel.value = prev;
+  statusEl.textContent = 'Shelf saved.';
+  statusEl.className = 'status-msg ok';
+  // Update local cache so labels stay in sync.
+  const cached = SHELVES.find(s => s.id === shelfId);
+  if (cached) { cached.name_tr = name; cached.subtitle_tr = subtitle; cached.deadline = deadline; }
+  SHELF_LABELS[shelfId] = name || `Raf ${shelfId}`;
+  document.getElementById('shelf-edit-title').textContent = name ? `Edit — ${name}` : `Edit Raf ${shelfId}`;
+  document.getElementById('shelf-articles-title').textContent = name ? `${name} · Articles` : `Raf ${shelfId} · Articles`;
+  setTimeout(() => { statusEl.textContent = ''; }, 2000);
+});
+
+document.getElementById('se-clear-deadline-btn').addEventListener('click', async () => {
+  document.getElementById('se-deadline').value = '';
+  const shelfId = Number(document.getElementById('se-shelf-id').value);
+  const statusEl = document.getElementById('se-status');
+  const { error } = await sb.from('library_shelves').update({ deadline: null }).eq('id', shelfId);
+  if (error) {
+    statusEl.textContent = error.message; statusEl.className = 'status-msg err'; return;
   }
+  const cached = SHELVES.find(s => s.id === shelfId);
+  if (cached) cached.deadline = null;
+  statusEl.textContent = 'Deadline cleared.'; statusEl.className = 'status-msg ok';
+  setTimeout(() => { statusEl.textContent = ''; }, 2000);
+});
+
+// Show / hide the article form inside the shelf editor.
+function openArticleForm(row) {
+  document.getElementById('article-form-block').style.display = '';
+  if (row) editArticle(row);
+  else resetForm();
+  document.getElementById('article-form-block').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function closeArticleForm() {
+  document.getElementById('article-form-block').style.display = 'none';
+  resetForm();
 }
 
-document.getElementById('filter-btn').addEventListener('click', () => {
-  loadArticles(document.getElementById('filter-scope').value);
-});
+document.getElementById('add-article-btn').addEventListener('click', () => openArticleForm(null));
 
 // Read the 4 poll-option inputs and assemble a { question, options } object,
 // or null if the question is blank or fewer than 2 options were filled in.
@@ -1363,10 +1469,11 @@ function readPollForm() {
 }
 
 // ── Submit (insert/update) ──
+// Inserts/updates use currentShelfId — the article form lives inside the
+// shelf editor, so there's no shelf picker on the form itself.
 document.getElementById('submit-btn').addEventListener('click', async () => {
   const editingId = document.getElementById('f-editing-id').value;
-  const shelfRaw = document.getElementById('f-shelf').value;
-  const shelf_id = shelfRaw ? Number(shelfRaw) : null;
+  const shelf_id = currentShelfId;
   const source = document.getElementById('f-source').value.trim() || null;
   const title = document.getElementById('f-title').value.trim();
   const author = document.getElementById('f-author').value.trim() || null;
@@ -1381,8 +1488,13 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   const statusEl = document.getElementById('form-status');
   const btn = document.getElementById('submit-btn');
 
-  if (!title || !shelf_id) {
-    statusEl.textContent = 'Please pick a shelf and enter a title.';
+  if (!shelf_id) {
+    statusEl.textContent = 'Open a shelf before adding an article.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  if (!title) {
+    statusEl.textContent = 'Please enter a title.';
     statusEl.className = 'status-msg err';
     return;
   }
@@ -1390,9 +1502,6 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   statusEl.textContent = ''; statusEl.className = 'status-msg';
   btn.innerHTML = '<span class="spinner"></span>';
 
-  // Poll questions written before the column existed would 400 the request;
-  // build the payload without `poll` if no question is set, so older schemas
-  // (pre-v5 migration) don't break.
   const payload = { shelf_id, source, title, summary, body, url, author, published_at, deadline };
   if (poll !== null) payload.poll = poll;
   else if (editingId) payload.poll = null; // explicitly clear on update
@@ -1417,14 +1526,13 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   }
   statusEl.textContent = editingId ? 'Article updated!' : 'Article published!';
   statusEl.className = 'status-msg ok';
-  resetForm();
-  loadArticles(document.getElementById('filter-scope').value);
+  closeArticleForm();
+  loadArticlesForShelf(shelf_id);
   setTimeout(() => { statusEl.textContent = ''; }, 3000);
 });
 
 function resetForm() {
   document.getElementById('f-editing-id').value = '';
-  document.getElementById('f-shelf').value = '';
   document.getElementById('f-source').value = '';
   document.getElementById('f-title').value = '';
   document.getElementById('f-author').value = '';
@@ -1437,14 +1545,15 @@ function resetForm() {
   ['f-poll-opt-0','f-poll-opt-1','f-poll-opt-2','f-poll-opt-3'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('submit-btn').textContent = 'Publish Article';
   document.getElementById('form-mode-label').textContent = 'Add New Article';
-  document.getElementById('cancel-edit-btn').style.display = 'none';
+  document.getElementById('form-status').textContent = '';
 }
 
-document.getElementById('cancel-edit-btn').addEventListener('click', resetForm);
+document.getElementById('cancel-edit-btn').addEventListener('click', closeArticleForm);
 
 function editArticle(row) {
+  openArticleForm.suppressReset = true;
+  document.getElementById('article-form-block').style.display = '';
   document.getElementById('f-editing-id').value = row.id;
-  document.getElementById('f-shelf').value = row.shelf_id != null ? String(row.shelf_id) : '';
   document.getElementById('f-source').value = row.source || '';
   document.getElementById('f-title').value = row.title || '';
   document.getElementById('f-author').value = row.author || '';
@@ -1465,8 +1574,7 @@ function editArticle(row) {
   }
   document.getElementById('submit-btn').textContent = 'Update Article';
   document.getElementById('form-mode-label').textContent = 'Editing Article';
-  document.getElementById('cancel-edit-btn').style.display = 'inline-block';
-  document.querySelector('#articles-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+  document.getElementById('article-form-block').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // Format an ISO timestamp for a <input type="datetime-local"> — strip the
@@ -1481,7 +1589,7 @@ async function deleteArticle(row) {
   if (!confirm('Delete this article? This cannot be undone.')) return;
   const { error } = await sb.from('library_articles').delete().eq('id', row.id);
   if (error) { alert('Error deleting: ' + error.message); return; }
-  loadArticles(document.getElementById('filter-scope').value);
+  if (currentShelfId != null) loadArticlesForShelf(currentShelfId);
 }
 
 async function reorderArticle(row, direction, sourceList) {
@@ -1497,101 +1605,7 @@ async function reorderArticle(row, direction, sourceList) {
   const { error: e1 } = await sb.from('library_articles').update({ position: pb }).eq('id', row.id);
   const { error: e2 } = await sb.from('library_articles').update({ position: pa }).eq('id', other.id);
   if (e1 || e2) { alert('Reorder failed: ' + (e1?.message || e2?.message)); return; }
-  loadArticles(document.getElementById('filter-scope').value);
-}
-
-// ══════════════════════════════════════════
-// Library Setup: Shelves + Counters CRUD
-// ══════════════════════════════════════════
-// Render the 6 fixed shelves as inline-editable rows: each shelf has a
-// name, an optional subtitle, and a deadline. There's no add/delete —
-// the rows are seeded by db/library_shelves_v5.sql.
-async function loadShelves() {
-  const listEl = document.getElementById('shelves-list');
-  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
-  const { data, error } = await sb.from('library_shelves')
-    .select('*').order('id', { ascending: true });
-  if (error) {
-    listEl.innerHTML = '<div class="empty-state">Error loading shelves: ' + escapeHtml(error.message) + '</div>';
-    return;
-  }
-  SHELVES = data || [];
-  SHELF_LABELS = {};
-  SHELVES.forEach(s => {
-    const label = (s.name_tr && s.name_tr.trim()) ? s.name_tr.trim() : `Raf ${s.id}`;
-    SHELF_LABELS[s.id] = label;
-  });
-  // Keep article-form dropdowns in sync when the admin renames a shelf.
-  refreshShelfDropdowns();
-
-  if (!SHELVES.length) {
-    listEl.innerHTML = '<div class="empty-state">Shelves not seeded. Run db/library_shelves_v5.sql.</div>';
-    return;
-  }
-
-  listEl.innerHTML = SHELVES.map(s => {
-    const deadline = s.deadline ? toLocalDatetimeInput(s.deadline) : '';
-    return `
-      <div class="article-card" data-shelf="${s.id}" style="display:flex;flex-direction:column;gap:8px;">
-        <div class="a-neighborhood">Raf ${s.id}</div>
-        <label style="font-size:0.7rem;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;">Name</label>
-        <input class="sh-name" type="text" value="${escapeHtml(s.name_tr || '')}" placeholder="Shelf name shown to readers"/>
-        <label style="font-size:0.7rem;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;">Subtitle (optional)</label>
-        <input class="sh-subtitle" type="text" value="${escapeHtml(s.subtitle_tr || '')}" placeholder="Short description"/>
-        <label style="font-size:0.7rem;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;">Deadline (countdown to)</label>
-        <input class="sh-deadline" type="datetime-local" value="${deadline}" style="padding:9px 12px;border:1px solid var(--rule);background:var(--field-bg);font-family:'Inter',sans-serif;font-size:0.92rem;"/>
-        <div class="card-actions">
-          <button class="btn-edit" data-act="sh-save" data-shelf="${s.id}">Save</button>
-          <button class="btn-del" data-act="sh-clear-deadline" data-shelf="${s.id}">Clear Deadline</button>
-        </div>
-        <div class="status-msg sh-status"></div>
-      </div>
-    `;
-  }).join('');
-
-  listEl.querySelectorAll('button[data-act]').forEach(btn => {
-    btn.addEventListener('click', () => onShelfAction(btn.dataset.act, Number(btn.dataset.shelf)));
-  });
-}
-
-async function onShelfAction(act, shelfId) {
-  const card = document.querySelector(`#shelves-list [data-shelf="${shelfId}"]`);
-  if (!card) return;
-  const statusEl = card.querySelector('.sh-status');
-  statusEl.textContent = '';
-  statusEl.className = 'status-msg';
-
-  if (act === 'sh-save') {
-    const name = card.querySelector('.sh-name').value.trim();
-    const subtitle = card.querySelector('.sh-subtitle').value.trim();
-    const deadlineRaw = card.querySelector('.sh-deadline').value;
-    const deadline = deadlineRaw ? new Date(deadlineRaw).toISOString() : null;
-    const { error } = await sb.from('library_shelves')
-      .update({ name_tr: name, subtitle_tr: subtitle, deadline })
-      .eq('id', shelfId);
-    if (error) {
-      statusEl.textContent = error.message;
-      statusEl.className = 'status-msg err';
-      return;
-    }
-    statusEl.textContent = 'Saved.';
-    statusEl.className = 'status-msg ok';
-    setTimeout(() => { statusEl.textContent = ''; }, 2000);
-    // Refresh in-memory cache + article-form dropdown labels.
-    refreshShelfDropdowns();
-  } else if (act === 'sh-clear-deadline') {
-    card.querySelector('.sh-deadline').value = '';
-    const { error } = await sb.from('library_shelves')
-      .update({ deadline: null }).eq('id', shelfId);
-    if (error) {
-      statusEl.textContent = error.message;
-      statusEl.className = 'status-msg err';
-      return;
-    }
-    statusEl.textContent = 'Deadline cleared.';
-    statusEl.className = 'status-msg ok';
-    setTimeout(() => { statusEl.textContent = ''; }, 2000);
-  }
+  if (currentShelfId != null) loadArticlesForShelf(currentShelfId);
 }
 
 // ── Counters ──
