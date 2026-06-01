@@ -471,7 +471,7 @@
       display: flex;
       flex-direction: column;
       gap: 3px;
-      width: min(240px, 38vh);
+      width: 240px; /* JS always overrides this with a fixed px value */
       flex-shrink: 0;
     }
 
@@ -483,6 +483,7 @@
 
     .letter-box {
       aspect-ratio: 1;
+      overflow: hidden;
       border: 2px solid var(--rule);
       display: flex;
       align-items: center;
@@ -3349,9 +3350,13 @@ function initWordGrid() {
   // after a word-length mismatch rebuild won't append duplicate rows with
   // duplicate box-* ids.
   grid.innerHTML = '';
-  // Scale the grid width with WORD_LENGTH so 6-letter Sundays don't squash the
-  // tiles. The base is ~48px per box, also clamped to fit vertically.
-  grid.style.width = `min(${48 * WORD_LENGTH}px, ${7.6 * WORD_LENGTH}vh)`;
+  // Compute a fixed pixel width once at init time rather than using a live
+  // vh value. A live `min(Xpx, Y*vh)` inline style would cause the grid to
+  // resize whenever the browser chrome (address bar) shows or hides on
+  // mobile, which makes the squares appear to jump/grow on first interaction.
+  const maxByPx = 48 * WORD_LENGTH;
+  const maxByVh = Math.round((window.innerHeight || 600) * 0.076 * WORD_LENGTH);
+  grid.style.width = Math.min(maxByPx, maxByVh) + 'px';
   for (let i = 0; i < 6; i++) {
     const row = document.createElement('div');
     row.className = 'word-row';
