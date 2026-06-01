@@ -925,6 +925,81 @@
     .reader-btn.secondary:hover { background: var(--paper-dark); }
     .reader-btn:disabled { background: var(--muted); cursor: default; }
 
+    /* ── Vote-slider widget (inline in article body) ── */
+    .vote-widget {
+      margin: 22px 0;
+      padding: 18px 20px;
+      background: var(--paper-card);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+    }
+    .vote-q {
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1.35;
+      margin-bottom: 14px;
+    }
+    .vote-people {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .vote-person {
+      width: 30px;
+      height: 30px;
+      fill: #b23332;
+      transition: fill 0.2s;
+    }
+    .vote-person.yes { fill: #2c8a2c; }
+    .vote-controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .vote-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: var(--paper-banner);
+      border: 1px solid var(--ink);
+      outline: none;
+      cursor: pointer;
+      padding: 0;
+    }
+    .vote-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      background: var(--ink);
+      border: 2px solid var(--paper);
+      box-shadow: 0 0 0 1px var(--ink);
+      border-radius: 50%;
+      cursor: grab;
+    }
+    .vote-slider::-webkit-slider-thumb:active { cursor: grabbing; }
+    .vote-slider::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      background: var(--ink);
+      border: 2px solid var(--paper);
+      box-shadow: 0 0 0 1px var(--ink);
+      border-radius: 50%;
+      cursor: grab;
+    }
+    .vote-readout {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+      min-width: 60px;
+      text-align: right;
+    }
+
     /* Poll at the end of the article */
     .reader-poll {
       margin-top: 32px;
@@ -2914,14 +2989,14 @@ function tickShelfCountdowns() {
 function formatCountdown(iso) {
   if (!iso) return '';
   const ms = new Date(iso).getTime() - Date.now();
-  if (ms <= 0) return 'Süre doldu';
+  if (ms <= 0) return 'Erişim kapandı';
   const totalMins = Math.floor(ms / 60000);
   const days = Math.floor(totalMins / 1440);
   const hours = Math.floor((totalMins % 1440) / 60);
   const mins = totalMins % 60;
-  if (days > 0) return `${days}g ${hours}s kaldı`;
-  if (hours > 0) return `${hours}s ${mins}d kaldı`;
-  return `${mins}d kaldı`;
+  if (days > 0) return `Erişime ${days} gün ${hours} saat boyunca açık`;
+  if (hours > 0) return `Erişime ${hours} saat ${mins} dakika boyunca açık`;
+  return `Erişime ${mins} dakika boyunca açık`;
 }
 
 async function openShelfPath(shelfId) {
@@ -2940,13 +3015,12 @@ async function openShelfPath(shelfId) {
   const title = (shelf && shelf.name_tr && shelf.name_tr.trim()) || `Raf ${shelfId}`;
   const subtitle = shelf && shelf.subtitle_tr ? shelf.subtitle_tr.trim() : '';
   const deadlineHtml = shelf && shelf.deadline
-    ? `<div class="path-deadline">Kapanışa ${libEsc(formatCountdown(shelf.deadline))}</div>` : '';
+    ? `<div class="path-deadline">${libEsc(formatCountdown(shelf.deadline))}</div>` : '';
 
   if (!articles || !articles.length) {
     area.innerHTML = `
       <div class="shelf-path">
         <div class="path-head">
-          <div class="path-shelf">Raf ${shelfId}</div>
           <h2 class="path-title">${libEsc(title)}</h2>
           ${subtitle ? `<p class="path-subtitle">${libEsc(subtitle)}</p>` : ''}
           ${deadlineHtml}
@@ -2960,7 +3034,7 @@ async function openShelfPath(shelfId) {
   area.innerHTML = `
     <div class="shelf-path">
       <div class="path-head">
-        <div class="path-shelf">Raf ${shelfId} · ${articles.length} bölüm</div>
+        <div class="path-shelf">Bölüm ${articles.length}</div>
         <h2 class="path-title">${libEsc(title)}</h2>
         ${subtitle ? `<p class="path-subtitle">${libEsc(subtitle)}</p>` : ''}
         ${deadlineHtml}
@@ -3001,16 +3075,83 @@ function parseArticleSections(body) {
   return parts.map(p => p.trim()).filter(p => p.length > 0);
 }
 
+// Body parser: vote widgets (must sit on their own line) are block-level,
+// vocab tooltips are inline. Splitting by line first keeps the vote block
+// out of any wrapping <p> tag — block elements inside <p> would render
+// fine in most browsers but break the source-order assumption when the
+// browser auto-closes the paragraph.
 function renderInlineBody(text) {
-  // Escape first, then re-introduce vocab spans. The marker is rare enough
-  // that we can match it inside the escaped string by looking for the
-  // entity-escaped brackets.
-  const escaped = libEsc(text);
-  const withVocab = escaped.replace(/\[\[([^|\]]+?)::([^\]]+?)\]\]/g, (_m, word, def) => {
-    return `<span class="vocab-term" tabindex="0">${word.trim()}<span class="vocab-pop">${def.trim()}</span></span>`;
+  const lines = String(text).replace(/\r\n/g, '\n').split('\n');
+  const voteLineRe = /^\s*\[\[vote::([^\]]+?)::(-?\d+)::(-?\d+)\]\]\s*$/;
+  const parts = [];
+  let buf = [];
+  function flushText() {
+    if (!buf.length) return;
+    const escaped = libEsc(buf.join('\n'));
+    const withVocab = escaped.replace(/\[\[([^|\]]+?)::([^\]]+?)\]\]/g, (_m, word, def) =>
+      `<span class="vocab-term" tabindex="0">${word.trim()}<span class="vocab-pop">${def.trim()}</span></span>`
+    );
+    parts.push(withVocab.split(/\n{2,}/).map(p =>
+      p.trim() ? `<p>${p.replace(/\n/g, '<br>')}</p>` : ''
+    ).join(''));
+    buf = [];
+  }
+  for (const line of lines) {
+    const m = line.match(voteLineRe);
+    if (m) {
+      flushText();
+      parts.push(`<div class="vote-widget" data-q="${libEsc(m[1].trim())}" data-min="${m[2]}" data-max="${m[3]}" data-answered="0"></div>`);
+    } else {
+      buf.push(line);
+    }
+  }
+  flushText();
+  return parts.join('');
+}
+
+// Build the inner UI for every empty .vote-widget container in `root`.
+// Each widget is a row of person icons (one per vote slot) + a slider
+// 0..count. Moving the slider flips the leftmost N icons green ("yes")
+// while the rest stay red ("no"); reader-next is gated on the widget
+// being answered (any interaction sets data-answered = "1").
+function hydrateVoteWidgets(root, onAnswerChange) {
+  root.querySelectorAll('.vote-widget[data-q]').forEach(w => {
+    if (w.dataset.hydrated === '1') return;
+    w.dataset.hydrated = '1';
+    const q = w.dataset.q;
+    const min = Number(w.dataset.min || 0);
+    const max = Number(w.dataset.max || 10);
+    const count = Math.max(0, max - min);
+    const peopleHtml = Array.from({ length: count }, () =>
+      `<svg class="vote-person" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M3 22c0-5 4-8 9-8s9 3 9 8z"/></svg>`
+    ).join('');
+    w.innerHTML = `
+      <div class="vote-q">${q}</div>
+      <div class="vote-people">${peopleHtml}</div>
+      <div class="vote-controls">
+        <input type="range" class="vote-slider" min="${min}" max="${max}" step="1" value="${min}" aria-label="${q}"/>
+        <div class="vote-readout">${min} / ${max}</div>
+      </div>
+    `;
+    const slider = w.querySelector('.vote-slider');
+    const readout = w.querySelector('.vote-readout');
+    const persons = w.querySelectorAll('.vote-person');
+    function paint(markAnswered) {
+      const v = Number(slider.value);
+      readout.textContent = `${v} / ${max}`;
+      persons.forEach((p, i) => p.classList.toggle('yes', i < (v - min)));
+      if (markAnswered) {
+        w.dataset.answered = '1';
+        if (onAnswerChange) onAnswerChange();
+      }
+    }
+    slider.addEventListener('input', () => paint(true));
+    slider.addEventListener('change', () => paint(true));
+    // Track-click that lands on the default value doesn't fire 'input';
+    // pointerdown ensures we still register the interaction as an answer.
+    slider.addEventListener('pointerdown', () => paint(true));
+    paint(false);
   });
-  // Paragraphs split on blank lines.
-  return withVocab.split(/\n{2,}/).map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
 }
 
 function openArticleReader(article, shelf, shelfId) {
@@ -3047,7 +3188,7 @@ function openArticleReader(article, shelf, shelfId) {
       const isFirst = step === 0;
       content = `
         ${isFirst ? `
-          <div class="reader-byline">${byline || 'İstanbulite Kütüphane'}</div>
+          ${byline ? `<div class="reader-byline">${byline}</div>` : ''}
           <h1 class="reader-title">${libEsc(article.title)}</h1>
           ${article.summary ? `<div class="reader-summary">${libEsc(article.summary)}</div>` : ''}
         ` : ''}
@@ -3073,6 +3214,16 @@ function openArticleReader(article, shelf, shelfId) {
       </div>
     `;
 
+    // Re-evaluate the Next button: gated when any vote widget in the
+    // current step still has data-answered="0".
+    function refreshNextGate() {
+      const next = document.getElementById('reader-next');
+      if (!next) return;
+      const widgets = area.querySelectorAll('.vote-widget[data-q]');
+      const allAnswered = Array.from(widgets).every(w => w.dataset.answered === '1');
+      next.disabled = !allAnswered;
+    }
+
     document.getElementById('reader-back').addEventListener('click', () => openShelfPath(shelfId));
     document.getElementById('reader-prev').addEventListener('click', () => {
       if (step > 0) { step--; renderStep(); }
@@ -3097,6 +3248,9 @@ function openArticleReader(article, shelf, shelfId) {
         el.classList.toggle('vocab-open');
       });
     });
+
+    hydrateVoteWidgets(area, refreshNextGate);
+    refreshNextGate();
 
     if (onPoll) mountPoll(article);
     area.scrollTop = 0;
