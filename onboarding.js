@@ -26,7 +26,7 @@
       finalHint: 'tap anywhere to get started',
     },
     languageScreen: {
-      body: 'ISTANBULITE is not a social media app; it is a network. By default, it is in Turglish. Before we get started, we would like to ask your preference. You can choose to have most things in Turkish, or most things in English — but never neither.',
+      body: 'ISTANBULITE is, by default, in Turglish. Before we get started, we would like to ask your preference. You can choose to have most things in Turkish, or most things in English — but never not both.',
       choices: [
         { value: 'default',      label: 'TÜRKÇE AĞIRLIKLI', sub: 'Turkish-heavy' },
         { value: 'more_english', label: 'ENGLISH-HEAVY',    sub: 'İngilizce ağırlıklı' },
