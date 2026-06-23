@@ -10,6 +10,8 @@
 
 (function (global) {
   const ROOT_ID = 'ist-onb-root';
+  // Cross-page state so the flow can hop anahane → kahvehane → kutuphane → anahane.
+  const STATE_KEY = 'istanbulite_onboarding';
 
   // ── Copy ──
   // English is fixed for the first 2 screens (welcome + language pick).
@@ -84,6 +86,41 @@
         },
       },
     },
+    // Last anahane beat tells the user the mascot is taking them to Kahvehane.
+    navLeave: {
+      tr: {
+        cat: 'Yukarıda diğer salonlar da var. Gel — önce Kahvehane.',
+        dog: 'Yukarıda başka yerler de var! Hadi seni önce Kahvehane\'ye götüreyim!',
+      },
+      en: {
+        cat: "Other halls are up here. Come — Kahvehane first.",
+        dog: "There are other places up here too! Come on, let me take you to Kahvehane first!",
+      },
+    },
+    kahvehaneIntro: {
+      tr: {
+        cat: 'Kahvehane. Üç oyun her gün değişir — Sözcel, Tümcel, Bulmaca. Serini kaybedersen anlarız. Şimdi Kütüphane\'ye.',
+        dog: 'İşte Kahvehane! Her gün ÜÇ yeni oyun var — Sözcel, Tümcel, Bulmaca! Diğerleri de buraya sohbete gelir! Hadi şimdi Kütüphane\'ye!',
+      },
+      en: {
+        cat: "Kahvehane. Three games change every day — Sözcel, Tümcel, Bulmaca. Lose your streak and we'll know. Now to Kütüphane.",
+        dog: "Here we are — Kahvehane! Every day there are THREE new games — Sözcel, Tümcel, Bulmaca! The others come here to talk too! Now let's go to Kütüphane!",
+      },
+    },
+    kutuphaneIntro: {
+      tr: {
+        cat: 'Kütüphane. Uzun okumalar burada. Vaktin olduğunda gez. Şimdi Hane\'ye dönelim — neredeyse bitti.',
+        dog: 'Ve burası Kütüphane! Bütün uzun yazılar burada! Son durak — Hane\'ye dönüyoruz!',
+      },
+      en: {
+        cat: "Kütüphane. The longer reading lives here. Browse when you've got time. Back to Hane — almost done.",
+        dog: "And this is Kütüphane! All the long reads live here! Last stop — back to Hane!",
+      },
+    },
+    btnTakeKahvehane: { tr: 'KAHVEHANE\'YE GİT', en: 'GO TO KAHVEHANE' },
+    btnTakeKutuphane: { tr: 'KÜTÜPHANE\'YE GİT', en: 'GO TO KÜTÜPHANE' },
+    btnBackToHane:    { tr: 'HANE\'YE DÖN',      en: 'BACK TO HANE' },
+
     // Mascot reaction after the user actually taps their neighborhood.
     // Calls out the news-feed filter switching to "mahalle" — the news
     // section is still lit on the left, so the user can see the change.
@@ -207,6 +244,30 @@
     if (hint) hint.remove();
   }
   function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // ── Cross-page state ──
+  function saveState(stage) {
+    try {
+      sessionStorage.setItem(STATE_KEY, JSON.stringify({
+        stage, lang, palette, mascot, kefilName, referralCode, homeNb,
+      }));
+    } catch (e) { /* sessionStorage might be unavailable; flow restarts on next page */ }
+  }
+  function loadState() {
+    try { return JSON.parse(sessionStorage.getItem(STATE_KEY) || 'null'); }
+    catch (e) { return null; }
+  }
+  function clearState() {
+    try { sessionStorage.removeItem(STATE_KEY); } catch (e) { /* ignore */ }
+  }
+  function hydrateFromState(s) {
+    lang = s.lang || 'en';
+    palette = s.palette || 'earth';
+    mascot = s.mascot || 'dog';
+    kefilName = s.kefilName || '';
+    referralCode = s.referralCode || '';
+    homeNb = s.homeNb || null;
+  }
 
   // Render a row of choice buttons + a Confirm button below.
   // onPick(choice) fires every time a choice is tapped; onConfirm() fires
@@ -493,7 +554,9 @@
       { target: 'aside.col-left',       speech: lines.news },
       { target: '.map-panel',           speech: lines.map,    interactive: 'hood' },
       { target: 'aside.col-right',      speech: lines.events },
-      { target: '.section-rule',        speech: lines.nav },
+      // Last beat hands off to the cross-page leg: mascot literally takes
+      // the user to Kahvehane (then Kütüphane) before the final modal.
+      { target: '.section-rule',        speech: COPY.navLeave[lang][mascot], navTo: 'kahvehane.html', btnKey: 'btnTakeKahvehane' },
     ];
 
     let idx = 0;
@@ -536,10 +599,12 @@
         }
       }
 
+      // A beat that ends with a page navigation uses its own button label.
+      const label = b.btnKey ? COPY[b.btnKey][lang] : nextLabel;
       renderPane({
         speech: b.speech,
-        actionLabel: nextLabel,
-        onAction: advance,
+        actionLabel: label,
+        onAction: b.navTo ? () => goToPage(b.navTo, 'phase2-kahvehane') : advance,
       });
     }
 
@@ -552,6 +617,39 @@
         runBeat();
       }
     }
+  }
+
+  // Save state + hop to the next page. The destination page's onboarding
+  // script picks up where we left off via loadState().
+  function goToPage(href, nextStage) {
+    saveState(nextStage);
+    window.location.href = href;
+  }
+
+  // ───── Kahvehane mini-tour ─────
+  function stepKahvehaneTour() {
+    enterSpotlightMode();
+    // Light the right-column aside (the games stack). The aside carries the
+    // background so the highlight isn't transparent over the dim.
+    const target = document.querySelector('aside.col-right') || document.querySelector('main');
+    if (target) addSpotlight(target);
+    renderPane({
+      speech: COPY.kahvehaneIntro[lang][mascot],
+      actionLabel: COPY.btnTakeKutuphane[lang],
+      onAction: () => goToPage('kutuphane.html', 'phase2-kutuphane'),
+    });
+  }
+
+  // ───── Kütüphane mini-tour ─────
+  function stepKutuphaneTour() {
+    enterSpotlightMode();
+    const target = document.querySelector('aside.col-left') || document.querySelector('main');
+    if (target) addSpotlight(target);
+    renderPane({
+      speech: COPY.kutuphaneIntro[lang][mascot],
+      actionLabel: COPY.btnBackToHane[lang],
+      onAction: () => goToPage('anahane.html', 'phase3-finale'),
+    });
   }
 
   function stepKefilShare() {
@@ -605,6 +703,7 @@
     } catch (e) {
       console.error('onboarding finish failed', e);
     }
+    clearState();
     hide();
   }
 
@@ -623,14 +722,37 @@
     sb = opts.sb;
     user = opts.user;
     if (!sb || !user) return false;
+    const page = opts.page || 'anahane';
 
-    // Check whether we already onboarded.
+    // Always confirm we're not done already.
     const { data: profile } = await sb.from('profiles')
       .select('onboarded_at, referral_code, referred_by, neighborhood')
       .eq('id', user.id)
       .maybeSingle();
-    if (!profile || profile.onboarded_at) return false;
+    if (!profile || profile.onboarded_at) { clearState(); return false; }
 
+    const saved = loadState();
+
+    // ── kahvehane / kutuphane: only run if we're mid-flow on this stage.
+    // Otherwise the user opened the page on their own and we should stay quiet.
+    if (page === 'kahvehane') {
+      if (!saved || saved.stage !== 'phase2-kahvehane') return false;
+      hydrateFromState(saved);
+      ensureRoot();
+      show();
+      stepKahvehaneTour();
+      return true;
+    }
+    if (page === 'kutuphane') {
+      if (!saved || saved.stage !== 'phase2-kutuphane') return false;
+      hydrateFromState(saved);
+      ensureRoot();
+      show();
+      stepKutuphaneTour();
+      return true;
+    }
+
+    // ── anahane: either fresh start or returning for the finale.
     referralCode = profile.referral_code || '';
     homeNb = profile.neighborhood || opts.homeNb || null;
 
@@ -646,11 +768,23 @@
     }
     if (!kefilName) kefilName = opts.kefilName || 'your sponsor';
 
-    if (!document.getElementById(ROOT_ID)) buildRoot();
-    else root = document.getElementById(ROOT_ID);
+    ensureRoot();
     show();
+
+    if (saved && saved.stage === 'phase3-finale') {
+      hydrateFromState(saved);
+      // Skip the welcome/language/palette/tour — go straight to the closing modals.
+      stepKefilShare();
+      return true;
+    }
+
     stepWelcome();
     return true;
+  }
+
+  function ensureRoot() {
+    if (!document.getElementById(ROOT_ID)) buildRoot();
+    else root = document.getElementById(ROOT_ID);
   }
 
   global.IstOnboarding = { maybeRun };
