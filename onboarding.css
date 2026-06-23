@@ -15,7 +15,17 @@
   overflow-y: auto;
 }
 #ist-onb-root.show { display: flex; }
-body.ist-onb-locked { overflow: hidden !important; }
+body.ist-onb-locked {
+  overflow: hidden !important;
+  /* Disable hovers, clicks, and touch gestures on everything underneath the
+     onboarding. Re-enabled only on the onboarding UI and the interactive
+     spotlight target. */
+  pointer-events: none !important;
+}
+body.ist-onb-locked #ist-onb-root,
+body.ist-onb-locked #ist-onb-pane,
+body.ist-onb-locked .ist-onb-target { pointer-events: auto !important; }
+body.ist-onb-locked #ist-onb-spotlight { pointer-events: none !important; }
 
 /* Per-palette tokens applied to the onboarding root only. The 4 modes
    come from data-palette × prefers-color-scheme; written to the DB once
@@ -260,7 +270,9 @@ body.ist-onb-locked { overflow: hidden !important; }
   cursor: pointer;
 }
 
-/* Mascot speech pane — fixed bottom-right corner */
+/* Mascot speech pane — fixed bottom-right corner.
+   Mirrors the palette tokens so child elements (buttons, prompts) inherit
+   the same --ist-onb-bg / --ist-onb-ink values as the modal. */
 #ist-onb-pane {
   position: fixed;
   bottom: 20px;
@@ -272,34 +284,49 @@ body.ist-onb-locked { overflow: hidden !important; }
   gap: 10px;
   max-width: min(380px, calc(100vw - 40px));
   font-family: 'Source Serif 4', Georgia, serif;
+  color: var(--ist-onb-ink, #4C382A);
+}
+#ist-onb-pane[data-palette="earth"] {
+  --ist-onb-bg: #eddbd0;
+  --ist-onb-ink: #4C382A;
+  --ist-onb-muted: #867264;
+  --ist-onb-card: #ddc4b5;
+  --ist-onb-rule: #b8a08a;
+}
+#ist-onb-pane[data-palette="mono"] {
+  --ist-onb-bg: #f5f5f5;
+  --ist-onb-ink: #111;
+  --ist-onb-muted: #555;
+  --ist-onb-card: #e6e6e6;
+  --ist-onb-rule: #bbb;
+}
+@media (prefers-color-scheme: dark) {
+  #ist-onb-pane[data-palette="earth"] {
+    --ist-onb-bg: #2a1f17;
+    --ist-onb-ink: #f0e4d8;
+    --ist-onb-muted: #b39c87;
+    --ist-onb-card: #3b2c20;
+    --ist-onb-rule: #5a4334;
+  }
+  #ist-onb-pane[data-palette="mono"] {
+    --ist-onb-bg: #0e0e0e;
+    --ist-onb-ink: #f5f5f5;
+    --ist-onb-muted: #999;
+    --ist-onb-card: #1c1c1c;
+    --ist-onb-rule: #444;
+  }
 }
 #ist-onb-pane.show { display: flex; }
 #ist-onb-pane .ist-onb-bubble {
-  background: var(--ist-onb-bg, #eddbd0);
-  color: var(--ist-onb-ink, #4C382A);
-  border: 1px solid var(--ist-onb-rule, #b8a08a);
+  background: var(--ist-onb-bg);
+  color: var(--ist-onb-ink);
+  border: 1px solid var(--ist-onb-rule);
   padding: 14px 16px;
   font-size: 1rem;
   line-height: 1.45;
   border-radius: 10px 10px 2px 10px;
   box-shadow: 0 6px 24px rgba(0,0,0,0.25);
   position: relative;
-}
-#ist-onb-pane[data-palette="mono"] .ist-onb-bubble {
-  --ist-onb-bg: #f5f5f5;
-  --ist-onb-ink: #111;
-  --ist-onb-rule: #bbb;
-  background: var(--ist-onb-bg);
-  color: var(--ist-onb-ink);
-  border-color: var(--ist-onb-rule);
-}
-@media (prefers-color-scheme: dark) {
-  #ist-onb-pane[data-palette="earth"] .ist-onb-bubble {
-    background: #2a1f17; color: #f0e4d8; border-color: #5a4334;
-  }
-  #ist-onb-pane[data-palette="mono"] .ist-onb-bubble {
-    background: #1c1c1c; color: #f5f5f5; border-color: #444;
-  }
 }
 #ist-onb-pane .ist-onb-mascot-row {
   display: flex;
@@ -308,18 +335,11 @@ body.ist-onb-locked { overflow: hidden !important; }
 }
 #ist-onb-pane .ist-onb-mascot {
   width: 90px; height: 90px;
-  background: var(--ist-onb-bg, #eddbd0);
-  border: 1px solid var(--ist-onb-rule, #b8a08a);
+  background: var(--ist-onb-bg);
+  border: 1px solid var(--ist-onb-rule);
   border-radius: 50%;
   padding: 6px;
   flex-shrink: 0;
-}
-#ist-onb-pane[data-palette="mono"] .ist-onb-mascot {
-  background: #f5f5f5; border-color: #bbb;
-}
-@media (prefers-color-scheme: dark) {
-  #ist-onb-pane[data-palette="earth"] .ist-onb-mascot { background: #2a1f17; border-color: #5a4334; }
-  #ist-onb-pane[data-palette="mono"] .ist-onb-mascot { background: #1c1c1c; border-color: #444; }
 }
 #ist-onb-pane .ist-onb-actions {
   display: flex;
@@ -331,9 +351,13 @@ body.ist-onb-locked { overflow: hidden !important; }
   font-weight: 600;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--ist-onb-ink, #4C382A);
+  color: var(--ist-onb-ink);
   opacity: 0.7;
   padding: 6px 0;
+}
+#ist-onb-pane .ist-onb-btn {
+  background: var(--ist-onb-ink);
+  color: var(--ist-onb-bg);
 }
 
 @media (max-width: 600px) {
