@@ -85,9 +85,17 @@
       },
     },
     // Mascot reaction after the user actually taps their neighborhood.
+    // Calls out the news-feed filter switching to "mahalle" — the news
+    // section is still lit on the left, so the user can see the change.
     mapTapped: {
-      tr: { cat: 'İşte. Mahallen. Aklında bulunsun.', dog: 'EVET! İşte burada — senin mahallen! Aferin sana!' },
-      en: { cat: 'There. Your district. Keep it in mind.',  dog: "YES! There it is — your district! Good job!" },
+      tr: {
+        cat: 'İşte. Mahallen. Sola bak — haber akışı da artık sadece senin mahallenden. Aklında bulunsun.',
+        dog: 'EVET! İşte burada — senin mahallen! Bak, sol taraftaki haberler de değişti! Şimdi sadece mahallenden son dakika!',
+      },
+      en: {
+        cat: 'There. Your district. Look left — the feed is filtered to your hood now. Keep it in mind.',
+        dog: "YES! There it is — your district! And look, the news on the left changed too! It's just your hood's breaking news now!",
+      },
     },
     promptTapHood: {
       tr: 'mahallene dokun',
@@ -126,11 +134,10 @@
   let palette = null;  // 'mono' | 'earth'
   let mascot = null;   // 'cat' | 'dog'
   let root;            // DOM root for fullscreen modal phases
-  let spotlightEl;     // The cutout overlay element
+  let spotlightEl;     // The persistent dim overlay
   let pane;            // The mascot pane (corner bubble)
-  let spotlightTarget; // The currently-spotlighted DOM element
+  let litTargets = []; // Every element the mascot has introduced so far
   let interactiveTarget; // Only set when the user must tap this element
-  let scrollHandler;   // Reposition spotlight on scroll/resize
   let firewallInstalled = false;
 
   // ── Helpers ──
@@ -337,55 +344,28 @@
     pane.setAttribute('data-palette', palette || 'earth');
   }
 
-  function positionSpotlight(el) {
-    if (!el) { spotlightEl.classList.add('full'); return; }
-    const r = el.getBoundingClientRect();
-    spotlightEl.classList.remove('full');
-    spotlightEl.style.left = r.left + 'px';
-    spotlightEl.style.top = r.top + 'px';
-    spotlightEl.style.width = r.width + 'px';
-    spotlightEl.style.height = r.height + 'px';
-  }
-
-  function setSpotlight(el) {
-    // Strip the marker from the previous target.
-    if (spotlightTarget) {
-      spotlightTarget.classList.remove('ist-onb-target', 'interactive');
-    }
-    spotlightTarget = el;
+  // Add a newly-introduced element to the lit set. Previously-lit elements
+  // stay lit (just lose the `.latest` brighter ring). Passing null = no new
+  // spotlight (the mascot is speaking generally, e.g. reveal beat).
+  function addSpotlight(el) {
     spotlightEl.classList.add('show');
-    if (el) {
-      el.classList.add('ist-onb-target');
-      // Scroll into view if needed.
-      const r = el.getBoundingClientRect();
-      if (r.top < 0 || r.bottom > window.innerHeight) {
-        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        // Re-measure after the scroll lands.
-        setTimeout(() => positionSpotlight(el), 360);
-      }
-      positionSpotlight(el);
-    } else {
-      spotlightEl.classList.add('full');
-    }
-    if (!scrollHandler) {
-      scrollHandler = () => { if (spotlightTarget) positionSpotlight(spotlightTarget); };
-      window.addEventListener('scroll', scrollHandler, true);
-      window.addEventListener('resize', scrollHandler);
+    // Demote the previous "latest" so only the newest gets the brighter ring.
+    litTargets.forEach(t => t.classList.remove('latest'));
+    if (!el) return;
+    if (!litTargets.includes(el)) litTargets.push(el);
+    el.classList.add('ist-onb-target', 'latest');
+    // Scroll into view if needed so the user can see the new highlight.
+    const r = el.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > window.innerHeight) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
   }
 
   function clearSpotlight() {
-    if (spotlightTarget) {
-      spotlightTarget.classList.remove('ist-onb-target', 'interactive');
-      spotlightTarget = null;
-    }
+    litTargets.forEach(t => t.classList.remove('ist-onb-target', 'interactive', 'latest'));
+    litTargets = [];
     interactiveTarget = null;
     if (spotlightEl) spotlightEl.classList.remove('show');
-    if (scrollHandler) {
-      window.removeEventListener('scroll', scrollHandler, true);
-      window.removeEventListener('resize', scrollHandler);
-      scrollHandler = null;
-    }
   }
 
   // Block clicks/swipes/wheel/keyboard on the rest of the page during the
@@ -522,14 +502,15 @@
     function runBeat() {
       const b = beats[idx];
       const el = b.target ? document.querySelector(b.target) : null;
-      setSpotlight(el);
+      addSpotlight(el);
 
       if (b.interactive === 'hood' && homeNb) {
         const hoodEl = document.getElementById(homeNb);
         if (hoodEl) {
           // Let ONLY the user's hood polygon receive clicks through the firewall.
           interactiveTarget = hoodEl;
-          hoodEl.classList.add('ist-onb-target', 'interactive');
+          hoodEl.classList.add('ist-onb-target', 'interactive', 'latest');
+          if (!litTargets.includes(hoodEl)) litTargets.push(hoodEl);
           renderPane({
             speech: b.speech,
             promptText: COPY.promptTapHood[lang],
@@ -537,6 +518,13 @@
           const handler = () => {
             hoodEl.removeEventListener('click', handler, true);
             interactiveTarget = null;
+            // Switch the breaking-news feed to the user's neighborhood so
+            // the reaction line ("see how the news changed?") actually
+            // reflects what's on screen. The news section is still lit.
+            // Calling applyNewsFilter directly bypasses our click firewall.
+            if (typeof window.applyNewsFilter === 'function') {
+              window.applyNewsFilter('mahalle');
+            }
             renderPane({
               speech: COPY.mapTapped[lang][mascot],
               actionLabel: nextLabel,
