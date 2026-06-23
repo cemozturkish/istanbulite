@@ -22,8 +22,8 @@
         '<em class="kefil-name">{KEFIL}</em> told us great things about you! We are glad to see you become a part of the community.',
         'But remember — they vouched for you. If you were to violate the code of conduct, <em class="kefil-name">{KEFIL}</em> will be responsible.',
       ],
-      tapHint: 'tap to continue',
-      finalHint: 'tap to get started',
+      tapHint: 'tap anywhere to continue',
+      finalHint: 'tap anywhere to get started',
     },
     languageScreen: {
       body: 'ISTANBULITE is not a social media app; it is a network. By default, it is in Turglish. Before we get started, we would like to ask your preference. You can choose to have most things in Turkish, or most things in English — but never neither.',
@@ -149,6 +149,7 @@
   function clearStage() {
     const stage = document.getElementById('ist-onb-stage');
     stage.innerHTML = '';
+    clearHint();
   }
   function addMsg(html, opts) {
     const stage = document.getElementById('ist-onb-stage');
@@ -160,13 +161,15 @@
     return el;
   }
   function addHint(text, onClick) {
-    const stage = document.getElementById('ist-onb-stage');
-    const old = stage.querySelector('.ist-onb-hint');
-    if (old) old.remove();
-    const hint = document.createElement('div');
-    hint.className = 'ist-onb-hint';
+    // Pin the hint to the bottom of the root (outside the stage) so it
+    // doesn't drift as new messages get appended above.
+    let hint = root.querySelector('.ist-onb-hint');
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.className = 'ist-onb-hint';
+      root.appendChild(hint);
+    }
     hint.textContent = text;
-    stage.appendChild(hint);
     setTimeout(() => hint.classList.add('show'), 250);
 
     // Whole overlay is a tap target.
@@ -177,6 +180,10 @@
       onClick();
     };
     root.addEventListener('click', handler);
+  }
+  function clearHint() {
+    const hint = root && root.querySelector('.ist-onb-hint');
+    if (hint) hint.remove();
   }
   function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -218,10 +225,14 @@
   function show() {
     root.classList.add('show');
     document.body.classList.add('ist-onb-locked');
+    installFirewall();
   }
   function hide() {
     root.classList.remove('show');
     document.body.classList.remove('ist-onb-locked');
+    removeFirewall();
+    clearSpotlight();
+    hidePane();
   }
 
   async function stepWelcome() {
@@ -352,23 +363,37 @@
     }
   }
 
-  // Block clicks on the rest of the page during the tour so the user can't
-  // accidentally navigate away mid-onboarding. Pane clicks always allowed;
-  // interactiveTarget clicks allowed during steps that require a real tap.
-  function clickFirewall(e) {
-    if (e.target.closest('#ist-onb-pane')) return;
+  // Block clicks/swipes/wheel/keyboard on the rest of the page during the
+  // whole onboarding so the user can't navigate away. anahane.html attaches
+  // touchstart + wheel listeners on `document` for swipe-pagination — we
+  // stopImmediatePropagation in the capture phase so those never see the
+  // event. Pane / modal clicks pass through, and the interactiveTarget (the
+  // user's hood polygon) is allowed during the map step.
+  function isInsideOnboarding(target) {
+    return target && target.closest && target.closest('#ist-onb-root, #ist-onb-pane');
+  }
+  function gestureFirewall(e) {
+    if (isInsideOnboarding(e.target)) return;
     if (interactiveTarget && interactiveTarget.contains(e.target)) return;
-    e.preventDefault();
+    if (typeof e.preventDefault === 'function' && e.cancelable) e.preventDefault();
     e.stopImmediatePropagation();
   }
   function installFirewall() {
     if (firewallInstalled) return;
-    document.addEventListener('click', clickFirewall, true);
+    document.addEventListener('click', gestureFirewall, true);
+    document.addEventListener('wheel', gestureFirewall, { capture: true, passive: false });
+    document.addEventListener('touchstart', gestureFirewall, { capture: true, passive: false });
+    document.addEventListener('touchmove', gestureFirewall, { capture: true, passive: false });
+    document.addEventListener('keydown', gestureFirewall, true);
     firewallInstalled = true;
   }
   function removeFirewall() {
     if (!firewallInstalled) return;
-    document.removeEventListener('click', clickFirewall, true);
+    document.removeEventListener('click', gestureFirewall, true);
+    document.removeEventListener('wheel', gestureFirewall, { capture: true });
+    document.removeEventListener('touchstart', gestureFirewall, { capture: true });
+    document.removeEventListener('touchmove', gestureFirewall, { capture: true });
+    document.removeEventListener('keydown', gestureFirewall, true);
     firewallInstalled = false;
   }
 
@@ -412,13 +437,11 @@
   // scroll past the page while spotlighted.
   function enterSpotlightMode() {
     ensureSpotlightDOM();
-    installFirewall();
     root.classList.remove('show');
   }
   function exitSpotlightMode() {
     clearSpotlight();
     hidePane();
-    removeFirewall();
     root.classList.add('show');
   }
 
