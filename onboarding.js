@@ -100,6 +100,7 @@
       },
     },
     finishLabel: { tr: 'BİTİR', en: 'FINISH' },
+    confirmLabel: { tr: 'ONAYLA', en: 'CONFIRM' },
     tapToContinue: { tr: 'devam etmek için dokun', en: 'tap to continue' },
     copy: { tr: 'KOPYALA', en: 'COPY' },
     copied: { tr: 'KOPYALANDI', en: 'COPIED' },
@@ -159,6 +160,40 @@
   }
   function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+  // Render a row of choice buttons + a Confirm button below.
+  // onPick(choice) fires every time a choice is tapped; onConfirm() fires
+  // when the user taps the confirm button (only enabled after a pick).
+  function addChoices(choices, onPick, onConfirm, renderInner) {
+    const stage = document.getElementById('ist-onb-stage');
+    const wrap = document.createElement('div');
+    wrap.className = 'ist-onb-choices';
+    const btns = [];
+    choices.forEach(c => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ist-onb-choice';
+      btn.innerHTML = renderInner(c);
+      btn.addEventListener('click', () => {
+        btns.forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        onPick(c);
+        confirmBtn.disabled = false;
+      });
+      btns.push(btn);
+      wrap.appendChild(btn);
+    });
+    stage.appendChild(wrap);
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.type = 'button';
+    confirmBtn.className = 'ist-onb-btn';
+    // Use the language-appropriate label; default to English before lang is set.
+    confirmBtn.textContent = COPY.confirmLabel[lang] || COPY.confirmLabel.en;
+    confirmBtn.disabled = true;
+    confirmBtn.addEventListener('click', onConfirm);
+    stage.appendChild(confirmBtn);
+  }
+
   // ── Steps ──
   function show() {
     root.classList.add('show');
@@ -171,7 +206,6 @@
 
   async function stepWelcome() {
     clearStage();
-    root.classList.add('is-welcome');
     const w = COPY.welcome;
     addMsg(w.lead, { lead: true });
     let idx = 0;
@@ -190,55 +224,42 @@
 
   function stepLanguage() {
     clearStage();
-    root.classList.remove('is-welcome');
     const s = COPY.languageScreen;
     addMsg(s.body);
-    const choicesWrap = document.createElement('div');
-    choicesWrap.className = 'ist-onb-choices';
-    s.choices.forEach(c => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ist-onb-choice';
-      btn.innerHTML = `<div>${c.label}</div><small>${c.sub}</small>`;
-      btn.addEventListener('click', () => {
-        lang = c.value === 'more_english' ? 'en' : 'tr';
-        if (global.I18N && I18N.setLang) I18N.setLang(c.value);
-        stepPalette();
-      });
-      choicesWrap.appendChild(btn);
-    });
-    document.getElementById('ist-onb-stage').appendChild(choicesWrap);
-    requestAnimationFrame(() => choicesWrap.querySelectorAll('.ist-onb-choice').forEach(el => {
-      el.style.opacity = '0';
-      el.style.transition = 'opacity 360ms ease';
-      requestAnimationFrame(() => { el.style.opacity = '1'; });
-    }));
+    let selected = null;
+    const onPick = (c) => {
+      selected = c;
+      lang = c.value === 'more_english' ? 'en' : 'tr';
+    };
+    const onConfirm = () => {
+      if (!selected) return;
+      if (global.I18N && I18N.setLang) I18N.setLang(selected.value);
+      stepPalette();
+    };
+    addChoices(s.choices, onPick, onConfirm, c => `<div>${c.label}</div><small>${c.sub}</small>`);
   }
 
   function stepPalette() {
     clearStage();
     const s = COPY.paletteScreen[lang];
     addMsg(s.body);
-    const choicesWrap = document.createElement('div');
-    choicesWrap.className = 'ist-onb-choices';
-    s.choices.forEach(c => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ist-onb-choice';
-      btn.innerHTML = `
-        <div class="ist-onb-swatch ${c.value}"><span></span><span></span><span></span></div>
-        <div>${c.label}</div>
-        <small>${c.sub}</small>
-      `;
-      btn.addEventListener('click', () => {
-        palette = c.value;
-        mascot = c.mascot;
-        root.setAttribute('data-palette', palette);
-        stepTour(0);
-      });
-      choicesWrap.appendChild(btn);
-    });
-    document.getElementById('ist-onb-stage').appendChild(choicesWrap);
+    let selected = null;
+    const onPick = (c) => {
+      selected = c;
+      // Preview the palette live as the user picks.
+      root.setAttribute('data-palette', c.value);
+    };
+    const onConfirm = () => {
+      if (!selected) return;
+      palette = selected.value;
+      mascot = selected.mascot;
+      stepTour(0);
+    };
+    addChoices(s.choices, onPick, onConfirm, c => `
+      <div class="ist-onb-swatch ${c.value}"><span></span><span></span><span></span></div>
+      <div>${c.label}</div>
+      <small>${c.sub}</small>
+    `);
   }
 
   // Single combined progression for mascot reveal + 3 tour beats.
