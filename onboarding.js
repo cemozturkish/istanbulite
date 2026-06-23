@@ -490,10 +490,10 @@
 
     const beats = [
       { target: null,                   speech: lines.reveal },
-      { target: '#left-sidebar',        speech: lines.news },
+      { target: 'aside.col-left',       speech: lines.news },
       { target: '.map-panel',           speech: lines.map,    interactive: 'hood' },
-      { target: '.sidebar-right',       speech: lines.events },
-      { target: 'header nav',           speech: lines.nav },
+      { target: 'aside.col-right',      speech: lines.events },
+      { target: '.section-rule',        speech: lines.nav },
     ];
 
     let idx = 0;
