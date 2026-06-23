@@ -150,6 +150,9 @@
     const stage = document.getElementById('ist-onb-stage');
     stage.innerHTML = '';
     clearHint();
+    // After a step rerenders, the previously-focused element is gone.
+    // Re-focus the first control in the visible container.
+    focusFirst();
   }
   function addMsg(html, opts) {
     const stage = document.getElementById('ist-onb-stage');
@@ -162,24 +165,35 @@
   }
   function addHint(text, onClick) {
     // Pin the hint to the bottom of the root (outside the stage) so it
-    // doesn't drift as new messages get appended above.
+    // doesn't drift as new messages get appended above. Render as a
+    // <button> so keyboard users can advance with Enter/Space.
     let hint = root.querySelector('.ist-onb-hint');
     if (!hint) {
-      hint = document.createElement('div');
+      hint = document.createElement('button');
+      hint.type = 'button';
       hint.className = 'ist-onb-hint';
       root.appendChild(hint);
     }
     hint.textContent = text;
     setTimeout(() => hint.classList.add('show'), 250);
 
-    // Whole overlay is a tap target.
+    // Whole overlay is a tap target; the hint button advances the same way.
     const handler = (e) => {
       // Ignore clicks on actual interactive children (choice buttons, etc.).
       if (e.target.closest('.ist-onb-choice, .ist-onb-btn, .ist-onb-codebox button')) return;
       root.removeEventListener('click', handler);
+      hint.removeEventListener('click', hintHandler);
+      onClick();
+    };
+    const hintHandler = (e) => {
+      e.stopPropagation();
+      root.removeEventListener('click', handler);
+      hint.removeEventListener('click', hintHandler);
       onClick();
     };
     root.addEventListener('click', handler);
+    hint.addEventListener('click', hintHandler);
+    focusFirst();
   }
   function clearHint() {
     const hint = root && root.querySelector('.ist-onb-hint');
@@ -226,6 +240,17 @@
     root.classList.add('show');
     document.body.classList.add('ist-onb-locked');
     installFirewall();
+    focusFirst();
+  }
+  // Pull focus into the onboarding so a keyboard user can Tab through
+  // its controls instead of being trapped on the page underneath.
+  function focusFirst() {
+    // Defer to next frame so freshly-appended buttons are focusable.
+    requestAnimationFrame(() => {
+      const el = firstFocusableIn(focusableContainer());
+      if (el) el.focus();
+      else if (root) { root.setAttribute('tabindex', '-1'); root.focus(); }
+    });
   }
   function hide() {
     root.classList.remove('show');
@@ -378,13 +403,43 @@
     if (typeof e.preventDefault === 'function' && e.cancelable) e.preventDefault();
     e.stopImmediatePropagation();
   }
+  // Keyboard firewall: blocks page-navigation keys (arrows, PageUp/Down,
+  // Home/End, Enter, Space) when fired outside the onboarding, but ALWAYS
+  // lets Tab and Escape through so a keyboard user can move focus. The
+  // focusin trap below then pulls focus back inside the onboarding if it
+  // lands on a background element.
+  function keyFirewall(e) {
+    if (e.key === 'Tab' || e.key === 'Escape') return;
+    if (isInsideOnboarding(e.target)) return;
+    if (interactiveTarget && interactiveTarget.contains(e.target)) return;
+    if (e.cancelable) e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+  // Pick the visible onboarding container so we focus the right place.
+  function focusableContainer() {
+    if (pane && pane.classList.contains('show')) return pane;
+    return root;
+  }
+  function firstFocusableIn(container) {
+    if (!container) return null;
+    return container.querySelector(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+  }
+  function focusTrap(e) {
+    if (isInsideOnboarding(e.target)) return;
+    if (interactiveTarget && interactiveTarget.contains(e.target)) return;
+    const el = firstFocusableIn(focusableContainer());
+    if (el) el.focus();
+  }
   function installFirewall() {
     if (firewallInstalled) return;
     document.addEventListener('click', gestureFirewall, true);
     document.addEventListener('wheel', gestureFirewall, { capture: true, passive: false });
     document.addEventListener('touchstart', gestureFirewall, { capture: true, passive: false });
     document.addEventListener('touchmove', gestureFirewall, { capture: true, passive: false });
-    document.addEventListener('keydown', gestureFirewall, true);
+    document.addEventListener('keydown', keyFirewall, true);
+    document.addEventListener('focusin', focusTrap, true);
     firewallInstalled = true;
   }
   function removeFirewall() {
@@ -393,7 +448,8 @@
     document.removeEventListener('wheel', gestureFirewall, { capture: true });
     document.removeEventListener('touchstart', gestureFirewall, { capture: true });
     document.removeEventListener('touchmove', gestureFirewall, { capture: true });
-    document.removeEventListener('keydown', gestureFirewall, true);
+    document.removeEventListener('keydown', keyFirewall, true);
+    document.removeEventListener('focusin', focusTrap, true);
     firewallInstalled = false;
   }
 
@@ -429,6 +485,7 @@
     }
     pane.appendChild(actions);
     pane.classList.add('show');
+    focusFirst();
   }
 
   function hidePane() { pane.classList.remove('show'); }
