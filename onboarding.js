@@ -171,6 +171,7 @@
 
   async function stepWelcome() {
     clearStage();
+    root.classList.add('is-welcome');
     const w = COPY.welcome;
     addMsg(w.lead, { lead: true });
     let idx = 0;
@@ -189,6 +190,7 @@
 
   function stepLanguage() {
     clearStage();
+    root.classList.remove('is-welcome');
     const s = COPY.languageScreen;
     addMsg(s.body);
     const choicesWrap = document.createElement('div');
