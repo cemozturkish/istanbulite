@@ -22,8 +22,8 @@
         '<em class="kefil-name">{KEFIL}</em> told us great things about you! We are glad to see you become a part of the community.',
         'But remember — they vouched for you. If you were to violate the code of conduct, <em class="kefil-name">{KEFIL}</em> will be responsible.',
       ],
-      tapHint: 'tap to continue',
-      finalHint: 'tap to get started',
+      tapHint: 'tap anywhere to continue',
+      finalHint: 'tap anywhere to get started',
     },
     languageScreen: {
       body: 'ISTANBULITE is not a social media app; it is a network. By default, it is in Turglish. Before we get started, we would like to ask your preference. You can choose to have most things in Turkish, or most things in English — but never neither.',
@@ -149,6 +149,7 @@
   function clearStage() {
     const stage = document.getElementById('ist-onb-stage');
     stage.innerHTML = '';
+    clearHint();
   }
   function addMsg(html, opts) {
     const stage = document.getElementById('ist-onb-stage');
@@ -160,13 +161,15 @@
     return el;
   }
   function addHint(text, onClick) {
-    const stage = document.getElementById('ist-onb-stage');
-    const old = stage.querySelector('.ist-onb-hint');
-    if (old) old.remove();
-    const hint = document.createElement('div');
-    hint.className = 'ist-onb-hint';
+    // Pin the hint to the bottom of the root (outside the stage) so it
+    // doesn't drift as new messages get appended above.
+    let hint = root.querySelector('.ist-onb-hint');
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.className = 'ist-onb-hint';
+      root.appendChild(hint);
+    }
     hint.textContent = text;
-    stage.appendChild(hint);
     setTimeout(() => hint.classList.add('show'), 250);
 
     // Whole overlay is a tap target.
@@ -177,6 +180,10 @@
       onClick();
     };
     root.addEventListener('click', handler);
+  }
+  function clearHint() {
+    const hint = root && root.querySelector('.ist-onb-hint');
+    if (hint) hint.remove();
   }
   function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
