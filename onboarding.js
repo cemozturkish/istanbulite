@@ -48,36 +48,50 @@
         ],
       },
     },
-    // mascot-led beats: [lang][mascot] → ordered list of step bodies.
+    // Spotlight tour: each beat targets a real element on the page.
+    // null target = no spotlight (just mascot floating).
     tour: {
       tr: {
-        cat: [
-          'Hâlâ buradasın demek. Peki, sana etrafı göstereyim. Ayak uydurmaya çalış.',
-          'Burası anasayfa. Mahallenden haberler, bu haftanın etkinlikleri. Acil bir şey yok. Yenilemen gereken bir şey yok.',
-          'Harita. Bir mahalleye dokun, ne varsa oku. Her yere bakabilirsin. Sadece yaşadığın yerde konuşabilirsin.',
-          'Kütüphane uzun yazıların olduğu yer. Kahvehane ise kahvehane — sohbet ve her gün değişen üç oyun: Sözcel, Tümcel, Bulmaca. Serini kaybetme.',
-        ],
-        dog: [
-          'SELAAM!! Vay, merhaba! Burada olmana çok sevindim! Hadi, sana her şeyi göstereyim!!',
-          'Burası anasayfa! Mahallenin haberleri, bu hafta neler oluyor — hepsi tek yerde! Güzel değil mi?',
-          'Bak, harita! Herhangi bir mahalleye dokun, içeri bak! Her yeri okuyabilirsin ama sadece kendi mahallende konuşursun — böylesi daha gerçek!',
-          'Kütüphane\'de tüm yazılar var, Kahvehane ise kahvehane — sohbetler VE her gün değişen üç oyun! Sözcel, Tümcel, Bulmaca — çok eğlenceli!',
-        ],
+        cat: {
+          reveal:  'Hâlâ buradasın demek. Peki, sana Hane\'yi göstereyim. Ayak uydurmaya çalış.',
+          news:    'Mahallenden ve dünyadan son dakika. Acil bir şey yoksa, yenilemene gerek yok.',
+          map:     'Harita. Buradaki ışıklı kısım senin mahallen. Üzerine bir dokun bakalım.',
+          events:  'Bu haftanın etkinlikleri. İnternette daha fazla vakit geçirmen için değil — dışarı çıkasın diye.',
+          nav:     'Kütüphane ve Kahvehane buradan. Kahvehane\'de her gün değişen üç oyun var: Sözcel, Tümcel, Bulmaca. Serini kaybetme.',
+        },
+        dog: {
+          reveal:  'SELAAM!! Vay, merhaba! Hane\'ye hoş geldin! Hadi sana her şeyi göstereyim!!',
+          news:    'Burada mahallenden ve dünyadan son haberler var! Hepsi tek yerde, ne güzel değil mi?',
+          map:     'Bak, harita! Işıklı olan kısım senin mahallen! Hadi üstüne bir dokun, beraber selamlayalım!',
+          events:  'Ve bu hafta neler oluyor! Bunlar gerçek hayatta — git, eğlen, biriyle tanış!',
+          nav:     'Buradan Kütüphane ve Kahvehane\'ye gidebilirsin! Kahvehane\'de her gün üç yeni oyun var: Sözcel, Tümcel, Bulmaca — çok eğlenceli!',
+        },
       },
       en: {
-        cat: [
-          "Oh. You're still here. Fine — I'll show you around. Try to keep up.",
-          'This is home. News from your district, events this week. Nothing urgent. Nothing you need to refresh.',
-          'The map. Tap a district, read what\'s there. You can look anywhere. You can only speak where you live.',
-          "Kütüphane is where the longer writing lives. Kahvehane is the coffeehouse — talk, and three games that change every day: Sözcel, Tümcel, Bulmaca. Don't lose your streak.",
-        ],
-        dog: [
-          "HI!! Oh wow, hi! I'm so happy you're here! Come on, let me show you everything!!",
-          "This is home! Your district's news, what's happening this week — all in one place! Isn't that nice?",
-          'Look, a map! Tap any district to peek inside! You can read everywhere but you only get to talk in your own — keeps things real!',
-          'Kütüphane has all the articles, and Kahvehane is the coffeehouse — chats AND three games that change every single day! Sözcel, Tümcel, Bulmaca — so fun!',
-        ],
+        cat: {
+          reveal:  "Oh. You're still here. Fine — let me show you around Hane. Try to keep up.",
+          news:    "Breaking news from your hood and the world. If nothing's urgent, don't refresh.",
+          map:     'The map. The lit-up one is your district. Go on, tap it.',
+          events:  "What's happening this week. Not so you spend more time online — so you go outside.",
+          nav:     "Kütüphane and Kahvehane are up here. Kahvehane has three games that change every day: Sözcel, Tümcel, Bulmaca. Don't lose your streak.",
+        },
+        dog: {
+          reveal:  "HI!! Oh wow, hi! Welcome to Hane! Come on, let me show you everything!!",
+          news:    "Here's the breaking news from your hood and the world! All in one place, isn't that nice?",
+          map:     "Look, a map! The glowing one is YOUR district! Tap it, let's say hi together!",
+          events:  "And here's what's happening this week! These are real-life things — go, have fun, meet someone!",
+          nav:     "Up here you can get to Kütüphane and Kahvehane! Kahvehane has three new games every day: Sözcel, Tümcel, Bulmaca — so fun!",
+        },
       },
+    },
+    // Mascot reaction after the user actually taps their neighborhood.
+    mapTapped: {
+      tr: { cat: 'İşte. Mahallen. Aklında bulunsun.', dog: 'EVET! İşte burada — senin mahallen! Aferin sana!' },
+      en: { cat: 'There. Your district. Keep it in mind.',  dog: "YES! There it is — your district! Good job!" },
+    },
+    promptTapHood: {
+      tr: 'mahallene dokun',
+      en: 'tap your district',
     },
     kefilShare: {
       tr: {
@@ -107,11 +121,17 @@
   };
 
   // ── State ──
-  let sb, user, kefilName, referralCode;
+  let sb, user, kefilName, referralCode, homeNb;
   let lang = 'en';     // 'en' or 'tr' for mascot-led beats
   let palette = null;  // 'mono' | 'earth'
   let mascot = null;   // 'cat' | 'dog'
-  let root;            // DOM root
+  let root;            // DOM root for fullscreen modal phases
+  let spotlightEl;     // The cutout overlay element
+  let pane;            // The mascot pane (corner bubble)
+  let spotlightTarget; // The currently-spotlighted DOM element
+  let interactiveTarget; // Only set when the user must tap this element
+  let scrollHandler;   // Reposition spotlight on scroll/resize
+  let firewallInstalled = false;
 
   // ── Helpers ──
   function fillKefil(s) {
@@ -262,18 +282,207 @@
     `);
   }
 
-  // Single combined progression for mascot reveal + 3 tour beats.
-  function stepTour(idx) {
-    clearStage();
-    const lines = COPY.tour[lang][mascot];
-    const stage = document.getElementById('ist-onb-stage');
-    stage.insertAdjacentHTML('beforeend', mascotImgHTML());
-    addMsg(lines[idx]);
-    const next = idx + 1;
-    if (next < lines.length) {
-      addHint(COPY.tapToContinue[lang], () => stepTour(next));
+  // ───── Phase 2: spotlight-driven tour ─────
+  // The fullscreen modal collapses; the actual page is dimmed and we cut a
+  // hole around one element at a time. Mascot sits in a corner and either
+  // shows a Next button or waits for the user to actually tap something.
+
+  function ensureSpotlightDOM() {
+    if (!spotlightEl) {
+      spotlightEl = document.createElement('div');
+      spotlightEl.id = 'ist-onb-spotlight';
+      document.body.appendChild(spotlightEl);
+    }
+    if (!pane) {
+      pane = document.createElement('div');
+      pane.id = 'ist-onb-pane';
+      document.body.appendChild(pane);
+    }
+    pane.setAttribute('data-palette', palette || 'earth');
+  }
+
+  function positionSpotlight(el) {
+    if (!el) { spotlightEl.classList.add('full'); return; }
+    const r = el.getBoundingClientRect();
+    spotlightEl.classList.remove('full');
+    spotlightEl.style.left = r.left + 'px';
+    spotlightEl.style.top = r.top + 'px';
+    spotlightEl.style.width = r.width + 'px';
+    spotlightEl.style.height = r.height + 'px';
+  }
+
+  function setSpotlight(el) {
+    // Strip the marker from the previous target.
+    if (spotlightTarget) {
+      spotlightTarget.classList.remove('ist-onb-target', 'interactive');
+    }
+    spotlightTarget = el;
+    spotlightEl.classList.add('show');
+    if (el) {
+      el.classList.add('ist-onb-target');
+      // Scroll into view if needed.
+      const r = el.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > window.innerHeight) {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        // Re-measure after the scroll lands.
+        setTimeout(() => positionSpotlight(el), 360);
+      }
+      positionSpotlight(el);
     } else {
-      addHint(COPY.tapToContinue[lang], stepKefilShare);
+      spotlightEl.classList.add('full');
+    }
+    if (!scrollHandler) {
+      scrollHandler = () => { if (spotlightTarget) positionSpotlight(spotlightTarget); };
+      window.addEventListener('scroll', scrollHandler, true);
+      window.addEventListener('resize', scrollHandler);
+    }
+  }
+
+  function clearSpotlight() {
+    if (spotlightTarget) {
+      spotlightTarget.classList.remove('ist-onb-target', 'interactive');
+      spotlightTarget = null;
+    }
+    interactiveTarget = null;
+    if (spotlightEl) spotlightEl.classList.remove('show');
+    if (scrollHandler) {
+      window.removeEventListener('scroll', scrollHandler, true);
+      window.removeEventListener('resize', scrollHandler);
+      scrollHandler = null;
+    }
+  }
+
+  // Block clicks on the rest of the page during the tour so the user can't
+  // accidentally navigate away mid-onboarding. Pane clicks always allowed;
+  // interactiveTarget clicks allowed during steps that require a real tap.
+  function clickFirewall(e) {
+    if (e.target.closest('#ist-onb-pane')) return;
+    if (interactiveTarget && interactiveTarget.contains(e.target)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+  function installFirewall() {
+    if (firewallInstalled) return;
+    document.addEventListener('click', clickFirewall, true);
+    firewallInstalled = true;
+  }
+  function removeFirewall() {
+    if (!firewallInstalled) return;
+    document.removeEventListener('click', clickFirewall, true);
+    firewallInstalled = false;
+  }
+
+  function renderPane({ speech, actionLabel, onAction, promptText }) {
+    pane.innerHTML = '';
+    const row = document.createElement('div');
+    row.className = 'ist-onb-mascot-row';
+    const mImg = document.createElement('div');
+    mImg.className = 'ist-onb-mascot';
+    mImg.innerHTML = `<img src="assets/mascot-${mascot}.svg" alt="">`;
+    const bubble = document.createElement('div');
+    bubble.className = 'ist-onb-bubble';
+    bubble.innerHTML = speech;
+    row.appendChild(mImg);
+    row.appendChild(bubble);
+    pane.appendChild(row);
+
+    const actions = document.createElement('div');
+    actions.className = 'ist-onb-actions';
+    if (promptText) {
+      const prompt = document.createElement('div');
+      prompt.className = 'ist-onb-prompt';
+      prompt.textContent = promptText;
+      actions.appendChild(prompt);
+    }
+    if (actionLabel) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ist-onb-btn';
+      btn.textContent = actionLabel;
+      btn.addEventListener('click', onAction);
+      actions.appendChild(btn);
+    }
+    pane.appendChild(actions);
+    pane.classList.add('show');
+  }
+
+  function hidePane() { pane.classList.remove('show'); }
+
+  // Hide the fullscreen modal but keep the body lock so the user can't
+  // scroll past the page while spotlighted.
+  function enterSpotlightMode() {
+    ensureSpotlightDOM();
+    installFirewall();
+    root.classList.remove('show');
+  }
+  function exitSpotlightMode() {
+    clearSpotlight();
+    hidePane();
+    removeFirewall();
+    root.classList.add('show');
+  }
+
+  // ───── Tour steps ─────
+  function stepTour() {
+    enterSpotlightMode();
+    const lines = COPY.tour[lang][mascot];
+    const nextLabel = COPY.tapToContinue[lang] === 'tap to continue' ? 'NEXT' : 'SIRADAKİ';
+
+    const beats = [
+      { target: null,                   speech: lines.reveal },
+      { target: '#left-sidebar',        speech: lines.news },
+      { target: '.map-panel',           speech: lines.map,    interactive: 'hood' },
+      { target: '.sidebar-right',       speech: lines.events },
+      { target: 'header nav',           speech: lines.nav },
+    ];
+
+    let idx = 0;
+    runBeat();
+
+    function runBeat() {
+      const b = beats[idx];
+      const el = b.target ? document.querySelector(b.target) : null;
+      setSpotlight(el);
+
+      if (b.interactive === 'hood' && homeNb) {
+        const hoodEl = document.getElementById(homeNb);
+        if (hoodEl) {
+          // Let ONLY the user's hood polygon receive clicks through the firewall.
+          interactiveTarget = hoodEl;
+          hoodEl.classList.add('ist-onb-target', 'interactive');
+          renderPane({
+            speech: b.speech,
+            promptText: COPY.promptTapHood[lang],
+          });
+          const handler = () => {
+            hoodEl.removeEventListener('click', handler, true);
+            interactiveTarget = null;
+            renderPane({
+              speech: COPY.mapTapped[lang][mascot],
+              actionLabel: nextLabel,
+              onAction: advance,
+            });
+          };
+          hoodEl.addEventListener('click', handler, true);
+          return;
+        }
+      }
+
+      renderPane({
+        speech: b.speech,
+        actionLabel: nextLabel,
+        onAction: advance,
+      });
+    }
+
+    function advance() {
+      idx++;
+      if (idx >= beats.length) {
+        exitSpotlightMode();
+        stepKefilShare();
+      } else {
+        runBeat();
+      }
     }
   }
 
@@ -349,12 +558,13 @@
 
     // Check whether we already onboarded.
     const { data: profile } = await sb.from('profiles')
-      .select('onboarded_at, referral_code, referred_by')
+      .select('onboarded_at, referral_code, referred_by, neighborhood')
       .eq('id', user.id)
       .maybeSingle();
     if (!profile || profile.onboarded_at) return false;
 
     referralCode = profile.referral_code || '';
+    homeNb = profile.neighborhood || opts.homeNb || null;
 
     // Resolve kefil display name (referred_by → profiles).
     if (profile.referred_by) {
