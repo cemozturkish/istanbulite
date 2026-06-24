@@ -1580,8 +1580,12 @@ async function init() {
   isAdmin = session.user.email === ADMIN_EMAIL;
   // Mount the shared mobile profile card.
   if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N, page: 'kahvehane' });
-  // Resume the onboarding flow if the user is mid-tour.
-  if (window.IstOnboarding) IstOnboarding.maybeRun({ sb, user: session.user, page: 'kahvehane' });
+  // Resume the onboarding flow if the user is mid-tour. onboarding.js is
+  // deferred — poll briefly in case it hasn't landed yet.
+  (function tryOnb(tries) {
+    if (window.IstOnboarding) IstOnboarding.maybeRun({ sb, user: session.user, page: 'kahvehane' });
+    else if (tries > 0) setTimeout(() => tryOnb(tries - 1), 60);
+  })(40);
 
   // Source of truth for current neighborhood is profiles.neighborhood — the
   // RLS policy on neighborhood_comments enforces the same value when posting.
