@@ -20,8 +20,14 @@
   const COPY = {
     welcome: {
       lead: 'Welcome to ISTANBULITE!',
+      // First entry: instant first sentence + typed second sentence so the
+      // user finishes reading the kefil line while the welcome line types in.
+      // Second entry: plain string, renders all at once like before.
       lines: [
-        '<em class="kefil-name">{KEFIL}</em> told us great things about you! We are glad to see you become a part of the community.',
+        {
+          instant: '<em class="kefil-name">{KEFIL}</em> told us great things about you!',
+          typed:   'We are glad to see you become a part of the community.',
+        },
         'But remember — they vouched for you. If you were to violate the code of conduct, <em class="kefil-name">{KEFIL}</em> will be responsible.',
       ],
       tapHint: 'tap anywhere to continue',
@@ -207,6 +213,34 @@
     requestAnimationFrame(() => el.classList.add('show'));
     return el;
   }
+
+  // Two-part message: first half appears instantly, second half types out
+  // letter-by-letter on the next line. Resolves when typing finishes.
+  function addMsgTyped({ instant, typed }, speed = 25) {
+    return new Promise(resolve => {
+      const stage = document.getElementById('ist-onb-stage');
+      const el = document.createElement('div');
+      el.className = 'ist-onb-msg';
+      const top = document.createElement('span');
+      top.innerHTML = instant;
+      const br = document.createElement('br');
+      const bottom = document.createElement('span');
+      bottom.className = 'ist-onb-typed';
+      el.appendChild(top);
+      el.appendChild(br);
+      el.appendChild(bottom);
+      stage.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      // Plain-text typing — keep the `typed` source HTML-free in COPY.
+      let i = 0;
+      (function tick() {
+        bottom.textContent = typed.slice(0, i);
+        if (i >= typed.length) { resolve(); return; }
+        i++;
+        setTimeout(tick, speed);
+      })();
+    });
+  }
   function addHint(text, onClick) {
     // Pin the hint to the bottom of the root (outside the stage) so it
     // doesn't drift as new messages get appended above. Render as a
@@ -333,12 +367,23 @@
     const w = COPY.welcome;
     addMsg(w.lead, { lead: true });
     let idx = 0;
-    const lines = w.lines.map(fillKefil);
     addHint(w.tapHint, advance);
-    function advance() {
-      addMsg(lines[idx]);
+
+    async function advance() {
+      const item = w.lines[idx];
       idx++;
-      if (idx < lines.length) {
+      // Hide the hint while the line renders/types so the user can't tap
+      // through before the message is even visible.
+      clearHint();
+      if (typeof item === 'string') {
+        addMsg(fillKefil(item));
+      } else {
+        await addMsgTyped({
+          instant: fillKefil(item.instant),
+          typed:   item.typed, // typed half stays plain text on purpose
+        });
+      }
+      if (idx < w.lines.length) {
         addHint(w.tapHint, advance);
       } else {
         addHint(w.finalHint, stepLanguage);
