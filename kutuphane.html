@@ -3967,10 +3967,17 @@ bootstrapLibraryNav();
 // profile-card.js is deferred, so wait until it's loaded.
 function __mountIstPc() {
   if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N, page: 'kutuphane' });
-  // Resume the onboarding flow if the user is mid-tour.
-  if (window.IstOnboarding) sb.auth.getSession().then(({ data }) => {
-    if (data?.session?.user) IstOnboarding.maybeRun({ sb, user: data.session.user, page: 'kutuphane' });
-  });
+  // Resume the onboarding flow if the user is mid-tour. onboarding.js is
+  // deferred — poll briefly in case it hasn't landed yet.
+  (function tryOnb(tries) {
+    if (window.IstOnboarding) {
+      sb.auth.getSession().then(({ data }) => {
+        if (data?.session?.user) IstOnboarding.maybeRun({ sb, user: data.session.user, page: 'kutuphane' });
+      });
+    } else if (tries > 0) {
+      setTimeout(() => tryOnb(tries - 1), 60);
+    }
+  })(40);
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', __mountIstPc);
