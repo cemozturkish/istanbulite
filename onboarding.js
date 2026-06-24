@@ -20,18 +20,19 @@
   const COPY = {
     welcome: {
       lead: 'Welcome to ISTANBULITE!',
-      // First entry: instant first sentence + typed second sentence so the
-      // user finishes reading the kefil line while the welcome line types in.
-      // Second entry: plain string, renders all at once like before.
+      // 1st entry: instant first sentence + typed second sentence.
+      // 2nd entry: plain string, renders all at once.
+      // 3rd entry: pure typed line. After it, the language picker is shown
+      // inline (instead of a fourth tap that opens a separate screen).
       lines: [
         {
           instant: '<em class="kefil-name">{KEFIL}</em> told us great things about you!',
           typed:   'We are glad to see you become a part of the community.',
         },
         'But remember — they vouched for you. If you were to violate the code of conduct, <em class="kefil-name">{KEFIL}</em> will be responsible.',
+        { typed: 'ISTANBULITE, by default, is in Turglish.' },
       ],
       tapHint: 'tap anywhere to continue',
-      finalHint: 'tap anywhere to get started',
     },
     languageScreen: {
       body: 'ISTANBULITE is not a social media app; it is a network. By default, it is in Turglish. Before we get started, we would like to ask your preference. You can choose to have most things in Turkish, or most things in English — but never neither.',
@@ -244,6 +245,27 @@
       })();
     });
   }
+
+  // Typed-only line (no instant half above it).
+  function addMsgTypedOnly(typed, speed = 25) {
+    return new Promise(resolve => {
+      const stage = document.getElementById('ist-onb-stage');
+      const el = document.createElement('div');
+      el.className = 'ist-onb-msg';
+      const span = document.createElement('span');
+      span.className = 'ist-onb-typed';
+      el.appendChild(span);
+      stage.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      let i = 0;
+      (function tick() {
+        span.textContent = typed.slice(0, i);
+        if (i >= typed.length) { resolve(); return; }
+        i++;
+        setTimeout(tick, speed);
+      })();
+    });
+  }
   function addHint(text, onClick) {
     // Pin the hint to the bottom of the root (outside the stage) so it
     // doesn't drift as new messages get appended above. Render as a
@@ -380,6 +402,8 @@
       clearHint();
       if (typeof item === 'string') {
         addMsg(fillKefil(item));
+      } else if (item.typed && !item.instant) {
+        await addMsgTypedOnly(item.typed);
       } else {
         await addMsgTyped({
           instant: fillKefil(item.instant),
@@ -389,9 +413,27 @@
       if (idx < w.lines.length) {
         addHint(w.tapHint, advance);
       } else {
-        addHint(w.finalHint, stepLanguage);
+        // After the last line, render the language picker in-place — no
+        // separate screen, no extra tap.
+        renderLanguageChoicesInline();
       }
     }
+  }
+
+  // Inline language picker on the welcome screen. Replaces stepLanguage.
+  function renderLanguageChoicesInline() {
+    const s = COPY.languageScreen;
+    let selected = null;
+    const onPick = (c) => {
+      selected = c;
+      lang = c.value === 'more_english' ? 'en' : 'tr';
+    };
+    const onConfirm = () => {
+      if (!selected) return;
+      if (global.I18N && I18N.setLang) I18N.setLang(selected.value);
+      stepPalette();
+    };
+    addChoices(s.choices, onPick, onConfirm, c => `<div>${c.label}</div><small>${c.sub}</small>`);
   }
 
   function stepLanguage() {
