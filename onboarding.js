@@ -20,18 +20,19 @@
   const COPY = {
     welcome: {
       lead: 'Welcome to ISTANBULITE!',
-      // First entry: instant first sentence + typed second sentence so the
-      // user finishes reading the kefil line while the welcome line types in.
-      // Second entry: plain string, renders all at once like before.
+      // 1st entry: instant first sentence + typed second sentence.
+      // 2nd entry: plain string, renders all at once.
+      // 3rd entry: pure typed line. After it, the language picker is shown
+      // inline (instead of a fourth tap that opens a separate screen).
       lines: [
         {
           instant: '<em class="kefil-name">{KEFIL}</em> told us great things about you!',
           typed:   'We are glad to see you become a part of the community.',
         },
         'But remember — they vouched for you. If you were to violate the code of conduct, <em class="kefil-name">{KEFIL}</em> will be responsible.',
+        { typed: 'ISTANBULITE, by default, is in Turglish.' },
       ],
       tapHint: 'tap anywhere to continue',
-      finalHint: 'tap anywhere to get started',
     },
     languageScreen: {
       body: 'ISTANBULITE is, by default, in Turglish. Before we get started, we would like to ask your preference. You can choose to have most things in Turkish, or most things in English — but never not both.',
@@ -126,6 +127,9 @@
     btnTakeKahvehane: { tr: 'KAHVEHANE\'YE GİT', en: 'GO TO KAHVEHANE' },
     btnTakeKutuphane: { tr: 'KÜTÜPHANE\'YE GİT', en: 'GO TO KÜTÜPHANE' },
     btnBackToHane:    { tr: 'HANE\'YE DÖN',      en: 'BACK TO HANE' },
+    promptTapKahvehane: { tr: 'üstteki menüden KAHVEHANE\'ye dokun', en: 'tap KAHVEHANE in the nav above' },
+    promptTapKutuphane: { tr: 'üstteki menüden KÜTÜPHANE\'ye dokun', en: 'tap KÜTÜPHANE in the nav above' },
+    promptTapHane:      { tr: 'üstteki menüden HANE\'ye dokun',      en: 'tap HANE in the nav above' },
 
     // Mascot reaction after the user actually taps their neighborhood.
     // Calls out the news-feed filter switching to "mahalle" — the news
@@ -235,6 +239,27 @@
       let i = 0;
       (function tick() {
         bottom.textContent = typed.slice(0, i);
+        if (i >= typed.length) { resolve(); return; }
+        i++;
+        setTimeout(tick, speed);
+      })();
+    });
+  }
+
+  // Typed-only line (no instant half above it).
+  function addMsgTypedOnly(typed, speed = 25) {
+    return new Promise(resolve => {
+      const stage = document.getElementById('ist-onb-stage');
+      const el = document.createElement('div');
+      el.className = 'ist-onb-msg';
+      const span = document.createElement('span');
+      span.className = 'ist-onb-typed';
+      el.appendChild(span);
+      stage.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      let i = 0;
+      (function tick() {
+        span.textContent = typed.slice(0, i);
         if (i >= typed.length) { resolve(); return; }
         i++;
         setTimeout(tick, speed);
@@ -377,6 +402,8 @@
       clearHint();
       if (typeof item === 'string') {
         addMsg(fillKefil(item));
+      } else if (item.typed && !item.instant) {
+        await addMsgTypedOnly(item.typed);
       } else {
         await addMsgTyped({
           instant: fillKefil(item.instant),
@@ -386,9 +413,27 @@
       if (idx < w.lines.length) {
         addHint(w.tapHint, advance);
       } else {
-        addHint(w.finalHint, stepLanguage);
+        // After the last line, render the language picker in-place — no
+        // separate screen, no extra tap.
+        renderLanguageChoicesInline();
       }
     }
+  }
+
+  // Inline language picker on the welcome screen. Replaces stepLanguage.
+  function renderLanguageChoicesInline() {
+    const s = COPY.languageScreen;
+    let selected = null;
+    const onPick = (c) => {
+      selected = c;
+      lang = c.value === 'more_english' ? 'en' : 'tr';
+    };
+    const onConfirm = () => {
+      if (!selected) return;
+      if (global.I18N && I18N.setLang) I18N.setLang(selected.value);
+      stepPalette();
+    };
+    addChoices(s.choices, onPick, onConfirm, c => `<div>${c.label}</div><small>${c.sub}</small>`);
   }
 
   function stepLanguage() {
@@ -599,9 +644,9 @@
       { target: 'aside.col-left',       speech: lines.news },
       { target: '.map-panel',           speech: lines.map,    interactive: 'hood' },
       { target: 'aside.col-right',      speech: lines.events },
-      // Last beat hands off to the cross-page leg: mascot literally takes
-      // the user to Kahvehane (then Kütüphane) before the final modal.
-      { target: '.section-rule',        speech: COPY.navLeave[lang][mascot], navTo: 'kahvehane.html', btnKey: 'btnTakeKahvehane' },
+      // Last beat hands off to the cross-page leg. Instead of a button,
+      // the user taps the actual Kahvehane link in the navbar.
+      { target: '.section-rule',        speech: COPY.navLeave[lang][mascot], interactive: 'nav-kahvehane' },
     ];
 
     let idx = 0;
@@ -644,12 +689,23 @@
         }
       }
 
-      // A beat that ends with a page navigation uses its own button label.
-      const label = b.btnKey ? COPY[b.btnKey][lang] : nextLabel;
+      // Handoff to Kahvehane: user taps the real navbar link instead of
+      // a Next button. We light the link, save state on click, then let
+      // the page's own click handlers (view transition / swipe-pagination)
+      // take over the navigation.
+      if (b.interactive === 'nav-kahvehane') {
+        renderPane({
+          speech: b.speech,
+          promptText: COPY.promptTapKahvehane[lang],
+        });
+        wireNavLink('kahvehane.html', 'phase2-kahvehane');
+        return;
+      }
+
       renderPane({
         speech: b.speech,
-        actionLabel: label,
-        onAction: b.navTo ? () => goToPage(b.navTo, 'phase2-kahvehane') : advance,
+        actionLabel: nextLabel,
+        onAction: advance,
       });
     }
 
@@ -671,30 +727,57 @@
     window.location.href = href;
   }
 
+  // Wire a real navbar link as the interactive target for a handoff beat.
+  // The user has to tap the link themselves; saveState fires in capture
+  // phase so the value is committed to sessionStorage before the page's
+  // own click handlers (view-transitions, swipe-pagination) take over.
+  function wireNavLink(linkHref, nextStage, onPick) {
+    const link = document.querySelector(`header nav a[href="${linkHref}"]`);
+    if (!link) {
+      // Page doesn't have the expected nav link — fall back to plain navigation.
+      goToPage(linkHref, nextStage);
+      return;
+    }
+    interactiveTarget = link;
+    addSpotlight(link);
+    const handler = () => {
+      saveState(nextStage);
+      // Don't preventDefault: the page's own click handler will run the
+      // view-transition + navigate, OR the browser will follow the href.
+      if (onPick) onPick();
+    };
+    link.addEventListener('click', handler, true);
+  }
+
   // ───── Kahvehane mini-tour ─────
   function stepKahvehaneTour() {
     enterSpotlightMode();
-    // Light the right-column aside (the games stack). The aside carries the
-    // background so the highlight isn't transparent over the dim.
-    const target = document.querySelector('aside.col-right') || document.querySelector('main');
-    if (target) addSpotlight(target);
+    // Light the right-column aside (the games stack) AND the masthead row
+    // (so the navbar — where the user is about to tap Kütüphane — is
+    // also lit against the dim).
+    const games = document.querySelector('aside.col-right') || document.querySelector('main');
+    if (games) addSpotlight(games);
+    const masthead = document.querySelector('.section-rule');
+    if (masthead) addSpotlight(masthead);
     renderPane({
       speech: COPY.kahvehaneIntro[lang][mascot],
-      actionLabel: COPY.btnTakeKutuphane[lang],
-      onAction: () => goToPage('kutuphane.html', 'phase2-kutuphane'),
+      promptText: COPY.promptTapKutuphane[lang],
     });
+    wireNavLink('kutuphane.html', 'phase2-kutuphane');
   }
 
   // ───── Kütüphane mini-tour ─────
   function stepKutuphaneTour() {
     enterSpotlightMode();
-    const target = document.querySelector('aside.col-left') || document.querySelector('main');
-    if (target) addSpotlight(target);
+    const lib = document.querySelector('aside.col-left') || document.querySelector('main');
+    if (lib) addSpotlight(lib);
+    const masthead = document.querySelector('.section-rule');
+    if (masthead) addSpotlight(masthead);
     renderPane({
       speech: COPY.kutuphaneIntro[lang][mascot],
-      actionLabel: COPY.btnBackToHane[lang],
-      onAction: () => goToPage('anahane.html', 'phase3-finale'),
+      promptText: COPY.promptTapHane[lang],
     });
+    wireNavLink('anahane.html', 'phase3-finale');
   }
 
   function stepKefilShare() {
@@ -812,6 +895,17 @@
       }
     }
     if (!kefilName) kefilName = opts.kefilName || 'your sponsor';
+
+    // If the user navigated back to anahane while mid-flow on another page,
+    // bounce them to where they were supposed to be instead of restarting.
+    if (saved && saved.stage === 'phase2-kahvehane') {
+      window.location.replace('kahvehane.html');
+      return false;
+    }
+    if (saved && saved.stage === 'phase2-kutuphane') {
+      window.location.replace('kutuphane.html');
+      return false;
+    }
 
     ensureRoot();
     show();
