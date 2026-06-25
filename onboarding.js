@@ -20,17 +20,20 @@
   const COPY = {
     welcome: {
       lead: 'Welcome to ISTANBULITE!',
-      // 1st entry: instant first sentence + typed second sentence.
-      // 2nd entry: plain string, renders all at once.
-      // 3rd entry: pure typed line. After it, the language picker is shown
-      // inline (instead of a fourth tap that opens a separate screen).
+      // 1st: instant first sentence + typed second sentence.
+      // 2nd: plain string, instant.
+      // 3rd: typed line about Turglish; autoNext means the 4th line follows
+      //      automatically (no tap) so the context reads as one paragraph.
+      // 4th: the rest of the language pitch, typed.
+      // After the 4th, a final tap moves to the language picker screen.
       lines: [
         {
           instant: '<em class="kefil-name">{KEFIL}</em> told us great things about you!',
           typed:   'We are glad to see you become a part of the community.',
         },
         'But remember — they vouched for you. If you were to violate the code of conduct, <em class="kefil-name">{KEFIL}</em> will be responsible.',
-        { typed: 'ISTANBULITE, by default, is in Turglish.' },
+        { typed: 'ISTANBULITE, by default, is in Turglish.', autoNext: true },
+        { typed: 'ISTANBULITE is not a social media app; it is a network. Before we get started, we would like to ask your preference. You can choose to have most things in Turkish, or most things in English — but never neither.', speed: 14 },
       ],
       tapHint: 'tap anywhere to continue',
     },
@@ -403,37 +406,26 @@
       if (typeof item === 'string') {
         addMsg(fillKefil(item));
       } else if (item.typed && !item.instant) {
-        await addMsgTypedOnly(item.typed);
+        await addMsgTypedOnly(item.typed, item.speed);
       } else {
         await addMsgTyped({
           instant: fillKefil(item.instant),
           typed:   item.typed, // typed half stays plain text on purpose
-        });
+        }, item.speed);
+      }
+      // Auto-cascade: the next line types on its own so two related
+      // sentences read as one paragraph. Brief pause for breathing room.
+      if (item.autoNext && idx < w.lines.length) {
+        await delay(350);
+        return advance();
       }
       if (idx < w.lines.length) {
         addHint(w.tapHint, advance);
       } else {
-        // After the last line, render the language picker in-place — no
-        // separate screen, no extra tap.
-        renderLanguageChoicesInline();
+        // Last line — tap moves to the language picker screen.
+        addHint(w.tapHint, stepLanguage);
       }
     }
-  }
-
-  // Inline language picker on the welcome screen. Replaces stepLanguage.
-  function renderLanguageChoicesInline() {
-    const s = COPY.languageScreen;
-    let selected = null;
-    const onPick = (c) => {
-      selected = c;
-      lang = c.value === 'more_english' ? 'en' : 'tr';
-    };
-    const onConfirm = () => {
-      if (!selected) return;
-      if (global.I18N && I18N.setLang) I18N.setLang(selected.value);
-      stepPalette();
-    };
-    addChoices(s.choices, onPick, onConfirm, c => `<div>${c.label}</div><small>${c.sub}</small>`);
   }
 
   function stepLanguage() {
