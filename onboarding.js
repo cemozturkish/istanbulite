@@ -38,7 +38,7 @@
       tapHint: 'tap anywhere to continue',
     },
     languageScreen: {
-      body: 'Tell us, would you prefer...',
+      body: 'ISTANBULITE is, by default, in Turglish. Before we get started, we would like to ask your preference. You can choose to have most things in Turkish, or most things in English — but never not both.',
       choices: [
         { value: 'default',      label: 'TÜRKÇE AĞIRLIKLI', sub: 'Turkish-heavy' },
         { value: 'more_english', label: 'ENGLISH-HEAVY',    sub: 'İngilizce ağırlıklı' },
