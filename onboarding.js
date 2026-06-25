@@ -22,22 +22,25 @@
       lead: 'Welcome to ISTANBULITE!',
       // 1st: instant first sentence + typed second sentence.
       // 2nd: plain string, instant.
-      // 3rd: typed line about Turglish; autoNext means the 4th line follows
-      //      automatically (no tap) so the context reads as one paragraph.
-      // 4th: the rest of the language pitch, typed.
-      // After the 4th, a final tap moves to the language picker screen.
+      // 3rd: instant Turglish line + typed explanation. After this types
+      //      out, the language picker is shown inline — no separate screen.
       lines: [
         {
           instant: '<em class="kefil-name">{KEFIL}</em> told us great things about you!',
           typed:   'We are glad to see you become a part of the community.',
         },
         'But remember — they vouched for you. If you were to violate the code of conduct, <em class="kefil-name">{KEFIL}</em> will be responsible.',
-        { typed: 'ISTANBULITE, by default, is in Turglish.', autoNext: true },
-        { typed: 'ISTANBULITE is not a social media app; it is a network. Before we get started, we would like to ask your preference. You can choose to have most things in Turkish, or most things in English — but never neither.', speed: 14 },
+        {
+          instant: 'ISTANBULITE, by default, is in Turglish.',
+          typed:   'But you can choose to have most things in Turkish, or most things in English — but never not both. It will always be both :)',
+          speed:   14,
+        },
       ],
       tapHint: 'tap anywhere to continue',
     },
     languageScreen: {
+      // Unused now — the picker is inline on the welcome screen — but
+      // kept so any caller that still references stepLanguage doesn't break.
       body: 'ISTANBULITE is, by default, in Turglish. Before we get started, we would like to ask your preference. You can choose to have most things in Turkish, or most things in English — but never not both.',
       choices: [
         { value: 'default',      label: 'TÜRKÇE AĞIRLIKLI', sub: 'Turkish-heavy' },
@@ -173,7 +176,7 @@
     },
     finishLabel: { tr: 'BİTİR', en: 'FINISH' },
     confirmLabel: { tr: 'ONAYLA', en: 'CONFIRM' },
-    tapToContinue: { tr: 'devam etmek için dokun', en: 'tap to continue' },
+    tapToContinue: { tr: 'devam etmek için herhangi bir yere dokun', en: 'tap anywhere to continue' },
     copy: { tr: 'KOPYALA', en: 'COPY' },
     copied: { tr: 'KOPYALANDI', en: 'COPIED' },
   };
@@ -189,6 +192,9 @@
   let litTargets = []; // Every element the mascot has introduced so far
   let interactiveTarget; // Only set when the user must tap this element
   let firewallInstalled = false;
+  // When set, a click anywhere on the page (outside the pane / interactive
+  // target) advances the tour. Cleared after firing once.
+  let tapAdvanceFn = null;
 
   // ── Helpers ──
   function fillKefil(s) {
@@ -270,40 +276,46 @@
     });
   }
   function addHint(text, onClick) {
-    // Pin the hint to the bottom of the root (outside the stage) so it
-    // doesn't drift as new messages get appended above. Render as a
-    // <button> so keyboard users can advance with Enter/Space.
-    let hint = root.querySelector('.ist-onb-hint');
+    // The hint button lives on <body> (not inside root) so it stays
+    // visible during the spotlight tour when the modal root is hidden.
+    // It's still position:fixed so the placement is unchanged.
+    let hint = document.body.querySelector('.ist-onb-hint');
     if (!hint) {
       hint = document.createElement('button');
       hint.type = 'button';
       hint.className = 'ist-onb-hint';
-      root.appendChild(hint);
+      document.body.appendChild(hint);
     }
     hint.textContent = text;
     setTimeout(() => hint.classList.add('show'), 250);
 
-    // Whole overlay is a tap target; the hint button advances the same way.
-    const handler = (e) => {
-      // Ignore clicks on actual interactive children (choice buttons, etc.).
-      if (e.target.closest('.ist-onb-choice, .ist-onb-btn, .ist-onb-codebox button')) return;
-      root.removeEventListener('click', handler);
+    function fire() {
       hint.removeEventListener('click', hintHandler);
+      if (rootHandler && root) root.removeEventListener('click', rootHandler);
+      tapAdvanceFn = null;
       onClick();
-    };
-    const hintHandler = (e) => {
-      e.stopPropagation();
-      root.removeEventListener('click', handler);
-      hint.removeEventListener('click', hintHandler);
-      onClick();
-    };
-    root.addEventListener('click', handler);
+    }
+    const hintHandler = (e) => { e.stopPropagation(); fire(); };
     hint.addEventListener('click', hintHandler);
+
+    // Welcome modal mode: any click inside the modal background (not on a
+    // button) advances. Spotlight mode: the firewall calls tapAdvanceFn.
+    let rootHandler = null;
+    if (root && root.classList.contains('show')) {
+      rootHandler = (e) => {
+        if (e.target.closest('.ist-onb-choice, .ist-onb-btn, .ist-onb-codebox button')) return;
+        fire();
+      };
+      root.addEventListener('click', rootHandler);
+    } else {
+      tapAdvanceFn = fire;
+    }
     focusFirst();
   }
   function clearHint() {
-    const hint = root && root.querySelector('.ist-onb-hint');
+    const hint = document.body.querySelector('.ist-onb-hint');
     if (hint) hint.remove();
+    tapAdvanceFn = null;
   }
   function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -377,7 +389,10 @@
   function focusFirst() {
     // Defer to next frame so freshly-appended buttons are focusable.
     requestAnimationFrame(() => {
-      const el = firstFocusableIn(focusableContainer());
+      let el = firstFocusableIn(focusableContainer());
+      // Fall back to the bottom-pinned hint if the pane / root has no controls
+      // (non-interactive spotlight beats only have the hint).
+      if (!el) el = document.body.querySelector('.ist-onb-hint');
       if (el) el.focus();
       else if (root) { root.setAttribute('tabindex', '-1'); root.focus(); }
     });
@@ -413,19 +428,31 @@
           typed:   item.typed, // typed half stays plain text on purpose
         }, item.speed);
       }
-      // Auto-cascade: the next line types on its own so two related
-      // sentences read as one paragraph. Brief pause for breathing room.
-      if (item.autoNext && idx < w.lines.length) {
-        await delay(350);
-        return advance();
-      }
       if (idx < w.lines.length) {
         addHint(w.tapHint, advance);
       } else {
-        // Last line — tap moves to the language picker screen.
-        addHint(w.tapHint, stepLanguage);
+        // After the last line, render the language picker in-place — no
+        // separate screen and no extra tap.
+        renderLanguageChoicesInline();
       }
     }
+  }
+
+  // Inline language picker: appended to the welcome stage right after the
+  // last typed line. Picking + confirming advances to the palette screen.
+  function renderLanguageChoicesInline() {
+    const s = COPY.languageScreen;
+    let selected = null;
+    const onPick = (c) => {
+      selected = c;
+      lang = c.value === 'more_english' ? 'en' : 'tr';
+    };
+    const onConfirm = () => {
+      if (!selected) return;
+      if (global.I18N && I18N.setLang) I18N.setLang(selected.value);
+      stepPalette();
+    };
+    addChoices(s.choices, onPick, onConfirm, c => `<div>${c.label}</div><small>${c.sub}</small>`);
   }
 
   function stepLanguage() {
@@ -518,13 +545,20 @@
   // event. Pane / modal clicks pass through, and the interactiveTarget (the
   // user's hood polygon) is allowed during the map step.
   function isInsideOnboarding(target) {
-    return target && target.closest && target.closest('#ist-onb-root, #ist-onb-pane');
+    return target && target.closest && target.closest('#ist-onb-root, #ist-onb-pane, .ist-onb-hint');
   }
   function gestureFirewall(e) {
     if (isInsideOnboarding(e.target)) return;
     if (interactiveTarget && interactiveTarget.contains(e.target)) return;
     if (typeof e.preventDefault === 'function' && e.cancelable) e.preventDefault();
     e.stopImmediatePropagation();
+    // Tap-anywhere advance for non-interactive spotlight beats. Only on
+    // real clicks — touchstart/wheel/etc shouldn't trigger this.
+    if (e.type === 'click' && tapAdvanceFn) {
+      const fn = tapAdvanceFn;
+      tapAdvanceFn = null;
+      fn();
+    }
   }
   // Keyboard firewall: blocks page-navigation keys (arrows, PageUp/Down,
   // Home/End, Enter, Space) when fired outside the onboarding, but ALWAYS
@@ -618,18 +652,19 @@
   function enterSpotlightMode() {
     ensureSpotlightDOM();
     root.classList.remove('show');
+    document.body.classList.add('ist-onb-spot');
   }
   function exitSpotlightMode() {
     clearSpotlight();
     hidePane();
     root.classList.add('show');
+    document.body.classList.remove('ist-onb-spot');
   }
 
   // ───── Tour steps ─────
   function stepTour() {
     enterSpotlightMode();
     const lines = COPY.tour[lang][mascot];
-    const nextLabel = COPY.tapToContinue[lang] === 'tap to continue' ? 'NEXT' : 'SIRADAKİ';
 
     const beats = [
       { target: null,                   speech: lines.reveal },
@@ -670,11 +705,10 @@
             if (typeof window.applyNewsFilter === 'function') {
               window.applyNewsFilter('mahalle');
             }
-            renderPane({
-              speech: COPY.mapTapped[lang][mascot],
-              actionLabel: nextLabel,
-              onAction: advance,
-            });
+            // Mascot reaction — nothing specific to click, so use the
+            // tap-anywhere pattern instead of a Next button.
+            renderPane({ speech: COPY.mapTapped[lang][mascot] });
+            addHint(COPY.tapToContinue[lang], advance);
           };
           hoodEl.addEventListener('click', handler, true);
           return;
@@ -694,11 +728,11 @@
         return;
       }
 
-      renderPane({
-        speech: b.speech,
-        actionLabel: nextLabel,
-        onAction: advance,
-      });
+      // Non-interactive beat: no NEXT button — user taps anywhere to advance.
+      // The hint at the bottom of the screen tells them so; clicks on the
+      // dim go through the firewall, which fires tapAdvanceFn (set by addHint).
+      renderPane({ speech: b.speech });
+      addHint(COPY.tapToContinue[lang] || 'tap anywhere to continue', advance);
     }
 
     function advance() {
