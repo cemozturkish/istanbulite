@@ -954,6 +954,30 @@
         <div class="empty-state"><span class="spinner"></span></div>
       </div>
       <div class="status-msg" id="sozcel-status"></div>
+
+      <!-- ── Sözcü Assignments ── -->
+      <div id="sozcel-sozcul-section" style="margin-top:24px;padding-top:16px;border-top:1px solid var(--rule);">
+        <div class="panel-title" style="margin:-0 -20px 14px;padding:10px 20px;">Sözcü Atamaları</div>
+        <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
+          Bir üyeyi belirli bir gün için Sözcü olarak atayın. O gün oynayan herkes Sözcünün seçtiği kelimeyi tahmin eder. Sözcü, gece yarısından önce kelimesini seçmek zorundadır.
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;">
+          <div>
+            <label style="margin-top:0;">Gün</label>
+            <select id="sozcul-assign-date"></select>
+          </div>
+          <div>
+            <label style="margin-top:0;">Üye</label>
+            <select id="sozcul-assign-user"><option value="">— Üye yükleniyor —</option></select>
+          </div>
+          <button class="btn btn-primary" id="sozcul-assign-btn" style="padding:9px 14px;white-space:nowrap;">Ata</button>
+        </div>
+        <div class="status-msg" id="sozcul-assign-status" style="margin-top:8px;"></div>
+        <div style="margin-top:14px;">
+          <div style="font-size:0.62rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Mevcut Atamalar</div>
+          <div id="sozcul-assignments-list"></div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -2386,6 +2410,17 @@ document.addEventListener('click', e => {
   }
 });
 
+let _sozculMembersList = null;
+
+async function ensureSozculMembersList() {
+  if (_sozculMembersList) return _sozculMembersList;
+  const { data } = await sb.from('profiles')
+    .select('id, first_name, last_name, neighborhood')
+    .order('first_name', { ascending: true });
+  if (data) _sozculMembersList = data;
+  return _sozculMembersList || [];
+}
+
 async function loadSozcelSchedule() {
   const wrap = document.getElementById('sozcel-schedule');
   const statusEl = document.getElementById('sozcel-status');
@@ -2394,16 +2429,20 @@ async function loadSozcelSchedule() {
   wrap.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
 
   const dates = Array.from({ length: 7 }, (_, i) => sozcelIstanbulDateISO(i));
-  const { data, error } = await sb
-    .from('sozcel_used_answers')
-    .select('used_on, word, definition')
-    .in('used_on', dates);
-  if (error) {
-    wrap.innerHTML = `<div class="empty-state">Error loading: ${escapeHtml(error.message)}</div>`;
+
+  // Fetch words and assignments in parallel
+  const [wordsRes, assignRes] = await Promise.all([
+    sb.from('sozcel_used_answers').select('used_on, word, definition').in('used_on', dates),
+    sb.from('sozcel_sozcul_assignments').select('game_date, user_id').in('game_date', dates),
+  ]);
+
+  if (wordsRes.error) {
+    wrap.innerHTML = `<div class="empty-state">Error loading: ${escapeHtml(wordsRes.error.message)}</div>`;
     return;
   }
+
   const byDate = {};
-  (data || []).forEach(r => {
+  (wordsRes.data || []).forEach(r => {
     let dictData = null;
     if (r.definition) {
       try { dictData = JSON.parse(r.definition); } catch (_) {
@@ -2413,16 +2452,36 @@ async function loadSozcelSchedule() {
     byDate[r.used_on] = { word: r.word || '', dictData };
   });
 
+  // Resolve assigned user names
+  const assignedUserIds = [...new Set((assignRes.data || []).map(r => r.user_id))];
+  let profById = {};
+  if (assignedUserIds.length) {
+    const { data: profs } = await sb.from('profiles')
+      .select('id, first_name, last_name').in('id', assignedUserIds);
+    (profs || []).forEach(p => { profById[p.id] = p; });
+  }
+  const byAssignment = {};
+  (assignRes.data || []).forEach(r => {
+    const p = profById[r.user_id];
+    const name = p ? capitalizeName((`${p.first_name || ''} ${p.last_name || ''}`).trim()) || 'İsimsiz' : r.user_id;
+    byAssignment[r.game_date] = { user_id: r.user_id, name };
+  });
+
   wrap.innerHTML = dates.map((iso, i) => {
     const word = (byDate[iso] && byDate[iso].word) || '';
     const dictData = (byDate[iso] && byDate[iso].dictData) || null;
     const len = sozcelLengthForISO(iso);
+    const assignment = byAssignment[iso];
+    const assignBadge = assignment
+      ? `<div style="font-size:0.62rem;font-family:'Inter',sans-serif;font-weight:700;color:var(--ink-red);margin-top:3px;letter-spacing:0.5px;">Sözcü: ${escapeHtml(assignment.name)}</div>`
+      : '';
     return `
       <div class="article-card" style="display:grid;gap:10px;">
         <div style="display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;">
           <div>
             <div class="a-neighborhood">${escapeHtml(sozcelFormatLabel(iso, i))}</div>
             <div style="font-size:0.7rem;color:var(--muted);font-family:'Inter',sans-serif;">${iso}</div>
+            ${assignBadge}
           </div>
           <input type="text" data-date="${iso}" value="${escapeHtml(word)}" maxlength="${len}"
             placeholder="${len} harf" style="width:140px;text-transform:uppercase;letter-spacing:2px;font-weight:700;"/>
@@ -2436,6 +2495,117 @@ async function loadSozcelSchedule() {
   wrap.querySelectorAll('button[data-save]').forEach(btn => {
     btn.addEventListener('click', () => saveSozcelDay(btn.dataset.save));
   });
+
+  // Populate the assignment UI below the schedule
+  populateSozculAssignmentUI(dates, byAssignment);
+}
+
+async function populateSozculAssignmentUI(dates, byAssignment) {
+  // Populate date dropdown (tomorrow through 6 days from now)
+  const dateSel = document.getElementById('sozcul-assign-date');
+  if (dateSel) {
+    dateSel.innerHTML = dates.slice(1).map(iso => {
+      const [y, m, d] = iso.split('-').map(Number);
+      const dt = new Date(Date.UTC(y, m - 1, d));
+      const label = dt.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+      return `<option value="${iso}">${escapeHtml(label)} (${iso})</option>`;
+    }).join('');
+  }
+
+  // Populate members dropdown
+  const userSel = document.getElementById('sozcul-assign-user');
+  if (userSel) {
+    userSel.innerHTML = '<option value="">— Sözcü seç —</option>';
+    const members = await ensureSozculMembersList();
+    members.forEach(p => {
+      const name = capitalizeName((`${p.first_name || ''} ${p.last_name || ''}`).trim()) || 'İsimsiz';
+      const nb = NEIGHBORHOOD_NAMES[p.neighborhood] || '';
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = name + (nb ? ` (${nb})` : '');
+      userSel.appendChild(opt);
+    });
+  }
+
+  // Render existing assignments list
+  const listEl = document.getElementById('sozcul-assignments-list');
+  if (!listEl) return;
+  const assigned = dates.filter(iso => byAssignment[iso]);
+  if (!assigned.length) {
+    listEl.innerHTML = '<div class="empty-state" style="font-size:0.75rem;padding:6px 0;">Henüz atama yapılmamış.</div>';
+    return;
+  }
+  listEl.innerHTML = assigned.map(iso => {
+    const a = byAssignment[iso];
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    const dateLabel = dt.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+    const hasWord = false; // could check byDate[iso] but not needed for display
+    return `
+      <div class="article-card" style="display:flex;align-items:center;gap:10px;padding:8px 12px;margin-bottom:6px;">
+        <div style="flex:1;min-width:0;">
+          <div class="a-neighborhood">${escapeHtml(iso)}</div>
+          <div style="font-size:0.85rem;font-weight:700;">${escapeHtml(dateLabel)}</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:1px;">Sözcü: ${escapeHtml(a.name)}</div>
+        </div>
+        <button class="btn-del" data-sozcul-clear="${escapeHtml(iso)}"
+          style="padding:4px 12px;font-size:0.75rem;font-weight:700;cursor:pointer;border:none;
+          background:var(--ink-red);color:var(--paper);letter-spacing:0.5px;white-space:nowrap;">
+          Kaldır
+        </button>
+      </div>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('[data-sozcul-clear]').forEach(btn => {
+    btn.addEventListener('click', () => sozculClearAssignment(btn.dataset.sozculClear));
+  });
+}
+
+document.getElementById('sozcul-assign-btn').addEventListener('click', async () => {
+  const date = document.getElementById('sozcul-assign-date').value;
+  const userId = document.getElementById('sozcul-assign-user').value;
+  const statusEl = document.getElementById('sozcul-assign-status');
+  statusEl.textContent = '';
+  statusEl.className = 'status-msg';
+
+  if (!date || !userId) {
+    statusEl.textContent = 'Gün ve üye seçin.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  const btn = document.getElementById('sozcul-assign-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const { data: { session } } = await sb.auth.getSession();
+  const assignedBy = session && session.user ? session.user.id : null;
+
+  const { error } = await sb.from('sozcel_sozcul_assignments').upsert(
+    { game_date: date, user_id: userId, assigned_by: assignedBy, assigned_at: new Date().toISOString() },
+    { onConflict: 'game_date' }
+  );
+
+  btn.disabled = false;
+  btn.textContent = 'Ata';
+
+  if (error) {
+    statusEl.textContent = 'Hata: ' + error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = 'Atama kaydedildi.';
+  statusEl.className = 'status-msg ok';
+  setTimeout(() => { statusEl.textContent = ''; }, 2500);
+  loadSozcelSchedule();
+});
+
+async function sozculClearAssignment(date) {
+  if (!confirm(`${date} tarihli sözcü atamasını kaldır?`)) return;
+  const { error } = await sb.from('sozcel_sozcul_assignments').delete().eq('game_date', date);
+  if (error) { alert('Silinemedi: ' + error.message); return; }
+  loadSozcelSchedule();
 }
 
 async function saveSozcelDay(iso) {
