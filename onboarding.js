@@ -130,9 +130,12 @@
     btnTakeKahvehane: { tr: 'KAHVEHANE\'YE GİT', en: 'GO TO KAHVEHANE' },
     btnTakeKutuphane: { tr: 'KÜTÜPHANE\'YE GİT', en: 'GO TO KÜTÜPHANE' },
     btnBackToHane:    { tr: 'HANE\'YE DÖN',      en: 'BACK TO HANE' },
-    promptTapKahvehane: { tr: 'üstteki menüden KAHVEHANE\'ye dokun', en: 'tap KAHVEHANE in the nav above' },
-    promptTapKutuphane: { tr: 'üstteki menüden KÜTÜPHANE\'ye dokun', en: 'tap KÜTÜPHANE in the nav above' },
-    promptTapHane:      { tr: 'üstteki menüden HANE\'ye dokun',      en: 'tap HANE in the nav above' },
+    promptTapKahvehane:       { tr: 'üstteki menüden KAHVEHANE\'ye dokun', en: 'tap KAHVEHANE in the nav above' },
+    promptTapKahvehaneMobile: { tr: 'alttaki sekmeden KAHVEHANE\'ye dokun', en: 'tap KAHVEHANE in the tab bar below' },
+    promptTapKutuphane:       { tr: 'üstteki menüden KÜTÜPHANE\'ye dokun', en: 'tap KÜTÜPHANE in the nav above' },
+    promptTapKutuphaneMobile: { tr: 'alttaki sekmeden KÜTÜPHANE\'ye dokun', en: 'tap KÜTÜPHANE in the tab bar below' },
+    promptTapHane:            { tr: 'üstteki menüden HANE\'ye dokun',       en: 'tap HANE in the nav above' },
+    promptTapHaneMobile:      { tr: 'alttaki sekmeden HANE\'ye dokun',      en: 'tap HANE in the tab bar below' },
 
     // Mascot reaction after the user actually taps their neighborhood.
     // Calls out the news-feed filter switching to "mahalle" — the news
@@ -191,6 +194,9 @@
   let firewallInstalled = false;
 
   // ── Helpers ──
+  // Matches the 768px breakpoint used by all page layouts.
+  function isMobile() { return window.matchMedia('(max-width: 768px)').matches; }
+
   function fillKefil(s) {
     return (s || '').replace(/\{KEFIL\}/g, escapeHTML(kefilName || ''));
   }
@@ -636,9 +642,11 @@
       { target: 'aside.col-left',       speech: lines.news },
       { target: '.map-panel',           speech: lines.map,    interactive: 'hood' },
       { target: 'aside.col-right',      speech: lines.events },
-      // Last beat hands off to the cross-page leg. Instead of a button,
-      // the user taps the actual Kahvehane link in the navbar.
-      { target: '.section-rule',        speech: COPY.navLeave[lang][mascot], interactive: 'nav-kahvehane' },
+      // Last beat hands off to the cross-page leg. On desktop the nav lives
+      // inside .section-rule (top bar); on mobile it's a fixed bottom tab bar
+      // (header). Spotlight whichever is relevant so the user looks in the
+      // right place for the Kahvehane link.
+      { target: isMobile() ? 'header' : '.section-rule', speech: COPY.navLeave[lang][mascot], interactive: 'nav-kahvehane' },
     ];
 
     let idx = 0;
@@ -688,7 +696,9 @@
       if (b.interactive === 'nav-kahvehane') {
         renderPane({
           speech: b.speech,
-          promptText: COPY.promptTapKahvehane[lang],
+          promptText: isMobile()
+            ? COPY.promptTapKahvehaneMobile[lang]
+            : COPY.promptTapKahvehane[lang],
         });
         wireNavLink('kahvehane.html', 'phase2-kahvehane');
         return;
@@ -744,16 +754,18 @@
   // ───── Kahvehane mini-tour ─────
   function stepKahvehaneTour() {
     enterSpotlightMode();
-    // Light the right-column aside (the games stack) AND the masthead row
-    // (so the navbar — where the user is about to tap Kütüphane — is
-    // also lit against the dim).
+    // Light the right-column aside (the games stack) AND the nav bar.
+    // On desktop the nav lives in .section-rule (top); on mobile it's
+    // the fixed bottom tab bar (header).
     const games = document.querySelector('aside.col-right') || document.querySelector('main');
     if (games) addSpotlight(games);
-    const masthead = document.querySelector('.section-rule');
-    if (masthead) addSpotlight(masthead);
+    const navBar = document.querySelector(isMobile() ? 'header' : '.section-rule');
+    if (navBar) addSpotlight(navBar);
     renderPane({
       speech: COPY.kahvehaneIntro[lang][mascot],
-      promptText: COPY.promptTapKutuphane[lang],
+      promptText: isMobile()
+        ? COPY.promptTapKutuphaneMobile[lang]
+        : COPY.promptTapKutuphane[lang],
     });
     wireNavLink('kutuphane.html', 'phase2-kutuphane');
   }
@@ -763,11 +775,13 @@
     enterSpotlightMode();
     const lib = document.querySelector('aside.col-left') || document.querySelector('main');
     if (lib) addSpotlight(lib);
-    const masthead = document.querySelector('.section-rule');
-    if (masthead) addSpotlight(masthead);
+    const navBar = document.querySelector(isMobile() ? 'header' : '.section-rule');
+    if (navBar) addSpotlight(navBar);
     renderPane({
       speech: COPY.kutuphaneIntro[lang][mascot],
-      promptText: COPY.promptTapHane[lang],
+      promptText: isMobile()
+        ? COPY.promptTapHaneMobile[lang]
+        : COPY.promptTapHane[lang],
     });
     wireNavLink('anahane.html', 'phase3-finale');
   }
