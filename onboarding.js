@@ -125,16 +125,55 @@
         dog: "There are other places up here too! Come on, let me take you to Kahvehane first!",
       },
     },
-    kahvehaneIntro: {
+    // Kahvehane multi-beat tour (replaces the single-beat intro).
+    // intro → discussion → tap your hood → comment rule → games + tap Sözcel.
+    // The map is pre-lit since the user already met it on Hane.
+    kahvehaneTour: {
       tr: {
-        cat: 'Kahvehane. Üç oyun her gün değişir — Sözcel, Tümcel, Bulmaca. Serini kaybedersen anlarız. Şimdi Kütüphane\'ye.',
-        dog: 'İşte Kahvehane! Her gün ÜÇ yeni oyun var — Sözcel, Tümcel, Bulmaca! Diğerleri de buraya sohbete gelir! Hadi şimdi Kütüphane\'ye!',
+        cat: {
+          intro:   'Kahvehane. Diğerlerinin oturup konuştuğu yer.',
+          discuss: 'Tartışmalar burada. Şimdilik sadece okuyacaksın — yazma sırası az kaldı.',
+          hoodTap: 'Mahalleni tıkla. Kendin gör.',
+          rule:    'İşte. Sadece yaşadığın yerde yorum yazabilirsin. Başka mahalleleri kirletmeye gerek yok.',
+          games:   'Üç oyun. Her gün yeni. Önce Sözcel\'i dene — dokun.',
+        },
+        dog: {
+          intro:   'GELDİK! Burası Kahvehane! Herkes burada takılır!',
+          discuss: 'Tartışmalara baksana! İstanbul\'un her yerinden insanların ne dediğini okuyabilirsin!',
+          hoodTap: 'Şimdi KENDİ mahalleni tıkla! Hadi haritada bul!',
+          rule:    'Gördün mü? Sadece KENDİ mahallende yorum yapabilirsin! Daha samimi oluyor!',
+          games:   'VE OYUNLAR! Her gün üç yeni! Sözcel\'e dokun — beraber oynayalım!',
+        },
       },
       en: {
-        cat: "Kahvehane. Three games change every day — Sözcel, Tümcel, Bulmaca. Lose your streak and we'll know. Now to Kütüphane.",
-        dog: "Here we are — Kahvehane! Every day there are THREE new games — Sözcel, Tümcel, Bulmaca! The others come here to talk too! Now let's go to Kütüphane!",
+        cat: {
+          intro:   'Kahvehane. The coffeehouse. Where the rest of us drink and talk.',
+          discuss: "The discussion. You can read it everywhere — and soon you'll write too.",
+          hoodTap: 'Tap your district. See for yourself.',
+          rule:    "There. You can only post where you live. Don't spam other districts. Keep it honest.",
+          games:   'Three games. Daily. Try Sözcel first — tap it.',
+        },
+        dog: {
+          intro:   'WE MADE IT! This is Kahvehane! Everyone hangs out here!',
+          discuss: 'Look at the discussions! You can read what people across Istanbul are saying!',
+          hoodTap: 'Now tap YOUR district! Go on, find it on the map!',
+          rule:    'See? You can only post in YOUR district! Keeps things real!',
+          games:   "AND THE GAMES! Three new ones every day! Tap Sözcel — let's play together!",
+        },
       },
     },
+    sozcelIntro: {
+      tr: {
+        cat: 'Sözcel. Altı denemede beş harfli Türkçe sözcüğü bul. Kaybedersen herkes görür. Hadi oyna — bittiğinde Kütüphane\'ye geçelim.',
+        dog: 'Sözcel! Altı denemede beş harfli Türkçe sözcüğü bul! Hadi oyna, bitince Kütüphane\'ye gidelim!',
+      },
+      en: {
+        cat: "Sözcel. Guess the five-letter Turkish word in six tries. Lose and we'll all see. Play it — then on to Kütüphane.",
+        dog: "Sözcel! Guess the five-letter Turkish word in six tries! Play it, then we'll head to Kütüphane!",
+      },
+    },
+    promptTapSozcel:         { tr: 'SÖZCEL\'e dokun',  en: 'tap SÖZCEL' },
+    promptTapHoodKahvehane:  { tr: 'mahallene dokun',  en: 'tap your district' },
     kutuphaneIntro: {
       tr: {
         cat: 'Kütüphane. Uzun okumalar burada. Vaktin olduğunda gez. Şimdi Hane\'ye dönelim — neredeyse bitti.',
@@ -862,21 +901,104 @@
     link.addEventListener('click', handler, true);
   }
 
-  // ───── Kahvehane mini-tour ─────
+  // ───── Kahvehane multi-beat tour ─────
+  // intro (masthead) → discussion (col-left) → tap your hood on the map
+  // (interactive) → comment rule speech → games (col-right) with the
+  // user tapping the Sözcel link (interactive, leaves the page).
+  // The map is pre-lit on entry since the user already met it on Hane.
   function stepKahvehaneTour() {
     enterSpotlightMode();
-    // Light the right-column aside (the games stack) AND the masthead row
-    // (so the navbar — where the user is about to tap Kütüphane — is
-    // also lit against the dim).
-    const games = document.querySelector('aside.col-right') || document.querySelector('main');
-    if (games) addSpotlight(games);
-    const masthead = document.querySelector('.section-rule');
-    if (masthead) addSpotlight(masthead);
+
+    // Pre-light the map for context; subsequent addSpotlight calls will
+    // demote its "latest" ring so it isn't the current focus.
+    const map = document.querySelector('.map-panel');
+    if (map) addSpotlight(map);
+
+    const lines = COPY.kahvehaneTour[lang][mascot];
+    const beats = [
+      { target: '.section-rule',  speech: lines.intro },
+      { target: 'aside.col-left', speech: lines.discuss },
+      { target: '.map-panel',     speech: lines.hoodTap, interactive: 'hood-comment' },
+      { target: null,             speech: lines.rule },
+      { target: 'aside.col-right', speech: lines.games,   interactive: 'sozcel' },
+    ];
+    let idx = 0;
+    runBeat();
+
+    function runBeat() {
+      const b = beats[idx];
+      const el = b.target ? document.querySelector(b.target) : null;
+      if (el) addSpotlight(el);
+
+      // Tap your own neighborhood polygon on the map; the page's own
+      // click handler will filter the discussion list, and we advance.
+      if (b.interactive === 'hood-comment' && homeNb) {
+        const hoodEl = document.getElementById(homeNb);
+        if (hoodEl) {
+          interactiveTarget = hoodEl;
+          hoodEl.classList.add('ist-onb-nav-flash');
+          litTargets.push(hoodEl);
+          renderPane({
+            speech: b.speech,
+            promptText: COPY.promptTapHoodKahvehane[lang],
+          });
+          const handler = () => {
+            hoodEl.removeEventListener('click', handler, true);
+            hoodEl.classList.remove('ist-onb-nav-flash');
+            interactiveTarget = null;
+            advance();
+          };
+          hoodEl.addEventListener('click', handler, true);
+          return;
+        }
+      }
+
+      // Tap the Sözcel game link in the games column — let the real
+      // navigation fire, save state for the destination page to pick up.
+      if (b.interactive === 'sozcel') {
+        const sozcelLink = document.querySelector('.game-link[data-game="sozcel"]');
+        if (sozcelLink) {
+          interactiveTarget = sozcelLink;
+          sozcelLink.classList.add('ist-onb-nav-flash');
+          litTargets.push(sozcelLink);
+          renderPane({
+            speech: b.speech,
+            promptText: COPY.promptTapSozcel[lang],
+          });
+          sozcelLink.addEventListener('click', () => {
+            saveState('phase2-sozcel');
+          }, true);
+          return;
+        }
+      }
+
+      // Non-interactive — tap anywhere to continue.
+      renderPane({ speech: b.speech });
+      addHint(COPY.tapToContinue[lang], advance);
+    }
+
+    function advance() {
+      idx++;
+      if (idx >= beats.length) {
+        exitSpotlightMode();
+      } else {
+        runBeat();
+      }
+    }
+  }
+
+  // ───── Sözcel intro (one beat) ─────
+  // Mascot describes the game; user clicks a Next button to continue to
+  // Kütüphane. They can come back and play any time.
+  function stepSozcelTour() {
+    enterSpotlightMode();
+    const board = document.querySelector('.game-panel') || document.querySelector('main');
+    if (board) addSpotlight(board);
     renderPane({
-      speech: COPY.kahvehaneIntro[lang][mascot],
-      promptText: COPY.promptTapKutuphane[lang],
+      speech: COPY.sozcelIntro[lang][mascot],
+      actionLabel: COPY.btnTakeKutuphane[lang],
+      onAction: () => goToPage('kutuphane.html', 'phase2-kutuphane'),
     });
-    wireNavLink('kutuphane.html', 'phase2-kutuphane');
   }
 
   // ───── Kütüphane mini-tour ─────
@@ -974,14 +1096,23 @@
 
     const saved = loadState();
 
-    // ── kahvehane / kutuphane: only run if we're mid-flow on this stage.
-    // Otherwise the user opened the page on their own and we should stay quiet.
+    // ── kahvehane / sozcel / kutuphane: only run if we're mid-flow on
+    // this stage. Otherwise the user opened the page on their own and
+    // we should stay quiet.
     if (page === 'kahvehane') {
       if (!saved || saved.stage !== 'phase2-kahvehane') return false;
       hydrateFromState(saved);
       ensureRoot();
       show();
       stepKahvehaneTour();
+      return true;
+    }
+    if (page === 'sozcel') {
+      if (!saved || saved.stage !== 'phase2-sozcel') return false;
+      hydrateFromState(saved);
+      ensureRoot();
+      show();
+      stepSozcelTour();
       return true;
     }
     if (page === 'kutuphane') {
@@ -1013,6 +1144,10 @@
     // bounce them to where they were supposed to be instead of restarting.
     if (saved && saved.stage === 'phase2-kahvehane') {
       window.location.replace('kahvehane.html');
+      return false;
+    }
+    if (saved && saved.stage === 'phase2-sozcel') {
+      window.location.replace('sozcel.html');
       return false;
     }
     if (saved && saved.stage === 'phase2-kutuphane') {
