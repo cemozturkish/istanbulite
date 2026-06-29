@@ -20,20 +20,24 @@
   const COPY = {
     welcome: {
       lead: 'Welcome to ISTANBULITE!',
-      // 1st: instant first sentence + typed second sentence.
-      // 2nd: plain string, instant.
-      // 3rd: instant Turglish line + typed explanation. After this types
-      //      out, the language picker is shown inline — no separate screen.
+      // Page 1: instant kefil line + typed community line, then a 3-line
+      // responsibility warning.
+      // Page 2 starts at the pageBreak marker: instant Turglish sentence
+      // (hover-revealing "Turkish + English"), then a typed explanation
+      // of the language preference, then the language picker inline.
       lines: [
         {
-          instant: '<em class="kefil-name">{KEFIL}</em> told us great things about you!',
+          instant: 'Kefil told us great things about you.',
           typed:   'We are glad to see you become a part of the community.',
         },
-        'But remember — they vouched for you. If you were to violate the code of conduct, <em class="kefil-name">{KEFIL}</em> will be responsible.',
+        'But remember — they vouched for you.<br>If you were to violate the code of conduct,<br>your sponsor will be responsible.',
         {
-          instant: 'ISTANBULITE, by default, is in Turglish.',
-          typed:   'But you can choose to have most things in Turkish, or most things in English — but never not both. It will always be both :)',
-          speed:   14,
+          pageBreak: true,
+          instant: 'Istanbulite is by default in <span class="ist-onb-turglish" data-tip="Turkish + English">Turglish</span>.',
+        },
+        {
+          typed: 'But you can choose to have a preference: to have most things in Turkish, or most things in English, but never not both. Things will always be both.',
+          speed: 14,
         },
       ],
       tapHint: 'tap anywhere to continue',
@@ -418,10 +422,18 @@
       // Hide the hint while the line renders/types so the user can't tap
       // through before the message is even visible.
       clearHint();
+      // pageBreak clears the previous lines (and the lead) before rendering
+      // this item — opens a fresh "page" inside the same welcome screen.
+      if (item && typeof item === 'object' && item.pageBreak) {
+        clearStage();
+      }
       if (typeof item === 'string') {
         addMsg(fillKefil(item));
       } else if (item.typed && !item.instant) {
         await addMsgTypedOnly(item.typed, item.speed);
+      } else if (item.instant && !item.typed) {
+        // Instant-only — render the HTML in one shot, no typing.
+        addMsg(fillKefil(item.instant));
       } else {
         await addMsgTyped({
           instant: fillKefil(item.instant),
