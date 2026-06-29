@@ -27,7 +27,7 @@
       // of the language preference, then the language picker inline.
       lines: [
         {
-          instant: 'Kefil told us great things about you.',
+          instant: '<em class="kefil-name">{KEFIL}</em> told us great things about you.',
           typed:   'We are glad to see you become a part of the community.',
         },
         'But remember — they vouched for you.<br>If you were to violate the code of conduct,<br>your sponsor will be responsible.',
