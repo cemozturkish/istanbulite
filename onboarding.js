@@ -187,9 +187,12 @@
     btnTakeKahvehane: { tr: 'KAHVEHANE\'YE GİT', en: 'GO TO KAHVEHANE' },
     btnTakeKutuphane: { tr: 'KÜTÜPHANE\'YE GİT', en: 'GO TO KÜTÜPHANE' },
     btnBackToHane:    { tr: 'HANE\'YE DÖN',      en: 'BACK TO HANE' },
-    promptTapKahvehane: { tr: 'üstteki menüden KAHVEHANE\'ye dokun', en: 'tap KAHVEHANE in the nav above' },
-    promptTapKutuphane: { tr: 'üstteki menüden KÜTÜPHANE\'ye dokun', en: 'tap KÜTÜPHANE in the nav above' },
-    promptTapHane:      { tr: 'üstteki menüden HANE\'ye dokun',      en: 'tap HANE in the nav above' },
+    promptTapKahvehane:       { tr: 'üstteki menüden KAHVEHANE\'ye dokun', en: 'tap KAHVEHANE in the nav above' },
+    promptTapKahvehaneMobile: { tr: 'alttaki sekmeden KAHVEHANE\'ye dokun', en: 'tap KAHVEHANE in the tab bar below' },
+    promptTapKutuphane:       { tr: 'üstteki menüden KÜTÜPHANE\'ye dokun', en: 'tap KÜTÜPHANE in the nav above' },
+    promptTapKutuphaneMobile: { tr: 'alttaki sekmeden KÜTÜPHANE\'ye dokun', en: 'tap KÜTÜPHANE in the tab bar below' },
+    promptTapHane:            { tr: 'üstteki menüden HANE\'ye dokun',       en: 'tap HANE in the nav above' },
+    promptTapHaneMobile:      { tr: 'alttaki sekmeden HANE\'ye dokun',      en: 'tap HANE in the tab bar below' },
 
     // Mascot reaction after the user actually taps their neighborhood.
     // Calls out the news-feed filter switching to "mahalle" — the news
@@ -251,6 +254,9 @@
   let tapAdvanceFn = null;
 
   // ── Helpers ──
+  // Matches the 768px breakpoint used by all page layouts.
+  function isMobile() { return window.matchMedia('(max-width: 768px)').matches; }
+
   function fillKefil(s) {
     return (s || '').replace(/\{KEFIL\}/g, escapeHTML(kefilName || ''));
   }
@@ -792,9 +798,11 @@
       { target: 'aside.col-left',       speech: lines.news },
       { target: '.map-panel',           speech: lines.map,    interactive: 'hood' },
       { target: 'aside.col-right',      speech: lines.events },
-      // Last beat hands off to the cross-page leg. Instead of a button,
-      // the user taps the actual Kahvehane link in the navbar.
-      { target: '.section-rule',        speech: COPY.navLeave[lang][mascot], interactive: 'nav-kahvehane' },
+      // Last beat hands off to the cross-page leg. On desktop the nav lives
+      // inside .section-rule (top bar); on mobile it's a fixed bottom tab bar
+      // (header). Spotlight whichever is relevant so the user looks in the
+      // right place for the Kahvehane link.
+      { target: isMobile() ? 'header' : '.section-rule', speech: COPY.navLeave[lang][mascot], interactive: 'nav-kahvehane' },
     ];
 
     let idx = 0;
@@ -843,7 +851,9 @@
       if (b.interactive === 'nav-kahvehane') {
         renderPane({
           speech: b.speech,
-          promptText: COPY.promptTapKahvehane[lang],
+          promptText: isMobile()
+            ? COPY.promptTapKahvehaneMobile[lang]
+            : COPY.promptTapKahvehane[lang],
         });
         wireNavLink('kahvehane.html', 'phase2-kahvehane');
         return;
@@ -908,96 +918,18 @@
   // The map is pre-lit on entry since the user already met it on Hane.
   function stepKahvehaneTour() {
     enterSpotlightMode();
-
-    // Pre-light the map for context; subsequent addSpotlight calls will
-    // demote its "latest" ring so it isn't the current focus.
-    const map = document.querySelector('.map-panel');
-    if (map) addSpotlight(map);
-
-    const lines = COPY.kahvehaneTour[lang][mascot];
-    const beats = [
-      { target: '.section-rule',  speech: lines.intro },
-      { target: 'aside.col-left', speech: lines.discuss },
-      { target: '.map-panel',     speech: lines.hoodTap, interactive: 'hood-comment' },
-      { target: null,             speech: lines.rule },
-      { target: 'aside.col-right', speech: lines.games,   interactive: 'sozcel' },
-    ];
-    let idx = 0;
-    runBeat();
-
-    function runBeat() {
-      const b = beats[idx];
-      const el = b.target ? document.querySelector(b.target) : null;
-      if (el) addSpotlight(el);
-
-      // Tap your own neighborhood polygon on the map; the page's own
-      // click handler will filter the discussion list, and we advance.
-      if (b.interactive === 'hood-comment' && homeNb) {
-        const hoodEl = document.getElementById(homeNb);
-        if (hoodEl) {
-          interactiveTarget = hoodEl;
-          hoodEl.classList.add('ist-onb-nav-flash');
-          litTargets.push(hoodEl);
-          renderPane({
-            speech: b.speech,
-            promptText: COPY.promptTapHoodKahvehane[lang],
-          });
-          const handler = () => {
-            hoodEl.removeEventListener('click', handler, true);
-            hoodEl.classList.remove('ist-onb-nav-flash');
-            interactiveTarget = null;
-            advance();
-          };
-          hoodEl.addEventListener('click', handler, true);
-          return;
-        }
-      }
-
-      // Tap the Sözcel game link in the games column — let the real
-      // navigation fire, save state for the destination page to pick up.
-      if (b.interactive === 'sozcel') {
-        const sozcelLink = document.querySelector('.game-link[data-game="sozcel"]');
-        if (sozcelLink) {
-          interactiveTarget = sozcelLink;
-          sozcelLink.classList.add('ist-onb-nav-flash');
-          litTargets.push(sozcelLink);
-          renderPane({
-            speech: b.speech,
-            promptText: COPY.promptTapSozcel[lang],
-          });
-          sozcelLink.addEventListener('click', () => {
-            saveState('phase2-sozcel');
-          }, true);
-          return;
-        }
-      }
-
-      // Non-interactive — tap anywhere to continue.
-      renderPane({ speech: b.speech });
-      addHint(COPY.tapToContinue[lang], advance);
-    }
-
-    function advance() {
-      idx++;
-      if (idx >= beats.length) {
-        exitSpotlightMode();
-      } else {
-        runBeat();
-      }
-    }
-  }
-
-  // ───── Sözcel intro (one beat) ─────
-  // Mascot describes the game; user clicks a Next button to continue to
-  // Kütüphane. They can come back and play any time.
-  function stepSozcelTour() {
-    enterSpotlightMode();
-    const board = document.querySelector('.game-panel') || document.querySelector('main');
-    if (board) addSpotlight(board);
+    // Light the right-column aside (the games stack) AND the nav bar.
+    // On desktop the nav lives in .section-rule (top); on mobile it's
+    // the fixed bottom tab bar (header).
+    const games = document.querySelector('aside.col-right') || document.querySelector('main');
+    if (games) addSpotlight(games);
+    const navBar = document.querySelector(isMobile() ? 'header' : '.section-rule');
+    if (navBar) addSpotlight(navBar);
     renderPane({
-      speech: COPY.sozcelIntro[lang][mascot],
-      actionLabel: COPY.btnTakeKutuphane[lang],
-      onAction: () => goToPage('kutuphane.html', 'phase2-kutuphane'),
+      speech: COPY.kahvehaneIntro[lang][mascot],
+      promptText: isMobile()
+        ? COPY.promptTapKutuphaneMobile[lang]
+        : COPY.promptTapKutuphane[lang],
     });
   }
 
@@ -1006,11 +938,13 @@
     enterSpotlightMode();
     const lib = document.querySelector('aside.col-left') || document.querySelector('main');
     if (lib) addSpotlight(lib);
-    const masthead = document.querySelector('.section-rule');
-    if (masthead) addSpotlight(masthead);
+    const navBar = document.querySelector(isMobile() ? 'header' : '.section-rule');
+    if (navBar) addSpotlight(navBar);
     renderPane({
       speech: COPY.kutuphaneIntro[lang][mascot],
-      promptText: COPY.promptTapHane[lang],
+      promptText: isMobile()
+        ? COPY.promptTapHaneMobile[lang]
+        : COPY.promptTapHane[lang],
     });
     wireNavLink('anahane.html', 'phase3-finale');
   }

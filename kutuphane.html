@@ -706,6 +706,27 @@
       margin-bottom: 18px;
       border-bottom: 1px solid var(--rule);
     }
+    /* Back-to-shelves button is mobile-only; desktop keeps the shelves visible
+       in the right column so no in-pane back button is needed. */
+    .path-back-mobile { display: none; }
+    @media (max-width: 768px) {
+      .path-back-mobile {
+        display: inline-flex;
+        align-items: center;
+        background: none;
+        border: none;
+        margin: 0 0 10px 0;
+        padding: 0;
+        font-family: 'Inter', sans-serif;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--accent);
+        cursor: pointer;
+      }
+      .path-back-mobile:hover { color: var(--ink); }
+    }
     .path-shelf {
       font-family: 'Inter', sans-serif;
       font-size: 0.62rem;
@@ -1517,22 +1538,34 @@
     /* ── MOBILE RESPONSIVE ── */
     @media (max-width: 768px) {
       html {
-        height: auto;
-        min-height: 100vh;
-        overflow-y: auto;
-        overflow-x: hidden;
+        height: 100dvh;
+        overflow: hidden;
       }
       body {
-        height: auto;
-        min-height: 100dvh;
-        display: block;
-        overflow: visible;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
         padding-bottom: calc(56px + env(safe-area-inset-bottom));
+        box-sizing: border-box;
       }
 
       .col-left, .col-right, header, .section-rule, main {
         grid-column: unset; grid-row: unset;
       }
+
+      /* On mobile, the kütüphane page is one screen: shelves view by default,
+         article reading view (#main) when a shelf is opened. Toggled by
+         body.mobile-reading. */
+      main {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+        display: none;
+        flex-direction: column;
+      }
+      body.mobile-reading main { display: flex; }
+      body.mobile-reading .col-right { display: none; }
 
       /* Compact top bar */
       .section-rule {
@@ -1542,7 +1575,9 @@
         position: sticky;
         top: 0;
         z-index: 10;
+        flex-shrink: 0;
       }
+      #ist-pc-mount, #mobile-top, #mobile-two-col { flex-shrink: 0; }
       .masthead { font-size: 1.05rem; }
       .datetime-block { gap: 8px; font-size: 9px; letter-spacing: 1.5px; }
       .datetime-block .day-line, .datetime-block .sep:nth-of-type(2) { display: none; }
@@ -1577,17 +1612,20 @@
       .counter-value .cv-days { font-size: 0.8rem; }
       .counter-value .cv-suffix { font-size: 0.8rem; }
 
-      /* Shelves area — visible, expands with content */
-      main {
-        display: block;
-        overflow: visible;
-        min-height: 0;
-      }
+      /* Shelves area — fills remaining viewport height, internal scroll if needed */
       .shelves {
         padding: 12px;
         gap: 8px;
-        overflow-y: visible;
-        flex: none;
+        overflow-y: auto;
+        flex: 1;
+        min-height: 0;
+      }
+      /* Reading area takes over full middle space when a shelf is opened */
+      .reading-area {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 16px;
       }
       .shelf-btn {
         padding: 14px;
@@ -1625,12 +1663,16 @@
       .composer-submit { padding: 7px 14px; font-size: 0.68rem; }
       .loading { padding: 14px; font-size: 12px; }
 
-      /* Profile section — below articles, separated by rule */
+      /* Right column hosts the shelves grid; flexes into remaining viewport height */
       .col-right {
         border: none;
         border-top: 2px solid var(--hairline);
         background: var(--paper-card);
-        display: block;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
       }
       .library-card { padding: 14px 16px; }
       .library-card .avatar { width: 48px; height: 48px; font-size: 1.2rem; border-width: 2px; }
@@ -1720,11 +1762,9 @@
       }
       #mobile-top .library-card .card-name { font-size: 0.85rem; }
       #mobile-top .library-card .card-meta { font-size: 0.62rem; }
-      /* Countdowns strip (article-tabs column retired) */
+      /* Countdowns strip hidden on mobile to free vertical space for shelves */
       #mobile-two-col {
-        display: block;
-        border-top: 1px solid var(--rule);
-        overflow: hidden;
+        display: none;
       }
       #mobile-col-articles { display: none; }
       #mobile-col-counts,
@@ -3004,6 +3044,8 @@ function formatCountdown(iso) {
 async function openShelfPath(shelfId) {
   const area = document.getElementById('reading-area');
   if (!area) return;
+  // Mobile: swap the shelves grid for the reader pane
+  document.body.classList.add('mobile-reading');
   area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   const { data: articles, error } = await sb.from('library_articles')
     .select('*').eq('shelf_id', shelfId)
@@ -3018,11 +3060,13 @@ async function openShelfPath(shelfId) {
   const subtitle = shelf && shelf.subtitle_tr ? shelf.subtitle_tr.trim() : '';
   const deadlineHtml = shelf && shelf.deadline
     ? `<div class="path-deadline">${libEsc(formatCountdown(shelf.deadline))}</div>` : '';
+  const backBtnHtml = `<button class="path-back-mobile" type="button" id="path-back-mobile">← Raflar</button>`;
 
   if (!articles || !articles.length) {
     area.innerHTML = `
       <div class="shelf-path">
         <div class="path-head">
+          ${backBtnHtml}
           <h2 class="path-title">${libEsc(title)}</h2>
           ${subtitle ? `<p class="path-subtitle">${libEsc(subtitle)}</p>` : ''}
           ${deadlineHtml}
@@ -3030,12 +3074,15 @@ async function openShelfPath(shelfId) {
         <div class="empty-state">Bu rafta henüz makale yok.</div>
       </div>
     `;
+    const back = document.getElementById('path-back-mobile');
+    if (back) back.addEventListener('click', closeMobileReading);
     return;
   }
 
   area.innerHTML = `
     <div class="shelf-path">
       <div class="path-head">
+        ${backBtnHtml}
         <div class="path-shelf">Bölüm ${articles.length}</div>
         <h2 class="path-title">${libEsc(title)}</h2>
         ${subtitle ? `<p class="path-subtitle">${libEsc(subtitle)}</p>` : ''}
@@ -3065,7 +3112,20 @@ async function openShelfPath(shelfId) {
       if (a) openArticleReader(a, shelf, shelfId);
     });
   });
+  const back = document.getElementById('path-back-mobile');
+  if (back) back.addEventListener('click', closeMobileReading);
   area.scrollTop = 0;
+}
+
+// Mobile: exit the article reader and return to the shelves grid.
+function closeMobileReading() {
+  document.body.classList.remove('mobile-reading');
+  const area = document.getElementById('reading-area');
+  if (area) area.innerHTML = '';
+  const shelvesEl = document.getElementById('shelves');
+  if (shelvesEl) {
+    shelvesEl.querySelectorAll('.shelf-btn.shelf-active').forEach(b => b.classList.remove('shelf-active'));
+  }
 }
 
 // Body parser: splits on lines that contain only --- into sections,

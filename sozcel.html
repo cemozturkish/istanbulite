@@ -351,6 +351,84 @@
     .sozcul-line .sozcul-name { color: var(--ink-red); cursor: pointer; }
     .sozcul-line .sozcul-name:hover { text-decoration: underline; }
 
+    /* Sözcü assignment panel in left column */
+    .sozcul-panel {
+      padding: 10px 12px;
+      border-top: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .sozcul-panel .panel-title { margin-bottom: 4px; }
+    .sozcul-panel .sozcul-hint {
+      font-size: 0.62rem;
+      color: var(--muted);
+      font-style: italic;
+      line-height: 1.35;
+    }
+    .sozcul-panel .sozcul-countdown {
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      font-family: 'Inter', sans-serif;
+      color: var(--ink);
+      text-align: center;
+      padding: 4px 0;
+    }
+    .sozcul-panel .sozcul-countdown.urgent { color: var(--ink-red); }
+    .sozcul-panel .sozcul-form { display: flex; gap: 4px; }
+    .sozcul-panel input[type="text"] {
+      flex: 1;
+      min-width: 0;
+      padding: 6px 8px;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ink);
+      outline: none;
+    }
+    .sozcul-panel input[type="text"]:focus { border-color: var(--accent); }
+    .sozcul-panel button {
+      padding: 6px 10px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .sozcul-panel button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .sozcul-panel .sozcul-status {
+      font-size: 0.62rem;
+      min-height: 14px;
+      font-style: italic;
+    }
+    .sozcul-panel .sozcul-status.ok { color: var(--success); }
+    .sozcul-panel .sozcul-status.err { color: var(--ink-red); }
+    .sozcul-panel .sozcul-done {
+      padding: 8px;
+      background: var(--paper-dark);
+      border: 1px solid var(--rule);
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-align: center;
+    }
+    .sozcul-panel .sozcul-done strong {
+      display: block;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+
     .panel-title {
       font-size: 0.55rem;
       font-weight: 700;
@@ -447,6 +525,21 @@
     }
     .game-ctrl-btn:hover { background: var(--paper-dark); }
     .game-ctrl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Mobile-only floating controls on the top-left (scoreboard + sözcü) */
+    .game-controls-left {
+      display: none;
+      position: fixed;
+      top: 10px;
+      left: 58px;
+      z-index: 200;
+      gap: 6px;
+    }
+    /* Scoreboard inside mobile popup */
+    #score-mobile-overlay .scoreboard-list {
+      width: 100%;
+      margin-top: 6px;
+    }
 
     /* Help popup reuses the result-overlay styling but with body text */
     .help-body {
@@ -1022,6 +1115,7 @@
         background: var(--paper);
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       }
+      .game-controls-left { display: flex; }
 
       /* Floating back button (top-left) */
       .game-back-btn {
@@ -1196,6 +1290,7 @@
   <aside class="col-left">
     <div class="nb-highlight" id="user-nb-badge"></div>
     <section class="stats-left" id="stats-left"></section>
+    <section class="sozcul-panel" id="sozcul-panel" style="display:none;"></section>
     <section class="suggest-section" id="suggest-section">
       <div class="panel-title">Sözcük Öner</div>
       <div class="suggest-hint">Bekleyen tek bir öneri tutabilirsiniz. Vazgeçip yenisini önerebilirsiniz. Bir sözcüğü başka bir üye önerdiyse aynı sözcük tekrar önerilemez.</div>
@@ -1225,6 +1320,10 @@
 
   <main>
     <a href="kahvehane.html" class="game-back-btn" aria-label="Geri" title="Geri">←</a>
+    <div class="game-controls-left" id="game-controls-left">
+      <button class="game-ctrl-btn" id="mobile-score-btn" type="button" aria-label="Skor Tablosu" title="Skor Tablosu">≡</button>
+      <button class="game-ctrl-btn" id="mobile-sozcul-btn" type="button" aria-label="Sözcü Görevi" title="Sözcü Görevi" style="display:none;">✎</button>
+    </div>
     <div class="game-controls">
       <button class="game-ctrl-btn" id="share-btn" type="button" aria-label="Paylaş" title="Paylaş" disabled>↗</button>
       <button class="game-ctrl-btn" id="help-btn" type="button" aria-label="Nasıl oynanır" title="Nasıl oynanır">?</button>
@@ -1299,6 +1398,26 @@
         </p>
         <p data-i18n="sozcel.help.daily">Her gün yeni bir sözcük gelir. Türkçe <strong>İ/I</strong> ayrımına dikkat edin.</p>
       </div>
+    </div>
+  </div>
+
+  <!-- Mobile scoreboard popup -->
+  <div class="result-overlay" id="score-mobile-overlay">
+    <div class="result-card">
+      <button class="result-close" id="score-mobile-close" type="button" aria-label="Kapat">×</button>
+      <div class="result-title" style="margin-bottom:6px;">Skor Tablosu</div>
+      <div class="scoreboard-countdown" id="scoreboard-countdown-mobile"></div>
+      <ol class="scoreboard-list" id="scoreboard-list-mobile">
+        <li class="scoreboard-empty">Yükleniyor...</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Mobile Sözcü picker popup -->
+  <div class="result-overlay" id="sozcul-mobile-overlay">
+    <div class="result-card" style="padding-bottom:16px;">
+      <button class="result-close" id="sozcul-mobile-close" type="button" aria-label="Kapat">×</button>
+      <section class="sozcul-panel" id="sozcul-panel-mobile" style="padding:0;border:none;"></section>
     </div>
   </div>
 
@@ -3804,7 +3923,12 @@ function getTimeUntilWeekReset() {
 
 async function loadScoreboard() {
   const listEl = document.getElementById('scoreboard-list');
-  if (!listEl) return;
+  const listElMobile = document.getElementById('scoreboard-list-mobile');
+  function setListHTML(html) {
+    if (listEl) listEl.innerHTML = html;
+    if (listElMobile) listElMobile.innerHTML = html;
+  }
+  if (!listEl && !listElMobile) return;
   let results = null;
   try {
     const { data, error } = await sb.from('game_results')
@@ -3814,11 +3938,11 @@ async function loadScoreboard() {
     if (error) throw error;
     results = data;
   } catch (e) {
-    listEl.innerHTML = '<li class="scoreboard-empty">Skorlar yüklenemedi</li>';
+    setListHTML('<li class="scoreboard-empty">Skorlar yüklenemedi</li>');
     return;
   }
   if (!results || results.length === 0) {
-    listEl.innerHTML = '<li class="scoreboard-empty">Bu hafta henüz skor yok</li>';
+    setListHTML('<li class="scoreboard-empty">Bu hafta henüz skor yok</li>');
     return;
   }
   // Weekly cutoff: Monday 00:00 of the current Istanbul week.
@@ -3828,7 +3952,7 @@ async function loadScoreboard() {
   const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - daysFromMonday);
   const weekly = results.filter(r => { const d = parseGameDate(r.date); return d && d >= cutoff; });
   if (weekly.length === 0) {
-    listEl.innerHTML = '<li class="scoreboard-empty">Bu hafta henüz skor yok</li>';
+    setListHTML('<li class="scoreboard-empty">Bu hafta henüz skor yok</li>');
     return;
   }
   // Find the first winner per date (earliest created_at among won=true rows).
@@ -3875,7 +3999,7 @@ async function loadScoreboard() {
     .map(([uid, v]) => ({ uid, score: v.score, neighborhood: v.neighborhood, name: nameMap.get(uid) || 'Anonim' }))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'tr'))
     .slice(0, 5);
-  listEl.innerHTML = top.map((p, i) => {
+  const listHtml = top.map((p, i) => {
     const nbName = (neighborhoodNames[p.neighborhood] || p.neighborhood || '').toLocaleUpperCase('tr-TR');
     const rankClass = ' r' + (i + 1);
     const suffix = getAblativeSuffix(nbName).toLocaleUpperCase('tr-TR');
@@ -3888,8 +4012,12 @@ async function loadScoreboard() {
       `<span class="scoreboard-score">${p.score}</span>` +
     `</li>`;
   }).join('');
+  setListHTML(listHtml);
+  const countdownText = getTimeUntilWeekReset();
   const countdownEl = document.getElementById('scoreboard-countdown');
-  if (countdownEl) countdownEl.textContent = getTimeUntilWeekReset();
+  if (countdownEl) countdownEl.textContent = countdownText;
+  const countdownMobileEl = document.getElementById('scoreboard-countdown-mobile');
+  if (countdownMobileEl) countdownMobileEl.textContent = countdownText;
 }
 
 // Turkish ablative suffix with vowel harmony + voiceless-consonant rule.
@@ -4079,6 +4207,49 @@ function showShareToast(msg) {
   }
 })();
 
+// ── Mobile top-left buttons: scoreboard + sözcü ──
+(function initMobileControls() {
+  const scoreOverlay = document.getElementById('score-mobile-overlay');
+  const scoreBtn = document.getElementById('mobile-score-btn');
+  const scoreClose = document.getElementById('score-mobile-close');
+  if (scoreBtn && scoreOverlay) {
+    scoreBtn.addEventListener('click', () => scoreOverlay.classList.add('open'));
+  }
+  if (scoreClose && scoreOverlay) {
+    scoreClose.addEventListener('click', () => scoreOverlay.classList.remove('open'));
+  }
+  if (scoreOverlay) {
+    scoreOverlay.addEventListener('click', (e) => {
+      if (e.target === scoreOverlay) scoreOverlay.classList.remove('open');
+    });
+  }
+
+  const sozcuOverlay = document.getElementById('sozcul-mobile-overlay');
+  const sozcuBtn = document.getElementById('mobile-sozcul-btn');
+  const sozcuClose = document.getElementById('sozcul-mobile-close');
+  if (sozcuBtn && sozcuOverlay) {
+    sozcuBtn.addEventListener('click', () => {
+      const mPanel = document.getElementById('sozcul-panel-mobile');
+      if (mPanel && _sozculPendingDate && _sozculPendingSession) {
+        if (_sozculSubmitted) {
+          _renderSozculDone(mPanel, _sozculPendingDate);
+        } else {
+          _renderSozculInput(mPanel, _sozculPendingDate, _sozculPendingSession);
+        }
+      }
+      sozcuOverlay.classList.add('open');
+    });
+  }
+  if (sozcuClose && sozcuOverlay) {
+    sozcuClose.addEventListener('click', () => sozcuOverlay.classList.remove('open'));
+  }
+  if (sozcuOverlay) {
+    sozcuOverlay.addEventListener('click', (e) => {
+      if (e.target === sozcuOverlay) sozcuOverlay.classList.remove('open');
+    });
+  }
+})();
+
 // ── Mark games as started (light gray) or completed (dark gray) in side nav ──
 // `attempts >= 1` in game_results means the game ended (win or loss). A row with
 // attempts=0 is just the in-progress marker written by markAsPlayed().
@@ -4146,6 +4317,7 @@ if (typeof applyGameLocks === 'function') applyGameLocks(sb);
   loadScoreboard();
   markPlayedGames();
   loadSozculOfTheDay();
+  initSozculPanel();
   initSuggestionForm();
   loadMySuggestions();
 })();
@@ -4178,11 +4350,22 @@ async function loadSozculOfTheDay() {
       .select('sozcul_id')
       .eq('used_on', today)
       .maybeSingle();
-    if (error || !data || !data.sozcul_id) { el.innerHTML = ''; return; }
+    if (error) { el.innerHTML = ''; return; }
+    let sozculId = data?.sozcul_id || null;
+    // Fall back to the assignment table if no sozcul_id on today's word
+    if (!sozculId) {
+      const { data: assign } = await sb
+        .from('sozcel_sozcul_assignments')
+        .select('user_id')
+        .eq('game_date', today)
+        .maybeSingle();
+      if (assign) sozculId = assign.user_id;
+    }
+    if (!sozculId) { el.innerHTML = ''; return; }
     const { data: prof } = await sb
       .from('profiles')
       .select('id, first_name, neighborhood')
-      .eq('id', data.sozcul_id)
+      .eq('id', sozculId)
       .maybeSingle();
     if (!prof) { el.innerHTML = ''; return; }
     const firstName = (prof.first_name || 'İSİMSİZ').toLocaleUpperCase('tr-TR');
@@ -4192,6 +4375,210 @@ async function loadSozculOfTheDay() {
     el.innerHTML = `<span class="sozcul-tag">Günün Sözcülü:</span><span class="sozcul-name author-link" data-user-id="${prof.id}">${escapeHtml(label)}</span>`;
   } catch (e) {
     el.innerHTML = '';
+  }
+}
+
+// ── Sözcü panel: assigned word-picker sees a submission form + countdown ──
+
+// Returns midnight IST (UTC+3) at the START of the given ISO date as a UTC Date.
+// That is the deadline for submitting the word for that date.
+function getSozculDeadline(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d) - 3 * 3600 * 1000);
+}
+
+// Returns the expected Sözcel word length for a given game date.
+function sozcelWordLengthForISO(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay() === 0 ? 6 : 5;
+}
+
+// Format ISO date as Turkish short form (e.g. "30 Haziran").
+function formatISOTurkish(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
+                  'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+  return `${d} ${months[m - 1]}`;
+}
+
+let _sozculCountdownInterval = null;
+let _sozculPendingDate = null;
+let _sozculPendingSession = null;
+let _sozculSubmitted = false;
+
+async function initSozculPanel() {
+  const panel = document.getElementById('sozcul-panel');
+  if (!panel) return;
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return;
+  const today = getIstanbulDateISO();
+  const now = new Date();
+
+  // Load assignments for this user from today onwards
+  const { data: assignments, error: aErr } = await sb
+    .from('sozcel_sozcul_assignments')
+    .select('game_date')
+    .eq('user_id', session.user.id)
+    .gte('game_date', today)
+    .order('game_date', { ascending: true });
+  if (aErr || !assignments || assignments.length === 0) return;
+
+  const assignedDates = assignments.map(a => a.game_date);
+
+  // Check which dates already have a word submitted
+  const { data: existing } = await sb
+    .from('sozcel_used_answers')
+    .select('used_on')
+    .in('used_on', assignedDates);
+  const submittedDates = new Set((existing || []).map(r => r.used_on));
+
+  // Find the earliest date that still needs a word and whose deadline hasn't passed
+  let targetDate = null;
+  for (const date of assignedDates) {
+    if (!submittedDates.has(date) && getSozculDeadline(date) > now) {
+      targetDate = date;
+      break;
+    }
+  }
+
+  if (!targetDate) {
+    // All pending dates are either submitted or expired.
+    // Show a done state if today's date was in the list and already submitted.
+    if (submittedDates.has(today) && assignedDates.includes(today)) {
+      _sozculPendingDate = today;
+      _sozculPendingSession = session;
+      _sozculSubmitted = true;
+      _renderSozculDone(panel, today);
+      panel.style.display = '';
+      const mBtn = document.getElementById('mobile-sozcul-btn');
+      if (mBtn) mBtn.style.display = '';
+    }
+    return;
+  }
+
+  _sozculPendingDate = targetDate;
+  _sozculPendingSession = session;
+  _sozculSubmitted = false;
+  _renderSozculInput(panel, targetDate, session);
+  panel.style.display = '';
+  const mBtn = document.getElementById('mobile-sozcul-btn');
+  if (mBtn) mBtn.style.display = '';
+}
+
+function _renderSozculDone(panel, date) {
+  if (_sozculCountdownInterval) { clearInterval(_sozculCountdownInterval); _sozculCountdownInterval = null; }
+  _sozculSubmitted = true;
+  panel.innerHTML = `
+    <div class="panel-title">Sözcü Görevin</div>
+    <div class="sozcul-done">
+      <strong>✓</strong>
+      <span>${formatISOTurkish(date)} için sözcüğünü seçtin.</span>
+    </div>
+  `;
+}
+
+function _renderSozculInput(panel, date, session) {
+  if (_sozculCountdownInterval) { clearInterval(_sozculCountdownInterval); _sozculCountdownInterval = null; }
+  const today = getIstanbulDateISO();
+  const isToday = date === today;
+  const dateLabel = isToday ? 'bugün' : formatISOTurkish(date);
+  const wordLen = sozcelWordLengthForISO(date);
+  const deadline = getSozculDeadline(date);
+
+  panel.innerHTML = `
+    <div class="panel-title">Sözcü Görevin</div>
+    <div class="sozcul-hint">${formatISOTurkish(date)} için ${wordLen} harfli sözcüğünü seç. Gece yarısına kadar girilmesi gerek.</div>
+    <div class="sozcul-countdown" id="sozcul-countdown"></div>
+    <div class="sozcul-form">
+      <input type="text" id="sozcul-word-input" maxlength="${wordLen}"
+             placeholder="${'◯'.repeat(wordLen)}"
+             autocomplete="off" autocorrect="off" spellcheck="false">
+      <button type="button" id="sozcul-submit-btn">Onayla</button>
+    </div>
+    <div class="sozcul-status" id="sozcul-panel-status"></div>
+  `;
+
+  const input = panel.querySelector('#sozcul-word-input');
+  const submitBtn = panel.querySelector('#sozcul-submit-btn');
+  const countdownEl = panel.querySelector('#sozcul-countdown');
+  const statusEl = panel.querySelector('#sozcul-panel-status');
+
+  if (input) {
+    input.addEventListener('input', () => {
+      input.value = input.value.toLocaleUpperCase('tr-TR').replace(/[^A-ZÇĞİÖŞÜ]/g, '');
+    });
+  }
+
+  // Live countdown to deadline
+  function updateCountdown() {
+    if (!countdownEl) return;
+    const remaining = deadline - new Date();
+    if (remaining <= 0) {
+      countdownEl.textContent = 'Süre doldu.';
+      countdownEl.className = 'sozcul-countdown urgent';
+      if (submitBtn) submitBtn.disabled = true;
+      clearInterval(_sozculCountdownInterval);
+      _sozculCountdownInterval = null;
+      return;
+    }
+    const totalSecs = Math.floor(remaining / 1000);
+    const h = Math.floor(totalSecs / 3600);
+    const min = Math.floor((totalSecs % 3600) / 60);
+    const s = totalSecs % 60;
+    countdownEl.textContent =
+      `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    countdownEl.className = 'sozcul-countdown' + (totalSecs < 3600 ? ' urgent' : '');
+  }
+  updateCountdown();
+  _sozculCountdownInterval = setInterval(updateCountdown, 1000);
+
+  if (submitBtn) {
+    submitBtn.addEventListener('click', async () => {
+      const word = input ? input.value.trim() : '';
+      // Use Turkish-locale lowercase so I→ı and İ→i are handled correctly.
+      const wordNorm = word.toLocaleLowerCase('tr-TR');
+      if (word.length !== wordLen) {
+        statusEl.textContent = `${wordLen} harfli bir sözcük gir.`;
+        statusEl.className = 'sozcul-status err';
+        return;
+      }
+      if (new Date() >= deadline) {
+        statusEl.textContent = 'Süre doldu.';
+        statusEl.className = 'sozcul-status err';
+        return;
+      }
+      submitBtn.disabled = true;
+      statusEl.textContent = '';
+      statusEl.className = 'sozcul-status';
+
+      // Guard: check if date already has a word (race condition safety)
+      const { data: guard } = await sb
+        .from('sozcel_used_answers')
+        .select('word')
+        .eq('used_on', date)
+        .maybeSingle();
+      if (guard && guard.word) {
+        statusEl.textContent = 'Bu gün için zaten sözcük seçilmiş.';
+        statusEl.className = 'sozcul-status err';
+        submitBtn.disabled = false;
+        return;
+      }
+
+      // Insert the word with this user as sozcul_id
+      const { error } = await sb
+        .from('sozcel_used_answers')
+        .insert({ used_on: date, word: wordNorm, sozcul_id: session.user.id });
+      if (error) {
+        statusEl.textContent = 'Hata: ' + (error.message || 'Bilinmeyen hata');
+        statusEl.className = 'sozcul-status err';
+        submitBtn.disabled = false;
+        return;
+      }
+
+      const panelEl = document.getElementById('sozcul-panel');
+      if (panelEl) _renderSozculDone(panelEl, date);
+      if (date === getIstanbulDateISO()) loadSozculOfTheDay();
+    });
   }
 }
 
