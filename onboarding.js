@@ -61,14 +61,17 @@
     },
     paletteScreen: {
       tr: {
-        body: 'Harika! Öyleyse Türkçe devam edelim. Merak ettiğimiz bir şey daha var: uygulaman için hangi renk paletini tercih edersin? Eğer siyah ve beyazı tercih edersen, konuşmanın geri kalanını bir kedi devralacak. Kahverengi ve beji tercih ettiğin takdirde ise bir köpek devralacak ve senin maskotun o olacak. Kararsızsan dert etme — bu ayarları istediğin zaman değiştirebilirsin.',
+        // A: instant "Harika!", B: typed explanation.
+        instant: 'Harika!',
+        typed:   'Uygulamanın renklerini de seçebilirsin. Bu ayarları istediğin zaman değiştirebilirsin.',
         choices: [
           { value: 'mono',  mascot: 'cat', label: 'SİYAH & BEYAZ', sub: 'kedi' },
           { value: 'earth', mascot: 'dog', label: 'TOPRAK TONLARI', sub: 'köpek' },
         ],
       },
       en: {
-        body: 'Great! Another thing we were wondering: what would you prefer the color palette of your application to be? If you go with black and white, a cat will take over from here. If you prefer earthy tones, then a dog becomes your mascot instead. You can change these settings whenever you want.',
+        instant: 'Great!',
+        typed:   'You can also choose the colors in which your application comes. You can always change these settings whenever you want.',
         choices: [
           { value: 'mono',  mascot: 'cat', label: 'BLACK & WHITE', sub: 'cat' },
           { value: 'earth', mascot: 'dog', label: 'EARTHY TONES',  sub: 'dog' },
@@ -549,10 +552,12 @@
     addChoices(s.choices, onPick, onConfirm, c => `<div>${c.label}</div><small>${c.sub}</small>`);
   }
 
-  function stepPalette() {
+  async function stepPalette() {
     clearStage();
     const s = COPY.paletteScreen[lang];
-    addMsg(s.body);
+    // A (instant) + B (typed). After the line finishes typing, the palette
+    // choices fade in (slow rise-in, same animation as the language picker).
+    await addMsgTyped({ instant: s.instant, typed: s.typed }, 22);
     let selected = null;
     const onPick = (c) => {
       selected = c;
@@ -569,7 +574,7 @@
       <div class="ist-onb-swatch ${c.value}"><span></span><span></span><span></span></div>
       <div>${c.label}</div>
       <small>${c.sub}</small>
-    `);
+    `, true);
   }
 
   // ───── Phase 2: spotlight-driven tour ─────
