@@ -620,7 +620,7 @@
   }
 
   function clearSpotlight() {
-    litTargets.forEach(t => t.classList.remove('ist-onb-target', 'interactive', 'latest'));
+    litTargets.forEach(t => t.classList.remove('ist-onb-target', 'interactive', 'latest', 'ist-onb-nav-flash'));
     litTargets = [];
     interactiveTarget = null;
     if (spotlightEl) spotlightEl.classList.remove('show');
@@ -857,7 +857,12 @@
       return;
     }
     interactiveTarget = link;
-    addSpotlight(link);
+    // Don't use the box-shadow ring on the link itself — flash the title
+    // text instead so it draws attention without a hard rectangle around it.
+    // The link still needs to render above the dim, so lift z-index but skip
+    // the .ist-onb-target ring styles.
+    link.classList.add('ist-onb-nav-flash');
+    litTargets.push(link); // tracked so clearSpotlight strips the class
     const handler = () => {
       saveState(nextStage);
       // Don't preventDefault: the page's own click handler will run the
