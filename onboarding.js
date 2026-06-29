@@ -20,27 +20,35 @@
   const COPY = {
     welcome: {
       lead: 'Welcome to ISTANBULITE!',
-      // Page 1: instant kefil line + typed community line, then a 3-line
-      // responsibility warning.
-      // Page 2 starts at the pageBreak marker: instant Turglish sentence
-      // (hover-revealing "Turkish + English"), then a typed explanation
-      // of the language preference, then the language picker inline.
+      // Page 1: kefil line + responsibility warning. The warning carries
+      // `tcCheckbox` so a "I agree to the terms and conditions." checkbox
+      // appears below it; the tap-to-continue hint only shows after it's
+      // ticked, blocking advance until the user consents.
+      // Page 2 (pageBreak): Turglish sentence (hover for "Turkish + English"),
+      // then the language pitch (instant lead + typed body), then a
+      // "tap to choose your preference" hint that slowly reveals the picker.
       lines: [
         {
           instant: '<em class="kefil-name">{KEFIL}</em> told us great things about you.',
           typed:   'We are glad to see you become a part of the community.',
         },
-        'But remember — they vouched for you.<br>If you were to violate the code of conduct,<br>your sponsor will be responsible.',
+        {
+          instant: 'But remember — they vouched for you.<br>If you were to violate the code of conduct,<br>your sponsor will be responsible.',
+          tcCheckbox: true,
+        },
         {
           pageBreak: true,
           instant: 'Istanbulite is by default in <span class="ist-onb-turglish" data-tip="Turkish + English">Turglish</span>.',
         },
         {
-          typed: 'But you can choose to have a preference: to have most things in Turkish, or most things in English, but never not both. Things will always be both.',
+          instant: 'But you can choose to have a preference:',
+          typed:   'You can see things mostly in Turkish, or mostly in English, but never not both. Things will always be in both languages.',
           speed: 14,
+          nextHint: 'tap to choose your preference',
         },
       ],
       tapHint: 'tap anywhere to continue',
+      tcLabel: 'I agree to the terms and conditions.',
     },
     languageScreen: {
       // Unused now — the picker is inline on the welcome screen — but
@@ -285,10 +293,26 @@
       })();
     });
   }
+  // Tracks the currently-installed addHint listeners so clearHint /
+  // re-addHint can remove them cleanly. Without this, stale handlers
+  // accumulate and clicks fire onClick multiple times — which would let
+  // the user advance past a checkbox they un-ticked, for example.
+  let activeHintHandlers = null;
+
+  function cleanupHintListeners() {
+    if (!activeHintHandlers) return;
+    const { hint, hintHandler, rootHandler } = activeHintHandlers;
+    if (hint && hintHandler) hint.removeEventListener('click', hintHandler);
+    if (root && rootHandler) root.removeEventListener('click', rootHandler);
+    tapAdvanceFn = null;
+    activeHintHandlers = null;
+  }
+
   function addHint(text, onClick) {
     // The hint button lives on <body> (not inside root) so it stays
     // visible during the spotlight tour when the modal root is hidden.
-    // It's still position:fixed so the placement is unchanged.
+    // Always tear down the previous listeners before wiring new ones.
+    cleanupHintListeners();
     let hint = document.body.querySelector('.ist-onb-hint');
     if (!hint) {
       hint = document.createElement('button');
@@ -300,32 +324,31 @@
     setTimeout(() => hint.classList.add('show'), 250);
 
     function fire() {
-      hint.removeEventListener('click', hintHandler);
-      if (rootHandler && root) root.removeEventListener('click', rootHandler);
-      tapAdvanceFn = null;
+      cleanupHintListeners();
       onClick();
     }
     const hintHandler = (e) => { e.stopPropagation(); fire(); };
     hint.addEventListener('click', hintHandler);
 
-    // Welcome modal mode: any click inside the modal background (not on a
-    // button) advances. Spotlight mode: the firewall calls tapAdvanceFn.
+    // Welcome modal mode: any click inside the modal background (not on
+    // an interactive child) advances. Spotlight mode: tapAdvanceFn instead.
     let rootHandler = null;
     if (root && root.classList.contains('show')) {
       rootHandler = (e) => {
-        if (e.target.closest('.ist-onb-choice, .ist-onb-btn, .ist-onb-codebox button')) return;
+        if (e.target.closest('.ist-onb-choice, .ist-onb-btn, .ist-onb-codebox button, .ist-onb-tc')) return;
         fire();
       };
       root.addEventListener('click', rootHandler);
     } else {
       tapAdvanceFn = fire;
     }
+    activeHintHandlers = { hint, hintHandler, rootHandler };
     focusFirst();
   }
   function clearHint() {
+    cleanupHintListeners();
     const hint = document.body.querySelector('.ist-onb-hint');
     if (hint) hint.remove();
-    tapAdvanceFn = null;
   }
   function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -356,10 +379,10 @@
   // Render a row of choice buttons + a Confirm button below.
   // onPick(choice) fires every time a choice is tapped; onConfirm() fires
   // when the user taps the confirm button (only enabled after a pick).
-  function addChoices(choices, onPick, onConfirm, renderInner) {
+  function addChoices(choices, onPick, onConfirm, renderInner, slow) {
     const stage = document.getElementById('ist-onb-stage');
     const wrap = document.createElement('div');
-    wrap.className = 'ist-onb-choices';
+    wrap.className = 'ist-onb-choices' + (slow ? ' slow' : '');
     const btns = [];
     choices.forEach(c => {
       const btn = document.createElement('button');
@@ -379,7 +402,7 @@
 
     const confirmBtn = document.createElement('button');
     confirmBtn.type = 'button';
-    confirmBtn.className = 'ist-onb-btn';
+    confirmBtn.className = 'ist-onb-btn' + (slow ? ' slow' : '');
     // Use the language-appropriate label; default to English before lang is set.
     confirmBtn.textContent = COPY.confirmLabel[lang] || COPY.confirmLabel.en;
     confirmBtn.disabled = true;
@@ -446,19 +469,61 @@
           typed:   item.typed, // typed half stays plain text on purpose
         }, item.speed);
       }
+      // Items can suppress the tap hint until the user consents to T&Cs.
+      // The checkbox renders inline; ticking it shows the hint.
+      if (item && typeof item === 'object' && item.tcCheckbox) {
+        renderTCCheckbox(() => {
+          if (idx < w.lines.length) addHint(w.tapHint, advance);
+          else addHint(w.tapHint, () => slowRevealLanguagePicker());
+        });
+        return;
+      }
       if (idx < w.lines.length) {
-        addHint(w.tapHint, advance);
+        // Per-item override (e.g. last Page-2 line uses "tap to choose...").
+        const hintText = (item && typeof item === 'object' && item.nextHint) || w.tapHint;
+        addHint(hintText, advance);
       } else {
-        // After the last line, render the language picker in-place — no
-        // separate screen and no extra tap.
-        renderLanguageChoicesInline();
+        // After the last line, a final tap slowly reveals the picker.
+        const hintText = (item && typeof item === 'object' && item.nextHint) || w.tapHint;
+        addHint(hintText, () => slowRevealLanguagePicker());
       }
     }
   }
 
+  // Render the T&C checkbox below the most recent message. `onConsent` is
+  // called the moment the user ticks; unchecking clears the tap hint so
+  // they can't proceed without consent.
+  function renderTCCheckbox(onConsent) {
+    const stage = document.getElementById('ist-onb-stage');
+    const label = document.createElement('label');
+    label.className = 'ist-onb-tc';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'ist-onb-tc-input';
+    const text = document.createElement('span');
+    text.className = 'ist-onb-tc-label';
+    text.textContent = COPY.welcome.tcLabel;
+    label.appendChild(cb);
+    label.appendChild(text);
+    stage.appendChild(label);
+    requestAnimationFrame(() => label.classList.add('show'));
+    cb.addEventListener('change', () => {
+      if (cb.checked) onConsent();
+      else clearHint();
+    });
+    focusFirst();
+  }
+
+  // Slow reveal: clears the welcome content's hint, then renders the
+  // language picker with a per-button rise animation (CSS-driven).
+  function slowRevealLanguagePicker() {
+    renderLanguageChoicesInline({ slow: true });
+  }
+
   // Inline language picker: appended to the welcome stage right after the
   // last typed line. Picking + confirming advances to the palette screen.
-  function renderLanguageChoicesInline() {
+  // `slow: true` adds a per-button rise animation for a softer entrance.
+  function renderLanguageChoicesInline(opts) {
     const s = COPY.languageScreen;
     let selected = null;
     const onPick = (c) => {
@@ -470,7 +535,7 @@
       if (global.I18N && I18N.setLang) I18N.setLang(selected.value);
       stepPalette();
     };
-    addChoices(s.choices, onPick, onConfirm, c => `<div>${c.label}</div><small>${c.sub}</small>`);
+    addChoices(s.choices, onPick, onConfirm, c => `<div>${c.label}</div><small>${c.sub}</small>`, opts && opts.slow);
   }
 
   function stepLanguage() {
