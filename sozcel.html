@@ -3894,196 +3894,77 @@ function checkWord(guess) {
   return result;
 }
 
-// ── Personal stats from Supabase ──
-// Dedupe per (user, date): a date is "played" if any row exists, "won" if
-// any row has won=true. For winning dates we keep the smallest `attempts`
-// value as that day's score (used for the personal guess distribution).
-async function loadPersonalStats() {
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) return null;
-    const { data, error } = await sb.from('game_results')
-      .select('date, attempts, won')
-      .eq('user_id', session.user.id)
-      .eq('game', 'sozcel');
-    if (error) return null;
-    const byDate = new Map();
-    (data || []).forEach(r => {
-      const prev = byDate.get(r.date) || { date: r.date, won: false, attempts: null };
-      if (r.won) {
-        prev.won = true;
-        if (prev.attempts === null || r.attempts < prev.attempts) prev.attempts = r.attempts;
-      }
-      byDate.set(r.date, prev);
-    });
-    const entries = Array.from(byDate.values());
-    const played = entries.length;
-    const wins = entries.filter(e => e.won).length;
-    // Guess distribution: attempts 1-6 -> indices 0-5; failures (no won row) -> index 6.
-    const dist = [0, 0, 0, 0, 0, 0, 0];
-    entries.forEach(e => {
-      if (e.won && e.attempts >= 1 && e.attempts <= 6) dist[e.attempts - 1]++;
-      else dist[6]++;
-    });
-    // Streaks. Compare Istanbul-local YYYY-M-D seeds (matches dailySeed format).
-    const winDateSet = new Set(entries.filter(e => e.won).map(e => e.date));
-    function seedForOffset(off) {
-      const now = new Date();
-      const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-      ist.setDate(ist.getDate() - off);
-      return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
-    }
-    // Current streak: count back from today; if today wasn't won, start at yesterday.
-    let currentStreak = 0;
-    let offset = winDateSet.has(seedForOffset(0)) ? 0 : 1;
-    while (winDateSet.has(seedForOffset(offset))) { currentStreak++; offset++; }
-    // Max streak: longest run of consecutive winning days.
-    const DAY = 86400000;
-    const winTimes = entries.filter(e => e.won).map(e => {
-      const [y, m, d] = e.date.split('-').map(Number);
-      return Date.UTC(y, m - 1, d);
-    }).sort((a, b) => a - b);
-    let maxStreak = 0, cur = 0, prev = null;
-    for (const t of winTimes) {
-      cur = (prev !== null && t - prev === DAY) ? cur + 1 : 1;
-      if (cur > maxStreak) maxStreak = cur;
-      prev = t;
-    }
-    return { played, wins, currentStreak, maxStreak, dist };
-  } catch (e) { return null; }
-}
-
-// ── Community stats from Supabase. Returns null when no data for today. ──
-async function loadCommunityStats() {
-  try {
-    const { data, error } = await sb.from('game_results')
-      .select('user_id, attempts, won, neighborhood')
-      .eq('game', 'sozcel')
-      .eq('date', dailySeed);
-
-    if (error || !data || data.length === 0) return null;
-
-    // Dedupe per user: one entry per player for today.
-    const byUser = new Map();
-    data.forEach(r => {
-      const prev = byUser.get(r.user_id) || { won: false, attempts: null, neighborhood: r.neighborhood };
-      if (r.neighborhood) prev.neighborhood = r.neighborhood;
-      if (r.won) {
-        prev.won = true;
-        if (prev.attempts === null || r.attempts < prev.attempts) prev.attempts = r.attempts;
-      }
-      byUser.set(r.user_id, prev);
-    });
-
-    const dist = [0, 0, 0, 0, 0, 0, 0]; // attempts 1-6 + failed
-    const districtMap = {};
-    byUser.forEach(e => {
-      if (e.won && e.attempts >= 1 && e.attempts <= 6) dist[e.attempts - 1]++;
-      else dist[6]++;
-      if (e.neighborhood) {
-        if (!districtMap[e.neighborhood]) districtMap[e.neighborhood] = { wins: 0, total: 0 };
-        districtMap[e.neighborhood].total++;
-        if (e.won) districtMap[e.neighborhood].wins++;
-      }
-    });
-
-    const topDistricts = Object.entries(districtMap)
-      .map(([k, v]) => ({ name: neighborhoodNames[k] || k, pct: Math.round(v.wins / v.total * 100), total: v.total }))
-      .sort((a, b) => b.pct - a.pct || b.total - a.total)
-      .slice(0, 5);
-
-    return { dist, topDistricts };
-  } catch (e) {
-    return null;
-  }
-}
-
-// ── Stats rendering ──
+// ── Daily neighborhood scoreboard ──
+// The left bar shows each neighborhood's share of today's Sözcel points,
+// styled like the Kahvehane scoreboard. Points per row come from
+// gamePoints() (20/12/8/6/4/2 for win in 1–6 guesses; 1 for played);
+// each neighborhood's share of the day's total is shown as a 0.XX ratio.
 async function renderStats() {
-  // Supabase is the source of truth. Cache the last successful payload in
-  // localStorage so first paint isn't blank on flaky networks.
-  const cacheKey = 'sozcel_stats_cache';
-  let personal = await loadPersonalStats();
-  if (personal) {
-    localStorage.setItem(cacheKey, JSON.stringify(personal));
-  } else {
-    try { personal = JSON.parse(localStorage.getItem(cacheKey) || 'null'); } catch { personal = null; }
-  }
-  const played = personal ? personal.played : 0;
-  const wins = personal ? personal.wins : 0;
-  const streak = personal ? personal.currentStreak : 0;
-  const displayMaxStreak = personal ? Math.max(personal.maxStreak, personal.currentStreak) : 0;
-  const winPct = played > 0 ? Math.round(wins / played * 100) : 0;
-
-  // Personal guess distribution: indices 0..5 = attempts 1..6 (index 6 = failed, not shown).
-  const distFull = personal ? personal.dist : [0,0,0,0,0,0,0];
-  const dist = distFull.slice(0, 6);
-  const maxDist = Math.max(...dist, 1);
-
-  // Community stats fetched in parallel; rendered side-by-side with personal distribution.
-  const community = await loadCommunityStats();
-  const communityDist = community ? community.dist : [0,0,0,0,0,0,0];
-  const totalCommunity = communityDist.reduce((a, b) => a + b, 0);
-  const maxCommunityDist = Math.max(...communityDist, 1);
-  const topDistricts = community ? community.topDistricts : [];
-
-  const communityColHtml = community
-    ? communityDist.map((d, i) => {
-        const pct = totalCommunity > 0 ? Math.round(d / totalCommunity * 100) : 0;
-        const label = i < 6 ? (i + 1) : 'X';
-        return `
-          <div class="dist-bar-wrap">
-            <span class="dist-label">${label}</span>
-            <div class="dist-bar-outer">
-              <div class="dist-bar-inner" style="width:${d > 0 ? Math.max(d / maxCommunityDist * 100, 3) : 0}%"></div>
-            </div>
-            <span class="dist-pct">${pct}%</span>
-          </div>
-        `;
-      }).join('')
-    : `<div class="stat-row"><span class="stat-label">Henüz veri yok</span></div>`;
-
-  const topDistrictsHtml = `
-    <div style="margin-top:6px;"><div class="panel-title">En Başarılı İlçeler</div></div>
-    ${topDistricts.length === 0
-      ? `<div class="stat-row"><span class="stat-label">Henüz veri yok</span></div>`
-      : topDistricts.map((d, i) => `
-        <div class="district-rank">
-          <span class="rank-name">${i + 1}. ${d.name}</span>
-          <span class="rank-pct">${d.pct}%</span>
-        </div>
-      `).join('')}
+  const el = document.getElementById('stats-left');
+  if (!el) return;
+  const emptyShell = (msg) => `
+    <div class="scoreboard">
+      <h2>Günün Mahalleleri</h2>
+      <ol class="scoreboard-list">
+        <li class="scoreboard-empty">${msg}</li>
+      </ol>
+    </div>
   `;
 
-  // Left panel: stat tiles on top, then Tahmin Dağılımı side-by-side with
-  // Günün İstatistikleri (both clipped to the height of the personal
-  // distribution), then En Başarılı İlçeler.
-  document.getElementById('stats-left').innerHTML = `
-    <div class="stat-tiles">
-      <div class="stat-tile"><div class="num">${streak}</div><div class="label">${I18N.t('games.streak')}</div></div>
-      <div class="stat-tile"><div class="num">${displayMaxStreak}</div><div class="label">${I18N.t('games.longest')}</div></div>
-      <div class="stat-tile"><div class="num">${played}</div><div class="label">${I18N.t('games.played')}</div></div>
-      <div class="stat-tile"><div class="num">${winPct}%</div><div class="label">${I18N.t('games.winrate')}</div></div>
+  let rows;
+  try {
+    const { data, error } = await sb.from('game_results')
+      .select('user_id, neighborhood, attempts, won')
+      .eq('game', 'sozcel')
+      .eq('date', dailySeed);
+    if (error) throw error;
+    rows = data || [];
+  } catch (e) {
+    el.innerHTML = emptyShell('Skorlar yüklenemedi');
+    return;
+  }
+
+  // Best-row-per-user (so multiple inserts in a session don't double-count).
+  const bestByUser = new Map();
+  rows.forEach(r => {
+    if (!r.user_id || !r.neighborhood) return;
+    const pts = gamePoints(r.attempts, r.won);
+    const prev = bestByUser.get(r.user_id);
+    if (!prev || pts > prev.pts) bestByUser.set(r.user_id, { pts, neighborhood: r.neighborhood });
+  });
+
+  const totalsByNb = new Map();
+  bestByUser.forEach(({ pts, neighborhood }) => {
+    totalsByNb.set(neighborhood, (totalsByNb.get(neighborhood) || 0) + pts);
+  });
+
+  const total = Array.from(totalsByNb.values()).reduce((a, b) => a + b, 0);
+  if (total === 0) {
+    el.innerHTML = emptyShell('Bugün henüz puan yok');
+    return;
+  }
+
+  const sorted = Array.from(totalsByNb.entries())
+    .map(([nb, pts]) => ({ nb, pts, pct: pts / total }))
+    .sort((a, b) => b.pts - a.pts);
+
+  el.innerHTML = `
+    <div class="scoreboard">
+      <h2>Günün Mahalleleri</h2>
+      <ol class="scoreboard-list">
+        ${sorted.map((row, i) => {
+          const rankClass = i < 3 ? ' r' + (i + 1) : '';
+          const name = (neighborhoodNames[row.nb] || row.nb).toLocaleUpperCase('tr-TR');
+          return `
+            <li class="scoreboard-item${rankClass}">
+              <span class="scoreboard-rank">${i + 1}.</span>
+              <span class="scoreboard-player"><span class="scoreboard-name">${name}</span></span>
+              <span class="scoreboard-score">${row.pct.toFixed(2)}</span>
+            </li>
+          `;
+        }).join('')}
+      </ol>
     </div>
-    <div class="stats-row-2col">
-      <div class="stats-col">
-        <div class="panel-title">${I18N.t('games.distribution')}</div>
-        ${dist.map((d, i) => `
-          <div class="dist-bar-wrap">
-            <span class="dist-label">${i + 1}</span>
-            <div class="dist-bar-outer">
-              <div class="dist-bar-inner" style="width:${d > 0 ? Math.max(d / maxDist * 100, 5) : 0}%"></div>
-            </div>
-            <span class="dist-pct">${d}</span>
-          </div>
-        `).join('')}
-      </div>
-      <div class="stats-col">
-        <div class="panel-title">Günün İstatistikleri</div>
-        ${communityColHtml}
-      </div>
-    </div>
-    ${topDistrictsHtml}
   `;
 }
 

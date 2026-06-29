@@ -1441,172 +1441,80 @@ async function restoreState() {
   } catch (e) { return false; }
 }
 
-// ── Personal stats ──
-async function loadPersonalStats() {
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) return null;
-    const { data, error } = await sb.from('game_results')
-      .select('date, attempts, won')
-      .eq('user_id', session.user.id)
-      .eq('game', 'tumcel');
-    if (error) return null;
-    const byDate = new Map();
-    (data || []).forEach(r => {
-      const prev = byDate.get(r.date) || { date: r.date, won: false, attempts: null };
-      if (r.won) {
-        prev.won = true;
-        if (prev.attempts === null || r.attempts < prev.attempts) prev.attempts = r.attempts;
-      }
-      byDate.set(r.date, prev);
-    });
-    const entries = Array.from(byDate.values());
-    const played = entries.length;
-    const wins = entries.filter(e => e.won).length;
-    const dist = [0, 0, 0, 0, 0];
-    entries.forEach(e => {
-      if (e.won && e.attempts >= 0 && e.attempts <= 3) dist[e.attempts]++;
-      else dist[4]++;
-    });
-    const winDateSet = new Set(entries.filter(e => e.won).map(e => e.date));
-    function seedForOffset(off) {
-      const now = new Date();
-      const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-      ist.setDate(ist.getDate() - off);
-      return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
-    }
-    let currentStreak = 0;
-    let offset = winDateSet.has(seedForOffset(0)) ? 0 : 1;
-    while (winDateSet.has(seedForOffset(offset))) { currentStreak++; offset++; }
-    const DAY = 86400000;
-    const winTimes = entries.filter(e => e.won).map(e => {
-      const [y, m, d] = e.date.split('-').map(Number);
-      return Date.UTC(y, m - 1, d);
-    }).sort((a, b) => a - b);
-    let maxStreak = 0, cur = 0, prev = null;
-    for (const t of winTimes) {
-      cur = (prev !== null && t - prev === DAY) ? cur + 1 : 1;
-      if (cur > maxStreak) maxStreak = cur;
-      prev = t;
-    }
-    return { played, wins, currentStreak, maxStreak, dist };
-  } catch (e) { return null; }
+// ── Daily neighborhood scoreboard ──
+// The left bar shows each neighborhood's share of today's Tümcel points.
+// Scoring: attempts is stored as (4 − mistakes) so a clean win is 4 → 20 pts,
+// each mistake costs 5 pts, a loss is 1 pt for participation.
+function _tumcelPointsForRow(attempts, won) {
+  if (won) return Math.max(5, attempts * 5);
+  return attempts >= 0 ? 1 : 0;
 }
 
-// ── Community stats ──
-async function loadCommunityStats() {
+async function renderStats() {
+  const el = document.getElementById('stats-left');
+  if (!el) return;
+  const emptyShell = (msg) => `
+    <div class="scoreboard">
+      <h2>Günün Mahalleleri</h2>
+      <ol class="scoreboard-list">
+        <li class="scoreboard-empty">${msg}</li>
+      </ol>
+    </div>
+  `;
+
+  let rows;
   try {
     const { data, error } = await sb.from('game_results')
-      .select('user_id, attempts, won, neighborhood')
+      .select('user_id, neighborhood, attempts, won')
       .eq('game', 'tumcel')
       .eq('date', dailySeed);
-    if (error || !data || data.length === 0) return null;
-    const byUser = new Map();
-    data.forEach(r => {
-      const prev = byUser.get(r.user_id) || { won: false, attempts: null, neighborhood: r.neighborhood };
-      if (r.neighborhood) prev.neighborhood = r.neighborhood;
-      if (r.won) {
-        prev.won = true;
-        if (prev.attempts === null || r.attempts < prev.attempts) prev.attempts = r.attempts;
-      }
-      byUser.set(r.user_id, prev);
-    });
-    const dist = [0, 0, 0, 0, 0];
-    const districtMap = {};
-    byUser.forEach(e => {
-      if (e.won && e.attempts >= 0 && e.attempts <= 3) dist[e.attempts]++;
-      else dist[4]++;
-      if (e.neighborhood) {
-        if (!districtMap[e.neighborhood]) districtMap[e.neighborhood] = { wins: 0, total: 0 };
-        districtMap[e.neighborhood].total++;
-        if (e.won) districtMap[e.neighborhood].wins++;
-      }
-    });
-    const topDistricts = Object.entries(districtMap)
-      .map(([k, v]) => ({ name: neighborhoodNames[k] || k, pct: Math.round(v.wins / v.total * 100), total: v.total }))
-      .sort((a, b) => b.pct - a.pct || b.total - a.total)
-      .slice(0, 5);
-    return { dist, topDistricts };
-  } catch (e) { return null; }
-}
-
-// ── Render stats ──
-async function renderStats() {
-  const cacheKey = 'tumcel_stats_cache';
-  let personal = await loadPersonalStats();
-  if (personal) {
-    localStorage.setItem(cacheKey, JSON.stringify(personal));
-  } else {
-    try { personal = JSON.parse(localStorage.getItem(cacheKey) || 'null'); } catch { personal = null; }
-  }
-  const played = personal ? personal.played : 0;
-  const wins = personal ? personal.wins : 0;
-  const streak = personal ? personal.currentStreak : 0;
-  const displayMaxStreak = personal ? Math.max(personal.maxStreak, personal.currentStreak) : 0;
-  const winPct = played > 0 ? Math.round(wins / played * 100) : 0;
-  const dist = personal ? personal.dist : [0, 0, 0, 0, 0];
-  const maxDist = Math.max(...dist, 1);
-  const distLabels = ['0 hata', '1 hata', '2 hata', '3 hata', 'Kaybetti'];
-
-  const community = await loadCommunityStats();
-  let communityHtml = '';
-  if (!community) {
-    communityHtml = `
-      <div><div class="panel-title">Günün İstatistikleri</div></div>
-      <div class="stat-row"><span class="stat-label">Henüz veri yok</span></div>
-    `;
-  } else {
-    const communityDist = community.dist;
-    const totalCommunity = communityDist.reduce((a, b) => a + b, 0);
-    const maxCommunityDist = Math.max(...communityDist, 1);
-    const topDistricts = community.topDistricts;
-    const communityLabels = ['0 hata', '1 hata', '2 hata', '3 hata', 'Kaybetti'];
-    communityHtml = `
-      <div><div class="panel-title">Günün İstatistikleri</div></div>
-      ${communityDist.map((d, i) => {
-        const pct = totalCommunity > 0 ? Math.round(d / totalCommunity * 100) : 0;
-        return `
-          <div class="dist-bar-wrap">
-            <span class="dist-label" style="min-width:46px;text-align:left;font-size:0.55rem;">${communityLabels[i]}</span>
-            <div class="dist-bar-outer">
-              <div class="dist-bar-inner" style="width:${d > 0 ? Math.max(d / maxCommunityDist * 100, 3) : 0}%"></div>
-            </div>
-            <span class="dist-pct">${pct}%</span>
-          </div>
-        `;
-      }).join('')}
-      <div style="margin-top:4px;"><div class="panel-title">En Başarılı İlçeler</div></div>
-      ${topDistricts.length === 0
-        ? `<div class="stat-row"><span class="stat-label">Henüz veri yok</span></div>`
-        : topDistricts.map((d, i) => `
-          <div class="district-rank">
-            <span class="rank-name">${i + 1}. ${d.name}</span>
-            <span class="rank-pct">${d.pct}%</span>
-          </div>
-        `).join('')}
-    `;
+    if (error) throw error;
+    rows = data || [];
+  } catch (e) {
+    el.innerHTML = emptyShell('Skorlar yüklenemedi');
+    return;
   }
 
-  document.getElementById('stats-left').innerHTML = `
-    <div><div class="panel-title">${I18N.t('games.personal')}</div></div>
-    <div class="stat-tiles">
-      <div class="stat-tile"><div class="num">${streak}</div><div class="label">${I18N.t('games.streak')}</div></div>
-      <div class="stat-tile"><div class="num">${displayMaxStreak}</div><div class="label">${I18N.t('games.longest')}</div></div>
-      <div class="stat-tile"><div class="num">${played}</div><div class="label">${I18N.t('games.played')}</div></div>
-      <div class="stat-tile"><div class="num">${winPct}%</div><div class="label">${I18N.t('games.winrate')}</div></div>
+  const bestByUser = new Map();
+  rows.forEach(r => {
+    if (!r.user_id || !r.neighborhood) return;
+    const pts = _tumcelPointsForRow(r.attempts, r.won);
+    const prev = bestByUser.get(r.user_id);
+    if (!prev || pts > prev.pts) bestByUser.set(r.user_id, { pts, neighborhood: r.neighborhood });
+  });
+
+  const totalsByNb = new Map();
+  bestByUser.forEach(({ pts, neighborhood }) => {
+    totalsByNb.set(neighborhood, (totalsByNb.get(neighborhood) || 0) + pts);
+  });
+
+  const total = Array.from(totalsByNb.values()).reduce((a, b) => a + b, 0);
+  if (total === 0) {
+    el.innerHTML = emptyShell('Bugün henüz puan yok');
+    return;
+  }
+
+  const sorted = Array.from(totalsByNb.entries())
+    .map(([nb, pts]) => ({ nb, pts, pct: pts / total }))
+    .sort((a, b) => b.pts - a.pts);
+
+  el.innerHTML = `
+    <div class="scoreboard">
+      <h2>Günün Mahalleleri</h2>
+      <ol class="scoreboard-list">
+        ${sorted.map((row, i) => {
+          const rankClass = i < 3 ? ' r' + (i + 1) : '';
+          const name = (neighborhoodNames[row.nb] || row.nb).toLocaleUpperCase('tr-TR');
+          return `
+            <li class="scoreboard-item${rankClass}">
+              <span class="scoreboard-rank">${i + 1}.</span>
+              <span class="scoreboard-player"><span class="scoreboard-name">${name}</span></span>
+              <span class="scoreboard-score">${row.pct.toFixed(2)}</span>
+            </li>
+          `;
+        }).join('')}
+      </ol>
     </div>
-    <div style="margin-top:4px;"><div class="panel-title">Hata Dağılımı</div></div>
-    ${dist.map((d, i) => `
-      <div class="dist-bar-wrap">
-        <span class="dist-label" style="min-width:46px;text-align:left;font-size:0.55rem;">${distLabels[i]}</span>
-        <div class="dist-bar-outer">
-          <div class="dist-bar-inner" style="width:${d > 0 ? Math.max(d / maxDist * 100, 5) : 0}%"></div>
-        </div>
-        <span class="dist-pct">${d}</span>
-      </div>
-    `).join('')}
-    <div style="margin-top:6px;"></div>
-    ${communityHtml}
   `;
 }
 
