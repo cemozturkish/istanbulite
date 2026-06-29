@@ -12,7 +12,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="i18n.js"></script>
   <script src="game-locks.js"></script>
-  <script src="sozcul-mascot.js" defer></script>
+  <link rel="stylesheet" href="onboarding.css">
+  <script src="onboarding.js" defer></script>
   <style>
     :root {
       /* Core ink & paper — warm cream newspaper palette */
@@ -1648,6 +1649,12 @@ const neighborhoodNames = {
     const { data: { session } } = await sb.auth.getSession();
     if (session) {
       I18N.syncFromSupabase(sb, session.user.id);
+      // Resume the onboarding flow if the user is mid-tour. onboarding.js
+      // is deferred — poll briefly until it lands.
+      (function tryOnb(tries) {
+        if (window.IstOnboarding) IstOnboarding.maybeRun({ sb, user: session.user, page: 'sozcel' });
+        else if (tries > 0) setTimeout(() => tryOnb(tries - 1), 60);
+      })(40);
       userNeighborhood = session.user.user_metadata?.yasadigi_ilce
         || session.user.user_metadata?.neighborhood || '';
       // Accounts created by admin don't have user_metadata — fall back to profiles table.
