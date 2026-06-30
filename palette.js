@@ -38,8 +38,10 @@
     try {
       const { data } = await sb.from('profiles')
         .select('palette_pref').eq('id', userId).maybeSingle();
-      const v = (data && VALID.has(data.palette_pref)) ? data.palette_pref : 'earth';
-      setPalette(v);
+      // If DB has a known value, adopt it. If null/unset, KEEP the cached
+      // choice — otherwise a freshly saved 'mono' on one page would flip
+      // back to 'earth' on the next page before its update propagates.
+      if (data && VALID.has(data.palette_pref)) setPalette(data.palette_pref);
     } catch (e) { /* keep cached value */ }
   }
 
