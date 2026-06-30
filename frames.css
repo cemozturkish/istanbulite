@@ -1,0 +1,172 @@
+/* ══════════════════════════════════════════════════════════════
+   Istanbulite — frames + shadows design layer
+   - Body sits on the lightest tone in light mode, the darkest in
+     dark mode. Every major panel (top bar, side columns, main,
+     döviz, mobile nav) becomes its own rounded "frame" with a
+     drop shadow, so each component reads as a discrete card
+     floating on the page canvas.
+   - Loaded AFTER each page's inline <style>, so its selectors
+     win the cascade where specificity ties.
+   ══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Page canvas — the lightest tone (light mode default).
+     Sits behind the framed panels. */
+  --page-bg: #f5e7dd;
+
+  /* Frame visuals */
+  --frame-radius: 12px;
+  --frame-gap: 10px;
+  --frame-pad: 10px;
+  --frame-shadow:
+    0 6px 20px -6px rgba(76, 56, 42, 0.30),
+    0 2px 6px -2px rgba(76, 56, 42, 0.18);
+  --frame-shadow-strong:
+    0 10px 28px -8px rgba(76, 56, 42, 0.38),
+    0 2px 8px -2px rgba(76, 56, 42, 0.22);
+}
+
+/* Dark mode — flip the base palette so frames stay readable, and
+   make the canvas the darkest tone with a stronger shadow. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink:          #f1e6d9;
+    --ink-deep:     #f7eee2;
+    --paper:        #2a1f17;
+    --paper-warm:   #2a1f17;
+    --paper-card:   #3a2c20;
+    --paper-banner: #4a382a;
+    --paper-navbar: #1c130b;
+    --paper-dark:   #251910;
+    --hover:        #3a2c20;
+    --field-bg:     #251a13;
+    --accent:       #d6bda3;
+    --accent-2:     #b8997f;
+    --muted:        #9c8268;
+    --rule:         #4a382a;
+    --hairline:     #3a2c20;
+    --whisper:      #2f2218;
+    --ink-red:      #e07a72;
+    --brown-1:      #a88a72;
+    --brown-2:      #b89580;
+    --brown-3:      #c9aa90;
+    --brown-4:      #d4bba0;
+
+    /* Darkest tone — page canvas in dark mode */
+    --page-bg: #0b0703;
+    --frame-shadow:
+      0 8px 26px rgba(0, 0, 0, 0.62),
+      0 2px 6px rgba(0, 0, 0, 0.45);
+    --frame-shadow-strong:
+      0 12px 36px rgba(0, 0, 0, 0.72),
+      0 2px 10px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* ── PAGE CANVAS ─────────────────────────────────────────────── */
+html,
+body {
+  background: var(--page-bg) !important;
+}
+
+/* ── OUTER FRAME PADDING + GAP ───────────────────────────────── */
+/* Pages where body IS the grid (kahvehane, kutuphane, sozcel,
+   tumcel, bulmaca) → put the outer ring + gap on body. We set
+   sides individually so the inline mobile padding-bottom (used
+   to reserve space for the fixed bottom tab bar) survives. */
+body {
+  padding-top: var(--frame-pad);
+  padding-left: var(--frame-pad);
+  padding-right: var(--frame-pad);
+  gap: var(--frame-gap);
+}
+
+/* On anahane, body is a flex column wrapping #main-site (the
+   real grid). To avoid double-ringing, strip body padding when
+   it has a #main-site child — the inner #main-site rule below
+   provides the ring instead. */
+body:has(> #main-site) {
+  padding: 0 !important;
+}
+
+/* anahane's grid container. Height drops from 100vh to 100% so
+   the grid fits inside the body box. Sides individually so
+   inline mobile padding-bottom (56px for the fixed nav) survives. */
+#main-site {
+  padding-top: var(--frame-pad);
+  padding-left: var(--frame-pad);
+  padding-right: var(--frame-pad);
+  gap: var(--frame-gap);
+  height: 100% !important;
+}
+
+/* Desktop: add the missing bottom ring (mobile already reserves
+   bottom space for the fixed nav, so don't override there). */
+@media (min-width: 769px) {
+  body { padding-bottom: var(--frame-pad); }
+  #main-site { padding-bottom: var(--frame-pad); }
+}
+
+/* ── FRAME COMPONENTS ────────────────────────────────────────── */
+/* Each major panel becomes a rounded card with a drop shadow.
+   Outer borders that previously connected panels are dropped —
+   the shadow + gap now do the separating. */
+.section-rule,
+.col-left,
+.col-right,
+main,
+#doviz-panel {
+  border: none !important;
+  border-radius: var(--frame-radius);
+  box-shadow: var(--frame-shadow);
+  overflow: hidden;
+}
+
+/* Main panel needs a frame background (it usually inherited from
+   body via its child .map-panel). */
+main {
+  background: var(--paper);
+}
+
+/* Mobile profile card mount → frame the card inside it. */
+#ist-pc-mount > * {
+  border-radius: var(--frame-radius);
+  box-shadow: var(--frame-shadow);
+  overflow: hidden;
+}
+
+/* ── DESKTOP HEADER (nav bar inside section-rule, no extra frame) */
+
+/* ── MOBILE FIXED BOTTOM NAV ─────────────────────────────────── */
+/* On mobile, .section-rule > header is repositioned to a fixed
+   bottom tab bar (anahane/kahvehane/kutuphane/sozcel/tumcel/
+   bulmaca). Frame it with rounded top corners and an upward
+   shadow. Scoped to .section-rule > header so admin.html's top
+   header is untouched. */
+@media (max-width: 768px) {
+  .section-rule > header {
+    border: none !important;
+    border-radius: var(--frame-radius) var(--frame-radius) 0 0 !important;
+    box-shadow: 0 -6px 20px rgba(76, 56, 42, 0.22) !important;
+  }
+  @media (prefers-color-scheme: dark) {
+    .section-rule > header {
+      box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.55) !important;
+    }
+  }
+}
+
+/* ── LOGIN / SIGNUP BOX ──────────────────────────────────────── */
+/* These boxes have a ::before pseudo-element for an inner double
+   border at inset: 4px. Adding a rounded outer radius would
+   clash with the sharp pseudo-border, so we leave the shape
+   alone and just float each box with a stronger shadow. */
+.login-box,
+.admin-login-box {
+  box-shadow: var(--frame-shadow-strong);
+}
+
+/* ── GAME / ARTICLE PANELS ───────────────────────────────────── */
+/* Game pages render their boards inside <main>. Inner sub-panels
+   (e.g. the daily-game cards on kahvehane) keep their existing
+   look; only the top-level frames change. */
