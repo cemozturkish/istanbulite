@@ -565,47 +565,6 @@
       line-height: 1.25;
     }
 
-    /* ── Counter strip (bottom of left column) ── */
-    .counter-strip {
-      border-top: 1px solid var(--rule);
-      padding: 8px 0 16px 0;
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
-    }
-    .counter-card {
-      padding: 12px 18px;
-      border-bottom: 1px dashed var(--hairline);
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .counter-card:last-child { border-bottom: none; }
-    .counter-label {
-      font-size: 0.62rem;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--muted);
-      line-height: 1.3;
-    }
-    .counter-value {
-      font-family: 'Inter', sans-serif;
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: var(--ink);
-      letter-spacing: 0.5px;
-    }
-    .counter-value .cv-days {
-      font-size: 0.95rem;
-    }
-    .counter-value .cv-suffix {
-      font-size: 0.95rem;
-      font-weight: 400;
-      color: var(--accent);
-      margin: 0 8px 0 3px;
-    }
-    .counter-value .cv-suffix:last-child { margin-right: 0; }
     .shelf-loading {
       padding: 24px;
       text-align: center;
@@ -1577,13 +1536,13 @@
         z-index: 10;
         flex-shrink: 0;
       }
-      #ist-pc-mount, #mobile-top, #mobile-two-col { flex-shrink: 0; }
+      #ist-pc-mount, #mobile-top { flex-shrink: 0; }
       .masthead { font-size: 1.05rem; }
       .datetime-block { gap: 8px; font-size: 9px; letter-spacing: 1.5px; }
       .datetime-block .day-line, .datetime-block .sep:nth-of-type(2) { display: none; }
 
-      /* col-left holds profile + countdowns + signout; render as a normal
-         vertical block on mobile (no more horizontal source-tab strip). */
+      /* col-left holds profile + signout; render as a normal vertical block
+         on mobile (no more horizontal source-tab strip). */
       .col-left {
         border: none;
         border-bottom: 1px solid var(--hairline);
@@ -1593,24 +1552,6 @@
         padding: 0;
       }
       .col-left .nb-highlight { display: none; }
-      .counter-strip {
-        flex-direction: row;
-        border-top: none;
-        border-left: 1px solid var(--rule);
-        padding: 0;
-      }
-      .counter-card {
-        flex-shrink: 0;
-        padding: 8px 14px;
-        border-bottom: none;
-        border-right: 1px dashed var(--hairline);
-        min-width: 140px;
-        justify-content: center;
-      }
-      .counter-card:last-child { border-right: none; }
-      .counter-label { font-size: 8px; letter-spacing: 1px; }
-      .counter-value .cv-days { font-size: 0.8rem; }
-      .counter-value .cv-suffix { font-size: 0.8rem; }
 
       /* Shelves area — fills remaining viewport height, internal scroll if needed */
       .shelves {
@@ -1762,42 +1703,6 @@
       }
       #mobile-top .library-card .card-name { font-size: 0.85rem; }
       #mobile-top .library-card .card-meta { font-size: 0.62rem; }
-      /* Countdowns strip hidden on mobile to free vertical space for shelves */
-      #mobile-two-col {
-        display: none;
-      }
-      #mobile-col-articles { display: none; }
-      #mobile-col-counts,
-      #mobile-col-articles {
-        min-width: 0; /* grid items must be allowed to shrink below content width */
-        overflow: hidden;
-      }
-      #mobile-col-counts {
-        border-right: 1px solid var(--hairline);
-        background: var(--paper-card);
-      }
-      #mobile-col-counts .counter-strip {
-        display: flex;
-        flex-direction: column;
-        border-top: none;
-        border-left: none;
-        padding: 0;
-      }
-      #mobile-col-counts .counter-card {
-        min-width: 0;
-        padding: 10px 10px;
-        border-right: none;
-      }
-      #mobile-col-counts .counter-label { font-size: 7px; letter-spacing: 0.8px; }
-      #mobile-col-counts .counter-value { font-size: 0.72rem; }
-      #mobile-col-counts .counter-value .cv-days { font-size: 0.72rem; }
-      #mobile-col-counts .counter-value .cv-suffix { font-size: 0.72rem; margin: 0 3px 0 2px; }
-      /* Article tabs in right column: static (no sticky), horizontal scroll within column */
-      #mobile-col-articles .col-left {
-        position: static;
-        overflow-x: auto;
-        overflow-y: hidden;
-      }
 
       /* Bottom tab bar */
       .section-rule > .masthead,
@@ -2049,15 +1954,8 @@
     <div class="profile-right">
       <div class="loading"><span class="spinner"></span></div>
     </div>
-    <div class="counter-strip" id="counter-strip"></div>
     <div class="profile-signout-wrap" id="profile-signout-wrap"></div>
   </aside>
-
-  <!-- Mobile-only: two-column layout (countdowns | shelves) filled by mobileReorderElements() -->
-  <div id="mobile-two-col">
-    <div id="mobile-col-counts"></div>
-    <div id="mobile-col-articles"></div>
-  </div>
 
   <main>
     <div class="reading-area" id="reading-area">
@@ -2410,31 +2308,18 @@ function updateTabStripOffset() {
 updateTabStripOffset();
 window.addEventListener('resize', updateTabStripOffset);
 
-// Mobile layout (≤768px):
-//   1. profile card  (full width)
-//   2. HESAP section (full width, col-right minus library-card)
-//   3. two columns:  countdowns (left) | article category tabs (right)
-//   4. article area  (full width, below)
-// Elements are physically relocated so JS that populates them by id still works.
+// Mobile layout (≤768px): surface the legacy profile card at the top when
+// viewing another user's profile (?user=ID); self-view uses #ist-pc-mount.
 (function () {
   const MOBILE_BP = 768;
-  // When viewing another user's profile (?user=ID), tag the body early so the
-  // legacy mobile layout takes effect synchronously instead of waiting for
-  // loadProfile() to set the class.
   if (new URLSearchParams(window.location.search).get('user')) {
     document.body.classList.add('ist-viewing-other');
   }
-  const mobileTop         = document.getElementById('mobile-top');
-  const mobileTwoCol      = document.getElementById('mobile-two-col');
-  const mobileColCounts   = document.getElementById('mobile-col-counts');
-  const mobileColArticles = document.getElementById('mobile-col-articles');
-  const card    = document.getElementById('library-card');
-  const strip   = document.getElementById('counter-strip');
-  const colLeft = document.querySelector('aside.col-left');
-  const colRight = document.querySelector('aside.col-right');
+  const mobileTop = document.getElementById('mobile-top');
+  const card      = document.getElementById('library-card');
+  const colLeft   = document.querySelector('aside.col-left');
 
-  if (!mobileTop || !mobileTwoCol || !mobileColCounts || !mobileColArticles) return;
-  if (!card || !strip || !colLeft) return;
+  if (!mobileTop || !card || !colLeft) return;
 
   let inMobile = null;
 
@@ -2442,20 +2327,8 @@ window.addEventListener('resize', updateTabStripOffset);
     const mobile = window.innerWidth <= MOBILE_BP;
     if (mobile === inMobile) return;
     inMobile = mobile;
-    if (mobile) {
-      // When viewing another user, surface the legacy profile card at the top.
-      // (Self-view uses #ist-pc-mount, mounted by profile-card.js.)
-      if (document.body.classList.contains('ist-viewing-other')) {
-        mobileTop.appendChild(card);
-      }
-      // Pull the countdowns out of col-left so they get their own row;
-      // the profile/account info stays in col-left.
-      mobileColCounts.appendChild(strip);
-    } else {
-      // Restore countdowns back into col-left, after profile-right.
-      colLeft.appendChild(strip);
-      const signoutWrap = document.getElementById('profile-signout-wrap');
-      if (signoutWrap) colLeft.appendChild(signoutWrap);
+    if (mobile && document.body.classList.contains('ist-viewing-other')) {
+      mobileTop.appendChild(card);
     }
   }
 
@@ -2469,8 +2342,8 @@ window.addEventListener('resize', updateTabStripOffset);
 }());
 
 // ── Kütüphane: topic tabs → article list → article detail ──
-// Reads articles, categories, and counters from public.library_articles,
-// public.library_categories, public.library_counters (see db/library_categories_v4.sql).
+// Reads articles and categories from public.library_articles,
+// public.library_categories (see db/library_categories_v4.sql).
 let LIB_CATEGORIES = []; // [{ id, label_tr, position }]
 let LIB_CATEGORY_LABELS = {}; // { id: label_tr }
 let activeCategoryId = null;
@@ -2535,71 +2408,6 @@ function renderCategoryTabs() {
       renderCategoryList(activeCategoryId);
     });
   });
-}
-
-// ── Counter strip: live-ticking sidebar counters from library_counters ──
-let COUNTERS = [];
-let counterTickInterval = null;
-
-async function loadCounters() {
-  const { data, error } = await sb.from('library_counters')
-    .select('*').order('position', { ascending: true });
-  if (error) {
-    console.error('[kutuphane counters fetch]', error);
-    COUNTERS = [];
-    return;
-  }
-  COUNTERS = data || [];
-}
-
-function renderCounterStrip() {
-  const strip = document.getElementById('counter-strip');
-  if (!strip) return;
-  if (!COUNTERS.length) {
-    strip.innerHTML = '';
-    return;
-  }
-  strip.innerHTML = COUNTERS.map((c, i) => `
-    <div class="counter-card" data-counter-id="${libEsc(c.id)}">
-      <div class="counter-label">${libEsc(c.label_tr)}</div>
-      <div class="counter-value" id="counter-val-${i}"></div>
-    </div>
-  `).join('');
-  tickCounters();
-  if (counterTickInterval) clearInterval(counterTickInterval);
-  // Refresh once a minute — counters tick at day granularity, so finer
-  // updates would just spin the CPU without changing the rendered text.
-  counterTickInterval = setInterval(tickCounters, 60000);
-}
-
-function tickCounters() {
-  const now = Date.now();
-  COUNTERS.forEach((c, i) => {
-    const el = document.getElementById('counter-val-' + i);
-    if (!el) return;
-    el.innerHTML = formatElapsed(c.start_date, now);
-  });
-}
-
-function formatElapsed(startDateStr, now) {
-  if (!startDateStr) return '<span class="cv-suffix">—</span>';
-  // Treat the start_date as Istanbul-local midnight so the counter
-  // ticks over at midnight there, not UTC.
-  const start = new Date(startDateStr + 'T00:00:00+03:00').getTime();
-  const diffMs = now - start;
-  if (diffMs < 0) return '<span class="cv-suffix">Henüz başlamadı</span>';
-  const totalMins = Math.floor(diffMs / 60000);
-  const totalDays = Math.floor(totalMins / 1440);
-  const years = Math.floor(totalDays / 365);
-  const days = totalDays % 365;
-  const hours = Math.floor((totalMins % 1440) / 60);
-  const mins = totalMins % 60;
-  return `
-    <span class="cv-days">${years}</span><span class="cv-suffix">${I18N.t('profile.years')}</span>
-    <span class="cv-days">${days}</span><span class="cv-suffix">${I18N.t('profile.days')}</span>
-    <span class="cv-days">${hours}</span><span class="cv-suffix">${I18N.t('profile.hours')}</span>
-    <span class="cv-days">${mins}</span><span class="cv-suffix">${I18N.t('profile.minutes')}</span>
-  `;
 }
 
 // Pull reaction counts + comment counts for a given set of article ids
@@ -2940,11 +2748,10 @@ async function submitComment(articleId) {
   loadComments(articleId);
 }
 
-// Shelves and counters are loaded after the supabase client is ready
+// Shelves are loaded after the supabase client is ready
 // (see the bootstrap call at the end of this script).
 async function bootstrapLibraryNav() {
-  await Promise.all([loadCounters(), loadShelvesUI()]);
-  renderCounterStrip();
+  await loadShelvesUI();
 }
 
 // ══════════════════════════════════════════
