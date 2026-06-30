@@ -215,19 +215,6 @@
       word-break: break-word;
     }
 
-    .avatar-upload {
-      font-size: 0.65rem;
-      color: var(--accent);
-      cursor: pointer;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      font-weight: 700;
-      border: none;
-      background: none;
-      font-family: 'Inter', sans-serif;
-    }
-    .avatar-upload:hover { text-decoration: underline; }
-
     .district-select-wrap {
       width: 100%;
       margin-top: 6px;
@@ -1568,20 +1555,41 @@
     .library-card .pref-ticks span:first-child { text-align: left; }
     .library-card .pref-ticks span:last-child { text-align: right; }
     .library-card .pref-ticks span.active { color: var(--ink); }
-    .library-card .avatar-upload {
-      font-size: 0.6rem;
-      color: var(--accent);
-      cursor: pointer;
-      letter-spacing: 1px;
-      text-transform: uppercase;
+    .library-card .avatar-picker-label {
+      font-size: 0.55rem;
       font-weight: 700;
-      border: none;
-      background: none;
-      font-family: 'Inter', sans-serif;
-      padding: 0;
-      text-align: left;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
     }
-    .library-card .avatar-upload:hover { text-decoration: underline; }
+    .library-card .avatar-picker {
+      display: flex;
+      gap: 6px;
+    }
+    .library-card .avatar-option {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid var(--rule);
+      background: var(--paper-dark);
+      padding: 0;
+      cursor: pointer;
+      overflow: hidden;
+      opacity: 0.55;
+      transition: opacity 0.15s, border-color 0.15s;
+    }
+    .library-card .avatar-option:hover { opacity: 0.85; }
+    .library-card .avatar-option.selected {
+      opacity: 1;
+      border-color: var(--ink);
+    }
+    .library-card .avatar-option img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
     .library-card .save-msg {
       font-size: 0.7rem;
       min-height: 14px;
@@ -3705,7 +3713,14 @@ if (profileMissing) {
   document.body.appendChild(banner);
 }
 
-const avatarUrl = profile?.avatar_url || null;
+// Preset avatars the user can pick from instead of uploading a photo.
+const AVATAR_OPTIONS = [
+  { url: 'assets/avatar-long.png',  label: 'Uzun saç' },
+  { url: 'assets/avatar-short.png', label: 'Kısa saç' },
+  { url: 'assets/avatar-bald.png',  label: 'Saçsız' },
+];
+
+let avatarUrl = profile?.avatar_url || null;
 
 const firstName = profile?.first_name || '';
 const lastName = profile?.last_name || '';
@@ -3743,9 +3758,22 @@ const THEME_VALUES = ['light', 'system', 'dark'];
     renderScoresSection(scores);
   });
 
-  const avatarContent = avatarUrl
-    ? `<img src="${avatarUrl}" alt="Profile">`
-    : displayName.charAt(0).toUpperCase();
+  function avatarDisplayHTML() {
+    return avatarUrl
+      ? `<img src="${avatarUrl}" alt="Profile">`
+      : displayName.charAt(0).toUpperCase();
+  }
+
+  function avatarPickerHTML() {
+    return AVATAR_OPTIONS.map(o => `
+      <button type="button"
+        class="avatar-option${avatarUrl === o.url ? ' selected' : ''}"
+        data-url="${o.url}"
+        aria-label="${o.label}">
+        <img src="${o.url}" alt="${o.label}">
+      </button>
+    `).join('');
+  }
 
   // Build living district dropdown
   const districtOptions = Object.entries(neighborhoodNames)
@@ -3766,7 +3794,7 @@ const THEME_VALUES = ['light', 'system', 'dark'];
   function renderCardView() {
     cardEl.innerHTML = `
       <div class="card-top">
-        <div class="avatar" id="avatar-display">${avatarContent}</div>
+        <div class="avatar" id="avatar-display">${avatarDisplayHTML()}</div>
         <div class="card-id">
           <div class="card-name">${displayName}</div>
           <div class="card-meta">${yasadigiDisplay}</div>
@@ -3782,10 +3810,10 @@ const THEME_VALUES = ['light', 'system', 'dark'];
   function renderCardEdit() {
     cardEl.innerHTML = `
       <div class="card-top">
-        <div class="avatar" id="avatar-display">${avatarContent}</div>
+        <div class="avatar" id="avatar-display">${avatarDisplayHTML()}</div>
         <div class="card-id">
-          <button class="avatar-upload" id="avatar-btn">${I18N.t('profile.changephoto')}</button>
-          <input type="file" id="avatar-input" accept="image/*" style="display:none;">
+          <div class="avatar-picker-label">${I18N.t('profile.chooseavatar')}</div>
+          <div class="avatar-picker" id="avatar-picker">${avatarPickerHTML()}</div>
         </div>
       </div>
       <div class="card-edit">
@@ -3835,10 +3863,9 @@ const THEME_VALUES = ['light', 'system', 'dark'];
     `;
     document.getElementById('cancel-btn').addEventListener('click', renderCardView);
     document.getElementById('save-btn').addEventListener('click', handleSave);
-    document.getElementById('avatar-btn').addEventListener('click', () => {
-      document.getElementById('avatar-input').click();
+    document.querySelectorAll('#avatar-picker .avatar-option').forEach(btn => {
+      btn.addEventListener('click', () => handleAvatarPick(btn.dataset.url));
     });
-    document.getElementById('avatar-input').addEventListener('change', handleAvatarChange);
 
     // Highlight active tick label as the user drags either slider
     function syncTicks(sliderId, ticksId) {
@@ -3916,35 +3943,29 @@ const THEME_VALUES = ['light', 'system', 'dark'];
     }
   }
 
-  async function handleAvatarChange(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 200 * 1024) {
-      alert('Fotoğraf 200KB\'den küçük olmalı.');
+  async function handleAvatarPick(url) {
+    if (!url || url === avatarUrl) return;
+    const { data, error } = await sb
+      .from('profiles')
+      .update({ avatar_url: url })
+      .eq('id', user.id)
+      .select('id');
+
+    if (error) {
+      console.error('[kutuphane avatar save]', error);
+      alert('Avatar kaydedilemedi: ' + error.message);
       return;
     }
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      const base64 = evt.target.result;
-      const { data, error } = await sb
-        .from('profiles')
-        .update({ avatar_url: base64 })
-        .eq('id', user.id)
-        .select('id');
-
-      if (error) {
-        console.error('[kutuphane avatar save]', error);
-        alert('Fotoğraf kaydedilemedi: ' + error.message);
-        return;
-      }
-      if (!data || data.length === 0) {
-        alert('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
-        return;
-      }
-      const av = document.getElementById('avatar-display');
-      if (av) av.innerHTML = `<img src="${base64}" alt="Profile">`;
-    };
-    reader.readAsDataURL(file);
+    if (!data || data.length === 0) {
+      alert('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
+      return;
+    }
+    avatarUrl = url;
+    const av = document.getElementById('avatar-display');
+    if (av) av.innerHTML = `<img src="${url}" alt="Profile">`;
+    document.querySelectorAll('#avatar-picker .avatar-option').forEach(b => {
+      b.classList.toggle('selected', b.dataset.url === url);
+    });
   }
 
   renderCardView();
