@@ -4417,6 +4417,17 @@ async function initSozculPanel() {
 
   const assignedDates = assignments.map(a => a.game_date);
 
+  // Sözcü must not play on the day they pick the word.
+  if (assignedDates.includes(today)) {
+    gameOver = true;
+    currentGuess = '';
+    const msg = document.getElementById('game-message');
+    if (msg) {
+      msg.textContent = 'Bugünün sözcüsüsün — oyunu oynayamazsın.';
+      msg.className = 'game-message';
+    }
+  }
+
   // Check which dates already have a word submitted
   const { data: existing } = await sb
     .from('sozcel_used_answers')
@@ -4497,7 +4508,7 @@ function _renderSozculInput(panel, date, session) {
 
   if (input) {
     input.addEventListener('input', () => {
-      input.value = input.value.toLocaleUpperCase('tr-TR').replace(/[^A-ZÇĞİÖŞÜ]/g, '');
+      input.value = turkishUpper(input.value).replace(/[^A-ZÇĞİÖŞÜ]/g, '');
     });
   }
 
@@ -4527,8 +4538,8 @@ function _renderSozculInput(panel, date, session) {
   if (submitBtn) {
     submitBtn.addEventListener('click', async () => {
       const word = input ? input.value.trim() : '';
-      // Use Turkish-locale lowercase so I→ı and İ→i are handled correctly.
-      const wordNorm = word.toLocaleLowerCase('tr-TR');
+      // Explicit Turkish case fold: İ→i and I→ı (toLocaleLowerCase is unreliable on some mobile browsers).
+      const wordNorm = word.replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase();
       if (word.length !== wordLen) {
         statusEl.textContent = `${wordLen} harfli bir sözcük gir.`;
         statusEl.className = 'sozcul-status err';
