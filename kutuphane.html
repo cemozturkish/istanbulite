@@ -3540,14 +3540,23 @@ const yasadigiIlce = profile?.neighborhood || '';
 const dogumYeri = profile?.birth_place || '';
 const phone = profile?.phone || '';
 const referralCode = profile?.referral_code || '';
-const languagePref = profile?.language_pref || 'default';
-const themePref = profile?.theme_pref || 'system';
+// Two-option toggles. Legacy `more_turkish` / `system` get folded into
+// their nearest neighbour so existing rows still pick a valid tick.
+// palette_pref reuses the column written by onboarding.js: 'mono' = siyah-beyaz, 'earth' = kahverengi.
+function normalizeLang(v)    { return v === 'more_english' ? 'more_english' : 'default'; }
+function normalizeTheme(v)   { return v === 'dark' ? 'dark' : 'light'; }
+function normalizePalette(v) { return v === 'earth' ? 'earth' : 'mono'; }
+
+const languagePref = normalizeLang(profile?.language_pref);
+const themePref = normalizeTheme(profile?.theme_pref);
+const palettePref = normalizePalette(profile?.palette_pref);
 
 // Apply the saved language immediately so labels render in the right tongue.
 I18N.setLang(languagePref);
 
-const LANG_VALUES = ['more_english', 'default', 'more_turkish'];
-const THEME_VALUES = ['light', 'system', 'dark'];
+const LANG_VALUES    = ['more_english', 'default']; // 0: Daha İngilizce, 1: Daha Türkçe
+const THEME_VALUES   = ['light', 'dark'];           // 0: Açık,           1: Koyu
+const PALETTE_VALUES = ['mono', 'earth'];           // 0: Siyah-Beyaz,    1: Kahverengi
 
   const joinedDate = I18N.formatDate(user.created_at, {
     year: 'numeric', month: 'long', day: 'numeric'
@@ -3632,20 +3641,26 @@ const THEME_VALUES = ['light', 'system', 'dark'];
         </div>
         <div>
           <div class="field-label">${I18N.t('profile.langpref')}</div>
-          <input class="pref-slider" id="edit-language" type="range" min="0" max="2" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
+          <input class="pref-slider" id="edit-language" type="range" min="0" max="1" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
           <div class="pref-ticks" id="edit-language-ticks">
             <span data-idx="0">Daha İngilizce</span>
-            <span data-idx="1">Olduğu Gibi</span>
-            <span data-idx="2">Daha Türkçe</span>
+            <span data-idx="1">Daha Türkçe</span>
+          </div>
+        </div>
+        <div>
+          <div class="field-label">${I18N.t('profile.colortheme')}</div>
+          <input class="pref-slider" id="edit-palette" type="range" min="0" max="1" step="1" value="${PALETTE_VALUES.indexOf(palettePref)}">
+          <div class="pref-ticks" id="edit-palette-ticks">
+            <span data-idx="0">Siyah-Beyaz</span>
+            <span data-idx="1">Kahverengi</span>
           </div>
         </div>
         <div>
           <div class="field-label">${I18N.t('profile.appearance')}</div>
-          <input class="pref-slider" id="edit-theme" type="range" min="0" max="2" step="1" value="${THEME_VALUES.indexOf(themePref)}">
+          <input class="pref-slider" id="edit-theme" type="range" min="0" max="1" step="1" value="${THEME_VALUES.indexOf(themePref)}">
           <div class="pref-ticks" id="edit-theme-ticks">
             <span data-idx="0">Açık</span>
-            <span data-idx="1">Sistem</span>
-            <span data-idx="2">Koyu</span>
+            <span data-idx="1">Koyu</span>
           </div>
         </div>
       </div>
@@ -3682,6 +3697,7 @@ const THEME_VALUES = ['light', 'system', 'dark'];
       update();
     }
     syncTicks('edit-language', 'edit-language-ticks');
+    syncTicks('edit-palette', 'edit-palette-ticks');
     syncTicks('edit-theme', 'edit-theme-ticks');
   }
 
@@ -3706,13 +3722,15 @@ const THEME_VALUES = ['light', 'system', 'dark'];
       // `neighborhood` is admin-controlled — the protect_profile_columns trigger
       // silently reverts it for non-admin users, so only send it for the admin.
       const newLanguage = LANG_VALUES[parseInt(document.getElementById('edit-language').value, 10)] || 'default';
-      const newTheme = THEME_VALUES[parseInt(document.getElementById('edit-theme').value, 10)] || 'system';
+      const newTheme = THEME_VALUES[parseInt(document.getElementById('edit-theme').value, 10)] || 'light';
+      const newPalette = PALETTE_VALUES[parseInt(document.getElementById('edit-palette').value, 10)] || 'mono';
 
       const payload = {
         first_name: newFirstName,
         last_name: newLastName,
         language_pref: newLanguage,
         theme_pref: newTheme,
+        palette_pref: newPalette,
       };
       const isAdminUser = user.email === 'cemwozturk@gmail.com';
       if (isAdminUser) payload.neighborhood = newYasadigi;
