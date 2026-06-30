@@ -134,9 +134,20 @@
       const user = session.user;
       container.innerHTML = `<div class="ist-pc"><div class="ist-pc-loading"><span>Yükleniyor…</span></div></div>`;
 
-      const [{ data: profile }, { count: kefaletCount }] = await Promise.all([
+      function istanbulTodayISO() {
+        const now = new Date();
+        const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+        const y = ist.getFullYear();
+        const m = String(ist.getMonth() + 1).padStart(2, '0');
+        const d = String(ist.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+      const today = istanbulTodayISO();
+
+      const [{ data: profile }, { count: kefaletCount }, { count: sozculCount }] = await Promise.all([
         sb.from('profiles').select('*').eq('id', user.id).single(),
         sb.from('profiles').select('*', { count: 'exact', head: true }).eq('referred_by', user.id),
+        sb.from('sozcel_sozcul_assignments').select('*', { count: 'exact', head: true }).eq('user_id', user.id).lte('game_date', today),
       ]);
 
       let kefilOfUser = null;
@@ -299,6 +310,10 @@
             <div class="ist-pc-info-row">
               <div class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</div>
               <div class="ist-pc-info-value">${kefaletCount ?? 0} ${esc(t('profile.people'))}</div>
+            </div>
+            <div class="ist-pc-info-row">
+              <div class="ist-pc-info-label">${esc(t('profile.sozculcount'))}</div>
+              <div class="ist-pc-info-value">${sozculCount ?? 0} ${esc(t('profile.times'))}</div>
             </div>
 
             <div class="ist-pc-section-title">${esc(t('profile.gamescores') || 'Oyun Skorları')}</div>

@@ -3890,15 +3890,30 @@ if (document.readyState === 'loading') {
     catch { return '—'; }
   }
 
+  function istanbulTodayISO() {
+    const now = new Date();
+    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+    const y = ist.getFullYear();
+    const m = String(ist.getMonth() + 1).padStart(2, '0');
+    const d = String(ist.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
   async function open(userId) {
     overlay.classList.add('open');
     body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
 
-    const { data: prof, error } = await sb
-      .from('profiles')
-      .select('id, first_name, last_name, neighborhood, birth_place, avatar_url, joined_at, referred_by')
-      .eq('id', userId)
-      .maybeSingle();
+    const today = istanbulTodayISO();
+    const [{ data: prof, error }, { count: sozculCount }] = await Promise.all([
+      sb.from('profiles')
+        .select('id, first_name, last_name, neighborhood, birth_place, avatar_url, joined_at, referred_by')
+        .eq('id', userId)
+        .maybeSingle(),
+      sb.from('sozcel_sozcul_assignments')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .lte('game_date', today),
+    ]);
 
     if (error || !prof) {
       body.innerHTML = '<div class="pp-error">Profil yüklenemedi.</div>';
@@ -3930,6 +3945,7 @@ if (document.readyState === 'loading') {
       <div class="pp-meta">${nbLabel(prof.neighborhood)}</div>
       <div class="pp-row"><span class="pp-label">${I18N.t('profile.birthplace')}</span><span class="pp-value">${birth}</span></div>
       <div class="pp-row"><span class="pp-label">${I18N.t('profile.membership')}</span><span class="pp-value">${fmtDate(prof.joined_at)}</span></div>
+      <div class="pp-row"><span class="pp-label">${I18N.t('profile.sozculcount')}</span><span class="pp-value">${sozculCount ?? 0} ${I18N.t('profile.times')}</span></div>
       ${kefilName ? `<div class="pp-row"><span class="pp-label">${I18N.t('profile.kefil')}</span><span class="pp-value"><button class="kefil-link" data-user-id="${kefilId}">${kefilName}</button></span></div>` : ''}
     `;
   }
