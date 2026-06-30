@@ -529,6 +529,7 @@
     }
 
     .post {
+      position: relative;
       background: var(--paper-card);
       padding: 16px 18px;
       margin-bottom: 12px;
@@ -542,6 +543,11 @@
       align-items: baseline;
       gap: 8px;
       margin-bottom: 4px;
+    }
+
+    .post-time {
+      margin-left: auto;
+      text-align: right;
     }
 
     .post-neighborhood {
@@ -596,15 +602,22 @@
     .load-more-btn:disabled { opacity: 0.6; cursor: default; }
 
     .post-delete {
+      position: absolute;
+      top: 6px;
+      right: 8px;
       background: none;
       border: none;
       color: var(--muted);
       cursor: pointer;
-      font-size: 0.7rem;
-      padding: 0 4px;
-      margin-left: 6px;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 2px 6px;
       font-family: 'Inter', sans-serif;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
     }
+    .post.can-delete:hover .post-delete,
+    .post-delete:focus { opacity: 1; }
     .post-delete:hover { color: var(--accent); }
 
     .submit-form .submit-form-note {
@@ -2012,15 +2025,15 @@ const POST_TTL_MS = (23 * 60 + 59) * 60 * 1000;
 
 function formatRelativeTime(iso) {
   const diff = Date.now() - new Date(iso).getTime();
-  if (diff < 0) return 'az önce';
+  if (diff < 0) return 'şimdi';
   const sec = Math.floor(diff / 1000);
-  if (sec < 60) return 'az önce';
+  if (sec < 60) return 'şimdi';
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}dk önce`;
+  if (min < 60) return `${min}dk`;
   const hr = Math.floor(min / 60);
   const remMin = min - hr * 60;
-  if (remMin === 0) return `${hr}sa önce`;
-  return `${hr}sa ${remMin}dk önce`;
+  if (remMin === 0) return `${hr}sa`;
+  return `${hr}sa ${remMin}dk`;
 }
 
 async function fetchPostsPage(neighborhoodFilter, offset) {
@@ -2076,13 +2089,15 @@ function appendPosts(rows) {
     const isMine = post.author_id && post.author_id === feedState.currentUserId;
     const canDelete = isMine || isAdmin;
     const deleteBtn = canDelete
-      ? `<button class="post-delete" data-delete-id="${post.id}" title="Mesajı sil">Sil</button>`
+      ? `<button class="post-delete" data-delete-id="${post.id}" title="Mesajı sil" aria-label="Mesajı sil">×</button>`
       : '';
+    const postClass = canDelete ? 'post can-delete' : 'post';
     return `
-      <div class="post" data-post-id="${post.id}" data-created-at="${post.created_at}">
+      <div class="${postClass}" data-post-id="${post.id}" data-created-at="${post.created_at}">
+        ${deleteBtn}
         <div class="post-meta">
           <span class="post-neighborhood">${authorLink}</span>
-          <span><span class="post-time">${formatRelativeTime(post.created_at)}</span> ${deleteBtn}</span>
+          <span class="post-time">${formatRelativeTime(post.created_at)}</span>
         </div>
         <div class="post-content">${escapeHtml(post.body)}</div>
       </div>
