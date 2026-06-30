@@ -5211,14 +5211,29 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
     return (typeof neighborhoodNames !== 'undefined' && neighborhoodNames[id]) || id;
   }
 
+  function istanbulTodayISO() {
+    const now = new Date();
+    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+    const y = ist.getFullYear();
+    const m = String(ist.getMonth() + 1).padStart(2, '0');
+    const d = String(ist.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
   async function open(userId) {
     overlay.classList.add('open');
     body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
-    const { data, error } = await sb
-      .from('profiles')
-      .select('id, first_name, last_name, neighborhood, birth_place, avatar_url, joined_at, referred_by')
-      .eq('id', userId)
-      .maybeSingle();
+    const today = istanbulTodayISO();
+    const [{ data, error }, { count: sozculCount }] = await Promise.all([
+      sb.from('profiles')
+        .select('id, first_name, last_name, neighborhood, birth_place, avatar_url, joined_at, referred_by')
+        .eq('id', userId)
+        .maybeSingle(),
+      sb.from('sozcel_sozcul_assignments')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .lte('game_date', today),
+    ]);
     if (error || !data) {
       body.innerHTML = '<div class="pp-error">Profil yüklenemedi.</div>';
       return;
@@ -5246,6 +5261,7 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
       <div class="pp-meta">${nbLabel(data.neighborhood)}</div>
       <div class="pp-row"><span class="pp-label">Doğum Yeri</span><span class="pp-value">${birth}</span></div>
       <div class="pp-row"><span class="pp-label">Üyelik</span><span class="pp-value">${fmtDate(data.joined_at)}</span></div>
+      <div class="pp-row"><span class="pp-label">Sözcül Olduğu</span><span class="pp-value">${sozculCount ?? 0} kez</span></div>
       ${kefilName ? `<div class="pp-row"><span class="pp-label">KEFİL</span><span class="pp-value"><span class="author-link" data-user-id="${kefilId}">${kefilName}</span></span></div>` : ''}
     `;
   }
