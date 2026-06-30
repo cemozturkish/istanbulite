@@ -1568,6 +1568,7 @@
       gap: 6px;
     }
     .library-card .avatar-option {
+      position: relative;
       width: 36px;
       height: 36px;
       border-radius: 50%;
@@ -1575,7 +1576,7 @@
       background: var(--paper-dark);
       padding: 0;
       cursor: pointer;
-      overflow: hidden;
+      overflow: visible;
       opacity: 0.55;
       transition: opacity 0.15s, border-color 0.15s;
     }
@@ -1589,6 +1590,27 @@
       height: 100%;
       object-fit: cover;
       display: block;
+      border-radius: 50%;
+    }
+    .library-card .avatar-option.locked {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    .library-card .avatar-option.locked:hover { opacity: 0.3; }
+    .library-card .avatar-option.locked::after {
+      content: attr(data-locked-badge);
+      position: absolute;
+      bottom: -3px;
+      right: -3px;
+      background: var(--ink);
+      color: var(--paper);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.5rem;
+      font-weight: 700;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 8px;
+      letter-spacing: 0.5px;
     }
     .library-card .save-msg {
       font-size: 0.7rem;
@@ -3679,6 +3701,20 @@ const { count: kefaletCount } = await sb
   .select('*', { count: 'exact', head: true })
   .eq('referred_by', profileUserId);
 
+// Lifetime sözcü count — gates premium avatars in the picker. Only needed
+// for the self-edit card; viewing another user never shows the picker.
+let ownSozculCount = 0;
+if (!isViewingOther) {
+  const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  const todayISO = `${istNow.getFullYear()}-${String(istNow.getMonth()+1).padStart(2,'0')}-${String(istNow.getDate()).padStart(2,'0')}`;
+  const { count: szc } = await sb
+    .from('sozcel_sozcul_assignments')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .lte('game_date', todayISO);
+  ownSozculCount = szc || 0;
+}
+
 // Resolve the name of the person who referred this user (their kefil)
 let kefilOfUser = null;
 if (profile?.referred_by) {
@@ -3714,10 +3750,12 @@ if (profileMissing) {
 }
 
 // Preset avatars the user can pick from instead of uploading a photo.
+// `requiresSozculCount` gates an option behind a lifetime sözcü count.
 const AVATAR_OPTIONS = [
   { url: 'assets/avatar-long.png',  label: 'Uzun saç' },
   { url: 'assets/avatar-short.png', label: 'Kısa saç' },
   { url: 'assets/avatar-bald.png',  label: 'Saçsız' },
+  { url: 'assets/avatar-sozcu.png', label: 'Sözcü', requiresSozculCount: 10 },
 ];
 
 let avatarUrl = profile?.avatar_url || null;
@@ -3774,14 +3812,28 @@ const PALETTE_VALUES = ['mono', 'earth'];           // 0: Siyah-Beyaz,    1: Kah
   }
 
   function avatarPickerHTML() {
-    return AVATAR_OPTIONS.map(o => `
-      <button type="button"
-        class="avatar-option${avatarUrl === o.url ? ' selected' : ''}"
-        data-url="${o.url}"
-        aria-label="${o.label}">
-        <img src="${o.url}" alt="${o.label}">
-      </button>
-    `).join('');
+    return AVATAR_OPTIONS.map(o => {
+      const required = o.requiresSozculCount || 0;
+      const locked = required > 0 && ownSozculCount < required;
+      const selected = avatarUrl === o.url;
+      const title = locked
+        ? `${o.label} — ${required} kez Sözcü olmak gerekiyor (${ownSozculCount}/${required})`
+        : o.label;
+      const cls = ['avatar-option'];
+      if (selected) cls.push('selected');
+      if (locked)   cls.push('locked');
+      return `
+        <button type="button"
+          class="${cls.join(' ')}"
+          data-url="${o.url}"
+          data-locked-badge="${required}×"
+          ${locked ? 'disabled aria-disabled="true"' : ''}
+          title="${title}"
+          aria-label="${o.label}">
+          <img src="${o.url}" alt="${o.label}">
+        </button>
+      `;
+    }).join('');
   }
 
   // Build living district dropdown
@@ -3963,6 +4015,8 @@ const PALETTE_VALUES = ['mono', 'earth'];           // 0: Siyah-Beyaz,    1: Kah
 
   async function handleAvatarPick(url) {
     if (!url || url === avatarUrl) return;
+    const opt = AVATAR_OPTIONS.find(o => o.url === url);
+    if (opt?.requiresSozculCount && ownSozculCount < opt.requiresSozculCount) return;
     const { data, error } = await sb
       .from('profiles')
       .update({ avatar_url: url })
