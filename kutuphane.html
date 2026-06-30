@@ -686,15 +686,6 @@
       }
       .path-back-mobile:hover { color: var(--ink); }
     }
-    .path-shelf {
-      font-family: 'Inter', sans-serif;
-      font-size: 0.62rem;
-      font-weight: 700;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--ink-red);
-      margin-bottom: 4px;
-    }
     .path-title {
       font-size: 1.6rem;
       font-weight: 700;
@@ -742,6 +733,111 @@
     .path-node:hover { background: var(--paper-banner); }
     .path-node:nth-child(odd):hover { transform: translateX(-34px); }
     .path-node:nth-child(even):hover { transform: translateX(34px); }
+    /* Sequential lock: every node beyond the next-unread is dimmed and
+       click-disabled until the prior chapter is completed. */
+    .path-node.locked {
+      background: var(--paper-dark);
+      opacity: 0.55;
+      cursor: not-allowed;
+      border-color: var(--rule);
+      border-bottom-color: var(--rule);
+    }
+    .path-node.locked:hover { background: var(--paper-dark); }
+    .path-node.locked:nth-child(odd):hover { transform: translateX(-30px); }
+    .path-node.locked:nth-child(even):hover { transform: translateX(30px); }
+    .path-node .path-lock {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.55rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .path-node .path-done {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent-2);
+    }
+
+    /* Chapter intro modal: shown when a chapter is tapped — gives the
+       reader the chapter description before the reader actually opens. */
+    .chapter-intro-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(35, 25, 18, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .chapter-intro {
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      border-bottom-width: 5px;
+      max-width: 480px;
+      width: 100%;
+      padding: 26px 30px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .chapter-intro-step {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--ink-red);
+    }
+    .chapter-intro-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      line-height: 1.25;
+      color: var(--ink);
+      margin: 0;
+    }
+    .chapter-intro-body {
+      font-size: 0.95rem;
+      line-height: 1.55;
+      color: var(--accent);
+      font-style: italic;
+      white-space: pre-wrap;
+    }
+    .chapter-intro-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .chapter-intro-btn {
+      padding: 10px 22px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .chapter-intro-btn:hover { background: var(--accent); }
+    .chapter-intro-btn.secondary {
+      background: var(--paper);
+      color: var(--ink);
+      border: 1px solid var(--ink);
+    }
+    .chapter-intro-btn.secondary:hover { background: var(--paper-dark); }
     .path-step {
       font-family: 'Inter', sans-serif;
       font-size: 0.6rem;
@@ -2855,6 +2951,69 @@ function formatCountdown(iso) {
   return `Erişime ${mins} dakika boyunca açık`;
 }
 
+// ── Sequential chapter unlock state (per-user, localStorage) ──
+// Members must read chapters in order: chapter N+1 stays locked until
+// chapter N is finished. Completion is recorded when the reader reaches
+// the "Tamamlandı" terminal step. Stored client-side per user id; a DB
+// table can replace this later if cross-device sync becomes a need.
+async function libGetCurrentUserId() {
+  const { data: { session } } = await sb.auth.getSession();
+  return session?.user?.id || null;
+}
+function libCompletionStorageKey(userId) {
+  return 'lib_chapter_completed_' + userId;
+}
+function libReadCompletedSet(userId) {
+  if (!userId) return new Set();
+  try {
+    const raw = localStorage.getItem(libCompletionStorageKey(userId));
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch (e) {
+    return new Set();
+  }
+}
+function libWriteArticleCompleted(userId, articleId) {
+  if (!userId || !articleId) return;
+  const set = libReadCompletedSet(userId);
+  if (set.has(articleId)) return;
+  set.add(articleId);
+  try {
+    localStorage.setItem(libCompletionStorageKey(userId), JSON.stringify([...set]));
+  } catch (e) {}
+}
+
+// Chapter intro modal: previews the chapter (number, title, description)
+// before the reader pane mounts, so the reader knows what they're entering.
+function showChapterIntro(article, index, onStart) {
+  const overlay = document.createElement('div');
+  overlay.className = 'chapter-intro-overlay';
+  const description = (article.summary && article.summary.trim())
+    ? libEsc(article.summary)
+    : 'Bu bölüm için henüz bir açıklama yazılmadı.';
+  overlay.innerHTML = `
+    <div class="chapter-intro" role="dialog" aria-modal="true" aria-label="Bölüm ${index + 1}">
+      <div class="chapter-intro-step">Bölüm ${index + 1}</div>
+      <h3 class="chapter-intro-title">${libEsc(article.title)}</h3>
+      <div class="chapter-intro-body">${description}</div>
+      <div class="chapter-intro-actions">
+        <button class="chapter-intro-btn secondary" type="button" data-act="cancel">İptal</button>
+        <button class="chapter-intro-btn" type="button" data-act="start">Okumaya Başla</button>
+      </div>
+    </div>
+  `;
+  function close() { overlay.remove(); document.removeEventListener('keydown', onKey); }
+  function onKey(e) { if (e.key === 'Escape') close(); }
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  overlay.querySelector('[data-act="cancel"]').addEventListener('click', close);
+  overlay.querySelector('[data-act="start"]').addEventListener('click', () => {
+    close();
+    onStart();
+  });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(overlay);
+}
+
 async function openShelfPath(shelfId) {
   const area = document.getElementById('reading-area');
   if (!area) return;
@@ -2893,11 +3052,19 @@ async function openShelfPath(shelfId) {
     return;
   }
 
+  // Compute lock state: a chapter unlocks only after the previous one
+  // has been completed. The first chapter is always open.
+  const userId = await libGetCurrentUserId();
+  const completedSet = libReadCompletedSet(userId);
+  const lockState = articles.map((a, i) => {
+    if (i === 0) return false;
+    return !completedSet.has(articles[i - 1].id);
+  });
+
   area.innerHTML = `
     <div class="shelf-path">
       <div class="path-head">
         ${backBtnHtml}
-        <div class="path-shelf">Bölüm ${articles.length}</div>
         <h2 class="path-title">${libEsc(title)}</h2>
         ${subtitle ? `<p class="path-subtitle">${libEsc(subtitle)}</p>` : ''}
         ${deadlineHtml}
@@ -2908,8 +3075,14 @@ async function openShelfPath(shelfId) {
             a.author ? libEsc(a.author) : null,
             a.deadline ? 'Son: ' + libEsc(formatCountdown(a.deadline)) : null,
           ].filter(Boolean).join(' · ');
+          const locked = lockState[i];
+          const completed = completedSet.has(a.id);
+          const badge = locked
+            ? `<div class="path-lock">Kilitli</div>`
+            : (completed ? `<div class="path-done">Okundu</div>` : '');
           return `
-            <button class="path-node" data-art="${a.id}" type="button">
+            <button class="path-node${locked ? ' locked' : ''}" data-art="${a.id}" data-locked="${locked ? '1' : '0'}" type="button"${locked ? ' aria-disabled="true"' : ''}>
+              ${badge}
               <div class="path-step">Bölüm ${i + 1}</div>
               <div class="path-art-title">${libEsc(a.title)}</div>
               ${a.summary ? `<div class="path-art-summary">${libEsc(a.summary)}</div>` : ''}
@@ -2922,8 +3095,11 @@ async function openShelfPath(shelfId) {
   `;
   area.querySelectorAll('.path-node').forEach(node => {
     node.addEventListener('click', () => {
+      if (node.dataset.locked === '1') return;
       const a = articles.find(x => x.id === node.dataset.art);
-      if (a) openArticleReader(a, shelf, shelfId);
+      if (!a) return;
+      const i = articles.indexOf(a);
+      showChapterIntro(a, i, () => openArticleReader(a, shelf, shelfId));
     });
   });
   const back = document.getElementById('path-back-mobile');
@@ -3104,14 +3280,17 @@ function openArticleReader(article, shelf, shelfId) {
     document.getElementById('reader-prev').addEventListener('click', () => {
       if (step > 0) { step--; renderStep(); }
     });
-    document.getElementById('reader-next').addEventListener('click', () => {
+    document.getElementById('reader-next').addEventListener('click', async () => {
       if (!onPoll && step < lastSectionIdx) { step++; renderStep(); return; }
       if (!onPoll && hasPoll) { step = sections.length; renderStep(); return; }
-      // Last action: surface a "finished" notice and return to the path.
+      // Last action: surface a "finished" notice and mark the chapter
+      // completed so the next one unlocks on the shelf path.
       const done = document.createElement('div');
       done.className = 'reader-done';
       done.textContent = '✓ Tamamlandı';
       area.querySelector('.reader-actions').replaceWith(done);
+      const uid = await libGetCurrentUserId();
+      libWriteArticleCompleted(uid, article.id);
     });
 
     // Vocab-pop on tap (mobile keeps tooltips open until next tap).
