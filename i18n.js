@@ -36,6 +36,7 @@
     'profile.chooseavatar':{ default: 'Avatar Seç',          more_english: 'Choose Avatar' },
     'profile.langpref':    { default: 'Dil Tercihi',         more_english: 'Language' },
     'profile.appearance':  { default: 'Görünüm',             more_english: 'Appearance' },
+    'profile.colortheme':  { default: 'Renk',                more_english: 'Color' },
     'profile.years':       { default: 'yıl',                 more_english: 'yr' },
     'profile.days':        { default: 'gün',                 more_english: 'd' },
     'profile.hours':       { default: 'saat',                more_english: 'h' },
