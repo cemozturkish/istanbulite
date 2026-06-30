@@ -1577,10 +1577,10 @@
       padding: 0;
       cursor: pointer;
       overflow: visible;
-      opacity: 0.55;
+      opacity: 0.75;
       transition: opacity 0.15s, border-color 0.15s;
     }
-    .library-card .avatar-option:hover { opacity: 0.85; }
+    .library-card .avatar-option:hover { opacity: 1; }
     .library-card .avatar-option.selected {
       opacity: 1;
       border-color: var(--ink);
@@ -1593,25 +1593,39 @@
       border-radius: 50%;
     }
     .library-card .avatar-option.locked {
-      opacity: 0.3;
+      opacity: 0.2;
       cursor: not-allowed;
     }
-    .library-card .avatar-option.locked:hover { opacity: 0.3; }
-    .library-card .avatar-option.locked::after {
-      content: attr(data-locked-badge);
+    .library-card .avatar-option.locked:hover { opacity: 0.25; }
+    .library-card .avatar-lock {
       position: absolute;
       bottom: -3px;
       right: -3px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
       background: var(--ink);
       color: var(--paper);
-      font-family: 'Inter', sans-serif;
-      font-size: 0.5rem;
-      font-weight: 700;
-      line-height: 1;
-      padding: 2px 4px;
-      border-radius: 8px;
-      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 1;
     }
+    .library-card .avatar-lock svg {
+      width: 8px;
+      height: 8px;
+      display: block;
+    }
+    .library-card .avatar-msg {
+      font-size: 0.65rem;
+      color: var(--accent);
+      line-height: 1.3;
+      margin-top: 6px;
+      min-height: 14px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .library-card .avatar-msg.show { opacity: 1; }
     .library-card .save-msg {
       font-size: 0.7rem;
       min-height: 14px;
@@ -3802,6 +3816,12 @@ const THEME_VALUES = ['light', 'system', 'dark'];
       : displayName.charAt(0).toUpperCase();
   }
 
+  // Small padlock SVG used as a corner badge on locked avatar options.
+  const LOCK_SVG = '<span class="avatar-lock" aria-hidden="true">'
+    + '<svg viewBox="0 0 12 12" fill="currentColor">'
+    + '<path d="M6 1.5a2.5 2.5 0 0 0-2.5 2.5V5.5h-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-.5-.5H8.5V4A2.5 2.5 0 0 0 6 1.5zm-1.5 4V4a1.5 1.5 0 1 1 3 0v1.5h-3z"/>'
+    + '</svg></span>';
+
   function avatarPickerHTML() {
     return AVATAR_OPTIONS.map(o => {
       const required = o.requiresSozculCount || 0;
@@ -3817,11 +3837,11 @@ const THEME_VALUES = ['light', 'system', 'dark'];
         <button type="button"
           class="${cls.join(' ')}"
           data-url="${o.url}"
-          data-locked-badge="${required}×"
-          ${locked ? 'disabled aria-disabled="true"' : ''}
+          ${locked ? 'aria-disabled="true"' : ''}
           title="${title}"
           aria-label="${o.label}">
           <img src="${o.url}" alt="${o.label}">
+          ${locked ? LOCK_SVG : ''}
         </button>
       `;
     }).join('');
@@ -3866,6 +3886,7 @@ const THEME_VALUES = ['light', 'system', 'dark'];
         <div class="card-id">
           <div class="avatar-picker-label">${I18N.t('profile.chooseavatar')}</div>
           <div class="avatar-picker" id="avatar-picker">${avatarPickerHTML()}</div>
+          <div class="avatar-msg" id="avatar-msg" role="status" aria-live="polite"></div>
         </div>
       </div>
       <div class="card-edit">
@@ -3995,10 +4016,26 @@ const THEME_VALUES = ['light', 'system', 'dark'];
     }
   }
 
+  let _avatarMsgTimer = null;
+  function showAvatarMsg(text) {
+    const el = document.getElementById('avatar-msg');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(_avatarMsgTimer);
+    _avatarMsgTimer = setTimeout(() => el.classList.remove('show'), 5000);
+  }
+
   async function handleAvatarPick(url) {
     if (!url || url === avatarUrl) return;
     const opt = AVATAR_OPTIONS.find(o => o.url === url);
-    if (opt?.requiresSozculCount && ownSozculCount < opt.requiresSozculCount) return;
+    if (opt?.requiresSozculCount && ownSozculCount < opt.requiresSozculCount) {
+      const need = opt.requiresSozculCount;
+      showAvatarMsg(
+        `Bu avatar kilitli — ${need} kez Sözcü olmak gerekiyor (${ownSozculCount}/${need}).`
+      );
+      return;
+    }
     const { data, error } = await sb
       .from('profiles')
       .update({ avatar_url: url })
