@@ -437,6 +437,9 @@
               .select('id');
             if (error) throw error;
             if (!data || data.length === 0) throw new Error('Profil bulunamadı.');
+            // Cache the new palette locally so the reload starts in the right
+            // colors instead of flashing the old palette.
+            if (window.Palette) window.Palette.setPalette(newPalette);
             setTimeout(() => window.location.reload(), 400);
           } catch (err) {
             btn.textContent = t('profile.save');
