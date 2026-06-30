@@ -1192,7 +1192,7 @@
         </a>
 
         <div class="scoreboard">
-          <h2>Haftanın Skor Tahtası</h2>
+          <h2 id="scoreboard-title">Haftanın Skor Tahtası</h2>
           <div class="scoreboard-countdown" id="scoreboard-countdown"></div>
           <ol class="scoreboard-list" id="scoreboard-list">
             <li class="scoreboard-empty">Yükleniyor...</li>
@@ -1634,7 +1634,7 @@ async function init() {
   loadPosts(homeNeighborhood || null);
   markPlayedGames(session.user.id);
   if (typeof applyGameLocks === 'function') applyGameLocks(sb);
-  loadScoreboard();
+  loadScoreboard(homeNeighborhood || null);
 
   // If the current user is the picked sözcül with a pending word,
   // glow the Sözcel tile and surface a one-time mascot popup.
@@ -1763,9 +1763,21 @@ function getTimeUntilWeekReset() {
   return `Sıfırlanmaya: ${minutes}dk`;
 }
 
-async function loadScoreboard() {
+async function loadScoreboard(neighborhoodFilter = null) {
   const listEl = document.getElementById('scoreboard-list');
   if (!listEl) return;
+  const titleEl = document.getElementById('scoreboard-title');
+  const countdownEl = document.getElementById('scoreboard-countdown');
+
+  // Title + countdown swap: a filtered view is per-neighborhood (no weekly
+  // countdown), while the unfiltered default is the full weekly leaderboard.
+  if (neighborhoodFilter) {
+    const nbName = neighborhoodNames[neighborhoodFilter] || neighborhoodFilter;
+    if (titleEl) titleEl.textContent = `${nbName.toLocaleUpperCase('tr-TR')} EN İYİLERİ`;
+    if (countdownEl) countdownEl.textContent = '';
+  } else {
+    if (titleEl) titleEl.textContent = 'Haftanın Skor Tahtası';
+  }
 
   let results = null;
   try {
@@ -1782,7 +1794,7 @@ async function loadScoreboard() {
   }
 
   if (!results || results.length === 0) {
-    listEl.innerHTML = '<li class="scoreboard-empty">Bu hafta henüz skor yok</li>';
+    listEl.innerHTML = '<li class="scoreboard-empty">Henüz skor yok</li>';
     return;
   }
 
@@ -1792,13 +1804,18 @@ async function loadScoreboard() {
   const daysFromMonday = dow === 0 ? 6 : dow - 1;
   const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - daysFromMonday);
 
-  const weekly = results.filter(r => {
+  let weekly = results.filter(r => {
     const d = parseGameDate(r.date);
     return d && d >= cutoff;
   });
 
+  // When filtered by a neighborhood, keep only that neighborhood's players.
+  if (neighborhoodFilter) {
+    weekly = weekly.filter(r => r.neighborhood === neighborhoodFilter);
+  }
+
   if (weekly.length === 0) {
-    listEl.innerHTML = '<li class="scoreboard-empty">Bu hafta henüz skor yok</li>';
+    listEl.innerHTML = `<li class="scoreboard-empty">${neighborhoodFilter ? 'Bu mahallede henüz skor yok' : 'Bu hafta henüz skor yok'}</li>`;
     return;
   }
 
@@ -1862,8 +1879,20 @@ async function loadScoreboard() {
     .slice(0, 5);
 
   listEl.innerHTML = top.map((p, i) => {
-    const nbName = (neighborhoodNames[p.neighborhood] || p.neighborhood || '').toLocaleUpperCase('tr-TR');
     const rankClass = ' r' + (i + 1);
+    // Filtered view ("best people of this neighborhood") shows just the name —
+    // no neighborhood prefix (redundant) and no score, per the design.
+    if (neighborhoodFilter) {
+      return (
+        `<li class="scoreboard-item${rankClass}">` +
+          `<span class="scoreboard-rank">${i + 1}.</span>` +
+          `<span class="scoreboard-player">` +
+            `<span class="scoreboard-name author-link" data-user-id="${p.uid}">${escapeHtml(p.name)}</span>` +
+          `</span>` +
+        `</li>`
+      );
+    }
+    const nbName = (neighborhoodNames[p.neighborhood] || p.neighborhood || '').toLocaleUpperCase('tr-TR');
     const suffix = getAblativeSuffix(nbName).toLocaleUpperCase('tr-TR');
     const playerLabel = nbName ? `${nbName}${suffix} ${escapeHtml(p.name)}` : escapeHtml(p.name);
     return (
@@ -1877,8 +1906,7 @@ async function loadScoreboard() {
     );
   }).join('');
 
-  const countdownEl = document.getElementById('scoreboard-countdown');
-  if (countdownEl) countdownEl.textContent = getTimeUntilWeekReset();
+  if (!neighborhoodFilter && countdownEl) countdownEl.textContent = getTimeUntilWeekReset();
 }
 
 // Game-lock rules live in game-locks.js (applyGameLocks). Adding a new gated
@@ -1910,6 +1938,7 @@ mapNeighborhoods.forEach(nb => {
     selectedNeighborhood = (isAdmin || nb.id === homeNeighborhood) ? nb.id : homeNeighborhood;
     updateSubmitFormVisibility();
     loadPosts(nb.id);
+    loadScoreboard(nb.id);
   });
   nb.addEventListener('mouseenter', () => {
     const name = nb.getAttribute('data-name') || nb.id;
@@ -1936,6 +1965,7 @@ document.querySelector('.map-panel').addEventListener('click', (e) => {
     selectedNeighborhood = homeNeighborhood;
     updateSubmitFormVisibility();
     loadPosts();
+    loadScoreboard();
   }
 });
 
