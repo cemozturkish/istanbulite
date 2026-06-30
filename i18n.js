@@ -33,7 +33,7 @@
     'profile.district':    { default: 'Yaşadığı İlçe',       more_english: 'District' },
     'profile.birthplace':  { default: 'Doğum Yeri',          more_english: 'Birthplace' },
     'profile.membership':  { default: 'Üyelik',              more_english: 'Member Since' },
-    'profile.changephoto': { default: 'Fotoğraf Değiştir',   more_english: 'Change Photo' },
+    'profile.chooseavatar':{ default: 'Avatar Seç',          more_english: 'Choose Avatar' },
     'profile.langpref':    { default: 'Dil Tercihi',         more_english: 'Language' },
     'profile.appearance':  { default: 'Görünüm',             more_english: 'Appearance' },
     'profile.years':       { default: 'yıl',                 more_english: 'yr' },
