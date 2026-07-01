@@ -1602,8 +1602,18 @@ async function showSite(user) {
   window.__currentUser = user;
   I18N.syncFromSupabase(sb, user.id);
   Palette.syncFromSupabase(sb, user.id);
-  // Mount the shared mobile profile card.
-  if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N, page: 'anahane' });
+  // Mount the shared mobile profile card. profile-card.js is deferred, so
+  // wait until it's loaded (DOMContentLoaded guarantees that) — otherwise a
+  // fast session check can beat the deferred script on mobile and the card
+  // silently never mounts.
+  function mountProfileCard() {
+    if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N, page: 'anahane' });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mountProfileCard);
+  } else {
+    mountProfileCard();
+  }
   I18N.onChange(() => { renderEvents(); applyNewsFilter(activeNewsFilter || 'all'); updateDateTime(); });
   loadBreakingNews();
   loadEvents();
