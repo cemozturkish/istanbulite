@@ -4768,7 +4768,9 @@ function serializeTakeoverDict(takeover) {
 async function submitTakeover(status, wordInput, submitBtn, statusEl, defsEl, takeover) {
   const targetDate = status.targetDate;
   const word = (wordInput.value || '').trim();
-  const wordNorm = word.toLocaleLowerCase('tr-TR');
+  // Store uppercase — matches WORD_LIST casing and the turkishUpper()'d guesses
+  // checkWord() compares against; a lowercase TARGET_WORD never matches.
+  const wordNorm = turkishUpper(word);
   const expectedLen = sozcelWordLengthForISO(targetDate);
 
   if (word.length !== expectedLen) {
@@ -4776,7 +4778,7 @@ async function submitTakeover(status, wordInput, submitBtn, statusEl, defsEl, ta
     statusEl.className = 'stk-status err';
     return;
   }
-  const lenRegex = new RegExp(`^[a-zçğıiöşü]{${expectedLen}}$`);
+  const lenRegex = new RegExp(`^[A-ZÇĞİÖŞÜ]{${expectedLen}}$`);
   if (!lenRegex.test(wordNorm)) {
     statusEl.textContent = 'Sadece Türkçe harfler kullan.';
     statusEl.className = 'stk-status err';
@@ -4975,8 +4977,9 @@ function _renderSozculInput(panel, date, session) {
   if (submitBtn) {
     submitBtn.addEventListener('click', async () => {
       const word = input ? input.value.trim() : '';
-      // Explicit Turkish case fold: İ→i and I→ı (toLocaleLowerCase is unreliable on some mobile browsers).
-      const wordNorm = word.replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase();
+      // Store uppercase — matches WORD_LIST casing and the turkishUpper()'d guesses
+      // checkWord() compares against; a lowercase TARGET_WORD never matches.
+      const wordNorm = turkishUpper(word);
       if (word.length !== wordLen) {
         statusEl.textContent = `${wordLen} harfli bir sözcük gir.`;
         statusEl.className = 'sozcul-status err';
