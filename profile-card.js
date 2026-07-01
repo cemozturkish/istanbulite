@@ -48,6 +48,13 @@
     { url: 'assets/avatar-sozcu.png', label: 'Sözcü', requiresSozculCount: 10 },
   ];
 
+  // Colors are a viewer-side preference, not a property of the profile
+  // owner: resolve avatar_url to the mono or brown file depending on the
+  // *current visitor's* palette_pref (see palette.js avatarSrc).
+  function avatarSrc(url) {
+    return (global.Palette && global.Palette.avatarSrc) ? global.Palette.avatarSrc(url) : url;
+  }
+
   const AVATAR_LOCK_SVG = '<span class="ist-avatar-lock" aria-hidden="true">'
     + '<svg viewBox="0 0 12 12" fill="currentColor">'
     + '<path d="M6 1.5a2.5 2.5 0 0 0-2.5 2.5V5.5h-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-.5-.5H8.5V4A2.5 2.5 0 0 0 6 1.5zm-1.5 4V4a1.5 1.5 0 1 1 3 0v1.5h-3z"/>'
@@ -73,7 +80,7 @@
           ${locked ? 'aria-disabled="true"' : ''}
           title="${title}"
           aria-label="${o.label}">
-          <img src="${o.url}" alt="${o.label}">
+          <img src="${avatarSrc(o.url)}" alt="${o.label}">
           ${locked ? AVATAR_LOCK_SVG : ''}
         </button>
       `;
@@ -240,7 +247,7 @@
 
       function avatarHTML() {
         return avatarUrl
-          ? `<img src="${esc(avatarUrl)}" alt="">`
+          ? `<img src="${esc(avatarSrc(avatarUrl))}" alt="">`
           : esc(displayName.charAt(0).toUpperCase());
       }
 
@@ -555,7 +562,7 @@
           }
           avatarUrl = url;
           const av = document.getElementById('ist-pc-avatar');
-          if (av) av.innerHTML = `<img src="${esc(url)}" alt="">`;
+          if (av) av.innerHTML = `<img src="${esc(avatarSrc(url))}" alt="">`;
           document.querySelectorAll('#ist-pc-avatar-picker .ist-avatar-option').forEach(b => {
             b.classList.toggle('selected', b.dataset.url === url);
           });
