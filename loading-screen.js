@@ -1,5 +1,13 @@
 // Shared sea-rising loading screen for Istanbulite's entry points
-// (index.html and anahane.html). Frame advances with real elapsed time,
+// (index.html and anahane.html).
+//
+// NOTE: index.html and anahane.html load this with a `?v=N` cache-busting
+// suffix (no build step to hash filenames). Bump N in both places whenever
+// this file or loading-screen.css changes, so browsers/CDN don't serve a
+// stale copy of one alongside a fresh copy of the other — a mismatch here
+// (old CSS with new markup, etc.) is what causes visibly broken frames.
+//
+// Frame advances with real elapsed time,
 // capped one frame short of full until the caller calls resolve() — so a
 // slow auth check holds mid-fill instead of freezing on the "done" frame.
 // Minimum 0.2s/frame (2s total for 10 frames) so a fast auth check still
