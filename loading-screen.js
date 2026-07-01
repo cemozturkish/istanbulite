@@ -11,6 +11,12 @@
 // stacked <img> layers crossfade into each other for each new frame so
 // the rise reads as smooth motion rather than a slideshow of stills.
 //
+// Only plays on an actual entry into the site: the first page load of
+// this browser tab/session, or an explicit refresh. Clicking between
+// pages that are already inside the site (e.g. Kütüphane -> Hane) is a
+// full page load too, but it's not "entering" the site, so it's skipped
+// there — the auth check still runs, it just doesn't animate.
+//
 // Usage:
 //   const resolveLoading = LoadingScreen.start(() => { ...reveal content... });
 //   // later, once the real async work (e.g. auth check) is done:
@@ -20,13 +26,47 @@
   const FRAME_COUNT = 10;
   const FRAME_MS = 200;
   const MIN_MS = FRAME_COUNT * FRAME_MS;
+  const ENTERED_KEY = 'istanbulite_entered';
   const frameSrc = n => `assets/loading/logo-dark-mono-${String(n).padStart(2, '0')}.jpg`;
+
+  function isReload() {
+    try {
+      const entries = performance.getEntriesByType('navigation');
+      if (entries.length) return entries[0].type === 'reload';
+      if (performance.navigation) return performance.navigation.type === 1;
+    } catch (e) { /* fall through */ }
+    return false;
+  }
+
+  function shouldPlay() {
+    try {
+      if (isReload()) return true;
+      return sessionStorage.getItem(ENTERED_KEY) !== '1';
+    } catch (e) {
+      return true; // storage unavailable — fail open, don't silently break entry UX
+    }
+  }
+
+  function markEntered() {
+    try { sessionStorage.setItem(ENTERED_KEY, '1'); } catch (e) { /* ignore */ }
+  }
 
   function start(onFinish) {
     const overlay = document.getElementById('loading-overlay');
     const back = document.getElementById('loading-frame-back');
     const front = document.getElementById('loading-frame-front');
     if (!overlay || !back || !front) { onFinish(); return () => {}; }
+
+    if (!shouldPlay()) {
+      overlay.remove();
+      let resolved = false;
+      return function resolve() {
+        if (resolved) return;
+        resolved = true;
+        onFinish();
+      };
+    }
+    markEntered();
 
     // Preload every frame and track which ones have actually finished
     // downloading — frame 1 is already showing via the initial markup.
