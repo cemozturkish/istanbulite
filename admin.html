@@ -697,6 +697,7 @@
     <button class="admin-tab" data-tab="events">Events</button>
     <button class="admin-tab" data-tab="sozcel">Sözcel</button>
     <button class="admin-tab" data-tab="tumcel">Tümcel</button>
+    <button class="admin-tab" data-tab="notifications">Notifications</button>
     <button class="admin-tab" data-tab="users">Users</button>
   </div>
 
@@ -1084,6 +1085,37 @@
 
   </div>
 
+  <div class="admin-body" id="notifications-tab" style="display:none;">
+
+    <!-- LEFT: Post Notification -->
+    <div class="panel">
+      <div class="panel-title">Post Login Notification</div>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        Shown once per user as a mascot bubble on their next authenticated page. Users dismiss it with a tap.
+      </p>
+
+      <label>Message</label>
+      <textarea id="notif-body" placeholder="e.g. Sözcel oyununu güncelledik — bir bakın!" maxlength="500" rows="4"></textarea>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="notif-submit-btn">Post Notification</button>
+      </div>
+      <div class="status-msg" id="notif-form-status"></div>
+    </div>
+
+    <!-- RIGHT: Existing Notifications -->
+    <div class="panel">
+      <div class="panel-title">Recent Notifications</div>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        Only the latest active notification is shown to users. Deactivate one to stop it appearing to users who haven't seen it yet.
+      </p>
+      <div class="articles-list" id="notif-list">
+        <div class="empty-state"><span class="spinner"></span></div>
+      </div>
+    </div>
+
+  </div>
+
   <div class="admin-body" id="users-tab" style="display:none;">
 
     <!-- LEFT: Create User -->
@@ -1206,12 +1238,14 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('events-tab').style.display = (tab === 'events') ? '' : 'none';
     document.getElementById('sozcel-tab').style.display = (tab === 'sozcel') ? 'grid' : 'none';
     document.getElementById('tumcel-tab').style.display = (tab === 'tumcel') ? 'grid' : 'none';
+    document.getElementById('notifications-tab').style.display = (tab === 'notifications') ? '' : 'none';
     document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
     if (tab === 'kutuphane') showKutuphaneIndex();
     if (tab === 'news') loadBreakingNews();
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
     if (tab === 'sozcel') loadSozcelSchedule();
     if (tab === 'tumcel') loadTumcelPuzzles();
+    if (tab === 'notifications') loadNotifications();
     if (tab === 'users') loadUsersList();
   });
 });
@@ -2734,6 +2768,89 @@ async function deleteTumcelPuzzle(date) {
   const { error } = await sb.from('tumcel_puzzles').delete().eq('puzzle_date', date);
   if (error) { alert('Silinemedi: ' + error.message); return; }
   loadTumcelPuzzles();
+}
+
+// ══════════════════════════════════════════
+// Notifications tab
+// ══════════════════════════════════════════
+async function loadNotifications() {
+  const listEl = document.getElementById('notif-list');
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const { data, error } = await sb.from('admin_notifications')
+    .select('*').order('created_at', { ascending: false }).limit(30);
+  if (error) {
+    listEl.innerHTML = '<div class="empty-state">Error loading notifications: ' + escapeHtml(error.message) + '</div>';
+    return;
+  }
+  if (!data || !data.length) {
+    listEl.innerHTML = '<div class="empty-state">No notifications yet.</div>';
+    return;
+  }
+  listEl.innerHTML = data.map(n => {
+    const when = n.created_at ? new Date(n.created_at).toLocaleString('tr-TR', {
+      year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'
+    }) : '—';
+    return `
+      <div class="article-card" data-id="${escapeHtml(n.id)}"${n.active ? '' : ' style="opacity:0.55;"'}>
+        <div class="a-neighborhood">${escapeHtml(when)}${n.active ? '' : ' · INACTIVE'}</div>
+        <h4 style="font-size:0.95rem;font-weight:400;font-style:italic;">${escapeHtml(n.body)}</h4>
+        <div class="card-actions">
+          <button class="btn-edit" data-act="nf-toggle" data-id="${escapeHtml(n.id)}" data-active="${n.active ? '1' : '0'}">${n.active ? 'Deactivate' : 'Reactivate'}</button>
+          <button class="btn-del"  data-act="nf-del"    data-id="${escapeHtml(n.id)}">Delete</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('button[data-act]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const act = btn.dataset.act;
+      if (act === 'nf-del') deleteNotification(id);
+      else if (act === 'nf-toggle') toggleNotificationActive(id, btn.dataset.active === '1');
+    });
+  });
+}
+
+document.getElementById('notif-submit-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('notif-submit-btn');
+  const statusEl = document.getElementById('notif-form-status');
+  const body = document.getElementById('notif-body').value.trim();
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  if (!body) {
+    statusEl.textContent = 'Please enter a message.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  const { error } = await sb.from('admin_notifications').insert([{ body }]);
+  btn.disabled = false;
+  btn.textContent = 'Post Notification';
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = 'Notification posted!';
+  statusEl.className = 'status-msg ok';
+  document.getElementById('notif-body').value = '';
+  loadNotifications();
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+async function toggleNotificationActive(id, currentlyActive) {
+  const { error } = await sb.from('admin_notifications')
+    .update({ active: !currentlyActive }).eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadNotifications();
+}
+
+async function deleteNotification(id) {
+  if (!confirm('Delete this notification? This cannot be undone.')) return;
+  const { error } = await sb.from('admin_notifications').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadNotifications();
 }
 
 checkAdmin();
