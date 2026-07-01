@@ -1025,6 +1025,38 @@
       display: none;
     }
     .event-item.expanded .ev-details { display: block; }
+    .event-item .ev-desc { margin-bottom: 10px; }
+    .ev-rsvp-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .ev-rsvp-btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 7px 14px;
+      background: transparent;
+      color: var(--ink-red);
+      border: 1px solid var(--ink-red);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .ev-rsvp-btn:hover { background: rgba(164, 50, 43, 0.1); }
+    .ev-rsvp-btn.attending {
+      background: var(--ink-red);
+      color: var(--paper);
+    }
+    .ev-rsvp-btn.attending:hover { opacity: 0.85; }
+    .ev-rsvp-btn:disabled { opacity: 0.6; cursor: default; }
+    .ev-rsvp-count {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
 
     @media (max-width: 768px) {
       @keyframes ist-vt-out-left { from { transform: translateX(0); } to { transform: translateX(-100vw); } }
@@ -2043,6 +2075,8 @@ function eventDateParts(iso) {
 
 let allEvents = [];
 let eventsRequestSeq = 0;
+let rsvpCounts = {};   // event_id -> attendee count
+let myRsvpIds = new Set(); // event_ids the current user has RSVP'd to
 
 async function loadEvents() {
   const reqId = ++eventsRequestSeq;
@@ -2061,7 +2095,54 @@ async function loadEvents() {
   if (reqId !== eventsRequestSeq) return;
   if (error) { console.error('[anahane events]', error); allEvents = []; }
   else allEvents = data || [];
+  await loadRsvps();
+  if (reqId !== eventsRequestSeq) return;
   renderEvents();
+}
+
+async function loadRsvps() {
+  rsvpCounts = {};
+  myRsvpIds = new Set();
+  const ids = allEvents.map(ev => ev.id);
+  if (!ids.length) return;
+  const { data, error } = await sb.from('event_rsvps').select('event_id, user_id').in('event_id', ids);
+  if (error) { console.error('[anahane rsvps]', error); return; }
+  const myId = window.__currentUser && window.__currentUser.id;
+  (data || []).forEach(r => {
+    rsvpCounts[r.event_id] = (rsvpCounts[r.event_id] || 0) + 1;
+    if (myId && r.user_id === myId) myRsvpIds.add(r.event_id);
+  });
+}
+
+async function toggleRsvp(eventId, btn) {
+  const myId = window.__currentUser && window.__currentUser.id;
+  if (!myId || btn.disabled) return;
+  const attending = myRsvpIds.has(eventId);
+  btn.disabled = true;
+  try {
+    if (attending) {
+      const { error } = await sb.from('event_rsvps').delete().eq('event_id', eventId).eq('user_id', myId);
+      if (error) throw error;
+      myRsvpIds.delete(eventId);
+      rsvpCounts[eventId] = Math.max(0, (rsvpCounts[eventId] || 1) - 1);
+    } else {
+      const { error } = await sb.from('event_rsvps').insert({ event_id: eventId, user_id: myId });
+      if (error) throw error;
+      myRsvpIds.add(eventId);
+      rsvpCounts[eventId] = (rsvpCounts[eventId] || 0) + 1;
+    }
+  } catch (err) {
+    console.error('[anahane rsvp]', err);
+    btn.disabled = false;
+    return;
+  }
+  // Patch just this button/count in place so the card doesn't collapse.
+  const nowAttending = myRsvpIds.has(eventId);
+  btn.classList.toggle('attending', nowAttending);
+  btn.textContent = nowAttending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join');
+  const countEl = btn.closest('.ev-rsvp-row')?.querySelector('.ev-rsvp-count');
+  if (countEl) countEl.textContent = `${rsvpCounts[eventId] || 0} ${I18N.t('home.events.rsvp.count')}`;
+  btn.disabled = false;
 }
 
 function renderEvents() {
@@ -2077,6 +2158,8 @@ function renderEvents() {
     const nbLabel = ev.neighborhood ? (NB_NAMES_TR[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
     const parts = eventDateParts(ev.event_date);
     const timeBits = [parts.weekday, parts.time, ev.location].filter(Boolean).join(' · ');
+    const count = rsvpCounts[ev.id] || 0;
+    const attending = myRsvpIds.has(ev.id);
     return `
       <div class="event-item expandable">
         <div class="ev-date-block">
@@ -2088,19 +2171,32 @@ function renderEvents() {
           <div class="ev-title">${escapeText(ev.title)}</div>
           ${timeBits ? `<div class="ev-meta">${escapeText(timeBits)}</div>` : ''}
         </div>
-        ${ev.description ? `<div class="ev-details">${escapeText(ev.description)}</div>` : ''}
+        <div class="ev-details">
+          ${ev.description ? `<div class="ev-desc">${escapeText(ev.description)}</div>` : ''}
+          <div class="ev-rsvp-row">
+            <button type="button" class="ev-rsvp-btn${attending ? ' attending' : ''}" data-event-id="${ev.id}">${attending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join')}</button>
+            <span class="ev-rsvp-count">${count} ${I18N.t('home.events.rsvp.count')}</span>
+          </div>
+        </div>
       </div>
     `;
   }).join('');
 
   panel.querySelectorAll('.event-item.expandable').forEach(el => {
     el.addEventListener('click', (e) => {
-      if (e.target.closest('a')) return;
+      if (e.target.closest('a, button')) return;
       const wasExpanded = el.classList.contains('expanded');
       panel.querySelectorAll('.event-item.expandable.expanded').forEach(other => {
         if (other !== el) other.classList.remove('expanded');
       });
       el.classList.toggle('expanded', !wasExpanded);
+    });
+  });
+
+  panel.querySelectorAll('.ev-rsvp-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleRsvp(btn.dataset.eventId, btn);
     });
   });
 }

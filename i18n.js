@@ -21,6 +21,9 @@
     'home.breaking.empty': { default: 'Aktif haber yok.',    more_english: 'No active news.' },
     'home.filter.all':     { default: 'Tümü',                more_english: 'All' },
     'home.events.thisweek':{ default: 'Bu hafta',            more_english: 'This week' },
+    'home.events.rsvp.join': { default: 'Katılıyorum',       more_english: 'RSVP' },
+    'home.events.rsvp.going':{ default: 'Katılıyorsun ✓',    more_english: 'Going ✓' },
+    'home.events.rsvp.count':{ default: 'kişi katılıyor',    more_english: 'attending' },
 
     // profile / settings card
     'profile.edit':        { default: 'Düzenle',             more_english: 'Edit' },
