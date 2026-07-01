@@ -3,8 +3,10 @@
 //
 // Fetches the most recent active row from public.admin_notifications
 // and shows it as a mascot bubble in the bottom-right, dismissed with
-// a tap. localStorage tracks which notification id the current user
-// has already seen so each one shows only once per browser.
+// a tap. Seen state is stored in public.admin_notification_reads so a
+// user who dismissed a notification on their phone doesn't see it
+// again on their laptop. localStorage is kept as a fast-path cache to
+// avoid a round-trip on repeat visits from the same browser.
 //
 // Usage on any authenticated page:
 //   <script src="admin-notification.js" defer></script>
@@ -15,6 +17,7 @@
 // ══════════════════════════════════════════════════════════════
 (function (global) {
   const TABLE = 'admin_notifications';
+  const READS_TABLE = 'admin_notification_reads';
   const SEEN_KEY_PREFIX = 'admin_notif_seen_';
   let stylesInjected = false;
 
@@ -128,6 +131,30 @@
     return data[0];
   }
 
+  // Server-side "has the current user already seen this notification?" —
+  // authoritative across devices. Returns true when a read row exists.
+  async function wasSeenServer(sb, userId, notificationId) {
+    const { data, error } = await sb
+      .from(READS_TABLE)
+      .select('notification_id')
+      .eq('user_id', userId)
+      .eq('notification_id', notificationId)
+      .limit(1);
+    if (error) return false;
+    return !!(data && data.length);
+  }
+
+  // Record that the user has seen a notification. Idempotent — the
+  // composite primary key means a duplicate is silently ignored.
+  async function markSeenServer(sb, userId, notificationId) {
+    try {
+      await sb.from(READS_TABLE).insert(
+        [{ user_id: userId, notification_id: notificationId }],
+        { returning: 'minimal' },
+      );
+    } catch (_) { /* best effort */ }
+  }
+
   // English-heavy users see body_en when the admin filled one in; everyone
   // else (and English users when body_en is empty) sees the Turkish body.
   function pickBody(notif) {
@@ -193,10 +220,17 @@
     if (!session) return null;
     const notif = await fetchLatest(sb);
     if (!notif) return null;
+    // Fast-path: this browser has already shown this notification.
     if (wasSeen(notif.id)) return null;
+    // Cross-device gate: another browser may have shown it to this user.
+    if (await wasSeenServer(sb, session.user.id, notif.id)) {
+      markSeen(notif.id);
+      return null;
+    }
     const mascot = await resolveMascot(sb, session);
     const popup = renderPopup(mascot, pickBody(notif));
     markSeen(notif.id);
+    markSeenServer(sb, session.user.id, notif.id);
     return popup;
   }
 
