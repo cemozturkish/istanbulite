@@ -277,6 +277,12 @@
             <button type="button" class="ist-pc-panel-close" id="ist-pc-panel-close" aria-label="Kapat">×</button>
             <div class="ist-pc-section-title">${esc(t('profile.account'))}</div>
 
+            <div class="ist-pc-avatar-field">
+              <div class="ist-pc-label">${esc(t('profile.chooseavatar'))}</div>
+              <div class="ist-pc-avatar-picker" id="ist-pc-avatar-picker">${buildAvatarPicker(avatarUrl, sozculCount)}</div>
+              <div class="ist-pc-avatar-msg" id="ist-pc-avatar-msg" role="status" aria-live="polite"></div>
+            </div>
+
             <div class="ist-pc-info-row">
               <div class="ist-pc-info-label">${esc(t('profile.firstname'))}</div>
               <div class="ist-pc-info-value">${esc(firstName || '—')}</div>
@@ -465,6 +471,49 @@
           });
         }
 
+        // Avatar picker
+        let _avatarMsgTimer = null;
+        function showAvatarMsg(text) {
+          const el = document.getElementById('ist-pc-avatar-msg');
+          if (!el) return;
+          el.textContent = text;
+          el.classList.add('show');
+          clearTimeout(_avatarMsgTimer);
+          _avatarMsgTimer = setTimeout(() => el.classList.remove('show'), 5000);
+        }
+
+        async function pickAvatar(url) {
+          if (!url || url === avatarUrl) return;
+          const opt = lookupAvatarOption(url);
+          if (opt?.requiresSozculCount && (sozculCount || 0) < opt.requiresSozculCount) {
+            showAvatarMsg(lockedAvatarMessage(opt, sozculCount));
+            return;
+          }
+          const { data, error } = await sb
+            .from('profiles')
+            .update({ avatar_url: url })
+            .eq('id', user.id)
+            .select('id');
+          if (error) {
+            showAvatarMsg('Avatar kaydedilemedi: ' + error.message);
+            return;
+          }
+          if (!data || data.length === 0) {
+            showAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
+            return;
+          }
+          avatarUrl = url;
+          const av = document.getElementById('ist-pc-avatar');
+          if (av) av.innerHTML = `<img src="${esc(url)}" alt="">`;
+          document.querySelectorAll('#ist-pc-avatar-picker .ist-avatar-option').forEach(b => {
+            b.classList.toggle('selected', b.dataset.url === url);
+          });
+        }
+
+        document.querySelectorAll('#ist-pc-avatar-picker .ist-avatar-option').forEach(btn => {
+          btn.addEventListener('click', () => pickAvatar(btn.dataset.url));
+        });
+
         // Hydrate scores async
         getGameScores(sb, user.id).then(scores => {
           const m = document.getElementById('ist-pc-scores-mount');
@@ -474,5 +523,12 @@
     }
   }
 
-  global.IstProfileCard = { mount };
+  global.IstProfileCard = {
+    mount,
+    AVATAR_OPTIONS,
+    AVATAR_LOCK_SVG,
+    buildAvatarPicker,
+    lookupAvatarOption,
+    lockedAvatarMessage,
+  };
 }(window));

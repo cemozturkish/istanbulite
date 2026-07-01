@@ -1600,25 +1600,6 @@
       cursor: not-allowed;
     }
     .library-card .avatar-option.locked:hover { opacity: 0.25; }
-    .library-card .avatar-lock {
-      position: absolute;
-      bottom: -3px;
-      right: -3px;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--ink);
-      color: var(--paper);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 1;
-    }
-    .library-card .avatar-lock svg {
-      width: 8px;
-      height: 8px;
-      display: block;
-    }
     .library-card .avatar-msg {
       font-size: 0.65rem;
       color: var(--accent);
@@ -3771,15 +3752,8 @@ if (profileMissing) {
   document.body.appendChild(banner);
 }
 
-// Preset avatars the user can pick from instead of uploading a photo.
-// `requiresSozculCount` gates an option behind a lifetime sözcü count.
-const AVATAR_OPTIONS = [
-  { url: 'assets/avatar-long.png',  label: 'Uzun saç' },
-  { url: 'assets/avatar-short.png', label: 'Kısa saç' },
-  { url: 'assets/avatar-bald.png',  label: 'Saçsız' },
-  { url: 'assets/avatar-sozcu.png', label: 'Sözcü', requiresSozculCount: 10 },
-];
-
+// Preset avatars and the picker renderer live on IstProfileCard so the
+// desktop library-card here and the mobile widget stay in sync.
 let avatarUrl = profile?.avatar_url || null;
 
 const firstName = profile?.first_name || '';
@@ -3835,35 +3809,10 @@ const PALETTE_VALUES = ['mono', 'earth'];           // 0: Siyah-Beyaz,    1: Kah
       : displayName.charAt(0).toUpperCase();
   }
 
-  // Small padlock SVG used as a corner badge on locked avatar options.
-  const LOCK_SVG = '<span class="avatar-lock" aria-hidden="true">'
-    + '<svg viewBox="0 0 12 12" fill="currentColor">'
-    + '<path d="M6 1.5a2.5 2.5 0 0 0-2.5 2.5V5.5h-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-.5-.5H8.5V4A2.5 2.5 0 0 0 6 1.5zm-1.5 4V4a1.5 1.5 0 1 1 3 0v1.5h-3z"/>'
-    + '</svg></span>';
-
   function avatarPickerHTML() {
-    return AVATAR_OPTIONS.map(o => {
-      const required = o.requiresSozculCount || 0;
-      const locked = required > 0 && ownSozculCount < required;
-      const selected = avatarUrl === o.url;
-      const title = locked
-        ? `${o.label} — ${required} kez Sözcü olmak gerekiyor (${ownSozculCount}/${required})`
-        : o.label;
-      const cls = ['avatar-option'];
-      if (selected) cls.push('selected');
-      if (locked)   cls.push('locked');
-      return `
-        <button type="button"
-          class="${cls.join(' ')}"
-          data-url="${o.url}"
-          ${locked ? 'aria-disabled="true"' : ''}
-          title="${title}"
-          aria-label="${o.label}">
-          <img src="${o.url}" alt="${o.label}">
-          ${locked ? LOCK_SVG : ''}
-        </button>
-      `;
-    }).join('');
+    return IstProfileCard.buildAvatarPicker(avatarUrl, ownSozculCount, {
+      optionClass: 'avatar-option',
+    });
   }
 
   // Build living district dropdown
@@ -4060,12 +4009,9 @@ const PALETTE_VALUES = ['mono', 'earth'];           // 0: Siyah-Beyaz,    1: Kah
 
   async function handleAvatarPick(url) {
     if (!url || url === avatarUrl) return;
-    const opt = AVATAR_OPTIONS.find(o => o.url === url);
+    const opt = IstProfileCard.lookupAvatarOption(url);
     if (opt?.requiresSozculCount && ownSozculCount < opt.requiresSozculCount) {
-      const need = opt.requiresSozculCount;
-      showAvatarMsg(
-        `Bu avatar kilitli — ${need} kez Sözcü olmak gerekiyor (${ownSozculCount}/${need}).`
-      );
+      showAvatarMsg(IstProfileCard.lockedAvatarMessage(opt, ownSozculCount));
       return;
     }
     const { data, error } = await sb
