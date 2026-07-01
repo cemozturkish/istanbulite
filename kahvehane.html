@@ -1611,8 +1611,18 @@ async function init() {
   I18N.syncFromSupabase(sb, session.user.id);
   Palette.syncFromSupabase(sb, session.user.id);
   isAdmin = session.user.email === ADMIN_EMAIL;
-  // Mount the shared mobile profile card.
-  if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N, page: 'kahvehane' });
+  // Mount the shared mobile profile card. profile-card.js is deferred, so
+  // wait until it's loaded (DOMContentLoaded guarantees that) — otherwise a
+  // fast session check can beat the deferred script on mobile and the card
+  // silently never mounts.
+  function mountProfileCard() {
+    if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N, page: 'kahvehane' });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mountProfileCard);
+  } else {
+    mountProfileCard();
+  }
   // Resume the onboarding flow if the user is mid-tour. onboarding.js is
   // deferred — poll briefly in case it hasn't landed yet.
   (function tryOnb(tries) {
