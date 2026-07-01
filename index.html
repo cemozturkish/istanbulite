@@ -58,6 +58,30 @@
       color: var(--ink);
     }
 
+    /* ── Loading overlay ──
+       Shown immediately on open, covers the login overlay while
+       checkSession() runs. Frame advances with real elapsed/auth
+       progress (see script below); fades out once auth resolves
+       AND the minimum display time has elapsed. */
+    #loading-overlay {
+      position: fixed; inset: 0;
+      background: #000;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 400ms ease;
+    }
+    #loading-overlay.loading-overlay-hide {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #loading-overlay img {
+      width: min(80vw, 480px);
+      height: auto;
+      display: block;
+    }
+
     /* ── Login overlay ──
        Hidden until the async session check confirms no session, so
        authenticated reloads don't flash the login form for a frame. */
@@ -161,6 +185,10 @@
 </head>
 <body>
 
+<div id="loading-overlay" aria-hidden="true">
+  <img id="loading-frame" src="assets/loading/logo-dark-mono-01.jpg" alt="">
+</div>
+
 <div id="login-overlay">
   <div class="masthead-login">istanbulite</div>
 
@@ -247,10 +275,51 @@ function enterSite() {
   window.location.href = 'anahane.html';
 }
 
+// ── Loading screen ──
+// Frame advances with real elapsed time, capped one frame short of
+// full until the auth check actually resolves — so a slow network
+// holds on a mid-fill frame instead of freezing on the "done" frame.
+// Minimum 0.2s/frame (2s total for 10 frames) so quick auth checks
+// still play the full rise instead of jumping straight to the end.
+const loadingOverlay = document.getElementById('loading-overlay');
+const loadingFrame = document.getElementById('loading-frame');
+const LOADING_FRAME_COUNT = 10;
+const LOADING_FRAME_MS = 200;
+const LOADING_MIN_MS = LOADING_FRAME_COUNT * LOADING_FRAME_MS;
+const loadingFrameSrc = n => `assets/loading/logo-dark-mono-${String(n).padStart(2, '0')}.jpg`;
+
+for (let i = 1; i <= LOADING_FRAME_COUNT; i++) { new Image().src = loadingFrameSrc(i); }
+
+let authResolved = false;
+let authHasSession = false;
+const loadingStart = performance.now();
+
+function runLoadingLoop(now) {
+  const elapsed = now - loadingStart;
+  const timeFrame = Math.floor(elapsed / LOADING_FRAME_MS) + 1;
+  const cap = authResolved ? LOADING_FRAME_COUNT : LOADING_FRAME_COUNT - 1;
+  const frame = Math.min(timeFrame, cap);
+  loadingFrame.src = loadingFrameSrc(frame);
+
+  if (authResolved && elapsed >= LOADING_MIN_MS && frame >= LOADING_FRAME_COUNT) {
+    finishLoading();
+    return;
+  }
+  requestAnimationFrame(runLoadingLoop);
+}
+requestAnimationFrame(runLoadingLoop);
+
+function finishLoading() {
+  if (authHasSession) { enterSite(); return; }
+  loginOverlay.classList.add('show');
+  loadingOverlay.classList.add('loading-overlay-hide');
+  loadingOverlay.addEventListener('transitionend', () => loadingOverlay.remove(), { once: true });
+}
+
 async function checkSession() {
   const { data: { session } } = await sb.auth.getSession();
-  if (session) enterSite();
-  else loginOverlay.classList.add('show');
+  authHasSession = !!session;
+  authResolved = true;
 }
 
 signinForm.addEventListener('submit', async (e) => {
