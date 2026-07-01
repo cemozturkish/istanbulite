@@ -9,10 +9,13 @@
   <title>istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="i18n.js"></script>
+  <script src="palette.js"></script>
+  <link rel="stylesheet" href="palette.css">
   <link rel="stylesheet" href="profile-card.css">
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
+  <script src="admin-notification.js" defer></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis). Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot. -->
   <script>
     (function(){
@@ -379,8 +382,8 @@
 
     .neighborhood {
       cursor: pointer;
-      fill: #e1cfc6;
-      stroke: #867A71;
+      fill: var(--whisper);
+      stroke: var(--muted);
       stroke-width: 1.4;
       opacity: 1;
       transition: fill 0.2s;
@@ -388,21 +391,21 @@
     }
 
     /* Hover: warm tan */
-    .neighborhood:hover { fill: #c9b09e; }
+    .neighborhood:hover { fill: var(--paper-banner); }
     /* Clicked/active: medium brown */
     .neighborhood.active {
-      fill: #a8876a;
-      stroke: #615145;
+      fill: var(--brown-1);
+      stroke: var(--accent);
       stroke-width: 1.4;
     }
     /* Home neighborhood: darker brown, always visible */
     .neighborhood.home {
-      fill: #866955;
-      stroke: #4C3B31;
+      fill: var(--brown-2);
+      stroke: var(--brown-4);
       stroke-width: 1.6;
     }
-    .neighborhood.home:hover { fill: #775E4C; }
-    .neighborhood.home.active { fill: #775E4C; stroke: #4C3B31; }
+    .neighborhood.home:hover { fill: var(--accent-2); }
+    .neighborhood.home.active { fill: var(--accent-2); stroke: var(--brown-4); }
 
     .map-label {
       text-align: center;
@@ -525,8 +528,8 @@
     }
 
     .article.expandable { cursor: pointer; }
-    .article.expandable:hover { background: #e3d0c6; }
-    .article.expanded { background: #e3d0c6; }
+    .article.expandable:hover { background: var(--hover); }
+    .article.expanded { background: var(--hover); }
     .article .meta-row {
       display: flex;
       justify-content: space-between;
@@ -635,7 +638,7 @@
 
     /* Flashing neighborhood with breaking news */
     @keyframes flash-nb {
-      0%, 100% { fill: #e8cfc0; }
+      0%, 100% { fill: var(--whisper); }
       50% { fill: var(--ink-red); }
     }
     .neighborhood.flashing-news {
@@ -1006,8 +1009,8 @@
       line-height: 1.35;
     }
     .event-item.expandable { cursor: pointer; }
-    .event-item.expandable:hover { background: #e3d0c6; }
-    .event-item.expanded { background: #e3d0c6; }
+    .event-item.expandable:hover { background: var(--hover); }
+    .event-item.expanded { background: var(--hover); }
     .event-item .ev-details {
       grid-column: 1 / -1;
       margin-top: 10px;
@@ -1364,7 +1367,7 @@
         overflow: 'hidden',
         pointerEvents: 'none',
         zIndex: '90',
-        background: '#eddbd0',
+        background: 'var(--paper)',
       });
       const stack = document.createElement('div');
       Object.assign(stack.style, {
@@ -1573,6 +1576,7 @@ async function showSite(user) {
   // Capture user id so seenKey() can scope per-user.
   window.__currentUser = user;
   I18N.syncFromSupabase(sb, user.id);
+  Palette.syncFromSupabase(sb, user.id);
   // Mount the shared mobile profile card.
   if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N, page: 'anahane' });
   I18N.onChange(() => { renderEvents(); applyNewsFilter(activeNewsFilter || 'all'); updateDateTime(); });
@@ -1602,6 +1606,15 @@ async function showSite(user) {
       IstOnboarding.maybeRun({ sb, user, page: 'anahane' });
     } else if (tries > 0) {
       setTimeout(() => tryOnb(tries - 1), 60);
+    }
+  })(40);
+
+  // Admin one-shot notification popup — mascot bubble, shown once per user.
+  (function tryNotif(tries) {
+    if (window.IstAdminNotification) {
+      IstAdminNotification.show({ sb });
+    } else if (tries > 0) {
+      setTimeout(() => tryNotif(tries - 1), 60);
     }
   })(40);
 }

@@ -11,12 +11,15 @@
   <title>Kahvehane — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="i18n.js"></script>
+  <script src="palette.js"></script>
+  <link rel="stylesheet" href="palette.css">
   <script src="game-locks.js"></script>
   <link rel="stylesheet" href="profile-card.css">
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
   <script src="sozcul-mascot.js" defer></script>
+  <script src="admin-notification.js" defer></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis). Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot. -->
   <script>
     (function(){
@@ -211,8 +214,8 @@
 
     .neighborhood {
       cursor: pointer;
-      fill: #e1cfc6;
-      stroke: #867A71;
+      fill: var(--whisper);
+      stroke: var(--muted);
       stroke-width: 1.4;
       opacity: 1;
       transition: fill 0.2s;
@@ -220,21 +223,21 @@
     }
 
     /* Hover */
-    .neighborhood:hover { fill: #c9b09e; }
+    .neighborhood:hover { fill: var(--paper-banner); }
     /* Clicked/active */
     .neighborhood.active {
-      fill: #a8876a;
-      stroke: #615145;
+      fill: var(--brown-1);
+      stroke: var(--accent);
       stroke-width: 1.4;
     }
     /* Home neighborhood */
     .neighborhood.home {
-      fill: #866955;
-      stroke: #4C3B31;
+      fill: var(--brown-2);
+      stroke: var(--brown-4);
       stroke-width: 1.6;
     }
-    .neighborhood.home:hover { fill: #775E4C; }
-    .neighborhood.home.active { fill: #775E4C; stroke: #4C3B31; }
+    .neighborhood.home:hover { fill: var(--accent-2); }
+    .neighborhood.home.active { fill: var(--accent-2); stroke: var(--brown-4); }
 
     .map-label {
       text-align: center;
@@ -1102,6 +1105,15 @@
       font-weight: 500;
       text-align: right;
     }
+    .profile-popup .pp-since {
+      text-align: center;
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 1px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e5e5;
+    }
     .profile-popup .pp-loading,
     .profile-popup .pp-error {
       text-align: center;
@@ -1597,6 +1609,7 @@ async function init() {
   if (!session) { window.location.href = 'index.html'; return; }
 
   I18N.syncFromSupabase(sb, session.user.id);
+  Palette.syncFromSupabase(sb, session.user.id);
   isAdmin = session.user.email === ADMIN_EMAIL;
   // Mount the shared mobile profile card.
   if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N, page: 'kahvehane' });
@@ -1663,6 +1676,15 @@ async function init() {
       window.IstSozcul.greet({ sb, page: 'kahvehane' });
     } else if (tries > 0) {
       setTimeout(() => tryGreet(tries - 1), 80);
+    }
+  })(40);
+
+  // Admin one-shot notification popup — mascot bubble, shown once per user.
+  (function tryNotif(tries) {
+    if (window.IstAdminNotification) {
+      IstAdminNotification.show({ sb });
+    } else if (tries > 0) {
+      setTimeout(() => tryNotif(tries - 1), 60);
     }
   })(40);
 }
@@ -2368,13 +2390,6 @@ function showToast(text, kind) {
     if (e.key === 'Escape' && overlay.classList.contains('open')) close();
   });
 
-  function fmtDate(s) {
-    if (!s) return '—';
-    try {
-      return I18N.formatDate(s, { year:'numeric', month:'long', day:'numeric' });
-    } catch { return '—'; }
-  }
-
   function nbLabel(id) {
     if (!id) return '—';
     if (id === 'istanbul_disi') return 'İstanbul Dışı';
@@ -2433,9 +2448,9 @@ function showToast(text, kind) {
       <div class="pp-name">${fullName.toLocaleUpperCase('tr-TR')}</div>
       <div class="pp-meta">${nbLabel(data.neighborhood)}</div>
       <div class="pp-row"><span class="pp-label">${I18N.t('profile.birthplace')}</span><span class="pp-value">${birth}</span></div>
-      <div class="pp-row"><span class="pp-label">${I18N.t('profile.membership')}</span><span class="pp-value">${fmtDate(data.joined_at)}</span></div>
       <div class="pp-row"><span class="pp-label">${I18N.t('profile.sozculcount')}</span><span class="pp-value">${sozculCount ?? 0} ${I18N.t('profile.times')}</span></div>
       ${kefilName ? `<div class="pp-row"><span class="pp-label">${I18N.t('profile.kefil')}</span><span class="pp-value"><span class="author-link" data-user-id="${kefilId}">${kefilName}</span></span></div>` : ''}
+      <div class="pp-since">${I18N.formatMemberSince(data.joined_at)}</div>
     `;
   }
 

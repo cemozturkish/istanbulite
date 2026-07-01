@@ -774,6 +774,15 @@
       font-weight: 500;
       text-align: right;
     }
+    .profile-popup .pp-since {
+      text-align: center;
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 1px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--hairline);
+    }
     .profile-popup .pp-loading,
     .profile-popup .pp-error {
       text-align: center;
@@ -791,6 +800,8 @@
   <link rel="stylesheet" href="frames.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="i18n.js"></script>
+  <script src="palette.js"></script>
+  <link rel="stylesheet" href="palette.css">
   <script src="game-locks.js"></script>
 </head>
 <body>
@@ -899,6 +910,7 @@ const neighborhoodNames = {
     const { data: { session } } = await sb.auth.getSession();
     if (session) {
       I18N.syncFromSupabase(sb, session.user.id);
+      Palette.syncFromSupabase(sb, session.user.id);
       userNeighborhood = session.user.user_metadata?.yasadigi_ilce
         || session.user.user_metadata?.neighborhood || '';
       // Accounts created by admin don't have user_metadata — fall back to profiles table.
@@ -1631,12 +1643,6 @@ async function markPlayedGames() {
     if (e.key === 'Escape' && overlay.classList.contains('open')) close();
   });
 
-  function fmtDate(s) {
-    if (!s) return '—';
-    try {
-      return I18N.formatDate(s, { year:'numeric', month:'long', day:'numeric' });
-    } catch { return '—'; }
-  }
   function nbLabel(id) {
     if (!id) return '—';
     if (id === 'istanbul_disi') return 'İstanbul Dışı';
@@ -1692,9 +1698,9 @@ async function markPlayedGames() {
       <div class="pp-name">${upperName}</div>
       <div class="pp-meta">${nbLabel(data.neighborhood)}</div>
       <div class="pp-row"><span class="pp-label">${I18N.t('profile.birthplace')}</span><span class="pp-value">${birth}</span></div>
-      <div class="pp-row"><span class="pp-label">${I18N.t('profile.membership')}</span><span class="pp-value">${fmtDate(data.joined_at)}</span></div>
       <div class="pp-row"><span class="pp-label">${I18N.t('profile.sozculcount')}</span><span class="pp-value">${sozculCount ?? 0} ${I18N.t('profile.times')}</span></div>
       ${kefilName ? `<div class="pp-row"><span class="pp-label">${I18N.t('profile.kefil')}</span><span class="pp-value"><span class="author-link" data-user-id="${kefilId}">${kefilName}</span></span></div>` : ''}
+      <div class="pp-since">${I18N.formatMemberSince(data.joined_at)}</div>
     `;
   }
 

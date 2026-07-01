@@ -36,6 +36,7 @@
     'profile.chooseavatar':{ default: 'Avatar Seç',          more_english: 'Choose Avatar' },
     'profile.langpref':    { default: 'Dil Tercihi',         more_english: 'Language' },
     'profile.appearance':  { default: 'Görünüm',             more_english: 'Appearance' },
+    'profile.colortheme':  { default: 'Renk',                more_english: 'Color' },
     'profile.years':       { default: 'yıl',                 more_english: 'yr' },
     'profile.days':        { default: 'gün',                 more_english: 'd' },
     'profile.hours':       { default: 'saat',                more_english: 'h' },
@@ -137,6 +138,43 @@
 
   function isEnglish() { return currentLang === 'more_english'; }
 
+  const TR_MONTHS = ['OCAK','ŞUBAT','MART','NİSAN','MAYIS','HAZİRAN',
+    'TEMMUZ','AĞUSTOS','EYLÜL','EKİM','KASIM','ARALIK'];
+  const EN_MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE',
+    'JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+
+  // Turkish ablative suffix ('DAN/'DEN/'TAN/'TEN) for a year, matching how the
+  // year is actually pronounced (e.g. 2026 -> "altı" -> 'DAN, 2023 -> "üç" -> 'TEN).
+  function turkishYearSuffix(year) {
+    const ones = ['bir','iki','üç','dört','beş','altı','yedi','sekiz','dokuz'];
+    const tens = ['on','yirmi','otuz','kırk','elli','altmış','yetmiş','seksen','doksan'];
+    const n = ((year % 100) + 100) % 100;
+    const onesDigit = n % 10;
+    const tensDigit = Math.floor(n / 10);
+    const lastWord = n === 0 ? 'bin' : (onesDigit === 0 ? tens[tensDigit - 1] : ones[onesDigit - 1]);
+    const frontVowels = 'eiöü';
+    const backVowels = 'aıou';
+    const unvoiced = 'çkptsşhf';
+    let lastVowel = null;
+    for (let i = lastWord.length - 1; i >= 0; i--) {
+      if (frontVowels.includes(lastWord[i]) || backVowels.includes(lastWord[i])) { lastVowel = lastWord[i]; break; }
+    }
+    const lastChar = lastWord[lastWord.length - 1];
+    const isVowelEnd = frontVowels.includes(lastChar) || backVowels.includes(lastChar);
+    const useT = !isVowelEnd && unvoiced.includes(lastChar);
+    return (useT ? 'T' : 'D') + (frontVowels.includes(lastVowel) ? 'EN' : 'AN');
+  }
+
+  // "MART 2026'DAN BERİ ÜYE" / "MEMBER SINCE MARCH 2026" — used on public profile cards.
+  function formatMemberSince(dateStr) {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    const year = d.getFullYear();
+    const monthIdx = d.getMonth();
+    if (isEnglish()) return `MEMBER SINCE ${EN_MONTHS[monthIdx]} ${year}`;
+    return `${TR_MONTHS[monthIdx]} ${year}'${turkishYearSuffix(year)} BERİ ÜYE`;
+  }
+
   // Date / time / countdown helpers
   function formatDate(date, opts) {
     const locale = isEnglish() ? 'en-US' : 'tr-TR';
@@ -186,7 +224,7 @@
 
   global.I18N = {
     t, setLang, applyToDOM, isEnglish, onChange,
-    formatDate, formatTime, formatWeekday, formatCountdown, formatMinutes,
+    formatDate, formatTime, formatWeekday, formatCountdown, formatMinutes, formatMemberSince,
     syncFromSupabase,
     get lang() { return currentLang; },
   };

@@ -26,60 +26,17 @@
     fatih:'Fatih', istanbul_disi:'İstanbul Dışı'
   };
 
-  const LANG_VALUES = ['more_english', 'default', 'more_turkish'];
-  const THEME_VALUES = ['light', 'system', 'dark'];
+  // Two-option toggles. Legacy `more_turkish` and `system` values are
+  // remapped via normalize* below to their nearest neighbour.
+  // palette_pref reuses the column written by onboarding.js: 'mono' = siyah-beyaz, 'earth' = kahverengi.
+  const LANG_VALUES    = ['more_english', 'default'];   // 0: Daha İngilizce, 1: Daha Türkçe
+  const THEME_VALUES   = ['light', 'dark'];             // 0: Açık,           1: Koyu
+  const PALETTE_VALUES = ['mono', 'earth'];             // 0: Siyah-Beyaz,    1: Kahverengi
   const ADMIN_EMAIL = 'cemwozturk@gmail.com';
 
-  // Preset avatars, shared between the desktop library-card picker and this
-  // mobile widget. `requiresSozculCount` gates an option behind a lifetime
-  // sözcü count.
-  const AVATAR_OPTIONS = [
-    { url: 'assets/avatar-long.png',  label: 'Uzun saç' },
-    { url: 'assets/avatar-short.png', label: 'Kısa saç' },
-    { url: 'assets/avatar-bald.png',  label: 'Saçsız' },
-    { url: 'assets/avatar-sozcu.png', label: 'Sözcü', requiresSozculCount: 10 },
-  ];
-
-  const AVATAR_LOCK_SVG = '<span class="ist-avatar-lock" aria-hidden="true">'
-    + '<svg viewBox="0 0 12 12" fill="currentColor">'
-    + '<path d="M6 1.5a2.5 2.5 0 0 0-2.5 2.5V5.5h-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-.5-.5H8.5V4A2.5 2.5 0 0 0 6 1.5zm-1.5 4V4a1.5 1.5 0 1 1 3 0v1.5h-3z"/>'
-    + '</svg></span>';
-
-  function buildAvatarPicker(currentAvatarUrl, sozculCount, opts) {
-    opts = opts || {};
-    const optionClass = opts.optionClass || 'ist-avatar-option';
-    return AVATAR_OPTIONS.map(o => {
-      const required = o.requiresSozculCount || 0;
-      const locked = required > 0 && (sozculCount || 0) < required;
-      const selected = currentAvatarUrl === o.url;
-      const title = locked
-        ? `${o.label} — ${required} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${required})`
-        : o.label;
-      const cls = [optionClass];
-      if (selected) cls.push('selected');
-      if (locked)   cls.push('locked');
-      return `
-        <button type="button"
-          class="${cls.join(' ')}"
-          data-url="${o.url}"
-          ${locked ? 'aria-disabled="true"' : ''}
-          title="${title}"
-          aria-label="${o.label}">
-          <img src="${o.url}" alt="${o.label}">
-          ${locked ? AVATAR_LOCK_SVG : ''}
-        </button>
-      `;
-    }).join('');
-  }
-
-  function lookupAvatarOption(url) {
-    return AVATAR_OPTIONS.find(o => o.url === url) || null;
-  }
-
-  function lockedAvatarMessage(opt, sozculCount) {
-    const need = opt.requiresSozculCount;
-    return `Bu avatar kilitli — ${need} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${need}).`;
-  }
+  function normalizeLang(v)    { return v === 'more_english' ? 'more_english' : 'default'; }
+  function normalizeTheme(v)   { return v === 'dark' ? 'dark' : 'light'; }
+  function normalizePalette(v) { return v === 'earth' ? 'earth' : 'mono'; }
 
   function capitalizeName(s) {
     if (!s) return '';
@@ -218,9 +175,10 @@
       const dogumYeri = profile?.birth_place || '';
       const phone = profile?.phone || '';
       const referralCode = profile?.referral_code || '';
-      const languagePref = profile?.language_pref || 'default';
-      const themePref = profile?.theme_pref || 'system';
-      let avatarUrl = profile?.avatar_url || null;
+      const languagePref = normalizeLang(profile?.language_pref);
+      const themePref = normalizeTheme(profile?.theme_pref);
+      const palettePref = normalizePalette(profile?.palette_pref);
+      const avatarUrl = profile?.avatar_url || null;
 
       const yasadigiDisplay = yasadigi ? (NB_NAMES[yasadigi] || yasadigi) : '—';
       const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
@@ -272,21 +230,28 @@
 
             <div class="ist-pc-field">
               <div class="ist-pc-label">${esc(t('profile.langpref'))}</div>
-              <input class="ist-pc-slider" id="ist-pc-language" type="range" min="0" max="2" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
+              <input class="ist-pc-slider" id="ist-pc-language" type="range" min="0" max="1" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
               <div class="ist-pc-ticks" id="ist-pc-language-ticks">
                 <span data-idx="0">Daha İngilizce</span>
-                <span data-idx="1">Olduğu Gibi</span>
-                <span data-idx="2">Daha Türkçe</span>
+                <span data-idx="1">Daha Türkçe</span>
+              </div>
+            </div>
+
+            <div class="ist-pc-field">
+              <div class="ist-pc-label">${esc(t('profile.colortheme'))}</div>
+              <input class="ist-pc-slider" id="ist-pc-palette" type="range" min="0" max="1" step="1" value="${PALETTE_VALUES.indexOf(palettePref)}">
+              <div class="ist-pc-ticks" id="ist-pc-palette-ticks">
+                <span data-idx="0">Siyah-Beyaz</span>
+                <span data-idx="1">Kahverengi</span>
               </div>
             </div>
 
             <div class="ist-pc-field">
               <div class="ist-pc-label">${esc(t('profile.appearance'))}</div>
-              <input class="ist-pc-slider" id="ist-pc-theme" type="range" min="0" max="2" step="1" value="${THEME_VALUES.indexOf(themePref)}">
+              <input class="ist-pc-slider" id="ist-pc-theme" type="range" min="0" max="1" step="1" value="${THEME_VALUES.indexOf(themePref)}">
               <div class="ist-pc-ticks" id="ist-pc-theme-ticks">
                 <span data-idx="0">Açık</span>
-                <span data-idx="1">Sistem</span>
-                <span data-idx="2">Koyu</span>
+                <span data-idx="1">Koyu</span>
               </div>
             </div>
 
@@ -456,13 +421,15 @@
           update();
         }
         syncTicks('ist-pc-language', 'ist-pc-language-ticks');
+        syncTicks('ist-pc-palette', 'ist-pc-palette-ticks');
         syncTicks('ist-pc-theme', 'ist-pc-theme-ticks');
 
         document.getElementById('ist-pc-save').addEventListener('click', async () => {
           const msgEl = document.getElementById('ist-pc-msg');
           const btn = document.getElementById('ist-pc-save');
           const newLang = LANG_VALUES[parseInt(document.getElementById('ist-pc-language').value, 10)] || 'default';
-          const newTheme = THEME_VALUES[parseInt(document.getElementById('ist-pc-theme').value, 10)] || 'system';
+          const newTheme = THEME_VALUES[parseInt(document.getElementById('ist-pc-theme').value, 10)] || 'light';
+          const newPalette = PALETTE_VALUES[parseInt(document.getElementById('ist-pc-palette').value, 10)] || 'mono';
 
           btn.textContent = t('profile.saving');
           btn.disabled = true;
@@ -471,11 +438,14 @@
           try {
             const { data, error } = await sb
               .from('profiles')
-              .update({ language_pref: newLang, theme_pref: newTheme })
+              .update({ language_pref: newLang, theme_pref: newTheme, palette_pref: newPalette })
               .eq('id', user.id)
               .select('id');
             if (error) throw error;
             if (!data || data.length === 0) throw new Error('Profil bulunamadı.');
+            // Cache the new palette locally so the reload starts in the right
+            // colors instead of flashing the old palette.
+            if (window.Palette) window.Palette.setPalette(newPalette);
             setTimeout(() => window.location.reload(), 400);
           } catch (err) {
             btn.textContent = t('profile.save');
