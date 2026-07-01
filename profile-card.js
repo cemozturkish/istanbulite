@@ -237,6 +237,11 @@
       const themePref = normalizeTheme(profile?.theme_pref);
       const palettePref = normalizePalette(profile?.palette_pref);
       let avatarUrl = profile?.avatar_url || null;
+      // Apply the freshly-fetched DB value now, synchronously, so the
+      // avatar (and everything else gated on Palette.current) renders in
+      // the right colors immediately instead of racing the slower
+      // Palette.syncFromSupabase call some pages also make on load.
+      if (global.Palette) global.Palette.setPalette(palettePref);
 
       const yasadigiDisplay = yasadigi ? (NB_NAMES[yasadigi] || yasadigi) : '—';
       const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
