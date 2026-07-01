@@ -10,7 +10,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="i18n.js"></script>
   <script src="palette.js"></script>
+  <script src="loading-screen.js"></script>
   <link rel="stylesheet" href="palette.css">
+  <link rel="stylesheet" href="loading-screen.css">
   <link rel="stylesheet" href="profile-card.css">
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
@@ -1080,6 +1082,10 @@
 </head>
 <body>
 
+<div id="loading-overlay" aria-hidden="true">
+  <img id="loading-frame" src="assets/loading/logo-dark-mono-01.jpg" alt="">
+</div>
+
 <!-- ══════════════ LOGIN OVERLAY ══════════════ -->
 <div id="login-overlay">
   <div class="masthead-login">istanbulite.net</div>
@@ -1564,10 +1570,19 @@ updateDateTime();
 setInterval(updateDateTime, 60000);
 
 // ── Auth State ──
+// Loading screen (loading-screen.js) covers the page — including on a
+// refresh while already logged in — until the real session check
+// resolves, then either reveals the site or bounces to the sign-in page.
+let authSession = null;
+const resolveLoading = LoadingScreen.start(() => {
+  if (!authSession) { window.location.href = 'index.html'; return; }
+  showSite(authSession.user);
+});
+
 async function checkSession() {
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) { window.location.href = 'index.html'; return; }
-  showSite(session.user);
+  authSession = session || null;
+  resolveLoading();
 }
 
 async function showSite(user) {
