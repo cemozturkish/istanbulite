@@ -1092,10 +1092,14 @@
       <div class="panel-title">Post Login Notification</div>
       <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
         Shown once per user as a mascot bubble on their next authenticated page. Users dismiss it with a tap.
+        Turkish is shown to Turkish-language users; English is shown to English-language users. Leave the English field blank to show the Turkish one to everyone.
       </p>
 
-      <label>Message</label>
-      <textarea id="notif-body" placeholder="e.g. Sözcel oyununu güncelledik — bir bakın!" maxlength="500" rows="4"></textarea>
+      <label>Turkish Message (required)</label>
+      <textarea id="notif-body" placeholder="Örn. Sözcel oyununu güncelledik — bir bakın!" maxlength="500" rows="4"></textarea>
+
+      <label>English Message (optional)</label>
+      <textarea id="notif-body-en" placeholder="e.g. We updated the Sözcel game — take a look!" maxlength="500" rows="4"></textarea>
 
       <div class="btn-row">
         <button class="btn btn-primary" id="notif-submit-btn">Post Notification</button>
@@ -2790,10 +2794,14 @@ async function loadNotifications() {
     const when = n.created_at ? new Date(n.created_at).toLocaleString('tr-TR', {
       year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'
     }) : '—';
+    const enBlock = n.body_en
+      ? `<p style="font-size:0.85rem;font-style:italic;margin-top:6px;color:var(--muted);"><strong style="color:var(--accent);letter-spacing:1px;font-size:0.65rem;text-transform:uppercase;font-weight:700;">EN · </strong>${escapeHtml(n.body_en)}</p>`
+      : '';
     return `
       <div class="article-card" data-id="${escapeHtml(n.id)}"${n.active ? '' : ' style="opacity:0.55;"'}>
         <div class="a-neighborhood">${escapeHtml(when)}${n.active ? '' : ' · INACTIVE'}</div>
-        <h4 style="font-size:0.95rem;font-weight:400;font-style:italic;">${escapeHtml(n.body)}</h4>
+        <h4 style="font-size:0.95rem;font-weight:400;font-style:italic;"><strong style="color:var(--accent);letter-spacing:1px;font-size:0.65rem;text-transform:uppercase;font-weight:700;font-style:normal;">TR · </strong>${escapeHtml(n.body)}</h4>
+        ${enBlock}
         <div class="card-actions">
           <button class="btn-edit" data-act="nf-toggle" data-id="${escapeHtml(n.id)}" data-active="${n.active ? '1' : '0'}">${n.active ? 'Deactivate' : 'Reactivate'}</button>
           <button class="btn-del"  data-act="nf-del"    data-id="${escapeHtml(n.id)}">Delete</button>
@@ -2816,15 +2824,17 @@ document.getElementById('notif-submit-btn').addEventListener('click', async () =
   const btn = document.getElementById('notif-submit-btn');
   const statusEl = document.getElementById('notif-form-status');
   const body = document.getElementById('notif-body').value.trim();
+  const bodyEn = document.getElementById('notif-body-en').value.trim();
   statusEl.textContent = ''; statusEl.className = 'status-msg';
   if (!body) {
-    statusEl.textContent = 'Please enter a message.';
+    statusEl.textContent = 'Please enter the Turkish message.';
     statusEl.className = 'status-msg err';
     return;
   }
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>';
-  const { error } = await sb.from('admin_notifications').insert([{ body }]);
+  const { error } = await sb.from('admin_notifications')
+    .insert([{ body, body_en: bodyEn || null }]);
   btn.disabled = false;
   btn.textContent = 'Post Notification';
   if (error) {
@@ -2835,6 +2845,7 @@ document.getElementById('notif-submit-btn').addEventListener('click', async () =
   statusEl.textContent = 'Notification posted!';
   statusEl.className = 'status-msg ok';
   document.getElementById('notif-body').value = '';
+  document.getElementById('notif-body-en').value = '';
   loadNotifications();
   setTimeout(() => { statusEl.textContent = ''; }, 3000);
 });

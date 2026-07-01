@@ -120,12 +120,21 @@
   async function fetchLatest(sb) {
     const { data, error } = await sb
       .from(TABLE)
-      .select('id, body, created_at')
+      .select('id, body, body_en, created_at')
       .eq('active', true)
       .order('created_at', { ascending: false })
       .limit(1);
     if (error || !data || !data.length) return null;
     return data[0];
+  }
+
+  // English-heavy users see body_en when the admin filled one in; everyone
+  // else (and English users when body_en is empty) sees the Turkish body.
+  function pickBody(notif) {
+    const isEnglish = (global.I18N && typeof global.I18N.isEnglish === 'function' && global.I18N.isEnglish()) ||
+                      (document.documentElement.getAttribute('data-lang') === 'more_english');
+    if (isEnglish && notif.body_en && notif.body_en.trim()) return notif.body_en;
+    return notif.body;
   }
 
   async function resolveMascot(sb, session) {
@@ -186,7 +195,7 @@
     if (!notif) return null;
     if (wasSeen(notif.id)) return null;
     const mascot = await resolveMascot(sb, session);
-    const popup = renderPopup(mascot, notif.body);
+    const popup = renderPopup(mascot, pickBody(notif));
     markSeen(notif.id);
     return popup;
   }

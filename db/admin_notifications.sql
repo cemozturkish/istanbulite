@@ -6,6 +6,10 @@
 -- is kept client-side in localStorage keyed by notification id, so no
 -- per-user write table is needed.
 --
+-- body    — Turkish text, always required.
+-- body_en — Optional English alternative. Users on more_english see it
+--           when set; empty/null falls back to body.
+--
 -- active=false hides a notification without deleting it.
 --
 -- Run in Supabase SQL editor. Idempotent.
@@ -14,9 +18,15 @@
 create table if not exists public.admin_notifications (
   id         uuid        primary key default gen_random_uuid(),
   body       text        not null check (char_length(body) between 1 and 500),
+  body_en    text        check (body_en is null or char_length(body_en) between 1 and 500),
   active     boolean     not null default true,
   created_at timestamptz not null default now()
 );
+
+-- Idempotent add for databases that already ran the earlier version.
+alter table public.admin_notifications
+  add column if not exists body_en text
+    check (body_en is null or char_length(body_en) between 1 and 500);
 
 create index if not exists admin_notifications_active_created_idx
   on public.admin_notifications (active, created_at desc);
