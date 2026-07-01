@@ -33,6 +33,17 @@
     apply();
   }
 
+  // Avatar preset images ship in two color variants (e.g. avatar-long.png /
+  // avatar-long-earth.png). The stored avatar_url is always the mono
+  // (canonical) filename; this maps it to whichever variant matches the
+  // *viewer's own* palette_pref — never the profile owner's — so the same
+  // avatar renders black for mono viewers and brown for earth viewers.
+  function avatarSrc(url) {
+    if (!url) return url;
+    if (current !== 'earth') return url;
+    return url.replace(/(\.[^./]+)$/, '-earth$1');
+  }
+
   async function syncFromSupabase(sb, userId) {
     if (!sb || !userId) return;
     try {
@@ -51,6 +62,7 @@
   global.Palette = {
     setPalette,
     syncFromSupabase,
+    avatarSrc,
     get current() { return current; },
   };
 })(window);
