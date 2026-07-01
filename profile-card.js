@@ -229,7 +229,7 @@
       const languagePref = normalizeLang(profile?.language_pref);
       const themePref = normalizeTheme(profile?.theme_pref);
       const palettePref = normalizePalette(profile?.palette_pref);
-      const avatarUrl = profile?.avatar_url || null;
+      let avatarUrl = profile?.avatar_url || null;
 
       const yasadigiDisplay = yasadigi ? (NB_NAMES[yasadigi] || yasadigi) : '—';
       const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
