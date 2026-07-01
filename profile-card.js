@@ -38,6 +38,57 @@
   function normalizeTheme(v)   { return v === 'dark' ? 'dark' : 'light'; }
   function normalizePalette(v) { return v === 'earth' ? 'earth' : 'mono'; }
 
+  // Preset avatars, shared between the desktop library-card picker and this
+  // mobile widget. `requiresSozculCount` gates an option behind a lifetime
+  // sözcü count.
+  const AVATAR_OPTIONS = [
+    { url: 'assets/avatar-long.png',  label: 'Uzun saç' },
+    { url: 'assets/avatar-short.png', label: 'Kısa saç' },
+    { url: 'assets/avatar-bald.png',  label: 'Saçsız' },
+    { url: 'assets/avatar-sozcu.png', label: 'Sözcü', requiresSozculCount: 10 },
+  ];
+
+  const AVATAR_LOCK_SVG = '<span class="ist-avatar-lock" aria-hidden="true">'
+    + '<svg viewBox="0 0 12 12" fill="currentColor">'
+    + '<path d="M6 1.5a2.5 2.5 0 0 0-2.5 2.5V5.5h-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-.5-.5H8.5V4A2.5 2.5 0 0 0 6 1.5zm-1.5 4V4a1.5 1.5 0 1 1 3 0v1.5h-3z"/>'
+    + '</svg></span>';
+
+  function buildAvatarPicker(currentAvatarUrl, sozculCount, opts) {
+    opts = opts || {};
+    const optionClass = opts.optionClass || 'ist-avatar-option';
+    return AVATAR_OPTIONS.map(o => {
+      const required = o.requiresSozculCount || 0;
+      const locked = required > 0 && (sozculCount || 0) < required;
+      const selected = currentAvatarUrl === o.url;
+      const title = locked
+        ? `${o.label} — ${required} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${required})`
+        : o.label;
+      const cls = [optionClass];
+      if (selected) cls.push('selected');
+      if (locked)   cls.push('locked');
+      return `
+        <button type="button"
+          class="${cls.join(' ')}"
+          data-url="${o.url}"
+          ${locked ? 'aria-disabled="true"' : ''}
+          title="${title}"
+          aria-label="${o.label}">
+          <img src="${o.url}" alt="${o.label}">
+          ${locked ? AVATAR_LOCK_SVG : ''}
+        </button>
+      `;
+    }).join('');
+  }
+
+  function lookupAvatarOption(url) {
+    return AVATAR_OPTIONS.find(o => o.url === url) || null;
+  }
+
+  function lockedAvatarMessage(opt, sozculCount) {
+    const need = opt.requiresSozculCount;
+    return `Bu avatar kilitli — ${need} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${need}).`;
+  }
+
   function capitalizeName(s) {
     if (!s) return '';
     return s.trim().split(/\s+/).map(w =>
