@@ -176,7 +176,7 @@
   <!-- Sign-in panel -->
   <form class="login-panel active" id="signin-form" autocomplete="on">
     <input type="email" id="signin-email" data-i18n-placeholder="auth.email" placeholder="E-posta" required autocomplete="email">
-    <input type="password" id="signin-password" data-i18n-placeholder="auth.password" placeholder="Şifre" required autocomplete="current-password">
+    <input type="text" data-real-type="password" id="signin-password" data-i18n-placeholder="auth.password" placeholder="Şifre" required autocomplete="current-password">
     <button type="submit" class="primary-btn" data-i18n="auth.signin">Giriş Yap</button>
     <div class="error-msg" id="signin-error"></div>
     <button type="button" class="text-btn" id="show-kefil" data-i18n="auth.signup">Kayıt Ol</button>
@@ -204,7 +204,7 @@
       <option value="" data-i18n="auth.birthdistrict">Doğduğun Mahalle</option>
     </select>
     <input type="email" id="signup-email" data-i18n-placeholder="auth.email" placeholder="E-posta" required autocomplete="email">
-    <input type="password" id="signup-password" data-i18n-placeholder="auth.password" placeholder="Şifre" required autocomplete="new-password" minlength="6">
+    <input type="text" data-real-type="password" id="signup-password" data-i18n-placeholder="auth.password" placeholder="Şifre" required autocomplete="new-password" minlength="6">
     <button type="submit" class="primary-btn" data-i18n="auth.signup">Kayıt Ol</button>
     <div class="error-msg" id="signup-error"></div>
     <button type="button" class="text-btn" data-back="signin" data-i18n="auth.back">Geri</button>
@@ -260,10 +260,19 @@ function enterSite() {
 // Tied to the real auth check via loading-screen.js: resolveLoading()
 // is called once checkSession() knows the answer, and the frame loop
 // reveals the right content (site vs sign-in) when it's done animating.
+//
+// The password fields start as type="text" (see data-real-type) so no
+// <input type="password"> exists in the DOM while the page first loads —
+// Safari (and other browsers) scan the page for login forms on load and
+// will pop up their native "AutoFill Password" suggestion immediately,
+// on top of the loading screen, if a password field is present that
+// early. Restoring the real type here, right as the form is revealed,
+// means that scan finds nothing until the form is actually on screen.
 let authHasSession = false;
 const resolveLoading = LoadingScreen.start(() => {
-  if (authHasSession) enterSite();
-  else loginOverlay.classList.add('show');
+  if (authHasSession) { enterSite(); return; }
+  document.querySelectorAll('[data-real-type]').forEach(el => { el.type = el.dataset.realType; });
+  loginOverlay.classList.add('show');
 });
 
 async function checkSession() {
