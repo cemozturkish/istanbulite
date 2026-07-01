@@ -4526,13 +4526,15 @@ let _takeoverCountdownInterval = null;
 
 // Resolves what (if anything) should be shown in the Sözcül takeover.
 // Modes:
-//   'pending-input' — user has an upcoming assignment whose word hasn't
-//                     been submitted yet and the deadline hasn't passed
-//   'today-done'    — user is today's Sözcül and submitted their word
-//                     (the play screen is hidden — they can't guess their
-//                     own word)
-//   'today-missed'  — user is today's Sözcül but never submitted; the
-//                     deadline has passed
+//   'pending-input' — user has an upcoming assignment whose deadline
+//                     hasn't passed yet. A word may already be entered
+//                     (status.existing is set) — the Sözcül can freely
+//                     keep changing it until the deadline hits.
+//   'today-done'    — user is today's Sözcül, the deadline for today has
+//                     passed and a word was submitted in time (the play
+//                     screen is hidden — they can't guess their own word)
+//   'today-missed'  — user is today's Sözcül but never submitted before
+//                     the deadline passed
 //   'none'          — show the normal play screen
 async function checkSozculTakeoverStatus() {
   const today = getIstanbulDateISO();
@@ -4554,23 +4556,25 @@ async function checkSozculTakeoverStatus() {
 
     const { data: words } = await sb
       .from('sozcel_used_answers')
-      .select('used_on, word')
+      .select('used_on, word, definition')
       .in('used_on', assignedDates);
-    const submittedDates = new Set((words || []).filter(w => w.word).map(w => w.used_on));
+    const wordByDate = new Map((words || []).filter(w => w.word).map(w => [w.used_on, w]));
 
-    // Prefer the earliest assignment whose word still needs entering.
-    const pending = assignedDates.find(d => !submittedDates.has(d) && getSozculDeadline(d) > now);
-    if (pending) {
-      return { session, today, mode: 'pending-input', targetDate: pending };
+    // The earliest assignment whose deadline hasn't passed yet stays
+    // editable — the Sözcül can change the word as many times as they
+    // like right up until midnight, whether or not one is already saved.
+    const editable = assignedDates.find(d => getSozculDeadline(d) > now);
+    if (editable) {
+      return { session, today, mode: 'pending-input', targetDate: editable, existing: wordByDate.get(editable) || null };
     }
 
-    // No pending entry — but if today is the user's assigned day, the
+    // No editable entry left — but if today is the user's assigned day, the
     // play screen still stays hidden so they can't guess their own word.
     if (assignedDates.includes(today)) {
       return {
         session,
         today,
-        mode: submittedDates.has(today) ? 'today-done' : 'today-missed',
+        mode: wordByDate.has(today) ? 'today-done' : 'today-missed',
         targetDate: today,
       };
     }
@@ -4650,6 +4654,11 @@ function renderTakeoverForm(takeover, status) {
   const wordLen = sozcelWordLengthForISO(date);
   const deadline = getSozculDeadline(date);
   const dateLabel = formatISOTurkish(date);
+  const existing = status.existing || null;
+  let dict = null;
+  if (existing && existing.definition) {
+    try { dict = JSON.parse(existing.definition); } catch (e) { dict = null; }
+  }
 
   takeover.innerHTML = `
     <div class="stk-eyebrow">Sözcü Görevin · ${escapeHtml(dateLabel)}</div>
@@ -4657,6 +4666,7 @@ function renderTakeoverForm(takeover, status) {
     <p class="stk-hint">
       ${wordLen} harfli bir Türkçe sözcük gir ve sözlük bilgisini doldur.
       ${escapeHtml(dateLabel)} günü diğer İstanbullular bu kelimeyi tahmin edecek.
+      ${existing ? 'Gece yarısına kadar dilediğin kadar değiştirebilirsin.' : ''}
     </p>
     <div class="stk-countdown" id="stk-countdown"></div>
     <div class="stk-form">
@@ -4664,7 +4674,8 @@ function renderTakeoverForm(takeover, status) {
         <label class="stk-label">Sözcük (${wordLen} harf)</label>
         <input type="text" class="stk-word-input" id="stk-word-input"
                maxlength="${wordLen}" autocomplete="off" autocorrect="off"
-               spellcheck="false" placeholder="${'◯'.repeat(wordLen)}">
+               spellcheck="false" placeholder="${'◯'.repeat(wordLen)}"
+               value="${escapeHtml(existing ? existing.word : '')}">
       </div>
 
       <div class="stk-section">
@@ -4676,16 +4687,18 @@ function renderTakeoverForm(takeover, status) {
       <div>
         <label class="stk-label">Köken (isteğe bağlı)</label>
         <input type="text" class="stk-text-input" id="stk-root-input"
-               placeholder="örn. Arapça niyyet" style="font-style:italic;">
+               placeholder="örn. Arapça niyyet" style="font-style:italic;"
+               value="${escapeHtml(dict && dict.root ? dict.root : '')}">
       </div>
 
       <div>
         <label class="stk-label">Günün Notu (isteğe bağlı)</label>
         <input type="text" class="stk-text-input" id="stk-note-input"
-               placeholder="örn. Bugün Cumhuriyet Bayramı">
+               placeholder="örn. Bugün Cumhuriyet Bayramı"
+               value="${escapeHtml(dict && dict.note ? dict.note : '')}">
       </div>
 
-      <button type="button" class="stk-submit" id="stk-submit">Onayla ve Kaydet</button>
+      <button type="button" class="stk-submit" id="stk-submit">${existing ? 'Değişikliği Kaydet' : 'Onayla ve Kaydet'}</button>
       <div class="stk-status" id="stk-status"></div>
     </div>
   `;
@@ -4696,8 +4709,10 @@ function renderTakeoverForm(takeover, status) {
   const statusEl = takeover.querySelector('#stk-status');
   const defsEl = takeover.querySelector('#stk-defs');
 
-  // Start with one empty definition row.
-  defsEl.insertAdjacentHTML('beforeend', buildTakeoverDefRow(0));
+  // Pre-fill definition rows from the saved dictionary entry, or start
+  // with one empty row if there's nothing saved yet.
+  const defsToRender = (dict && dict.defs && dict.defs.length) ? dict.defs : [{ cls: SOZCUL_WORD_CLASSES[0], text: '' }];
+  defsToRender.forEach((d, i) => defsEl.insertAdjacentHTML('beforeend', buildTakeoverDefRow(i, d.cls, d.text)));
 
   wordInput.addEventListener('input', () => {
     wordInput.value = wordInput.value.toLocaleUpperCase('tr-TR').replace(/[^A-ZÇĞİÖŞÜ]/g, '');
@@ -4743,15 +4758,15 @@ function renderTakeoverForm(takeover, status) {
   submitBtn.addEventListener('click', () => submitTakeover(status, wordInput, submitBtn, statusEl, defsEl, takeover));
 }
 
-function buildTakeoverDefRow(idx) {
-  const opts = SOZCUL_WORD_CLASSES.map(c => `<option value="${c}">${c}</option>`).join('');
+function buildTakeoverDefRow(idx, cls, text) {
+  const opts = SOZCUL_WORD_CLASSES.map(c => `<option value="${c}"${c === cls ? ' selected' : ''}>${c}</option>`).join('');
   return `
     <div class="stk-def-row">
       <span class="stk-def-num">${idx + 1}.</span>
       <select class="stk-text-input stk-def-cls">${opts}</select>
       <button type="button" class="stk-def-remove" aria-label="Anlamı kaldır">×</button>
       <div style="grid-column:1 / -1;margin-top:6px;">
-        <textarea class="stk-textarea stk-def-text" rows="2" placeholder="Tanım…"></textarea>
+        <textarea class="stk-textarea stk-def-text" rows="2" placeholder="Tanım…">${escapeHtml(text || '')}</textarea>
       </div>
     </div>
   `;
@@ -4810,13 +4825,15 @@ async function submitTakeover(status, wordInput, submitBtn, statusEl, defsEl, ta
   statusEl.textContent = 'Kaydediliyor...';
   statusEl.className = 'stk-status';
 
-  // Race-condition guard.
+  // Guard: only block if someone else already owns this day's word.
+  // The assigned Sözcül can freely overwrite their own entry up until
+  // the deadline, so this is not a "first write wins" check anymore.
   const { data: guard } = await sb
     .from('sozcel_used_answers')
-    .select('word')
+    .select('word, sozcul_id')
     .eq('used_on', targetDate)
     .maybeSingle();
-  if (guard && guard.word) {
+  if (guard && guard.word && guard.sozcul_id && guard.sozcul_id !== status.session.user.id) {
     statusEl.textContent = 'Bu gün için zaten kelime kaydedilmiş.';
     statusEl.className = 'stk-status err';
     submitBtn.disabled = false;
@@ -4826,7 +4843,7 @@ async function submitTakeover(status, wordInput, submitBtn, statusEl, defsEl, ta
   const definition = serializeTakeoverDict(takeover);
   const { error } = await sb
     .from('sozcel_used_answers')
-    .insert({ used_on: targetDate, word: wordNorm, definition, sozcul_id: status.session.user.id });
+    .upsert({ used_on: targetDate, word: wordNorm, definition, sozcul_id: status.session.user.id }, { onConflict: 'used_on' });
   if (error) {
     statusEl.textContent = 'Hata: ' + (error.message || 'Bilinmeyen hata');
     statusEl.className = 'stk-status err';
@@ -4836,11 +4853,19 @@ async function submitTakeover(status, wordInput, submitBtn, statusEl, defsEl, ta
 
   if (window.IstSozcul && window.IstSozcul.invalidate) window.IstSozcul.invalidate();
 
-  // If the user has another pending assignment after this one, roll
-  // straight into the next entry form. Otherwise show the "done" state.
+  // The deadline hasn't necessarily passed just because we saved — the
+  // Sözcül can keep changing this same day's word right up until
+  // midnight, so re-render the (now pre-filled) form instead of locking.
+  // Only move on to the next assignment or the "done" state once this
+  // day's deadline has actually passed.
   const next = await checkSozculTakeoverStatus();
-  if (next && next.mode === 'pending-input' && next.targetDate !== targetDate) {
+  if (next && next.mode === 'pending-input') {
     renderTakeoverForm(takeover, next);
+    const savedStatusEl = takeover.querySelector('#stk-status');
+    if (savedStatusEl) {
+      savedStatusEl.textContent = 'Kaydedildi — istersen değiştirmeye devam edebilirsin.';
+      savedStatusEl.className = 'stk-status ok';
+    }
   } else {
     renderTakeoverDone(takeover, targetDate);
   }
