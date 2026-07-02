@@ -1155,7 +1155,7 @@
 
   <aside class="col-left">
     <section class="discussion-section">
-      <div class="discussion-label" id="discussion-label">Tüm İstanbul</div>
+      <div class="discussion-label" id="discussion-label" data-i18n="kahvehane.allistanbul">Tüm İstanbul</div>
       <div class="discussion-posts" id="discussion-posts">
         <div class="empty-state"><span class="spinner"></span> Yükleniyor...</div>
       </div>
@@ -1206,7 +1206,7 @@
   <aside class="col-right">
     <section class="games-section">
       <div class="games-section-inner">
-        <h2 style="text-transform: uppercase;">Günün Oyunları</h2>
+        <h2 style="text-transform: uppercase;" data-i18n="games.today">Günün Oyunları</h2>
 
         <a href="sozcel.html" class="game-link" data-game="sozcel">
           <div class="game-link-title">Sözcel</div>
@@ -1224,7 +1224,7 @@
         </a>
 
         <div class="scoreboard">
-          <h2 id="scoreboard-title">Haftanın Skor Tahtası</h2>
+          <h2 id="scoreboard-title" data-i18n="games.weeklyscoreboard">Haftanın Skor Tahtası</h2>
           <div class="scoreboard-countdown" id="scoreboard-countdown"></div>
           <ol class="scoreboard-list" id="scoreboard-list">
             <li class="scoreboard-empty">Yükleniyor...</li>
@@ -1558,6 +1558,13 @@ setInterval(() => {
   const cdEl = document.getElementById('scoreboard-countdown');
   if (cdEl && cdEl.textContent) cdEl.textContent = getTimeUntilWeekReset();
 }, 60000);
+// Re-render language-sensitive bits immediately once the profile's language
+// preference syncs from Supabase, instead of waiting for the next interval tick.
+I18N.onChange(() => {
+  updateDateTime();
+  const cdEl = document.getElementById('scoreboard-countdown');
+  if (cdEl && cdEl.textContent) cdEl.textContent = getTimeUntilWeekReset();
+});
 
 const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
@@ -1803,9 +1810,7 @@ function getTimeUntilWeekReset() {
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  if (days > 0) return `Sıfırlanmaya: ${days}g ${hours}sa ${minutes}dk`;
-  if (hours > 0) return `Sıfırlanmaya: ${hours}sa ${minutes}dk`;
-  return `Sıfırlanmaya: ${minutes}dk`;
+  return I18N.formatWeekReset(days, hours, minutes);
 }
 
 async function loadScoreboard(neighborhoodFilter = null) {
@@ -1818,10 +1823,10 @@ async function loadScoreboard(neighborhoodFilter = null) {
   // countdown), while the unfiltered default is the full weekly leaderboard.
   if (neighborhoodFilter) {
     const nbName = neighborhoodNames[neighborhoodFilter] || neighborhoodFilter;
-    if (titleEl) titleEl.textContent = `${nbName.toLocaleUpperCase('tr-TR')} EN İYİLERİ`;
+    if (titleEl) titleEl.textContent = I18N.formatNeighborhoodBest(nbName.toLocaleUpperCase('tr-TR'));
     if (countdownEl) countdownEl.textContent = '';
   } else {
-    if (titleEl) titleEl.textContent = 'Haftanın Skor Tahtası';
+    if (titleEl) titleEl.textContent = I18N.t('games.weeklyscoreboard');
   }
 
   let results = null;
@@ -1860,7 +1865,7 @@ async function loadScoreboard(neighborhoodFilter = null) {
   }
 
   if (weekly.length === 0) {
-    listEl.innerHTML = `<li class="scoreboard-empty">${neighborhoodFilter ? 'Bu mahallede henüz skor yok' : 'Bu hafta henüz skor yok'}</li>`;
+    listEl.innerHTML = `<li class="scoreboard-empty">${neighborhoodFilter ? I18N.t('games.scoreboard.emptyneighborhood') : I18N.t('games.scoreboard.emptyweek')}</li>`;
     return;
   }
 
@@ -2006,7 +2011,7 @@ document.querySelector('.map-panel').addEventListener('click', (e) => {
       if (homeEl) homeEl.classList.add('home');
     }
     document.getElementById('map-label').textContent = 'İstanbul';
-    document.getElementById('discussion-label').textContent = 'Tüm İstanbul';
+    document.getElementById('discussion-label').textContent = I18N.t('kahvehane.allistanbul');
     activeMapNeighborhood = null;
     selectedNeighborhood = homeNeighborhood;
     updateSubmitFormVisibility();
@@ -2035,7 +2040,7 @@ async function loadPosts(neighborhoodFilter = null) {
     return;
   }
   if (rows.length === 0) {
-    postsEl.innerHTML = '<div class="empty-state">Henüz mesaj yok. İlk yazan siz olun!</div>';
+    postsEl.innerHTML = `<div class="empty-state">${I18N.t('kahvehane.nomessages')}</div>`;
     return;
   }
   postsEl.innerHTML = '';
@@ -2209,7 +2214,7 @@ setInterval(() => {
     const lm = postsEl.querySelector('.load-more-wrap');
     if (lm) lm.remove();
     if (!postsEl.innerHTML.trim()) {
-      postsEl.innerHTML = '<div class="empty-state">Henüz mesaj yok. İlk yazan siz olun!</div>';
+      postsEl.innerHTML = `<div class="empty-state">${I18N.t('kahvehane.nomessages')}</div>`;
     }
   }
 }, 30000);
