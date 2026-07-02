@@ -1556,7 +1556,7 @@
   <aside class="col-right">
     <section class="games-section">
       <div class="games-section-inner">
-        <h2 style="text-transform: uppercase;">Günün Oyunları</h2>
+        <h2 style="text-transform: uppercase;" data-i18n="games.today">Günün Oyunları</h2>
 
         <a href="sozcel.html" class="game-link active" data-game="sozcel">
           <div class="game-link-title">Sözcel</div>
@@ -1574,7 +1574,7 @@
         </a>
 
         <div class="scoreboard">
-          <h2>Haftanın Skor Tahtası</h2>
+          <h2 data-i18n="games.weeklyscoreboard">Haftanın Skor Tahtası</h2>
           <div class="scoreboard-countdown" id="scoreboard-countdown"></div>
           <ol class="scoreboard-list" id="scoreboard-list">
             <li class="scoreboard-empty">Yükleniyor...</li>
@@ -1589,10 +1589,10 @@
     <div class="result-card">
       <button class="result-close" id="result-close" type="button" aria-label="Kapat">×</button>
       <div class="result-icon-box" id="result-icon-box">★</div>
-      <div class="result-title" id="result-title">Tebrikler!</div>
+      <div class="result-title" id="result-title" data-i18n="games.congrats">Tebrikler!</div>
       <div class="result-subtitle" id="result-subtitle"></div>
       <div class="result-emoji-grid" id="result-emoji-grid"></div>
-      <button class="result-share-btn" id="result-share-btn" type="button">PAYLAŞ</button>
+      <button class="result-share-btn" id="result-share-btn" type="button" data-i18n="games.share">Paylaş</button>
       <div class="result-dict-entry" id="result-dict-entry" style="display:none;"></div>
       <div class="result-next-info" id="result-next-info"></div>
     </div>
@@ -1707,10 +1707,12 @@ async function recordGameResult(game, date, attempts, won, neighborhood) {
 function updateDateTime() {
   const now = new Date();
   const opts = { timeZone: 'Europe/Istanbul' };
-  const day = now.toLocaleDateString('tr-TR', { ...opts, day: 'numeric' });
-  const month = now.toLocaleDateString('tr-TR', { ...opts, month: 'long' });
-  const weekday = now.toLocaleDateString('tr-TR', { ...opts, weekday: 'long' });
-  const time = now.toLocaleTimeString('tr-TR', { ...opts, hour: '2-digit', minute: '2-digit', hour12: false });
+  const en = I18N.isEnglish();
+  const locale = en ? 'en-US' : 'tr-TR';
+  const day = now.toLocaleDateString(locale, { ...opts, day: 'numeric' });
+  const month = now.toLocaleDateString(locale, { ...opts, month: 'long' });
+  const weekday = now.toLocaleDateString(locale, { ...opts, weekday: 'long' });
+  const time = now.toLocaleTimeString(locale, { ...opts, hour: '2-digit', minute: '2-digit', hour12: en });
   document.getElementById('date-line').textContent = (day + ' ' + month).toUpperCase();
   document.getElementById('day-line').textContent = weekday.toUpperCase();
   document.getElementById('time-line').textContent = time;
@@ -1721,6 +1723,13 @@ setInterval(() => {
   const cdEl = document.getElementById('scoreboard-countdown');
   if (cdEl && cdEl.textContent) cdEl.textContent = getTimeUntilWeekReset();
 }, 60000);
+// Re-render language-sensitive bits immediately once the profile's language
+// preference syncs from Supabase, instead of waiting for the next interval tick.
+I18N.onChange(() => {
+  updateDateTime();
+  const cdEl = document.getElementById('scoreboard-countdown');
+  if (cdEl && cdEl.textContent) cdEl.textContent = getTimeUntilWeekReset();
+});
 
 // ── Turkish letter normalization ──
 // Treat İ/I and ı/i correctly for Turkish
@@ -3661,7 +3670,7 @@ async function restoreState() {
       const lastGuess = validGuesses[validGuesses.length - 1];
       const wasWon = lastGuess === TARGET_WORD;
       if (wasWon) {
-        document.getElementById('game-message').textContent = 'Tebrikler!';
+        document.getElementById('game-message').textContent = I18N.t('games.congrats');
         document.getElementById('game-message').className = 'game-message win';
       } else {
         document.getElementById('game-message').textContent = `Kelime: ${TARGET_WORD}`;
@@ -3850,7 +3859,7 @@ function submitGuess() {
 
   setTimeout(async () => {
     if (guessSnap === TARGET_WORD) {
-      document.getElementById('game-message').textContent = 'Tebrikler!';
+      document.getElementById('game-message').textContent = I18N.t('games.congrats');
       document.getElementById('game-message').className = 'game-message win';
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
@@ -3916,7 +3925,7 @@ async function renderStats() {
   if (!el) return;
   const emptyShell = (msg) => `
     <div class="scoreboard">
-      <h2>Günün Mahalleleri</h2>
+      <h2>${I18N.t('games.todayneighborhoods')}</h2>
       <ol class="scoreboard-list">
         <li class="scoreboard-empty">${msg}</li>
       </ol>
@@ -3962,7 +3971,7 @@ async function renderStats() {
 
   el.innerHTML = `
     <div class="scoreboard">
-      <h2>Günün Mahalleleri</h2>
+      <h2>${I18N.t('games.todayneighborhoods')}</h2>
       <ol class="scoreboard-list">
         ${sorted.map((row, i) => {
           const rankClass = i < 3 ? ' r' + (i + 1) : '';
@@ -4013,9 +4022,7 @@ function getTimeUntilWeekReset() {
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  if (days > 0) return `Sıfırlanmaya: ${days}g ${hours}sa ${minutes}dk`;
-  if (hours > 0) return `Sıfırlanmaya: ${hours}sa ${minutes}dk`;
-  return `Sıfırlanmaya: ${minutes}dk`;
+  return I18N.formatWeekReset(days, hours, minutes);
 }
 
 async function loadScoreboard() {
@@ -4039,7 +4046,7 @@ async function loadScoreboard() {
     return;
   }
   if (!results || results.length === 0) {
-    setListHTML('<li class="scoreboard-empty">Bu hafta henüz skor yok</li>');
+    setListHTML(`<li class="scoreboard-empty">${I18N.t('games.scoreboard.emptyweek')}</li>`);
     return;
   }
   // Weekly cutoff: Monday 00:00 of the current Istanbul week.
@@ -4049,7 +4056,7 @@ async function loadScoreboard() {
   const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - daysFromMonday);
   const weekly = results.filter(r => { const d = parseGameDate(r.date); return d && d >= cutoff; });
   if (weekly.length === 0) {
-    setListHTML('<li class="scoreboard-empty">Bu hafta henüz skor yok</li>');
+    setListHTML(`<li class="scoreboard-empty">${I18N.t('games.scoreboard.emptyweek')}</li>`);
     return;
   }
   // Find the first winner per date (earliest created_at among won=true rows).
@@ -4222,16 +4229,16 @@ function showResultPopup(won) {
   document.getElementById('result-icon-box').textContent = won ? '★' : '✕';
   document.getElementById('result-icon-box').style.background = won ? 'var(--success)' : 'var(--ink)';
   const isFirst = won && lastResultIsFirstWinner;
-  document.getElementById('result-title').textContent = isFirst ? 'Günün İlk Çözücüsü!' : (won ? 'Tebrikler!' : 'Bugünlük Bu Kadar');
+  document.getElementById('result-title').textContent = I18N.sozcelResultTitle(isFirst, won);
   const basePts = gamePoints(won ? guessResults.length : 7, won);
   const totalPts = basePts + (isFirst ? 10 : 0);
   const subtitleEl = document.getElementById('result-subtitle');
   if (won) {
     subtitleEl.innerHTML = isFirst
-      ? `Kelimeyi ${score}. tahminde buldunuz.<br><strong>+${basePts} puan &nbsp;+&nbsp; 10 ilk çözücü bonusu = ${totalPts} puan</strong>`
-      : `Kelimeyi ${score}. tahminde buldunuz. +${totalPts} puan`;
+      ? I18N.formatFoundInGuessesFirst(score, basePts, totalPts)
+      : I18N.formatFoundInGuesses(score, totalPts);
   } else {
-    subtitleEl.textContent = `Bugünkü kelime: ${TARGET_WORD} — +${totalPts} puan`;
+    subtitleEl.textContent = I18N.formatTodaysWordPoints(TARGET_WORD, totalPts);
   }
   document.getElementById('result-emoji-grid').innerHTML = guessResults.map(result =>
     result.map(r => r === 'correct' ? '🟫' : r === 'present' ? '🟧' : '⬜').join('')
