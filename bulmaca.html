@@ -846,7 +846,7 @@
   <aside class="col-right">
     <section class="games-section">
       <div class="games-section-inner">
-        <h2 style="text-transform: uppercase;">Günün Oyunları</h2>
+        <h2 style="text-transform: uppercase;" data-i18n="games.today">Günün Oyunları</h2>
 
         <a href="sozcel.html" class="game-link" data-game="sozcel">
           <div class="game-link-title">Sözcel</div>
@@ -864,7 +864,7 @@
         </a>
 
         <div class="scoreboard">
-          <h2>Haftanın Skor Tahtası</h2>
+          <h2 data-i18n="games.weeklyscoreboard">Haftanın Skor Tahtası</h2>
           <ol class="scoreboard-list" id="scoreboard-list">
             <li class="scoreboard-empty">Yükleniyor...</li>
           </ol>
@@ -961,6 +961,9 @@ function updateDateTime() {
 }
 updateDateTime();
 setInterval(updateDateTime, 60000);
+// Re-render immediately once the profile's language preference syncs from
+// Supabase, instead of waiting for the next interval tick.
+I18N.onChange(updateDateTime);
 
 // Daily seed for puzzle rotation
 function getDailySeed() {
@@ -1343,7 +1346,7 @@ async function restoreState() {
     checkAttempts = state.checkAttempts || 0;
     gameCompleted = state.gameCompleted || false;
     if (gameCompleted) {
-      document.getElementById('game-message').textContent = 'Tebrikler! Tamamladınız!';
+      document.getElementById('game-message').textContent = I18N.t('bulmaca.congrats');
       document.getElementById('game-message').style.color = 'var(--success)';
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
     }
@@ -1371,7 +1374,7 @@ document.getElementById('check-btn').addEventListener('click', async () => {
 
   const msgEl = document.getElementById('game-message');
   if (allCorrect) {
-    msgEl.textContent = 'Tebrikler! Tamamladınız!';
+    msgEl.textContent = I18N.t('bulmaca.congrats');
     msgEl.style.color = 'var(--success)';
     document.getElementById('reset-info').textContent = getTimeUntilMidnight();
     gameCompleted = true;
@@ -1417,7 +1420,7 @@ async function renderStats() {
   if (!el) return;
   const emptyShell = (msg) => `
     <div class="scoreboard">
-      <h2>Günün Mahalleleri</h2>
+      <h2>${I18N.t('games.todayneighborhoods')}</h2>
       <ol class="scoreboard-list">
         <li class="scoreboard-empty">${msg}</li>
       </ol>
@@ -1462,7 +1465,7 @@ async function renderStats() {
 
   el.innerHTML = `
     <div class="scoreboard">
-      <h2>Günün Mahalleleri</h2>
+      <h2>${I18N.t('games.todayneighborhoods')}</h2>
       <ol class="scoreboard-list">
         ${sorted.map((row, i) => {
           const rankClass = i < 3 ? ' r' + (i + 1) : '';
@@ -1506,14 +1509,14 @@ async function loadScoreboard() {
     return;
   }
   if (!results || results.length === 0) {
-    listEl.innerHTML = '<li class="scoreboard-empty">Bu hafta henüz skor yok</li>';
+    listEl.innerHTML = `<li class="scoreboard-empty">${I18N.t('games.scoreboard.emptyweek')}</li>`;
     return;
   }
   const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
   const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - 6);
   const weekly = results.filter(r => { const d = parseGameDate(r.date); return d && d >= cutoff; });
   if (weekly.length === 0) {
-    listEl.innerHTML = '<li class="scoreboard-empty">Bu hafta henüz skor yok</li>';
+    listEl.innerHTML = `<li class="scoreboard-empty">${I18N.t('games.scoreboard.emptyweek')}</li>`;
     return;
   }
   const scores = new Map();

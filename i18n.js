@@ -94,6 +94,21 @@
     'sozcel.help.yellow2': { default: 'Harf sözcükte var ama yanlış yerde.', more_english: 'Letter is in the word but the wrong spot.' },
     'sozcel.help.gray2':   { default: 'Harf sözcükte yok.',              more_english: 'Letter is not in the word.' },
     'sozcel.help.daily':   { default: 'Her gün yeni bir sözcük gelir. Türkçe <strong>İ/I</strong> ayrımına dikkat edin.', more_english: 'A new word arrives every day. Mind the Turkish <strong>İ/I</strong> distinction.' },
+
+    // kahvehane — discussion feed
+    'kahvehane.allistanbul': { default: 'Tüm İstanbul',      more_english: 'All Istanbul' },
+    'kahvehane.nomessages':  { default: 'Henüz mesaj yok. İlk yazan siz olun!', more_english: 'No messages yet. Be the first to post!' },
+
+    // games — shared right column (Günün Oyunları / scoreboard / neighborhood stats)
+    'games.today':            { default: 'Günün Oyunları',        more_english: "Today's Games" },
+    'games.weeklyscoreboard': { default: 'Haftanın Skor Tahtası', more_english: 'Weekly Scoreboard' },
+    'games.todayneighborhoods': { default: 'Günün Mahalleleri',   more_english: "Today's Neighborhoods" },
+    'games.scoreboard.emptyweek':         { default: 'Bu hafta henüz skor yok',    more_english: 'No scores yet this week' },
+    'games.scoreboard.emptyneighborhood': { default: 'Bu mahallede henüz skor yok', more_english: 'No scores yet in this neighborhood' },
+    'games.congrats': { default: 'Tebrikler!', more_english: 'Congratulations!' },
+    'games.share':     { default: 'Paylaş',     more_english: 'Share' },
+    'tumcel.congrats':  { default: 'Tebrikler! Hepsini buldun!', more_english: 'Congratulations! You found them all!' },
+    'bulmaca.congrats': { default: 'Tebrikler! Tamamladınız!',   more_english: 'Congratulations! You completed it!' },
   };
 
   let currentLang = readCached();
@@ -210,6 +225,42 @@
     return isEnglish() ? `${mins} min` : `${mins} dakika`;
   }
 
+  // Weekly scoreboard reset countdown: "Sıfırlanmaya: 3g 8sa 51dk" / "Resets in: 3d 8h 51m"
+  function formatWeekReset(days, hours, minutes) {
+    const en = isEnglish();
+    if (days > 0) return en ? `Resets in: ${days}d ${hours}h ${minutes}m` : `Sıfırlanmaya: ${days}g ${hours}sa ${minutes}dk`;
+    if (hours > 0) return en ? `Resets in: ${hours}h ${minutes}m` : `Sıfırlanmaya: ${hours}sa ${minutes}dk`;
+    return en ? `Resets in: ${minutes}m` : `Sıfırlanmaya: ${minutes}dk`;
+  }
+
+  // "KADIKÖY EN İYİLERİ" / "KADIKÖY'S BEST" — neighborhood-filtered scoreboard title.
+  function formatNeighborhoodBest(name) {
+    return isEnglish() ? `${name}'S BEST` : `${name} EN İYİLERİ`;
+  }
+
+  // Sözcel result-popup subtitle: "Kelimeyi 3. tahminde buldunuz. +8 puan"
+  function formatFoundInGuesses(guessNum, points) {
+    return isEnglish()
+      ? `You found the word on guess ${guessNum}. +${points} points`
+      : `Kelimeyi ${guessNum}. tahminde buldunuz. +${points} puan`;
+  }
+  // Same, with the first-solver bonus line.
+  function formatFoundInGuessesFirst(guessNum, basePts, totalPts) {
+    return isEnglish()
+      ? `You found the word on guess ${guessNum}.<br><strong>+${basePts} points &nbsp;+&nbsp; 10 first-solver bonus = ${totalPts} points</strong>`
+      : `Kelimeyi ${guessNum}. tahminde buldunuz.<br><strong>+${basePts} puan &nbsp;+&nbsp; 10 ilk çözücü bonusu = ${totalPts} puan</strong>`;
+  }
+  // Loss subtitle: "Bugünkü kelime: KALEM — +2 puan"
+  function formatTodaysWordPoints(word, points) {
+    return isEnglish() ? `Today's word: ${word} — +${points} points` : `Bugünkü kelime: ${word} — +${points} puan`;
+  }
+  // Result-popup title: won / first-solver / lost.
+  function sozcelResultTitle(isFirst, won) {
+    if (isFirst) return isEnglish() ? "Today's First Solver!" : 'Günün İlk Çözücüsü!';
+    if (won) return t('games.congrats');
+    return isEnglish() ? 'Better Luck Tomorrow' : 'Bugünlük Bu Kadar';
+  }
+
   async function syncFromSupabase(sb, userId) {
     if (!sb || !userId) return;
     try {
@@ -228,6 +279,8 @@
   global.I18N = {
     t, setLang, applyToDOM, isEnglish, onChange,
     formatDate, formatTime, formatWeekday, formatCountdown, formatMinutes, formatMemberSince,
+    formatWeekReset, formatNeighborhoodBest,
+    formatFoundInGuesses, formatFoundInGuessesFirst, formatTodaysWordPoints, sozcelResultTitle,
     syncFromSupabase,
     get lang() { return currentLang; },
   };
