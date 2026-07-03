@@ -369,7 +369,7 @@
       top: 92px;
       right: 16px;
       bottom: 16px;
-      width: 180px;
+      width: 200px;
       z-index: 5;
       border-radius: 0;
       /* background/box-shadow: see frames.css, same as .section-rule */
@@ -397,7 +397,10 @@
       inset: 0;
       padding: 0;
       overflow: hidden;
-      background: var(--paper);
+      /* Matches the map artwork's own sea/background gray (#eeeeee), not
+         a theme token, so contain-mode letterbox gaps blend seamlessly
+         into the art instead of showing a mismatched warm/pale edge. */
+      background: #eeeeee;
     }
 
     .map-panel svg {
@@ -1020,8 +1023,8 @@
 
     .event-item {
       display: grid;
-      grid-template-columns: 50px 1fr;
-      column-gap: 16px;
+      grid-template-columns: 38px 1fr;
+      column-gap: 10px;
       padding: 14px 16px 14px 14px;
       margin-bottom: 12px;
       background: var(--paper-card);
@@ -2238,7 +2241,11 @@ function renderEvents() {
   panel.innerHTML = rows.map(ev => {
     const nbLabel = ev.neighborhood ? (NB_NAMES_TR[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
     const parts = eventDateParts(ev.event_date);
-    const timeBits = [parts.weekday, parts.time, ev.location].filter(Boolean).join(' · ');
+    // Weekday + time on one line ("Saturday 11:00 PM"), location on its
+    // own line below -- built from pre-escaped pieces joined with a real
+    // <br>, since the pieces need to stay separately escapable.
+    const dateTime = [parts.weekday, parts.time].filter(Boolean).join(' ');
+    const metaHTML = [dateTime, ev.location].filter(Boolean).map(escapeText).join('<br>');
     const count = rsvpCounts[ev.id] || 0;
     const attending = myRsvpIds.has(ev.id);
     return `
@@ -2250,7 +2257,7 @@ function renderEvents() {
         <div class="ev-body">
           <div class="ev-kicker">${escapeText(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
           <div class="ev-title">${escapeText(ev.title)}</div>
-          ${timeBits ? `<div class="ev-meta">${escapeText(timeBits)}</div>` : ''}
+          ${metaHTML ? `<div class="ev-meta">${metaHTML}</div>` : ''}
         </div>
         <div class="ev-details">
           ${ev.description ? `<div class="ev-desc">${escapeText(ev.description)}</div>` : ''}
