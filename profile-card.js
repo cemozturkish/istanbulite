@@ -172,6 +172,16 @@
     }
   }
 
+  // Module-level state so a page can call setPage() to re-render the card
+  // for a new page context (e.g. after a client-side navigation) without
+  // re-fetching from Supabase. `_state` holds everything fetched once;
+  // `_resizeListener`/`_escListener` are tracked so unmount() can remove
+  // them instead of leaking one more registration per mount() call.
+  let _mounted = false;
+  let _state = null;
+  let _resizeListener = null;
+  let _escListener = null;
+
   async function mount(opts) {
     const sb = opts.sb;
     const I18N = opts.I18N;
@@ -179,17 +189,22 @@
     const container = document.getElementById('ist-pc-mount');
     if (!container || !sb) return;
 
+    // Already mounted this session (e.g. a router re-invoking mount on a
+    // virtual navigation) — just re-render for the new page, no re-fetch.
+    if (_mounted) { setPage(page); return; }
+
     // Only show on mobile — bail early on desktop to save Supabase calls.
     if (window.innerWidth > 768) {
-      let mounted = false;
-      const onResize = () => {
-        if (!mounted && window.innerWidth <= 768) {
-          mounted = true;
-          window.removeEventListener('resize', onResize);
+      let resolved = false;
+      _resizeListener = () => {
+        if (!resolved && window.innerWidth <= 768) {
+          resolved = true;
+          window.removeEventListener('resize', _resizeListener);
+          _resizeListener = null;
           doMount();
         }
       };
-      window.addEventListener('resize', onResize);
+      window.addEventListener('resize', _resizeListener);
       return;
     }
     doMount();
@@ -199,58 +214,96 @@
       if (!session) return;
       const user = session.user;
       container.innerHTML = `<div class="ist-pc"><div class="ist-pc-loading"><span>Yükleniyor…</span></div></div>`;
+      _state = await fetchProfileData(sb, I18N, user);
+      _mounted = true;
+      renderPage(container, page, _state);
+    }
+  }
 
-      function istanbulTodayISO() {
-        const now = new Date();
-        const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-        const y = ist.getFullYear();
-        const m = String(ist.getMonth() + 1).padStart(2, '0');
-        const d = String(ist.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
-      }
-      const today = istanbulTodayISO();
+  function setPage(page) {
+    const container = document.getElementById('ist-pc-mount');
+    if (!container || !_state) return;
+    renderPage(container, page, _state);
+  }
 
-      const [{ data: profile }, { count: kefaletCount }, { count: sozculCount }] = await Promise.all([
-        sb.from('profiles').select('*').eq('id', user.id).single(),
-        sb.from('profiles').select('*', { count: 'exact', head: true }).eq('referred_by', user.id),
-        sb.from('sozcel_sozcul_assignments').select('*', { count: 'exact', head: true }).eq('user_id', user.id).lte('game_date', today),
-      ]);
+  function unmount() {
+    if (_resizeListener) { window.removeEventListener('resize', _resizeListener); _resizeListener = null; }
+    if (_escListener) { document.removeEventListener('keydown', _escListener); _escListener = null; }
+    _mounted = false;
+    _state = null;
+  }
 
-      let kefilOfUser = null;
-      if (profile && profile.referred_by) {
-        const { data: kp } = await sb
-          .from('profiles')
-          .select('id, first_name, last_name')
-          .eq('id', profile.referred_by)
-          .maybeSingle();
-        if (kp) kefilOfUser = kp;
-      }
+  function istanbulTodayISO() {
+    const now = new Date();
+    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+    const y = ist.getFullYear();
+    const m = String(ist.getMonth() + 1).padStart(2, '0');
+    const d = String(ist.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
 
-      const firstName = profile?.first_name || '';
-      const lastName = profile?.last_name || '';
-      const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
-      const yasadigi = profile?.neighborhood || '';
-      const dogumYeri = profile?.birth_place || '';
-      const phone = profile?.phone || '';
-      const referralCode = profile?.referral_code || '';
-      const languagePref = normalizeLang(profile?.language_pref);
-      const themePref = normalizeTheme(profile?.theme_pref);
-      const palettePref = normalizePalette(profile?.palette_pref);
-      let avatarUrl = profile?.avatar_url || null;
-      // Apply the freshly-fetched DB value now, synchronously, so the
-      // avatar (and everything else gated on Palette.current) renders in
-      // the right colors immediately instead of racing the slower
-      // Palette.syncFromSupabase call some pages also make on load.
-      if (global.Palette) global.Palette.setPalette(palettePref);
+  // Fetches everything the card needs exactly once per session. `avatarUrl`
+  // is carried on the returned object (not recomputed on later renders)
+  // because pickAvatar() mutates it in place so a later setPage() call
+  // still reflects a just-picked avatar without re-fetching.
+  async function fetchProfileData(sb, I18N, user) {
+    const today = istanbulTodayISO();
 
-      const yasadigiDisplay = yasadigi ? (NB_NAMES[yasadigi] || yasadigi) : '—';
-      const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
-      const joinedDate = I18N.formatDate(user.created_at, { year:'numeric', month:'long', day:'numeric' });
-      const lastSeenText = formatLastSeen(user.last_sign_in_at, I18N);
+    const [{ data: profile }, { count: kefaletCount }, { count: sozculCount }] = await Promise.all([
+      sb.from('profiles').select('*').eq('id', user.id).single(),
+      sb.from('profiles').select('*', { count: 'exact', head: true }).eq('referred_by', user.id),
+      sb.from('sozcel_sozcul_assignments').select('*', { count: 'exact', head: true }).eq('user_id', user.id).lte('game_date', today),
+    ]);
 
-      const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
+    let kefilOfUser = null;
+    if (profile && profile.referred_by) {
+      const { data: kp } = await sb
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .eq('id', profile.referred_by)
+        .maybeSingle();
+      if (kp) kefilOfUser = kp;
+    }
 
-      function avatarHTML() {
+    const palettePref = normalizePalette(profile?.palette_pref);
+    // Apply the freshly-fetched DB value now, synchronously, so the
+    // avatar (and everything else gated on Palette.current) renders in
+    // the right colors immediately instead of racing the slower
+    // Palette.syncFromSupabase call some pages also make on load.
+    if (global.Palette) global.Palette.setPalette(palettePref);
+
+    return {
+      sb, I18N, user, profile, kefaletCount, sozculCount, kefilOfUser,
+      avatarUrl: profile?.avatar_url || null,
+    };
+  }
+
+  // Renders the card into `container` for the given `page` context, using
+  // already-fetched `state`. Callable repeatedly (via setPage) without
+  // hitting Supabase again — only mount()'s first call ever fetches.
+  function renderPage(container, page, state) {
+    const { I18N, user, profile, kefaletCount, sozculCount, kefilOfUser } = state;
+    const firstName = profile?.first_name || '';
+    const lastName = profile?.last_name || '';
+    const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
+    const yasadigi = profile?.neighborhood || '';
+    const dogumYeri = profile?.birth_place || '';
+    const phone = profile?.phone || '';
+    const referralCode = profile?.referral_code || '';
+    const languagePref = normalizeLang(profile?.language_pref);
+    const themePref = normalizeTheme(profile?.theme_pref);
+    const palettePref = normalizePalette(profile?.palette_pref);
+    const sb = state.sb;
+    let avatarUrl = state.avatarUrl;
+
+    const yasadigiDisplay = yasadigi ? (NB_NAMES[yasadigi] || yasadigi) : '—';
+    const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
+    const joinedDate = I18N.formatDate(user.created_at, { year:'numeric', month:'long', day:'numeric' });
+    const lastSeenText = formatLastSeen(user.last_sign_in_at, I18N);
+
+    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
+
+    function avatarHTML() {
         return avatarUrl
           ? `<img src="${esc(avatarSrc(avatarUrl))}" alt="">`
           : esc(displayName.charAt(0).toUpperCase());
@@ -423,7 +476,7 @@
               <div class="ist-pc-name">${esc(displayName)}</div>
               <div class="ist-pc-meta">${esc(yasadigiDisplay)}</div>
             </div>
-            ${hasPanel ? `<button type="button" class="ist-pc-toggle" id="ist-pc-toggle">${esc(toggleLabel)}</button>` : ''}
+            ${hasPanel ? `<button type="button" class="ist-pc-toggle" id="ist-pc-toggle" data-label="${esc(toggleLabel)}">${esc(toggleLabel)}</button>` : ''}
           </div>
           ${page === 'anahane'   ? ayarlarPanelHTML() : ''}
           ${page === 'kutuphane' ? duzenlePanelHTML() : ''}
@@ -458,9 +511,23 @@
         if (e.target === panel) closePanel();
       });
 
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && root.classList.contains('open')) closePanel();
-      });
+      // A single persistent document-level Escape listener, shared across
+      // every renderPage() call (and every future setPage() re-render), so
+      // repeated navigations don't stack up one handler each — it always
+      // re-queries the live #ist-pc-root/#ist-pc-toggle instead of closing
+      // over this particular render's now-possibly-stale `root`/`toggleBtn`.
+      if (!_escListener) {
+        _escListener = (e) => {
+          if (e.key !== 'Escape') return;
+          const r = document.getElementById('ist-pc-root');
+          if (!r || !r.classList.contains('open')) return;
+          r.classList.remove('open');
+          const btn = document.getElementById('ist-pc-toggle');
+          if (btn) btn.textContent = btn.dataset.label || btn.textContent;
+          document.body.style.overflow = '';
+        };
+        document.addEventListener('keydown', _escListener);
+      }
 
       if (page === 'anahane') {
         // Sliders + save (language and theme only)
@@ -566,6 +633,7 @@
             return;
           }
           avatarUrl = url;
+          state.avatarUrl = url; // persist so a later setPage() re-render (no re-fetch) still reflects the pick
           const av = document.getElementById('ist-pc-avatar');
           if (av) av.innerHTML = `<img src="${esc(avatarSrc(url))}" alt="">`;
           document.querySelectorAll('#ist-pc-avatar-picker .ist-avatar-option').forEach(b => {
@@ -583,11 +651,12 @@
           if (m) m.innerHTML = scoresHTML(scores);
         });
       }
-    }
   }
 
   global.IstProfileCard = {
     mount,
+    setPage,
+    unmount,
     AVATAR_OPTIONS,
     AVATAR_LOCK_SVG,
     buildAvatarPicker,

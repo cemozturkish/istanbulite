@@ -114,6 +114,10 @@
   let currentLang = readCached();
   const listeners = [];
   function onChange(cb) { if (typeof cb === 'function') listeners.push(cb); }
+  function offChange(cb) {
+    const i = listeners.indexOf(cb);
+    if (i !== -1) listeners.splice(i, 1);
+  }
   function emit() { listeners.forEach(cb => { try { cb(currentLang); } catch (e) { console.error(e); } }); }
 
   function readCached() {
@@ -277,7 +281,7 @@
   else document.addEventListener('DOMContentLoaded', () => applyToDOM());
 
   global.I18N = {
-    t, setLang, applyToDOM, isEnglish, onChange,
+    t, setLang, applyToDOM, isEnglish, onChange, offChange,
     formatDate, formatTime, formatWeekday, formatCountdown, formatMinutes, formatMemberSince,
     formatWeekReset, formatNeighborhoodBest,
     formatFoundInGuesses, formatFoundInGuessesFirst, formatTodaysWordPoints, sozcelResultTitle,
