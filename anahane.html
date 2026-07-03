@@ -410,6 +410,10 @@
       pointer-events: painted;
     }
 
+    /* Mobile-only draft map image -- hidden on desktop, shown instead of
+       the svg inside the mobile media query below. */
+    .map-mobile-draft { display: none; }
+
     .neighborhood {
       cursor: pointer;
       fill: transparent;
@@ -733,98 +737,82 @@
       .q-buttons-inline { display: flex; gap: 8px; }
 
       #main-site {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto auto auto 1fr;
+        position: relative;
         height: 100%;
         overflow: hidden;
-        /* Reserve space for fixed bottom tab bar + a frame-gap so the
-           cards don't visually press against the nav (frames.css design). */
-        padding-bottom: calc(56px + env(safe-area-inset-bottom) + var(--frame-gap, 10px));
       }
 
-      /* Undo the desktop floating-card treatment (position:fixed, blur,
-         shadow, rounded corners) so these participate in the mobile grid
-         exactly as before — mobile keeps the original boxed layout. */
-      .col-left, .col-right, header, .section-rule, main {
-        grid-column: unset; grid-row: unset;
-        position: static;
-        inset: auto;
-        border-radius: 0;
-        box-shadow: none;
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
+      /* Map fills the entire screen as a fixed background layer, same
+         mechanism as desktop -- draft/placeholder art for now, no
+         hit-regions traced yet. Base rule already has main pinned
+         fixed/inset; on mobile there's no docked top bar reserving
+         space, so pull the top edge all the way to 0. */
+      main { top: 0; }
+      .map-panel svg { display: none; }
+      .map-mobile-draft {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .map-label {
+        bottom: calc(56px + env(safe-area-inset-bottom) + 14px);
+        left: 50%;
+        right: auto;
+        font-size: 11px;
+        letter-spacing: 1px;
+        padding: 7px 18px;
       }
 
-      /* Mobile profile card sits at the very top */
+      /* Profile bar: floats at the very top. */
       #ist-pc-mount {
-        grid-column: 1 / -1;
-        grid-row: 1;
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        z-index: 10;
+        max-height: 40vh;
         overflow-y: auto;
-        max-height: 50vh;
       }
 
-      /* Compact top brand bar */
+      /* Istanbulite masthead bar: floats just below the profile bar.
+         NOTE: top:78px is a placeholder guess for the profile card's
+         rendered height -- needs tuning once real profile-card content
+         is in place, not just this stubbed draft pass.
+         No backdrop-filter here (unlike the other floating panels): its
+         child <header> is position:fixed and gets pulled out to become
+         the bottom tab bar -- backdrop-filter creates a new containing
+         block for fixed descendants, which would trap header inside
+         this small top bar instead of the viewport. */
       .section-rule {
-        grid-column: 1 / -1;
-        grid-row: 2;
-        padding: 10px 14px 8px 14px;
-        border-bottom: 1px solid var(--rule);
-        background: var(--paper);
+        top: 78px;
+        left: 12px;
+        right: 12px;
+        padding: 10px 14px;
         display: flex;
         justify-content: space-between;
         align-items: center;
         gap: 12px;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
       }
       .masthead { font-size: 1.05rem; }
       .datetime-block { gap: 8px; font-size: 9px; letter-spacing: 1.5px; }
       .datetime-block .day-line, .datetime-block .sep:nth-of-type(2) { display: none; }
 
-      /* Map: fills horizontally, height determined by aspect ratio */
-      main {
-        grid-column: 1 / -1;
-        grid-row: 3;
-        overflow: hidden;
-        display: block;
+      /* News + events: floating panel pair docked above the bottom tab
+         bar, side by side like they sat before. Placement here is a
+         placeholder -- wasn't specified yet, easiest to react to once
+         you see it live. */
+      .col-left, .col-right {
+        top: auto;
+        bottom: calc(56px + env(safe-area-inset-bottom) + 12px);
+        height: 32vh;
+        width: auto;
       }
-      .map-panel {
-        position: static;
-        padding: 0;
-        display: block;
-        overflow: hidden;
-      }
-      .map-panel svg {
-        display: block;
-        width: 100%;
-        height: auto;
-      }
-      .map-label {
-        position: static;
-        transform: none;
-        margin: 4px 0 6px 0;
-        padding: 4px 14px;
-        border-radius: 0;
-        background: transparent;
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        box-shadow: none;
-        font-size: 11px;
-        letter-spacing: 1px;
-        text-align: center;
-      }
+      .col-left { left: 12px; right: calc(50% + 5px); }
+      .col-right { left: calc(50% + 5px); right: 12px; }
 
-      /* Left column below map: news feed */
-      .col-left {
-        grid-column: 1;
-        grid-row: 4;
-        min-height: 0;
-        overflow: hidden;
-        background: var(--paper-warm);
-        border-right: 1px solid var(--rule);
-        border-top: 1px solid var(--rule);
-        display: flex;
-        flex-direction: column;
-      }
       .sidebar-left {
         overflow: hidden;
         flex: 1;
@@ -855,19 +843,6 @@
         font-size: 10px;
         line-height: 1.35;
       }
-
-      /* Right column below map: neighborhood articles */
-      .col-right {
-        grid-column: 2;
-        grid-row: 4;
-        min-height: 0;
-        overflow: hidden;
-        background: var(--paper-warm);
-        border-left: none;
-        border-top: 1px solid var(--rule);
-        display: flex;
-        flex-direction: column;
-      }
       .sidebar-right-inner {
         padding: 8px 12px;
         gap: 6px;
@@ -875,10 +850,7 @@
       .no-articles { font-size: 11px; padding: 14px 8px; }
       .news-filter-btn { font-size: 9px; padding: 4px 2px; letter-spacing: 0; }
 
-      /* Bottom tab bar — fixed at bottom */
-      .section-rule > .masthead,
-      .section-rule > header,
-      .section-rule > .datetime-block { justify-self: auto; }
+      /* Bottom tab bar — fixed at bottom, unchanged */
       header {
         position: fixed;
         bottom: 0;
@@ -1333,6 +1305,12 @@
           <!-- Kocaeli-side landmass standing in for "istanbul_disi" -->
           <g class="map-istanbul-disi"><polygon points="3215.37 1460.46 3036.05 1596.39 3029.03 1740.38 2881.23 1844.36 2923.88 1860.94 2923.88 1872.35 2947.96 1881.22 2984.71 1852.07 3173.54 1917.97 3172.28 1942.05 3190.02 1953.46 3210.3 1949.66 3215.37 1460.46"/></g>
         </svg>
+
+        <!-- Mobile portrait map: draft/placeholder art only, no hit-regions
+             traced yet -- layout planning, real SVG comes later. Desktop
+             svg above is hidden on mobile and vice versa (see mobile
+             media query). -->
+        <img class="map-mobile-draft" src="assets/istanbul-map-mobile.png" alt="">
 
       <div class="map-label" id="map-label">İstanbul</div>
     </section>
