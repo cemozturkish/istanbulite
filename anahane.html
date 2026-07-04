@@ -429,6 +429,53 @@
     .neighborhood.home:hover { fill: rgba(164, 50, 43, 0.26); }
     .neighborhood.home.active { fill: rgba(164, 50, 43, 0.38); stroke: var(--brown-4); stroke-dasharray: none; }
 
+    /* ── Beşiktaş zoom-in marker (prototype) ──
+       Stands in for a traced SVG hit-region until the real map is
+       re-traced (see the scrapped-SVG comment on .map-panel above);
+       position below is eyeballed, not surveyed coordinates. Shares
+       view-transition-name with kahvehane.html's mahalle zoom panel so
+       the cross-document navigation morphs this dot into the full
+       mahalle grid instead of just cross-fading. */
+    .ilce-marker {
+      position: absolute;
+      top: 24%;
+      left: 40%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      view-transition-name: ist-nb-zoom;
+    }
+    .ilce-marker-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--ink-red);
+      border: 3px solid var(--paper);
+      box-shadow: 0 0 0 2px var(--ink-red);
+    }
+    .ilce-marker-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--paper);
+      background: rgba(var(--ink-rgb), 0.82);
+      padding: 3px 10px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    ::view-transition-group(ist-nb-zoom) {
+      animation-duration: 480ms;
+      animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
     .map-label {
       position: fixed;
       bottom: 24px;
@@ -1185,6 +1232,11 @@
         <img class="map-mobile-draft" src="assets/istanbul-map-mobile.png" alt="">
 
       <div class="map-label" id="map-label">İstanbul</div>
+
+      <button type="button" class="ilce-marker" id="ilce-marker-besiktas" aria-label="Beşiktaş — mahallelere yakınlaş">
+        <span class="ilce-marker-dot"></span>
+        <span class="ilce-marker-label">Beşiktaş</span>
+      </button>
     </section>
   </main>
 
@@ -1507,6 +1559,24 @@
   } else {
     handleIncoming();
   }
+})();
+
+// ══════════════════════════════════════════
+// Mahalle zoom-in prototype (Beşiktaş only)
+// Flags the next Kahvehane load to render its mahalle grid instead of
+// the plain map, then lets the existing forward navigation (and its
+// cross-document view transition) carry the shared ist-nb-zoom element.
+// ══════════════════════════════════════════
+(function initIlceZoomMarker() {
+  const marker = document.getElementById('ilce-marker-besiktas');
+  if (!marker) return;
+  marker.addEventListener('click', () => {
+    try {
+      sessionStorage.setItem('ist-page-enter-dir', 'forward');
+      sessionStorage.setItem('ist-zoom-target', 'besiktas');
+    } catch (e) {}
+    location.href = 'kahvehane.html';
+  });
 })();
 
 // ══════════════════════════════════════════

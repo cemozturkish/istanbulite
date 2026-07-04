@@ -222,6 +222,56 @@
     .neighborhood.home:hover { fill: var(--accent-2); }
     .neighborhood.home.active { fill: var(--accent-2); stroke: var(--brown-4); }
 
+    /* ── Mahalle zoom-in prototype (Beşiktaş only) ──
+       Swapped in over the plain map by the inline script right after
+       .map-panel below, only when arriving from anahane.html's
+       Beşiktaş marker. Shares view-transition-name with that marker so
+       the cross-document navigation morphs the small dot into this
+       full grid instead of a plain cross-fade. */
+    .map-panel.mahalle-zoom-active {
+      view-transition-name: ist-nb-zoom;
+      z-index: 1;
+    }
+    ::view-transition-group(ist-nb-zoom) {
+      animation-duration: 480ms;
+      animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .mahalle-zoom {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      padding: 40px 24px;
+      background: var(--paper);
+      overflow: auto;
+    }
+    .mahalle-zoom-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--ink);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    .mahalle-zoom-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      max-width: 640px;
+    }
+    .mahalle-tile {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--ink);
+      background: var(--paper-banner);
+      border: 1px solid var(--rule);
+      border-radius: 999px;
+      padding: 7px 16px;
+    }
+
     .map-label {
       position: fixed;
       bottom: 24px;
@@ -1146,8 +1196,47 @@
            regions re-traced against this photo will replace this plain image. -->
       <img class="map-photo" src="assets/istanbul-map.png" alt="">
       <div class="map-label" id="map-label">İstanbul</div>
+      <div class="mahalle-zoom" id="mahalle-zoom" hidden>
+        <div class="mahalle-zoom-title">Beşiktaş</div>
+        <div class="mahalle-zoom-grid" id="mahalle-zoom-grid"></div>
+      </div>
     </section>
   </main>
+  <script>
+  // Mahalle zoom-in prototype (Beşiktaş only): runs inline, synchronously,
+  // right after the markup above so the swap happens before first paint
+  // instead of flashing the plain map first. One-shot — the flag is
+  // consumed immediately, so a later normal load of this page (Kütüphane
+  // swipe, tab click, refresh) renders the plain map as usual.
+  (function () {
+    let target;
+    try { target = sessionStorage.getItem('ist-zoom-target'); } catch (e) { target = null; }
+    if (target !== 'besiktas') return;
+    try { sessionStorage.removeItem('ist-zoom-target'); } catch (e) {}
+
+    const BESIKTAS_MAHALLE = [
+      'Abbasağa', 'Akatlar', 'Arnavutköy', 'Balmumcu', 'Bebek', 'Cihannüma',
+      'Dikilitaş', 'Etiler', 'Gayrettepe', 'Konaklar', 'Kuruçeşme', 'Kültür',
+      'Levazım', 'Levent', 'Mecidiye', 'Muradiye', 'Nispetiye', 'Ortaköy',
+      'Sinanpaşa', 'Türkali', 'Ulus', 'Vişnezade', 'Yıldız'
+    ];
+
+    const panel = document.querySelector('.map-panel');
+    const zoomEl = document.getElementById('mahalle-zoom');
+    const gridEl = document.getElementById('mahalle-zoom-grid');
+    if (!panel || !zoomEl || !gridEl) return;
+
+    gridEl.innerHTML = BESIKTAS_MAHALLE
+      .map((name) => '<span class="mahalle-tile">' + name + '</span>')
+      .join('');
+    panel.classList.add('mahalle-zoom-active');
+    zoomEl.hidden = false;
+    const photo = panel.querySelector('.map-photo');
+    const label = panel.querySelector('.map-label');
+    if (photo) photo.style.display = 'none';
+    if (label) label.style.display = 'none';
+  })();
+  </script>
 
   <aside class="col-right">
     <section class="games-section">
