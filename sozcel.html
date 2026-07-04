@@ -147,7 +147,6 @@
       flex-direction: column;
       overflow: hidden;
       min-height: 0;
-      view-transition-name: ist-col-left;
     }
     .col-left .nb-highlight {
       padding: 12px 18px;
@@ -170,13 +169,8 @@
       display: flex;
       flex-direction: column;
       overflow-y: auto;
-      view-transition-name: ist-col-right;
     }
 
-    /* Shared with kahvehane.html: the board rises up from the bottom
-       like a sheet when entering from Kahvehane's game list, and sinks
-       back down when leaving via the ← Geri button. See kahvehane.html
-       for the .game-link click handler / referrer-based trigger. */
     main {
       grid-column: 2;
       grid-row: 2;
@@ -185,17 +179,6 @@
       overflow: hidden;
       min-height: 0;
       position: relative;
-      view-transition-name: ist-game-stage;
-    }
-
-    @view-transition { navigation: auto; }
-    @keyframes ist-stage-out-down { from { transform: translateY(0); } to { transform: translateY(100%); } }
-    @keyframes ist-stage-in-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
-    ::view-transition-old(ist-game-stage) {
-      animation: 380ms cubic-bezier(0.4, 0, 0.2, 1) both ist-stage-out-down;
-    }
-    ::view-transition-new(ist-game-stage) {
-      animation: 380ms cubic-bezier(0.4, 0, 0.2, 1) both ist-stage-in-up;
     }
 
     /* Left: personal + community stats (compact) */
@@ -1552,6 +1535,19 @@
 
   <main>
     <a href="kahvehane.html" class="game-back-btn" aria-label="Geri" title="Geri">←</a>
+    <script>
+      // Opened as kahvehane.html's game overlay (an iframe), not a
+      // standalone page: closing means telling the parent to hide the
+      // sheet, not actually navigating this iframe to kahvehane.html.
+      // Visiting this page directly (no parent) keeps the plain <a href>
+      // fallback so it still works on its own.
+      if (window.self !== window.top) {
+        document.querySelector('.game-back-btn').addEventListener('click', (e) => {
+          e.preventDefault();
+          parent.postMessage('ist-close-game-overlay', '*');
+        });
+      }
+    </script>
     <div class="game-controls-left" id="game-controls-left">
       <button class="game-ctrl-btn" id="mobile-score-btn" type="button" aria-label="Skor Tablosu" title="Skor Tablosu">≡</button>
       <button class="game-ctrl-btn" id="mobile-sozcul-btn" type="button" aria-label="Sözcü Görevi" title="Sözcü Görevi" style="display:none;">✎</button>
