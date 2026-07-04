@@ -17,6 +17,8 @@
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
+  <link rel="stylesheet" href="mahalle-picker.css">
+  <script src="mahalle-picker.js" defer></script>
   <script src="admin-notification.js" defer></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis). Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot. -->
   <script>
@@ -1650,6 +1652,18 @@ async function showSite(user) {
       IstOnboarding.maybeRun({ sb, user, page: 'anahane' });
     } else if (tries > 0) {
       setTimeout(() => tryOnb(tries - 1), 60);
+    }
+  })(40);
+
+  // Post-login mahalle picker: independent of onboarding.js (which only
+  // ever runs once, on first login) so it also reaches existing users
+  // whose ilçe gained mahalle data after they already signed up. No-ops
+  // on its own if the ilçe has no mahalle rows yet or one is already set.
+  (function tryMahallePicker(tries) {
+    if (window.MahallePicker) {
+      MahallePicker.maybeRun({ sb, user });
+    } else if (tries > 0) {
+      setTimeout(() => tryMahallePicker(tries - 1), 60);
     }
   })(40);
 
