@@ -506,6 +506,7 @@
 
     #breaking-news-feed {
       overflow-y: auto;
+      overflow-x: hidden;
       flex: 1;
       min-height: 0;
     }
@@ -628,6 +629,7 @@
     .sidebar-right {
       padding: 0;
       overflow-y: auto;
+      overflow-x: hidden;
       display: flex;
       flex-direction: column;
     }
@@ -1087,6 +1089,30 @@
       font-size: 0.7rem;
       color: var(--card-fg-muted);
     }
+
+    /* News (left) and event (right) cards slide in from their own
+       column's outer screen edge on render, and slide back out the
+       same way when the feed is about to be replaced -- see the
+       animateFeedSwap() helper used by renderBreakingNewsFeed() /
+       renderEvents(). Generic so it also covers the "no articles/
+       events" empty-state message. */
+    @keyframes card-slide-in-left {
+      from { transform: translateX(-100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes card-slide-in-right {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .card-entering-left { animation: card-slide-in-left 0.4s ease-out; }
+    .card-entering-right { animation: card-slide-in-right 0.4s ease-out; }
+    .card-leaving-left,
+    .card-leaving-right {
+      transition: transform 0.3s ease-in, opacity 0.3s ease-in;
+      opacity: 0;
+    }
+    .card-leaving-left { transform: translateX(-100%); }
+    .card-leaving-right { transform: translateX(100%); }
 
     @media (max-width: 768px) {
       @keyframes ist-vt-out-left { from { transform: translateX(0); } to { transform: translateX(-100vw); } }
@@ -2062,9 +2088,36 @@ function safeUrl(u) {
   return null;
 }
 
+// Slides a feed panel's current cards out toward their column's outer
+// screen edge, then rebuilds it and slides the fresh cards back in from
+// that same edge. `direction` is 'left' (breaking news, left column) or
+// 'right' (events, right column) -- see the .card-entering-*/.card-leaving-*
+// CSS. Renders immediately (no leave animation) on first paint, when the
+// panel starts out empty.
+const CARD_SWAP_MS = 300;
+function animateFeedSwap(container, direction, buildFn) {
+  const enterClass = direction === 'left' ? 'card-entering-left' : 'card-entering-right';
+  const leaveClass = direction === 'left' ? 'card-leaving-left' : 'card-leaving-right';
+  const playEnter = () => {
+    buildFn();
+    Array.from(container.children).forEach(el => {
+      el.classList.add(enterClass);
+      el.addEventListener('animationend', () => el.classList.remove(enterClass), { once: true });
+    });
+  };
+  const existing = Array.from(container.children);
+  if (!existing.length) { playEnter(); return; }
+  existing.forEach(el => el.classList.add(leaveClass));
+  setTimeout(playEnter, CARD_SWAP_MS);
+}
+
 function renderBreakingNewsFeed(rows) {
   const feed = document.getElementById('breaking-news-feed');
   if (!feed) return;
+  animateFeedSwap(feed, 'left', () => renderBreakingNewsFeedNow(feed, rows));
+}
+
+function renderBreakingNewsFeedNow(feed, rows) {
   if (!rows.length) {
     feed.innerHTML = `<p class="no-articles" style="padding:12px;">${I18N.t('home.breaking.empty')}</p>`;
     return;
@@ -2264,6 +2317,10 @@ function renderEvents() {
   if (!panel) return;
   let rows = allEvents;
   if (activeNeighborhood) rows = rows.filter(ev => ev.neighborhood === activeNeighborhood);
+  animateFeedSwap(panel, 'right', () => renderEventsNow(panel, rows));
+}
+
+function renderEventsNow(panel, rows) {
   if (!rows.length) {
     panel.innerHTML = `<p class="no-articles" style="padding:12px 18px;">${I18N.t('home.events.empty')}</p>`;
     return;
