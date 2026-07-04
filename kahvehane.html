@@ -30,18 +30,6 @@
           document.documentElement.classList.add('vt-' + _d);
         }
       } catch(e) {}
-      // Arriving back from a game (via its ← Geri button): tag <html> so
-      // .map-panel picks up the shared ist-game-stage view-transition-name
-      // before VT captures this page as the "new" snapshot, and the map
-      // rises up over the departing game board instead of the default
-      // crossfade. Referrer-based since the game page's back link is a
-      // plain <a href>, not JS-driven — no sessionStorage round-trip needed.
-      try {
-        var _ref = document.referrer && new URL(document.referrer).pathname;
-        if (_ref && /\/(sozcel|tumcel|bulmaca)\.html$/.test(_ref)) {
-          document.documentElement.classList.add('ist-from-game');
-        }
-      } catch(e) {}
     })();
   </script>
   <style>
@@ -1053,28 +1041,61 @@
     }
 
     /* ══════════════════════════════════════════════
-       Entering/leaving a game: the board rises up from
-       the bottom like a sheet, covering the map (and
-       vice versa going back) — direction-agnostic, unlike
-       the carousel's vt-forward/backward pair above.
-       Whichever page is "old" always sinks down and out;
-       whichever is "new" always rises up and in. Forward
-       trigger: the .game-link click handler below tags
-       .map-panel with the shared name before navigating.
-       Backward trigger: the ist-from-game class from the
-       pre-body referrer check in <head>. Each game page
-       carries this name on its own <main> unconditionally
-       (see sozcel.html/tumcel.html/bulmaca.html). */
-    @keyframes ist-stage-out-down { from { transform: translateY(0); } to { transform: translateY(100%); } }
-    @keyframes ist-stage-in-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
-    ::view-transition-old(ist-game-stage) {
-      animation: 380ms cubic-bezier(0.4, 0, 0.2, 1) both ist-stage-out-down;
+       Game overlay: a bottom sheet that rises over the
+       map instead of navigating to a separate page. The
+       game itself renders in an iframe (sozcel.html etc.
+       stay self-contained, unmodified pages) — see the
+       markup near .col-right below and the script at the
+       bottom of the file for open/close wiring. */
+    .game-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
     }
-    ::view-transition-new(ist-game-stage) {
-      animation: 380ms cubic-bezier(0.4, 0, 0.2, 1) both ist-stage-in-up;
+    .game-overlay[hidden] { display: none; }
+    .game-overlay-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      opacity: 0;
+      transition: opacity 0.35s;
     }
-    html.ist-from-game .map-panel {
-      view-transition-name: ist-game-stage;
+    .game-overlay.open .game-overlay-backdrop { opacity: 1; }
+    .game-overlay-sheet {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 92vh;
+      background: var(--paper);
+      border-top: 2px solid var(--ink);
+      box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .game-overlay.open .game-overlay-sheet { transform: translateY(0); }
+    .game-overlay-close {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      z-index: 2;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 1rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .game-overlay-frame {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      border: none;
     }
 
     /* ── Profile popup ── */
@@ -1372,6 +1393,17 @@
       </div>
     </section>
   </aside>
+  </div>
+
+  <!-- Game overlay: bottom sheet housing an iframe, opened instead of
+       navigating to sozcel.html/tumcel.html/bulmaca.html — see the
+       initGameOverlay script further down. -->
+  <div class="game-overlay" id="game-overlay" hidden>
+    <div class="game-overlay-backdrop" id="game-overlay-backdrop"></div>
+    <div class="game-overlay-sheet">
+      <button type="button" class="game-overlay-close" id="game-overlay-close" aria-label="Kapat" title="Kapat">✕</button>
+      <iframe class="game-overlay-frame" id="game-overlay-frame" title="Oyun"></iframe>
+    </div>
   </div>
 
 <script>
@@ -1678,18 +1710,44 @@
   }
 })();
 
-// Entering a game: tag .map-panel with the shared ist-game-stage name
-// right before the browser snapshots this page as "old", so the game
-// board rises up over it instead of a plain crossfade (see the
-// ist-game-stage rules above and the referrer check in <head> for the
-// reverse trip). Plain <a href> underneath — no preventDefault, the
-// browser's own cross-document view transition takes it from here.
-document.querySelectorAll('.game-link').forEach((link) => {
-  link.addEventListener('click', () => {
-    const panel = document.querySelector('.map-panel');
-    if (panel) panel.style.viewTransitionName = 'ist-game-stage';
+// Game overlay: clicking a game link opens it as a bottom sheet (an
+// iframe loading the game's own, otherwise-unmodified page) instead of
+// navigating away from Kahvehane. Closing it — the ✕ button, clicking
+// the backdrop, or a postMessage from the game's own ← Geri button
+// (see sozcel.html/tumcel.html/bulmaca.html) — just hides the sheet;
+// Kahvehane itself was never actually left.
+(function initGameOverlay() {
+  const overlay = document.getElementById('game-overlay');
+  const frame = document.getElementById('game-overlay-frame');
+  const backdrop = document.getElementById('game-overlay-backdrop');
+  const closeBtn = document.getElementById('game-overlay-close');
+  if (!overlay || !frame || !backdrop || !closeBtn) return;
+
+  function openGame(href) {
+    frame.src = href;
+    overlay.hidden = false;
+    requestAnimationFrame(() => overlay.classList.add('open'));
+  }
+  function closeGame() {
+    overlay.classList.remove('open');
+    setTimeout(() => {
+      overlay.hidden = true;
+      frame.src = 'about:blank';
+    }, 400);
+  }
+
+  document.querySelectorAll('.game-link').forEach((link) => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      openGame(link.getAttribute('href'));
+    });
   });
-});
+  backdrop.addEventListener('click', closeGame);
+  closeBtn.addEventListener('click', closeGame);
+  window.addEventListener('message', (e) => {
+    if (e.source === frame.contentWindow && e.data === 'ist-close-game-overlay') closeGame();
+  });
+})();
 
 setInterval(() => {
   const cdEl = document.getElementById('scoreboard-countdown');
