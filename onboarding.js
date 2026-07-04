@@ -411,8 +411,8 @@
   }
   function hydrateFromState(s) {
     lang = s.lang || 'en';
-    palette = s.palette || 'earth';
-    mascot = s.mascot || 'dog';
+    palette = s.palette || 'mono';
+    mascot = s.mascot || 'cat';
     kefilName = s.kefilName || '';
     referralCode = s.referralCode || '';
     homeNb = s.homeNb || null;
@@ -638,7 +638,7 @@
       pane.id = 'ist-onb-pane';
       document.body.appendChild(pane);
     }
-    pane.setAttribute('data-palette', palette || 'earth');
+    pane.setAttribute('data-palette', palette || 'mono');
   }
 
   // Add a newly-introduced element to the lit set. Previously-lit elements
@@ -1007,7 +1007,7 @@
   function buildRoot() {
     root = document.createElement('div');
     root.id = ROOT_ID;
-    root.setAttribute('data-palette', 'earth');
+    root.setAttribute('data-palette', 'mono');
     root.innerHTML = `
       <div class="ist-onb-tap-zone"></div>
       <div id="ist-onb-stage"></div>

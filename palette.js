@@ -2,7 +2,7 @@
 // Reads `profiles.palette_pref` (cached in localStorage for instant first paint),
 // sets data-palette on <html>, and exposes a setter the AYARLAR panel calls.
 //
-// Values: 'earth' (default — warm cream / brown) | 'mono' (siyah-beyaz).
+// Values: 'mono' (default — siyah-beyaz) | 'earth' (warm cream / brown).
 // Pages declare warm/earth tokens inline; palette.css overrides them when
 // data-palette="mono". See palette.css for the override block.
 
@@ -13,8 +13,8 @@
   function readCached() {
     try {
       const v = localStorage.getItem(STORAGE_KEY);
-      return VALID.has(v) ? v : 'earth';
-    } catch (e) { return 'earth'; }
+      return VALID.has(v) ? v : 'mono';
+    } catch (e) { return 'mono'; }
   }
   function writeCached(v) {
     try { localStorage.setItem(STORAGE_KEY, v); } catch (e) { /* ignore */ }
@@ -27,7 +27,7 @@
   }
 
   function setPalette(v) {
-    if (!VALID.has(v)) v = 'earth';
+    if (!VALID.has(v)) v = 'mono';
     current = v;
     writeCached(v);
     apply();
