@@ -443,20 +443,6 @@
     .neighborhood.home:hover { fill: rgba(164, 50, 43, 0.26); }
     .neighborhood.home.active { fill: rgba(164, 50, 43, 0.38); stroke: var(--brown-4); stroke-dasharray: none; }
 
-    /* Beşiktaş carries the shared view-transition-name with kahvehane.html's
-       mahalle zoom panel, so leaving Hane for Kahvehane (see
-       maybeFlagMahalleZoom() in the swipe-pagination script below) morphs
-       this polygon's shape into the full mahalle grid instead of just
-       cross-fading. Hardcoded to Beşiktaş for now — the only ilçe with
-       mahalle data — same scope as maybeFlagMahalleZoom(). */
-    #besiktas {
-      view-transition-name: ist-nb-zoom;
-    }
-    ::view-transition-group(ist-nb-zoom) {
-      animation-duration: 480ms;
-      animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
     .map-label {
       position: fixed;
       bottom: 24px;
@@ -1405,20 +1391,6 @@
     });
   }
 
-  // Flags the next Kahvehane load to render its mahalle grid instead of
-  // the plain map — but only if the user actually has Beşiktaş selected
-  // on Hane's map when they leave (activeNeighborhood, set by the
-  // .neighborhood click handler further down). Otherwise Kahvehane just
-  // shows its normal view — leaving Hane for Kahvehane shouldn't hijack
-  // every visit into a Beşiktaş-only screen. Hardcoded to Beşiktaş for
-  // now since it's the only ilçe with mahalle data; once more ilçes have
-  // data, check activeNeighborhood against that list instead of a single id.
-  function maybeFlagMahalleZoom(targetHref) {
-    if (targetHref !== 'kahvehane.html') return;
-    if (activeNeighborhood !== 'besiktas') return;
-    try { sessionStorage.setItem('ist-zoom-target', 'besiktas'); } catch (e) {}
-  }
-
   let navigating = false;
   function navigate(targetIdx, dir) {
     if (navigating) return;
@@ -1427,7 +1399,6 @@
     if (targetIdx === curr) return;
     navigating = true;
     recordDir(dir);
-    maybeFlagMahalleZoom(PAGES[targetIdx]);
     if (supportsVT) {
       // The browser will trigger a view transition on this navigation.
       location.href = PAGES[targetIdx];
@@ -1571,7 +1542,6 @@
     if (targetIdx === -1 || targetIdx === curr) return;
     const dir = targetIdx > curr ? 'forward' : 'backward';
     const dist = Math.abs(targetIdx - curr);
-    maybeFlagMahalleZoom(href);
     if (supportsVT && dist >= 2) {
       e.preventDefault();
       multiHopSlide(curr, targetIdx);
