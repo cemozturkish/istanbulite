@@ -448,13 +448,20 @@
     .neighborhood.home:hover { fill: rgba(164, 50, 43, 0.26); }
     .neighborhood.home.active { fill: rgba(164, 50, 43, 0.38); stroke: var(--brown-4); stroke-dasharray: none; }
 
-    /* ── Beşiktaş zoom-in marker (prototype) ──
+    /* ── Beşiktaş marker (prototype) ──
        Stands in for a traced SVG hit-region until the real map is
        re-traced (see the scrapped-SVG comment on .map-panel above);
-       position below is eyeballed, not surveyed coordinates. Shares
-       view-transition-name with kahvehane.html's mahalle zoom panel so
-       the cross-document navigation morphs this dot into the full
-       mahalle grid instead of just cross-fading. */
+       position below is eyeballed, not surveyed coordinates. Also
+       carries the plain .neighborhood class so clicking it plugs into
+       the existing activeNeighborhood/news-filter system below instead
+       of navigating anywhere — tapping an ilçe on Hane just narrows the
+       news/events to that ilçe, same as any other district would.
+       Zooming into Kahvehane's mahalle grid is a separate concern,
+       triggered by leaving Hane for Kahvehane (nav click or swipe), not
+       by this click — see maybeFlagMahalleZoom() in the swipe-pagination
+       script below. Shares view-transition-name with kahvehane.html's
+       mahalle zoom panel so that navigation morphs this dot into the
+       full mahalle grid instead of just cross-fading. */
     .ilce-marker {
       position: absolute;
       top: 24%;
@@ -478,6 +485,12 @@
       background: var(--ink-red);
       border: 3px solid var(--paper);
       box-shadow: 0 0 0 2px var(--ink-red);
+    }
+    /* .neighborhood.active's fill/stroke rules are SVG-only and no-op on
+       this HTML button, so give the dot its own active feedback. */
+    .ilce-marker.active .ilce-marker-dot {
+      background: var(--brown-4);
+      box-shadow: 0 0 0 4px rgba(164, 50, 43, 0.35);
     }
     .ilce-marker-label {
       font-family: 'Inter', sans-serif;
@@ -1266,7 +1279,7 @@
 
       <div class="map-label" id="map-label">İstanbul</div>
 
-      <button type="button" class="ilce-marker" id="ilce-marker-besiktas" aria-label="Beşiktaş — mahallelere yakınlaş">
+      <button type="button" class="ilce-marker neighborhood" id="besiktas" data-name="Beşiktaş" aria-label="Beşiktaş">
         <span class="ilce-marker-dot"></span>
         <span class="ilce-marker-label">Beşiktaş</span>
       </button>
@@ -1355,6 +1368,19 @@
     });
   }
 
+  // Flags the next Kahvehane load to render its mahalle grid instead of
+  // the plain map — leaving Hane for Kahvehane (however you leave: nav
+  // click, swipe, wheel) carries the zoom, not clicking an ilçe on the
+  // map (that only filters news/events, see the .neighborhood click
+  // handler further down). Hardcoded to Beşiktaş for now — the only
+  // ilçe with mahalle data + a marker on this map; once more ilçes have
+  // mahalle data this should key off activeNeighborhood or the user's
+  // home ilçe instead of a fixed target.
+  function maybeFlagMahalleZoom(targetHref) {
+    if (targetHref !== 'kahvehane.html') return;
+    try { sessionStorage.setItem('ist-zoom-target', 'besiktas'); } catch (e) {}
+  }
+
   let navigating = false;
   function navigate(targetIdx, dir) {
     if (navigating) return;
@@ -1363,6 +1389,7 @@
     if (targetIdx === curr) return;
     navigating = true;
     recordDir(dir);
+    maybeFlagMahalleZoom(PAGES[targetIdx]);
     if (supportsVT) {
       // The browser will trigger a view transition on this navigation.
       location.href = PAGES[targetIdx];
@@ -1506,6 +1533,7 @@
     if (targetIdx === -1 || targetIdx === curr) return;
     const dir = targetIdx > curr ? 'forward' : 'backward';
     const dist = Math.abs(targetIdx - curr);
+    maybeFlagMahalleZoom(href);
     if (supportsVT && dist >= 2) {
       e.preventDefault();
       multiHopSlide(curr, targetIdx);
@@ -1592,24 +1620,6 @@
   } else {
     handleIncoming();
   }
-})();
-
-// ══════════════════════════════════════════
-// Mahalle zoom-in prototype (Beşiktaş only)
-// Flags the next Kahvehane load to render its mahalle grid instead of
-// the plain map, then lets the existing forward navigation (and its
-// cross-document view transition) carry the shared ist-nb-zoom element.
-// ══════════════════════════════════════════
-(function initIlceZoomMarker() {
-  const marker = document.getElementById('ilce-marker-besiktas');
-  if (!marker) return;
-  marker.addEventListener('click', () => {
-    try {
-      sessionStorage.setItem('ist-page-enter-dir', 'forward');
-      sessionStorage.setItem('ist-zoom-target', 'besiktas');
-    } catch (e) {}
-    location.href = 'kahvehane.html';
-  });
 })();
 
 // ══════════════════════════════════════════
