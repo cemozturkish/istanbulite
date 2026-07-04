@@ -30,6 +30,18 @@
           document.documentElement.classList.add('vt-' + _d);
         }
       } catch(e) {}
+      // Arriving back from a game (via its ← Geri button): tag <html> so
+      // .map-panel picks up the shared ist-game-stage view-transition-name
+      // before VT captures this page as the "new" snapshot, and the map
+      // rises up over the departing game board instead of the default
+      // crossfade. Referrer-based since the game page's back link is a
+      // plain <a href>, not JS-driven — no sessionStorage round-trip needed.
+      try {
+        var _ref = document.referrer && new URL(document.referrer).pathname;
+        if (_ref && /\/(sozcel|tumcel|bulmaca)\.html$/.test(_ref)) {
+          document.documentElement.classList.add('ist-from-game');
+        }
+      } catch(e) {}
     })();
   </script>
   <style>
@@ -1040,6 +1052,31 @@
       }
     }
 
+    /* ══════════════════════════════════════════════
+       Entering/leaving a game: the board rises up from
+       the bottom like a sheet, covering the map (and
+       vice versa going back) — direction-agnostic, unlike
+       the carousel's vt-forward/backward pair above.
+       Whichever page is "old" always sinks down and out;
+       whichever is "new" always rises up and in. Forward
+       trigger: the .game-link click handler below tags
+       .map-panel with the shared name before navigating.
+       Backward trigger: the ist-from-game class from the
+       pre-body referrer check in <head>. Each game page
+       carries this name on its own <main> unconditionally
+       (see sozcel.html/tumcel.html/bulmaca.html). */
+    @keyframes ist-stage-out-down { from { transform: translateY(0); } to { transform: translateY(100%); } }
+    @keyframes ist-stage-in-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    ::view-transition-old(ist-game-stage) {
+      animation: 380ms cubic-bezier(0.4, 0, 0.2, 1) both ist-stage-out-down;
+    }
+    ::view-transition-new(ist-game-stage) {
+      animation: 380ms cubic-bezier(0.4, 0, 0.2, 1) both ist-stage-in-up;
+    }
+    html.ist-from-game .map-panel {
+      view-transition-name: ist-game-stage;
+    }
+
     /* ── Profile popup ── */
     .profile-popup-overlay {
       position: fixed;
@@ -1640,6 +1677,19 @@
     handleIncoming();
   }
 })();
+
+// Entering a game: tag .map-panel with the shared ist-game-stage name
+// right before the browser snapshots this page as "old", so the game
+// board rises up over it instead of a plain crossfade (see the
+// ist-game-stage rules above and the referrer check in <head> for the
+// reverse trip). Plain <a href> underneath — no preventDefault, the
+// browser's own cross-document view transition takes it from here.
+document.querySelectorAll('.game-link').forEach((link) => {
+  link.addEventListener('click', () => {
+    const panel = document.querySelector('.map-panel');
+    if (panel) panel.style.viewTransitionName = 'ist-game-stage';
+  });
+});
 
 setInterval(() => {
   const cdEl = document.getElementById('scoreboard-countdown');
