@@ -2093,16 +2093,22 @@ function safeUrl(u) {
 // that same edge. `direction` is 'left' (breaking news, left column) or
 // 'right' (events, right column) -- see the .card-entering-*/.card-leaving-*
 // CSS. Renders immediately (no leave animation) on first paint, when the
-// panel starts out empty.
+// panel starts out empty. Cards enter with a staggered delay by list
+// position, so the topmost card arrives first and lower ones follow.
 const CARD_SWAP_MS = 300;
+const CARD_STAGGER_MS = 80;
 function animateFeedSwap(container, direction, buildFn) {
   const enterClass = direction === 'left' ? 'card-entering-left' : 'card-entering-right';
   const leaveClass = direction === 'left' ? 'card-leaving-left' : 'card-leaving-right';
   const playEnter = () => {
     buildFn();
-    Array.from(container.children).forEach(el => {
+    Array.from(container.children).forEach((el, i) => {
+      el.style.animationDelay = `${i * CARD_STAGGER_MS}ms`;
       el.classList.add(enterClass);
-      el.addEventListener('animationend', () => el.classList.remove(enterClass), { once: true });
+      el.addEventListener('animationend', () => {
+        el.classList.remove(enterClass);
+        el.style.animationDelay = '';
+      }, { once: true });
     });
   };
   const existing = Array.from(container.children);
