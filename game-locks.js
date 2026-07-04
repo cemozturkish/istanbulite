@@ -33,7 +33,7 @@
     style.textContent = `
       .game-link.locked { cursor: not-allowed; opacity: 0.45; color: var(--muted); border-color: var(--rule); }
       .game-link.locked .game-link-subtitle { color: var(--muted); }
-      .game-link.locked:hover { background: var(--paper-warm); }
+      .game-link.locked:hover, .game-link.locked:active { background: var(--paper-warm); transform: none; filter: none; }
 
       #game-lock-toast {
         position: fixed;
