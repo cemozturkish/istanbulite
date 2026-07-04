@@ -40,6 +40,14 @@
       --paper: #eddbd0;       /* main canvas + sidebar columns — lightest */
       --paper-warm: #eddbd0;  /* sidebar column background — lightest */
       --paper-card: rgba(210, 210, 210, 0.55);  /* news + event cards — light grey, translucent over the map photo */
+      /* Card text flips to a light palette when hovered/expanded, since
+         that state turns the card dark grey (see .expandable:hover /
+         .expanded overrides below). */
+      --card-fg: #1a1a1a;
+      --card-fg-heading: #1a1a1a;
+      --card-fg-muted: #4a4a4a;
+      --card-border: rgba(26, 26, 26, 0.2);
+      --card-border-soft: rgba(26, 26, 26, 0.15);
       --paper-banner: #c9ae9a;/* sidebar header bars — darker */
       --paper-navbar: #b89b7f;/* top nav bar — darkest */
       --paper-dark: #d8c0b1;
@@ -77,9 +85,9 @@
 
     /* News + event cards float over the map photo and keep one fixed
        look (light grey, translucent) regardless of the earth/mono
-       palette toggle — same reasoning as the fixed light text colors
-       on .article/.event-item below. This overrides palette.css's
-       mono --paper-card just for this page. */
+       palette toggle — same reasoning as the fixed --card-fg text
+       colors on .article/.event-item below. This overrides
+       palette.css's mono --paper-card just for this page. */
     :root[data-palette="mono"] {
       --paper-card: rgba(210, 210, 210, 0.55);
     }
@@ -537,16 +545,16 @@
 
     #breaking-news-feed { padding: 10px 14px 16px 14px; }
 
-    /* Cards are a dark, translucent square floating over the map photo,
-       so their text uses a fixed light palette (not the page's --ink
-       tokens, which assume a light card) regardless of OS light/dark
-       preference. */
+    /* Cards are a light grey, translucent square floating over the map
+       photo, so their text uses a fixed dark palette (not the page's
+       --ink tokens, which vary by earth/mono palette) regardless of
+       OS light/dark preference or the active palette. */
     .article {
       background: var(--paper-card);
       padding: 16px 18px;
       margin-bottom: 12px;
-      color: #f1e6d9;
-      transition: background 0.15s;
+      color: var(--card-fg);
+      transition: background 0.15s, color 0.15s;
     }
     .article:last-child { margin-bottom: 0; }
 
@@ -568,19 +576,26 @@
       text-transform: none;
       line-height: 1.25;
       margin-bottom: 8px;
-      color: #f7eee2;
+      color: var(--card-fg-heading);
     }
 
     .article p {
       font-family: 'Source Serif 4', Georgia, serif;
       font-size: 0.82rem;
       line-height: 1.5;
-      color: #d6bda3;
+      color: var(--card-fg);
     }
 
     .article.expandable { cursor: pointer; }
-    .article.expandable:hover { background: rgba(65, 65, 65, 0.7); }
-    .article.expanded { background: rgba(65, 65, 65, 0.7); }
+    .article.expandable:hover,
+    .article.expanded {
+      background: rgba(65, 65, 65, 0.7);
+      --card-fg: #f1e6d9;
+      --card-fg-heading: #f7eee2;
+      --card-fg-muted: #c9b498;
+      --card-border: rgba(241, 230, 217, 0.3);
+      --card-border-soft: rgba(241, 230, 217, 0.25);
+    }
     .article .meta-row {
       display: flex;
       justify-content: space-between;
@@ -592,19 +607,19 @@
       font-size: 0.65rem;
       letter-spacing: 1px;
       text-transform: uppercase;
-      color: #9c8268;
+      color: var(--card-fg-muted);
       font-style: italic;
     }
     .article .sources {
       margin-top: 10px;
       padding-top: 10px;
-      border-top: 1px dashed rgba(241, 230, 217, 0.3);
+      border-top: 1px dashed var(--card-border);
       display: none;
     }
     .article.expanded .sources { display: block; }
     .article .src-item {
       padding: 6px 0;
-      border-bottom: 1px dotted rgba(241, 230, 217, 0.25);
+      border-bottom: 1px dotted var(--card-border-soft);
       font-size: 0.78rem;
     }
     .article .src-item:last-child { border-bottom: none; }
@@ -614,20 +629,20 @@
       text-transform: uppercase;
       font-size: 0.65rem;
       display: block;
-      color: #9c8268;
+      color: var(--card-fg-muted);
       margin-bottom: 2px;
     }
     .article .src-item a {
-      color: #f1e6d9;
+      color: var(--card-fg);
       text-decoration: none;
-      border-bottom: 1px solid #f1e6d9;
+      border-bottom: 1px solid currentColor;
       line-height: 1.4;
     }
     .article .src-item a:hover { opacity: 0.7; }
     .article .sources-empty {
       font-size: 0.75rem;
       font-style: italic;
-      color: #9c8268;
+      color: var(--card-fg-muted);
     }
 
     /* ── RIGHT SIDEBAR (neighborhood info) ── */
@@ -998,7 +1013,7 @@
       text-align: center;
       padding-top: 18px;
       font-family: 'Source Serif 4', Georgia, serif;
-      color: #f7eee2;
+      color: var(--card-fg-heading);
     }
     .event-item .ev-day {
       font-size: 1.7rem;
@@ -1011,7 +1026,7 @@
       font-weight: 600;
       letter-spacing: 1.5px;
       text-transform: uppercase;
-      color: #9c8268;
+      color: var(--card-fg-muted);
       margin-top: 4px;
     }
     .event-item .ev-body { min-width: 0; }
@@ -1030,26 +1045,33 @@
       font-weight: 600;
       line-height: 1.2;
       margin-bottom: 4px;
-      color: #f7eee2;
+      color: var(--card-fg-heading);
     }
     .event-item .ev-meta {
       font-family: 'Source Serif 4', Georgia, serif;
       font-size: 0.78rem;
-      color: #d6bda3;
+      color: var(--card-fg-muted);
       line-height: 1.35;
     }
     .event-item.expandable { cursor: pointer; }
-    .event-item.expandable:hover { background: rgba(65, 65, 65, 0.7); }
-    .event-item.expanded { background: rgba(65, 65, 65, 0.7); }
+    .event-item.expandable:hover,
+    .event-item.expanded {
+      background: rgba(65, 65, 65, 0.7);
+      --card-fg: #f1e6d9;
+      --card-fg-heading: #f7eee2;
+      --card-fg-muted: #c9b498;
+      --card-border: rgba(241, 230, 217, 0.3);
+      --card-border-soft: rgba(241, 230, 217, 0.25);
+    }
     .event-item .ev-details {
       grid-column: 1 / -1;
       margin-top: 10px;
       padding-top: 10px;
-      border-top: 1px dashed rgba(241, 230, 217, 0.3);
+      border-top: 1px dashed var(--card-border);
       font-family: 'Source Serif 4', Georgia, serif;
       font-size: 0.82rem;
       line-height: 1.5;
-      color: #d6bda3;
+      color: var(--card-fg);
       display: none;
     }
     .event-item.expanded .ev-details { display: block; }
@@ -1083,7 +1105,7 @@
     .ev-rsvp-count {
       font-family: 'Inter', sans-serif;
       font-size: 0.7rem;
-      color: #9c8268;
+      color: var(--card-fg-muted);
     }
 
     @media (max-width: 768px) {
