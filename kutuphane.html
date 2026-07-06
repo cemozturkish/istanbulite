@@ -160,6 +160,11 @@
       display: flex;
       flex-direction: column;
       overflow-y: auto;
+      /* Sits above the reader overlay's full-viewport backdrop (z-index
+         500) so the chapter nav stays clickable — jumping chapters while
+         the sheet is open shouldn't require closing it first. */
+      position: relative;
+      z-index: 501;
     }
 
     main {
@@ -704,7 +709,11 @@
     /* ── Article reader overlay: a bottom sheet that rises over the map
        and shelves when a chapter is opened, mirroring kahvehane's game
        overlay. The shelf path underneath is left untouched, so closing
-       (← Raf, backdrop click, Esc) just hides the sheet again. */
+       (← Raf, backdrop click, Esc) just hides the sheet again.
+       Unlike the game overlay (a floating centered card), this sheet stays
+       flush against the bottom edge it rose from — inset from the left,
+       right and top so the map/shelves still show around it, but with no
+       gap below. Mobile falls back to full-bleed, same as the game overlay. */
     .reader-overlay {
       position: fixed;
       inset: 0;
@@ -721,18 +730,32 @@
     .reader-overlay.open .reader-overlay-backdrop { opacity: 1; }
     .reader-overlay-sheet {
       position: absolute;
-      left: 0;
-      right: 0;
+      left: 50%;
       bottom: 0;
-      height: 92vh;
+      width: min(760px, 92vw);
+      height: min(82vh, 800px);
       background: var(--paper);
-      border-top: 2px solid var(--ink);
+      border: 2px solid var(--ink);
+      border-bottom: none;
+      border-radius: 18px 18px 0 0;
       box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.25);
       overflow-y: auto;
-      transform: translateY(100%);
+      transform: translate(-50%, 100%);
       transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .reader-overlay.open .reader-overlay-sheet { transform: translateY(0); }
+    .reader-overlay.open .reader-overlay-sheet { transform: translate(-50%, 0); }
+    @media (max-width: 768px) {
+      .reader-overlay-sheet {
+        left: 0;
+        right: 0;
+        width: 100%;
+        height: 92vh;
+        border-width: 2px 0 0 0;
+        border-radius: 16px 16px 0 0;
+        transform: translateY(100%);
+      }
+      .reader-overlay.open .reader-overlay-sheet { transform: translateY(0); }
+    }
 
     /* ── Shelves (right column) — 6 horizontal rectangle buttons styled like bookshelves ── */
     .shelves {
@@ -805,6 +828,70 @@
     }
     .shelf-btn.shelf-empty:hover { transform: none; background: var(--paper-dark); }
     .shelf-btn.shelf-empty .shelf-title { color: var(--muted); }
+
+    /* ── Chapter nav (right column, while the reader sheet is open) ──
+       Replaces the shelves grid with the open article's own table of
+       contents, so a reader can jump chapters without closing the sheet —
+       styled like a compact shelf-btn to stay in the same visual family. */
+    .chapter-nav-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 0 4px 4px;
+      flex-shrink: 0;
+    }
+    .chapter-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      background: var(--paper-warm);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      padding: 10px 14px;
+      text-align: left;
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--ink);
+      position: relative;
+      width: 100%;
+      flex-shrink: 0;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .chapter-nav-item:hover { background: var(--paper-dark); transform: translateX(-4px); }
+    .chapter-nav-item.current { background: var(--paper-banner); cursor: default; }
+    .chapter-nav-item.current:hover { transform: none; }
+    .chapter-nav-item.locked {
+      background: var(--paper-dark);
+      opacity: 0.55;
+      cursor: not-allowed;
+      border-color: var(--rule);
+      border-bottom-color: var(--rule);
+    }
+    .chapter-nav-item.locked:hover { transform: none; background: var(--paper-dark); }
+    .chapter-nav-step {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .chapter-nav-art-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+    .chapter-nav-badge {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--accent-2);
+    }
+    .chapter-nav-item.locked .chapter-nav-badge { color: var(--muted); }
 
     /* ── Shelf path (article list inside a shelf) ── */
     .shelf-path { padding: 8px 0; }
@@ -3207,13 +3294,14 @@ function staggerEntrance(elements, direction) {
   });
 }
 
-function renderShelfButtons() {
+function renderShelfButtons(activeShelfId = null) {
   const shelvesEl = document.getElementById('shelves');
   if (!shelvesEl) return;
   animateFeedSwap(shelvesEl, 'right', () => {
     shelvesEl.innerHTML = SHELVES_CACHE.map(s => {
       const count = SHELF_COUNTS[s.id] || 0;
       const empty = count === 0;
+      const active = s.id === activeShelfId;
       const name = (s.name_tr || '').trim();
       const subtitle = (s.subtitle_tr || '').trim();
       const display = empty ? 'Çok Yakında' : (name || `Raf ${s.id}`);
@@ -3222,7 +3310,7 @@ function renderShelfButtons() {
         ? `<div class="shelf-countdown" data-deadline="${libEsc(s.deadline)}">…</div>`
         : '';
       return `
-        <a class="shelf-btn ${empty ? 'shelf-empty' : ''}" data-shelf="${s.id}" href="#">
+        <a class="shelf-btn ${empty ? 'shelf-empty' : ''}${active ? ' shelf-active' : ''}" data-shelf="${s.id}" href="#">
           <div>
             <div class="shelf-title">${libEsc(display)}</div>
             ${subtitleHtml}
@@ -3419,7 +3507,7 @@ async function openShelfPath(shelfId) {
       const a = articles.find(x => x.id === node.dataset.art);
       if (!a) return;
       const i = articles.indexOf(a);
-      showChapterIntro(a, i, () => openArticleReader(a, shelf, shelfId));
+      showChapterIntro(a, i, () => openArticleReader(a, shelf, shelfId, articles, lockState, completedSet));
     });
   });
   const back = document.getElementById('path-back-mobile');
@@ -3526,7 +3614,7 @@ function hydrateVoteWidgets(root, onAnswerChange) {
   });
 }
 
-function openArticleReader(article, shelf, shelfId) {
+function openArticleReader(article, shelf, shelfId, articles, lockState, completedSet) {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
@@ -3535,8 +3623,10 @@ function openArticleReader(article, shelf, shelfId) {
     overlay.classList.remove('open');
     setTimeout(() => { overlay.hidden = true; area.innerHTML = ''; }, 400);
     // Re-render the shelf path underneath so a freshly-completed chapter's
-    // unlock state is reflected once the sheet finishes revealing it.
+    // unlock state is reflected once the sheet finishes revealing it, and
+    // swap the right column back from the chapter nav to the shelves grid.
     openShelfPath(shelfId);
+    renderShelfButtons(shelfId);
   }
   _closeReaderOverlay = closeReader;
 
@@ -3622,6 +3712,14 @@ function openArticleReader(article, shelf, shelfId) {
       area.querySelector('.reader-actions').replaceWith(done);
       const uid = await libGetCurrentUserId();
       libWriteArticleCompleted(uid, article.id);
+      // Reflect the unlock live in the chapter nav without waiting for the
+      // sheet to close: mark this chapter read and open the next one.
+      if (articles && lockState && completedSet) {
+        completedSet.add(article.id);
+        const idx = articles.indexOf(article);
+        if (idx > -1 && idx + 1 < articles.length) lockState[idx + 1] = false;
+        renderChapterNav(shelfId, articles, article.id, lockState, completedSet, shelf);
+      }
     });
 
     // Vocab-pop on tap (mobile keeps tooltips open until next tap).
@@ -3645,6 +3743,51 @@ function openArticleReader(article, shelf, shelfId) {
   renderStep();
   overlay.hidden = false;
   requestAnimationFrame(() => overlay.classList.add('open'));
+
+  // Contextual swap: while the reader sheet is up, the right column shows
+  // this article's own chapter list instead of the shelves grid, mirroring
+  // how the map swaps news/events on Hane and the game swaps the
+  // scoreboard on Kahvehane.
+  if (articles && lockState && completedSet) {
+    renderChapterNav(shelfId, articles, article.id, lockState, completedSet, shelf);
+  }
+}
+
+// Right column, while the reader sheet is open: this article's own table
+// of contents in place of the shelves grid. Clicking an unlocked chapter
+// jumps straight to it (via the same intro modal) without closing the sheet.
+function renderChapterNav(shelfId, articles, currentArticleId, lockState, completedSet, shelf) {
+  const shelvesEl = document.getElementById('shelves');
+  if (!shelvesEl) return;
+  const title = (shelf && shelf.name_tr && shelf.name_tr.trim()) || `Raf ${shelfId}`;
+  animateFeedSwap(shelvesEl, 'right', () => {
+    shelvesEl.innerHTML = `
+      <div class="chapter-nav-title">${libEsc(title)}</div>
+      ${articles.map((a, i) => {
+        const locked = lockState[i];
+        const current = a.id === currentArticleId;
+        const completed = completedSet.has(a.id);
+        const badge = locked ? 'Kilitli' : (current ? 'Şu an burada' : (completed ? 'Okundu' : ''));
+        return `
+          <button class="chapter-nav-item${current ? ' current' : ''}${locked ? ' locked' : ''}"
+                  data-art="${a.id}" type="button" ${(locked || current) ? 'aria-disabled="true"' : ''}>
+            <span class="chapter-nav-step">Bölüm ${i + 1}</span>
+            <span class="chapter-nav-art-title">${libEsc(a.title)}</span>
+            ${badge ? `<span class="chapter-nav-badge">${badge}</span>` : ''}
+          </button>
+        `;
+      }).join('')}
+    `;
+    shelvesEl.querySelectorAll('.chapter-nav-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.classList.contains('locked') || btn.classList.contains('current')) return;
+        const a = articles.find(x => x.id === btn.dataset.art);
+        if (!a) return;
+        const i = articles.indexOf(a);
+        showChapterIntro(a, i, () => openArticleReader(a, shelf, shelfId, articles, lockState, completedSet));
+      });
+    });
+  });
 }
 
 // Wires the reader overlay's backdrop-click/Escape close once; which
