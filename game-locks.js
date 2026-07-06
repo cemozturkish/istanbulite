@@ -7,16 +7,10 @@
 // includes this script picks up the new rule automatically.
 //
 // Rules:
-//   - Tümcel is locked until the user has ≥ 15 Sözcel wins.
 //   - Bulmaca is locked until the user has won Tümcel at least once.
 
 (function () {
   const GATES = [
-    {
-      game: 'tumcel',
-      requires: (s) => s.sozcelWins >= 15,
-      message: (s) => `Tümcel'i oynayabilmek için Sözcel'de en az 15 sözcük bulmuş olman gerekiyor. (Şu an: ${s.sozcelWins}/15)`,
-    },
     {
       game: 'bulmaca',
       requires: (s) => s.tumcelWon,
@@ -103,17 +97,16 @@
     } catch (_) {}
     if (!userId) return;
 
-    const stats = { sozcelWins: 0, tumcelWon: false };
+    const stats = { tumcelWon: false };
     try {
       const { data, error } = await sb
         .from('game_results')
         .select('game, won')
         .eq('user_id', userId)
-        .in('game', ['sozcel', 'tumcel'])
+        .eq('game', 'tumcel')
         .eq('won', true);
       if (!error && data) {
-        stats.sozcelWins = data.filter(r => r.game === 'sozcel').length;
-        stats.tumcelWon  = data.some(r => r.game === 'tumcel');
+        stats.tumcelWon = data.length > 0;
       }
     } catch (_) {}
 
