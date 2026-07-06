@@ -968,7 +968,9 @@
       }
     }
 
-    /* ── Desktop swipe pagination: full page (map + datetime + columns) slides vertically; nav stays ── */
+    /* ── Desktop swipe pagination: left column slides out/in toward the
+       left edge, right column toward the right edge — regardless of nav
+       direction; nav stays ── */
     @media (min-width: 769px) {
       .col-left, .col-right {
         transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -976,22 +978,22 @@
         backface-visibility: hidden;
       }
       html.ist-entering-forward .col-left,
-      html.ist-entering-forward .col-right {
-        transform: translateY(100vh);
+      html.ist-entering-backward .col-left {
+        transform: translateX(-100vw);
         transition: none;
       }
-      html.ist-entering-backward .col-left,
+      html.ist-entering-forward .col-right,
       html.ist-entering-backward .col-right {
-        transform: translateY(-100vh);
+        transform: translateX(100vw);
         transition: none;
       }
       body.ist-exiting-forward .col-left,
-      body.ist-exiting-forward .col-right {
-        transform: translateY(-100vh);
+      body.ist-exiting-backward .col-left {
+        transform: translateX(-100vw);
       }
-      body.ist-exiting-backward .col-left,
+      body.ist-exiting-forward .col-right,
       body.ist-exiting-backward .col-right {
-        transform: translateY(100vh);
+        transform: translateX(100vw);
       }
     }
 
@@ -1001,10 +1003,11 @@
        it visible until the new page is ready, so there's
        no white flash between reloads. Only the columns
        animate; the map, nav, and datetime bar stay put
-       because their content is identical across tabs.
-       Direction comes from a class on <html> seeded by
-       the outgoing page via sessionStorage, so the class
-       is present before VT captures the new snapshot.
+       because their content is identical across tabs. On
+       mobile, direction comes from a class on <html> seeded
+       by the outgoing page via sessionStorage (present before
+       VT captures the new snapshot); desktop ignores direction
+       entirely (see the media query below).
        ══════════════════════════════════════════════ */
     @view-transition { navigation: auto; }
 
@@ -1018,27 +1021,26 @@
     .col-left { view-transition-name: ist-col-left; }
     .col-right { view-transition-name: ist-col-right; }
 
+    /* Desktop: left column always exits/enters via the left edge, right
+       column via the right edge — independent of nav direction, so no
+       html.vt-forward/vt-backward gate is needed here. */
     @media (min-width: 769px) {
-      @keyframes ist-vt-out-up { from { transform: translateY(0); } to { transform: translateY(-100vh); } }
-      @keyframes ist-vt-in-up { from { transform: translateY(100vh); } to { transform: translateY(0); } }
-      @keyframes ist-vt-out-down { from { transform: translateY(0); } to { transform: translateY(100vh); } }
-      @keyframes ist-vt-in-down { from { transform: translateY(-100vh); } to { transform: translateY(0); } }
+      @keyframes ist-vt-col-left-exit { from { transform: translateX(0); } to { transform: translateX(-100vw); } }
+      @keyframes ist-vt-col-left-enter { from { transform: translateX(-100vw); } to { transform: translateX(0); } }
+      @keyframes ist-vt-col-right-exit { from { transform: translateX(0); } to { transform: translateX(100vw); } }
+      @keyframes ist-vt-col-right-enter { from { transform: translateX(100vw); } to { transform: translateX(0); } }
 
-      html.vt-forward::view-transition-old(ist-col-left),
-      html.vt-forward::view-transition-old(ist-col-right) {
-        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-up;
+      ::view-transition-old(ist-col-left) {
+        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-col-left-exit;
       }
-      html.vt-forward::view-transition-new(ist-col-left),
-      html.vt-forward::view-transition-new(ist-col-right) {
-        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-up;
+      ::view-transition-new(ist-col-left) {
+        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-col-left-enter;
       }
-      html.vt-backward::view-transition-old(ist-col-left),
-      html.vt-backward::view-transition-old(ist-col-right) {
-        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-out-down;
+      ::view-transition-old(ist-col-right) {
+        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-col-right-exit;
       }
-      html.vt-backward::view-transition-new(ist-col-left),
-      html.vt-backward::view-transition-new(ist-col-right) {
-        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-down;
+      ::view-transition-new(ist-col-right) {
+        animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-col-right-enter;
       }
     }
 
@@ -1435,11 +1437,12 @@
 <script>
 // ══════════════════════════════════════════
 // Swipe pagination
-// Navigate Anahane → Kahvehane → Kütüphane → Hane with a full-page slide.
-// The entire page (map, datetime bar, both columns) translates as one unit;
-// only the nav bar stays fixed. Mobile = horizontal touch swipe, desktop =
-// vertical wheel swipe; CSS picks the axis per media query. Tab-bar clicks
-// trigger the same animation.
+// Navigate Anahane → Kahvehane → Kütüphane → Hane. Mobile: touch-swipe
+// slides the whole page (map, datetime bar, both columns) horizontally as
+// one unit, direction keyed off which way you swiped. Desktop: no gesture
+// (nav-bar clicks only) — the left column always slides out/in toward the
+// left edge and the right column toward the right edge, regardless of nav
+// direction. CSS picks the behavior per media query.
 // ══════════════════════════════════════════
 (function initSwipePagination() {
   const PAGES = ['kutuphane.html', 'anahane.html', 'kahvehane.html'];
@@ -1588,9 +1591,15 @@
           overflow: 'hidden',
         });
         node.style.viewTransitionName = 'none';
-        const ax = mobile ? 'translateX' : 'translateY';
-        const pct = (dir === 'forward' ? i : -i) * 100;
-        node.style.transform = ax + '(' + pct + '%)';
+        // Mobile: whole page travels one way, keyed off nav direction.
+        // Desktop: left column always sweeps toward the left edge and the
+        // right column toward the right edge, regardless of nav direction
+        // -- so frames are stacked toward the opposite edge here and swept
+        // back by the container's own animation below.
+        const pct = mobile
+          ? (dir === 'forward' ? i : -i) * 100
+          : (key === 'right' ? -i : i) * 100;
+        node.style.transform = 'translateX(' + pct + '%)';
         stack.appendChild(node);
       }
       const frame0 = origEl.cloneNode(true);
@@ -1616,15 +1625,21 @@
     const hops = hopIdxs.length;
     const perHop = hops === 2 ? 260 : 220;
     const totalMs = perHop * hops;
-    const axis = mobile ? 'X' : 'Y';
-    const endPct = dir === 'forward' ? -hops * 100 : hops * 100;
-    const keyframes = [
-      { transform: 'translate' + axis + '(0%)' },
-      { transform: 'translate' + axis + '(' + endPct + '%)' },
-    ];
     const opts = { duration: totalMs, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' };
-    const a1 = leftStack.stack.animate(keyframes, opts);
-    const a2 = rightStack.stack.animate(keyframes, opts);
+    // Mobile: both stacks travel together, keyed off nav direction.
+    // Desktop: left stack always slides left, right stack always slides
+    // right, regardless of nav direction (see placeFrame above).
+    const mobileEndPct = dir === 'forward' ? -hops * 100 : hops * 100;
+    const leftKeyframes = [
+      { transform: 'translateX(0%)' },
+      { transform: 'translateX(' + (mobile ? mobileEndPct : -hops * 100) + '%)' },
+    ];
+    const rightKeyframes = [
+      { transform: 'translateX(0%)' },
+      { transform: 'translateX(' + (mobile ? mobileEndPct : hops * 100) + '%)' },
+    ];
+    const a1 = leftStack.stack.animate(leftKeyframes, opts);
+    const a2 = rightStack.stack.animate(rightKeyframes, opts);
 
     try { await Promise.all([a1.finished, a2.finished]); } catch (e) {}
 
@@ -1683,51 +1698,6 @@
     if (dx < 0) navigate(curr + 1, 'forward');
     else        navigate(curr - 1, 'backward');
   }, { passive: true });
-
-  // ── Desktop: vertical wheel-based swipe anywhere on the page ──
-  // Respects native scrolling: only triggers navigation when there's no
-  // more content to scroll in that direction. Wheel delta is accumulated
-  // so a single flick doesn't accidentally navigate.
-  let wheelAccum = 0, wheelTs = 0;
-  const WHEEL_THRESHOLD = 180;
-  const WHEEL_RESET_MS = 220;
-  function canScrollInDir(target, dy) {
-    let el = target;
-    while (el && el !== document.body && el !== document.documentElement) {
-      if (el.scrollHeight > el.clientHeight + 1) {
-        const atTop = el.scrollTop < 0.5;
-        const atBottom = el.scrollTop + el.clientHeight > el.scrollHeight - 0.5;
-        if (dy > 0 && !atBottom) return true;
-        if (dy < 0 && !atTop) return true;
-      }
-      el = el.parentElement;
-    }
-    return false;
-  }
-  document.addEventListener('wheel', (e) => {
-    if (isMobile()) return;
-    if (navigating) { e.preventDefault(); return; }
-    if (e.target.closest && e.target.closest('nav')) { wheelAccum = 0; return; }
-    const dy = e.deltaY;
-    if (Math.abs(dy) < 1) return;
-    if (canScrollInDir(e.target, dy)) {
-      wheelAccum = 0;
-      return; // let a nested scroll container scroll normally
-    }
-    // At a scroll boundary — suppress overscroll and accumulate toward navigation.
-    e.preventDefault();
-    const now = Date.now();
-    if (now - wheelTs > WHEEL_RESET_MS) wheelAccum = 0;
-    wheelTs = now;
-    wheelAccum += dy;
-    if (Math.abs(wheelAccum) >= WHEEL_THRESHOLD) {
-      const curr = currentIdx();
-      const accum = wheelAccum;
-      wheelAccum = 0;
-      if (accum > 0) navigate(curr + 1, 'forward');
-      else           navigate(curr - 1, 'backward');
-    }
-  }, { passive: false });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', handleIncoming);
