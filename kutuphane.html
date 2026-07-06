@@ -659,6 +659,39 @@
       font-size: 0.85rem;
     }
 
+    /* ── Article reader overlay: a bottom sheet that rises over the map
+       and shelves when a chapter is opened, mirroring kahvehane's game
+       overlay. The shelf path underneath is left untouched, so closing
+       (← Raf, backdrop click, Esc) just hides the sheet again. */
+    .reader-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+    }
+    .reader-overlay[hidden] { display: none; }
+    .reader-overlay-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      opacity: 0;
+      transition: opacity 0.35s;
+    }
+    .reader-overlay.open .reader-overlay-backdrop { opacity: 1; }
+    .reader-overlay-sheet {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 92vh;
+      background: var(--paper);
+      border-top: 2px solid var(--ink);
+      box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.25);
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .reader-overlay.open .reader-overlay-sheet { transform: translateY(0); }
+
     /* ── Shelves (right column) — 6 horizontal rectangle buttons styled like bookshelves ── */
     .shelves {
       flex: 1;
@@ -2319,6 +2352,14 @@
   </aside>
   </div>
 
+  <!-- Article reader overlay: bottom sheet housing the chapter reader,
+       opened instead of swapping it into #reading-area in place — see
+       initReaderOverlay and openArticleReader further down. -->
+  <div class="reader-overlay" id="reader-overlay" hidden>
+    <div class="reader-overlay-backdrop" id="reader-overlay-backdrop"></div>
+    <div class="reader-overlay-sheet" id="reader-overlay-sheet"></div>
+  </div>
+
 <script>
 // ══════════════════════════════════════════
 // Swipe pagination
@@ -3405,8 +3446,19 @@ function hydrateVoteWidgets(root, onAnswerChange) {
 }
 
 function openArticleReader(article, shelf, shelfId) {
-  const area = document.getElementById('reading-area');
-  if (!area) return;
+  const overlay = document.getElementById('reader-overlay');
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !area) return;
+
+  function closeReader() {
+    overlay.classList.remove('open');
+    setTimeout(() => { overlay.hidden = true; area.innerHTML = ''; }, 400);
+    // Re-render the shelf path underneath so a freshly-completed chapter's
+    // unlock state is reflected once the sheet finishes revealing it.
+    openShelfPath(shelfId);
+  }
+  _closeReaderOverlay = closeReader;
+
   const sections = parseArticleSections(article.body || '');
   // Always render at least one section so the reader has something to show.
   if (!sections.length) sections.push(article.summary || '');
@@ -3474,7 +3526,7 @@ function openArticleReader(article, shelf, shelfId) {
       next.disabled = !allAnswered;
     }
 
-    document.getElementById('reader-back').addEventListener('click', () => openShelfPath(shelfId));
+    document.getElementById('reader-back').addEventListener('click', closeReader);
     document.getElementById('reader-prev').addEventListener('click', () => {
       if (step > 0) { step--; renderStep(); }
     });
@@ -3510,7 +3562,23 @@ function openArticleReader(article, shelf, shelfId) {
   }
 
   renderStep();
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('open'));
 }
+
+// Wires the reader overlay's backdrop-click/Escape close once; which
+// chapter is currently open (and how to close it) is set by
+// openArticleReader each time it runs, via _closeReaderOverlay.
+let _closeReaderOverlay = null;
+(function initReaderOverlay() {
+  const overlay = document.getElementById('reader-overlay');
+  const backdrop = document.getElementById('reader-overlay-backdrop');
+  if (!overlay || !backdrop) return;
+  backdrop.addEventListener('click', () => { if (_closeReaderOverlay) _closeReaderOverlay(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open') && _closeReaderOverlay) _closeReaderOverlay();
+  });
+})();
 
 async function mountPoll(article) {
   const mount = document.getElementById('poll-mount');
