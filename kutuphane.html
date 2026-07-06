@@ -262,6 +262,34 @@
       color: var(--ink);
     }
 
+    /* Profile/scores cards (left) and shelves (right) slide in from their
+       own column's outer screen edge on render, staggered by list
+       position so the topmost card arrives first — see the
+       animateFeedSwap()/staggerEntrance() helpers used by loadProfile()
+       and renderShelfButtons(). Same mechanism as Hane's news/events and
+       Kahvehane's discussion feed/scoreboard. */
+    @keyframes card-slide-in-left {
+      from { transform: translateX(-100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes card-slide-in-right {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    /* backwards fill-mode holds the keyframe's "from" state during the
+       staggered animation-delay set in JS, so a lower card stays hidden
+       off-screen while it waits its turn instead of flashing visible
+       in place first. */
+    .card-entering-left { animation: card-slide-in-left 0.4s ease-out backwards; }
+    .card-entering-right { animation: card-slide-in-right 0.4s ease-out backwards; }
+    .card-leaving-left,
+    .card-leaving-right {
+      transition: transform 0.3s ease-in, opacity 0.3s ease-in;
+      opacity: 0;
+    }
+    .card-leaving-left { transform: translateX(-100%); }
+    .card-leaving-right { transform: translateX(100%); }
+
     /* ── Profile identity section (left column) ── */
     .profile-left {
       display: flex;
@@ -375,7 +403,6 @@
       padding: 8px 12px;
       display: flex;
       justify-content: center;
-      border-top: 1px solid var(--hairline);
       margin-top: auto;
       flex-shrink: 0;
     }
@@ -498,17 +525,24 @@
       color: var(--accent);
       margin-bottom: 6px;
       padding-bottom: 3px;
-      border-bottom: 1px solid var(--hairline);
     }
 
     /* Chapter-box style, matching .library-card above — the account-info
-       block also needs its own frame now that col-left is transparent. */
+       and game-score blocks also need their own frame now that col-left
+       is transparent. A little see-through (like the Hane news/event
+       cards) so the map still reads behind them, with a hover nudge
+       toward the left edge this column enters from. */
     .info-card {
       border: 2px solid var(--ink);
-      border-bottom: 4px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
       box-shadow: var(--frame-shadow);
       padding: 10px 12px;
-      background: var(--paper);
+      background: color-mix(in srgb, var(--paper) 85%, transparent);
+      transition: background 0.15s, transform 0.15s ease;
+    }
+    .info-card:hover {
+      background: color-mix(in srgb, var(--hover) 90%, transparent);
+      transform: translateX(-6px);
     }
 
     .info-row {
@@ -545,9 +579,7 @@
     }
 
     .score-card {
-      border: 1px solid var(--rule);
       padding: 6px 4px;
-      background: var(--paper);
       text-align: center;
       margin-bottom: 0;
       min-width: 0;
@@ -1491,18 +1523,25 @@
        Chapter-box style, matching the shelf/game-link cards elsewhere on
        the page — now that col-left itself is transparent (floating over
        the map), the profile card needs its own frame to read as a
-       discrete card rather than a bare, edge-to-edge strip of text. */
+       discrete card rather than a bare, edge-to-edge strip of text. A
+       little see-through (like the Hane news/event cards) with a hover
+       nudge toward the left edge this column enters from. */
     .library-card {
       border: 2px solid var(--ink);
-      border-bottom: 4px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
       box-shadow: var(--frame-shadow);
       margin: 12px;
       padding: 12px 14px;
+      background: color-mix(in srgb, var(--paper) 85%, transparent);
+      transition: background 0.15s, transform 0.15s ease;
       display: flex;
       flex-direction: column;
       gap: 6px;
-      background: var(--paper);
       flex-shrink: 0;
+    }
+    .library-card:hover {
+      background: color-mix(in srgb, var(--hover) 90%, transparent);
+      transform: translateX(-6px);
     }
     .library-card .card-top {
       display: flex;
@@ -1861,13 +1900,11 @@
         overflow: visible;
         display: flex;
         flex-direction: column;
-        border-top: 1px solid var(--hairline);
       }
       .profile-signout-wrap {
         padding: 14px 16px 20px 16px;
         display: flex;
         justify-content: center;
-        border-top: 1px solid var(--hairline);
       }
       .profile-signout-wrap .btn-signout {
         width: 100%;
@@ -1884,13 +1921,6 @@
       .score-card .game-name { font-size: 9px; margin-bottom: 2px; letter-spacing: 1px; }
       .score-card .score-value { font-size: 16px; }
       .score-card .score-detail { font-size: 10px; margin-top: 1px; }
-
-      /* profile-right border-top was a separator below library-card;
-         after moving library-card to #mobile-top, col-right's border-top
-         already acts as the section separator */
-      .col-right .profile-right {
-        border-top: none;
-      }
 
       /* Existing library-card and HESAP column are replaced by the shared
          #ist-pc-mount widget on mobile. When viewing another user's profile
@@ -3124,39 +3154,80 @@ async function loadShelvesUI() {
   startShelfCountdownTicker();
 }
 
+// Slides a column's current cards out toward its outer screen edge, then
+// rebuilds it and slides the fresh cards back in from that same edge.
+// `direction` is 'left' (profile/scores, left column) or 'right' (shelves,
+// right column) -- see the .card-entering-*/.card-leaving-* CSS. Renders
+// immediately (no leave animation) on first paint, when the container
+// starts out empty. Cards enter with a staggered delay by list position,
+// so the topmost card arrives first and lower ones follow. Same pattern
+// as Hane's news/events and Kahvehane's discussion feed/scoreboard.
+const CARD_SWAP_MS = 300;
+const CARD_STAGGER_MS = 80;
+function animateFeedSwap(container, direction, buildFn) {
+  const enterClass = direction === 'left' ? 'card-entering-left' : 'card-entering-right';
+  const leaveClass = direction === 'left' ? 'card-leaving-left' : 'card-leaving-right';
+  const playEnter = () => {
+    buildFn();
+    staggerEntrance(Array.from(container.children), direction);
+  };
+  const existing = Array.from(container.children);
+  if (!existing.length) { playEnter(); return; }
+  existing.forEach(el => el.classList.add(leaveClass));
+  setTimeout(playEnter, CARD_SWAP_MS);
+}
+
+// Applies the staggered slide-in entrance to an already-rendered list of
+// elements (used directly by loadProfile() for the left column's fixed
+// set of blocks, which only render once rather than repeatedly swapping
+// like a feed) -- also the tail end of animateFeedSwap() above.
+function staggerEntrance(elements, direction) {
+  const enterClass = direction === 'left' ? 'card-entering-left' : 'card-entering-right';
+  elements.filter(Boolean).forEach((el, i) => {
+    el.style.animationDelay = `${i * CARD_STAGGER_MS}ms`;
+    el.classList.add(enterClass);
+    el.addEventListener('animationend', () => {
+      el.classList.remove(enterClass);
+      el.style.animationDelay = '';
+    }, { once: true });
+  });
+}
+
 function renderShelfButtons() {
   const shelvesEl = document.getElementById('shelves');
   if (!shelvesEl) return;
-  shelvesEl.innerHTML = SHELVES_CACHE.map(s => {
-    const count = SHELF_COUNTS[s.id] || 0;
-    const empty = count === 0;
-    const name = (s.name_tr || '').trim();
-    const subtitle = (s.subtitle_tr || '').trim();
-    const display = empty ? 'Çok Yakında' : (name || `Raf ${s.id}`);
-    const subtitleHtml = !empty && subtitle ? `<div class="shelf-subtitle">${libEsc(subtitle)}</div>` : '';
-    const countdownHtml = !empty && s.deadline
-      ? `<div class="shelf-countdown" data-deadline="${libEsc(s.deadline)}">…</div>`
-      : '';
-    return `
-      <a class="shelf-btn ${empty ? 'shelf-empty' : ''}" data-shelf="${s.id}" href="#">
-        <div>
-          <div class="shelf-title">${libEsc(display)}</div>
-          ${subtitleHtml}
-          ${countdownHtml}
-        </div>
-      </a>
-    `;
-  }).join('');
-  shelvesEl.querySelectorAll('.shelf-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (btn.classList.contains('shelf-empty')) return;
-      const id = Number(btn.dataset.shelf);
-      shelvesEl.querySelectorAll('.shelf-btn').forEach(b => b.classList.toggle('shelf-active', b === btn));
-      openShelfPath(id);
+  animateFeedSwap(shelvesEl, 'right', () => {
+    shelvesEl.innerHTML = SHELVES_CACHE.map(s => {
+      const count = SHELF_COUNTS[s.id] || 0;
+      const empty = count === 0;
+      const name = (s.name_tr || '').trim();
+      const subtitle = (s.subtitle_tr || '').trim();
+      const display = empty ? 'Çok Yakında' : (name || `Raf ${s.id}`);
+      const subtitleHtml = !empty && subtitle ? `<div class="shelf-subtitle">${libEsc(subtitle)}</div>` : '';
+      const countdownHtml = !empty && s.deadline
+        ? `<div class="shelf-countdown" data-deadline="${libEsc(s.deadline)}">…</div>`
+        : '';
+      return `
+        <a class="shelf-btn ${empty ? 'shelf-empty' : ''}" data-shelf="${s.id}" href="#">
+          <div>
+            <div class="shelf-title">${libEsc(display)}</div>
+            ${subtitleHtml}
+            ${countdownHtml}
+          </div>
+        </a>
+      `;
+    }).join('');
+    shelvesEl.querySelectorAll('.shelf-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (btn.classList.contains('shelf-empty')) return;
+        const id = Number(btn.dataset.shelf);
+        shelvesEl.querySelectorAll('.shelf-btn').forEach(b => b.classList.toggle('shelf-active', b === btn));
+        openShelfPath(id);
+      });
     });
+    tickShelfCountdowns();
   });
-  tickShelfCountdowns();
 }
 
 // Counter ticks for shelf deadlines: refresh every minute so the
@@ -4343,13 +4414,23 @@ const PALETTE_VALUES = ['mono', 'earth'];           // 0: Siyah-Beyaz,    1: Kah
           <div class="info-value">${kefaletCount ?? 0} ${I18N.t('profile.people')}</div>
         </div>
       </div>
-      <div id="scores-section">
+      <div id="scores-section" class="info-card">
         <div class="right-section-title">${I18N.t('profile.gamescores')}</div>
         <div class="loading" style="padding:8px;font-size:11px;"><span class="spinner"></span></div>
       </div>
     `;
     renderScoresSection(scores);
   }
+
+  // Left column entrance: profile card, account info, and scores slide in
+  // from the left edge, staggered top-to-bottom (topmost first) — same
+  // treatment as Hane's news feed / Kahvehane's discussion feed.
+  staggerEntrance([
+    document.getElementById('library-card'),
+    document.querySelector('.profile-right .info-card'),
+    document.getElementById('scores-section'),
+    document.getElementById('profile-signout-wrap'),
+  ], 'left');
 }
 
 loadProfile();
