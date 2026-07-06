@@ -20,7 +20,7 @@
   <script src="onboarding.js" defer></script>
   <script src="sozcul-mascot.js" defer></script>
   <script src="admin-notification.js" defer></script>
-  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis). Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot. -->
+  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in. Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot, and a one-shot flag so the posts/scoreboard card-entrance animation (see animateFeedSwap) skips its first run here -- the column itself is already sliding in from the same edge, so animating the cards inside it too would look like the content arriving twice. -->
   <script>
     (function(){
       try {
@@ -28,6 +28,7 @@
         if (_d) {
           document.documentElement.classList.add('ist-entering-' + _d);
           document.documentElement.classList.add('vt-' + _d);
+          window.__istSuppressFirstCardAnim = { left: true, right: true };
         }
       } catch(e) {}
     })();
@@ -1968,14 +1969,21 @@ async function markPlayedGames(userId) {
 // .card-leaving-* CSS. Renders immediately (no leave animation) on first
 // paint, when the panel starts out empty. Rows enter with a staggered
 // delay by list position, so the topmost row arrives first and lower
-// ones follow.
+// ones follow. Skips that entrance animation on the first call after
+// arriving via the swipe-pagination nav (see
+// window.__istSuppressFirstCardAnim, seeded pre-body): the whole column
+// is already sliding in from that same edge, so animating the rows
+// inside it too would look like the content arriving twice.
 const CARD_SWAP_MS = 300;
 const CARD_STAGGER_MS = 80;
 function animateFeedSwap(container, direction, buildFn) {
+  const suppress = window.__istSuppressFirstCardAnim && window.__istSuppressFirstCardAnim[direction];
+  if (suppress) window.__istSuppressFirstCardAnim[direction] = false;
   const enterClass = direction === 'left' ? 'card-entering-left' : 'card-entering-right';
   const leaveClass = direction === 'left' ? 'card-leaving-left' : 'card-leaving-right';
   const playEnter = () => {
     buildFn();
+    if (suppress) return;
     Array.from(container.children).forEach((el, i) => {
       el.style.animationDelay = `${i * CARD_STAGGER_MS}ms`;
       el.classList.add(enterClass);
