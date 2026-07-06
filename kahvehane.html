@@ -665,6 +665,32 @@
     .post-delete:focus { opacity: 1; }
     .post-delete:hover { color: var(--danger); }
 
+    /* Discussion posts (left column) and scoreboard rows (right column)
+       slide in from their own column's outer screen edge on render, and
+       slide back out the same way just before the feed is replaced --
+       see the animateFeedSwap() helper used by loadPosts() / loadScoreboard(). */
+    @keyframes card-slide-in-left {
+      from { transform: translateX(-100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes card-slide-in-right {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    /* backwards fill-mode holds the keyframe's "from" state during the
+       staggered animation-delay set in JS, so a lower row stays hidden
+       off-screen while it waits its turn instead of flashing visible
+       in place first. */
+    .card-entering-left { animation: card-slide-in-left 0.4s ease-out backwards; }
+    .card-entering-right { animation: card-slide-in-right 0.4s ease-out backwards; }
+    .card-leaving-left,
+    .card-leaving-right {
+      transition: transform 0.3s ease-in, opacity 0.3s ease-in;
+      opacity: 0;
+    }
+    .card-leaving-left { transform: translateX(-100%); }
+    .card-leaving-right { transform: translateX(100%); }
+
     .submit-form .submit-form-note {
       font-size: 0.72rem;
       color: var(--muted);
@@ -1965,6 +1991,36 @@ async function markPlayedGames(userId) {
   });
 }
 
+// Slides a panel's current rows out toward their column's outer screen
+// edge, then rebuilds it and slides the fresh rows back in from that
+// same edge. `direction` is 'left' (discussion posts, left column) or
+// 'right' (scoreboard, right column) -- see the .card-entering-*/
+// .card-leaving-* CSS. Renders immediately (no leave animation) on first
+// paint, when the panel starts out empty. Rows enter with a staggered
+// delay by list position, so the topmost row arrives first and lower
+// ones follow.
+const CARD_SWAP_MS = 300;
+const CARD_STAGGER_MS = 80;
+function animateFeedSwap(container, direction, buildFn) {
+  const enterClass = direction === 'left' ? 'card-entering-left' : 'card-entering-right';
+  const leaveClass = direction === 'left' ? 'card-leaving-left' : 'card-leaving-right';
+  const playEnter = () => {
+    buildFn();
+    Array.from(container.children).forEach((el, i) => {
+      el.style.animationDelay = `${i * CARD_STAGGER_MS}ms`;
+      el.classList.add(enterClass);
+      el.addEventListener('animationend', () => {
+        el.classList.remove(enterClass);
+        el.style.animationDelay = '';
+      }, { once: true });
+    });
+  };
+  const existing = Array.from(container.children);
+  if (!existing.length) { playEnter(); return; }
+  existing.forEach(el => el.classList.add(leaveClass));
+  setTimeout(playEnter, CARD_SWAP_MS);
+}
+
 // ── Weekly scoreboard ──
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => (
@@ -2012,6 +2068,7 @@ async function loadScoreboard(neighborhoodFilter = null) {
   if (!listEl) return;
   const titleEl = document.getElementById('scoreboard-title');
   const countdownEl = document.getElementById('scoreboard-countdown');
+  const setList = (html) => animateFeedSwap(listEl, 'right', () => { listEl.innerHTML = html; });
 
   // Title + countdown swap: a filtered view is per-neighborhood (no weekly
   // countdown), while the unfiltered default is the full weekly leaderboard.
@@ -2033,12 +2090,12 @@ async function loadScoreboard(neighborhoodFilter = null) {
     if (error) throw error;
     results = data;
   } catch (e) {
-    listEl.innerHTML = '<li class="scoreboard-empty">Skorlar yüklenemedi</li>';
+    setList('<li class="scoreboard-empty">Skorlar yüklenemedi</li>');
     return;
   }
 
   if (!results || results.length === 0) {
-    listEl.innerHTML = '<li class="scoreboard-empty">Henüz skor yok</li>';
+    setList('<li class="scoreboard-empty">Henüz skor yok</li>');
     return;
   }
 
@@ -2059,7 +2116,7 @@ async function loadScoreboard(neighborhoodFilter = null) {
   }
 
   if (weekly.length === 0) {
-    listEl.innerHTML = `<li class="scoreboard-empty">${neighborhoodFilter ? I18N.t('games.scoreboard.emptyneighborhood') : I18N.t('games.scoreboard.emptyweek')}</li>`;
+    setList(`<li class="scoreboard-empty">${neighborhoodFilter ? I18N.t('games.scoreboard.emptyneighborhood') : I18N.t('games.scoreboard.emptyweek')}</li>`);
     return;
   }
 
@@ -2122,7 +2179,7 @@ async function loadScoreboard(neighborhoodFilter = null) {
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'tr'))
     .slice(0, 5);
 
-  listEl.innerHTML = top.map((p, i) => {
+  const html = top.map((p, i) => {
     const rankClass = ' r' + (i + 1);
     // Filtered view ("best people of this neighborhood") drops the neighborhood
     // prefix (redundant) but keeps the score so ranks are legible.
@@ -2150,6 +2207,7 @@ async function loadScoreboard(neighborhoodFilter = null) {
       `</li>`
     );
   }).join('');
+  setList(html);
 
   if (!neighborhoodFilter && countdownEl) countdownEl.textContent = getTimeUntilWeekReset();
 }
@@ -2226,25 +2284,27 @@ let feedState = { filter: null, offset: 0, done: false, currentUserId: null };
 async function loadPosts(neighborhoodFilter = null) {
   feedState = { filter: neighborhoodFilter, offset: 0, done: false, currentUserId: feedState.currentUserId };
   const postsEl = document.getElementById('discussion-posts');
-  postsEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
 
   const { data: { session } } = await sb.auth.getSession();
   feedState.currentUserId = session?.user?.id || null;
 
   const rows = await fetchPostsPage(neighborhoodFilter, 0);
-  if (!rows) {
-    postsEl.innerHTML = '<div class="empty-state">Mesajlar yüklenemedi.</div>';
-    return;
-  }
-  if (rows.length === 0) {
-    postsEl.innerHTML = `<div class="empty-state">${I18N.t('kahvehane.nomessages')}</div>`;
-    return;
-  }
-  postsEl.innerHTML = '';
-  appendPosts(rows);
-  feedState.offset = rows.length;
-  feedState.done = rows.length < PAGE_SIZE;
-  renderLoadMore();
+
+  animateFeedSwap(postsEl, 'left', () => {
+    if (!rows) {
+      postsEl.innerHTML = '<div class="empty-state">Mesajlar yüklenemedi.</div>';
+      return;
+    }
+    if (rows.length === 0) {
+      postsEl.innerHTML = `<div class="empty-state">${I18N.t('kahvehane.nomessages')}</div>`;
+      return;
+    }
+    postsEl.innerHTML = '';
+    appendPosts(rows);
+    feedState.offset = rows.length;
+    feedState.done = rows.length < PAGE_SIZE;
+    renderLoadMore();
+  });
 }
 
 // Posts older than this disappear from the feed.
