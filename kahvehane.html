@@ -683,7 +683,7 @@
        off-screen while it waits its turn instead of flashing visible
        in place first. */
     .card-entering-left { animation: card-slide-in-left 0.4s ease-out backwards; }
-    .card-entering-right { animation: card-slide-in-right 0.4s ease-out backwards; }
+    .card-entering-right { animation: card-slide-in-right 0.7s ease-out backwards; }
     .card-leaving-left,
     .card-leaving-right {
       transition: transform 0.3s ease-in, opacity 0.3s ease-in;
@@ -1969,14 +1969,17 @@ async function markPlayedGames(userId) {
 // .card-leaving-* CSS. Renders immediately (no leave animation) on first
 // paint, when the panel starts out empty. Rows enter with a staggered
 // delay by list position, so the topmost row arrives first and lower
-// ones follow. Skips that entrance animation on the first call after
-// arriving via the swipe-pagination nav (see
-// window.__istSuppressFirstCardAnim, seeded pre-body): the whole column
-// is already sliding in from that same edge, so animating the rows
-// inside it too would look like the content arriving twice.
+// ones follow. `leadingEls` (optional) are static elements sitting above
+// the container -- e.g. the game links above the scoreboard -- that
+// should join the same top-to-bottom entrance cascade without being
+// part of the container's own leave/rebuild cycle. Skips the entrance
+// animation on the first call after arriving via the swipe-pagination
+// nav (see window.__istSuppressFirstCardAnim, seeded pre-body): the
+// whole column is already sliding in from that same edge, so animating
+// the rows inside it too would look like the content arriving twice.
 const CARD_SWAP_MS = 300;
 const CARD_STAGGER_MS = 80;
-function animateFeedSwap(container, direction, buildFn) {
+function animateFeedSwap(container, direction, buildFn, leadingEls = []) {
   const suppress = window.__istSuppressFirstCardAnim && window.__istSuppressFirstCardAnim[direction];
   if (suppress) window.__istSuppressFirstCardAnim[direction] = false;
   const enterClass = direction === 'left' ? 'card-entering-left' : 'card-entering-right';
@@ -1984,7 +1987,8 @@ function animateFeedSwap(container, direction, buildFn) {
   const playEnter = () => {
     buildFn();
     if (suppress) return;
-    Array.from(container.children).forEach((el, i) => {
+    const items = [...leadingEls, ...Array.from(container.children)];
+    items.forEach((el, i) => {
       el.style.animationDelay = `${i * CARD_STAGGER_MS}ms`;
       el.classList.add(enterClass);
       el.addEventListener('animationend', () => {
@@ -2046,7 +2050,11 @@ async function loadScoreboard(neighborhoodFilter = null) {
   if (!listEl) return;
   const titleEl = document.getElementById('scoreboard-title');
   const countdownEl = document.getElementById('scoreboard-countdown');
-  const setList = (html) => animateFeedSwap(listEl, 'right', () => { listEl.innerHTML = html; });
+  // Game links sit above the scoreboard and never get rebuilt, but they
+  // should still join the same top-to-bottom entrance cascade as the
+  // scoreboard rows below them.
+  const gameLinks = Array.from(document.querySelectorAll('.games-section .game-link'));
+  const setList = (html) => animateFeedSwap(listEl, 'right', () => { listEl.innerHTML = html; }, gameLinks);
 
   // Title + countdown swap: a filtered view is per-neighborhood (no weekly
   // countdown), while the unfiltered default is the full weekly leaderboard.
