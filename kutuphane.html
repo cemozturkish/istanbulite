@@ -501,6 +501,16 @@
       border-bottom: 1px solid var(--hairline);
     }
 
+    /* Chapter-box style, matching .library-card above — the account-info
+       block also needs its own frame now that col-left is transparent. */
+    .info-card {
+      border: 2px solid var(--ink);
+      border-bottom: 4px solid var(--ink);
+      box-shadow: var(--frame-shadow);
+      padding: 10px 12px;
+      background: var(--paper);
+    }
+
     .info-row {
       display: flex;
       flex-direction: row;
@@ -3783,22 +3793,6 @@ function renderScoresSection(scores) {
   `;
 }
 
-function formatLastSeen(dateStr) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now - d;
-  const diffMins = Math.floor(diffMs / 60000);
-  const en = I18N.isEnglish();
-  if (diffMins < 1) return en ? 'Online now' : 'Şimdi çevrimiçi';
-  if (diffMins < 60) return en ? `${diffMins}m ago` : `${diffMins} dk önce`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return en ? `${diffHours}h ago` : `${diffHours} saat önce`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return en ? `${diffDays}d ago` : `${diffDays} gün önce`;
-  return I18N.formatDate(d, { year: 'numeric', month: 'long', day: 'numeric' });
-}
-
 // ── Sticker board persistence (localStorage, keyed by user id) ──
 function loadBoardStickers(userId) {
   try {
@@ -4055,7 +4049,6 @@ const PALETTE_VALUES = ['mono', 'earth'];           // 0: Siyah-Beyaz,    1: Kah
   const joinedDate = I18N.formatDate(user.created_at, {
     year: 'numeric', month: 'long', day: 'numeric'
   });
-  const lastSeenText = formatLastSeen(user.last_sign_in_at);
   // Scores are loaded async from Supabase — provide a zeroed object first
   // then hydrate the score cards once the query resolves.
   const scores = {
@@ -4317,7 +4310,7 @@ const PALETTE_VALUES = ['mono', 'earth'];           // 0: Siyah-Beyaz,    1: Kah
   // ── RIGHT: stats & account info ──
   if (isViewingOther) {
     document.querySelector('.profile-right').innerHTML = `
-      <div>
+      <div class="info-card">
         <div class="right-section-title">${I18N.t('profile.kefil')}</div>
         ${kefilOfUser ? `<div class="info-row">
           <div class="info-label">${I18N.t('profile.kefil')}</div>
@@ -4331,19 +4324,11 @@ const PALETTE_VALUES = ['mono', 'earth'];           // 0: Siyah-Beyaz,    1: Kah
     `;
   } else {
     document.querySelector('.profile-right').innerHTML = `
-      <div>
+      <div class="info-card">
         <div class="right-section-title">${I18N.t('profile.account')}</div>
-        <div class="info-row">
-          <div class="info-label">${I18N.t('profile.email')}</div>
-          <div class="info-value">${user.email}</div>
-        </div>
         <div class="info-row">
           <div class="info-label">${I18N.t('profile.membership')}</div>
           <div class="info-value">${joinedDate}</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">${I18N.t('profile.lastseen')}</div>
-          <div class="info-value">${lastSeenText}</div>
         </div>
         ${kefilOfUser ? `<div class="info-row">
           <div class="info-label">${I18N.t('profile.kefil')}</div>
