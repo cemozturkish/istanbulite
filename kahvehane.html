@@ -316,6 +316,30 @@
       overflow-y: auto;
     }
 
+    /* Wraps the heading + 3 game links so they can be hidden as one unit
+       while a game's bottom sheet is open (see enterGameContext), leaving
+       just that game's own scoreboard in view. */
+    .game-picker {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    /* Left-column card shown in place of the discussion feed while a game's
+       bottom sheet is open — a short blurb about the game being played,
+       mirroring how the map swaps in neighborhood-specific content. */
+    .game-info-card {
+      margin: 0;
+      padding: 14px 16px;
+      background: var(--paper-warm);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .game-info-card p { margin: 0; }
+
     .games-section h2 {
       font-size: 0.95rem;
       font-weight: 700;
@@ -1414,22 +1438,24 @@
   <aside class="col-right">
     <section class="games-section">
       <div class="games-section-inner">
-        <h2 style="text-transform: uppercase;" data-i18n="games.today">Günün Oyunları</h2>
+        <div class="game-picker" id="game-picker">
+          <h2 style="text-transform: uppercase;" data-i18n="games.today">Günün Oyunları</h2>
 
-        <a href="sozcel.html" class="game-link" data-game="sozcel">
-          <div class="game-link-title">Sözcel</div>
-          <div class="game-link-subtitle">Türkçe Wordle</div>
-        </a>
+          <a href="sozcel.html" class="game-link" data-game="sozcel">
+            <div class="game-link-title">Sözcel</div>
+            <div class="game-link-subtitle">Türkçe Wordle</div>
+          </a>
 
-        <a href="tumcel.html" class="game-link" data-game="tumcel">
-          <div class="game-link-title">Tümcel</div>
-          <div class="game-link-subtitle">Türkçe Alıntı Bulmacası</div>
-        </a>
+          <a href="tumcel.html" class="game-link" data-game="tumcel">
+            <div class="game-link-title">Tümcel</div>
+            <div class="game-link-subtitle">Türkçe Alıntı Bulmacası</div>
+          </a>
 
-        <a href="bulmaca.html" class="game-link" data-game="bulmaca">
-          <div class="game-link-title">Bulmaca</div>
-          <div class="game-link-subtitle">Mini Çapraz Bulmaca</div>
-        </a>
+          <a href="bulmaca.html" class="game-link" data-game="bulmaca">
+            <div class="game-link-title">Bulmaca</div>
+            <div class="game-link-subtitle">Mini Çapraz Bulmaca</div>
+          </a>
+        </div>
 
         <div class="scoreboard">
           <h2 id="scoreboard-title" data-i18n="games.weeklyscoreboard">Haftanın Skor Tahtası</h2>
@@ -1732,6 +1758,54 @@
 // the backdrop, or a postMessage from the game's own ← Geri button
 // (see sozcel.html/tumcel.html/bulmaca.html) — just hides the sheet;
 // Kahvehane itself was never actually left.
+//
+// Opening/closing the sheet also swaps the side columns, the same way
+// clicking a neighborhood on the map swaps them: the left column trades
+// the discussion feed for a short blurb about the game being played, and
+// the right column narrows from the full game picker + weekly board down
+// to just that game's own scoreboard.
+const GAME_DISPLAY_NAMES = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Bulmaca' };
+const GAME_BLURBS = {
+  sozcel: 'Her gün yeni bir Türkçe kelime. 6 hakkın var: her tahminden sonra harfler ipucu verir — yeşil doğru yerde, sarı kelimede ama yanlış yerde, gri o harf yok demek.',
+  tumcel: '16 cümle parçasını 4 alıntı halinde doğru grupla. Yanlış gruplama hakkın sınırlı, dikkatli seç. Kilidi açmak için Sözcel’de en az 15 kelime bulmuş olman gerekiyor.',
+  bulmaca: 'Küçük çapraz bulmacayı çöz: yatay ve dikey ipuçlarından kelimeleri bul, kutuları doldur. Kilidi açmak için önce Tümcel’i kazanman gerekiyor.',
+};
+
+let gameContextActive = null;
+
+function enterGameContext(gameKey) {
+  gameContextActive = gameKey;
+  const label = document.getElementById('discussion-label');
+  const postsEl = document.getElementById('discussion-posts');
+  const submitForm = document.getElementById('submit-form');
+  const gamePicker = document.getElementById('game-picker');
+  if (label) label.textContent = (GAME_DISPLAY_NAMES[gameKey] || gameKey).toLocaleUpperCase('tr-TR');
+  if (submitForm) submitForm.style.display = 'none';
+  if (gamePicker) gamePicker.style.display = 'none';
+  if (postsEl) {
+    animateFeedSwap(postsEl, 'left', () => {
+      postsEl.innerHTML = `<div class="game-info-card"><p>${escapeHtml(GAME_BLURBS[gameKey] || '')}</p></div>`;
+    });
+  }
+  loadScoreboard(null, gameKey);
+}
+
+function exitGameContext() {
+  if (!gameContextActive) return;
+  gameContextActive = null;
+  const gamePicker = document.getElementById('game-picker');
+  if (gamePicker) gamePicker.style.display = '';
+  const label = document.getElementById('discussion-label');
+  if (label) {
+    label.textContent = activeMapNeighborhood
+      ? (document.getElementById(activeMapNeighborhood)?.getAttribute('data-name') || activeMapNeighborhood)
+      : I18N.t('kahvehane.allistanbul');
+  }
+  updateSubmitFormVisibility();
+  loadPosts(activeMapNeighborhood || null);
+  loadScoreboard(activeMapNeighborhood || null);
+}
+
 (function initGameOverlay() {
   const overlay = document.getElementById('game-overlay');
   const frame = document.getElementById('game-overlay-frame');
@@ -1739,10 +1813,11 @@
   const closeBtn = document.getElementById('game-overlay-close');
   if (!overlay || !frame || !backdrop || !closeBtn) return;
 
-  function openGame(href) {
+  function openGame(href, gameKey) {
     frame.src = href;
     overlay.hidden = false;
     requestAnimationFrame(() => overlay.classList.add('open'));
+    if (gameKey) enterGameContext(gameKey);
   }
   function closeGame() {
     overlay.classList.remove('open');
@@ -1750,12 +1825,14 @@
       overlay.hidden = true;
       frame.src = 'about:blank';
     }, 400);
+    exitGameContext();
   }
 
   document.querySelectorAll('.game-link').forEach((link) => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      openGame(link.getAttribute('href'));
+      if (link.classList.contains('locked')) return;
+      openGame(link.getAttribute('href'), link.dataset.game);
     });
   });
   backdrop.addEventListener('click', closeGame);
@@ -2064,20 +2141,27 @@ function getTimeUntilWeekReset() {
   return I18N.formatWeekReset(days, hours, minutes);
 }
 
-async function loadScoreboard(neighborhoodFilter = null) {
+async function loadScoreboard(neighborhoodFilter = null, gameFilter = null) {
   const listEl = document.getElementById('scoreboard-list');
   if (!listEl) return;
   const titleEl = document.getElementById('scoreboard-title');
   const countdownEl = document.getElementById('scoreboard-countdown');
   // Game links sit above the scoreboard and never get rebuilt, but they
   // should still join the same top-to-bottom entrance cascade as the
-  // scoreboard rows below them.
-  const gameLinks = Array.from(document.querySelectorAll('.games-section .game-link'));
+  // scoreboard rows below them. Hidden while a game context is active
+  // (game-picker display:none), so there's nothing to cascade with then.
+  const gameLinks = document.getElementById('game-picker')?.style.display === 'none'
+    ? []
+    : Array.from(document.querySelectorAll('.games-section .game-link'));
   const setList = (html) => animateFeedSwap(listEl, 'right', () => { listEl.innerHTML = html; }, gameLinks);
 
-  // Title + countdown swap: a filtered view is per-neighborhood (no weekly
-  // countdown), while the unfiltered default is the full weekly leaderboard.
-  if (neighborhoodFilter) {
+  // Title + countdown swap: a filtered view is per-neighborhood or
+  // per-game (no weekly countdown shown for those narrowed views), while
+  // the unfiltered default is the full weekly leaderboard.
+  if (gameFilter) {
+    const gameName = (GAME_DISPLAY_NAMES[gameFilter] || gameFilter).toLocaleUpperCase('tr-TR');
+    if (titleEl) titleEl.textContent = `${gameName} — Skor Tahtası`;
+  } else if (neighborhoodFilter) {
     const nbName = neighborhoodNames[neighborhoodFilter] || neighborhoodFilter;
     if (titleEl) titleEl.textContent = I18N.formatNeighborhoodBest(nbName.toLocaleUpperCase('tr-TR'));
     if (countdownEl) countdownEl.textContent = '';
@@ -2090,7 +2174,7 @@ async function loadScoreboard(neighborhoodFilter = null) {
     const { data, error } = await sb
       .from('game_results')
       .select('user_id, neighborhood, date, won, attempts, created_at')
-      .eq('game', 'sozcel')
+      .eq('game', gameFilter || 'sozcel')
       .gte('attempts', 1);
     if (error) throw error;
     results = data;
