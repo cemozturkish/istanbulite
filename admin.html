@@ -2511,6 +2511,16 @@ async function sozculClearAssignment(date) {
 // Tümcel tab is opened or the form is reset.
 let _tumcelPendingSuggestions = [];
 let _tumcelProfilesById = {};
+let _tumcelMembersList = null;
+
+async function ensureTumcelMembersList() {
+  if (_tumcelMembersList) return _tumcelMembersList;
+  const { data } = await sb.from('profiles')
+    .select('id, first_name, last_name, neighborhood')
+    .order('first_name', { ascending: true });
+  _tumcelMembersList = data || [];
+  return _tumcelMembersList;
+}
 
 async function loadTumcelSuggestionPickers() {
   const { data: suggestions } = await sb
@@ -2539,6 +2549,14 @@ async function loadTumcelSuggestionPickers() {
     return `${name}${where}: “${short}” — ${s.source}`;
   }
 
+  function memberLabel(p) {
+    const name = capitalizeName((`${p.first_name || ''} ${p.last_name || ''}`).trim()) || 'İsimsiz';
+    const nb = p.neighborhood ? (NEIGHBORHOOD_NAMES[p.neighborhood] || p.neighborhood) : '';
+    return nb ? `${name} (${nb})` : name;
+  }
+
+  const members = await ensureTumcelMembersList();
+
   for (let i = 1; i <= 4; i++) {
     const colorEl = document.getElementById(`tc-color-${i}`);
     if (!colorEl) continue;
@@ -2550,7 +2568,7 @@ async function loadTumcelSuggestionPickers() {
       pickWrap.id = `tc-pick-wrap-${i}`;
       pickWrap.style.cssText = 'margin:8px 0;';
       pickWrap.innerHTML = `
-        <label style="margin-top:0;">Öneriden seç (boş bırakırsan tümcül sen olursun)</label>
+        <label style="margin-top:0;">Tümcül seç: öneriden ya da üyelerden (boş bırakırsan tümcül sen olursun)</label>
         <select id="tc-pick-${i}"></select>
         <div id="tc-suggested-body-${i}" style="display:none;margin-top:6px;padding:8px;background:var(--paper);border:1px solid var(--rule);font-family:'Source Serif 4',Georgia,serif;font-style:italic;font-size:0.85rem;line-height:1.4;"></div>
         <input type="hidden" id="tc-suggestion-id-${i}"/>
@@ -2563,10 +2581,15 @@ async function loadTumcelSuggestionPickers() {
     // Always refresh the options
     const sel = document.getElementById(`tc-pick-${i}`);
     const currentVal = sel.value;
+    const suggestionOptions = _tumcelPendingSuggestions.map(s =>
+      `<option value="${s.id}" data-body="${escapeHtml(s.body)}" data-source="${escapeHtml(s.source)}" data-by="${escapeHtml(s.suggested_by)}">${escapeHtml(label(s))}</option>`
+    ).join('');
+    const memberOptions = members.map(p =>
+      `<option value="member:${p.id}">${escapeHtml(memberLabel(p))}</option>`
+    ).join('');
     sel.innerHTML = `<option value="">— Serbest giriş —</option>` +
-      _tumcelPendingSuggestions.map(s =>
-        `<option value="${s.id}" data-body="${escapeHtml(s.body)}" data-source="${escapeHtml(s.source)}" data-by="${escapeHtml(s.suggested_by)}">${escapeHtml(label(s))}</option>`
-      ).join('');
+      (suggestionOptions ? `<optgroup label="Bekleyen öneriler">${suggestionOptions}</optgroup>` : '') +
+      `<optgroup label="Tüm üyeler">${memberOptions}</optgroup>`;
     // Try to preserve selection when refreshing
     if (currentVal && [...sel.options].some(o => o.value === currentVal)) sel.value = currentVal;
   }
@@ -2575,13 +2598,22 @@ async function loadTumcelSuggestionPickers() {
 function onTumcelPickChange(i) {
   const sel = document.getElementById(`tc-pick-${i}`);
   const opt = sel.options[sel.selectedIndex];
-  const id = sel.value || '';
+  const val = sel.value || '';
+  const helper = document.getElementById(`tc-suggested-body-${i}`);
+  if (val.startsWith('member:')) {
+    // Direct member pick: credit them as tümcül, no suggestion to lock.
+    document.getElementById(`tc-suggestion-id-${i}`).value = '';
+    document.getElementById(`tc-tumcul-id-${i}`).value = val.slice('member:'.length);
+    helper.style.display = 'none';
+    helper.textContent = '';
+    return;
+  }
+  const id = val;
   const body = opt.getAttribute('data-body') || '';
   const source = opt.getAttribute('data-source') || '';
   const by = opt.getAttribute('data-by') || '';
   document.getElementById(`tc-suggestion-id-${i}`).value = id;
   document.getElementById(`tc-tumcul-id-${i}`).value = by;
-  const helper = document.getElementById(`tc-suggested-body-${i}`);
   if (id) {
     document.getElementById(`tc-source-${i}`).value = source;
     helper.style.display = 'block';
@@ -2648,9 +2680,13 @@ function fillTumcelForm(puzzle) {
     if (sIdEl) sIdEl.value = q.suggestion_id || '';
     if (tIdEl) tIdEl.value = q.tumcul_id || '';
     if (pickEl) {
-      // Try to select the suggestion in the dropdown if it's still pending.
+      // Try to select the suggestion in the dropdown if it's still pending,
+      // otherwise fall back to the credited member if they're still listed.
+      const memberVal = q.tumcul_id ? `member:${q.tumcul_id}` : '';
       if (q.suggestion_id && [...pickEl.options].some(o => o.value === q.suggestion_id)) {
         pickEl.value = q.suggestion_id;
+      } else if (memberVal && [...pickEl.options].some(o => o.value === memberVal)) {
+        pickEl.value = memberVal;
       } else {
         pickEl.value = '';
       }
