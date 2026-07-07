@@ -41,11 +41,9 @@
       --paper: #eddbd0;       /* main canvas + sidebar columns — lightest */
       --paper-warm: #eddbd0;  /* sidebar column background — lightest */
       --paper-card: rgba(255, 255, 255, 0.85);  /* news + event cards — white, mostly opaque over the map photo */
-      /* Card text flips to a light palette only once clicked open
-         (.expanded turns the card dark grey) -- plain hover just
-         lightens the background a touch, so text stays dark. The box
-         border itself never changes color (see .article/.event-item's
-         own border-color, which doesn't reference --card-fg). */
+      /* Card text stays dark; hover just lightens the background a
+         touch. Full detail (sources / RSVP) opens in the bottom sheet
+         instead of flipping the card's own colors in place. */
       --card-fg: #1a1a1a;
       --card-fg-heading: #1a1a1a;
       --card-fg-muted: #4a4a4a;
@@ -551,23 +549,12 @@
       color: var(--card-fg);
     }
 
-    .article.expandable { cursor: pointer; }
+    .article.openable { cursor: pointer; }
     /* Plain hover: just a lighter background + a small nudge toward the
        screen edge this column slides in from — text/border stay put. */
-    .article.expandable:hover {
+    .article.openable:hover {
       background: #e8e8e8;
       transform: translateX(-6px);
-    }
-    /* Clicked open: turns dark grey (lighter than it used to), flipping
-       text to a light palette for contrast -- the box border itself
-       never changes color (see --card-border-color, untouched here). */
-    .article.expandable.expanded {
-      background: #7a7a7a;
-      --card-fg: #ffffff;
-      --card-fg-heading: #ffffff;
-      --card-fg-muted: #d9d9d9;
-      --card-border: rgba(255, 255, 255, 0.25);
-      --card-border-soft: rgba(255, 255, 255, 0.18);
     }
     .article .meta-row {
       display: flex;
@@ -583,13 +570,14 @@
       color: var(--card-fg-muted);
       font-style: italic;
     }
+    /* Only ever rendered inside the detail sheet (see buildNewsDetailHtml)
+       — the sidebar preview card doesn't include it, so no visibility
+       toggle is needed here. */
     .article .sources {
       margin-top: 10px;
       padding-top: 10px;
       border-top: 1px dashed var(--card-border);
-      display: none;
     }
-    .article.expanded .sources { display: block; }
     .article .src-item {
       padding: 6px 0;
       border-bottom: 1px dotted var(--card-border-soft);
@@ -1032,24 +1020,16 @@
       color: var(--card-fg-muted);
       line-height: 1.35;
     }
-    .event-item.expandable { cursor: pointer; }
+    .event-item.openable { cursor: pointer; }
     /* Plain hover: just a lighter background + a small nudge toward the
        screen edge this column slides in from — text/border stay put. */
-    .event-item.expandable:hover {
+    .event-item.openable:hover {
       background: #e8e8e8;
       transform: translateX(6px);
     }
-    /* Clicked open: turns dark grey (lighter than it used to), flipping
-       text to a light palette for contrast -- the box border itself
-       never changes color (see --card-border-color, untouched here). */
-    .event-item.expandable.expanded {
-      background: #7a7a7a;
-      --card-fg: #ffffff;
-      --card-fg-heading: #ffffff;
-      --card-fg-muted: #d9d9d9;
-      --card-border: rgba(255, 255, 255, 0.25);
-      --card-border-soft: rgba(255, 255, 255, 0.18);
-    }
+    /* Only ever rendered inside the detail sheet (see buildEventDetailHtml)
+       — the sidebar preview card doesn't include it, so no visibility
+       toggle is needed here. */
     .event-item .ev-details {
       grid-column: 1 / -1;
       margin-top: 10px;
@@ -1059,9 +1039,7 @@
       font-size: 0.82rem;
       line-height: 1.5;
       color: var(--card-fg);
-      display: none;
     }
-    .event-item.expanded .ev-details { display: block; }
     .event-item .ev-desc { margin-bottom: 10px; }
     .ev-rsvp-row {
       display: flex;
@@ -1169,6 +1147,71 @@
       }
       /* Tighten padding inside the narrow events column */
       .sidebar-right-inner { padding: 6px 6px; }
+    }
+
+    /* ── Detail overlay: bottom sheet for a news article or event's full
+       details, opened instead of the old expand-in-place toggle —
+       mirrors Kahvehane's game overlay / Kütüphane's reader overlay.
+       Background/border/shadow come from frames.css's shared flat-card
+       rule (it targets .detail-overlay-sheet alongside the other two). */
+    .detail-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+    }
+    .detail-overlay[hidden] { display: none; }
+    .detail-overlay-backdrop {
+      /* Transparent, like the other two overlays — still catches
+         outside clicks to close. */
+      position: absolute;
+      inset: 0;
+      background: transparent;
+    }
+    .detail-overlay-sheet {
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      width: min(680px, 86vw);
+      height: min(88vh, 860px);
+      overflow-y: auto;
+      transform: translate(-50%, 100%);
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .detail-overlay.open .detail-overlay-sheet { transform: translate(-50%, 0); }
+    .detail-overlay-close {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      z-index: 2;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 1rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .detail-overlay-body {
+      padding: 48px 24px 24px;
+    }
+    /* Comfortable reading width for the card sitting inside the sheet,
+       centered rather than stretched edge-to-edge. */
+    .detail-overlay-body .article,
+    .detail-overlay-body .event-item {
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    @media (max-width: 768px) {
+      .detail-overlay-sheet {
+        left: 0;
+        right: 0;
+        width: 100%;
+        height: 92vh;
+        transform: translateY(100%);
+      }
+      .detail-overlay.open .detail-overlay-sheet { transform: translateY(0); }
     }
   </style>
   <link rel="stylesheet" href="frames.css">
@@ -1396,6 +1439,18 @@
       </div>
     </section>
   </aside>
+  </div>
+</div>
+
+<!-- Detail overlay: bottom sheet housing a news article or event's full
+     details, opened instead of the old expand-in-place toggle — see
+     openDetail/closeDetail and buildNewsDetailHtml/buildEventDetailHtml
+     further down. -->
+<div class="detail-overlay" id="detail-overlay" hidden>
+  <div class="detail-overlay-backdrop" id="detail-overlay-backdrop"></div>
+  <div class="detail-overlay-sheet" id="detail-overlay-sheet">
+    <button type="button" class="detail-overlay-close" id="detail-overlay-close" aria-label="Kapat" title="Kapat">✕</button>
+    <div class="detail-overlay-body" id="detail-overlay-body"></div>
   </div>
 </div>
 
@@ -2093,54 +2148,63 @@ function renderBreakingNewsFeed(rows) {
   animateFeedSwap(feed, 'left', () => renderBreakingNewsFeedNow(feed, rows));
 }
 
+// Full detail markup for a news article — rendered into the detail
+// overlay's sheet (see openDetail). Reuses the .article card's own
+// styling so it looks like the same card, just full-size.
+function buildNewsDetailHtml(n) {
+  const sources = (n.breaking_news_sources || [])
+    .slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const sourcesHtml = sources.length
+    ? sources.map(s => {
+        const url = safeUrl(s.url);
+        const inner = `
+          <span class="src-name">${escapeText(s.name)}</span>
+          ${escapeText(s.headline)}
+        `;
+        return `<div class="src-item">${
+          url
+            ? `<a href="${escapeText(url)}" target="_blank" rel="noopener">${inner}</a>`
+            : inner
+        }</div>`;
+      }).join('')
+    : '<div class="sources-empty">Henüz kaynak eklenmedi.</div>';
+  return `
+    <div class="article">
+      <div class="meta-row">
+        <div class="kicker">${escapeText(categoryLabelTR(n))}</div>
+        <div class="ago" data-iso="${escapeText(n.created_at)}">${escapeText(formatAgoTR(n.created_at))}</div>
+      </div>
+      <h3>${escapeText(n.title)}</h3>
+      ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
+      <div class="sources">
+        <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Kaynaklar</div>
+        ${sourcesHtml}
+      </div>
+    </div>
+  `;
+}
+
 function renderBreakingNewsFeedNow(feed, rows) {
   if (!rows.length) {
     feed.innerHTML = `<p class="no-articles" style="padding:12px;">${I18N.t('home.breaking.empty')}</p>`;
     return;
   }
-  feed.innerHTML = rows.map(n => {
-    const sources = (n.breaking_news_sources || [])
-      .slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    const sourcesHtml = sources.length
-      ? sources.map(s => {
-          const url = safeUrl(s.url);
-          const inner = `
-            <span class="src-name">${escapeText(s.name)}</span>
-            ${escapeText(s.headline)}
-          `;
-          return `<div class="src-item">${
-            url
-              ? `<a href="${escapeText(url)}" target="_blank" rel="noopener">${inner}</a>`
-              : inner
-          }</div>`;
-        }).join('')
-      : '<div class="sources-empty">Henüz kaynak eklenmedi.</div>';
-    return `
-      <div class="article expandable" data-news-id="${escapeText(n.id)}">
+  const rowsById = new Map(rows.map(n => [String(n.id), n]));
+  feed.innerHTML = rows.map(n => `
+      <div class="article openable" data-news-id="${escapeText(n.id)}">
         <div class="meta-row">
           <div class="kicker">${escapeText(categoryLabelTR(n))}</div>
           <div class="ago" data-iso="${escapeText(n.created_at)}">${escapeText(formatAgoTR(n.created_at))}</div>
         </div>
         <h3>${escapeText(n.title)}</h3>
         ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
-        <div class="sources">
-          <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Kaynaklar</div>
-          ${sourcesHtml}
-        </div>
       </div>
-    `;
-  }).join('');
+    `).join('');
 
-  feed.querySelectorAll('.article.expandable').forEach(el => {
-    el.addEventListener('click', (e) => {
-      // Let source links open without toggling.
-      if (e.target.closest('a')) return;
-      const wasExpanded = el.classList.contains('expanded');
-      // Collapse any other open item — only one at a time.
-      feed.querySelectorAll('.article.expandable.expanded').forEach(other => {
-        if (other !== el) other.classList.remove('expanded');
-      });
-      el.classList.toggle('expanded', !wasExpanded);
+  feed.querySelectorAll('.article.openable').forEach(el => {
+    el.addEventListener('click', () => {
+      const n = rowsById.get(el.dataset.newsId);
+      if (n) openDetail(buildNewsDetailHtml(n));
     });
   });
 
@@ -2296,11 +2360,44 @@ function renderEvents() {
   animateFeedSwap(panel, 'right', () => renderEventsNow(panel, rows));
 }
 
+// Full detail markup for an event — rendered into the detail overlay's
+// sheet (see openDetail). Reuses the .event-item card's own styling so
+// it looks like the same card, just full-size, with the RSVP row live.
+function buildEventDetailHtml(ev) {
+  const nbLabel = ev.neighborhood ? (NB_NAMES_TR[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
+  const parts = eventDateParts(ev.event_date);
+  const dateTime = [parts.weekday, parts.time].filter(Boolean).join(' ');
+  const metaHTML = [dateTime, ev.location].filter(Boolean).map(escapeText).join('<br>');
+  const count = rsvpCounts[ev.id] || 0;
+  const attending = myRsvpIds.has(ev.id);
+  return `
+    <div class="event-item">
+      <div class="ev-date-block">
+        <div class="ev-day">${parts.day}</div>
+        <div class="ev-mon">${parts.mon}</div>
+      </div>
+      <div class="ev-body">
+        <div class="ev-kicker">${escapeText(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
+        <div class="ev-title">${escapeText(ev.title)}</div>
+        ${metaHTML ? `<div class="ev-meta">${metaHTML}</div>` : ''}
+      </div>
+      <div class="ev-details">
+        ${ev.description ? `<div class="ev-desc">${escapeText(ev.description)}</div>` : ''}
+        <div class="ev-rsvp-row">
+          <button type="button" class="ev-rsvp-btn${attending ? ' attending' : ''}" data-event-id="${ev.id}">${attending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join')}</button>
+          <span class="ev-rsvp-count">${count} ${I18N.t('home.events.rsvp.count')}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderEventsNow(panel, rows) {
   if (!rows.length) {
     panel.innerHTML = `<p class="no-articles" style="padding:12px 18px;">${I18N.t('home.events.empty')}</p>`;
     return;
   }
+  const rowsById = new Map(rows.map(ev => [String(ev.id), ev]));
   panel.innerHTML = rows.map(ev => {
     const nbLabel = ev.neighborhood ? (NB_NAMES_TR[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
     const parts = eventDateParts(ev.event_date);
@@ -2309,10 +2406,8 @@ function renderEventsNow(panel, rows) {
     // <br>, since the pieces need to stay separately escapable.
     const dateTime = [parts.weekday, parts.time].filter(Boolean).join(' ');
     const metaHTML = [dateTime, ev.location].filter(Boolean).map(escapeText).join('<br>');
-    const count = rsvpCounts[ev.id] || 0;
-    const attending = myRsvpIds.has(ev.id);
     return `
-      <div class="event-item expandable">
+      <div class="event-item openable" data-event-id="${escapeText(ev.id)}">
         <div class="ev-date-block">
           <div class="ev-day">${parts.day}</div>
           <div class="ev-mon">${parts.mon}</div>
@@ -2322,45 +2417,59 @@ function renderEventsNow(panel, rows) {
           <div class="ev-title">${escapeText(ev.title)}</div>
           ${metaHTML ? `<div class="ev-meta">${metaHTML}</div>` : ''}
         </div>
-        <div class="ev-details">
-          ${ev.description ? `<div class="ev-desc">${escapeText(ev.description)}</div>` : ''}
-          <div class="ev-rsvp-row">
-            <button type="button" class="ev-rsvp-btn${attending ? ' attending' : ''}" data-event-id="${ev.id}">${attending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join')}</button>
-            <span class="ev-rsvp-count">${count} ${I18N.t('home.events.rsvp.count')}</span>
-          </div>
-        </div>
       </div>
     `;
   }).join('');
 
-  panel.querySelectorAll('.event-item.expandable').forEach(el => {
-    el.addEventListener('click', (e) => {
-      if (e.target.closest('a, button')) return;
-      const wasExpanded = el.classList.contains('expanded');
-      panel.querySelectorAll('.event-item.expandable.expanded').forEach(other => {
-        if (other !== el) other.classList.remove('expanded');
-      });
-      el.classList.toggle('expanded', !wasExpanded);
-    });
-  });
-
-  panel.querySelectorAll('.ev-rsvp-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleRsvp(btn.dataset.eventId, btn);
+  panel.querySelectorAll('.event-item.openable').forEach(el => {
+    el.addEventListener('click', () => {
+      const ev = rowsById.get(el.dataset.eventId);
+      if (ev) openDetail(buildEventDetailHtml(ev));
     });
   });
 }
 
+// Detail overlay: a bottom sheet for a news article or event's full
+// details, opened instead of the old expand-in-place toggle — mirrors
+// Kahvehane's game overlay / Kütüphane's reader overlay. Content is
+// built by buildNewsDetailHtml/buildEventDetailHtml above.
+function openDetail(html) {
+  const overlay = document.getElementById('detail-overlay');
+  const body = document.getElementById('detail-overlay-body');
+  if (!overlay || !body) return;
+  body.innerHTML = html;
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('open'));
+}
+function closeDetail() {
+  const overlay = document.getElementById('detail-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('open');
+  setTimeout(() => { overlay.hidden = true; }, 400);
+}
+(function initDetailOverlay() {
+  const overlay = document.getElementById('detail-overlay');
+  const backdrop = document.getElementById('detail-overlay-backdrop');
+  const closeBtn = document.getElementById('detail-overlay-close');
+  const body = document.getElementById('detail-overlay-body');
+  if (!overlay || !backdrop || !closeBtn || !body) return;
+  backdrop.addEventListener('click', closeDetail);
+  closeBtn.addEventListener('click', closeDetail);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeDetail();
+  });
+  // Delegated so it keeps working across re-renders of the sheet body
+  // (e.g. jumping straight from one event's detail to another's).
+  body.addEventListener('click', (e) => {
+    const btn = e.target.closest('.ev-rsvp-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    toggleRsvp(btn.dataset.eventId, btn);
+  });
+})();
+
 // loadBreakingNews() is called from showSite() once the user is known
 // so the per-user "seen" set is in play immediately.
-
-// Collapse any expanded news/event when clicking outside of them.
-document.addEventListener('click', (e) => {
-  if (e.target.closest('.article.expandable, .event-item.expandable')) return;
-  document.querySelectorAll('.article.expandable.expanded, .event-item.expandable.expanded')
-    .forEach(el => el.classList.remove('expanded'));
-});
 
 // ── Init ──
 checkSession();
