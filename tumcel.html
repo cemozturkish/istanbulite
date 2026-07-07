@@ -260,15 +260,25 @@
 
     .instructions {
       text-align: center;
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       color: var(--muted);
     }
 
     .mistakes {
       text-align: center;
-      font-size: 0.8rem;
-      color: var(--accent);
-      font-weight: 700;
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+    }
+    .mistakes .heart {
+      font-size: 1.3rem;
+      line-height: 1;
+      color: var(--ink-red);
+      transition: color 0.2s, transform 0.2s;
+    }
+    .mistakes .heart.lost {
+      color: var(--rule);
+      transform: scale(0.85);
     }
 
     .solved-groups {
@@ -293,19 +303,27 @@
     .solved-quote {
       font-family: 'Source Serif 4', Georgia, serif;
       font-style: italic;
-      font-size: 0.88rem;
+      font-size: 1rem;
       line-height: 1.45;
       margin-bottom: 5px;
     }
 
     .solved-source {
       font-family: 'Inter', sans-serif;
-      font-size: 0.6rem;
+      font-size: 0.7rem;
       font-weight: 700;
       letter-spacing: 2px;
       text-transform: uppercase;
       opacity: 0.85;
     }
+
+    .solved-tumcul {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      margin-top: 4px;
+      opacity: 0.85;
+    }
+    .solved-tumcul .name { font-weight: 700; }
 
     .words-grid {
       display: grid;
@@ -319,7 +337,7 @@
       border: 2px solid var(--rule);
       color: var(--ink);
       text-align: center;
-      font-size: 0.72rem;
+      font-size: 0.85rem;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
@@ -379,7 +397,7 @@
 
     .game-status {
       text-align: center;
-      font-size: 0.9rem;
+      font-size: 1rem;
       min-height: 22px;
       font-weight: 700;
     }
@@ -959,12 +977,12 @@
         overflow: hidden;
         gap: 6px;
       }
-      .instructions { font-size: 11px; }
-      .mistakes { font-size: 11px; font-weight: 700; }
+      .instructions { font-size: 13px; }
+      .mistakes .heart { font-size: 1.1rem; }
       .words-grid { gap: 6px; }
       .word-card {
         padding: 8px 4px;
-        font-size: 10px;
+        font-size: 13px;
         border-width: 2px;
         border-radius: 4px;
         font-weight: 700;
@@ -979,8 +997,9 @@
         padding: 7px 10px;
         border-radius: 4px;
       }
-      .solved-quote { font-size: 0.78rem; margin-bottom: 3px; }
-      .solved-source { font-size: 0.52rem; }
+      .solved-quote { font-size: 0.92rem; margin-bottom: 3px; }
+      .solved-source { font-size: 0.65rem; }
+      .solved-tumcul { font-size: 0.62rem; }
       .controls { gap: 6px; }
       .btn {
         padding: 8px 14px;
@@ -988,7 +1007,7 @@
         letter-spacing: 0.5px;
         border-radius: 4px;
       }
-      .game-status { font-size: 12px; min-height: 14px; }
+      .game-status { font-size: 14px; min-height: 14px; }
       .reset-info { font-size: 10px; }
     }
   </style>
@@ -1048,7 +1067,7 @@
           4 parça seç — aynı alıntıya ait olduklarını düşündüklerini bul. 4 alıntı var!
         </div>
 
-        <div class="mistakes" id="mistakes">Kalan hak: 4</div>
+        <div class="mistakes" id="mistakes"></div>
 
         <div class="solved-groups" id="solved-groups"></div>
 
@@ -1208,6 +1227,16 @@ let solvedQuotes = [];   // quoteIndex values
 let mistakes = 4;
 let gameOver = false;
 
+function renderMistakesHearts() {
+  const el = document.getElementById('mistakes');
+  if (!el) return;
+  let html = '';
+  for (let i = 0; i < 4; i++) {
+    html += `<span class="heart${i >= mistakes ? ' lost' : ''}">♥</span>`;
+  }
+  el.innerHTML = html;
+}
+
 async function loadTodaysPuzzle() {
   try {
     const { data, error } = await sb
@@ -1311,6 +1340,7 @@ async function checkGuess() {
     groupDiv.innerHTML = `
       <div class="solved-quote">${escapeHtml(fullText)}</div>
       <div class="solved-source">${escapeHtml(quote.source)}</div>
+      ${tumculTagHtml(quote)}
     `;
     solvedDiv.appendChild(groupDiv);
 
@@ -1340,8 +1370,13 @@ async function checkGuess() {
     setTimeout(() => card.classList.remove('shake'), 400);
   });
 
+  // "One away": 3 of the 4 picks share a group, only 1 is off.
+  const groupCounts = {};
+  selectedFragments.forEach(f => { groupCounts[f.quoteIndex] = (groupCounts[f.quoteIndex] || 0) + 1; });
+  const oneAway = Object.values(groupCounts).some(c => c === 3);
+
   mistakes--;
-  document.getElementById('mistakes').textContent = `Kalan hak: ${mistakes}`;
+  renderMistakesHearts();
 
   if (mistakes === 0) {
     statusEl.textContent = 'Oyun bitti!';
@@ -1354,7 +1389,7 @@ async function checkGuess() {
     saveState();
     renderStats();
   } else {
-    statusEl.textContent = 'Yanlış tahmin!';
+    statusEl.textContent = oneAway ? 'Bir tane uzaktasın!' : 'Yanlış tahmin!';
     statusEl.style.color = 'var(--accent)';
     setTimeout(() => { statusEl.textContent = ''; }, 2000);
     saveState();
@@ -1376,6 +1411,7 @@ function revealUnsolvedQuotes() {
     groupDiv.innerHTML = `
       <div class="solved-quote">${escapeHtml(fullText)}</div>
       <div class="solved-source">${escapeHtml(quote.source)}</div>
+      ${tumculTagHtml(quote)}
     `;
     solvedDiv.appendChild(groupDiv);
   });
@@ -1473,11 +1509,12 @@ async function restoreState() {
       groupDiv.innerHTML = `
         <div class="solved-quote">${escapeHtml(fullText)}</div>
         <div class="solved-source">${escapeHtml(quote.source)}</div>
+        ${tumculTagHtml(quote)}
       `;
       solvedDiv.appendChild(groupDiv);
     });
 
-    document.getElementById('mistakes').textContent = `Kalan hak: ${mistakes}`;
+    renderMistakesHearts();
 
     if (gameOver) {
       if (solvedQuotes.length === 4) {
@@ -1721,8 +1758,9 @@ async function markPlayedGames() {
   }
 
   initGame(puzzle);
+  await loadTumculProfiles(puzzle);
   const restored = await restoreState();
-  if (!restored) renderFragments();
+  if (!restored) { renderFragments(); renderMistakesHearts(); }
   renderStats();
   loadScoreboard();
   markPlayedGames();
@@ -1748,32 +1786,49 @@ function turkishLocativeName(name) {
   return upper + d + suffixVowel + 'N';
 }
 
-async function renderTumculler(puzzle) {
-  const el = document.getElementById('tumculler-line');
-  if (!el) return;
+// Fetched once per load so both the "Günün Tümcülleri" line and each
+// individual solved-group card can show the credited member by name.
+let _tumculProfilesById = {};
+async function loadTumculProfiles(puzzle) {
   const tumculIds = [...new Set(((puzzle && puzzle.quotes) || []).map(q => q.tumcul_id).filter(Boolean))];
-  if (tumculIds.length === 0) { el.innerHTML = ''; return; }
+  _tumculProfilesById = {};
+  if (tumculIds.length === 0) return;
   try {
     const { data: profs } = await sb
       .from('profiles')
       .select('id, first_name, neighborhood')
       .in('id', tumculIds);
-    if (!profs || profs.length === 0) { el.innerHTML = ''; return; }
-    const byId = {};
-    profs.forEach(p => { byId[p.id] = p; });
-    const tag = tumculIds.length === 1 ? 'Günün Tümcülü:' : 'Günün Tümcülleri:';
-    const names = tumculIds.map(id => {
-      const p = byId[id];
-      if (!p) return '';
-      const first = (p.first_name || 'İSİMSİZ').toLocaleUpperCase('tr-TR');
-      const nb = (typeof neighborhoodNames !== 'undefined' && neighborhoodNames[p.neighborhood]) || p.neighborhood || '';
-      const label = nb ? `${turkishLocativeName(nb)} ${first}` : first;
-      return `<span class="name author-link" data-user-id="${p.id}">${escapeHtml(label)}</span>`;
-    }).filter(Boolean).join('<span class="sep">·</span>');
-    el.innerHTML = `<span class="tag">${tag}</span>${names}`;
-  } catch (e) {
-    el.innerHTML = '';
-  }
+    (profs || []).forEach(p => { _tumculProfilesById[p.id] = p; });
+  } catch (e) {}
+}
+
+function tumculLabel(id) {
+  const p = _tumculProfilesById[id];
+  if (!p) return '';
+  const first = (p.first_name || 'İSİMSİZ').toLocaleUpperCase('tr-TR');
+  const nb = (typeof neighborhoodNames !== 'undefined' && neighborhoodNames[p.neighborhood]) || p.neighborhood || '';
+  return nb ? `${turkishLocativeName(nb)} ${first}` : first;
+}
+
+// HTML for the credited member, shown right on the solved-group card.
+function tumculTagHtml(quote) {
+  if (!quote || !quote.tumcul_id) return '';
+  const label = tumculLabel(quote.tumcul_id);
+  if (!label) return '';
+  return `<div class="solved-tumcul">Tümcül: <span class="name author-link" data-user-id="${quote.tumcul_id}">${escapeHtml(label)}</span></div>`;
+}
+
+function renderTumculler(puzzle) {
+  const el = document.getElementById('tumculler-line');
+  if (!el) return;
+  const tumculIds = [...new Set(((puzzle && puzzle.quotes) || []).map(q => q.tumcul_id).filter(Boolean))];
+  const tag = tumculIds.length === 1 ? 'Günün Tümcülü:' : 'Günün Tümcülleri:';
+  const names = tumculIds.map(id => {
+    const label = tumculLabel(id);
+    if (!label) return '';
+    return `<span class="name author-link" data-user-id="${id}">${escapeHtml(label)}</span>`;
+  }).filter(Boolean).join('<span class="sep">·</span>');
+  el.innerHTML = names ? `<span class="tag">${tag}</span>${names}` : '';
 }
 
 // ── Alıntı önerisi: one pending per user, globally unique ──
