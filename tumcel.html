@@ -1226,6 +1226,11 @@ let selectedFragments = [];
 let solvedQuotes = [];   // quoteIndex values
 let mistakes = 4;
 let gameOver = false;
+let guessedCombos = []; // wrong guesses already tried, as comboKey() strings
+
+function comboKey(fragments) {
+  return fragments.map(f => `${f.quoteIndex}-${f.fragIndex}`).sort().join(',');
+}
 
 function renderMistakesHearts() {
   const el = document.getElementById('mistakes');
@@ -1362,6 +1367,16 @@ async function checkGuess() {
     return;
   }
 
+  // Already tried this exact combination — don't re-penalize.
+  const key = comboKey(selectedFragments);
+  if (guessedCombos.includes(key)) {
+    statusEl.textContent = 'Bunu zaten denedin!';
+    statusEl.style.color = 'var(--accent)';
+    setTimeout(() => { statusEl.textContent = ''; }, 2000);
+    return;
+  }
+  guessedCombos.push(key);
+
   // Wrong guess — shake selected tiles
   document.querySelectorAll('.word-card.selected').forEach(card => {
     card.classList.remove('shake');
@@ -1439,6 +1454,7 @@ function saveState() {
     solvedQuotes,
     mistakes,
     gameOver,
+    guessedCombos,
     fragmentOrder: allFragments.map(f => ({ quoteIndex: f.quoteIndex, fragIndex: f.fragIndex }))
   };
   localStorage.setItem(SAVE_KEY, JSON.stringify(state));
@@ -1487,6 +1503,7 @@ async function restoreState() {
     solvedQuotes = state.solvedQuotes;
     mistakes = state.mistakes;
     gameOver = state.gameOver;
+    guessedCombos = state.guessedCombos || [];
 
     if (state.fragmentOrder) {
       allFragments = state.fragmentOrder
