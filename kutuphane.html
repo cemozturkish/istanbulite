@@ -184,8 +184,8 @@
        position:fixed escapes the body grid entirely, and lives as a sibling
        of main (not nested inside it) so it keeps rendering on mobile even
        while main is hidden between shelf/article opens. Visible behind the
-       shelves and chapter-path browsing; .reader goes opaque once an
-       article is actually open, covering it back up (see .reader below). */
+       shelves; the reader-overlay sheet (chapter list or article, see
+       below) goes opaque once opened, covering it back up. */
     .map-panel {
       position: fixed;
       inset: 0;
@@ -688,11 +688,10 @@
       color: var(--muted);
     }
 
-    /* ── Reading area (center) — where shelf contents will render ──
-       Left transparent (no background) so the map panel shows through
-       while idle or browsing a shelf's chapter path — only the actual
-       article reader (.reader, below) goes opaque, since dense long-form
-       text over the map artwork would be hard to read. */
+    /* ── Reading area (center) — idle/empty-state pane ──
+       Left transparent (no background) so the map panel shows through.
+       Shelf chapter lists and the article reader both live in the
+       reader-overlay sheet instead (below), never here. */
     .reading-area {
       flex: 1;
       padding: 32px 40px;
@@ -700,7 +699,8 @@
       min-height: 0;
       pointer-events: auto;
     }
-    .reading-area .empty-state {
+    .reading-area .empty-state,
+    .reader-overlay-sheet .empty-state {
       text-align: center;
       font-style: italic;
       color: var(--muted);
@@ -708,10 +708,15 @@
       font-size: 0.85rem;
     }
 
-    /* ── Article reader overlay: a bottom sheet that rises over the map
-       and shelves when a chapter is opened, mirroring kahvehane's game
-       overlay. The shelf path underneath is left untouched, so closing
-       (← Raf, backdrop click, Esc) just hides the sheet again.
+    /* ── Reader overlay: a bottom sheet that rises over the map and
+       shelves when a shelf is opened, mirroring kahvehane's game overlay.
+       Houses two interchangeable views rendered into the same sheet: a
+       shelf's table of contents (renderShelfPathView) and the article
+       reader itself (openArticleReader) — picking a chapter swaps the
+       sheet's content without closing/reopening it. A shelf with only one
+       article skips the table of contents and opens straight into the
+       reader (chapters aren't mandatory). Closing (← Raf/Raflar, backdrop
+       click, Esc) hides the sheet and returns to the shelves grid.
        Unlike the game overlay (a floating centered card), this sheet stays
        flush against the bottom edge it rose from — inset from the left,
        right and top so the map/shelves still show around it, but with no
@@ -891,33 +896,35 @@
     .chapter-nav-item.locked .chapter-nav-badge { color: var(--muted); }
 
     /* ── Shelf path (article list inside a shelf) ── */
-    .shelf-path { padding: 8px 0; }
+    /* Now rendered as the reader-overlay-sheet's content (see .reader
+       below, which it shares a parent with) rather than inside
+       #reading-area, so it needs the same self-supplied padding — the
+       sheet itself contributes none. */
+    .shelf-path { padding: 20px 24px; min-height: 100%; box-sizing: border-box; }
     .path-head {
       padding-bottom: 14px;
       margin-bottom: 18px;
       border-bottom: 1px solid var(--rule);
     }
-    /* Back-to-shelves button is mobile-only; desktop keeps the shelves visible
-       in the right column so no in-pane back button is needed. */
-    .path-back-mobile { display: none; }
-    @media (max-width: 768px) {
-      .path-back-mobile {
-        display: inline-flex;
-        align-items: center;
-        background: none;
-        border: none;
-        margin: 0 0 10px 0;
-        padding: 0;
-        font-family: 'Inter', sans-serif;
-        font-size: 0.7rem;
-        font-weight: 700;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        color: var(--accent);
-        cursor: pointer;
-      }
-      .path-back-mobile:hover { color: var(--ink); }
+    /* Back-to-shelves button: the table of contents now lives in the same
+       rising overlay sheet as the reader, so it always needs its own way
+       back out (there's no shelves grid showing through underneath it). */
+    .path-back {
+      display: inline-flex;
+      align-items: center;
+      background: none;
+      border: none;
+      margin: 0 0 10px 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      cursor: pointer;
     }
+    .path-back:hover { color: var(--ink); }
     .path-title {
       font-size: 1.6rem;
       font-weight: 700;
@@ -1899,9 +1906,10 @@
         grid-column: unset; grid-row: unset;
       }
 
-      /* On mobile, the kütüphane page is one screen: shelves view by default,
-         article reading view (#main) when a shelf is opened. Toggled by
-         body.mobile-reading. */
+      /* On mobile, the kütüphane page is one screen: the shelves grid.
+         Both the chapter list and the reader itself rise over it as the
+         same full-bleed .reader-overlay sheet (see .reader-overlay-sheet's
+         mobile rule below) rather than swapping #reading-area into view. */
       main {
         flex: 1;
         min-height: 0;
@@ -1909,8 +1917,6 @@
         display: none;
         flex-direction: column;
       }
-      body.mobile-reading main { display: flex; }
-      body.mobile-reading .col-right { display: none; }
 
       /* Compact top bar — nav itself relocates to the fixed bottom tab
          bar below, so this just reserves a little top space (matches
@@ -3421,40 +3427,45 @@ function showChapterIntro(article, index, onStart) {
 }
 
 async function openShelfPath(shelfId) {
-  const area = document.getElementById('reading-area');
-  if (!area) return;
-  // Mobile: swap the shelves grid for the reader pane
-  document.body.classList.add('mobile-reading');
+  const overlay = document.getElementById('reader-overlay');
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !area) return;
+  const shelf = SHELVES_CACHE.find(s => s.id === shelfId);
+
+  // Rise the sheet right away with a spinner — the chapter list (or the
+  // reader directly, for a single-article shelf) fills it in once the
+  // fetch resolves, so this gets the same page-rising treatment as the
+  // reader itself instead of appearing flat in the center column.
   area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  _closeReaderOverlay = closeReaderOverlay;
+
   const { data: articles, error } = await sb.from('library_articles')
     .select('*').eq('shelf_id', shelfId)
     .order('position', { ascending: true })
     .order('created_at', { ascending: false });
   if (error) {
-    area.innerHTML = '<div class="empty-state">Yüklenemedi.</div>';
+    area.innerHTML = `
+      <div class="shelf-path">
+        <div class="path-head"><button class="path-back" type="button" id="path-back">← Raflar</button></div>
+        <div class="empty-state">Yüklenemedi.</div>
+      </div>
+    `;
+    document.getElementById('path-back').addEventListener('click', closeReaderOverlay);
     return;
   }
-  const shelf = SHELVES_CACHE.find(s => s.id === shelfId);
-  const title = (shelf && shelf.name_tr && shelf.name_tr.trim()) || `Raf ${shelfId}`;
-  const subtitle = shelf && shelf.subtitle_tr ? shelf.subtitle_tr.trim() : '';
-  const deadlineHtml = shelf && shelf.deadline
-    ? `<div class="path-deadline">${libEsc(formatCountdown(shelf.deadline))}</div>` : '';
-  const backBtnHtml = `<button class="path-back-mobile" type="button" id="path-back-mobile">← Raflar</button>`;
-
   if (!articles || !articles.length) {
     area.innerHTML = `
       <div class="shelf-path">
         <div class="path-head">
-          ${backBtnHtml}
-          <h2 class="path-title">${libEsc(title)}</h2>
-          ${subtitle ? `<p class="path-subtitle">${libEsc(subtitle)}</p>` : ''}
-          ${deadlineHtml}
+          <button class="path-back" type="button" id="path-back">← Raflar</button>
+          <h2 class="path-title">${libEsc((shelf && shelf.name_tr && shelf.name_tr.trim()) || `Raf ${shelfId}`)}</h2>
         </div>
         <div class="empty-state">Bu rafta henüz makale yok.</div>
       </div>
     `;
-    const back = document.getElementById('path-back-mobile');
-    if (back) back.addEventListener('click', closeMobileReading);
+    document.getElementById('path-back').addEventListener('click', closeReaderOverlay);
     return;
   }
 
@@ -3467,10 +3478,44 @@ async function openShelfPath(shelfId) {
     return !completedSet.has(articles[i - 1].id);
   });
 
+  if (articles.length === 1) {
+    // Chapters aren't mandatory: a shelf with a single article (e.g. a
+    // standalone letter) has nothing to pick between, so it skips the
+    // table of contents and opens straight into the reader.
+    openArticleReader(articles[0], shelf, shelfId, articles, lockState, completedSet);
+    return;
+  }
+
+  renderShelfPathView(shelf, shelfId, articles, lockState, completedSet);
+}
+
+// Closes the reader overlay entirely, whichever view (table of contents or
+// reader) is currently showing, and restores the plain shelves grid.
+function closeReaderOverlay() {
+  const overlay = document.getElementById('reader-overlay');
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !area) return;
+  overlay.classList.remove('open');
+  setTimeout(() => { overlay.hidden = true; area.innerHTML = ''; }, 400);
+  renderShelfButtons();
+}
+
+// Table of contents view, rendered into the reader overlay sheet so it
+// rises from the bottom like the reader itself. Reused both when a shelf
+// is first opened and when the reader's back button returns here without
+// closing the sheet.
+function renderShelfPathView(shelf, shelfId, articles, lockState, completedSet) {
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!area) return;
+  const title = (shelf && shelf.name_tr && shelf.name_tr.trim()) || `Raf ${shelfId}`;
+  const subtitle = shelf && shelf.subtitle_tr ? shelf.subtitle_tr.trim() : '';
+  const deadlineHtml = shelf && shelf.deadline
+    ? `<div class="path-deadline">${libEsc(formatCountdown(shelf.deadline))}</div>` : '';
+
   area.innerHTML = `
     <div class="shelf-path">
       <div class="path-head">
-        ${backBtnHtml}
+        <button class="path-back" type="button" id="path-back">← Raflar</button>
         <h2 class="path-title">${libEsc(title)}</h2>
         ${subtitle ? `<p class="path-subtitle">${libEsc(subtitle)}</p>` : ''}
         ${deadlineHtml}
@@ -3508,20 +3553,10 @@ async function openShelfPath(shelfId) {
       showChapterIntro(a, i, () => openArticleReader(a, shelf, shelfId, articles, lockState, completedSet));
     });
   });
-  const back = document.getElementById('path-back-mobile');
-  if (back) back.addEventListener('click', closeMobileReading);
+  document.getElementById('path-back').addEventListener('click', closeReaderOverlay);
+  _closeReaderOverlay = closeReaderOverlay;
+  renderShelfButtons(shelf ? shelf.id : null);
   area.scrollTop = 0;
-}
-
-// Mobile: exit the article reader and return to the shelves grid.
-function closeMobileReading() {
-  document.body.classList.remove('mobile-reading');
-  const area = document.getElementById('reading-area');
-  if (area) area.innerHTML = '';
-  const shelvesEl = document.getElementById('shelves');
-  if (shelvesEl) {
-    shelvesEl.querySelectorAll('.shelf-btn.shelf-active').forEach(b => b.classList.remove('shelf-active'));
-  }
 }
 
 // Body parser: splits on lines that contain only --- into sections,
@@ -3617,16 +3652,21 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
 
-  function closeReader() {
-    overlay.classList.remove('open');
-    setTimeout(() => { overlay.hidden = true; area.innerHTML = ''; }, 400);
-    // Re-render the shelf path underneath so a freshly-completed chapter's
-    // unlock state is reflected once the sheet finishes revealing it, and
-    // swap the right column back from the chapter nav to the shelves grid.
-    openShelfPath(shelfId);
-    renderShelfButtons(shelfId);
+  // Multi-chapter shelves: the in-sheet back button returns to the table
+  // of contents (still inside the same sheet, no close/reopen) so a
+  // freshly-completed chapter's unlock state shows immediately. A
+  // single-article shelf has no table of contents to return to, so its
+  // back button closes the sheet outright. Backdrop click / Esc always
+  // close the sheet fully, regardless of which view is showing.
+  const hasChapters = articles && articles.length > 1;
+  function backToPath() {
+    if (hasChapters) {
+      renderShelfPathView(shelf, shelfId, articles, lockState, completedSet);
+    } else {
+      closeReaderOverlay();
+    }
   }
-  _closeReaderOverlay = closeReader;
+  _closeReaderOverlay = closeReaderOverlay;
 
   const sections = parseArticleSections(article.body || '');
   // Always render at least one section so the reader has something to show.
@@ -3673,7 +3713,7 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
     area.innerHTML = `
       <div class="reader">
         <div class="reader-top">
-          <button class="reader-back" type="button" id="reader-back">← Raf</button>
+          <button class="reader-back" type="button" id="reader-back">${hasChapters ? '← Raf' : '← Raflar'}</button>
           <div class="reader-progress"><div class="reader-progress-fill" style="width:${progressPct}%"></div></div>
           <div class="reader-step-count">${libEsc(stepLabel)}</div>
         </div>
@@ -3695,7 +3735,7 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
       next.disabled = !allAnswered;
     }
 
-    document.getElementById('reader-back').addEventListener('click', closeReader);
+    document.getElementById('reader-back').addEventListener('click', backToPath);
     document.getElementById('reader-prev').addEventListener('click', () => {
       if (step > 0) { step--; renderStep(); }
     });
@@ -3712,7 +3752,7 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
       libWriteArticleCompleted(uid, article.id);
       // Reflect the unlock live in the chapter nav without waiting for the
       // sheet to close: mark this chapter read and open the next one.
-      if (articles && lockState && completedSet) {
+      if (hasChapters) {
         completedSet.add(article.id);
         const idx = articles.indexOf(article);
         if (idx > -1 && idx + 1 < articles.length) lockState[idx + 1] = false;
@@ -3745,8 +3785,10 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
   // Contextual swap: while the reader sheet is up, the right column shows
   // this article's own chapter list instead of the shelves grid, mirroring
   // how the map swaps news/events on Hane and the game swaps the
-  // scoreboard on Kahvehane.
-  if (articles && lockState && completedSet) {
+  // scoreboard on Kahvehane. A single-article shelf has no chapters to
+  // list, so the shelves grid (already showing, already highlighted by
+  // the click that got us here) just stays put.
+  if (hasChapters) {
     renderChapterNav(shelfId, articles, article.id, lockState, completedSet, shelf);
   }
 }
