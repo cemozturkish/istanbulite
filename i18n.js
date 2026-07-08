@@ -229,14 +229,6 @@
     return isEnglish() ? `${mins} min` : `${mins} dakika`;
   }
 
-  // Weekly scoreboard reset countdown: "Sıfırlanmaya: 3g 8sa 51dk" / "Resets in: 3d 8h 51m"
-  function formatWeekReset(days, hours, minutes) {
-    const en = isEnglish();
-    if (days > 0) return en ? `Resets in: ${days}d ${hours}h ${minutes}m` : `Sıfırlanmaya: ${days}g ${hours}sa ${minutes}dk`;
-    if (hours > 0) return en ? `Resets in: ${hours}h ${minutes}m` : `Sıfırlanmaya: ${hours}sa ${minutes}dk`;
-    return en ? `Resets in: ${minutes}m` : `Sıfırlanmaya: ${minutes}dk`;
-  }
-
   // "KADIKÖY EN İYİLERİ" / "KADIKÖY'S BEST" — neighborhood-filtered scoreboard title.
   function formatNeighborhoodBest(name) {
     return isEnglish() ? `${name}'S BEST` : `${name} EN İYİLERİ`;
@@ -283,7 +275,7 @@
   global.I18N = {
     t, setLang, applyToDOM, isEnglish, onChange, offChange,
     formatDate, formatTime, formatWeekday, formatCountdown, formatMinutes, formatMemberSince,
-    formatWeekReset, formatNeighborhoodBest,
+    formatNeighborhoodBest,
     formatFoundInGuesses, formatFoundInGuessesFirst, formatTodaysWordPoints, sozcelResultTitle,
     syncFromSupabase,
     get lang() { return currentLang; },
