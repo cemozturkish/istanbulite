@@ -330,20 +330,6 @@
       flex-shrink: 0;
     }
 
-    /* Left-column card shown in place of the discussion feed while a game's
-       bottom sheet is open — a short blurb about the game being played,
-       mirroring how the map swaps in neighborhood-specific content. */
-    .game-info-card {
-      margin: 0;
-      padding: 14px 16px;
-      background: var(--paper-warm);
-      border: 2px solid var(--ink);
-      border-bottom: 5px solid var(--ink);
-      font-size: 0.85rem;
-      line-height: 1.5;
-    }
-    .game-info-card p { margin: 0; }
-
     .games-section h2 {
       font-size: 0.95rem;
       font-weight: 700;
@@ -1124,11 +1110,17 @@
     }
     .game-overlay-sheet {
       /* Background/border/shadow come from frames.css's shared flat-card
-         rule, matching every other panel on the page. */
+         rule, matching every other panel on the page.
+         Width stays above 768px on purpose: the game itself (sozcel.html
+         etc.) has its own @media (max-width: 768px) mobile layout, and
+         since that media query evaluates against the iframe's own
+         rendered width, a narrower sheet here would wrongly trigger the
+         game's mobile styles (giant keyboard, mobile padding) even on a
+         desktop-width viewport. */
       position: absolute;
       left: 50%;
       bottom: 0;
-      width: min(680px, 86vw);
+      width: min(820px, 90vw);
       height: min(88vh, 860px);
       display: flex;
       flex-direction: column;
@@ -1137,21 +1129,6 @@
       transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .game-overlay.open .game-overlay-sheet { transform: translate(-50%, 0); }
-    .game-overlay-close {
-      position: absolute;
-      top: 10px;
-      right: 14px;
-      z-index: 2;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      border: 1px solid var(--ink);
-      background: var(--paper);
-      color: var(--ink);
-      font-size: 1rem;
-      line-height: 1;
-      cursor: pointer;
-    }
     .game-overlay-frame {
       flex: 1;
       width: 100%;
@@ -1475,7 +1452,6 @@
   <div class="game-overlay" id="game-overlay" hidden>
     <div class="game-overlay-backdrop" id="game-overlay-backdrop"></div>
     <div class="game-overlay-sheet">
-      <button type="button" class="game-overlay-close" id="game-overlay-close" aria-label="Kapat" title="Kapat">✕</button>
       <iframe class="game-overlay-frame" id="game-overlay-frame" title="Oyun"></iframe>
     </div>
   </div>
@@ -1759,34 +1735,19 @@
 // (see sozcel.html/tumcel.html/bulmaca.html) — just hides the sheet;
 // Kahvehane itself was never actually left.
 //
-// Opening/closing the sheet also swaps the side columns, the same way
-// clicking a neighborhood on the map swaps them: the left column trades
-// the discussion feed for a short blurb about the game being played, and
-// the right column narrows from the full game picker + weekly board down
-// to just that game's own scoreboard.
+// Opening/closing the sheet also narrows the right column, the same way
+// clicking a neighborhood on the map swaps it: from the full game picker
+// + weekly board down to just that game's own scoreboard. The left
+// column (discussion feed) is left alone — the game already has its own
+// "?" help button, so a duplicate instructions blurb here was redundant.
 const GAME_DISPLAY_NAMES = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Bulmaca' };
-const GAME_BLURBS = {
-  sozcel: 'Her gün yeni bir Türkçe kelime. 6 hakkın var: her tahminden sonra harfler ipucu verir — yeşil doğru yerde, sarı kelimede ama yanlış yerde, gri o harf yok demek.',
-  tumcel: '16 cümle parçasını 4 alıntı halinde doğru grupla. Yanlış gruplama hakkın sınırlı, dikkatli seç. Kilidi açmak için Sözcel’de en az 15 kelime bulmuş olman gerekiyor.',
-  bulmaca: 'Küçük çapraz bulmacayı çöz: yatay ve dikey ipuçlarından kelimeleri bul, kutuları doldur. Kilidi açmak için önce Tümcel’i kazanman gerekiyor.',
-};
 
 let gameContextActive = null;
 
 function enterGameContext(gameKey) {
   gameContextActive = gameKey;
-  const label = document.getElementById('discussion-label');
-  const postsEl = document.getElementById('discussion-posts');
-  const submitForm = document.getElementById('submit-form');
   const gamePicker = document.getElementById('game-picker');
-  if (label) label.textContent = (GAME_DISPLAY_NAMES[gameKey] || gameKey).toLocaleUpperCase('tr-TR');
-  if (submitForm) submitForm.style.display = 'none';
   if (gamePicker) gamePicker.style.display = 'none';
-  if (postsEl) {
-    animateFeedSwap(postsEl, 'left', () => {
-      postsEl.innerHTML = `<div class="game-info-card"><p>${escapeHtml(GAME_BLURBS[gameKey] || '')}</p></div>`;
-    });
-  }
   loadScoreboard(null, gameKey);
 }
 
@@ -1795,14 +1756,6 @@ function exitGameContext() {
   gameContextActive = null;
   const gamePicker = document.getElementById('game-picker');
   if (gamePicker) gamePicker.style.display = '';
-  const label = document.getElementById('discussion-label');
-  if (label) {
-    label.textContent = activeMapNeighborhood
-      ? (document.getElementById(activeMapNeighborhood)?.getAttribute('data-name') || activeMapNeighborhood)
-      : I18N.t('kahvehane.allistanbul');
-  }
-  updateSubmitFormVisibility();
-  loadPosts(activeMapNeighborhood || null);
   loadScoreboard(activeMapNeighborhood || null);
 }
 
@@ -1810,8 +1763,7 @@ function exitGameContext() {
   const overlay = document.getElementById('game-overlay');
   const frame = document.getElementById('game-overlay-frame');
   const backdrop = document.getElementById('game-overlay-backdrop');
-  const closeBtn = document.getElementById('game-overlay-close');
-  if (!overlay || !frame || !backdrop || !closeBtn) return;
+  if (!overlay || !frame || !backdrop) return;
 
   function openGame(href, gameKey) {
     frame.src = href;
@@ -1835,8 +1787,9 @@ function exitGameContext() {
       openGame(link.getAttribute('href'), link.dataset.game);
     });
   });
+  // No standalone ✕ — the game's own ← back button (postMessage below)
+  // and clicking outside the sheet both close it.
   backdrop.addEventListener('click', closeGame);
-  closeBtn.addEventListener('click', closeGame);
   window.addEventListener('message', (e) => {
     if (e.source === frame.contentWindow && e.data === 'ist-close-game-overlay') closeGame();
   });
