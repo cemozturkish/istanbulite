@@ -435,6 +435,40 @@
       letter-spacing: 1px;
       font-style: italic;
     }
+    /* Seven-square week tracker replacing the old countdown text: past days
+       dark, today double-bordered, future days plain. */
+    .week-progress {
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+      padding: 4px 4px 6px;
+    }
+    .week-day {
+      box-sizing: border-box;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      border: 1px solid var(--rule);
+      font-size: 0.5rem;
+      font-weight: 700;
+      color: var(--muted);
+      font-family: 'Inter', sans-serif;
+    }
+    .week-day.past { background: var(--muted); border-color: var(--muted); color: var(--paper); }
+    .week-day.today { background: var(--paper); border: 3px double var(--ink); color: var(--ink); }
+    .week-day.future { background: #fff; border-color: var(--rule); color: var(--muted); }
+    /* Scoreboard rows are clickable end-to-end (not just the name) and
+       give a little playful wobble on hover to invite the click. */
+    .scoreboard-item.author-link { cursor: pointer; }
+    .scoreboard-item.author-link:hover { animation: scoreboard-wobble 0.5s ease-in-out infinite; }
+    @keyframes scoreboard-wobble {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-1.5deg); }
+      75% { transform: rotate(1.5deg); }
+    }
 
     /* Chapter-box style, matching the Kütüphane reading-path nodes
        (.path-node): thick ink border with a heavier bottom edge. */
@@ -1844,13 +1878,13 @@ function exitGameContext() {
 
 setInterval(() => {
   const cdEl = document.getElementById('scoreboard-countdown');
-  if (cdEl && cdEl.textContent) cdEl.textContent = getTimeUntilWeekReset();
+  if (cdEl && cdEl.dataset.mode === 'week') setWeekProgress(cdEl);
 }, 60000);
 // Re-render language-sensitive bits immediately once the profile's language
 // preference syncs from Supabase, instead of waiting for the next interval tick.
 I18N.onChange(() => {
   const cdEl = document.getElementById('scoreboard-countdown');
-  if (cdEl && cdEl.textContent) cdEl.textContent = getTimeUntilWeekReset();
+  if (cdEl && cdEl.dataset.mode === 'week') setWeekProgress(cdEl);
 });
 
 const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
@@ -2074,7 +2108,7 @@ async function markPlayedGames(userId) {
 // whole column is already sliding in from that same edge, so animating
 // the rows inside it too would look like the content arriving twice.
 const CARD_SWAP_MS = 300;
-const CARD_STAGGER_MS = 80;
+const CARD_STAGGER_MS = 160;
 function animateFeedSwap(container, direction, buildFn, leadingEls = []) {
   const suppress = window.__istSuppressFirstCardAnim && window.__istSuppressFirstCardAnim[direction];
   if (suppress) window.__istSuppressFirstCardAnim[direction] = false;
@@ -2127,18 +2161,33 @@ function gamePoints(attempts, won) {
   return attempts >= 1 ? 1 : 0;
 }
 
-// Time until next Monday 00:00 Istanbul (= end of current scoring week).
-function getTimeUntilWeekReset() {
-  const now = new Date();
-  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-  const dayOfWeek = ist.getDay(); // 0=Sun … 6=Sat
-  const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
-  const nextMonday = new Date(ist.getFullYear(), ist.getMonth(), ist.getDate() + daysUntilMonday);
-  const diff = nextMonday - ist;
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  return I18N.formatWeekReset(days, hours, minutes);
+// Seven-square week tracker (Monday first, matching the scoring week):
+// days already passed are dark, today is double-bordered, days to come are plain.
+function renderWeekProgress() {
+  const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  const dow = nowIst.getDay(); // 0=Sun … 6=Sat
+  const todayIdx = dow === 0 ? 6 : dow - 1; // Monday=0 … Sunday=6
+  const en = I18N.isEnglish();
+  const letters = en ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['P', 'S', 'Ç', 'P', 'C', 'C', 'P'];
+  const names = en
+    ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    : ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+  const label = en ? 'Weekly progress' : 'Haftalık ilerleme';
+  const days = letters.map((l, i) => {
+    const cls = i < todayIdx ? 'past' : i === todayIdx ? 'today' : 'future';
+    return `<span class="week-day ${cls}" title="${names[i]}">${l}</span>`;
+  }).join('');
+  return `<div class="week-progress" role="img" aria-label="${label}">${days}</div>`;
+}
+function setWeekProgress(el) {
+  if (!el) return;
+  el.innerHTML = renderWeekProgress();
+  el.dataset.mode = 'week';
+}
+function clearWeekProgress(el) {
+  if (!el) return;
+  el.innerHTML = '';
+  el.dataset.mode = '';
 }
 
 async function loadScoreboard(neighborhoodFilter = null, gameFilter = null) {
@@ -2164,7 +2213,7 @@ async function loadScoreboard(neighborhoodFilter = null, gameFilter = null) {
   } else if (neighborhoodFilter) {
     const nbName = neighborhoodNames[neighborhoodFilter] || neighborhoodFilter;
     if (titleEl) titleEl.textContent = I18N.formatNeighborhoodBest(nbName.toLocaleUpperCase('tr-TR'));
-    if (countdownEl) countdownEl.textContent = '';
+    clearWeekProgress(countdownEl);
   } else {
     if (titleEl) titleEl.textContent = I18N.t('games.weeklyscoreboard');
   }
@@ -2274,10 +2323,10 @@ async function loadScoreboard(neighborhoodFilter = null, gameFilter = null) {
     // prefix (redundant) but keeps the score so ranks are legible.
     if (neighborhoodFilter) {
       return (
-        `<li class="scoreboard-item${rankClass}">` +
+        `<li class="scoreboard-item${rankClass} author-link" data-user-id="${p.uid}">` +
           `<span class="scoreboard-rank">${i + 1}.</span>` +
           `<span class="scoreboard-player">` +
-            `<span class="scoreboard-name author-link" data-user-id="${p.uid}">${escapeHtml(p.name)}</span>` +
+            `<span class="scoreboard-name">${escapeHtml(p.name)}</span>` +
           `</span>` +
           `<span class="scoreboard-score">${p.score}</span>` +
         `</li>`
@@ -2287,10 +2336,10 @@ async function loadScoreboard(neighborhoodFilter = null, gameFilter = null) {
     const suffix = getAblativeSuffix(nbName).toLocaleUpperCase('tr-TR');
     const playerLabel = nbName ? `${nbName}${suffix} ${escapeHtml(p.name)}` : escapeHtml(p.name);
     return (
-      `<li class="scoreboard-item${rankClass}">` +
+      `<li class="scoreboard-item${rankClass} author-link" data-user-id="${p.uid}">` +
         `<span class="scoreboard-rank">${i + 1}.</span>` +
         `<span class="scoreboard-player">` +
-          `<span class="scoreboard-name author-link" data-user-id="${p.uid}">${playerLabel}</span>` +
+          `<span class="scoreboard-name">${playerLabel}</span>` +
         `</span>` +
         `<span class="scoreboard-score">${p.score}</span>` +
       `</li>`
@@ -2298,7 +2347,7 @@ async function loadScoreboard(neighborhoodFilter = null, gameFilter = null) {
   }).join('');
   setList(html);
 
-  if (!neighborhoodFilter && countdownEl) countdownEl.textContent = getTimeUntilWeekReset();
+  if (!neighborhoodFilter && countdownEl) setWeekProgress(countdownEl);
 }
 
 // Game-lock rules live in game-locks.js (applyGameLocks). Adding a new gated

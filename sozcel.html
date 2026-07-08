@@ -1068,6 +1068,40 @@
       letter-spacing: 1px;
       font-style: italic;
     }
+    /* Seven-square week tracker replacing the old countdown text: past days
+       dark, today double-bordered, future days plain. */
+    .week-progress {
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+      padding: 4px 4px 6px;
+    }
+    .week-day {
+      box-sizing: border-box;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      border: 1px solid var(--rule);
+      font-size: 0.5rem;
+      font-weight: 700;
+      color: var(--muted);
+      font-family: 'Inter', sans-serif;
+    }
+    .week-day.past { background: var(--muted); border-color: var(--muted); color: var(--paper); }
+    .week-day.today { background: var(--paper); border: 3px double var(--ink); color: var(--ink); }
+    .week-day.future { background: #fff; border-color: var(--rule); color: var(--muted); }
+    /* Scoreboard rows are clickable end-to-end (not just the name) and
+       give a little playful wobble on hover to invite the click. */
+    .scoreboard-item.author-link { cursor: pointer; }
+    .scoreboard-item.author-link:hover { animation: scoreboard-wobble 0.5s ease-in-out infinite; }
+    @keyframes scoreboard-wobble {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-1.5deg); }
+      75% { transform: rotate(1.5deg); }
+    }
 
     /* ── Result popup ── */
     .result-overlay {
@@ -1763,17 +1797,19 @@ function updateDateTime() {
   document.getElementById('time-line').textContent = time;
 }
 updateDateTime();
+function refreshWeekProgress() {
+  [document.getElementById('scoreboard-countdown'), document.getElementById('scoreboard-countdown-mobile')]
+    .forEach(el => { if (el && el.dataset.mode === 'week') setWeekProgress(el); });
+}
 setInterval(() => {
   updateDateTime();
-  const cdEl = document.getElementById('scoreboard-countdown');
-  if (cdEl && cdEl.textContent) cdEl.textContent = getTimeUntilWeekReset();
+  refreshWeekProgress();
 }, 60000);
 // Re-render language-sensitive bits immediately once the profile's language
 // preference syncs from Supabase, instead of waiting for the next interval tick.
 I18N.onChange(() => {
   updateDateTime();
-  const cdEl = document.getElementById('scoreboard-countdown');
-  if (cdEl && cdEl.textContent) cdEl.textContent = getTimeUntilWeekReset();
+  refreshWeekProgress();
 });
 
 // ── Turkish letter normalization ──
@@ -4056,18 +4092,28 @@ function gamePoints(attempts, won) {
   return attempts >= 1 ? 1 : 0;
 }
 
-// Returns time until next Monday 00:00 Istanbul (= end of current scoring week).
-function getTimeUntilWeekReset() {
-  const now = new Date();
-  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-  const dayOfWeek = ist.getDay(); // 0=Sun, 1=Mon … 6=Sat
-  const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
-  const nextMonday = new Date(ist.getFullYear(), ist.getMonth(), ist.getDate() + daysUntilMonday);
-  const diff = nextMonday - ist;
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  return I18N.formatWeekReset(days, hours, minutes);
+// Seven-square week tracker (Monday first, matching the scoring week):
+// days already passed are dark, today is double-bordered, days to come are plain.
+function renderWeekProgress() {
+  const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  const dow = nowIst.getDay(); // 0=Sun … 6=Sat
+  const todayIdx = dow === 0 ? 6 : dow - 1; // Monday=0 … Sunday=6
+  const en = I18N.isEnglish();
+  const letters = en ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['P', 'S', 'Ç', 'P', 'C', 'C', 'P'];
+  const names = en
+    ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    : ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+  const label = en ? 'Weekly progress' : 'Haftalık ilerleme';
+  const days = letters.map((l, i) => {
+    const cls = i < todayIdx ? 'past' : i === todayIdx ? 'today' : 'future';
+    return `<span class="week-day ${cls}" title="${names[i]}">${l}</span>`;
+  }).join('');
+  return `<div class="week-progress" role="img" aria-label="${label}">${days}</div>`;
+}
+function setWeekProgress(el) {
+  if (!el) return;
+  el.innerHTML = renderWeekProgress();
+  el.dataset.mode = 'week';
 }
 
 async function loadScoreboard() {
@@ -4153,20 +4199,17 @@ async function loadScoreboard() {
     const rankClass = ' r' + (i + 1);
     const suffix = getAblativeSuffix(nbName).toLocaleUpperCase('tr-TR');
     const playerLabel = nbName ? `${nbName}${suffix} ${escapeHtml(p.name)}` : escapeHtml(p.name);
-    return `<li class="scoreboard-item${rankClass}">` +
+    return `<li class="scoreboard-item${rankClass} author-link" data-user-id="${p.uid}">` +
       `<span class="scoreboard-rank">${i + 1}.</span>` +
       `<span class="scoreboard-player">` +
-        `<span class="scoreboard-name author-link" data-user-id="${p.uid}">${playerLabel}</span>` +
+        `<span class="scoreboard-name">${playerLabel}</span>` +
       `</span>` +
       `<span class="scoreboard-score">${p.score}</span>` +
     `</li>`;
   }).join('');
   setListHTML(listHtml);
-  const countdownText = getTimeUntilWeekReset();
-  const countdownEl = document.getElementById('scoreboard-countdown');
-  if (countdownEl) countdownEl.textContent = countdownText;
-  const countdownMobileEl = document.getElementById('scoreboard-countdown-mobile');
-  if (countdownMobileEl) countdownMobileEl.textContent = countdownText;
+  setWeekProgress(document.getElementById('scoreboard-countdown'));
+  setWeekProgress(document.getElementById('scoreboard-countdown-mobile'));
 }
 
 // Turkish ablative suffix with vowel harmony + voiceless-consonant rule.
