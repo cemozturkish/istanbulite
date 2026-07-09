@@ -696,10 +696,14 @@
 
     /* ── MOBILE RESPONSIVE ──
        Stacked flow instead of desktop's floating-over-fullscreen-map
-       layout: profile card, then the map, then a news/events column pair,
-       all scrolling in #main-site itself, with the tab bar pinned fixed
-       at the very bottom (its <header> already escapes to the viewport
-       via position:fixed regardless of where .section-rule sits). */
+       layout: the map sits at the very top like a hero banner with the
+       profile card floating over its empty/sea-colored band (same
+       #eeeeee as the map artwork's own background, so the card reads as
+       part of the map rather than a stacked box), then a news/events
+       column pair below, all scrolling in #main-site itself, with the
+       tab bar pinned fixed at the very bottom (its <header> already
+       escapes to the viewport via position:fixed regardless of where
+       .section-rule sits). */
     @media (max-width: 768px) {
       html, body {
         height: 100vh;
@@ -722,7 +726,6 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
-          "profile profile"
           "map map"
           "news events";
         align-content: start;
@@ -759,12 +762,23 @@
         letter-spacing: 1px;
       }
 
-      /* Profile bar: first block in the stack, full width. */
+      /* Profile bar: floats over the top (empty/sea) band of the map
+         instead of taking its own row -- absolutely positioned against
+         #main-site (the nearest positioned ancestor), which places it
+         right at the top since the map is the first grid row. Matches
+         the map artwork's own #eeeeee background exactly (see
+         .map-panel above) and drops the card's usual border so it reads
+         as floating directly on the map rather than a stacked box. */
       #ist-pc-mount {
-        grid-area: profile;
-        position: static;
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        z-index: 20;
         max-height: none;
         overflow: visible;
+        background: #eeeeee;
+        border-bottom: none;
       }
 
       /* .section-rule no longer renders a floating masthead bar -- its
@@ -1035,10 +1049,10 @@
     }
     .event-item .ev-title {
       font-family: 'Source Serif 4', Georgia, serif;
-      font-size: 1.08rem;
+      font-size: 1.2rem;
       font-weight: 600;
       line-height: 1.22;
-      margin-bottom: 4px;
+      margin-bottom: 0;
       color: var(--card-fg-heading);
     }
     .event-item .ev-meta {
@@ -1146,8 +1160,7 @@
       .event-item .ev-mon { font-size: 0.5rem; margin-top: 2px; }
       .event-item .ev-wd { font-size: 0.46rem; margin-top: 1px; }
       .event-item .ev-kicker { font-size: 9px; letter-spacing: 1.5px; margin-bottom: 2px; }
-      .event-item .ev-title { font-size: 14px; margin-bottom: 2px; line-height: 1.2; }
-      .event-item .ev-meta { font-size: 10px; }
+      .event-item .ev-title { font-size: 16px; margin-bottom: 0; line-height: 1.2; }
 
       html.vt-forward::view-transition-old(ist-col-left),
       html.vt-forward::view-transition-old(ist-col-right) {
@@ -2426,11 +2439,10 @@ function renderEventsNow(panel, rows) {
   panel.innerHTML = rows.map(ev => {
     const nbLabel = ev.neighborhood ? (NB_NAMES_TR[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
     const parts = eventDateParts(ev.event_date);
-    // Weekday now lives in the date block (day / month / weekday), and
-    // the time is dropped from the preview entirely -- see buildEventDetailHtml
-    // for the full date/time, still shown once you open the card. That
-    // frees this line for just the location.
-    const metaHTML = ev.location ? escapeText(ev.location) : '';
+    // Weekday now lives in the date block (day / month / weekday); time
+    // and location are both dropped from the preview -- see
+    // buildEventDetailHtml for the full date/time/location, still shown
+    // once you open the card. That frees this card for a bigger title.
     return `
       <div class="event-item openable" data-event-id="${escapeText(ev.id)}">
         <div class="ev-date-block">
@@ -2441,7 +2453,6 @@ function renderEventsNow(panel, rows) {
         <div class="ev-body">
           <div class="ev-kicker">${escapeText(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
           <div class="ev-title">${escapeText(ev.title)}</div>
-          ${metaHTML ? `<div class="ev-meta">${metaHTML}</div>` : ''}
         </div>
       </div>
     `;
