@@ -17,8 +17,6 @@
     // anahane (home) — breaking news + events sidebars
     'home.breaking':       { default: 'Son Dakika',          more_english: 'Breaking News' },
     'home.events':         { default: 'Etkinlikler',         more_english: 'Events' },
-    'home.events.empty':   { default: 'Yaklaşan etkinlik yok.', more_english: 'No upcoming events.' },
-    'home.breaking.empty': { default: 'Aktif haber yok.',    more_english: 'No active news.' },
     'home.filter.all':     { default: 'Tümü',                more_english: 'All' },
     'home.events.thisweek':{ default: 'Bu hafta',            more_english: 'This week' },
     'home.events.rsvp.join': { default: 'Katılıyorum',       more_english: 'RSVP' },
@@ -97,14 +95,11 @@
 
     // kahvehane — discussion feed
     'kahvehane.allistanbul': { default: 'Tüm İstanbul',      more_english: 'All Istanbul' },
-    'kahvehane.nomessages':  { default: 'Henüz mesaj yok. İlk yazan siz olun!', more_english: 'No messages yet. Be the first to post!' },
 
     // games — shared right column (Günün Oyunları / scoreboard / neighborhood stats)
     'games.today':            { default: 'Günün Oyunları',        more_english: "Today's Games" },
     'games.weeklyscoreboard': { default: 'Haftanın Skor Tahtası', more_english: 'Weekly Scoreboard' },
     'games.todayneighborhoods': { default: 'Günün Mahalleleri',   more_english: "Today's Neighborhoods" },
-    'games.scoreboard.emptyweek':         { default: 'Bu hafta henüz skor yok',    more_english: 'No scores yet this week' },
-    'games.scoreboard.emptyneighborhood': { default: 'Bu mahallede henüz skor yok', more_english: 'No scores yet in this neighborhood' },
     'games.congrats': { default: 'Tebrikler!', more_english: 'Congratulations!' },
     'games.share':     { default: 'Paylaş',     more_english: 'Share' },
     'tumcel.congrats':  { default: 'Tebrikler! Hepsini buldun!', more_english: 'Congratulations! You found them all!' },
