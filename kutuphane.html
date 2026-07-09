@@ -819,9 +819,10 @@
       font-style: italic;
       margin-top: 4px;
     }
-    .shelf-countdown {
+    .shelf-progress {
       font-family: 'Inter', sans-serif;
       font-size: 0.62rem;
+      font-weight: 700;
       color: var(--accent);
       letter-spacing: 1px;
       margin-top: 6px;
@@ -947,14 +948,6 @@
       color: var(--accent);
       font-style: italic;
       margin: 0 0 6px;
-    }
-    .path-deadline {
-      font-family: 'Inter', sans-serif;
-      font-size: 0.65rem;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-top: 4px;
     }
     .path-list {
       display: flex;
@@ -3241,23 +3234,29 @@ async function bootstrapLibraryNav() {
 // ══════════════════════════════════════════
 let SHELVES_CACHE = [];
 let SHELF_COUNTS = {};
-let SHELF_COUNTDOWN_TIMER = null;
+let SHELF_ARTICLE_IDS = {};
+let LIB_USER_ID = null;
 
 async function loadShelvesUI() {
   const shelvesEl = document.getElementById('shelves');
   if (!shelvesEl) return;
-  const [shRes, artRes] = await Promise.all([
+  const [shRes, artRes, userId] = await Promise.all([
     sb.from('library_shelves').select('*').order('id', { ascending: true }),
-    sb.from('library_articles').select('shelf_id'),
+    sb.from('library_articles').select('id, shelf_id'),
+    libGetCurrentUserId(),
   ]);
   if (shRes.error) {
     shelvesEl.innerHTML = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Raflar yüklenemedi.</div>`;
     return;
   }
   SHELVES_CACHE = shRes.data || [];
+  LIB_USER_ID = userId;
   SHELF_COUNTS = {};
+  SHELF_ARTICLE_IDS = {};
   (artRes.data || []).forEach(r => {
-    if (r.shelf_id != null) SHELF_COUNTS[r.shelf_id] = (SHELF_COUNTS[r.shelf_id] || 0) + 1;
+    if (r.shelf_id == null) return;
+    SHELF_COUNTS[r.shelf_id] = (SHELF_COUNTS[r.shelf_id] || 0) + 1;
+    (SHELF_ARTICLE_IDS[r.shelf_id] || (SHELF_ARTICLE_IDS[r.shelf_id] = [])).push(r.id);
   });
 
   if (!SHELVES_CACHE.length) {
@@ -3266,7 +3265,17 @@ async function loadShelvesUI() {
   }
 
   renderShelfButtons();
-  startShelfCountdownTicker();
+}
+
+// Chapters read vs. total for a shelf, for the "3/6" style progress badge
+// on its button. Reads localStorage fresh each call so it stays accurate
+// right after a chapter is completed, without a full shelves refetch.
+function shelfProgress(shelfId) {
+  const ids = SHELF_ARTICLE_IDS[shelfId] || [];
+  if (!ids.length) return null;
+  const completed = libReadCompletedSet(LIB_USER_ID);
+  const done = ids.filter(id => completed.has(id)).length;
+  return { done, total: ids.length };
 }
 
 // Slides a column's current cards out toward its outer screen edge, then
@@ -3320,15 +3329,16 @@ function renderShelfButtons(activeShelfId = null) {
       const subtitle = (s.subtitle_tr || '').trim();
       const display = empty ? 'Çok Yakında' : (name || `Raf ${s.id}`);
       const subtitleHtml = !empty && subtitle ? `<div class="shelf-subtitle">${libEsc(subtitle)}</div>` : '';
-      const countdownHtml = !empty && s.deadline
-        ? `<div class="shelf-countdown" data-deadline="${libEsc(s.deadline)}">…</div>`
+      const progress = !empty ? shelfProgress(s.id) : null;
+      const progressHtml = progress
+        ? `<div class="shelf-progress">${progress.done}/${progress.total}</div>`
         : '';
       return `
         <a class="shelf-btn ${empty ? 'shelf-empty' : ''}${active ? ' shelf-active' : ''}" data-shelf="${s.id}" href="#">
           <div>
             <div class="shelf-title">${libEsc(display)}</div>
             ${subtitleHtml}
-            ${countdownHtml}
+            ${progressHtml}
           </div>
         </a>
       `;
@@ -3342,35 +3352,7 @@ function renderShelfButtons(activeShelfId = null) {
         openShelfPath(id);
       });
     });
-    tickShelfCountdowns();
   });
-}
-
-// Counter ticks for shelf deadlines: refresh every minute so the
-// hours/minutes update without spinning the CPU.
-function startShelfCountdownTicker() {
-  if (SHELF_COUNTDOWN_TIMER) clearInterval(SHELF_COUNTDOWN_TIMER);
-  SHELF_COUNTDOWN_TIMER = setInterval(tickShelfCountdowns, 60000);
-}
-
-function tickShelfCountdowns() {
-  document.querySelectorAll('.shelf-countdown').forEach(el => {
-    const iso = el.getAttribute('data-deadline');
-    el.textContent = formatCountdown(iso);
-  });
-}
-
-function formatCountdown(iso) {
-  if (!iso) return '';
-  const ms = new Date(iso).getTime() - Date.now();
-  if (ms <= 0) return 'Erişim kapandı';
-  const totalMins = Math.floor(ms / 60000);
-  const days = Math.floor(totalMins / 1440);
-  const hours = Math.floor((totalMins % 1440) / 60);
-  const mins = totalMins % 60;
-  if (days > 0) return `Erişime ${days} gün ${hours} saat boyunca açık`;
-  if (hours > 0) return `Erişime ${hours} saat ${mins} dakika boyunca açık`;
-  return `Erişime ${mins} dakika boyunca açık`;
 }
 
 // ── Sequential chapter unlock state (per-user, localStorage) ──
@@ -3519,8 +3501,6 @@ function renderShelfPathView(shelf, shelfId, articles, lockState, completedSet) 
   if (!area) return;
   const title = (shelf && shelf.name_tr && shelf.name_tr.trim()) || `Raf ${shelfId}`;
   const subtitle = shelf && shelf.subtitle_tr ? shelf.subtitle_tr.trim() : '';
-  const deadlineHtml = shelf && shelf.deadline
-    ? `<div class="path-deadline">${libEsc(formatCountdown(shelf.deadline))}</div>` : '';
 
   area.innerHTML = `
     <div class="shelf-path">
@@ -3528,13 +3508,11 @@ function renderShelfPathView(shelf, shelfId, articles, lockState, completedSet) 
         <button class="path-back" type="button" id="path-back">← Raflar</button>
         <h2 class="path-title">${libEsc(title)}</h2>
         ${subtitle ? `<p class="path-subtitle">${libEsc(subtitle)}</p>` : ''}
-        ${deadlineHtml}
       </div>
       <div class="path-list">
         ${articles.map((a, i) => {
           const meta = [
             a.author ? libEsc(a.author) : null,
-            a.deadline ? 'Son: ' + libEsc(formatCountdown(a.deadline)) : null,
           ].filter(Boolean).join(' · ');
           const locked = lockState[i];
           const completed = completedSet.has(a.id);
