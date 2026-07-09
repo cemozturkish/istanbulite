@@ -243,15 +243,6 @@
       stroke: var(--accent);
       stroke-width: 1.4;
     }
-    .neighborhood.home {
-      fill: rgba(134, 105, 85, 0.4); /* --brown-2 */
-      stroke: var(--brown-4);
-      stroke-width: 1.6;
-      stroke-dasharray: 10 6;
-    }
-    .neighborhood.home:hover { fill: rgba(119, 94, 76, 0.6); } /* --accent-2 */
-    .neighborhood.home.active { fill: rgba(119, 94, 76, 0.85); stroke: var(--brown-4); stroke-dasharray: none; } /* --accent-2 */
-
     /* Plain text, no frame/shadow — matches the HANE/KÜTÜPHANE/KAHVEHANE
        nav tab style (nav a above), not a floating pill. */
     .map-label {
@@ -3907,9 +3898,11 @@ const neighborhoodNames = {
 
 // ── Interactive map — cosmetic parity with Hane/Kahvehane ──
 // library_shelves content isn't neighborhood-scoped, so clicking a
-// district here only gives the same visual feedback (active tint, home
-// highlight, map-label text) as the other two pages; it doesn't filter
-// shelves or articles.
+// district here only gives the same visual feedback (active tint,
+// map-label text) as the other two pages; it doesn't filter shelves or
+// articles. Unlike Hane/Kahvehane, this map doesn't highlight the user's
+// home neighborhood — Kütüphane is moving to a Turkey-wide map, where a
+// single home *district* has no obvious analogue.
 (function initLibraryMap() {
   const mapNeighborhoods = document.querySelectorAll('.neighborhood');
   const mapLabel = document.getElementById('map-label');
@@ -3917,7 +3910,6 @@ const neighborhoodNames = {
   if (!mapNeighborhoods.length || !mapLabel || !mapPanel) return;
 
   let activeMapNeighborhood = null;
-  let homeNeighborhood = null;
 
   function baseMapLabel() {
     if (!activeMapNeighborhood) return 'İstanbul';
@@ -3950,31 +3942,10 @@ const neighborhoodNames = {
   mapPanel.addEventListener('click', (e) => {
     if (!e.target.closest('.neighborhood') && !e.target.closest('.map-label')) {
       mapNeighborhoods.forEach(n => n.classList.remove('active'));
-      if (homeNeighborhood) {
-        const homeEl = document.getElementById(homeNeighborhood);
-        if (homeEl) homeEl.classList.add('home');
-      }
       mapLabel.textContent = 'İstanbul';
       activeMapNeighborhood = null;
     }
   });
-
-  // Home neighborhood highlight — a lightweight independent lookup so this
-  // stays decoupled from the larger profile/library-card load path above.
-  (async function highlightHome() {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) return;
-    let nb = null;
-    try {
-      const { data: prof } = await sb.from('profiles').select('neighborhood').eq('id', session.user.id).maybeSingle();
-      nb = prof?.neighborhood || null;
-    } catch (_) {}
-    homeNeighborhood = nb || session.user.user_metadata?.neighborhood || null;
-    if (homeNeighborhood) {
-      const nbEl = document.getElementById(homeNeighborhood);
-      if (nbEl) nbEl.classList.add('home');
-    }
-  })();
 })();
 
 // Sticker definitions — image-based stickers, unlocked by birth district
