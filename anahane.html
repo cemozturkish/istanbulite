@@ -995,7 +995,7 @@
     .event-item:last-child { margin-bottom: 0; }
     .event-item .ev-date-block {
       text-align: center;
-      padding-top: 18px;
+      padding-top: 14px;
       font-family: 'Source Serif 4', Georgia, serif;
       color: var(--card-fg-heading);
     }
@@ -1013,6 +1013,16 @@
       color: var(--card-fg-muted);
       margin-top: 4px;
     }
+    .event-item .ev-wd {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.55rem;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--card-fg-muted);
+      margin-top: 2px;
+      opacity: 0.75;
+    }
     .event-item .ev-body { min-width: 0; }
     .event-item .ev-kicker {
       font-family: 'Inter', sans-serif;
@@ -1025,9 +1035,9 @@
     }
     .event-item .ev-title {
       font-family: 'Source Serif 4', Georgia, serif;
-      font-size: 0.95rem;
+      font-size: 1.08rem;
       font-weight: 600;
-      line-height: 1.2;
+      line-height: 1.22;
       margin-bottom: 4px;
       color: var(--card-fg-heading);
     }
@@ -1134,8 +1144,9 @@
       .event-item .ev-date-block { padding-top: 2px; }
       .event-item .ev-day { font-size: 1.05rem; line-height: 1; }
       .event-item .ev-mon { font-size: 0.5rem; margin-top: 2px; }
+      .event-item .ev-wd { font-size: 0.46rem; margin-top: 1px; }
       .event-item .ev-kicker { font-size: 9px; letter-spacing: 1.5px; margin-bottom: 2px; }
-      .event-item .ev-title { font-size: 12px; margin-bottom: 2px; }
+      .event-item .ev-title { font-size: 14px; margin-bottom: 2px; line-height: 1.2; }
       .event-item .ev-meta { font-size: 10px; }
 
       html.vt-forward::view-transition-old(ist-col-left),
@@ -2288,9 +2299,10 @@ function eventDateParts(iso) {
   const day = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, day: 'numeric' }), 10);
   const month = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, month: 'numeric' }), 10);
   const weekday = d.toLocaleDateString(locale, { timeZone: tz, weekday: 'long' });
+  const wd = d.toLocaleDateString(locale, { timeZone: tz, weekday: 'short' }).toLocaleUpperCase(locale);
   const time = d.toLocaleTimeString(locale, { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: en });
   const monAbbr = (en ? MONTH_ABBR_EN : MONTH_ABBR_TR)[month - 1] || '';
-  return { day, mon: monAbbr, weekday, time };
+  return { day, mon: monAbbr, wd, weekday, time };
 }
 
 let allEvents = [];
@@ -2414,16 +2426,17 @@ function renderEventsNow(panel, rows) {
   panel.innerHTML = rows.map(ev => {
     const nbLabel = ev.neighborhood ? (NB_NAMES_TR[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
     const parts = eventDateParts(ev.event_date);
-    // Weekday + time on one line ("Saturday 11:00 PM"), location on its
-    // own line below -- built from pre-escaped pieces joined with a real
-    // <br>, since the pieces need to stay separately escapable.
-    const dateTime = [parts.weekday, parts.time].filter(Boolean).join(' ');
-    const metaHTML = [dateTime, ev.location].filter(Boolean).map(escapeText).join('<br>');
+    // Weekday now lives in the date block (day / month / weekday), and
+    // the time is dropped from the preview entirely -- see buildEventDetailHtml
+    // for the full date/time, still shown once you open the card. That
+    // frees this line for just the location.
+    const metaHTML = ev.location ? escapeText(ev.location) : '';
     return `
       <div class="event-item openable" data-event-id="${escapeText(ev.id)}">
         <div class="ev-date-block">
           <div class="ev-day">${parts.day}</div>
           <div class="ev-mon">${parts.mon}</div>
+          <div class="ev-wd">${parts.wd}</div>
         </div>
         <div class="ev-body">
           <div class="ev-kicker">${escapeText(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
