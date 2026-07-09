@@ -694,7 +694,12 @@
       animation: flash-card 1.2s ease-in-out infinite;
     }
 
-    /* ── MOBILE RESPONSIVE ── */
+    /* ── MOBILE RESPONSIVE ──
+       Stacked flow instead of desktop's floating-over-fullscreen-map
+       layout: profile card, then the map, then a news/events column pair,
+       all scrolling in #main-site itself, with the tab bar pinned fixed
+       at the very bottom (its <header> already escapes to the viewport
+       via position:fixed regardless of where .section-rule sits). */
     @media (max-width: 768px) {
       html, body {
         height: 100vh;
@@ -711,108 +716,115 @@
       #main-site {
         position: relative;
         height: 100%;
-        overflow: hidden;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+          "profile profile"
+          "map map"
+          "news events";
+        align-content: start;
+        /* Clears the fixed bottom tab bar so the last row of cards isn't
+           hidden behind it. */
+        padding-bottom: calc(56px + env(safe-area-inset-bottom) + 16px);
       }
 
-      /* Map fills the entire screen as a fixed background layer, same
-         mechanism as desktop -- draft/placeholder art for now, no
-         hit-regions traced yet. Base rule already has main pinned
-         fixed/inset; on mobile there's no docked top bar reserving
-         space, so pull the top edge all the way to 0. */
-      main { top: 0; }
-      .map-panel img.map-photo { display: none; }
-      .map-panel svg.map-svg { display: none; }
-      .map-mobile-draft {
-        display: block;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
+      /* Map: same real desktop artwork + traced SVG hit-regions (no more
+         placeholder draft image), now a normal in-flow square block
+         instead of a fixed full-bleed background layer. */
+      main {
+        grid-area: map;
+        position: static;
+        height: auto;
+        overflow: visible;
       }
+      .map-panel {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        overflow: hidden;
+      }
+      .map-panel img.map-photo { display: block; }
+      .map-panel svg.map-svg { display: block; }
+      .map-mobile-draft { display: none; }
       .map-label {
-        bottom: calc(56px + env(safe-area-inset-bottom) + 14px);
+        position: absolute;
+        bottom: 8px;
         left: 50%;
         right: auto;
+        transform: translateX(-50%);
         font-size: 11px;
         letter-spacing: 1px;
       }
 
-      /* Profile bar: floats at the very top. */
+      /* Profile bar: first block in the stack, full width. */
       #ist-pc-mount {
-        position: fixed;
-        top: 12px;
-        left: 12px;
-        right: 12px;
-        z-index: 10;
-        max-height: 40vh;
-        overflow-y: auto;
+        grid-area: profile;
+        position: static;
+        max-height: none;
+        overflow: visible;
       }
 
-      /* Istanbulite masthead bar: floats just below the profile bar.
-         NOTE: top:78px is a placeholder guess for the profile card's
-         rendered height -- needs tuning once real profile-card content
-         is in place, not just this stubbed draft pass.
-         No backdrop-filter here (unlike the other floating panels): its
-         child <header> is position:fixed and gets pulled out to become
-         the bottom tab bar -- backdrop-filter creates a new containing
-         block for fixed descendants, which would trap header inside
-         this small top bar instead of the viewport. */
+      /* .section-rule no longer renders a floating masthead bar -- its
+         only visible content (the tab nav) is pulled out via the
+         <header> position:fixed rule below and pinned to the viewport
+         bottom regardless of where this sits. Taken out of grid flow so
+         it doesn't claim a row of its own. */
       .section-rule {
-        top: 78px;
-        left: 12px;
-        right: 12px;
-        padding: 10px 14px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 0;
+        height: 0;
+        padding: 0;
+        overflow: visible;
       }
 
-      /* News + events: floating panel pair docked above the bottom tab
-         bar, side by side like they sat before. Placement here is a
-         placeholder -- wasn't specified yet, easiest to react to once
-         you see it live. */
+      /* News (left) + events (right): normal in-flow columns below the
+         map, each stacking its own cards top to bottom. */
       .col-left, .col-right {
-        top: auto;
-        bottom: calc(56px + env(safe-area-inset-bottom) + 12px);
-        height: 32vh;
+        position: static;
+        top: auto; bottom: auto; left: auto; right: auto;
+        height: auto;
         width: auto;
+        display: block;
+        overflow: visible;
       }
-      .col-left { left: 0; right: calc(50% + 5px); }
-      .col-right { left: calc(50% + 5px); right: 0; }
+      .col-left { grid-area: news; }
+      .col-right { grid-area: events; }
 
       /* #ist-pc-mount (profile-card.js) already covers the identity card
-         on mobile — the desktop-only #library-card would otherwise eat
-         into this cramped 32vh strip. */
+         on mobile — the desktop-only #library-card would otherwise
+         duplicate it. */
       #library-card { display: none; }
 
       .sidebar-left {
-        overflow: hidden;
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
+        overflow: visible;
+        display: block;
       }
+      #breaking-news-feed { overflow: visible; }
+      .sidebar-right { overflow: visible; display: block; }
       .sidebar-label {
         font-size: 9px;
         letter-spacing: 1.5px;
       }
       .article {
-        padding: 6px 12px;
+        padding: 8px 12px;
       }
       .article .kicker {
-        font-size: 9px;
+        font-size: 10px;
         margin-bottom: 2px;
         letter-spacing: 1px;
       }
       .article h3 {
-        font-size: 11px;
+        font-size: 13px;
         margin-bottom: 3px;
         line-height: 1.25;
       }
       .article p {
-        font-size: 10px;
+        font-size: 12px;
         line-height: 1.35;
       }
       .sidebar-right-inner {
@@ -1112,19 +1124,19 @@
       @keyframes ist-vt-out-right { from { transform: translateX(0); } to { transform: translateX(100vw); } }
       @keyframes ist-vt-in-right { from { transform: translateX(-100vw); } to { transform: translateX(0); } }
 
-      #events-panel { padding: 6px 8px 10px 8px; }
+      #events-panel { padding: 8px 8px 10px 8px; }
       .event-item {
-        grid-template-columns: 24px 1fr;
-        column-gap: 6px;
-        padding: 5px 7px;
-        margin-bottom: 4px;
+        grid-template-columns: 30px 1fr;
+        column-gap: 8px;
+        padding: 8px 9px;
+        margin-bottom: 6px;
       }
-      .event-item .ev-date-block { padding-top: 1px; }
-      .event-item .ev-day { font-size: 0.82rem; line-height: 1; }
-      .event-item .ev-mon { font-size: 0.48rem; margin-top: 2px; }
-      .event-item .ev-kicker { font-size: 8px; letter-spacing: 1.5px; margin-bottom: 2px; }
-      .event-item .ev-title { font-size: 10px; margin-bottom: 2px; }
-      .event-item .ev-meta { font-size: 9px; }
+      .event-item .ev-date-block { padding-top: 2px; }
+      .event-item .ev-day { font-size: 1.05rem; line-height: 1; }
+      .event-item .ev-mon { font-size: 0.5rem; margin-top: 2px; }
+      .event-item .ev-kicker { font-size: 9px; letter-spacing: 1.5px; margin-bottom: 2px; }
+      .event-item .ev-title { font-size: 12px; margin-bottom: 2px; }
+      .event-item .ev-meta { font-size: 10px; }
 
       html.vt-forward::view-transition-old(ist-col-left),
       html.vt-forward::view-transition-old(ist-col-right) {
@@ -1146,11 +1158,7 @@
 
     /* ── Small-phone overrides (≤ 400px, e.g. iPhone 15) ── */
     @media (max-width: 400px) {
-      /* News column gets ~270px (1fr), events column a fixed 120px. */
-      #main-site {
-        grid-template-columns: 1fr 120px;
-      }
-      /* Tighten padding inside the narrow events column */
+      /* Tighten padding inside the narrower news/events columns */
       .sidebar-right-inner { padding: 6px 6px; }
     }
 
