@@ -709,7 +709,7 @@
       <div id="shelves-index-block">
         <div class="panel-title">Kütüphane — Shelves (Rafs)</div>
         <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
-          Click a shelf to set its name, deadline, and add the articles inside. Empty shelves render as "Coming Soon" to readers.
+          Click a shelf to set its name and add the articles inside. Empty shelves render as "Coming Soon" to readers.
         </p>
         <div id="shelves-grid">
           <div class="empty-state"><span class="spinner"></span></div>
@@ -727,14 +727,10 @@
         <label>Subtitle (optional)</label>
         <input type="text" id="se-subtitle" placeholder="Short description"/>
 
-        <label>Deadline (countdown to)</label>
-        <input type="datetime-local" id="se-deadline"/>
-
         <input type="hidden" id="se-shelf-id"/>
 
         <div class="btn-row">
           <button class="btn btn-primary" id="se-save-btn">Save Shelf</button>
-          <button class="btn btn-secondary" id="se-clear-deadline-btn">Clear Deadline</button>
         </div>
         <div class="status-msg" id="se-status"></div>
 
@@ -753,9 +749,6 @@
 
           <label>Date Published</label>
           <input type="date" id="f-published"/>
-
-          <label>Reading Deadline (optional)</label>
-          <input type="datetime-local" id="f-deadline"/>
 
           <label>One-sentence summary</label>
           <textarea id="f-summary" placeholder="Shown in the article list..."></textarea>
@@ -1376,7 +1369,7 @@ function showKutuphaneIndex() {
 }
 
 // Render the 6 shelves as clickable cards in the index. Each card shows
-// the name, subtitle, deadline, and article count — click to open the editor.
+// the name, subtitle, and article count — click to open the editor.
 async function loadShelfCards() {
   const gridEl = document.getElementById('shelves-grid');
   gridEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
@@ -1407,13 +1400,10 @@ async function loadShelfCards() {
   gridEl.innerHTML = SHELVES.map(s => {
     const name = (s.name_tr && s.name_tr.trim()) ? escapeHtml(s.name_tr.trim()) : '<span style="color:var(--muted);font-style:italic;">(unnamed)</span>';
     const subtitle = s.subtitle_tr ? escapeHtml(s.subtitle_tr) : '';
-    const deadline = s.deadline
-      ? new Date(s.deadline).toLocaleString('tr-TR', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
-      : 'no deadline';
     const count = counts[s.id] || 0;
     return `
       <div class="article-card" data-shelf="${s.id}" style="cursor:pointer;">
-        <div class="a-neighborhood">Raf ${s.id} · ${count} article${count === 1 ? '' : 's'} · ${escapeHtml(deadline)}</div>
+        <div class="a-neighborhood">Raf ${s.id} · ${count} article${count === 1 ? '' : 's'}</div>
         <h4>${name}</h4>
         ${subtitle ? `<p>${subtitle}</p>` : ''}
       </div>
@@ -1442,7 +1432,6 @@ async function openShelfEditor(shelfId) {
   document.getElementById('se-shelf-id').value = String(shelfId);
   document.getElementById('se-name').value = shelf ? (shelf.name_tr || '') : '';
   document.getElementById('se-subtitle').value = shelf ? (shelf.subtitle_tr || '') : '';
-  document.getElementById('se-deadline').value = (shelf && shelf.deadline) ? toLocalDatetimeInput(shelf.deadline) : '';
   document.getElementById('se-status').textContent = '';
 
   loadArticlesForShelf(shelfId);
@@ -1466,7 +1455,6 @@ async function loadArticlesForShelf(shelfId) {
     const meta = [
       a.author ? escapeHtml(a.author) : null,
       a.published_at ? new Date(a.published_at).toLocaleDateString('tr-TR', { year:'numeric', month:'short', day:'numeric' }) : null,
-      a.deadline ? 'deadline ' + new Date(a.deadline).toLocaleString('tr-TR', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : null,
     ].filter(Boolean).join(' · ');
     return `
       <div class="article-card" data-id="${a.id}">
@@ -1503,12 +1491,10 @@ document.getElementById('se-save-btn').addEventListener('click', async () => {
   const shelfId = Number(document.getElementById('se-shelf-id').value);
   const name = document.getElementById('se-name').value.trim();
   const subtitle = document.getElementById('se-subtitle').value.trim();
-  const deadlineRaw = document.getElementById('se-deadline').value;
-  const deadline = deadlineRaw ? new Date(deadlineRaw).toISOString() : null;
   const statusEl = document.getElementById('se-status');
   statusEl.textContent = ''; statusEl.className = 'status-msg';
   const { error } = await sb.from('library_shelves')
-    .update({ name_tr: name, subtitle_tr: subtitle, deadline })
+    .update({ name_tr: name, subtitle_tr: subtitle })
     .eq('id', shelfId);
   if (error) {
     statusEl.textContent = error.message;
@@ -1519,24 +1505,10 @@ document.getElementById('se-save-btn').addEventListener('click', async () => {
   statusEl.className = 'status-msg ok';
   // Update local cache so labels stay in sync.
   const cached = SHELVES.find(s => s.id === shelfId);
-  if (cached) { cached.name_tr = name; cached.subtitle_tr = subtitle; cached.deadline = deadline; }
+  if (cached) { cached.name_tr = name; cached.subtitle_tr = subtitle; }
   SHELF_LABELS[shelfId] = name || `Raf ${shelfId}`;
   document.getElementById('shelf-edit-title').textContent = name ? `Edit — ${name}` : `Edit Raf ${shelfId}`;
   document.getElementById('shelf-articles-title').textContent = name ? `${name} · Articles` : `Raf ${shelfId} · Articles`;
-  setTimeout(() => { statusEl.textContent = ''; }, 2000);
-});
-
-document.getElementById('se-clear-deadline-btn').addEventListener('click', async () => {
-  document.getElementById('se-deadline').value = '';
-  const shelfId = Number(document.getElementById('se-shelf-id').value);
-  const statusEl = document.getElementById('se-status');
-  const { error } = await sb.from('library_shelves').update({ deadline: null }).eq('id', shelfId);
-  if (error) {
-    statusEl.textContent = error.message; statusEl.className = 'status-msg err'; return;
-  }
-  const cached = SHELVES.find(s => s.id === shelfId);
-  if (cached) cached.deadline = null;
-  statusEl.textContent = 'Deadline cleared.'; statusEl.className = 'status-msg ok';
   setTimeout(() => { statusEl.textContent = ''; }, 2000);
 });
 
@@ -1645,8 +1617,6 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   const author = document.getElementById('f-author').value.trim() || null;
   const publishedRaw = document.getElementById('f-published').value;
   const published_at = publishedRaw ? new Date(publishedRaw).toISOString() : null;
-  const deadlineRaw = document.getElementById('f-deadline').value;
-  const deadline = deadlineRaw ? new Date(deadlineRaw).toISOString() : null;
   const summary = document.getElementById('f-summary').value.trim();
   const body = getPagesBody();
   const url = document.getElementById('f-url').value.trim();
@@ -1668,7 +1638,7 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   statusEl.textContent = ''; statusEl.className = 'status-msg';
   btn.innerHTML = '<span class="spinner"></span>';
 
-  const payload = { shelf_id, source, title, summary, body, url, author, published_at, deadline };
+  const payload = { shelf_id, source, title, summary, body, url, author, published_at };
   if (poll !== null) payload.poll = poll;
   else if (editingId) payload.poll = null; // explicitly clear on update
 
@@ -1703,7 +1673,6 @@ function resetForm() {
   document.getElementById('f-title').value = '';
   document.getElementById('f-author').value = '';
   document.getElementById('f-published').value = '';
-  document.getElementById('f-deadline').value = '';
   document.getElementById('f-summary').value = '';
   renderPagesEditor(['']);
   document.getElementById('f-url').value = '';
@@ -1726,10 +1695,6 @@ function editArticle(row) {
   document.getElementById('f-published').value = row.published_at
     ? new Date(row.published_at).toISOString().slice(0, 10)
     : '';
-  // datetime-local wants a local-formatted string without the timezone suffix.
-  document.getElementById('f-deadline').value = row.deadline
-    ? toLocalDatetimeInput(row.deadline)
-    : '';
   document.getElementById('f-summary').value = row.summary || '';
   setPagesFromBody(row.body);
   document.getElementById('f-url').value = row.url || '';
@@ -1741,14 +1706,6 @@ function editArticle(row) {
   document.getElementById('submit-btn').textContent = 'Update Article';
   document.getElementById('form-mode-label').textContent = 'Editing Article';
   document.getElementById('article-form-block').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-// Format an ISO timestamp for a <input type="datetime-local"> — strip the
-// timezone and seconds so the browser doesn't reject it.
-function toLocalDatetimeInput(iso) {
-  const d = new Date(iso);
-  const pad = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 async function deleteArticle(row) {
