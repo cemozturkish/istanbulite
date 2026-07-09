@@ -320,9 +320,9 @@
       overflow-y: auto;
     }
 
-    /* Wraps the heading + 3 game links so they can be hidden as one unit
-       while a game's bottom sheet is open (see enterGameContext), leaving
-       just that game's own scoreboard in view. */
+    /* Wraps the heading + 3 game links; stays visible while a game's bottom
+       sheet is open (see enterGameContext) so the buttons and the
+       scoreboard (narrowed to that game) both stay on screen. */
     .game-picker {
       display: flex;
       flex-direction: column;
@@ -1130,11 +1130,13 @@
        bottom of the file for open/close wiring. On desktop it's
        a card sized to the game and attached to the bottom edge,
        so kahvehane's own top nav and left/right columns stay
-       visible around it when there's room; below ~1380px the columns
+       visible around it when there's room; below ~1240px the columns
        step aside instead of cramping into the same space (see the
-       @media (max-width: 1380px) rule below), and on narrow screens
+       @media (max-width: 1240px) rule below), and on narrow screens
        there's no room for any of it, so it falls back to a full-bleed
-       bottom sheet instead. */
+       bottom sheet instead. Sized identically to kütüphane's
+       .reader-overlay-sheet so both bottom sheets read as the same
+       window. */
     .game-overlay {
       position: fixed;
       inset: 0;
@@ -1151,17 +1153,14 @@
     }
     .game-overlay-sheet {
       /* Background/border/shadow come from frames.css's shared flat-card
-         rule, matching every other panel on the page.
-         Width stays above 768px on purpose: the game itself (sozcel.html
-         etc.) has its own @media (max-width: 768px) mobile layout, and
-         since that media query evaluates against the iframe's own
-         rendered width, a narrower sheet here would wrongly trigger the
-         game's mobile styles (giant keyboard, mobile padding) even on a
-         desktop-width viewport. */
+         rule, matching every other panel on the page. Same width formula
+         as .reader-overlay-sheet in kutuphane.html — see .game-overlay-frame
+         below for how the embedded game still avoids its own mobile
+         breakpoint at this narrower width. */
       position: absolute;
       left: 50%;
       bottom: 0;
-      width: min(820px, 90vw);
+      width: min(680px, 86vw);
       height: min(88vh, 860px);
       display: flex;
       flex-direction: column;
@@ -1170,22 +1169,35 @@
       transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .game-overlay.open .game-overlay-sheet { transform: translate(-50%, 0); }
+    /* The sheet itself now matches kütüphane's narrower width, but the game
+       (sozcel.html etc.) has its own @media (max-width: 768px) mobile
+       layout that reads the *iframe's* rendered width — a 680px iframe
+       would wrongly trip that breakpoint on an ordinary desktop-width
+       viewport (giant keyboard, mobile padding). So the iframe itself
+       stays fixed at a desktop-safe 820px and is centered over the
+       narrower sheet, with the sheet's overflow:hidden cropping the
+       unused side padding; the game's actual content (word grid,
+       keyboard) is well under 680px wide and centered, so nothing real
+       gets clipped. Below ~768px (see the media query below) this reverts
+       to a normal full-width flex child, matching a real mobile viewport
+       one-to-one so the game's own mobile layout kicks in correctly. */
     .game-overlay-frame {
-      flex: 1;
-      width: 100%;
+      position: absolute;
+      left: 50%;
+      top: 0;
+      width: 820px;
       height: 100%;
+      transform: translateX(-50%);
       border: none;
     }
-    /* Below ~1380px there isn't room for both 260px side columns and a
-       sheet wide enough (>768px) to stay out of the embedded game's own
-       mobile breakpoint (see the width comment above) — shrinking the
-       sheet instead would trigger that breakpoint on a desktop-width
-       viewport, so the side columns step aside instead while a game is
-       open, leaving the centered sheet with a clear lane the full width
-       of the viewport. Matches the .col-left/.col-right stacking
-       breakpoint (768px) below, so there's no gap where neither rule
-       applies. */
-    @media (max-width: 1380px) {
+    /* Below ~1240px there isn't room for both 260px side columns and the
+       sheet, so the side columns step aside instead of cramping into the
+       same space while a game is open, leaving the centered sheet with a
+       clear lane the full width of the viewport. Matches kütüphane's
+       .reader-overlay-sheet breakpoint and the .col-left/.col-right
+       stacking breakpoint (768px) below, so there's no gap where neither
+       rule applies. */
+    @media (max-width: 1240px) {
       body:has(.game-overlay.open) .col-left,
       body:has(.game-overlay.open) .col-right {
         visibility: hidden;
@@ -1201,6 +1213,13 @@
         transform: translateY(100%);
       }
       .game-overlay.open .game-overlay-sheet { transform: translateY(0); }
+      .game-overlay-frame {
+        position: static;
+        width: 100%;
+        height: 100%;
+        transform: none;
+        flex: 1;
+      }
     }
 
     /* ── Profile popup ── */
@@ -1792,27 +1811,28 @@
 // (see sozcel.html/tumcel.html/bulmaca.html) — just hides the sheet;
 // Kahvehane itself was never actually left.
 //
-// Opening/closing the sheet also narrows the right column, the same way
-// clicking a neighborhood on the map swaps it: from the full game picker
-// + weekly board down to just that game's own scoreboard. The left
-// column (discussion feed) is left alone — the game already has its own
-// "?" help button, so a duplicate instructions blurb here was redundant.
+// Opening/closing the sheet also narrows the scoreboard, the same way
+// clicking a neighborhood on the map swaps it: from the full weekly board
+// down to just that game's own scoreboard. The game links stay put so
+// switching games (or backing out to the picker) doesn't require closing
+// the sheet. The left column (discussion feed) is left alone — the game
+// already has its own "?" help button, so a duplicate instructions blurb
+// here was redundant.
 const GAME_DISPLAY_NAMES = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Bulmaca' };
 
 let gameContextActive = null;
 
+// The game links stay visible while a game is open (so switching games or
+// bailing back to the picker doesn't require closing the sheet first) —
+// only the scoreboard narrows down to the open game's own board.
 function enterGameContext(gameKey) {
   gameContextActive = gameKey;
-  const gamePicker = document.getElementById('game-picker');
-  if (gamePicker) gamePicker.style.display = 'none';
   loadScoreboard(null, gameKey);
 }
 
 function exitGameContext() {
   if (!gameContextActive) return;
   gameContextActive = null;
-  const gamePicker = document.getElementById('game-picker');
-  if (gamePicker) gamePicker.style.display = '';
   loadScoreboard(activeMapNeighborhood || null);
 }
 
@@ -2176,11 +2196,8 @@ async function loadScoreboard(neighborhoodFilter = null, gameFilter = null) {
   const countdownEl = document.getElementById('scoreboard-countdown');
   // Game links sit above the scoreboard and never get rebuilt, but they
   // should still join the same top-to-bottom entrance cascade as the
-  // scoreboard rows below them. Hidden while a game context is active
-  // (game-picker display:none), so there's nothing to cascade with then.
-  const gameLinks = document.getElementById('game-picker')?.style.display === 'none'
-    ? []
-    : Array.from(document.querySelectorAll('.games-section .game-link'));
+  // scoreboard rows below them.
+  const gameLinks = Array.from(document.querySelectorAll('.games-section .game-link'));
   const setList = (html) => animateFeedSwap(listEl, 'right', () => { listEl.innerHTML = html; }, gameLinks);
 
   // Title + countdown swap: a filtered view is per-neighborhood or
