@@ -760,6 +760,16 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── MOBILE RESPONSIVE ── */
+    /* ── MOBILE RESPONSIVE ──
+       Same stacked-flow treatment as anahane: the map sits at the top
+       like a hero banner with the profile card floating over its empty/
+       sea-colored band (same #eeeeee as the map artwork's own
+       background, so the card reads as part of the map rather than a
+       stacked box), then comments (left) and square game tiles (right)
+       below, all scrolling in body itself, with the tab bar pinned
+       fixed at the very bottom (its <header> already escapes to the
+       viewport via position:fixed regardless of where .section-rule
+       sits). */
     @media (max-width: 768px) {
       html, body {
         height: 100vh;
@@ -772,8 +782,11 @@
       body {
         display: grid;
         grid-template-columns: 1fr auto;
-        grid-template-rows: auto auto auto 1fr;
-        overflow: hidden;
+        grid-template-rows: auto auto;
+        align-content: start;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
         /* Reserve space for fixed bottom tab bar + a frame-gap so the
            cards don't visually press against the nav (frames.css design). */
         padding-bottom: calc(56px + env(safe-area-inset-bottom) + var(--frame-gap, 10px));
@@ -783,50 +796,80 @@
         grid-column: unset; grid-row: unset;
       }
 
+      /* Profile bar: floats over the top (empty/sea) band of the map
+         instead of taking its own row -- absolutely positioned against
+         body (already position:fixed, so it's a valid containing block
+         for this), which places it right at the top since the map is
+         the first grid row. Matches the map artwork's own #eeeeee
+         background exactly (see .map-panel below) and drops the card's
+         usual border so it reads as floating directly on the map. */
       #ist-pc-mount {
-        grid-column: 1 / -1;
-        grid-row: 1;
-        overflow-y: auto;
-        max-height: 50vh;
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        z-index: 20;
+        max-height: none;
+        overflow: visible;
+        background: #eeeeee;
+        border-bottom: none;
       }
 
-      /* Compact top brand bar */
+      /* .section-rule no longer renders a floating brand bar -- its
+         only visible content (the tab nav) is pulled out via the
+         <header> position:fixed rule below and pinned to the viewport
+         bottom regardless of where this sits. Taken out of grid flow so
+         it doesn't claim a row of its own. */
       .section-rule {
-        grid-column: 1 / -1;
-        grid-row: 2;
-        padding: 10px 14px 8px 14px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 12px;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 0;
+        height: 0;
+        padding: 0;
+        overflow: visible;
       }
 
-      /* Map: fixed full-bleed background (position comes from the base
-         .map-panel rule; this row just reserves no extra space for it). */
+      /* Map: same real artwork + traced SVG hit-regions, now a normal
+         in-flow square block instead of a fixed full-bleed background
+         layer sitting behind everything -- so it also drops the
+         desktop click-through hack (main's pointer-events:none /
+         .map-panel's negative z-index), which only existed because the
+         map used to escape main's box via position:fixed. */
       main {
         grid-column: 1 / -1;
-        grid-row: 3;
-        overflow: hidden;
+        grid-row: 1;
         display: block;
+        overflow: visible;
+        pointer-events: auto;
+      }
+      .map-panel {
+        position: relative;
+        inset: auto;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        z-index: auto;
+        overflow: hidden;
       }
       .map-label {
+        position: absolute;
+        bottom: 8px;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
         font-size: 11px;
         letter-spacing: 1px;
-        text-align: center;
-        bottom: 12px;
       }
 
-      /* Left column below map: simple block scroll so submit-form is always
-         reachable even when the map pushes content toward the tab bar. */
+      /* Comments: normal in-flow column below the map, to the left. */
       .col-left {
         grid-column: 1;
-        grid-row: 4;
+        grid-row: 2;
         min-height: 0;
-        overflow: hidden;
+        overflow: visible;
         border-right: 1px solid var(--rule);
         border-top: 1px solid var(--rule);
-        display: flex;
-        flex-direction: column;
+        display: block;
       }
       .col-left .nb-highlight {
         padding: 6px 12px;
@@ -838,26 +881,17 @@
          space above the discussion feed. */
       #library-card { display: none; }
       .discussion-section {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        min-height: 0;
+        display: block;
+        overflow: visible;
       }
       .discussion-label {
         padding: 5px 12px;
         font-size: 9px;
         letter-spacing: 1.2px;
-        position: sticky;
-        top: 0;
-        background: var(--paper);
-        z-index: 2;
       }
       .discussion-posts {
         padding: 6px 10px;
-        flex: 1;
-        min-height: 0;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
+        overflow: visible;
       }
       .post {
         padding: 10px 12px;
@@ -878,6 +912,7 @@
         padding: 8px 10px 12px;
         border-top: 1px solid var(--rule);
         background: var(--paper);
+        margin-top: 0;
       }
       .submit-form-header {
         font-size: 10px;
@@ -896,42 +931,39 @@
         border-radius: 4px;
       }
 
-      /* Right column below map: square game buttons stacked vertically */
+      /* Games: normal in-flow column below the map, to the right --
+         true square tiles (aspect-ratio, not flex-stretched to fill a
+         clipped column) stacked with a gap. */
       .col-right {
         grid-column: 2;
-        grid-row: 4;
+        grid-row: 2;
         min-height: 0;
-        overflow: hidden;
+        overflow: visible;
         border-left: none;
         border-top: 1px solid var(--rule);
-        display: flex;
-        flex-direction: column;
+        display: block;
         width: auto;
       }
       .games-section {
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        flex: 1;
-        overflow: hidden;
+        display: block;
+        overflow: visible;
       }
       .games-section-inner {
         padding: 8px;
-        gap: 6px;
+        gap: 8px;
         display: flex;
         flex-direction: column;
-        flex: 1;
-        min-height: 0;
-        overflow: hidden;
+        overflow: visible;
       }
       .games-section h2 { display: none; }
-      /* Hide the weekly scoreboard on mobile — keeps the game-button row compact */
+      /* Hide the weekly scoreboard on mobile — keeps the tile column compact */
       .scoreboard { display: none; }
+      .game-picker { gap: 8px; }
       .game-link {
         padding: 0;
-        width: clamp(96px, 22vw, 128px);
-        flex: 1;
-        min-height: 0;
+        width: clamp(96px, 26vw, 128px);
+        aspect-ratio: 1 / 1;
+        flex-shrink: 0;
         display: flex;
         flex-direction: column;
         align-items: center;
