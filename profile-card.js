@@ -653,10 +653,272 @@
       }
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // Shared desktop identity card: avatar, name, neighborhood, edit form
+  // (name/district/avatar/prefs). Mirrors kütüphane.html's own top-of-
+  // col-left `.library-card` (kept local there — see the comment above
+  // .library-card in profile-card.css). Desktop-only; each page hides
+  // #library-card on mobile in its own <768px query since #ist-pc-mount
+  // already covers that.
+  //
+  // Usage: IstProfileCard.mountLibraryCard({ sb, I18N });
+  // Assumes a <div id="library-card"> exists in the page.
+  // ══════════════════════════════════════════════════════════════
+  async function mountLibraryCard(opts) {
+    const sb = opts.sb;
+    const I18N = opts.I18N;
+    const cardEl = opts.mountEl || document.getElementById('library-card');
+    if (!cardEl || !sb) return;
+
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    const user = session.user;
+    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
+
+    const today = istanbulTodayISO();
+    const [{ data: profile }, { count: sozculCount }] = await Promise.all([
+      sb.from('profiles').select('*').eq('id', user.id).single(),
+      sb.from('sozcel_sozcul_assignments').select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id).lte('game_date', today),
+    ]);
+
+    const firstName = profile?.first_name || '';
+    const lastName = profile?.last_name || '';
+    const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
+    const yasadigiIlce = profile?.neighborhood || '';
+    const dogumYeri = profile?.birth_place || '';
+    let avatarUrl = profile?.avatar_url || null;
+
+    const languagePref = normalizeLang(profile?.language_pref);
+    const themePref = normalizeTheme(profile?.theme_pref);
+    const palettePref = normalizePalette(profile?.palette_pref);
+    const isAdminUser = user.email === ADMIN_EMAIL;
+
+    // `yaşadığı ilçe` can't be istanbul_disi (DB check constraint) — only
+    // offer the 25 real districts, same as kütüphane's own card.
+    const districtOptions = Object.entries(NB_NAMES)
+      .filter(([id]) => id !== 'istanbul_disi')
+      .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
+      .map(([id, name]) => `<option value="${id}"${id === yasadigiIlce ? ' selected' : ''}>${esc(name)}</option>`)
+      .join('');
+
+    const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
+    let dogumDisplay = '—';
+    if (dogumYeri && NB_NAMES[dogumYeri]) dogumDisplay = NB_NAMES[dogumYeri];
+    else if (dogumYeri) dogumDisplay = dogumYeri;
+
+    function avatarDisplayHTML() {
+      return avatarUrl
+        ? `<img src="${esc(avatarSrc(avatarUrl))}" alt="">`
+        : esc(displayName.charAt(0).toUpperCase());
+    }
+
+    function renderView() {
+      cardEl.innerHTML = `
+        <div class="card-top">
+          <div class="avatar" id="lc-avatar-display">${avatarDisplayHTML()}</div>
+          <div class="card-id">
+            <div class="card-name">${esc(displayName)}</div>
+            <div class="card-meta">${esc(yasadigiDisplay)}</div>
+          </div>
+        </div>
+        <button class="edit-btn" id="lc-edit-btn">${esc(t('profile.edit'))}</button>
+      `;
+      document.getElementById('lc-edit-btn').addEventListener('click', renderEdit);
+    }
+
+    function renderEdit() {
+      cardEl.innerHTML = `
+        <div class="card-top">
+          <div class="avatar" id="lc-avatar-display">${avatarDisplayHTML()}</div>
+          <div class="card-id">
+            <div class="avatar-picker-label">${esc(t('profile.chooseavatar'))}</div>
+            <div class="avatar-picker" id="lc-avatar-picker">${buildAvatarPicker(avatarUrl, sozculCount, { optionClass: 'avatar-option' })}</div>
+            <div class="avatar-msg" id="lc-avatar-msg" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="card-edit">
+          <div>
+            <div class="field-label">${esc(t('profile.firstname'))}</div>
+            <input class="field-input" id="lc-firstname" type="text" value="${esc(firstName)}" placeholder="${esc(t('profile.firstname'))}">
+          </div>
+          <div>
+            <div class="field-label">${esc(t('profile.lastname'))}</div>
+            <input class="field-input" id="lc-lastname" type="text" value="${esc(lastName)}" placeholder="${esc(t('profile.lastname'))}">
+          </div>
+          <div>
+            <div class="field-label">${esc(t('profile.district'))}</div>
+            <select class="field-select" id="lc-yasadigi">
+              <option value="">— ${esc(t('profile.district'))} —</option>
+              ${districtOptions}
+            </select>
+          </div>
+          <div>
+            <div class="field-label">${esc(t('profile.birthplace'))}</div>
+            <div class="field-display">${esc(dogumDisplay)}</div>
+          </div>
+          <div>
+            <div class="field-label">${esc(t('profile.langpref'))}</div>
+            <input class="pref-slider" id="lc-language" type="range" min="0" max="1" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
+            <div class="pref-ticks" id="lc-language-ticks">
+              <span data-idx="0">Daha İngilizce</span>
+              <span data-idx="1">Daha Türkçe</span>
+            </div>
+          </div>
+          <div>
+            <div class="field-label">${esc(t('profile.colortheme'))}</div>
+            <input class="pref-slider" id="lc-palette" type="range" min="0" max="1" step="1" value="${PALETTE_VALUES.indexOf(palettePref)}">
+            <div class="pref-ticks" id="lc-palette-ticks">
+              <span data-idx="0">Siyah-Beyaz</span>
+              <span data-idx="1">Kahverengi</span>
+            </div>
+          </div>
+          <div>
+            <div class="field-label">${esc(t('profile.appearance'))}</div>
+            <input class="pref-slider" id="lc-theme" type="range" min="0" max="1" step="1" value="${THEME_VALUES.indexOf(themePref)}">
+            <div class="pref-ticks" id="lc-theme-ticks">
+              <span data-idx="0">Açık</span>
+              <span data-idx="1">Koyu</span>
+            </div>
+          </div>
+        </div>
+        <div class="edit-row">
+          <button class="cancel-btn" id="lc-cancel-btn">${esc(t('profile.cancel'))}</button>
+          <button class="save-btn" id="lc-save-btn">${esc(t('profile.save'))}</button>
+        </div>
+        <div class="save-msg" id="lc-save-msg"></div>
+      `;
+      document.getElementById('lc-cancel-btn').addEventListener('click', renderView);
+      document.getElementById('lc-save-btn').addEventListener('click', handleSave);
+      document.querySelectorAll('#lc-avatar-picker .avatar-option').forEach(btn => {
+        btn.addEventListener('click', () => handleAvatarPick(btn.dataset.url));
+      });
+
+      function syncTicks(sliderId, ticksId) {
+        const slider = document.getElementById(sliderId);
+        const ticks = document.getElementById(ticksId);
+        const update = () => {
+          const v = parseInt(slider.value, 10);
+          ticks.querySelectorAll('span').forEach(s => {
+            s.classList.toggle('active', parseInt(s.dataset.idx, 10) === v);
+          });
+        };
+        slider.addEventListener('input', update);
+        ticks.querySelectorAll('span').forEach(s => {
+          s.addEventListener('click', () => {
+            slider.value = s.dataset.idx;
+            slider.dispatchEvent(new Event('input'));
+          });
+        });
+        update();
+      }
+      syncTicks('lc-language', 'lc-language-ticks');
+      syncTicks('lc-palette', 'lc-palette-ticks');
+      syncTicks('lc-theme', 'lc-theme-ticks');
+    }
+
+    async function handleSave() {
+      const msgEl = document.getElementById('lc-save-msg');
+      const btn = document.getElementById('lc-save-btn');
+      const newYasadigi = document.getElementById('lc-yasadigi').value;
+      const newFirstName = capitalizeName(document.getElementById('lc-firstname').value.trim());
+      const newLastName = capitalizeName(document.getElementById('lc-lastname').value.trim());
+
+      if (!newYasadigi) {
+        msgEl.textContent = 'Lütfen bir ilçe seçin.';
+        msgEl.style.color = 'var(--accent)';
+        return;
+      }
+
+      btn.textContent = t('profile.saving');
+      btn.disabled = true;
+      msgEl.textContent = '';
+
+      try {
+        const newLanguage = LANG_VALUES[parseInt(document.getElementById('lc-language').value, 10)] || 'default';
+        const newTheme = THEME_VALUES[parseInt(document.getElementById('lc-theme').value, 10)] || 'light';
+        const newPalette = PALETTE_VALUES[parseInt(document.getElementById('lc-palette').value, 10)] || 'mono';
+
+        // `neighborhood` is admin-controlled — the protect_profile_columns
+        // trigger silently reverts it for non-admin users, so only send it
+        // for the admin (matches kütüphane's own card).
+        const payload = {
+          first_name: newFirstName,
+          last_name: newLastName,
+          language_pref: newLanguage,
+          theme_pref: newTheme,
+          palette_pref: newPalette,
+        };
+        if (isAdminUser) payload.neighborhood = newYasadigi;
+
+        const { data, error } = await sb
+          .from('profiles')
+          .update(payload)
+          .eq('id', user.id)
+          .select('id, first_name, last_name, neighborhood');
+
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
+        }
+
+        if (global.Palette) global.Palette.setPalette(newPalette);
+        setTimeout(() => window.location.reload(), 400);
+      } catch (err) {
+        btn.textContent = t('profile.save');
+        btn.disabled = false;
+        msgEl.textContent = err && err.message ? err.message : 'Kaydedilemedi.';
+        msgEl.style.color = 'var(--accent)';
+      }
+    }
+
+    let _avatarMsgTimer = null;
+    function showAvatarMsg(text) {
+      const el = document.getElementById('lc-avatar-msg');
+      if (!el) return;
+      el.textContent = text;
+      el.classList.add('show');
+      clearTimeout(_avatarMsgTimer);
+      _avatarMsgTimer = setTimeout(() => el.classList.remove('show'), 5000);
+    }
+
+    async function handleAvatarPick(url) {
+      if (!url || url === avatarUrl) return;
+      const opt = lookupAvatarOption(url);
+      if (opt?.requiresSozculCount && (sozculCount || 0) < opt.requiresSozculCount) {
+        showAvatarMsg(lockedAvatarMessage(opt, sozculCount));
+        return;
+      }
+      const { data, error } = await sb
+        .from('profiles')
+        .update({ avatar_url: url })
+        .eq('id', user.id)
+        .select('id');
+
+      if (error) {
+        showAvatarMsg('Avatar kaydedilemedi: ' + error.message);
+        return;
+      }
+      if (!data || data.length === 0) {
+        showAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
+        return;
+      }
+      avatarUrl = url;
+      const av = document.getElementById('lc-avatar-display');
+      if (av) av.innerHTML = `<img src="${esc(avatarSrc(url))}" alt="">`;
+      document.querySelectorAll('#lc-avatar-picker .avatar-option').forEach(b => {
+        b.classList.toggle('selected', b.dataset.url === url);
+      });
+    }
+
+    renderView();
+  }
+
   global.IstProfileCard = {
     mount,
     setPage,
     unmount,
+    mountLibraryCard,
     AVATAR_OPTIONS,
     AVATAR_LOCK_SVG,
     buildAvatarPicker,
