@@ -1160,6 +1160,33 @@
       font-size: 0.7rem;
       color: var(--card-fg-muted);
     }
+    .ev-attendees {
+      display: flex;
+      align-items: center;
+    }
+    .ev-attendee-avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--paper-dark);
+      border: 1.5px solid var(--paper-card, #fff);
+      box-shadow: 0 0 0 1px var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--accent);
+      overflow: hidden;
+      margin-left: -8px;
+    }
+    .ev-attendee-avatar:first-child { margin-left: 0; }
+    .ev-attendee-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .ev-attendee-avatar.ev-attendee-more {
+      font-size: 0.56rem;
+      color: var(--card-fg-muted);
+    }
 
     /* News (left) and event (right) cards slide in from their own
        column's outer screen edge on render, and slide back out the
@@ -2386,6 +2413,13 @@ let allEvents = [];
 let eventsRequestSeq = 0;
 let rsvpCounts = {};   // event_id -> attendee count
 let myRsvpIds = new Set(); // event_ids the current user has RSVP'd to
+let rsvpAttendees = {}; // event_id -> [{ id, first_name, last_name, avatar_url }, ...] (capped)
+const MAX_ATTENDEE_AVATARS = 6;
+
+function capitalizeName(s) {
+  if (!s) return '';
+  return s.trim().split(/\s+/).map(w => w ? w.charAt(0).toLocaleUpperCase('tr-TR') + w.slice(1).toLocaleLowerCase('tr-TR') : '').join(' ');
+}
 
 async function loadEvents(instant) {
   const reqId = ++eventsRequestSeq;
@@ -2412,15 +2446,52 @@ async function loadEvents(instant) {
 async function loadRsvps() {
   rsvpCounts = {};
   myRsvpIds = new Set();
+  rsvpAttendees = {};
   const ids = allEvents.map(ev => ev.id);
   if (!ids.length) return;
-  const { data, error } = await sb.from('event_rsvps').select('event_id, user_id').in('event_id', ids);
+  const { data, error } = await sb.from('event_rsvps')
+    .select('event_id, user_id, created_at')
+    .in('event_id', ids)
+    .order('created_at', { ascending: true });
   if (error) { console.error('[anahane rsvps]', error); return; }
   const myId = window.__currentUser && window.__currentUser.id;
   (data || []).forEach(r => {
     rsvpCounts[r.event_id] = (rsvpCounts[r.event_id] || 0) + 1;
     if (myId && r.user_id === myId) myRsvpIds.add(r.event_id);
   });
+  // Resolve attendee profile pictures in one batched query.
+  const userIds = Array.from(new Set((data || []).map(r => r.user_id)));
+  if (userIds.length) {
+    const { data: profs, error: profErr } = await sb.from('profiles')
+      .select('id, first_name, last_name, avatar_url')
+      .in('id', userIds);
+    if (profErr) { console.error('[anahane rsvp attendees]', profErr); return; }
+    const profMap = new Map((profs || []).map(p => [p.id, p]));
+    (data || []).forEach(r => {
+      const p = profMap.get(r.user_id);
+      if (!p) return;
+      (rsvpAttendees[r.event_id] = rsvpAttendees[r.event_id] || []).push(p);
+    });
+  }
+}
+
+function buildAttendeeAvatarsHtml(eventId) {
+  const list = rsvpAttendees[eventId] || [];
+  if (!list.length) return '';
+  const shown = list.slice(0, MAX_ATTENDEE_AVATARS);
+  const extra = list.length - shown.length;
+  const avatarsHtml = shown.map(p => {
+    const name = capitalizeName([p.first_name, p.last_name].filter(Boolean).join(' ')) || 'Üye';
+    const initial = (p.first_name || p.last_name || '?').charAt(0).toLocaleUpperCase('tr-TR');
+    const inner = p.avatar_url
+      ? `<img src="${Palette.avatarSrc(p.avatar_url)}" alt="">`
+      : initial;
+    return `<span class="ev-attendee-avatar" title="${escapeText(name)}">${inner}</span>`;
+  }).join('');
+  const moreHtml = extra > 0
+    ? `<span class="ev-attendee-avatar ev-attendee-more" title="+${extra}">+${extra}</span>`
+    : '';
+  return avatarsHtml + moreHtml;
 }
 
 async function toggleRsvp(eventId, btn) {
@@ -2432,25 +2503,26 @@ async function toggleRsvp(eventId, btn) {
     if (attending) {
       const { error } = await sb.from('event_rsvps').delete().eq('event_id', eventId).eq('user_id', myId);
       if (error) throw error;
-      myRsvpIds.delete(eventId);
-      rsvpCounts[eventId] = Math.max(0, (rsvpCounts[eventId] || 1) - 1);
     } else {
       const { error } = await sb.from('event_rsvps').insert({ event_id: eventId, user_id: myId });
       if (error) throw error;
-      myRsvpIds.add(eventId);
-      rsvpCounts[eventId] = (rsvpCounts[eventId] || 0) + 1;
     }
   } catch (err) {
     console.error('[anahane rsvp]', err);
     btn.disabled = false;
     return;
   }
-  // Patch just this button/count in place so the card doesn't collapse.
+  // Refetch counts + attendee avatars so the stack reflects the change,
+  // then patch just this event's row in place so the card doesn't collapse.
+  await loadRsvps();
   const nowAttending = myRsvpIds.has(eventId);
   btn.classList.toggle('attending', nowAttending);
   btn.textContent = nowAttending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join');
-  const countEl = btn.closest('.ev-rsvp-row')?.querySelector('.ev-rsvp-count');
+  const row = btn.closest('.ev-rsvp-row');
+  const countEl = row?.querySelector('.ev-rsvp-count');
   if (countEl) countEl.textContent = `${rsvpCounts[eventId] || 0} ${I18N.t('home.events.rsvp.count')}`;
+  const avatarsEl = row?.querySelector('.ev-attendees');
+  if (avatarsEl) avatarsEl.innerHTML = buildAttendeeAvatarsHtml(eventId);
   btn.disabled = false;
 }
 
@@ -2488,6 +2560,7 @@ function buildEventDetailHtml(ev) {
         <div class="ev-rsvp-row">
           <button type="button" class="ev-rsvp-btn${attending ? ' attending' : ''}" data-event-id="${ev.id}">${attending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join')}</button>
           <span class="ev-rsvp-count">${count} ${I18N.t('home.events.rsvp.count')}</span>
+          <span class="ev-attendees">${buildAttendeeAvatarsHtml(ev.id)}</span>
         </div>
       </div>
     </div>
