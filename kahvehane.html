@@ -791,11 +791,15 @@
            main bleeds to the true screen edges (see its negative
            margins below), so its rendered width is always 100vw --
            sizing row 1 to 100vw directly gives the same square,
-           deterministically. Row 2 uses min-content rather than auto
-           for the same reason (auto was still getting compressed even
-           once row 1 was fixed; min-content reliably sizes to its
-           tallest column's real content instead). */
-        grid-template-rows: 100vw min-content;
+           deterministically. Row 2 uses minmax(min-content, 1fr) rather
+           than plain min-content for the same clipping reason (a bare
+           "auto" was still getting compressed even once row 1 was
+           fixed) *and* so it stretches to fill any leftover space down
+           to the tab bar on a short comments/games day, instead of
+           leaving a dead gap below them -- the 1fr only ever grows the
+           track, min-content still guarantees it never shrinks below
+           its tallest column's real content. */
+        grid-template-rows: 100vw minmax(min-content, 1fr);
         align-content: start;
         overflow-y: auto;
         overflow-x: hidden;
@@ -919,18 +923,21 @@
       }
 
       /* Comments: normal in-flow column below the map, to the left.
-         No min-height:0 -- that was needed for the old fixed-height
-         flex column (to let it shrink and scroll internally); now that
-         it's a plain block sized to its own content, it would instead
-         zero out this column's contribution to row 2's min-content
-         sizing and clip the comment feed. */
+         No min-height:0 on .col-left itself -- that was needed for the
+         old fixed-height flex column (to let it shrink and scroll
+         internally); on this grid item it would zero out this column's
+         contribution to row 2's min-content sizing and clip the comment
+         feed. flex (not block) so .discussion-section below can grow to
+         fill row 2's now-stretchy height (minmax(min-content,1fr) on
+         body) instead of leaving blank space under the composer. */
       .col-left {
         grid-column: 1;
         grid-row: 2;
         overflow: visible;
         border-right: 1px solid var(--rule);
         border-top: 1px solid var(--rule);
-        display: block;
+        display: flex;
+        flex-direction: column;
       }
       /* The desktop rule near the top of this file (body .col-left/
          .col-right) sets background:none!important so these read as
@@ -953,8 +960,15 @@
          on mobile — the desktop-only #library-card would just take up
          space above the discussion feed. */
       #library-card { display: none; }
+      /* Grows to fill .col-left's stretched height; min-height:0 is safe
+         here (unlike on .col-left itself) since it only affects this
+         nested flex item's own shrink behavior, not .col-left's
+         contribution to the outer grid row's min-content sizing. */
       .discussion-section {
-        display: block;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
         overflow: visible;
       }
       .discussion-label {
@@ -985,7 +999,14 @@
         padding: 8px 10px 12px;
         border-top: 1px solid var(--rule);
         background: var(--paper);
-        margin-top: 0;
+        /* Pinned to the bottom of .discussion-section (a flex column
+           that now fills the column's stretched height) instead of
+           sitting right after the last post -- any leftover space
+           collects between the posts and the composer, not below
+           everything, so the composer always sits at the same spot
+           near the tab bar instead of drifting depending on post count. */
+        margin-top: auto;
+        flex-shrink: 0;
       }
       .submit-form-header {
         font-size: 10px;
@@ -1006,26 +1027,43 @@
 
       /* Games: normal in-flow column below the map, to the right --
          short rectangular tiles (fixed height, not flex-stretched to
-         fill a clipped column) stacked with a gap. No min-height:0,
-         same reasoning as .col-left above. */
+         fill a clipped column) stacked with a gap. No min-height:0 on
+         .col-right itself, same reasoning as .col-left above. flex (not
+         block) so .games-section below can grow to fill row 2's now-
+         stretchy height instead of leaving blank space under the tiles. */
       .col-right {
         grid-column: 2;
         grid-row: 2;
         overflow: visible;
         border-left: none;
         border-top: 1px solid var(--rule);
-        display: block;
+        display: flex;
+        flex-direction: column;
         width: auto;
       }
+      /* min-height:0 is safe here for the same reason as
+         .discussion-section above -- nested flex item, not the grid
+         item itself. */
       .games-section {
-        display: block;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
         overflow: visible;
       }
+      /* justify-content:space-between spreads the leftover height
+         between the game tiles and the scoreboard instead of leaving
+         it all stranded below the scoreboard -- so the scoreboard (or,
+         when it's empty, the tiles themselves) reaches down toward the
+         tab bar rather than sitting top-packed with dead space under it. */
       .games-section-inner {
         padding: 8px;
         gap: 8px;
         display: flex;
         flex-direction: column;
+        justify-content: space-between;
+        flex: 1;
+        min-height: 0;
         overflow: visible;
       }
       /* Just the "Günün Oyunları" heading above the game tiles -- not
