@@ -776,7 +776,20 @@
       body {
         display: grid;
         grid-template-columns: 1fr auto;
-        grid-template-rows: auto auto;
+        /* Row 1 (the map) gets an explicit, definite track size instead
+           of "auto": with one auto-width column (games) and one 1fr
+           column (comments) below it, and body's content taller than
+           the viewport, plain "auto auto" rows didn't size to their own
+           content -- they got compressed to fit body's definite height
+           (each row roughly halved, clipping the map's bottom edge).
+           main bleeds to the true screen edges (see its negative
+           margins below), so its rendered width is always 100vw --
+           sizing row 1 to 100vw directly gives the same square,
+           deterministically. Row 2 uses min-content rather than auto
+           for the same reason (auto was still getting compressed even
+           once row 1 was fixed; min-content reliably sizes to its
+           tallest column's real content instead). */
+        grid-template-rows: 100vw min-content;
         align-content: start;
         overflow-y: auto;
         overflow-x: hidden;
@@ -848,7 +861,17 @@
         position: relative;
         inset: auto;
         width: 100%;
-        aspect-ratio: 1 / 1;
+        /* aspect-ratio (which works fine on anahane) doesn't resolve
+           reliably here: main spans an explicit 1fr column and an auto
+           (content-sized) one, and that combination made the grid's
+           "auto" row track collapse to half the leftover body height
+           instead of sizing to the map's own square, clipping its
+           bottom half. A definite viewport-based height sidesteps that
+           row-sizing ambiguity entirely -- main's rendered width is
+           always ~100vw (full-bleed, see the negative margins above),
+           so 100vw here still yields the same square as anahane. */
+        height: 100vw;
+        aspect-ratio: auto;
         z-index: auto;
         overflow: hidden;
       }
@@ -862,11 +885,15 @@
         letter-spacing: 1px;
       }
 
-      /* Comments: normal in-flow column below the map, to the left. */
+      /* Comments: normal in-flow column below the map, to the left.
+         No min-height:0 -- that was needed for the old fixed-height
+         flex column (to let it shrink and scroll internally); now that
+         it's a plain block sized to its own content, it would instead
+         zero out this column's contribution to row 2's min-content
+         sizing and clip the comment feed. */
       .col-left {
         grid-column: 1;
         grid-row: 2;
-        min-height: 0;
         overflow: visible;
         border-right: 1px solid var(--rule);
         border-top: 1px solid var(--rule);
@@ -933,12 +960,12 @@
       }
 
       /* Games: normal in-flow column below the map, to the right --
-         true square tiles (aspect-ratio, not flex-stretched to fill a
-         clipped column) stacked with a gap. */
+         short rectangular tiles (fixed height, not flex-stretched to
+         fill a clipped column) stacked with a gap. No min-height:0,
+         same reasoning as .col-left above. */
       .col-right {
         grid-column: 2;
         grid-row: 2;
-        min-height: 0;
         overflow: visible;
         border-left: none;
         border-top: 1px solid var(--rule);
@@ -960,10 +987,14 @@
       /* Hide the weekly scoreboard on mobile — keeps the tile column compact */
       .scoreboard { display: none; }
       .game-picker { gap: 8px; }
+      /* Short rectangles instead of squares -- keeps the games column
+         from towering over the comments column, which was letting the
+         taller of the two stretch the shared row well past the map's
+         own height (see the .map-panel comment above). */
       .game-link {
         padding: 0;
         width: clamp(96px, 26vw, 128px);
-        aspect-ratio: 1 / 1;
+        height: 64px;
         flex-shrink: 0;
         display: flex;
         flex-direction: column;
@@ -974,13 +1005,13 @@
       }
       .game-link-title {
         font-size: 12px;
-        margin-bottom: 3px;
+        margin-bottom: 2px;
         font-weight: 700;
       }
       .game-link-subtitle {
         font-size: 9px;
         padding: 0 4px;
-        line-height: 1.2;
+        line-height: 1.15;
         overflow-wrap: break-word;
         word-break: break-word;
         max-width: 100%;
