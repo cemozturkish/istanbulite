@@ -2087,8 +2087,11 @@ neighborhoods.forEach(nb => {
     flashingNewsCardId = flashedItem ? flashedItem.id : null;
     markNewsSeenForNeighborhood(nbId);
     activeNeighborhood = nbId;
-    applyNewsFilter(activeNewsFilter);
-    loadEvents();
+    // instant: a map click filters the existing feed to this district --
+    // it should update in place, not slide the whole feed out and back
+    // in as if it were leaving and re-entering the screen.
+    applyNewsFilter(activeNewsFilter, true);
+    loadEvents(true);
   });
   nb.addEventListener('mouseenter', () => {
     const name = nb.getAttribute('data-name') || nb.id;
@@ -2106,8 +2109,8 @@ document.addEventListener('click', (e) => {
     if (activeNeighborhood !== null) {
       activeNeighborhood = null;
       flashingNewsCardId = null;
-      applyNewsFilter(activeNewsFilter);
-      loadEvents();
+      applyNewsFilter(activeNewsFilter, true);
+      loadEvents(true);
     }
   }
 });
@@ -2206,9 +2209,13 @@ function safeUrl(u) {
 // pre-body): the whole column is already sliding in from that same edge,
 // so animating the cards inside it too would look like the content
 // arriving twice.
+// `instant`: rebuilds in place with no leave/enter animation at all --
+// used for map neighborhood clicks, where the slide-out/in read as the
+// whole feed leaving and re-entering the screen instead of just updating.
 const CARD_SWAP_MS = 300;
 const CARD_STAGGER_MS = 160;
-function animateFeedSwap(container, direction, buildFn) {
+function animateFeedSwap(container, direction, buildFn, instant) {
+  if (instant) { buildFn(); return; }
   const suppress = window.__istSuppressFirstCardAnim && window.__istSuppressFirstCardAnim[direction];
   if (suppress) window.__istSuppressFirstCardAnim[direction] = false;
   const enterClass = direction === 'left' ? 'card-entering-left' : 'card-entering-right';
@@ -2231,10 +2238,10 @@ function animateFeedSwap(container, direction, buildFn) {
   setTimeout(playEnter, CARD_SWAP_MS);
 }
 
-function renderBreakingNewsFeed(rows) {
+function renderBreakingNewsFeed(rows, instant) {
   const feed = document.getElementById('breaking-news-feed');
   if (!feed) return;
-  animateFeedSwap(feed, 'left', () => renderBreakingNewsFeedNow(feed, rows));
+  animateFeedSwap(feed, 'left', () => renderBreakingNewsFeedNow(feed, rows), instant);
 }
 
 // Full detail markup for a news article — rendered into the detail
@@ -2307,7 +2314,7 @@ setInterval(() => {
   });
 }, 60000);
 
-function applyNewsFilter(filter) {
+function applyNewsFilter(filter, instant) {
   activeNewsFilter = filter;
   document.querySelectorAll('.news-filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.filter === filter);
@@ -2319,7 +2326,7 @@ function applyNewsFilter(filter) {
   else if (filter === 'mahalle') rows = allBreakingNews.filter(n => n.category !== 'istanbul' && n.category !== 'turkiye' && n.category !== 'dunya');
   // When a district is selected on the map, narrow further to its news.
   if (activeNeighborhood) rows = rows.filter(n => n.neighborhood === activeNeighborhood);
-  renderBreakingNewsFeed(rows);
+  renderBreakingNewsFeed(rows, instant);
 }
 
 document.querySelectorAll('.news-filter-btn').forEach(btn => {
@@ -2375,7 +2382,7 @@ let eventsRequestSeq = 0;
 let rsvpCounts = {};   // event_id -> attendee count
 let myRsvpIds = new Set(); // event_ids the current user has RSVP'd to
 
-async function loadEvents() {
+async function loadEvents(instant) {
   const reqId = ++eventsRequestSeq;
   const now = new Date().toISOString();
   // Scope the query to the selected neighborhood so the 30-row cap
@@ -2394,7 +2401,7 @@ async function loadEvents() {
   else allEvents = data || [];
   await loadRsvps();
   if (reqId !== eventsRequestSeq) return;
-  renderEvents();
+  renderEvents(instant);
 }
 
 async function loadRsvps() {
@@ -2442,12 +2449,12 @@ async function toggleRsvp(eventId, btn) {
   btn.disabled = false;
 }
 
-function renderEvents() {
+function renderEvents(instant) {
   const panel = document.getElementById('events-panel');
   if (!panel) return;
   let rows = allEvents;
   if (activeNeighborhood) rows = rows.filter(ev => ev.neighborhood === activeNeighborhood);
-  animateFeedSwap(panel, 'right', () => renderEventsNow(panel, rows));
+  animateFeedSwap(panel, 'right', () => renderEventsNow(panel, rows), instant);
 }
 
 // Full detail markup for an event — rendered into the detail overlay's
