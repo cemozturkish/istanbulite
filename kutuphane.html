@@ -192,7 +192,7 @@
       pointer-events: auto;
       z-index: -1;
       overflow: hidden;
-      background: #eeeeee;
+      background: #f7f7f7;
     }
 
     .map-panel img.map-photo {
@@ -1906,6 +1906,17 @@
     }
 
     /* ── MOBILE RESPONSIVE ── */
+    /* ── MOBILE RESPONSIVE ──
+       Same stacked-flow treatment as anahane/kahvehane: the map sits at
+       the top like a hero banner with the profile card floating over
+       its empty/sea-colored band (same #f7f7f7 as the map artwork's own
+       background, so the card reads as part of the map rather than a
+       stacked box), then the shelves grid below it, all scrolling in
+       body itself (a plain flex column here, not a grid -- .map-panel
+       is a sibling of col-left/main/col-right rather than nested in
+       main, so it just needs to become an in-flow item instead of a
+       fixed full-bleed background layer for the stacking order to fall
+       out correctly), with the tab bar pinned fixed at the very bottom. */
     @media (max-width: 768px) {
       html {
         height: 100dvh;
@@ -1915,7 +1926,14 @@
         height: 100dvh;
         display: flex;
         flex-direction: column;
-        overflow: hidden;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        /* frames.css's shared gap would otherwise expose a sliver of
+           the raw page canvas (a different color from the map's own
+           #f7f7f7) between every stacked block, most visibly right
+           under the map. */
+        gap: 0 !important;
         /* Reserve space for fixed bottom tab bar + a frame-gap so the
            cards don't visually press against the nav (frames.css design). */
         padding-bottom: calc(56px + env(safe-area-inset-bottom) + var(--frame-gap, 10px));
@@ -1938,23 +1956,95 @@
         flex-direction: column;
       }
 
-      /* Compact top bar — nav itself relocates to the fixed bottom tab
-         bar below, so this just reserves a little top space (matches
-         anahane/kahvehane's frameless mobile chrome). */
+      /* .section-rule no longer renders a floating brand bar -- its
+         only visible content (the tab nav) is pulled out via the
+         <header> position:fixed rule below and pinned to the viewport
+         bottom regardless of where this sits. Taken out of flow so it
+         doesn't claim space above the map. */
       .section-rule {
-        padding: 10px 14px 8px 14px;
-        flex-shrink: 0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 12px;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 0;
+        height: 0;
+        padding: 0;
+        overflow: visible;
       }
-      #ist-pc-mount, #mobile-top { flex-shrink: 0; }
+
+      /* Profile bar: floats over the top (empty/sea) band of the map
+         instead of taking its own flex slot -- absolutely positioned
+         against body (already position:fixed, so it's a valid
+         containing block for this), which places it right at the top
+         since the map is the first visible flex item (#mobile-top and
+         .col-left, which sit before it in DOM order, are display:none
+         for the normal self-view case). Matches the map artwork's own
+         #f7f7f7 background exactly (see .map-panel below) and drops
+         the card's usual border so it reads as floating directly on
+         the map rather than a stacked box. */
+      #ist-pc-mount {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        z-index: 20;
+        overflow: visible;
+        background: #f7f7f7;
+        border-bottom: none;
+      }
+      /* frames.css drops a card shadow on #ist-pc-mount's child (the
+         same treatment every other panel gets) -- here that shadow was
+         casting a visible dark band onto the map below, breaking the
+         color match above even though the fill itself was correct. */
+      #ist-pc-mount > * {
+        box-shadow: none !important;
+      }
+      /* #mobile-top only shows in the ?user=ID "viewing another
+         profile" case (see body.ist-viewing-other below) -- same
+         floating treatment as #ist-pc-mount so it doesn't regress to a
+         stacked box in that path. */
+      body.ist-viewing-other #mobile-top {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        z-index: 20;
+        background: #f7f7f7 !important;
+      }
+
+      /* Map: real artwork + traced SVG hit-regions, now a normal
+         in-flow square block instead of a fixed full-bleed background
+         layer sitting behind everything. Bleeds past body's own left/
+         right frame padding (frames.css) so it reaches the true screen
+         edges instead of sitting in a gutter -- no shadow to strip here
+         since, unlike anahane/kahvehane, this page's frameless rule
+         above already zeroes out main's shadow and .map-panel was never
+         one of frames.css's shadowed panels to begin with. Height is a
+         definite 100vw rather than aspect-ratio: main's row track in
+         kahvehane's CSS Grid turned out to size unreliably from an
+         aspect-ratio child, and while this page uses flexbox (which
+         doesn't have that specific failure mode), 100vw keeps the same
+         square deterministically either way, with one fewer thing that
+         could behave differently across browsers. */
+      .map-panel {
+        position: relative;
+        inset: auto;
+        width: 100%;
+        height: 100vw;
+        z-index: auto;
+        overflow: hidden;
+        margin-left: calc(-1 * var(--frame-pad, 10px));
+        margin-right: calc(-1 * var(--frame-pad, 10px));
+        flex-shrink: 0;
+      }
       .map-label {
+        position: absolute;
+        bottom: 8px;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
         font-size: 11px;
         letter-spacing: 1px;
         text-align: center;
-        bottom: 12px;
       }
 
       /* col-left holds profile + signout; render as a normal vertical block
@@ -1966,16 +2056,28 @@
         display: flex;
         flex-direction: column;
         padding: 0;
+        /* Same reasoning as .col-right's flex-shrink:0 below -- avoids
+           body (a definite-height flex column) silently compressing
+           this below its content height. */
+        flex-shrink: 0;
       }
       .col-left .nb-highlight { display: none; }
 
-      /* Shelves area — fills remaining viewport height, internal scroll if needed */
+      /* Shelves area — sits below the map now instead of filling the
+         remaining viewport, so it grows with its own content (6 shelves
+         = 3 left / 3 right) instead of scrolling internally. Column
+         flow (not row) so the buttons fill top-to-bottom on the left
+         before starting the right column, matching Hane/Kahvehane's
+         two-column pattern below the map. */
       .shelves {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-auto-flow: column;
+        grid-template-rows: repeat(3, auto);
+        grid-auto-columns: 1fr;
         padding: 12px;
         gap: 8px;
-        overflow-y: auto;
-        flex: 1;
-        min-height: 0;
+        overflow: visible;
       }
       /* Reading area takes over full middle space when a shelf is opened */
       .reading-area {
@@ -2020,16 +2122,35 @@
       .composer-submit { padding: 7px 14px; font-size: 0.68rem; }
       .loading { padding: 14px; font-size: 12px; }
 
-      /* Right column hosts the shelves grid; flexes into remaining viewport height */
+      /* Right column hosts the shelves grid, now a normal in-flow block
+         below the map instead of filling the remaining viewport height. */
       .col-right {
         border: none;
         border-top: 2px solid var(--hairline);
-        background: var(--paper-card);
         display: flex;
         flex-direction: column;
-        flex: 1;
-        min-height: 0;
-        overflow: hidden;
+        overflow: visible;
+        /* body has a definite height (100dvh) and is itself a flex
+           column; without this, the default flex-shrink:1 would
+           compress .col-right (and the .shelves grid inside it) to fit
+           whatever space is left instead of taking its natural content
+           height and letting body scroll to the rest -- silently
+           clipping the bottom row of shelves with no scrollbar to
+           reach it. */
+        flex-shrink: 0;
+      }
+      /* The desktop rule near the top of this file (body .col-left/
+         .col-right) sets background:none!important so these read as
+         frameless text floating on the always-visible map behind them.
+         On mobile the map isn't behind this row anymore (it's the block
+         above), so "none" was showing body's own raw page-canvas color
+         instead -- a visible mismatch right under the map's #f7f7f7.
+         Matches the desktop rule's body-qualified specificity so it
+         actually wins; also covers .col-left for the (rarer) viewing-
+         another-profile case. */
+      body .col-left,
+      body .col-right {
+        background: #f7f7f7 !important;
       }
       .library-card { padding: 14px 16px; }
       .library-card .avatar { width: 48px; height: 48px; font-size: 1.2rem; border-width: 2px; }
