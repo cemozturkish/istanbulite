@@ -2211,7 +2211,13 @@ async function markPlayedGames(userId) {
 // the rows inside it too would look like the content arriving twice.
 const CARD_SWAP_MS = 300;
 const CARD_STAGGER_MS = 160;
-function animateFeedSwap(container, direction, buildFn, leadingEls = []) {
+// `instant`: rebuilds in place with no leave/enter animation at all (and
+// no entrance cascade for leadingEls either) -- used for map neighborhood
+// clicks, where the slide-out/in read as the comments/scoreboard (and the
+// always-static game buttons above them) leaving and re-entering the
+// screen instead of just updating.
+function animateFeedSwap(container, direction, buildFn, leadingEls = [], instant = false) {
+  if (instant) { buildFn(); return; }
   const suppress = window.__istSuppressFirstCardAnim && window.__istSuppressFirstCardAnim[direction];
   if (suppress) window.__istSuppressFirstCardAnim[direction] = false;
   const enterClass = direction === 'left' ? 'card-entering-left' : 'card-entering-right';
@@ -2292,7 +2298,7 @@ function clearWeekProgress(el) {
   el.dataset.mode = '';
 }
 
-async function loadScoreboard(neighborhoodFilter = null, gameFilter = null) {
+async function loadScoreboard(neighborhoodFilter = null, gameFilter = null, instant = false) {
   const listEl = document.getElementById('scoreboard-list');
   if (!listEl) return;
   const titleEl = document.getElementById('scoreboard-title');
@@ -2480,8 +2486,12 @@ mapNeighborhoods.forEach(nb => {
     activeMapNeighborhood = nbId;
     selectedNeighborhood = (isAdmin || nbId === homeNeighborhood) ? nbId : homeNeighborhood;
     updateSubmitFormVisibility();
-    loadPosts(nbId);
-    loadScoreboard(nbId);
+    // instant: a map click filters the existing feed/scoreboard to this
+    // district -- it should update in place, not slide out and back in
+    // (which also replays the game buttons' own entrance animation even
+    // though they never change).
+    loadPosts(nbId, true);
+    loadScoreboard(nbId, null, true);
   });
   nb.addEventListener('mouseenter', () => {
     const name = nb.getAttribute('data-name') || nb.id;
@@ -2507,8 +2517,8 @@ document.querySelector('.map-panel').addEventListener('click', (e) => {
     activeMapNeighborhood = null;
     selectedNeighborhood = homeNeighborhood;
     updateSubmitFormVisibility();
-    loadPosts();
-    loadScoreboard();
+    loadPosts(null, true);
+    loadScoreboard(null, null, true);
   }
 });
 
@@ -2518,7 +2528,7 @@ document.querySelector('.map-panel').addEventListener('click', (e) => {
 const PAGE_SIZE = 20;
 let feedState = { filter: null, offset: 0, done: false, currentUserId: null };
 
-async function loadPosts(neighborhoodFilter = null) {
+async function loadPosts(neighborhoodFilter = null, instant = false) {
   feedState = { filter: neighborhoodFilter, offset: 0, done: false, currentUserId: feedState.currentUserId };
   const postsEl = document.getElementById('discussion-posts');
 
@@ -2541,7 +2551,7 @@ async function loadPosts(neighborhoodFilter = null) {
     feedState.offset = rows.length;
     feedState.done = rows.length < PAGE_SIZE;
     renderLoadMore();
-  });
+  }, [], instant);
 }
 
 // Posts older than this disappear from the feed.
