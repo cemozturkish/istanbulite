@@ -784,26 +784,20 @@
         grid-template-columns: 1fr auto;
         /* Row 1 (the map) gets an explicit, definite track size instead
            of "auto": with one auto-width column (games) and one 1fr
-           column (comments) below it, and body's content taller than
-           the viewport, plain "auto auto" rows didn't size to their own
-           content -- they got compressed to fit body's definite height
-           (each row roughly halved, clipping the map's bottom edge).
-           main bleeds to the true screen edges (see its negative
-           margins below), so its rendered width is always 100vw --
-           sizing row 1 to 100vw directly gives the same square,
-           deterministically. Row 2 uses minmax(min-content, 1fr) rather
-           than plain min-content for the same clipping reason (a bare
-           "auto" was still getting compressed even once row 1 was
-           fixed) *and* so it stretches to fill any leftover space down
-           to the tab bar on a short comments/games day, instead of
-           leaving a dead gap below them -- the 1fr only ever grows the
-           track, min-content still guarantees it never shrinks below
-           its tallest column's real content. */
-        grid-template-rows: 100vw minmax(min-content, 1fr);
+           column (comments) below it, plain "auto auto" rows didn't
+           size to their own content -- they got compressed to fit
+           body's definite height (each row roughly halved, clipping
+           the map's bottom edge). main bleeds to the true screen edges
+           (see its negative margins below), so its rendered width is
+           always 100vw -- sizing row 1 to 100vw directly gives the same
+           square, deterministically. Row 2 is a plain 1fr: the page
+           itself doesn't scroll (see overflow below), so row 2 is
+           exactly the leftover space and no more -- content that
+           doesn't fit scrolls inside .discussion-posts instead of
+           growing this row or the page. */
+        grid-template-rows: 100vw 1fr;
         align-content: start;
-        overflow-y: auto;
-        overflow-x: hidden;
-        -webkit-overflow-scrolling: touch;
+        overflow: hidden;
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
            the map -- a different color from the map's own #f7f7f7,
@@ -922,14 +916,11 @@
         letter-spacing: 1px;
       }
 
-      /* Comments: normal in-flow column below the map, to the left.
-         No min-height:0 on .col-left itself -- that was needed for the
-         old fixed-height flex column (to let it shrink and scroll
-         internally); on this grid item it would zero out this column's
-         contribution to row 2's min-content sizing and clip the comment
-         feed. flex (not block) so .discussion-section below can grow to
-         fill row 2's now-stretchy height (minmax(min-content,1fr) on
-         body) instead of leaving blank space under the composer. */
+      /* Comments: normal in-flow column below the map, to the left --
+         flex (not block) so .discussion-section below can stretch to
+         exactly fill row 2's height (a plain 1fr, see body above),
+         which is what lets its own .discussion-posts scroll internally
+         within a fixed-size column instead of growing the page. */
       .col-left {
         grid-column: 1;
         grid-row: 2;
@@ -960,10 +951,9 @@
          on mobile — the desktop-only #library-card would just take up
          space above the discussion feed. */
       #library-card { display: none; }
-      /* Grows to fill .col-left's stretched height; min-height:0 is safe
-         here (unlike on .col-left itself) since it only affects this
-         nested flex item's own shrink behavior, not .col-left's
-         contribution to the outer grid row's min-content sizing. */
+      /* Fills .col-left's height exactly; min-height:0 lets it (and,
+         in turn, .discussion-posts below) shrink to fit rather than
+         overflowing the fixed column. */
       .discussion-section {
         display: flex;
         flex-direction: column;
@@ -976,9 +966,15 @@
         font-size: 9px;
         letter-spacing: 1.2px;
       }
+      /* Scrolls internally instead of growing .discussion-section past
+         its allotted (fixed, non-scrolling-page) height -- flex:1 lets
+         it take exactly the space left after the label and composer. */
       .discussion-posts {
         padding: 6px 10px;
-        overflow: visible;
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
       }
       .post {
         padding: 10px 12px;
@@ -999,13 +995,10 @@
         padding: 8px 10px 12px;
         border-top: 1px solid var(--rule);
         background: var(--paper);
-        /* Pinned to the bottom of .discussion-section (a flex column
-           that now fills the column's stretched height) instead of
-           sitting right after the last post -- any leftover space
-           collects between the posts and the composer, not below
-           everything, so the composer always sits at the same spot
-           near the tab bar instead of drifting depending on post count. */
-        margin-top: auto;
+        /* Stays fixed at the bottom of the column, right after
+           .discussion-posts's flex:1 -- that's what takes up the
+           leftover space (and scrolls internally if there's too much
+           to fit), not this. */
         flex-shrink: 0;
       }
       .submit-form-header {
@@ -1026,11 +1019,9 @@
       }
 
       /* Games: normal in-flow column below the map, to the right --
-         short rectangular tiles (fixed height, not flex-stretched to
-         fill a clipped column) stacked with a gap. No min-height:0 on
-         .col-right itself, same reasoning as .col-left above. flex (not
-         block) so .games-section below can grow to fill row 2's now-
-         stretchy height instead of leaving blank space under the tiles. */
+         short rectangular tiles stacked with a gap. flex (not block)
+         so .games-section below sizes within the column's fixed
+         (non-scrolling-page) height instead of overflowing it. */
       .col-right {
         grid-column: 2;
         grid-row: 2;
@@ -1041,9 +1032,6 @@
         flex-direction: column;
         width: auto;
       }
-      /* min-height:0 is safe here for the same reason as
-         .discussion-section above -- nested flex item, not the grid
-         item itself. */
       .games-section {
         display: flex;
         flex-direction: column;
@@ -1051,53 +1039,28 @@
         min-height: 0;
         overflow: visible;
       }
-      /* justify-content:space-between spreads the leftover height
-         between the game tiles and the scoreboard instead of leaving
-         it all stranded below the scoreboard -- so the scoreboard (or,
-         when it's empty, the tiles themselves) reaches down toward the
-         tab bar rather than sitting top-packed with dead space under it. */
+      /* Scrolls internally (rather than growing the page) on the rare
+         screen too short for even the 3 short tiles to fit. */
       .games-section-inner {
         padding: 8px;
         gap: 8px;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
         flex: 1;
         min-height: 0;
-        overflow: visible;
+        overflow-y: auto;
       }
       /* Just the "Günün Oyunları" heading above the game tiles -- not
          .games-section h2 generally, which was also catching (and
          hiding) the scoreboard's own h2 below. */
       .game-picker h2 { display: none; }
-      /* Weekly scoreboard, shown below the game tiles -- fills the gap
-         that otherwise sat empty under the games column whenever the
-         comments column ran taller (its post composer makes it the
-         taller of the two most of the time). Countdown/week-progress
-         stay hidden: 7 day-squares don't fit this narrow a column. */
-      .scoreboard {
-        display: block;
-        margin-top: 8px;
-      }
-      .scoreboard h2 {
-        font-size: 10px;
-        padding: 6px 8px;
-        margin-bottom: 6px;
-        letter-spacing: 1px;
-      }
-      .scoreboard-countdown,
-      .week-progress {
-        display: none;
-      }
-      .scoreboard-list { gap: 4px; }
-      .scoreboard-item {
-        padding: 5px 6px;
-        gap: 4px;
-        font-size: 10px;
-      }
-      .scoreboard-rank { font-size: 10px; min-width: 12px; }
-      .scoreboard-score { font-size: 11px; min-width: 16px; }
-      .scoreboard-empty { font-size: 9px; padding: 8px 4px; }
+      /* Hidden on mobile -- stays part of the games section in markup
+         (loadScoreboard() still runs, keeping it ready for a game
+         context), it just isn't shown on the main tile view here;
+         there isn't room for it alongside the tiles without either
+         scrolling the page or shrinking the tiles, neither of which is
+         wanted. */
+      .scoreboard { display: none; }
       .game-picker { gap: 8px; }
       /* Short rectangles instead of squares -- keeps the games column
          from towering over the comments column, which was letting the
