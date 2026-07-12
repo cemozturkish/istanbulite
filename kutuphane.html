@@ -636,6 +636,15 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    .map-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
     /* ── Library shelf (left column) ── */
     .library-shelf {
       padding: 16px 0;
@@ -2544,7 +2553,28 @@
        see the .reading-area vs .reader background split below for how the
        map stays visible behind shelves but gets covered once reading. -->
   <section class="map-panel">
-    <img class="map-photo" src="assets/turkey-map.png" alt="">
+    <!-- Mobile gets a resized/quantized copy (1400px wide, ~97KB) instead
+         of the 5046px/1.5MB desktop source -- the browser picks one before
+         fetching, so phones on slow connections never download the big
+         file. Swap point matches the page's 768px mobile breakpoint. -->
+    <picture>
+      <source media="(max-width: 768px)" srcset="assets/turkey-map-mobile.png">
+      <img class="map-photo" id="map-photo-img" src="assets/turkey-map.png" alt="">
+    </picture>
+
+    <!-- Spinner shown until the map image above finishes loading -- without
+         it the empty .map-panel background (matched to the map's own
+         sea color) gave no sign anything was still happening. -->
+    <div class="map-loading" id="map-loading"><span class="spinner"></span></div>
+    <script>
+      (function() {
+        var img = document.getElementById('map-photo-img');
+        var loading = document.getElementById('map-loading');
+        if (img.complete) { loading.remove(); return; }
+        img.addEventListener('load', function() { loading.remove(); });
+        img.addEventListener('error', function() { loading.remove(); });
+      })();
+    </script>
 
     <!-- TEST: Kütüphane now shows the Turkey map background while the
          neighborhood hit-regions below are unchanged (still traced against
