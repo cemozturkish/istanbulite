@@ -1,13 +1,15 @@
 -- =====================================================================
--- 2-option polls on breaking_news items. Admin sets both option labels
--- when posting (or leaves both blank for no poll). One vote per user,
--- locked once cast (no changing/removing a vote). Votes are readable by
--- all authenticated users so result bars can be computed client-side.
+-- 2-option polls on breaking_news items. Admin sets a question and both
+-- option labels when posting (or leaves all three blank for no poll).
+-- One vote per user, locked once cast (no changing/removing a vote).
+-- Votes are readable by all authenticated users so result bars can be
+-- computed client-side.
 --
 -- Run in Supabase SQL editor. Idempotent.
 -- =====================================================================
 
 alter table public.breaking_news
+  add column if not exists poll_question text,
   add column if not exists poll_option_a text,
   add column if not exists poll_option_b text;
 

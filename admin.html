@@ -860,8 +860,9 @@
         Picking a neighborhood also pulses it on the map.
       </p>
 
-      <label>Poll (optional — fill both or leave both blank)</label>
-      <input type="text" id="n-poll-a" placeholder="Option A..."/>
+      <label>Poll (optional — fill all three or leave all blank)</label>
+      <input type="text" id="n-poll-q" placeholder="Question..."/>
+      <input type="text" id="n-poll-a" placeholder="Option A..." style="margin-top:8px;"/>
       <input type="text" id="n-poll-b" placeholder="Option B..." style="margin-top:8px;"/>
 
       <div class="btn-row">
@@ -1879,13 +1880,14 @@ async function loadBreakingNews() {
       </div>
     `).join('');
     let pollHtml = '';
-    if (n.poll_option_a && n.poll_option_b) {
+    if (n.poll_question && n.poll_option_a && n.poll_option_b) {
       const votes = n.breaking_news_poll_votes || [];
       const votesA = votes.filter(v => v.option === 1).length;
       const votesB = votes.filter(v => v.option === 2).length;
       pollHtml = `
         <div class="sources-block">
           <div class="sources-label">Anket (${votesA + votesB} oy)</div>
+          <div class="src-row"><div class="src-info"><strong>${escapeHtml(n.poll_question)}</strong></div></div>
           <div class="src-row"><div class="src-info">${escapeHtml(n.poll_option_a)} — ${votesA}</div></div>
           <div class="src-row"><div class="src-info">${escapeHtml(n.poll_option_b)} — ${votesB}</div></div>
         </div>`;
@@ -1915,6 +1917,7 @@ async function loadBreakingNews() {
           <input type="text" class="ne-title" value="${escapeHtml(n.title)}"/>
           <textarea class="ne-body" rows="3">${escapeHtml(n.body || '')}</textarea>
           <select class="ne-category">${catOptions}</select>
+          <input type="text" class="ne-poll-q" placeholder="Poll question..." value="${escapeHtml(n.poll_question || '')}"/>
           <input type="text" class="ne-poll-a" placeholder="Poll option A..." value="${escapeHtml(n.poll_option_a || '')}"/>
           <input type="text" class="ne-poll-b" placeholder="Poll option B..." value="${escapeHtml(n.poll_option_b || '')}"/>
           <div class="btn-row">
@@ -1965,6 +1968,7 @@ async function saveNewsEdit(newsId, card) {
   const title = form.querySelector('.ne-title').value.trim();
   const body = form.querySelector('.ne-body').value.trim();
   const category = form.querySelector('.ne-category').value;
+  const pollQ = form.querySelector('.ne-poll-q').value.trim();
   const pollA = form.querySelector('.ne-poll-a').value.trim();
   const pollB = form.querySelector('.ne-poll-b').value.trim();
   const statusEl = form.querySelector('.ne-status');
@@ -1975,8 +1979,9 @@ async function saveNewsEdit(newsId, card) {
     statusEl.className = 'ne-status status-msg err';
     return;
   }
-  if (!!pollA !== !!pollB) {
-    statusEl.textContent = 'Anket için iki seçeneği de doldurun ya da ikisini de boş bırakın.';
+  const pollFieldsFilled = [pollQ, pollA, pollB].filter(Boolean).length;
+  if (pollFieldsFilled > 0 && pollFieldsFilled < 3) {
+    statusEl.textContent = 'Anket için soruyu ve iki seçeneği de doldurun ya da üçünü de boş bırakın.';
     statusEl.className = 'ne-status status-msg err';
     return;
   }
@@ -1989,7 +1994,7 @@ async function saveNewsEdit(newsId, card) {
   const { error } = await sb.from('breaking_news')
     .update({
       title, body: body || null, category, neighborhood,
-      poll_option_a: pollA || null, poll_option_b: pollB || null,
+      poll_question: pollQ || null, poll_option_a: pollA || null, poll_option_b: pollB || null,
     })
     .eq('id', newsId);
 
@@ -2070,6 +2075,7 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   const title = document.getElementById('n-title').value.trim();
   const body = document.getElementById('n-body').value.trim();
   const category = document.getElementById('n-category').value;
+  const pollQ = document.getElementById('n-poll-q').value.trim();
   const pollA = document.getElementById('n-poll-a').value.trim();
   const pollB = document.getElementById('n-poll-b').value.trim();
   // Pulse the map only when the category is an actual neighborhood id.
@@ -2085,8 +2091,9 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
     statusEl.className = 'status-msg err';
     return;
   }
-  if (!!pollA !== !!pollB) {
-    statusEl.textContent = 'Fill in both poll options, or leave both blank.';
+  const pollFieldsFilled = [pollQ, pollA, pollB].filter(Boolean).length;
+  if (pollFieldsFilled > 0 && pollFieldsFilled < 3) {
+    statusEl.textContent = 'Fill in the poll question and both options, or leave all three blank.';
     statusEl.className = 'status-msg err';
     return;
   }
@@ -2096,7 +2103,7 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
 
   const { error } = await sb.from('breaking_news').insert([{
     title, body: body || null, neighborhood, category,
-    poll_option_a: pollA || null, poll_option_b: pollB || null,
+    poll_question: pollQ || null, poll_option_a: pollA || null, poll_option_b: pollB || null,
   }]);
   btn.disabled = false;
   btn.textContent = 'Post Breaking News';
@@ -2108,7 +2115,7 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   }
   statusEl.textContent = 'Breaking news posted!';
   statusEl.className = 'status-msg ok';
-  ['n-title','n-body','n-poll-a','n-poll-b'].forEach(id => document.getElementById(id).value = '');
+  ['n-title','n-body','n-poll-q','n-poll-a','n-poll-b'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('n-category').value = 'turkiye';
   loadBreakingNews();
   setTimeout(() => { statusEl.textContent = ''; }, 3000);

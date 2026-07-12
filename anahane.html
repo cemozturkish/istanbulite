@@ -2393,7 +2393,7 @@ function buildNewsDetailHtml(n) {
       </div>
       <h3>${escapeText(n.title)}</h3>
       ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
-      ${n.poll_option_a && n.poll_option_b ? `<div class="poll-block" id="poll-${escapeText(n.id)}"></div>` : ''}
+      ${n.poll_question && n.poll_option_a && n.poll_option_b ? `<div class="poll-block" id="poll-${escapeText(n.id)}"></div>` : ''}
       <div class="sources">
         <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Kaynaklar</div>
         ${sourcesHtml}
@@ -2408,7 +2408,7 @@ function buildNewsDetailHtml(n) {
 // sheet's HTML is built synchronously but the vote/result state isn't
 // known until this query resolves.
 async function loadAndRenderPoll(n) {
-  if (!n.poll_option_a || !n.poll_option_b) return;
+  if (!n.poll_question || !n.poll_option_a || !n.poll_option_b) return;
   const container = document.getElementById('poll-' + n.id);
   if (!container) return;
   const { data, error } = await sb.from('breaking_news_poll_votes')
@@ -2428,7 +2428,7 @@ function renderPollInto(container, n, countA, countB, mine) {
   const total = countA + countB;
   if (mine == null) {
     container.innerHTML = `
-      <div class="poll-question">Anket</div>
+      <div class="poll-question">${escapeText(n.poll_question)}</div>
       <div class="poll-options">
         <button class="poll-opt-btn" type="button" data-option="1">${escapeText(n.poll_option_a)}</button>
         <button class="poll-opt-btn" type="button" data-option="2">${escapeText(n.poll_option_b)}</button>
@@ -2442,7 +2442,7 @@ function renderPollInto(container, n, countA, countB, mine) {
     const pctA = total ? Math.round((countA / total) * 100) : 0;
     const pctB = total ? 100 - pctA : 0;
     container.innerHTML = `
-      <div class="poll-question">Anket · ${total} oy</div>
+      <div class="poll-question">${escapeText(n.poll_question)} · ${total} oy</div>
       <div class="poll-result${mine === 1 ? ' poll-result-mine' : ''}">
         <div class="poll-result-label"><span>${escapeText(n.poll_option_a)}</span><span>${pctA}%</span></div>
         <div class="poll-bar-track"><div class="poll-bar-fill" style="width:${pctA}%"></div></div>
