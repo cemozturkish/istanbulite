@@ -146,6 +146,15 @@
       flex-direction: column;
       overflow-y: auto;
     }
+    /* Wraps everything in .col-left except #library-card, so the profile
+       card can be excluded from the column's slide/view-transition
+       animation below and stay visually still while switching pages. */
+    .col-left-slide {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
     .col-left .nb-highlight {
       padding: 12px 18px;
       font-family: 'Inter', sans-serif;
@@ -2372,13 +2381,13 @@
        left edge, right column toward the right edge — regardless of nav
        direction; nav stays ── */
     @media (min-width: 769px) {
-      .col-left, .col-right {
+      .col-left-slide, .col-right {
         transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: transform;
         backface-visibility: hidden;
       }
-      html.ist-entering-forward .col-left,
-      html.ist-entering-backward .col-left {
+      html.ist-entering-forward .col-left-slide,
+      html.ist-entering-backward .col-left-slide {
         transform: translateX(-100vw);
         transition: none;
       }
@@ -2387,8 +2396,8 @@
         transform: translateX(100vw);
         transition: none;
       }
-      body.ist-exiting-forward .col-left,
-      body.ist-exiting-backward .col-left {
+      body.ist-exiting-forward .col-left-slide,
+      body.ist-exiting-backward .col-left-slide {
         transform: translateX(-100vw);
       }
       body.ist-exiting-forward .col-right,
@@ -2418,7 +2427,7 @@
       mix-blend-mode: normal;
     }
 
-    .col-left { view-transition-name: ist-col-left; }
+    .col-left-slide { view-transition-name: ist-col-left; }
     .col-right { view-transition-name: ist-col-right; }
 
     /* Desktop: left column always exits/enters via the left edge, right
@@ -2695,10 +2704,12 @@
     <div class="library-card" id="library-card">
       <div class="loading"><span class="spinner"></span></div>
     </div>
-    <div class="profile-right">
-      <div class="loading"><span class="spinner"></span></div>
+    <div class="col-left-slide">
+      <div class="profile-right">
+        <div class="loading"><span class="spinner"></span></div>
+      </div>
+      <div class="profile-signout-wrap" id="profile-signout-wrap"></div>
     </div>
-    <div class="profile-signout-wrap" id="profile-signout-wrap"></div>
   </aside>
 
   <main>
@@ -2830,7 +2841,7 @@
     navigating = true;
 
     const fetches = hopIdxs.map(i => fetch(PAGES[i]).then(r => r.text()).catch(() => null));
-    const leftEl = document.querySelector('.col-left');
+    const leftEl = document.querySelector('.col-left-slide');
     const rightEl = document.querySelector('.col-right');
     if (!leftEl || !rightEl) { recordDir(dir); location.href = PAGES[target]; return; }
     const leftRect = leftEl.getBoundingClientRect();
@@ -2848,7 +2859,7 @@
     const fragments = htmls.map(html => {
       const doc = parser.parseFromString(html, 'text/html');
       return {
-        left: doc.querySelector('.col-left'),
+        left: doc.querySelector('.col-left-slide'),
         right: doc.querySelector('.col-right'),
       };
     });
