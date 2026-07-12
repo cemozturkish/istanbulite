@@ -620,6 +620,63 @@
       color: var(--card-fg-muted);
     }
 
+    /* Poll block — only ever rendered inside the detail sheet, filled
+       in async after openDetail() by loadAndRenderPoll(). */
+    .article .poll-block {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--card-border);
+    }
+    .article .poll-question {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ink-red);
+      margin-bottom: 8px;
+    }
+    .article .poll-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .article .poll-opt-btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.82rem;
+      text-align: left;
+      padding: 9px 12px;
+      background: var(--paper-card);
+      border: 1px solid var(--card-border-color);
+      color: var(--card-fg);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .article .poll-opt-btn:hover:not(:disabled) { background: #e8e8e8; }
+    .article .poll-opt-btn:disabled { cursor: default; opacity: 0.6; }
+    .article .poll-result { margin-bottom: 10px; }
+    .article .poll-result:last-child { margin-bottom: 0; }
+    .article .poll-result-label {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.78rem;
+      color: var(--card-fg);
+      margin-bottom: 4px;
+    }
+    .article .poll-result-mine .poll-result-label { font-weight: 700; }
+    .article .poll-bar-track {
+      height: 8px;
+      background: var(--card-border-soft);
+      overflow: hidden;
+    }
+    .article .poll-bar-fill {
+      height: 100%;
+      background: var(--ink-red);
+      transition: width 0.3s ease;
+    }
+    .article .poll-status.err { color: var(--ink-red); font-size: 0.72rem; margin-top: 6px; }
+
     /* ── RIGHT SIDEBAR (neighborhood info) ── */
     .sidebar-right {
       padding: 0;
@@ -2336,12 +2393,85 @@ function buildNewsDetailHtml(n) {
       </div>
       <h3>${escapeText(n.title)}</h3>
       ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
+      ${n.poll_option_a && n.poll_option_b ? `<div class="poll-block" id="poll-${escapeText(n.id)}"></div>` : ''}
       <div class="sources">
         <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Kaynaklar</div>
         ${sourcesHtml}
       </div>
     </div>
   `;
+}
+
+// Fetches this news item's poll votes and renders either the voting
+// buttons or the result bars into its #poll-<id> container inside the
+// currently-open detail sheet. Called after openDetail() since the
+// sheet's HTML is built synchronously but the vote/result state isn't
+// known until this query resolves.
+async function loadAndRenderPoll(n) {
+  if (!n.poll_option_a || !n.poll_option_b) return;
+  const container = document.getElementById('poll-' + n.id);
+  if (!container) return;
+  const { data, error } = await sb.from('breaking_news_poll_votes')
+    .select('user_id, option').eq('news_id', n.id);
+  if (error) { console.error('[poll]', error); return; }
+  const uid = window.__currentUser && window.__currentUser.id;
+  let countA = 0, countB = 0, mine = null;
+  (data || []).forEach(v => {
+    if (v.option === 1) countA++;
+    else if (v.option === 2) countB++;
+    if (uid && v.user_id === uid) mine = v.option;
+  });
+  renderPollInto(container, n, countA, countB, mine);
+}
+
+function renderPollInto(container, n, countA, countB, mine) {
+  const total = countA + countB;
+  if (mine == null) {
+    container.innerHTML = `
+      <div class="poll-question">Anket</div>
+      <div class="poll-options">
+        <button class="poll-opt-btn" type="button" data-option="1">${escapeText(n.poll_option_a)}</button>
+        <button class="poll-opt-btn" type="button" data-option="2">${escapeText(n.poll_option_b)}</button>
+      </div>
+      <div class="poll-status"></div>
+    `;
+    container.querySelectorAll('.poll-opt-btn').forEach(btn => {
+      btn.addEventListener('click', () => submitPollVote(n, parseInt(btn.dataset.option, 10), container));
+    });
+  } else {
+    const pctA = total ? Math.round((countA / total) * 100) : 0;
+    const pctB = total ? 100 - pctA : 0;
+    container.innerHTML = `
+      <div class="poll-question">Anket · ${total} oy</div>
+      <div class="poll-result${mine === 1 ? ' poll-result-mine' : ''}">
+        <div class="poll-result-label"><span>${escapeText(n.poll_option_a)}</span><span>${pctA}%</span></div>
+        <div class="poll-bar-track"><div class="poll-bar-fill" style="width:${pctA}%"></div></div>
+      </div>
+      <div class="poll-result${mine === 2 ? ' poll-result-mine' : ''}">
+        <div class="poll-result-label"><span>${escapeText(n.poll_option_b)}</span><span>${pctB}%</span></div>
+        <div class="poll-bar-track"><div class="poll-bar-fill" style="width:${pctB}%"></div></div>
+      </div>
+    `;
+  }
+}
+
+async function submitPollVote(n, option, container) {
+  const uid = window.__currentUser && window.__currentUser.id;
+  if (!uid) return;
+  container.querySelectorAll('.poll-opt-btn').forEach(b => b.disabled = true);
+  const { error } = await sb.from('breaking_news_poll_votes')
+    .insert([{ news_id: n.id, user_id: uid, option }]);
+  if (error) {
+    console.error('[poll vote]', error);
+    const statusEl = container.querySelector('.poll-status');
+    if (statusEl) {
+      statusEl.textContent = 'Oy kaydedilemedi, tekrar deneyin.';
+      statusEl.className = 'poll-status err';
+    }
+    container.querySelectorAll('.poll-opt-btn').forEach(b => b.disabled = false);
+    return;
+  }
+  loadAndRenderPoll(n);
 }
 
 function renderBreakingNewsFeedNow(feed, rows) {
@@ -2364,7 +2494,10 @@ function renderBreakingNewsFeedNow(feed, rows) {
   feed.querySelectorAll('.article.openable').forEach(el => {
     el.addEventListener('click', () => {
       const n = rowsById.get(el.dataset.newsId);
-      if (n) openDetail(buildNewsDetailHtml(n));
+      if (n) {
+        openDetail(buildNewsDetailHtml(n));
+        loadAndRenderPoll(n);
+      }
     });
   });
 
