@@ -2874,6 +2874,18 @@
     const rightStack = buildStack(rightEl, rightRect, 'right');
     document.body.appendChild(leftStack.wrap);
     document.body.appendChild(rightStack.wrap);
+    // These clones are only ever meant to be visible for the duration of this
+    // navigation. If left in the DOM they can survive into a bfcache snapshot
+    // of this document (or linger through a stalled cross-document view
+    // transition) and reappear — showing another page's column content — the
+    // next time this document is shown. pagehide fires after the VT snapshot
+    // is taken but before the document is torn down/cached, so removing here
+    // is invisible to the departing animation but keeps the clones out of
+    // whatever gets cached or rendered next.
+    window.addEventListener('pagehide', () => {
+      leftStack.wrap.remove();
+      rightStack.wrap.remove();
+    }, { once: true });
 
     leftEl.style.visibility = 'hidden';
     rightEl.style.visibility = 'hidden';
