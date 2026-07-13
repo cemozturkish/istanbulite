@@ -619,6 +619,29 @@
       font-style: italic;
       color: var(--card-fg-muted);
     }
+    .article .timeline {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--card-border);
+    }
+    .article .timeline-item {
+      padding: 6px 0;
+      border-bottom: 1px dotted var(--card-border-soft);
+    }
+    .article .timeline-item:last-child { border-bottom: none; }
+    .article .timeline-item .ago {
+      display: block;
+      margin-bottom: 2px;
+    }
+    .article .timeline-item strong {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 0.85rem;
+      color: var(--card-fg-heading);
+    }
+    .article .timeline-item p {
+      margin-top: 2px;
+      font-size: 0.78rem;
+    }
 
     /* Poll block — only ever rendered inside the detail sheet, filled
        in async after openDetail() by loadAndRenderPoll(). */
@@ -2260,10 +2283,13 @@ document.addEventListener('click', (e) => {
 });
 
 // ── Breaking News (from public.breaking_news) ──────────────────
-// Rows expire client-side 24h after created_at. A row with a
-// neighborhood pulses that district on the map until the *current
-// user* has clicked it; "seen" state is local to the browser
-// (localStorage key: ist-news-seen-<userId>).
+// Rows expire client-side 24h after updated_at (falls back to
+// created_at for stories with no timeline updates yet), so a story
+// that keeps getting "gelişme" updates stays in the feed instead of
+// silently vanishing at the 24h mark. A row with a neighborhood pulses
+// that district on the map until the *current user* has clicked it;
+// "seen" state is local to the browser (localStorage key:
+// ist-news-seen-<userId>).
 let flashingNews = {}; // nbId -> { id, title, body, url, created_at }
 let allBreakingNews = []; // cached for client-side filter
 let activeNewsFilter = 'all';
@@ -2408,15 +2434,31 @@ function buildNewsDetailHtml(n) {
         }</div>`;
       }).join('')
     : '<div class="sources-empty">Henüz kaynak eklenmedi.</div>';
+  const updates = (n.breaking_news_updates || [])
+    .slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const timelineHtml = updates.length ? `
+    <div class="timeline">
+      <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Zaman Akışı</div>
+      ${updates.map(u => `
+        <div class="timeline-item">
+          <div class="ago" data-iso="${escapeText(u.created_at)}">${escapeText(formatAgoTR(u.created_at))}</div>
+          <strong>${escapeText(u.title)}</strong>
+          ${u.body ? `<p>${escapeText(u.body)}</p>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+  const lastTouch = n.updated_at || n.created_at;
   return `
     <div class="article">
       <div class="meta-row">
         <div class="kicker">${escapeText(categoryLabelTR(n))}</div>
-        <div class="ago" data-iso="${escapeText(n.created_at)}">${escapeText(formatAgoTR(n.created_at))}</div>
+        <div class="ago" data-iso="${escapeText(lastTouch)}">${escapeText(formatAgoTR(lastTouch))}</div>
       </div>
       <h3>${escapeText(n.title)}</h3>
       ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
       ${n.poll_question && n.poll_option_a && n.poll_option_b ? `<div class="poll-block" id="poll-${escapeText(n.id)}"></div>` : ''}
+      ${timelineHtml}
       <div class="sources">
         <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Kaynaklar</div>
         ${sourcesHtml}
@@ -2543,16 +2585,19 @@ function renderBreakingNewsFeedNow(feed, rows) {
     return;
   }
   const rowsById = new Map(rows.map(n => [String(n.id), n]));
-  feed.innerHTML = rows.map(n => `
+  feed.innerHTML = rows.map(n => {
+    const lastTouch = n.updated_at || n.created_at;
+    return `
       <div class="article openable" data-news-id="${escapeText(n.id)}">
         <div class="meta-row">
           <div class="kicker">${escapeText(categoryLabelTR(n))}</div>
-          <div class="ago" data-iso="${escapeText(n.created_at)}">${escapeText(formatAgoTR(n.created_at))}</div>
+          <div class="ago" data-iso="${escapeText(lastTouch)}">${escapeText(formatAgoTR(lastTouch))}</div>
         </div>
         <h3>${escapeText(n.title)}</h3>
         ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
       </div>
-    `).join('');
+    `;
+  }).join('');
 
   feed.querySelectorAll('.article.openable').forEach(el => {
     el.addEventListener('click', () => {
@@ -2596,8 +2641,8 @@ document.querySelectorAll('.news-filter-btn').forEach(btn => {
 async function loadBreakingNews() {
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('breaking_news')
-    .select('*, breaking_news_sources(*)').gte('created_at', cutoff)
-    .order('created_at', { ascending: false });
+    .select('*, breaking_news_sources(*), breaking_news_updates(*)').gte('updated_at', cutoff)
+    .order('updated_at', { ascending: false });
   if (error) { console.error('[anahane breaking_news]', error); return; }
   allBreakingNews = data || [];
 

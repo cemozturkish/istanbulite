@@ -490,6 +490,39 @@
       .src-form { grid-template-columns: 1fr; }
     }
 
+    .upd-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--whisper);
+      font-size: 0.8rem;
+    }
+    .upd-row .upd-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .upd-row .upd-time { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
+    .upd-row .upd-body-text { color: var(--muted); font-style: italic; }
+    .upd-row .btn-del { padding: 0 8px; font-size: 0.9rem; line-height: 1; }
+    .upd-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 6px;
+      margin-top: 8px;
+      align-items: start;
+    }
+    .upd-form input, .upd-form textarea {
+      padding: 5px 8px;
+      font-size: 0.8rem;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      font-family: 'Inter', sans-serif;
+      resize: vertical;
+    }
+    .upd-form button { white-space: nowrap; padding: 6px 10px; font-size: 0.75rem; }
+    .upd-status { grid-column: 1 / -1; margin: 0; font-size: 0.75rem; }
+    @media (max-width: 600px) {
+      .upd-form { grid-template-columns: 1fr; }
+    }
+
     .news-edit-form {
       display: none;
       margin-top: 10px;
@@ -1856,8 +1889,9 @@ async function loadBreakingNews() {
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('breaking_news')
-    .select('*, breaking_news_sources(*), breaking_news_poll_votes(option)').gte('created_at', cutoff)
-    .order('created_at', { ascending: false });
+    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_poll_votes(option)')
+    .gte('updated_at', cutoff)
+    .order('updated_at', { ascending: false });
   if (error) { listEl.innerHTML = '<div class="empty-state">Error loading news.</div>'; return; }
   if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No active breaking news.</div>'; return; }
 
@@ -1865,8 +1899,20 @@ async function loadBreakingNews() {
   const catOptions = document.getElementById('n-category').innerHTML;
 
   listEl.innerHTML = data.map(n => {
-    const ago = formatAgo(n.created_at);
+    const ago = formatAgo(n.updated_at || n.created_at);
     const cat = n.category || n.neighborhood || 'turkiye';
+    const updates = (n.breaking_news_updates || [])
+      .slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const updatesHtml = updates.length ? updates.map(u => `
+      <div class="upd-row" data-upd-id="${u.id}">
+        <div class="upd-info">
+          <span class="upd-time">${formatAgo(u.created_at)}</span>
+          <strong>${escapeHtml(u.title)}</strong>
+          ${u.body ? `<span class="upd-body-text">${escapeHtml(u.body)}</span>` : ''}
+        </div>
+        <button class="btn-del" data-act="del-update" data-id="${u.id}">×</button>
+      </div>
+    `).join('') : '<div class="upd-empty" style="color:var(--muted);font-size:0.8rem;">Henüz gelişme eklenmedi.</div>';
     const sources = (n.breaking_news_sources || [])
       .slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     const sourcesHtml = sources.map(s => `
@@ -1898,6 +1944,16 @@ async function loadBreakingNews() {
         <h4>${escapeHtml(n.title)}</h4>
         ${n.body ? `<p>${escapeHtml(n.body)}</p>` : ''}
         ${pollHtml}
+        <div class="sources-block">
+          <div class="sources-label">Gelişmeler (${updates.length})</div>
+          ${updatesHtml}
+          <div class="upd-form">
+            <input type="text" class="upd-title" placeholder="Yeni başlık (haberin güncel hali)"/>
+            <textarea class="upd-body" rows="1" placeholder="Ek detay (opsiyonel)"></textarea>
+            <button class="btn btn-secondary" data-act="add-update" data-news-id="${n.id}">+ Gelişme Ekle</button>
+            <div class="upd-status status-msg"></div>
+          </div>
+        </div>
         <div class="sources-block">
           <div class="sources-label">Kaynaklar (${sources.length})</div>
           ${sourcesHtml}
@@ -1947,6 +2003,8 @@ document.getElementById('news-list').addEventListener('click', function(e) {
   if (act === 'del-news') deleteBreakingNews(btn.dataset.id);
   else if (act === 'del-src') deleteSource(btn.dataset.id);
   else if (act === 'add-src') addSource(btn);
+  else if (act === 'del-update') deleteNewsUpdate(btn.dataset.id);
+  else if (act === 'add-update') addNewsUpdate(btn);
   else if (act === 'edit-news') showNewsEditForm(card);
   else if (act === 'cancel-edit') hideNewsEditForm(card);
   else if (act === 'save-edit') saveNewsEdit(btn.dataset.id, card);
@@ -2056,6 +2114,97 @@ async function addSource(btn) {
 async function deleteSource(id) {
   if (!confirm('Bu kaynağı sil?')) return;
   const { error } = await sb.from('breaking_news_sources').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadBreakingNews();
+}
+
+// Adds a timeline entry ("gelişme") to a breaking news story: the new
+// headline/body become the story's current title/body (shown on the
+// card and map), while the previous state is preserved as a
+// breaking_news_updates row. Also bumps updated_at so an actively
+// developing story doesn't drop out of the 24h feed just because it's old.
+async function addNewsUpdate(btn) {
+  const card = btn.closest('.article-card');
+  const newsId = btn.dataset.newsId;
+  const titleEl = card.querySelector('.upd-title');
+  const bodyEl = card.querySelector('.upd-body');
+  const statusEl = card.querySelector('.upd-status');
+  const title = titleEl.value.trim();
+  const body = bodyEl.value.trim();
+
+  statusEl.textContent = '';
+  statusEl.className = 'upd-status status-msg';
+
+  if (!title) {
+    statusEl.textContent = 'Gelişme için bir başlık gerekli.';
+    statusEl.className = 'upd-status status-msg err';
+    return;
+  }
+
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  // First update on this story: snapshot its current headline into the
+  // timeline (at its original created_at) before overwriting it, so the
+  // original post isn't lost.
+  const { data: existing, error: existingErr } = await sb.from('breaking_news_updates')
+    .select('id').eq('news_id', newsId).limit(1);
+  if (existingErr) {
+    btn.disabled = false; btn.textContent = origText;
+    statusEl.textContent = existingErr.message;
+    statusEl.className = 'upd-status status-msg err';
+    return;
+  }
+  if (!existing.length) {
+    const { data: current, error: curErr } = await sb.from('breaking_news')
+      .select('title, body, created_at').eq('id', newsId).single();
+    if (curErr) {
+      btn.disabled = false; btn.textContent = origText;
+      statusEl.textContent = curErr.message;
+      statusEl.className = 'upd-status status-msg err';
+      return;
+    }
+    const { error: seedErr } = await sb.from('breaking_news_updates').insert([{
+      news_id: newsId, title: current.title, body: current.body, created_at: current.created_at,
+    }]);
+    if (seedErr) {
+      btn.disabled = false; btn.textContent = origText;
+      statusEl.textContent = seedErr.message;
+      statusEl.className = 'upd-status status-msg err';
+      return;
+    }
+  }
+
+  const { error } = await sb.from('breaking_news_updates')
+    .insert([{ news_id: newsId, title, body: body || null }]);
+  if (error) {
+    btn.disabled = false; btn.textContent = origText;
+    statusEl.textContent = error.message;
+    statusEl.className = 'upd-status status-msg err';
+    return;
+  }
+
+  const { error: updErr } = await sb.from('breaking_news')
+    .update({ title, body: body || null, updated_at: new Date().toISOString() })
+    .eq('id', newsId);
+  if (updErr) {
+    btn.disabled = false; btn.textContent = origText;
+    statusEl.textContent = updErr.message;
+    statusEl.className = 'upd-status status-msg err';
+    return;
+  }
+
+  titleEl.value = '';
+  bodyEl.value = '';
+  btn.textContent = '✓ Eklendi';
+  statusEl.textContent = '';
+  setTimeout(() => loadBreakingNews(), 500);
+}
+
+async function deleteNewsUpdate(id) {
+  if (!confirm('Bu gelişmeyi sil?')) return;
+  const { error } = await sb.from('breaking_news_updates').delete().eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   loadBreakingNews();
 }
