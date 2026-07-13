@@ -59,6 +59,16 @@
     + '<path d="M6 1.5a2.5 2.5 0 0 0-2.5 2.5V5.5h-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-.5-.5H8.5V4A2.5 2.5 0 0 0 6 1.5zm-1.5 4V4a1.5 1.5 0 1 1 3 0v1.5h-3z"/>'
     + '</svg></span>';
 
+  // Gear icon for the profile/settings toggle — icon-only so the button
+  // stays a small square regardless of the current language's label
+  // length, and sits inline next to the avatar/name instead of pushing
+  // onto its own line below them.
+  const GEAR_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    + '<circle cx="12" cy="12" r="3"></circle>'
+    + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>'
+    + '</svg>';
+
   function buildAvatarPicker(currentAvatarUrl, sozculCount, opts) {
     opts = opts || {};
     const optionClass = opts.optionClass || 'ist-avatar-option';
@@ -356,7 +366,7 @@
             <div class="ist-pc-name">${esc(displayName)}</div>
             <div class="ist-pc-meta">${esc(yasadigiDisplay)}</div>
           </div>
-          <button type="button" class="ist-pc-toggle" id="ist-pc-toggle">${esc(toggleLabel)}</button>
+          <button type="button" class="ist-pc-toggle" id="ist-pc-toggle" aria-label="${esc(toggleLabel)}" title="${esc(toggleLabel)}">${GEAR_SVG}</button>
         </div>
       </div>
     `;
@@ -813,8 +823,8 @@
             <div class="card-name">${esc(displayName)}</div>
             <div class="card-meta">${esc(yasadigiDisplay)}</div>
           </div>
+          <button type="button" class="edit-btn" id="lc-edit-btn" aria-label="${esc(t('profile.toggle'))}" title="${esc(t('profile.toggle'))}">${GEAR_SVG}</button>
         </div>
-        <button class="edit-btn" id="lc-edit-btn">${esc(t('profile.toggle'))}</button>
       `;
       document.getElementById('lc-edit-btn').addEventListener('click', () => {
         openProfileOverlay({
@@ -843,6 +853,7 @@
     closeProfileOverlay,
     AVATAR_OPTIONS,
     AVATAR_LOCK_SVG,
+    GEAR_SVG,
     buildAvatarPicker,
     lookupAvatarOption,
     lockedAvatarMessage,
