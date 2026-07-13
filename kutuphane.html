@@ -764,18 +764,19 @@
     }
     @media (max-width: 768px) {
       .reader-overlay-sheet {
-        /* Rises to cover only the area below the map instead of nearly
-           the full screen -- the map (and the profile card floating
-           over it, #ist-pc-mount, z-index: 20) stay visible above it
-           and never get covered by the sheet's z-index: 500. Top
-           matches where the map's own row ends (100vw, same square as
-           .map-panel's height above) plus a frame-pad gap; left/right
-           get the same gap so the map peeks through on 3 sides, like a
-           page rising from below -- flush at the bottom (see
-           frames.css's border-bottom-width: 0 for this class) so it
-           reads as continuing past the screen edge instead of stopping
-           short. */
-        top: calc(var(--frame-pad, 10px) + 100vw + var(--frame-pad, 10px));
+        /* Rises as high as it can -- right up under the profile card
+           floating over the map (#ist-pc-mount, z-index: 20), with the
+           same gap below the card as the sheet's own left/right gap,
+           rather than clearing the whole map. The card's height varies
+           with its content, so this top value is only a same-viewport
+           fallback (in case JS hasn't run yet) -- positionReaderSheet()
+           (near initReaderOverlay) sets the real, measured value inline
+           every time the sheet opens. Left/right get the frame-pad gap
+           so the map peeks through on 3 sides, like a page rising from
+           below -- flush at the bottom (see frames.css's
+           border-bottom-width: 0 for this class) so it reads as
+           continuing past the screen edge instead of stopping short. */
+        top: var(--frame-pad, 10px);
         left: var(--frame-pad, 10px);
         right: var(--frame-pad, 10px);
         bottom: 0;
@@ -3638,6 +3639,27 @@ function showChapterIntro(article, index, onStart) {
   document.body.appendChild(overlay);
 }
 
+// On mobile the sheet should rise right up under the profile card
+// floating over the map (#ist-pc-mount), with the same gap below the
+// card as the sheet's own left/right gap -- the card's height varies
+// with its content (name/neighborhood length), so that gap has to be
+// measured rather than hardcoded. No-ops (clears the inline override)
+// above the mobile breakpoint, where the sheet is centered/floating
+// and doesn't sit under the card at all.
+function positionReaderSheet() {
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!area) return;
+  if (!window.matchMedia('(max-width: 768px)').matches) { area.style.top = ''; return; }
+  const framePad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-pad')) || 10;
+  const pcMount = document.getElementById('ist-pc-mount');
+  const cardBottom = pcMount ? pcMount.getBoundingClientRect().bottom : 0;
+  area.style.top = `${Math.max(cardBottom, 0) + framePad}px`;
+}
+window.addEventListener('resize', () => {
+  const overlay = document.getElementById('reader-overlay');
+  if (overlay && overlay.classList.contains('open')) positionReaderSheet();
+});
+
 async function openShelfPath(shelfId) {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
@@ -3649,6 +3671,7 @@ async function openShelfPath(shelfId) {
   // fetch resolves, so this gets the same page-rising treatment as the
   // reader itself instead of appearing flat in the center column.
   area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  positionReaderSheet();
   overlay.hidden = false;
   requestAnimationFrame(() => overlay.classList.add('open'));
   _closeReaderOverlay = closeReaderOverlay;
@@ -3708,7 +3731,9 @@ function closeReaderOverlay() {
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
   overlay.classList.remove('open');
-  setTimeout(() => { overlay.hidden = true; area.innerHTML = ''; }, 400);
+  // Matches the sheet's own 0.55s transition (see .reader-overlay-sheet)
+  // so hiding doesn't cut the closing slide-down short.
+  setTimeout(() => { overlay.hidden = true; area.innerHTML = ''; }, 550);
   renderShelfButtons();
 }
 
@@ -3991,6 +4016,7 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
   }
 
   renderStep();
+  positionReaderSheet();
   overlay.hidden = false;
   requestAnimationFrame(() => overlay.classList.add('open'));
 
