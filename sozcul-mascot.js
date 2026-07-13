@@ -204,7 +204,10 @@
     if (old) old.remove();
     const root = document.createElement('div');
     root.id = 'sozcul-mascot-popup';
-    const src = mascot === 'cat' ? 'assets/mascot-cat-right.png' : 'assets/mascot-dog-right.png';
+    // TEMP: dog art isn't uploaded yet — use the cat PNG for dog mascots too
+    // so the popup doesn't show a broken image. Restore the dog branch once
+    // assets/mascot-dog-right.png exists.
+    const src = 'assets/mascot-cat-right.png';
     root.innerHTML = `
       <div class="szm-bubble">
         ${html}
