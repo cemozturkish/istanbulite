@@ -909,7 +909,12 @@
 
     <!-- RIGHT: Active News -->
     <div class="panel">
-      <div class="panel-title">Active Breaking News (last 24h)</div>
+      <div class="panel-title">Breaking News</div>
+      <div class="btn-row" style="margin-bottom:10px;">
+        <button class="btn btn-primary" id="news-view-recent">Son 24 Saat</button>
+        <button class="btn btn-secondary" id="news-view-all">Tümü</button>
+      </div>
+      <input type="text" id="news-search" placeholder="Başlıkta veya metinde ara..." style="margin-bottom:10px;"/>
       <div class="articles-list" id="news-list">
         <div class="empty-state"><span class="spinner"></span></div>
       </div>
@@ -1884,16 +1889,42 @@ function categoryLabel(cat) {
   return (NEIGHBORHOOD_NAMES[cat] || cat || 'GENERAL').toLocaleUpperCase('tr-TR');
 }
 
+// 'recent' mirrors the public 24h window readers see; 'all' drops the
+// cutoff so the admin can find and revive a story that already expired
+// out of the feed (e.g. to post a new "gelişme" on it).
+let newsViewMode = 'recent';
+let allAdminNews = [];
+
 async function loadBreakingNews() {
   const listEl = document.getElementById('news-list');
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await sb.from('breaking_news')
+  let query = sb.from('breaking_news')
     .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_poll_votes(option)')
-    .gte('updated_at', cutoff)
     .order('updated_at', { ascending: false });
+  if (newsViewMode === 'recent') {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    query = query.gte('updated_at', cutoff);
+  } else {
+    query = query.limit(300);
+  }
+  const { data, error } = await query;
   if (error) { listEl.innerHTML = '<div class="empty-state">Error loading news.</div>'; return; }
-  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No active breaking news.</div>'; return; }
+  allAdminNews = data || [];
+  renderNewsList();
+}
+
+function renderNewsList() {
+  const listEl = document.getElementById('news-list');
+  const q = document.getElementById('news-search').value.trim().toLocaleLowerCase('tr-TR');
+  const data = q
+    ? allAdminNews.filter(n =>
+        (n.title || '').toLocaleLowerCase('tr-TR').includes(q) ||
+        (n.body || '').toLocaleLowerCase('tr-TR').includes(q))
+    : allAdminNews;
+  if (!data.length) {
+    listEl.innerHTML = `<div class="empty-state">${q ? 'No matching news.' : 'No active breaking news.'}</div>`;
+    return;
+  }
 
   // Grab category options from the post form (already populated with neighborhoods).
   const catOptions = document.getElementById('n-category').innerHTML;
@@ -2215,8 +2246,26 @@ function formatAgo(iso) {
   if (mins < 1) return 'just now';
   if (mins < 60) return mins + ' min ago';
   const hrs = Math.floor(mins / 60);
-  return hrs + ' h ago';
+  if (hrs < 24) return hrs + ' h ago';
+  const days = Math.floor(hrs / 24);
+  return days + ' d ago';
 }
+
+document.getElementById('news-view-recent').addEventListener('click', () => {
+  if (newsViewMode === 'recent') return;
+  newsViewMode = 'recent';
+  document.getElementById('news-view-recent').className = 'btn btn-primary';
+  document.getElementById('news-view-all').className = 'btn btn-secondary';
+  loadBreakingNews();
+});
+document.getElementById('news-view-all').addEventListener('click', () => {
+  if (newsViewMode === 'all') return;
+  newsViewMode = 'all';
+  document.getElementById('news-view-all').className = 'btn btn-primary';
+  document.getElementById('news-view-recent').className = 'btn btn-secondary';
+  loadBreakingNews();
+});
+document.getElementById('news-search').addEventListener('input', renderNewsList);
 
 document.getElementById('n-submit-btn').addEventListener('click', async () => {
   const btn = document.getElementById('n-submit-btn');
