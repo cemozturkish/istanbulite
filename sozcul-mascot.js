@@ -137,10 +137,6 @@
       #sozcul-mascot-popup .szm-mascot {
         width: 84px;
         height: 84px;
-        background: var(--paper, #eddbd0);
-        border: 1px solid var(--rule, #b8a08a);
-        border-radius: 50%;
-        padding: 4px;
         flex-shrink: 0;
       }
       #sozcul-mascot-popup .szm-mascot img {
