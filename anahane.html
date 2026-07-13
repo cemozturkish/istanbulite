@@ -273,13 +273,17 @@
     }
 
     /* ── MAIN SITE ──
-       Desktop: the map is a fixed full-bleed background layer (z-index 0);
-       the top bar and both sidebars float above it as separate cards
-       (z-index 5/10). Mobile keeps the original grid layout untouched,
+       Desktop: a real CSS Grid (matches kahvehane/kutuphane's body grid)
+       -- 260px/1fr/260px columns, auto/1fr rows. The map is a fixed
+       full-bleed background layer that escapes the grid entirely
+       (z-index -1); the top nav and both sidebars are frameless grid
+       items floating over it. Mobile keeps its own stacked layout,
        redeclared wholesale inside its own @media block below. */
     #main-site {
       pointer-events: none;
-      position: relative;
+      display: grid;
+      grid-template-columns: 260px 1fr 260px;
+      grid-template-rows: auto 1fr;
       height: 100vh;
       overflow: hidden;
     }
@@ -301,13 +305,12 @@
     }
 
     .section-rule {
-      position: fixed;
-      top: 24px;
-      left: 0;
-      right: 0;
-      z-index: 10;
+      grid-column: 1 / -1;
+      grid-row: 1;
       display: flex;
       justify-content: center;
+      align-items: center;
+      padding: 14px 28px 10px 28px;
     }
 
     header {
@@ -335,12 +338,8 @@
     nav a.active { color: var(--ink); font-weight: 700; }
 
     .col-left {
-      position: fixed;
-      top: 24px;
-      left: 0;
-      bottom: 16px;
-      width: 260px;
-      z-index: 5;
+      grid-column: 1;
+      grid-row: 1 / -1;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -369,32 +368,36 @@
       flex-shrink: 0;
     }
     .col-right {
-      position: fixed;
-      top: 24px;
-      right: 0;
-      bottom: 16px;
-      width: 260px;
-      z-index: 5;
+      grid-column: 3;
+      grid-row: 1 / -1;
       display: flex;
       flex-direction: column;
       overflow-y: auto;
     }
 
     main {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      z-index: 0;
+      grid-column: 2;
+      grid-row: 2;
       display: block;
       overflow: hidden;
+      /* main's only child is .map-panel, which escapes to position:fixed
+         with a negative z-index (see below) — meaning main's own
+         (invisible but still hit-testable) box sits in front of it in
+         the root stacking context and was silently swallowing every
+         click meant for the map. Nothing else lives in main, so letting
+         clicks pass straight through it is safe; .map-panel re-enables
+         pointer-events for itself and its children below. */
+      pointer-events: none;
     }
 
-    /* ── MAP PANEL: fixed full-bleed background ── */
+    /* ── MAP PANEL: fixed full-bleed background (matches kahvehane/kutuphane) ──
+       position:fixed escapes the grid entirely, so this covers the whole
+       viewport regardless of which grid cell it's a DOM child of. */
     .map-panel {
-      position: absolute;
+      position: fixed;
       inset: 0;
+      pointer-events: auto;
+      z-index: -1;
       padding: 0;
       overflow: hidden;
       /* Matches the map artwork's own sea/background gray (#f7f7f7); the
@@ -931,6 +934,7 @@
          bottom regardless of where this sits. Taken out of grid flow so
          it doesn't claim a row of its own. */
       .section-rule {
+        grid-area: auto;
         position: absolute;
         top: 0;
         left: 0;
