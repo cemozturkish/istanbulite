@@ -1,8 +1,10 @@
 -- =====================================================================
 -- breaking_news — short-lived banner items shown on Anahane.
 -- Admin posts; auto-hidden after 24h (filtered client-side by
--- created_at > now() - interval '24 hours'). If neighborhood is set,
--- that district pulses on the map until the viewer clicks it.
+-- updated_at > now() - interval '24 hours' — see breaking_news_updates.sql
+-- for the updated_at column and the update/timeline mechanism that keeps
+-- a developing story alive past its original post time). If neighborhood
+-- is set, that district pulses on the map until the viewer clicks it.
 --
 -- Run in Supabase SQL editor. Idempotent.
 -- =====================================================================
