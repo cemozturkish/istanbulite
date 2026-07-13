@@ -395,31 +395,6 @@
       margin-top: 2px;
     }
 
-    .btn-signout {
-      padding: 8px 20px;
-      background: var(--accent);
-      color: var(--paper);
-      border: none;
-      font-family: 'Inter', sans-serif;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      cursor: pointer;
-      margin-top: 8px;
-    }
-    .btn-signout:hover { background: var(--accent-2); }
-
-    /* Signout wrapper (bottom of right column on desktop, below everything on mobile) */
-    .profile-signout-wrap {
-      padding: 8px 12px;
-      display: flex;
-      justify-content: center;
-      margin-top: auto;
-      flex-shrink: 0;
-    }
-    .profile-signout-wrap .btn-signout { margin-top: 0; padding: 6px 16px; font-size: 0.65rem; }
-
     /* ── Center: profile board ── */
     .profile-center {
       display: flex;
@@ -583,48 +558,6 @@
       text-align: right;
       word-break: break-word;
       min-width: 0;
-    }
-
-    .scores-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 5px;
-    }
-
-    .score-card {
-      padding: 6px 4px;
-      text-align: center;
-      margin-bottom: 0;
-      min-width: 0;
-    }
-
-    .score-card .game-name {
-      font-size: 0.52rem;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .score-card .score-value {
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: var(--ink);
-      line-height: 1;
-    }
-
-    .score-card .score-detail {
-      font-size: 0.55rem;
-      color: var(--muted);
-      margin-top: 2px;
-      font-style: italic;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .loading {
@@ -1774,20 +1707,6 @@
       letter-spacing: 1px;
       text-transform: uppercase;
     }
-    .copy-kefil-btn {
-      font-size: 0.6rem;
-      padding: 2px 7px;
-      background: transparent;
-      color: var(--muted);
-      border: 1px solid var(--muted);
-      cursor: pointer;
-      font-family: 'Inter', sans-serif;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      vertical-align: middle;
-      margin-left: 6px;
-    }
-    .copy-kefil-btn:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
     /* .card-top/.edit-btn are the only states .library-card ever renders
        now — editing/settings/badges live in the shared profile-overlay
        bottom sheet (IstProfileCard.openProfileOverlay) instead. .edit-btn
@@ -2112,32 +2031,15 @@
         display: flex;
         flex-direction: column;
       }
-      .profile-signout-wrap {
-        padding: 14px 16px 20px 16px;
-        display: flex;
-        justify-content: center;
-      }
-      .profile-signout-wrap .btn-signout {
-        width: 100%;
-        max-width: 320px;
-        padding: 11px 16px;
-        font-size: 12px;
-        border-radius: 4px;
-      }
       .right-section-title { font-size: 10px; margin-bottom: 6px; padding-bottom: 3px; letter-spacing: 1.2px; }
       .info-row { margin-bottom: 5px; gap: 2px; }
       .info-label { font-size: 9px; letter-spacing: 1px; }
       .info-value { font-size: 12px; }
-      .score-card { padding: 8px 10px; margin-bottom: 6px; border-radius: 4px; }
-      .score-card .game-name { font-size: 9px; margin-bottom: 2px; letter-spacing: 1px; }
-      .score-card .score-value { font-size: 16px; }
-      .score-card .score-detail { font-size: 10px; margin-top: 1px; }
 
       /* Existing library-card and HESAP column are replaced by the shared
          #ist-pc-mount widget on mobile. When viewing another user's profile
          (?user=ID), keep the legacy layout instead. */
       body:not(.ist-viewing-other) #mobile-top,
-      body:not(.ist-viewing-other) .profile-signout-wrap,
       body:not(.ist-viewing-other) .col-left { display: none !important; }
       body.ist-viewing-other #ist-pc-mount { display: none !important; }
 
@@ -2570,10 +2472,7 @@
       <div class="loading"><span class="spinner"></span></div>
     </div>
     <div class="col-left-slide">
-      <div class="profile-right">
-        <div class="loading"><span class="spinner"></span></div>
-      </div>
-      <div class="profile-signout-wrap" id="profile-signout-wrap"></div>
+      <div class="profile-right"></div>
     </div>
   </aside>
 
@@ -4122,102 +4021,6 @@ const STICKERS = [
   { src: 'assets/kizkulesisticker.png', label: 'Kız Kulesi', district: 'uskudar' },
 ];
 
-// Read game scores from Supabase's game_results table, aggregating per game.
-// Falls back to localStorage if the query fails (table missing, offline, etc.).
-async function getGameScores(userId) {
-  // Compute per-game current streak from the set of winning dates: count back
-  // from today (or yesterday, if today wasn't won) over consecutive days.
-  function currentStreakFor(winDates) {
-    function seedForOffset(off) {
-      const now = new Date();
-      const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-      ist.setDate(ist.getDate() - off);
-      return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
-    }
-    let streak = 0;
-    let offset = winDates.has(seedForOffset(0)) ? 0 : 1;
-    while (winDates.has(seedForOffset(offset))) { streak++; offset++; }
-    return streak;
-  }
-  try {
-    const { data, error } = await sb
-      .from('game_results')
-      .select('game, won, date')
-      .eq('user_id', userId);
-    if (error) throw error;
-    // Dedupe per (game, date): a date counts as "played" if any row exists,
-    // and as "won" if any row has won=true. (We insert a "started" row on
-    // first interaction with attempts=0, won=false.)
-    const byGameDate = {};
-    (data || []).forEach(r => {
-      const key = r.game + '|' + r.date;
-      if (!byGameDate[key]) byGameDate[key] = { game: r.game, date: r.date, won: false };
-      if (r.won) byGameDate[key].won = true;
-    });
-    const agg = {
-      bulmacaPlayed: 0, bulmacaWins: 0,
-      sozcelPlayed: 0, sozcelWins: 0,
-      tumcelPlayed: 0, tumcelWins: 0,
-    };
-    const winDatesByGame = { bulmaca: new Set(), sozcel: new Set(), tumcel: new Set() };
-    Object.values(byGameDate).forEach(entry => {
-      if (entry.game === 'bulmaca') {
-        agg.bulmacaPlayed++;
-        if (entry.won) { agg.bulmacaWins++; winDatesByGame.bulmaca.add(entry.date); }
-      } else if (entry.game === 'sozcel') {
-        agg.sozcelPlayed++;
-        if (entry.won) { agg.sozcelWins++; winDatesByGame.sozcel.add(entry.date); }
-      } else if (entry.game === 'tumcel') {
-        agg.tumcelPlayed++;
-        if (entry.won) { agg.tumcelWins++; winDatesByGame.tumcel.add(entry.date); }
-      }
-    });
-    agg.sozcelStreak = currentStreakFor(winDatesByGame.sozcel);
-    agg.bulmacaStreak = currentStreakFor(winDatesByGame.bulmaca);
-    agg.tumcelStreak = currentStreakFor(winDatesByGame.tumcel);
-    return agg;
-  } catch (e) {
-    return {
-      bulmacaWins: 0, bulmacaPlayed: 0, bulmacaStreak: 0,
-      sozcelWins: 0, sozcelPlayed: 0, sozcelStreak: 0,
-      tumcelWins: 0, tumcelPlayed: 0, tumcelStreak: 0,
-    };
-  }
-}
-
-// Render the Oyun Skorları section. Called once synchronously with zeroed
-// scores (so the layout settles) and again after the Supabase query resolves.
-function renderScoresSection(scores) {
-  const el = document.getElementById('scores-section');
-  if (!el) return;
-  // Detail line: show current streak if there is one, otherwise total games.
-  function detailFor(played, streak) {
-    if (played === 0) return 'Henüz oynanmadı';
-    if (streak && streak > 0) return streak + ' seri';
-    return played + ' oyun';
-  }
-  el.innerHTML = `
-    <div class="right-section-title">Oyun Skorları</div>
-    <div class="scores-grid">
-      <div class="score-card">
-        <div class="game-name">Bulmaca</div>
-        <div class="score-value">${scores.bulmacaWins || 0}</div>
-        <div class="score-detail">${detailFor(scores.bulmacaPlayed || 0, scores.bulmacaStreak || 0)}</div>
-      </div>
-      <div class="score-card">
-        <div class="game-name">Sözcel</div>
-        <div class="score-value">${scores.sozcelWins || 0}</div>
-        <div class="score-detail">${detailFor(scores.sozcelPlayed || 0, scores.sozcelStreak || 0)}</div>
-      </div>
-      <div class="score-card">
-        <div class="game-name">Tümcel</div>
-        <div class="score-value">${scores.tumcelWins || 0}</div>
-        <div class="score-detail">${detailFor(scores.tumcelPlayed || 0, scores.tumcelStreak || 0)}</div>
-      </div>
-    </div>
-  `;
-}
-
 // ── Sticker board persistence (localStorage, keyed by user id) ──
 function loadBoardStickers(userId) {
   try {
@@ -4450,7 +4253,6 @@ const displayName =
 const yasadigiIlce = profile?.neighborhood || '';
 const dogumYeri = profile?.birth_place || '';
 const phone = profile?.phone || '';
-const referralCode = profile?.referral_code || '';
 // Two-option toggles. Legacy `more_turkish` / `system` get folded into
 // their nearest neighbour so existing rows still pick a valid tick.
 // palette_pref reuses the column written by onboarding.js: 'mono' = siyah-beyaz, 'earth' = kahverengi.
@@ -4466,21 +4268,6 @@ const palettePref = normalizePalette(profile?.palette_pref);
 I18N.setLang(languagePref);
 // Apply the saved palette too (palette.js already booted from the cached value).
 Palette.setPalette(palettePref);
-
-  const joinedDate = I18N.formatDate(user.created_at, {
-    year: 'numeric', month: 'long', day: 'numeric'
-  });
-  // Scores are loaded async from Supabase — provide a zeroed object first
-  // then hydrate the score cards once the query resolves.
-  const scores = {
-    bulmacaWins: 0, bulmacaPlayed: 0,
-    sozcelWins: 0, sozcelPlayed: 0, sozcelStreak: 0,
-    tumcelWins: 0, tumcelPlayed: 0,
-  };
-  getGameScores(user.id).then(s => {
-    Object.assign(scores, s);
-    renderScoresSection(scores);
-  });
 
   function avatarDisplayHTML() {
     return avatarUrl
@@ -4531,17 +4318,10 @@ Palette.setPalette(palettePref);
 
   renderCardView();
 
-  if (!isViewingOther) {
-    document.getElementById('profile-signout-wrap').innerHTML = `
-      <button class="btn-signout" id="signout-btn">${I18N.t('profile.signout')}</button>
-    `;
-    document.getElementById('signout-btn').addEventListener('click', async () => {
-      await sb.auth.signOut();
-      window.location.href = 'index.html';
-    });
-  }
-
-  // ── RIGHT: stats & account info ──
+  // Self-view: account info, game scores, and sign-out already live in the
+  // shared settings overlay (gear icon on the library card above), so the
+  // rest of the left column stays empty here to avoid duplicating them.
+  // ── RIGHT: kefil & sponsored count (only shown when viewing another user) ──
   if (isViewingOther) {
     document.querySelector('.profile-right').innerHTML = `
       <div class="info-card">
@@ -4556,43 +4336,13 @@ Palette.setPalette(palettePref);
         </div>
       </div>
     `;
-  } else {
-    document.querySelector('.profile-right').innerHTML = `
-      <div class="info-card">
-        <div class="right-section-title">${I18N.t('profile.account')}</div>
-        <div class="info-row">
-          <div class="info-label">${I18N.t('profile.membership')}</div>
-          <div class="info-value">${joinedDate}</div>
-        </div>
-        ${kefilOfUser ? `<div class="info-row">
-          <div class="info-label">${I18N.t('profile.kefil')}</div>
-          <div class="info-value"><button class="kefil-link" data-user-id="${kefilOfUser.id}">${capitalizeName((`${kefilOfUser.first_name || ''} ${kefilOfUser.last_name || ''}`).trim()) || I18N.t('profile.unnamed')}</button></div>
-        </div>` : ''}
-        ${referralCode ? `<div class="info-row">
-          <div class="info-label">${I18N.t('profile.referralcode')}</div>
-          <div class="info-value" style="font-family:'Courier New',monospace;letter-spacing:2px;">${referralCode}<button class="copy-kefil-btn" style="margin-left:8px;" onclick="navigator.clipboard.writeText('${referralCode}').then(()=>{const c=I18N.t('profile.copied');const k=I18N.t('profile.copy');this.textContent=c;setTimeout(()=>this.textContent=k,1500)})">${I18N.t('profile.copy')}</button></div>
-        </div>` : ''}
-        <div class="info-row">
-          <div class="info-label">${I18N.t('profile.sponsoredcount')}</div>
-          <div class="info-value">${kefaletCount ?? 0} ${I18N.t('profile.people')}</div>
-        </div>
-      </div>
-      <div id="scores-section" class="info-card">
-        <div class="right-section-title">${I18N.t('profile.gamescores')}</div>
-        <div class="loading" style="padding:8px;font-size:11px;"><span class="spinner"></span></div>
-      </div>
-    `;
-    renderScoresSection(scores);
   }
 
-  // Left column entrance: profile card, account info, and scores slide in
-  // from the left edge, staggered top-to-bottom (topmost first) — same
+  // Left column entrance: profile card slides in from the left edge — same
   // treatment as Hane's news feed / Kahvehane's discussion feed.
   staggerEntrance([
     document.getElementById('library-card'),
     document.querySelector('.profile-right .info-card'),
-    document.getElementById('scores-section'),
-    document.getElementById('profile-signout-wrap'),
   ], 'left');
 }
 
