@@ -682,6 +682,16 @@
       background: var(--card-fg);
       transition: width 0.3s ease;
     }
+    .article .poll-voters-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .article .poll-voters {
+      display: flex;
+      align-items: center;
+    }
     .article .poll-status.err { color: var(--ink-red); font-size: 0.72rem; margin-top: 6px; }
 
     /* ── RIGHT SIDEBAR (neighborhood info) ── */
@@ -1240,7 +1250,8 @@
       display: flex;
       align-items: center;
     }
-    .ev-attendee-avatar {
+    .ev-attendee-avatar,
+    .poll-voter-avatar {
       width: 26px;
       height: 26px;
       border-radius: 50%;
@@ -1257,9 +1268,12 @@
       overflow: hidden;
       margin-left: -8px;
     }
-    .ev-attendee-avatar:first-child { margin-left: 0; }
-    .ev-attendee-avatar img { width: 100%; height: 100%; object-fit: cover; }
-    .ev-attendee-avatar.ev-attendee-more {
+    .ev-attendee-avatar:first-child,
+    .poll-voter-avatar:first-child { margin-left: 0; }
+    .ev-attendee-avatar img,
+    .poll-voter-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .ev-attendee-avatar.ev-attendee-more,
+    .poll-voter-avatar.poll-voter-more {
       font-size: 0.56rem;
       color: var(--card-fg-muted);
     }
@@ -2416,6 +2430,8 @@ function buildNewsDetailHtml(n) {
 // currently-open detail sheet. Called after openDetail() since the
 // sheet's HTML is built synchronously but the vote/result state isn't
 // known until this query resolves.
+const MAX_POLL_VOTER_AVATARS = 6;
+
 async function loadAndRenderPoll(n) {
   if (!n.poll_question || !n.poll_option_a || !n.poll_option_b) return;
   const container = document.getElementById('poll-' + n.id);
@@ -2424,16 +2440,50 @@ async function loadAndRenderPoll(n) {
     .select('user_id, option').eq('news_id', n.id);
   if (error) { console.error('[poll]', error); return; }
   const uid = window.__currentUser && window.__currentUser.id;
-  let countA = 0, countB = 0, mine = null;
+  const votersA = [], votersB = [];
+  let mine = null;
   (data || []).forEach(v => {
-    if (v.option === 1) countA++;
-    else if (v.option === 2) countB++;
+    if (v.option === 1) votersA.push(v.user_id);
+    else if (v.option === 2) votersB.push(v.user_id);
     if (uid && v.user_id === uid) mine = v.option;
   });
-  renderPollInto(container, n, countA, countB, mine);
+
+  // Only need profile pictures once the result view (bars + avatars) is
+  // about to be shown -- skip the query while votes are still empty or
+  // the viewer hasn't voted yet (still seeing the plain vote buttons).
+  let profilesById = new Map();
+  const userIds = Array.from(new Set([...votersA, ...votersB]));
+  if (mine != null && userIds.length) {
+    const { data: profs, error: profErr } = await sb.from('profiles')
+      .select('id, first_name, last_name, avatar_url').in('id', userIds);
+    if (profErr) console.error('[poll voter profiles]', profErr);
+    else profilesById = new Map(profs.map(p => [p.id, p]));
+  }
+
+  renderPollInto(container, n, votersA, votersB, mine, profilesById);
 }
 
-function renderPollInto(container, n, countA, countB, mine) {
+function buildVoterAvatarsHtml(userIds, profilesById) {
+  const list = userIds.map(id => profilesById.get(id)).filter(Boolean);
+  if (!list.length) return '';
+  const shown = list.slice(0, MAX_POLL_VOTER_AVATARS);
+  const extra = list.length - shown.length;
+  const avatarsHtml = shown.map(p => {
+    const name = capitalizeName([p.first_name, p.last_name].filter(Boolean).join(' ')) || 'Üye';
+    const initial = (p.first_name || p.last_name || '?').charAt(0).toLocaleUpperCase('tr-TR');
+    const inner = p.avatar_url
+      ? `<img src="${Palette.avatarSrc(p.avatar_url)}" alt="">`
+      : initial;
+    return `<span class="poll-voter-avatar" title="${escapeText(name)}">${inner}</span>`;
+  }).join('');
+  const moreHtml = extra > 0
+    ? `<span class="poll-voter-avatar poll-voter-more" title="+${extra}">+${extra}</span>`
+    : '';
+  return avatarsHtml + moreHtml;
+}
+
+function renderPollInto(container, n, votersA, votersB, mine, profilesById) {
+  const countA = votersA.length, countB = votersB.length;
   const total = countA + countB;
   if (mine == null) {
     container.innerHTML = `
@@ -2459,6 +2509,10 @@ function renderPollInto(container, n, countA, countB, mine) {
       <div class="poll-bar-track">
         <div class="poll-bar-fill-a" style="width:${pctA}%"></div>
         <div class="poll-bar-fill-b" style="width:${pctB}%"></div>
+      </div>
+      <div class="poll-voters-row">
+        <div class="poll-voters poll-voters-a">${buildVoterAvatarsHtml(votersA, profilesById)}</div>
+        <div class="poll-voters poll-voters-b">${buildVoterAvatarsHtml(votersB, profilesById)}</div>
       </div>
     `;
   }
