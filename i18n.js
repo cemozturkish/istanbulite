@@ -54,6 +54,11 @@
     'profile.gamescores':  { default: 'Oyun Skorları',       more_english: 'Game Scores' },
     'profile.people':      { default: 'kişi',                more_english: 'people' },
     'profile.unnamed':     { default: 'İsimsiz Üye',         more_english: 'Unnamed Member' },
+    'profile.toggle':      { default: 'Profil',              more_english: 'Profile' },
+    'profile.tab.profil':  { default: 'Profil',              more_english: 'Profile' },
+    'profile.tab.ayarlar': { default: 'Ayarlar',             more_english: 'Settings' },
+    'profile.tab.rozetler':{ default: 'Rozetler',            more_english: 'Badges' },
+    'profile.rozetler.soon':{ default: 'Rozetler yakında burada olacak.', more_english: 'Badges are coming here soon.' },
 
     // login / signup (index.html)
     'auth.email':          { default: 'E-posta',             more_english: 'Email' },
