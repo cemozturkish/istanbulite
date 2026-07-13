@@ -786,6 +786,14 @@
           <label>One-sentence summary</label>
           <textarea id="f-summary" placeholder="Shown in the article list..."></textarea>
 
+          <label>Cover Image (optional)</label>
+          <div id="f-image-preview-wrap" style="display:none; margin-bottom:8px;">
+            <img id="f-image-preview" alt="" style="display:block; max-width:100%; max-height:160px; object-fit:cover; border:1px solid var(--hairline);"/>
+            <button type="button" class="btn btn-secondary" id="f-image-remove-btn" style="margin-top:6px;">Remove Image</button>
+          </div>
+          <input type="file" id="f-image" accept="image/*"/>
+          <input type="hidden" id="f-image-url"/>
+
           <label>Pages (Sayfalar)</label>
           <p style="font-size:0.72rem;color:var(--muted);font-style:italic;line-height:1.4;margin:0 0 6px;">
             Each page is one Duolingo-style step the reader clicks through with İleri →.
@@ -1503,6 +1511,7 @@ async function loadArticlesForShelf(shelfId) {
       <div class="article-card" data-id="${a.id}">
         <div class="a-neighborhood">Step ${i + 1}${meta ? ' · ' + meta : ''}</div>
         <h4>${escapeHtml(a.title)}</h4>
+        ${a.image_url ? `<img src="${a.image_url}" alt="" style="max-width:100%; max-height:90px; object-fit:cover; margin:6px 0; border:1px solid var(--hairline);"/>` : ''}
         ${a.summary ? `<p>${escapeHtml(a.summary)}</p>` : ''}
         <div class="card-actions">
           <button class="btn-edit" data-act="up"   data-id="${a.id}" ${i === 0 ? 'disabled style="opacity:0.4;cursor:default;"' : ''}>↑</button>
@@ -1649,6 +1658,31 @@ function readPollForm() {
   return { question: q, options: opts };
 }
 
+// ── Cover image (Storage-backed) ──
+// Local preview only on file pick; the actual upload happens on submit so
+// nothing hits Storage unless the article is actually published/updated.
+document.getElementById('f-image').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('f-image-preview').src = URL.createObjectURL(file);
+  document.getElementById('f-image-preview-wrap').style.display = '';
+});
+
+document.getElementById('f-image-remove-btn').addEventListener('click', () => {
+  document.getElementById('f-image').value = '';
+  document.getElementById('f-image-url').value = '';
+  document.getElementById('f-image-preview').src = '';
+  document.getElementById('f-image-preview-wrap').style.display = 'none';
+});
+
+// Pulls the object path back out of a public Storage URL so it can be
+// passed to storage.remove(). Returns null for anything else (e.g. blank).
+function storagePathFromUrl(url) {
+  const marker = '/object/public/article-images/';
+  const idx = (url || '').indexOf(marker);
+  return idx === -1 ? null : url.slice(idx + marker.length);
+}
+
 // ── Submit (insert/update) ──
 // Inserts/updates use currentShelfId — the article form lives inside the
 // shelf editor, so there's no shelf picker on the form itself.
@@ -1681,7 +1715,22 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   statusEl.textContent = ''; statusEl.className = 'status-msg';
   btn.innerHTML = '<span class="spinner"></span>';
 
-  const payload = { shelf_id, source, title, summary, body, url, author, published_at };
+  let image_url = document.getElementById('f-image-url').value || null;
+  const imageFile = document.getElementById('f-image').files[0];
+  if (imageFile) {
+    const ext = (imageFile.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const path = `${shelf_id}/${Date.now()}.${ext}`;
+    const { error: uploadError } = await sb.storage.from('article-images').upload(path, imageFile, { upsert: true });
+    if (uploadError) {
+      statusEl.textContent = 'Image upload failed: ' + uploadError.message;
+      statusEl.className = 'status-msg err';
+      btn.textContent = editingId ? 'Update Article' : 'Publish Article';
+      return;
+    }
+    image_url = sb.storage.from('article-images').getPublicUrl(path).data.publicUrl;
+  }
+
+  const payload = { shelf_id, source, title, summary, body, url, author, published_at, image_url };
   if (poll !== null) payload.poll = poll;
   else if (editingId) payload.poll = null; // explicitly clear on update
 
@@ -1717,6 +1766,10 @@ function resetForm() {
   document.getElementById('f-author').value = '';
   document.getElementById('f-published').value = '';
   document.getElementById('f-summary').value = '';
+  document.getElementById('f-image').value = '';
+  document.getElementById('f-image-url').value = '';
+  document.getElementById('f-image-preview').src = '';
+  document.getElementById('f-image-preview-wrap').style.display = 'none';
   renderPagesEditor(['']);
   document.getElementById('f-url').value = '';
   document.getElementById('f-poll-question').value = '';
@@ -1739,6 +1792,10 @@ function editArticle(row) {
     ? new Date(row.published_at).toISOString().slice(0, 10)
     : '';
   document.getElementById('f-summary').value = row.summary || '';
+  document.getElementById('f-image').value = '';
+  document.getElementById('f-image-url').value = row.image_url || '';
+  document.getElementById('f-image-preview').src = row.image_url || '';
+  document.getElementById('f-image-preview-wrap').style.display = row.image_url ? '' : 'none';
   setPagesFromBody(row.body);
   document.getElementById('f-url').value = row.url || '';
   const poll = row.poll || null;
@@ -1755,6 +1812,8 @@ async function deleteArticle(row) {
   if (!confirm('Delete this article? This cannot be undone.')) return;
   const { error } = await sb.from('library_articles').delete().eq('id', row.id);
   if (error) { alert('Error deleting: ' + error.message); return; }
+  const imagePath = storagePathFromUrl(row.image_url);
+  if (imagePath) sb.storage.from('article-images').remove([imagePath]);
   if (currentShelfId != null) loadArticlesForShelf(currentShelfId);
 }
 
