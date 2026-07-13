@@ -1121,14 +1121,6 @@
       border: 1px solid var(--ink);
     }
     .chapter-intro-btn.secondary:hover { background: var(--paper-dark); }
-    .path-thumb {
-      width: 100%;
-      max-height: 120px;
-      object-fit: cover;
-      display: block;
-      margin-bottom: 10px;
-      border: 1px solid var(--ink);
-    }
     .path-step {
       font-family: 'Inter', sans-serif;
       font-size: 0.6rem;
@@ -1231,14 +1223,6 @@
       line-height: 1.2;
       margin-bottom: 20px;
     }
-    .reader-hero {
-      width: 100%;
-      max-height: 320px;
-      object-fit: cover;
-      display: block;
-      border: 1px solid var(--rule);
-      margin-bottom: 22px;
-    }
     .reader-summary {
       font-size: 1rem;
       color: var(--accent);
@@ -1254,6 +1238,16 @@
     }
     .reader-section-body p { margin: 0 0 1em 0; }
     .reader-section-body p:last-child { margin-bottom: 0; }
+    /* Inline [[img::URL]] tokens — used in both the sectioned reader body
+       and the flat (non-paginated) article detail body. */
+    .body-img {
+      width: 100%;
+      max-height: 420px;
+      object-fit: cover;
+      display: block;
+      margin: 18px 0;
+      border: 1px solid var(--rule);
+    }
     .vocab-term {
       background: var(--paper-banner);
       border-bottom: 1px dashed var(--ink);
@@ -1559,14 +1553,6 @@
       transition: background 0.12s;
     }
     .article-item:hover { background: var(--paper-dark); }
-    .article-item .item-thumb {
-      width: 100%;
-      max-height: 160px;
-      object-fit: cover;
-      display: block;
-      margin-bottom: 10px;
-      border: 1px solid var(--border);
-    }
     .article-item .item-title {
       font-size: 1rem;
       font-weight: 700;
@@ -1605,14 +1591,6 @@
       color: var(--ink);
       line-height: 1.25;
       margin-bottom: 12px;
-    }
-    .article-detail .detail-hero {
-      width: 100%;
-      max-height: 360px;
-      object-fit: cover;
-      display: block;
-      border: 1px solid var(--border);
-      margin-bottom: 20px;
     }
     .article-detail .detail-summary {
       font-size: 0.95rem;
@@ -3133,7 +3111,6 @@ async function renderCategoryList(categoryId) {
     `;
     return `
       <div class="article-item" data-id="${a.id}">
-        ${a.image_url ? `<img class="item-thumb" src="${a.image_url}" alt="" loading="lazy">` : ''}
         <div class="item-title">${libEsc(a.title)}</div>
         ${meta ? `<div class="item-byline">${meta}</div>` : ''}
         <div class="item-summary">${libEsc(a.summary || '')}</div>
@@ -3175,6 +3152,17 @@ function formatLibDate(iso) {
   } catch { return ''; }
 }
 
+// Plain (non-paginated) article body: escapes text and turns newlines into
+// <br>, except lines that are just an [[img::URL]] token, which become an
+// inline image instead.
+function renderPlainBodyWithImages(text) {
+  const imgLineRe = /^\s*\[\[img::(\S+?)\]\]\s*$/;
+  return String(text).replace(/\r\n/g, '\n').split('\n').map(line => {
+    const m = line.match(imgLineRe);
+    return m ? `<img class="body-img" src="${libEsc(m[1])}" alt="" loading="lazy">` : libEsc(line);
+  }).join('<br>');
+}
+
 function renderArticleDetail(categoryId, article) {
   const area = document.getElementById('article-area');
   const name = LIB_CATEGORY_LABELS[categoryId];
@@ -3189,9 +3177,8 @@ function renderArticleDetail(categoryId, article) {
       <div class="detail-source">${name}</div>
       <div class="detail-title">${libEsc(article.title)}</div>
       ${byline ? `<div class="detail-byline">${byline}</div>` : ''}
-      ${article.image_url ? `<img class="detail-hero" src="${article.image_url}" alt="" loading="lazy">` : ''}
       ${article.summary ? `<div class="detail-summary">${libEsc(article.summary)}</div>` : ''}
-      ${article.body ? `<div class="detail-body">${libEsc(article.body).replace(/\n/g, '<br>')}</div>` : ''}
+      ${article.body ? `<div class="detail-body">${renderPlainBodyWithImages(article.body)}</div>` : ''}
       ${article.url ? `<a class="detail-link" href="${article.url}" target="_blank" rel="noopener">Kaynakta Oku ↗</a>` : ''}
 
       <div class="reaction-bar" id="reaction-bar">
@@ -3686,7 +3673,6 @@ function renderShelfPathView(shelf, shelfId, articles, lockState, completedSet) 
           return `
             <button class="path-node${locked ? ' locked' : ''}" data-art="${a.id}" data-locked="${locked ? '1' : '0'}" type="button"${locked ? ' aria-disabled="true"' : ''}>
               ${badge}
-              ${a.image_url ? `<img class="path-thumb" src="${a.image_url}" alt="" loading="lazy">` : ''}
               <div class="path-step">Bölüm ${i + 1}</div>
               <div class="path-art-title">${libEsc(a.title)}</div>
               ${a.summary ? `<div class="path-art-summary">${libEsc(a.summary)}</div>` : ''}
@@ -3730,6 +3716,7 @@ function parseArticleSections(body) {
 function renderInlineBody(text) {
   const lines = String(text).replace(/\r\n/g, '\n').split('\n');
   const voteLineRe = /^\s*\[\[vote::([^\]]+?)::(-?\d+)::(-?\d+)\]\]\s*$/;
+  const imgLineRe = /^\s*\[\[img::(\S+?)\]\]\s*$/;
   const parts = [];
   let buf = [];
   function flushText() {
@@ -3744,10 +3731,14 @@ function renderInlineBody(text) {
     buf = [];
   }
   for (const line of lines) {
-    const m = line.match(voteLineRe);
-    if (m) {
+    const voteMatch = line.match(voteLineRe);
+    const imgMatch = !voteMatch && line.match(imgLineRe);
+    if (voteMatch) {
       flushText();
-      parts.push(`<div class="vote-widget" data-q="${libEsc(m[1].trim())}" data-min="${m[2]}" data-max="${m[3]}" data-answered="0"></div>`);
+      parts.push(`<div class="vote-widget" data-q="${libEsc(voteMatch[1].trim())}" data-min="${voteMatch[2]}" data-max="${voteMatch[3]}" data-answered="0"></div>`);
+    } else if (imgMatch) {
+      flushText();
+      parts.push(`<img class="body-img" src="${libEsc(imgMatch[1])}" alt="" loading="lazy">`);
     } else {
       buf.push(line);
     }
@@ -3856,7 +3847,6 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
         ${isFirst ? `
           ${byline ? `<div class="reader-byline">${byline}</div>` : ''}
           <h1 class="reader-title">${libEsc(article.title)}</h1>
-          ${article.image_url ? `<img class="reader-hero" src="${article.image_url}" alt="" loading="lazy">` : ''}
           ${article.summary ? `<div class="reader-summary">${libEsc(article.summary)}</div>` : ''}
         ` : ''}
         <div class="reader-section-body">${sectionHtml}</div>
