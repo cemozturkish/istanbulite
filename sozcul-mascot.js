@@ -181,6 +181,21 @@
     document.head.appendChild(style);
   }
 
+  // On desktop, the right column (game links + scoreboard) sits flush
+  // against the viewport's right edge -- the popup's default fixed
+  // right:18px lands right on top of it. Nudge the popup left of that
+  // column instead, so it appears beside the scoreboard rather than
+  // over it. Mobile keeps its own full-width bar (see media query above)
+  // so this only applies above the mobile breakpoint.
+  function clearSidebar(root) {
+    if (window.innerWidth <= 768) return;
+    const sidebar = document.querySelector('.col-right');
+    if (!sidebar) return;
+    const rect = sidebar.getBoundingClientRect();
+    if (!rect.width) return;
+    root.style.right = `${Math.round(window.innerWidth - rect.left + 18)}px`;
+  }
+
   // Show the mascot popup. The bubble + mascot fade in, the user can
   // close with the X or by clicking the bubble/mascot.
   function showPopup({ mascot, html, onDismiss }) {
@@ -189,7 +204,7 @@
     if (old) old.remove();
     const root = document.createElement('div');
     root.id = 'sozcul-mascot-popup';
-    const src = mascot === 'cat' ? 'assets/mascot-cat.svg' : 'assets/mascot-dog.svg';
+    const src = mascot === 'cat' ? 'assets/mascot-cat-right.png' : 'assets/mascot-dog-right.png';
     root.innerHTML = `
       <div class="szm-bubble">
         ${html}
@@ -200,6 +215,7 @@
       </div>
     `;
     document.body.appendChild(root);
+    clearSidebar(root);
     requestAnimationFrame(() => root.classList.add('szm-show'));
     let dismissed = false;
     const dismiss = () => {

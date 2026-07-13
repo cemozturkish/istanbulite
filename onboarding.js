@@ -266,7 +266,7 @@
     }[c]));
   }
   function mascotImgHTML() {
-    const src = mascot === 'cat' ? 'assets/mascot-cat.svg' : 'assets/mascot-dog.svg';
+    const src = mascot === 'cat' ? 'assets/mascot-cat-right.png' : 'assets/mascot-dog-right.png';
     return `<div class="ist-onb-mascot"><img src="${src}" alt=""></div>`;
   }
   function clearStage() {
@@ -743,7 +743,7 @@
     row.className = 'ist-onb-mascot-row';
     const mImg = document.createElement('div');
     mImg.className = 'ist-onb-mascot';
-    mImg.innerHTML = `<img src="assets/mascot-${mascot}.svg" alt="">`;
+    mImg.innerHTML = `<img src="assets/mascot-${mascot}-right.png" alt="">`;
     const bubble = document.createElement('div');
     bubble.className = 'ist-onb-bubble';
     bubble.innerHTML = speech;
