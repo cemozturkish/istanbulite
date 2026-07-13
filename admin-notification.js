@@ -184,7 +184,10 @@
     if (old) old.remove();
     const root = document.createElement('div');
     root.id = 'admin-notif-popup';
-    const src = mascot === 'cat' ? 'assets/mascot-cat-left.png' : 'assets/mascot-dog-left.png';
+    // TEMP: dog art isn't uploaded yet — use the cat PNG for dog mascots too
+    // so the popup doesn't show a broken image. Restore the dog branch once
+    // assets/mascot-dog-left.png exists.
+    const src = 'assets/mascot-cat-left.png';
     const escaped = String(text).replace(/[&<>"']/g,
       c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     root.innerHTML = `
