@@ -1,17 +1,16 @@
 // ══════════════════════════════════════════════════════════════
-// Shared mobile profile card widget.
+// Shared profile UI: a compact mobile card (avatar + name + neighborhood +
+// "Profil" button) plus a shared bottom-sheet overlay — the same slide-up
+// card used for news/event details (anahane), games (kahvehane), and
+// articles (kutuphane) — that houses three tabs: Profil (identity/account),
+// Ayarlar (language/theme/color + sign out), Rozetler (badges).
+//
 // Included by anahane.html, kahvehane.html, and kutuphane.html.
 //
-// Renders a compact card (avatar + name + neighborhood + action button)
-// at the top of the page on mobile.
-//
-// Page-specific behaviour (set via opts.page):
-//   'anahane'   → AYARLAR button → language/theme sliders + ÇIKIŞ YAP
-//   'kutuphane' → DÜZENLE button → read-only HESAP info + game scores
-//   'kahvehane' → no button, no panel
-//
-// Usage: IstProfileCard.mount({ sb, I18N, page });
-// Assumes a <div id="ist-pc-mount"> exists in the page.
+// Usage:
+//   IstProfileCard.mount({ sb, I18N, page });           // mobile compact card
+//   IstProfileCard.mountLibraryCard({ sb, I18N });       // desktop identity card
+//   IstProfileCard.openProfileOverlay({ sb, I18N, user, profile, ... });
 // ══════════════════════════════════════════════════════════════
 (function (global) {
   const NB_NAMES = {
@@ -38,7 +37,7 @@
   function normalizeTheme(v)   { return v === 'dark' ? 'dark' : 'light'; }
   function normalizePalette(v) { return v === 'earth' ? 'earth' : 'mono'; }
 
-  // Preset avatars, shared between the desktop library-card picker and this
+  // Preset avatars, shared between the profile-overlay picker and this
   // mobile widget. `requiresSozculCount` gates an option behind a lifetime
   // sözcü count.
   const AVATAR_OPTIONS = [
@@ -172,15 +171,63 @@
     }
   }
 
+  function scoresHTML(scores) {
+    function detail(played, streak) {
+      if (played === 0) return 'Henüz oynanmadı';
+      if (streak && streak > 0) return streak + ' seri';
+      return played + ' oyun';
+    }
+    return `
+      <div class="ist-pc-scores">
+        <div class="ist-pc-score-card">
+          <div class="ist-pc-score-game">Bulmaca</div>
+          <div class="ist-pc-score-value">${scores.bulmacaWins || 0}</div>
+          <div class="ist-pc-score-detail">${detail(scores.bulmacaPlayed||0, scores.bulmacaStreak||0)}</div>
+        </div>
+        <div class="ist-pc-score-card">
+          <div class="ist-pc-score-game">Sözcel</div>
+          <div class="ist-pc-score-value">${scores.sozcelWins || 0}</div>
+          <div class="ist-pc-score-detail">${detail(scores.sozcelPlayed||0, scores.sozcelStreak||0)}</div>
+        </div>
+        <div class="ist-pc-score-card">
+          <div class="ist-pc-score-game">Tümcel</div>
+          <div class="ist-pc-score-value">${scores.tumcelWins || 0}</div>
+          <div class="ist-pc-score-detail">${detail(scores.tumcelPlayed||0, scores.tumcelStreak||0)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Wires a range input to its tick labels: clicking a tick jumps the
+  // slider, dragging the slider highlights the nearest tick.
+  function syncTicks(sliderId, ticksId) {
+    const slider = document.getElementById(sliderId);
+    const ticks = document.getElementById(ticksId);
+    if (!slider || !ticks) return;
+    const update = () => {
+      const v = parseInt(slider.value, 10);
+      ticks.querySelectorAll('span').forEach(s => {
+        s.classList.toggle('active', parseInt(s.dataset.idx, 10) === v);
+      });
+    };
+    slider.addEventListener('input', update);
+    ticks.querySelectorAll('span').forEach(s => {
+      s.addEventListener('click', () => {
+        slider.value = s.dataset.idx;
+        slider.dispatchEvent(new Event('input'));
+      });
+    });
+    update();
+  }
+
   // Module-level state so a page can call setPage() to re-render the card
   // for a new page context (e.g. after a client-side navigation) without
   // re-fetching from Supabase. `_state` holds everything fetched once;
-  // `_resizeListener`/`_escListener` are tracked so unmount() can remove
-  // them instead of leaking one more registration per mount() call.
+  // `_resizeListener` is tracked so unmount() can remove it instead of
+  // leaking one more registration per mount() call.
   let _mounted = false;
   let _state = null;
   let _resizeListener = null;
-  let _escListener = null;
 
   async function mount(opts) {
     const sb = opts.sb;
@@ -228,7 +275,6 @@
 
   function unmount() {
     if (_resizeListener) { window.removeEventListener('resize', _resizeListener); _resizeListener = null; }
-    if (_escListener) { document.removeEventListener('keydown', _escListener); _escListener = null; }
     _mounted = false;
     _state = null;
   }
@@ -242,10 +288,10 @@
     return `${y}-${m}-${d}`;
   }
 
-  // Fetches everything the card needs exactly once per session. `avatarUrl`
-  // is carried on the returned object (not recomputed on later renders)
-  // because pickAvatar() mutates it in place so a later setPage() call
-  // still reflects a just-picked avatar without re-fetching.
+  // Fetches everything the card/overlay needs exactly once per session.
+  // `avatarUrl` is carried on the returned object (not recomputed on later
+  // renders) because avatar picks mutate it in place so a later setPage()
+  // call still reflects a just-picked avatar without re-fetching.
   async function fetchProfileData(sb, I18N, user) {
     const today = istanbulTodayISO();
 
@@ -278,388 +324,456 @@
     };
   }
 
-  // Renders the card into `container` for the given `page` context, using
-  // already-fetched `state`. Callable repeatedly (via setPage) without
+  // Renders the compact card into `container` for the given `page` context,
+  // using already-fetched `state`. Callable repeatedly (via setPage) without
   // hitting Supabase again — only mount()'s first call ever fetches.
+  // Every page gets the same single "Profil" button, opening the shared
+  // bottom-sheet overlay (see openProfileOverlay below) — the actual
+  // editing/settings/badges UI no longer lives in this compact card.
   function renderPage(container, page, state) {
     const { I18N, user, profile, kefaletCount, sozculCount, kefilOfUser } = state;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
     const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
     const yasadigi = profile?.neighborhood || '';
-    const dogumYeri = profile?.birth_place || '';
-    const phone = profile?.phone || '';
-    const referralCode = profile?.referral_code || '';
-    const languagePref = normalizeLang(profile?.language_pref);
-    const themePref = normalizeTheme(profile?.theme_pref);
-    const palettePref = normalizePalette(profile?.palette_pref);
-    const sb = state.sb;
     let avatarUrl = state.avatarUrl;
 
     const yasadigiDisplay = yasadigi ? (NB_NAMES[yasadigi] || yasadigi) : '—';
-    const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
-    const joinedDate = I18N.formatDate(user.created_at, { year:'numeric', month:'long', day:'numeric' });
-    const lastSeenText = formatLastSeen(user.last_sign_in_at, I18N);
-
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
+    const toggleLabel = t('profile.toggle') || 'Profil';
 
     function avatarHTML() {
-        return avatarUrl
-          ? `<img src="${esc(avatarSrc(avatarUrl))}" alt="">`
-          : esc(displayName.charAt(0).toUpperCase());
-      }
+      return avatarUrl
+        ? `<img src="${esc(avatarSrc(avatarUrl))}" alt="">`
+        : esc(displayName.charAt(0).toUpperCase());
+    }
 
-      function scoresHTML(scores) {
-        function detail(played, streak) {
-          if (played === 0) return 'Henüz oynanmadı';
-          if (streak && streak > 0) return streak + ' seri';
-          return played + ' oyun';
-        }
-        return `
-          <div class="ist-pc-scores">
-            <div class="ist-pc-score-card">
-              <div class="ist-pc-score-game">Bulmaca</div>
-              <div class="ist-pc-score-value">${scores.bulmacaWins || 0}</div>
-              <div class="ist-pc-score-detail">${detail(scores.bulmacaPlayed||0, scores.bulmacaStreak||0)}</div>
-            </div>
-            <div class="ist-pc-score-card">
-              <div class="ist-pc-score-game">Sözcel</div>
-              <div class="ist-pc-score-value">${scores.sozcelWins || 0}</div>
-              <div class="ist-pc-score-detail">${detail(scores.sozcelPlayed||0, scores.sozcelStreak||0)}</div>
-            </div>
-            <div class="ist-pc-score-card">
-              <div class="ist-pc-score-game">Tümcel</div>
-              <div class="ist-pc-score-value">${scores.tumcelWins || 0}</div>
-              <div class="ist-pc-score-detail">${detail(scores.tumcelPlayed||0, scores.tumcelStreak||0)}</div>
-            </div>
+    container.innerHTML = `
+      <div class="ist-pc" id="ist-pc-root">
+        <div class="ist-pc-row">
+          <div class="ist-pc-avatar" id="ist-pc-avatar">${avatarHTML()}</div>
+          <div class="ist-pc-id">
+            <div class="ist-pc-name">${esc(displayName)}</div>
+            <div class="ist-pc-meta">${esc(yasadigiDisplay)}</div>
           </div>
-        `;
-      }
-
-      // ── AYARLAR panel (anahane): language/theme sliders + sign out ──
-      function ayarlarPanelHTML() {
-        return `
-          <div class="ist-pc-panel" id="ist-pc-panel">
-          <div class="ist-pc-panel-inner">
-            <button type="button" class="ist-pc-panel-close" id="ist-pc-panel-close" aria-label="Kapat">×</button>
-            <div class="ist-pc-section-title">Ayarlar</div>
-
-            <div class="ist-pc-field">
-              <div class="ist-pc-label">${esc(t('profile.langpref'))}</div>
-              <input class="ist-pc-slider" id="ist-pc-language" type="range" min="0" max="1" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
-              <div class="ist-pc-ticks" id="ist-pc-language-ticks">
-                <span data-idx="0">Daha İngilizce</span>
-                <span data-idx="1">Daha Türkçe</span>
-              </div>
-            </div>
-
-            <div class="ist-pc-field">
-              <div class="ist-pc-label">${esc(t('profile.colortheme'))}</div>
-              <input class="ist-pc-slider" id="ist-pc-palette" type="range" min="0" max="1" step="1" value="${PALETTE_VALUES.indexOf(palettePref)}">
-              <div class="ist-pc-ticks" id="ist-pc-palette-ticks">
-                <span data-idx="0">Siyah-Beyaz</span>
-                <span data-idx="1">Kahverengi</span>
-              </div>
-            </div>
-
-            <div class="ist-pc-field">
-              <div class="ist-pc-label">${esc(t('profile.appearance'))}</div>
-              <input class="ist-pc-slider" id="ist-pc-theme" type="range" min="0" max="1" step="1" value="${THEME_VALUES.indexOf(themePref)}">
-              <div class="ist-pc-ticks" id="ist-pc-theme-ticks">
-                <span data-idx="0">Açık</span>
-                <span data-idx="1">Koyu</span>
-              </div>
-            </div>
-
-            <div class="ist-pc-actions">
-              <button type="button" class="ist-pc-save" id="ist-pc-save">${esc(t('profile.save'))}</button>
-            </div>
-            <div class="ist-pc-msg" id="ist-pc-msg"></div>
-
-            <button type="button" class="ist-pc-signout" id="ist-pc-signout">${esc(t('profile.signout'))}</button>
-          </div>
-          </div>
-        `;
-      }
-
-      // ── DÜZENLE panel (kutuphane): read-only account info + game scores ──
-      function duzenlePanelHTML() {
-        const kefilLabel = kefilOfUser
-          ? esc(capitalizeName(`${kefilOfUser.first_name||''} ${kefilOfUser.last_name||''}`.trim()) || t('profile.unnamed'))
-          : '';
-        return `
-          <div class="ist-pc-panel" id="ist-pc-panel">
-          <div class="ist-pc-panel-inner">
-            <button type="button" class="ist-pc-panel-close" id="ist-pc-panel-close" aria-label="Kapat">×</button>
-            <div class="ist-pc-section-title">${esc(t('profile.account'))}</div>
-
-            <div class="ist-pc-avatar-field">
-              <div class="ist-pc-label">${esc(t('profile.chooseavatar'))}</div>
-              <div class="ist-pc-avatar-picker" id="ist-pc-avatar-picker">${buildAvatarPicker(avatarUrl, sozculCount)}</div>
-              <div class="ist-pc-avatar-msg" id="ist-pc-avatar-msg" role="status" aria-live="polite"></div>
-            </div>
-
-            <div class="ist-pc-info-row">
-              <div class="ist-pc-info-label">${esc(t('profile.firstname'))}</div>
-              <div class="ist-pc-info-value">${esc(firstName || '—')}</div>
-            </div>
-            <div class="ist-pc-info-row">
-              <div class="ist-pc-info-label">${esc(t('profile.lastname'))}</div>
-              <div class="ist-pc-info-value">${esc(lastName || '—')}</div>
-            </div>
-            <div class="ist-pc-info-row">
-              <div class="ist-pc-info-label">${esc(t('profile.district'))}</div>
-              <div class="ist-pc-info-value">${esc(yasadigiDisplay)}</div>
-            </div>
-            <div class="ist-pc-info-row">
-              <div class="ist-pc-info-label">${esc(t('profile.birthplace'))}</div>
-              <div class="ist-pc-info-value">${esc(dogumDisplay)}</div>
-            </div>
-            <div class="ist-pc-info-row">
-              <div class="ist-pc-info-label">${esc(t('profile.email'))}</div>
-              <div class="ist-pc-info-value">${esc(user.email)}</div>
-            </div>
-            ${phone ? `
-            <div class="ist-pc-info-row">
-              <div class="ist-pc-info-label">${esc(t('profile.phone') || 'Telefon')}</div>
-              <div class="ist-pc-info-value">${esc(phone)}</div>
-            </div>` : ''}
-            <div class="ist-pc-info-row">
-              <div class="ist-pc-info-label">${esc(t('profile.membership'))}</div>
-              <div class="ist-pc-info-value">${esc(joinedDate)}</div>
-            </div>
-            <div class="ist-pc-info-row">
-              <div class="ist-pc-info-label">${esc(t('profile.lastseen'))}</div>
-              <div class="ist-pc-info-value">${esc(lastSeenText)}</div>
-            </div>
-            ${kefilOfUser ? `
-            <div class="ist-pc-info-row">
-              <div class="ist-pc-info-label">${esc(t('profile.kefil'))}</div>
-              <div class="ist-pc-info-value">${kefilLabel}</div>
-            </div>` : ''}
-            ${referralCode ? `
-            <div class="ist-pc-info-row">
-              <div class="ist-pc-info-label">${esc(t('profile.referralcode'))}</div>
-              <div class="ist-pc-info-value">
-                <span class="ist-pc-code">${esc(referralCode)}</span>
-                <button type="button" class="ist-pc-copy" id="ist-pc-copy">${esc(t('profile.copy'))}</button>
-              </div>
-            </div>` : ''}
-            <div class="ist-pc-info-row">
-              <div class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</div>
-              <div class="ist-pc-info-value">${kefaletCount ?? 0} ${esc(t('profile.people'))}</div>
-            </div>
-            <div class="ist-pc-info-row">
-              <div class="ist-pc-info-label">${esc(t('profile.sozculcount'))}</div>
-              <div class="ist-pc-info-value">${sozculCount ?? 0} ${esc(t('profile.times'))}</div>
-            </div>
-
-            <div class="ist-pc-section-title">${esc(t('profile.gamescores') || 'Oyun Skorları')}</div>
-            <div id="ist-pc-scores-mount">${scoresHTML({})}</div>
-          </div>
-          </div>
-        `;
-      }
-
-      // Button label by page
-      const toggleLabel = page === 'kutuphane' ? (t('profile.edit') || 'DÜZENLE')
-                        : page === 'anahane'   ? 'AYARLAR'
-                        : '';
-
-      const hasPanel = page === 'anahane' || page === 'kutuphane';
-
-      container.innerHTML = `
-        <div class="ist-pc" id="ist-pc-root">
-          <div class="ist-pc-row">
-            <div class="ist-pc-avatar" id="ist-pc-avatar">${avatarHTML()}</div>
-            <div class="ist-pc-id">
-              <div class="ist-pc-name">${esc(displayName)}</div>
-              <div class="ist-pc-meta">${esc(yasadigiDisplay)}</div>
-            </div>
-            ${hasPanel ? `<button type="button" class="ist-pc-toggle" id="ist-pc-toggle" data-label="${esc(toggleLabel)}">${esc(toggleLabel)}</button>` : ''}
-          </div>
-          ${page === 'anahane'   ? ayarlarPanelHTML() : ''}
-          ${page === 'kutuphane' ? duzenlePanelHTML() : ''}
+          <button type="button" class="ist-pc-toggle" id="ist-pc-toggle">${esc(toggleLabel)}</button>
         </div>
-      `;
+      </div>
+    `;
 
-      if (!hasPanel) return;
-
-      const root = document.getElementById('ist-pc-root');
-      const toggleBtn = document.getElementById('ist-pc-toggle');
-      const panel = document.getElementById('ist-pc-panel');
-
-      function openPanel() {
-        root.classList.add('open');
-        toggleBtn.textContent = t('profile.cancel');
-        document.body.style.overflow = 'hidden';
-      }
-      function closePanel() {
-        root.classList.remove('open');
-        toggleBtn.textContent = toggleLabel;
-        document.body.style.overflow = '';
-      }
-
-      toggleBtn.addEventListener('click', () => {
-        if (root.classList.contains('open')) closePanel();
-        else openPanel();
-      });
-
-      document.getElementById('ist-pc-panel-close').addEventListener('click', closePanel);
-
-      panel.addEventListener('click', (e) => {
-        if (e.target === panel) closePanel();
-      });
-
-      // A single persistent document-level Escape listener, shared across
-      // every renderPage() call (and every future setPage() re-render), so
-      // repeated navigations don't stack up one handler each — it always
-      // re-queries the live #ist-pc-root/#ist-pc-toggle instead of closing
-      // over this particular render's now-possibly-stale `root`/`toggleBtn`.
-      if (!_escListener) {
-        _escListener = (e) => {
-          if (e.key !== 'Escape') return;
-          const r = document.getElementById('ist-pc-root');
-          if (!r || !r.classList.contains('open')) return;
-          r.classList.remove('open');
-          const btn = document.getElementById('ist-pc-toggle');
-          if (btn) btn.textContent = btn.dataset.label || btn.textContent;
-          document.body.style.overflow = '';
-        };
-        document.addEventListener('keydown', _escListener);
-      }
-
-      if (page === 'anahane') {
-        // Sliders + save (language and theme only)
-        function syncTicks(sliderId, ticksId) {
-          const slider = document.getElementById(sliderId);
-          const ticks = document.getElementById(ticksId);
-          if (!slider || !ticks) return;
-          const update = () => {
-            const v = parseInt(slider.value, 10);
-            ticks.querySelectorAll('span').forEach(s => {
-              s.classList.toggle('active', parseInt(s.dataset.idx, 10) === v);
-            });
-          };
-          slider.addEventListener('input', update);
-          ticks.querySelectorAll('span').forEach(s => {
-            s.addEventListener('click', () => {
-              slider.value = s.dataset.idx;
-              slider.dispatchEvent(new Event('input'));
-            });
-          });
-          update();
-        }
-        syncTicks('ist-pc-language', 'ist-pc-language-ticks');
-        syncTicks('ist-pc-palette', 'ist-pc-palette-ticks');
-        syncTicks('ist-pc-theme', 'ist-pc-theme-ticks');
-
-        document.getElementById('ist-pc-save').addEventListener('click', async () => {
-          const msgEl = document.getElementById('ist-pc-msg');
-          const btn = document.getElementById('ist-pc-save');
-          const newLang = LANG_VALUES[parseInt(document.getElementById('ist-pc-language').value, 10)] || 'default';
-          const newTheme = THEME_VALUES[parseInt(document.getElementById('ist-pc-theme').value, 10)] || 'light';
-          const newPalette = PALETTE_VALUES[parseInt(document.getElementById('ist-pc-palette').value, 10)] || 'mono';
-
-          btn.textContent = t('profile.saving');
-          btn.disabled = true;
-          msgEl.textContent = '';
-
-          try {
-            const { data, error } = await sb
-              .from('profiles')
-              .update({ language_pref: newLang, theme_pref: newTheme, palette_pref: newPalette })
-              .eq('id', user.id)
-              .select('id');
-            if (error) throw error;
-            if (!data || data.length === 0) throw new Error('Profil bulunamadı.');
-            // Cache the new palette locally so the reload starts in the right
-            // colors instead of flashing the old palette.
-            if (window.Palette) window.Palette.setPalette(newPalette);
-            setTimeout(() => window.location.reload(), 400);
-          } catch (err) {
-            btn.textContent = t('profile.save');
-            btn.disabled = false;
-            msgEl.textContent = err.message || 'Kaydedilemedi.';
-          }
-        });
-
-        document.getElementById('ist-pc-signout').addEventListener('click', async () => {
-          await sb.auth.signOut();
-          window.location.href = 'index.html';
-        });
-      }
-
-      if (page === 'kutuphane') {
-        const copyBtn = document.getElementById('ist-pc-copy');
-        if (copyBtn) {
-          copyBtn.addEventListener('click', () => {
-            navigator.clipboard.writeText(referralCode);
-            const orig = copyBtn.textContent;
-            copyBtn.textContent = t('profile.copied');
-            setTimeout(() => copyBtn.textContent = orig, 1500);
-          });
-        }
-
-        // Avatar picker
-        let _avatarMsgTimer = null;
-        function showAvatarMsg(text) {
-          const el = document.getElementById('ist-pc-avatar-msg');
-          if (!el) return;
-          el.textContent = text;
-          el.classList.add('show');
-          clearTimeout(_avatarMsgTimer);
-          _avatarMsgTimer = setTimeout(() => el.classList.remove('show'), 5000);
-        }
-
-        async function pickAvatar(url) {
-          if (!url || url === avatarUrl) return;
-          const opt = lookupAvatarOption(url);
-          if (opt?.requiresSozculCount && (sozculCount || 0) < opt.requiresSozculCount) {
-            showAvatarMsg(lockedAvatarMessage(opt, sozculCount));
-            return;
-          }
-          const { data, error } = await sb
-            .from('profiles')
-            .update({ avatar_url: url })
-            .eq('id', user.id)
-            .select('id');
-          if (error) {
-            showAvatarMsg('Avatar kaydedilemedi: ' + error.message);
-            return;
-          }
-          if (!data || data.length === 0) {
-            showAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
-            return;
-          }
+    document.getElementById('ist-pc-toggle').addEventListener('click', () => {
+      openProfileOverlay({
+        sb: state.sb, I18N, user, profile,
+        sozculCount, kefaletCount, kefilOfUser,
+        avatarUrl: state.avatarUrl,
+        defaultTab: 'profil',
+        onAvatarChange(url) {
+          state.avatarUrl = url;
           avatarUrl = url;
-          state.avatarUrl = url; // persist so a later setPage() re-render (no re-fetch) still reflects the pick
           const av = document.getElementById('ist-pc-avatar');
-          if (av) av.innerHTML = `<img src="${esc(avatarSrc(url))}" alt="">`;
-          document.querySelectorAll('#ist-pc-avatar-picker .ist-avatar-option').forEach(b => {
-            b.classList.toggle('selected', b.dataset.url === url);
-          });
-        }
-
-        document.querySelectorAll('#ist-pc-avatar-picker .ist-avatar-option').forEach(btn => {
-          btn.addEventListener('click', () => pickAvatar(btn.dataset.url));
-        });
-
-        // Hydrate scores async
-        getGameScores(sb, user.id).then(scores => {
-          const m = document.getElementById('ist-pc-scores-mount');
-          if (m) m.innerHTML = scoresHTML(scores);
-        });
-      }
+          if (av) av.innerHTML = avatarHTML();
+        },
+      });
+    });
   }
 
   // ══════════════════════════════════════════════════════════════
-  // Shared desktop identity card: avatar, name, neighborhood, edit form
-  // (name/district/avatar/prefs). Mirrors kütüphane.html's own top-of-
-  // col-left `.library-card` (kept local there — see the comment above
-  // .library-card in profile-card.css). Desktop-only; each page hides
-  // #library-card on mobile in its own <768px query since #ist-pc-mount
-  // already covers that.
+  // Shared bottom-sheet profile overlay: Profil / Ayarlar / Rozetler tabs.
+  // Mirrors the game-overlay (kahvehane) / reader-overlay (kutuphane) /
+  // detail-overlay (anahane) bottom sheets — same markup shape, same
+  // slide-up transition, same shared frames.css card treatment — so
+  // opening your profile reads as the same kind of surface as opening a
+  // news item, an event, an article, or a game.
+  //
+  // Injected into <body> lazily (once) so every page that loads this
+  // script gets it without needing its own overlay markup.
+  // ══════════════════════════════════════════════════════════════
+  let _ov = null; // { sb, I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl, activeTab, onAvatarChange }
+
+  function ensureProfileOverlay() {
+    if (document.getElementById('profile-overlay')) return;
+    const el = document.createElement('div');
+    el.className = 'profile-overlay';
+    el.id = 'profile-overlay';
+    el.hidden = true;
+    el.innerHTML = `
+      <div class="profile-overlay-backdrop" id="profile-overlay-backdrop"></div>
+      <div class="profile-overlay-sheet" id="profile-overlay-sheet">
+        <button type="button" class="profile-overlay-close" id="profile-overlay-close" aria-label="Kapat" title="Kapat">✕</button>
+        <div class="profile-overlay-tabs" id="profile-overlay-tabs"></div>
+        <div class="profile-overlay-body" id="profile-overlay-body"></div>
+      </div>
+    `;
+    document.body.appendChild(el);
+
+    document.getElementById('profile-overlay-backdrop').addEventListener('click', closeProfileOverlay);
+    document.getElementById('profile-overlay-close').addEventListener('click', closeProfileOverlay);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && el.classList.contains('open')) closeProfileOverlay();
+    });
+    document.getElementById('profile-overlay-tabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('.profile-overlay-tab');
+      if (btn) setActiveTab(btn.dataset.tab);
+    });
+  }
+
+  // On mobile, the sheet rises from just below the compact #ist-pc-mount
+  // card (same convention as kahvehane's game-overlay / kutuphane's
+  // reader-overlay) rather than clearing the whole viewport — measured
+  // live since the mount card's height varies with its content.
+  function positionProfileSheet() {
+    const sheet = document.getElementById('profile-overlay-sheet');
+    if (!sheet) return;
+    if (!window.matchMedia('(max-width: 768px)').matches) { sheet.style.top = ''; return; }
+    const framePad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-pad')) || 10;
+    const pcMount = document.getElementById('ist-pc-mount');
+    const cardBottom = pcMount ? pcMount.getBoundingClientRect().bottom : 0;
+    sheet.style.top = `${Math.max(cardBottom, 0) + framePad}px`;
+  }
+
+  let _ovResizeListener = null;
+
+  function openProfileOverlay(opts) {
+    ensureProfileOverlay();
+    _ov = Object.assign({ sozculCount: 0, kefaletCount: 0, kefilOfUser: null }, opts);
+    if (_ov.avatarUrl === undefined) _ov.avatarUrl = _ov.profile?.avatar_url || null;
+    setActiveTab(opts.defaultTab || 'profil');
+    const overlay = document.getElementById('profile-overlay');
+    positionProfileSheet();
+    overlay.hidden = false;
+    requestAnimationFrame(() => overlay.classList.add('open'));
+    if (!_ovResizeListener) {
+      _ovResizeListener = () => {
+        const ov = document.getElementById('profile-overlay');
+        if (ov && ov.classList.contains('open')) positionProfileSheet();
+      };
+      window.addEventListener('resize', _ovResizeListener);
+    }
+  }
+
+  function closeProfileOverlay() {
+    const overlay = document.getElementById('profile-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    // Matches the sheet's own 0.55s transition (see profile-card.css)
+    // so hiding doesn't cut the closing slide-down short.
+    setTimeout(() => { overlay.hidden = true; }, 550);
+  }
+
+  function setActiveTab(tab) {
+    if (!_ov) return;
+    _ov.activeTab = tab;
+    const t = (k) => (_ov.I18N && _ov.I18N.t) ? _ov.I18N.t(k) : k;
+    const tabs = [
+      { id: 'profil',    label: t('profile.tab.profil') },
+      { id: 'ayarlar',   label: t('profile.tab.ayarlar') },
+      { id: 'rozetler',  label: t('profile.tab.rozetler') },
+    ];
+    document.getElementById('profile-overlay-tabs').innerHTML = tabs.map(tb => `
+      <button type="button" class="profile-overlay-tab${tb.id === tab ? ' active' : ''}" data-tab="${tb.id}">${esc(tb.label)}</button>
+    `).join('');
+    renderOverlayBody();
+  }
+
+  function renderOverlayBody() {
+    const body = document.getElementById('profile-overlay-body');
+    if (!body || !_ov) return;
+    if (_ov.activeTab === 'ayarlar') body.innerHTML = ayarlarTabHTML(_ov);
+    else if (_ov.activeTab === 'rozetler') body.innerHTML = rozetlerTabHTML(_ov);
+    else body.innerHTML = profilTabHTML(_ov);
+    wireTabEvents(_ov.activeTab, _ov);
+  }
+
+  function profilTabHTML(state) {
+    const { I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl } = state;
+    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
+    const firstName = profile?.first_name || '';
+    const lastName = profile?.last_name || '';
+    const yasadigiIlce = profile?.neighborhood || '';
+    const dogumYeri = profile?.birth_place || '';
+    const phone = profile?.phone || '';
+    const referralCode = profile?.referral_code || '';
+    const isAdminUser = user.email === ADMIN_EMAIL;
+
+    // `yaşadığı ilçe` is admin-controlled (protect_profile_columns trigger
+    // reverts it for everyone else) — only the admin gets an editable
+    // select; other users see it the same way they see birth place: read-only.
+    const districtOptions = Object.entries(NB_NAMES)
+      .filter(([id]) => id !== 'istanbul_disi')
+      .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
+      .map(([id, name]) => `<option value="${id}"${id === yasadigiIlce ? ' selected' : ''}>${esc(name)}</option>`)
+      .join('');
+
+    const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
+    const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
+    const joinedDate = I18N.formatDate(user.created_at, { year: 'numeric', month: 'long', day: 'numeric' });
+    const lastSeenText = formatLastSeen(user.last_sign_in_at, I18N);
+    const kefilLabel = kefilOfUser
+      ? esc(capitalizeName(`${kefilOfUser.first_name||''} ${kefilOfUser.last_name||''}`.trim()) || t('profile.unnamed'))
+      : '';
+
+    return `
+      <div class="ist-pc-avatar-field">
+        <div class="ist-pc-label">${esc(t('profile.chooseavatar'))}</div>
+        <div class="ist-pc-avatar-picker" id="po-avatar-picker">${buildAvatarPicker(avatarUrl, sozculCount)}</div>
+        <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="ist-pc-field">
+        <div class="ist-pc-label">${esc(t('profile.firstname'))}</div>
+        <input class="ist-pc-input" id="po-firstname" type="text" value="${esc(firstName)}" placeholder="${esc(t('profile.firstname'))}">
+      </div>
+      <div class="ist-pc-field">
+        <div class="ist-pc-label">${esc(t('profile.lastname'))}</div>
+        <input class="ist-pc-input" id="po-lastname" type="text" value="${esc(lastName)}" placeholder="${esc(t('profile.lastname'))}">
+      </div>
+      <div class="ist-pc-field">
+        <div class="ist-pc-label">${esc(t('profile.district'))}</div>
+        ${isAdminUser
+          ? `<select class="ist-pc-select" id="po-yasadigi"><option value="">— ${esc(t('profile.district'))} —</option>${districtOptions}</select>`
+          : `<div class="ist-pc-display">${esc(yasadigiDisplay)}</div>`}
+      </div>
+      <div class="ist-pc-field">
+        <div class="ist-pc-label">${esc(t('profile.birthplace'))}</div>
+        <div class="ist-pc-display">${esc(dogumDisplay)}</div>
+      </div>
+
+      <div class="ist-pc-actions">
+        <button type="button" class="ist-pc-save" id="po-save">${esc(t('profile.save'))}</button>
+      </div>
+      <div class="ist-pc-msg" id="po-save-msg"></div>
+
+      <div class="ist-pc-section-title">${esc(t('profile.account'))}</div>
+      <div class="ist-pc-info-row">
+        <div class="ist-pc-info-label">${esc(t('profile.email'))}</div>
+        <div class="ist-pc-info-value">${esc(user.email)}</div>
+      </div>
+      ${phone ? `
+      <div class="ist-pc-info-row">
+        <div class="ist-pc-info-label">${esc(t('profile.phone') || 'Telefon')}</div>
+        <div class="ist-pc-info-value">${esc(phone)}</div>
+      </div>` : ''}
+      <div class="ist-pc-info-row">
+        <div class="ist-pc-info-label">${esc(t('profile.membership'))}</div>
+        <div class="ist-pc-info-value">${esc(joinedDate)}</div>
+      </div>
+      <div class="ist-pc-info-row">
+        <div class="ist-pc-info-label">${esc(t('profile.lastseen'))}</div>
+        <div class="ist-pc-info-value">${esc(lastSeenText)}</div>
+      </div>
+      ${kefilOfUser ? `
+      <div class="ist-pc-info-row">
+        <div class="ist-pc-info-label">${esc(t('profile.kefil'))}</div>
+        <div class="ist-pc-info-value">${kefilLabel}</div>
+      </div>` : ''}
+      ${referralCode ? `
+      <div class="ist-pc-info-row">
+        <div class="ist-pc-info-label">${esc(t('profile.referralcode'))}</div>
+        <div class="ist-pc-info-value">
+          <span class="ist-pc-code">${esc(referralCode)}</span>
+          <button type="button" class="ist-pc-copy" id="po-copy">${esc(t('profile.copy'))}</button>
+        </div>
+      </div>` : ''}
+      <div class="ist-pc-info-row">
+        <div class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</div>
+        <div class="ist-pc-info-value">${kefaletCount ?? 0} ${esc(t('profile.people'))}</div>
+      </div>
+      <div class="ist-pc-info-row">
+        <div class="ist-pc-info-label">${esc(t('profile.sozculcount'))}</div>
+        <div class="ist-pc-info-value">${sozculCount ?? 0} ${esc(t('profile.times'))}</div>
+      </div>
+
+      <div class="ist-pc-section-title">${esc(t('profile.gamescores') || 'Oyun Skorları')}</div>
+      <div id="po-scores-mount">${scoresHTML({})}</div>
+    `;
+  }
+
+  function ayarlarTabHTML(state) {
+    const { I18N, profile } = state;
+    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
+    const languagePref = normalizeLang(profile?.language_pref);
+    const themePref = normalizeTheme(profile?.theme_pref);
+    const palettePref = normalizePalette(profile?.palette_pref);
+    return `
+      <div class="ist-pc-field">
+        <div class="ist-pc-label">${esc(t('profile.langpref'))}</div>
+        <input class="ist-pc-slider" id="po-language" type="range" min="0" max="1" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
+        <div class="ist-pc-ticks" id="po-language-ticks">
+          <span data-idx="0">Daha İngilizce</span>
+          <span data-idx="1">Daha Türkçe</span>
+        </div>
+      </div>
+      <div class="ist-pc-field">
+        <div class="ist-pc-label">${esc(t('profile.colortheme'))}</div>
+        <input class="ist-pc-slider" id="po-palette" type="range" min="0" max="1" step="1" value="${PALETTE_VALUES.indexOf(palettePref)}">
+        <div class="ist-pc-ticks" id="po-palette-ticks">
+          <span data-idx="0">Siyah-Beyaz</span>
+          <span data-idx="1">Kahverengi</span>
+        </div>
+      </div>
+      <div class="ist-pc-field">
+        <div class="ist-pc-label">${esc(t('profile.appearance'))}</div>
+        <input class="ist-pc-slider" id="po-theme" type="range" min="0" max="1" step="1" value="${THEME_VALUES.indexOf(themePref)}">
+        <div class="ist-pc-ticks" id="po-theme-ticks">
+          <span data-idx="0">Açık</span>
+          <span data-idx="1">Koyu</span>
+        </div>
+      </div>
+      <div class="ist-pc-actions">
+        <button type="button" class="ist-pc-save" id="po-ayarlar-save">${esc(t('profile.save'))}</button>
+      </div>
+      <div class="ist-pc-msg" id="po-ayarlar-msg"></div>
+      <button type="button" class="ist-pc-signout" id="po-signout">${esc(t('profile.signout'))}</button>
+    `;
+  }
+
+  function rozetlerTabHTML(state) {
+    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
+    return `
+      <div class="ist-pc-rozet-placeholder">
+        <div class="ist-pc-rozet-icon" aria-hidden="true">🏅</div>
+        <div class="ist-pc-rozet-text">${esc(t('profile.rozetler.soon'))}</div>
+      </div>
+    `;
+  }
+
+  function wireTabEvents(tab, state) {
+    const { sb, I18N, user } = state;
+    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
+
+    if (tab === 'profil') {
+      document.querySelectorAll('#po-avatar-picker .ist-avatar-option').forEach(btn => {
+        btn.addEventListener('click', () => pickOverlayAvatar(btn.dataset.url, state));
+      });
+      document.getElementById('po-save').addEventListener('click', () => saveProfilTab(state));
+      const copyBtn = document.getElementById('po-copy');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText(state.profile?.referral_code || '');
+          const orig = copyBtn.textContent;
+          copyBtn.textContent = t('profile.copied');
+          setTimeout(() => { copyBtn.textContent = orig; }, 1500);
+        });
+      }
+      getGameScores(sb, user.id).then(scores => {
+        const m = document.getElementById('po-scores-mount');
+        if (m) m.innerHTML = scoresHTML(scores);
+      });
+    } else if (tab === 'ayarlar') {
+      syncTicks('po-language', 'po-language-ticks');
+      syncTicks('po-palette', 'po-palette-ticks');
+      syncTicks('po-theme', 'po-theme-ticks');
+      document.getElementById('po-ayarlar-save').addEventListener('click', () => saveAyarlarTab(state));
+      document.getElementById('po-signout').addEventListener('click', async () => {
+        await sb.auth.signOut();
+        window.location.href = 'index.html';
+      });
+    }
+  }
+
+  async function saveProfilTab(state) {
+    const { sb, I18N, user } = state;
+    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
+    const msgEl = document.getElementById('po-save-msg');
+    const btn = document.getElementById('po-save');
+    const isAdminUser = user.email === ADMIN_EMAIL;
+    const newFirstName = capitalizeName(document.getElementById('po-firstname').value.trim());
+    const newLastName = capitalizeName(document.getElementById('po-lastname').value.trim());
+    const yasadigiEl = document.getElementById('po-yasadigi');
+
+    const payload = { first_name: newFirstName, last_name: newLastName };
+    if (isAdminUser && yasadigiEl) {
+      if (!yasadigiEl.value) {
+        msgEl.textContent = 'Lütfen bir ilçe seçin.';
+        msgEl.style.color = 'var(--accent)';
+        return;
+      }
+      payload.neighborhood = yasadigiEl.value;
+    }
+
+    btn.textContent = t('profile.saving');
+    btn.disabled = true;
+    msgEl.textContent = '';
+
+    try {
+      const { data, error } = await sb.from('profiles').update(payload).eq('id', user.id).select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
+      setTimeout(() => window.location.reload(), 400);
+    } catch (err) {
+      btn.textContent = t('profile.save');
+      btn.disabled = false;
+      msgEl.textContent = (err && err.message) || 'Kaydedilemedi.';
+      msgEl.style.color = 'var(--accent)';
+    }
+  }
+
+  async function saveAyarlarTab(state) {
+    const { sb, I18N, user } = state;
+    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
+    const msgEl = document.getElementById('po-ayarlar-msg');
+    const btn = document.getElementById('po-ayarlar-save');
+    const newLang = LANG_VALUES[parseInt(document.getElementById('po-language').value, 10)] || 'default';
+    const newTheme = THEME_VALUES[parseInt(document.getElementById('po-theme').value, 10)] || 'light';
+    const newPalette = PALETTE_VALUES[parseInt(document.getElementById('po-palette').value, 10)] || 'mono';
+
+    btn.textContent = t('profile.saving');
+    btn.disabled = true;
+    msgEl.textContent = '';
+
+    try {
+      const { data, error } = await sb.from('profiles')
+        .update({ language_pref: newLang, theme_pref: newTheme, palette_pref: newPalette })
+        .eq('id', user.id)
+        .select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Profil bulunamadı.');
+      // Cache the new palette locally so the reload starts in the right
+      // colors instead of flashing the old palette.
+      if (global.Palette) global.Palette.setPalette(newPalette);
+      setTimeout(() => window.location.reload(), 400);
+    } catch (err) {
+      btn.textContent = t('profile.save');
+      btn.disabled = false;
+      msgEl.textContent = (err && err.message) || 'Kaydedilemedi.';
+    }
+  }
+
+  let _ovAvatarMsgTimer = null;
+  function showOverlayAvatarMsg(text) {
+    const el = document.getElementById('po-avatar-msg');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(_ovAvatarMsgTimer);
+    _ovAvatarMsgTimer = setTimeout(() => el.classList.remove('show'), 5000);
+  }
+
+  async function pickOverlayAvatar(url, state) {
+    const { sb, user, sozculCount } = state;
+    if (!url || url === state.avatarUrl) return;
+    const opt = lookupAvatarOption(url);
+    if (opt?.requiresSozculCount && (sozculCount || 0) < opt.requiresSozculCount) {
+      showOverlayAvatarMsg(lockedAvatarMessage(opt, sozculCount));
+      return;
+    }
+    const { data, error } = await sb.from('profiles').update({ avatar_url: url }).eq('id', user.id).select('id');
+    if (error) { showOverlayAvatarMsg('Avatar kaydedilemedi: ' + error.message); return; }
+    if (!data || data.length === 0) { showOverlayAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
+    state.avatarUrl = url;
+    document.querySelectorAll('#po-avatar-picker .ist-avatar-option').forEach(b => {
+      b.classList.toggle('selected', b.dataset.url === url);
+    });
+    if (typeof state.onAvatarChange === 'function') state.onAvatarChange(url);
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // Shared desktop identity card: avatar, name, neighborhood, "Profil"
+  // button — opens the same bottom-sheet overlay used everywhere else.
+  // Mirrors kütüphane.html's own top-of-col-left `.library-card` (kept
+  // local there — see the comment above .library-card in profile-card.css).
+  // Desktop-only; each page hides #library-card on mobile in its own
+  // <768px query since #ist-pc-mount already covers that.
   //
   // Usage: IstProfileCard.mountLibraryCard({ sb, I18N });
   // Assumes a <div id="library-card"> exists in the page.
@@ -675,43 +789,21 @@
     const user = session.user;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
 
-    const today = istanbulTodayISO();
-    const [{ data: profile }, { count: sozculCount }] = await Promise.all([
-      sb.from('profiles').select('*').eq('id', user.id).single(),
-      sb.from('sozcel_sozcul_assignments').select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id).lte('game_date', today),
-    ]);
+    const state = await fetchProfileData(sb, I18N, user);
+    const { profile, kefaletCount, sozculCount, kefilOfUser } = state;
 
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
     const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
     const yasadigiIlce = profile?.neighborhood || '';
-    const dogumYeri = profile?.birth_place || '';
-    let avatarUrl = profile?.avatar_url || null;
-
-    const languagePref = normalizeLang(profile?.language_pref);
-    const themePref = normalizeTheme(profile?.theme_pref);
-    const palettePref = normalizePalette(profile?.palette_pref);
-    const isAdminUser = user.email === ADMIN_EMAIL;
-
-    // `yaşadığı ilçe` can't be istanbul_disi (DB check constraint) — only
-    // offer the 25 real districts, same as kütüphane's own card.
-    const districtOptions = Object.entries(NB_NAMES)
-      .filter(([id]) => id !== 'istanbul_disi')
-      .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
-      .map(([id, name]) => `<option value="${id}"${id === yasadigiIlce ? ' selected' : ''}>${esc(name)}</option>`)
-      .join('');
-
-    const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
-    let dogumDisplay = '—';
-    if (dogumYeri && NB_NAMES[dogumYeri]) dogumDisplay = NB_NAMES[dogumYeri];
-    else if (dogumYeri) dogumDisplay = dogumYeri;
 
     function avatarDisplayHTML() {
-      return avatarUrl
-        ? `<img src="${esc(avatarSrc(avatarUrl))}" alt="">`
+      return state.avatarUrl
+        ? `<img src="${esc(avatarSrc(state.avatarUrl))}" alt="">`
         : esc(displayName.charAt(0).toUpperCase());
     }
+
+    const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
 
     function renderView() {
       cardEl.innerHTML = `
@@ -722,192 +814,20 @@
             <div class="card-meta">${esc(yasadigiDisplay)}</div>
           </div>
         </div>
-        <button class="edit-btn" id="lc-edit-btn">${esc(t('profile.edit'))}</button>
+        <button class="edit-btn" id="lc-edit-btn">${esc(t('profile.toggle'))}</button>
       `;
-      document.getElementById('lc-edit-btn').addEventListener('click', renderEdit);
-    }
-
-    function renderEdit() {
-      cardEl.innerHTML = `
-        <div class="card-top">
-          <div class="avatar" id="lc-avatar-display">${avatarDisplayHTML()}</div>
-          <div class="card-id">
-            <div class="avatar-picker-label">${esc(t('profile.chooseavatar'))}</div>
-            <div class="avatar-picker" id="lc-avatar-picker">${buildAvatarPicker(avatarUrl, sozculCount, { optionClass: 'avatar-option' })}</div>
-            <div class="avatar-msg" id="lc-avatar-msg" role="status" aria-live="polite"></div>
-          </div>
-        </div>
-        <div class="card-edit">
-          <div>
-            <div class="field-label">${esc(t('profile.firstname'))}</div>
-            <input class="field-input" id="lc-firstname" type="text" value="${esc(firstName)}" placeholder="${esc(t('profile.firstname'))}">
-          </div>
-          <div>
-            <div class="field-label">${esc(t('profile.lastname'))}</div>
-            <input class="field-input" id="lc-lastname" type="text" value="${esc(lastName)}" placeholder="${esc(t('profile.lastname'))}">
-          </div>
-          <div>
-            <div class="field-label">${esc(t('profile.district'))}</div>
-            <select class="field-select" id="lc-yasadigi">
-              <option value="">— ${esc(t('profile.district'))} —</option>
-              ${districtOptions}
-            </select>
-          </div>
-          <div>
-            <div class="field-label">${esc(t('profile.birthplace'))}</div>
-            <div class="field-display">${esc(dogumDisplay)}</div>
-          </div>
-          <div>
-            <div class="field-label">${esc(t('profile.langpref'))}</div>
-            <input class="pref-slider" id="lc-language" type="range" min="0" max="1" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
-            <div class="pref-ticks" id="lc-language-ticks">
-              <span data-idx="0">Daha İngilizce</span>
-              <span data-idx="1">Daha Türkçe</span>
-            </div>
-          </div>
-          <div>
-            <div class="field-label">${esc(t('profile.colortheme'))}</div>
-            <input class="pref-slider" id="lc-palette" type="range" min="0" max="1" step="1" value="${PALETTE_VALUES.indexOf(palettePref)}">
-            <div class="pref-ticks" id="lc-palette-ticks">
-              <span data-idx="0">Siyah-Beyaz</span>
-              <span data-idx="1">Kahverengi</span>
-            </div>
-          </div>
-          <div>
-            <div class="field-label">${esc(t('profile.appearance'))}</div>
-            <input class="pref-slider" id="lc-theme" type="range" min="0" max="1" step="1" value="${THEME_VALUES.indexOf(themePref)}">
-            <div class="pref-ticks" id="lc-theme-ticks">
-              <span data-idx="0">Açık</span>
-              <span data-idx="1">Koyu</span>
-            </div>
-          </div>
-        </div>
-        <div class="edit-row">
-          <button class="cancel-btn" id="lc-cancel-btn">${esc(t('profile.cancel'))}</button>
-          <button class="save-btn" id="lc-save-btn">${esc(t('profile.save'))}</button>
-        </div>
-        <div class="save-msg" id="lc-save-msg"></div>
-      `;
-      document.getElementById('lc-cancel-btn').addEventListener('click', renderView);
-      document.getElementById('lc-save-btn').addEventListener('click', handleSave);
-      document.querySelectorAll('#lc-avatar-picker .avatar-option').forEach(btn => {
-        btn.addEventListener('click', () => handleAvatarPick(btn.dataset.url));
-      });
-
-      function syncTicks(sliderId, ticksId) {
-        const slider = document.getElementById(sliderId);
-        const ticks = document.getElementById(ticksId);
-        const update = () => {
-          const v = parseInt(slider.value, 10);
-          ticks.querySelectorAll('span').forEach(s => {
-            s.classList.toggle('active', parseInt(s.dataset.idx, 10) === v);
-          });
-        };
-        slider.addEventListener('input', update);
-        ticks.querySelectorAll('span').forEach(s => {
-          s.addEventListener('click', () => {
-            slider.value = s.dataset.idx;
-            slider.dispatchEvent(new Event('input'));
-          });
+      document.getElementById('lc-edit-btn').addEventListener('click', () => {
+        openProfileOverlay({
+          sb, I18N, user, profile,
+          sozculCount, kefaletCount, kefilOfUser,
+          avatarUrl: state.avatarUrl,
+          defaultTab: 'profil',
+          onAvatarChange(url) {
+            state.avatarUrl = url;
+            const av = document.getElementById('lc-avatar-display');
+            if (av) av.innerHTML = avatarDisplayHTML();
+          },
         });
-        update();
-      }
-      syncTicks('lc-language', 'lc-language-ticks');
-      syncTicks('lc-palette', 'lc-palette-ticks');
-      syncTicks('lc-theme', 'lc-theme-ticks');
-    }
-
-    async function handleSave() {
-      const msgEl = document.getElementById('lc-save-msg');
-      const btn = document.getElementById('lc-save-btn');
-      const newYasadigi = document.getElementById('lc-yasadigi').value;
-      const newFirstName = capitalizeName(document.getElementById('lc-firstname').value.trim());
-      const newLastName = capitalizeName(document.getElementById('lc-lastname').value.trim());
-
-      if (!newYasadigi) {
-        msgEl.textContent = 'Lütfen bir ilçe seçin.';
-        msgEl.style.color = 'var(--accent)';
-        return;
-      }
-
-      btn.textContent = t('profile.saving');
-      btn.disabled = true;
-      msgEl.textContent = '';
-
-      try {
-        const newLanguage = LANG_VALUES[parseInt(document.getElementById('lc-language').value, 10)] || 'default';
-        const newTheme = THEME_VALUES[parseInt(document.getElementById('lc-theme').value, 10)] || 'light';
-        const newPalette = PALETTE_VALUES[parseInt(document.getElementById('lc-palette').value, 10)] || 'mono';
-
-        // `neighborhood` is admin-controlled — the protect_profile_columns
-        // trigger silently reverts it for non-admin users, so only send it
-        // for the admin (matches kütüphane's own card).
-        const payload = {
-          first_name: newFirstName,
-          last_name: newLastName,
-          language_pref: newLanguage,
-          theme_pref: newTheme,
-          palette_pref: newPalette,
-        };
-        if (isAdminUser) payload.neighborhood = newYasadigi;
-
-        const { data, error } = await sb
-          .from('profiles')
-          .update(payload)
-          .eq('id', user.id)
-          .select('id, first_name, last_name, neighborhood');
-
-        if (error) throw error;
-        if (!data || data.length === 0) {
-          throw new Error('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
-        }
-
-        if (global.Palette) global.Palette.setPalette(newPalette);
-        setTimeout(() => window.location.reload(), 400);
-      } catch (err) {
-        btn.textContent = t('profile.save');
-        btn.disabled = false;
-        msgEl.textContent = err && err.message ? err.message : 'Kaydedilemedi.';
-        msgEl.style.color = 'var(--accent)';
-      }
-    }
-
-    let _avatarMsgTimer = null;
-    function showAvatarMsg(text) {
-      const el = document.getElementById('lc-avatar-msg');
-      if (!el) return;
-      el.textContent = text;
-      el.classList.add('show');
-      clearTimeout(_avatarMsgTimer);
-      _avatarMsgTimer = setTimeout(() => el.classList.remove('show'), 5000);
-    }
-
-    async function handleAvatarPick(url) {
-      if (!url || url === avatarUrl) return;
-      const opt = lookupAvatarOption(url);
-      if (opt?.requiresSozculCount && (sozculCount || 0) < opt.requiresSozculCount) {
-        showAvatarMsg(lockedAvatarMessage(opt, sozculCount));
-        return;
-      }
-      const { data, error } = await sb
-        .from('profiles')
-        .update({ avatar_url: url })
-        .eq('id', user.id)
-        .select('id');
-
-      if (error) {
-        showAvatarMsg('Avatar kaydedilemedi: ' + error.message);
-        return;
-      }
-      if (!data || data.length === 0) {
-        showAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
-        return;
-      }
-      avatarUrl = url;
-      const av = document.getElementById('lc-avatar-display');
-      if (av) av.innerHTML = `<img src="${esc(avatarSrc(url))}" alt="">`;
-      document.querySelectorAll('#lc-avatar-picker .avatar-option').forEach(b => {
-        b.classList.toggle('selected', b.dataset.url === url);
       });
     }
 
@@ -919,6 +839,8 @@
     setPage,
     unmount,
     mountLibraryCard,
+    openProfileOverlay,
+    closeProfileOverlay,
     AVATAR_OPTIONS,
     AVATAR_LOCK_SVG,
     buildAvatarPicker,
