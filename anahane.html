@@ -385,13 +385,19 @@
       grid-row: 2;
       display: block;
       overflow: hidden;
-      /* main's only child is .map-panel, which escapes to position:fixed
-         with a negative z-index (see below) — meaning main's own
-         (invisible but still hit-testable) box sits in front of it in
-         the root stacking context and was silently swallowing every
-         click meant for the map. Nothing else lives in main, so letting
-         clicks pass straight through it is safe; .map-panel re-enables
-         pointer-events for itself and its children below. */
+      /* z-index (any explicit value, grid items don't need `position` for
+         this) gives main its own stacking context, so its fixed/negative
+         z-index child .map-panel stays contained within main's local
+         paint order instead of escaping all the way to the root stacking
+         context. Without this, .map-panel ends up stacked below
+         #main-site's own box -- and #main-site.active has
+         pointer-events:auto (see above) covering the full viewport, so it
+         silently intercepted every hover/click meant for the map's SVG
+         hit-regions before they ever reached them. Nothing else lives in
+         main, so letting clicks pass straight through main's own box is
+         safe; .map-panel re-enables pointer-events for itself and its
+         children below. */
+      z-index: 0;
       pointer-events: none;
     }
 
