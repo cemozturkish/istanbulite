@@ -23,7 +23,7 @@
 
   function injectStyles() {
     if (stylesInjected) return;
-    if (document.getElementById('sozcul-mascot-styles') || document.getElementById('admin-notif-styles')) {
+    if (document.getElementById('admin-notif-styles')) {
       stylesInjected = true;
       return;
     }
@@ -81,10 +81,6 @@
       #admin-notif-popup .anp-mascot {
         width: 84px;
         height: 84px;
-        background: var(--paper, #eddbd0);
-        border: 1px solid var(--rule, #b8a08a);
-        border-radius: 50%;
-        padding: 4px;
         flex-shrink: 0;
         cursor: pointer;
       }
@@ -178,6 +174,21 @@
     }
   }
 
+  // On desktop, the left column (news/discussion) sits flush against the
+  // viewport's left edge -- the popup's default fixed left:18px lands
+  // right on top of it. Nudge the popup right of that column instead, so
+  // it appears beside the content rather than over it. Mobile keeps its
+  // own full-width bar (see media query above) so this only applies
+  // above the mobile breakpoint.
+  function clearSidebar(root) {
+    if (window.innerWidth <= 768) return;
+    const sidebar = document.querySelector('.col-left');
+    if (!sidebar) return;
+    const rect = sidebar.getBoundingClientRect();
+    if (!rect.width) return;
+    root.style.left = `${Math.round(rect.right + 18)}px`;
+  }
+
   function renderPopup(mascot, text) {
     injectStyles();
     const old = document.getElementById('admin-notif-popup');
@@ -197,6 +208,7 @@
       </div>
     `;
     document.body.appendChild(root);
+    clearSidebar(root);
     requestAnimationFrame(() => root.classList.add('anp-show'));
 
     let dismissed = false;
