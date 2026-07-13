@@ -31,12 +31,12 @@
     const css = `
       #admin-notif-popup {
         position: fixed;
-        right: 18px;
+        left: 18px;
         bottom: 18px;
         z-index: 100000;
         display: flex;
         flex-direction: column;
-        align-items: flex-end;
+        align-items: flex-start;
         gap: 8px;
         max-width: min(380px, calc(100vw - 36px));
         font-family: 'Source Serif 4', Georgia, serif;
@@ -54,7 +54,7 @@
         padding: 14px 38px 14px 16px;
         font-size: 1rem;
         line-height: 1.45;
-        border-radius: 12px 12px 4px 12px;
+        border-radius: 12px 12px 12px 4px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.22);
         max-width: 100%;
         cursor: pointer;
@@ -184,7 +184,7 @@
     if (old) old.remove();
     const root = document.createElement('div');
     root.id = 'admin-notif-popup';
-    const src = mascot === 'cat' ? 'assets/mascot-cat.svg' : 'assets/mascot-dog.svg';
+    const src = mascot === 'cat' ? 'assets/mascot-cat-left.png' : 'assets/mascot-dog-left.png';
     const escaped = String(text).replace(/[&<>"']/g,
       c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     root.innerHTML = `
