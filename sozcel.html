@@ -637,8 +637,41 @@
       margin: 0 auto;
       margin-top: 0;
     }
+    /* Bugünün Sonuçları: tap a row to reveal that player's result as an
+       emoji bar. We only ever know attempts + won/lost (game_results
+       doesn't store per-letter guess data), so the bar shows attempt
+       progress — used tries in black, the final try green/red, remaining
+       tries blank — not a real per-letter Wordle pattern. */
+    #today-results-list-takeover .scoreboard-item.result-toggle {
+      cursor: pointer;
+      flex-wrap: wrap;
+      transition: transform 0.15s ease;
+    }
+    #today-results-list-takeover .scoreboard-item.result-toggle:hover { transform: translateX(-4px); }
+    #today-results-list-takeover .scoreboard-result-reveal {
+      display: none;
+      flex-basis: 100%;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed currentColor;
+      opacity: 0.92;
+      text-align: center;
+    }
+    #today-results-list-takeover .scoreboard-item.expanded .scoreboard-result-reveal { display: block; }
+    #today-results-list-takeover .emoji-bar { font-size: 1rem; letter-spacing: 3px; }
+    #today-results-list-takeover .result-caption {
+      margin-top: 4px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.66rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
     @media (max-width: 768px) {
-      .sozcul-takeover { padding: 14px; }
+      /* Top padding matches .game-panel's mobile top padding (60px) so the
+         eyebrow/title clear the fixed back/scoreboard/help buttons instead
+         of sitting underneath them. */
+      .sozcul-takeover { padding: 60px 14px 24px; }
       .sozcul-takeover h2 { font-size: 1.35rem; }
       .sozcul-takeover .stk-word-input { font-size: 1.2rem; letter-spacing: 4px; padding: 10px 12px; }
     }
@@ -1387,10 +1420,15 @@
       /* Hide everything except the game itself for immersive fullscreen */
       .section-rule, .col-left, .col-right, header { display: none !important; }
 
-      /* On mobile, move share/help next to the back button instead of overlapping the game */
+      /* On mobile, move share/help next to the back button instead of overlapping the game.
+         Switched from the desktop `position: absolute` (relative to <main>, which sits
+         var(--frame-pad) below the true viewport top) to `fixed` so this lines up with
+         .game-back-btn / .game-controls-left, which are already fixed to the viewport. */
       .game-controls {
+        position: fixed;
         top: 10px;
         right: 10px;
+        z-index: 200;
       }
       .game-ctrl-btn {
         width: 38px;
@@ -4272,12 +4310,37 @@ async function loadTodayResults() {
     const playerLabel = nbName ? `${nbName}${suffix} ${escapeHtml(name)}` : escapeHtml(name);
     const resultLabel = r.won ? `${r.attempts}/6` : 'X/6';
     const rankClass = i < 3 ? ' r' + (i + 1) : '';
-    return `<li class="scoreboard-item${rankClass} author-link" data-user-id="${r.user_id}">` +
+    const emojiBar = buildResultEmojiBar(r.attempts, r.won);
+    const caption = r.won ? `${r.attempts}. denemede buldu` : '6 denemede bulamadı';
+    return `<li class="scoreboard-item${rankClass} result-toggle" data-user-id="${r.user_id}">` +
       `<span class="scoreboard-rank">${i + 1}.</span>` +
       `<span class="scoreboard-player"><span class="scoreboard-name">${playerLabel}</span></span>` +
       `<span class="scoreboard-score">${resultLabel}</span>` +
+      `<div class="scoreboard-result-reveal">` +
+        `<div class="emoji-bar">${emojiBar}</div>` +
+        `<div class="result-caption">${escapeHtml(caption)}</div>` +
+      `</div>` +
     `</li>`;
   }).join('');
+  listEl.querySelectorAll('.scoreboard-item.result-toggle').forEach(item => {
+    item.addEventListener('click', () => item.classList.toggle('expanded'));
+  });
+}
+
+// Abstracted attempt-progress bar for another player's result: black for
+// each used try, green (win) or red (loss) for the final try, blank for
+// tries never reached. We don't know their actual per-letter guess
+// pattern — game_results only stores attempts + won/lost — so this shows
+// how many tries it took rather than a real Wordle-style grid.
+function buildResultEmojiBar(attempts, won) {
+  const used = won ? Math.max(1, Math.min(6, attempts || 1)) : 6;
+  const squares = [];
+  for (let i = 0; i < 6; i++) {
+    if (i < used - 1) squares.push('⬛');
+    else if (i === used - 1) squares.push(won ? '🟩' : '🟥');
+    else squares.push('⬜');
+  }
+  return squares.join('');
 }
 
 // Turkish ablative suffix with vowel harmony + voiceless-consonant rule.
