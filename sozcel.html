@@ -628,6 +628,15 @@
       color: var(--muted);
       line-height: 1.45;
     }
+    /* The takeover panel's own flex gap already separates this from what's
+       above it, so drop the .scoreboard block's own top margin to avoid a
+       doubled gap; keep the rule line for visual separation. */
+    .sozcul-takeover .stk-scoreboard {
+      width: 100%;
+      max-width: 340px;
+      margin: 0 auto;
+      margin-top: 0;
+    }
     @media (max-width: 768px) {
       .sozcul-takeover { padding: 14px; }
       .sozcul-takeover h2 { font-size: 1.35rem; }
@@ -4125,11 +4134,13 @@ function setWeekProgress(el) {
 async function loadScoreboard() {
   const listEl = document.getElementById('scoreboard-list');
   const listElMobile = document.getElementById('scoreboard-list-mobile');
+  const listElTakeover = document.getElementById('scoreboard-list-takeover');
   function setListHTML(html) {
     if (listEl) listEl.innerHTML = html;
     if (listElMobile) listElMobile.innerHTML = html;
+    if (listElTakeover) listElTakeover.innerHTML = html;
   }
-  if (!listEl && !listElMobile) return;
+  if (!listEl && !listElMobile && !listElTakeover) return;
   let results = null;
   try {
     const { data, error } = await sb.from('game_results')
@@ -4216,6 +4227,7 @@ async function loadScoreboard() {
   setListHTML(listHtml);
   setWeekProgress(document.getElementById('scoreboard-countdown'));
   setWeekProgress(document.getElementById('scoreboard-countdown-mobile'));
+  setWeekProgress(document.getElementById('scoreboard-countdown-takeover'));
 }
 
 // Turkish ablative suffix with vowel harmony + voiceless-consonant rule.
@@ -4715,6 +4727,23 @@ function enterSozculTakeoverMode(status) {
   }
 }
 
+// Shared scoreboard block dropped into every takeover state so the Sözcü —
+// who can't play their own game and gets the play surface replaced entirely
+// — still has somewhere to see how everyone else is doing. loadScoreboard()
+// re-populates it (by id) right after each render since takeover.innerHTML
+// gets fully replaced on every state change.
+function sozculTakeoverScoreboardHTML() {
+  return `
+    <div class="scoreboard stk-scoreboard">
+      <h2 data-i18n="games.weeklyscoreboard">Haftanın Skor Tahtası</h2>
+      <div class="scoreboard-countdown" id="scoreboard-countdown-takeover"></div>
+      <ol class="scoreboard-list" id="scoreboard-list-takeover">
+        <li class="scoreboard-empty">Yükleniyor...</li>
+      </ol>
+    </div>
+  `;
+}
+
 function renderTakeoverDone(takeover, date) {
   if (_takeoverCountdownInterval) { clearInterval(_takeoverCountdownInterval); _takeoverCountdownInterval = null; }
   const today = getIstanbulDateISO();
@@ -4733,9 +4762,11 @@ function renderTakeoverDone(takeover, date) {
       <span>${escapeHtml(body)}</span>
     </div>
     ${playToday}
+    ${sozculTakeoverScoreboardHTML()}
   `;
   const playBtn = takeover.querySelector('#stk-play-today');
   if (playBtn) playBtn.addEventListener('click', () => window.location.reload());
+  loadScoreboard();
 }
 
 function renderTakeoverMissed(takeover, date) {
@@ -4747,7 +4778,9 @@ function renderTakeoverMissed(takeover, date) {
       <strong>Kelime girilmedi</strong>
       <span>${escapeHtml(formatISOTurkish(date))} için Sözcü sen seçildin ama kelimeyi gece yarısından önce gönderemedin. Bugün oyun yöneticinin seçtiği kelimeyle oynanıyor.</span>
     </div>
+    ${sozculTakeoverScoreboardHTML()}
   `;
+  loadScoreboard();
 }
 
 function renderTakeoverForm(takeover, status) {
@@ -4802,7 +4835,9 @@ function renderTakeoverForm(takeover, status) {
       <button type="button" class="stk-submit" id="stk-submit">${existing ? 'Değişikliği Kaydet' : 'Onayla ve Kaydet'}</button>
       <div class="stk-status" id="stk-status"></div>
     </div>
+    ${sozculTakeoverScoreboardHTML()}
   `;
+  loadScoreboard();
 
   const wordInput = takeover.querySelector('#stk-word-input');
   const submitBtn = takeover.querySelector('#stk-submit');
