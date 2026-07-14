@@ -4134,13 +4134,11 @@ function setWeekProgress(el) {
 async function loadScoreboard() {
   const listEl = document.getElementById('scoreboard-list');
   const listElMobile = document.getElementById('scoreboard-list-mobile');
-  const listElTakeover = document.getElementById('scoreboard-list-takeover');
   function setListHTML(html) {
     if (listEl) listEl.innerHTML = html;
     if (listElMobile) listElMobile.innerHTML = html;
-    if (listElTakeover) listElTakeover.innerHTML = html;
   }
-  if (!listEl && !listElMobile && !listElTakeover) return;
+  if (!listEl && !listElMobile) return;
   let results = null;
   try {
     const { data, error } = await sb.from('game_results')
@@ -4227,7 +4225,59 @@ async function loadScoreboard() {
   setListHTML(listHtml);
   setWeekProgress(document.getElementById('scoreboard-countdown'));
   setWeekProgress(document.getElementById('scoreboard-countdown-mobile'));
-  setWeekProgress(document.getElementById('scoreboard-countdown-takeover'));
+}
+
+// ── Today's Sözcel results (shown to the Sözcü, who can't play today's
+// word themselves) — who played today, on which attempt they solved it
+// (or that they missed it), ordered best-to-worst. Unlike loadScoreboard()
+// this is a single day's raw results, not the weekly points table.
+async function loadTodayResults() {
+  const listEl = document.getElementById('today-results-list-takeover');
+  if (!listEl) return;
+  let results = null;
+  try {
+    const { data, error } = await sb.from('game_results')
+      .select('user_id, neighborhood, won, attempts, created_at')
+      .eq('game', 'sozcel')
+      .eq('date', dailySeed)
+      .gte('attempts', 1)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    results = data;
+  } catch (e) {
+    listEl.innerHTML = '<li class="scoreboard-empty">Sonuçlar yüklenemedi</li>';
+    return;
+  }
+  if (!results || results.length === 0) {
+    listEl.innerHTML = '<li class="scoreboard-empty">Bugün henüz kimse oynamadı</li>';
+    return;
+  }
+  const sorted = [...results].sort((a, b) => {
+    if (a.won !== b.won) return a.won ? -1 : 1;
+    if (a.won && a.attempts !== b.attempts) return a.attempts - b.attempts;
+    return new Date(a.created_at) - new Date(b.created_at);
+  });
+  const userIds = [...new Set(sorted.map(r => r.user_id).filter(Boolean))];
+  const nameMap = new Map();
+  try {
+    if (userIds.length > 0) {
+      const { data: profs } = await sb.from('profiles').select('id, first_name').in('id', userIds);
+      (profs || []).forEach(p => { if (p.first_name) nameMap.set(p.id, p.first_name.toLocaleUpperCase('tr-TR')); });
+    }
+  } catch (e) {}
+  listEl.innerHTML = sorted.map((r, i) => {
+    const nbName = (neighborhoodNames[r.neighborhood] || r.neighborhood || '').toLocaleUpperCase('tr-TR');
+    const name = nameMap.get(r.user_id) || 'Anonim';
+    const suffix = getAblativeSuffix(nbName).toLocaleUpperCase('tr-TR');
+    const playerLabel = nbName ? `${nbName}${suffix} ${escapeHtml(name)}` : escapeHtml(name);
+    const resultLabel = r.won ? `${r.attempts}/6` : 'X/6';
+    const rankClass = i < 3 ? ' r' + (i + 1) : '';
+    return `<li class="scoreboard-item${rankClass} author-link" data-user-id="${r.user_id}">` +
+      `<span class="scoreboard-rank">${i + 1}.</span>` +
+      `<span class="scoreboard-player"><span class="scoreboard-name">${playerLabel}</span></span>` +
+      `<span class="scoreboard-score">${resultLabel}</span>` +
+    `</li>`;
+  }).join('');
 }
 
 // Turkish ablative suffix with vowel harmony + voiceless-consonant rule.
@@ -4727,17 +4777,17 @@ function enterSozculTakeoverMode(status) {
   }
 }
 
-// Shared scoreboard block dropped into every takeover state so the Sözcü —
+// Shared results block dropped into every takeover state so the Sözcü —
 // who can't play their own game and gets the play surface replaced entirely
-// — still has somewhere to see how everyone else is doing. loadScoreboard()
-// re-populates it (by id) right after each render since takeover.innerHTML
-// gets fully replaced on every state change.
+// — still has somewhere to see how everyone else did on today's word:
+// who played, and on which attempt they solved it (or that they missed
+// it). loadTodayResults() re-populates it (by id) right after each render
+// since takeover.innerHTML gets fully replaced on every state change.
 function sozculTakeoverScoreboardHTML() {
   return `
     <div class="scoreboard stk-scoreboard">
-      <h2 data-i18n="games.weeklyscoreboard">Haftanın Skor Tahtası</h2>
-      <div class="scoreboard-countdown" id="scoreboard-countdown-takeover"></div>
-      <ol class="scoreboard-list" id="scoreboard-list-takeover">
+      <h2>Bugünün Sonuçları</h2>
+      <ol class="scoreboard-list" id="today-results-list-takeover">
         <li class="scoreboard-empty">Yükleniyor...</li>
       </ol>
     </div>
@@ -4766,7 +4816,7 @@ function renderTakeoverDone(takeover, date) {
   `;
   const playBtn = takeover.querySelector('#stk-play-today');
   if (playBtn) playBtn.addEventListener('click', () => window.location.reload());
-  loadScoreboard();
+  loadTodayResults();
 }
 
 function renderTakeoverMissed(takeover, date) {
@@ -4780,7 +4830,7 @@ function renderTakeoverMissed(takeover, date) {
     </div>
     ${sozculTakeoverScoreboardHTML()}
   `;
-  loadScoreboard();
+  loadTodayResults();
 }
 
 function renderTakeoverForm(takeover, status) {
@@ -4837,7 +4887,7 @@ function renderTakeoverForm(takeover, status) {
     </div>
     ${sozculTakeoverScoreboardHTML()}
   `;
-  loadScoreboard();
+  loadTodayResults();
 
   const wordInput = takeover.querySelector('#stk-word-input');
   const submitBtn = takeover.querySelector('#stk-submit');
