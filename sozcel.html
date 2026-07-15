@@ -638,10 +638,11 @@
       margin-top: 0;
     }
     /* Bugünün Sonuçları: tap a row to reveal that player's result as an
-       emoji bar. We only ever know attempts + won/lost (game_results
-       doesn't store per-letter guess data), so the bar shows attempt
-       progress — used tries in black, the final try green/red, remaining
-       tries blank — not a real per-letter Wordle pattern. */
+       emoji bar, reusing the same 🟫/🟧 squares as the game's own share
+       grid. We only ever know attempts + won/lost (game_results doesn't
+       store per-letter guess data), so the bar shows attempt progress —
+       🟧 per try, the final square flipping to 🟫 only on a win — not a
+       real per-letter Wordle pattern. */
     #today-results-list-takeover .scoreboard-item.result-toggle {
       cursor: pointer;
       flex-wrap: wrap;
@@ -4327,18 +4328,18 @@ async function loadTodayResults() {
   });
 }
 
-// Abstracted attempt-progress bar for another player's result: black for
-// each used try, green (win) or red (loss) for the final try, blank for
-// tries never reached. We don't know their actual per-letter guess
-// pattern — game_results only stores attempts + won/lost — so this shows
-// how many tries it took rather than a real Wordle-style grid.
+// Abstracted attempt-progress bar for another player's result, reusing the
+// same 🟫 (correct)/🟧 (present) squares as buildShareText()'s own share
+// grid: 🟧 per try, flipping to 🟫 on the final square only for a win. We
+// don't know their actual per-letter guess pattern — game_results only
+// stores attempts + won/lost — so this shows how many tries it took
+// rather than a real Wordle-style grid.
 function buildResultEmojiBar(attempts, won) {
   const used = won ? Math.max(1, Math.min(6, attempts || 1)) : 6;
   const squares = [];
-  for (let i = 0; i < 6; i++) {
-    if (i < used - 1) squares.push('⬛');
-    else if (i === used - 1) squares.push(won ? '🟩' : '🟥');
-    else squares.push('⬜');
+  for (let i = 0; i < used; i++) {
+    const isLast = i === used - 1;
+    squares.push(isLast && won ? '🟫' : '🟧');
   }
   return squares.join('');
 }
