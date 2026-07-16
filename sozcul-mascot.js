@@ -146,7 +146,7 @@
         #sozcul-mascot-popup {
           left: 12px;
           right: 12px;
-          bottom: calc(56px + env(safe-area-inset-bottom) + 12px);
+          bottom: calc(68px + env(safe-area-inset-bottom) + 12px);
           max-width: none;
           align-items: stretch;
         }
