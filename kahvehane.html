@@ -902,6 +902,10 @@
         pointer-events: auto;
         margin-left: calc(-1 * var(--frame-pad, 10px));
         margin-right: calc(-1 * var(--frame-pad, 10px));
+        /* Room for the floating profile card (now offset by the same
+           safe-area amount) so it still sits over empty "sea", not over
+           the districts themselves. */
+        margin-top: env(safe-area-inset-top);
         box-shadow: none !important;
       }
       .map-panel {
@@ -1723,8 +1727,12 @@
   const MAX_TIME = 700;
   // Prefer the View Transitions API when available — it snapshots the
   // outgoing page and holds it until the new one is rendered, which
-  // eliminates the white flash the manual slide-out can't hide.
-  const supportsVT = 'startViewTransition' in document;
+  // eliminates the white flash the manual slide-out can't hide. Cross-
+  // document VT is new enough that Capacitor's embedded WKWebView can
+  // report the API as present without actually completing the
+  // navigation, silently swallowing tab-bar taps — so skip it inside
+  // the native app and always use the manual slide/timeout fallback.
+  const supportsVT = 'startViewTransition' in document && !window.Capacitor;
 
   function isMobile() { return window.innerWidth <= 768; }
   function currentIdx() {
