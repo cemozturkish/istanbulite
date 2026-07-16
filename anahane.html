@@ -933,6 +933,20 @@
         aspect-ratio: 1 / 1;
         overflow: hidden;
       }
+      /* Neither this page nor kahvehane's is meant to scroll -- so once
+         map-zoom.js zooms past 1x, it switches the panel to a fixed
+         position pinned at its own current on-screen rect (computed in
+         JS, not CSS) with overflow allowed to escape that little square.
+         That's the same "position:fixed escapes the grid" trick the
+         desktop full-bleed map already relies on (see main's z-index:0
+         above, which keeps it correctly layered instead of jumping to
+         the root stacking context), so the larger zoomed map can spill
+         into the rest of the screen without ever growing #main-site's
+         own scrollable content size. */
+      .map-panel.ist-zoomed {
+        position: fixed;
+        overflow: visible;
+      }
       .map-panel img.map-photo { display: block; }
       .map-panel svg.map-svg { display: block; }
       .map-mobile-draft { display: none; }
@@ -1007,7 +1021,11 @@
       }
 
       /* News (left) + events (right): normal in-flow columns below the
-         map, each stacking its own cards top to bottom. */
+         map, each stacking its own cards top to bottom. Explicit z-index
+         (above main's own 0, see main{} above) so they stay on top of
+         the map even once it's zoomed in and spilling past its own
+         little square -- otherwise DOM order alone would leave one of
+         the two columns stacked below it. */
       .col-left, .col-right {
         position: static;
         top: auto; bottom: auto; left: auto; right: auto;
@@ -1015,6 +1033,7 @@
         width: auto;
         display: block;
         overflow: visible;
+        z-index: 1;
       }
       .col-left { grid-area: news; }
       .col-right { grid-area: events; }
@@ -1082,7 +1101,6 @@
         border-bottom: none;
         background: var(--paper-navbar);
         z-index: 100;
-        box-shadow: 0 -2px 8px rgba(42,34,26,0.06);
         display: flex;
         align-items: stretch;
       }

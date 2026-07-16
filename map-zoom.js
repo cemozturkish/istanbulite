@@ -8,6 +8,17 @@
 // Single-finger touches only pan once already zoomed in -- at rest
 // (scale 1) they're left alone entirely, so tapping a district and
 // swiping to switch tabs both keep working exactly as before.
+//
+// At rest the map sits in its normal small in-flow square, same as
+// always. Neither hane nor kahvehane's page is meant to scroll, so once
+// zoomed in .map-panel switches to position:fixed at its own current
+// on-screen rect (see setZoomedMode) -- that escapes it from the grid
+// entirely, exactly like the desktop layout's own full-bleed map already
+// does, so the larger scaled content can spill past its little square
+// into the rest of the screen without ever growing the page's own
+// scrollable area. .col-left/.col-right sit above it in z-index (see
+// each page's CSS) so news/events (or comments/games) stay visible,
+// covering the map wherever they overlap it -- which is fine, expected.
 (function () {
   const MIN_SCALE = 1;
   const MAX_SCALE = 4;
@@ -20,8 +31,10 @@
     let scale = 1, tx = 0, ty = 0;
     let panelW = 0, panelH = 0;
     let gesture = null;
+    let zoomedMode = false;
 
     function measure() {
+      if (zoomedMode) return; // fixed rect is pinned to the pre-zoom measurement, see setZoomedMode
       const r = panel.getBoundingClientRect();
       panelW = r.width;
       panelH = r.height;
@@ -29,10 +42,35 @@
     measure();
     window.addEventListener('resize', () => { measure(); apply(); });
 
+    function setZoomedMode(on) {
+      if (on === zoomedMode) return;
+      zoomedMode = on;
+      if (on) {
+        const r = panel.getBoundingClientRect();
+        panel.style.top = r.top + 'px';
+        panel.style.left = r.left + 'px';
+        panel.style.width = r.width + 'px';
+        panel.style.height = r.height + 'px';
+        panel.classList.add('ist-zoomed');
+      } else {
+        panel.classList.remove('ist-zoomed');
+        panel.style.top = panel.style.left = panel.style.width = panel.style.height = '';
+      }
+    }
+
     function clamp() {
       scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
-      const maxX = Math.max(0, panelW * (scale - 1));
-      const maxY = Math.max(0, panelH * (scale - 1));
+      setZoomedMode(scale > 1.001);
+      // Once zoomed, .map-panel escapes to a fixed position (see above)
+      // and can be covered by the rest of the page, so the pannable
+      // content needs to cover the full viewport wherever it might peek
+      // through -- not just its own little square. At scale 1 this
+      // reduces to the original panelW/panelH bound (no pan allowed),
+      // matching the un-zoomed default exactly.
+      const coverW = Math.max(panelW, window.innerWidth);
+      const coverH = Math.max(panelH, window.innerHeight);
+      const maxX = Math.max(0, panelW * scale - coverW);
+      const maxY = Math.max(0, panelH * scale - coverH);
       tx = Math.min(0, Math.max(-maxX, tx));
       ty = Math.min(0, Math.max(-maxY, ty));
     }
