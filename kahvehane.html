@@ -21,6 +21,7 @@
   <script src="onboarding.js" defer></script>
   <script src="sozcul-mascot.js" defer></script>
   <script src="admin-notification.js" defer></script>
+  <script src="map-zoom.js" defer></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in. Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot, and a one-shot flag so the posts/scoreboard card-entrance animation (see animateFeedSwap) skips its first run here -- the column itself is already sliding in from the same edge, so animating the cards inside it too would look like the content arriving twice. -->
   <script>
     (function(){
@@ -213,6 +214,19 @@
       z-index: -1;
       overflow: hidden;
       background: #f7f7f7;
+      /* Hands touch gestures on the map entirely to map-zoom.js (pinch
+         to zoom, drag to pan when zoomed) instead of the browser's own
+         page-zoom/scroll handling, which would otherwise fight it. */
+      touch-action: none;
+    }
+
+    /* Wraps the photo + hit-region overlay so map-zoom.js can scale/pan
+       them together as one unit with a single transform -- map-label
+       stays outside it, un-zoomed. */
+    .map-zoom-layer {
+      position: absolute;
+      inset: 0;
+      transform-origin: 0 0;
     }
 
     .map-panel img.map-photo {
@@ -1571,6 +1585,9 @@
 
   <main>
     <section class="map-panel">
+      <!-- Scaled/panned as one unit by map-zoom.js (pinch to zoom, drag
+           to pan once zoomed) -- map-label below stays outside it. -->
+      <div class="map-zoom-layer">
       <img class="map-photo" src="assets/istanbul-map.png" alt="">
 
       <!-- Hit-region overlay traced against map-photo (same 5046x2300
@@ -1681,6 +1698,7 @@
           <polygon id="bahcelievler" class="neighborhood" data-name="Bahçelievler" points="1622.68 1693.32 1637.83 1671.21 1632.58 1649.59 1519.4 1624.55 1328.74 1616.93 1272.58 1737 1359.01 1780.79 1448.51 1767.02 1613.73 1703.92 1622.68 1693.32" fill="none" stroke="#000" stroke-miterlimit="10"/>
         </g>
       </svg>
+      </div>
 
       <div class="map-label" id="map-label">İstanbul</div>
     </section>
