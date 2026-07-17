@@ -19,12 +19,18 @@
 // scrollable area. .col-left/.col-right sit above it in z-index (see
 // each page's CSS) so news/events (or comments/games) stay visible,
 // covering the map wherever they overlap it -- which is fine, expected.
-(function () {
+(function (global) {
   const MIN_SCALE = 1;
   const MAX_SCALE = 4;
   const MOVE_THRESHOLD = 6; // px of screen movement before a 1-finger touch counts as a drag, not a tap
 
   function initMapZoom(panel) {
+    // A virtual navigation can call this again on a .map-panel it already
+    // wired up (e.g. re-entering a cached page) -- guard so a revisit
+    // doesn't double-register touch listeners on the same node.
+    if (panel.dataset.mapZoomInit) return;
+    panel.dataset.mapZoomInit = '1';
+
     const layer = panel.querySelector('.map-zoom-layer');
     if (!layer) return;
 
@@ -42,11 +48,23 @@
     measure();
     window.addEventListener('resize', () => { measure(); apply(); });
 
+    // panel's parent (<main>, on every page that uses this) has no
+    // explicit height of its own -- it's sized purely by .map-panel's
+    // normal-flow height. Once the panel escapes to position:fixed
+    // below, a parent with nothing else inside it collapses to ~0. On
+    // anahane, where the whole page (#main-site) is what scrolls, that
+    // collapse shrinks the scrollable content height out from under a
+    // user who had scrolled into the news feed, and the browser clamps
+    // their scroll position back up toward the top the instant it
+    // happens -- reserving the parent's height explicitly here keeps
+    // that from ever having anything to collapse into.
     function setZoomedMode(on) {
       if (on === zoomedMode) return;
       zoomedMode = on;
+      const parentEl = panel.parentElement;
       if (on) {
         const r = panel.getBoundingClientRect();
+        if (parentEl) parentEl.style.height = r.height + 'px';
         panel.style.top = r.top + 'px';
         panel.style.left = r.left + 'px';
         panel.style.width = r.width + 'px';
@@ -55,6 +73,7 @@
       } else {
         panel.classList.remove('ist-zoomed');
         panel.style.top = panel.style.left = panel.style.width = panel.style.height = '';
+        if (parentEl) parentEl.style.height = '';
       }
     }
 
@@ -165,4 +184,10 @@
   }
 
   document.querySelectorAll('.map-panel').forEach(initMapZoom);
-})();
+
+  // Exposed so a virtual navigation (see router.js) can (re-)initialize a
+  // fresh .map-panel node after swapping #ist-content -- otherwise pinch
+  // zoom would silently stop working the first time a user swipes away
+  // from and back to a page with an interactive map.
+  global.MapZoom = { init: initMapZoom };
+})(window);

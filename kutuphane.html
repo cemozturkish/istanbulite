@@ -11,14 +11,20 @@
   <title>Kütüphane — istanbulite.net</title>
   <script src="safe-area-ready.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="router.js"></script>
   <script src="i18n.js"></script>
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
+  <script src="game-locks.js"></script>
   <link rel="stylesheet" href="profile-card.css">
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
+  <link rel="stylesheet" href="mahalle-picker.css">
+  <script src="mahalle-picker.js" defer></script>
+  <script src="sozcul-mascot.js" defer></script>
   <script src="admin-notification.js" defer></script>
+  <script src="map-zoom.js" defer></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis) -->
   <script>
     (function(){
@@ -31,7 +37,7 @@
       } catch(e) {}
     })();
   </script>
-  <style>
+  <style data-page="kutuphane">
     :root {
       /* Core ink & paper — warm cream newspaper palette */
       --ink: #4C382A;
@@ -86,6 +92,21 @@
       font-family: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
       background-color: var(--paper);
       color: var(--ink);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* The actual grid lives on #main-site (a wrapper around everything
+       except modals, matching anahane.html), not body directly -- so that
+       when a virtual navigation (see router.js) swaps #ist-content's
+       contents for a different page, this element -- which persists in
+       the DOM across that swap since it's outside #ist-content -- keeps
+       being correctly laid out by whichever page's stylesheet is
+       currently active (see setActiveStylesheet), instead of silently
+       losing its grid-ness whenever this page's own stylesheet gets
+       disabled. frames.css already special-cases #main-site (stripping
+       body's own padding, adding its own) for exactly this reason. */
+    #main-site {
       display: grid;
       grid-template-columns: 260px 1fr 260px;
       grid-template-rows: auto 1fr;
@@ -1746,7 +1767,9 @@
         height: 100dvh;
         overflow: hidden;
       }
-      body {
+      /* Lives on #main-site (not body directly) for the same reason as
+         the desktop rule above -- see that rule's comment. */
+      #main-site {
         height: 100dvh;
         display: flex;
         flex-direction: column;
@@ -2099,7 +2122,7 @@
         height: 96px;
         padding: 0 0 env(safe-area-inset-bottom);
         margin: 0;
-        border-top: 1px solid var(--hairline);
+        border-top: 1px solid var(--rule);
         border-bottom: none;
         background: var(--paper-navbar);
         z-index: 100;
@@ -2124,7 +2147,7 @@
         align-items: center;
         justify-content: center;
         font-size: 16px;
-        font-weight: 700;
+        font-weight: 600;
         letter-spacing: 0.5px;
         text-transform: uppercase;
         color: var(--muted);
@@ -2132,7 +2155,7 @@
         border: none;
         text-decoration: none;
       }
-      nav a.active { color: var(--ink); }
+      nav a.active { color: var(--ink); font-weight: 700; }
 
       /* Swipe animation — tab strip and profile card slide horizontally between pages */
       .col-left, .col-right {
@@ -2317,6 +2340,11 @@
   <link rel="stylesheet" href="frames.css">
 </head>
 <body>
+
+<!-- Wraps everything except modals (matching anahane.html) so #main-site
+     (not body) is the grid/flex container -- see the CSS comment on
+     #main-site for why. -->
+<div id="main-site">
 
   <!-- Mobile-only compact profile card (mounted by profile-card.js) -->
   <div id="ist-pc-mount"></div>
@@ -2505,6 +2533,8 @@
   </aside>
   </div>
 
+</div><!-- /#main-site -->
+
   <!-- Article reader overlay: bottom sheet housing the chapter reader,
        opened instead of swapping it into #reading-area in place — see
        initReaderOverlay and openArticleReader further down. -->
@@ -2514,300 +2544,13 @@
   </div>
 
 <script>
-// ══════════════════════════════════════════
-// Swipe pagination
-// Navigate Kütüphane → Hane → Kahvehane. Mobile: touch-swipe
-// slides the whole page (map, datetime bar, both columns) horizontally as
-// one unit, direction keyed off which way you swiped. Desktop: no gesture
-// (nav-bar clicks only) — the left column always slides out/in toward the
-// left edge and the right column toward the right edge, regardless of nav
-// direction. CSS picks the behavior per media query.
-// ══════════════════════════════════════════
-(function initSwipePagination() {
-  const PAGES = ['kutuphane.html', 'anahane.html', 'kahvehane.html'];
-  const DURATION = 400;
-  const MIN_DX = 50;
-  const MAX_TIME = 700;
-  // Prefer the View Transitions API when available — it snapshots the
-  // outgoing page and holds it until the new one is rendered, which
-  // eliminates the white flash the manual slide-out can't hide. Cross-
-  // document VT is new enough that Capacitor's embedded WKWebView can
-  // report the API as present without actually completing the
-  // navigation, silently swallowing tab-bar taps — so skip it inside
-  // the native app and always use the manual slide/timeout fallback.
-  const supportsVT = 'startViewTransition' in document && !window.Capacitor;
-
-  function isMobile() { return window.innerWidth <= 768; }
-  function currentIdx() {
-    const path = (location.pathname.split('/').pop() || 'index.html');
-    const idx = PAGES.indexOf(path);
-    return idx === -1 ? 0 : idx;
-  }
-  function pageFromUrl(url) {
-    try { return new URL(url).pathname.split('/').pop() || 'index.html'; }
-    catch(e) { return ''; }
-  }
-  function recordDir(dir) {
-    try { sessionStorage.setItem('ist-page-enter-dir', dir); } catch(e) {}
-  }
-
-  // Tell the browser which direction to animate by setting a VT type AND
-  // toggling a class on <html>. The class is the reliable hook; some
-  // browsers don't match :active-view-transition-type() consistently, so
-  // our CSS targets html.vt-forward / html.vt-backward instead.
-  if (supportsVT) {
-    window.addEventListener('pageswap', (e) => {
-      if (!e.viewTransition) return;
-      const dir = sessionStorage.getItem('ist-page-enter-dir');
-      if (dir) e.viewTransition.types.add(dir);
-    });
-    window.addEventListener('pagereveal', (e) => {
-      if (!e.viewTransition) return;
-      const root = document.documentElement;
-      const dir = root.classList.contains('vt-forward') ? 'forward'
-                : root.classList.contains('vt-backward') ? 'backward' : null;
-      if (dir) e.viewTransition.types.add(dir);
-      e.viewTransition.finished.finally(() => {
-        root.classList.remove('vt-forward', 'vt-backward');
-        try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
-      });
-    });
-  }
-
-  // Fallback entry cleanup (runs on every load; releases the offscreen
-  // transform that the pre-body script applied for non-VT browsers).
-  function handleIncoming() {
-    const root = document.documentElement;
-    const dir = root.classList.contains('ist-entering-forward') ? 'forward'
-              : root.classList.contains('ist-entering-backward') ? 'backward' : null;
-    try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
-    if (!dir) return;
-    // Double rAF so the initial transform has painted before we release it.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        root.classList.remove('ist-entering-' + dir);
-      });
-    });
-  }
-
-  let navigating = false;
-  function navigate(targetIdx, dir) {
-    if (navigating) return;
-    if (targetIdx < 0 || targetIdx >= PAGES.length) return;
-    const curr = currentIdx();
-    if (targetIdx === curr) return;
-    navigating = true;
-    recordDir(dir);
-    if (supportsVT) {
-      // The browser will trigger a view transition on this navigation.
-      location.href = PAGES[targetIdx];
-      return;
-    }
-    const exitClass = dir === 'forward' ? 'ist-exiting-forward' : 'ist-exiting-backward';
-    document.body.classList.add(exitClass);
-    setTimeout(() => { location.href = PAGES[targetIdx]; }, DURATION - 30);
-  }
-
-  // Chain-slide through intermediate tabs when the user jumps 2+ away.
-  // Fetch each hop in parallel (warmed by <link rel="prefetch">), extract
-  // its .col-left / .col-right, stack the clones in a fixed overlay, then
-  // translate the stack to reveal each frame in sequence. The final hop
-  // ends with a real navigation so the destination's scripts run normally;
-  // we strip the direction class and kill the cross-document VT animation
-  // so there's no double-animation on arrival.
-  async function multiHopSlide(curr, target) {
-    if (navigating) return;
-    const dir = target > curr ? 'forward' : 'backward';
-    const step = dir === 'forward' ? 1 : -1;
-    const hopIdxs = [];
-    for (let i = curr + step; i !== target + step; i += step) hopIdxs.push(i);
-    if (hopIdxs.length === 0) return;
-    navigating = true;
-
-    const fetches = hopIdxs.map(i => fetch(PAGES[i]).then(r => r.text()).catch(() => null));
-    const leftEl = document.querySelector('.col-left-slide');
-    const rightEl = document.querySelector('.col-right');
-    if (!leftEl || !rightEl) { recordDir(dir); location.href = PAGES[target]; return; }
-    const leftRect = leftEl.getBoundingClientRect();
-    const rightRect = rightEl.getBoundingClientRect();
-    const mobile = window.innerWidth <= 768;
-
-    const htmls = await Promise.all(fetches);
-    if (htmls.some(h => h == null)) {
-      navigating = false;
-      recordDir(dir);
-      location.href = PAGES[target];
-      return;
-    }
-    const parser = new DOMParser();
-    const fragments = htmls.map(html => {
-      const doc = parser.parseFromString(html, 'text/html');
-      return {
-        left: doc.querySelector('.col-left-slide'),
-        right: doc.querySelector('.col-right'),
-      };
-    });
-
-    function buildStack(origEl, origRect, key) {
-      const wrap = document.createElement('div');
-      Object.assign(wrap.style, {
-        position: 'fixed',
-        left: origRect.left + 'px',
-        top: origRect.top + 'px',
-        width: origRect.width + 'px',
-        height: origRect.height + 'px',
-        overflow: 'hidden',
-        pointerEvents: 'none',
-        zIndex: '90',
-        background: '#ffffff',
-      });
-      const stack = document.createElement('div');
-      Object.assign(stack.style, {
-        position: 'absolute',
-        inset: '0',
-        willChange: 'transform',
-      });
-      wrap.appendChild(stack);
-
-      function placeFrame(node, i) {
-        Object.assign(node.style, {
-          position: 'absolute',
-          top: '0',
-          left: '0',
-          width: '100%',
-          height: '100%',
-          margin: '0',
-          boxSizing: 'border-box',
-          overflow: 'hidden',
-        });
-        node.style.viewTransitionName = 'none';
-        // Mobile: whole page travels one way, keyed off nav direction.
-        // Desktop: left column always sweeps toward the left edge and the
-        // right column toward the right edge, regardless of nav direction
-        // -- so frames are stacked toward the opposite edge here and swept
-        // back by the container's own animation below.
-        const pct = mobile
-          ? (dir === 'forward' ? i : -i) * 100
-          : (key === 'right' ? -i : i) * 100;
-        node.style.transform = 'translateX(' + pct + '%)';
-        stack.appendChild(node);
-      }
-      const frame0 = origEl.cloneNode(true);
-      placeFrame(frame0, 0);
-      fragments.forEach((frag, i) => {
-        const src = frag[key];
-        const node = src ? src.cloneNode(true) : document.createElement('div');
-        placeFrame(node, i + 1);
-      });
-      return { wrap, stack };
-    }
-
-    const leftStack = buildStack(leftEl, leftRect, 'left');
-    const rightStack = buildStack(rightEl, rightRect, 'right');
-    document.body.appendChild(leftStack.wrap);
-    document.body.appendChild(rightStack.wrap);
-    // These clones are only ever meant to be visible for the duration of this
-    // navigation. If left in the DOM they can survive into a bfcache snapshot
-    // of this document (or linger through a stalled cross-document view
-    // transition) and reappear — showing another page's column content — the
-    // next time this document is shown. pagehide fires after the VT snapshot
-    // is taken but before the document is torn down/cached, so removing here
-    // is invisible to the departing animation but keeps the clones out of
-    // whatever gets cached or rendered next.
-    window.addEventListener('pagehide', () => {
-      leftStack.wrap.remove();
-      rightStack.wrap.remove();
-    }, { once: true });
-
-    leftEl.style.visibility = 'hidden';
-    rightEl.style.visibility = 'hidden';
-    leftEl.style.viewTransitionName = 'none';
-    rightEl.style.viewTransitionName = 'none';
-
-    const hops = hopIdxs.length;
-    const perHop = hops === 2 ? 260 : 220;
-    const totalMs = perHop * hops;
-    const opts = { duration: totalMs, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' };
-    // Mobile: both stacks travel together, keyed off nav direction.
-    // Desktop: left stack always slides left, right stack always slides
-    // right, regardless of nav direction (see placeFrame above).
-    const mobileEndPct = dir === 'forward' ? -hops * 100 : hops * 100;
-    const leftKeyframes = [
-      { transform: 'translateX(0%)' },
-      { transform: 'translateX(' + (mobile ? mobileEndPct : -hops * 100) + '%)' },
-    ];
-    const rightKeyframes = [
-      { transform: 'translateX(0%)' },
-      { transform: 'translateX(' + (mobile ? mobileEndPct : hops * 100) + '%)' },
-    ];
-    const a1 = leftStack.stack.animate(leftKeyframes, opts);
-    const a2 = rightStack.stack.animate(rightKeyframes, opts);
-
-    try { await Promise.all([a1.finished, a2.finished]); } catch (e) {}
-
-    try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
-    document.documentElement.classList.remove('vt-forward', 'vt-backward');
-    const killVT = document.createElement('style');
-    killVT.textContent = '::view-transition-group(*),::view-transition-image-pair(*),::view-transition-old(*),::view-transition-new(*){animation:none !important;}';
-    document.head.appendChild(killVT);
-
-    location.href = PAGES[target];
-  }
-
-  // Intercept tab-bar clicks: direct-neighbor hops ride the built-in VT;
-  // jumps of 2+ go through multiHopSlide so intermediate tabs flash past.
-  document.addEventListener('click', (e) => {
-    const link = e.target.closest('nav a');
-    if (!link) return;
-    const href = link.getAttribute('href');
-    const targetIdx = PAGES.indexOf(href);
-    const curr = currentIdx();
-    if (targetIdx === -1 || targetIdx === curr) return;
-    const dir = targetIdx > curr ? 'forward' : 'backward';
-    const dist = Math.abs(targetIdx - curr);
-    if (supportsVT && dist >= 2) {
-      e.preventDefault();
-      multiHopSlide(curr, targetIdx);
-      return;
-    }
-    if (supportsVT) { recordDir(dir); return; }
-    e.preventDefault();
-    navigate(targetIdx, dir);
-  }, true);
-
-  // ── Mobile: horizontal touch-swipe anywhere on main-site (except the nav bar) ──
-  let sx = 0, sy = 0, st = 0, active = false;
-  document.addEventListener('touchstart', (e) => {
-    if (!isMobile() || e.touches.length !== 1) return;
-    if (e.target.closest && e.target.closest('nav')) return; // let nav-bar taps through
-    sx = e.touches[0].clientX;
-    sy = e.touches[0].clientY;
-    st = Date.now();
-    active = true;
-  }, { passive: true });
-
-  document.addEventListener('touchend', (e) => {
-    if (!active) return;
-    active = false;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - sx;
-    const dy = t.clientY - sy;
-    const dt = Date.now() - st;
-    if (dt > MAX_TIME) return;
-    if (Math.abs(dx) < MIN_DX) return;
-    if (Math.abs(dx) < Math.abs(dy) * 1.2) return; // vertical-dominant: let it scroll
-    const curr = currentIdx();
-    if (dx < 0) navigate(curr + 1, 'forward');
-    else        navigate(curr - 1, 'backward');
-  }, { passive: true });
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', handleIncoming);
-  } else {
-    handleIncoming();
-  }
-})();
-
+// Wrapped in a scoping IIFE so this page's top-level declarations (sb,
+// neighborhoodNames, etc.) don't leak to the global scope -- a future
+// client-side navigation may execute this same script a second time in a
+// document that already ran another carousel page's script, and without
+// this wrapper a repeated `const` at global scope throws a
+// duplicate-declaration SyntaxError.
+(function () {
 // Mobile: pin source tab strip just below the top nav bar.
 function updateTabStripOffset() {
   if (window.innerWidth > 768) return;
@@ -3966,11 +3709,10 @@ async function mountPoll(article) {
   });
 }
 
-const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
-
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Shared client (see router.js) — no page may declare its own createClient
+// anymore, so that a future client-side navigation can run more than one
+// page's script in the same document without a duplicate-declaration crash.
+const sb = IstRouter.sb;
 
 const neighborhoodNames = {
   bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler',
@@ -3991,10 +3733,13 @@ const neighborhoodNames = {
 // home neighborhood — Kütüphane is moving to a Turkey-wide map, where a
 // single home *district* has no obvious analogue.
 (function initLibraryMap() {
-  const mapNeighborhoods = document.querySelectorAll('.neighborhood');
-  const mapLabel = document.getElementById('map-label');
-  const mapPanel = document.querySelector('.map-panel');
-  if (!mapNeighborhoods.length || !mapLabel || !mapPanel) return;
+  // Delegated on document and re-queried fresh each time rather than
+  // bound per-node once -- a virtual navigation (see router.js) replaces
+  // #ist-content's whole subtree on every revisit to this page, including
+  // the map's .neighborhood elements, so listeners bound once to the
+  // original nodes would go stale after the first navigate-away-and-back.
+  function getMapNeighborhoods() { return document.querySelectorAll('.neighborhood'); }
+  if (!getMapNeighborhoods().length) return;
 
   let activeMapNeighborhood = null;
 
@@ -4004,34 +3749,38 @@ const neighborhoodNames = {
     return (active && active.getAttribute('data-name')) || activeMapNeighborhood;
   }
 
-  mapNeighborhoods.forEach(nb => {
-    nb.addEventListener('click', (e) => {
-      e.stopPropagation();
+  document.addEventListener('click', (e) => {
+    const mapLabel = document.getElementById('map-label');
+    const nb = e.target.closest('.neighborhood');
+    if (nb) {
       // data-neighborhood covers multi-polygon districts (e.g. Şişli's
       // exclave piece) whose element id must stay unique but which still
       // count as the same neighborhood.
       const nbId = nb.dataset.neighborhood || nb.id;
-      mapNeighborhoods.forEach(n => n.classList.toggle('active', (n.dataset.neighborhood || n.id) === nbId));
-      mapLabel.textContent = nb.getAttribute('data-name') || nbId;
+      getMapNeighborhoods().forEach(n => n.classList.toggle('active', (n.dataset.neighborhood || n.id) === nbId));
+      if (mapLabel) mapLabel.textContent = nb.getAttribute('data-name') || nbId;
       activeMapNeighborhood = nbId;
-    });
-    nb.addEventListener('mouseenter', () => {
-      mapLabel.textContent = nb.getAttribute('data-name') || nb.id;
-    });
-    nb.addEventListener('mouseleave', () => {
-      mapLabel.textContent = baseMapLabel();
-    });
-  });
-
-  // Snap back to Tüm İstanbul only when clicking empty space inside the
-  // map panel itself — clicking the shelves, reading area or other UI
-  // that floats over the map must not reset it.
-  mapPanel.addEventListener('click', (e) => {
-    if (!e.target.closest('.neighborhood') && !e.target.closest('.map-label')) {
-      mapNeighborhoods.forEach(n => n.classList.remove('active'));
-      mapLabel.textContent = 'İstanbul';
-      activeMapNeighborhood = null;
+      return;
     }
+    // Snap back to Tüm İstanbul only when clicking empty space inside the
+    // map panel itself — clicking the shelves, reading area or other UI
+    // that floats over the map must not reset it.
+    if (!e.target.closest('.map-panel') || e.target.closest('.map-label')) return;
+    getMapNeighborhoods().forEach(n => n.classList.remove('active'));
+    if (mapLabel) mapLabel.textContent = 'İstanbul';
+    activeMapNeighborhood = null;
+  });
+  document.addEventListener('mouseover', (e) => {
+    const nb = e.target.closest('.neighborhood');
+    if (!nb) return;
+    const mapLabel = document.getElementById('map-label');
+    if (mapLabel) mapLabel.textContent = nb.getAttribute('data-name') || nb.id;
+  });
+  document.addEventListener('mouseout', (e) => {
+    const nb = e.target.closest('.neighborhood');
+    if (!nb || nb.contains(e.relatedTarget)) return;
+    const mapLabel = document.getElementById('map-label');
+    if (mapLabel) mapLabel.textContent = baseMapLabel();
   });
 })();
 
@@ -4366,11 +4115,29 @@ Palette.setPalette(palettePref);
   ], 'left');
 }
 
-loadProfile();
-bootstrapLibraryNav();
+// This page's repeatable "become the active page" work -- the part that
+// re-runs on every virtual re-entry into kutuphane, not just the first
+// real load. No timers or page-specific top-level listeners get set up
+// by either call (both re-render their target elements via innerHTML,
+// which is self-cleaning), so there's nothing for unmount() to undo.
+function mount() {
+  loadProfile();
+  bootstrapLibraryNav();
+}
+function unmount() {}
+
+// Skipped when this script is being injected by a virtual navigation (see
+// router.js's navigateTo) -- that path calls the registered mount()
+// directly instead, since the user's already authenticated and the
+// profile card's already mounted from the real page load that got them
+// into the app in the first place.
+if (!window.__istVirtualNavInjecting) mount();
 
 // Mount the shared mobile profile card (hidden on desktop via CSS).
-// profile-card.js is deferred, so wait until it's loaded.
+// profile-card.js is deferred, so wait until it's loaded. Also skipped
+// when injected by a virtual navigation, for the same reason as mount()
+// above -- the card is already mounted and onboarding/admin-notification
+// already had their one-time chance on the real page load.
 function __mountIstPc() {
   if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N, page: 'kutuphane' });
   // Resume the onboarding flow if the user is mid-tour. onboarding.js is
@@ -4394,16 +4161,27 @@ function __mountIstPc() {
     }
   })(40);
 }
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', __mountIstPc);
-} else {
-  __mountIstPc();
+if (!window.__istVirtualNavInjecting) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', __mountIstPc);
+  } else {
+    __mountIstPc();
+  }
 }
 
 // ── Profile popup — opens on any .kefil-link click, navigates in-place for the chain ──
 (function() {
   const overlay = document.createElement('div');
   overlay.className = 'profile-popup-overlay';
+  // Belt-and-suspenders like the game/reader overlays elsewhere: this
+  // element is created once, up front, and lives in the DOM for the rest
+  // of the session (outside #ist-content) -- once a virtual navigation
+  // (see router.js) disables this page's own stylesheet, the CSS class
+  // alone (.profile-popup-overlay{display:none}) stops applying and it'd
+  // render as bare, unstyled content. The `hidden` attribute's display:
+  // none comes from the browser's own built-in stylesheet, not this
+  // page's, so it stays correct regardless.
+  overlay.hidden = true;
   overlay.innerHTML = `
     <div class="profile-popup" role="dialog" aria-modal="true">
       <button class="close-btn" type="button" aria-label="Kapat">×</button>
@@ -4414,7 +4192,7 @@ if (document.readyState === 'loading') {
 
   const body = overlay.querySelector('.pp-body');
 
-  function close() { overlay.classList.remove('open'); }
+  function close() { overlay.classList.remove('open'); overlay.hidden = true; }
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   overlay.querySelector('.close-btn').addEventListener('click', close);
   document.addEventListener('keydown', (e) => {
@@ -4437,6 +4215,7 @@ if (document.readyState === 'loading') {
   }
 
   async function open(userId) {
+    overlay.hidden = false;
     overlay.classList.add('open');
     body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
 
@@ -4494,6 +4273,9 @@ if (document.readyState === 'loading') {
     const id = btn.getAttribute('data-user-id');
     if (id) open(id);
   });
+})();
+
+IstRouter.registerPage('kutuphane', { mount, unmount });
 })();
 </script>
 </body>
