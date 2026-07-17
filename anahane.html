@@ -640,6 +640,34 @@
       padding-top: 10px;
       border-top: 1px dashed var(--card-border);
     }
+    .article .sources-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+      text-align: left;
+    }
+    .article .sources-toggle .sidebar-label { margin: 0; }
+    .article .sources-toggle-icon {
+      font-size: 0.7rem;
+      color: var(--card-fg-muted);
+      transition: transform 0.15s ease;
+      flex-shrink: 0;
+    }
+    .article .sources.open .sources-toggle-icon { transform: rotate(180deg); }
+    .article .sources-body {
+      display: none;
+      margin-top: 8px;
+    }
+    .article .sources.open .sources-body { display: block; }
     .article .src-item {
       padding: 6px 0;
       border-bottom: 1px dotted var(--card-border-soft);
@@ -2304,6 +2332,9 @@ function buildNewsDetailHtml(n) {
     </div>
   ` : '';
   const lastTouch = n.updated_at || n.created_at;
+  const polls = (n.breaking_news_polls || [])
+    .slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const pollsHtml = polls.map(p => `<div class="poll-block" id="poll-${escapeText(p.id)}"></div>`).join('');
   return `
     <div class="article">
       <div class="meta-row">
@@ -2312,11 +2343,16 @@ function buildNewsDetailHtml(n) {
       </div>
       <h3>${escapeText(n.title)}</h3>
       ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
-      ${n.poll_question && n.poll_option_a && n.poll_option_b ? `<div class="poll-block" id="poll-${escapeText(n.id)}"></div>` : ''}
+      ${pollsHtml}
       ${timelineHtml}
       <div class="sources">
-        <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Kaynaklar</div>
-        ${sourcesHtml}
+        <button type="button" class="sources-toggle" aria-expanded="false">
+          <div class="sidebar-label" style="padding:0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Kaynaklar (${sources.length})</div>
+          <span class="sources-toggle-icon">▾</span>
+        </button>
+        <div class="sources-body">
+          ${sourcesHtml}
+        </div>
       </div>
     </div>
   `;
@@ -2329,12 +2365,11 @@ function buildNewsDetailHtml(n) {
 // known until this query resolves.
 const MAX_POLL_VOTER_AVATARS = 6;
 
-async function loadAndRenderPoll(n) {
-  if (!n.poll_question || !n.poll_option_a || !n.poll_option_b) return;
-  const container = document.getElementById('poll-' + n.id);
+async function loadAndRenderPoll(poll) {
+  const container = document.getElementById('poll-' + poll.id);
   if (!container) return;
-  const { data, error } = await sb.from('breaking_news_poll_votes')
-    .select('user_id, option').eq('news_id', n.id);
+  const { data, error } = await sb.from('breaking_news_poll_option_votes')
+    .select('user_id, option').eq('poll_id', poll.id);
   if (error) { console.error('[poll]', error); return; }
   const uid = window.__currentUser && window.__currentUser.id;
   const votersA = [], votersB = [];
@@ -2357,7 +2392,7 @@ async function loadAndRenderPoll(n) {
     else profilesById = new Map(profs.map(p => [p.id, p]));
   }
 
-  renderPollInto(container, n, votersA, votersB, mine, profilesById);
+  renderPollInto(container, poll, votersA, votersB, mine, profilesById);
 }
 
 function buildVoterAvatarsHtml(userIds, profilesById) {
@@ -2379,29 +2414,29 @@ function buildVoterAvatarsHtml(userIds, profilesById) {
   return avatarsHtml + moreHtml;
 }
 
-function renderPollInto(container, n, votersA, votersB, mine, profilesById) {
+function renderPollInto(container, poll, votersA, votersB, mine, profilesById) {
   const countA = votersA.length, countB = votersB.length;
   const total = countA + countB;
   if (mine == null) {
     container.innerHTML = `
-      <div class="poll-question">${escapeText(n.poll_question)}</div>
+      <div class="poll-question">${escapeText(poll.question)}</div>
       <div class="poll-options">
-        <button class="poll-opt-btn" type="button" data-option="1">${escapeText(n.poll_option_a)}</button>
-        <button class="poll-opt-btn" type="button" data-option="2">${escapeText(n.poll_option_b)}</button>
+        <button class="poll-opt-btn" type="button" data-option="1">${escapeText(poll.option_a)}</button>
+        <button class="poll-opt-btn" type="button" data-option="2">${escapeText(poll.option_b)}</button>
       </div>
       <div class="poll-status"></div>
     `;
     container.querySelectorAll('.poll-opt-btn').forEach(btn => {
-      btn.addEventListener('click', () => submitPollVote(n, parseInt(btn.dataset.option, 10), container));
+      btn.addEventListener('click', () => submitPollVote(poll, parseInt(btn.dataset.option, 10), container));
     });
   } else {
     const pctA = total ? Math.round((countA / total) * 100) : 0;
     const pctB = total ? 100 - pctA : 0;
     container.innerHTML = `
-      <div class="poll-question">${escapeText(n.poll_question)}</div>
+      <div class="poll-question">${escapeText(poll.question)}</div>
       <div class="poll-result-labels">
-        <span class="poll-label-a${mine === 1 ? ' poll-label-mine' : ''}">${escapeText(n.poll_option_a)} · ${pctA}%</span>
-        <span class="poll-label-b${mine === 2 ? ' poll-label-mine' : ''}">${pctB}% · ${escapeText(n.poll_option_b)}</span>
+        <span class="poll-label-a${mine === 1 ? ' poll-label-mine' : ''}">${escapeText(poll.option_a)} · ${pctA}%</span>
+        <span class="poll-label-b${mine === 2 ? ' poll-label-mine' : ''}">${pctB}% · ${escapeText(poll.option_b)}</span>
       </div>
       <div class="poll-bar-track">
         <div class="poll-bar-fill-a" style="width:${pctA}%"></div>
@@ -2415,12 +2450,12 @@ function renderPollInto(container, n, votersA, votersB, mine, profilesById) {
   }
 }
 
-async function submitPollVote(n, option, container) {
+async function submitPollVote(poll, option, container) {
   const uid = window.__currentUser && window.__currentUser.id;
   if (!uid) return;
   container.querySelectorAll('.poll-opt-btn').forEach(b => b.disabled = true);
-  const { error } = await sb.from('breaking_news_poll_votes')
-    .insert([{ news_id: n.id, user_id: uid, option }]);
+  const { error } = await sb.from('breaking_news_poll_option_votes')
+    .insert([{ poll_id: poll.id, user_id: uid, option }]);
   if (error) {
     console.error('[poll vote]', error);
     const statusEl = container.querySelector('.poll-status');
@@ -2431,7 +2466,7 @@ async function submitPollVote(n, option, container) {
     container.querySelectorAll('.poll-opt-btn').forEach(b => b.disabled = false);
     return;
   }
-  loadAndRenderPoll(n);
+  loadAndRenderPoll(poll);
 }
 
 function renderBreakingNewsFeedNow(feed, rows) {
@@ -2459,7 +2494,7 @@ function renderBreakingNewsFeedNow(feed, rows) {
       const n = rowsById.get(el.dataset.newsId);
       if (n) {
         openDetail(buildNewsDetailHtml(n));
-        loadAndRenderPoll(n);
+        (n.breaking_news_polls || []).forEach(p => loadAndRenderPoll(p));
       }
     });
   });
@@ -2489,7 +2524,7 @@ document.querySelectorAll('.news-filter-btn').forEach(btn => {
 async function loadBreakingNews() {
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('breaking_news')
-    .select('*, breaking_news_sources(*), breaking_news_updates(*)').gte('updated_at', cutoff)
+    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*)').gte('updated_at', cutoff)
     .order('updated_at', { ascending: false });
   if (error) { console.error('[anahane breaking_news]', error); return; }
   allBreakingNews = data || [];
@@ -2758,6 +2793,15 @@ function closeDetail() {
   // Delegated so it keeps working across re-renders of the sheet body
   // (e.g. jumping straight from one event's detail to another's).
   body.addEventListener('click', (e) => {
+    const toggle = e.target.closest('.sources-toggle');
+    if (toggle) {
+      const wrap = toggle.closest('.sources');
+      if (wrap) {
+        const isOpen = wrap.classList.toggle('open');
+        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      }
+      return;
+    }
     const btn = e.target.closest('.ev-rsvp-btn');
     if (!btn) return;
     e.stopPropagation();
