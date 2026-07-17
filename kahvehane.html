@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" class="ist-safe-area-pending">
 <head>
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/favicon.png">
@@ -9,7 +9,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Kahvehane — istanbulite.net</title>
+  <script src="safe-area-ready.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="router.js"></script>
   <script src="i18n.js"></script>
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
@@ -18,8 +20,11 @@
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
+  <link rel="stylesheet" href="mahalle-picker.css">
+  <script src="mahalle-picker.js" defer></script>
   <script src="sozcul-mascot.js" defer></script>
   <script src="admin-notification.js" defer></script>
+  <script src="map-zoom.js" defer></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in. Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot, and a one-shot flag so the posts/scoreboard card-entrance animation (see animateFeedSwap) skips its first run here -- the column itself is already sliding in from the same edge, so animating the cards inside it too would look like the content arriving twice. -->
   <script>
     (function(){
@@ -33,7 +38,7 @@
       } catch(e) {}
     })();
   </script>
-  <style>
+  <style data-page="kahvehane">
     :root {
       /* Core ink & paper — warm cream newspaper palette */
       --ink: #4C382A;
@@ -88,6 +93,21 @@
       font-family: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
       background-color: var(--paper);
       color: var(--ink);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* The actual grid lives on #main-site (a wrapper around everything
+       except modals, matching anahane.html), not body directly -- so that
+       when a virtual navigation (see router.js) swaps #ist-content's
+       contents for a different page, this element -- which persists in
+       the DOM across that swap since it's outside #ist-content -- keeps
+       being correctly laid out by whichever page's stylesheet is
+       currently active (see setActiveStylesheet), instead of silently
+       losing its grid-ness whenever this page's own stylesheet gets
+       disabled. frames.css already special-cases #main-site (stripping
+       body's own padding, adding its own) for exactly this reason. */
+    #main-site {
       display: grid;
       grid-template-columns: 260px 1fr 260px;
       grid-template-rows: auto 1fr;
@@ -212,6 +232,19 @@
       z-index: -1;
       overflow: hidden;
       background: #f7f7f7;
+      /* Hands touch gestures on the map entirely to map-zoom.js (pinch
+         to zoom, drag to pan when zoomed) instead of the browser's own
+         page-zoom/scroll handling, which would otherwise fight it. */
+      touch-action: none;
+    }
+
+    /* Wraps the photo + hit-region overlay so map-zoom.js can scale/pan
+       them together as one unit with a single transform -- map-label
+       stays outside it, un-zoomed. */
+    .map-zoom-layer {
+      position: absolute;
+      inset: 0;
+      transform-origin: 0 0;
     }
 
     .map-panel img.map-photo {
@@ -306,15 +339,12 @@
       min-height: 0;
     }
 
-    /* Sticky label showing which neighborhood is active */
+    /* Which neighborhood's comments are showing is already visible under
+       the map itself (#map-label) -- this used to repeat it here too,
+       redundantly; the element (and the JS that keeps its text in sync)
+       stays, just hidden, so nothing else has to change. */
     .discussion-label {
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      padding: 8px 16px;
-      color: var(--ink);
-      flex-shrink: 0;
+      display: none;
     }
 
     .games-section {
@@ -495,15 +525,15 @@
     }
 
     .game-link-title {
-      font-size: 1rem;
+      font-size: 1.1rem;
       font-weight: 700;
-      margin-bottom: 4px;
     }
 
+    /* Kept in the markup (JS toggles .started/.completed color on it
+       elsewhere) but no longer shown -- the name alone is enough now
+       that each tile has room to just center it. */
     .game-link-subtitle {
-      font-size: 0.75rem;
-      color: var(--muted);
-      font-style: italic;
+      display: none;
     }
 
     /* Started today (light warm) vs completed today (dim dark brown) */
@@ -518,6 +548,34 @@
       border-color: var(--brown-4);
     }
     .game-link.completed .game-link-subtitle { color: var(--paper-card); }
+
+    /* Swiping/tapping into Kahvehane slides the whole right column in as
+       one rigid block (see .col-right's own 0.32s transform below),
+       which carries these three cards along together with no sense of
+       order. .game-link-enter (a plain wrapper div around each .a.game-
+       link, see the markup below) plays its own staggered slide+fade on
+       top of that -- top card first, each lower one a beat later -- so
+       they visibly cascade in rather than arriving as one block, while
+       still riding the column's own "from the right" motion the whole
+       time (never opacity:0 for the full slide -- an earlier version
+       hid them for its whole duration and they just popped in at the
+       end with no visible motion of their own). The wrapper (not
+       .game-link itself) carries this transform because .game-link's
+       own transform is already used for :hover/:active's nudge --
+       sharing one property between two different-speed transitions
+       would make that feedback sluggish too. */
+    .game-link-enter {
+      transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.32s ease;
+    }
+    .game-link-enter:nth-of-type(1) { transition-delay: 0ms; }
+    .game-link-enter:nth-of-type(2) { transition-delay: 180ms; }
+    .game-link-enter:nth-of-type(3) { transition-delay: 360ms; }
+    html.ist-entering-forward .game-link-enter,
+    html.ist-entering-backward .game-link-enter {
+      transform: translateX(50px);
+      opacity: 0.4;
+      transition: none;
+    }
 
     /* .game-link.locked and #game-lock-toast styles are injected by
        game-locks.js so the rule lives in one place. */
@@ -536,7 +594,6 @@
     }
 
     .submit-form {
-      border-top: var(--col-border);
       padding: 16px 20px;
       flex-shrink: 0;
       margin-top: auto;
@@ -553,24 +610,54 @@
       gap: 8px;
     }
 
+    /* Textarea + send button side by side instead of stacked -- the
+       button used to be a full-width bar under the textarea, which read
+       as oversized for a one-word action. */
+    .submit-form-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      /* A flex item's default min-width is auto (its own content's
+         natural width), not 0 -- without this, the textarea (and this
+         row) refused to shrink below that, which forced the whole
+         column's grid track wider to fit it, visibly pushing the map
+         and game tiles to the right whenever the composer appeared. */
+      min-width: 0;
+    }
+
+    /* Chapter-box style, matching .post/.game-link/.shelf-btn -- a thick
+       ink border with a heavier bottom edge, square corners, instead of
+       the thin gray outline + rounded corners these had before, which
+       read as a generic form control rather than one of this site's own
+       cards. */
+    /* Explicit, matching height on both -- padding/border/line-height
+       alone left the button a different height than the resizable
+       textarea. resize:vertical still lets the textarea grow taller on
+       drag; the button just stays put at that shared baseline height. */
     .submit-form textarea {
-      width: 100%;
-      min-height: 80px;
+      flex: 1;
+      min-width: 0;
+      height: 44px;
       padding: 10px;
-      border: 1px solid var(--rule);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      border-radius: 0;
       background: var(--paper-warm);
       font-family: 'Inter', sans-serif;
       font-size: 0.9rem;
       resize: vertical;
-      margin-bottom: 10px;
     }
 
     .submit-form button {
-      width: 100%;
-      padding: 10px;
+      flex-shrink: 0;
+      width: auto;
+      height: 44px;
+      padding: 0 18px;
       background: var(--ink);
       color: var(--paper);
-      border: none;
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      border-radius: 0;
       font-family: 'Inter', sans-serif;
       font-size: 0.85rem;
       font-weight: 700;
@@ -587,6 +674,13 @@
       text-align: center;
       margin-top: 8px;
       font-style: italic;
+    }
+    /* JS only ever sets textContent here, never toggles display -- empty
+       by default, it was still taking up its own line-height + margin
+       below the send row, pushing the row up from the composer's true
+       bottom edge. */
+    .submit-status:empty {
+      display: none;
     }
     .submit-status.ok { color: var(--success); }
     .submit-status.err { color: var(--accent); }
@@ -788,7 +882,7 @@
         width: 100%;
       }
 
-      body {
+      #main-site {
         display: grid;
         grid-template-columns: 1fr auto;
         /* Row 1 (the map) gets an explicit, definite track size instead
@@ -799,13 +893,27 @@
            the map's bottom edge). main bleeds to the true screen edges
            (see its negative margins below), so its rendered width is
            always 100vw -- sizing row 1 to 100vw directly gives the same
-           square, deterministically. Row 2 is a plain 1fr: the page
-           itself doesn't scroll (see overflow below), so row 2 is
-           exactly the leftover space and no more -- content that
-           doesn't fit scrolls inside .discussion-posts instead of
-           growing this row or the page. */
-        grid-template-rows: 100vw 1fr;
-        align-content: start;
+           square, deterministically. The extra env(safe-area-inset-top)
+           + 40px term matches main's own margin-top below -- without
+           it, the fixed track was sized for the square alone and the
+           pushed-down map either got clipped or overlapped row 2. Row 2
+           is a plain 1fr: the page itself doesn't scroll (see overflow
+           below), so row 2 is exactly the leftover space and no more --
+           content that doesn't fit scrolls inside .discussion-posts
+           instead of growing this row or the page. */
+        grid-template-rows: calc(100vw + env(safe-area-inset-top) + 40px) 1fr;
+        /* align-content other than the default (stretch) makes grid
+           track-size its rows by content first and only then position
+           the resulting (shorter) track set within the container -- so
+           despite row 2 being "1fr", it was sizing to comments/games'
+           own short content and leaving the real leftover space
+           unclaimed by any grid item (see the now-stale comment this
+           replaced, and the html body background rule below, both
+           written around that gap). Plain stretch (the default -- this
+           was previously pinned to `start`) makes row 2 actually
+           consume all remaining space, so .discussion-section's own
+           flex:1 chain (see .discussion-posts) can grow into it instead
+           of leaving it as bare backdrop. */
         overflow: hidden;
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
@@ -817,17 +925,18 @@
         row-gap: 0 !important;
         /* Reserve space for fixed bottom tab bar + a frame-gap so the
            cards don't visually press against the nav (frames.css design). */
-        padding-bottom: calc(56px + env(safe-area-inset-bottom) + var(--frame-gap, 10px));
+        padding-bottom: calc(96px + env(safe-area-inset-bottom) + var(--frame-gap, 10px));
       }
-      /* body always fills the full viewport height, but its content
-         (map + one short row of comments/games) often doesn't -- with
-         align-content:start packing everything at the top, the
-         leftover space at the bottom belongs to no grid item and was
-         showing frames.css's raw page canvas instead of the map/card
-         #f7f7f7. Coloring the container itself means any such gap
-         matches by default. frames.css's html,body rule also sets a
-         background with !important, so this needs the extra "html"
-         qualifier to win on specificity regardless of source order. */
+      /* Defensive fallback, not the primary fix (see grid-template-rows'
+         own comment above): row 2 now stretches to fill the viewport, so
+         in the normal case .col-left/.col-right's own backgrounds
+         already cover it end to end and this never shows. Kept in case
+         a row ever IS shorter than the container (e.g. unusually little
+         content) -- otherwise that gap would show frames.css's raw page
+         canvas (--page-bg) instead of the map/card #f7f7f7. frames.css's
+         html,body rule also sets a background with !important, so this
+         needs the extra "html" qualifier to win on specificity
+         regardless of source order. */
       html body {
         background: #f7f7f7 !important;
       }
@@ -860,6 +969,18 @@
         background: #eeeeee;
         border: 2px solid #1a1a1a;
         border-bottom: 5px solid #1a1a1a;
+      }
+      /* Capacitor's WKWebView reports env(safe-area-inset-top) as 0 for a
+         real (measured, ~80-200ms) window after every fresh page load
+         before self-correcting on its own -- with no gating, the card
+         renders flush under the status bar/notch for that window,
+         covering the map's top districts. safe-area-ready.js removes
+         this class once the real value is confirmed (or after a
+         timeout), so the card and map simply appear already in the
+         right place instead of visibly jumping. */
+      html.ist-safe-area-pending #ist-pc-mount,
+      html.ist-safe-area-pending main {
+        visibility: hidden;
       }
       /* frames.css drops a card shadow on #ist-pc-mount's child (the
          same treatment every other panel gets) -- here that shadow was
@@ -903,9 +1024,10 @@
         margin-left: calc(-1 * var(--frame-pad, 10px));
         margin-right: calc(-1 * var(--frame-pad, 10px));
         /* Room for the floating profile card (now offset by the same
-           safe-area amount) so it still sits over empty "sea", not over
-           the districts themselves. */
-        margin-top: env(safe-area-inset-top);
+           safe-area amount, plus extra breathing room below the card)
+           so it still sits over empty "sea", not over the districts
+           themselves. */
+        margin-top: calc(env(safe-area-inset-top) + 40px);
         box-shadow: none !important;
       }
       .map-panel {
@@ -926,6 +1048,18 @@
         z-index: auto;
         overflow: hidden;
       }
+      /* This page isn't meant to scroll either -- so once map-zoom.js
+         zooms past 1x, it switches the panel to a fixed position pinned
+         at its own current on-screen rect (computed in JS, not CSS)
+         with overflow allowed to escape its little square. That's the
+         same "position:fixed escapes the grid" trick the desktop
+         full-bleed map already relies on, so the larger zoomed map can
+         spill into the rest of the screen without ever growing body's
+         own layout size. */
+      .map-panel.ist-zoomed {
+        position: fixed;
+        overflow: visible;
+      }
       .map-label {
         position: absolute;
         bottom: 8px;
@@ -940,28 +1074,27 @@
          flex (not block) so .discussion-section below can stretch to
          exactly fill row 2's height (a plain 1fr, see body above),
          which is what lets its own .discussion-posts scroll internally
-         within a fixed-size column instead of growing the page. */
+         within a fixed-size column instead of growing the page.
+         Explicit z-index so it stays on top of the map even once it's
+         zoomed in and spilling past its own little square. */
       .col-left {
         grid-column: 1;
         grid-row: 2;
+        min-height: 0;
+        min-width: 0;
         overflow: visible;
         border-right: 1px solid var(--rule);
         border-top: 1px solid var(--rule);
         display: flex;
         flex-direction: column;
+        z-index: 1;
       }
-      /* The desktop rule near the top of this file (body .col-left/
-         .col-right) sets background:none!important so these read as
-         frameless text floating on the always-visible map behind them.
-         On mobile the map isn't behind this row anymore (it's the block
-         above), so "none" was showing body's own raw page-canvas color
-         instead -- a visible mismatch right under the map's #f7f7f7.
-         Matches the desktop rule's body-qualified specificity so it
-         actually wins. */
-      body .col-left,
-      body .col-right {
-        background: #f7f7f7 !important;
-      }
+      /* Transparent (inherits the desktop rule's background:none) so
+         these read as frameless text floating over the map, same as
+         desktop -- body's own background is the same #f7f7f7, so this
+         looks identical at rest, and once map-zoom.js zooms the map
+         past its little square, it now shows through here instead of
+         being hidden behind a flat color. */
       .col-left .nb-highlight {
         padding: 6px 12px;
         font-size: 10px;
@@ -1012,9 +1145,14 @@
         line-height: 1.4;
       }
       .submit-form {
-        padding: 8px 10px 12px;
-        border-top: 1px solid var(--rule);
-        background: var(--paper);
+        /* Bottom padding matches .games-section-inner's own so the send
+           row's bottom edge lands flush with the game tiles' bottom. */
+        padding: 8px 10px 8px;
+        /* Transparent -- reads as floating over the map/page background
+           like the rest of this column instead of a separate white
+           panel (matches .col-left .nb-highlight's own reasoning). */
+        background: none;
+        margin-top: 56px;
         /* Stays fixed at the bottom of the column, right after
            .discussion-posts's flex:1 -- that's what takes up the
            leftover space (and scrolls internally if there's too much
@@ -1026,16 +1164,14 @@
         margin-bottom: 4px;
       }
       .submit-form textarea {
-        min-height: 30px;
+        height: 38px;
         padding: 5px 7px;
         font-size: 11px;
-        margin-bottom: 5px;
-        border-radius: 4px;
       }
       .submit-form button {
-        padding: 6px;
+        height: 38px;
+        padding: 0 14px;
         font-size: 11px;
-        border-radius: 4px;
       }
 
       /* Games: normal in-flow column below the map, to the right --
@@ -1045,12 +1181,14 @@
       .col-right {
         grid-column: 2;
         grid-row: 2;
+        min-height: 0;
         overflow: visible;
         border-left: none;
         border-top: 1px solid var(--rule);
         display: flex;
         flex-direction: column;
         width: auto;
+        z-index: 1;
       }
       .games-section {
         display: flex;
@@ -1081,16 +1219,41 @@
          scrolling the page or shrinking the tiles, neither of which is
          wanted. */
       .scoreboard { display: none; }
-      .game-picker { gap: 8px; }
-      /* Short rectangles instead of squares -- keeps the games column
-         from towering over the comments column, which was letting the
-         taller of the two stretch the shared row well past the map's
-         own height (see the .map-panel comment above). */
+      /* Grows to fill .games-section-inner's own height instead of
+         sizing to content (overriding the desktop rule's flex-shrink:0)
+         -- otherwise the game-link-enter tiles below have nothing
+         concrete to grow into despite their own flex:1. */
+      .game-picker {
+        gap: 8px;
+        flex: 1;
+        min-height: 0;
+      }
+      /* Each tile grows to fill the column's own height (see
+         syncColumnHeights() in the script below, which is what gives
+         .col-right a real height to grow into in the first place) --
+         the top tile's top edge stays put (games-section-inner packs
+         from the top) and growing all three equally means the bottom
+         tile's bottom edge lands exactly at the column's own bottom,
+         same level as the comments side. .game-link-enter (the
+         entrance-animation wrapper, see above) has to be the flex item
+         actually doing the growing, with .game-link filling it in turn
+         -- flex:1 on .game-link itself would have no effect since its
+         own parent (.game-link-enter) isn't flex-sized. */
+      .game-link-enter {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+      }
       .game-link {
         padding: 0;
         width: clamp(96px, 26vw, 128px);
-        height: 64px;
-        flex-shrink: 0;
+        /* No explicit height/flex here -- .game-link-enter (its parent,
+           a row-direction flex container) stretches it to fill that
+           wrapper's height by default (align-items:stretch), which is
+           what actually grows the tile now that .game-link-enter itself
+           has flex:1. flex:1 directly on .game-link would set
+           flex-basis:0%, overriding the width above instead of just
+           adding height. */
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -1099,8 +1262,7 @@
         position: relative;
       }
       .game-link-title {
-        font-size: 12px;
-        margin-bottom: 2px;
+        font-size: 15px;
         font-weight: 700;
       }
       .game-link-subtitle {
@@ -1118,14 +1280,13 @@
         bottom: 0;
         left: 0;
         right: 0;
-        height: 56px;
+        height: 96px;
         padding: 0 0 env(safe-area-inset-bottom);
         margin: 0;
         border-top: 1px solid var(--rule);
         border-bottom: none;
         background: var(--paper-navbar);
         z-index: 100;
-        box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
         display: flex;
         align-items: stretch;
       }
@@ -1134,7 +1295,10 @@
         width: 100%;
         height: 100%;
         gap: 0;
-        padding: 0;
+        /* Pull KÜTÜPHANE/KAHVEHANE in from the screen's rounded corners --
+           at full-bleed width:100% the outer tabs sat right under the
+           curve. */
+        padding: 0 20px;
         flex-wrap: nowrap;
         justify-content: stretch;
       }
@@ -1143,16 +1307,16 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.8px;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
         text-transform: uppercase;
         color: var(--muted);
         padding: 0;
         border: none;
         text-decoration: none;
       }
-      nav a.active { color: var(--ink); }
+      nav a.active { color: var(--ink); font-weight: 700; }
 
       /* ── Mobile swipe pagination: full page (map + datetime + columns) slides; fixed bottom nav stays ── */
       .col-left, .col-right {
@@ -1512,6 +1676,10 @@
 </head>
 <body>
 
+<!-- Wraps everything except modals (matching anahane.html) so #main-site
+     (not body) is the grid -- see the CSS comment on #main-site for why. -->
+<div id="main-site">
+
   <!-- Mobile-only compact profile card (mounted by profile-card.js) -->
   <div id="ist-pc-mount"></div>
 
@@ -1535,13 +1703,13 @@
     <div class="col-left-slide">
       <section class="discussion-section">
         <div class="discussion-label" id="discussion-label" data-i18n="kahvehane.allistanbul">Tüm İstanbul</div>
-        <div class="discussion-posts" id="discussion-posts">
-          <div class="empty-state"><span class="spinner"></span> Yükleniyor...</div>
-        </div>
+        <div class="discussion-posts" id="discussion-posts"></div>
         <div class="submit-form" id="submit-form" style="display:none;">
           <span id="home-nb-badge" class="home-nb-badge" style="display:none;"></span>
-          <textarea id="post-content" placeholder="Ne söylemek istersiniz?"></textarea>
-          <button id="submit-btn">Gönder</button>
+          <div class="submit-form-row">
+            <textarea id="post-content" placeholder="Ne söylemek istersiniz?"></textarea>
+            <button id="submit-btn">Gönder</button>
+          </div>
           <div class="submit-form-note" id="submit-form-note" style="display:none;"></div>
           <div class="submit-status" id="submit-status"></div>
         </div>
@@ -1551,6 +1719,9 @@
 
   <main>
     <section class="map-panel">
+      <!-- Scaled/panned as one unit by map-zoom.js (pinch to zoom, drag
+           to pan once zoomed) -- map-label below stays outside it. -->
+      <div class="map-zoom-layer">
       <img class="map-photo" src="assets/istanbul-map.png" alt="">
 
       <!-- Hit-region overlay traced against map-photo (same 5046x2300
@@ -1661,6 +1832,7 @@
           <polygon id="bahcelievler" class="neighborhood" data-name="Bahçelievler" points="1622.68 1693.32 1637.83 1671.21 1632.58 1649.59 1519.4 1624.55 1328.74 1616.93 1272.58 1737 1359.01 1780.79 1448.51 1767.02 1613.73 1703.92 1622.68 1693.32" fill="none" stroke="#000" stroke-miterlimit="10"/>
         </g>
       </svg>
+      </div>
 
       <div class="map-label" id="map-label">İstanbul</div>
     </section>
@@ -1672,20 +1844,26 @@
         <div class="game-picker" id="game-picker">
           <h2 style="text-transform: uppercase;" data-i18n="games.today">Günün Oyunları</h2>
 
+          <div class="game-link-enter">
           <a href="sozcel.html" class="game-link" data-game="sozcel">
             <div class="game-link-title">Sözcel</div>
             <div class="game-link-subtitle">Türkçe Wordle</div>
           </a>
+          </div>
 
+          <div class="game-link-enter">
           <a href="tumcel.html" class="game-link" data-game="tumcel">
             <div class="game-link-title">Tümcel</div>
             <div class="game-link-subtitle">Türkçe Alıntı Bulmacası</div>
           </a>
+          </div>
 
+          <div class="game-link-enter">
           <a href="bulmaca.html" class="game-link" data-game="bulmaca">
             <div class="game-link-title">Bulmaca</div>
             <div class="game-link-subtitle">Mini Çapraz Bulmaca</div>
           </a>
+          </div>
         </div>
 
         <div class="scoreboard">
@@ -1700,6 +1878,8 @@
   </aside>
   </div>
 
+</div><!-- /#main-site -->
+
   <!-- Game overlay: bottom sheet housing an iframe, opened instead of
        navigating to sozcel.html/tumcel.html/bulmaca.html — see the
        initGameOverlay script further down. -->
@@ -1711,293 +1891,13 @@
   </div>
 
 <script>
-// ══════════════════════════════════════════
-// Swipe pagination
-// Navigate Kütüphane → Hane → Kahvehane. Mobile: touch-swipe
-// slides the whole page (map, datetime bar, both columns) horizontally as
-// one unit, direction keyed off which way you swiped. Desktop: no gesture
-// (nav-bar clicks only) — the left column always slides out/in toward the
-// left edge and the right column toward the right edge, regardless of nav
-// direction. CSS picks the behavior per media query.
-// ══════════════════════════════════════════
-(function initSwipePagination() {
-  const PAGES = ['kutuphane.html', 'anahane.html', 'kahvehane.html'];
-  const DURATION = 400;
-  const MIN_DX = 50;
-  const MAX_TIME = 700;
-  // Prefer the View Transitions API when available — it snapshots the
-  // outgoing page and holds it until the new one is rendered, which
-  // eliminates the white flash the manual slide-out can't hide. Cross-
-  // document VT is new enough that Capacitor's embedded WKWebView can
-  // report the API as present without actually completing the
-  // navigation, silently swallowing tab-bar taps — so skip it inside
-  // the native app and always use the manual slide/timeout fallback.
-  const supportsVT = 'startViewTransition' in document && !window.Capacitor;
-
-  function isMobile() { return window.innerWidth <= 768; }
-  function currentIdx() {
-    const path = (location.pathname.split('/').pop() || 'index.html');
-    const idx = PAGES.indexOf(path);
-    return idx === -1 ? 0 : idx;
-  }
-  function recordDir(dir) {
-    // Seed the direction for the incoming page. The pre-body script
-    // reads this and sets vt-<dir> on <html> before VT captures the
-    // new snapshot, so the CSS slide keyframes can match.
-    try { sessionStorage.setItem('ist-page-enter-dir', dir); } catch(e) {}
-  }
-
-  if (supportsVT) {
-    window.addEventListener('pageswap', (e) => {
-      if (!e.viewTransition) return;
-      const dir = sessionStorage.getItem('ist-page-enter-dir');
-      if (dir) e.viewTransition.types.add(dir);
-    });
-    window.addEventListener('pagereveal', (e) => {
-      if (!e.viewTransition) return;
-      const root = document.documentElement;
-      const dir = root.classList.contains('vt-forward') ? 'forward'
-                : root.classList.contains('vt-backward') ? 'backward' : null;
-      if (dir) e.viewTransition.types.add(dir);
-      e.viewTransition.finished.finally(() => {
-        root.classList.remove('vt-forward', 'vt-backward');
-      });
-    });
-  }
-
-  // Entry handler — runs on every page load. Cleans up direction state
-  // and, for non-VT browsers, releases the manual offscreen transform.
-  function handleIncoming() {
-    const root = document.documentElement;
-    const dir = root.classList.contains('ist-entering-forward') ? 'forward'
-              : root.classList.contains('ist-entering-backward') ? 'backward' : null;
-    try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
-    if (!dir) return;
-    // Double rAF so the initial transform has painted before we release it.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        root.classList.remove('ist-entering-' + dir);
-      });
-    });
-  }
-
-  let navigating = false;
-  function navigate(targetIdx, dir) {
-    if (navigating) return;
-    if (targetIdx < 0 || targetIdx >= PAGES.length) return;
-    const curr = currentIdx();
-    if (targetIdx === curr) return;
-    navigating = true;
-    recordDir(dir);
-    if (supportsVT) {
-      location.href = PAGES[targetIdx];
-      return;
-    }
-    const exitClass = dir === 'forward' ? 'ist-exiting-forward' : 'ist-exiting-backward';
-    document.body.classList.add(exitClass);
-    setTimeout(() => { location.href = PAGES[targetIdx]; }, DURATION - 30);
-  }
-
-  // Chain-slide through intermediate tabs when the user jumps 2+ away.
-  // Fetch each hop in parallel (warmed by <link rel="prefetch">), extract
-  // its .col-left / .col-right, stack the clones in a fixed overlay, then
-  // translate the stack to reveal each frame in sequence. The final hop
-  // ends with a real navigation so the destination's scripts run normally;
-  // we strip the direction class and kill the cross-document VT animation
-  // so there's no double-animation on arrival.
-  async function multiHopSlide(curr, target) {
-    if (navigating) return;
-    const dir = target > curr ? 'forward' : 'backward';
-    const step = dir === 'forward' ? 1 : -1;
-    const hopIdxs = [];
-    for (let i = curr + step; i !== target + step; i += step) hopIdxs.push(i);
-    if (hopIdxs.length === 0) return;
-    navigating = true;
-
-    const fetches = hopIdxs.map(i => fetch(PAGES[i]).then(r => r.text()).catch(() => null));
-    const leftEl = document.querySelector('.col-left-slide');
-    const rightEl = document.querySelector('.col-right');
-    if (!leftEl || !rightEl) { recordDir(dir); location.href = PAGES[target]; return; }
-    const leftRect = leftEl.getBoundingClientRect();
-    const rightRect = rightEl.getBoundingClientRect();
-    const mobile = window.innerWidth <= 768;
-
-    const htmls = await Promise.all(fetches);
-    if (htmls.some(h => h == null)) {
-      navigating = false;
-      recordDir(dir);
-      location.href = PAGES[target];
-      return;
-    }
-    const parser = new DOMParser();
-    const fragments = htmls.map(html => {
-      const doc = parser.parseFromString(html, 'text/html');
-      return {
-        left: doc.querySelector('.col-left-slide'),
-        right: doc.querySelector('.col-right'),
-      };
-    });
-
-    function buildStack(origEl, origRect, key) {
-      const wrap = document.createElement('div');
-      Object.assign(wrap.style, {
-        position: 'fixed',
-        left: origRect.left + 'px',
-        top: origRect.top + 'px',
-        width: origRect.width + 'px',
-        height: origRect.height + 'px',
-        overflow: 'hidden',
-        pointerEvents: 'none',
-        zIndex: '90',
-        background: '#ffffff',
-      });
-      const stack = document.createElement('div');
-      Object.assign(stack.style, {
-        position: 'absolute',
-        inset: '0',
-        willChange: 'transform',
-      });
-      wrap.appendChild(stack);
-
-      function placeFrame(node, i) {
-        Object.assign(node.style, {
-          position: 'absolute',
-          top: '0',
-          left: '0',
-          width: '100%',
-          height: '100%',
-          margin: '0',
-          boxSizing: 'border-box',
-          overflow: 'hidden',
-        });
-        node.style.viewTransitionName = 'none';
-        // Mobile: whole page travels one way, keyed off nav direction.
-        // Desktop: left column always sweeps toward the left edge and the
-        // right column toward the right edge, regardless of nav direction
-        // -- so frames are stacked toward the opposite edge here and swept
-        // back by the container's own animation below.
-        const pct = mobile
-          ? (dir === 'forward' ? i : -i) * 100
-          : (key === 'right' ? -i : i) * 100;
-        node.style.transform = 'translateX(' + pct + '%)';
-        stack.appendChild(node);
-      }
-      const frame0 = origEl.cloneNode(true);
-      placeFrame(frame0, 0);
-      fragments.forEach((frag, i) => {
-        const src = frag[key];
-        const node = src ? src.cloneNode(true) : document.createElement('div');
-        placeFrame(node, i + 1);
-      });
-      return { wrap, stack };
-    }
-
-    const leftStack = buildStack(leftEl, leftRect, 'left');
-    const rightStack = buildStack(rightEl, rightRect, 'right');
-    document.body.appendChild(leftStack.wrap);
-    document.body.appendChild(rightStack.wrap);
-    // These clones are only ever meant to be visible for the duration of this
-    // navigation. If left in the DOM they can survive into a bfcache snapshot
-    // of this document (or linger through a stalled cross-document view
-    // transition) and reappear — showing another page's column content — the
-    // next time this document is shown. pagehide fires after the VT snapshot
-    // is taken but before the document is torn down/cached, so removing here
-    // is invisible to the departing animation but keeps the clones out of
-    // whatever gets cached or rendered next.
-    window.addEventListener('pagehide', () => {
-      leftStack.wrap.remove();
-      rightStack.wrap.remove();
-    }, { once: true });
-
-    leftEl.style.visibility = 'hidden';
-    rightEl.style.visibility = 'hidden';
-    leftEl.style.viewTransitionName = 'none';
-    rightEl.style.viewTransitionName = 'none';
-
-    const hops = hopIdxs.length;
-    const perHop = hops === 2 ? 260 : 220;
-    const totalMs = perHop * hops;
-    const opts = { duration: totalMs, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' };
-    // Mobile: both stacks travel together, keyed off nav direction.
-    // Desktop: left stack always slides left, right stack always slides
-    // right, regardless of nav direction (see placeFrame above).
-    const mobileEndPct = dir === 'forward' ? -hops * 100 : hops * 100;
-    const leftKeyframes = [
-      { transform: 'translateX(0%)' },
-      { transform: 'translateX(' + (mobile ? mobileEndPct : -hops * 100) + '%)' },
-    ];
-    const rightKeyframes = [
-      { transform: 'translateX(0%)' },
-      { transform: 'translateX(' + (mobile ? mobileEndPct : hops * 100) + '%)' },
-    ];
-    const a1 = leftStack.stack.animate(leftKeyframes, opts);
-    const a2 = rightStack.stack.animate(rightKeyframes, opts);
-
-    try { await Promise.all([a1.finished, a2.finished]); } catch (e) {}
-
-    try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
-    document.documentElement.classList.remove('vt-forward', 'vt-backward');
-    const killVT = document.createElement('style');
-    killVT.textContent = '::view-transition-group(*),::view-transition-image-pair(*),::view-transition-old(*),::view-transition-new(*){animation:none !important;}';
-    document.head.appendChild(killVT);
-
-    location.href = PAGES[target];
-  }
-
-  // Intercept tab-bar clicks: direct-neighbor hops ride the built-in VT;
-  // jumps of 2+ go through multiHopSlide so intermediate tabs flash past.
-  document.addEventListener('click', (e) => {
-    const link = e.target.closest('nav a');
-    if (!link) return;
-    const href = link.getAttribute('href');
-    const targetIdx = PAGES.indexOf(href);
-    const curr = currentIdx();
-    if (targetIdx === -1 || targetIdx === curr) return;
-    const dir = targetIdx > curr ? 'forward' : 'backward';
-    const dist = Math.abs(targetIdx - curr);
-    if (supportsVT && dist >= 2) {
-      e.preventDefault();
-      multiHopSlide(curr, targetIdx);
-      return;
-    }
-    if (supportsVT) { recordDir(dir); return; }
-    e.preventDefault();
-    navigate(targetIdx, dir);
-  }, true);
-
-  // ── Mobile: horizontal touch-swipe anywhere on main-site (except the nav bar) ──
-  let sx = 0, sy = 0, st = 0, active = false;
-  document.addEventListener('touchstart', (e) => {
-    if (!isMobile() || e.touches.length !== 1) return;
-    if (e.target.closest && e.target.closest('nav')) return; // let nav-bar taps through
-    sx = e.touches[0].clientX;
-    sy = e.touches[0].clientY;
-    st = Date.now();
-    active = true;
-  }, { passive: true });
-
-  document.addEventListener('touchend', (e) => {
-    if (!active) return;
-    active = false;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - sx;
-    const dy = t.clientY - sy;
-    const dt = Date.now() - st;
-    if (dt > MAX_TIME) return;
-    if (Math.abs(dx) < MIN_DX) return;
-    if (Math.abs(dx) < Math.abs(dy) * 1.2) return; // vertical-dominant: let it scroll
-    const curr = currentIdx();
-    if (dx < 0) navigate(curr + 1, 'forward');
-    else        navigate(curr - 1, 'backward');
-  }, { passive: true });
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', handleIncoming);
-  } else {
-    handleIncoming();
-  }
-})();
-
+// Wrapped in a scoping IIFE so this page's top-level declarations (sb,
+// neighborhoodNames, etc.) don't leak to the global scope -- a future
+// client-side navigation may execute this same script a second time in a
+// document that already ran another carousel page's script, and without
+// this wrapper a repeated `const` at global scope throws a
+// duplicate-declaration SyntaxError.
+(function () {
 // Game overlay: clicking a game link opens it as a bottom sheet (an
 // iframe loading the game's own, otherwise-unmodified page) instead of
 // navigating away from Kahvehane. Closing it — the ✕ button, clicking
@@ -2018,16 +1918,20 @@ let gameContextActive = null;
 
 // The game links stay visible while a game is open (so switching games or
 // bailing back to the picker doesn't require closing the sheet first) —
-// only the scoreboard narrows down to the open game's own board.
+// only the scoreboard narrows down to the open game's own board. Passing
+// includeGameLinks=false keeps them out of the entrance cascade entirely:
+// they never actually left the screen (only the scoreboard rows below
+// them are swapping), so animating them in again here would look like
+// they'd just arrived.
 function enterGameContext(gameKey) {
   gameContextActive = gameKey;
-  loadScoreboard(null, gameKey);
+  loadScoreboard(null, gameKey, false, false);
 }
 
 function exitGameContext() {
   if (!gameContextActive) return;
   gameContextActive = null;
-  loadScoreboard(activeMapNeighborhood || null);
+  loadScoreboard(activeMapNeighborhood || null, null, false, false);
 }
 
 (function initGameOverlay() {
@@ -2073,12 +1977,17 @@ function exitGameContext() {
     if (overlay.classList.contains('open')) positionGameSheet();
   });
 
-  document.querySelectorAll('.game-link').forEach((link) => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (link.classList.contains('locked')) return;
-      openGame(link.getAttribute('href'), link.dataset.game);
-    });
+  // Delegated on document (not bound per-node) -- a virtual navigation
+  // (see router.js) replaces #ist-content's whole subtree on every
+  // revisit to this page, including these .game-link cards, so a
+  // listener bound once to the original nodes would go stale after the
+  // first navigate-away-and-back.
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('.game-link');
+    if (!link) return;
+    e.preventDefault();
+    if (link.classList.contains('locked')) return;
+    openGame(link.getAttribute('href'), link.dataset.game);
   });
   // No standalone ✕ — the game's own ← back button (postMessage below)
   // and clicking outside the sheet both close it.
@@ -2088,23 +1997,21 @@ function exitGameContext() {
   });
 })();
 
-setInterval(() => {
+// Tick every 60s via the shared clock (see router.js) instead of running
+// its own setInterval, which a revisit via virtual navigation would
+// duplicate. Also re-rendered immediately on an I18N language change
+// instead of waiting for the next tick.
+function tickScoreboardCountdown() {
   const cdEl = document.getElementById('scoreboard-countdown');
   if (cdEl && cdEl.dataset.mode === 'week') setWeekProgress(cdEl);
-}, 60000);
-// Re-render language-sensitive bits immediately once the profile's language
-// preference syncs from Supabase, instead of waiting for the next interval tick.
-I18N.onChange(() => {
-  const cdEl = document.getElementById('scoreboard-countdown');
-  if (cdEl && cdEl.dataset.mode === 'week') setWeekProgress(cdEl);
-});
+}
 
-const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
 const ADMIN_EMAIL = 'cemwozturk@gmail.com';
 
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Shared client (see router.js) — no page may declare its own createClient
+// anymore, so that a future client-side navigation can run more than one
+// page's script in the same document without a duplicate-declaration crash.
+const sb = IstRouter.sb;
 
 const neighborhoodNames = {
   bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler',
@@ -2143,10 +2050,149 @@ function getAblativeSuffix(name) {
   return "'den";
 }
 
+// Source of truth for current neighborhood is profiles.neighborhood — the
+// RLS policy on neighborhood_comments enforces the same value when posting.
+// Fall back to user_metadata only if the profile read fails for some reason.
+// Re-run on every mount (not just the first) so it stays correct if it
+// changes mid-session.
+async function refreshHomeNeighborhood() {
+  const user = window.__currentUser;
+  // Re-apply the last known highlight immediately (synchronously, before
+  // the profile fetch below) -- #ist-content's map is rebuilt fresh on
+  // every mount and starts with no .home class, so without this a
+  // revisit shows the map for a beat with no highlight, then fades it in
+  // once the fetch resolves. That read as a visible flash; this makes a
+  // revisit correct on the very first paint, with the fetch below only
+  // silently correcting it later if it actually changed.
+  if (homeNeighborhood) {
+    const nbEl = document.getElementById(homeNeighborhood);
+    if (nbEl) nbEl.classList.add('home');
+  }
+  let profileNb = null;
+  let profileFirst = '';
+  try {
+    const { data: prof } = await sb
+      .from('profiles')
+      .select('neighborhood, first_name')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (prof) {
+      profileNb = prof.neighborhood || null;
+      profileFirst = prof.first_name || '';
+    }
+  } catch (_) {}
+
+  homeNeighborhood = profileNb
+    || user.user_metadata?.neighborhood
+    || user.user_metadata?.yasadigi_ilce
+    || localStorage.getItem('yasadigi_ilce_local') || null;
+  currentUserFirstName = profileFirst || user.user_metadata?.first_name || '';
+
+  if (homeNeighborhood) {
+    selectedNeighborhood = homeNeighborhood;
+    const nbName = neighborhoodNames[homeNeighborhood] || homeNeighborhood;
+    document.getElementById('home-nb-badge').textContent = nbName;
+    // Highlight home neighborhood on map without activating it — the
+    // default view is Tüm İstanbul, not the user's own neighborhood.
+    const nbEl = document.getElementById(homeNeighborhood);
+    if (nbEl) nbEl.classList.add('home');
+  } else {
+    document.getElementById('home-nb-badge').textContent = 'Semt seçilmedi';
+  }
+}
+
+let onI18NChangeForCountdown = null;
+let discussionTickIntervalId = null;
+
+// This page's repeatable "become the active page" work -- the part that
+// re-runs on every virtual re-entry into kahvehane, not just the first
+// real load (see init() below for the one-time login-gateway part: the
+// auth check, mounting the profile card, resuming onboarding, the admin
+// notification nudge).
+// Mobile only: .col-left/.col-right are meant to fill exactly the space
+// between the map and the fixed bottom nav (see #main-site's own
+// grid-template-rows comment), but that "1fr" row doesn't actually
+// stretch them there in practice -- #ist-content is display:contents
+// (needed so a virtual navigation, see router.js, can swap it without
+// disturbing #main-site's own grid), and grid item stretch sizing
+// doesn't reliably propagate through a display:contents wrapper in this
+// WebKit version. Measuring the real gap and setting an explicit height
+// sidesteps that entirely instead of fighting the grid/flex cascade for
+// it. header is position:fixed at the very bottom regardless of DOM
+// position, so its own rect is a reliable, already-safe-area-aware
+// reference point.
+function syncColumnHeights() {
+  const colLeft = document.querySelector('.col-left');
+  const colRight = document.querySelector('.col-right');
+  const headerEl = document.querySelector('header');
+  if (!colLeft || !colRight || !headerEl) return;
+  if (window.innerWidth > 768) {
+    colLeft.style.height = '';
+    colRight.style.height = '';
+    return;
+  }
+  const frameGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-gap')) || 10;
+  const navTop = headerEl.getBoundingClientRect().top;
+  const colTop = colLeft.getBoundingClientRect().top;
+  const height = Math.max(0, navTop - colTop - frameGap);
+  colLeft.style.height = height + 'px';
+  colRight.style.height = height + 'px';
+}
+window.addEventListener('resize', syncColumnHeights);
+
+async function mount() {
+  await refreshHomeNeighborhood();
+  updateSubmitFormVisibility();
+  syncColumnHeights();
+  // header's own safe-area-inset-bottom padding can resolve a moment
+  // after this first measurement on a fresh WKWebView paint (see
+  // safe-area-ready.js) -- re-measure shortly after to correct for that.
+  setTimeout(syncColumnHeights, 350);
+
+  // Posts should always cascade in from the left on arrival (see
+  // loadPosts's own animateFeedSwap call below) -- only the
+  // scoreboard/game-buttons' entrance is meant to stay suppressed here
+  // (see __istSuppressFirstCardAnim, seeded by router.js's navigateTo or
+  // the pre-body script on a real load) to avoid a double-motion look
+  // with the column's own slide. The game buttons get their own
+  // separate staggered entrance instead now (see .game-link-enter), so
+  // nothing else depends on 'left' staying suppressed here.
+  if (window.__istSuppressFirstCardAnim) window.__istSuppressFirstCardAnim.left = false;
+
+  loadPosts();
+  markPlayedGames(window.__currentUser.id);
+  if (typeof applyGameLocks === 'function') applyGameLocks(sb);
+  loadScoreboard();
+
+  IstRouter.onTick(tickScoreboardCountdown);
+  onI18NChangeForCountdown = tickScoreboardCountdown;
+  I18N.onChange(onI18NChangeForCountdown);
+  if (discussionTickIntervalId) clearInterval(discussionTickIntervalId);
+  discussionTickIntervalId = setInterval(tickDiscussionPosts, 30000);
+
+  // If the current user is the picked sözcül with a pending word,
+  // glow the Sözcel tile and surface a one-time mascot popup.
+  (function tryGreet(tries) {
+    if (window.IstSozcul) {
+      window.IstSozcul.glowGameLink(sb);
+      window.IstSozcul.greet({ sb, page: 'kahvehane' });
+    } else if (tries > 0) {
+      setTimeout(() => tryGreet(tries - 1), 80);
+    }
+  })(40);
+}
+
+function unmount() {
+  IstRouter.offTick(tickScoreboardCountdown);
+  if (onI18NChangeForCountdown) { I18N.offChange(onI18NChangeForCountdown); onI18NChangeForCountdown = null; }
+  if (discussionTickIntervalId) { clearInterval(discussionTickIntervalId); discussionTickIntervalId = null; }
+}
+
 async function init() {
   // Require auth
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = 'index.html'; return; }
+  window.__currentUser = session.user;
 
   I18N.syncFromSupabase(sb, session.user.id);
   Palette.syncFromSupabase(sb, session.user.id);
@@ -2173,58 +2219,7 @@ async function init() {
     else if (tries > 0) setTimeout(() => tryOnb(tries - 1), 60);
   })(40);
 
-  // Source of truth for current neighborhood is profiles.neighborhood — the
-  // RLS policy on neighborhood_comments enforces the same value when posting.
-  // Fall back to user_metadata only if the profile read fails for some reason.
-  let profileNb = null;
-  let profileFirst = '';
-  try {
-    const { data: prof } = await sb
-      .from('profiles')
-      .select('neighborhood, first_name')
-      .eq('id', session.user.id)
-      .maybeSingle();
-    if (prof) {
-      profileNb = prof.neighborhood || null;
-      profileFirst = prof.first_name || '';
-    }
-  } catch (_) {}
-
-  homeNeighborhood = profileNb
-    || session.user.user_metadata?.neighborhood
-    || session.user.user_metadata?.yasadigi_ilce
-    || localStorage.getItem('yasadigi_ilce_local') || null;
-  currentUserFirstName = profileFirst || session.user.user_metadata?.first_name || '';
-
-  if (homeNeighborhood) {
-    selectedNeighborhood = homeNeighborhood;
-    const nbName = neighborhoodNames[homeNeighborhood] || homeNeighborhood;
-    document.getElementById('home-nb-badge').textContent = nbName;
-    // Highlight home neighborhood on map without activating it — the
-    // default view is Tüm İstanbul, not the user's own neighborhood.
-    const nbEl = document.getElementById(homeNeighborhood);
-    if (nbEl) nbEl.classList.add('home');
-  } else {
-    document.getElementById('home-nb-badge').textContent = 'Semt seçilmedi';
-  }
-
-  updateSubmitFormVisibility();
-
-  loadPosts();
-  markPlayedGames(session.user.id);
-  if (typeof applyGameLocks === 'function') applyGameLocks(sb);
-  loadScoreboard();
-
-  // If the current user is the picked sözcül with a pending word,
-  // glow the Sözcel tile and surface a one-time mascot popup.
-  (function tryGreet(tries) {
-    if (window.IstSozcul) {
-      window.IstSozcul.glowGameLink(sb);
-      window.IstSozcul.greet({ sb, page: 'kahvehane' });
-    } else if (tries > 0) {
-      setTimeout(() => tryGreet(tries - 1), 80);
-    }
-  })(40);
+  await mount();
 
   // Admin one-shot notification popup — mascot bubble, shown once per user.
   (function tryNotif(tries) {
@@ -2411,15 +2406,18 @@ function clearWeekProgress(el) {
   el.dataset.mode = '';
 }
 
-async function loadScoreboard(neighborhoodFilter = null, gameFilter = null, instant = false) {
+async function loadScoreboard(neighborhoodFilter = null, gameFilter = null, instant = false, includeGameLinks = true) {
   const listEl = document.getElementById('scoreboard-list');
   if (!listEl) return;
   const titleEl = document.getElementById('scoreboard-title');
   const countdownEl = document.getElementById('scoreboard-countdown');
-  // Game links sit above the scoreboard and never get rebuilt, but they
-  // should still join the same top-to-bottom entrance cascade as the
-  // scoreboard rows below them.
-  const gameLinks = Array.from(document.querySelectorAll('.games-section .game-link'));
+  // Game links sit above the scoreboard and never get rebuilt. On the
+  // page's own arrival they join the same top-to-bottom entrance cascade
+  // as the scoreboard rows below them -- but opening/closing a game
+  // overlay (see enterGameContext/exitGameContext) also calls this to
+  // narrow/widen the board, and there the links never actually left the
+  // screen, so includeGameLinks=false keeps them out of that cascade.
+  const gameLinks = includeGameLinks ? Array.from(document.querySelectorAll('.games-section .game-link')) : [];
   const setList = (html) => animateFeedSwap(listEl, 'right', () => { listEl.innerHTML = html; }, gameLinks, instant);
 
   // Title + countdown swap: a filtered view is per-neighborhood or
@@ -2572,10 +2570,20 @@ async function loadScoreboard(neighborhoodFilter = null, gameFilter = null, inst
 // game means updating that file — every page that loads it picks up the new
 // rule for free.
 
-init();
+// Skipped when this script is being injected by a virtual navigation (see
+// router.js's navigateTo) -- that path calls the registered mount()
+// directly instead, since the user's already authenticated and the
+// profile card's already mounted from the real page load that got them
+// into the app in the first place.
+if (!window.__istVirtualNavInjecting) init();
 
 // ── Map Interaction — clicking a neighborhood filters the discussion feed ──
-const mapNeighborhoods = document.querySelectorAll('.neighborhood');
+// Delegated on document and re-queried fresh each time rather than bound
+// per-node once -- a virtual navigation (see router.js) replaces
+// #ist-content's whole subtree on every revisit to this page, including
+// the map's .neighborhood elements, so listeners bound once to the
+// original nodes would go stale after the first navigate-away-and-back.
+function getMapNeighborhoods() { return document.querySelectorAll('.neighborhood'); }
 
 // Resolve what the map label should show when nothing is being hovered:
 // the active neighborhood's name, or 'İstanbul' if none is active.
@@ -2585,14 +2593,14 @@ function baseMapLabel() {
   return (active && active.getAttribute('data-name')) || activeMapNeighborhood;
 }
 
-mapNeighborhoods.forEach(nb => {
-  nb.addEventListener('click', (e) => {
-    e.stopPropagation();
+document.addEventListener('click', (e) => {
+  const nb = e.target.closest('.neighborhood');
+  if (nb) {
     // data-neighborhood covers multi-polygon districts (e.g. Şişli's
     // exclave piece) whose element id must stay unique but which still
     // count as the same neighborhood for comment/scoreboard purposes.
     const nbId = nb.dataset.neighborhood || nb.id;
-    mapNeighborhoods.forEach(n => n.classList.toggle('active', (n.dataset.neighborhood || n.id) === nbId));
+    getMapNeighborhoods().forEach(n => n.classList.toggle('active', (n.dataset.neighborhood || n.id) === nbId));
     const name = nb.getAttribute('data-name') || nbId;
     document.getElementById('map-label').textContent = name;
     document.getElementById('discussion-label').textContent = name;
@@ -2605,34 +2613,35 @@ mapNeighborhoods.forEach(nb => {
     // though they never change).
     loadPosts(nbId, true);
     loadScoreboard(nbId, null, true);
-  });
-  nb.addEventListener('mouseenter', () => {
-    const name = nb.getAttribute('data-name') || nb.id;
-    document.getElementById('map-label').textContent = name;
-  });
-  nb.addEventListener('mouseleave', () => {
-    document.getElementById('map-label').textContent = baseMapLabel();
-  });
-});
-
-// Snap back to Tüm İstanbul only when clicking empty space inside the map
-// panel itself — clicking the composer, posts, or other UI must not reset.
-document.querySelector('.map-panel').addEventListener('click', (e) => {
-  if (!e.target.closest('.neighborhood') && !e.target.closest('.map-label')) {
-    mapNeighborhoods.forEach(n => n.classList.remove('active'));
-    // Restore home highlight after clearing active state
-    if (homeNeighborhood) {
-      const homeEl = document.getElementById(homeNeighborhood);
-      if (homeEl) homeEl.classList.add('home');
-    }
-    document.getElementById('map-label').textContent = 'İstanbul';
-    document.getElementById('discussion-label').textContent = I18N.t('kahvehane.allistanbul');
-    activeMapNeighborhood = null;
-    selectedNeighborhood = homeNeighborhood;
-    updateSubmitFormVisibility();
-    loadPosts(null, true);
-    loadScoreboard(null, null, true);
+    return;
   }
+  // Snap back to Tüm İstanbul only when clicking empty space inside the
+  // map panel itself — clicking the composer, posts, or other UI must
+  // not reset.
+  if (!e.target.closest('.map-panel') || e.target.closest('.map-label')) return;
+  getMapNeighborhoods().forEach(n => n.classList.remove('active'));
+  // Restore home highlight after clearing active state
+  if (homeNeighborhood) {
+    const homeEl = document.getElementById(homeNeighborhood);
+    if (homeEl) homeEl.classList.add('home');
+  }
+  document.getElementById('map-label').textContent = 'İstanbul';
+  document.getElementById('discussion-label').textContent = I18N.t('kahvehane.allistanbul');
+  activeMapNeighborhood = null;
+  selectedNeighborhood = homeNeighborhood;
+  updateSubmitFormVisibility();
+  loadPosts(null, true);
+  loadScoreboard(null, null, true);
+});
+document.addEventListener('mouseover', (e) => {
+  const nb = e.target.closest('.neighborhood');
+  if (!nb) return;
+  document.getElementById('map-label').textContent = nb.getAttribute('data-name') || nb.id;
+});
+document.addEventListener('mouseout', (e) => {
+  const nb = e.target.closest('.neighborhood');
+  if (!nb || nb.contains(e.relatedTarget)) return;
+  document.getElementById('map-label').textContent = baseMapLabel();
 });
 
 // ── Paginated comment feed ──
@@ -2793,7 +2802,13 @@ async function handleLoadMore() {
   }
 }
 
-document.getElementById('discussion-posts').addEventListener('click', async (e) => {
+// Delegated on document (not the #discussion-posts container itself) --
+// a virtual navigation (see router.js) replaces #ist-content's whole
+// subtree on every revisit to this page, so a listener bound once to the
+// original container node would go stale after the first
+// navigate-away-and-back.
+document.addEventListener('click', async (e) => {
+  if (!e.target.closest('#discussion-posts')) return;
   const loadMoreBtn = e.target.closest('#load-more-btn');
   if (loadMoreBtn) { handleLoadMore(); return; }
   const delBtn = e.target.closest('.post-delete');
@@ -2813,8 +2828,11 @@ document.getElementById('discussion-posts').addEventListener('click', async (e) 
   }
 });
 
-// Refresh relative-time labels every 30s and drop expired posts.
-setInterval(() => {
+// Refresh relative-time labels every 30s and drop expired posts. Router's
+// shared clock only ticks every 60s, so this keeps its own interval --
+// named + ID-tracked (see mount()/unmount()) so a revisit via virtual
+// navigation clears the old one instead of stacking a second.
+function tickDiscussionPosts() {
   const postsEl = document.getElementById('discussion-posts');
   if (!postsEl) return;
   const now = Date.now();
@@ -2831,9 +2849,14 @@ setInterval(() => {
     const lm = postsEl.querySelector('.load-more-wrap');
     if (lm) lm.remove();
   }
-}, 30000);
+}
 
-document.getElementById('submit-btn').addEventListener('click', async () => {
+// Delegated on document (not the button itself) -- a virtual navigation
+// (see router.js) replaces #ist-content's whole subtree on every revisit
+// to this page, so a listener bound once to the original button node
+// would go stale after the first navigate-away-and-back.
+document.addEventListener('click', async (e) => {
+  if (!e.target.closest('#submit-btn')) return;
   const content = document.getElementById('post-content').value.trim();
   const statusEl = document.getElementById('submit-status');
   
@@ -2893,8 +2916,8 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   function attemptInsert() {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${SUPABASE_URL}/rest/v1/neighborhood_comments`, true);
-      xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
+      xhr.open('POST', 'https://fgxispjoiynnoqitwpks.supabase.co/rest/v1/neighborhood_comments', true);
+      xhr.setRequestHeader('apikey', 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z');
       xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.setRequestHeader('Prefer', 'return=minimal');
@@ -2995,6 +3018,15 @@ function showToast(text, kind) {
 (function initProfilePopup() {
   const overlay = document.createElement('div');
   overlay.className = 'profile-popup-overlay';
+  // Belt-and-suspenders like the game/reader overlays elsewhere: this
+  // element is created once, up front, and lives in the DOM for the rest
+  // of the session (outside #ist-content) -- once a virtual navigation
+  // (see router.js) disables this page's own stylesheet, the CSS class
+  // alone (.profile-popup-overlay{display:none}) stops applying and it'd
+  // render as bare, unstyled content. The `hidden` attribute's display:
+  // none comes from the browser's own built-in stylesheet, not this
+  // page's, so it stays correct regardless.
+  overlay.hidden = true;
   overlay.innerHTML = `
     <div class="profile-popup" role="dialog" aria-modal="true">
       <button class="close-btn" type="button" aria-label="Kapat">×</button>
@@ -3006,7 +3038,7 @@ function showToast(text, kind) {
   const popup = overlay.querySelector('.profile-popup');
   const body = overlay.querySelector('.pp-body');
 
-  function close() { overlay.classList.remove('open'); }
+  function close() { overlay.classList.remove('open'); overlay.hidden = true; }
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   overlay.querySelector('.close-btn').addEventListener('click', close);
   document.addEventListener('keydown', (e) => {
@@ -3029,6 +3061,7 @@ function showToast(text, kind) {
   }
 
   async function open(userId) {
+    overlay.hidden = false;
     overlay.classList.add('open');
     body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
     const today = istanbulTodayISO();
@@ -3083,6 +3116,9 @@ function showToast(text, kind) {
     const id = link.getAttribute('data-user-id');
     if (id) open(id);
   });
+})();
+
+IstRouter.registerPage('kahvehane', { mount, unmount });
 })();
 </script>
 
