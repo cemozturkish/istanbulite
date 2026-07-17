@@ -490,6 +490,26 @@
       .src-form { grid-template-columns: 1fr; }
     }
 
+    .series-edit-row {
+      display: none;
+      gap: 6px;
+      margin: 4px 0 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .series-edit-row.open { display: flex; }
+    .series-edit-row input {
+      flex: 1;
+      min-width: 120px;
+      padding: 5px 8px;
+      font-size: 0.8rem;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      font-family: 'Inter', sans-serif;
+    }
+    .series-edit-row button { padding: 5px 10px; font-size: 0.75rem; white-space: nowrap; }
+    .series-edit-row .se-status { flex-basis: 100%; margin: 0; font-size: 0.75rem; }
+
     .upd-row {
       display: flex;
       align-items: flex-start;
@@ -918,6 +938,11 @@
         Picking a neighborhood also pulses it on the map.
       </p>
 
+      <label>Seri (opsiyonel)</label>
+      <select id="n-series">
+        <option value="">— Seri yok —</option>
+      </select>
+
       <label>Tarih ve saat (opsiyonel — boş bırakırsan şu an kullanılır)</label>
       <input type="datetime-local" id="n-datetime"/>
 
@@ -936,6 +961,21 @@
       <p style="margin-top:14px;font-size:0.75rem;color:var(--muted);font-style:italic;line-height:1.4;">
         Breaking news auto-disappears 24 hours after posting.
       </p>
+
+      <div style="margin-top:18px;">
+        <div class="panel-title" style="margin-top:8px;">Seriler</div>
+        <p style="font-size:0.72rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:10px;">
+          Ayrı haberleri aynı gelişen olay altında toplamak için seri adı verin.
+        </p>
+        <div class="src-form" style="grid-template-columns:2fr auto;">
+          <input type="text" id="series-new-name" placeholder="Yeni seri adı..."/>
+          <button class="btn btn-secondary" id="series-add-btn">+ Seri Ekle</button>
+        </div>
+        <div class="status-msg" id="series-add-status"></div>
+        <div class="articles-list" id="series-list" style="margin-top:10px;">
+          <div class="empty-state"><span class="spinner"></span></div>
+        </div>
+      </div>
     </div>
 
     <!-- RIGHT: Active News -->
@@ -1320,7 +1360,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('notifications-tab').style.display = (tab === 'notifications') ? '' : 'none';
     document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
     if (tab === 'kutuphane') showKutuphaneIndex();
-    if (tab === 'news') loadBreakingNews();
+    if (tab === 'news') { loadSeries(); loadBreakingNews(); }
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
     if (tab === 'sozcel') loadSozcelSchedule();
     if (tab === 'tumcel') loadTumcelPuzzles();
@@ -1963,6 +2003,159 @@ function categoryLabel(cat) {
   return (NEIGHBORHOOD_NAMES[cat] || cat || 'GENERAL').toLocaleUpperCase('tr-TR');
 }
 
+// ── Series (named groupings across separate breaking_news posts) ──
+let SERIES_LIST = [];
+let SERIES_BY_ID = new Map();
+
+async function loadSeries() {
+  const [seriesRes, newsRes] = await Promise.all([
+    sb.from('breaking_news_series').select('*').order('name'),
+    sb.from('breaking_news').select('series_id').not('series_id', 'is', null),
+  ]);
+  if (seriesRes.error) {
+    const listEl = document.getElementById('series-list');
+    if (listEl) listEl.innerHTML = '<div class="empty-state">Error loading series.</div>';
+    return;
+  }
+  const counts = new Map();
+  (newsRes.data || []).forEach(n => counts.set(n.series_id, (counts.get(n.series_id) || 0) + 1));
+  SERIES_LIST = (seriesRes.data || []).map(s => ({ ...s, count: counts.get(s.id) || 0 }));
+  SERIES_BY_ID = new Map(SERIES_LIST.map(s => [s.id, s.name]));
+
+  const options = '<option value="">— Seri yok —</option>' +
+    SERIES_LIST.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+  const sel = document.getElementById('n-series');
+  if (sel) {
+    const prev = sel.value;
+    sel.innerHTML = options;
+    if (SERIES_BY_ID.has(prev)) sel.value = prev;
+  }
+
+  renderSeriesList();
+  // Series names may have changed (rename/delete) — refresh any badges
+  // already shown on the news list, if it's loaded.
+  if (allAdminNews.length) renderNewsList();
+}
+
+function renderSeriesList() {
+  const listEl = document.getElementById('series-list');
+  if (!listEl) return;
+  if (!SERIES_LIST.length) {
+    listEl.innerHTML = '<div class="empty-state">Henüz seri yok.</div>';
+    return;
+  }
+  listEl.innerHTML = SERIES_LIST.map(s => {
+    const count = s.count || 0;
+    return `
+      <div class="src-row" data-series-id="${s.id}">
+        <div class="src-info">
+          <strong>${escapeHtml(s.name)}</strong>
+          <span class="src-headline">${count} haber</span>
+        </div>
+        <button class="btn-edit" data-act="edit-series" data-id="${s.id}">Düzenle</button>
+        <button class="btn-del" data-act="del-series" data-id="${s.id}">×</button>
+      </div>
+      <div class="series-edit-row" data-series-edit-id="${s.id}">
+        <input type="text" class="se-name" value="${escapeHtml(s.name)}"/>
+        <button class="btn btn-primary" data-act="save-series-edit" data-id="${s.id}">Kaydet</button>
+        <button class="btn btn-secondary" data-act="cancel-series-edit" data-id="${s.id}">İptal</button>
+        <div class="se-status status-msg"></div>
+      </div>
+    `;
+  }).join('');
+}
+
+document.getElementById('series-list').addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const act = btn.dataset.act;
+  const id = btn.dataset.id;
+  if (act === 'edit-series') showSeriesEditForm(id);
+  else if (act === 'cancel-series-edit') hideSeriesEditForm(id);
+  else if (act === 'save-series-edit') saveSeriesEdit(id);
+  else if (act === 'del-series') deleteSeries(id);
+});
+
+function showSeriesEditForm(id) {
+  const form = document.querySelector(`.series-edit-row[data-series-edit-id="${id}"]`);
+  if (!form) return;
+  form.classList.add('open');
+  form.querySelector('.se-name').focus();
+}
+
+function hideSeriesEditForm(id) {
+  const form = document.querySelector(`.series-edit-row[data-series-edit-id="${id}"]`);
+  if (form) form.classList.remove('open');
+}
+
+async function saveSeriesEdit(id) {
+  const form = document.querySelector(`.series-edit-row[data-series-edit-id="${id}"]`);
+  const name = form.querySelector('.se-name').value.trim();
+  const statusEl = form.querySelector('.se-status');
+
+  if (!name) {
+    statusEl.textContent = 'Seri adı boş bırakılamaz.';
+    statusEl.className = 'se-status status-msg err';
+    return;
+  }
+
+  const saveBtn = form.querySelector('[data-act="save-series-edit"]');
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '<span class="spinner"></span>';
+  statusEl.textContent = '';
+
+  const { error } = await sb.from('breaking_news_series').update({ name }).eq('id', id);
+
+  saveBtn.disabled = false;
+  saveBtn.textContent = 'Kaydet';
+
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'se-status status-msg err';
+    return;
+  }
+  loadSeries();
+}
+
+async function deleteSeries(id) {
+  if (!confirm('Bu seriyi sil? Bu seriye bağlı haberler silinmez, sadece seri etiketi kaldırılır.')) return;
+  const { error } = await sb.from('breaking_news_series').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadSeries();
+}
+
+document.getElementById('series-add-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('series-add-btn');
+  const input = document.getElementById('series-new-name');
+  const statusEl = document.getElementById('series-add-status');
+  const name = input.value.trim();
+
+  statusEl.textContent = '';
+  statusEl.className = 'status-msg';
+
+  if (!name) {
+    statusEl.textContent = 'Seri adı gerekli.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const { error } = await sb.from('breaking_news_series').insert([{ name }]);
+
+  btn.disabled = false;
+  btn.textContent = '+ Seri Ekle';
+
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  input.value = '';
+  loadSeries();
+});
+
 // 'recent' mirrors the public 24h window readers see; 'all' drops the
 // cutoff so the admin can find and revive a story that already expired
 // out of the feed (e.g. to post a new "gelişme" on it).
@@ -2000,8 +2193,9 @@ function renderNewsList() {
     return;
   }
 
-  // Grab category options from the post form (already populated with neighborhoods).
+  // Grab category/series options from the post form (already populated).
   const catOptions = document.getElementById('n-category').innerHTML;
+  const seriesOptions = document.getElementById('n-series').innerHTML;
 
   listEl.innerHTML = data.map(n => {
     const ago = formatAgo(n.updated_at || n.created_at);
@@ -2057,9 +2251,10 @@ function renderNewsList() {
       `;
     }).join('') : '';
     const newsDatetimeVal = n.created_at ? new Date(n.created_at).toISOString().slice(0, 16) : '';
+    const seriesName = n.series_id ? SERIES_BY_ID.get(n.series_id) : null;
     return `
       <div class="article-card" data-id="${n.id}">
-        <div class="a-neighborhood">${escapeHtml(categoryLabel(cat))} · ${ago}</div>
+        <div class="a-neighborhood">${escapeHtml(categoryLabel(cat))}${seriesName ? ' · SERİ: ' + escapeHtml(seriesName) : ''} · ${ago}</div>
         <h4>${escapeHtml(n.title)}</h4>
         ${n.body ? `<p>${escapeHtml(n.body)}</p>` : ''}
         <div class="sources-block">
@@ -2102,6 +2297,7 @@ function renderNewsList() {
           <input type="text" class="ne-title" value="${escapeHtml(n.title)}"/>
           <textarea class="ne-body" rows="3">${escapeHtml(n.body || '')}</textarea>
           <select class="ne-category">${catOptions}</select>
+          <select class="ne-series">${seriesOptions}</select>
           <label style="margin:0;font-size:0.75rem;color:var(--muted);">Tarih ve saat</label>
           <input type="datetime-local" class="ne-datetime" value="${newsDatetimeVal}"/>
           <div class="btn-row">
@@ -2114,11 +2310,14 @@ function renderNewsList() {
     `;
   }).join('');
 
-  // Set the correct selected category on each edit form.
+  // Set the correct selected category/series on each edit form.
   data.forEach(n => {
     const cat = n.category || n.neighborhood || 'turkiye';
     const form = listEl.querySelector(`.news-edit-form[data-id="${n.id}"]`);
-    if (form) form.querySelector('.ne-category').value = cat;
+    if (form) {
+      form.querySelector('.ne-category').value = cat;
+      form.querySelector('.ne-series').value = n.series_id || '';
+    }
   });
 }
 
@@ -2221,6 +2420,7 @@ async function saveNewsEdit(newsId, card) {
   const title = form.querySelector('.ne-title').value.trim();
   const body = form.querySelector('.ne-body').value.trim();
   const category = form.querySelector('.ne-category').value;
+  const seriesId = form.querySelector('.ne-series').value || null;
   const datetimeVal = form.querySelector('.ne-datetime').value;
   const statusEl = form.querySelector('.ne-status');
   const saveBtn = form.querySelector('[data-act="save-edit"]');
@@ -2243,7 +2443,7 @@ async function saveNewsEdit(newsId, card) {
     timestamps.updated_at = iso;
   }
   const { error } = await sb.from('breaking_news')
-    .update({ title, body: body || null, category, neighborhood, ...timestamps })
+    .update({ title, body: body || null, category, neighborhood, series_id: seriesId, ...timestamps })
     .eq('id', newsId);
 
   saveBtn.disabled = false;
@@ -2480,6 +2680,7 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   const title = document.getElementById('n-title').value.trim();
   const body = document.getElementById('n-body').value.trim();
   const category = document.getElementById('n-category').value;
+  const seriesId = document.getElementById('n-series').value || null;
   const datetimeVal = document.getElementById('n-datetime').value;
   const pollQ = document.getElementById('n-poll-q').value.trim();
   const pollA = document.getElementById('n-poll-a').value.trim();
@@ -2517,7 +2718,7 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   }
 
   const { data, error } = await sb.from('breaking_news').insert([{
-    title, body: body || null, neighborhood, category, ...timestamps,
+    title, body: body || null, neighborhood, category, series_id: seriesId, ...timestamps,
   }]).select().single();
 
   if (!error && pollFieldsFilled === 3) {
