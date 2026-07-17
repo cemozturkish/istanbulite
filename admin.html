@@ -485,7 +485,7 @@
       font-family: 'Inter', sans-serif;
     }
     .src-form button { white-space: nowrap; padding: 6px 10px; font-size: 0.75rem; }
-    .src-status { grid-column: 1 / -1; margin: 0; font-size: 0.75rem; }
+    .src-status, .poll-status { grid-column: 1 / -1; margin: 0; font-size: 0.75rem; }
     @media (max-width: 600px) {
       .src-form { grid-template-columns: 1fr; }
     }
@@ -918,7 +918,13 @@
         Picking a neighborhood also pulses it on the map.
       </p>
 
+      <label>Tarih ve saat (opsiyonel — boş bırakırsan şu an kullanılır)</label>
+      <input type="datetime-local" id="n-datetime"/>
+
       <label>Poll (optional — fill all three or leave all blank)</label>
+      <p style="margin-top:-4px;font-size:0.7rem;color:var(--muted);font-style:italic;">
+        You can add more polls to this story after posting it.
+      </p>
       <input type="text" id="n-poll-q" placeholder="Question..."/>
       <input type="text" id="n-poll-a" placeholder="Option A..." style="margin-top:8px;"/>
       <input type="text" id="n-poll-b" placeholder="Option B..." style="margin-top:8px;"/>
@@ -1967,7 +1973,7 @@ async function loadBreakingNews() {
   const listEl = document.getElementById('news-list');
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   let query = sb.from('breaking_news')
-    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_poll_votes(option)')
+    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*, breaking_news_poll_option_votes(option))')
     .order('updated_at', { ascending: false });
   if (newsViewMode === 'recent') {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -2034,25 +2040,28 @@ function renderNewsList() {
         <button class="btn-del" data-act="del-src" data-id="${s.id}" data-news-id="${n.id}">×</button>
       </div>
     `).join('');
-    let pollHtml = '';
-    if (n.poll_question && n.poll_option_a && n.poll_option_b) {
-      const votes = n.breaking_news_poll_votes || [];
+    const polls = (n.breaking_news_polls || [])
+      .slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const pollsHtml = polls.length ? polls.map(p => {
+      const votes = p.breaking_news_poll_option_votes || [];
       const votesA = votes.filter(v => v.option === 1).length;
       const votesB = votes.filter(v => v.option === 2).length;
-      pollHtml = `
-        <div class="sources-block">
-          <div class="sources-label">Anket (${votesA + votesB} oy)</div>
-          <div class="src-row"><div class="src-info"><strong>${escapeHtml(n.poll_question)}</strong></div></div>
-          <div class="src-row"><div class="src-info">${escapeHtml(n.poll_option_a)} — ${votesA}</div></div>
-          <div class="src-row"><div class="src-info">${escapeHtml(n.poll_option_b)} — ${votesB}</div></div>
-        </div>`;
-    }
+      return `
+        <div class="src-row" data-poll-id="${p.id}">
+          <div class="src-info">
+            <strong>${escapeHtml(p.question)}</strong>
+            <span class="src-headline">${escapeHtml(p.option_a)} — ${votesA} · ${escapeHtml(p.option_b)} — ${votesB}</span>
+          </div>
+          <button class="btn-del" data-act="del-poll" data-id="${p.id}">×</button>
+        </div>
+      `;
+    }).join('') : '';
+    const newsDatetimeVal = n.created_at ? new Date(n.created_at).toISOString().slice(0, 16) : '';
     return `
       <div class="article-card" data-id="${n.id}">
         <div class="a-neighborhood">${escapeHtml(categoryLabel(cat))} · ${ago}</div>
         <h4>${escapeHtml(n.title)}</h4>
         ${n.body ? `<p>${escapeHtml(n.body)}</p>` : ''}
-        ${pollHtml}
         <div class="sources-block">
           <div class="sources-label">Gelişmeler (${updates.length})</div>
           ${updatesHtml}
@@ -2061,6 +2070,17 @@ function renderNewsList() {
             <textarea class="upd-body" rows="1" placeholder="Ek detay (opsiyonel)"></textarea>
             <button class="btn btn-secondary" data-act="add-update" data-news-id="${n.id}">+ Gelişme Ekle</button>
             <div class="upd-status status-msg"></div>
+          </div>
+        </div>
+        <div class="sources-block">
+          <div class="sources-label">Anketler (${polls.length})</div>
+          ${pollsHtml}
+          <div class="src-form">
+            <input type="text" class="poll-question" placeholder="Soru"/>
+            <input type="text" class="poll-option-a" placeholder="Seçenek A"/>
+            <input type="text" class="poll-option-b" placeholder="Seçenek B"/>
+            <button class="btn btn-secondary" data-act="add-poll" data-news-id="${n.id}">+ Anket Ekle</button>
+            <div class="poll-status status-msg"></div>
           </div>
         </div>
         <div class="sources-block">
@@ -2082,9 +2102,8 @@ function renderNewsList() {
           <input type="text" class="ne-title" value="${escapeHtml(n.title)}"/>
           <textarea class="ne-body" rows="3">${escapeHtml(n.body || '')}</textarea>
           <select class="ne-category">${catOptions}</select>
-          <input type="text" class="ne-poll-q" placeholder="Poll question..." value="${escapeHtml(n.poll_question || '')}"/>
-          <input type="text" class="ne-poll-a" placeholder="Poll option A..." value="${escapeHtml(n.poll_option_a || '')}"/>
-          <input type="text" class="ne-poll-b" placeholder="Poll option B..." value="${escapeHtml(n.poll_option_b || '')}"/>
+          <label style="margin:0;font-size:0.75rem;color:var(--muted);">Tarih ve saat</label>
+          <input type="datetime-local" class="ne-datetime" value="${newsDatetimeVal}"/>
           <div class="btn-row">
             <button class="btn btn-primary" data-act="save-edit" data-id="${n.id}">Kaydet</button>
             <button class="btn btn-secondary" data-act="cancel-edit" data-id="${n.id}">İptal</button>
@@ -2120,6 +2139,8 @@ document.getElementById('news-list').addEventListener('click', function(e) {
   else if (act === 'edit-update') showUpdateEditForm(btn.dataset.id);
   else if (act === 'cancel-update-edit') hideUpdateEditForm(btn.dataset.id);
   else if (act === 'save-update-edit') saveNewsUpdateEdit(btn);
+  else if (act === 'add-poll') addPoll(btn);
+  else if (act === 'del-poll') deletePoll(btn.dataset.id);
 });
 
 function showUpdateEditForm(id) {
@@ -2200,20 +2221,12 @@ async function saveNewsEdit(newsId, card) {
   const title = form.querySelector('.ne-title').value.trim();
   const body = form.querySelector('.ne-body').value.trim();
   const category = form.querySelector('.ne-category').value;
-  const pollQ = form.querySelector('.ne-poll-q').value.trim();
-  const pollA = form.querySelector('.ne-poll-a').value.trim();
-  const pollB = form.querySelector('.ne-poll-b').value.trim();
+  const datetimeVal = form.querySelector('.ne-datetime').value;
   const statusEl = form.querySelector('.ne-status');
   const saveBtn = form.querySelector('[data-act="save-edit"]');
 
   if (!title) {
     statusEl.textContent = 'Başlık boş bırakılamaz.';
-    statusEl.className = 'ne-status status-msg err';
-    return;
-  }
-  const pollFieldsFilled = [pollQ, pollA, pollB].filter(Boolean).length;
-  if (pollFieldsFilled > 0 && pollFieldsFilled < 3) {
-    statusEl.textContent = 'Anket için soruyu ve iki seçeneği de doldurun ya da üçünü de boş bırakın.';
     statusEl.className = 'ne-status status-msg err';
     return;
   }
@@ -2223,11 +2236,14 @@ async function saveNewsEdit(newsId, card) {
   statusEl.textContent = '';
 
   const neighborhood = (category !== 'turkiye' && category !== 'istanbul' && category !== 'dunya') ? category : null;
+  const timestamps = {};
+  if (datetimeVal) {
+    const iso = new Date(datetimeVal).toISOString();
+    timestamps.created_at = iso;
+    timestamps.updated_at = iso;
+  }
   const { error } = await sb.from('breaking_news')
-    .update({
-      title, body: body || null, category, neighborhood,
-      poll_question: pollQ || null, poll_option_a: pollA || null, poll_option_b: pollB || null,
-    })
+    .update({ title, body: body || null, category, neighborhood, ...timestamps })
     .eq('id', newsId);
 
   saveBtn.disabled = false;
@@ -2238,6 +2254,54 @@ async function saveNewsEdit(newsId, card) {
     statusEl.className = 'ne-status status-msg err';
     return;
   }
+  loadBreakingNews();
+}
+
+async function addPoll(btn) {
+  const card = btn.closest('.article-card');
+  const newsId = btn.dataset.newsId;
+  const qEl = card.querySelector('.poll-question');
+  const aEl = card.querySelector('.poll-option-a');
+  const bEl = card.querySelector('.poll-option-b');
+  const statusEl = card.querySelector('.poll-status');
+  const question = qEl.value.trim();
+  const optionA = aEl.value.trim();
+  const optionB = bEl.value.trim();
+
+  statusEl.textContent = '';
+  statusEl.className = 'poll-status status-msg';
+
+  if (!question || !optionA || !optionB) {
+    statusEl.textContent = 'Soru ve her iki seçenek de zorunlu.';
+    statusEl.className = 'poll-status status-msg err';
+    return;
+  }
+
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const { error } = await sb.from('breaking_news_polls')
+    .insert([{ news_id: newsId, question, option_a: optionA, option_b: optionB }]);
+
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = origText;
+    statusEl.textContent = error.message;
+    statusEl.className = 'poll-status status-msg err';
+    return;
+  }
+
+  qEl.value = ''; aEl.value = ''; bEl.value = '';
+  btn.textContent = '✓ Eklendi';
+  statusEl.textContent = '';
+  setTimeout(() => loadBreakingNews(), 500);
+}
+
+async function deletePoll(id) {
+  if (!confirm('Bu anketi sil?')) return;
+  const { error } = await sb.from('breaking_news_polls').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
   loadBreakingNews();
 }
 
@@ -2416,6 +2480,7 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   const title = document.getElementById('n-title').value.trim();
   const body = document.getElementById('n-body').value.trim();
   const category = document.getElementById('n-category').value;
+  const datetimeVal = document.getElementById('n-datetime').value;
   const pollQ = document.getElementById('n-poll-q').value.trim();
   const pollA = document.getElementById('n-poll-a').value.trim();
   const pollB = document.getElementById('n-poll-b').value.trim();
@@ -2442,10 +2507,32 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>';
 
-  const { error } = await sb.from('breaking_news').insert([{
-    title, body: body || null, neighborhood, category,
-    poll_question: pollQ || null, poll_option_a: pollA || null, poll_option_b: pollB || null,
-  }]);
+  // A custom date/time drives both columns the feed sorts/labels by, so
+  // the story actually appears to have happened when the admin picked.
+  const timestamps = {};
+  if (datetimeVal) {
+    const iso = new Date(datetimeVal).toISOString();
+    timestamps.created_at = iso;
+    timestamps.updated_at = iso;
+  }
+
+  const { data, error } = await sb.from('breaking_news').insert([{
+    title, body: body || null, neighborhood, category, ...timestamps,
+  }]).select().single();
+
+  if (!error && pollFieldsFilled === 3) {
+    const { error: pollErr } = await sb.from('breaking_news_polls')
+      .insert([{ news_id: data.id, question: pollQ, option_a: pollA, option_b: pollB }]);
+    if (pollErr) {
+      btn.disabled = false;
+      btn.textContent = 'Post Breaking News';
+      statusEl.textContent = 'Posted, but the poll failed to save: ' + pollErr.message;
+      statusEl.className = 'status-msg err';
+      loadBreakingNews();
+      return;
+    }
+  }
+
   btn.disabled = false;
   btn.textContent = 'Post Breaking News';
 
@@ -2456,7 +2543,7 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   }
   statusEl.textContent = 'Breaking news posted!';
   statusEl.className = 'status-msg ok';
-  ['n-title','n-body','n-poll-q','n-poll-a','n-poll-b'].forEach(id => document.getElementById(id).value = '');
+  ['n-title','n-body','n-datetime','n-poll-q','n-poll-a','n-poll-b'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('n-category').value = 'turkiye';
   loadBreakingNews();
   setTimeout(() => { statusEl.textContent = ''; }, 3000);
