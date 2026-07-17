@@ -522,6 +522,29 @@
     @media (max-width: 600px) {
       .upd-form { grid-template-columns: 1fr; }
     }
+    .upd-row .btn-edit { padding: 0 8px; font-size: 0.75rem; }
+    .upd-edit-form {
+      display: none;
+      margin: 0 0 8px;
+      padding: 8px;
+      border: 1px dashed var(--rule);
+      flex-direction: column;
+      gap: 6px;
+    }
+    .upd-edit-form.open { display: flex; }
+    .upd-edit-form input,
+    .upd-edit-form textarea {
+      padding: 5px 8px;
+      font-size: 0.8rem;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      font-family: 'Inter', sans-serif;
+      width: 100%;
+      box-sizing: border-box;
+      resize: vertical;
+    }
+    .upd-edit-form .btn-row { display: flex; gap: 6px; }
+    .upd-edit-form .ue-status { margin: 0; font-size: 0.75rem; }
 
     .news-edit-form {
       display: none;
@@ -1979,14 +2002,24 @@ function renderNewsList() {
     const cat = n.category || n.neighborhood || 'turkiye';
     const updates = (n.breaking_news_updates || [])
       .slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    const updatesHtml = updates.length ? updates.map(u => `
+    const updatesHtml = updates.length ? updates.map((u, idx) => `
       <div class="upd-row" data-upd-id="${u.id}">
         <div class="upd-info">
           <span class="upd-time">${formatAgo(u.created_at)}</span>
           <strong>${escapeHtml(u.title)}</strong>
           ${u.body ? `<span class="upd-body-text">${escapeHtml(u.body)}</span>` : ''}
         </div>
+        <button class="btn-edit" data-act="edit-update" data-id="${u.id}">Düzenle</button>
         <button class="btn-del" data-act="del-update" data-id="${u.id}">×</button>
+      </div>
+      <div class="upd-edit-form" data-upd-edit-id="${u.id}">
+        <input type="text" class="ue-title" value="${escapeHtml(u.title)}"/>
+        <textarea class="ue-body" rows="2">${escapeHtml(u.body || '')}</textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary" data-act="save-update-edit" data-id="${u.id}" data-news-id="${n.id}" data-is-latest="${idx === 0 ? '1' : '0'}">Kaydet</button>
+          <button class="btn btn-secondary" data-act="cancel-update-edit" data-id="${u.id}">İptal</button>
+        </div>
+        <div class="ue-status status-msg"></div>
       </div>
     `).join('') : '<div class="upd-empty" style="color:var(--muted);font-size:0.8rem;">Henüz gelişme eklenmedi.</div>';
     const sources = (n.breaking_news_sources || [])
@@ -2084,7 +2117,72 @@ document.getElementById('news-list').addEventListener('click', function(e) {
   else if (act === 'edit-news') showNewsEditForm(card);
   else if (act === 'cancel-edit') hideNewsEditForm(card);
   else if (act === 'save-edit') saveNewsEdit(btn.dataset.id, card);
+  else if (act === 'edit-update') showUpdateEditForm(btn.dataset.id);
+  else if (act === 'cancel-update-edit') hideUpdateEditForm(btn.dataset.id);
+  else if (act === 'save-update-edit') saveNewsUpdateEdit(btn);
 });
+
+function showUpdateEditForm(id) {
+  const form = document.querySelector(`.upd-edit-form[data-upd-edit-id="${id}"]`);
+  if (!form) return;
+  form.classList.add('open');
+  form.querySelector('.ue-title').focus();
+}
+
+function hideUpdateEditForm(id) {
+  const form = document.querySelector(`.upd-edit-form[data-upd-edit-id="${id}"]`);
+  if (form) form.classList.remove('open');
+}
+
+async function saveNewsUpdateEdit(btn) {
+  const id = btn.dataset.id;
+  const newsId = btn.dataset.newsId;
+  const isLatest = btn.dataset.isLatest === '1';
+  const form = document.querySelector(`.upd-edit-form[data-upd-edit-id="${id}"]`);
+  const title = form.querySelector('.ue-title').value.trim();
+  const body = form.querySelector('.ue-body').value.trim();
+  const statusEl = form.querySelector('.ue-status');
+
+  if (!title) {
+    statusEl.textContent = 'Başlık boş bırakılamaz.';
+    statusEl.className = 'ue-status status-msg err';
+    return;
+  }
+
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  statusEl.textContent = '';
+
+  const { error } = await sb.from('breaking_news_updates')
+    .update({ title, body: body || null })
+    .eq('id', id);
+
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = origText;
+    statusEl.textContent = error.message;
+    statusEl.className = 'ue-status status-msg err';
+    return;
+  }
+
+  // The most recent update snapshot mirrors the story's current headline
+  // shown to readers on the map/feed — keep the two in sync when edited.
+  if (isLatest) {
+    const { error: syncErr } = await sb.from('breaking_news')
+      .update({ title, body: body || null })
+      .eq('id', newsId);
+    if (syncErr) {
+      btn.disabled = false;
+      btn.textContent = origText;
+      statusEl.textContent = syncErr.message;
+      statusEl.className = 'ue-status status-msg err';
+      return;
+    }
+  }
+
+  loadBreakingNews();
+}
 
 function showNewsEditForm(card) {
   card.querySelector('.card-actions').style.display = 'none';
