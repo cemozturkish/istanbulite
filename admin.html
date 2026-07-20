@@ -773,6 +773,7 @@
     <button class="admin-tab" data-tab="events">Events</button>
     <button class="admin-tab" data-tab="sozcel">Sözcel</button>
     <button class="admin-tab" data-tab="tumcel">Tümcel</button>
+    <button class="admin-tab" data-tab="quotes">Alıntılar</button>
     <button class="admin-tab" data-tab="notifications">Notifications</button>
     <button class="admin-tab" data-tab="users">Users</button>
   </div>
@@ -1200,6 +1201,40 @@
 
   </div>
 
+  <div class="admin-body" id="quotes-tab" style="display:none;">
+
+    <!-- LEFT: Add / Edit Quote -->
+    <div class="panel">
+      <div class="panel-title" id="q-form-mode-label">Add New Quote</div>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        A general quote bank. Where these get shown on the site is still undecided — this just builds the data set to draw from later.
+      </p>
+
+      <label>Quote</label>
+      <textarea id="q-body" rows="4" placeholder="The quote itself..."></textarea>
+
+      <label>Author</label>
+      <input type="text" id="q-author" placeholder="Who said it..."/>
+
+      <input type="hidden" id="q-editing-id"/>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="q-submit-btn">Add Quote</button>
+        <button class="btn btn-secondary" id="q-cancel-btn" style="display:none;">Cancel Edit</button>
+      </div>
+      <div class="status-msg" id="q-form-status"></div>
+    </div>
+
+    <!-- RIGHT: Quotes List -->
+    <div class="panel">
+      <div class="panel-title">Quotes</div>
+      <div class="articles-list" id="quotes-list">
+        <div class="empty-state"><span class="spinner"></span></div>
+      </div>
+    </div>
+
+  </div>
+
   <div class="admin-body" id="notifications-tab" style="display:none;">
 
     <!-- LEFT: Post Notification -->
@@ -1357,6 +1392,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('events-tab').style.display = (tab === 'events') ? '' : 'none';
     document.getElementById('sozcel-tab').style.display = (tab === 'sozcel') ? 'grid' : 'none';
     document.getElementById('tumcel-tab').style.display = (tab === 'tumcel') ? 'grid' : 'none';
+    document.getElementById('quotes-tab').style.display = (tab === 'quotes') ? '' : 'none';
     document.getElementById('notifications-tab').style.display = (tab === 'notifications') ? '' : 'none';
     document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
     if (tab === 'kutuphane') showKutuphaneIndex();
@@ -1364,6 +1400,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
     if (tab === 'sozcel') loadSozcelSchedule();
     if (tab === 'tumcel') loadTumcelPuzzles();
+    if (tab === 'quotes') loadQuotesList();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'users') loadUsersList();
   });
@@ -2926,6 +2963,99 @@ async function deleteEvent(id) {
   const { error } = await sb.from('events').delete().eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   loadEventsList();
+}
+
+// ── Quotes: general-purpose quote bank ──
+async function loadQuotesList() {
+  const listEl = document.getElementById('quotes-list');
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const { data, error } = await sb.from('quotes')
+    .select('*').order('created_at', { ascending: false });
+  if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
+  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No quotes yet.</div>'; return; }
+
+  listEl.innerHTML = data.map(q => `
+    <div class="article-card" data-id="${q.id}">
+      <p>&ldquo;${escapeHtml(q.body)}&rdquo;</p>
+      <div class="a-neighborhood">— ${escapeHtml(q.author)}</div>
+      <div class="card-actions">
+        <button class="btn-edit" data-act="q-edit" data-id="${q.id}">Edit</button>
+        <button class="btn-del"  data-act="q-del"  data-id="${q.id}">Delete</button>
+      </div>
+    </div>
+  `).join('');
+
+  listEl.querySelectorAll('button[data-act]').forEach(btn => {
+    const q = data.find(x => x.id === btn.dataset.id);
+    if (!q) return;
+    if (btn.dataset.act === 'q-edit') btn.addEventListener('click', () => editQuote(q));
+    if (btn.dataset.act === 'q-del') btn.addEventListener('click', () => deleteQuote(q.id));
+  });
+}
+
+function editQuote(q) {
+  document.getElementById('q-editing-id').value = q.id;
+  document.getElementById('q-body').value = q.body || '';
+  document.getElementById('q-author').value = q.author || '';
+  document.getElementById('q-submit-btn').textContent = 'Update Quote';
+  document.getElementById('q-form-mode-label').textContent = 'Editing Quote';
+  document.getElementById('q-cancel-btn').style.display = 'inline-block';
+  document.querySelector('#quotes-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetQuoteForm() {
+  document.getElementById('q-editing-id').value = '';
+  document.getElementById('q-body').value = '';
+  document.getElementById('q-author').value = '';
+  document.getElementById('q-submit-btn').textContent = 'Add Quote';
+  document.getElementById('q-form-mode-label').textContent = 'Add New Quote';
+  document.getElementById('q-cancel-btn').style.display = 'none';
+}
+
+document.getElementById('q-cancel-btn').addEventListener('click', resetQuoteForm);
+
+document.getElementById('q-submit-btn').addEventListener('click', async () => {
+  const editingId = document.getElementById('q-editing-id').value;
+  const body = document.getElementById('q-body').value.trim();
+  const author = document.getElementById('q-author').value.trim();
+  const statusEl = document.getElementById('q-form-status');
+  const btn = document.getElementById('q-submit-btn');
+
+  if (!body || !author) {
+    statusEl.textContent = 'Quote and author are required.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  let result;
+  if (editingId) {
+    result = await sb.from('quotes').update({ body, author }).eq('id', editingId);
+  } else {
+    result = await sb.from('quotes').insert([{ body, author }]);
+  }
+
+  btn.textContent = editingId ? 'Update Quote' : 'Add Quote';
+
+  if (result.error) {
+    statusEl.textContent = result.error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = editingId ? 'Quote updated!' : 'Quote added!';
+  statusEl.className = 'status-msg ok';
+  resetQuoteForm();
+  loadQuotesList();
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+async function deleteQuote(id) {
+  if (!confirm('Delete this quote?')) return;
+  const { error } = await sb.from('quotes').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadQuotesList();
 }
 
 // ── Sözcel: Sözcü assignment + day status ──

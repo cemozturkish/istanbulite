@@ -121,6 +121,11 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 - `id uuid pk`, `author_id` (FK profiles, cascade), `article_id` (FK articles, cascade), `body`, `created_at`.
 - RLS: authenticated users SELECT all; INSERT any authenticated (no neighborhood gate); DELETE own or admin; no edits (admin UPDATE only).
 
+**Table: `quotes`** — general-purpose quote bank (`db/quotes.sql`).
+- `id uuid pk`, `body text`, `author text`, `created_at`, `updated_at` (auto via trigger).
+- Admin-managed via the "Alıntılar" tab in `admin.html`; not yet surfaced anywhere on the site — where/how they're shown is still undecided, this just holds the data set to draw from. Not related to `tumcel_quote_suggestions`/`tumcel_puzzles`, which are specific to the Tümcel game's daily puzzle pipeline.
+- RLS: authenticated users SELECT all; admin-only INSERT/UPDATE/DELETE.
+
 ### Key DB functions / triggers
 - `public.is_admin()` — returns true if `auth.uid()`'s email matches the admin email; used in every admin-only RLS policy.
 - `public.handle_new_user()` — trigger on `auth.users insert`. Reads `raw_user_meta_data` (first_name, last_name, phone, neighborhood, birth_neighborhood, birth_place, referral_code), validates the kefil code, resolves the referrer, generates a unique 8-char `referral_code`, inserts the matching `profiles` row. Atomic with the auth user creation — failure rolls everything back.
