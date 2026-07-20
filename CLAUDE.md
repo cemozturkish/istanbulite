@@ -122,7 +122,7 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 - RLS: authenticated users SELECT all; INSERT any authenticated (no neighborhood gate); DELETE own or admin; no edits (admin UPDATE only).
 
 **Table: `quotes`** — general-purpose quote bank (`db/quotes.sql`).
-- `id uuid pk`, `body text`, `author text`, `created_at`, `updated_at` (auto via trigger).
+- `id uuid pk`, `body_tr text` (Turkish), `body_en text` (English), `author text`, `created_at`, `updated_at` (auto via trigger). Both `body_tr` and `body_en` are required — every quote is entered in both languages.
 - Admin-managed via the "Alıntılar" tab in `admin.html`; not yet surfaced anywhere on the site — where/how they're shown is still undecided, this just holds the data set to draw from. Not related to `tumcel_quote_suggestions`/`tumcel_puzzles`, which are specific to the Tümcel game's daily puzzle pipeline.
 - RLS: authenticated users SELECT all; admin-only INSERT/UPDATE/DELETE.
 
