@@ -904,6 +904,12 @@
     .key.correct { background: var(--success); color: var(--paper); }
     .key.present { background: var(--present); color: var(--paper); }
     .key.absent { background: var(--accent-2); color: var(--paper); }
+    /* Q/W/X sit in their native-keyboard position but never do anything —
+       no valid Turkish word contains them. */
+    .key:disabled, .key.key-disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
 
     .game-message {
       text-align: center;
@@ -1506,10 +1512,10 @@
         font-size: clamp(1.35rem, 4.5vh, 2.15rem);
         border-radius: 5px;
       }
-      /* Native-keyboard placement: key width is fixed to what the 11-key
-         middle row (A S D F ... Ş İ) needs to span edge-to-edge, and every
-         row reuses that same width. Rows with fewer plain keys (the 10-key
-         top row) fall short of full width and get centered by the row's
+      /* Native-keyboard placement: key width is fixed to what the 12-key
+         top row (Q W E R T Y U I O P Ğ Ü) needs to span edge-to-edge, and
+         every row reuses that same width. The 11-key middle row (A S D F
+         ... Ş İ) falls short of full width and gets centered by the row's
          justify-content, producing the inset/staggered look of a real
          QWERTY keyboard instead of every row stretching independently.
          The bottom row's GİR/← keys widen to soak up the remaining space,
@@ -1518,7 +1524,7 @@
         max-width: 100%;
         gap: 6px;
         --kb-gap: 4px;
-        --kb-key: calc((100% - (10 * var(--kb-gap))) / 11);
+        --kb-key: calc((100% - (11 * var(--kb-gap))) / 12);
       }
       .keyboard-row { gap: var(--kb-gap); }
       .key {
@@ -1530,7 +1536,7 @@
         min-width: 0;
       }
       .key.wide {
-        flex: 0 0 calc((100% - (8 * var(--kb-key)) - (9 * var(--kb-gap))) / 2);
+        flex: 0 0 calc((100% - (9 * var(--kb-key)) - (10 * var(--kb-gap))) / 2);
         font-size: 13px;
       }
       .game-message { font-size: 15px; min-height: 18px; }
@@ -3854,11 +3860,17 @@ async function restoreState() {
 }
 
 // ── Keyboard ──
+// Matches the native Turkish Q keyboard formation exactly, including Q/W/X
+// even though no valid Turkish word ever contains them — those three are
+// rendered disabled (see DISABLED_KEYS) rather than left out, so the row
+// lengths/positions line up with the real keyboard.
 const KEYBOARD_LAYOUT = [
-  ['E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Ğ', 'Ü'],
+  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Ğ', 'Ü'],
   ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ş', 'İ'],
-  ['GİR', 'Z', 'C', 'V', 'B', 'N', 'M', 'Ö', 'Ç', '←']
+  ['GİR', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'Ö', 'Ç', '←']
 ];
+const WIDE_KEYS = new Set(['GİR', '←']);
+const DISABLED_KEYS = new Set(['Q', 'W', 'X']);
 
 function initWordGrid() {
   const grid = document.getElementById('word-grid');
@@ -3894,10 +3906,15 @@ function initKeyboard() {
     rowDiv.className = 'keyboard-row';
     row.forEach(key => {
       const btn = document.createElement('button');
-      btn.className = 'key' + (key.length > 1 ? ' wide' : '');
+      const disabled = DISABLED_KEYS.has(key);
+      btn.className = 'key' + (WIDE_KEYS.has(key) ? ' wide' : '') + (disabled ? ' key-disabled' : '');
       btn.textContent = key;
-      btn.onclick = () => handleKey(key);
       btn.id = `key-${key}`;
+      if (disabled) {
+        btn.disabled = true;
+      } else {
+        btn.onclick = () => handleKey(key);
+      }
       rowDiv.appendChild(btn);
     });
     keyboard.appendChild(rowDiv);
