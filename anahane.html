@@ -2231,6 +2231,14 @@ function categoryLabelTR(n) {
   return (NB_NAMES_TR[c] || c).toLocaleUpperCase('tr-TR');
 }
 
+// Category label, plus the story's series name (if the admin tagged one
+// grouping several separate posts under the same ongoing event).
+function newsKickerLabel(n) {
+  const cat = categoryLabelTR(n);
+  const seriesName = n.breaking_news_series && n.breaking_news_series.name;
+  return seriesName ? `${cat} · ${seriesName.toLocaleUpperCase('tr-TR')}` : cat;
+}
+
 function formatAgoTR(iso) {
   const d = new Date(iso);
   const secs = Math.floor((Date.now() - d.getTime()) / 1000);
@@ -2338,7 +2346,7 @@ function buildNewsDetailHtml(n) {
   return `
     <div class="article">
       <div class="meta-row">
-        <div class="kicker">${escapeText(categoryLabelTR(n))}</div>
+        <div class="kicker">${escapeText(newsKickerLabel(n))}</div>
         <div class="ago" data-iso="${escapeText(lastTouch)}">${escapeText(formatAgoTR(lastTouch))}</div>
       </div>
       <h3>${escapeText(n.title)}</h3>
@@ -2480,7 +2488,7 @@ function renderBreakingNewsFeedNow(feed, rows) {
     return `
       <div class="article openable" data-news-id="${escapeText(n.id)}">
         <div class="meta-row">
-          <div class="kicker">${escapeText(categoryLabelTR(n))}</div>
+          <div class="kicker">${escapeText(newsKickerLabel(n))}</div>
           <div class="ago" data-iso="${escapeText(lastTouch)}">${escapeText(formatAgoTR(lastTouch))}</div>
         </div>
         <h3>${escapeText(n.title)}</h3>
@@ -2524,7 +2532,7 @@ document.querySelectorAll('.news-filter-btn').forEach(btn => {
 async function loadBreakingNews() {
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('breaking_news')
-    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*)').gte('updated_at', cutoff)
+    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*), breaking_news_series(name)').gte('updated_at', cutoff)
     .order('updated_at', { ascending: false });
   if (error) { console.error('[anahane breaking_news]', error); return; }
   allBreakingNews = data || [];
