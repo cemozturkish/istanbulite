@@ -1,5 +1,5 @@
 -- =====================================================================
--- quotes — general-purpose quote bank ("body" + "author").
+-- quotes — general-purpose quote bank (Turkish + English body, author).
 -- Admin adds/edits/removes quotes from admin.html; where they get shown
 -- (games, library, profile pages, etc.) is decided later — this table
 -- just holds the data set to draw from.
@@ -9,11 +9,28 @@
 
 create table if not exists public.quotes (
   id         uuid        primary key default gen_random_uuid(),
-  body       text        not null,
+  body_tr    text        not null,
+  body_en    text        not null,
   author     text        not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- If an earlier version of this migration already ran with a single
+-- `body` column, migrate it into `body_tr` and backfill `body_en`.
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'quotes' and column_name = 'body')
+     and not exists (select 1 from information_schema.columns
+                      where table_schema = 'public' and table_name = 'quotes' and column_name = 'body_tr') then
+    alter table public.quotes rename column body to body_tr;
+  end if;
+end $$;
+
+alter table public.quotes add column if not exists body_en text;
+update public.quotes set body_en = body_tr where body_en is null;
+alter table public.quotes alter column body_en set not null;
 
 alter table public.quotes enable row level security;
 

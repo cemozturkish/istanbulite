@@ -1210,8 +1210,11 @@
         A general quote bank. Where these get shown on the site is still undecided — this just builds the data set to draw from later.
       </p>
 
-      <label>Quote</label>
-      <textarea id="q-body" rows="4" placeholder="The quote itself..."></textarea>
+      <label>Alıntı (Türkçe)</label>
+      <textarea id="q-body-tr" rows="4" placeholder="Alıntının Türkçesi..."></textarea>
+
+      <label>Quote (English)</label>
+      <textarea id="q-body-en" rows="4" placeholder="The quote in English..."></textarea>
 
       <label>Author</label>
       <input type="text" id="q-author" placeholder="Who said it..."/>
@@ -2976,7 +2979,8 @@ async function loadQuotesList() {
 
   listEl.innerHTML = data.map(q => `
     <div class="article-card" data-id="${q.id}">
-      <p>&ldquo;${escapeHtml(q.body)}&rdquo;</p>
+      <p>&ldquo;${escapeHtml(q.body_tr)}&rdquo;</p>
+      <p style="color:var(--muted);">&ldquo;${escapeHtml(q.body_en)}&rdquo;</p>
       <div class="a-neighborhood">— ${escapeHtml(q.author)}</div>
       <div class="card-actions">
         <button class="btn-edit" data-act="q-edit" data-id="${q.id}">Edit</button>
@@ -2995,7 +2999,8 @@ async function loadQuotesList() {
 
 function editQuote(q) {
   document.getElementById('q-editing-id').value = q.id;
-  document.getElementById('q-body').value = q.body || '';
+  document.getElementById('q-body-tr').value = q.body_tr || '';
+  document.getElementById('q-body-en').value = q.body_en || '';
   document.getElementById('q-author').value = q.author || '';
   document.getElementById('q-submit-btn').textContent = 'Update Quote';
   document.getElementById('q-form-mode-label').textContent = 'Editing Quote';
@@ -3005,7 +3010,8 @@ function editQuote(q) {
 
 function resetQuoteForm() {
   document.getElementById('q-editing-id').value = '';
-  document.getElementById('q-body').value = '';
+  document.getElementById('q-body-tr').value = '';
+  document.getElementById('q-body-en').value = '';
   document.getElementById('q-author').value = '';
   document.getElementById('q-submit-btn').textContent = 'Add Quote';
   document.getElementById('q-form-mode-label').textContent = 'Add New Quote';
@@ -3016,13 +3022,14 @@ document.getElementById('q-cancel-btn').addEventListener('click', resetQuoteForm
 
 document.getElementById('q-submit-btn').addEventListener('click', async () => {
   const editingId = document.getElementById('q-editing-id').value;
-  const body = document.getElementById('q-body').value.trim();
+  const body_tr = document.getElementById('q-body-tr').value.trim();
+  const body_en = document.getElementById('q-body-en').value.trim();
   const author = document.getElementById('q-author').value.trim();
   const statusEl = document.getElementById('q-form-status');
   const btn = document.getElementById('q-submit-btn');
 
-  if (!body || !author) {
-    statusEl.textContent = 'Quote and author are required.';
+  if (!body_tr || !body_en || !author) {
+    statusEl.textContent = 'Turkish quote, English quote, and author are all required.';
     statusEl.className = 'status-msg err';
     return;
   }
@@ -3032,9 +3039,9 @@ document.getElementById('q-submit-btn').addEventListener('click', async () => {
 
   let result;
   if (editingId) {
-    result = await sb.from('quotes').update({ body, author }).eq('id', editingId);
+    result = await sb.from('quotes').update({ body_tr, body_en, author }).eq('id', editingId);
   } else {
-    result = await sb.from('quotes').insert([{ body, author }]);
+    result = await sb.from('quotes').insert([{ body_tr, body_en, author }]);
   }
 
   btn.textContent = editingId ? 'Update Quote' : 'Add Quote';
