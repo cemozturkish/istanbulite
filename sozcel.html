@@ -1410,6 +1410,19 @@
     body.embedded-game .game-panel {
       padding-top: 44px;
     }
+    /* Embedded on desktop, kahvehane's iframe renders 820px wide (see
+       kahvehane.html's .game-overlay-frame comment) so this page's own
+       ≤768px breakpoint never trips, but the sheet around it is only
+       ~680px, centered — overflow:hidden crops ~70px off each side.
+       .game-back-btn/.game-controls anchor to <main>'s real (820px)
+       edges, so their normal 14px inset lands inside that cropped band
+       and never renders (or renders half-cut). Push them in past the
+       crop. Scoped to min-width so it doesn't fight the mobile block
+       below, which repositions both with `position: fixed` instead. */
+    @media (min-width: 769px) {
+      body.embedded-game .game-back-btn { left: 86px; }
+      body.embedded-game .game-controls { right: 86px; }
+    }
 
     @media (max-width: 768px) {
       html, body {
@@ -3770,13 +3783,17 @@ const submittedGuesses = []; // authoritative list of submitted guess strings (n
 
 const SAVE_KEY = 'sozcel_state_' + dailySeed;
 
-function saveState() {
+async function saveState() {
   // Use the JS-tracked array as the authoritative source — never read from
   // the DOM, which can be empty on mobile due to rendering timing issues.
   const state = { currentRow, currentGuess, gameOver, guesses: submittedGuesses.slice() };
   localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-  // Mirror to Supabase so the board syncs across devices.
-  saveStateRemote(state);
+  // Mirror to Supabase so the board syncs across devices. Awaited by callers
+  // that follow it with a win/loss popup so a mobile tab closed right after
+  // finishing doesn't cut off the upsert before it reaches Supabase — the
+  // grid on another device would otherwise still show the second-to-last
+  // guess, missing the one that actually finished the game.
+  await saveStateRemote(state);
 }
 
 // Upsert the board state to Supabase. Fire-and-forget; localStorage remains
@@ -4063,7 +4080,7 @@ function submitGuess() {
       // Check before inserting — count = 0 means no one has won today yet.
       const isFirstWinner = await checkFirstWinner(dailySeed);
       await recordGameResult('sozcel', dailySeed, rowSnap + 1, true, userNeighborhood);
-      saveState();
+      await saveState();
       renderStats();
       enableShareButton(true, isFirstWinner);
       // Longer pause lets the user see the final row flip + win message before
@@ -4075,7 +4092,7 @@ function submitGuess() {
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
       await recordGameResult('sozcel', dailySeed, 7, false, userNeighborhood);
-      saveState();
+      await saveState();
       renderStats();
       enableShareButton(false);
       setTimeout(() => showResultPopup(false), 1500);

@@ -948,6 +948,18 @@
       box-shadow: none !important;
       background: transparent !important;
     }
+    /* Embedded on desktop, kahvehane's iframe renders 820px wide (see
+       kahvehane.html's .game-overlay-frame comment) so this page's own
+       ≤768px breakpoint never trips, but the sheet around it is only
+       ~680px, centered — overflow:hidden crops ~70px off each side.
+       .game-back-btn anchors to <main>'s real (820px) left edge, so its
+       normal 14px inset lands inside that cropped band and never
+       renders. Push it in past the crop. Scoped to min-width so it
+       doesn't fight the mobile block below, which repositions it with
+       `position: fixed` instead. */
+    @media (min-width: 769px) {
+      body.embedded-game .game-back-btn { left: 86px; }
+    }
 
     @media (max-width: 768px) {
       html, body {
@@ -1409,7 +1421,7 @@ async function checkGuess() {
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
       await recordGameResult('tumcel', dailySeed, 4 - mistakes, true, userNeighborhood);
-      saveState();
+      await saveState();
       renderStats();
     } else {
       saveState();
@@ -1451,7 +1463,7 @@ async function checkGuess() {
     gameOver = true;
     revealUnsolvedQuotes();
     await recordGameResult('tumcel', dailySeed, 4, false, userNeighborhood);
-    saveState();
+    await saveState();
     renderStats();
   } else {
     statusEl.textContent = oneAway ? 'Bir tane uzaktasın!' : 'Yanlış tahmin!';
@@ -1499,7 +1511,7 @@ document.getElementById('deselect-btn').addEventListener('click', () => {
 // ── State persistence ──
 const SAVE_KEY = 'tumcel_state_' + dailySeed;
 
-function saveState() {
+async function saveState() {
   const state = {
     solvedQuotes,
     mistakes,
@@ -1508,7 +1520,9 @@ function saveState() {
     fragmentOrder: allFragments.map(f => ({ quoteIndex: f.quoteIndex, fragIndex: f.fragIndex }))
   };
   localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-  saveStateRemote(state);
+  // Awaited by the win/loss branches in checkGuess() so a tab closed right
+  // after finishing doesn't cut the upsert off before it reaches Supabase.
+  await saveStateRemote(state);
 }
 
 async function saveStateRemote(state) {
