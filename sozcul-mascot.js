@@ -115,7 +115,7 @@
         box-shadow: 0 10px 30px rgba(0,0,0,0.22);
         max-width: 100%;
       }
-      #sozcul-mascot-popup .szm-bubble strong { color: var(--ink-red, #a4322b); }
+      #sozcul-mascot-popup .szm-bubble strong { color: var(--ink-red, #B93631); }
       #sozcul-mascot-popup .szm-close {
         position: absolute;
         top: 6px;
