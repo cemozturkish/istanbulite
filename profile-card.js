@@ -37,6 +37,16 @@
   function normalizeTheme(v)   { return v === 'dark' ? 'dark' : 'light'; }
   function normalizePalette(v) { return v === 'earth' ? 'earth' : 'mono'; }
 
+  // Which Istanbul-local weekdays each game runs on (Monday=0 … Sunday=6),
+  // driving the Profil tab's weekly grid. Purely a display concern here —
+  // it does not gate access to the game pages (see game-locks.js for the
+  // actual Tümcel-win-unlocks-Bulmaca rule).
+  const GAME_SCHEDULE = [
+    { id: 'sozcel',  label: 'Sözcel',  days: [0, 1, 2, 3, 4, 5, 6] },
+    { id: 'tumcel',  label: 'Tümcel',  days: [0, 2, 4, 6] },
+    { id: 'bulmaca', label: 'Bulmaca', days: [1, 3, 5] },
+  ];
+
   // Preset avatars, shared between the profile-overlay picker and this
   // mobile widget. `requiresSozculCount` gates an option behind a lifetime
   // sözcü count.
@@ -206,6 +216,99 @@
         </div>
       </div>
     `;
+  }
+
+  // Monday-first day index (0…6) of "now" in Istanbul time.
+  function istWeekdayIdx(d) {
+    const dow = d.getDay(); // 0=Sun…6=Sat
+    return dow === 0 ? 6 : dow - 1;
+  }
+
+  // The 7 calendar dates (Monday…Sunday) of the current Istanbul week, each
+  // as an unpadded "Y-M-D" key matching game_results.date (see
+  // db/game_results.sql: "YYYY-M-D Istanbul-local", no zero-padding).
+  function weekDatesIst() {
+    const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+    const monday = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - istWeekdayIdx(nowIst));
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+      out.push(`${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`);
+    }
+    return out;
+  }
+
+  // Fetches this user's game_results for the current Istanbul week and
+  // reduces them to per (game, date) played/won flags for the weekly grid.
+  async function getWeekGameStatus(sb, userId) {
+    const dateKeys = weekDatesIst();
+    const empty = { dateKeys, played: new Set(), won: new Set() };
+    try {
+      const { data, error } = await sb
+        .from('game_results')
+        .select('game, date, won')
+        .eq('user_id', userId)
+        .in('date', dateKeys);
+      if (error) throw error;
+      (data || []).forEach(r => {
+        const k = r.game + '|' + r.date;
+        empty.played.add(k);
+        if (r.won) empty.won.add(k);
+      });
+      return empty;
+    } catch (e) {
+      return empty;
+    }
+  }
+
+  // Renders the 3-game × 7-day grid: white = day hasn't arrived yet, grey =
+  // arrived but not played, yellow = played without winning, green = won.
+  // Days outside a given game's own schedule (GAME_SCHEDULE) render as a
+  // muted dashed cell instead of a color, since the game has nothing to
+  // show there.
+  function weekGridHTML(status, I18N) {
+    const en = I18N && I18N.isEnglish && I18N.isEnglish();
+    const dayLetters = en ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['P', 'S', 'Ç', 'P', 'C', 'C', 'P'];
+    const dayNames = en
+      ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+      : ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+    const todayIdx = istWeekdayIdx(new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' })));
+
+    const header = `
+      <div class="ist-pc-weekgrid-header">
+        <span class="ist-pc-weekgrid-label-spacer"></span>
+        <div class="ist-pc-weekgrid-days">
+          ${dayLetters.map(l => `<span>${l}</span>`).join('')}
+        </div>
+      </div>
+    `;
+
+    const rows = GAME_SCHEDULE.map(game => {
+      const cells = status.dateKeys.map((dateKey, i) => {
+        let state, title;
+        if (!game.days.includes(i)) {
+          state = 'inactive';
+          title = `${game.label} — ${dayNames[i]}`;
+        } else if (i > todayIdx) {
+          state = 'future';
+          title = `${game.label} — ${dayNames[i]}`;
+        } else {
+          const k = game.id + '|' + dateKey;
+          if (status.won.has(k)) { state = 'win'; title = `${game.label} — ${dayNames[i]}: kazandı`; }
+          else if (status.played.has(k)) { state = 'played'; title = `${game.label} — ${dayNames[i]}: oynadı, kazanamadı`; }
+          else { state = 'none'; title = `${game.label} — ${dayNames[i]}: oynamadı`; }
+        }
+        return `<span class="ist-pc-daycell ist-pc-daycell-${state}" title="${esc(title)}"></span>`;
+      }).join('');
+      return `
+        <div class="ist-pc-weekgrid-row">
+          <span class="ist-pc-weekgrid-label">${esc(game.label)}</span>
+          <div class="ist-pc-weekgrid-cells">${cells}</div>
+        </div>
+      `;
+    }).join('');
+
+    return `<div class="ist-pc-weekgrid">${header}${rows}</div>`;
   }
 
   // Wires a range input to its tick labels: clicking a tick jumps the
@@ -494,7 +597,46 @@
     wireTabEvents(_ov.activeTab, _ov);
   }
 
+  function coverAvatarHTML(avatarUrl, displayName) {
+    return avatarUrl
+      ? `<img src="${esc(avatarSrc(avatarUrl))}" alt="">`
+      : esc(displayName.charAt(0).toUpperCase());
+  }
+
+  // Profil tab: a white "pano" cover — the avatar sits on it like a Twitter
+  // cover photo, and it's the surface future rozetler (stickers) will be
+  // placed on — plus the weekly game grid and the lifetime score cards.
+  // No editable fields here: account info and personalization all live in
+  // the Ayarlar tab now (see ayarlarTabHTML).
   function profilTabHTML(state) {
+    const { I18N, user, profile, avatarUrl } = state;
+    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
+    const firstName = profile?.first_name || '';
+    const lastName = profile?.last_name || '';
+    const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
+    const yasadigiIlce = profile?.neighborhood || '';
+    const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
+
+    return `
+      <div class="ist-pc-cover">
+        <div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, displayName)}</div>
+        <div class="ist-pc-cover-name">${esc(displayName)}</div>
+        <div class="ist-pc-cover-meta">${esc(yasadigiDisplay)}</div>
+      </div>
+
+      <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
+      <div id="po-weekgrid-mount"></div>
+
+      <div class="ist-pc-section-title">${esc(t('profile.gamescores') || 'Oyun Skorları')}</div>
+      <div id="po-scores-mount">${scoresHTML({})}</div>
+    `;
+  }
+
+  // Ayarlar tab: everything about the account (avatar, name, district,
+  // birthplace, membership/kefil info) plus personalization (language,
+  // color palette, appearance) and sign out — moved here from Profil so
+  // that tab is just identity + games.
+  function ayarlarTabHTML(state) {
     const { I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
@@ -504,6 +646,9 @@
     const phone = profile?.phone || '';
     const referralCode = profile?.referral_code || '';
     const isAdminUser = user.email === ADMIN_EMAIL;
+    const languagePref = normalizeLang(profile?.language_pref);
+    const themePref = normalizeTheme(profile?.theme_pref);
+    const palettePref = normalizePalette(profile?.palette_pref);
 
     // `yaşadığı ilçe` is admin-controlled (protect_profile_columns trigger
     // reverts it for everyone else) — only the admin gets an editable
@@ -523,6 +668,7 @@
       : '';
 
     return `
+      <div class="ist-pc-section-title">${esc(t('profile.profileinfo'))}</div>
       <div class="ist-pc-avatar-field">
         <div class="ist-pc-label">${esc(t('profile.chooseavatar'))}</div>
         <div class="ist-pc-avatar-picker" id="po-avatar-picker">${buildAvatarPicker(avatarUrl, sozculCount)}</div>
@@ -593,18 +739,7 @@
         <div class="ist-pc-info-value">${sozculCount ?? 0} ${esc(t('profile.times'))}</div>
       </div>
 
-      <div class="ist-pc-section-title">${esc(t('profile.gamescores') || 'Oyun Skorları')}</div>
-      <div id="po-scores-mount">${scoresHTML({})}</div>
-    `;
-  }
-
-  function ayarlarTabHTML(state) {
-    const { I18N, profile } = state;
-    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
-    const languagePref = normalizeLang(profile?.language_pref);
-    const themePref = normalizeTheme(profile?.theme_pref);
-    const palettePref = normalizePalette(profile?.palette_pref);
-    return `
+      <div class="ist-pc-section-title">${esc(t('profile.tab.ayarlar'))}</div>
       <div class="ist-pc-field">
         <div class="ist-pc-label">${esc(t('profile.langpref'))}</div>
         <input class="ist-pc-slider" id="po-language" type="range" min="0" max="1" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
@@ -652,6 +787,15 @@
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
 
     if (tab === 'profil') {
+      getGameScores(sb, user.id).then(scores => {
+        const m = document.getElementById('po-scores-mount');
+        if (m) m.innerHTML = scoresHTML(scores);
+      });
+      getWeekGameStatus(sb, user.id).then(status => {
+        const m = document.getElementById('po-weekgrid-mount');
+        if (m) m.innerHTML = weekGridHTML(status, I18N);
+      });
+    } else if (tab === 'ayarlar') {
       document.querySelectorAll('#po-avatar-picker .ist-avatar-option').forEach(btn => {
         btn.addEventListener('click', () => pickOverlayAvatar(btn.dataset.url, state));
       });
@@ -665,11 +809,6 @@
           setTimeout(() => { copyBtn.textContent = orig; }, 1500);
         });
       }
-      getGameScores(sb, user.id).then(scores => {
-        const m = document.getElementById('po-scores-mount');
-        if (m) m.innerHTML = scoresHTML(scores);
-      });
-    } else if (tab === 'ayarlar') {
       syncTicks('po-language', 'po-language-ticks');
       syncTicks('po-palette', 'po-palette-ticks');
       syncTicks('po-theme', 'po-theme-ticks');
