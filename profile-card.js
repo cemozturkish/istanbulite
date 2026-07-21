@@ -697,34 +697,39 @@
         </div>
       </div>
 
-      <div class="ist-pc-actions">
-        <button type="button" class="ist-pc-save" id="po-save">${esc(t('profile.save'))}</button>
-      </div>
-      <div class="ist-pc-msg" id="po-save-msg"></div>
-
       <div class="ist-pc-section-title">${esc(t('profile.account'))}</div>
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.email'))}</div>
-        <div class="ist-pc-info-value">${esc(user.email)}</div>
+      <div class="ist-pc-info-grid">
+        <div class="ist-pc-info-cell">
+          <div class="ist-pc-info-label">${esc(t('profile.email'))}</div>
+          <div class="ist-pc-info-value">${esc(user.email)}</div>
+        </div>
+        ${phone ? `
+        <div class="ist-pc-info-cell">
+          <div class="ist-pc-info-label">${esc(t('profile.phone') || 'Telefon')}</div>
+          <div class="ist-pc-info-value">${esc(phone)}</div>
+        </div>` : ''}
+        <div class="ist-pc-info-cell">
+          <div class="ist-pc-info-label">${esc(t('profile.membership'))}</div>
+          <div class="ist-pc-info-value">${esc(joinedDate)}</div>
+        </div>
+        <div class="ist-pc-info-cell">
+          <div class="ist-pc-info-label">${esc(t('profile.lastseen'))}</div>
+          <div class="ist-pc-info-value">${esc(lastSeenText)}</div>
+        </div>
+        ${kefilOfUser ? `
+        <div class="ist-pc-info-cell">
+          <div class="ist-pc-info-label">${esc(t('profile.kefil'))}</div>
+          <div class="ist-pc-info-value">${kefilLabel}</div>
+        </div>` : ''}
+        <div class="ist-pc-info-cell">
+          <div class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</div>
+          <div class="ist-pc-info-value">${kefaletCount ?? 0} ${esc(t('profile.people'))}</div>
+        </div>
+        <div class="ist-pc-info-cell">
+          <div class="ist-pc-info-label">${esc(t('profile.sozculcount'))}</div>
+          <div class="ist-pc-info-value">${sozculCount ?? 0} ${esc(t('profile.times'))}</div>
+        </div>
       </div>
-      ${phone ? `
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.phone') || 'Telefon')}</div>
-        <div class="ist-pc-info-value">${esc(phone)}</div>
-      </div>` : ''}
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.membership'))}</div>
-        <div class="ist-pc-info-value">${esc(joinedDate)}</div>
-      </div>
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.lastseen'))}</div>
-        <div class="ist-pc-info-value">${esc(lastSeenText)}</div>
-      </div>
-      ${kefilOfUser ? `
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.kefil'))}</div>
-        <div class="ist-pc-info-value">${kefilLabel}</div>
-      </div>` : ''}
       ${referralCode ? `
       <div class="ist-pc-info-row">
         <div class="ist-pc-info-label">${esc(t('profile.referralcode'))}</div>
@@ -733,14 +738,6 @@
           <button type="button" class="ist-pc-copy" id="po-copy">${esc(t('profile.copy'))}</button>
         </div>
       </div>` : ''}
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</div>
-        <div class="ist-pc-info-value">${kefaletCount ?? 0} ${esc(t('profile.people'))}</div>
-      </div>
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.sozculcount'))}</div>
-        <div class="ist-pc-info-value">${sozculCount ?? 0} ${esc(t('profile.times'))}</div>
-      </div>
 
       <div class="ist-pc-section-title">${esc(t('profile.tab.ayarlar'))}</div>
       <div class="ist-pc-field">
@@ -767,10 +764,11 @@
           <span data-idx="1">Koyu</span>
         </div>
       </div>
+
       <div class="ist-pc-actions">
-        <button type="button" class="ist-pc-save" id="po-ayarlar-save">${esc(t('profile.save'))}</button>
+        <button type="button" class="ist-pc-save" id="po-save">${esc(t('profile.save'))}</button>
       </div>
-      <div class="ist-pc-msg" id="po-ayarlar-msg"></div>
+      <div class="ist-pc-msg" id="po-save-msg"></div>
       <button type="button" class="ist-pc-signout" id="po-signout">${esc(t('profile.signout'))}</button>
     `;
   }
@@ -798,7 +796,7 @@
       document.querySelectorAll('#po-avatar-picker .ist-avatar-option').forEach(btn => {
         btn.addEventListener('click', () => pickOverlayAvatar(btn.dataset.url, state));
       });
-      document.getElementById('po-save').addEventListener('click', () => saveProfilTab(state));
+      document.getElementById('po-save').addEventListener('click', () => saveAyarlar(state));
       const copyBtn = document.getElementById('po-copy');
       if (copyBtn) {
         copyBtn.addEventListener('click', () => {
@@ -811,7 +809,6 @@
       syncTicks('po-language', 'po-language-ticks');
       syncTicks('po-palette', 'po-palette-ticks');
       syncTicks('po-theme', 'po-theme-ticks');
-      document.getElementById('po-ayarlar-save').addEventListener('click', () => saveAyarlarTab(state));
       document.getElementById('po-signout').addEventListener('click', async () => {
         await sb.auth.signOut();
         window.location.href = 'index.html';
@@ -819,7 +816,10 @@
     }
   }
 
-  async function saveProfilTab(state) {
+  // One combined save for the whole Ayarlar tab — name/district plus
+  // language/palette/appearance — so there's a single Kaydet button and
+  // message instead of two separate save flows (keeps the tab shorter).
+  async function saveAyarlar(state) {
     const { sb, I18N, user } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const msgEl = document.getElementById('po-save-msg');
@@ -828,8 +828,17 @@
     const newFirstName = capitalizeName(document.getElementById('po-firstname').value.trim());
     const newLastName = capitalizeName(document.getElementById('po-lastname').value.trim());
     const yasadigiEl = document.getElementById('po-yasadigi');
+    const newLang = LANG_VALUES[parseInt(document.getElementById('po-language').value, 10)] || 'default';
+    const newTheme = THEME_VALUES[parseInt(document.getElementById('po-theme').value, 10)] || 'light';
+    const newPalette = PALETTE_VALUES[parseInt(document.getElementById('po-palette').value, 10)] || 'mono';
 
-    const payload = { first_name: newFirstName, last_name: newLastName };
+    const payload = {
+      first_name: newFirstName,
+      last_name: newLastName,
+      language_pref: newLang,
+      theme_pref: newTheme,
+      palette_pref: newPalette,
+    };
     if (isAdminUser && yasadigiEl) {
       if (!yasadigiEl.value) {
         msgEl.textContent = 'Lütfen bir ilçe seçin.';
@@ -847,35 +856,6 @@
       const { data, error } = await sb.from('profiles').update(payload).eq('id', user.id).select('id');
       if (error) throw error;
       if (!data || data.length === 0) throw new Error('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
-      setTimeout(() => window.location.reload(), 400);
-    } catch (err) {
-      btn.textContent = t('profile.save');
-      btn.disabled = false;
-      msgEl.textContent = (err && err.message) || 'Kaydedilemedi.';
-      msgEl.style.color = 'var(--accent)';
-    }
-  }
-
-  async function saveAyarlarTab(state) {
-    const { sb, I18N, user } = state;
-    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
-    const msgEl = document.getElementById('po-ayarlar-msg');
-    const btn = document.getElementById('po-ayarlar-save');
-    const newLang = LANG_VALUES[parseInt(document.getElementById('po-language').value, 10)] || 'default';
-    const newTheme = THEME_VALUES[parseInt(document.getElementById('po-theme').value, 10)] || 'light';
-    const newPalette = PALETTE_VALUES[parseInt(document.getElementById('po-palette').value, 10)] || 'mono';
-
-    btn.textContent = t('profile.saving');
-    btn.disabled = true;
-    msgEl.textContent = '';
-
-    try {
-      const { data, error } = await sb.from('profiles')
-        .update({ language_pref: newLang, theme_pref: newTheme, palette_pref: newPalette })
-        .eq('id', user.id)
-        .select('id');
-      if (error) throw error;
-      if (!data || data.length === 0) throw new Error('Profil bulunamadı.');
       // Cache the new palette locally so the reload starts in the right
       // colors instead of flashing the old palette.
       if (global.Palette) global.Palette.setPalette(newPalette);
@@ -884,6 +864,7 @@
       btn.textContent = t('profile.save');
       btn.disabled = false;
       msgEl.textContent = (err && err.message) || 'Kaydedilemedi.';
+      msgEl.style.color = 'var(--accent)';
     }
   }
 
