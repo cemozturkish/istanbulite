@@ -104,6 +104,9 @@
     // kahvehane — discussion feed
     'kahvehane.allistanbul': { default: 'Tüm İstanbul',      more_english: 'All Istanbul' },
 
+    // anahane — breaking news detail sheet
+    'news.sources':        { default: 'Kaynaklar',           more_english: 'Sources' },
+
     // games — shared right column (Günün Oyunları / scoreboard / neighborhood stats)
     'games.today':            { default: 'Günün Oyunları',        more_english: "Today's Games" },
     'games.weeklyscoreboard': { default: 'Haftanın Skor Tahtası', more_english: 'Weekly Scoreboard' },
