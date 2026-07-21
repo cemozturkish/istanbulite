@@ -59,6 +59,9 @@
     'profile.tab.ayarlar': { default: 'Ayarlar',             more_english: 'Settings' },
     'profile.tab.rozetler':{ default: 'Rozetler',            more_english: 'Badges' },
     'profile.rozetler.soon':{ default: 'Rozetler yakında burada olacak.', more_english: 'Badges are coming here soon.' },
+    'profile.email':        { default: 'E-posta',             more_english: 'Email' },
+    'profile.thisweek':     { default: 'Bu Hafta',             more_english: 'This Week' },
+    'profile.profileinfo':  { default: 'Profil Bilgileri',     more_english: 'Profile Info' },
 
     // login / signup (index.html)
     'auth.email':          { default: 'E-posta',             more_english: 'Email' },
