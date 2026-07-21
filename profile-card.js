@@ -57,6 +57,15 @@
     { url: 'assets/avatar-sozcu.png', label: 'Sözcü', requiresSozculCount: 10 },
   ];
 
+  // Cover badges (rozetler) — image stickers the user can place on the
+  // Profil tab's cover, unlocked by matching their birth district
+  // (profiles.birth_place). Add new badges here as new district stickers
+  // are drawn; the picker/cover rendering below doesn't need to change.
+  const BADGES = [
+    { id: 'galata',    src: 'assets/galatakulesisticker.png', label: 'Galata Kulesi', district: 'beyoglu' },
+    { id: 'kizkulesi', src: 'assets/kizkulesisticker.png',    label: 'Kız Kulesi',    district: 'uskudar' },
+  ];
+
   // Colors are a viewer-side preference, not a property of the profile
   // owner: resolve avatar_url to the mono or brown file depending on the
   // *current visitor's* palette_pref (see palette.js avatarSrc).
@@ -113,6 +122,31 @@
   function lockedAvatarMessage(opt, sozculCount) {
     const need = opt.requiresSozculCount;
     return `Bu avatar kilitli — ${need} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${need}).`;
+  }
+
+  function buildBadgePicker(badges, placedIds, birthDistrict) {
+    return badges.map(b => {
+      const unlocked = !!birthDistrict && b.district === birthDistrict;
+      const selected = placedIds.includes(b.id);
+      const cls = ['ist-pc-badge-option'];
+      if (selected) cls.push('selected');
+      if (!unlocked) cls.push('locked');
+      const title = unlocked
+        ? b.label
+        : `${b.label} — ${NB_NAMES[b.district] || b.district} doğumlular için kilitli`;
+      return `
+        <button type="button"
+          class="${cls.join(' ')}"
+          data-id="${b.id}"
+          ${unlocked ? '' : 'aria-disabled="true"'}
+          title="${esc(title)}"
+          aria-label="${esc(b.label)}">
+          <img src="${b.src}" alt="${esc(b.label)}">
+          ${unlocked ? '' : AVATAR_LOCK_SVG}
+          <span class="ist-pc-badge-label">${esc(b.label)}</span>
+        </button>
+      `;
+    }).join('');
   }
 
   function capitalizeName(s) {
@@ -606,10 +640,11 @@
   }
 
   // Profil tab: a white "pano" cover — the avatar sits on it like a Twitter
-  // cover photo, and it's the surface future rozetler (stickers) will be
-  // placed on — plus the weekly game grid and the lifetime score cards.
-  // No editable fields here: account info and personalization all live in
-  // the Ayarlar tab now (see ayarlarTabHTML).
+  // cover photo, and any rozetler (badges) picked in the Rozetler tab (see
+  // rozetlerTabHTML/toggleCoverBadge) are pinned to its corners — plus the
+  // weekly game grid and the lifetime score cards. No editable fields here:
+  // account info and personalization all live in the Ayarlar tab now (see
+  // ayarlarTabHTML).
   function profilTabHTML(state) {
     const { I18N, user, profile, avatarUrl } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
@@ -619,8 +654,12 @@
     const yasadigiIlce = profile?.neighborhood || '';
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
 
+    const placedIds = profile?.cover_badges || [];
+    const placedBadges = BADGES.filter(b => placedIds.includes(b.id));
+
     return `
       <div class="ist-pc-cover">
+        ${placedBadges.map((b, i) => `<img class="ist-pc-cover-badge ist-pc-cover-badge-${i % 4}" src="${b.src}" alt="${esc(b.label)}" title="${esc(b.label)}">`).join('')}
         <div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, displayName)}</div>
         <div class="ist-pc-cover-name">${esc(displayName)}</div>
         <div class="ist-pc-cover-meta">${esc(yasadigiDisplay)}</div>
@@ -766,13 +805,20 @@
     `;
   }
 
+  // Rozetler tab: a picker grid of district-locked badge stickers. Clicking
+  // an unlocked one toggles it onto the Profil tab's cover (see
+  // profilTabHTML) and saves immediately — same immediate-save pattern as
+  // the avatar picker, no separate Kaydet button.
   function rozetlerTabHTML(state) {
-    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
+    const { I18N, profile } = state;
+    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
+    const birthDistrict = profile?.birth_place || '';
+    const placedIds = profile?.cover_badges || [];
     return `
-      <div class="ist-pc-rozet-placeholder">
-        <div class="ist-pc-rozet-icon" aria-hidden="true">🏅</div>
-        <div class="ist-pc-rozet-text">${esc(t('profile.rozetler.soon'))}</div>
-      </div>
+      <div class="ist-pc-section-title">${esc(t('profile.tab.rozetler'))}</div>
+      <div class="ist-pc-badge-hint">${esc(t('profile.rozetler.hint'))}</div>
+      <div class="ist-pc-badge-grid" id="po-badge-grid">${buildBadgePicker(BADGES, placedIds, birthDistrict)}</div>
+      <div class="ist-pc-badge-msg" id="po-badge-msg" role="status" aria-live="polite"></div>
     `;
   }
 
@@ -805,6 +851,10 @@
       document.getElementById('po-signout').addEventListener('click', async () => {
         await sb.auth.signOut();
         window.location.href = 'index.html';
+      });
+    } else if (tab === 'rozetler') {
+      document.querySelectorAll('#po-badge-grid .ist-pc-badge-option').forEach(btn => {
+        btn.addEventListener('click', () => toggleCoverBadge(btn.dataset.id, state));
       });
     }
   }
@@ -873,6 +923,40 @@
       b.classList.toggle('selected', b.dataset.url === url);
     });
     if (typeof state.onAvatarChange === 'function') state.onAvatarChange(url);
+  }
+
+  let _badgeMsgTimer = null;
+  function showBadgeMsg(text) {
+    const el = document.getElementById('po-badge-msg');
+    if (!el) return;
+    el.textContent = text;
+    clearTimeout(_badgeMsgTimer);
+    _badgeMsgTimer = setTimeout(() => { el.textContent = ''; }, 4000);
+  }
+
+  // Toggles a badge on/off the cover and saves straight to Supabase (no
+  // separate Kaydet button, same immediate-save pattern as the avatar
+  // picker). Mutates `state.profile.cover_badges` in place rather than
+  // reassigning `state.profile` — every call site (mobile card, desktop
+  // library card, kutuphane's own profile fetch) hands this overlay the
+  // *same* profile object, so the mutation is visible everywhere without
+  // extra plumbing, mirroring how avatar picks rely on onAvatarChange.
+  async function toggleCoverBadge(id, state) {
+    const { sb, user, profile } = state;
+    const badge = BADGES.find(b => b.id === id);
+    if (!badge) return;
+    const birthDistrict = profile?.birth_place || '';
+    if (badge.district !== birthDistrict) return;
+
+    const current = profile?.cover_badges || [];
+    const next = current.includes(id) ? current.filter(x => x !== id) : [...current, id];
+
+    const { data, error } = await sb.from('profiles').update({ cover_badges: next }).eq('id', user.id).select('id');
+    if (error) { showBadgeMsg('Rozet kaydedilemedi: ' + error.message); return; }
+    if (!data || data.length === 0) { showBadgeMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
+
+    if (profile) profile.cover_badges = next;
+    renderOverlayBody();
   }
 
   // ══════════════════════════════════════════════════════════════
