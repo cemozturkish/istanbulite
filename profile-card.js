@@ -644,19 +644,9 @@
     const dogumYeri = profile?.birth_place || '';
     const phone = profile?.phone || '';
     const referralCode = profile?.referral_code || '';
-    const isAdminUser = user.email === ADMIN_EMAIL;
     const languagePref = normalizeLang(profile?.language_pref);
     const themePref = normalizeTheme(profile?.theme_pref);
     const palettePref = normalizePalette(profile?.palette_pref);
-
-    // `yaşadığı ilçe` is admin-controlled (protect_profile_columns trigger
-    // reverts it for everyone else) — only the admin gets an editable
-    // select; other users see it the same way they see birth place: read-only.
-    const districtOptions = Object.entries(NB_NAMES)
-      .filter(([id]) => id !== 'istanbul_disi')
-      .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
-      .map(([id, name]) => `<option value="${id}"${id === yasadigiIlce ? ' selected' : ''}>${esc(name)}</option>`)
-      .join('');
 
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
     const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
@@ -674,101 +664,104 @@
         <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
       </div>
 
-      <div class="ist-pc-field-row">
-        <div class="ist-pc-field">
+      <!-- Ad, soyad and district are not user-editable for now (protect_profile_columns
+           already reverted district for non-admins; name/lastname are locked here too
+           until an editing flow is decided) — shown read-only, all on one line. -->
+      <div class="ist-pc-info-line">
+        <div class="ist-pc-info-line-cell">
           <div class="ist-pc-label">${esc(t('profile.firstname'))}</div>
-          <input class="ist-pc-input" id="po-firstname" type="text" value="${esc(firstName)}" placeholder="${esc(t('profile.firstname'))}">
+          <div class="ist-pc-display">${esc(firstName || '—')}</div>
         </div>
-        <div class="ist-pc-field">
+        <div class="ist-pc-info-line-cell">
           <div class="ist-pc-label">${esc(t('profile.lastname'))}</div>
-          <input class="ist-pc-input" id="po-lastname" type="text" value="${esc(lastName)}" placeholder="${esc(t('profile.lastname'))}">
+          <div class="ist-pc-display">${esc(lastName || '—')}</div>
         </div>
-      </div>
-      <div class="ist-pc-field-row">
-        <div class="ist-pc-field">
+        <div class="ist-pc-info-line-cell">
           <div class="ist-pc-label">${esc(t('profile.district'))}</div>
-          ${isAdminUser
-            ? `<select class="ist-pc-select" id="po-yasadigi"><option value="">— ${esc(t('profile.district'))} —</option>${districtOptions}</select>`
-            : `<div class="ist-pc-display">${esc(yasadigiDisplay)}</div>`}
+          <div class="ist-pc-display">${esc(yasadigiDisplay)}</div>
         </div>
-        <div class="ist-pc-field">
+        <div class="ist-pc-info-line-cell">
           <div class="ist-pc-label">${esc(t('profile.birthplace'))}</div>
           <div class="ist-pc-display">${esc(dogumDisplay)}</div>
         </div>
       </div>
 
-      <div class="ist-pc-section-title">${esc(t('profile.account'))}</div>
-      <div class="ist-pc-info-grid">
-        <div class="ist-pc-info-cell">
-          <div class="ist-pc-info-label">${esc(t('profile.email'))}</div>
-          <div class="ist-pc-info-value">${esc(user.email)}</div>
+      <div class="ist-pc-two-col">
+        <div class="ist-pc-col">
+          <div class="ist-pc-section-title">${esc(t('profile.account'))}</div>
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.email'))}</div>
+            <div class="ist-pc-info-value">${esc(user.email)}</div>
+          </div>
+          ${phone ? `
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.phone') || 'Telefon')}</div>
+            <div class="ist-pc-info-value">${esc(phone)}</div>
+          </div>` : ''}
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.membership'))}</div>
+            <div class="ist-pc-info-value">${esc(joinedDate)}</div>
+          </div>
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.lastseen'))}</div>
+            <div class="ist-pc-info-value">${esc(lastSeenText)}</div>
+          </div>
+          ${kefilOfUser ? `
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.kefil'))}</div>
+            <div class="ist-pc-info-value">${kefilLabel}</div>
+          </div>` : ''}
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</div>
+            <div class="ist-pc-info-value">${kefaletCount ?? 0} ${esc(t('profile.people'))}</div>
+          </div>
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.sozculcount'))}</div>
+            <div class="ist-pc-info-value">${sozculCount ?? 0} ${esc(t('profile.times'))}</div>
+          </div>
+          ${referralCode ? `
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.referralcode'))}</div>
+            <div class="ist-pc-info-value">
+              <span class="ist-pc-code">${esc(referralCode)}</span>
+              <button type="button" class="ist-pc-copy" id="po-copy">${esc(t('profile.copy'))}</button>
+            </div>
+          </div>` : ''}
         </div>
-        ${phone ? `
-        <div class="ist-pc-info-cell">
-          <div class="ist-pc-info-label">${esc(t('profile.phone') || 'Telefon')}</div>
-          <div class="ist-pc-info-value">${esc(phone)}</div>
-        </div>` : ''}
-        <div class="ist-pc-info-cell">
-          <div class="ist-pc-info-label">${esc(t('profile.membership'))}</div>
-          <div class="ist-pc-info-value">${esc(joinedDate)}</div>
-        </div>
-        <div class="ist-pc-info-cell">
-          <div class="ist-pc-info-label">${esc(t('profile.lastseen'))}</div>
-          <div class="ist-pc-info-value">${esc(lastSeenText)}</div>
-        </div>
-        ${kefilOfUser ? `
-        <div class="ist-pc-info-cell">
-          <div class="ist-pc-info-label">${esc(t('profile.kefil'))}</div>
-          <div class="ist-pc-info-value">${kefilLabel}</div>
-        </div>` : ''}
-        <div class="ist-pc-info-cell">
-          <div class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</div>
-          <div class="ist-pc-info-value">${kefaletCount ?? 0} ${esc(t('profile.people'))}</div>
-        </div>
-        <div class="ist-pc-info-cell">
-          <div class="ist-pc-info-label">${esc(t('profile.sozculcount'))}</div>
-          <div class="ist-pc-info-value">${sozculCount ?? 0} ${esc(t('profile.times'))}</div>
-        </div>
-      </div>
-      ${referralCode ? `
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.referralcode'))}</div>
-        <div class="ist-pc-info-value">
-          <span class="ist-pc-code">${esc(referralCode)}</span>
-          <button type="button" class="ist-pc-copy" id="po-copy">${esc(t('profile.copy'))}</button>
-        </div>
-      </div>` : ''}
 
-      <div class="ist-pc-section-title">${esc(t('profile.tab.ayarlar'))}</div>
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.langpref'))}</div>
-        <input class="ist-pc-slider" id="po-language" type="range" min="0" max="1" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
-        <div class="ist-pc-ticks" id="po-language-ticks">
-          <span data-idx="0">Daha İngilizce</span>
-          <span data-idx="1">Daha Türkçe</span>
-        </div>
-      </div>
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.colortheme'))}</div>
-        <input class="ist-pc-slider" id="po-palette" type="range" min="0" max="1" step="1" value="${PALETTE_VALUES.indexOf(palettePref)}">
-        <div class="ist-pc-ticks" id="po-palette-ticks">
-          <span data-idx="0">Siyah-Beyaz</span>
-          <span data-idx="1">Kahverengi</span>
-        </div>
-      </div>
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.appearance'))}</div>
-        <input class="ist-pc-slider" id="po-theme" type="range" min="0" max="1" step="1" value="${THEME_VALUES.indexOf(themePref)}">
-        <div class="ist-pc-ticks" id="po-theme-ticks">
-          <span data-idx="0">Açık</span>
-          <span data-idx="1">Koyu</span>
+        <div class="ist-pc-col">
+          <div class="ist-pc-section-title">${esc(t('profile.tab.ayarlar'))}</div>
+          <div class="ist-pc-field">
+            <div class="ist-pc-label">${esc(t('profile.langpref'))}</div>
+            <input class="ist-pc-slider" id="po-language" type="range" min="0" max="1" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
+            <div class="ist-pc-ticks" id="po-language-ticks">
+              <span data-idx="0">Daha İngilizce</span>
+              <span data-idx="1">Daha Türkçe</span>
+            </div>
+          </div>
+          <div class="ist-pc-field">
+            <div class="ist-pc-label">${esc(t('profile.colortheme'))}</div>
+            <input class="ist-pc-slider" id="po-palette" type="range" min="0" max="1" step="1" value="${PALETTE_VALUES.indexOf(palettePref)}">
+            <div class="ist-pc-ticks" id="po-palette-ticks">
+              <span data-idx="0">Siyah-Beyaz</span>
+              <span data-idx="1">Kahverengi</span>
+            </div>
+          </div>
+          <div class="ist-pc-field">
+            <div class="ist-pc-label">${esc(t('profile.appearance'))}</div>
+            <input class="ist-pc-slider" id="po-theme" type="range" min="0" max="1" step="1" value="${THEME_VALUES.indexOf(themePref)}">
+            <div class="ist-pc-ticks" id="po-theme-ticks">
+              <span data-idx="0">Açık</span>
+              <span data-idx="1">Koyu</span>
+            </div>
+          </div>
+          <div class="ist-pc-actions">
+            <button type="button" class="ist-pc-save" id="po-save">${esc(t('profile.save'))}</button>
+          </div>
+          <div class="ist-pc-msg" id="po-save-msg"></div>
         </div>
       </div>
 
-      <div class="ist-pc-actions">
-        <button type="button" class="ist-pc-save" id="po-save">${esc(t('profile.save'))}</button>
-      </div>
-      <div class="ist-pc-msg" id="po-save-msg"></div>
       <button type="button" class="ist-pc-signout" id="po-signout">${esc(t('profile.signout'))}</button>
     `;
   }
@@ -816,37 +809,23 @@
     }
   }
 
-  // One combined save for the whole Ayarlar tab — name/district plus
-  // language/palette/appearance — so there's a single Kaydet button and
-  // message instead of two separate save flows (keeps the tab shorter).
+  // Saves the Ayarlar tab's only editable fields — language/palette/
+  // appearance. Ad/Soyad/Yaşadığı İlçe are read-only for now (see the
+  // comment in ayarlarTabHTML), so there's nothing else to send.
   async function saveAyarlar(state) {
     const { sb, I18N, user } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const msgEl = document.getElementById('po-save-msg');
     const btn = document.getElementById('po-save');
-    const isAdminUser = user.email === ADMIN_EMAIL;
-    const newFirstName = capitalizeName(document.getElementById('po-firstname').value.trim());
-    const newLastName = capitalizeName(document.getElementById('po-lastname').value.trim());
-    const yasadigiEl = document.getElementById('po-yasadigi');
     const newLang = LANG_VALUES[parseInt(document.getElementById('po-language').value, 10)] || 'default';
     const newTheme = THEME_VALUES[parseInt(document.getElementById('po-theme').value, 10)] || 'light';
     const newPalette = PALETTE_VALUES[parseInt(document.getElementById('po-palette').value, 10)] || 'mono';
 
     const payload = {
-      first_name: newFirstName,
-      last_name: newLastName,
       language_pref: newLang,
       theme_pref: newTheme,
       palette_pref: newPalette,
     };
-    if (isAdminUser && yasadigiEl) {
-      if (!yasadigiEl.value) {
-        msgEl.textContent = 'Lütfen bir ilçe seçin.';
-        msgEl.style.color = 'var(--accent)';
-        return;
-      }
-      payload.neighborhood = yasadigiEl.value;
-    }
 
     btn.textContent = t('profile.saving');
     btn.disabled = true;
