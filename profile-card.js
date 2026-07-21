@@ -260,12 +260,16 @@
     return dow === 0 ? 6 : dow - 1;
   }
 
+  function mondayOfIstWeek() {
+    const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+    return new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - istWeekdayIdx(nowIst));
+  }
+
   // The 7 calendar dates (Monday…Sunday) of the current Istanbul week, each
   // as an unpadded "Y-M-D" key matching game_results.date (see
   // db/game_results.sql: "YYYY-M-D Istanbul-local", no zero-padding).
   function weekDatesIst() {
-    const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-    const monday = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - istWeekdayIdx(nowIst));
+    const monday = mondayOfIstWeek();
     const out = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
@@ -274,23 +278,48 @@
     return out;
   }
 
+  // Same week, zero-padded ISO ("YYYY-MM-DD") to match
+  // sozcel_sozcul_assignments.game_date — a real `date` column, unlike
+  // game_results.date which is unpadded text. Index-aligned with
+  // weekDatesIst() so the two can be zipped together.
+  function weekDatesIstISO() {
+    const monday = mondayOfIstWeek();
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      out.push(`${d.getFullYear()}-${m}-${dd}`);
+    }
+    return out;
+  }
+
   // Fetches this user's game_results for the current Istanbul week and
-  // reduces them to per (game, date) played/won flags for the weekly grid.
+  // reduces them to per (game, date) played/won flags for the weekly grid,
+  // plus which of those days they were the assigned Sözcü (Sözcel's daily
+  // word-of-day solver) — rendered as a distinct color in weekGridHTML
+  // rather than the usual win/played states.
   async function getWeekGameStatus(sb, userId) {
     const dateKeys = weekDatesIst();
-    const empty = { dateKeys, played: new Set(), won: new Set() };
+    const isoDateKeys = weekDatesIstISO();
+    const empty = { dateKeys, played: new Set(), won: new Set(), sozcuDates: new Set() };
     try {
-      const { data, error } = await sb
-        .from('game_results')
-        .select('game, date, won')
-        .eq('user_id', userId)
-        .in('date', dateKeys);
+      const [{ data, error }, { data: sozcuData, error: sozcuError }] = await Promise.all([
+        sb.from('game_results').select('game, date, won').eq('user_id', userId).in('date', dateKeys),
+        sb.from('sozcel_sozcul_assignments').select('game_date').eq('user_id', userId).in('game_date', isoDateKeys),
+      ]);
       if (error) throw error;
       (data || []).forEach(r => {
         const k = r.game + '|' + r.date;
         empty.played.add(k);
         if (r.won) empty.won.add(k);
       });
+      if (!sozcuError) {
+        (sozcuData || []).forEach(r => {
+          const idx = isoDateKeys.indexOf(r.game_date);
+          if (idx !== -1) empty.sozcuDates.add(dateKeys[idx]);
+        });
+      }
       return empty;
     } catch (e) {
       return empty;
@@ -328,6 +357,9 @@
         } else if (i > todayIdx) {
           state = 'future';
           title = `${game.label} — ${dayNames[i]}`;
+        } else if (game.id === 'sozcel' && status.sozcuDates && status.sozcuDates.has(dateKey)) {
+          state = 'sozcu';
+          title = `${game.label} — ${dayNames[i]}: Sözcü`;
         } else {
           const k = game.id + '|' + dateKey;
           if (status.won.has(k)) { state = 'win'; title = `${game.label} — ${dayNames[i]}: kazandı`; }
@@ -639,12 +671,29 @@
       : esc(displayName.charAt(0).toUpperCase());
   }
 
-  // Profil tab: a white "pano" cover — the avatar sits on it like a Twitter
-  // cover photo, and any rozetler (badges) picked in the Rozetler tab (see
-  // rozetlerTabHTML/toggleCoverBadge) are pinned to its corners — plus the
-  // weekly game grid and the lifetime score cards. No editable fields here:
-  // account info and personalization all live in the Ayarlar tab now (see
-  // ayarlarTabHTML).
+  // The white "pano" cover — the avatar sits on it like a Twitter cover
+  // photo, and any rozetler (badges) picked in the Rozetler tab (see
+  // rozetlerTabHTML/toggleCoverBadge) are pinned to its corners. Shared
+  // between the self-editing Profil tab (profilTabHTML below) and
+  // kutuphane.html's read-only "someone else's profile" popup (exposed as
+  // IstProfileCard.coverHTML) so both surfaces render badges identically.
+  function coverHTML(opts) {
+    const { profile, avatarUrl, displayName, metaText } = opts;
+    const placedIds = profile?.cover_badges || [];
+    const placedBadges = BADGES.filter(b => placedIds.includes(b.id));
+    return `
+      <div class="ist-pc-cover">
+        ${placedBadges.map((b, i) => `<img class="ist-pc-cover-badge ist-pc-cover-badge-${i % 4}" src="${b.src}" alt="${esc(b.label)}" title="${esc(b.label)}">`).join('')}
+        <div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, displayName)}</div>
+        <div class="ist-pc-cover-name">${esc(displayName)}</div>
+        <div class="ist-pc-cover-meta">${esc(metaText)}</div>
+      </div>
+    `;
+  }
+
+  // Profil tab: the cover, plus the weekly game grid and the lifetime score
+  // cards. No editable fields here: account info and personalization all
+  // live in the Ayarlar tab now (see ayarlarTabHTML).
   function profilTabHTML(state) {
     const { I18N, user, profile, avatarUrl } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
@@ -654,16 +703,8 @@
     const yasadigiIlce = profile?.neighborhood || '';
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
 
-    const placedIds = profile?.cover_badges || [];
-    const placedBadges = BADGES.filter(b => placedIds.includes(b.id));
-
     return `
-      <div class="ist-pc-cover">
-        ${placedBadges.map((b, i) => `<img class="ist-pc-cover-badge ist-pc-cover-badge-${i % 4}" src="${b.src}" alt="${esc(b.label)}" title="${esc(b.label)}">`).join('')}
-        <div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, displayName)}</div>
-        <div class="ist-pc-cover-name">${esc(displayName)}</div>
-        <div class="ist-pc-cover-meta">${esc(yasadigiDisplay)}</div>
-      </div>
+      ${coverHTML({ profile, avatarUrl, displayName, metaText: yasadigiDisplay })}
 
       <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
       <div id="po-weekgrid-mount"></div>
@@ -1060,5 +1101,8 @@
     buildAvatarPicker,
     lookupAvatarOption,
     lockedAvatarMessage,
+    coverHTML,
+    getWeekGameStatus,
+    weekGridHTML,
   };
 }(window));

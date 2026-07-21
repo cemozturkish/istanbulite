@@ -2201,36 +2201,16 @@
     .profile-popup .close-btn .close-icon {
       width: 17px; height: 17px; display: block;
     }
-    .profile-popup .pp-avatar {
-      width: 96px; height: 96px; border-radius: 50%;
-      background: var(--paper-dark); border: 1px solid #ccc;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 2.2rem; font-weight: 600; color: var(--accent);
-      margin: 0 auto 14px; overflow: hidden;
-    }
-    .profile-popup .pp-avatar img { width: 100%; height: 100%; object-fit: cover; }
-    .profile-popup .pp-name {
-      text-align: center; font-size: 1.1rem; font-weight: 700;
-      letter-spacing: 0.5px; margin-bottom: 4px;
-    }
-    .profile-popup .pp-meta {
-      text-align: center; font-size: 0.72rem; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 16px;
-    }
-    .profile-popup .pp-row {
-      display: flex; justify-content: space-between;
-      padding: 8px 0; border-top: 1px solid var(--hairline); font-size: 0.8rem;
-    }
-    .profile-popup .pp-row .pp-label {
-      color: var(--muted); text-transform: uppercase;
-      font-size: 0.65rem; letter-spacing: 1.5px; align-self: center;
-    }
-    .profile-popup .pp-row .pp-value { color: var(--ink); font-weight: 500; text-align: right; }
+    /* Cover (avatar + badges) and the weekly game grid are the shared
+       .ist-pc-cover / .ist-pc-weekgrid markup from profile-card.css
+       (IstProfileCard.coverHTML / weekGridHTML) — no page-local styling
+       needed for those here. */
     .profile-popup .pp-since {
       text-align: center; font-size: 0.68rem; color: var(--muted);
       letter-spacing: 1px; margin-top: 14px; padding-top: 12px;
       border-top: 1px solid var(--hairline);
     }
+    .profile-popup .pp-since-kefil { margin-top: 4px; }
     .profile-popup .pp-loading, .profile-popup .pp-error {
       text-align: center; color: var(--muted); font-size: 0.85rem; padding: 30px 0;
     }
@@ -4092,30 +4072,17 @@ if (!window.__istVirtualNavInjecting) {
     return neighborhoodNames[id] || id;
   }
 
-  function istanbulTodayISO() {
-    const now = new Date();
-    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-    const y = ist.getFullYear();
-    const m = String(ist.getMonth() + 1).padStart(2, '0');
-    const d = String(ist.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-
   async function open(userId) {
     overlay.hidden = false;
     overlay.classList.add('open');
     body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
 
-    const today = istanbulTodayISO();
-    const [{ data: prof, error }, { count: sozculCount }] = await Promise.all([
+    const [{ data: prof, error }, weekStatus] = await Promise.all([
       sb.from('profiles')
-        .select('id, first_name, last_name, neighborhood, birth_place, avatar_url, joined_at, referred_by')
+        .select('id, first_name, last_name, neighborhood, avatar_url, cover_badges, joined_at, referred_by')
         .eq('id', userId)
         .maybeSingle(),
-      sb.from('sozcel_sozcul_assignments')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .lte('game_date', today),
+      IstProfileCard.getWeekGameStatus(sb, userId),
     ]);
 
     if (error || !prof) {
@@ -4137,19 +4104,19 @@ if (!window.__istVirtualNavInjecting) {
     }
 
     const fullName = capitalizeName((`${prof.first_name || ''} ${prof.last_name || ''}`).trim()) || 'İsimsiz Üye';
-    const avatar = prof.avatar_url
-      ? `<img src="${Palette.avatarSrc(prof.avatar_url)}" alt="">`
-      : (fullName.charAt(0) || '?').toUpperCase();
-    const birth = nbLabel(prof.birth_place);
 
+    // Cover (avatar + placed rozetler) and the weekly game grid reuse the
+    // same shared markup/logic as the self-editing Profil tab (see
+    // IstProfileCard.coverHTML/getWeekGameStatus/weekGridHTML in
+    // profile-card.js) instead of a page-local avatar circle.
     body.innerHTML = `
-      <div class="pp-avatar">${avatar}</div>
-      <div class="pp-name">${fullName.toLocaleUpperCase('tr-TR')}</div>
-      <div class="pp-meta">${nbLabel(prof.neighborhood)}</div>
-      <div class="pp-row"><span class="pp-label">${I18N.t('profile.birthplace')}</span><span class="pp-value">${birth}</span></div>
-      <div class="pp-row"><span class="pp-label">${I18N.t('profile.sozculcount')}</span><span class="pp-value">${sozculCount ?? 0} ${I18N.t('profile.times')}</span></div>
-      ${kefilName ? `<div class="pp-row"><span class="pp-label">${I18N.t('profile.kefil')}</span><span class="pp-value"><button class="kefil-link" data-user-id="${kefilId}">${kefilName}</button></span></div>` : ''}
-      <div class="pp-since">${I18N.formatMemberSince(prof.joined_at)}</div>
+      ${IstProfileCard.coverHTML({ profile: prof, avatarUrl: prof.avatar_url, displayName: fullName, metaText: nbLabel(prof.neighborhood) })}
+      <div class="ist-pc-section-title">${I18N.t('profile.thisweek')}</div>
+      ${IstProfileCard.weekGridHTML(weekStatus, I18N)}
+      <div class="pp-since">
+        <div>${I18N.formatMemberSince(prof.joined_at)}</div>
+        ${kefilName ? `<div class="pp-since-kefil">${I18N.t('profile.kefil')}: <button class="kefil-link" data-user-id="${kefilId}">${kefilName}</button></div>` : ''}
+      </div>
     `;
   }
 
