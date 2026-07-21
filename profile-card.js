@@ -674,23 +674,27 @@
         <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
       </div>
 
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.firstname'))}</div>
-        <input class="ist-pc-input" id="po-firstname" type="text" value="${esc(firstName)}" placeholder="${esc(t('profile.firstname'))}">
+      <div class="ist-pc-field-row">
+        <div class="ist-pc-field">
+          <div class="ist-pc-label">${esc(t('profile.firstname'))}</div>
+          <input class="ist-pc-input" id="po-firstname" type="text" value="${esc(firstName)}" placeholder="${esc(t('profile.firstname'))}">
+        </div>
+        <div class="ist-pc-field">
+          <div class="ist-pc-label">${esc(t('profile.lastname'))}</div>
+          <input class="ist-pc-input" id="po-lastname" type="text" value="${esc(lastName)}" placeholder="${esc(t('profile.lastname'))}">
+        </div>
       </div>
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.lastname'))}</div>
-        <input class="ist-pc-input" id="po-lastname" type="text" value="${esc(lastName)}" placeholder="${esc(t('profile.lastname'))}">
-      </div>
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.district'))}</div>
-        ${isAdminUser
-          ? `<select class="ist-pc-select" id="po-yasadigi"><option value="">— ${esc(t('profile.district'))} —</option>${districtOptions}</select>`
-          : `<div class="ist-pc-display">${esc(yasadigiDisplay)}</div>`}
-      </div>
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.birthplace'))}</div>
-        <div class="ist-pc-display">${esc(dogumDisplay)}</div>
+      <div class="ist-pc-field-row">
+        <div class="ist-pc-field">
+          <div class="ist-pc-label">${esc(t('profile.district'))}</div>
+          ${isAdminUser
+            ? `<select class="ist-pc-select" id="po-yasadigi"><option value="">— ${esc(t('profile.district'))} —</option>${districtOptions}</select>`
+            : `<div class="ist-pc-display">${esc(yasadigiDisplay)}</div>`}
+        </div>
+        <div class="ist-pc-field">
+          <div class="ist-pc-label">${esc(t('profile.birthplace'))}</div>
+          <div class="ist-pc-display">${esc(dogumDisplay)}</div>
+        </div>
       </div>
 
       <div class="ist-pc-actions">
