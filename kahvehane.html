@@ -366,8 +366,8 @@
     }
 
     /* Wraps the heading + 3 game links; stays visible while a game's bottom
-       sheet is open (see enterGameContext) so the buttons and the
-       scoreboard (narrowed to that game) both stay on screen. */
+       sheet is open so the buttons and the full weekly scoreboard both
+       stay on screen. */
     .game-picker {
       display: flex;
       flex-direction: column;
@@ -1213,11 +1213,10 @@
          hiding) the scoreboard's own h2 below. */
       .game-picker h2 { display: none; }
       /* Hidden on mobile -- stays part of the games section in markup
-         (loadScoreboard() still runs, keeping it ready for a game
-         context), it just isn't shown on the main tile view here;
-         there isn't room for it alongside the tiles without either
-         scrolling the page or shrinking the tiles, neither of which is
-         wanted. */
+         (loadScoreboard() still runs), it just isn't shown on the main
+         tile view here; there isn't room for it alongside the tiles
+         without either scrolling the page or shrinking the tiles,
+         neither of which is wanted. */
       .scoreboard { display: none; }
       /* Grows to fill .games-section-inner's own height instead of
          sizing to content (overriding the desktop rule's flex-shrink:0)
@@ -1911,36 +1910,11 @@
 // navigating away from Kahvehane. Closing it — the ✕ button, clicking
 // the backdrop, or a postMessage from the game's own ← Geri button
 // (see sozcel.html/tumcel.html/bulmaca.html) — just hides the sheet;
-// Kahvehane itself was never actually left.
-//
-// Opening/closing the sheet also narrows the scoreboard, the same way
-// clicking a neighborhood on the map swaps it: from the full weekly board
-// down to just that game's own scoreboard. The game links stay put so
-// switching games (or backing out to the picker) doesn't require closing
-// the sheet. The left column (discussion feed) is left alone — the game
-// already has its own "?" help button, so a duplicate instructions blurb
-// here was redundant.
-const GAME_DISPLAY_NAMES = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Bulmaca' };
-
-let gameContextActive = null;
-
-// The game links stay visible while a game is open (so switching games or
-// bailing back to the picker doesn't require closing the sheet first) —
-// only the scoreboard narrows down to the open game's own board. Passing
-// includeGameLinks=false keeps them out of the entrance cascade entirely:
-// they never actually left the screen (only the scoreboard rows below
-// them are swapping), so animating them in again here would look like
-// they'd just arrived.
-function enterGameContext(gameKey) {
-  gameContextActive = gameKey;
-  loadScoreboard(null, gameKey, false, false);
-}
-
-function exitGameContext() {
-  if (!gameContextActive) return;
-  gameContextActive = null;
-  loadScoreboard(activeMapNeighborhood || null, null, false, false);
-}
+// Kahvehane itself was never actually left. The scoreboard stays on the
+// full weekly board throughout — opening a game doesn't narrow it to that
+// game's own scores. The left column (discussion feed) is left alone —
+// the game already has its own "?" help button, so a duplicate
+// instructions blurb here was redundant.
 
 (function initGameOverlay() {
   const overlay = document.getElementById('game-overlay');
@@ -1964,12 +1938,11 @@ function exitGameContext() {
     sheet.style.top = `${Math.max(cardBottom, 0) + framePad}px`;
   }
 
-  function openGame(href, gameKey) {
+  function openGame(href) {
     positionGameSheet();
     frame.src = href;
     overlay.hidden = false;
     requestAnimationFrame(() => overlay.classList.add('open'));
-    if (gameKey) enterGameContext(gameKey);
   }
   function closeGame() {
     overlay.classList.remove('open');
@@ -1979,7 +1952,6 @@ function exitGameContext() {
       overlay.hidden = true;
       frame.src = 'about:blank';
     }, 550);
-    exitGameContext();
   }
   window.addEventListener('resize', () => {
     if (overlay.classList.contains('open')) positionGameSheet();
@@ -1995,7 +1967,7 @@ function exitGameContext() {
     if (!link) return;
     e.preventDefault();
     if (link.classList.contains('locked')) return;
-    openGame(link.getAttribute('href'), link.dataset.game);
+    openGame(link.getAttribute('href'));
   });
   // No standalone ✕ — the game's own ← back button (postMessage below)
   // and clicking outside the sheet both close it.
@@ -2414,27 +2386,20 @@ function clearWeekProgress(el) {
   el.dataset.mode = '';
 }
 
-async function loadScoreboard(neighborhoodFilter = null, gameFilter = null, instant = false, includeGameLinks = true) {
+async function loadScoreboard(neighborhoodFilter = null, instant = false) {
   const listEl = document.getElementById('scoreboard-list');
   if (!listEl) return;
   const titleEl = document.getElementById('scoreboard-title');
   const countdownEl = document.getElementById('scoreboard-countdown');
-  // Game links sit above the scoreboard and never get rebuilt. On the
-  // page's own arrival they join the same top-to-bottom entrance cascade
-  // as the scoreboard rows below them -- but opening/closing a game
-  // overlay (see enterGameContext/exitGameContext) also calls this to
-  // narrow/widen the board, and there the links never actually left the
-  // screen, so includeGameLinks=false keeps them out of that cascade.
-  const gameLinks = includeGameLinks ? Array.from(document.querySelectorAll('.games-section .game-link')) : [];
+  // Game links sit above the scoreboard and never get rebuilt; they join
+  // the same top-to-bottom entrance cascade as the scoreboard rows below.
+  const gameLinks = Array.from(document.querySelectorAll('.games-section .game-link'));
   const setList = (html) => animateFeedSwap(listEl, 'right', () => { listEl.innerHTML = html; }, gameLinks, instant);
 
-  // Title + countdown swap: a filtered view is per-neighborhood or
-  // per-game (no weekly countdown shown for those narrowed views), while
-  // the unfiltered default is the full weekly leaderboard.
-  if (gameFilter) {
-    const gameName = (GAME_DISPLAY_NAMES[gameFilter] || gameFilter).toLocaleUpperCase('tr-TR');
-    if (titleEl) titleEl.textContent = `${gameName} — Skor Tahtası`;
-  } else if (neighborhoodFilter) {
+  // Title + countdown swap: a filtered view is per-neighborhood (no weekly
+  // countdown shown there), while the unfiltered default is the full
+  // weekly leaderboard.
+  if (neighborhoodFilter) {
     const nbName = neighborhoodNames[neighborhoodFilter] || neighborhoodFilter;
     if (titleEl) titleEl.textContent = I18N.formatNeighborhoodBest(nbName.toLocaleUpperCase('tr-TR'));
     clearWeekProgress(countdownEl);
@@ -2447,7 +2412,7 @@ async function loadScoreboard(neighborhoodFilter = null, gameFilter = null, inst
     const { data, error } = await sb
       .from('game_results')
       .select('user_id, neighborhood, date, won, attempts, created_at')
-      .eq('game', gameFilter || 'sozcel')
+      .eq('game', 'sozcel')
       .gte('attempts', 1);
     if (error) throw error;
     results = data;
@@ -2557,8 +2522,12 @@ async function loadScoreboard(neighborhoodFilter = null, gameFilter = null, inst
       );
     }
     const nbName = (neighborhoodNames[p.neighborhood] || p.neighborhood || '').toLocaleUpperCase('tr-TR');
-    const suffix = getAblativeSuffix(nbName).toLocaleUpperCase('tr-TR');
-    const playerLabel = nbName ? `${nbName}${suffix} ${escapeHtml(p.name)}` : escapeHtml(p.name);
+    let playerLabel = escapeHtml(p.name);
+    if (nbName) {
+      playerLabel = I18N.isEnglish()
+        ? `${escapeHtml(p.name)} FROM ${nbName}`
+        : `${nbName}${getAblativeSuffix(nbName).toLocaleUpperCase('tr-TR')} ${escapeHtml(p.name)}`;
+    }
     return (
       `<li class="scoreboard-item${rankClass} author-link" data-user-id="${p.uid}">` +
         `<span class="scoreboard-rank">${i + 1}.</span>` +
@@ -2620,7 +2589,7 @@ document.addEventListener('click', (e) => {
     // (which also replays the game buttons' own entrance animation even
     // though they never change).
     loadPosts(nbId, true);
-    loadScoreboard(nbId, null, true);
+    loadScoreboard(nbId, true);
     return;
   }
   // Snap back to Tüm İstanbul only when clicking empty space inside the
@@ -2639,7 +2608,7 @@ document.addEventListener('click', (e) => {
   selectedNeighborhood = homeNeighborhood;
   updateSubmitFormVisibility();
   loadPosts(null, true);
-  loadScoreboard(null, null, true);
+  loadScoreboard(null, true);
 });
 document.addEventListener('mouseover', (e) => {
   const nb = e.target.closest('.neighborhood');
@@ -2742,6 +2711,9 @@ function appendPosts(rows) {
       authorDisplay = (first || last)
         ? [first, last].filter(Boolean).join(' ')
         : nbName;
+    } else if (I18N.isEnglish()) {
+      // All Istanbul view — show "Cem from Bakırköy"
+      authorDisplay = first ? `${first} from ${nbName}` : nbName;
     } else {
       // All Istanbul view — show "Bakırköy'den Cem"
       const suffix = getAblativeSuffix(nbName);
