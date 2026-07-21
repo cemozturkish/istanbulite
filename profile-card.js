@@ -143,7 +143,9 @@
     return I18N.formatDate(d, { year: 'numeric', month: 'long', day: 'numeric' });
   }
 
-  // Read game scores from Supabase, aggregated per game.
+  // Read game scores from Supabase, aggregated per game. Currently unused —
+  // the Oyun Skorları cards were pulled from the Profil tab (kept for now
+  // in case they come back in some form) in favor of the weekly grid.
   async function getGameScores(sb, userId) {
     function currentStreakFor(winDates) {
       function seedForOffset(off) {
@@ -626,9 +628,6 @@
 
       <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
       <div id="po-weekgrid-mount"></div>
-
-      <div class="ist-pc-section-title">${esc(t('profile.gamescores') || 'Oyun Skorları')}</div>
-      <div id="po-scores-mount">${scoresHTML({})}</div>
     `;
   }
 
@@ -787,10 +786,6 @@
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
 
     if (tab === 'profil') {
-      getGameScores(sb, user.id).then(scores => {
-        const m = document.getElementById('po-scores-mount');
-        if (m) m.innerHTML = scoresHTML(scores);
-      });
       getWeekGameStatus(sb, user.id).then(status => {
         const m = document.getElementById('po-weekgrid-mount');
         if (m) m.innerHTML = weekGridHTML(status, I18N);
