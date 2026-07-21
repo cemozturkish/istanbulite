@@ -409,7 +409,7 @@
     el.innerHTML = `
       <div class="profile-overlay-backdrop" id="profile-overlay-backdrop"></div>
       <div class="profile-overlay-sheet" id="profile-overlay-sheet">
-        <button type="button" class="profile-overlay-close" id="profile-overlay-close" aria-label="Kapat" title="Kapat">✕</button>
+        <button type="button" class="profile-overlay-close" id="profile-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
         <div class="profile-overlay-tabs" id="profile-overlay-tabs"></div>
         <div class="profile-overlay-body" id="profile-overlay-body"></div>
       </div>
