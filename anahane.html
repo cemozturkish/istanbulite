@@ -585,6 +585,13 @@
       text-transform: uppercase;
       color: var(--ink-red);
       margin-bottom: 6px;
+      /* Series/category name always stays on one line -- truncates with
+         an ellipsis instead of wrapping onto a second line when the
+         timestamp on the other side of .meta-row squeezes its width. */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
     }
 
     .article h3 {
@@ -611,7 +618,17 @@
       color: var(--card-fg);
     }
 
-    .article.openable { cursor: pointer; }
+    .article.openable {
+      cursor: pointer;
+      /* Feed preview cards: kicker+timestamp stay pinned at the top via
+         .meta-row, and the headline anchors to the bottom of the card
+         whenever there's slack height to push into (e.g. cards
+         stretched to a shared height). No-op when the card is exactly
+         as tall as its content, which is the common case today. */
+      display: flex;
+      flex-direction: column;
+    }
+    .article.openable h3 { margin-top: auto; }
     /* Plain hover: just a lighter background + a small nudge inward
        toward the center — text/border stay put. */
     .article.openable:hover {
@@ -621,7 +638,10 @@
     .article .meta-row {
       display: flex;
       justify-content: space-between;
-      align-items: baseline;
+      /* flex-start (not baseline) keeps the kicker pinned to the
+         top-left and the timestamp pinned to the top-right regardless
+         of either one's line-height. */
+      align-items: flex-start;
       gap: 8px;
       margin-bottom: 4px;
     }
@@ -631,6 +651,10 @@
       text-transform: uppercase;
       color: var(--card-fg-muted);
       font-style: italic;
+      /* Stays on one line and never gets squeezed by the kicker --
+         the kicker truncates instead (see .kicker's text-overflow). */
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     /* Only ever rendered inside the detail sheet (see buildNewsDetailHtml)
        — the sidebar preview card doesn't include it, so no visibility
