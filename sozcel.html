@@ -17,6 +17,8 @@
   <script src="game-locks.js"></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
+  <link rel="stylesheet" href="profile-card.css">
+  <script src="profile-card.js" defer></script>
   <style>
     :root {
       /* Core ink & paper — warm cream newspaper palette */
@@ -1609,56 +1611,10 @@
       height: 17px;
       display: block;
     }
-    .profile-popup .pp-avatar {
-      width: 96px;
-      height: 96px;
-      border-radius: 50%;
-      background: var(--paper-card);
-      border: 1px solid var(--rule);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2.2rem;
-      font-weight: 600;
-      color: var(--accent);
-      margin: 0 auto 14px;
-      overflow: hidden;
-    }
-    .profile-popup .pp-avatar img { width: 100%; height: 100%; object-fit: cover; }
-    .profile-popup .pp-name {
-      text-align: center;
-      font-size: 1.1rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
-    }
-    .profile-popup .pp-meta {
-      text-align: center;
-      font-size: 0.72rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 16px;
-    }
-    .profile-popup .pp-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 0;
-      border-top: 1px solid var(--hairline);
-      font-size: 0.8rem;
-    }
-    .profile-popup .pp-row .pp-label {
-      color: var(--muted);
-      text-transform: uppercase;
-      font-size: 0.65rem;
-      letter-spacing: 1.5px;
-      align-self: center;
-    }
-    .profile-popup .pp-row .pp-value {
-      color: var(--ink);
-      font-weight: 500;
-      text-align: right;
-    }
+    /* Cover (avatar + badges) and the weekly game grid reuse the shared
+       .ist-pc-cover / .ist-pc-weekgrid markup from profile-card.css
+       (IstProfileCard.coverHTML / weekGridHTML) — no page-local styling
+       needed for those here. */
     .profile-popup .pp-since {
       text-align: center;
       font-size: 0.68rem;
@@ -1668,6 +1624,7 @@
       padding-top: 12px;
       border-top: 1px solid var(--hairline);
     }
+    .profile-popup .pp-since-kefil { margin-top: 4px; }
     .profile-popup .pp-loading,
     .profile-popup .pp-error {
       text-align: center;
@@ -5578,28 +5535,20 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
     return (typeof neighborhoodNames !== 'undefined' && neighborhoodNames[id]) || id;
   }
 
-  function istanbulTodayISO() {
-    const now = new Date();
-    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-    const y = ist.getFullYear();
-    const m = String(ist.getMonth() + 1).padStart(2, '0');
-    const d = String(ist.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+  function capitalizeName(s) {
+    if (!s) return '';
+    return s.trim().split(/\s+/).map(w => w ? w.charAt(0).toLocaleUpperCase('tr-TR') + w.slice(1).toLocaleLowerCase('tr-TR') : '').join(' ');
   }
 
   async function open(userId) {
     overlay.classList.add('open');
     body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
-    const today = istanbulTodayISO();
-    const [{ data, error }, { count: sozculCount }] = await Promise.all([
+    const [{ data, error }, weekStatus] = await Promise.all([
       sb.from('profiles')
-        .select('id, first_name, last_name, neighborhood, birth_place, avatar_url, joined_at, referred_by')
+        .select('id, first_name, last_name, neighborhood, avatar_url, cover_badges, joined_at, referred_by')
         .eq('id', userId)
         .maybeSingle(),
-      sb.from('sozcel_sozcul_assignments')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .lte('game_date', today),
+      IstProfileCard.getWeekGameStatus(sb, userId),
     ]);
     if (error || !data) {
       body.innerHTML = '<div class="pp-error">Profil yüklenemedi.</div>';
@@ -5613,23 +5562,19 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
         .eq('id', data.referred_by)
         .maybeSingle();
       if (kp) {
-        kefilName = (`${kp.first_name || ''} ${kp.last_name || ''}`).trim() || 'İsimsiz Üye';
+        kefilName = capitalizeName(`${kp.first_name || ''} ${kp.last_name || ''}`.trim()) || 'İsimsiz Üye';
         kefilId = kp.id;
       }
     }
-    const fullName = `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'İsimsiz Üye';
-    const initial = (fullName.charAt(0) || '?').toUpperCase();
-    const avatar = data.avatar_url ? `<img src="${Palette.avatarSrc(data.avatar_url)}" alt="">` : initial;
-    const birth = nbLabel(data.birth_place);
-    const upperName = fullName.toLocaleUpperCase('tr-TR');
+    const fullName = capitalizeName(`${data.first_name || ''} ${data.last_name || ''}`.trim()) || 'İsimsiz Üye';
     body.innerHTML = `
-      <div class="pp-avatar">${avatar}</div>
-      <div class="pp-name">${upperName}</div>
-      <div class="pp-meta">${nbLabel(data.neighborhood)}</div>
-      <div class="pp-row"><span class="pp-label">Doğum Yeri</span><span class="pp-value">${birth}</span></div>
-      <div class="pp-row"><span class="pp-label">Sözcül Olduğu</span><span class="pp-value">${sozculCount ?? 0} kez</span></div>
-      ${kefilName ? `<div class="pp-row"><span class="pp-label">KEFİL</span><span class="pp-value"><span class="author-link" data-user-id="${kefilId}">${kefilName}</span></span></div>` : ''}
-      <div class="pp-since">${I18N.formatMemberSince(data.joined_at)}</div>
+      ${IstProfileCard.coverHTML({ profile: data, avatarUrl: data.avatar_url, displayName: fullName, metaText: nbLabel(data.neighborhood) })}
+      <div class="ist-pc-section-title">${I18N.t('profile.thisweek')}</div>
+      ${IstProfileCard.weekGridHTML(weekStatus, I18N)}
+      <div class="pp-since">
+        <div>${I18N.formatMemberSince(data.joined_at)}</div>
+        ${kefilName ? `<div class="pp-since-kefil">${I18N.t('profile.kefil')}: <span class="author-link" data-user-id="${kefilId}">${kefilName}</span></div>` : ''}
+      </div>
     `;
   }
 
