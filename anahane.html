@@ -936,6 +936,17 @@
       animation: flash-card 1.2s ease-in-out infinite;
     }
 
+    /* Hovering a neighborhood-specific news/event card highlights that
+       district on the map (see attachCardMapHover). Listed last among the
+       .neighborhood rules so it reads clearly even over .home/.active/
+       .flashing-news. */
+    .neighborhood.card-hover {
+      animation: none;
+      fill: rgba(var(--ink-rgb), 0.32);
+      stroke: var(--accent);
+      stroke-width: 3;
+    }
+
     /* ── MOBILE RESPONSIVE ──
        Stacked flow instead of desktop's floating-over-fullscreen-map
        layout: the map sits at the very top like a hero banner with the
@@ -2571,6 +2582,20 @@ async function submitPollVote(poll, option, container) {
   loadAndRenderPoll(poll);
 }
 
+// Hovering a news/event card highlights its neighborhood on the map (no-op
+// for city-wide rows with no neighborhood). Shared by both feeds.
+function attachCardMapHover(el, nbId) {
+  if (!nbId) return;
+  el.addEventListener('mouseenter', () => {
+    const nbEl = document.getElementById(nbId);
+    if (nbEl) nbEl.classList.add('card-hover');
+  });
+  el.addEventListener('mouseleave', () => {
+    const nbEl = document.getElementById(nbId);
+    if (nbEl) nbEl.classList.remove('card-hover');
+  });
+}
+
 function renderBreakingNewsFeedNow(feed, rows) {
   if (!rows.length) {
     feed.innerHTML = '';
@@ -2592,13 +2617,14 @@ function renderBreakingNewsFeedNow(feed, rows) {
   }).join('');
 
   feed.querySelectorAll('.article.openable').forEach(el => {
+    const n = rowsById.get(el.dataset.newsId);
     el.addEventListener('click', () => {
-      const n = rowsById.get(el.dataset.newsId);
       if (n) {
         openDetail(buildNewsDetailHtml(n));
         (n.breaking_news_polls || []).forEach(p => loadAndRenderPoll(p));
       }
     });
+    if (n) attachCardMapHover(el, n.neighborhood);
   });
 
   applyFlashingNewsCard();
@@ -2854,10 +2880,11 @@ function renderEventsNow(panel, rows) {
   }).join('');
 
   panel.querySelectorAll('.event-item.openable').forEach(el => {
+    const ev = rowsById.get(el.dataset.eventId);
     el.addEventListener('click', () => {
-      const ev = rowsById.get(el.dataset.eventId);
       if (ev) openDetail(buildEventDetailHtml(ev));
     });
+    if (ev) attachCardMapHover(el, ev.neighborhood);
   });
 }
 
