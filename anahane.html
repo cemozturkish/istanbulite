@@ -724,11 +724,36 @@
       padding-top: 10px;
       border-top: 1px dashed var(--card-border);
     }
-    .article .timeline-item {
-      padding: 6px 0;
-      border-bottom: 1px dotted var(--card-border-soft);
+    /* Vertical spine with a horizontal tick branching off to each dated
+       entry (update or poll), newest first. */
+    .article .timeline-track {
+      position: relative;
+      padding-left: 18px;
     }
-    .article .timeline-item:last-child { border-bottom: none; }
+    .article .timeline-track::before {
+      content: '';
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      left: 4px;
+      width: 2px;
+      background: var(--ink-red);
+    }
+    .article .timeline-item {
+      position: relative;
+      padding: 8px 0;
+    }
+    .article .timeline-item:first-child { padding-top: 0; }
+    .article .timeline-item:last-child { padding-bottom: 0; }
+    .article .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -14px;
+      top: 15px;
+      width: 12px;
+      height: 2px;
+      background: var(--ink-red);
+    }
     .article .timeline-item .ago {
       display: block;
       margin-bottom: 2px;
@@ -741,6 +766,11 @@
     .article .timeline-item p {
       margin-top: 2px;
       font-size: 0.78rem;
+    }
+    .article .timeline-item .poll-block {
+      margin-top: 6px;
+      padding-top: 0;
+      border-top: none;
     }
 
     /* Poll block — only ever rendered inside the detail sheet, filled
@@ -2358,24 +2388,32 @@ function buildNewsDetailHtml(n) {
         }</div>`;
       }).join('')
     : '<div class="sources-empty">Henüz kaynak eklenmedi.</div>';
-  const updates = (n.breaking_news_updates || [])
-    .slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  const timelineHtml = updates.length ? `
+  // Updates and polls share one chronological spine (newest first) — a
+  // poll slots in at the point in the story's history it was posted,
+  // rather than living in a separate block.
+  const timelineEvents = (n.breaking_news_updates || []).map(u => ({ type: 'update', created_at: u.created_at, data: u }))
+    .concat((n.breaking_news_polls || []).map(p => ({ type: 'poll', created_at: p.created_at, data: p })))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const timelineHtml = timelineEvents.length ? `
     <div class="timeline">
       <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Zaman Akışı</div>
-      ${updates.map(u => `
-        <div class="timeline-item">
-          <div class="ago" data-iso="${escapeText(u.created_at)}">${escapeText(formatAgoTR(u.created_at))}</div>
-          <strong>${escapeText(u.title)}</strong>
-          ${u.body ? `<p>${escapeText(u.body)}</p>` : ''}
-        </div>
-      `).join('')}
+      <div class="timeline-track">
+        ${timelineEvents.map(ev => ev.type === 'poll' ? `
+          <div class="timeline-item timeline-item-poll">
+            <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatAgoTR(ev.created_at))}</div>
+            <div class="poll-block" id="poll-${escapeText(ev.data.id)}"></div>
+          </div>
+        ` : `
+          <div class="timeline-item">
+            <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatAgoTR(ev.created_at))}</div>
+            <strong>${escapeText(ev.data.title)}</strong>
+            ${ev.data.body ? `<p>${escapeText(ev.data.body)}</p>` : ''}
+          </div>
+        `).join('')}
+      </div>
     </div>
   ` : '';
   const lastTouch = n.updated_at || n.created_at;
-  const polls = (n.breaking_news_polls || [])
-    .slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  const pollsHtml = polls.map(p => `<div class="poll-block" id="poll-${escapeText(p.id)}"></div>`).join('');
   return `
     <div class="article">
       <div class="meta-row">
@@ -2384,7 +2422,6 @@ function buildNewsDetailHtml(n) {
       </div>
       <h3>${escapeText(n.title)}</h3>
       ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
-      ${pollsHtml}
       ${timelineHtml}
       <div class="sources">
         <button type="button" class="sources-toggle" aria-expanded="false">
