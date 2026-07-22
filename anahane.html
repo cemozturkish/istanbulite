@@ -725,38 +725,45 @@
       border-top: 1px dashed var(--card-border);
     }
     /* Vertical spine with a horizontal tick branching off to each dated
-       entry (update or poll), newest first. */
+       entry (update or poll), newest first. The tick sits in a flex row
+       with the .ago date so it's centered on that line exactly, instead
+       of an eyeballed pixel offset against the item as a whole. */
     .article .timeline-track {
       position: relative;
-      padding-left: 18px;
     }
     .article .timeline-track::before {
       content: '';
       position: absolute;
-      top: 4px;
-      bottom: 4px;
-      left: 4px;
+      top: 6px;
+      bottom: 6px;
+      left: 0;
       width: 2px;
       background: var(--ink-red);
     }
     .article .timeline-item {
-      position: relative;
-      padding: 8px 0;
+      padding: 10px 0;
     }
     .article .timeline-item:first-child { padding-top: 0; }
     .article .timeline-item:last-child { padding-bottom: 0; }
-    .article .timeline-item::before {
-      content: '';
-      position: absolute;
-      left: -14px;
-      top: 15px;
-      width: 12px;
+    .article .timeline-item-date {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 4px;
+    }
+    .article .timeline-tick {
+      flex: 0 0 12px;
       height: 2px;
       background: var(--ink-red);
     }
     .article .timeline-item .ago {
       display: block;
-      margin-bottom: 2px;
+    }
+    .article .timeline-item strong,
+    .article .timeline-item p,
+    .article .timeline-item .poll-block {
+      display: block;
+      margin-left: 26px;
     }
     .article .timeline-item strong {
       font-family: 'Source Serif 4', Georgia, serif;
@@ -2315,6 +2322,16 @@ function formatAgoTR(iso) {
   return en ? `${days}d` : `${days} gün`;
 }
 
+// Spelled-out "X sa önce" / "Xh ago" form used in the timeline, where the
+// date stands alone as a column of its own (formatAgoTR's terse "X sa" is
+// tuned for the cramped meta-row next to a kicker instead).
+function formatAgoTRLong(iso) {
+  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  const en = I18N.isEnglish();
+  if (secs < 60) return en ? 'now' : 'şimdi';
+  return `${formatAgoTR(iso)} ${en ? 'ago' : 'önce'}`;
+}
+
 function safeUrl(u) {
   const s = String(u || '').trim();
   if (/^https?:\/\//i.test(s)) return s;
@@ -2400,12 +2417,18 @@ function buildNewsDetailHtml(n) {
       <div class="timeline-track">
         ${timelineEvents.map(ev => ev.type === 'poll' ? `
           <div class="timeline-item timeline-item-poll">
-            <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatAgoTR(ev.created_at))}</div>
+            <div class="timeline-item-date">
+              <span class="timeline-tick"></span>
+              <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatAgoTRLong(ev.created_at))}</div>
+            </div>
             <div class="poll-block" id="poll-${escapeText(ev.data.id)}"></div>
           </div>
         ` : `
           <div class="timeline-item">
-            <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatAgoTR(ev.created_at))}</div>
+            <div class="timeline-item-date">
+              <span class="timeline-tick"></span>
+              <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatAgoTRLong(ev.created_at))}</div>
+            </div>
             <strong>${escapeText(ev.data.title)}</strong>
             ${ev.data.body ? `<p>${escapeText(ev.data.body)}</p>` : ''}
           </div>
