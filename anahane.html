@@ -1454,6 +1454,18 @@
       display: flex;
       align-items: center;
     }
+    /* Preview-card attendee stack: only ever shown on desktop, under the
+       title, in the space the compact card otherwise leaves empty. The
+       detail overlay's .ev-attendees (inside .ev-rsvp-row) is unaffected
+       since it isn't matched by this class. */
+    .ev-attendees-preview {
+      display: none;
+      margin-top: 10px;
+    }
+    .ev-attendees-preview:empty { display: none !important; }
+    @media (min-width: 769px) {
+      .ev-attendees-preview { display: flex; }
+    }
     .ev-attendee-avatar,
     .poll-voter-avatar {
       width: 26px;
@@ -2807,6 +2819,10 @@ async function toggleRsvp(eventId, btn) {
   if (countEl) countEl.textContent = `${rsvpCounts[eventId] || 0} ${I18N.t('home.events.rsvp.count')}`;
   const avatarsEl = row?.querySelector('.ev-attendees');
   if (avatarsEl) avatarsEl.innerHTML = buildAttendeeAvatarsHtml(eventId);
+  // Also patch the (separate) preview card in the events list behind the
+  // overlay, so its attendee stack matches without waiting for a reload.
+  const previewEl = document.querySelector(`.event-item[data-event-id="${CSS.escape(eventId)}"] .ev-attendees-preview`);
+  if (previewEl) previewEl.innerHTML = buildAttendeeAvatarsHtml(eventId);
   btn.disabled = false;
 }
 
@@ -2874,6 +2890,7 @@ function renderEventsNow(panel, rows) {
         <div class="ev-body">
           <div class="ev-kicker">${escapeText(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
           <div class="ev-title">${escapeText(ev.title)}</div>
+          <span class="ev-attendees ev-attendees-preview">${buildAttendeeAvatarsHtml(ev.id)}</span>
         </div>
       </div>
     `;
