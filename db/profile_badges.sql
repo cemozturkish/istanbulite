@@ -13,25 +13,39 @@
 -- migrated in place, defaulting each existing badge to a center position.
 
 do $$
+declare
+  col_type text;
 begin
-  if not exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'profiles' and column_name = 'cover_badges'
-  ) then
+  select data_type into col_type
+  from information_schema.columns
+  where table_schema = 'public' and table_name = 'profiles' and column_name = 'cover_badges';
+
+  if col_type is null then
+    -- Fresh install: column doesn't exist yet.
     alter table public.profiles add column cover_badges jsonb not null default '[]'::jsonb;
-  elsif (
-    select data_type from information_schema.columns
-    where table_schema = 'public' and table_name = 'profiles' and column_name = 'cover_badges'
-  ) = 'ARRAY' then
+
+  elsif col_type = 'ARRAY' then
+    -- Column exists as the earlier plain text[] of ids (pre-drag-and-drop).
+    -- `alter column ... type jsonb using (...)` can't contain a correlated
+    -- subquery — Postgres rejects it with "cannot use subquery in
+    -- transform expression" even though it's just unnesting and
+    -- re-aggregating the same column — so convert via a side column +
+    -- UPDATE instead, which has no such restriction.
+    alter table public.profiles add column if not exists cover_badges_jsonb jsonb;
+
+    update public.profiles set cover_badges_jsonb = (
+      select coalesce(
+        jsonb_agg(jsonb_build_object('id', elem, 'x', 50, 'y', 50)),
+        '[]'::jsonb
+      )
+      from unnest(cover_badges) as elem
+    );
+
+    alter table public.profiles drop column cover_badges;
+    alter table public.profiles rename column cover_badges_jsonb to cover_badges;
     alter table public.profiles
-      alter column cover_badges type jsonb
-      using (
-        coalesce(
-          (select jsonb_agg(jsonb_build_object('id', elem, 'x', 50, 'y', 50)) from unnest(cover_badges) as elem),
-          '[]'::jsonb
-        )
-      );
-    alter table public.profiles alter column cover_badges set default '[]'::jsonb;
+      alter column cover_badges set default '[]'::jsonb,
+      alter column cover_badges set not null;
   end if;
 end $$;
 
