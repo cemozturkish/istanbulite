@@ -24,6 +24,7 @@
 
   function apply() {
     document.documentElement.setAttribute('data-palette', current);
+    syncThemeColor();
   }
 
   function setPalette(v) {
@@ -32,6 +33,28 @@
     writeCached(v);
     apply();
   }
+
+  // Mirrors --page-bg (frames.css, varies by palette + OS light/dark
+  // scheme) onto <meta name="theme-color">, so the iOS/Android status
+  // bar and Safari's surrounding chrome match the page instead of
+  // defaulting to black in dark mode. frames.css loads after this
+  // script, so the very first call (before its rules exist) is a
+  // no-op -- window's load event below re-fires it once styles are in.
+  function syncThemeColor() {
+    try {
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (!meta) return;
+      const bg = getComputedStyle(document.documentElement)
+        .getPropertyValue('--page-bg').trim();
+      if (bg) meta.setAttribute('content', bg);
+    } catch (e) { /* ignore */ }
+  }
+
+  try {
+    window.addEventListener('load', syncThemeColor);
+    window.matchMedia('(prefers-color-scheme: dark)')
+      .addEventListener('change', syncThemeColor);
+  } catch (e) { /* ignore */ }
 
   // Avatar preset images ship in two color variants (e.g. avatar-long.png /
   // avatar-long-earth.png). The stored avatar_url is always the mono
