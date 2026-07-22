@@ -66,6 +66,30 @@
     { id: 'kizkulesi', src: 'assets/kizkulesisticker.png',    label: 'Kız Kulesi',    district: 'uskudar' },
   ];
 
+  // Where a newly-placed badge lands before the user drags it anywhere —
+  // cycles by how many badges are already placed. profiles.cover_badges is
+  // a jsonb array of {id, x, y} (x/y are 0-100 percentages of the cover's
+  // own width/height, so a saved spot scales sensibly between the wider
+  // overlay sheet and the narrower read-only popup).
+  const DEFAULT_BADGE_SLOTS = [
+    { x: 20, y: 25 }, { x: 80, y: 25 }, { x: 20, y: 75 }, { x: 80, y: 75 },
+  ];
+
+  // profiles.cover_badges briefly shipped as a plain text[] of ids (before
+  // drag-and-drop positioning existed) — db/profile_badges.sql migrates any
+  // existing rows, but this tolerates a stray un-migrated string entry too.
+  function normalizeBadgeEntry(entry, idx) {
+    if (typeof entry === 'string') {
+      const slot = DEFAULT_BADGE_SLOTS[idx % DEFAULT_BADGE_SLOTS.length];
+      return { id: entry, x: slot.x, y: slot.y };
+    }
+    return entry;
+  }
+
+  function normalizedCoverBadges(profile) {
+    return (profile?.cover_badges || []).map(normalizeBadgeEntry);
+  }
+
   // Colors are a viewer-side preference, not a property of the profile
   // owner: resolve avatar_url to the mono or brown file depending on the
   // *current visitor's* palette_pref (see palette.js avatarSrc).
@@ -673,22 +697,76 @@
 
   // The white "pano" cover — the avatar sits on it like a Twitter cover
   // photo, and any rozetler (badges) picked in the Rozetler tab (see
-  // rozetlerTabHTML/toggleCoverBadge) are pinned to its corners. Shared
-  // between the self-editing Profil tab (profilTabHTML below) and
-  // kutuphane.html's read-only "someone else's profile" popup (exposed as
-  // IstProfileCard.coverHTML) so both surfaces render badges identically.
+  // rozetlerTabHTML/toggleCoverBadge) are dragged freely around it (see
+  // wireCoverDragging). Shared between the self-editing Profil tab
+  // (profilTabHTML below, editable: true) and kutuphane.html's read-only
+  // "someone else's profile" popup (exposed as IstProfileCard.coverHTML,
+  // editable omitted) so both surfaces render badges identically — the
+  // popup just doesn't wire up dragging on top of it.
   function coverHTML(opts) {
-    const { profile, avatarUrl, displayName, metaText } = opts;
-    const placedIds = profile?.cover_badges || [];
-    const placedBadges = BADGES.filter(b => placedIds.includes(b.id));
+    const { profile, avatarUrl, displayName, metaText, editable } = opts;
+    const placed = normalizedCoverBadges(profile);
+    const badgesHTML = placed.map(p => {
+      const badge = BADGES.find(b => b.id === p.id);
+      if (!badge) return '';
+      return `<img class="ist-pc-cover-badge" data-id="${badge.id}" draggable="false" style="left:${p.x}%; top:${p.y}%;" src="${badge.src}" alt="${esc(badge.label)}" title="${esc(badge.label)}">`;
+    }).join('');
     return `
-      <div class="ist-pc-cover">
-        ${placedBadges.map((b, i) => `<img class="ist-pc-cover-badge ist-pc-cover-badge-${i % 4}" src="${b.src}" alt="${esc(b.label)}" title="${esc(b.label)}">`).join('')}
+      <div class="ist-pc-cover${editable ? ' ist-pc-cover-editable' : ''}"${editable ? ' id="po-cover"' : ''}>
+        ${badgesHTML}
         <div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, displayName)}</div>
         <div class="ist-pc-cover-name">${esc(displayName)}</div>
         <div class="ist-pc-cover-meta">${esc(metaText)}</div>
       </div>
     `;
+  }
+
+  // Drag-and-drop repositioning of cover badges (Profil tab only — the
+  // read-only popup never passes editable: true to coverHTML, so it has no
+  // .ist-pc-cover-badge with pointer-events enabled to drag). Position is
+  // tracked as a percentage of the cover's own box so it scales sensibly
+  // if the same profile is later viewed in a differently-sized container.
+  function wireCoverDragging(state) {
+    const cover = document.getElementById('po-cover');
+    if (!cover) return;
+    let dragEl = null, startClientX = 0, startClientY = 0, startLeft = 0, startTop = 0;
+
+    function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+
+    function onPointerDown(e) {
+      const badge = e.target.closest('.ist-pc-cover-badge');
+      if (!badge) return;
+      e.preventDefault();
+      dragEl = badge;
+      dragEl.setPointerCapture(e.pointerId);
+      dragEl.classList.add('dragging');
+      startClientX = e.clientX;
+      startClientY = e.clientY;
+      startLeft = parseFloat(dragEl.style.left) || 50;
+      startTop = parseFloat(dragEl.style.top) || 50;
+    }
+
+    function onPointerMove(e) {
+      if (!dragEl) return;
+      const rect = cover.getBoundingClientRect();
+      const x = clamp(startLeft + ((e.clientX - startClientX) / rect.width) * 100, 10, 90);
+      const y = clamp(startTop + ((e.clientY - startClientY) / rect.height) * 100, 15, 85);
+      dragEl.style.left = x + '%';
+      dragEl.style.top = y + '%';
+    }
+
+    async function onPointerUp(e) {
+      if (!dragEl) return;
+      const badge = dragEl;
+      dragEl = null;
+      badge.classList.remove('dragging');
+      await saveCoverBadgePosition(badge.dataset.id, parseFloat(badge.style.left), parseFloat(badge.style.top), state);
+    }
+
+    cover.addEventListener('pointerdown', onPointerDown);
+    cover.addEventListener('pointermove', onPointerMove);
+    cover.addEventListener('pointerup', onPointerUp);
+    cover.addEventListener('pointercancel', onPointerUp);
   }
 
   // Profil tab: the cover, plus the weekly game grid and the lifetime score
@@ -704,7 +782,7 @@
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
 
     return `
-      ${coverHTML({ profile, avatarUrl, displayName, metaText: yasadigiDisplay })}
+      ${coverHTML({ profile, avatarUrl, displayName, metaText: yasadigiDisplay, editable: true })}
 
       <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
       <div id="po-weekgrid-mount"></div>
@@ -854,7 +932,7 @@
     const { I18N, profile } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const birthDistrict = profile?.birth_place || '';
-    const placedIds = profile?.cover_badges || [];
+    const placedIds = normalizedCoverBadges(profile).map(e => e.id);
     return `
       <div class="ist-pc-section-title">${esc(t('profile.tab.rozetler'))}</div>
       <div class="ist-pc-badge-hint">${esc(t('profile.rozetler.hint'))}</div>
@@ -868,6 +946,7 @@
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
 
     if (tab === 'profil') {
+      wireCoverDragging(state);
       getWeekGameStatus(sb, user.id).then(status => {
         const m = document.getElementById('po-weekgrid-mount');
         if (m) m.innerHTML = weekGridHTML(status, I18N);
@@ -989,8 +1068,15 @@
     const birthDistrict = profile?.birth_place || '';
     if (badge.district !== birthDistrict) return;
 
-    const current = profile?.cover_badges || [];
-    const next = current.includes(id) ? current.filter(x => x !== id) : [...current, id];
+    const current = normalizedCoverBadges(profile);
+    const has = current.some(e => e.id === id);
+    let next;
+    if (has) {
+      next = current.filter(e => e.id !== id);
+    } else {
+      const slot = DEFAULT_BADGE_SLOTS[current.length % DEFAULT_BADGE_SLOTS.length];
+      next = [...current, { id, x: slot.x, y: slot.y }];
+    }
 
     const { data, error } = await sb.from('profiles').update({ cover_badges: next }).eq('id', user.id).select('id');
     if (error) { showBadgeMsg('Rozet kaydedilemedi: ' + error.message); return; }
@@ -998,6 +1084,17 @@
 
     if (profile) profile.cover_badges = next;
     renderOverlayBody();
+  }
+
+  // Persists a badge's dragged position. Best-effort: the drag already
+  // reflects visually regardless of whether the save round-trips, since
+  // reverting mid-drag would feel worse than a rare silent failure here.
+  async function saveCoverBadgePosition(id, x, y, state) {
+    const { sb, user, profile } = state;
+    const next = normalizedCoverBadges(profile).map(e => (e.id === id ? { id, x, y } : e));
+    const { error } = await sb.from('profiles').update({ cover_badges: next }).eq('id', user.id);
+    if (error) return;
+    if (profile) profile.cover_badges = next;
   }
 
   // ══════════════════════════════════════════════════════════════
