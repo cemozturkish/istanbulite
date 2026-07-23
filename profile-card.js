@@ -207,21 +207,6 @@
     }[c]));
   }
 
-  function formatLastSeen(dateStr, I18N) {
-    if (!dateStr) return '—';
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diffMins = Math.floor((now - d) / 60000);
-    const en = I18N && I18N.isEnglish && I18N.isEnglish();
-    if (diffMins < 1) return en ? 'Online now' : 'Şimdi çevrimiçi';
-    if (diffMins < 60) return en ? `${diffMins}m ago` : `${diffMins} dk önce`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return en ? `${diffHours}h ago` : `${diffHours} saat önce`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return en ? `${diffDays}d ago` : `${diffDays} gün önce`;
-    return I18N.formatDate(d, { year: 'numeric', month: 'long', day: 'numeric' });
-  }
-
   // Read game scores from Supabase, aggregated per game. Currently unused —
   // the Oyun Skorları cards were pulled from the Profil tab (kept for now
   // in case they come back in some form) in favor of the weekly grid.
@@ -725,17 +710,19 @@
   // editable omitted) so both surfaces render badges identically — the
   // popup just doesn't wire up dragging or avatar-picking on top of it.
   //
-  // When editable AND customizing, the avatar itself becomes the shared
-  // preview for four independent rows of prev/next arrows underneath it —
-  // hair (see wireHairCarousel), hat (see wireHatCarousel), accessory (see
-  // wireAccessoryCarousel), and shirt (see wireShirtCarousel) — so any
-  // combination of the four can be worn together. When editable but not
+  // When editable AND customizing, four uniform rows of prev/next arrows
+  // appear below the (now plain, unflanked) avatar — hat, hair, accessory,
+  // shirt, top to bottom (see wireHatCarousel/wireHairCarousel/
+  // wireAccessoryCarousel/wireShirtCarousel) — all the same size, so no
+  // category reads as more "primary" than another. When editable but not
   // customizing, it's just a plain read-only avatar — same as the
   // non-editable popup — until Kişiselleştir turns the arrows on (see
-  // settingsPageHTML). `sozculCount` is only needed in the customizing
-  // case, to know whether the locked Sözcü hat should show unlocked (the
-  // accessory row's lock is unconditional — see AVATAR_ACCESSORY_OPTIONS —
-  // so it doesn't need it).
+  // settingsPageHTML). The cover box itself (.ist-pc-cover) has a fixed
+  // height in CSS regardless of which of these two renders, so the pano
+  // stickers sit on never resizes under them. `sozculCount` is only needed
+  // in the customizing case, to know whether the locked Sözcü hat should
+  // show unlocked (the accessory row's lock is unconditional — see
+  // AVATAR_ACCESSORY_OPTIONS — so it doesn't need it).
   function coverHTML(opts) {
     const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText, editable, customizing, sozculCount } = opts;
     const placed = normalizedCoverBadges(profile);
@@ -752,29 +739,30 @@
       const shirtOpt = AVATAR_SHIRT_OPTIONS[shirtOptionIndex(avatarShirt)];
       const title = `${hairOpt.label} · ${hatOpt.label} · ${accessoryOpt.label} · ${shirtOpt.label}`;
       avatarBlockHTML = `
-        <div class="ist-pc-cover-avatar-row">
-          <button type="button" class="ist-pc-cover-avatar-arrow" id="po-hair-prev" aria-label="Önceki saç">${ARROW_ICON_LEFT}</button>
-          <div class="ist-pc-cover-avatar" id="po-avatar-preview" title="${esc(title)}">${avatarPreviewHTML(avatarHair, avatarHat, avatarAccessory, avatarShirt, false)}</div>
-          <button type="button" class="ist-pc-cover-avatar-arrow" id="po-hair-next" aria-label="Sonraki saç">${ARROW_ICON_RIGHT}</button>
+        <div class="ist-pc-cover-avatar" id="po-avatar-preview" title="${esc(title)}">${avatarPreviewHTML(avatarHair, avatarHat, avatarAccessory, avatarShirt, false)}</div>
+        <div class="ist-pc-cover-pick-row">
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-prev" aria-label="Önceki şapka">${ARROW_ICON_LEFT}</button>
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-next" aria-label="Sonraki şapka">${ARROW_ICON_RIGHT}</button>
         </div>
-        <div class="ist-pc-cover-hat-row">
-          <button type="button" class="ist-pc-cover-hat-arrow" id="po-hat-prev" aria-label="Önceki şapka">${ARROW_ICON_LEFT}</button>
-          <button type="button" class="ist-pc-cover-hat-arrow" id="po-hat-next" aria-label="Sonraki şapka">${ARROW_ICON_RIGHT}</button>
+        <div class="ist-pc-cover-pick-row">
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-prev" aria-label="Önceki saç">${ARROW_ICON_LEFT}</button>
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-next" aria-label="Sonraki saç">${ARROW_ICON_RIGHT}</button>
         </div>
-        <div class="ist-pc-cover-accessory-row">
-          <button type="button" class="ist-pc-cover-accessory-arrow" id="po-accessory-prev" aria-label="Önceki aksesuar">${ARROW_ICON_LEFT}</button>
-          <button type="button" class="ist-pc-cover-accessory-arrow" id="po-accessory-next" aria-label="Sonraki aksesuar">${ARROW_ICON_RIGHT}</button>
+        <div class="ist-pc-cover-pick-row">
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-prev" aria-label="Önceki aksesuar">${ARROW_ICON_LEFT}</button>
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-next" aria-label="Sonraki aksesuar">${ARROW_ICON_RIGHT}</button>
         </div>
-        <div class="ist-pc-cover-shirt-row">
-          <button type="button" class="ist-pc-cover-shirt-arrow" id="po-shirt-prev" aria-label="Önceki tişört">${ARROW_ICON_LEFT}</button>
-          <button type="button" class="ist-pc-cover-shirt-arrow" id="po-shirt-next" aria-label="Sonraki tişört">${ARROW_ICON_RIGHT}</button>
+        <div class="ist-pc-cover-pick-row">
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-prev" aria-label="Önceki tişört">${ARROW_ICON_LEFT}</button>
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-next" aria-label="Sonraki tişört">${ARROW_ICON_RIGHT}</button>
         </div>
       `;
     } else {
       avatarBlockHTML = `<div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>`;
     }
+    const customizingClass = (editable && customizing) ? ' ist-pc-cover-customizing' : '';
     return `
-      <div class="ist-pc-cover${editable ? ' ist-pc-cover-editable' : ''}"${editable ? ' id="po-cover"' : ''}>
+      <div class="ist-pc-cover${editable ? ' ist-pc-cover-editable' : ''}${customizingClass}"${editable ? ' id="po-cover"' : ''}>
         ${badgesHTML}
         ${avatarBlockHTML}
         <div class="ist-pc-cover-name">${esc(displayName)}</div>
@@ -857,7 +845,6 @@
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
     const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
     const joinedDate = I18N.formatDate(user.created_at, { year: 'numeric', month: 'long', day: 'numeric' });
-    const lastSeenText = formatLastSeen(user.last_sign_in_at, I18N);
     const kefilLabel = kefilOfUser
       ? esc(capitalizeName(`${kefilOfUser.first_name||''} ${kefilOfUser.last_name||''}`.trim()) || t('profile.unnamed'))
       : '';
@@ -874,7 +861,6 @@
           <div id="po-weekgrid-mount"></div>
 
           <div class="ist-pc-section-title">${esc(t('profile.tab.rozetler'))}</div>
-          <div class="ist-pc-badge-hint">${esc(t('profile.rozetler.hint'))}</div>
           <div class="ist-pc-badge-grid" id="po-badge-grid">${buildBadgePicker(BADGES, placedBadgeIds, birthDistrict)}</div>
           <div class="ist-pc-badge-msg" id="po-badge-msg" role="status" aria-live="polite"></div>
         </div>
@@ -897,10 +883,6 @@
           <div class="ist-pc-info-row">
             <div class="ist-pc-info-label">${esc(t('profile.membership'))}</div>
             <div class="ist-pc-info-value">${esc(joinedDate)}</div>
-          </div>
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.lastseen'))}</div>
-            <div class="ist-pc-info-value">${esc(lastSeenText)}</div>
           </div>
           ${kefilOfUser ? `
           <div class="ist-pc-info-row">
@@ -982,7 +964,9 @@
     const { sb, I18N, user } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
 
-    wireCoverDragging(state);
+    if (state.customizing) {
+      wireCoverDragging(state);
+    }
     wireHairCarousel(state);
     wireHatCarousel(state);
     wireAccessoryCarousel(state);
@@ -991,9 +975,11 @@
       const m = document.getElementById('po-weekgrid-mount');
       if (m) m.innerHTML = weekGridHTML(status, I18N);
     });
-    document.querySelectorAll('#po-badge-grid .ist-pc-badge-option').forEach(btn => {
-      btn.addEventListener('click', () => toggleCoverBadge(btn.dataset.id, state));
-    });
+    if (state.customizing) {
+      document.querySelectorAll('#po-badge-grid .ist-pc-badge-option').forEach(btn => {
+        btn.addEventListener('click', () => toggleCoverBadge(btn.dataset.id, state));
+      });
+    }
 
     document.getElementById('po-save').addEventListener('click', () => {
       if (state.customizing) {
