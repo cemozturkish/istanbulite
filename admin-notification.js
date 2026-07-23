@@ -198,7 +198,7 @@
     // TEMP: dog art isn't uploaded yet — use the cat PNG for dog mascots too
     // so the popup doesn't show a broken image. Restore the dog branch once
     // assets/mascot-dog-left.png exists.
-    const src = 'assets/mascot-cat-left.png';
+    const src = 'assets/mascot/mascot-cat-left.png';
     const escaped = String(text).replace(/[&<>"']/g,
       c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     root.innerHTML = `

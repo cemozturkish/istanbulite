@@ -1,8 +1,8 @@
 -- Layered avatar: profiles.avatar_url is now only ever the locked Sözcü
 -- special (a single full-image override, unchanged) or null. Everyone else's
--- avatar is the bald base (assets/avatar-base.png) with an optional
+-- avatar is the bald base (assets/avatar/avatar-base.png) with an optional
 -- transparent hair overlay picked here — 'short'/'long' match
--- assets/avatar-hair-short.png / assets/avatar-hair-long.png, null = kel
+-- assets/avatar/avatar-hair-short.png / assets/avatar/avatar-hair-long.png, null = kel
 -- (bald, no overlay). See avatar.js / profile-card.js AVATAR_HAIR_OPTIONS.
 
 alter table public.profiles

@@ -302,8 +302,8 @@ Edit the form submission and Supabase call handlers in `admin.html`.
 
 ## Assets
 
+`assets/` is grouped into subfolders by kind: `assets/avatar/` (layered avatar base + hair overlays, see the Account & User Model section), `assets/mascot/` (onboarding/notification cat mascot), `assets/map/` (Istanbul/Turkey map images and the SVG source of truth). Ungrouped one-offs (favicon, close icon, district stickers, loading screen frames) stay directly in `assets/`.
+
 | Asset | Path | Notes |
 |-------|------|-------|
-| Istanbul map | `assets/istanbul-map.png` | 416 KB, 2739×2057 px; embedded in SVG |
-
-No other media assets exist. If adding images, place them in `assets/`.
+| Istanbul map | `assets/map/istanbul-map.png` | 416 KB, 2739×2057 px; embedded in SVG |

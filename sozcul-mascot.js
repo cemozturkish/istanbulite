@@ -203,7 +203,7 @@
     // TEMP: dog art isn't uploaded yet — use the cat PNG for dog mascots too
     // so the popup doesn't show a broken image. Restore the dog branch once
     // assets/mascot-dog-right.png exists.
-    const src = 'assets/mascot-cat-right.png';
+    const src = 'assets/mascot/mascot-cat-right.png';
     root.innerHTML = `
       <div class="szm-bubble">
         ${html}
