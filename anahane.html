@@ -2517,7 +2517,7 @@ async function loadAndRenderPoll(poll) {
   const userIds = Array.from(new Set([...votersA, ...votersB]));
   if (mine != null && userIds.length) {
     const { data: profs, error: profErr } = await sb.from('profiles')
-      .select('id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory').in('id', userIds);
+      .select('id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt').in('id', userIds);
     if (profErr) console.error('[poll voter profiles]', profErr);
     else profilesById = new Map(profs.map(p => [p.id, p]));
   }
@@ -2532,7 +2532,7 @@ function buildVoterAvatarsHtml(userIds, profilesById) {
   const extra = list.length - shown.length;
   const avatarsHtml = shown.map(p => {
     const name = capitalizeName([p.first_name, p.last_name].filter(Boolean).join(' ')) || 'Üye';
-    const inner = IstAvatar.html(p.avatar_url, p.avatar_hair, p.avatar_hat, p.avatar_accessory);
+    const inner = IstAvatar.html(p.avatar_url, p.avatar_hair, p.avatar_hat, p.avatar_accessory, p.avatar_shirt);
     return `<span class="poll-voter-avatar" title="${escapeText(name)}">${inner}</span>`;
   }).join('');
   const moreHtml = extra > 0
@@ -2711,7 +2711,7 @@ let allEvents = [];
 let eventsRequestSeq = 0;
 let rsvpCounts = {};   // event_id -> attendee count
 let myRsvpIds = new Set(); // event_ids the current user has RSVP'd to
-let rsvpAttendees = {}; // event_id -> [{ id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory }, ...] (capped)
+let rsvpAttendees = {}; // event_id -> [{ id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt }, ...] (capped)
 const MAX_ATTENDEE_AVATARS = 6;
 
 function capitalizeName(s) {
@@ -2761,7 +2761,7 @@ async function loadRsvps() {
   const userIds = Array.from(new Set((data || []).map(r => r.user_id)));
   if (userIds.length) {
     const { data: profs, error: profErr } = await sb.from('profiles')
-      .select('id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory')
+      .select('id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt')
       .in('id', userIds);
     if (profErr) { console.error('[anahane rsvp attendees]', profErr); return; }
     const profMap = new Map((profs || []).map(p => [p.id, p]));
@@ -2780,7 +2780,7 @@ function buildAttendeeAvatarsHtml(eventId) {
   const extra = list.length - shown.length;
   const avatarsHtml = shown.map(p => {
     const name = capitalizeName([p.first_name, p.last_name].filter(Boolean).join(' ')) || 'Üye';
-    const inner = IstAvatar.html(p.avatar_url, p.avatar_hair, p.avatar_hat, p.avatar_accessory);
+    const inner = IstAvatar.html(p.avatar_url, p.avatar_hair, p.avatar_hat, p.avatar_accessory, p.avatar_shirt);
     return `<span class="ev-attendee-avatar" title="${escapeText(name)}">${inner}</span>`;
   }).join('');
   const moreHtml = extra > 0
