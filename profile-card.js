@@ -710,18 +710,19 @@
   // editable omitted) so both surfaces render badges identically — the
   // popup just doesn't wire up dragging or avatar-picking on top of it.
   //
-  // When editable AND customizing, four uniform rows of prev/next arrows
-  // appear below the (now plain, unflanked) avatar — hat, hair, accessory,
-  // shirt, top to bottom (see wireHatCarousel/wireHairCarousel/
-  // wireAccessoryCarousel/wireShirtCarousel) — all the same size, so no
-  // category reads as more "primary" than another. When editable but not
-  // customizing, it's just a plain read-only avatar — same as the
-  // non-editable popup — until Kişiselleştir turns the arrows on (see
-  // settingsPageHTML). The cover box itself (.ist-pc-cover) has a fixed
-  // height in CSS regardless of which of these two renders, so the pano
-  // stickers sit on never resizes under them. `sozculCount` is only needed
-  // in the customizing case, to know whether the locked Sözcü hat should
-  // show unlocked (the accessory row's lock is unconditional — see
+  // When editable AND customizing, the avatar sits between two flanking
+  // columns of uniform prev/next arrows — a left column of four "prev"
+  // arrows and a right column of four "next" arrows, each stacked
+  // top-to-bottom as hat, hair, accessory, shirt (see wireHatCarousel/
+  // wireHairCarousel/wireAccessoryCarousel/wireShirtCarousel) — all the
+  // same size, so no category reads as more "primary" than another. When
+  // editable but not customizing, it's just a plain read-only avatar — same
+  // as the non-editable popup — until Kişiselleştir turns the arrows on
+  // (see settingsPageHTML). The cover box itself (.ist-pc-cover) has a
+  // fixed height in CSS regardless of which of these two renders, so the
+  // pano stickers sit on never resizes under them. `sozculCount` is only
+  // needed in the customizing case, to know whether the locked Sözcü hat
+  // should show unlocked (the accessory row's lock is unconditional — see
   // AVATAR_ACCESSORY_OPTIONS — so it doesn't need it).
   function coverHTML(opts) {
     const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText, editable, customizing, sozculCount } = opts;
@@ -739,22 +740,20 @@
       const shirtOpt = AVATAR_SHIRT_OPTIONS[shirtOptionIndex(avatarShirt)];
       const title = `${hairOpt.label} · ${hatOpt.label} · ${accessoryOpt.label} · ${shirtOpt.label}`;
       avatarBlockHTML = `
-        <div class="ist-pc-cover-avatar" id="po-avatar-preview" title="${esc(title)}">${avatarPreviewHTML(avatarHair, avatarHat, avatarAccessory, avatarShirt, false)}</div>
-        <div class="ist-pc-cover-pick-row">
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-prev" aria-label="Önceki şapka">${ARROW_ICON_LEFT}</button>
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-next" aria-label="Sonraki şapka">${ARROW_ICON_RIGHT}</button>
-        </div>
-        <div class="ist-pc-cover-pick-row">
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-prev" aria-label="Önceki saç">${ARROW_ICON_LEFT}</button>
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-next" aria-label="Sonraki saç">${ARROW_ICON_RIGHT}</button>
-        </div>
-        <div class="ist-pc-cover-pick-row">
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-prev" aria-label="Önceki aksesuar">${ARROW_ICON_LEFT}</button>
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-next" aria-label="Sonraki aksesuar">${ARROW_ICON_RIGHT}</button>
-        </div>
-        <div class="ist-pc-cover-pick-row">
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-prev" aria-label="Önceki tişört">${ARROW_ICON_LEFT}</button>
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-next" aria-label="Sonraki tişört">${ARROW_ICON_RIGHT}</button>
+        <div class="ist-pc-cover-picker">
+          <div class="ist-pc-cover-pick-col">
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-prev" aria-label="Önceki şapka">${ARROW_ICON_LEFT}</button>
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-prev" aria-label="Önceki saç">${ARROW_ICON_LEFT}</button>
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-prev" aria-label="Önceki aksesuar">${ARROW_ICON_LEFT}</button>
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-prev" aria-label="Önceki tişört">${ARROW_ICON_LEFT}</button>
+          </div>
+          <div class="ist-pc-cover-avatar" id="po-avatar-preview" title="${esc(title)}">${avatarPreviewHTML(avatarHair, avatarHat, avatarAccessory, avatarShirt, false)}</div>
+          <div class="ist-pc-cover-pick-col">
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-next" aria-label="Sonraki şapka">${ARROW_ICON_RIGHT}</button>
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-next" aria-label="Sonraki saç">${ARROW_ICON_RIGHT}</button>
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-next" aria-label="Sonraki aksesuar">${ARROW_ICON_RIGHT}</button>
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-next" aria-label="Sonraki tişört">${ARROW_ICON_RIGHT}</button>
+          </div>
         </div>
       `;
     } else {
