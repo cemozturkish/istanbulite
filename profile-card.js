@@ -115,57 +115,56 @@
     + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>'
     + '</svg>';
 
-  // Renders the hair-overlay options (kel/kısa/uzun, each shown as the bald
+  const ARROW_ICON_LEFT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>';
+  const ARROW_ICON_RIGHT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"></path></svg>';
+
+  // The carousel's slide list: kel/kısa/uzun hair overlays (each the bald
   // base composited with that hair) plus the locked Sözcü special at the
-  // end. `currentAvatarUrl` set means Sözcü is active and no hair option is
-  // selected, regardless of `currentAvatarHair` (see pickOverlayHair/
-  // pickOverlaySozcu — picking one always clears the other).
-  function buildAvatarPicker(currentAvatarUrl, currentAvatarHair, sozculCount, opts) {
-    opts = opts || {};
-    const optionClass = opts.optionClass || 'ist-avatar-option';
-
-    const hairButtons = AVATAR_HAIR_OPTIONS.map(o => {
-      const selected = !currentAvatarUrl && currentAvatarHair === o.value;
-      const hairOverlay = IstAvatar.hairUrl(o.value);
-      const cls = [optionClass];
-      if (selected) cls.push('selected');
-      return `
-        <button type="button"
-          class="${cls.join(' ')}"
-          data-kind="hair"
-          data-hair="${o.value || ''}"
-          title="${o.label}"
-          aria-label="${o.label}">
-          <span class="ist-avatar-stack">
-            <img src="${IstAvatar.BASE_URL}" alt="">
-            ${hairOverlay ? `<img src="${hairOverlay}" alt="">` : ''}
-          </span>
-        </button>
-      `;
-    }).join('');
-
+  // end. Recomputed on demand from `sozculCount` rather than cached, since
+  // it's cheap and keeps the lock state always current.
+  function avatarCarouselOptions(sozculCount) {
     const required = SOZCU_AVATAR.requiresSozculCount;
-    const locked = (sozculCount || 0) < required;
-    const selected = currentAvatarUrl === SOZCU_AVATAR.url;
-    const title = locked
-      ? `${SOZCU_AVATAR.label} — ${required} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${required})`
-      : SOZCU_AVATAR.label;
-    const sozcuCls = [optionClass];
-    if (selected) sozcuCls.push('selected');
-    if (locked)   sozcuCls.push('locked');
-    const sozcuButton = `
-      <button type="button"
-        class="${sozcuCls.join(' ')}"
-        data-kind="sozcu"
-        ${locked ? 'aria-disabled="true"' : ''}
-        title="${title}"
-        aria-label="${SOZCU_AVATAR.label}">
-        <img src="${avatarSrc(SOZCU_AVATAR.url)}" alt="${SOZCU_AVATAR.label}">
-        ${locked ? AVATAR_LOCK_SVG : ''}
-      </button>
-    `;
+    return [
+      ...AVATAR_HAIR_OPTIONS.map(o => ({ kind: 'hair', hair: o.value, label: o.label, locked: false })),
+      { kind: 'sozcu', label: SOZCU_AVATAR.label, locked: (sozculCount || 0) < required, required },
+    ];
+  }
 
-    return hairButtons + sozcuButton;
+  // Which slide matches the currently-saved avatar — `avatarUrl` set means
+  // Sözcü is the active pick (always the carousel's last slide), otherwise
+  // whichever hair slide matches `avatarHair` (defaulting to kel/index 0).
+  function avatarCarouselCurrentIndex(opts, avatarUrl, avatarHair) {
+    if (avatarUrl === SOZCU_AVATAR.url) return opts.length - 1;
+    const i = opts.findIndex(o => o.kind === 'hair' && o.hair === avatarHair);
+    return i === -1 ? 0 : i;
+  }
+
+  function avatarCarouselSlideHTML(opt) {
+    if (opt.kind === 'sozcu') {
+      return `<img src="${avatarSrc(SOZCU_AVATAR.url)}" alt="${esc(opt.label)}">` + (opt.locked ? AVATAR_LOCK_SVG : '');
+    }
+    return IstAvatar.html(null, opt.hair);
+  }
+
+  // Single big preview (base + hair composite, or the Sözcü special) with
+  // prev/next arrows either side instead of a grid of small buttons —
+  // browsing to a slide with the arrows picks it immediately, same
+  // immediate-save convention as the rest of Ayarlar (see wireAvatarCarousel
+  // for the actual pick/lock logic).
+  function buildAvatarCarousel(currentAvatarUrl, currentAvatarHair, sozculCount) {
+    const opts = avatarCarouselOptions(sozculCount);
+    const idx = avatarCarouselCurrentIndex(opts, currentAvatarUrl, currentAvatarHair);
+    const opt = opts[idx];
+    return `
+      <div class="ist-avatar-carousel">
+        <button type="button" class="ist-avatar-arrow" id="po-avatar-prev" aria-label="Önceki">${ARROW_ICON_LEFT}</button>
+        <div class="ist-avatar-carousel-preview${opt.locked ? ' locked' : ''}" id="po-avatar-preview">${avatarCarouselSlideHTML(opt)}</div>
+        <button type="button" class="ist-avatar-arrow" id="po-avatar-next" aria-label="Sonraki">${ARROW_ICON_RIGHT}</button>
+      </div>
+      <div class="ist-avatar-carousel-label" id="po-avatar-label">${esc(opt.label)}</div>
+    `;
   }
 
   function buildBadgePicker(badges, placedIds, birthDistrict) {
@@ -840,7 +839,7 @@
       <div class="ist-pc-section-title">${esc(t('profile.profileinfo'))}</div>
       <div class="ist-pc-avatar-field">
         <div class="ist-pc-label">${esc(t('profile.chooseavatar'))}</div>
-        <div class="ist-pc-avatar-picker" id="po-avatar-picker">${buildAvatarPicker(avatarUrl, avatarHair, sozculCount)}</div>
+        <div id="po-avatar-picker">${buildAvatarCarousel(avatarUrl, avatarHair, sozculCount)}</div>
         <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
       </div>
 
@@ -974,12 +973,7 @@
         if (m) m.innerHTML = weekGridHTML(status, I18N);
       });
     } else if (tab === 'ayarlar') {
-      document.querySelectorAll('#po-avatar-picker .ist-avatar-option').forEach(btn => {
-        btn.addEventListener('click', () => {
-          if (btn.dataset.kind === 'hair') pickOverlayHair(btn.dataset.hair || null, state);
-          else pickOverlaySozcu(state);
-        });
-      });
+      wireAvatarCarousel(state);
       document.getElementById('po-save').addEventListener('click', () => saveAyarlar(state));
       const copyBtn = document.getElementById('po-copy');
       if (copyBtn) {
@@ -1052,18 +1046,48 @@
     _ovAvatarMsgTimer = setTimeout(() => el.classList.remove('show'), 5000);
   }
 
-  function refreshAvatarPickerSelection(state) {
-    document.querySelectorAll('#po-avatar-picker .ist-avatar-option').forEach(b => {
-      if (b.dataset.kind === 'hair') {
-        b.classList.toggle('selected', !state.avatarUrl && (b.dataset.hair || null) === state.avatarHair);
-      } else {
-        b.classList.toggle('selected', state.avatarUrl === SOZCU_AVATAR.url);
-      }
-    });
+  // Wires the prev/next arrows either side of the single avatar preview
+  // (see buildAvatarCarousel). Browsing is purely local — `idx` tracks
+  // whatever slide is currently shown, independent of what's actually
+  // saved — and each step immediately tries to pick that slide. Landing on
+  // the locked Sözcü slide shows the lock message and leaves the saved
+  // avatar untouched (no snapping back to the last valid slide), so the
+  // user can keep freely browsing either direction.
+  function wireAvatarCarousel(state) {
+    const prevBtn = document.getElementById('po-avatar-prev');
+    const nextBtn = document.getElementById('po-avatar-next');
+    const previewEl = document.getElementById('po-avatar-preview');
+    const labelEl = document.getElementById('po-avatar-label');
+    if (!prevBtn || !nextBtn || !previewEl || !labelEl) return;
+
+    let idx = avatarCarouselCurrentIndex(avatarCarouselOptions(state.sozculCount), state.avatarUrl, state.avatarHair);
+
+    function render() {
+      const opt = avatarCarouselOptions(state.sozculCount)[idx];
+      previewEl.innerHTML = avatarCarouselSlideHTML(opt);
+      previewEl.classList.toggle('locked', !!opt.locked);
+      labelEl.textContent = opt.label;
+    }
+
+    function commit() {
+      const opt = avatarCarouselOptions(state.sozculCount)[idx];
+      if (opt.kind === 'sozcu') pickOverlaySozcu(state);
+      else pickOverlayHair(opt.hair, state);
+    }
+
+    function step(delta) {
+      const opts = avatarCarouselOptions(state.sozculCount);
+      idx = (idx + delta + opts.length) % opts.length;
+      render();
+      commit();
+    }
+
+    prevBtn.addEventListener('click', () => step(-1));
+    nextBtn.addEventListener('click', () => step(1));
   }
 
   // Picking a hair style always clears the Sözcü special (they're mutually
-  // exclusive — see buildAvatarPicker), so this writes avatar_url back to
+  // exclusive — see buildAvatarCarousel), so this writes avatar_url back to
   // null alongside the new avatar_hair in the same update.
   async function pickOverlayHair(hair, state) {
     const { sb, user } = state;
@@ -1073,7 +1097,6 @@
     if (!data || data.length === 0) { showOverlayAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
     state.avatarUrl = null;
     state.avatarHair = hair;
-    refreshAvatarPickerSelection(state);
     if (typeof state.onAvatarChange === 'function') state.onAvatarChange(null, hair);
   }
 
@@ -1088,7 +1111,6 @@
     if (error) { showOverlayAvatarMsg('Avatar kaydedilemedi: ' + error.message); return; }
     if (!data || data.length === 0) { showOverlayAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
     state.avatarUrl = SOZCU_AVATAR.url;
-    refreshAvatarPickerSelection(state);
     if (typeof state.onAvatarChange === 'function') state.onAvatarChange(SOZCU_AVATAR.url, state.avatarHair);
   }
 
@@ -1221,7 +1243,7 @@
     AVATAR_HAIR_OPTIONS,
     AVATAR_LOCK_SVG,
     GEAR_SVG,
-    buildAvatarPicker,
+    buildAvatarCarousel,
     coverHTML,
     getWeekGameStatus,
     weekGridHTML,
