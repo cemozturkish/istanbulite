@@ -55,10 +55,14 @@
     { value: 'long',  label: 'Uzun saç' },
   ];
 
-  // The locked Sözcü reward is still a single full-image override (not part
-  // of the hair layering) — picking it sets avatar_url instead of
-  // avatar_hair, same as before this file split the picker in two.
-  const SOZCU_AVATAR = { url: IstAvatar.SOZCU_URL, label: 'Sözcü', requiresSozculCount: IstAvatar.SOZCU_REQUIRED_COUNT };
+  // Hat overlays — a second, independent layer stacked on top of hair (see
+  // avatar.js), so any hat can be worn over any hair. The locked Sözcü
+  // reward is the 'crown' hat (used to be a single full-image override
+  // before profiles.avatar_hat existed — see db/avatar_hat.sql).
+  const AVATAR_HAT_OPTIONS = [
+    { value: null,    label: 'Yok' },
+    { value: 'crown', label: 'Sözcü Tacı', requiresSozculCount: IstAvatar.SOZCU_REQUIRED_COUNT },
+  ];
 
   // Cover badges (rozetler) — image stickers the user can place on the
   // Profil tab's cover, unlocked by matching their birth district
@@ -93,13 +97,6 @@
     return (profile?.cover_badges || []).map(normalizeBadgeEntry);
   }
 
-  // Colors are a viewer-side preference, not a property of the profile
-  // owner: resolve avatar_url to the mono or brown file depending on the
-  // *current visitor's* palette_pref (see palette.js avatarSrc).
-  function avatarSrc(url) {
-    return (global.Palette && global.Palette.avatarSrc) ? global.Palette.avatarSrc(url) : url;
-  }
-
   const AVATAR_LOCK_SVG = '<span class="ist-avatar-lock" aria-hidden="true">'
     + '<svg viewBox="0 0 12 12" fill="currentColor">'
     + '<path d="M6 1.5a2.5 2.5 0 0 0-2.5 2.5V5.5h-.5a.5.5 0 0 0-.5.5v4a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5v-4a.5.5 0 0 0-.5-.5H8.5V4A2.5 2.5 0 0 0 6 1.5zm-1.5 4V4a1.5 1.5 0 1 1 3 0v1.5h-3z"/>'
@@ -120,51 +117,26 @@
   const ARROW_ICON_RIGHT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
     + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"></path></svg>';
 
-  // The carousel's slide list: kel/kısa/uzun hair overlays (each the bald
-  // base composited with that hair) plus the locked Sözcü special at the
-  // end. Recomputed on demand from `sozculCount` rather than cached, since
-  // it's cheap and keeps the lock state always current.
-  function avatarCarouselOptions(sozculCount) {
-    const required = SOZCU_AVATAR.requiresSozculCount;
-    return [
-      ...AVATAR_HAIR_OPTIONS.map(o => ({ kind: 'hair', hair: o.value, label: o.label, locked: false })),
-      { kind: 'sozcu', label: SOZCU_AVATAR.label, locked: (sozculCount || 0) < required, required },
-    ];
+  // Index into AVATAR_HAIR_OPTIONS / AVATAR_HAT_OPTIONS matching the
+  // currently-saved value (defaulting to each list's first/"none" entry).
+  function hairOptionIndex(avatarHair) {
+    const i = AVATAR_HAIR_OPTIONS.findIndex(o => o.value === avatarHair);
+    return i === -1 ? 0 : i;
   }
-
-  // Which slide matches the currently-saved avatar — `avatarUrl` set means
-  // Sözcü is the active pick (always the carousel's last slide), otherwise
-  // whichever hair slide matches `avatarHair` (defaulting to kel/index 0).
-  function avatarCarouselCurrentIndex(opts, avatarUrl, avatarHair) {
-    if (avatarUrl === SOZCU_AVATAR.url) return opts.length - 1;
-    const i = opts.findIndex(o => o.kind === 'hair' && o.hair === avatarHair);
+  function hatOptionIndex(avatarHat) {
+    const i = AVATAR_HAT_OPTIONS.findIndex(o => o.value === avatarHat);
     return i === -1 ? 0 : i;
   }
 
-  function avatarCarouselSlideHTML(opt) {
-    if (opt.kind === 'sozcu') {
-      return `<img src="${avatarSrc(SOZCU_AVATAR.url)}" alt="${esc(opt.label)}">` + (opt.locked ? AVATAR_LOCK_SVG : '');
-    }
-    return IstAvatar.html(null, opt.hair);
-  }
-
-  // Single big preview (base + hair composite, or the Sözcü special) with
-  // prev/next arrows either side instead of a grid of small buttons —
-  // browsing to a slide with the arrows picks it immediately, same
-  // immediate-save convention as the rest of Ayarlar (see wireAvatarCarousel
-  // for the actual pick/lock logic).
-  function buildAvatarCarousel(currentAvatarUrl, currentAvatarHair, sozculCount) {
-    const opts = avatarCarouselOptions(sozculCount);
-    const idx = avatarCarouselCurrentIndex(opts, currentAvatarUrl, currentAvatarHair);
-    const opt = opts[idx];
-    return `
-      <div class="ist-avatar-carousel">
-        <button type="button" class="ist-avatar-arrow" id="po-avatar-prev" aria-label="Önceki">${ARROW_ICON_LEFT}</button>
-        <div class="ist-avatar-carousel-preview${opt.locked ? ' locked' : ''}" id="po-avatar-preview">${avatarCarouselSlideHTML(opt)}</div>
-        <button type="button" class="ist-avatar-arrow" id="po-avatar-next" aria-label="Sonraki">${ARROW_ICON_RIGHT}</button>
-      </div>
-      <div class="ist-avatar-carousel-label" id="po-avatar-label">${esc(opt.label)}</div>
-    `;
+  // The shared avatar preview — both the hair row and the hat row browse
+  // independently (see wireHairCarousel/wireHatCarousel) but always render
+  // into this same composite (base + hair + hat), so picking either one
+  // immediately shows how it looks combined with whatever the other is
+  // currently set to. `locked` renders the browsed-but-not-yet-earned hat
+  // with the lock badge, without actually committing it (see
+  // wireHatCarousel's render()).
+  function avatarPreviewHTML(avatarHair, avatarHat, locked) {
+    return IstAvatar.html(null, avatarHair, avatarHat) + (locked ? AVATAR_LOCK_SVG : '');
   }
 
   function buildBadgePicker(badges, placedIds, birthDistrict) {
@@ -546,6 +518,7 @@
       sb, I18N, user, profile, kefaletCount, sozculCount, kefilOfUser,
       avatarUrl: profile?.avatar_url || null,
       avatarHair: profile?.avatar_hair || null,
+      avatarHat: profile?.avatar_hat || null,
     };
   }
 
@@ -563,13 +536,14 @@
     const yasadigi = profile?.neighborhood || '';
     let avatarUrl = state.avatarUrl;
     let avatarHair = state.avatarHair;
+    let avatarHat = state.avatarHat;
 
     const yasadigiDisplay = yasadigi ? (NB_NAMES[yasadigi] || yasadigi) : '—';
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const toggleLabel = t('profile.toggle') || 'Profil';
 
     function avatarHTML() {
-      return IstAvatar.html(avatarUrl, avatarHair);
+      return IstAvatar.html(avatarUrl, avatarHair, avatarHat);
     }
 
     container.innerHTML = `
@@ -591,11 +565,12 @@
         sozculCount, kefaletCount, kefilOfUser,
         avatarUrl: state.avatarUrl,
         avatarHair: state.avatarHair,
-        onAvatarChange(url, hair) {
-          state.avatarUrl = url;
+        avatarHat: state.avatarHat,
+        onAvatarChange(hair, hat) {
           state.avatarHair = hair;
-          avatarUrl = url;
+          state.avatarHat = hat;
           avatarHair = hair;
+          avatarHat = hat;
           const av = document.getElementById('ist-pc-avatar');
           if (av) av.innerHTML = avatarHTML();
         },
@@ -604,12 +579,12 @@
   }
 
   // ══════════════════════════════════════════════════════════════
-  // Shared bottom-sheet profile overlay: Profil / Ayarlar / Rozetler tabs.
-  // Mirrors the game-overlay (kahvehane) / reader-overlay (kutuphane) /
-  // detail-overlay (anahane) bottom sheets — same markup shape, same
-  // slide-up transition, same shared frames.css card treatment — so
-  // opening your profile reads as the same kind of surface as opening a
-  // news item, an event, an article, or a game.
+  // Shared bottom-sheet profile overlay: the combined settings page (see
+  // settingsPageHTML). Mirrors the game-overlay (kahvehane) / reader-overlay
+  // (kutuphane) / detail-overlay (anahane) bottom sheets — same markup
+  // shape, same slide-up transition, same shared frames.css card treatment
+  // — so opening your profile reads as the same kind of surface as opening
+  // a news item, an event, an article, or a game.
   //
   // Injected into <body> lazily (once) so every page that loads this
   // script gets it without needing its own overlay markup.
@@ -659,6 +634,7 @@
     _ov = Object.assign({ sozculCount: 0, kefaletCount: 0, kefilOfUser: null }, opts);
     if (_ov.avatarUrl === undefined) _ov.avatarUrl = _ov.profile?.avatar_url || null;
     if (_ov.avatarHair === undefined) _ov.avatarHair = _ov.profile?.avatar_hair || null;
+    if (_ov.avatarHat === undefined) _ov.avatarHat = _ov.profile?.avatar_hat || null;
     renderOverlayBody();
     const overlay = document.getElementById('profile-overlay');
     positionProfileSheet();
@@ -689,8 +665,8 @@
     wireSettingsEvents(_ov);
   }
 
-  function coverAvatarHTML(avatarUrl, avatarHair) {
-    return IstAvatar.html(avatarUrl, avatarHair);
+  function coverAvatarHTML(avatarUrl, avatarHair, avatarHat) {
+    return IstAvatar.html(avatarUrl, avatarHair, avatarHat);
   }
 
   // The white "pano" cover — the avatar sits on it like a Twitter cover
@@ -702,12 +678,13 @@
   // editable omitted) so both surfaces render badges identically — the
   // popup just doesn't wire up dragging or avatar-picking on top of it.
   //
-  // When editable, the avatar itself becomes the carousel preview (see
-  // buildAvatarCarousel/wireAvatarCarousel) with small arrow buttons
-  // flanking it — `sozculCount` is only needed in that case, to know
-  // whether the locked Sözcü slide should show unlocked.
+  // When editable, the avatar itself becomes the shared preview for two
+  // independent rows of prev/next arrows underneath it — one browsing hair
+  // (see wireHairCarousel), one browsing hats (see wireHatCarousel) — so
+  // any hat can be combined with any hair. `sozculCount` is only needed in
+  // that case, to know whether the locked Sözcü hat should show unlocked.
   function coverHTML(opts) {
-    const { profile, avatarUrl, avatarHair, displayName, metaText, editable, sozculCount } = opts;
+    const { profile, avatarUrl, avatarHair, avatarHat, displayName, metaText, editable, sozculCount } = opts;
     const placed = normalizedCoverBadges(profile);
     const badgesHTML = placed.map(p => {
       const badge = BADGES.find(b => b.id === p.id);
@@ -716,19 +693,22 @@
     }).join('');
     let avatarBlockHTML;
     if (editable) {
-      const carouselOpts = avatarCarouselOptions(sozculCount);
-      const idx = avatarCarouselCurrentIndex(carouselOpts, avatarUrl, avatarHair);
-      const opt = carouselOpts[idx];
+      const hairOpt = AVATAR_HAIR_OPTIONS[hairOptionIndex(avatarHair)];
+      const hatOpt = AVATAR_HAT_OPTIONS[hatOptionIndex(avatarHat)];
+      const title = `${hairOpt.label} · ${hatOpt.label}`;
       avatarBlockHTML = `
         <div class="ist-pc-cover-avatar-row">
-          <button type="button" class="ist-pc-cover-avatar-arrow" id="po-avatar-prev" aria-label="Önceki">${ARROW_ICON_LEFT}</button>
-          <div class="ist-pc-cover-avatar${opt.locked ? ' locked' : ''}" id="po-avatar-preview">${avatarCarouselSlideHTML(opt)}</div>
-          <button type="button" class="ist-pc-cover-avatar-arrow" id="po-avatar-next" aria-label="Sonraki">${ARROW_ICON_RIGHT}</button>
+          <button type="button" class="ist-pc-cover-avatar-arrow" id="po-hair-prev" aria-label="Önceki saç">${ARROW_ICON_LEFT}</button>
+          <div class="ist-pc-cover-avatar" id="po-avatar-preview" title="${esc(title)}">${avatarPreviewHTML(avatarHair, avatarHat, false)}</div>
+          <button type="button" class="ist-pc-cover-avatar-arrow" id="po-hair-next" aria-label="Sonraki saç">${ARROW_ICON_RIGHT}</button>
         </div>
-        <div class="ist-pc-cover-avatar-label" id="po-avatar-label">${esc(opt.label)}</div>
+        <div class="ist-pc-cover-hat-row">
+          <button type="button" class="ist-pc-cover-hat-arrow" id="po-hat-prev" aria-label="Önceki şapka">${ARROW_ICON_LEFT}</button>
+          <button type="button" class="ist-pc-cover-hat-arrow" id="po-hat-next" aria-label="Sonraki şapka">${ARROW_ICON_RIGHT}</button>
+        </div>
       `;
     } else {
-      avatarBlockHTML = `<div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, avatarHair)}</div>`;
+      avatarBlockHTML = `<div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat)}</div>`;
     }
     return `
       <div class="ist-pc-cover${editable ? ' ist-pc-cover-editable' : ''}"${editable ? ' id="po-cover"' : ''}>
@@ -795,7 +775,7 @@
   // appearance) on the right, matching a two-column layout so both halves
   // fit on screen together without scrolling between "pages".
   function settingsPageHTML(state) {
-    const { I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl, avatarHair } = state;
+    const { I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl, avatarHair, avatarHat } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
@@ -821,7 +801,7 @@
     return `
       <div class="ist-pc-settings-grid">
         <div class="ist-pc-settings-col ist-pc-settings-left">
-          ${coverHTML({ profile, avatarUrl, avatarHair, displayName, metaText: yasadigiDisplay, editable: true, sozculCount })}
+          ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, displayName, metaText: yasadigiDisplay, editable: true, sozculCount })}
           <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
 
           <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
@@ -922,7 +902,8 @@
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
 
     wireCoverDragging(state);
-    wireAvatarCarousel(state);
+    wireHairCarousel(state);
+    wireHatCarousel(state);
     getWeekGameStatus(sb, user.id).then(status => {
       const m = document.getElementById('po-weekgrid-mount');
       if (m) m.innerHTML = weekGridHTML(status, I18N);
@@ -999,72 +980,89 @@
     _ovAvatarMsgTimer = setTimeout(() => el.classList.remove('show'), 5000);
   }
 
-  // Wires the prev/next arrows either side of the single avatar preview
-  // (see buildAvatarCarousel). Browsing is purely local — `idx` tracks
-  // whatever slide is currently shown, independent of what's actually
-  // saved — and each step immediately tries to pick that slide. Landing on
-  // the locked Sözcü slide shows the lock message and leaves the saved
-  // avatar untouched (no snapping back to the last valid slide), so the
-  // user can keep freely browsing either direction.
-  function wireAvatarCarousel(state) {
-    const prevBtn = document.getElementById('po-avatar-prev');
-    const nextBtn = document.getElementById('po-avatar-next');
+  // Wires the hair row's prev/next arrows. Browsing is purely local — `idx`
+  // tracks whatever hair is currently shown, independent of what's actually
+  // saved — and each step immediately picks it (hair is never locked, so
+  // this always commits). Both this and wireHatCarousel render into the
+  // same #po-avatar-preview, using the *other* carousel's current value for
+  // the layer they don't control (state.avatarHat here).
+  function wireHairCarousel(state) {
+    const prevBtn = document.getElementById('po-hair-prev');
+    const nextBtn = document.getElementById('po-hair-next');
     const previewEl = document.getElementById('po-avatar-preview');
-    const labelEl = document.getElementById('po-avatar-label');
-    if (!prevBtn || !nextBtn || !previewEl || !labelEl) return;
+    if (!prevBtn || !nextBtn || !previewEl) return;
 
-    let idx = avatarCarouselCurrentIndex(avatarCarouselOptions(state.sozculCount), state.avatarUrl, state.avatarHair);
+    let idx = hairOptionIndex(state.avatarHair);
 
     function render() {
-      const opt = avatarCarouselOptions(state.sozculCount)[idx];
-      previewEl.innerHTML = avatarCarouselSlideHTML(opt);
-      previewEl.classList.toggle('locked', !!opt.locked);
-      labelEl.textContent = opt.label;
-    }
-
-    function commit() {
-      const opt = avatarCarouselOptions(state.sozculCount)[idx];
-      if (opt.kind === 'sozcu') pickOverlaySozcu(state);
-      else pickOverlayHair(opt.hair, state);
+      const hair = AVATAR_HAIR_OPTIONS[idx].value;
+      previewEl.innerHTML = avatarPreviewHTML(hair, state.avatarHat, false);
+      previewEl.classList.remove('locked');
     }
 
     function step(delta) {
-      const opts = avatarCarouselOptions(state.sozculCount);
-      idx = (idx + delta + opts.length) % opts.length;
+      idx = (idx + delta + AVATAR_HAIR_OPTIONS.length) % AVATAR_HAIR_OPTIONS.length;
       render();
-      commit();
+      pickOverlayHair(AVATAR_HAIR_OPTIONS[idx].value, state);
     }
 
     prevBtn.addEventListener('click', () => step(-1));
     nextBtn.addEventListener('click', () => step(1));
   }
 
-  // Picking a hair style always clears the Sözcü special (they're mutually
-  // exclusive — see buildAvatarCarousel), so this writes avatar_url back to
-  // null alongside the new avatar_hair in the same update.
-  async function pickOverlayHair(hair, state) {
-    const { sb, user } = state;
-    if (!state.avatarUrl && state.avatarHair === hair) return;
-    const { data, error } = await sb.from('profiles').update({ avatar_hair: hair, avatar_url: null }).eq('id', user.id).select('id');
-    if (error) { showOverlayAvatarMsg('Avatar kaydedilemedi: ' + error.message); return; }
-    if (!data || data.length === 0) { showOverlayAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
-    state.avatarUrl = null;
-    state.avatarHair = hair;
-    if (typeof state.onAvatarChange === 'function') state.onAvatarChange(null, hair);
+  // Wires the hat row's prev/next arrows — same immediate-pick convention,
+  // except landing on a locked hat shows it (with the lock badge) on the
+  // shared preview without committing, so browsing further or away doesn't
+  // leave a half-saved state (see pickOverlayHat's own lock check, which is
+  // the actual source of truth — this is just the matching visual).
+  function wireHatCarousel(state) {
+    const prevBtn = document.getElementById('po-hat-prev');
+    const nextBtn = document.getElementById('po-hat-next');
+    const previewEl = document.getElementById('po-avatar-preview');
+    if (!prevBtn || !nextBtn || !previewEl) return;
+
+    let idx = hatOptionIndex(state.avatarHat);
+
+    function render() {
+      const opt = AVATAR_HAT_OPTIONS[idx];
+      const locked = !!opt.requiresSozculCount && (state.sozculCount || 0) < opt.requiresSozculCount;
+      previewEl.innerHTML = avatarPreviewHTML(state.avatarHair, opt.value, locked);
+      previewEl.classList.toggle('locked', locked);
+    }
+
+    function step(delta) {
+      idx = (idx + delta + AVATAR_HAT_OPTIONS.length) % AVATAR_HAT_OPTIONS.length;
+      render();
+      pickOverlayHat(AVATAR_HAT_OPTIONS[idx].value, state);
+    }
+
+    prevBtn.addEventListener('click', () => step(-1));
+    nextBtn.addEventListener('click', () => step(1));
   }
 
-  async function pickOverlaySozcu(state) {
-    const { sb, user, sozculCount } = state;
-    if (state.avatarUrl === SOZCU_AVATAR.url) return;
-    if ((sozculCount || 0) < SOZCU_AVATAR.requiresSozculCount) {
-      showOverlayAvatarMsg(`Bu avatar kilitli — ${SOZCU_AVATAR.requiresSozculCount} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${SOZCU_AVATAR.requiresSozculCount}).`);
-      return;
-    }
-    const { data, error } = await sb.from('profiles').update({ avatar_url: SOZCU_AVATAR.url }).eq('id', user.id).select('id');
+  async function pickOverlayHair(hair, state) {
+    const { sb, user } = state;
+    if (state.avatarHair === hair) return;
+    const { data, error } = await sb.from('profiles').update({ avatar_hair: hair }).eq('id', user.id).select('id');
     if (error) { showOverlayAvatarMsg('Avatar kaydedilemedi: ' + error.message); return; }
     if (!data || data.length === 0) { showOverlayAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
-    state.avatarUrl = SOZCU_AVATAR.url;
-    if (typeof state.onAvatarChange === 'function') state.onAvatarChange(SOZCU_AVATAR.url, state.avatarHair);
+    state.avatarHair = hair;
+    if (typeof state.onAvatarChange === 'function') state.onAvatarChange(hair, state.avatarHat);
+  }
+
+  async function pickOverlayHat(hat, state) {
+    const { sb, user, sozculCount } = state;
+    if (state.avatarHat === hat) return;
+    const opt = AVATAR_HAT_OPTIONS.find(o => o.value === hat);
+    if (opt && opt.requiresSozculCount && (sozculCount || 0) < opt.requiresSozculCount) {
+      showOverlayAvatarMsg(`Bu şapka kilitli — ${opt.requiresSozculCount} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${opt.requiresSozculCount}).`);
+      return;
+    }
+    const { data, error } = await sb.from('profiles').update({ avatar_hat: hat }).eq('id', user.id).select('id');
+    if (error) { showOverlayAvatarMsg('Avatar kaydedilemedi: ' + error.message); return; }
+    if (!data || data.length === 0) { showOverlayAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
+    state.avatarHat = hat;
+    if (typeof state.onAvatarChange === 'function') state.onAvatarChange(state.avatarHair, hat);
   }
 
   let _badgeMsgTimer = null;
@@ -1150,7 +1148,7 @@
     const yasadigiIlce = profile?.neighborhood || '';
 
     function avatarDisplayHTML() {
-      return IstAvatar.html(state.avatarUrl, state.avatarHair);
+      return IstAvatar.html(state.avatarUrl, state.avatarHair, state.avatarHat);
     }
 
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
@@ -1172,9 +1170,10 @@
           sozculCount, kefaletCount, kefilOfUser,
           avatarUrl: state.avatarUrl,
           avatarHair: state.avatarHair,
-          onAvatarChange(url, hair) {
-            state.avatarUrl = url;
+          avatarHat: state.avatarHat,
+          onAvatarChange(hair, hat) {
             state.avatarHair = hair;
+            state.avatarHat = hat;
             const av = document.getElementById('lc-avatar-display');
             if (av) av.innerHTML = avatarDisplayHTML();
           },
@@ -1193,9 +1192,9 @@
     openProfileOverlay,
     closeProfileOverlay,
     AVATAR_HAIR_OPTIONS,
+    AVATAR_HAT_OPTIONS,
     AVATAR_LOCK_SVG,
     GEAR_SVG,
-    buildAvatarCarousel,
     coverHTML,
     getWeekGameStatus,
     weekGridHTML,
