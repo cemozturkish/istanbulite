@@ -1,4 +1,4 @@
-// Shared avatar rendering: a fixed bald base (assets/avatar-base.png) with an
+// Shared avatar rendering: a fixed bald base (assets/avatar/avatar-base.png) with an
 // optional transparent hair overlay (assets/avatar-hair-<value>.png) stacked
 // on top — profiles.avatar_hair picks the overlay ('short' | 'long' | null
 // for kel/bald). The locked Sözcü reward (profiles.avatar_url) is still a
@@ -9,9 +9,9 @@
 // can load just this file instead of all of profile-card.js. profile-card.js
 // itself also uses these constants/helpers for the self-edit picker.
 (function (global) {
-  const BASE_URL = 'assets/avatar-base.png';
-  const HAIR_URLS = { short: 'assets/avatar-hair-short.png', long: 'assets/avatar-hair-long.png' };
-  const SOZCU_URL = 'assets/avatar-sozcu.png';
+  const BASE_URL = 'assets/avatar/avatar-base.png';
+  const HAIR_URLS = { short: 'assets/avatar/avatar-hair-short.png', long: 'assets/avatar/avatar-hair-long.png' };
+  const SOZCU_URL = 'assets/avatar/avatar-sozcu.png';
   const SOZCU_REQUIRED_COUNT = 10;
 
   function hairUrl(hair) {
