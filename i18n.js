@@ -25,6 +25,7 @@
 
     // profile / settings card
     'profile.edit':        { default: 'Düzenle',             more_english: 'Edit' },
+    'profile.customize':   { default: 'Kişiselleştir',       more_english: 'Customize' },
     'profile.save':        { default: 'Kaydet',              more_english: 'Save' },
     'profile.saving':      { default: 'Kaydediliyor...',     more_english: 'Saving...' },
     'profile.cancel':      { default: 'İptal',               more_english: 'Cancel' },
