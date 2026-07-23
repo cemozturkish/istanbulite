@@ -56,11 +56,12 @@
       .addEventListener('change', syncThemeColor);
   } catch (e) { /* ignore */ }
 
-  // Avatar preset images ship in two color variants (e.g. avatar-long.png /
-  // avatar-long-earth.png). The stored avatar_url is always the mono
-  // (canonical) filename; this maps it to whichever variant matches the
-  // *viewer's own* palette_pref — never the profile owner's — so the same
-  // avatar renders black for mono viewers and brown for earth viewers.
+  // Historically, avatar preset images shipped in two color variants (e.g.
+  // foo.png / foo-earth.png) and this mapped the stored (mono/canonical)
+  // filename to whichever variant matched the *viewer's own* palette_pref —
+  // never the profile owner's. The only avatar_url value left that still
+  // goes through this is the locked Sözcü special (see avatar.js); the
+  // layered bald-base/hair-overlay avatar has no color variants yet.
   function avatarSrc(url) {
     if (!url) return url;
     if (current !== 'earth') return url;

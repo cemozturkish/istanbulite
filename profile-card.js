@@ -47,15 +47,18 @@
     { id: 'bulmaca', label: 'Bulmaca', days: [1, 3, 5] },
   ];
 
-  // Preset avatars, shared between the profile-overlay picker and this
-  // mobile widget. `requiresSozculCount` gates an option behind a lifetime
-  // sözcü count.
-  const AVATAR_OPTIONS = [
-    { url: 'assets/avatar-long.png',  label: 'Uzun saç' },
-    { url: 'assets/avatar-short.png', label: 'Kısa saç' },
-    { url: 'assets/avatar-bald.png',  label: 'Saçsız' },
-    { url: 'assets/avatar-sozcu.png', label: 'Sözcü', requiresSozculCount: 10 },
+  // Hair overlays for the layered avatar (bald base + optional transparent
+  // hair PNG on top — see avatar.js). `null` is kel (bald, no overlay).
+  const AVATAR_HAIR_OPTIONS = [
+    { value: null,    label: 'Kel' },
+    { value: 'short', label: 'Kısa saç' },
+    { value: 'long',  label: 'Uzun saç' },
   ];
+
+  // The locked Sözcü reward is still a single full-image override (not part
+  // of the hair layering) — picking it sets avatar_url instead of
+  // avatar_hair, same as before this file split the picker in two.
+  const SOZCU_AVATAR = { url: IstAvatar.SOZCU_URL, label: 'Sözcü', requiresSozculCount: IstAvatar.SOZCU_REQUIRED_COUNT };
 
   // Cover badges (rozetler) — image stickers the user can place on the
   // Profil tab's cover, unlocked by matching their birth district
@@ -112,40 +115,57 @@
     + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>'
     + '</svg>';
 
-  function buildAvatarPicker(currentAvatarUrl, sozculCount, opts) {
+  // Renders the hair-overlay options (kel/kısa/uzun, each shown as the bald
+  // base composited with that hair) plus the locked Sözcü special at the
+  // end. `currentAvatarUrl` set means Sözcü is active and no hair option is
+  // selected, regardless of `currentAvatarHair` (see pickOverlayHair/
+  // pickOverlaySozcu — picking one always clears the other).
+  function buildAvatarPicker(currentAvatarUrl, currentAvatarHair, sozculCount, opts) {
     opts = opts || {};
     const optionClass = opts.optionClass || 'ist-avatar-option';
-    return AVATAR_OPTIONS.map(o => {
-      const required = o.requiresSozculCount || 0;
-      const locked = required > 0 && (sozculCount || 0) < required;
-      const selected = currentAvatarUrl === o.url;
-      const title = locked
-        ? `${o.label} — ${required} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${required})`
-        : o.label;
+
+    const hairButtons = AVATAR_HAIR_OPTIONS.map(o => {
+      const selected = !currentAvatarUrl && currentAvatarHair === o.value;
+      const hairOverlay = IstAvatar.hairUrl(o.value);
       const cls = [optionClass];
       if (selected) cls.push('selected');
-      if (locked)   cls.push('locked');
       return `
         <button type="button"
           class="${cls.join(' ')}"
-          data-url="${o.url}"
-          ${locked ? 'aria-disabled="true"' : ''}
-          title="${title}"
+          data-kind="hair"
+          data-hair="${o.value || ''}"
+          title="${o.label}"
           aria-label="${o.label}">
-          <img src="${avatarSrc(o.url)}" alt="${o.label}">
-          ${locked ? AVATAR_LOCK_SVG : ''}
+          <span class="ist-avatar-stack">
+            <img src="${IstAvatar.BASE_URL}" alt="">
+            ${hairOverlay ? `<img src="${hairOverlay}" alt="">` : ''}
+          </span>
         </button>
       `;
     }).join('');
-  }
 
-  function lookupAvatarOption(url) {
-    return AVATAR_OPTIONS.find(o => o.url === url) || null;
-  }
+    const required = SOZCU_AVATAR.requiresSozculCount;
+    const locked = (sozculCount || 0) < required;
+    const selected = currentAvatarUrl === SOZCU_AVATAR.url;
+    const title = locked
+      ? `${SOZCU_AVATAR.label} — ${required} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${required})`
+      : SOZCU_AVATAR.label;
+    const sozcuCls = [optionClass];
+    if (selected) sozcuCls.push('selected');
+    if (locked)   sozcuCls.push('locked');
+    const sozcuButton = `
+      <button type="button"
+        class="${sozcuCls.join(' ')}"
+        data-kind="sozcu"
+        ${locked ? 'aria-disabled="true"' : ''}
+        title="${title}"
+        aria-label="${SOZCU_AVATAR.label}">
+        <img src="${avatarSrc(SOZCU_AVATAR.url)}" alt="${SOZCU_AVATAR.label}">
+        ${locked ? AVATAR_LOCK_SVG : ''}
+      </button>
+    `;
 
-  function lockedAvatarMessage(opt, sozculCount) {
-    const need = opt.requiresSozculCount;
-    return `Bu avatar kilitli — ${need} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${need}).`;
+    return hairButtons + sozcuButton;
   }
 
   function buildBadgePicker(badges, placedIds, birthDistrict) {
@@ -526,6 +546,7 @@
     return {
       sb, I18N, user, profile, kefaletCount, sozculCount, kefilOfUser,
       avatarUrl: profile?.avatar_url || null,
+      avatarHair: profile?.avatar_hair || null,
     };
   }
 
@@ -542,15 +563,14 @@
     const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
     const yasadigi = profile?.neighborhood || '';
     let avatarUrl = state.avatarUrl;
+    let avatarHair = state.avatarHair;
 
     const yasadigiDisplay = yasadigi ? (NB_NAMES[yasadigi] || yasadigi) : '—';
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const toggleLabel = t('profile.toggle') || 'Profil';
 
     function avatarHTML() {
-      return avatarUrl
-        ? `<img src="${esc(avatarSrc(avatarUrl))}" alt="">`
-        : esc(displayName.charAt(0).toUpperCase());
+      return IstAvatar.html(avatarUrl, avatarHair);
     }
 
     container.innerHTML = `
@@ -571,10 +591,13 @@
         sb: state.sb, I18N, user, profile,
         sozculCount, kefaletCount, kefilOfUser,
         avatarUrl: state.avatarUrl,
+        avatarHair: state.avatarHair,
         defaultTab: 'profil',
-        onAvatarChange(url) {
+        onAvatarChange(url, hair) {
           state.avatarUrl = url;
+          state.avatarHair = hair;
           avatarUrl = url;
+          avatarHair = hair;
           const av = document.getElementById('ist-pc-avatar');
           if (av) av.innerHTML = avatarHTML();
         },
@@ -642,6 +665,7 @@
     ensureProfileOverlay();
     _ov = Object.assign({ sozculCount: 0, kefaletCount: 0, kefilOfUser: null }, opts);
     if (_ov.avatarUrl === undefined) _ov.avatarUrl = _ov.profile?.avatar_url || null;
+    if (_ov.avatarHair === undefined) _ov.avatarHair = _ov.profile?.avatar_hair || null;
     setActiveTab(opts.defaultTab || 'profil');
     const overlay = document.getElementById('profile-overlay');
     positionProfileSheet();
@@ -689,10 +713,8 @@
     wireTabEvents(_ov.activeTab, _ov);
   }
 
-  function coverAvatarHTML(avatarUrl, displayName) {
-    return avatarUrl
-      ? `<img src="${esc(avatarSrc(avatarUrl))}" alt="">`
-      : esc(displayName.charAt(0).toUpperCase());
+  function coverAvatarHTML(avatarUrl, avatarHair) {
+    return IstAvatar.html(avatarUrl, avatarHair);
   }
 
   // The white "pano" cover — the avatar sits on it like a Twitter cover
@@ -704,7 +726,7 @@
   // editable omitted) so both surfaces render badges identically — the
   // popup just doesn't wire up dragging on top of it.
   function coverHTML(opts) {
-    const { profile, avatarUrl, displayName, metaText, editable } = opts;
+    const { profile, avatarUrl, avatarHair, displayName, metaText, editable } = opts;
     const placed = normalizedCoverBadges(profile);
     const badgesHTML = placed.map(p => {
       const badge = BADGES.find(b => b.id === p.id);
@@ -714,7 +736,7 @@
     return `
       <div class="ist-pc-cover${editable ? ' ist-pc-cover-editable' : ''}"${editable ? ' id="po-cover"' : ''}>
         ${badgesHTML}
-        <div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, displayName)}</div>
+        <div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, avatarHair)}</div>
         <div class="ist-pc-cover-name">${esc(displayName)}</div>
         <div class="ist-pc-cover-meta">${esc(metaText)}</div>
       </div>
@@ -773,7 +795,7 @@
   // cards. No editable fields here: account info and personalization all
   // live in the Ayarlar tab now (see ayarlarTabHTML).
   function profilTabHTML(state) {
-    const { I18N, user, profile, avatarUrl } = state;
+    const { I18N, user, profile, avatarUrl, avatarHair } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
@@ -782,7 +804,7 @@
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
 
     return `
-      ${coverHTML({ profile, avatarUrl, displayName, metaText: yasadigiDisplay, editable: true })}
+      ${coverHTML({ profile, avatarUrl, avatarHair, displayName, metaText: yasadigiDisplay, editable: true })}
 
       <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
       <div id="po-weekgrid-mount"></div>
@@ -794,7 +816,7 @@
   // color palette, appearance) and sign out — moved here from Profil so
   // that tab is just identity + games.
   function ayarlarTabHTML(state) {
-    const { I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl } = state;
+    const { I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl, avatarHair } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
@@ -818,7 +840,7 @@
       <div class="ist-pc-section-title">${esc(t('profile.profileinfo'))}</div>
       <div class="ist-pc-avatar-field">
         <div class="ist-pc-label">${esc(t('profile.chooseavatar'))}</div>
-        <div class="ist-pc-avatar-picker" id="po-avatar-picker">${buildAvatarPicker(avatarUrl, sozculCount)}</div>
+        <div class="ist-pc-avatar-picker" id="po-avatar-picker">${buildAvatarPicker(avatarUrl, avatarHair, sozculCount)}</div>
         <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
       </div>
 
@@ -953,7 +975,10 @@
       });
     } else if (tab === 'ayarlar') {
       document.querySelectorAll('#po-avatar-picker .ist-avatar-option').forEach(btn => {
-        btn.addEventListener('click', () => pickOverlayAvatar(btn.dataset.url, state));
+        btn.addEventListener('click', () => {
+          if (btn.dataset.kind === 'hair') pickOverlayHair(btn.dataset.hair || null, state);
+          else pickOverlaySozcu(state);
+        });
       });
       document.getElementById('po-save').addEventListener('click', () => saveAyarlar(state));
       const copyBtn = document.getElementById('po-copy');
@@ -1027,22 +1052,44 @@
     _ovAvatarMsgTimer = setTimeout(() => el.classList.remove('show'), 5000);
   }
 
-  async function pickOverlayAvatar(url, state) {
-    const { sb, user, sozculCount } = state;
-    if (!url || url === state.avatarUrl) return;
-    const opt = lookupAvatarOption(url);
-    if (opt?.requiresSozculCount && (sozculCount || 0) < opt.requiresSozculCount) {
-      showOverlayAvatarMsg(lockedAvatarMessage(opt, sozculCount));
-      return;
-    }
-    const { data, error } = await sb.from('profiles').update({ avatar_url: url }).eq('id', user.id).select('id');
+  function refreshAvatarPickerSelection(state) {
+    document.querySelectorAll('#po-avatar-picker .ist-avatar-option').forEach(b => {
+      if (b.dataset.kind === 'hair') {
+        b.classList.toggle('selected', !state.avatarUrl && (b.dataset.hair || null) === state.avatarHair);
+      } else {
+        b.classList.toggle('selected', state.avatarUrl === SOZCU_AVATAR.url);
+      }
+    });
+  }
+
+  // Picking a hair style always clears the Sözcü special (they're mutually
+  // exclusive — see buildAvatarPicker), so this writes avatar_url back to
+  // null alongside the new avatar_hair in the same update.
+  async function pickOverlayHair(hair, state) {
+    const { sb, user } = state;
+    if (!state.avatarUrl && state.avatarHair === hair) return;
+    const { data, error } = await sb.from('profiles').update({ avatar_hair: hair, avatar_url: null }).eq('id', user.id).select('id');
     if (error) { showOverlayAvatarMsg('Avatar kaydedilemedi: ' + error.message); return; }
     if (!data || data.length === 0) { showOverlayAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
-    state.avatarUrl = url;
-    document.querySelectorAll('#po-avatar-picker .ist-avatar-option').forEach(b => {
-      b.classList.toggle('selected', b.dataset.url === url);
-    });
-    if (typeof state.onAvatarChange === 'function') state.onAvatarChange(url);
+    state.avatarUrl = null;
+    state.avatarHair = hair;
+    refreshAvatarPickerSelection(state);
+    if (typeof state.onAvatarChange === 'function') state.onAvatarChange(null, hair);
+  }
+
+  async function pickOverlaySozcu(state) {
+    const { sb, user, sozculCount } = state;
+    if (state.avatarUrl === SOZCU_AVATAR.url) return;
+    if ((sozculCount || 0) < SOZCU_AVATAR.requiresSozculCount) {
+      showOverlayAvatarMsg(`Bu avatar kilitli — ${SOZCU_AVATAR.requiresSozculCount} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${SOZCU_AVATAR.requiresSozculCount}).`);
+      return;
+    }
+    const { data, error } = await sb.from('profiles').update({ avatar_url: SOZCU_AVATAR.url }).eq('id', user.id).select('id');
+    if (error) { showOverlayAvatarMsg('Avatar kaydedilemedi: ' + error.message); return; }
+    if (!data || data.length === 0) { showOverlayAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
+    state.avatarUrl = SOZCU_AVATAR.url;
+    refreshAvatarPickerSelection(state);
+    if (typeof state.onAvatarChange === 'function') state.onAvatarChange(SOZCU_AVATAR.url, state.avatarHair);
   }
 
   let _badgeMsgTimer = null;
@@ -1128,9 +1175,7 @@
     const yasadigiIlce = profile?.neighborhood || '';
 
     function avatarDisplayHTML() {
-      return state.avatarUrl
-        ? `<img src="${esc(avatarSrc(state.avatarUrl))}" alt="">`
-        : esc(displayName.charAt(0).toUpperCase());
+      return IstAvatar.html(state.avatarUrl, state.avatarHair);
     }
 
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
@@ -1151,9 +1196,11 @@
           sb, I18N, user, profile,
           sozculCount, kefaletCount, kefilOfUser,
           avatarUrl: state.avatarUrl,
+          avatarHair: state.avatarHair,
           defaultTab: 'profil',
-          onAvatarChange(url) {
+          onAvatarChange(url, hair) {
             state.avatarUrl = url;
+            state.avatarHair = hair;
             const av = document.getElementById('lc-avatar-display');
             if (av) av.innerHTML = avatarDisplayHTML();
           },
@@ -1171,12 +1218,10 @@
     mountLibraryCard,
     openProfileOverlay,
     closeProfileOverlay,
-    AVATAR_OPTIONS,
+    AVATAR_HAIR_OPTIONS,
     AVATAR_LOCK_SVG,
     GEAR_SVG,
     buildAvatarPicker,
-    lookupAvatarOption,
-    lockedAvatarMessage,
     coverHTML,
     getWeekGameStatus,
     weekGridHTML,
