@@ -48,13 +48,13 @@
   ];
 
   // Shirt overlays — the base clothing layer (see avatar.js), stacked
-  // directly on the bald base before hair/hat/accessory. Unlike those, this
-  // one defaults to 'black' for everyone (profiles.avatar_shirt has a DB
-  // default — see db/avatar_shirt.sql) rather than defaulting to none, so
-  // 'black' is listed first here to match that default state.
+  // directly on the bald base before hair/hat/accessory. Defaults to null
+  // (the plain bare look), same as hair/hat/accessory. 'black' is the one
+  // shirt color so far, fully open to everyone — no lock, just like the
+  // hair options.
   const AVATAR_SHIRT_OPTIONS = [
-    { value: 'black', label: 'Siyah Tişört' },
     { value: null,    label: 'Yok' },
+    { value: 'black', label: 'Siyah Tişört' },
   ];
 
   // Hair overlays for the layered avatar (bald base + optional transparent
@@ -138,8 +138,7 @@
 
   // Index into AVATAR_SHIRT_OPTIONS / AVATAR_HAIR_OPTIONS / AVATAR_HAT_
   // OPTIONS / AVATAR_ACCESSORY_OPTIONS matching the currently-saved value
-  // (defaulting to each list's first entry — "black" for shirt, "none" for
-  // the other three).
+  // (defaulting to each list's first/"none" entry).
   function shirtOptionIndex(avatarShirt) {
     const i = AVATAR_SHIRT_OPTIONS.findIndex(o => o.value === avatarShirt);
     return i === -1 ? 0 : i;
@@ -551,9 +550,7 @@
       avatarHair: profile?.avatar_hair || null,
       avatarHat: profile?.avatar_hat || null,
       avatarAccessory: profile?.avatar_accessory || null,
-      // Defaults to 'black' (not null) — see db/avatar_shirt.sql and the
-      // comment on AVATAR_SHIRT_OPTIONS above.
-      avatarShirt: profile?.avatar_shirt || 'black',
+      avatarShirt: profile?.avatar_shirt || null,
     };
   }
 
@@ -679,7 +676,7 @@
     if (_ov.avatarHair === undefined) _ov.avatarHair = _ov.profile?.avatar_hair || null;
     if (_ov.avatarHat === undefined) _ov.avatarHat = _ov.profile?.avatar_hat || null;
     if (_ov.avatarAccessory === undefined) _ov.avatarAccessory = _ov.profile?.avatar_accessory || null;
-    if (_ov.avatarShirt === undefined) _ov.avatarShirt = _ov.profile?.avatar_shirt || 'black';
+    if (_ov.avatarShirt === undefined) _ov.avatarShirt = _ov.profile?.avatar_shirt || null;
     renderOverlayBody();
     const overlay = document.getElementById('profile-overlay');
     positionProfileSheet();

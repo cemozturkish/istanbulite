@@ -4,12 +4,10 @@
 // hat (assets/avatar-hat-<value>.png), accessory
 // (assets/avatar-accessory-<value>.png) — profiles.avatar_shirt / avatar_hair
 // / avatar_hat / avatar_accessory each pick their own overlay independently,
-// so any combination can be worn together. Shirt is the odd one out: it
-// defaults to 'black' for everyone (profiles.avatar_shirt has a DB default —
-// see db/avatar_shirt.sql — and html()'s own default parameter falls back to
-// it too, so a caller that doesn't pass a shirt at all still gets one; only
-// an explicit `null` renders bare). Hair/hat/accessory default to null/none.
-// The locked Sözcü reward is the 'crown' hat (previously a single full-image
+// so any combination can be worn together, and all four default to null/none
+// (the plain bare-chested/bald look). 'black' is the one shirt option so
+// far, fully open to everyone — no lock, just like the hair options. The
+// locked Sözcü reward is the 'crown' hat (previously a single full-image
 // override via profiles.avatar_url — that column is no longer written, but
 // html() still honors it if set, as a fallback for any row a migration
 // hasn't backfilled yet).
@@ -55,7 +53,7 @@
   // shirt + hair + hat + accessory stack. No earth/mono color variants for
   // these layers yet (only the legacy avatarUrl path goes through
   // Palette.avatarSrc) — those are plain line art for now.
-  function html(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt = 'black') {
+  function html(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt) {
     if (avatarUrl) {
       const src = (global.Palette && global.Palette.avatarSrc) ? global.Palette.avatarSrc(avatarUrl) : avatarUrl;
       return `<img src="${esc(src)}" alt="">`;

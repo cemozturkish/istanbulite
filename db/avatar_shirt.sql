@@ -1,16 +1,12 @@
--- Layered avatar, part 4: shirt — the odd one out among the layers (see
--- avatar_hair.sql / avatar_hat.sql / avatar_accessory.sql), because it
--- defaults to 'black' for everyone instead of defaulting to none. The
--- column default backfills existing rows too (Postgres fills in the
--- default for a column added with ADD COLUMN, not just new inserts), and
--- the explicit UPDATE below is just belt-and-suspenders for that.
+-- Layered avatar, part 4: shirt — a fourth independent overlay on top of
+-- hair/hat/accessory (see avatar_hair.sql / avatar_hat.sql /
+-- avatar_accessory.sql), same shape as the others: defaults to null (the
+-- plain bare look). 'black' is the one shirt option so far, fully open to
+-- everyone — no lock, just like the hair options.
 
 alter table public.profiles
-  add column if not exists avatar_shirt text default 'black' check (avatar_shirt in ('black'));
-
-update public.profiles set avatar_shirt = 'black' where avatar_shirt is null;
+  add column if not exists avatar_shirt text check (avatar_shirt in ('black'));
 
 -- The existing protect_profile_columns trigger does NOT touch this column,
 -- so the standard "users update their own row" RLS policy already lets the
--- user write it (same reasoning as avatar_hair.sql/avatar_hat.sql) — e.g.
--- to pick 'Yok' (null) and go bare-chested instead of the default shirt.
+-- user write it (same reasoning as avatar_hair.sql/avatar_hat.sql).
