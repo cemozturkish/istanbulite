@@ -677,6 +677,11 @@
     if (_ov.avatarHat === undefined) _ov.avatarHat = _ov.profile?.avatar_hat || null;
     if (_ov.avatarAccessory === undefined) _ov.avatarAccessory = _ov.profile?.avatar_accessory || null;
     if (_ov.avatarShirt === undefined) _ov.avatarShirt = _ov.profile?.avatar_shirt || null;
+    // Settings page opens in read-only "info" mode every time — Kişiselleştir
+    // switches it into the editable avatar-arrows + sliders mode (see
+    // settingsPageHTML/coverHTML), Kaydet saves and the page reload resets
+    // this back to false on its own.
+    _ov.customizing = false;
     renderOverlayBody();
     const overlay = document.getElementById('profile-overlay');
     positionProfileSheet();
@@ -720,16 +725,19 @@
   // editable omitted) so both surfaces render badges identically — the
   // popup just doesn't wire up dragging or avatar-picking on top of it.
   //
-  // When editable, the avatar itself becomes the shared preview for four
-  // independent rows of prev/next arrows underneath it — hair (see
-  // wireHairCarousel), hat (see wireHatCarousel), accessory (see
+  // When editable AND customizing, the avatar itself becomes the shared
+  // preview for four independent rows of prev/next arrows underneath it —
+  // hair (see wireHairCarousel), hat (see wireHatCarousel), accessory (see
   // wireAccessoryCarousel), and shirt (see wireShirtCarousel) — so any
-  // combination of the four can be worn together. `sozculCount` is only
-  // needed in that case, to know whether the locked Sözcü hat should show
-  // unlocked (the accessory row's lock is unconditional — see
-  // AVATAR_ACCESSORY_OPTIONS — so it doesn't need it).
+  // combination of the four can be worn together. When editable but not
+  // customizing, it's just a plain read-only avatar — same as the
+  // non-editable popup — until Kişiselleştir turns the arrows on (see
+  // settingsPageHTML). `sozculCount` is only needed in the customizing
+  // case, to know whether the locked Sözcü hat should show unlocked (the
+  // accessory row's lock is unconditional — see AVATAR_ACCESSORY_OPTIONS —
+  // so it doesn't need it).
   function coverHTML(opts) {
-    const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText, editable, sozculCount } = opts;
+    const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText, editable, customizing, sozculCount } = opts;
     const placed = normalizedCoverBadges(profile);
     const badgesHTML = placed.map(p => {
       const badge = BADGES.find(b => b.id === p.id);
@@ -737,7 +745,7 @@
       return `<img class="ist-pc-cover-badge" data-id="${badge.id}" draggable="false" style="left:${p.x}%; top:${p.y}%;" src="${badge.src}" alt="${esc(badge.label)}" title="${esc(badge.label)}">`;
     }).join('');
     let avatarBlockHTML;
-    if (editable) {
+    if (editable && customizing) {
       const hairOpt = AVATAR_HAIR_OPTIONS[hairOptionIndex(avatarHair)];
       const hatOpt = AVATAR_HAT_OPTIONS[hatOptionIndex(avatarHat)];
       const accessoryOpt = AVATAR_ACCESSORY_OPTIONS[accessoryOptionIndex(avatarAccessory)];
@@ -830,7 +838,7 @@
   // appearance) on the right, matching a two-column layout so both halves
   // fit on screen together without scrolling between "pages".
   function settingsPageHTML(state) {
-    const { I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt } = state;
+    const { I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
@@ -842,6 +850,9 @@
     const languagePref = normalizeLang(profile?.language_pref);
     const themePref = normalizeTheme(profile?.theme_pref);
     const palettePref = normalizePalette(profile?.palette_pref);
+    const langLabel = LANG_VALUES.indexOf(languagePref) === 1 ? 'Daha Türkçe' : 'Daha İngilizce';
+    const paletteLabel = PALETTE_VALUES.indexOf(palettePref) === 1 ? 'Kahverengi' : 'Siyah-Beyaz';
+    const themeLabel = THEME_VALUES.indexOf(themePref) === 1 ? 'Koyu' : 'Açık';
 
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
     const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
@@ -856,7 +867,7 @@
     return `
       <div class="ist-pc-settings-grid">
         <div class="ist-pc-settings-col ist-pc-settings-left">
-          ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText: yasadigiDisplay, editable: true, sozculCount })}
+          ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText: yasadigiDisplay, editable: true, customizing, sozculCount })}
           <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
 
           <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
@@ -914,6 +925,7 @@
           </div>` : ''}
 
           <div class="ist-pc-section-title">${esc(t('profile.tab.ayarlar'))}</div>
+          ${customizing ? `
           <div class="ist-pc-field">
             <div class="ist-pc-label">${esc(t('profile.langpref'))}</div>
             <input class="ist-pc-slider" id="po-language" type="range" min="0" max="1" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
@@ -938,8 +950,22 @@
               <span data-idx="1">Koyu</span>
             </div>
           </div>
+          ` : `
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.langpref'))}</div>
+            <div class="ist-pc-info-value">${esc(langLabel)}</div>
+          </div>
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.colortheme'))}</div>
+            <div class="ist-pc-info-value">${esc(paletteLabel)}</div>
+          </div>
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.appearance'))}</div>
+            <div class="ist-pc-info-value">${esc(themeLabel)}</div>
+          </div>
+          `}
           <div class="ist-pc-actions">
-            <button type="button" class="ist-pc-save" id="po-save">${esc(t('profile.save'))}</button>
+            <button type="button" class="ist-pc-save" id="po-save">${esc(customizing ? t('profile.save') : t('profile.customize'))}</button>
           </div>
           <div class="ist-pc-msg" id="po-save-msg"></div>
         </div>
@@ -969,7 +995,14 @@
       btn.addEventListener('click', () => toggleCoverBadge(btn.dataset.id, state));
     });
 
-    document.getElementById('po-save').addEventListener('click', () => saveSettings(state));
+    document.getElementById('po-save').addEventListener('click', () => {
+      if (state.customizing) {
+        saveSettings(state);
+      } else {
+        state.customizing = true;
+        renderOverlayBody();
+      }
+    });
     const copyBtn = document.getElementById('po-copy');
     if (copyBtn) {
       copyBtn.addEventListener('click', () => {
