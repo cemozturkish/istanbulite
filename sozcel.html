@@ -4316,6 +4316,7 @@ async function loadScoreboard() {
 async function loadTodayResults() {
   const listEl = document.getElementById('today-results-list-takeover');
   if (!listEl) return;
+  const pointsEl = document.getElementById('stk-sozcu-points-total');
   let results = null;
   try {
     const { data, error } = await sb.from('game_results')
@@ -4329,6 +4330,10 @@ async function loadTodayResults() {
   } catch (e) {
     listEl.innerHTML = '<li class="scoreboard-empty">Sonuçlar yüklenemedi</li>';
     return;
+  }
+  if (pointsEl) {
+    const totalSozcuPoints = (results || []).reduce((sum, r) => sum + sozcuPoints(r.attempts, r.won), 0);
+    pointsEl.textContent = `Sözcü puanın: ${totalSozcuPoints}`;
   }
   if (!results || results.length === 0) {
     listEl.innerHTML = '<li class="scoreboard-empty">Bugün henüz kimse oynamadı</li>';
@@ -4894,11 +4899,20 @@ function sozculTakeoverScoreboardHTML() {
   return `
     <div class="scoreboard stk-scoreboard">
       <h2>Bugünün Sonuçları</h2>
+      <div class="scoreboard-countdown" id="stk-sozcu-points-total"></div>
       <ol class="scoreboard-list" id="today-results-list-takeover">
         <li class="scoreboard-empty">Yükleniyor...</li>
       </ol>
     </div>
   `;
+}
+
+// Points the Sözcü earns from each solver's result on their word: 5/1/2/3/2/1
+// for a win found on the 1st–6th guess; 0 if the solver didn't find it.
+function sozcuPoints(attempts, won) {
+  if (!won) return 0;
+  const pts = [5, 1, 2, 3, 2, 1];
+  return pts[attempts - 1] ?? 0;
 }
 
 function renderTakeoverDone(takeover, date) {
