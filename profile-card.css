@@ -126,11 +126,11 @@
   position: absolute;
   left: 50%;
   bottom: 0;
-  width: min(680px, 86vw);
-  height: min(88vh, 860px);
+  width: min(860px, 92vw);
+  max-height: min(88vh, 760px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 40px 20px 16px;
+  padding: 36px 20px 16px;
   transform: translate(-50%, 100%);
   /* Ease-out-quint: fast off the bottom edge, then settles into place
      slowly instead of arriving at a constant speed. */
@@ -178,39 +178,12 @@
   .profile-overlay.open .profile-overlay-sheet { transform: translateY(0); }
 }
 
-.profile-overlay-tabs {
-  display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--hairline);
-  margin-bottom: 10px;
-}
-.profile-overlay-tab {
-  flex: 1;
-  padding: 8px 6px 10px;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--muted);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  transition: color 160ms, border-color 160ms;
-}
-.profile-overlay-tab:hover { color: var(--ink); }
-.profile-overlay-tab.active {
-  color: var(--ink);
-  border-bottom-color: var(--ink);
-}
-
 .profile-overlay-body {
-  max-width: 480px;
+  max-width: 900px;
   margin: 0 auto;
 }
 
-/* ── Profil tab cover ("pano") ──
+/* ── Settings page cover ("pano") ──
    A plain white rectangle — like a cover photo — that the avatar sits on.
    Deliberately white (not the themed --paper token) in every palette/theme:
    it's meant to read as a blank canvas that rozetler (stickers, see
@@ -221,9 +194,9 @@
   position: relative;
   background: #fff;
   border: 2px solid var(--ink);
-  padding: 28px 16px 20px;
-  margin-bottom: 14px;
-  min-height: 230px;
+  padding: 22px 16px 16px;
+  margin-bottom: 10px;
+  min-height: 210px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -231,13 +204,13 @@
   text-align: center;
 }
 
-/* Badges picked in the Rozetler tab (see rozetlerTabHTML/toggleCoverBadge
-   in profile-card.js). Position (left/top) is set inline per-badge as a
-   percentage of the cover box (see coverHTML), so it's read-only markup
-   here — .ist-pc-cover-editable enables actually dragging them (see
-   wireCoverDragging), used only by the self-editing Profil tab; the
-   read-only "someone else's profile" popup renders the same badges at
-   their saved spot but pointer-events stay off. */
+/* Badges picked in the Rozetler section (see settingsPageHTML/
+   toggleCoverBadge in profile-card.js). Position (left/top) is set inline
+   per-badge as a percentage of the cover box (see coverHTML), so it's
+   read-only markup here — .ist-pc-cover-editable enables actually dragging
+   them (see wireCoverDragging), used only by the self-editing settings
+   page; the read-only "someone else's profile" popup renders the same
+   badges at their saved spot but pointer-events stay off. */
 .ist-pc-cover-badge {
   position: absolute;
   width: 84px;
@@ -273,10 +246,16 @@
    parked behind the avatar/name/district would become unreachable to grab
    again, since the element on top normally claims the pointer event. */
 .ist-pc-cover-editable .ist-pc-cover-avatar,
+.ist-pc-cover-editable .ist-pc-cover-avatar-row,
+.ist-pc-cover-editable .ist-pc-cover-avatar-label,
 .ist-pc-cover-editable .ist-pc-cover-name,
 .ist-pc-cover-editable .ist-pc-cover-meta {
   pointer-events: none;
 }
+/* ...except the picker arrows themselves, which need to stay clickable
+   even while a badge could visually sit underneath them (see the comment
+   block above). */
+.ist-pc-cover-editable .ist-pc-cover-avatar-arrow { pointer-events: auto; }
 
 .ist-pc-cover-avatar {
   position: relative;
@@ -295,8 +274,49 @@
   color: #1a1a1a;
   overflow: hidden;
   flex-shrink: 0;
+  transition: opacity 0.15s;
 }
 .ist-pc-cover-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ist-pc-cover-avatar.locked { opacity: 0.45; }
+
+/* Avatar-picker arrows, baked directly into the cover instead of a
+   separate carousel elsewhere (see coverHTML/wireAvatarCarousel in
+   profile-card.js) — picking browses the same hair/Sözcü options as
+   before, just relocated onto the cover avatar itself. */
+.ist-pc-cover-avatar-row {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.ist-pc-cover-avatar-arrow {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background 160ms;
+}
+.ist-pc-cover-avatar-arrow svg { width: 12px; height: 12px; }
+.ist-pc-cover-avatar-arrow:hover { background: #4a4a4a; }
+
+.ist-pc-cover-avatar-label {
+  position: relative;
+  z-index: 3;
+  margin-top: 4px;
+  font-size: 0.6rem;
+  letter-spacing: 0.3px;
+  color: #6b6b6b;
+}
 
 .ist-pc-cover-name {
   position: relative;
@@ -473,24 +493,25 @@
 /* Edit form */
 .ist-pc-field { margin-bottom: 6px; }
 
-/* Ad, Soyad, Yaşadığı İlçe and Doğum Yeri — read-only, all on one line
-   (see the comment above this block in ayarlarTabHTML). */
-.ist-pc-info-line {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
+/* Whole-page split for the combined settings page (see settingsPageHTML in
+   profile-card.js): identity/games/badges on the left, account info and
+   personalization on the right, so both halves show together instead of
+   the old Profil/Ayarlar/Rozetler tab pagination. Stacks to one column
+   below the same breakpoint the profile-overlay-sheet itself switches to
+   its full-width mobile layout at (see profile-card.css's .profile-overlay-sheet). */
+.ist-pc-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
 }
-.ist-pc-info-line-cell { flex: 1; min-width: 0; }
-.ist-pc-info-line-cell .ist-pc-display { padding: 0; }
-
-/* Splits Hesap (left) and Ayarlar personalization (right) into two
-   columns instead of stacking them one after another. */
-.ist-pc-two-col {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
+.ist-pc-settings-col { min-width: 0; }
+@media (max-width: 768px) {
+  .ist-pc-settings-grid {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
 }
-.ist-pc-two-col .ist-pc-col { flex: 1; min-width: 0; }
 
 .ist-pc-label {
   font-size: 0.58rem;
@@ -696,8 +717,8 @@
   min-height: 0;
 }
 
-/* HESAP info rows — single column, since the left/right split with
-   Ayarlar (.ist-pc-two-col) already halves the available width. */
+/* HESAP info rows — single column; the settings-page split
+   (.ist-pc-settings-grid) already halves the available width. */
 .ist-pc-info-row {
   display: flex;
   justify-content: space-between;

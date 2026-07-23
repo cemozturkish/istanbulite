@@ -591,7 +591,6 @@
         sozculCount, kefaletCount, kefilOfUser,
         avatarUrl: state.avatarUrl,
         avatarHair: state.avatarHair,
-        defaultTab: 'profil',
         onAvatarChange(url, hair) {
           state.avatarUrl = url;
           state.avatarHair = hair;
@@ -627,7 +626,6 @@
       <div class="profile-overlay-backdrop" id="profile-overlay-backdrop"></div>
       <div class="profile-overlay-sheet" id="profile-overlay-sheet">
         <button type="button" class="profile-overlay-close" id="profile-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-        <div class="profile-overlay-tabs" id="profile-overlay-tabs"></div>
         <div class="profile-overlay-body" id="profile-overlay-body"></div>
       </div>
     `;
@@ -637,10 +635,6 @@
     document.getElementById('profile-overlay-close').addEventListener('click', closeProfileOverlay);
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && el.classList.contains('open')) closeProfileOverlay();
-    });
-    document.getElementById('profile-overlay-tabs').addEventListener('click', (e) => {
-      const btn = e.target.closest('.profile-overlay-tab');
-      if (btn) setActiveTab(btn.dataset.tab);
     });
   }
 
@@ -665,7 +659,7 @@
     _ov = Object.assign({ sozculCount: 0, kefaletCount: 0, kefilOfUser: null }, opts);
     if (_ov.avatarUrl === undefined) _ov.avatarUrl = _ov.profile?.avatar_url || null;
     if (_ov.avatarHair === undefined) _ov.avatarHair = _ov.profile?.avatar_hair || null;
-    setActiveTab(opts.defaultTab || 'profil');
+    renderOverlayBody();
     const overlay = document.getElementById('profile-overlay');
     positionProfileSheet();
     overlay.hidden = false;
@@ -688,28 +682,11 @@
     setTimeout(() => { overlay.hidden = true; }, 550);
   }
 
-  function setActiveTab(tab) {
-    if (!_ov) return;
-    _ov.activeTab = tab;
-    const t = (k) => (_ov.I18N && _ov.I18N.t) ? _ov.I18N.t(k) : k;
-    const tabs = [
-      { id: 'profil',    label: t('profile.tab.profil') },
-      { id: 'ayarlar',   label: t('profile.tab.ayarlar') },
-      { id: 'rozetler',  label: t('profile.tab.rozetler') },
-    ];
-    document.getElementById('profile-overlay-tabs').innerHTML = tabs.map(tb => `
-      <button type="button" class="profile-overlay-tab${tb.id === tab ? ' active' : ''}" data-tab="${tb.id}">${esc(tb.label)}</button>
-    `).join('');
-    renderOverlayBody();
-  }
-
   function renderOverlayBody() {
     const body = document.getElementById('profile-overlay-body');
     if (!body || !_ov) return;
-    if (_ov.activeTab === 'ayarlar') body.innerHTML = ayarlarTabHTML(_ov);
-    else if (_ov.activeTab === 'rozetler') body.innerHTML = rozetlerTabHTML(_ov);
-    else body.innerHTML = profilTabHTML(_ov);
-    wireTabEvents(_ov.activeTab, _ov);
+    body.innerHTML = settingsPageHTML(_ov);
+    wireSettingsEvents(_ov);
   }
 
   function coverAvatarHTML(avatarUrl, avatarHair) {
@@ -717,25 +694,46 @@
   }
 
   // The white "pano" cover — the avatar sits on it like a Twitter cover
-  // photo, and any rozetler (badges) picked in the Rozetler tab (see
-  // rozetlerTabHTML/toggleCoverBadge) are dragged freely around it (see
-  // wireCoverDragging). Shared between the self-editing Profil tab
-  // (profilTabHTML below, editable: true) and kutuphane.html's read-only
+  // photo, and any rozetler (badges) picked on the settings page (see
+  // settingsPageHTML/toggleCoverBadge) are dragged freely around it (see
+  // wireCoverDragging). Shared between the self-editing settings page
+  // (settingsPageHTML below, editable: true) and kutuphane.html's read-only
   // "someone else's profile" popup (exposed as IstProfileCard.coverHTML,
   // editable omitted) so both surfaces render badges identically — the
-  // popup just doesn't wire up dragging on top of it.
+  // popup just doesn't wire up dragging or avatar-picking on top of it.
+  //
+  // When editable, the avatar itself becomes the carousel preview (see
+  // buildAvatarCarousel/wireAvatarCarousel) with small arrow buttons
+  // flanking it — `sozculCount` is only needed in that case, to know
+  // whether the locked Sözcü slide should show unlocked.
   function coverHTML(opts) {
-    const { profile, avatarUrl, avatarHair, displayName, metaText, editable } = opts;
+    const { profile, avatarUrl, avatarHair, displayName, metaText, editable, sozculCount } = opts;
     const placed = normalizedCoverBadges(profile);
     const badgesHTML = placed.map(p => {
       const badge = BADGES.find(b => b.id === p.id);
       if (!badge) return '';
       return `<img class="ist-pc-cover-badge" data-id="${badge.id}" draggable="false" style="left:${p.x}%; top:${p.y}%;" src="${badge.src}" alt="${esc(badge.label)}" title="${esc(badge.label)}">`;
     }).join('');
+    let avatarBlockHTML;
+    if (editable) {
+      const carouselOpts = avatarCarouselOptions(sozculCount);
+      const idx = avatarCarouselCurrentIndex(carouselOpts, avatarUrl, avatarHair);
+      const opt = carouselOpts[idx];
+      avatarBlockHTML = `
+        <div class="ist-pc-cover-avatar-row">
+          <button type="button" class="ist-pc-cover-avatar-arrow" id="po-avatar-prev" aria-label="Önceki">${ARROW_ICON_LEFT}</button>
+          <div class="ist-pc-cover-avatar${opt.locked ? ' locked' : ''}" id="po-avatar-preview">${avatarCarouselSlideHTML(opt)}</div>
+          <button type="button" class="ist-pc-cover-avatar-arrow" id="po-avatar-next" aria-label="Sonraki">${ARROW_ICON_RIGHT}</button>
+        </div>
+        <div class="ist-pc-cover-avatar-label" id="po-avatar-label">${esc(opt.label)}</div>
+      `;
+    } else {
+      avatarBlockHTML = `<div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, avatarHair)}</div>`;
+    }
     return `
       <div class="ist-pc-cover${editable ? ' ist-pc-cover-editable' : ''}"${editable ? ' id="po-cover"' : ''}>
         ${badgesHTML}
-        <div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, avatarHair)}</div>
+        ${avatarBlockHTML}
         <div class="ist-pc-cover-name">${esc(displayName)}</div>
         <div class="ist-pc-cover-meta">${esc(metaText)}</div>
       </div>
@@ -790,35 +788,18 @@
     cover.addEventListener('pointercancel', onPointerUp);
   }
 
-  // Profil tab: the cover, plus the weekly game grid and the lifetime score
-  // cards. No editable fields here: account info and personalization all
-  // live in the Ayarlar tab now (see ayarlarTabHTML).
-  function profilTabHTML(state) {
-    const { I18N, user, profile, avatarUrl, avatarHair } = state;
-    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
-    const firstName = profile?.first_name || '';
-    const lastName = profile?.last_name || '';
-    const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
-    const yasadigiIlce = profile?.neighborhood || '';
-    const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
-
-    return `
-      ${coverHTML({ profile, avatarUrl, avatarHair, displayName, metaText: yasadigiDisplay, editable: true })}
-
-      <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
-      <div id="po-weekgrid-mount"></div>
-    `;
-  }
-
-  // Ayarlar tab: everything about the account (avatar, name, district,
-  // birthplace, membership/kefil info) plus personalization (language,
-  // color palette, appearance) and sign out — moved here from Profil so
-  // that tab is just identity + games.
-  function ayarlarTabHTML(state) {
+  // The settings page: replaces the old Profil/Ayarlar/Rozetler tab split
+  // with a single non-paginated view — cover (with the avatar carousel
+  // baked in, see coverHTML), the weekly game grid and the rozetler picker
+  // on the left; account info and personalization (language/color/
+  // appearance) on the right, matching a two-column layout so both halves
+  // fit on screen together without scrolling between "pages".
+  function settingsPageHTML(state) {
     const { I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl, avatarHair } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
+    const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
     const yasadigiIlce = profile?.neighborhood || '';
     const dogumYeri = profile?.birth_place || '';
     const phone = profile?.phone || '';
@@ -834,39 +815,25 @@
     const kefilLabel = kefilOfUser
       ? esc(capitalizeName(`${kefilOfUser.first_name||''} ${kefilOfUser.last_name||''}`.trim()) || t('profile.unnamed'))
       : '';
+    const birthDistrict = profile?.birth_place || '';
+    const placedBadgeIds = normalizedCoverBadges(profile).map(e => e.id);
 
     return `
-      <div class="ist-pc-section-title">${esc(t('profile.profileinfo'))}</div>
-      <div class="ist-pc-avatar-field">
-        <div class="ist-pc-label">${esc(t('profile.chooseavatar'))}</div>
-        <div id="po-avatar-picker">${buildAvatarCarousel(avatarUrl, avatarHair, sozculCount)}</div>
-        <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
-      </div>
+      <div class="ist-pc-settings-grid">
+        <div class="ist-pc-settings-col ist-pc-settings-left">
+          ${coverHTML({ profile, avatarUrl, avatarHair, displayName, metaText: yasadigiDisplay, editable: true, sozculCount })}
+          <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
 
-      <!-- Ad, soyad and district are not user-editable for now (protect_profile_columns
-           already reverted district for non-admins; name/lastname are locked here too
-           until an editing flow is decided) — shown read-only, all on one line. -->
-      <div class="ist-pc-info-line">
-        <div class="ist-pc-info-line-cell">
-          <div class="ist-pc-label">${esc(t('profile.firstname'))}</div>
-          <div class="ist-pc-display">${esc(firstName || '—')}</div>
-        </div>
-        <div class="ist-pc-info-line-cell">
-          <div class="ist-pc-label">${esc(t('profile.lastname'))}</div>
-          <div class="ist-pc-display">${esc(lastName || '—')}</div>
-        </div>
-        <div class="ist-pc-info-line-cell">
-          <div class="ist-pc-label">${esc(t('profile.district'))}</div>
-          <div class="ist-pc-display">${esc(yasadigiDisplay)}</div>
-        </div>
-        <div class="ist-pc-info-line-cell">
-          <div class="ist-pc-label">${esc(t('profile.birthplace'))}</div>
-          <div class="ist-pc-display">${esc(dogumDisplay)}</div>
-        </div>
-      </div>
+          <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
+          <div id="po-weekgrid-mount"></div>
 
-      <div class="ist-pc-two-col">
-        <div class="ist-pc-col">
+          <div class="ist-pc-section-title">${esc(t('profile.tab.rozetler'))}</div>
+          <div class="ist-pc-badge-hint">${esc(t('profile.rozetler.hint'))}</div>
+          <div class="ist-pc-badge-grid" id="po-badge-grid">${buildBadgePicker(BADGES, placedBadgeIds, birthDistrict)}</div>
+          <div class="ist-pc-badge-msg" id="po-badge-msg" role="status" aria-live="polite"></div>
+        </div>
+
+        <div class="ist-pc-settings-col ist-pc-settings-right">
           <div class="ist-pc-section-title">${esc(t('profile.account'))}</div>
           <div class="ist-pc-info-row">
             <div class="ist-pc-info-label">${esc(t('profile.email'))}</div>
@@ -877,6 +844,10 @@
             <div class="ist-pc-info-label">${esc(t('profile.phone') || 'Telefon')}</div>
             <div class="ist-pc-info-value">${esc(phone)}</div>
           </div>` : ''}
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.birthplace'))}</div>
+            <div class="ist-pc-info-value">${esc(dogumDisplay)}</div>
+          </div>
           <div class="ist-pc-info-row">
             <div class="ist-pc-info-label">${esc(t('profile.membership'))}</div>
             <div class="ist-pc-info-value">${esc(joinedDate)}</div>
@@ -906,9 +877,7 @@
               <button type="button" class="ist-pc-copy" id="po-copy">${esc(t('profile.copy'))}</button>
             </div>
           </div>` : ''}
-        </div>
 
-        <div class="ist-pc-col">
           <div class="ist-pc-section-title">${esc(t('profile.tab.ayarlar'))}</div>
           <div class="ist-pc-field">
             <div class="ist-pc-label">${esc(t('profile.langpref'))}</div>
@@ -945,63 +914,47 @@
     `;
   }
 
-  // Rozetler tab: a picker grid of district-locked badge stickers. Clicking
-  // an unlocked one toggles it onto the Profil tab's cover (see
-  // profilTabHTML) and saves immediately — same immediate-save pattern as
-  // the avatar picker, no separate Kaydet button.
-  function rozetlerTabHTML(state) {
-    const { I18N, profile } = state;
-    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
-    const birthDistrict = profile?.birth_place || '';
-    const placedIds = normalizedCoverBadges(profile).map(e => e.id);
-    return `
-      <div class="ist-pc-section-title">${esc(t('profile.tab.rozetler'))}</div>
-      <div class="ist-pc-badge-hint">${esc(t('profile.rozetler.hint'))}</div>
-      <div class="ist-pc-badge-grid" id="po-badge-grid">${buildBadgePicker(BADGES, placedIds, birthDistrict)}</div>
-      <div class="ist-pc-badge-msg" id="po-badge-msg" role="status" aria-live="polite"></div>
-    `;
-  }
-
-  function wireTabEvents(tab, state) {
+  // Wires every interactive piece of the combined settings page in one
+  // pass (cover dragging + avatar carousel live on the same cover now, so
+  // both always need wiring together — there's no more per-tab split).
+  function wireSettingsEvents(state) {
     const { sb, I18N, user } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
 
-    if (tab === 'profil') {
-      wireCoverDragging(state);
-      getWeekGameStatus(sb, user.id).then(status => {
-        const m = document.getElementById('po-weekgrid-mount');
-        if (m) m.innerHTML = weekGridHTML(status, I18N);
-      });
-    } else if (tab === 'ayarlar') {
-      wireAvatarCarousel(state);
-      document.getElementById('po-save').addEventListener('click', () => saveAyarlar(state));
-      const copyBtn = document.getElementById('po-copy');
-      if (copyBtn) {
-        copyBtn.addEventListener('click', () => {
-          navigator.clipboard.writeText(state.profile?.referral_code || '');
-          const orig = copyBtn.textContent;
-          copyBtn.textContent = t('profile.copied');
-          setTimeout(() => { copyBtn.textContent = orig; }, 1500);
-        });
-      }
-      syncTicks('po-language', 'po-language-ticks');
-      syncTicks('po-palette', 'po-palette-ticks');
-      syncTicks('po-theme', 'po-theme-ticks');
-      document.getElementById('po-signout').addEventListener('click', async () => {
-        await sb.auth.signOut();
-        window.location.href = 'index.html';
-      });
-    } else if (tab === 'rozetler') {
-      document.querySelectorAll('#po-badge-grid .ist-pc-badge-option').forEach(btn => {
-        btn.addEventListener('click', () => toggleCoverBadge(btn.dataset.id, state));
+    wireCoverDragging(state);
+    wireAvatarCarousel(state);
+    getWeekGameStatus(sb, user.id).then(status => {
+      const m = document.getElementById('po-weekgrid-mount');
+      if (m) m.innerHTML = weekGridHTML(status, I18N);
+    });
+    document.querySelectorAll('#po-badge-grid .ist-pc-badge-option').forEach(btn => {
+      btn.addEventListener('click', () => toggleCoverBadge(btn.dataset.id, state));
+    });
+
+    document.getElementById('po-save').addEventListener('click', () => saveSettings(state));
+    const copyBtn = document.getElementById('po-copy');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(state.profile?.referral_code || '');
+        const orig = copyBtn.textContent;
+        copyBtn.textContent = t('profile.copied');
+        setTimeout(() => { copyBtn.textContent = orig; }, 1500);
       });
     }
+    syncTicks('po-language', 'po-language-ticks');
+    syncTicks('po-palette', 'po-palette-ticks');
+    syncTicks('po-theme', 'po-theme-ticks');
+    document.getElementById('po-signout').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      window.location.href = 'index.html';
+    });
   }
 
-  // Saves the Ayarlar tab's only editable fields — language/palette/
+  // Saves the settings page's only editable fields — language/palette/
   // appearance. Ad/Soyad/Yaşadığı İlçe are read-only for now (see the
-  // comment in ayarlarTabHTML), so there's nothing else to send.
-  async function saveAyarlar(state) {
+  // comment above the info rows in settingsPageHTML), so there's nothing
+  // else to send.
+  async function saveSettings(state) {
     const { sb, I18N, user } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const msgEl = document.getElementById('po-save-msg');
@@ -1219,7 +1172,6 @@
           sozculCount, kefaletCount, kefilOfUser,
           avatarUrl: state.avatarUrl,
           avatarHair: state.avatarHair,
-          defaultTab: 'profil',
           onAvatarChange(url, hair) {
             state.avatarUrl = url;
             state.avatarHair = hair;
