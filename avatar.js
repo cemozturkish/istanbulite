@@ -1,15 +1,15 @@
 // Shared avatar rendering: a fixed bald base (assets/avatar/avatar-base.png)
 // with optional transparent overlays stacked on top, in this order: shirt
-// (assets/avatar-shirt-<value>.png), hair (assets/avatar-hair-<value>.png),
-// hat (assets/avatar-hat-<value>.png), accessory
-// (assets/avatar-accessory-<value>.png) — profiles.avatar_shirt / avatar_hair
-// / avatar_hat / avatar_accessory each pick their own overlay independently,
-// so any combination can be worn together. Shirt is the odd one out: it
-// defaults to 'black' for everyone (profiles.avatar_shirt has a DB default —
-// see db/avatar_shirt.sql — and html()'s own default parameter falls back to
-// it too, so a caller that doesn't pass a shirt at all still gets one; only
-// an explicit `null` renders bare). Hair/hat/accessory default to null/none.
-// The locked Sözcü reward is the 'crown' hat (previously a single full-image
+// (assets/avatar-shirt-<value>.png), accessory
+// (assets/avatar-accessory-<value>.png), hair (assets/avatar-hair-<value>.png),
+// hat (assets/avatar-hat-<value>.png) — accessory sits *under* hair on
+// purpose (glasses temples should disappear behind long hair, not poke
+// through it) — profiles.avatar_shirt / avatar_hair / avatar_hat /
+// avatar_accessory each pick their own overlay independently,
+// so any combination can be worn together, and all four default to null/none
+// (the plain bare-chested/bald look). 'black' is the one shirt option so
+// far, fully open to everyone — no lock, just like the hair options. The
+// locked Sözcü reward is the 'crown' hat (previously a single full-image
 // override via profiles.avatar_url — that column is no longer written, but
 // html() still honors it if set, as a fallback for any row a migration
 // hasn't backfilled yet).
@@ -52,10 +52,10 @@
   // avatar_hat, avatar_accessory, avatar_shirt) set. avatarUrl is only ever
   // a leftover legacy full-image override at this point (see comment above)
   // — a fresh pick never sets it anymore, so the common path is the base +
-  // shirt + hair + hat + accessory stack. No earth/mono color variants for
+  // shirt + accessory + hair + hat stack. No earth/mono color variants for
   // these layers yet (only the legacy avatarUrl path goes through
   // Palette.avatarSrc) — those are plain line art for now.
-  function html(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt = 'black') {
+  function html(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt) {
     if (avatarUrl) {
       const src = (global.Palette && global.Palette.avatarSrc) ? global.Palette.avatarSrc(avatarUrl) : avatarUrl;
       return `<img src="${esc(src)}" alt="">`;
@@ -67,9 +67,9 @@
     return `<span class="ist-avatar-stack">`
       + `<img src="${esc(BASE_URL)}" alt="">`
       + (shirt ? `<img src="${esc(shirt)}" alt="">` : '')
+      + (accessory ? `<img src="${esc(accessory)}" alt="">` : '')
       + (hair ? `<img src="${esc(hair)}" alt="">` : '')
       + (hat ? `<img src="${esc(hat)}" alt="">` : '')
-      + (accessory ? `<img src="${esc(accessory)}" alt="">` : '')
       + `</span>`;
   }
 
