@@ -820,10 +820,14 @@
 
   // The settings page: replaces the old Profil/Ayarlar/Rozetler tab split
   // with a single non-paginated view — cover (with the avatar carousel
-  // baked in, see coverHTML), the weekly game grid and the rozetler picker
-  // on the left; account info and personalization (language/color/
-  // appearance) on the right, matching a two-column layout so both halves
-  // fit on screen together without scrolling between "pages".
+  // baked in, see coverHTML) and the weekly game grid on the left; account
+  // info and personalization (language/color/appearance) on the right,
+  // matching a two-column layout so both halves fit on screen together
+  // without scrolling between "pages". The rozetler (badges) picker that
+  // used to sit under the week grid is temporarily removed to save
+  // vertical space on mobile — see BADGES/buildBadgePicker/toggleCoverBadge
+  // above, kept intact so it can be re-added later; already-placed cover
+  // badges still render via coverHTML.
   function settingsPageHTML(state) {
     const { I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
@@ -847,8 +851,6 @@
     const kefilLabel = kefilOfUser
       ? esc(capitalizeName(`${kefilOfUser.first_name||''} ${kefilOfUser.last_name||''}`.trim()) || t('profile.unnamed'))
       : '';
-    const birthDistrict = profile?.birth_place || '';
-    const placedBadgeIds = normalizedCoverBadges(profile).map(e => e.id);
 
     return `
       <div class="ist-pc-settings-grid">
@@ -858,10 +860,6 @@
 
           <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
           <div id="po-weekgrid-mount"></div>
-
-          <div class="ist-pc-section-title">${esc(t('profile.tab.rozetler'))}</div>
-          <div class="ist-pc-badge-grid" id="po-badge-grid">${buildBadgePicker(BADGES, placedBadgeIds, birthDistrict)}</div>
-          <div class="ist-pc-badge-msg" id="po-badge-msg" role="status" aria-live="polite"></div>
         </div>
 
         <div class="ist-pc-settings-col ist-pc-settings-right">
@@ -974,12 +972,6 @@
       const m = document.getElementById('po-weekgrid-mount');
       if (m) m.innerHTML = weekGridHTML(status, I18N);
     });
-    if (state.customizing) {
-      document.querySelectorAll('#po-badge-grid .ist-pc-badge-option').forEach(btn => {
-        btn.addEventListener('click', () => toggleCoverBadge(btn.dataset.id, state));
-      });
-    }
-
     document.getElementById('po-save').addEventListener('click', () => {
       if (state.customizing) {
         saveSettings(state);
