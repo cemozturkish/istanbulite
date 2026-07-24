@@ -534,7 +534,7 @@
       color: var(--accent);
     }
 
-    /* ── LEFT SIDEBAR (articles) ── */
+    /* ── LEFT SIDEBAR ── */
     .sidebar-left {
       display: flex;
       flex-direction: column;
@@ -543,7 +543,11 @@
       min-height: 0;
     }
 
-    #breaking-news-feed {
+    /* Shared by whichever feed (news or events) lands in the left column's
+       scroll slot below the pinned library-card -- see the swappable
+       #breaking-news-feed/#events-panel markup in #main-site. */
+    #breaking-news-feed,
+    #events-panel {
       overflow-y: auto;
       overflow-x: hidden;
       flex: 1;
@@ -849,7 +853,7 @@
     }
     .article .poll-status.err { color: var(--ink-red); font-size: 0.72rem; margin-top: 6px; }
 
-    /* ── RIGHT SIDEBAR (neighborhood info) ── */
+    /* ── RIGHT SIDEBAR ── */
     .sidebar-right {
       padding: 0;
       overflow-y: auto;
@@ -953,7 +957,7 @@
        layout: the map sits at the very top like a hero banner with the
        profile card floating over its empty/sea-colored band (same
        #f7f7f7 as the map artwork's own background, so the card reads as
-       part of the map rather than a stacked box), then a news/events
+       part of the map rather than a stacked box), then an events/news
        column pair below, all scrolling in #main-site itself, with the
        tab bar pinned fixed at the very bottom (its <header> already
        escapes to the viewport via position:fixed regardless of where
@@ -981,18 +985,18 @@
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
           "map map"
-          "news events";
+          "events news";
         align-content: start;
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
            the map -- a different color from the map's own #f7f7f7,
            breaking the edge-to-edge look right where it's most visible.
            Zero the row gap so the map's bottom edge sits flush against
-           the content below it; the column gap (between news/events)
+           the content below it; the column gap (between events/news)
            is kept, just halved below. */
         row-gap: 0 !important;
         /* Halve frames.css's column-gap (--frame-gap, 10px) between the
-           news and events columns -- the full gap read as too much
+           events and news columns -- the full gap read as too much
            breathing room between the two card stacks on mobile. */
         column-gap: calc(var(--frame-gap) / 2) !important;
         /* #main-site always fills the full viewport height (height:100%
@@ -1122,7 +1126,7 @@
         overflow: visible;
       }
 
-      /* News (left) + events (right): normal in-flow columns below the
+      /* Events (left) + news (right): normal in-flow columns below the
          map, each stacking its own cards top to bottom. Explicit z-index
          (above main's own 0, see main{} above) so they stay on top of
          the map even once it's zoomed in and spilling past its own
@@ -1137,8 +1141,8 @@
         overflow: visible;
         z-index: 1;
       }
-      .col-left { grid-area: news; }
-      .col-right { grid-area: events; }
+      .col-left { grid-area: events; }
+      .col-right { grid-area: news; }
       /* Transparent (inherits the desktop rule's background:none) so
          these read as frameless text floating over the map, same as
          desktop -- #main-site's own background is the same #f7f7f7, so
@@ -1155,7 +1159,7 @@
         overflow: visible;
         display: block;
       }
-      #breaking-news-feed { overflow: visible; }
+      #breaking-news-feed, #events-panel { overflow: visible; }
       .sidebar-right { overflow: visible; display: block; }
       .sidebar-label {
         font-size: 9px;
@@ -1772,7 +1776,7 @@
     <div class="library-card" id="library-card"><div class="card-loading"><span class="spinner"></span></div></div>
     <div class="col-left-slide">
       <section class="sidebar-left" id="left-sidebar">
-        <div id="breaking-news-feed"></div>
+        <div id="events-panel"></div>
       </section>
     </div>
   </aside>
@@ -1906,7 +1910,7 @@
 
   <aside class="col-right">
     <section class="sidebar-right">
-      <div id="events-panel"></div>
+      <div id="breaking-news-feed"></div>
     </section>
   </aside>
   </div>
@@ -2386,8 +2390,8 @@ function safeUrl(u) {
 
 // Slides a feed panel's current cards out toward their column's outer
 // screen edge, then rebuilds it and slides the fresh cards back in from
-// that same edge. `direction` is 'left' (breaking news, left column) or
-// 'right' (events, right column) -- see the .card-entering-*/.card-leaving-*
+// that same edge. `direction` is 'left' (events, left column) or
+// 'right' (breaking news, right column) -- see the .card-entering-*/.card-leaving-*
 // CSS. Renders immediately (no leave animation) on first paint, when the
 // panel starts out empty. Cards enter with a staggered delay by list
 // position, so the topmost card arrives first and lower ones follow.
@@ -2428,7 +2432,7 @@ function animateFeedSwap(container, direction, buildFn, instant) {
 function renderBreakingNewsFeed(rows, instant) {
   const feed = document.getElementById('breaking-news-feed');
   if (!feed) return;
-  animateFeedSwap(feed, 'left', () => renderBreakingNewsFeedNow(feed, rows), instant);
+  animateFeedSwap(feed, 'right', () => renderBreakingNewsFeedNow(feed, rows), instant);
 }
 
 // Full detail markup for a news article — rendered into the detail
@@ -2706,7 +2710,7 @@ async function loadBreakingNews() {
   });
 }
 
-// ── Events (right column) ──────────────────
+// ── Events (left column) ──────────────────
 const MONTH_ABBR_TR = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
 const MONTH_ABBR_EN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
@@ -2847,7 +2851,7 @@ function renderEvents(instant) {
   if (!panel) return;
   let rows = allEvents;
   if (activeNeighborhood) rows = rows.filter(ev => ev.neighborhood === activeNeighborhood);
-  animateFeedSwap(panel, 'right', () => renderEventsNow(panel, rows), instant);
+  animateFeedSwap(panel, 'left', () => renderEventsNow(panel, rows), instant);
 }
 
 // Full detail markup for an event — rendered into the detail overlay's
