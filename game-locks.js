@@ -47,7 +47,7 @@
         opacity: 0;
         pointer-events: none;
         transition: opacity .25s ease;
-        font-family: 'Inter', sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       }
       #game-lock-toast.visible { opacity: 1; }
     `;
