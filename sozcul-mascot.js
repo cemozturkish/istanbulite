@@ -96,7 +96,7 @@
         align-items: flex-end;
         gap: 8px;
         max-width: min(380px, calc(100vw - 36px));
-        font-family: 'Source Serif 4', Georgia, serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
         opacity: 0;
         transform: translateY(14px);
         transition: opacity 280ms ease, transform 280ms ease;
