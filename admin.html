@@ -13,6 +13,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="palette.js"></script>
   <script src="avatar.js"></script>
+  <script src="tbmm.js"></script>
   <link rel="stylesheet" href="palette.css">
   <style>
     :root {
@@ -224,6 +225,24 @@
       grid-template-columns: 1fr;
       max-width: 520px;
     }
+
+    /* TBMM tab: the 600-seat chart needs a lot more width than the usual
+       1fr/1.4fr split gives it. */
+    .admin-body.tbmm-mode {
+      grid-template-columns: 340px 1fr;
+      max-width: 1400px;
+    }
+    .admin-body.tbmm-mode .panel { overflow-y: auto; }
+    #tbmm-admin-chart { max-width: 100%; }
+    .tbmm-svg { display: block; width: 100%; height: auto; }
+    .tbmm-seat {
+      cursor: pointer;
+      stroke: var(--ink);
+      stroke-width: 0;
+      transition: stroke-width 0.1s, opacity 0.1s;
+    }
+    .tbmm-seat:hover { stroke-width: 3; opacity: 0.85; }
+    .tbmm-seat.selected { stroke-width: 4; stroke: var(--danger); }
 
     .admin-tabs {
       display: flex;
@@ -785,6 +804,7 @@
     <button class="admin-tab" data-tab="quotes">Alıntılar</button>
     <button class="admin-tab" data-tab="people">Kişiler</button>
     <button class="admin-tab" data-tab="politicians">Koltuklar</button>
+    <button class="admin-tab" data-tab="tbmm">TBMM</button>
     <button class="admin-tab" data-tab="notifications">Notifications</button>
     <button class="admin-tab" data-tab="users">Users</button>
   </div>
@@ -1340,6 +1360,54 @@
 
   </div>
 
+  <div class="admin-body tbmm-mode" id="tbmm-tab" style="display:none;">
+
+    <!-- LEFT: Tools -->
+    <div class="panel">
+      <div class="panel-title">Bulk Renk / Parti Ata</div>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        Bir koltuk aralığını tek seferde renklendirin/partiye atayın — belirli bir kişi atamadan, sadece grafiğin blok renklerini kurmak için. Zaten atanmış milletvekilleri etkilenmez.
+      </p>
+      <label>Koltuk Aralığı</label>
+      <div style="display:flex;gap:8px;">
+        <input type="number" id="tb-range-from" min="1" max="600" placeholder="Baş (1-600)" style="flex:1;"/>
+        <input type="number" id="tb-range-to" min="1" max="600" placeholder="Son (1-600)" style="flex:1;"/>
+      </div>
+      <label>Parti (opsiyonel)</label>
+      <input type="text" id="tb-range-party" placeholder="Parti adı..."/>
+      <label>Renk</label>
+      <input type="color" id="tb-range-color" value="#d9d3c9"/>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="tb-range-apply-btn">Aralığa Uygula</button>
+      </div>
+      <div class="status-msg" id="tb-range-status"></div>
+
+      <div class="panel-title" style="margin-top:28px;">Tek Koltuk Düzenle</div>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        Sağdaki grafikte bir koltuğa tıklayın, ya da koltuk numarasını doğrudan girin.
+      </p>
+      <label>Koltuk No</label>
+      <input type="number" id="tb-seat-number" min="1" max="600"/>
+      <label>Milletvekili</label>
+      <select id="tb-seat-person"><option value="">— Kimse atanmadı —</option></select>
+      <label>Parti</label>
+      <input type="text" id="tb-seat-party" placeholder="Parti adı..."/>
+      <label>Renk</label>
+      <input type="color" id="tb-seat-color" value="#d9d3c9"/>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="tb-seat-save-btn">Koltuğu Kaydet</button>
+      </div>
+      <div class="status-msg" id="tb-seat-status"></div>
+    </div>
+
+    <!-- RIGHT: Interactive chart -->
+    <div class="panel">
+      <div class="panel-title">Meclis (600 koltuk)</div>
+      <div id="tbmm-admin-chart"><div class="empty-state"><span class="spinner"></span></div></div>
+    </div>
+
+  </div>
+
   <div class="admin-body" id="notifications-tab" style="display:none;">
 
     <!-- LEFT: Post Notification -->
@@ -1500,6 +1568,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('quotes-tab').style.display = (tab === 'quotes') ? '' : 'none';
     document.getElementById('people-tab').style.display = (tab === 'people') ? '' : 'none';
     document.getElementById('politicians-tab').style.display = (tab === 'politicians') ? '' : 'none';
+    document.getElementById('tbmm-tab').style.display = (tab === 'tbmm') ? '' : 'none';
     document.getElementById('notifications-tab').style.display = (tab === 'notifications') ? '' : 'none';
     document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
     if (tab === 'kutuphane') showKutuphaneIndex();
@@ -1510,6 +1579,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'quotes') loadQuotesList();
     if (tab === 'people') loadPeopleTab();
     if (tab === 'politicians') loadPoliticiansTab();
+    if (tab === 'tbmm') loadTBMMTab();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'users') loadUsersList();
   });
@@ -3478,6 +3548,141 @@ document.getElementById('p-submit-btn').addEventListener('click', async () => {
   statusEl.textContent = 'Seat saved!';
   statusEl.className = 'status-msg ok';
   loadPoliticiansList();
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+// ── TBMM: the 600-seat hemicycle chart (public.tbmm_seats) ──
+// Same person roster as Koltuklar (public.politicians), a different kind
+// of seat: seat_number is a purely geometric index (see tbmm.js), with no
+// per-seat title -- just an optional party label + color, independent of
+// whichever specific person (if any) currently holds it, same split as
+// political_seats. The chart itself doubles as the "list" of 600 seats;
+// clicking a dot loads it into the single-seat form below.
+let tbmmSeatsById = null;
+let tbmmPeopleLoaded = false;
+
+async function loadTBMMTab() {
+  if (!tbmmPeopleLoaded) {
+    const { data } = await sb.from('politicians').select('id, first_name, last_name').order('first_name');
+    document.getElementById('tb-seat-person').innerHTML = '<option value="">— Kimse atanmadı —</option>'
+      + (data || []).map(p => `<option value="${p.id}">${escapeHtml(`${p.first_name} ${p.last_name}`.trim())}</option>`).join('');
+    tbmmPeopleLoaded = true;
+  }
+  await refreshTBMMChart();
+}
+
+async function refreshTBMMChart() {
+  const chartEl = document.getElementById('tbmm-admin-chart');
+  const { data, error } = await sb.from('tbmm_seats').select('*, politicians(*)');
+  if (error) { chartEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
+  tbmmSeatsById = {};
+  (data || []).forEach(s => { tbmmSeatsById[s.seat_number] = s; });
+  chartEl.innerHTML = IstTBMM.renderSVG(tbmmSeatsById);
+  chartEl.querySelector('.tbmm-svg').addEventListener('click', (e) => {
+    const dot = e.target.closest('.tbmm-seat');
+    if (dot) selectTBMMSeat(parseInt(dot.dataset.seatNumber, 10));
+  });
+}
+
+function selectTBMMSeat(seatNumber) {
+  const seat = tbmmSeatsById?.[seatNumber];
+  document.getElementById('tb-seat-number').value = seatNumber;
+  document.getElementById('tb-seat-person').value = seat?.politician_id || '';
+  document.getElementById('tb-seat-party').value = seat?.party || '';
+  document.getElementById('tb-seat-color').value = seat?.color || '#d9d3c9';
+  const chartEl = document.getElementById('tbmm-admin-chart');
+  chartEl.querySelectorAll('.tbmm-seat.selected').forEach(el => el.classList.remove('selected'));
+  const dot = chartEl.querySelector(`.tbmm-seat[data-seat-number="${seatNumber}"]`);
+  if (dot) dot.classList.add('selected');
+}
+
+document.getElementById('tb-seat-number').addEventListener('change', () => {
+  const n = parseInt(document.getElementById('tb-seat-number').value, 10);
+  if (n >= 1 && n <= 600) selectTBMMSeat(n);
+});
+
+document.getElementById('tb-seat-save-btn').addEventListener('click', async () => {
+  const seatNumber = parseInt(document.getElementById('tb-seat-number').value, 10);
+  const statusEl = document.getElementById('tb-seat-status');
+  const btn = document.getElementById('tb-seat-save-btn');
+
+  if (!seatNumber || seatNumber < 1 || seatNumber > 600) {
+    statusEl.textContent = 'Geçerli bir koltuk numarası girin (1-600).';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  const politician_id = document.getElementById('tb-seat-person').value || null;
+  const party = document.getElementById('tb-seat-party').value.trim() || null;
+  const color = document.getElementById('tb-seat-color').value || null;
+
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const { error } = await sb.from('tbmm_seats').upsert([{ seat_number: seatNumber, politician_id, party, color }]);
+  btn.textContent = 'Koltuğu Kaydet';
+
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = 'Koltuk kaydedildi!';
+  statusEl.className = 'status-msg ok';
+  await refreshTBMMChart();
+  selectTBMMSeat(seatNumber);
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+document.getElementById('tb-range-apply-btn').addEventListener('click', async () => {
+  const from = parseInt(document.getElementById('tb-range-from').value, 10);
+  const to = parseInt(document.getElementById('tb-range-to').value, 10);
+  const statusEl = document.getElementById('tb-range-status');
+  const btn = document.getElementById('tb-range-apply-btn');
+
+  if (!from || !to || from < 1 || to > 600 || from > to) {
+    statusEl.textContent = 'Geçerli bir aralık girin (1-600, baş ≤ son).';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  const party = document.getElementById('tb-range-party').value.trim() || null;
+  const color = document.getElementById('tb-range-color').value || null;
+
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const seatNumbers = [];
+  for (let n = from; n <= to; n++) seatNumbers.push(n);
+
+  // Only politician_id is preserved from any existing row in the range --
+  // party/color are always overwritten with whatever's in the form, since
+  // that's the whole point of this tool (laying out the chart's party
+  // blocks). Assigned people are never touched by a range apply.
+  const { data: existing, error: fetchError } = await sb.from('tbmm_seats').select('seat_number, politician_id').in('seat_number', seatNumbers);
+  if (fetchError) {
+    statusEl.textContent = fetchError.message;
+    statusEl.className = 'status-msg err';
+    btn.textContent = 'Aralığa Uygula';
+    return;
+  }
+  const existingPersonBySeat = {};
+  (existing || []).forEach(s => { existingPersonBySeat[s.seat_number] = s.politician_id; });
+  const rows = seatNumbers.map(n => ({
+    seat_number: n,
+    politician_id: existingPersonBySeat[n] || null,
+    party, color,
+  }));
+
+  const { error } = await sb.from('tbmm_seats').upsert(rows);
+  btn.textContent = 'Aralığa Uygula';
+
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = `${rows.length} koltuk güncellendi!`;
+  statusEl.className = 'status-msg ok';
+  await refreshTBMMChart();
   setTimeout(() => { statusEl.textContent = ''; }, 3000);
 });
 

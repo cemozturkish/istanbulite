@@ -19,6 +19,7 @@
   <script src="game-locks.js"></script>
   <link rel="stylesheet" href="profile-card.css">
   <script src="avatar.js" defer></script>
+  <script src="tbmm.js" defer></script>
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
@@ -615,18 +616,77 @@
     }
 
     /* ── TBMM info page (rendered into reader-overlay-sheet, see
-       openTBMMSheet) -- plain readable text, the seat-distribution chart
-       shown in the screenshot the admin is drawing will slot in above
-       .tbmm-soon once it exists. */
+       openTBMMSheet) -- intro text + the interactive 600-seat hemicycle
+       chart (see tbmm.js). Which seat is currently *assigned to* a given
+       neighborhood click will change once the Anahane-side map exists,
+       but this page itself won't. */
     .tbmm-page p {
       font-size: 0.9rem;
       line-height: 1.6;
       color: var(--ink);
       margin: 0 0 14px;
     }
-    .tbmm-page .tbmm-soon {
-      font-style: italic;
+    .tbmm-chart {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    .tbmm-svg { display: block; width: 100%; height: auto; }
+    .tbmm-seat {
+      cursor: pointer;
+      stroke: var(--ink);
+      stroke-width: 0;
+      transition: stroke-width 0.1s, opacity 0.1s;
+    }
+    .tbmm-seat:hover { stroke-width: 3; opacity: 0.85; }
+
+    /* Seat detail view -- swapped into the same sheet when a seat is
+       clicked (see openTBMMSeatDetail); "← TBMM" returns to the chart
+       instead of closing the sheet. Same profile-card treatment as
+       Anahane's politician detail sheet. */
+    .tbmm-detail {
+      max-width: 420px;
+      margin: 0 auto;
+      background: var(--paper-card);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      box-shadow: var(--frame-shadow);
+      padding: 24px;
+      text-align: center;
+    }
+    .tbmm-detail-avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 2px solid var(--ink);
+      background: var(--paper-dark);
+      overflow: hidden;
+      position: relative;
+      margin: 0 auto 14px;
+    }
+    .tbmm-detail-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .tbmm-detail-title {
+      font-size: 0.8rem;
       color: var(--muted);
+      margin-top: 2px;
+      margin-bottom: 16px;
+    }
+    .tbmm-detail-row {
+      text-align: left;
+      font-size: 0.86rem;
+      padding: 8px 0;
+      border-top: 1px solid var(--rule);
+    }
+    .tbmm-detail-bio {
+      text-align: left;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-top: 12px;
+      white-space: pre-wrap;
     }
 
     /* ── Reader overlay: a bottom sheet that rises over the map and
@@ -3273,12 +3333,25 @@ function closeReaderOverlay() {
   renderShelfButtons();
 }
 
-// TBMM info page -- opened from the centered #tbmm-open-btn in the
-// reading area, using the same rising bottom sheet as shelves/articles.
-// Plain static info for now; the seat-distribution chart (like the one
-// sketched for reference) needs its own hand-traced graphic first, same
-// as the Anahane map, so it isn't wired in yet -- see .tbmm-soon below.
-function openTBMMSheet() {
+// TBMM page -- opened from the centered #tbmm-open-btn in the reading
+// area, using the same rising bottom sheet as shelves/articles. Which
+// action opens this same page will change later (e.g. a specific
+// Anahane map click instead of this button), but the page itself won't.
+// Seats are fetched once and cached (see db/tbmm_seats.sql + tbmm.js);
+// clicking a seat swaps the sheet's content to that seat's info
+// (openTBMMSeatDetail) with a "← TBMM" back button that re-renders the
+// chart from the same cache instead of refetching.
+let tbmmSeatsById = null;
+
+async function loadTBMMSeats() {
+  if (tbmmSeatsById) return tbmmSeatsById;
+  const { data } = await sb.from('tbmm_seats').select('*, politicians(*)');
+  tbmmSeatsById = {};
+  (data || []).forEach(s => { tbmmSeatsById[s.seat_number] = s; });
+  return tbmmSeatsById;
+}
+
+async function openTBMMSheet() {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
@@ -3289,8 +3362,8 @@ function openTBMMSheet() {
         <h2 class="path-title">TBMM</h2>
       </div>
       <div class="tbmm-page">
-        <p>Türkiye Büyük Millet Meclisi (TBMM), Türkiye Cumhuriyeti'nin yasama organıdır. Ankara'da bulunur; 600 milletvekilinden oluşur ve milletvekilleri 5 yılda bir yapılan seçimlerle belirlenir.</p>
-        <p class="tbmm-soon">Meclisteki güncel parti dağılımını gösteren grafik yakında burada olacak.</p>
+        <p>Türkiye Büyük Millet Meclisi (TBMM), Türkiye Cumhuriyeti'nin yasama organıdır. Ankara'da bulunur; 600 milletvekilinden oluşur ve milletvekilleri 5 yılda bir yapılan seçimlerle belirlenir. Bir koltuğa tıklayarak o milletvekili hakkında bilgi alabilirsiniz.</p>
+        <div class="tbmm-chart" id="tbmm-chart"><div class="empty-state"><span class="spinner"></span></div></div>
       </div>
     </div>
   `;
@@ -3299,7 +3372,49 @@ function openTBMMSheet() {
   overlay.hidden = false;
   requestAnimationFrame(() => overlay.classList.add('open'));
   _closeReaderOverlay = closeReaderOverlay;
+
+  const byId = await loadTBMMSeats();
+  const chart = document.getElementById('tbmm-chart');
+  if (!chart) return; // sheet closed again before the fetch resolved
+  chart.innerHTML = IstTBMM.renderSVG(byId);
+  chart.addEventListener('click', (e) => {
+    const dot = e.target.closest('.tbmm-seat');
+    if (!dot) return;
+    openTBMMSeatDetail(parseInt(dot.dataset.seatNumber, 10));
+  });
 }
+
+async function openTBMMSeatDetail(seatNumber) {
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!area) return;
+  const byId = await loadTBMMSeats();
+  const seat = byId[seatNumber];
+  const p = seat?.politicians || null;
+  const name = p ? `${p.first_name} ${p.last_name}`.trim() : 'Koltuk ' + seatNumber;
+  const birthParts = [];
+  if (p?.birth_date) birthParts.push(I18N.formatDate(p.birth_date, { year: 'numeric', month: 'long', day: 'numeric' }));
+  if (p?.birth_place) birthParts.push(p.birth_place);
+  const avatarHTML = IstAvatar.html(null, p?.avatar_hair, p?.avatar_hat, p?.avatar_accessory, p?.avatar_shirt);
+
+  area.innerHTML = `
+    <div class="shelf-path">
+      <div class="path-head">
+        <button class="path-back" type="button" id="tbmm-detail-back">← TBMM</button>
+        <h2 class="path-title">Koltuk ${seatNumber}</h2>
+      </div>
+      <div class="tbmm-detail">
+        <div class="tbmm-detail-avatar">${avatarHTML}</div>
+        <div class="tbmm-detail-name">${libEsc(name)}</div>
+        <div class="tbmm-detail-title">${libEsc(p?.party || seat?.party || 'Bu koltuğa henüz kimse atanmadı')}</div>
+        ${birthParts.length ? `<div class="tbmm-detail-row"><strong>Doğum:</strong> ${libEsc(birthParts.join(', '))}</div>` : ''}
+        ${p?.bio ? `<p class="tbmm-detail-bio">${libEsc(p.bio)}</p>` : ''}
+      </div>
+    </div>
+  `;
+  document.getElementById('tbmm-detail-back').addEventListener('click', openTBMMSheet);
+  positionReaderSheet();
+}
+
 const tbmmOpenBtn = document.getElementById('tbmm-open-btn');
 if (tbmmOpenBtn) tbmmOpenBtn.addEventListener('click', openTBMMSheet);
 
