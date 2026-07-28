@@ -580,6 +580,55 @@
       font-size: 0.85rem;
     }
 
+    /* Centered call-to-action button, sitting in the otherwise-empty
+       reading area -- opens the TBMM info page in the same reader-overlay
+       sheet used for shelves/articles (see openTBMMSheet). */
+    .tbmm-open-btn {
+      display: block;
+      margin: 80px auto 0;
+      padding: 20px 40px;
+      background: var(--paper-card);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      box-shadow: var(--frame-shadow);
+      cursor: pointer;
+      text-align: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      color: var(--ink);
+      transition: background 0.15s, transform 0.15s ease;
+    }
+    .tbmm-open-btn:hover { background: var(--hover); transform: translateY(-4px); }
+    .tbmm-open-btn-title {
+      display: block;
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .tbmm-open-btn-sub {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ── TBMM info page (rendered into reader-overlay-sheet, see
+       openTBMMSheet) -- plain readable text, the seat-distribution chart
+       shown in the screenshot the admin is drawing will slot in above
+       .tbmm-soon once it exists. */
+    .tbmm-page p {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--ink);
+      margin: 0 0 14px;
+    }
+    .tbmm-page .tbmm-soon {
+      font-style: italic;
+      color: var(--muted);
+    }
+
     /* ── Reader overlay: a bottom sheet that rises over the map and
        shelves when a shelf is opened, mirroring kahvehane's game overlay.
        Houses two interchangeable views rendered into the same sheet: a
@@ -2438,6 +2487,10 @@
   <main>
     <div class="reading-area" id="reading-area">
       <div class="empty-state"></div>
+      <button type="button" class="tbmm-open-btn" id="tbmm-open-btn">
+        <span class="tbmm-open-btn-title">TBMM</span>
+        <span class="tbmm-open-btn-sub">Türkiye Büyük Millet Meclisi</span>
+      </button>
     </div>
   </main>
 
@@ -3219,6 +3272,36 @@ function closeReaderOverlay() {
   setTimeout(() => { overlay.hidden = true; area.innerHTML = ''; }, 550);
   renderShelfButtons();
 }
+
+// TBMM info page -- opened from the centered #tbmm-open-btn in the
+// reading area, using the same rising bottom sheet as shelves/articles.
+// Plain static info for now; the seat-distribution chart (like the one
+// sketched for reference) needs its own hand-traced graphic first, same
+// as the Anahane map, so it isn't wired in yet -- see .tbmm-soon below.
+function openTBMMSheet() {
+  const overlay = document.getElementById('reader-overlay');
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !area) return;
+  area.innerHTML = `
+    <div class="shelf-path">
+      <div class="path-head">
+        <button class="path-back" type="button" id="tbmm-back">← Kütüphane</button>
+        <h2 class="path-title">TBMM</h2>
+      </div>
+      <div class="tbmm-page">
+        <p>Türkiye Büyük Millet Meclisi (TBMM), Türkiye Cumhuriyeti'nin yasama organıdır. Ankara'da bulunur; 600 milletvekilinden oluşur ve milletvekilleri 5 yılda bir yapılan seçimlerle belirlenir.</p>
+        <p class="tbmm-soon">Meclisteki güncel parti dağılımını gösteren grafik yakında burada olacak.</p>
+      </div>
+    </div>
+  `;
+  document.getElementById('tbmm-back').addEventListener('click', closeReaderOverlay);
+  positionReaderSheet();
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  _closeReaderOverlay = closeReaderOverlay;
+}
+const tbmmOpenBtn = document.getElementById('tbmm-open-btn');
+if (tbmmOpenBtn) tbmmOpenBtn.addEventListener('click', openTBMMSheet);
 
 // Table of contents view, rendered into the reader overlay sheet so it
 // rises from the bottom like the reader itself. Reused both when a shelf
