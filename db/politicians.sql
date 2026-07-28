@@ -63,6 +63,7 @@ create table if not exists public.politicians (
   avatar_hat       text,
   avatar_accessory text,
   avatar_shirt     text,
+  in_jail      boolean     not null default false,
   bio          text,
   party        text,
   birth_date   date,
@@ -70,6 +71,12 @@ create table if not exists public.politicians (
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
+
+-- in_jail: admin-only status flag, not a pickable avatar option (see
+-- avatar.js's JAIL_URL overlay, which stacks above every other layer
+-- regardless of hair/hat/accessory/shirt) -- added after this table's
+-- initial rollout, so backfill it for anyone already migrated.
+alter table public.politicians add column if not exists in_jail boolean not null default false;
 
 alter table public.political_seats add column if not exists politician_id uuid references public.politicians(id) on delete set null;
 

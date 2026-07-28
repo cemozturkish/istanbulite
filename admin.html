@@ -1295,6 +1295,11 @@
         </div>
       </div>
 
+      <label style="display:flex;align-items:center;gap:8px;font-weight:400;">
+        <input type="checkbox" id="pp-in-jail" style="width:auto;margin:0;"/>
+        Tutuklu / Hapiste (avatarın üstüne parmaklık eklenir)
+      </label>
+
       <label>Party (optional)</label>
       <input type="text" id="pp-party" placeholder="Parti..."/>
 
@@ -3266,7 +3271,7 @@ const PP_AVATAR_SHIRT_OPTIONS = [
 ];
 
 function personAvatarHTML(p) {
-  return IstAvatar.html(null, p?.avatar_hair || null, p?.avatar_hat || null, p?.avatar_accessory || null, p?.avatar_shirt || null);
+  return IstAvatar.html(null, p?.avatar_hair || null, p?.avatar_hat || null, p?.avatar_accessory || null, p?.avatar_shirt || null, !!p?.in_jail);
 }
 
 function updatePersonAvatarPreview() {
@@ -3275,6 +3280,7 @@ function updatePersonAvatarPreview() {
     avatar_hat: document.getElementById('pp-avatar-hat').value,
     avatar_accessory: document.getElementById('pp-avatar-accessory').value,
     avatar_shirt: document.getElementById('pp-avatar-shirt').value,
+    in_jail: document.getElementById('pp-in-jail').checked,
   });
 }
 
@@ -3290,7 +3296,7 @@ async function loadPeopleTab() {
     fill('pp-avatar-hat', PP_AVATAR_HAT_OPTIONS);
     fill('pp-avatar-accessory', PP_AVATAR_ACCESSORY_OPTIONS);
     fill('pp-avatar-shirt', PP_AVATAR_SHIRT_OPTIONS);
-    ['pp-avatar-hair', 'pp-avatar-hat', 'pp-avatar-accessory', 'pp-avatar-shirt'].forEach(id => {
+    ['pp-avatar-hair', 'pp-avatar-hat', 'pp-avatar-accessory', 'pp-avatar-shirt', 'pp-in-jail'].forEach(id => {
       document.getElementById(id).addEventListener('change', updatePersonAvatarPreview);
     });
     updatePersonAvatarPreview();
@@ -3336,6 +3342,7 @@ function editPerson(p) {
   document.getElementById('pp-avatar-hat').value = p.avatar_hat || '';
   document.getElementById('pp-avatar-accessory').value = p.avatar_accessory || '';
   document.getElementById('pp-avatar-shirt').value = p.avatar_shirt || '';
+  document.getElementById('pp-in-jail').checked = !!p.in_jail;
   updatePersonAvatarPreview();
   document.getElementById('pp-party').value = p.party || '';
   document.getElementById('pp-birth-date').value = p.birth_date || '';
@@ -3355,6 +3362,7 @@ function resetPersonForm() {
   document.getElementById('pp-avatar-hat').value = '';
   document.getElementById('pp-avatar-accessory').value = '';
   document.getElementById('pp-avatar-shirt').value = '';
+  document.getElementById('pp-in-jail').checked = false;
   updatePersonAvatarPreview();
   document.getElementById('pp-party').value = '';
   document.getElementById('pp-birth-date').value = '';
@@ -3375,6 +3383,7 @@ document.getElementById('pp-submit-btn').addEventListener('click', async () => {
   const avatar_hat = document.getElementById('pp-avatar-hat').value || null;
   const avatar_accessory = document.getElementById('pp-avatar-accessory').value || null;
   const avatar_shirt = document.getElementById('pp-avatar-shirt').value || null;
+  const in_jail = document.getElementById('pp-in-jail').checked;
   const party = document.getElementById('pp-party').value.trim() || null;
   const birth_date = document.getElementById('pp-birth-date').value || null;
   const birth_place = document.getElementById('pp-birth-place').value.trim() || null;
@@ -3391,7 +3400,7 @@ document.getElementById('pp-submit-btn').addEventListener('click', async () => {
   statusEl.textContent = ''; statusEl.className = 'status-msg';
   btn.innerHTML = '<span class="spinner"></span>';
 
-  const payload = { first_name, last_name, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt, party, birth_date, birth_place, bio };
+  const payload = { first_name, last_name, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt, in_jail, party, birth_date, birth_place, bio };
   let result;
   if (editingId) {
     result = await sb.from('politicians').update(payload).eq('id', editingId);
