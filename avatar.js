@@ -24,6 +24,11 @@
   const HAIR_URLS = { short: 'assets/avatar/avatar-hair-short.png', long: 'assets/avatar/avatar-hair-long.png' };
   const HAT_URLS = { crown: 'assets/avatar/avatar-hat-crown.png' };
   const ACCESSORY_URLS = { glasses: 'assets/avatar/avatar-accessory-glasses.png' };
+  // Not a pickable option -- admin-only, set per-politician (public.
+  // politicians.in_jail) from admin.html's Kişiler tab, never something a
+  // regular user can put on their own avatar. Always the topmost layer,
+  // over hat included, regardless of what else is worn.
+  const JAIL_URL = 'assets/avatar/jail.png';
   const SOZCU_REQUIRED_COUNT = 10;
 
   function shirtUrl(shirt) {
@@ -49,16 +54,20 @@
   }
 
   // Renders the avatar markup for a profile's (avatar_url, avatar_hair,
-  // avatar_hat, avatar_accessory, avatar_shirt) set. avatarUrl is only ever
-  // a leftover legacy full-image override at this point (see comment above)
-  // — a fresh pick never sets it anymore, so the common path is the base +
-  // shirt + accessory + hair + hat stack. No earth/mono color variants for
-  // these layers yet (only the legacy avatarUrl path goes through
-  // Palette.avatarSrc) — those are plain line art for now.
-  function html(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt) {
+  // avatar_hat, avatar_accessory, avatar_shirt) set, plus an optional
+  // trailing `inJail` flag (politicians only — see JAIL_URL above).
+  // avatarUrl is only ever a leftover legacy full-image override at this
+  // point (see comment above) — a fresh pick never sets it anymore, so
+  // the common path is the base + shirt + accessory + hair + hat stack.
+  // No earth/mono color variants for these layers yet (only the legacy
+  // avatarUrl path goes through Palette.avatarSrc) — those are plain line
+  // art for now.
+  function html(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, inJail) {
+    const jail = inJail ? `<img src="${esc(JAIL_URL)}" alt="">` : '';
     if (avatarUrl) {
       const src = (global.Palette && global.Palette.avatarSrc) ? global.Palette.avatarSrc(avatarUrl) : avatarUrl;
-      return `<img src="${esc(src)}" alt="">`;
+      if (!jail) return `<img src="${esc(src)}" alt="">`;
+      return `<span class="ist-avatar-stack"><img src="${esc(src)}" alt="">${jail}</span>`;
     }
     const shirt = shirtUrl(avatarShirt);
     const hair = hairUrl(avatarHair);
@@ -70,11 +79,12 @@
       + (accessory ? `<img src="${esc(accessory)}" alt="">` : '')
       + (hair ? `<img src="${esc(hair)}" alt="">` : '')
       + (hat ? `<img src="${esc(hat)}" alt="">` : '')
+      + jail
       + `</span>`;
   }
 
   global.IstAvatar = {
-    BASE_URL, SHIRT_URLS, HAIR_URLS, HAT_URLS, ACCESSORY_URLS, SOZCU_REQUIRED_COUNT,
+    BASE_URL, SHIRT_URLS, HAIR_URLS, HAT_URLS, ACCESSORY_URLS, JAIL_URL, SOZCU_REQUIRED_COUNT,
     shirtUrl, hairUrl, hatUrl, accessoryUrl, html,
   };
 })(window);
