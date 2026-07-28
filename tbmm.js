@@ -25,6 +25,15 @@
   // rounded to whole seats via largest-remainder so the total is exactly
   // TOTAL_SEATS regardless of rounding. Computed once and cached — this
   // is pure geometry, never changes at runtime.
+  //
+  // seat_number order sweeps left to right by ANGLE across all rings
+  // together (ties at the same angle broken innermost-ring-first), not
+  // row by row — real parliament diagrams number seats this way so a
+  // contiguous seat_number range reads as a radial wedge (one party's
+  // block cutting across every ring), matching how party blocks actually
+  // look in a hemicycle chart. Numbering row by row instead would make a
+  // "range" fill whole rings before moving to the next one, which looks
+  // like concentric bands, not the wedges a real chart has.
   let _cachedSeats = null;
 
   function seatPositions() {
@@ -44,8 +53,7 @@
       .slice(0, remainder)
       .forEach(({ i }) => { counts[i]++; });
 
-    const seats = [];
-    let seatNumber = 1;
+    const raw = [];
     for (let row = 0; row < ROWS; row++) {
       const n = counts[row];
       const r = radii[row];
@@ -53,14 +61,19 @@
         const t = n === 1 ? 0.5 : j / (n - 1);
         const angleDeg = ANGLE_START + t * (ANGLE_END - ANGLE_START);
         const angleRad = angleDeg * Math.PI / 180;
-        seats.push({
-          seatNumber: seatNumber++,
-          row,
+        raw.push({
+          row, angleDeg,
           cx: CENTER_X + r * Math.cos(angleRad),
           cy: CENTER_Y - r * Math.sin(angleRad),
         });
       }
     }
+    // Descending angle (180° down to 0°) = left to right; ties (every
+    // row's own leftmost/rightmost seat lands on exactly the same angle)
+    // broken by row ascending, i.e. innermost ring first.
+    raw.sort((a, b) => (b.angleDeg - a.angleDeg) || (a.row - b.row));
+
+    const seats = raw.map((s, i) => ({ seatNumber: i + 1, row: s.row, cx: s.cx, cy: s.cy }));
     _cachedSeats = seats;
     return seats;
   }
