@@ -406,6 +406,11 @@
       flex: 1;
       min-height: 0;
     }
+    /* Mirrors #library-card's layout: DOM order in renderPoliticianCard()
+       puts the avatar last (right side) instead of first, and this
+       right-aligns the name/title text next to it -- a true mirror image
+       of the top-left card rather than just a reused style. */
+    .politician-card .card-id { text-align: right; }
 
     main {
       grid-column: 2;
@@ -1922,12 +1927,13 @@
   </main>
 
   <aside class="col-right">
-    <!-- Mirrors #library-card at the top of col-left: İstanbul's Büyükşehir
-         Belediye Başkanı by default, swapped for the clicked district's
-         Belediye Başkanı via renderPoliticianCard() below. Reuses the
-         .library-card class outright for pixel-identical styling instead
-         of duplicating it under a new name. -->
-    <div class="library-card" id="politician-card"><div class="card-loading"><span class="spinner"></span></div></div>
+    <!-- Symmetric mirror of #library-card at the top of col-left: same
+         .library-card visual style, but the extra .politician-card class
+         (see its CSS above) flips the avatar to the right side, and
+         renderPoliticianCard() below renders the avatar/name/text in that
+         reversed order to match. İstanbul's Büyükşehir Belediye Başkanı by
+         default, swapped for the clicked district's Belediye Başkanı. -->
+    <div class="library-card politician-card" id="politician-card"><div class="card-loading"><span class="spinner"></span></div></div>
     <div class="col-right-slide">
       <section class="sidebar-right">
         <div id="breaking-news-feed"></div>
@@ -2281,26 +2287,24 @@ async function loadPoliticians() {
   return politiciansById;
 }
 
-function politicianInitials(p) {
-  return ((p.first_name || '')[0] || '') + ((p.last_name || '')[0] || '');
-}
-
 async function renderPoliticianCard(seatId) {
   const card = document.getElementById('politician-card');
   if (!card) return;
   const byId = await loadPoliticians();
   const p = byId[seatId || 'istanbul'];
   const seatLabel = seatId && seatId !== 'istanbul' ? (districtNames[seatId] || seatId) : 'İstanbul';
+  // Same illustrated avatar system as user profiles (bald base + optional
+  // shirt/accessory/hair/hat overlays) -- an empty seat just renders the
+  // plain bare base, same as a brand-new user with no picks yet.
+  const avatarHTML = IstAvatar.html(null, p?.avatar_hair, p?.avatar_hat, p?.avatar_accessory, p?.avatar_shirt);
 
   card.innerHTML = `
     <div class="card-top">
-      <div class="avatar">${p && p.photo_url
-        ? `<img src="${esc(p.photo_url)}" alt="">`
-        : esc(p ? politicianInitials(p) : '—')}</div>
       <div class="card-id">
         <div class="card-name">${esc(p ? `${p.first_name} ${p.last_name}`.trim() : seatLabel)}</div>
         <div class="card-meta">${esc(p ? p.title : 'Henüz eklenmedi')}</div>
       </div>
+      <div class="avatar">${avatarHTML}</div>
     </div>
   `;
 }

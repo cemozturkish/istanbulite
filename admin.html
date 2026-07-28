@@ -12,6 +12,7 @@
   <title>Admin — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="palette.js"></script>
+  <script src="avatar.js"></script>
   <link rel="stylesheet" href="palette.css">
   <style>
     :root {
@@ -738,6 +739,13 @@
         overflow: visible;
       }
     }
+
+    /* Stacked avatar layers for the politicians tab's live preview + list
+       thumbnails (see avatar.js — base + optional shirt/accessory/hair/hat
+       overlays). Matches profile-card.css's own .ist-avatar-stack, kept
+       local here since this page doesn't otherwise load that stylesheet. */
+    .ist-avatar-stack { position: relative; display: block; width: 100%; height: 100%; }
+    .ist-avatar-stack img { position: absolute; inset: 0; }
   </style>
   <link rel="stylesheet" href="frames.css">
 </head>
@@ -1261,8 +1269,16 @@
       <label>Title</label>
       <input type="text" id="p-title" placeholder="Örn. İstanbul Büyükşehir Belediye Başkanı"/>
 
-      <label>Photo URL (optional)</label>
-      <input type="text" id="p-photo-url" placeholder="https://..."/>
+      <label>Avatar</label>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;">
+        <div id="p-avatar-preview" style="width:56px;height:56px;border-radius:50%;border:2px solid var(--ink);overflow:hidden;flex-shrink:0;position:relative;background:var(--field-bg);"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1;">
+          <select id="p-avatar-hair"></select>
+          <select id="p-avatar-hat"></select>
+          <select id="p-avatar-accessory"></select>
+          <select id="p-avatar-shirt"></select>
+        </div>
+      </div>
 
       <div class="btn-row">
         <button class="btn btn-primary" id="p-submit-btn">Save Seat</button>
@@ -3113,12 +3129,60 @@ async function deleteQuote(id) {
 // ── Politicians: mayors shown on Anahane's top-right card ──
 // Fixed set of 26 "seats" (İstanbul Büyükşehir + 25 ilçe) rather than
 // freeform rows like quotes/events — admin edits who currently holds each
-// seat instead of creating/deleting arbitrary entries.
+// seat instead of creating/deleting arbitrary entries. Same illustrated
+// avatar system as user profiles (avatar.js), picked freely here with no
+// unlock rules -- those only gate a real user's own game history.
 let politiciansSeatsLoaded = false;
 let politiciansNeighborhoodNames = {};
 
+const P_AVATAR_HAIR_OPTIONS = [
+  { value: '', label: 'Kel' },
+  { value: 'short', label: 'Kısa Saç' },
+  { value: 'long', label: 'Uzun Saç' },
+];
+const P_AVATAR_HAT_OPTIONS = [
+  { value: '', label: 'Yok' },
+  { value: 'crown', label: 'Taç' },
+];
+const P_AVATAR_ACCESSORY_OPTIONS = [
+  { value: '', label: 'Yok' },
+  { value: 'glasses', label: 'Gözlük' },
+];
+const P_AVATAR_SHIRT_OPTIONS = [
+  { value: '', label: 'Yok' },
+  { value: 'black', label: 'Siyah Tişört' },
+];
+
+function populatePoliticianAvatarSelects() {
+  function fill(selectId, options) {
+    const sel = document.getElementById(selectId);
+    sel.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+  }
+  fill('p-avatar-hair', P_AVATAR_HAIR_OPTIONS);
+  fill('p-avatar-hat', P_AVATAR_HAT_OPTIONS);
+  fill('p-avatar-accessory', P_AVATAR_ACCESSORY_OPTIONS);
+  fill('p-avatar-shirt', P_AVATAR_SHIRT_OPTIONS);
+}
+
+function politicianAvatarHTML(p) {
+  return IstAvatar.html(null, p?.avatar_hair || null, p?.avatar_hat || null, p?.avatar_accessory || null, p?.avatar_shirt || null);
+}
+
+function updatePoliticianAvatarPreview() {
+  document.getElementById('p-avatar-preview').innerHTML = politicianAvatarHTML({
+    avatar_hair: document.getElementById('p-avatar-hair').value,
+    avatar_hat: document.getElementById('p-avatar-hat').value,
+    avatar_accessory: document.getElementById('p-avatar-accessory').value,
+    avatar_shirt: document.getElementById('p-avatar-shirt').value,
+  });
+}
+
 async function loadPoliticiansTab() {
   if (!politiciansSeatsLoaded) {
+    populatePoliticianAvatarSelects();
+    ['p-avatar-hair', 'p-avatar-hat', 'p-avatar-accessory', 'p-avatar-shirt'].forEach(id => {
+      document.getElementById(id).addEventListener('change', updatePoliticianAvatarPreview);
+    });
     const { data, error } = await sb.from('neighborhoods').select('id, name_tr').order('name_tr');
     if (!error && data) {
       const seatSel = document.getElementById('p-seat');
@@ -3136,6 +3200,7 @@ async function loadPoliticiansTab() {
       });
       politiciansSeatsLoaded = true;
     }
+    updatePoliticianAvatarPreview();
   }
   loadPoliticiansList();
 }
@@ -3159,9 +3224,12 @@ async function loadPoliticiansList() {
     return `
       <div class="article-card" data-id="${seatId}">
         <div class="a-neighborhood">${escapeHtml(politicianSeatLabel(seatId))}</div>
-        ${filled
-          ? `<p>${escapeHtml(`${p.first_name} ${p.last_name}`.trim())}</p><p style="color:var(--muted);">${escapeHtml(p.title || '')}</p>`
-          : `<p style="color:var(--muted);font-style:italic;">— boş —</p>`}
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:40px;height:40px;border-radius:50%;border:2px solid var(--ink);overflow:hidden;flex-shrink:0;position:relative;background:var(--field-bg);">${politicianAvatarHTML(p)}</div>
+          ${filled
+            ? `<div><p style="margin:0;">${escapeHtml(`${p.first_name} ${p.last_name}`.trim())}</p><p style="margin:0;color:var(--muted);">${escapeHtml(p.title || '')}</p></div>`
+            : `<p style="color:var(--muted);font-style:italic;margin:0;">— boş —</p>`}
+        </div>
         <div class="card-actions">
           <button class="btn-edit" data-act="p-edit" data-id="${seatId}">Edit</button>
         </div>
@@ -3179,7 +3247,11 @@ function editPoliticianSeat(seatId, p) {
   document.getElementById('p-first-name').value = p?.first_name || '';
   document.getElementById('p-last-name').value = p?.last_name || '';
   document.getElementById('p-title').value = p?.title || '';
-  document.getElementById('p-photo-url').value = p?.photo_url || '';
+  document.getElementById('p-avatar-hair').value = p?.avatar_hair || '';
+  document.getElementById('p-avatar-hat').value = p?.avatar_hat || '';
+  document.getElementById('p-avatar-accessory').value = p?.avatar_accessory || '';
+  document.getElementById('p-avatar-shirt').value = p?.avatar_shirt || '';
+  updatePoliticianAvatarPreview();
   document.getElementById('p-form-mode-label').textContent = 'Editing: ' + politicianSeatLabel(seatId);
   document.getElementById('p-clear-btn').style.display = p ? 'inline-block' : 'none';
   document.querySelector('#politicians-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
@@ -3189,7 +3261,11 @@ function resetPoliticianForm() {
   document.getElementById('p-first-name').value = '';
   document.getElementById('p-last-name').value = '';
   document.getElementById('p-title').value = '';
-  document.getElementById('p-photo-url').value = '';
+  document.getElementById('p-avatar-hair').value = '';
+  document.getElementById('p-avatar-hat').value = '';
+  document.getElementById('p-avatar-accessory').value = '';
+  document.getElementById('p-avatar-shirt').value = '';
+  updatePoliticianAvatarPreview();
   document.getElementById('p-form-mode-label').textContent = 'Edit Seat';
   document.getElementById('p-clear-btn').style.display = 'none';
 }
@@ -3205,7 +3281,10 @@ document.getElementById('p-submit-btn').addEventListener('click', async () => {
   const first_name = document.getElementById('p-first-name').value.trim();
   const last_name = document.getElementById('p-last-name').value.trim();
   const title = document.getElementById('p-title').value.trim();
-  const photo_url = document.getElementById('p-photo-url').value.trim();
+  const avatar_hair = document.getElementById('p-avatar-hair').value || null;
+  const avatar_hat = document.getElementById('p-avatar-hat').value || null;
+  const avatar_accessory = document.getElementById('p-avatar-accessory').value || null;
+  const avatar_shirt = document.getElementById('p-avatar-shirt').value || null;
   const statusEl = document.getElementById('p-form-status');
   const btn = document.getElementById('p-submit-btn');
 
@@ -3222,7 +3301,7 @@ document.getElementById('p-submit-btn').addEventListener('click', async () => {
     id: seatId,
     neighborhood: seatId === 'istanbul' ? null : seatId,
     first_name, last_name, title,
-    photo_url: photo_url || null,
+    avatar_hair, avatar_hat, avatar_accessory, avatar_shirt,
   }]);
 
   btn.textContent = 'Save Seat';
