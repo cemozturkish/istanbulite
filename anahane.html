@@ -411,6 +411,10 @@
        right-aligns the name/title text next to it -- a true mirror image
        of the top-left card rather than just a reused style. */
     .politician-card .card-id { text-align: right; }
+    /* Clicking the card opens the detail bottom sheet (see the delegated
+       #politician-card click listener) -- unlike #library-card, the whole
+       card is the click target, not just an inner edit button. */
+    .politician-card { cursor: pointer; }
 
     main {
       grid-column: 2;
@@ -1674,9 +1678,58 @@
     /* Comfortable reading width for the card sitting inside the sheet,
        centered rather than stretched edge-to-edge. */
     .detail-overlay-body .article,
-    .detail-overlay-body .event-item {
+    .detail-overlay-body .event-item,
+    .detail-overlay-body .politician-detail {
       max-width: 520px;
       margin: 0 auto;
+    }
+
+    /* Politician detail sheet -- opened from #politician-card (see
+       buildPoliticianDetailHtml). Same card treatment as .article
+       (background/border/shadow), but a centered profile layout instead
+       of an article's kicker+headline. */
+    .politician-detail {
+      background: var(--paper-card);
+      border: 2px solid var(--card-border-color);
+      border-bottom: 5px solid var(--card-border-color);
+      padding: 24px;
+      color: var(--card-fg);
+      text-align: center;
+    }
+    .politician-detail-avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 2px solid var(--card-border-color);
+      background: var(--paper-dark);
+      overflow: hidden;
+      position: relative;
+      margin: 0 auto 14px;
+    }
+    .politician-detail-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--card-fg-heading);
+    }
+    .politician-detail-title {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 2px;
+      margin-bottom: 16px;
+    }
+    .politician-detail-row {
+      text-align: left;
+      font-size: 0.86rem;
+      padding: 8px 0;
+      border-top: 1px solid var(--rule);
+    }
+    .politician-detail-bio {
+      text-align: left;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-top: 12px;
+      white-space: pre-wrap;
     }
     @media (max-width: 768px) {
       .detail-overlay-sheet {
@@ -2272,39 +2325,77 @@ function baseMapLabel() {
 
 // ── Politician card (top-right, desktop) ───────────────────────
 // Mirrors #library-card at the top-left: the İstanbul Büyükşehir Belediye
-// Başkanı by default, swapped for the clicked district's Belediye Başkanı
-// (see public.politicians, managed from admin.html — nothing here is
-// hardcoded, since officeholders change). Fetched once and cached, since
-// there are only ever 26 rows (İstanbul + the 25 districts) and they
-// rarely change.
-let politiciansById = null;
+// Başkanı by default, swapped for the clicked district's Belediye Başkanı.
+// Backed by two tables (see db/politicians.sql) so a person's data (name,
+// avatar, bio) is independent of which seat, if any, they currently hold:
+//   public.politicians     — the people roster
+//   public.political_seats — id ('istanbul' or a neighborhood id) ->
+//                            politician_id + title
+// Nothing here is hardcoded, since officeholders change. Fetched once and
+// cached, since there are only ever 26 seats and they rarely change.
+let politicalSeatsById = null;
 
-async function loadPoliticians() {
-  if (politiciansById) return politiciansById;
-  const { data } = await sb.from('politicians').select('*');
-  politiciansById = {};
-  (data || []).forEach(p => { politiciansById[p.id] = p; });
-  return politiciansById;
+async function loadPoliticalSeats() {
+  if (politicalSeatsById) return politicalSeatsById;
+  const { data } = await sb.from('political_seats').select('*, politicians(*)');
+  politicalSeatsById = {};
+  (data || []).forEach(s => { politicalSeatsById[s.id] = s; });
+  return politicalSeatsById;
+}
+
+function politicianAvatarHTML(p) {
+  // Same illustrated avatar system as user profiles (bald base + optional
+  // shirt/accessory/hair/hat overlays) -- an empty/vacant seat just
+  // renders the plain bare base, same as a brand-new user with no picks.
+  return IstAvatar.html(null, p?.avatar_hair, p?.avatar_hat, p?.avatar_accessory, p?.avatar_shirt);
 }
 
 async function renderPoliticianCard(seatId) {
   const card = document.getElementById('politician-card');
   if (!card) return;
-  const byId = await loadPoliticians();
-  const p = byId[seatId || 'istanbul'];
+  const byId = await loadPoliticalSeats();
+  const seat = byId[seatId || 'istanbul'];
+  const p = seat?.politicians || null;
   const seatLabel = seatId && seatId !== 'istanbul' ? (districtNames[seatId] || seatId) : 'İstanbul';
-  // Same illustrated avatar system as user profiles (bald base + optional
-  // shirt/accessory/hair/hat overlays) -- an empty seat just renders the
-  // plain bare base, same as a brand-new user with no picks yet.
-  const avatarHTML = IstAvatar.html(null, p?.avatar_hair, p?.avatar_hat, p?.avatar_accessory, p?.avatar_shirt);
 
   card.innerHTML = `
     <div class="card-top">
       <div class="card-id">
         <div class="card-name">${esc(p ? `${p.first_name} ${p.last_name}`.trim() : seatLabel)}</div>
-        <div class="card-meta">${esc(p ? p.title : 'Henüz eklenmedi')}</div>
+        <div class="card-meta">${esc(seat?.title || 'Henüz eklenmedi')}</div>
       </div>
-      <div class="avatar">${avatarHTML}</div>
+      <div class="avatar">${politicianAvatarHTML(p)}</div>
+    </div>
+  `;
+}
+
+// Opens the shared bottom-sheet (see openDetail) with the currently-shown
+// seat's full info -- looked up fresh from the cache at click time rather
+// than stashed on the card, so it always reflects whatever seat/district
+// is currently active on the map.
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#politician-card') || !politicalSeatsById) return;
+  const seatId = activeNeighborhood || 'istanbul';
+  const seat = politicalSeatsById[seatId];
+  const seatLabel = seatId !== 'istanbul' ? (districtNames[seatId] || seatId) : 'İstanbul';
+  openDetail(buildPoliticianDetailHtml(seat, seatLabel));
+});
+
+function buildPoliticianDetailHtml(seat, seatLabel) {
+  const p = seat?.politicians || null;
+  const name = p ? `${p.first_name} ${p.last_name}`.trim() : seatLabel;
+  const birthParts = [];
+  if (p?.birth_date) birthParts.push(I18N.formatDate(p.birth_date, { year: 'numeric', month: 'long', day: 'numeric' }));
+  if (p?.birth_place) birthParts.push(p.birth_place);
+  return `
+    <div class="politician-detail">
+      <div class="politician-detail-avatar">${politicianAvatarHTML(p)}</div>
+      <div class="politician-detail-name">${esc(name)}</div>
+      <div class="politician-detail-title">${esc(seat?.title || 'Henüz eklenmedi')}</div>
+      ${p?.party ? `<div class="politician-detail-row"><strong>Parti:</strong> ${esc(p.party)}</div>` : ''}
+      ${birthParts.length ? `<div class="politician-detail-row"><strong>Doğum:</strong> ${esc(birthParts.join(', '))}</div>` : ''}
+      ${p?.bio ? `<p class="politician-detail-bio">${esc(p.bio)}</p>` : ''}
+      ${!p ? `<p class="politician-detail-bio" style="font-style:italic;color:var(--muted);">Bu koltuğa henüz kimse atanmadı.</p>` : ''}
     </div>
   `;
 }
