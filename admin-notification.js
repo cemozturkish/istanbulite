@@ -39,7 +39,7 @@
         align-items: flex-start;
         gap: 8px;
         max-width: min(380px, calc(100vw - 36px));
-        font-family: 'Source Serif 4', Georgia, serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
         opacity: 0;
         transform: translateY(14px);
         transition: opacity 280ms ease, transform 280ms ease;
@@ -91,7 +91,7 @@
         #admin-notif-popup {
           left: 12px;
           right: 12px;
-          bottom: calc(96px + env(safe-area-inset-bottom) + 12px);
+          bottom: calc(38px + env(safe-area-inset-bottom) + 12px);
           max-width: none;
           align-items: stretch;
         }
@@ -198,7 +198,7 @@
     // TEMP: dog art isn't uploaded yet — use the cat PNG for dog mascots too
     // so the popup doesn't show a broken image. Restore the dog branch once
     // assets/mascot-dog-left.png exists.
-    const src = 'assets/mascot-cat-left.png';
+    const src = 'assets/mascot/mascot-cat-left.png';
     const escaped = String(text).replace(/[&<>"']/g,
       c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     root.innerHTML = `

@@ -96,7 +96,7 @@
         align-items: flex-end;
         gap: 8px;
         max-width: min(380px, calc(100vw - 36px));
-        font-family: 'Source Serif 4', Georgia, serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
         opacity: 0;
         transform: translateY(14px);
         transition: opacity 280ms ease, transform 280ms ease;
@@ -115,7 +115,7 @@
         box-shadow: 0 10px 30px rgba(0,0,0,0.22);
         max-width: 100%;
       }
-      #sozcul-mascot-popup .szm-bubble strong { color: var(--ink-red, #a4322b); }
+      #sozcul-mascot-popup .szm-bubble strong { color: var(--ink-red, #B93631); }
       #sozcul-mascot-popup .szm-close {
         position: absolute;
         top: 6px;
@@ -146,7 +146,7 @@
         #sozcul-mascot-popup {
           left: 12px;
           right: 12px;
-          bottom: calc(96px + env(safe-area-inset-bottom) + 12px);
+          bottom: calc(38px + env(safe-area-inset-bottom) + 12px);
           max-width: none;
           align-items: stretch;
         }
@@ -161,13 +161,13 @@
       @keyframes sozcul-glow {
         0%, 100% {
           box-shadow:
-            0 0 0 0 rgba(164, 50, 43, 0.0),
-            0 0 18px 4px rgba(164, 50, 43, 0.0);
+            0 0 0 0 rgba(185, 54, 49, 0.0),
+            0 0 18px 4px rgba(185, 54, 49, 0.0);
         }
         50% {
           box-shadow:
-            0 0 0 2px rgba(164, 50, 43, 0.55),
-            0 0 22px 6px rgba(164, 50, 43, 0.35);
+            0 0 0 2px rgba(185, 54, 49, 0.55),
+            0 0 22px 6px rgba(185, 54, 49, 0.35);
         }
       }
     `;
@@ -203,7 +203,7 @@
     // TEMP: dog art isn't uploaded yet — use the cat PNG for dog mascots too
     // so the popup doesn't show a broken image. Restore the dog branch once
     // assets/mascot-dog-right.png exists.
-    const src = 'assets/mascot-cat-right.png';
+    const src = 'assets/mascot/mascot-cat-right.png';
     root.innerHTML = `
       <div class="szm-bubble">
         ${html}

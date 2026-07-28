@@ -5,9 +5,10 @@
   <link rel="apple-touch-icon" href="assets/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f0f0f0">
   <title>Kahvehane — istanbulite.net</title>
   <script src="safe-area-ready.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -17,6 +18,8 @@
   <link rel="stylesheet" href="palette.css">
   <script src="game-locks.js"></script>
   <link rel="stylesheet" href="profile-card.css">
+  <script src="avatar.js" defer></script>
+  <script src="politician-card.js" defer></script>
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
@@ -63,7 +66,7 @@
       --hairline: #c5ad9a;
       --whisper: #d4bbad;
       /* Newspaper accents */
-      --ink-red: #a4322b;
+      --ink-red: #B93631;
       --brown-1: #b8947a;
       --brown-2: #866955;
       --brown-3: #775742;
@@ -90,7 +93,7 @@
     }
 
     body {
-      font-family: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       background-color: var(--paper);
       color: var(--ink);
       height: 100vh;
@@ -136,6 +139,16 @@
       justify-content: center;
       align-items: center;
       padding: 14px 28px 10px 28px;
+      /* main now carries z-index:0 (see main{} below) to keep its fixed
+         .map-panel child contained in its own stacking context instead of
+         escaping to the root -- but that also makes main's whole subtree,
+         including the full-bleed map, paint above any *non*-stacking-context
+         sibling. .col-left/.col-right already get z-index:501 from
+         frames.css (for the bottom-sheet layering, desktop-only), so they
+         were unaffected; .section-rule had no z-index of its own and ended
+         up buried under the map (matches anahane). A plain positive z-index
+         (any value above main's 0) is enough to put it back on top. */
+      z-index: 1;
     }
 
     header {
@@ -151,7 +164,7 @@
       text-align: center;
       text-decoration: none;
       color: var(--muted);
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.78rem;
       font-weight: 600;
       letter-spacing: 4px;
@@ -185,7 +198,7 @@
     }
     .col-left .nb-highlight {
       padding: 12px 18px;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.68rem;
       font-weight: 700;
       letter-spacing: 3px;
@@ -204,6 +217,21 @@
       flex-direction: column;
       overflow-y: hidden;
     }
+    /* Wraps everything in .col-right except #politician-card, mirroring
+       .col-left-slide -- keeps the politician card visually still during
+       the slide/view-transition animations below while the games section
+       slides (see anahane.html's own .col-right-slide for the same
+       pattern). */
+    .col-right-slide {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    /* Mirrors #library-card's layout: avatar on the right, name/title
+       text right-aligned next to it -- see politician-card.js. */
+    .politician-card .card-id { text-align: right; }
+    .politician-card { cursor: pointer; }
 
     main {
       grid-column: 2;
@@ -212,13 +240,17 @@
       flex-direction: column;
       overflow: hidden;
       min-height: 0;
-      /* main's only child is .map-panel, which escapes to position:fixed
-         with a negative z-index (see below) — meaning main's own
-         (invisible but still hit-testable) box sits in front of it in
-         the root stacking context and was silently swallowing every
-         click meant for the map. Nothing else lives in main, so letting
-         clicks pass straight through it is safe; .map-panel re-enables
+      /* z-index (any explicit value, grid items don't need `position` for
+         this) gives main its own stacking context, so its fixed/negative
+         z-index child .map-panel stays contained within main's local
+         paint order instead of escaping all the way to the root stacking
+         context. Without this, .map-panel ends up stacked below
+         #main-site's own box, which silently intercepted every hover/
+         click meant for the map's SVG hit-regions before they ever
+         reached them. Nothing else lives in main, so letting clicks pass
+         straight through main's own box is safe; .map-panel re-enables
          pointer-events for itself and its children below. */
+      z-index: 0;
       pointer-events: none;
     }
 
@@ -256,7 +288,7 @@
     }
 
     /* Hit-region overlay traced against map-photo (same 5046x2300 source
-       image) — see assets/istanbul-map.svg for the source of truth; keep
+       image) — see assets/map/istanbul-map.svg for the source of truth; keep
        this copy and anahane.html's in sync. */
     .map-panel svg.map-svg {
       position: absolute;
@@ -292,8 +324,11 @@
 
     /* Hover: dim the artwork under the cursor (matches anahane) — a
        transparent ink tint, not an element-opacity fade, so the black
-       stroke borders stay black instead of washing out to gray. */
-    .neighborhood:hover { fill: rgba(var(--ink-rgb), 0.18); }
+       stroke borders stay black instead of washing out to gray.
+       .hover-active is toggled via JS on every polygon sharing the same
+       data-neighborhood, so multi-polygon districts (e.g. Şişli) light
+       up as one unit instead of just the piece under the cursor. */
+    .neighborhood:hover, .neighborhood.hover-active { fill: rgba(var(--ink-rgb), 0.18); }
     /* Clicked/active: darker tint + outline (matches anahane exactly —
        was a much stronger brown-1 tint before, which read as the
        district turning solid brown instead of just a darker shade of
@@ -311,7 +346,7 @@
       stroke-width: 4;
       stroke-dasharray: 10 6;
     }
-    .neighborhood.home:hover { fill: rgba(130, 55, 48, 0.26); }
+    .neighborhood.home:hover, .neighborhood.home.hover-active { fill: rgba(130, 55, 48, 0.26); }
     .neighborhood.home.active { fill: rgba(130, 55, 48, 0.38); stroke: var(--brown-4); stroke-dasharray: none; }
 
     /* Plain text, no frame/shadow — matches the HANE/KÜTÜPHANE/KAHVEHANE
@@ -323,7 +358,7 @@
       transform: translateX(-50%);
       z-index: 100;
       text-align: center;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.78rem;
       font-weight: 700;
       letter-spacing: 4px;
@@ -366,8 +401,8 @@
     }
 
     /* Wraps the heading + 3 game links; stays visible while a game's bottom
-       sheet is open (see enterGameContext) so the buttons and the
-       scoreboard (narrowed to that game) both stay on screen. */
+       sheet is open so the buttons and the full weekly scoreboard both
+       stay on screen. */
     .game-picker {
       display: flex;
       flex-direction: column;
@@ -375,6 +410,9 @@
       flex-shrink: 0;
     }
 
+    /* Fixed white/transparent, matching the .post / Anahane news+event
+       cards floating on the map photo -- not --paper-warm, so this
+       doesn't retheme with earth/mono like the games column used to. */
     .games-section h2 {
       font-size: 0.95rem;
       font-weight: 700;
@@ -382,8 +420,9 @@
       text-align: center;
       letter-spacing: 2px;
       flex-shrink: 0;
-      border: 2px solid var(--ink);
-      background: var(--paper-warm);
+      border: 2px solid #1a1a1a;
+      background: rgba(255, 255, 255, 0.85);
+      color: #1a1a1a;
       padding: 10px 12px;
     }
 
@@ -401,8 +440,9 @@
       text-align: center;
       letter-spacing: 2px;
       text-transform: uppercase;
-      border: 2px solid var(--ink);
-      background: var(--paper-warm);
+      border: 2px solid #1a1a1a;
+      background: rgba(255, 255, 255, 0.85);
+      color: #1a1a1a;
       padding: 8px 12px;
     }
     .scoreboard-list {
@@ -422,11 +462,14 @@
       border: 1px solid var(--rule);
       font-size: 0.75rem;
     }
-    /* 4-stop brown gradient on the row BACKGROUND. Dark-bg rows flip text to paper. */
-    .scoreboard-item { background: var(--brown-1); color: var(--ink); border-color: var(--brown-2); }
-    .scoreboard-item.r1 { background: var(--brown-4); color: var(--paper); border-color: var(--ink); }
-    .scoreboard-item.r2 { background: var(--brown-3); color: var(--paper); }
-    .scoreboard-item.r3 { background: var(--brown-2); color: var(--paper); }
+    /* 4-stop dark-tint gradient on the row background, fixed white/black
+       (not the palette's brown-*) so these read as the same frosted
+       glass over the map photo as the .post / Anahane cards -- more
+       transparent for the plain rows, darker+more opaque toward rank 1. */
+    .scoreboard-item { background: rgba(255, 255, 255, 0.7); color: #1a1a1a; border-color: rgba(26, 26, 26, 0.2); }
+    .scoreboard-item.r1 { background: rgba(26, 26, 26, 0.75); color: #fff; border-color: #1a1a1a; }
+    .scoreboard-item.r2 { background: rgba(26, 26, 26, 0.55); color: #fff; }
+    .scoreboard-item.r3 { background: rgba(26, 26, 26, 0.4); color: #fff; }
     .scoreboard-rank {
       font-weight: 700;
       color: inherit;
@@ -462,7 +505,7 @@
       color: var(--muted);
       text-align: center;
       padding: 2px 4px 0;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       letter-spacing: 1px;
       font-style: italic;
     }
@@ -481,39 +524,42 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #fff;
-      border: 1px solid var(--rule);
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(26, 26, 26, 0.25);
       font-size: 0.5rem;
       font-weight: 700;
-      color: var(--muted);
-      font-family: 'Inter', sans-serif;
+      color: #868686;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
     }
-    .week-day.past { background: var(--muted); border-color: var(--muted); color: var(--paper); }
-    .week-day.today { background: var(--paper); border: 3px double var(--ink); color: var(--ink); }
-    .week-day.future { background: #fff; border-color: var(--rule); color: var(--muted); }
+    .week-day.past { background: rgba(26, 26, 26, 0.5); border-color: rgba(26, 26, 26, 0.5); color: #fff; }
+    .week-day.today { background: rgba(255, 255, 255, 0.85); border: 3px double #1a1a1a; color: #1a1a1a; }
+    .week-day.future { background: rgba(255, 255, 255, 0.85); border-color: rgba(26, 26, 26, 0.25); color: #868686; }
     /* Scoreboard rows are clickable end-to-end (not just the name) and
        nudge left on hover, same feel as the game-link cards above. */
     .scoreboard-item.author-link { cursor: pointer; transition: transform 0.15s ease; }
     .scoreboard-item.author-link:hover { transform: translateX(-4px); text-decoration: none; }
 
     /* Chapter-box style, matching the Kütüphane reading-path nodes
-       (.path-node): thick ink border with a heavier bottom edge. */
+       (.path-node): thick ink border with a heavier bottom edge. Fixed
+       white/transparent + dark ink, matching the .post / Anahane
+       news+event cards over the map photo, instead of the palette-driven
+       --paper-warm/--ink these used to retheme with under earth/mono. */
     .game-link {
       display: block;
-      background: var(--paper-warm);
-      border: 2px solid var(--ink);
-      border-bottom: 5px solid var(--ink);
+      background: rgba(255, 255, 255, 0.85);
+      border: 2px solid #1a1a1a;
+      border-bottom: 5px solid #1a1a1a;
       padding: 14px;
       text-align: center;
       text-decoration: none;
-      color: var(--ink);
+      color: #1a1a1a;
       transition: background 0.2s, border-color 0.2s, transform 0.15s ease, filter 0.1s ease;
       position: relative;
       flex-shrink: 0;
     }
 
     .game-link:hover {
-      background: var(--paper-dark);
+      background: rgba(232, 232, 232, 0.85);
       transform: translateX(-4px);
     }
     /* Pressed feedback: darken whatever the current state's colors are
@@ -536,18 +582,20 @@
       display: none;
     }
 
-    /* Started today (light warm) vs completed today (dim dark brown) */
+    /* Started today (brighter/more opaque white) vs completed today (dark
+       tinted, dimmed) -- same fixed white/black frosted-glass treatment
+       as the base tile, not the palette's --paper-card/--brown-3. */
     .game-link.started {
-      background: var(--paper-card);
-      color: var(--accent);
+      background: rgba(255, 255, 255, 0.95);
+      color: #4C3B31;
     }
     .game-link.started .game-link-subtitle { color: var(--muted); }
     .game-link.completed {
-      background: var(--brown-3);
-      color: var(--paper);
-      border-color: var(--brown-4);
+      background: rgba(26, 26, 26, 0.55);
+      color: #fff;
+      border-color: #1a1a1a;
     }
-    .game-link.completed .game-link-subtitle { color: var(--paper-card); }
+    .game-link.completed .game-link-subtitle { color: rgba(255, 255, 255, 0.7); }
 
     /* Swiping/tapping into Kahvehane slides the whole right column in as
        one rigid block (see .col-right's own 0.32s transform below),
@@ -643,7 +691,7 @@
       border-bottom: 5px solid var(--ink);
       border-radius: 0;
       background: var(--paper-warm);
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.9rem;
       resize: vertical;
     }
@@ -658,7 +706,7 @@
       border: 2px solid var(--ink);
       border-bottom: 5px solid var(--ink);
       border-radius: 0;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.85rem;
       font-weight: 700;
       letter-spacing: 1px;
@@ -749,12 +797,12 @@
     }
 
     .post-neighborhood {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.62rem;
       font-weight: 700;
       letter-spacing: 2.5px;
       text-transform: uppercase;
-      color: #e07a72;
+      color: var(--ink-red);
     }
 
     .post-time {
@@ -766,7 +814,7 @@
     }
 
     .post-content {
-      font-family: 'Source Serif 4', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.9rem;
       line-height: 1.5;
       color: #1a1a1a;
@@ -794,7 +842,7 @@
       text-transform: uppercase;
       cursor: pointer;
       color: var(--ink);
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
     }
     .load-more-btn:hover { background: var(--hover, #e0e0e0); }
     .load-more-btn:disabled { opacity: 0.6; cursor: default; }
@@ -810,7 +858,7 @@
       font-size: 1rem;
       line-height: 1;
       padding: 2px 6px;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       opacity: 0;
       transition: opacity 0.15s, color 0.15s;
     }
@@ -925,7 +973,7 @@
         row-gap: 0 !important;
         /* Reserve space for fixed bottom tab bar + a frame-gap so the
            cards don't visually press against the nav (frames.css design). */
-        padding-bottom: calc(96px + env(safe-area-inset-bottom) + var(--frame-gap, 10px));
+        padding-bottom: calc(38px + env(safe-area-inset-bottom) + var(--frame-gap, 10px));
       }
       /* Defensive fallback, not the primary fix (see grid-template-rows'
          own comment above): row 2 now stretches to fill the viewport, so
@@ -1104,6 +1152,9 @@
          on mobile — the desktop-only #library-card would just take up
          space above the discussion feed. */
       #library-card { display: none; }
+      /* Politician card is desktop-only, same as #library-card -- nothing
+         replaces it on mobile. */
+      #politician-card { display: none; }
       /* Fills .col-left's height exactly; min-height:0 lets it (and,
          in turn, .discussion-posts below) shrink to fit rather than
          overflowing the fixed column. */
@@ -1213,11 +1264,10 @@
          hiding) the scoreboard's own h2 below. */
       .game-picker h2 { display: none; }
       /* Hidden on mobile -- stays part of the games section in markup
-         (loadScoreboard() still runs, keeping it ready for a game
-         context), it just isn't shown on the main tile view here;
-         there isn't room for it alongside the tiles without either
-         scrolling the page or shrinking the tiles, neither of which is
-         wanted. */
+         (loadScoreboard() still runs), it just isn't shown on the main
+         tile view here; there isn't room for it alongside the tiles
+         without either scrolling the page or shrinking the tiles,
+         neither of which is wanted. */
       .scoreboard { display: none; }
       /* Grows to fill .games-section-inner's own height instead of
          sizing to content (overriding the desktop rule's flex-shrink:0)
@@ -1274,13 +1324,15 @@
         max-width: 100%;
       }
 
-      /* Bottom tab bar — fixed at bottom */
+      /* Bottom tab bar — fixed at bottom. Thinned from the top; labels sit
+         flush against the bottom edge (the safe-area padding below is what
+         separates them from the home-indicator area). */
       header {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
-        height: 96px;
+        height: 38px;
         padding: 0 0 env(safe-area-inset-bottom);
         margin: 0;
         border-top: 1px solid var(--rule);
@@ -1305,14 +1357,14 @@
       nav a {
         flex: 1;
         display: flex;
-        align-items: center;
+        align-items: flex-end;
         justify-content: center;
+        padding-bottom: 6px;
         font-size: 16px;
         font-weight: 600;
         letter-spacing: 0.5px;
         text-transform: uppercase;
         color: var(--muted);
-        padding: 0;
         border: none;
         text-decoration: none;
       }
@@ -1348,7 +1400,7 @@
        left edge, right column toward the right edge — regardless of nav
        direction; nav stays ── */
     @media (min-width: 769px) {
-      .col-left-slide, .col-right {
+      .col-left-slide, .col-right-slide {
         transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: transform;
         backface-visibility: hidden;
@@ -1358,8 +1410,8 @@
         transform: translateX(-100vw);
         transition: none;
       }
-      html.ist-entering-forward .col-right,
-      html.ist-entering-backward .col-right {
+      html.ist-entering-forward .col-right-slide,
+      html.ist-entering-backward .col-right-slide {
         transform: translateX(100vw);
         transition: none;
       }
@@ -1367,8 +1419,8 @@
       body.ist-exiting-backward .col-left-slide {
         transform: translateX(-100vw);
       }
-      body.ist-exiting-forward .col-right,
-      body.ist-exiting-backward .col-right {
+      body.ist-exiting-forward .col-right-slide,
+      body.ist-exiting-backward .col-right-slide {
         transform: translateX(100vw);
       }
     }
@@ -1395,7 +1447,22 @@
     }
 
     .col-left-slide { view-transition-name: ist-col-left; }
-    .col-right { view-transition-name: ist-col-right; }
+    .col-right-slide { view-transition-name: ist-col-right; }
+
+    /* The browser's own view-transition-group animation interpolates this
+       named box's size/position between the outgoing and incoming page's
+       rect. Kahvehane's col-right (the stacked game tiles) sits at a
+       different height/position than col-right on the other pages (news/
+       events), so that automatic box-morph -- stacked on top of the slide
+       keyframes below -- swung the outgoing snapshot across the wrong part
+       of the screen mid-transition, on top of the fixed nav bar (the view-
+       transition layer always paints above it regardless of z-index).
+       Disabling it pins the group to the new page's rect immediately; the
+       keyframes below do 100% of the visible motion. */
+    ::view-transition-group(ist-col-left),
+    ::view-transition-group(ist-col-right) {
+      animation: none;
+    }
 
     /* Desktop: left column always exits/enters via the left edge, right
        column via the right edge — independent of nav direction, so no
@@ -1562,6 +1629,117 @@
       }
     }
 
+    /* ── Detail overlay: bottom sheet for #politician-card's full info
+       (see politician-card.js). A plain HTML-content sheet, unlike
+       .game-overlay's iframe -- same sizing/positioning formula as
+       .game-overlay-sheet above so both read as the same kind of window. */
+    .detail-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+    }
+    .detail-overlay[hidden] { display: none; }
+    .detail-overlay-backdrop {
+      position: absolute;
+      inset: 0;
+      background: transparent;
+    }
+    .detail-overlay-sheet {
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      width: min(680px, 86vw);
+      height: min(88vh, 860px);
+      overflow-y: auto;
+      transform: translate(-50%, 100%);
+      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .detail-overlay.open .detail-overlay-sheet { transform: translate(-50%, 0); }
+    .detail-overlay-close {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      z-index: 2;
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: none;
+      color: var(--ink);
+      font-size: 1rem;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .detail-overlay-close .close-icon { width: 22px; height: 22px; display: block; }
+    .detail-overlay-body { padding: 48px 24px 24px; }
+    .detail-overlay-body .politician-detail { max-width: 520px; margin: 0 auto; }
+
+    /* Politician detail sheet -- opened from #politician-card. Same card
+       treatment as the rest of the page (background/border/shadow via
+       frames.css's shared flat-card rule), centered profile layout. */
+    .politician-detail {
+      background: var(--paper-card);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      padding: 24px;
+      text-align: center;
+    }
+    .politician-detail-avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 2px solid var(--ink);
+      background: var(--paper-dark);
+      overflow: hidden;
+      position: relative;
+      margin: 0 auto 14px;
+    }
+    .politician-detail-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .politician-detail-title {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 2px;
+      margin-bottom: 16px;
+    }
+    .politician-detail-row {
+      text-align: left;
+      font-size: 0.86rem;
+      padding: 8px 0;
+      border-top: 1px solid var(--rule);
+    }
+    .politician-detail-bio {
+      text-align: left;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-top: 12px;
+      white-space: pre-wrap;
+    }
+    @media (max-width: 1240px) {
+      body:has(.detail-overlay.open) .col-left,
+      body:has(.detail-overlay.open) .col-right {
+        visibility: hidden;
+      }
+    }
+    @media (max-width: 768px) {
+      .detail-overlay-sheet {
+        top: var(--frame-pad, 10px);
+        left: var(--frame-pad, 10px);
+        right: var(--frame-pad, 10px);
+        bottom: 0;
+        width: auto;
+        height: auto;
+        transform: translateY(100%);
+      }
+      .detail-overlay.open .detail-overlay-sheet { transform: translateY(0); }
+    }
+
     /* ── Profile popup ── */
     .profile-popup-overlay {
       position: fixed;
@@ -1582,72 +1760,45 @@
       overflow: auto;
       padding: 24px;
       position: relative;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
     }
     .profile-popup .close-btn {
       position: absolute;
-      top: 8px;
+      top: 10px;
       right: 10px;
+      width: 26px;
+      height: 26px;
       background: none;
       border: none;
-      font-size: 1.4rem;
       cursor: pointer;
       color: var(--muted);
       line-height: 1;
-      padding: 4px 8px;
-    }
-    .profile-popup .close-btn:hover { color: var(--ink); }
-    .profile-popup .pp-avatar {
-      width: 96px;
-      height: 96px;
-      border-radius: 50%;
-      background: var(--paper-dark);
-      border: 1px solid var(--rule);
+      padding: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2.2rem;
-      font-weight: 600;
-      color: var(--accent);
-      margin: 0 auto 14px;
-      overflow: hidden;
     }
-    .profile-popup .pp-avatar img {
-      width: 100%; height: 100%; object-fit: cover;
+    .profile-popup .close-btn:hover { color: var(--ink); }
+    .profile-popup .close-btn .close-icon {
+      width: 17px;
+      height: 17px;
+      display: block;
     }
-    .profile-popup .pp-name {
-      text-align: center;
-      font-size: 1.1rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
+    /* Cover reuses the shared .ist-pc-cover markup from profile-card.css
+       (IstProfileCard.coverHTML), but shorter than its default 258px (that
+       height suits the self-editing settings page, which stacks avatar
+       carousel arrows underneath) and pushed down a bit so it clears the
+       close button in this corner instead of overlapping it. */
+    .profile-popup .ist-pc-cover {
+      height: 190px;
+      margin-top: 16px;
     }
-    .profile-popup .pp-meta {
-      text-align: center;
-      font-size: 0.72rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 16px;
-    }
-    .profile-popup .pp-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 0;
-      border-top: 1px solid #e5e5e5;
-      font-size: 0.8rem;
-    }
-    .profile-popup .pp-row .pp-label {
-      color: var(--muted);
-      text-transform: uppercase;
-      font-size: 0.65rem;
-      letter-spacing: 1.5px;
-      align-self: center;
-    }
-    .profile-popup .pp-row .pp-value {
-      color: var(--ink);
-      font-weight: 500;
-      text-align: right;
+    /* The weekly game grid (.ist-pc-weekgrid) gets a frame added below
+       since, unlike the cover, it has no border of its own in the shared
+       CSS. */
+    .profile-popup .ist-pc-weekgrid {
+      border: 1px solid var(--ink);
+      padding: 8px 8px 6px;
     }
     .profile-popup .pp-since {
       text-align: center;
@@ -1658,6 +1809,7 @@
       padding-top: 12px;
       border-top: 1px solid #e5e5e5;
     }
+    .profile-popup .pp-since-kefil { margin-top: 4px; text-transform: uppercase; }
     .profile-popup .pp-loading,
     .profile-popup .pp-error {
       text-align: center;
@@ -1722,10 +1874,10 @@
       <!-- Scaled/panned as one unit by map-zoom.js (pinch to zoom, drag
            to pan once zoomed) -- map-label below stays outside it. -->
       <div class="map-zoom-layer">
-      <img class="map-photo" src="assets/istanbul-map.png" alt="">
+      <img class="map-photo" src="assets/map/istanbul-map.png" alt="">
 
       <!-- Hit-region overlay traced against map-photo (same 5046x2300
-           source image) — see assets/istanbul-map.svg for the source of
+           source image) — see assets/map/istanbul-map.svg for the source of
            truth; keep this copy and anahane.html's in sync. -->
       <svg class="map-svg" viewBox="0 0 5046 2300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
         <g id="Layer_2" data-name="Layer 2">
@@ -1839,6 +1991,13 @@
   </main>
 
   <aside class="col-right">
+    <!-- Mirrors #library-card at the top of col-left: this neighborhood's
+         Belediye Başkanı (see politician-card.js's mount()). Reuses the
+         .library-card class outright for pixel-identical styling;
+         .politician-card's own CSS above flips the avatar to the right
+         side. -->
+    <div class="library-card politician-card" id="politician-card"><div class="card-loading"><span class="spinner"></span></div></div>
+    <div class="col-right-slide">
     <section class="games-section">
       <div class="games-section-inner">
         <div class="game-picker" id="game-picker">
@@ -1875,6 +2034,7 @@
         </div>
       </div>
     </section>
+    </div>
   </aside>
   </div>
 
@@ -1887,6 +2047,16 @@
     <div class="game-overlay-backdrop" id="game-overlay-backdrop"></div>
     <div class="game-overlay-sheet" id="game-overlay-sheet">
       <iframe class="game-overlay-frame" id="game-overlay-frame" title="Oyun"></iframe>
+    </div>
+  </div>
+
+  <!-- Detail overlay: bottom sheet for #politician-card's full info (see
+       politician-card.js and initDetailOverlay further down). -->
+  <div class="detail-overlay" id="detail-overlay" hidden>
+    <div class="detail-overlay-backdrop" id="detail-overlay-backdrop"></div>
+    <div class="detail-overlay-sheet" id="detail-overlay-sheet">
+      <button type="button" class="detail-overlay-close" id="detail-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
+      <div class="detail-overlay-body" id="detail-overlay-body"></div>
     </div>
   </div>
 
@@ -1903,36 +2073,11 @@
 // navigating away from Kahvehane. Closing it — the ✕ button, clicking
 // the backdrop, or a postMessage from the game's own ← Geri button
 // (see sozcel.html/tumcel.html/bulmaca.html) — just hides the sheet;
-// Kahvehane itself was never actually left.
-//
-// Opening/closing the sheet also narrows the scoreboard, the same way
-// clicking a neighborhood on the map swaps it: from the full weekly board
-// down to just that game's own scoreboard. The game links stay put so
-// switching games (or backing out to the picker) doesn't require closing
-// the sheet. The left column (discussion feed) is left alone — the game
-// already has its own "?" help button, so a duplicate instructions blurb
-// here was redundant.
-const GAME_DISPLAY_NAMES = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Bulmaca' };
-
-let gameContextActive = null;
-
-// The game links stay visible while a game is open (so switching games or
-// bailing back to the picker doesn't require closing the sheet first) —
-// only the scoreboard narrows down to the open game's own board. Passing
-// includeGameLinks=false keeps them out of the entrance cascade entirely:
-// they never actually left the screen (only the scoreboard rows below
-// them are swapping), so animating them in again here would look like
-// they'd just arrived.
-function enterGameContext(gameKey) {
-  gameContextActive = gameKey;
-  loadScoreboard(null, gameKey, false, false);
-}
-
-function exitGameContext() {
-  if (!gameContextActive) return;
-  gameContextActive = null;
-  loadScoreboard(activeMapNeighborhood || null, null, false, false);
-}
+// Kahvehane itself was never actually left. The scoreboard stays on the
+// full weekly board throughout — opening a game doesn't narrow it to that
+// game's own scores. The left column (discussion feed) is left alone —
+// the game already has its own "?" help button, so a duplicate
+// instructions blurb here was redundant.
 
 (function initGameOverlay() {
   const overlay = document.getElementById('game-overlay');
@@ -1956,12 +2101,11 @@ function exitGameContext() {
     sheet.style.top = `${Math.max(cardBottom, 0) + framePad}px`;
   }
 
-  function openGame(href, gameKey) {
+  function openGame(href) {
     positionGameSheet();
     frame.src = href;
     overlay.hidden = false;
     requestAnimationFrame(() => overlay.classList.add('open'));
-    if (gameKey) enterGameContext(gameKey);
   }
   function closeGame() {
     overlay.classList.remove('open');
@@ -1971,7 +2115,6 @@ function exitGameContext() {
       overlay.hidden = true;
       frame.src = 'about:blank';
     }, 550);
-    exitGameContext();
   }
   window.addEventListener('resize', () => {
     if (overlay.classList.contains('open')) positionGameSheet();
@@ -1987,13 +2130,56 @@ function exitGameContext() {
     if (!link) return;
     e.preventDefault();
     if (link.classList.contains('locked')) return;
-    openGame(link.getAttribute('href'), link.dataset.game);
+    openGame(link.getAttribute('href'));
   });
   // No standalone ✕ — the game's own ← back button (postMessage below)
   // and clicking outside the sheet both close it.
   backdrop.addEventListener('click', closeGame);
   window.addEventListener('message', (e) => {
     if (e.source === frame.contentWindow && e.data === 'ist-close-game-overlay') closeGame();
+  });
+})();
+
+// Detail overlay: a plain HTML-content bottom sheet for #politician-card
+// (see politician-card.js), separate from .game-overlay since that one's
+// iframe-only. Same sizing/mobile-positioning formula as the game overlay
+// above so both read as the same kind of window.
+function openDetail(html) {
+  const overlay = document.getElementById('detail-overlay');
+  const body = document.getElementById('detail-overlay-body');
+  if (!overlay || !body) return;
+  body.innerHTML = html;
+  positionDetailSheet();
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('open'));
+}
+function closeDetail() {
+  const overlay = document.getElementById('detail-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('open');
+  setTimeout(() => { overlay.hidden = true; }, 550);
+}
+function positionDetailSheet() {
+  const sheet = document.getElementById('detail-overlay-sheet');
+  if (!sheet) return;
+  if (!window.matchMedia('(max-width: 768px)').matches) { sheet.style.top = ''; return; }
+  const framePad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-pad')) || 10;
+  const pcMount = document.getElementById('ist-pc-mount');
+  const cardBottom = pcMount ? pcMount.getBoundingClientRect().bottom : 0;
+  sheet.style.top = `${Math.max(cardBottom, 0) + framePad}px`;
+}
+(function initDetailOverlay() {
+  const overlay = document.getElementById('detail-overlay');
+  const backdrop = document.getElementById('detail-overlay-backdrop');
+  const closeBtn = document.getElementById('detail-overlay-close');
+  if (!overlay || !backdrop || !closeBtn) return;
+  backdrop.addEventListener('click', closeDetail);
+  closeBtn.addEventListener('click', closeDetail);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeDetail();
+  });
+  window.addEventListener('resize', () => {
+    if (overlay.classList.contains('open')) positionDetailSheet();
   });
 })();
 
@@ -2142,6 +2328,18 @@ window.addEventListener('resize', syncColumnHeights);
 
 async function mount() {
   await refreshHomeNeighborhood();
+  // Default politician card is this user's own neighborhood's mayor (not
+  // İstanbul's, unlike Anahane's map-driven card) -- see politician-card.js.
+  // homeNeighborhood is resolved by refreshHomeNeighborhood() above, so
+  // this only ever renders once we know it (never null in practice, since
+  // every profile requires a neighborhood).
+  if (window.IstPoliticianCard && homeNeighborhood) {
+    IstPoliticianCard.mount({
+      sb, mountElId: 'politician-card', seatId: homeNeighborhood,
+      seatLabel: neighborhoodNames[homeNeighborhood] || homeNeighborhood,
+      openDetail,
+    });
+  }
   updateSubmitFormVisibility();
   syncColumnHeights();
   // header's own safe-area-inset-bottom padding can resolve a moment
@@ -2406,27 +2604,20 @@ function clearWeekProgress(el) {
   el.dataset.mode = '';
 }
 
-async function loadScoreboard(neighborhoodFilter = null, gameFilter = null, instant = false, includeGameLinks = true) {
+async function loadScoreboard(neighborhoodFilter = null, instant = false) {
   const listEl = document.getElementById('scoreboard-list');
   if (!listEl) return;
   const titleEl = document.getElementById('scoreboard-title');
   const countdownEl = document.getElementById('scoreboard-countdown');
-  // Game links sit above the scoreboard and never get rebuilt. On the
-  // page's own arrival they join the same top-to-bottom entrance cascade
-  // as the scoreboard rows below them -- but opening/closing a game
-  // overlay (see enterGameContext/exitGameContext) also calls this to
-  // narrow/widen the board, and there the links never actually left the
-  // screen, so includeGameLinks=false keeps them out of that cascade.
-  const gameLinks = includeGameLinks ? Array.from(document.querySelectorAll('.games-section .game-link')) : [];
+  // Game links sit above the scoreboard and never get rebuilt; they join
+  // the same top-to-bottom entrance cascade as the scoreboard rows below.
+  const gameLinks = Array.from(document.querySelectorAll('.games-section .game-link'));
   const setList = (html) => animateFeedSwap(listEl, 'right', () => { listEl.innerHTML = html; }, gameLinks, instant);
 
-  // Title + countdown swap: a filtered view is per-neighborhood or
-  // per-game (no weekly countdown shown for those narrowed views), while
-  // the unfiltered default is the full weekly leaderboard.
-  if (gameFilter) {
-    const gameName = (GAME_DISPLAY_NAMES[gameFilter] || gameFilter).toLocaleUpperCase('tr-TR');
-    if (titleEl) titleEl.textContent = `${gameName} — Skor Tahtası`;
-  } else if (neighborhoodFilter) {
+  // Title + countdown swap: a filtered view is per-neighborhood (no weekly
+  // countdown shown there), while the unfiltered default is the full
+  // weekly leaderboard.
+  if (neighborhoodFilter) {
     const nbName = neighborhoodNames[neighborhoodFilter] || neighborhoodFilter;
     if (titleEl) titleEl.textContent = I18N.formatNeighborhoodBest(nbName.toLocaleUpperCase('tr-TR'));
     clearWeekProgress(countdownEl);
@@ -2439,7 +2630,7 @@ async function loadScoreboard(neighborhoodFilter = null, gameFilter = null, inst
     const { data, error } = await sb
       .from('game_results')
       .select('user_id, neighborhood, date, won, attempts, created_at')
-      .eq('game', gameFilter || 'sozcel')
+      .eq('game', 'sozcel')
       .gte('attempts', 1);
     if (error) throw error;
     results = data;
@@ -2549,8 +2740,12 @@ async function loadScoreboard(neighborhoodFilter = null, gameFilter = null, inst
       );
     }
     const nbName = (neighborhoodNames[p.neighborhood] || p.neighborhood || '').toLocaleUpperCase('tr-TR');
-    const suffix = getAblativeSuffix(nbName).toLocaleUpperCase('tr-TR');
-    const playerLabel = nbName ? `${nbName}${suffix} ${escapeHtml(p.name)}` : escapeHtml(p.name);
+    let playerLabel = escapeHtml(p.name);
+    if (nbName) {
+      playerLabel = I18N.isEnglish()
+        ? `${escapeHtml(p.name)} FROM ${nbName}`
+        : `${nbName}${getAblativeSuffix(nbName).toLocaleUpperCase('tr-TR')} ${escapeHtml(p.name)}`;
+    }
     return (
       `<li class="scoreboard-item${rankClass} author-link" data-user-id="${p.uid}">` +
         `<span class="scoreboard-rank">${i + 1}.</span>` +
@@ -2612,7 +2807,7 @@ document.addEventListener('click', (e) => {
     // (which also replays the game buttons' own entrance animation even
     // though they never change).
     loadPosts(nbId, true);
-    loadScoreboard(nbId, null, true);
+    loadScoreboard(nbId, true);
     return;
   }
   // Snap back to Tüm İstanbul only when clicking empty space inside the
@@ -2631,17 +2826,20 @@ document.addEventListener('click', (e) => {
   selectedNeighborhood = homeNeighborhood;
   updateSubmitFormVisibility();
   loadPosts(null, true);
-  loadScoreboard(null, null, true);
+  loadScoreboard(null, true);
 });
 document.addEventListener('mouseover', (e) => {
   const nb = e.target.closest('.neighborhood');
   if (!nb) return;
   document.getElementById('map-label').textContent = nb.getAttribute('data-name') || nb.id;
+  const nbId = nb.dataset.neighborhood || nb.id;
+  getMapNeighborhoods().forEach(n => n.classList.toggle('hover-active', (n.dataset.neighborhood || n.id) === nbId));
 });
 document.addEventListener('mouseout', (e) => {
   const nb = e.target.closest('.neighborhood');
   if (!nb || nb.contains(e.relatedTarget)) return;
   document.getElementById('map-label').textContent = baseMapLabel();
+  getMapNeighborhoods().forEach(n => n.classList.remove('hover-active'));
 });
 
 // ── Paginated comment feed ──
@@ -2734,6 +2932,9 @@ function appendPosts(rows) {
       authorDisplay = (first || last)
         ? [first, last].filter(Boolean).join(' ')
         : nbName;
+    } else if (I18N.isEnglish()) {
+      // All Istanbul view — show "Cem from Bakırköy"
+      authorDisplay = first ? `${first} from ${nbName}` : nbName;
     } else {
       // All Istanbul view — show "Bakırköy'den Cem"
       const suffix = getAblativeSuffix(nbName);
@@ -3029,7 +3230,7 @@ function showToast(text, kind) {
   overlay.hidden = true;
   overlay.innerHTML = `
     <div class="profile-popup" role="dialog" aria-modal="true">
-      <button class="close-btn" type="button" aria-label="Kapat">×</button>
+      <button class="close-btn" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
       <div class="pp-body"><div class="pp-loading">Yükleniyor…</div></div>
     </div>
   `;
@@ -3051,29 +3252,16 @@ function showToast(text, kind) {
     return neighborhoodNames[id] || id;
   }
 
-  function istanbulTodayISO() {
-    const now = new Date();
-    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-    const y = ist.getFullYear();
-    const m = String(ist.getMonth() + 1).padStart(2, '0');
-    const d = String(ist.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-
   async function open(userId) {
     overlay.hidden = false;
     overlay.classList.add('open');
     body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
-    const today = istanbulTodayISO();
-    const [{ data, error }, { count: sozculCount }] = await Promise.all([
+    const [{ data, error }, weekStatus] = await Promise.all([
       sb.from('profiles')
-        .select('id, first_name, last_name, neighborhood, birth_place, avatar_url, joined_at, referred_by')
+        .select('id, first_name, last_name, neighborhood, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt, cover_badges, joined_at, referred_by')
         .eq('id', userId)
         .maybeSingle(),
-      sb.from('sozcel_sozcul_assignments')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .lte('game_date', today),
+      IstProfileCard.getWeekGameStatus(sb, userId),
     ]);
     if (error || !data) {
       body.innerHTML = '<div class="pp-error">Profil yüklenemedi.</div>';
@@ -3094,19 +3282,13 @@ function showToast(text, kind) {
     }
 
     const fullName = capitalizeName(`${data.first_name || ''} ${data.last_name || ''}`.trim()) || 'İsimsiz Üye';
-    const initial = (fullName.charAt(0) || '?').toUpperCase();
-    const avatar = data.avatar_url
-      ? `<img src="${Palette.avatarSrc(data.avatar_url)}" alt="">`
-      : initial;
-    const birth = nbLabel(data.birth_place);
     body.innerHTML = `
-      <div class="pp-avatar">${avatar}</div>
-      <div class="pp-name">${fullName.toLocaleUpperCase('tr-TR')}</div>
-      <div class="pp-meta">${nbLabel(data.neighborhood)}</div>
-      <div class="pp-row"><span class="pp-label">${I18N.t('profile.birthplace')}</span><span class="pp-value">${birth}</span></div>
-      <div class="pp-row"><span class="pp-label">${I18N.t('profile.sozculcount')}</span><span class="pp-value">${sozculCount ?? 0} ${I18N.t('profile.times')}</span></div>
-      ${kefilName ? `<div class="pp-row"><span class="pp-label">${I18N.t('profile.kefil')}</span><span class="pp-value"><span class="author-link" data-user-id="${kefilId}">${kefilName}</span></span></div>` : ''}
-      <div class="pp-since">${I18N.formatMemberSince(data.joined_at)}</div>
+      ${IstProfileCard.coverHTML({ profile: data, avatarUrl: data.avatar_url, avatarHair: data.avatar_hair, avatarHat: data.avatar_hat, avatarAccessory: data.avatar_accessory, avatarShirt: data.avatar_shirt, displayName: fullName, metaText: nbLabel(data.neighborhood) })}
+      ${IstProfileCard.weekGridHTML(weekStatus, I18N)}
+      <div class="pp-since">
+        <div>${I18N.formatMemberSince(data.joined_at)}</div>
+        ${kefilName ? `<div class="pp-since-kefil">${I18N.t('profile.kefil')}: <span class="author-link" data-user-id="${kefilId}">${kefilName}</span></div>` : ''}
+      </div>
     `;
   }
 

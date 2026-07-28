@@ -25,6 +25,7 @@
 
     // profile / settings card
     'profile.edit':        { default: 'Düzenle',             more_english: 'Edit' },
+    'profile.customize':   { default: 'Kişiselleştir',       more_english: 'Customize' },
     'profile.save':        { default: 'Kaydet',              more_english: 'Save' },
     'profile.saving':      { default: 'Kaydediliyor...',     more_english: 'Saving...' },
     'profile.cancel':      { default: 'İptal',               more_english: 'Cancel' },
@@ -58,7 +59,10 @@
     'profile.tab.profil':  { default: 'Profil',              more_english: 'Profile' },
     'profile.tab.ayarlar': { default: 'Ayarlar',             more_english: 'Settings' },
     'profile.tab.rozetler':{ default: 'Rozetler',            more_english: 'Badges' },
-    'profile.rozetler.soon':{ default: 'Rozetler yakında burada olacak.', more_english: 'Badges are coming here soon.' },
+    'profile.rozetler.hint':{ default: 'Doğum ilçenize ait rozetleri seçerek kapağınıza yerleştirin.', more_english: 'Pick badges tied to your birth district to pin them on your cover.' },
+    'profile.email':        { default: 'E-posta',             more_english: 'Email' },
+    'profile.thisweek':     { default: 'Bu Hafta',             more_english: 'This Week' },
+    'profile.profileinfo':  { default: 'Profil Bilgileri',     more_english: 'Profile Info' },
 
     // login / signup (index.html)
     'auth.email':          { default: 'E-posta',             more_english: 'Email' },
@@ -100,6 +104,9 @@
 
     // kahvehane — discussion feed
     'kahvehane.allistanbul': { default: 'Tüm İstanbul',      more_english: 'All Istanbul' },
+
+    // anahane — breaking news detail sheet
+    'news.sources':        { default: 'Kaynaklar',           more_english: 'Sources' },
 
     // games — shared right column (Günün Oyunları / scoreboard / neighborhood stats)
     'games.today':            { default: 'Günün Oyunları',        more_english: "Today's Games" },

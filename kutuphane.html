@@ -5,9 +5,10 @@
   <link rel="apple-touch-icon" href="assets/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f0f0f0">
   <title>Kütüphane — istanbulite.net</title>
   <script src="safe-area-ready.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -17,6 +18,9 @@
   <link rel="stylesheet" href="palette.css">
   <script src="game-locks.js"></script>
   <link rel="stylesheet" href="profile-card.css">
+  <script src="avatar.js" defer></script>
+  <script src="tbmm.js" defer></script>
+  <script src="politician-card.js" defer></script>
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
@@ -62,7 +66,7 @@
       --hairline: #c5ad9a;
       --whisper: #d4bbad;
       /* Newspaper accents */
-      --ink-red: #a4322b;
+      --ink-red: #B93631;
       --brown-1: #b8947a;
       --brown-2: #866955;
       --brown-3: #775742;
@@ -89,7 +93,7 @@
     }
 
     body {
-      font-family: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       background-color: var(--paper);
       color: var(--ink);
       height: 100vh;
@@ -147,7 +151,7 @@
       gap: 32px;
     }
     nav a {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       text-align: center;
       text-decoration: none;
       color: var(--muted);
@@ -179,7 +183,7 @@
     }
     .col-left .nb-highlight {
       padding: 12px 18px;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.68rem;
       font-weight: 700;
       letter-spacing: 3px;
@@ -196,6 +200,21 @@
       flex-direction: column;
       overflow-y: auto;
     }
+    /* Wraps everything in .col-right except #politician-card, mirroring
+       .col-left-slide -- keeps the politician card visually still during
+       the slide/view-transition animations below while the shelves list
+       slides (see anahane.html's own .col-right-slide for the same
+       pattern). */
+    .col-right-slide {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    /* Mirrors #library-card's layout: avatar on the right, name/title
+       text right-aligned next to it -- see politician-card.js. */
+    .politician-card .card-id { text-align: right; }
+    .politician-card { cursor: pointer; }
 
     main {
       grid-column: 2;
@@ -235,7 +254,7 @@
     }
 
     /* Hit-region overlay traced against map-photo (same 5046x2300 source
-       image) — see assets/istanbul-map.svg for the source of truth; keep
+       image) — see assets/map/istanbul-map.svg for the source of truth; keep
        this copy in sync with anahane.html's and kahvehane.html's. */
     .map-panel svg.map-svg {
       position: absolute;
@@ -270,8 +289,11 @@
 
     /* Hover: dim the artwork under the cursor (matches anahane) — a
        transparent ink tint, not an element-opacity fade, so the black
-       stroke borders stay black instead of washing out to gray. */
-    .neighborhood:hover { fill: rgba(var(--ink-rgb), 0.18); }
+       stroke borders stay black instead of washing out to gray.
+       .hover-active is toggled via JS on every polygon sharing the same
+       data-neighborhood, so multi-polygon districts (e.g. Şişli) light
+       up as one unit instead of just the piece under the cursor. */
+    .neighborhood:hover, .neighborhood.hover-active { fill: rgba(var(--ink-rgb), 0.18); }
     /* Same fix as hover — bake the alpha into the fill color instead of
        element opacity, so the accent-colored stroke doesn't wash out. */
     .neighborhood.active {
@@ -288,7 +310,7 @@
       transform: translateX(-50%);
       z-index: 100;
       text-align: center;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.78rem;
       font-weight: 700;
       letter-spacing: 4px;
@@ -373,7 +395,7 @@
     }
 
     .district-select {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.8rem;
       padding: 6px 8px;
       background: var(--field-bg);
@@ -397,7 +419,7 @@
       background: var(--ink);
       color: var(--paper);
       border: none;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.75rem;
       font-weight: 700;
       letter-spacing: 2px;
@@ -417,106 +439,6 @@
       margin-top: 2px;
     }
 
-    /* ── Center: profile board ── */
-    .profile-center {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      flex: 1;
-    }
-
-    #sticker-area {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    .board-header {
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      padding: 8px 16px;
-      background: var(--paper-dark);
-      border-bottom: var(--col-border);
-      color: var(--ink);
-      flex-shrink: 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .board-header .edit-toggle {
-      font-size: 0.6rem;
-      cursor: pointer;
-      color: var(--muted);
-      font-weight: 700;
-      letter-spacing: 1px;
-      border: none;
-      background: none;
-      font-family: 'Inter', sans-serif;
-      text-transform: uppercase;
-    }
-    .board-header .edit-toggle:hover { color: var(--ink); }
-
-    .sticker-board {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-      background: var(--paper);
-      min-height: 0;
-    }
-
-    .sticker {
-      position: absolute;
-      cursor: grab;
-      user-select: none;
-      width: 120px;
-      height: auto;
-      filter: grayscale(100%);
-      transition: filter 0.2s;
-    }
-    .sticker:hover { filter: grayscale(60%); }
-    .sticker.dragging { cursor: grabbing; z-index: 100; filter: grayscale(0%); }
-
-    /* Sticker tray (shown in edit mode) */
-    .sticker-tray {
-      display: none;
-      padding: 10px 16px;
-      background: var(--paper-dark);
-      border-top: var(--col-border);
-      flex-shrink: 0;
-      overflow-x: auto;
-      white-space: nowrap;
-      gap: 8px;
-    }
-
-    .sticker-tray.active {
-      display: flex;
-    }
-
-    .tray-sticker {
-      width: 64px;
-      height: 64px;
-      object-fit: contain;
-      cursor: pointer;
-      filter: grayscale(100%);
-      opacity: 0.7;
-      transition: all 0.2s;
-      flex-shrink: 0;
-      padding: 4px;
-      border: 2px solid transparent;
-    }
-    .tray-sticker:hover { filter: grayscale(40%); opacity: 1; }
-    .tray-sticker.locked {
-      opacity: 0.2;
-      cursor: not-allowed;
-      filter: grayscale(100%);
-    }
-    .tray-sticker.locked:hover { opacity: 0.2; filter: grayscale(100%); }
-
     /* ── Right: stats & info ── */
     .profile-right {
       display: flex;
@@ -527,7 +449,7 @@
     }
 
     .right-section-title {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.58rem;
       font-weight: 700;
       letter-spacing: 2.5px;
@@ -623,7 +545,7 @@
       border: none;
       border-left: 3px solid transparent;
       text-align: left;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.75rem;
       font-weight: 700;
       letter-spacing: 2px;
@@ -676,6 +598,158 @@
       color: var(--muted);
       padding: 80px 20px;
       font-size: 0.85rem;
+    }
+
+    /* Centered call-to-action button, sitting in the otherwise-empty
+       reading area -- opens the TBMM info page in the same reader-overlay
+       sheet used for shelves/articles (see openTBMMSheet). */
+    .tbmm-open-btn {
+      display: block;
+      margin: 80px auto 0;
+      padding: 20px 40px;
+      background: var(--paper-card);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      box-shadow: var(--frame-shadow);
+      cursor: pointer;
+      text-align: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      color: var(--ink);
+      transition: background 0.15s, transform 0.15s ease;
+    }
+    .tbmm-open-btn:hover { background: var(--hover); transform: translateY(-4px); }
+    .tbmm-open-btn-title {
+      display: block;
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .tbmm-open-btn-sub {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ── TBMM info page (rendered into reader-overlay-sheet, see
+       openTBMMSheet) -- the interactive 600-seat hemicycle chart (see
+       tbmm.js). Which seat is currently *assigned to* a given
+       neighborhood click will change once the Anahane-side map exists,
+       but this page itself won't. */
+    .tbmm-chart {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    .tbmm-svg { display: block; width: 100%; height: auto; }
+    .tbmm-seat {
+      cursor: pointer;
+      stroke: var(--ink);
+      stroke-width: 1;
+      transition: stroke-width 0.1s, opacity 0.1s;
+    }
+    .tbmm-seat:hover { stroke-width: 3; opacity: 0.85; }
+
+    /* Seat detail view -- swapped into the same sheet when a seat is
+       clicked (see openTBMMSeatDetail); "← TBMM" returns to the chart
+       instead of closing the sheet. Same profile-card treatment as
+       Anahane's politician detail sheet. */
+    .tbmm-detail {
+      max-width: 420px;
+      margin: 0 auto;
+      background: var(--paper-card);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      box-shadow: var(--frame-shadow);
+      padding: 24px;
+      text-align: center;
+    }
+    .tbmm-detail-avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 2px solid var(--ink);
+      background: var(--paper-dark);
+      overflow: hidden;
+      position: relative;
+      margin: 0 auto 14px;
+    }
+    .tbmm-detail-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .tbmm-detail-title {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 2px;
+      margin-bottom: 16px;
+    }
+    .tbmm-detail-row {
+      text-align: left;
+      font-size: 0.86rem;
+      padding: 8px 0;
+      border-top: 1px solid var(--rule);
+    }
+    .tbmm-detail-bio {
+      text-align: left;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-top: 12px;
+      white-space: pre-wrap;
+    }
+
+    /* Politician detail sheet -- opened from #politician-card (see
+       politician-card.js). Same treatment as .tbmm-detail above, just a
+       different class name (the shared module hardcodes these class
+       names so it renders identically on every page that uses it). */
+    .politician-detail {
+      max-width: 420px;
+      margin: 0 auto;
+      background: var(--paper-card);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      box-shadow: var(--frame-shadow);
+      padding: 24px;
+      text-align: center;
+    }
+    .politician-detail-avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 2px solid var(--ink);
+      background: var(--paper-dark);
+      overflow: hidden;
+      position: relative;
+      margin: 0 auto 14px;
+    }
+    .politician-detail-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .politician-detail-title {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 2px;
+      margin-bottom: 16px;
+    }
+    .politician-detail-row {
+      text-align: left;
+      font-size: 0.86rem;
+      padding: 8px 0;
+      border-top: 1px solid var(--rule);
+    }
+    .politician-detail-bio {
+      text-align: left;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-top: 12px;
+      white-space: pre-wrap;
     }
 
     /* ── Reader overlay: a bottom sheet that rises over the map and
@@ -790,7 +864,7 @@
       position: relative;
       flex-shrink: 0;
       cursor: pointer;
-      font-family: 'Source Serif 4', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
     }
     .shelf-btn::before {
       content: '';
@@ -816,7 +890,7 @@
       margin-top: 4px;
     }
     .shelf-progress {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.62rem;
       font-weight: 700;
       color: var(--accent);
@@ -881,7 +955,7 @@
     }
     .chapter-nav-item.locked:hover { transform: none; background: var(--paper-dark); }
     .chapter-nav-step {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.6rem;
       font-weight: 700;
       letter-spacing: 2px;
@@ -893,7 +967,7 @@
       font-weight: 700;
     }
     .chapter-nav-badge {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.58rem;
       font-weight: 700;
       letter-spacing: 1.5px;
@@ -923,7 +997,7 @@
       border: none;
       margin: 0 0 10px 0;
       padding: 0;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.7rem;
       font-weight: 700;
       letter-spacing: 2px;
@@ -987,7 +1061,7 @@
       position: absolute;
       top: 10px;
       right: 14px;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.55rem;
       font-weight: 700;
       letter-spacing: 2px;
@@ -998,7 +1072,7 @@
       position: absolute;
       top: 10px;
       right: 14px;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.6rem;
       font-weight: 700;
       letter-spacing: 2px;
@@ -1030,7 +1104,7 @@
       gap: 12px;
     }
     .chapter-intro-step {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.62rem;
       font-weight: 700;
       letter-spacing: 3px;
@@ -1062,7 +1136,7 @@
       background: var(--ink);
       color: var(--paper);
       border: none;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.72rem;
       font-weight: 700;
       letter-spacing: 2px;
@@ -1077,7 +1151,7 @@
     }
     .chapter-intro-btn.secondary:hover { background: var(--paper-dark); }
     .path-step {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.6rem;
       font-weight: 700;
       letter-spacing: 2.5px;
@@ -1098,7 +1172,7 @@
       line-height: 1.4;
     }
     .path-art-meta {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.6rem;
       letter-spacing: 1px;
       color: var(--accent);
@@ -1132,7 +1206,7 @@
       background: none;
       border: none;
       color: var(--muted);
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.7rem;
       font-weight: 700;
       letter-spacing: 2px;
@@ -1157,7 +1231,7 @@
       transition: width 0.3s ease;
     }
     .reader-step-count {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.65rem;
       font-weight: 700;
       letter-spacing: 1.5px;
@@ -1165,7 +1239,7 @@
       white-space: nowrap;
     }
     .reader-byline {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.7rem;
       letter-spacing: 2px;
       text-transform: uppercase;
@@ -1253,7 +1327,7 @@
       background: var(--ink);
       color: var(--paper);
       border: none;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.75rem;
       font-weight: 700;
       letter-spacing: 2px;
@@ -1340,7 +1414,7 @@
       cursor: grab;
     }
     .vote-readout {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-weight: 700;
       font-size: 0.85rem;
       letter-spacing: 1px;
@@ -1395,12 +1469,12 @@
     }
     .poll-option .opt-pct {
       font-weight: 700;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.82rem;
     }
     .reader-done {
       text-align: center;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.72rem;
       letter-spacing: 2px;
       text-transform: uppercase;
@@ -1454,7 +1528,7 @@
       color: var(--muted);
     }
     .sort-control select {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.75rem;
       padding: 4px 8px;
       background: var(--paper);
@@ -1489,7 +1563,7 @@
       background: var(--paper);
       border: 1px solid var(--border);
       color: var(--ink);
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.85rem;
       cursor: pointer;
       transition: background 0.15s, border-color 0.15s;
@@ -1523,7 +1597,7 @@
       background: none;
       border: none;
       color: var(--muted);
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.7rem;
       font-weight: 700;
       letter-spacing: 2px;
@@ -1616,7 +1690,7 @@
       background: none;
       border: none;
       color: var(--muted);
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.65rem;
       letter-spacing: 1px;
       text-transform: uppercase;
@@ -1634,7 +1708,7 @@
     .comment-composer textarea {
       width: 100%;
       box-sizing: border-box;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.85rem;
       padding: 10px 12px;
       border: 1px solid var(--ink);
@@ -1662,7 +1736,7 @@
       background: var(--ink);
       color: var(--paper);
       border: none;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.7rem;
       font-weight: 700;
       letter-spacing: 2px;
@@ -1783,7 +1857,7 @@
         gap: 0 !important;
         /* Reserve space for fixed bottom tab bar + a frame-gap so the
            cards don't visually press against the nav (frames.css design). */
-        padding-bottom: calc(96px + env(safe-area-inset-bottom) + var(--frame-gap, 10px));
+        padding-bottom: calc(38px + env(safe-area-inset-bottom) + var(--frame-gap, 10px));
         box-sizing: border-box;
       }
       /* body always fills the full viewport height, but its content
@@ -2079,6 +2153,9 @@
       body:not(.ist-viewing-other) #mobile-top,
       body:not(.ist-viewing-other) .col-left { display: none !important; }
       body.ist-viewing-other #ist-pc-mount { display: none !important; }
+      /* Politician card (top-right, desktop) is a desktop-only artifact,
+         same as #library-card -- nothing replaces it on mobile. */
+      #politician-card { display: none !important; }
 
       /* ── Mobile top: compact profile card + countdowns ── */
       #mobile-top {
@@ -2113,13 +2190,15 @@
       #mobile-top .library-card .card-name { font-size: 0.85rem; }
       #mobile-top .library-card .card-meta { font-size: 0.62rem; }
 
-      /* Bottom tab bar */
+      /* Bottom tab bar — thinned from the top; labels sit flush against the
+         bottom edge (the safe-area padding below is what separates them
+         from the home-indicator area). */
       header {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
-        height: 96px;
+        height: 38px;
         padding: 0 0 env(safe-area-inset-bottom);
         margin: 0;
         border-top: 1px solid var(--rule);
@@ -2144,14 +2223,14 @@
       nav a {
         flex: 1;
         display: flex;
-        align-items: center;
+        align-items: flex-end;
         justify-content: center;
+        padding-bottom: 6px;
         font-size: 16px;
         font-weight: 600;
         letter-spacing: 0.5px;
         text-transform: uppercase;
         color: var(--muted);
-        padding: 0;
         border: none;
         text-decoration: none;
       }
@@ -2187,7 +2266,7 @@
        left edge, right column toward the right edge — regardless of nav
        direction; nav stays ── */
     @media (min-width: 769px) {
-      .col-left-slide, .col-right {
+      .col-left-slide, .col-right-slide {
         transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: transform;
         backface-visibility: hidden;
@@ -2197,8 +2276,8 @@
         transform: translateX(-100vw);
         transition: none;
       }
-      html.ist-entering-forward .col-right,
-      html.ist-entering-backward .col-right {
+      html.ist-entering-forward .col-right-slide,
+      html.ist-entering-backward .col-right-slide {
         transform: translateX(100vw);
         transition: none;
       }
@@ -2206,8 +2285,8 @@
       body.ist-exiting-backward .col-left-slide {
         transform: translateX(-100vw);
       }
-      body.ist-exiting-forward .col-right,
-      body.ist-exiting-backward .col-right {
+      body.ist-exiting-forward .col-right-slide,
+      body.ist-exiting-backward .col-right-slide {
         transform: translateX(100vw);
       }
     }
@@ -2234,7 +2313,22 @@
     }
 
     .col-left-slide { view-transition-name: ist-col-left; }
-    .col-right { view-transition-name: ist-col-right; }
+    .col-right-slide { view-transition-name: ist-col-right; }
+
+    /* The browser's own view-transition-group animation interpolates this
+       named box's size/position between the outgoing and incoming page's
+       rect. Kahvehane's col-right (the stacked game tiles) sits at a
+       different height/position than col-right on the other pages (news/
+       events), so that automatic box-morph -- stacked on top of the slide
+       keyframes below -- swung the outgoing snapshot across the wrong part
+       of the screen mid-transition, on top of the fixed nav bar (the view-
+       transition layer always paints above it regardless of z-index).
+       Disabling it pins the group to the new page's rect immediately; the
+       keyframes below do 100% of the visible motion. */
+    ::view-transition-group(ist-col-left),
+    ::view-transition-group(ist-col-right) {
+      animation: none;
+    }
 
     /* Desktop: left column always exits/enters via the left edge, right
        column via the right edge — independent of nav direction, so no
@@ -2290,43 +2384,39 @@
     .profile-popup {
       background: var(--paper); border: 1px solid var(--ink);
       width: 360px; max-width: calc(100vw - 40px); max-height: calc(100vh - 80px);
-      overflow: auto; padding: 24px; position: relative; font-family: 'Inter', sans-serif;
+      overflow: auto; padding: 24px; position: relative; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
     }
     .profile-popup .close-btn {
-      position: absolute; top: 8px; right: 10px; background: none; border: none;
-      font-size: 1.4rem; cursor: pointer; color: var(--muted); line-height: 1; padding: 4px 8px;
+      position: absolute; top: 10px; right: 10px; width: 26px; height: 26px;
+      background: none; border: none; cursor: pointer; color: var(--muted); line-height: 1; padding: 0;
+      display: flex; align-items: center; justify-content: center;
     }
     .profile-popup .close-btn:hover { color: var(--ink); }
-    .profile-popup .pp-avatar {
-      width: 96px; height: 96px; border-radius: 50%;
-      background: var(--paper-dark); border: 1px solid #ccc;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 2.2rem; font-weight: 600; color: var(--accent);
-      margin: 0 auto 14px; overflow: hidden;
+    .profile-popup .close-btn .close-icon {
+      width: 17px; height: 17px; display: block;
     }
-    .profile-popup .pp-avatar img { width: 100%; height: 100%; object-fit: cover; }
-    .profile-popup .pp-name {
-      text-align: center; font-size: 1.1rem; font-weight: 700;
-      letter-spacing: 0.5px; margin-bottom: 4px;
+    /* Cover reuses the shared .ist-pc-cover markup from profile-card.css
+       (IstProfileCard.coverHTML), but shorter than its default 258px (that
+       height suits the self-editing settings page, which stacks avatar
+       carousel arrows underneath) and pushed down a bit so it clears the
+       close button in this corner instead of overlapping it. */
+    .profile-popup .ist-pc-cover {
+      height: 190px;
+      margin-top: 16px;
     }
-    .profile-popup .pp-meta {
-      text-align: center; font-size: 0.72rem; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 16px;
+    /* The weekly game grid (.ist-pc-weekgrid) gets a frame added below
+       since, unlike the cover, it has no border of its own in the shared
+       CSS. */
+    .profile-popup .ist-pc-weekgrid {
+      border: 1px solid var(--ink);
+      padding: 8px 8px 6px;
     }
-    .profile-popup .pp-row {
-      display: flex; justify-content: space-between;
-      padding: 8px 0; border-top: 1px solid var(--hairline); font-size: 0.8rem;
-    }
-    .profile-popup .pp-row .pp-label {
-      color: var(--muted); text-transform: uppercase;
-      font-size: 0.65rem; letter-spacing: 1.5px; align-self: center;
-    }
-    .profile-popup .pp-row .pp-value { color: var(--ink); font-weight: 500; text-align: right; }
     .profile-popup .pp-since {
       text-align: center; font-size: 0.68rem; color: var(--muted);
       letter-spacing: 1px; margin-top: 14px; padding-top: 12px;
       border-top: 1px solid var(--hairline);
     }
+    .profile-popup .pp-since-kefil { margin-top: 4px; text-transform: uppercase; }
     .profile-popup .pp-loading, .profile-popup .pp-error {
       text-align: center; color: var(--muted); font-size: 0.85rem; padding: 30px 0;
     }
@@ -2378,8 +2468,8 @@
          fetching, so phones on slow connections never download the big
          file. Swap point matches the page's 768px mobile breakpoint. -->
     <picture>
-      <source media="(max-width: 768px)" srcset="assets/turkey-map-mobile.png">
-      <img class="map-photo" id="map-photo-img" src="assets/turkey-map.png" alt="">
+      <source media="(max-width: 768px)" srcset="assets/map/turkey-map-mobile.png">
+      <img class="map-photo" id="map-photo-img" src="assets/map/turkey-map.png" alt="">
     </picture>
 
     <!-- Spinner shown until the map image above finishes loading -- without
@@ -2523,12 +2613,23 @@
   <main>
     <div class="reading-area" id="reading-area">
       <div class="empty-state"></div>
+      <button type="button" class="tbmm-open-btn" id="tbmm-open-btn">
+        <span class="tbmm-open-btn-title">TBMM</span>
+        <span class="tbmm-open-btn-sub">Türkiye Büyük Millet Meclisi</span>
+      </button>
     </div>
   </main>
 
   <aside class="col-right">
-    <div class="shelves" id="shelves">
-      <div class="empty-state" style="padding:24px 16px;"><span class="spinner"></span></div>
+    <!-- Mirrors #library-card at the top of col-left: the Cumhurbaşkanı,
+         see politician-card.js's mount(). Reuses the .library-card class
+         outright for pixel-identical styling; .politician-card's own CSS
+         above flips the avatar to the right side. -->
+    <div class="library-card politician-card" id="politician-card"><div class="loading"><span class="spinner"></span></div></div>
+    <div class="col-right-slide">
+      <div class="shelves" id="shelves">
+        <div class="empty-state" style="padding:24px 16px;"><span class="spinner"></span></div>
+      </div>
     </div>
   </aside>
   </div>
@@ -3305,6 +3406,113 @@ function closeReaderOverlay() {
   renderShelfButtons();
 }
 
+// TBMM page -- opened from the centered #tbmm-open-btn in the reading
+// area, using the same rising bottom sheet as shelves/articles. Which
+// action opens this same page will change later (e.g. a specific
+// Anahane map click instead of this button), but the page itself won't.
+// Seats are fetched once and cached (see db/tbmm_seats.sql + tbmm.js);
+// clicking a seat swaps the sheet's content to that seat's info
+// (openTBMMSeatDetail) with a "← TBMM" back button that re-renders the
+// chart from the same cache instead of refetching.
+let tbmmSeatsById = null;
+
+async function loadTBMMSeats() {
+  if (tbmmSeatsById) return tbmmSeatsById;
+  const { data } = await sb.from('tbmm_seats').select('*, politicians(*)');
+  tbmmSeatsById = {};
+  (data || []).forEach(s => { tbmmSeatsById[s.seat_number] = s; });
+  return tbmmSeatsById;
+}
+
+async function openTBMMSheet() {
+  const overlay = document.getElementById('reader-overlay');
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !area) return;
+  area.innerHTML = `
+    <div class="shelf-path">
+      <div class="path-head">
+        <button class="path-back" type="button" id="tbmm-back">← Kütüphane</button>
+        <h2 class="path-title">TBMM</h2>
+      </div>
+      <div class="tbmm-page">
+        <div class="tbmm-chart" id="tbmm-chart"><div class="empty-state"><span class="spinner"></span></div></div>
+      </div>
+    </div>
+  `;
+  document.getElementById('tbmm-back').addEventListener('click', closeReaderOverlay);
+  positionReaderSheet();
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  _closeReaderOverlay = closeReaderOverlay;
+
+  const byId = await loadTBMMSeats();
+  const chart = document.getElementById('tbmm-chart');
+  if (!chart) return; // sheet closed again before the fetch resolved
+  chart.innerHTML = IstTBMM.renderSVG(byId);
+  chart.addEventListener('click', (e) => {
+    const dot = e.target.closest('.tbmm-seat');
+    if (!dot) return;
+    openTBMMSeatDetail(parseInt(dot.dataset.seatNumber, 10));
+  });
+}
+
+async function openTBMMSeatDetail(seatNumber) {
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!area) return;
+  const byId = await loadTBMMSeats();
+  const seat = byId[seatNumber];
+  const p = seat?.politicians || null;
+  const name = p ? `${p.first_name} ${p.last_name}`.trim() : 'Koltuk ' + seatNumber;
+  const birthParts = [];
+  if (p?.birth_date) birthParts.push(I18N.formatDate(p.birth_date, { year: 'numeric', month: 'long', day: 'numeric' }));
+  if (p?.birth_place) birthParts.push(p.birth_place);
+  const avatarHTML = IstAvatar.html(null, p?.avatar_hair, p?.avatar_hat, p?.avatar_accessory, p?.avatar_shirt, p?.in_jail);
+
+  area.innerHTML = `
+    <div class="shelf-path">
+      <div class="path-head">
+        <button class="path-back" type="button" id="tbmm-detail-back">← TBMM</button>
+        <h2 class="path-title">Koltuk ${seatNumber}</h2>
+      </div>
+      <div class="tbmm-detail">
+        <div class="tbmm-detail-avatar">${avatarHTML}</div>
+        <div class="tbmm-detail-name">${libEsc(name)}</div>
+        <div class="tbmm-detail-title">${libEsc(p?.party || seat?.party || 'Bu koltuğa henüz kimse atanmadı')}</div>
+        ${birthParts.length ? `<div class="tbmm-detail-row"><strong>Doğum:</strong> ${libEsc(birthParts.join(', '))}</div>` : ''}
+        ${p?.bio ? `<p class="tbmm-detail-bio">${libEsc(p.bio)}</p>` : ''}
+      </div>
+    </div>
+  `;
+  document.getElementById('tbmm-detail-back').addEventListener('click', openTBMMSheet);
+  positionReaderSheet();
+}
+
+// Generic bottom-sheet opener for #politician-card (see politician-card.js
+// mount()'s openDetail callback) -- unlike the TBMM seat detail above,
+// there's no "back to a list" to return to, so the back button just
+// closes the sheet.
+function openPoliticianDetailSheet(html) {
+  const overlay = document.getElementById('reader-overlay');
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !area) return;
+  area.innerHTML = `
+    <div class="shelf-path">
+      <div class="path-head">
+        <button class="path-back" type="button" id="politician-detail-back">← Kütüphane</button>
+      </div>
+      ${html}
+    </div>
+  `;
+  document.getElementById('politician-detail-back').addEventListener('click', closeReaderOverlay);
+  positionReaderSheet();
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  _closeReaderOverlay = closeReaderOverlay;
+}
+
+const tbmmOpenBtn = document.getElementById('tbmm-open-btn');
+if (tbmmOpenBtn) tbmmOpenBtn.addEventListener('click', openTBMMSheet);
+
 // Table of contents view, rendered into the reader overlay sheet so it
 // rises from the bottom like the reader itself. Reused both when a shelf
 // is first opened and when the reader's back button returns here without
@@ -3775,31 +3983,17 @@ const neighborhoodNames = {
     if (!nb) return;
     const mapLabel = document.getElementById('map-label');
     if (mapLabel) mapLabel.textContent = nb.getAttribute('data-name') || nb.id;
+    const nbId = nb.dataset.neighborhood || nb.id;
+    getMapNeighborhoods().forEach(n => n.classList.toggle('hover-active', (n.dataset.neighborhood || n.id) === nbId));
   });
   document.addEventListener('mouseout', (e) => {
     const nb = e.target.closest('.neighborhood');
     if (!nb || nb.contains(e.relatedTarget)) return;
     const mapLabel = document.getElementById('map-label');
     if (mapLabel) mapLabel.textContent = baseMapLabel();
+    getMapNeighborhoods().forEach(n => n.classList.remove('hover-active'));
   });
 })();
-
-// Sticker definitions — image-based stickers, unlocked by birth district
-const STICKERS = [
-  { src: 'assets/galatakulesisticker.png', label: 'Galata Kulesi', district: 'beyoglu' },
-  { src: 'assets/kizkulesisticker.png', label: 'Kız Kulesi', district: 'uskudar' },
-];
-
-// ── Sticker board persistence (localStorage, keyed by user id) ──
-function loadBoardStickers(userId) {
-  try {
-    return JSON.parse(localStorage.getItem('hane_stickers_' + userId)) || [];
-  } catch { return []; }
-}
-
-function saveBoardStickers(userId, stickers) {
-  localStorage.setItem('hane_stickers_' + userId, JSON.stringify(stickers));
-}
 
 // Generate an 8-char uppercase referral code (matches the format the
 // handle_new_user trigger uses for new accounts).
@@ -3816,7 +4010,7 @@ function generateReferralCode() {
 // in-app. Shown when the auth user is the admin and has no profiles row
 // (typically the original admin account that predates handle_new_user).
 function renderProfileBootstrap(user) {
-  const stickerArea = document.getElementById('reading-area');
+  const readingArea = document.getElementById('reading-area');
   const right = document.querySelector('.profile-right');
   const card = document.getElementById('library-card');
   if (card) card.innerHTML = '';
@@ -3827,9 +4021,9 @@ function renderProfileBootstrap(user) {
     .map(([id, name]) => `<option value="${id}">${name}</option>`)
     .join('');
 
-  if (!stickerArea) return;
-  stickerArea.innerHTML = `
-    <div style="max-width:520px;margin:40px auto;padding:24px;border:1px solid var(--ink);background:#fff;font-family:'Inter',sans-serif;">
+  if (!readingArea) return;
+  readingArea.innerHTML = `
+    <div style="max-width:520px;margin:40px auto;padding:24px;border:1px solid var(--ink);background:#fff;font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;">
       <div style="font-size:0.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Profil Kurulumu</div>
       <div style="font-size:1.1rem;font-weight:700;margin-bottom:6px;">Profilinizi oluşturun</div>
       <div style="font-size:0.8rem;color:var(--muted);margin-bottom:18px;line-height:1.4;">
@@ -4008,9 +4202,14 @@ if (profileMissing) {
   document.body.appendChild(banner);
 }
 
-// Preset avatars and the picker renderer live on IstProfileCard so the
-// desktop library-card here and the mobile widget stay in sync.
+// The layered avatar (bald base + hair overlay) and the picker renderer
+// live on IstProfileCard/IstAvatar so the desktop library-card here and the
+// mobile widget stay in sync.
 let avatarUrl = profile?.avatar_url || null;
+let avatarHair = profile?.avatar_hair || null;
+let avatarHat = profile?.avatar_hat || null;
+let avatarAccessory = profile?.avatar_accessory || null;
+let avatarShirt = profile?.avatar_shirt || null;
 
 const firstName = profile?.first_name || '';
 const lastName = profile?.last_name || '';
@@ -4039,9 +4238,7 @@ I18N.setLang(languagePref);
 Palette.setPalette(palettePref);
 
   function avatarDisplayHTML() {
-    return avatarUrl
-      ? `<img src="${Palette.avatarSrc(avatarUrl)}" alt="Profile">`
-      : displayName.charAt(0).toUpperCase();
+    return IstAvatar.html(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt);
   }
 
   // Birth place display (read-only)
@@ -4074,9 +4271,15 @@ Palette.setPalette(palettePref);
           sb, I18N, user, profile,
           sozculCount: ownSozculCount, kefaletCount, kefilOfUser,
           avatarUrl,
-          defaultTab: 'profil',
-          onAvatarChange(url) {
-            avatarUrl = url;
+          avatarHair,
+          avatarHat,
+          avatarAccessory,
+          avatarShirt,
+          onAvatarChange(hair, hat, accessory, shirt) {
+            avatarHair = hair;
+            avatarHat = hat;
+            avatarAccessory = accessory;
+            avatarShirt = shirt;
             const av = document.getElementById('avatar-display');
             if (av) av.innerHTML = avatarDisplayHTML();
           },
@@ -4123,6 +4326,21 @@ Palette.setPalette(palettePref);
 function mount() {
   loadProfile();
   bootstrapLibraryNav();
+  // politician-card.js is deferred -- on a fresh real page load this
+  // mount() call runs synchronously during parsing, before any deferred
+  // script has executed, so a plain `if (window.IstPoliticianCard)` check
+  // here would silently miss it. Poll briefly instead (same idiom as
+  // __mountIstPc's tryOnb below).
+  (function tryPoliticianCard(tries) {
+    if (window.IstPoliticianCard) {
+      IstPoliticianCard.mount({
+        sb, mountElId: 'politician-card', seatId: 'cumhurbaskani', seatLabel: 'Cumhurbaşkanı',
+        openDetail: openPoliticianDetailSheet,
+      });
+    } else if (tries > 0) {
+      setTimeout(() => tryPoliticianCard(tries - 1), 60);
+    }
+  })(10);
 }
 function unmount() {}
 
@@ -4184,7 +4402,7 @@ if (!window.__istVirtualNavInjecting) {
   overlay.hidden = true;
   overlay.innerHTML = `
     <div class="profile-popup" role="dialog" aria-modal="true">
-      <button class="close-btn" type="button" aria-label="Kapat">×</button>
+      <button class="close-btn" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
       <div class="pp-body"><div class="pp-loading">Yükleniyor…</div></div>
     </div>
   `;
@@ -4205,30 +4423,17 @@ if (!window.__istVirtualNavInjecting) {
     return neighborhoodNames[id] || id;
   }
 
-  function istanbulTodayISO() {
-    const now = new Date();
-    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-    const y = ist.getFullYear();
-    const m = String(ist.getMonth() + 1).padStart(2, '0');
-    const d = String(ist.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-
   async function open(userId) {
     overlay.hidden = false;
     overlay.classList.add('open');
     body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
 
-    const today = istanbulTodayISO();
-    const [{ data: prof, error }, { count: sozculCount }] = await Promise.all([
+    const [{ data: prof, error }, weekStatus] = await Promise.all([
       sb.from('profiles')
-        .select('id, first_name, last_name, neighborhood, birth_place, avatar_url, joined_at, referred_by')
+        .select('id, first_name, last_name, neighborhood, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt, cover_badges, joined_at, referred_by')
         .eq('id', userId)
         .maybeSingle(),
-      sb.from('sozcel_sozcul_assignments')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .lte('game_date', today),
+      IstProfileCard.getWeekGameStatus(sb, userId),
     ]);
 
     if (error || !prof) {
@@ -4250,19 +4455,18 @@ if (!window.__istVirtualNavInjecting) {
     }
 
     const fullName = capitalizeName((`${prof.first_name || ''} ${prof.last_name || ''}`).trim()) || 'İsimsiz Üye';
-    const avatar = prof.avatar_url
-      ? `<img src="${Palette.avatarSrc(prof.avatar_url)}" alt="">`
-      : (fullName.charAt(0) || '?').toUpperCase();
-    const birth = nbLabel(prof.birth_place);
 
+    // Cover (avatar + placed rozetler) and the weekly game grid reuse the
+    // same shared markup/logic as the self-editing Profil tab (see
+    // IstProfileCard.coverHTML/getWeekGameStatus/weekGridHTML in
+    // profile-card.js) instead of a page-local avatar circle.
     body.innerHTML = `
-      <div class="pp-avatar">${avatar}</div>
-      <div class="pp-name">${fullName.toLocaleUpperCase('tr-TR')}</div>
-      <div class="pp-meta">${nbLabel(prof.neighborhood)}</div>
-      <div class="pp-row"><span class="pp-label">${I18N.t('profile.birthplace')}</span><span class="pp-value">${birth}</span></div>
-      <div class="pp-row"><span class="pp-label">${I18N.t('profile.sozculcount')}</span><span class="pp-value">${sozculCount ?? 0} ${I18N.t('profile.times')}</span></div>
-      ${kefilName ? `<div class="pp-row"><span class="pp-label">${I18N.t('profile.kefil')}</span><span class="pp-value"><button class="kefil-link" data-user-id="${kefilId}">${kefilName}</button></span></div>` : ''}
-      <div class="pp-since">${I18N.formatMemberSince(prof.joined_at)}</div>
+      ${IstProfileCard.coverHTML({ profile: prof, avatarUrl: prof.avatar_url, avatarHair: prof.avatar_hair, avatarHat: prof.avatar_hat, avatarAccessory: prof.avatar_accessory, avatarShirt: prof.avatar_shirt, displayName: fullName, metaText: nbLabel(prof.neighborhood) })}
+      ${IstProfileCard.weekGridHTML(weekStatus, I18N)}
+      <div class="pp-since">
+        <div>${I18N.formatMemberSince(prof.joined_at)}</div>
+        ${kefilName ? `<div class="pp-since-kefil">${I18N.t('profile.kefil')}: <button class="kefil-link" data-user-id="${kefilId}">${kefilName}</button></div>` : ''}
+      </div>
     `;
   }
 

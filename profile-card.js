@@ -37,21 +37,83 @@
   function normalizeTheme(v)   { return v === 'dark' ? 'dark' : 'light'; }
   function normalizePalette(v) { return v === 'earth' ? 'earth' : 'mono'; }
 
-  // Preset avatars, shared between the profile-overlay picker and this
-  // mobile widget. `requiresSozculCount` gates an option behind a lifetime
-  // sözcü count.
-  const AVATAR_OPTIONS = [
-    { url: 'assets/avatar-long.png',  label: 'Uzun saç' },
-    { url: 'assets/avatar-short.png', label: 'Kısa saç' },
-    { url: 'assets/avatar-bald.png',  label: 'Saçsız' },
-    { url: 'assets/avatar-sozcu.png', label: 'Sözcü', requiresSozculCount: 10 },
+  // Which Istanbul-local weekdays each game runs on (Monday=0 … Sunday=6),
+  // driving the Profil tab's weekly grid. Purely a display concern here —
+  // it does not gate access to the game pages (see game-locks.js for the
+  // actual Tümcel-win-unlocks-Bulmaca rule).
+  const GAME_SCHEDULE = [
+    { id: 'sozcel',  label: 'Sözcel',  days: [0, 1, 2, 3, 4, 5, 6] },
+    { id: 'tumcel',  label: 'Tümcel',  days: [0, 2, 4, 6] },
+    { id: 'bulmaca', label: 'Bulmaca', days: [1, 3, 5] },
   ];
 
-  // Colors are a viewer-side preference, not a property of the profile
-  // owner: resolve avatar_url to the mono or brown file depending on the
-  // *current visitor's* palette_pref (see palette.js avatarSrc).
-  function avatarSrc(url) {
-    return (global.Palette && global.Palette.avatarSrc) ? global.Palette.avatarSrc(url) : url;
+  // Shirt overlays — the base clothing layer (see avatar.js), stacked
+  // directly on the bald base before hair/hat/accessory. Defaults to null
+  // (the plain bare look), same as hair/hat/accessory. 'black' is the one
+  // shirt color so far, fully open to everyone — no lock, just like the
+  // hair options.
+  const AVATAR_SHIRT_OPTIONS = [
+    { value: null,    label: 'Yok' },
+    { value: 'black', label: 'Siyah Tişört' },
+  ];
+
+  // Hair overlays for the layered avatar (bald base + optional transparent
+  // hair PNG on top — see avatar.js). `null` is kel (bald, no overlay).
+  const AVATAR_HAIR_OPTIONS = [
+    { value: null,    label: 'Kel' },
+    { value: 'short', label: 'Kısa saç' },
+    { value: 'long',  label: 'Uzun saç' },
+  ];
+
+  // Hat overlays — a second, independent layer stacked on top of hair (see
+  // avatar.js), so any hat can be worn over any hair. The locked Sözcü
+  // reward is the 'crown' hat (used to be a single full-image override
+  // before profiles.avatar_hat existed — see db/avatar_hat.sql).
+  const AVATAR_HAT_OPTIONS = [
+    { value: null,    label: 'Yok' },
+    { value: 'crown', label: 'Sözcü Tacı', requiresSozculCount: IstAvatar.SOZCU_REQUIRED_COUNT },
+  ];
+
+  // Accessory overlays — a third independent layer, stacked above hat (see
+  // avatar.js). Unlike the hat's numeric Sözcü-count lock, `locked: true`
+  // here is unconditional — there's no unlock path yet, it's just not
+  // available to anyone until that's designed (see db/avatar_accessory.sql).
+  const AVATAR_ACCESSORY_OPTIONS = [
+    { value: null,       label: 'Yok' },
+    { value: 'glasses',  label: 'Gözlük', locked: true },
+  ];
+
+  // Cover badges (rozetler) — image stickers the user can place on the
+  // Profil tab's cover, unlocked by matching their birth district
+  // (profiles.birth_place). Add new badges here as new district stickers
+  // are drawn; the picker/cover rendering below doesn't need to change.
+  const BADGES = [
+    { id: 'galata',    src: 'assets/galatakulesisticker.png', label: 'Galata Kulesi', district: 'beyoglu' },
+    { id: 'kizkulesi', src: 'assets/kizkulesisticker.png',    label: 'Kız Kulesi',    district: 'uskudar' },
+  ];
+
+  // Where a newly-placed badge lands before the user drags it anywhere —
+  // cycles by how many badges are already placed. profiles.cover_badges is
+  // a jsonb array of {id, x, y} (x/y are 0-100 percentages of the cover's
+  // own width/height, so a saved spot scales sensibly between the wider
+  // overlay sheet and the narrower read-only popup).
+  const DEFAULT_BADGE_SLOTS = [
+    { x: 20, y: 25 }, { x: 80, y: 25 }, { x: 20, y: 75 }, { x: 80, y: 75 },
+  ];
+
+  // profiles.cover_badges briefly shipped as a plain text[] of ids (before
+  // drag-and-drop positioning existed) — db/profile_badges.sql migrates any
+  // existing rows, but this tolerates a stray un-migrated string entry too.
+  function normalizeBadgeEntry(entry, idx) {
+    if (typeof entry === 'string') {
+      const slot = DEFAULT_BADGE_SLOTS[idx % DEFAULT_BADGE_SLOTS.length];
+      return { id: entry, x: slot.x, y: slot.y };
+    }
+    return entry;
+  }
+
+  function normalizedCoverBadges(profile) {
+    return (profile?.cover_badges || []).map(normalizeBadgeEntry);
   }
 
   const AVATAR_LOCK_SVG = '<span class="ist-avatar-lock" aria-hidden="true">'
@@ -69,40 +131,67 @@
     + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>'
     + '</svg>';
 
-  function buildAvatarPicker(currentAvatarUrl, sozculCount, opts) {
-    opts = opts || {};
-    const optionClass = opts.optionClass || 'ist-avatar-option';
-    return AVATAR_OPTIONS.map(o => {
-      const required = o.requiresSozculCount || 0;
-      const locked = required > 0 && (sozculCount || 0) < required;
-      const selected = currentAvatarUrl === o.url;
-      const title = locked
-        ? `${o.label} — ${required} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${required})`
-        : o.label;
-      const cls = [optionClass];
+  const ARROW_ICON_LEFT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>';
+  const ARROW_ICON_RIGHT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"></path></svg>';
+
+  // Index into AVATAR_SHIRT_OPTIONS / AVATAR_HAIR_OPTIONS / AVATAR_HAT_
+  // OPTIONS / AVATAR_ACCESSORY_OPTIONS matching the currently-saved value
+  // (defaulting to each list's first/"none" entry).
+  function shirtOptionIndex(avatarShirt) {
+    const i = AVATAR_SHIRT_OPTIONS.findIndex(o => o.value === avatarShirt);
+    return i === -1 ? 0 : i;
+  }
+  function hairOptionIndex(avatarHair) {
+    const i = AVATAR_HAIR_OPTIONS.findIndex(o => o.value === avatarHair);
+    return i === -1 ? 0 : i;
+  }
+  function hatOptionIndex(avatarHat) {
+    const i = AVATAR_HAT_OPTIONS.findIndex(o => o.value === avatarHat);
+    return i === -1 ? 0 : i;
+  }
+  function accessoryOptionIndex(avatarAccessory) {
+    const i = AVATAR_ACCESSORY_OPTIONS.findIndex(o => o.value === avatarAccessory);
+    return i === -1 ? 0 : i;
+  }
+
+  // The shared avatar preview — the shirt, hair, hat, and accessory rows
+  // all browse independently (see wireShirtCarousel/wireHairCarousel/
+  // wireHatCarousel/wireAccessoryCarousel) but always render into this same
+  // composite (base + shirt + hair + hat + accessory), so picking any one
+  // of them immediately shows how it looks combined with whatever the
+  // other three are currently set to. `locked` renders the
+  // browsed-but-not-available layer with the lock badge, without actually
+  // committing it (see wireHatCarousel's / wireAccessoryCarousel's
+  // render()).
+  function avatarPreviewHTML(avatarHair, avatarHat, avatarAccessory, avatarShirt, locked) {
+    return IstAvatar.html(null, avatarHair, avatarHat, avatarAccessory, avatarShirt) + (locked ? AVATAR_LOCK_SVG : '');
+  }
+
+  function buildBadgePicker(badges, placedIds, birthDistrict) {
+    return badges.map(b => {
+      const unlocked = !!birthDistrict && b.district === birthDistrict;
+      const selected = placedIds.includes(b.id);
+      const cls = ['ist-pc-badge-option'];
       if (selected) cls.push('selected');
-      if (locked)   cls.push('locked');
+      if (!unlocked) cls.push('locked');
+      const title = unlocked
+        ? b.label
+        : `${b.label} — ${NB_NAMES[b.district] || b.district} doğumlular için kilitli`;
       return `
         <button type="button"
           class="${cls.join(' ')}"
-          data-url="${o.url}"
-          ${locked ? 'aria-disabled="true"' : ''}
-          title="${title}"
-          aria-label="${o.label}">
-          <img src="${avatarSrc(o.url)}" alt="${o.label}">
-          ${locked ? AVATAR_LOCK_SVG : ''}
+          data-id="${b.id}"
+          ${unlocked ? '' : 'aria-disabled="true"'}
+          title="${esc(title)}"
+          aria-label="${esc(b.label)}">
+          <img src="${b.src}" alt="${esc(b.label)}">
+          ${unlocked ? '' : AVATAR_LOCK_SVG}
+          <span class="ist-pc-badge-label">${esc(b.label)}</span>
         </button>
       `;
     }).join('');
-  }
-
-  function lookupAvatarOption(url) {
-    return AVATAR_OPTIONS.find(o => o.url === url) || null;
-  }
-
-  function lockedAvatarMessage(opt, sozculCount) {
-    const need = opt.requiresSozculCount;
-    return `Bu avatar kilitli — ${need} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${need}).`;
   }
 
   function capitalizeName(s) {
@@ -118,22 +207,9 @@
     }[c]));
   }
 
-  function formatLastSeen(dateStr, I18N) {
-    if (!dateStr) return '—';
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diffMins = Math.floor((now - d) / 60000);
-    const en = I18N && I18N.isEnglish && I18N.isEnglish();
-    if (diffMins < 1) return en ? 'Online now' : 'Şimdi çevrimiçi';
-    if (diffMins < 60) return en ? `${diffMins}m ago` : `${diffMins} dk önce`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return en ? `${diffHours}h ago` : `${diffHours} saat önce`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return en ? `${diffDays}d ago` : `${diffDays} gün önce`;
-    return I18N.formatDate(d, { year: 'numeric', month: 'long', day: 'numeric' });
-  }
-
-  // Read game scores from Supabase, aggregated per game.
+  // Read game scores from Supabase, aggregated per game. Currently unused —
+  // the Oyun Skorları cards were pulled from the Profil tab (kept for now
+  // in case they come back in some form) in favor of the weekly grid.
   async function getGameScores(sb, userId) {
     function currentStreakFor(winDates) {
       function seedForOffset(off) {
@@ -206,6 +282,131 @@
         </div>
       </div>
     `;
+  }
+
+  // Monday-first day index (0…6) of "now" in Istanbul time.
+  function istWeekdayIdx(d) {
+    const dow = d.getDay(); // 0=Sun…6=Sat
+    return dow === 0 ? 6 : dow - 1;
+  }
+
+  function mondayOfIstWeek() {
+    const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+    return new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - istWeekdayIdx(nowIst));
+  }
+
+  // The 7 calendar dates (Monday…Sunday) of the current Istanbul week, each
+  // as an unpadded "Y-M-D" key matching game_results.date (see
+  // db/game_results.sql: "YYYY-M-D Istanbul-local", no zero-padding).
+  function weekDatesIst() {
+    const monday = mondayOfIstWeek();
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+      out.push(`${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`);
+    }
+    return out;
+  }
+
+  // Same week, zero-padded ISO ("YYYY-MM-DD") to match
+  // sozcel_sozcul_assignments.game_date — a real `date` column, unlike
+  // game_results.date which is unpadded text. Index-aligned with
+  // weekDatesIst() so the two can be zipped together.
+  function weekDatesIstISO() {
+    const monday = mondayOfIstWeek();
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      out.push(`${d.getFullYear()}-${m}-${dd}`);
+    }
+    return out;
+  }
+
+  // Fetches this user's game_results for the current Istanbul week and
+  // reduces them to per (game, date) played/won flags for the weekly grid,
+  // plus which of those days they were the assigned Sözcü (Sözcel's daily
+  // word-of-day solver) — rendered as a distinct color in weekGridHTML
+  // rather than the usual win/played states.
+  async function getWeekGameStatus(sb, userId) {
+    const dateKeys = weekDatesIst();
+    const isoDateKeys = weekDatesIstISO();
+    const empty = { dateKeys, played: new Set(), won: new Set(), sozcuDates: new Set() };
+    try {
+      const [{ data, error }, { data: sozcuData, error: sozcuError }] = await Promise.all([
+        sb.from('game_results').select('game, date, won').eq('user_id', userId).in('date', dateKeys),
+        sb.from('sozcel_sozcul_assignments').select('game_date').eq('user_id', userId).in('game_date', isoDateKeys),
+      ]);
+      if (error) throw error;
+      (data || []).forEach(r => {
+        const k = r.game + '|' + r.date;
+        empty.played.add(k);
+        if (r.won) empty.won.add(k);
+      });
+      if (!sozcuError) {
+        (sozcuData || []).forEach(r => {
+          const idx = isoDateKeys.indexOf(r.game_date);
+          if (idx !== -1) empty.sozcuDates.add(dateKeys[idx]);
+        });
+      }
+      return empty;
+    } catch (e) {
+      return empty;
+    }
+  }
+
+  // Renders the 3-game × 7-day grid: white = day hasn't arrived yet, grey =
+  // arrived but not played, yellow = played without winning, green = won.
+  // Days outside a given game's own schedule (GAME_SCHEDULE) render as a
+  // muted dashed cell instead of a color, since the game has nothing to
+  // show there.
+  function weekGridHTML(status, I18N) {
+    const en = I18N && I18N.isEnglish && I18N.isEnglish();
+    const dayLetters = en ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['P', 'S', 'Ç', 'P', 'C', 'C', 'P'];
+    const dayNames = en
+      ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+      : ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+    const todayIdx = istWeekdayIdx(new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' })));
+
+    const header = `
+      <div class="ist-pc-weekgrid-header">
+        <span class="ist-pc-weekgrid-label-spacer"></span>
+        <div class="ist-pc-weekgrid-days">
+          ${dayLetters.map(l => `<span>${l}</span>`).join('')}
+        </div>
+      </div>
+    `;
+
+    const rows = GAME_SCHEDULE.map(game => {
+      const cells = status.dateKeys.map((dateKey, i) => {
+        let state, title;
+        if (!game.days.includes(i)) {
+          state = 'inactive';
+          title = `${game.label} — ${dayNames[i]}`;
+        } else if (i > todayIdx) {
+          state = 'future';
+          title = `${game.label} — ${dayNames[i]}`;
+        } else if (game.id === 'sozcel' && status.sozcuDates && status.sozcuDates.has(dateKey)) {
+          state = 'sozcu';
+          title = `${game.label} — ${dayNames[i]}: Sözcü`;
+        } else {
+          const k = game.id + '|' + dateKey;
+          if (status.won.has(k)) { state = 'win'; title = `${game.label} — ${dayNames[i]}: kazandı`; }
+          else if (status.played.has(k)) { state = 'played'; title = `${game.label} — ${dayNames[i]}: oynadı, kazanamadı`; }
+          else { state = 'none'; title = `${game.label} — ${dayNames[i]}: oynamadı`; }
+        }
+        return `<span class="ist-pc-daycell ist-pc-daycell-${state}" title="${esc(title)}"></span>`;
+      }).join('');
+      return `
+        <div class="ist-pc-weekgrid-row">
+          <span class="ist-pc-weekgrid-label">${esc(game.label)}</span>
+          <div class="ist-pc-weekgrid-cells">${cells}</div>
+        </div>
+      `;
+    }).join('');
+
+    return `<div class="ist-pc-weekgrid">${header}${rows}</div>`;
   }
 
   // Wires a range input to its tick labels: clicking a tick jumps the
@@ -331,6 +532,10 @@
     return {
       sb, I18N, user, profile, kefaletCount, sozculCount, kefilOfUser,
       avatarUrl: profile?.avatar_url || null,
+      avatarHair: profile?.avatar_hair || null,
+      avatarHat: profile?.avatar_hat || null,
+      avatarAccessory: profile?.avatar_accessory || null,
+      avatarShirt: profile?.avatar_shirt || null,
     };
   }
 
@@ -347,15 +552,17 @@
     const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
     const yasadigi = profile?.neighborhood || '';
     let avatarUrl = state.avatarUrl;
+    let avatarHair = state.avatarHair;
+    let avatarHat = state.avatarHat;
+    let avatarAccessory = state.avatarAccessory;
+    let avatarShirt = state.avatarShirt;
 
     const yasadigiDisplay = yasadigi ? (NB_NAMES[yasadigi] || yasadigi) : '—';
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const toggleLabel = t('profile.toggle') || 'Profil';
 
     function avatarHTML() {
-      return avatarUrl
-        ? `<img src="${esc(avatarSrc(avatarUrl))}" alt="">`
-        : esc(displayName.charAt(0).toUpperCase());
+      return IstAvatar.html(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt);
     }
 
     container.innerHTML = `
@@ -376,10 +583,19 @@
         sb: state.sb, I18N, user, profile,
         sozculCount, kefaletCount, kefilOfUser,
         avatarUrl: state.avatarUrl,
-        defaultTab: 'profil',
-        onAvatarChange(url) {
-          state.avatarUrl = url;
-          avatarUrl = url;
+        avatarHair: state.avatarHair,
+        avatarHat: state.avatarHat,
+        avatarAccessory: state.avatarAccessory,
+        avatarShirt: state.avatarShirt,
+        onAvatarChange(hair, hat, accessory, shirt) {
+          state.avatarHair = hair;
+          state.avatarHat = hat;
+          state.avatarAccessory = accessory;
+          state.avatarShirt = shirt;
+          avatarHair = hair;
+          avatarHat = hat;
+          avatarAccessory = accessory;
+          avatarShirt = shirt;
           const av = document.getElementById('ist-pc-avatar');
           if (av) av.innerHTML = avatarHTML();
         },
@@ -388,12 +604,12 @@
   }
 
   // ══════════════════════════════════════════════════════════════
-  // Shared bottom-sheet profile overlay: Profil / Ayarlar / Rozetler tabs.
-  // Mirrors the game-overlay (kahvehane) / reader-overlay (kutuphane) /
-  // detail-overlay (anahane) bottom sheets — same markup shape, same
-  // slide-up transition, same shared frames.css card treatment — so
-  // opening your profile reads as the same kind of surface as opening a
-  // news item, an event, an article, or a game.
+  // Shared bottom-sheet profile overlay: the combined settings page (see
+  // settingsPageHTML). Mirrors the game-overlay (kahvehane) / reader-overlay
+  // (kutuphane) / detail-overlay (anahane) bottom sheets — same markup
+  // shape, same slide-up transition, same shared frames.css card treatment
+  // — so opening your profile reads as the same kind of surface as opening
+  // a news item, an event, an article, or a game.
   //
   // Injected into <body> lazily (once) so every page that loads this
   // script gets it without needing its own overlay markup.
@@ -409,8 +625,7 @@
     el.innerHTML = `
       <div class="profile-overlay-backdrop" id="profile-overlay-backdrop"></div>
       <div class="profile-overlay-sheet" id="profile-overlay-sheet">
-        <button type="button" class="profile-overlay-close" id="profile-overlay-close" aria-label="Kapat" title="Kapat">✕</button>
-        <div class="profile-overlay-tabs" id="profile-overlay-tabs"></div>
+        <button type="button" class="profile-overlay-close" id="profile-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
         <div class="profile-overlay-body" id="profile-overlay-body"></div>
       </div>
     `;
@@ -420,10 +635,6 @@
     document.getElementById('profile-overlay-close').addEventListener('click', closeProfileOverlay);
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && el.classList.contains('open')) closeProfileOverlay();
-    });
-    document.getElementById('profile-overlay-tabs').addEventListener('click', (e) => {
-      const btn = e.target.closest('.profile-overlay-tab');
-      if (btn) setActiveTab(btn.dataset.tab);
     });
   }
 
@@ -447,7 +658,16 @@
     ensureProfileOverlay();
     _ov = Object.assign({ sozculCount: 0, kefaletCount: 0, kefilOfUser: null }, opts);
     if (_ov.avatarUrl === undefined) _ov.avatarUrl = _ov.profile?.avatar_url || null;
-    setActiveTab(opts.defaultTab || 'profil');
+    if (_ov.avatarHair === undefined) _ov.avatarHair = _ov.profile?.avatar_hair || null;
+    if (_ov.avatarHat === undefined) _ov.avatarHat = _ov.profile?.avatar_hat || null;
+    if (_ov.avatarAccessory === undefined) _ov.avatarAccessory = _ov.profile?.avatar_accessory || null;
+    if (_ov.avatarShirt === undefined) _ov.avatarShirt = _ov.profile?.avatar_shirt || null;
+    // Settings page opens in read-only "info" mode every time — Kişiselleştir
+    // switches it into the editable avatar-arrows + sliders mode (see
+    // settingsPageHTML/coverHTML), Kaydet saves and the page reload resets
+    // this back to false on its own.
+    _ov.customizing = false;
+    renderOverlayBody();
     const overlay = document.getElementById('profile-overlay');
     positionProfileSheet();
     overlay.hidden = false;
@@ -470,236 +690,332 @@
     setTimeout(() => { overlay.hidden = true; }, 550);
   }
 
-  function setActiveTab(tab) {
-    if (!_ov) return;
-    _ov.activeTab = tab;
-    const t = (k) => (_ov.I18N && _ov.I18N.t) ? _ov.I18N.t(k) : k;
-    const tabs = [
-      { id: 'profil',    label: t('profile.tab.profil') },
-      { id: 'ayarlar',   label: t('profile.tab.ayarlar') },
-      { id: 'rozetler',  label: t('profile.tab.rozetler') },
-    ];
-    document.getElementById('profile-overlay-tabs').innerHTML = tabs.map(tb => `
-      <button type="button" class="profile-overlay-tab${tb.id === tab ? ' active' : ''}" data-tab="${tb.id}">${esc(tb.label)}</button>
-    `).join('');
-    renderOverlayBody();
-  }
-
   function renderOverlayBody() {
     const body = document.getElementById('profile-overlay-body');
     if (!body || !_ov) return;
-    if (_ov.activeTab === 'ayarlar') body.innerHTML = ayarlarTabHTML(_ov);
-    else if (_ov.activeTab === 'rozetler') body.innerHTML = rozetlerTabHTML(_ov);
-    else body.innerHTML = profilTabHTML(_ov);
-    wireTabEvents(_ov.activeTab, _ov);
+    body.innerHTML = settingsPageHTML(_ov);
+    wireSettingsEvents(_ov);
   }
 
-  function profilTabHTML(state) {
-    const { I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl } = state;
+  function coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt) {
+    return IstAvatar.html(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt);
+  }
+
+  // The white "pano" cover — the avatar sits on it like a Twitter cover
+  // photo, and any rozetler (badges) picked on the settings page (see
+  // settingsPageHTML/toggleCoverBadge) are dragged freely around it (see
+  // wireCoverDragging). Shared between the self-editing settings page
+  // (settingsPageHTML below, editable: true) and kutuphane.html's read-only
+  // "someone else's profile" popup (exposed as IstProfileCard.coverHTML,
+  // editable omitted) so both surfaces render badges identically — the
+  // popup just doesn't wire up dragging or avatar-picking on top of it.
+  //
+  // When editable AND customizing, the avatar sits between two flanking
+  // columns of uniform prev/next arrows — a left column of four "prev"
+  // arrows and a right column of four "next" arrows, each stacked
+  // top-to-bottom as hat, hair, accessory, shirt (see wireHatCarousel/
+  // wireHairCarousel/wireAccessoryCarousel/wireShirtCarousel) — all the
+  // same size, so no category reads as more "primary" than another. When
+  // editable but not customizing, it's just a plain read-only avatar — same
+  // as the non-editable popup — until Kişiselleştir turns the arrows on
+  // (see settingsPageHTML). The cover box itself (.ist-pc-cover) has a
+  // fixed height in CSS regardless of which of these two renders, so the
+  // pano stickers sit on never resizes under them. `sozculCount` is only
+  // needed in the customizing case, to know whether the locked Sözcü hat
+  // should show unlocked (the accessory row's lock is unconditional — see
+  // AVATAR_ACCESSORY_OPTIONS — so it doesn't need it).
+  function coverHTML(opts) {
+    const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText, editable, customizing, sozculCount } = opts;
+    const placed = normalizedCoverBadges(profile);
+    const badgesHTML = placed.map(p => {
+      const badge = BADGES.find(b => b.id === p.id);
+      if (!badge) return '';
+      return `<img class="ist-pc-cover-badge" data-id="${badge.id}" draggable="false" style="left:${p.x}%; top:${p.y}%;" src="${badge.src}" alt="${esc(badge.label)}" title="${esc(badge.label)}">`;
+    }).join('');
+    let avatarBlockHTML;
+    if (editable && customizing) {
+      const hairOpt = AVATAR_HAIR_OPTIONS[hairOptionIndex(avatarHair)];
+      const hatOpt = AVATAR_HAT_OPTIONS[hatOptionIndex(avatarHat)];
+      const accessoryOpt = AVATAR_ACCESSORY_OPTIONS[accessoryOptionIndex(avatarAccessory)];
+      const shirtOpt = AVATAR_SHIRT_OPTIONS[shirtOptionIndex(avatarShirt)];
+      const title = `${hairOpt.label} · ${hatOpt.label} · ${accessoryOpt.label} · ${shirtOpt.label}`;
+      avatarBlockHTML = `
+        <div class="ist-pc-cover-picker">
+          <div class="ist-pc-cover-pick-col">
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-prev" aria-label="Önceki şapka">${ARROW_ICON_LEFT}</button>
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-prev" aria-label="Önceki saç">${ARROW_ICON_LEFT}</button>
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-prev" aria-label="Önceki aksesuar">${ARROW_ICON_LEFT}</button>
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-prev" aria-label="Önceki tişört">${ARROW_ICON_LEFT}</button>
+          </div>
+          <div class="ist-pc-cover-avatar" id="po-avatar-preview" title="${esc(title)}">${avatarPreviewHTML(avatarHair, avatarHat, avatarAccessory, avatarShirt, false)}</div>
+          <div class="ist-pc-cover-pick-col">
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-next" aria-label="Sonraki şapka">${ARROW_ICON_RIGHT}</button>
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-next" aria-label="Sonraki saç">${ARROW_ICON_RIGHT}</button>
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-next" aria-label="Sonraki aksesuar">${ARROW_ICON_RIGHT}</button>
+            <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-next" aria-label="Sonraki tişört">${ARROW_ICON_RIGHT}</button>
+          </div>
+        </div>
+      `;
+    } else {
+      avatarBlockHTML = `<div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>`;
+    }
+    const customizingClass = (editable && customizing) ? ' ist-pc-cover-customizing' : '';
+    return `
+      <div class="ist-pc-cover${editable ? ' ist-pc-cover-editable' : ''}${customizingClass}"${editable ? ' id="po-cover"' : ''}>
+        ${badgesHTML}
+        ${avatarBlockHTML}
+        <div class="ist-pc-cover-name">${esc(displayName)}</div>
+        <div class="ist-pc-cover-meta">${esc(metaText)}</div>
+      </div>
+    `;
+  }
+
+  // Drag-and-drop repositioning of cover badges (Profil tab only — the
+  // read-only popup never passes editable: true to coverHTML, so it has no
+  // .ist-pc-cover-badge with pointer-events enabled to drag). Position is
+  // tracked as a percentage of the cover's own box so it scales sensibly
+  // if the same profile is later viewed in a differently-sized container.
+  function wireCoverDragging(state) {
+    const cover = document.getElementById('po-cover');
+    if (!cover) return;
+    let dragEl = null, startClientX = 0, startClientY = 0, startLeft = 0, startTop = 0;
+
+    function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+
+    function onPointerDown(e) {
+      const badge = e.target.closest('.ist-pc-cover-badge');
+      if (!badge) return;
+      e.preventDefault();
+      dragEl = badge;
+      dragEl.setPointerCapture(e.pointerId);
+      dragEl.classList.add('dragging');
+      startClientX = e.clientX;
+      startClientY = e.clientY;
+      startLeft = parseFloat(dragEl.style.left) || 50;
+      startTop = parseFloat(dragEl.style.top) || 50;
+    }
+
+    function onPointerMove(e) {
+      if (!dragEl) return;
+      const rect = cover.getBoundingClientRect();
+      const x = clamp(startLeft + ((e.clientX - startClientX) / rect.width) * 100, 10, 90);
+      const y = clamp(startTop + ((e.clientY - startClientY) / rect.height) * 100, 15, 85);
+      dragEl.style.left = x + '%';
+      dragEl.style.top = y + '%';
+    }
+
+    async function onPointerUp(e) {
+      if (!dragEl) return;
+      const badge = dragEl;
+      dragEl = null;
+      badge.classList.remove('dragging');
+      await saveCoverBadgePosition(badge.dataset.id, parseFloat(badge.style.left), parseFloat(badge.style.top), state);
+    }
+
+    cover.addEventListener('pointerdown', onPointerDown);
+    cover.addEventListener('pointermove', onPointerMove);
+    cover.addEventListener('pointerup', onPointerUp);
+    cover.addEventListener('pointercancel', onPointerUp);
+  }
+
+  // The settings page: replaces the old Profil/Ayarlar/Rozetler tab split
+  // with a single non-paginated view — cover (with the avatar carousel
+  // baked in, see coverHTML) and the weekly game grid on the left; account
+  // info and personalization (language/color/appearance) on the right,
+  // matching a two-column layout so both halves fit on screen together
+  // without scrolling between "pages". The rozetler (badges) picker that
+  // used to sit under the week grid is temporarily removed to save
+  // vertical space on mobile — see BADGES/buildBadgePicker/toggleCoverBadge
+  // above, kept intact so it can be re-added later; already-placed cover
+  // badges still render via coverHTML.
+  function settingsPageHTML(state) {
+    const { I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
+    const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
     const yasadigiIlce = profile?.neighborhood || '';
     const dogumYeri = profile?.birth_place || '';
     const phone = profile?.phone || '';
     const referralCode = profile?.referral_code || '';
-    const isAdminUser = user.email === ADMIN_EMAIL;
-
-    // `yaşadığı ilçe` is admin-controlled (protect_profile_columns trigger
-    // reverts it for everyone else) — only the admin gets an editable
-    // select; other users see it the same way they see birth place: read-only.
-    const districtOptions = Object.entries(NB_NAMES)
-      .filter(([id]) => id !== 'istanbul_disi')
-      .sort((a, b) => a[1].localeCompare(b[1], 'tr'))
-      .map(([id, name]) => `<option value="${id}"${id === yasadigiIlce ? ' selected' : ''}>${esc(name)}</option>`)
-      .join('');
+    const languagePref = normalizeLang(profile?.language_pref);
+    const themePref = normalizeTheme(profile?.theme_pref);
+    const palettePref = normalizePalette(profile?.palette_pref);
+    const langLabel = LANG_VALUES.indexOf(languagePref) === 1 ? 'Daha Türkçe' : 'Daha İngilizce';
+    const paletteLabel = PALETTE_VALUES.indexOf(palettePref) === 1 ? 'Kahverengi' : 'Siyah-Beyaz';
+    const themeLabel = THEME_VALUES.indexOf(themePref) === 1 ? 'Koyu' : 'Açık';
 
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
     const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
     const joinedDate = I18N.formatDate(user.created_at, { year: 'numeric', month: 'long', day: 'numeric' });
-    const lastSeenText = formatLastSeen(user.last_sign_in_at, I18N);
     const kefilLabel = kefilOfUser
       ? esc(capitalizeName(`${kefilOfUser.first_name||''} ${kefilOfUser.last_name||''}`.trim()) || t('profile.unnamed'))
       : '';
 
     return `
-      <div class="ist-pc-avatar-field">
-        <div class="ist-pc-label">${esc(t('profile.chooseavatar'))}</div>
-        <div class="ist-pc-avatar-picker" id="po-avatar-picker">${buildAvatarPicker(avatarUrl, sozculCount)}</div>
-        <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
-      </div>
+      <div class="ist-pc-settings-grid">
+        <div class="ist-pc-settings-col ist-pc-settings-left">
+          ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText: yasadigiDisplay, editable: true, customizing, sozculCount })}
+          <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
 
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.firstname'))}</div>
-        <input class="ist-pc-input" id="po-firstname" type="text" value="${esc(firstName)}" placeholder="${esc(t('profile.firstname'))}">
-      </div>
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.lastname'))}</div>
-        <input class="ist-pc-input" id="po-lastname" type="text" value="${esc(lastName)}" placeholder="${esc(t('profile.lastname'))}">
-      </div>
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.district'))}</div>
-        ${isAdminUser
-          ? `<select class="ist-pc-select" id="po-yasadigi"><option value="">— ${esc(t('profile.district'))} —</option>${districtOptions}</select>`
-          : `<div class="ist-pc-display">${esc(yasadigiDisplay)}</div>`}
-      </div>
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.birthplace'))}</div>
-        <div class="ist-pc-display">${esc(dogumDisplay)}</div>
-      </div>
-
-      <div class="ist-pc-actions">
-        <button type="button" class="ist-pc-save" id="po-save">${esc(t('profile.save'))}</button>
-      </div>
-      <div class="ist-pc-msg" id="po-save-msg"></div>
-
-      <div class="ist-pc-section-title">${esc(t('profile.account'))}</div>
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.email'))}</div>
-        <div class="ist-pc-info-value">${esc(user.email)}</div>
-      </div>
-      ${phone ? `
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.phone') || 'Telefon')}</div>
-        <div class="ist-pc-info-value">${esc(phone)}</div>
-      </div>` : ''}
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.membership'))}</div>
-        <div class="ist-pc-info-value">${esc(joinedDate)}</div>
-      </div>
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.lastseen'))}</div>
-        <div class="ist-pc-info-value">${esc(lastSeenText)}</div>
-      </div>
-      ${kefilOfUser ? `
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.kefil'))}</div>
-        <div class="ist-pc-info-value">${kefilLabel}</div>
-      </div>` : ''}
-      ${referralCode ? `
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.referralcode'))}</div>
-        <div class="ist-pc-info-value">
-          <span class="ist-pc-code">${esc(referralCode)}</span>
-          <button type="button" class="ist-pc-copy" id="po-copy">${esc(t('profile.copy'))}</button>
+          <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
+          <div id="po-weekgrid-mount"></div>
         </div>
-      </div>` : ''}
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</div>
-        <div class="ist-pc-info-value">${kefaletCount ?? 0} ${esc(t('profile.people'))}</div>
-      </div>
-      <div class="ist-pc-info-row">
-        <div class="ist-pc-info-label">${esc(t('profile.sozculcount'))}</div>
-        <div class="ist-pc-info-value">${sozculCount ?? 0} ${esc(t('profile.times'))}</div>
-      </div>
 
-      <div class="ist-pc-section-title">${esc(t('profile.gamescores') || 'Oyun Skorları')}</div>
-      <div id="po-scores-mount">${scoresHTML({})}</div>
-    `;
-  }
+        <div class="ist-pc-settings-col ist-pc-settings-right">
+          <div class="ist-pc-section-title">${esc(t('profile.account'))}</div>
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.email'))}</div>
+            <div class="ist-pc-info-value">${esc(user.email)}</div>
+          </div>
+          ${phone ? `
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.phone') || 'Telefon')}</div>
+            <div class="ist-pc-info-value">${esc(phone)}</div>
+          </div>` : ''}
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.birthplace'))}</div>
+            <div class="ist-pc-info-value">${esc(dogumDisplay)}</div>
+          </div>
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.membership'))}</div>
+            <div class="ist-pc-info-value">${esc(joinedDate)}</div>
+          </div>
+          ${kefilOfUser ? `
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.kefil'))}</div>
+            <div class="ist-pc-info-value">${kefilLabel}</div>
+          </div>` : ''}
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</div>
+            <div class="ist-pc-info-value">${kefaletCount ?? 0} ${esc(t('profile.people'))}</div>
+          </div>
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.sozculcount'))}</div>
+            <div class="ist-pc-info-value">${sozculCount ?? 0} ${esc(t('profile.times'))}</div>
+          </div>
+          ${referralCode ? `
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.referralcode'))}</div>
+            <div class="ist-pc-info-value">
+              <span class="ist-pc-code">${esc(referralCode)}</span>
+              <button type="button" class="ist-pc-copy" id="po-copy">${esc(t('profile.copy'))}</button>
+            </div>
+          </div>` : ''}
 
-  function ayarlarTabHTML(state) {
-    const { I18N, profile } = state;
-    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
-    const languagePref = normalizeLang(profile?.language_pref);
-    const themePref = normalizeTheme(profile?.theme_pref);
-    const palettePref = normalizePalette(profile?.palette_pref);
-    return `
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.langpref'))}</div>
-        <input class="ist-pc-slider" id="po-language" type="range" min="0" max="1" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
-        <div class="ist-pc-ticks" id="po-language-ticks">
-          <span data-idx="0">Daha İngilizce</span>
-          <span data-idx="1">Daha Türkçe</span>
-        </div>
-      </div>
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.colortheme'))}</div>
-        <input class="ist-pc-slider" id="po-palette" type="range" min="0" max="1" step="1" value="${PALETTE_VALUES.indexOf(palettePref)}">
-        <div class="ist-pc-ticks" id="po-palette-ticks">
-          <span data-idx="0">Siyah-Beyaz</span>
-          <span data-idx="1">Kahverengi</span>
+          <div class="ist-pc-section-title">${esc(t('profile.tab.ayarlar'))}</div>
+          ${customizing ? `
+          <div class="ist-pc-field">
+            <div class="ist-pc-label">${esc(t('profile.langpref'))}</div>
+            <input class="ist-pc-slider" id="po-language" type="range" min="0" max="1" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
+            <div class="ist-pc-ticks" id="po-language-ticks">
+              <span data-idx="0">Daha İngilizce</span>
+              <span data-idx="1">Daha Türkçe</span>
+            </div>
+          </div>
+          <div class="ist-pc-field">
+            <div class="ist-pc-label">${esc(t('profile.colortheme'))}</div>
+            <input class="ist-pc-slider" id="po-palette" type="range" min="0" max="1" step="1" value="${PALETTE_VALUES.indexOf(palettePref)}">
+            <div class="ist-pc-ticks" id="po-palette-ticks">
+              <span data-idx="0">Siyah-Beyaz</span>
+              <span data-idx="1">Kahverengi</span>
+            </div>
+          </div>
+          <div class="ist-pc-field">
+            <div class="ist-pc-label">${esc(t('profile.appearance'))}</div>
+            <input class="ist-pc-slider" id="po-theme" type="range" min="0" max="1" step="1" value="${THEME_VALUES.indexOf(themePref)}">
+            <div class="ist-pc-ticks" id="po-theme-ticks">
+              <span data-idx="0">Açık</span>
+              <span data-idx="1">Koyu</span>
+            </div>
+          </div>
+          ` : `
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.langpref'))}</div>
+            <div class="ist-pc-info-value">${esc(langLabel)}</div>
+          </div>
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.colortheme'))}</div>
+            <div class="ist-pc-info-value">${esc(paletteLabel)}</div>
+          </div>
+          <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.appearance'))}</div>
+            <div class="ist-pc-info-value">${esc(themeLabel)}</div>
+          </div>
+          `}
+          <div class="ist-pc-actions">
+            <button type="button" class="ist-pc-save" id="po-save">${esc(customizing ? t('profile.save') : t('profile.customize'))}</button>
+          </div>
+          <div class="ist-pc-msg" id="po-save-msg"></div>
         </div>
       </div>
-      <div class="ist-pc-field">
-        <div class="ist-pc-label">${esc(t('profile.appearance'))}</div>
-        <input class="ist-pc-slider" id="po-theme" type="range" min="0" max="1" step="1" value="${THEME_VALUES.indexOf(themePref)}">
-        <div class="ist-pc-ticks" id="po-theme-ticks">
-          <span data-idx="0">Açık</span>
-          <span data-idx="1">Koyu</span>
-        </div>
-      </div>
-      <div class="ist-pc-actions">
-        <button type="button" class="ist-pc-save" id="po-ayarlar-save">${esc(t('profile.save'))}</button>
-      </div>
-      <div class="ist-pc-msg" id="po-ayarlar-msg"></div>
+
       <button type="button" class="ist-pc-signout" id="po-signout">${esc(t('profile.signout'))}</button>
     `;
   }
 
-  function rozetlerTabHTML(state) {
-    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
-    return `
-      <div class="ist-pc-rozet-placeholder">
-        <div class="ist-pc-rozet-icon" aria-hidden="true">🏅</div>
-        <div class="ist-pc-rozet-text">${esc(t('profile.rozetler.soon'))}</div>
-      </div>
-    `;
-  }
-
-  function wireTabEvents(tab, state) {
+  // Wires every interactive piece of the combined settings page in one
+  // pass (cover dragging + avatar carousel live on the same cover now, so
+  // both always need wiring together — there's no more per-tab split).
+  function wireSettingsEvents(state) {
     const { sb, I18N, user } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
 
-    if (tab === 'profil') {
-      document.querySelectorAll('#po-avatar-picker .ist-avatar-option').forEach(btn => {
-        btn.addEventListener('click', () => pickOverlayAvatar(btn.dataset.url, state));
-      });
-      document.getElementById('po-save').addEventListener('click', () => saveProfilTab(state));
-      const copyBtn = document.getElementById('po-copy');
-      if (copyBtn) {
-        copyBtn.addEventListener('click', () => {
-          navigator.clipboard.writeText(state.profile?.referral_code || '');
-          const orig = copyBtn.textContent;
-          copyBtn.textContent = t('profile.copied');
-          setTimeout(() => { copyBtn.textContent = orig; }, 1500);
-        });
+    if (state.customizing) {
+      wireCoverDragging(state);
+    }
+    wireHairCarousel(state);
+    wireHatCarousel(state);
+    wireAccessoryCarousel(state);
+    wireShirtCarousel(state);
+    getWeekGameStatus(sb, user.id).then(status => {
+      const m = document.getElementById('po-weekgrid-mount');
+      if (m) m.innerHTML = weekGridHTML(status, I18N);
+    });
+    document.getElementById('po-save').addEventListener('click', () => {
+      if (state.customizing) {
+        saveSettings(state);
+      } else {
+        state.customizing = true;
+        renderOverlayBody();
       }
-      getGameScores(sb, user.id).then(scores => {
-        const m = document.getElementById('po-scores-mount');
-        if (m) m.innerHTML = scoresHTML(scores);
-      });
-    } else if (tab === 'ayarlar') {
-      syncTicks('po-language', 'po-language-ticks');
-      syncTicks('po-palette', 'po-palette-ticks');
-      syncTicks('po-theme', 'po-theme-ticks');
-      document.getElementById('po-ayarlar-save').addEventListener('click', () => saveAyarlarTab(state));
-      document.getElementById('po-signout').addEventListener('click', async () => {
-        await sb.auth.signOut();
-        window.location.href = 'index.html';
+    });
+    const copyBtn = document.getElementById('po-copy');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(state.profile?.referral_code || '');
+        const orig = copyBtn.textContent;
+        copyBtn.textContent = t('profile.copied');
+        setTimeout(() => { copyBtn.textContent = orig; }, 1500);
       });
     }
+    syncTicks('po-language', 'po-language-ticks');
+    syncTicks('po-palette', 'po-palette-ticks');
+    syncTicks('po-theme', 'po-theme-ticks');
+    document.getElementById('po-signout').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      window.location.href = 'index.html';
+    });
   }
 
-  async function saveProfilTab(state) {
+  // Saves the settings page's only editable fields — language/palette/
+  // appearance. Ad/Soyad/Yaşadığı İlçe are read-only for now (see the
+  // comment above the info rows in settingsPageHTML), so there's nothing
+  // else to send.
+  async function saveSettings(state) {
     const { sb, I18N, user } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const msgEl = document.getElementById('po-save-msg');
     const btn = document.getElementById('po-save');
-    const isAdminUser = user.email === ADMIN_EMAIL;
-    const newFirstName = capitalizeName(document.getElementById('po-firstname').value.trim());
-    const newLastName = capitalizeName(document.getElementById('po-lastname').value.trim());
-    const yasadigiEl = document.getElementById('po-yasadigi');
+    const newLang = LANG_VALUES[parseInt(document.getElementById('po-language').value, 10)] || 'default';
+    const newTheme = THEME_VALUES[parseInt(document.getElementById('po-theme').value, 10)] || 'light';
+    const newPalette = PALETTE_VALUES[parseInt(document.getElementById('po-palette').value, 10)] || 'mono';
 
-    const payload = { first_name: newFirstName, last_name: newLastName };
-    if (isAdminUser && yasadigiEl) {
-      if (!yasadigiEl.value) {
-        msgEl.textContent = 'Lütfen bir ilçe seçin.';
-        msgEl.style.color = 'var(--accent)';
-        return;
-      }
-      payload.neighborhood = yasadigiEl.value;
-    }
+    const payload = {
+      language_pref: newLang,
+      theme_pref: newTheme,
+      palette_pref: newPalette,
+    };
 
     btn.textContent = t('profile.saving');
     btn.disabled = true;
@@ -709,35 +1025,6 @@
       const { data, error } = await sb.from('profiles').update(payload).eq('id', user.id).select('id');
       if (error) throw error;
       if (!data || data.length === 0) throw new Error('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
-      setTimeout(() => window.location.reload(), 400);
-    } catch (err) {
-      btn.textContent = t('profile.save');
-      btn.disabled = false;
-      msgEl.textContent = (err && err.message) || 'Kaydedilemedi.';
-      msgEl.style.color = 'var(--accent)';
-    }
-  }
-
-  async function saveAyarlarTab(state) {
-    const { sb, I18N, user } = state;
-    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
-    const msgEl = document.getElementById('po-ayarlar-msg');
-    const btn = document.getElementById('po-ayarlar-save');
-    const newLang = LANG_VALUES[parseInt(document.getElementById('po-language').value, 10)] || 'default';
-    const newTheme = THEME_VALUES[parseInt(document.getElementById('po-theme').value, 10)] || 'light';
-    const newPalette = PALETTE_VALUES[parseInt(document.getElementById('po-palette').value, 10)] || 'mono';
-
-    btn.textContent = t('profile.saving');
-    btn.disabled = true;
-    msgEl.textContent = '';
-
-    try {
-      const { data, error } = await sb.from('profiles')
-        .update({ language_pref: newLang, theme_pref: newTheme, palette_pref: newPalette })
-        .eq('id', user.id)
-        .select('id');
-      if (error) throw error;
-      if (!data || data.length === 0) throw new Error('Profil bulunamadı.');
       // Cache the new palette locally so the reload starts in the right
       // colors instead of flashing the old palette.
       if (global.Palette) global.Palette.setPalette(newPalette);
@@ -746,6 +1033,7 @@
       btn.textContent = t('profile.save');
       btn.disabled = false;
       msgEl.textContent = (err && err.message) || 'Kaydedilemedi.';
+      msgEl.style.color = 'var(--accent)';
     }
   }
 
@@ -759,22 +1047,223 @@
     _ovAvatarMsgTimer = setTimeout(() => el.classList.remove('show'), 5000);
   }
 
-  async function pickOverlayAvatar(url, state) {
-    const { sb, user, sozculCount } = state;
-    if (!url || url === state.avatarUrl) return;
-    const opt = lookupAvatarOption(url);
-    if (opt?.requiresSozculCount && (sozculCount || 0) < opt.requiresSozculCount) {
-      showOverlayAvatarMsg(lockedAvatarMessage(opt, sozculCount));
-      return;
+  // Wires the hair row's prev/next arrows. Browsing is purely local — `idx`
+  // tracks whatever hair is currently shown, independent of what's actually
+  // saved — and each step immediately picks it (hair is never locked, so
+  // this always commits). All four carousels render into the same
+  // #po-avatar-preview, using the *other* three's current value for the
+  // layers they don't control (state.avatarHat/avatarAccessory/avatarShirt
+  // here).
+  function wireHairCarousel(state) {
+    const prevBtn = document.getElementById('po-hair-prev');
+    const nextBtn = document.getElementById('po-hair-next');
+    const previewEl = document.getElementById('po-avatar-preview');
+    if (!prevBtn || !nextBtn || !previewEl) return;
+
+    let idx = hairOptionIndex(state.avatarHair);
+
+    function render() {
+      const hair = AVATAR_HAIR_OPTIONS[idx].value;
+      previewEl.innerHTML = avatarPreviewHTML(hair, state.avatarHat, state.avatarAccessory, state.avatarShirt, false);
+      previewEl.classList.remove('locked');
     }
-    const { data, error } = await sb.from('profiles').update({ avatar_url: url }).eq('id', user.id).select('id');
+
+    function step(delta) {
+      idx = (idx + delta + AVATAR_HAIR_OPTIONS.length) % AVATAR_HAIR_OPTIONS.length;
+      render();
+      pickOverlayHair(AVATAR_HAIR_OPTIONS[idx].value, state);
+    }
+
+    prevBtn.addEventListener('click', () => step(-1));
+    nextBtn.addEventListener('click', () => step(1));
+  }
+
+  // Wires the hat row's prev/next arrows — same immediate-pick convention,
+  // except landing on a locked hat shows it (with the lock badge) on the
+  // shared preview without committing, so browsing further or away doesn't
+  // leave a half-saved state (see pickOverlayHat's own lock check, which is
+  // the actual source of truth — this is just the matching visual).
+  function wireHatCarousel(state) {
+    const prevBtn = document.getElementById('po-hat-prev');
+    const nextBtn = document.getElementById('po-hat-next');
+    const previewEl = document.getElementById('po-avatar-preview');
+    if (!prevBtn || !nextBtn || !previewEl) return;
+
+    let idx = hatOptionIndex(state.avatarHat);
+
+    function render() {
+      const opt = AVATAR_HAT_OPTIONS[idx];
+      const locked = !!opt.requiresSozculCount && (state.sozculCount || 0) < opt.requiresSozculCount;
+      previewEl.innerHTML = avatarPreviewHTML(state.avatarHair, opt.value, state.avatarAccessory, state.avatarShirt, locked);
+      previewEl.classList.toggle('locked', locked);
+    }
+
+    function step(delta) {
+      idx = (idx + delta + AVATAR_HAT_OPTIONS.length) % AVATAR_HAT_OPTIONS.length;
+      render();
+      pickOverlayHat(AVATAR_HAT_OPTIONS[idx].value, state);
+    }
+
+    prevBtn.addEventListener('click', () => step(-1));
+    nextBtn.addEventListener('click', () => step(1));
+  }
+
+  // Wires the accessory row's prev/next arrows — same shape as the hat
+  // row, except the lock is unconditional (see AVATAR_ACCESSORY_OPTIONS):
+  // there's no count to check, `opt.locked` alone decides it, and picking
+  // a locked accessory never commits, now or later, until that changes.
+  function wireAccessoryCarousel(state) {
+    const prevBtn = document.getElementById('po-accessory-prev');
+    const nextBtn = document.getElementById('po-accessory-next');
+    const previewEl = document.getElementById('po-avatar-preview');
+    if (!prevBtn || !nextBtn || !previewEl) return;
+
+    let idx = accessoryOptionIndex(state.avatarAccessory);
+
+    function render() {
+      const opt = AVATAR_ACCESSORY_OPTIONS[idx];
+      const locked = !!opt.locked;
+      previewEl.innerHTML = avatarPreviewHTML(state.avatarHair, state.avatarHat, opt.value, state.avatarShirt, locked);
+      previewEl.classList.toggle('locked', locked);
+    }
+
+    function step(delta) {
+      idx = (idx + delta + AVATAR_ACCESSORY_OPTIONS.length) % AVATAR_ACCESSORY_OPTIONS.length;
+      render();
+      pickOverlayAccessory(AVATAR_ACCESSORY_OPTIONS[idx].value, state);
+    }
+
+    prevBtn.addEventListener('click', () => step(-1));
+    nextBtn.addEventListener('click', () => step(1));
+  }
+
+  // Wires the shirt row's prev/next arrows — never locked (unlike hat/
+  // accessory), just a plain immediate-pick toggle between the default
+  // 'black' and 'Yok' (bare).
+  function wireShirtCarousel(state) {
+    const prevBtn = document.getElementById('po-shirt-prev');
+    const nextBtn = document.getElementById('po-shirt-next');
+    const previewEl = document.getElementById('po-avatar-preview');
+    if (!prevBtn || !nextBtn || !previewEl) return;
+
+    let idx = shirtOptionIndex(state.avatarShirt);
+
+    function render() {
+      const shirt = AVATAR_SHIRT_OPTIONS[idx].value;
+      previewEl.innerHTML = avatarPreviewHTML(state.avatarHair, state.avatarHat, state.avatarAccessory, shirt, false);
+      previewEl.classList.remove('locked');
+    }
+
+    function step(delta) {
+      idx = (idx + delta + AVATAR_SHIRT_OPTIONS.length) % AVATAR_SHIRT_OPTIONS.length;
+      render();
+      pickOverlayShirt(AVATAR_SHIRT_OPTIONS[idx].value, state);
+    }
+
+    prevBtn.addEventListener('click', () => step(-1));
+    nextBtn.addEventListener('click', () => step(1));
+  }
+
+  async function pickOverlayHair(hair, state) {
+    const { sb, user } = state;
+    if (state.avatarHair === hair) return;
+    const { data, error } = await sb.from('profiles').update({ avatar_hair: hair }).eq('id', user.id).select('id');
     if (error) { showOverlayAvatarMsg('Avatar kaydedilemedi: ' + error.message); return; }
     if (!data || data.length === 0) { showOverlayAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
-    state.avatarUrl = url;
-    document.querySelectorAll('#po-avatar-picker .ist-avatar-option').forEach(b => {
-      b.classList.toggle('selected', b.dataset.url === url);
-    });
-    if (typeof state.onAvatarChange === 'function') state.onAvatarChange(url);
+    state.avatarHair = hair;
+    if (typeof state.onAvatarChange === 'function') state.onAvatarChange(hair, state.avatarHat, state.avatarAccessory, state.avatarShirt);
+  }
+
+  async function pickOverlayHat(hat, state) {
+    const { sb, user, sozculCount } = state;
+    if (state.avatarHat === hat) return;
+    const opt = AVATAR_HAT_OPTIONS.find(o => o.value === hat);
+    if (opt && opt.requiresSozculCount && (sozculCount || 0) < opt.requiresSozculCount) {
+      showOverlayAvatarMsg(`Bu şapka kilitli — ${opt.requiresSozculCount} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${opt.requiresSozculCount}).`);
+      return;
+    }
+    const { data, error } = await sb.from('profiles').update({ avatar_hat: hat }).eq('id', user.id).select('id');
+    if (error) { showOverlayAvatarMsg('Avatar kaydedilemedi: ' + error.message); return; }
+    if (!data || data.length === 0) { showOverlayAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
+    state.avatarHat = hat;
+    if (typeof state.onAvatarChange === 'function') state.onAvatarChange(state.avatarHair, hat, state.avatarAccessory, state.avatarShirt);
+  }
+
+  async function pickOverlayAccessory(accessory, state) {
+    const { sb, user } = state;
+    if (state.avatarAccessory === accessory) return;
+    const opt = AVATAR_ACCESSORY_OPTIONS.find(o => o.value === accessory);
+    if (opt && opt.locked) {
+      showOverlayAvatarMsg('Bu aksesuar henüz kullanılamıyor.');
+      return;
+    }
+    const { data, error } = await sb.from('profiles').update({ avatar_accessory: accessory }).eq('id', user.id).select('id');
+    if (error) { showOverlayAvatarMsg('Avatar kaydedilemedi: ' + error.message); return; }
+    if (!data || data.length === 0) { showOverlayAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
+    state.avatarAccessory = accessory;
+    if (typeof state.onAvatarChange === 'function') state.onAvatarChange(state.avatarHair, state.avatarHat, accessory, state.avatarShirt);
+  }
+
+  async function pickOverlayShirt(shirt, state) {
+    const { sb, user } = state;
+    if (state.avatarShirt === shirt) return;
+    const { data, error } = await sb.from('profiles').update({ avatar_shirt: shirt }).eq('id', user.id).select('id');
+    if (error) { showOverlayAvatarMsg('Avatar kaydedilemedi: ' + error.message); return; }
+    if (!data || data.length === 0) { showOverlayAvatarMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
+    state.avatarShirt = shirt;
+    if (typeof state.onAvatarChange === 'function') state.onAvatarChange(state.avatarHair, state.avatarHat, state.avatarAccessory, shirt);
+  }
+
+  let _badgeMsgTimer = null;
+  function showBadgeMsg(text) {
+    const el = document.getElementById('po-badge-msg');
+    if (!el) return;
+    el.textContent = text;
+    clearTimeout(_badgeMsgTimer);
+    _badgeMsgTimer = setTimeout(() => { el.textContent = ''; }, 4000);
+  }
+
+  // Toggles a badge on/off the cover and saves straight to Supabase (no
+  // separate Kaydet button, same immediate-save pattern as the avatar
+  // picker). Mutates `state.profile.cover_badges` in place rather than
+  // reassigning `state.profile` — every call site (mobile card, desktop
+  // library card, kutuphane's own profile fetch) hands this overlay the
+  // *same* profile object, so the mutation is visible everywhere without
+  // extra plumbing, mirroring how avatar picks rely on onAvatarChange.
+  async function toggleCoverBadge(id, state) {
+    const { sb, user, profile } = state;
+    const badge = BADGES.find(b => b.id === id);
+    if (!badge) return;
+    const birthDistrict = profile?.birth_place || '';
+    if (badge.district !== birthDistrict) return;
+
+    const current = normalizedCoverBadges(profile);
+    const has = current.some(e => e.id === id);
+    let next;
+    if (has) {
+      next = current.filter(e => e.id !== id);
+    } else {
+      const slot = DEFAULT_BADGE_SLOTS[current.length % DEFAULT_BADGE_SLOTS.length];
+      next = [...current, { id, x: slot.x, y: slot.y }];
+    }
+
+    const { data, error } = await sb.from('profiles').update({ cover_badges: next }).eq('id', user.id).select('id');
+    if (error) { showBadgeMsg('Rozet kaydedilemedi: ' + error.message); return; }
+    if (!data || data.length === 0) { showBadgeMsg('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.'); return; }
+
+    if (profile) profile.cover_badges = next;
+    renderOverlayBody();
+  }
+
+  // Persists a badge's dragged position. Best-effort: the drag already
+  // reflects visually regardless of whether the save round-trips, since
+  // reverting mid-drag would feel worse than a rare silent failure here.
+  async function saveCoverBadgePosition(id, x, y, state) {
+    const { sb, user, profile } = state;
+    const next = normalizedCoverBadges(profile).map(e => (e.id === id ? { id, x, y } : e));
+    const { error } = await sb.from('profiles').update({ cover_badges: next }).eq('id', user.id);
+    if (error) return;
+    if (profile) profile.cover_badges = next;
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -808,9 +1297,7 @@
     const yasadigiIlce = profile?.neighborhood || '';
 
     function avatarDisplayHTML() {
-      return state.avatarUrl
-        ? `<img src="${esc(avatarSrc(state.avatarUrl))}" alt="">`
-        : esc(displayName.charAt(0).toUpperCase());
+      return IstAvatar.html(state.avatarUrl, state.avatarHair, state.avatarHat, state.avatarAccessory, state.avatarShirt);
     }
 
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
@@ -831,9 +1318,15 @@
           sb, I18N, user, profile,
           sozculCount, kefaletCount, kefilOfUser,
           avatarUrl: state.avatarUrl,
-          defaultTab: 'profil',
-          onAvatarChange(url) {
-            state.avatarUrl = url;
+          avatarHair: state.avatarHair,
+          avatarHat: state.avatarHat,
+          avatarAccessory: state.avatarAccessory,
+          avatarShirt: state.avatarShirt,
+          onAvatarChange(hair, hat, accessory, shirt) {
+            state.avatarHair = hair;
+            state.avatarHat = hat;
+            state.avatarAccessory = accessory;
+            state.avatarShirt = shirt;
             const av = document.getElementById('lc-avatar-display');
             if (av) av.innerHTML = avatarDisplayHTML();
           },
@@ -851,11 +1344,14 @@
     mountLibraryCard,
     openProfileOverlay,
     closeProfileOverlay,
-    AVATAR_OPTIONS,
+    AVATAR_SHIRT_OPTIONS,
+    AVATAR_HAIR_OPTIONS,
+    AVATAR_HAT_OPTIONS,
+    AVATAR_ACCESSORY_OPTIONS,
     AVATAR_LOCK_SVG,
     GEAR_SVG,
-    buildAvatarPicker,
-    lookupAvatarOption,
-    lockedAvatarMessage,
+    coverHTML,
+    getWeekGameStatus,
+    weekGridHTML,
   };
 }(window));

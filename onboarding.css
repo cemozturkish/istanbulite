@@ -9,7 +9,7 @@
   align-items: center;
   justify-content: flex-start;
   padding: 18vh 24px 24px;
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
   background: var(--ist-onb-bg, #eddbd0);
   color: var(--ist-onb-ink, #4C382A);
   overflow-y: auto;
@@ -25,8 +25,11 @@ body.ist-onb-locked {
 body.ist-onb-locked #ist-onb-root,
 body.ist-onb-locked #ist-onb-pane,
 body.ist-onb-locked .ist-onb-hint,
-body.ist-onb-locked .ist-onb-target { pointer-events: auto !important; }
-body.ist-onb-locked #ist-onb-spotlight { pointer-events: none !important; }
+body.ist-onb-locked .ist-onb-target,
+/* The dim layer must stay a real hit-testable target — see the comment
+   on #ist-onb-spotlight below for why it can't rely on pointer-events:none
+   "falling through" to a clickable ancestor. */
+body.ist-onb-locked #ist-onb-spotlight { pointer-events: auto !important; }
 
 /* Per-palette tokens applied to the onboarding root only. The 4 modes
    come from data-palette × prefers-color-scheme; written to the DB once
@@ -104,7 +107,7 @@ body.ist-onb-locked #ist-onb-spotlight { pointer-events: none !important; }
   color: var(--ist-onb-bg, #eddbd0);
   padding: 6px 12px;
   font-size: 0.75rem;
-  font-family: 'Inter', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
   letter-spacing: 1px;
   border-radius: 4px;
   white-space: nowrap;
@@ -123,7 +126,7 @@ body.ist-onb-locked #ist-onb-spotlight { pointer-events: none !important; }
   align-items: center;
   gap: 10px;
   margin-top: 12px;
-  font-family: 'Inter', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
   font-size: 0.85rem;
   color: var(--ist-onb-ink, #4C382A);
   cursor: pointer;
@@ -168,31 +171,29 @@ body.ist-onb-locked #ist-onb-spotlight { pointer-events: none !important; }
      so the hint stays visible in every onboarding mode. The previous
      value (99993) sat behind the welcome modal and the hint vanished. */
   z-index: 100001;
-  font-family: 'Inter', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
   font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: #867264;
+  /* Lives on <body>, outside the palette-scoped #ist-onb-root, so it can't
+     read --ist-onb-muted — it needs a color that stays readable over any
+     palette/theme combination behind it, hence the fixed dark pill. */
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 999px;
   user-select: none;
   padding: 8px 16px;
-  transition: opacity 200ms, color 200ms;
+  transition: opacity 200ms, background 200ms;
   opacity: 0;
-  background: transparent;
   border: none;
   cursor: pointer;
   pointer-events: auto;
 }
-/* During the spotlight tour the hint sits on the dim layer — switch to
-   a light color with a soft shadow so it's readable against the dark. */
-body.ist-onb-spot .ist-onb-hint {
-  color: rgba(255, 255, 255, 0.85);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-}
 .ist-onb-hint:focus-visible {
-  /* Keyboard focus indicator is kept subtle — color shift, no rectangle. */
+  /* Keyboard focus indicator is kept subtle — background shift, no rectangle. */
   outline: none;
-  color: var(--ist-onb-ink);
+  background: rgba(0, 0, 0, 0.75);
 }
 .ist-onb-hint.show { opacity: 1; }
 
@@ -218,7 +219,7 @@ body.ist-onb-spot .ist-onb-hint {
   background: var(--ist-onb-card);
   border: 1px solid var(--ist-onb-rule);
   padding: 28px 20px;
-  font-family: 'Inter', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 1.5px;
@@ -282,14 +283,14 @@ body.ist-onb-spot .ist-onb-hint {
   background: var(--ist-onb-card);
   border: 1px solid var(--ist-onb-rule);
   padding: 12px 16px;
-  font-family: 'Inter', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
   font-size: 1.4rem;
   font-weight: 700;
   letter-spacing: 4px;
   margin-top: 8px;
 }
 .ist-onb-codebox button {
-  font-family: 'Inter', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
   font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 2px;
@@ -305,7 +306,7 @@ body.ist-onb-spot .ist-onb-hint {
 .ist-onb-btn {
   margin-top: 12px;
   padding: 12px 28px;
-  font-family: 'Inter', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 2px;
@@ -342,7 +343,16 @@ body.ist-onb-spot .ist-onb-hint {
 #ist-onb-spotlight {
   position: fixed;
   inset: 0;
-  pointer-events: none;
+  /* Must stay hit-testable: the rest of the page is pointer-events:none
+     while locked, so this dim layer is the only thing under the finger
+     for non-interactive beats. It needs to be the real click target that
+     the tap-anywhere firewall catches — relying on the click "falling
+     through" to <html> is a happy Chromium quirk, not something mobile
+     Safari can be trusted to do. .ist-onb-target/.ist-onb-nav-flash sit
+     above it (z-index 99990) so interactive beats still tap the real
+     element underneath. */
+  pointer-events: auto;
+  cursor: pointer;
   z-index: 99989;
   background: rgba(0, 0, 0, 0.62);
   display: none;
@@ -393,7 +403,7 @@ body.ist-onb-spot .ist-onb-hint {
   align-items: flex-end;
   gap: 10px;
   max-width: min(380px, calc(100vw - 40px));
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
   color: var(--ist-onb-ink, #4C382A);
 }
 #ist-onb-pane[data-palette="earth"] {
@@ -452,7 +462,7 @@ body.ist-onb-spot .ist-onb-hint {
   gap: 8px;
 }
 #ist-onb-pane .ist-onb-prompt {
-  font-family: 'Inter', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
   font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 2px;

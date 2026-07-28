@@ -3,9 +3,10 @@
 <head>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f0f0f0">
   <title>istanbulite.net</title>
   <script src="safe-area-ready.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -17,6 +18,7 @@
   <link rel="stylesheet" href="loading-screen.css?v=2">
   <script src="game-locks.js"></script>
   <link rel="stylesheet" href="profile-card.css">
+  <script src="avatar.js" defer></script>
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
@@ -73,7 +75,7 @@
       --hairline: #c5ad9a;
       --whisper: #d4bbad;
       /* Newspaper accents */
-      --ink-red: #a4322b;
+      --ink-red: #B93631;
       --brown-1: #b8947a;
       --brown-2: #866955;
       --brown-3: #775742;
@@ -109,7 +111,7 @@
     }
 
     body {
-      font-family: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       background-color: var(--paper);
       color: var(--ink);
       display: flex;
@@ -131,7 +133,7 @@
     }
 
     #login-overlay .masthead-login {
-      font-family: 'Source Serif 4', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       font-weight: 400;
       font-size: 2.4rem;
       letter-spacing: 0.5px;
@@ -164,7 +166,7 @@
     }
 
     .login-box h2 {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 1rem;
       font-weight: 700;
       text-transform: uppercase;
@@ -181,7 +183,7 @@
       margin-bottom: 14px;
       border: 1px solid var(--ink);
       background: var(--field-bg);
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.95rem;
       color: var(--ink);
       outline: none;
@@ -198,7 +200,7 @@
       background: var(--ink);
       color: var(--paper);
       border: none;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.95rem;
       font-weight: 700;
       letter-spacing: 2px;
@@ -250,7 +252,7 @@
 
     .q-btn-sm, .q-btn-sm-outline {
       padding: 7px 20px;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.8rem;
       font-weight: 700;
       letter-spacing: 1px;
@@ -346,7 +348,7 @@
       text-align: center;
       text-decoration: none;
       color: var(--muted);
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.78rem;
       font-weight: 600;
       letter-spacing: 4px;
@@ -375,7 +377,7 @@
     }
     .col-left .nb-highlight {
       padding: 9px 14px;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.66rem;
       font-weight: 600;
       letter-spacing: 2.5px;
@@ -384,7 +386,7 @@
       color: var(--muted);
       text-align: left;
       font-style: italic;
-      font-family: 'Source Serif 4', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       flex-shrink: 0;
     }
     .col-right {
@@ -394,6 +396,25 @@
       flex-direction: column;
       overflow-y: auto;
     }
+    /* Wraps everything in .col-right except #politician-card, mirroring
+       .col-left-slide -- keeps the politician card visually still during
+       the slide/view-transition animations below while the news feed
+       slides. */
+    .col-right-slide {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    /* Mirrors #library-card's layout: DOM order in renderPoliticianCard()
+       puts the avatar last (right side) instead of first, and this
+       right-aligns the name/title text next to it -- a true mirror image
+       of the top-left card rather than just a reused style. */
+    .politician-card .card-id { text-align: right; }
+    /* Clicking the card opens the detail bottom sheet (see the delegated
+       #politician-card click listener) -- unlike #library-card, the whole
+       card is the click target, not just an inner edit button. */
+    .politician-card { cursor: pointer; }
 
     main {
       grid-column: 2;
@@ -494,8 +515,13 @@
       pointer-events: none;
     }
 
-    /* Hover: dim the artwork under the cursor */
-    .neighborhood:hover { fill: rgba(var(--ink-rgb), 0.18); }
+    /* Hover: dim the artwork under the cursor. .hover-active is toggled
+       via JS on every polygon sharing the same data-neighborhood (see
+       the mouseover/mouseout listeners below), so multi-polygon
+       districts like Şişli light up as one unit instead of just the
+       piece under the cursor; :hover stays as a no-JS fallback for the
+       single polygon actually being pointed at. */
+    .neighborhood:hover, .neighborhood.hover-active { fill: rgba(var(--ink-rgb), 0.18); }
     /* Clicked/active: darker tint + outline */
     .neighborhood.active {
       fill: rgba(var(--ink-rgb), 0.32);
@@ -512,7 +538,7 @@
       stroke-width: 4;
       stroke-dasharray: 10 6;
     }
-    .neighborhood.home:hover { fill: rgba(130, 55, 48, 0.26); }
+    .neighborhood.home:hover, .neighborhood.home.hover-active { fill: rgba(130, 55, 48, 0.26); }
     .neighborhood.home.active { fill: rgba(130, 55, 48, 0.38); stroke: var(--brown-4); stroke-dasharray: none; }
 
     /* Plain text, no frame/shadow — matches the HANE/KÜTÜPHANE/KAHVEHANE
@@ -524,7 +550,7 @@
       transform: translateX(-50%);
       z-index: 6;
       text-align: center;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.78rem;
       font-weight: 700;
       letter-spacing: 4px;
@@ -532,7 +558,7 @@
       color: var(--accent);
     }
 
-    /* ── LEFT SIDEBAR (articles) ── */
+    /* ── LEFT SIDEBAR ── */
     .sidebar-left {
       display: flex;
       flex-direction: column;
@@ -541,7 +567,11 @@
       min-height: 0;
     }
 
-    #breaking-news-feed {
+    /* Shared by whichever feed (news or events) lands in the left column's
+       scroll slot below the pinned library-card -- see the swappable
+       #breaking-news-feed/#events-panel markup in #main-site. */
+    #breaking-news-feed,
+    #events-panel {
       overflow-y: auto;
       overflow-x: hidden;
       flex: 1;
@@ -551,7 +581,7 @@
     /* Still used by the "Kaynaklar" (sources) sub-heading inside an
        expanded article -- see renderBreakingNewsFeed(). */
     .sidebar-label {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.68rem;
       font-weight: 700;
       letter-spacing: 3px;
@@ -578,17 +608,24 @@
     .article:last-child { margin-bottom: 0; }
 
     .article .kicker {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.62rem;
       font-weight: 700;
       letter-spacing: 2.5px;
       text-transform: uppercase;
-      color: #e07a72;
+      color: var(--ink-red);
       margin-bottom: 6px;
+      /* Series/category name always stays on one line -- truncates with
+         an ellipsis instead of wrapping onto a second line when the
+         timestamp on the other side of .meta-row squeezes its width. */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
     }
 
     .article h3 {
-      font-family: 'Source Serif 4', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       font-size: 1.34rem;
       font-weight: 600;
       letter-spacing: 0;
@@ -605,13 +642,23 @@
     }
 
     .article p {
-      font-family: 'Source Serif 4', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.82rem;
       line-height: 1.5;
       color: var(--card-fg);
     }
 
-    .article.openable { cursor: pointer; }
+    .article.openable {
+      cursor: pointer;
+      /* Feed preview cards: kicker+timestamp stay pinned at the top via
+         .meta-row, and the headline anchors to the bottom of the card
+         whenever there's slack height to push into (e.g. cards
+         stretched to a shared height). No-op when the card is exactly
+         as tall as its content, which is the common case today. */
+      display: flex;
+      flex-direction: column;
+    }
+    .article.openable h3 { margin-top: auto; }
     /* Plain hover: just a lighter background + a small nudge inward
        toward the center — text/border stay put. */
     .article.openable:hover {
@@ -621,7 +668,10 @@
     .article .meta-row {
       display: flex;
       justify-content: space-between;
-      align-items: baseline;
+      /* flex-start (not baseline) keeps the kicker pinned to the
+         top-left and the timestamp pinned to the top-right regardless
+         of either one's line-height. */
+      align-items: flex-start;
       gap: 8px;
       margin-bottom: 4px;
     }
@@ -631,6 +681,10 @@
       text-transform: uppercase;
       color: var(--card-fg-muted);
       font-style: italic;
+      /* Stays on one line and never gets squeezed by the kicker --
+         the kicker truncates instead (see .kicker's text-overflow). */
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     /* Only ever rendered inside the detail sheet (see buildNewsDetailHtml)
        — the sidebar preview card doesn't include it, so no visibility
@@ -700,23 +754,53 @@
       padding-top: 10px;
       border-top: 1px dashed var(--card-border);
     }
+    /* Vertical spine with a horizontal tick branching off to each dated
+       entry (update or poll), newest first. Each item draws its own
+       border-left segment (instead of one pseudo-element spanning a
+       guessed top/bottom offset), so stacking items reproduces one
+       continuous line that starts and ends exactly at the first/last
+       tick — no eyeballed pixel offset to drift out of alignment. The
+       tick sits in a flex row with the .ago date so it's centered on
+       that line exactly too. */
     .article .timeline-item {
-      padding: 6px 0;
-      border-bottom: 1px dotted var(--card-border-soft);
+      border-left: 2px solid var(--ink-red);
+      padding: 10px 0;
     }
-    .article .timeline-item:last-child { border-bottom: none; }
+    .article .timeline-item:first-child { padding-top: 0; }
+    .article .timeline-item:last-child { padding-bottom: 0; }
+    .article .timeline-item-date {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 4px;
+    }
+    .article .timeline-tick {
+      flex: 0 0 12px;
+      height: 2px;
+      background: var(--ink-red);
+    }
     .article .timeline-item .ago {
       display: block;
-      margin-bottom: 2px;
+    }
+    .article .timeline-item strong,
+    .article .timeline-item p,
+    .article .timeline-item .poll-block {
+      display: block;
+      margin-left: 26px;
     }
     .article .timeline-item strong {
-      font-family: 'Source Serif 4', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.85rem;
       color: var(--card-fg-heading);
     }
     .article .timeline-item p {
       margin-top: 2px;
       font-size: 0.78rem;
+    }
+    .article .timeline-item .poll-block {
+      margin-top: 6px;
+      padding-top: 0;
+      border-top: none;
     }
 
     /* Poll block — only ever rendered inside the detail sheet, filled
@@ -727,7 +811,7 @@
       border-top: 1px dashed var(--card-border);
     }
     .article .poll-question {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.68rem;
       font-weight: 700;
       letter-spacing: 2px;
@@ -741,7 +825,7 @@
       gap: 8px;
     }
     .article .poll-opt-btn {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.82rem;
       text-align: left;
       padding: 9px 12px;
@@ -757,7 +841,7 @@
       display: flex;
       justify-content: space-between;
       gap: 10px;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.78rem;
       color: var(--card-fg);
       margin-bottom: 6px;
@@ -793,7 +877,7 @@
     }
     .article .poll-status.err { color: var(--ink-red); font-size: 0.72rem; margin-top: 6px; }
 
-    /* ── RIGHT SIDEBAR (neighborhood info) ── */
+    /* ── RIGHT SIDEBAR ── */
     .sidebar-right {
       padding: 0;
       overflow-y: auto;
@@ -853,8 +937,8 @@
 
     /* Flashing neighborhood with breaking news */
     @keyframes flash-nb {
-      0%, 100% { fill: rgba(164, 50, 43, 0.1); }
-      50% { fill: rgba(164, 50, 43, 0.6); }
+      0%, 100% { fill: rgba(185, 54, 49, 0.1); }
+      50% { fill: rgba(185, 54, 49, 0.6); }
     }
     .neighborhood.flashing-news {
       animation: flash-nb 1.2s ease-in-out infinite;
@@ -863,11 +947,11 @@
     }
     .neighborhood.flashing-news:hover {
       animation: none;
-      fill: rgba(164, 50, 43, 0.5);
+      fill: rgba(185, 54, 49, 0.5);
     }
     .neighborhood.flashing-news.active {
       animation: none;
-      fill: rgba(164, 50, 43, 0.5);
+      fill: rgba(185, 54, 49, 0.5);
       stroke: var(--ink-deep);
       stroke-width: 3;
     }
@@ -881,12 +965,23 @@
       animation: flash-card 1.2s ease-in-out infinite;
     }
 
+    /* Hovering a neighborhood-specific news/event card highlights that
+       district on the map (see attachCardMapHover). Listed last among the
+       .neighborhood rules so it reads clearly even over .home/.active/
+       .flashing-news. */
+    .neighborhood.card-hover {
+      animation: none;
+      fill: rgba(var(--ink-rgb), 0.32);
+      stroke: var(--accent);
+      stroke-width: 3;
+    }
+
     /* ── MOBILE RESPONSIVE ──
        Stacked flow instead of desktop's floating-over-fullscreen-map
        layout: the map sits at the very top like a hero banner with the
        profile card floating over its empty/sea-colored band (same
        #f7f7f7 as the map artwork's own background, so the card reads as
-       part of the map rather than a stacked box), then a news/events
+       part of the map rather than a stacked box), then an events/news
        column pair below, all scrolling in #main-site itself, with the
        tab bar pinned fixed at the very bottom (its <header> already
        escapes to the viewport via position:fixed regardless of where
@@ -914,16 +1009,20 @@
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
           "map map"
-          "news events";
+          "events news";
         align-content: start;
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
            the map -- a different color from the map's own #f7f7f7,
            breaking the edge-to-edge look right where it's most visible.
-           Keep the column gap (between news/events) but zero the row
-           gap so the map's bottom edge sits flush against the content
-           below it. */
+           Zero the row gap so the map's bottom edge sits flush against
+           the content below it; the column gap (between events/news)
+           is kept, just halved below. */
         row-gap: 0 !important;
+        /* Halve frames.css's column-gap (--frame-gap, 10px) between the
+           events and news columns -- the full gap read as too much
+           breathing room between the two card stacks on mobile. */
+        column-gap: calc(var(--frame-gap) / 2) !important;
         /* #main-site always fills the full viewport height (height:100%
            above), but its content (map + one short row of cards) often
            doesn't -- with align-content:start packing everything at the
@@ -934,7 +1033,7 @@
         background: #f7f7f7;
         /* Clears the fixed bottom tab bar so the last row of cards isn't
            hidden behind it. */
-        padding-bottom: calc(96px + env(safe-area-inset-bottom) + 16px);
+        padding-bottom: calc(38px + env(safe-area-inset-bottom) + 16px);
       }
 
       /* Map: same real desktop artwork + traced SVG hit-regions (no more
@@ -1051,7 +1150,7 @@
         overflow: visible;
       }
 
-      /* News (left) + events (right): normal in-flow columns below the
+      /* Events (left) + news (right): normal in-flow columns below the
          map, each stacking its own cards top to bottom. Explicit z-index
          (above main's own 0, see main{} above) so they stay on top of
          the map even once it's zoomed in and spilling past its own
@@ -1066,8 +1165,8 @@
         overflow: visible;
         z-index: 1;
       }
-      .col-left { grid-area: news; }
-      .col-right { grid-area: events; }
+      .col-left { grid-area: events; }
+      .col-right { grid-area: news; }
       /* Transparent (inherits the desktop rule's background:none) so
          these read as frameless text floating over the map, same as
          desktop -- #main-site's own background is the same #f7f7f7, so
@@ -1079,12 +1178,15 @@
          on mobile — the desktop-only #library-card would otherwise
          duplicate it. */
       #library-card { display: none; }
+      /* Politician card is desktop-only (see #politician-card usage note
+         at its markup) -- nothing replaces it on mobile. */
+      #politician-card { display: none; }
 
       .sidebar-left {
         overflow: visible;
         display: block;
       }
-      #breaking-news-feed { overflow: visible; }
+      #breaking-news-feed, #events-panel { overflow: visible; }
       .sidebar-right { overflow: visible; display: block; }
       .sidebar-label {
         font-size: 9px;
@@ -1113,13 +1215,15 @@
       }
       .no-articles { font-size: 11px; padding: 14px 8px; }
 
-      /* Bottom tab bar — fixed at bottom, unchanged */
+      /* Bottom tab bar — fixed at bottom. Thinned from the top; labels sit
+         flush against the bottom edge (the safe-area padding below is what
+         separates them from the home-indicator area). */
       header {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
-        height: 96px;
+        height: 38px;
         padding: 0 0 env(safe-area-inset-bottom);
         margin: 0;
         border-top: 1px solid var(--rule);
@@ -1144,14 +1248,14 @@
       nav a {
         flex: 1;
         display: flex;
-        align-items: center;
+        align-items: flex-end;
         justify-content: center;
+        padding-bottom: 6px;
         font-size: 16px;
         font-weight: 600;
         letter-spacing: 0.5px;
         text-transform: uppercase;
         color: var(--muted);
-        padding: 0;
         border: none;
         text-decoration: none;
       }
@@ -1187,7 +1291,7 @@
        left edge, right column toward the right edge — regardless of nav
        direction; map, datetime bar, and nav stay ── */
     @media (min-width: 769px) {
-      .col-left-slide, .col-right {
+      .col-left-slide, .col-right-slide {
         transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: transform;
         backface-visibility: hidden;
@@ -1197,8 +1301,8 @@
         transform: translateX(-100vw);
         transition: none;
       }
-      html.ist-entering-forward .col-right,
-      html.ist-entering-backward .col-right {
+      html.ist-entering-forward .col-right-slide,
+      html.ist-entering-backward .col-right-slide {
         transform: translateX(100vw);
         transition: none;
       }
@@ -1206,8 +1310,8 @@
       body.ist-exiting-backward .col-left-slide {
         transform: translateX(-100vw);
       }
-      body.ist-exiting-forward .col-right,
-      body.ist-exiting-backward .col-right {
+      body.ist-exiting-forward .col-right-slide,
+      body.ist-exiting-backward .col-right-slide {
         transform: translateX(100vw);
       }
     }
@@ -1234,7 +1338,22 @@
     }
 
     .col-left-slide { view-transition-name: ist-col-left; }
-    .col-right { view-transition-name: ist-col-right; }
+    .col-right-slide { view-transition-name: ist-col-right; }
+
+    /* The browser's own view-transition-group animation interpolates this
+       named box's size/position between the outgoing and incoming page's
+       rect. Kahvehane's col-right (the stacked game tiles) sits at a
+       different height/position than col-right on the other pages (news/
+       events), so that automatic box-morph -- stacked on top of the slide
+       keyframes below -- swung the outgoing snapshot across the wrong part
+       of the screen mid-transition, on top of the fixed nav bar (the view-
+       transition layer always paints above it regardless of z-index).
+       Disabling it pins the group to the new page's rect immediately; the
+       keyframes below do 100% of the visible motion. */
+    ::view-transition-group(ist-col-left),
+    ::view-transition-group(ist-col-right) {
+      animation: none;
+    }
 
     /* Desktop: left column always exits/enters via the left edge, right
        column via the right edge — independent of nav direction, so no
@@ -1277,7 +1396,7 @@
     .event-item .ev-date-block {
       text-align: center;
       padding-top: 14px;
-      font-family: 'Source Serif 4', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       color: var(--card-fg-heading);
     }
     .event-item .ev-day {
@@ -1286,7 +1405,7 @@
       line-height: 1;
     }
     .event-item .ev-mon {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.6rem;
       font-weight: 600;
       letter-spacing: 1.5px;
@@ -1295,7 +1414,7 @@
       margin-top: 4px;
     }
     .event-item .ev-wd {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.55rem;
       font-weight: 600;
       letter-spacing: 1.5px;
@@ -1306,16 +1425,16 @@
     }
     .event-item .ev-body { min-width: 0; }
     .event-item .ev-kicker {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.6rem;
       font-weight: 700;
       letter-spacing: 2.5px;
       text-transform: uppercase;
-      color: #e07a72;
+      color: var(--ink-red);
       margin-bottom: 5px;
     }
     .event-item .ev-title {
-      font-family: 'Source Serif 4', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       font-size: 1.2rem;
       font-weight: 600;
       line-height: 1.22;
@@ -1323,7 +1442,7 @@
       color: var(--card-fg-heading);
     }
     .event-item .ev-meta {
-      font-family: 'Source Serif 4', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.78rem;
       color: var(--card-fg-muted);
       line-height: 1.35;
@@ -1343,7 +1462,7 @@
       margin-top: 10px;
       padding-top: 10px;
       border-top: 1px dashed var(--card-border);
-      font-family: 'Source Serif 4', Georgia, serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.82rem;
       line-height: 1.5;
       color: var(--card-fg);
@@ -1356,27 +1475,27 @@
       flex-wrap: wrap;
     }
     .ev-rsvp-btn {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.62rem;
       font-weight: 700;
       letter-spacing: 1.5px;
       text-transform: uppercase;
       padding: 7px 14px;
       background: transparent;
-      color: #e07a72;
-      border: 1px solid #e07a72;
+      color: var(--ink-red);
+      border: 1px solid var(--ink-red);
       cursor: pointer;
       transition: background 0.15s, color 0.15s;
     }
-    .ev-rsvp-btn:hover { background: rgba(224, 122, 114, 0.15); }
+    .ev-rsvp-btn:hover { background: rgba(185, 54, 49, 0.15); }
     .ev-rsvp-btn.attending {
-      background: #e07a72;
+      background: var(--ink-red);
       color: #1a1a1a;
     }
     .ev-rsvp-btn.attending:hover { opacity: 0.85; }
     .ev-rsvp-btn:disabled { opacity: 0.6; cursor: default; }
     .ev-rsvp-count {
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.7rem;
       color: var(--card-fg-muted);
     }
@@ -1384,6 +1503,15 @@
       display: flex;
       align-items: center;
     }
+    /* Preview-card attendee stack: shown under the title on every
+       breakpoint, in the space the compact card otherwise leaves empty.
+       The detail overlay's .ev-attendees (inside .ev-rsvp-row) is
+       unaffected since it isn't matched by this class. */
+    .ev-attendees-preview {
+      display: flex;
+      margin-top: 10px;
+    }
+    .ev-attendees-preview:empty { display: none !important; }
     .ev-attendee-avatar,
     .poll-voter-avatar {
       width: 26px;
@@ -1395,7 +1523,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: 'Inter', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.62rem;
       font-weight: 700;
       color: var(--accent);
@@ -1446,7 +1574,10 @@
       @keyframes ist-vt-out-right { from { transform: translateX(0); } to { transform: translateX(100vw); } }
       @keyframes ist-vt-in-right { from { transform: translateX(-100vw); } to { transform: translateX(0); } }
 
-      #events-panel { padding: 8px 8px 10px 8px; }
+      /* Top padding matches #breaking-news-feed's (10px, set once above
+         for all breakpoints) so the news and event cards' top edges
+         align instead of the event column sitting higher. */
+      #events-panel { padding: 10px 8px 10px 8px; }
       .event-item {
         grid-template-columns: 30px 1fr;
         column-gap: 8px;
@@ -1459,6 +1590,13 @@
       .event-item .ev-wd { font-size: 0.46rem; margin-top: 1px; }
       .event-item .ev-kicker { font-size: 9px; letter-spacing: 1.5px; margin-bottom: 2px; }
       .event-item .ev-title { font-size: 16px; margin-bottom: 0; line-height: 1.2; }
+      .ev-attendees-preview { margin-top: 6px; }
+      .ev-attendees-preview .ev-attendee-avatar {
+        width: 20px;
+        height: 20px;
+        font-size: 0.5rem;
+        margin-left: -6px;
+      }
 
       html.vt-forward::view-transition-old(ist-col-left),
       html.vt-forward::view-transition-old(ist-col-right) {
@@ -1524,13 +1662,20 @@
       z-index: 2;
       width: 32px;
       height: 32px;
-      border-radius: 50%;
-      border: 1px solid var(--ink);
-      background: var(--paper);
+      border: none;
+      background: none;
       color: var(--ink);
       font-size: 1rem;
       line-height: 1;
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .detail-overlay-close .close-icon {
+      width: 22px;
+      height: 22px;
+      display: block;
     }
     .detail-overlay-body {
       padding: 48px 24px 24px;
@@ -1538,9 +1683,58 @@
     /* Comfortable reading width for the card sitting inside the sheet,
        centered rather than stretched edge-to-edge. */
     .detail-overlay-body .article,
-    .detail-overlay-body .event-item {
+    .detail-overlay-body .event-item,
+    .detail-overlay-body .politician-detail {
       max-width: 520px;
       margin: 0 auto;
+    }
+
+    /* Politician detail sheet -- opened from #politician-card (see
+       buildPoliticianDetailHtml). Same card treatment as .article
+       (background/border/shadow), but a centered profile layout instead
+       of an article's kicker+headline. */
+    .politician-detail {
+      background: var(--paper-card);
+      border: 2px solid var(--card-border-color);
+      border-bottom: 5px solid var(--card-border-color);
+      padding: 24px;
+      color: var(--card-fg);
+      text-align: center;
+    }
+    .politician-detail-avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 2px solid var(--card-border-color);
+      background: var(--paper-dark);
+      overflow: hidden;
+      position: relative;
+      margin: 0 auto 14px;
+    }
+    .politician-detail-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--card-fg-heading);
+    }
+    .politician-detail-title {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 2px;
+      margin-bottom: 16px;
+    }
+    .politician-detail-row {
+      text-align: left;
+      font-size: 0.86rem;
+      padding: 8px 0;
+      border-top: 1px solid var(--rule);
+    }
+    .politician-detail-bio {
+      text-align: left;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-top: 12px;
+      white-space: pre-wrap;
     }
     @media (max-width: 768px) {
       .detail-overlay-sheet {
@@ -1658,7 +1852,7 @@
     <div class="library-card" id="library-card"><div class="card-loading"><span class="spinner"></span></div></div>
     <div class="col-left-slide">
       <section class="sidebar-left" id="left-sidebar">
-        <div id="breaking-news-feed"></div>
+        <div id="events-panel"></div>
       </section>
     </div>
   </aside>
@@ -1668,16 +1862,16 @@
       <!-- Scaled/panned as one unit by map-zoom.js (pinch to zoom, drag
            to pan once zoomed) -- map-label below stays outside it. -->
       <div class="map-zoom-layer">
-      <img class="map-photo" src="assets/istanbul-map.png" alt="">
+      <img class="map-photo" src="assets/map/istanbul-map.png" alt="">
 
         <!-- Mobile portrait map: draft/placeholder art only, no hit-regions
              traced yet -- layout planning, real SVG comes later. Desktop
              svg above is hidden on mobile and vice versa (see mobile
              media query). -->
-        <img class="map-mobile-draft" src="assets/istanbul-map-mobile.png" alt="">
+        <img class="map-mobile-draft" src="assets/map/istanbul-map-mobile.png" alt="">
 
       <!-- Hit-region overlay traced against map-photo (same 5046x2300
-           source image) — see assets/istanbul-map.svg for the source of
+           source image) — see assets/map/istanbul-map.svg for the source of
            truth; keep this copy and kahvehane.html's in sync. -->
       <svg class="map-svg" viewBox="0 0 5046 2300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
         <g id="Layer_2" data-name="Layer 2">
@@ -1791,9 +1985,18 @@
   </main>
 
   <aside class="col-right">
-    <section class="sidebar-right">
-      <div id="events-panel"></div>
-    </section>
+    <!-- Symmetric mirror of #library-card at the top of col-left: same
+         .library-card visual style, but the extra .politician-card class
+         (see its CSS above) flips the avatar to the right side, and
+         renderPoliticianCard() below renders the avatar/name/text in that
+         reversed order to match. İstanbul's Büyükşehir Belediye Başkanı by
+         default, swapped for the clicked district's Belediye Başkanı. -->
+    <div class="library-card politician-card" id="politician-card"><div class="card-loading"><span class="spinner"></span></div></div>
+    <div class="col-right-slide">
+      <section class="sidebar-right">
+        <div id="breaking-news-feed"></div>
+      </section>
+    </div>
   </aside>
   </div>
 </div>
@@ -1805,7 +2008,7 @@
 <div class="detail-overlay" id="detail-overlay" hidden>
   <div class="detail-overlay-backdrop" id="detail-overlay-backdrop"></div>
   <div class="detail-overlay-sheet" id="detail-overlay-sheet">
-    <button type="button" class="detail-overlay-close" id="detail-overlay-close" aria-label="Kapat" title="Kapat">✕</button>
+    <button type="button" class="detail-overlay-close" id="detail-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
     <div class="detail-overlay-body" id="detail-overlay-body"></div>
   </div>
 </div>
@@ -1896,6 +2099,7 @@ function mount() {
   IstRouter.onTick(tickNewsAgo);
   loadBreakingNews();
   loadEvents();
+  renderPoliticianCard(activeNeighborhood || 'istanbul');
 }
 
 function unmount() {
@@ -2124,6 +2328,89 @@ function baseMapLabel() {
   return (active && active.getAttribute('data-name')) || activeNeighborhood;
 }
 
+// ── Politician card (top-right, desktop) ───────────────────────
+// Mirrors #library-card at the top-left: the İstanbul Büyükşehir Belediye
+// Başkanı by default, swapped for the clicked district's Belediye Başkanı.
+// Backed by two tables (see db/politicians.sql) so a person's data (name,
+// avatar, bio) is independent of which seat, if any, they currently hold:
+//   public.politicians     — the people roster
+//   public.political_seats — id ('istanbul' or a neighborhood id) ->
+//                            politician_id + title
+// Nothing here is hardcoded, since officeholders change. Fetched once and
+// cached, since there are only ever 26 seats and they rarely change.
+let politicalSeatsById = null;
+
+async function loadPoliticalSeats() {
+  if (politicalSeatsById) return politicalSeatsById;
+  const { data } = await sb.from('political_seats').select('*, politicians(*)');
+  politicalSeatsById = {};
+  (data || []).forEach(s => { politicalSeatsById[s.id] = s; });
+  return politicalSeatsById;
+}
+
+function politicianAvatarHTML(p) {
+  // Same illustrated avatar system as user profiles (bald base + optional
+  // shirt/accessory/hair/hat overlays) -- an empty/vacant seat just
+  // renders the plain bare base, same as a brand-new user with no picks.
+  return IstAvatar.html(null, p?.avatar_hair, p?.avatar_hat, p?.avatar_accessory, p?.avatar_shirt, p?.in_jail);
+}
+
+async function renderPoliticianCard(seatId) {
+  const card = document.getElementById('politician-card');
+  if (!card) return;
+  const byId = await loadPoliticalSeats();
+  const seat = byId[seatId || 'istanbul'];
+  const p = seat?.politicians || null;
+  const seatLabel = seatId && seatId !== 'istanbul' ? (districtNames[seatId] || seatId) : 'İstanbul';
+
+  card.innerHTML = `
+    <div class="card-top">
+      <div class="card-id">
+        <div class="card-name">${esc(p ? `${p.first_name} ${p.last_name}`.trim() : seatLabel)}</div>
+        <div class="card-meta">${esc(seat?.title || 'Henüz eklenmedi')}</div>
+      </div>
+      <div class="avatar">${politicianAvatarHTML(p)}</div>
+    </div>
+  `;
+}
+
+// Opens the shared bottom-sheet (see openDetail) with the currently-shown
+// seat's full info -- looked up fresh from the cache at click time rather
+// than stashed on the card, so it always reflects whatever seat/district
+// is currently active on the map.
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#politician-card') || !politicalSeatsById) return;
+  const seatId = activeNeighborhood || 'istanbul';
+  const seat = politicalSeatsById[seatId];
+  const seatLabel = seatId !== 'istanbul' ? (districtNames[seatId] || seatId) : 'İstanbul';
+  openDetail(buildPoliticianDetailHtml(seat, seatLabel));
+});
+
+function buildPoliticianDetailHtml(seat, seatLabel) {
+  const p = seat?.politicians || null;
+  const name = p ? `${p.first_name} ${p.last_name}`.trim() : seatLabel;
+  const birthParts = [];
+  if (p?.birth_date) birthParts.push(I18N.formatDate(p.birth_date, { year: 'numeric', month: 'long', day: 'numeric' }));
+  if (p?.birth_place) birthParts.push(p.birth_place);
+  return `
+    <div class="politician-detail">
+      <div class="politician-detail-avatar">${politicianAvatarHTML(p)}</div>
+      <div class="politician-detail-name">${esc(name)}</div>
+      <div class="politician-detail-title">${esc(seat?.title || 'Henüz eklenmedi')}</div>
+      ${p?.party ? `<div class="politician-detail-row"><strong>Parti:</strong> ${esc(p.party)}</div>` : ''}
+      ${birthParts.length ? `<div class="politician-detail-row"><strong>Doğum:</strong> ${esc(birthParts.join(', '))}</div>` : ''}
+      ${p?.bio ? `<p class="politician-detail-bio">${esc(p.bio)}</p>` : ''}
+      ${!p ? `<p class="politician-detail-bio" style="font-style:italic;color:var(--muted);">Bu koltuğa henüz kimse atanmadı.</p>` : ''}
+    </div>
+  `;
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
 document.addEventListener('click', (e) => {
   const nb = e.target.closest('.neighborhood');
   if (!nb) {
@@ -2134,6 +2421,7 @@ document.addEventListener('click', (e) => {
       flashingNewsCardId = null;
       applyNewsFilter(activeNewsFilter, true);
       loadEvents(true);
+      renderPoliticianCard('istanbul');
     }
     return;
   }
@@ -2153,16 +2441,20 @@ document.addEventListener('click', (e) => {
   // in as if it were leaving and re-entering the screen.
   applyNewsFilter(activeNewsFilter, true);
   loadEvents(true);
+  renderPoliticianCard(nbId);
 });
 document.addEventListener('mouseover', (e) => {
   const nb = e.target.closest('.neighborhood');
   if (!nb) return;
   document.getElementById('map-label').textContent = nb.getAttribute('data-name') || nb.id;
+  const nbId = nb.dataset.neighborhood || nb.id;
+  getNeighborhoods().forEach(n => n.classList.toggle('hover-active', (n.dataset.neighborhood || n.id) === nbId));
 });
 document.addEventListener('mouseout', (e) => {
   const nb = e.target.closest('.neighborhood');
   if (!nb || nb.contains(e.relatedTarget)) return;
   document.getElementById('map-label').textContent = baseMapLabel();
+  getNeighborhoods().forEach(n => n.classList.remove('hover-active'));
 });
 
 // ── Breaking News (from public.breaking_news) ──────────────────
@@ -2231,25 +2523,37 @@ function categoryLabelTR(n) {
   return (NB_NAMES_TR[c] || c).toLocaleUpperCase('tr-TR');
 }
 
-// Category label, plus the story's series name (if the admin tagged one
-// grouping several separate posts under the same ongoing event).
+// The story's series name (if the admin tagged one grouping several
+// separate posts under the same ongoing event), falling back to the
+// category label when the story isn't part of a series.
 function newsKickerLabel(n) {
-  const cat = categoryLabelTR(n);
   const seriesName = n.breaking_news_series && n.breaking_news_series.name;
-  return seriesName ? `${cat} · ${seriesName.toLocaleUpperCase('tr-TR')}` : cat;
+  return seriesName ? seriesName.toLocaleUpperCase('tr-TR') : categoryLabelTR(n);
 }
 
+// No trailing "ago"/"önce" word -- kept as short as possible so the
+// series name (kicker) gets more of .meta-row's width before truncating.
 function formatAgoTR(iso) {
   const d = new Date(iso);
   const secs = Math.floor((Date.now() - d.getTime()) / 1000);
   const en = I18N.isEnglish();
-  if (secs < 60) return en ? 'just now' : 'az önce';
+  if (secs < 60) return en ? 'now' : 'şimdi';
   const mins = Math.floor(secs / 60);
-  if (mins < 60) return en ? `${mins}m ago` : `${mins} dk önce`;
+  if (mins < 60) return en ? `${mins}m` : `${mins} dk`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return en ? `${hrs}h ago` : `${hrs} sa önce`;
+  if (hrs < 24) return en ? `${hrs}h` : `${hrs} sa`;
   const days = Math.floor(hrs / 24);
-  return en ? `${days}d ago` : `${days} gün önce`;
+  return en ? `${days}d` : `${days} gün`;
+}
+
+// Spelled-out "X sa önce" / "Xh ago" form used in the timeline, where the
+// date stands alone as a column of its own (formatAgoTR's terse "X sa" is
+// tuned for the cramped meta-row next to a kicker instead).
+function formatAgoTRLong(iso) {
+  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  const en = I18N.isEnglish();
+  if (secs < 60) return en ? 'now' : 'şimdi';
+  return `${formatAgoTR(iso)} ${en ? 'ago' : 'önce'}`;
 }
 
 function safeUrl(u) {
@@ -2260,8 +2564,8 @@ function safeUrl(u) {
 
 // Slides a feed panel's current cards out toward their column's outer
 // screen edge, then rebuilds it and slides the fresh cards back in from
-// that same edge. `direction` is 'left' (breaking news, left column) or
-// 'right' (events, right column) -- see the .card-entering-*/.card-leaving-*
+// that same edge. `direction` is 'left' (events, left column) or
+// 'right' (breaking news, right column) -- see the .card-entering-*/.card-leaving-*
 // CSS. Renders immediately (no leave animation) on first paint, when the
 // panel starts out empty. Cards enter with a staggered delay by list
 // position, so the topmost card arrives first and lower ones follow.
@@ -2302,7 +2606,7 @@ function animateFeedSwap(container, direction, buildFn, instant) {
 function renderBreakingNewsFeed(rows, instant) {
   const feed = document.getElementById('breaking-news-feed');
   if (!feed) return;
-  animateFeedSwap(feed, 'left', () => renderBreakingNewsFeedNow(feed, rows), instant);
+  animateFeedSwap(feed, 'right', () => renderBreakingNewsFeedNow(feed, rows), instant);
 }
 
 // Full detail markup for a news article — rendered into the detail
@@ -2325,24 +2629,38 @@ function buildNewsDetailHtml(n) {
         }</div>`;
       }).join('')
     : '<div class="sources-empty">Henüz kaynak eklenmedi.</div>';
-  const updates = (n.breaking_news_updates || [])
-    .slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  const timelineHtml = updates.length ? `
+  // Updates and polls share one chronological spine (newest first) — a
+  // poll slots in at the point in the story's history it was posted,
+  // rather than living in a separate block.
+  const timelineEvents = (n.breaking_news_updates || []).map(u => ({ type: 'update', created_at: u.created_at, data: u }))
+    .concat((n.breaking_news_polls || []).map(p => ({ type: 'poll', created_at: p.created_at, data: p })))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const timelineHtml = timelineEvents.length ? `
     <div class="timeline">
       <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Zaman Akışı</div>
-      ${updates.map(u => `
-        <div class="timeline-item">
-          <div class="ago" data-iso="${escapeText(u.created_at)}">${escapeText(formatAgoTR(u.created_at))}</div>
-          <strong>${escapeText(u.title)}</strong>
-          ${u.body ? `<p>${escapeText(u.body)}</p>` : ''}
-        </div>
-      `).join('')}
+      <div class="timeline-track">
+        ${timelineEvents.map(ev => ev.type === 'poll' ? `
+          <div class="timeline-item timeline-item-poll">
+            <div class="timeline-item-date">
+              <span class="timeline-tick"></span>
+              <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatAgoTRLong(ev.created_at))}</div>
+            </div>
+            <div class="poll-block" id="poll-${escapeText(ev.data.id)}"></div>
+          </div>
+        ` : `
+          <div class="timeline-item">
+            <div class="timeline-item-date">
+              <span class="timeline-tick"></span>
+              <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatAgoTRLong(ev.created_at))}</div>
+            </div>
+            <strong>${escapeText(ev.data.title)}</strong>
+            ${ev.data.body ? `<p>${escapeText(ev.data.body)}</p>` : ''}
+          </div>
+        `).join('')}
+      </div>
     </div>
   ` : '';
   const lastTouch = n.updated_at || n.created_at;
-  const polls = (n.breaking_news_polls || [])
-    .slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  const pollsHtml = polls.map(p => `<div class="poll-block" id="poll-${escapeText(p.id)}"></div>`).join('');
   return `
     <div class="article">
       <div class="meta-row">
@@ -2351,11 +2669,10 @@ function buildNewsDetailHtml(n) {
       </div>
       <h3>${escapeText(n.title)}</h3>
       ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
-      ${pollsHtml}
       ${timelineHtml}
       <div class="sources">
         <button type="button" class="sources-toggle" aria-expanded="false">
-          <div class="sidebar-label" style="padding:0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Kaynaklar (${sources.length})</div>
+          <div class="sidebar-label" style="padding:0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">${I18N.t('news.sources')} (${sources.length})</div>
           <span class="sources-toggle-icon">▾</span>
         </button>
         <div class="sources-body">
@@ -2395,7 +2712,7 @@ async function loadAndRenderPoll(poll) {
   const userIds = Array.from(new Set([...votersA, ...votersB]));
   if (mine != null && userIds.length) {
     const { data: profs, error: profErr } = await sb.from('profiles')
-      .select('id, first_name, last_name, avatar_url').in('id', userIds);
+      .select('id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt').in('id', userIds);
     if (profErr) console.error('[poll voter profiles]', profErr);
     else profilesById = new Map(profs.map(p => [p.id, p]));
   }
@@ -2410,10 +2727,7 @@ function buildVoterAvatarsHtml(userIds, profilesById) {
   const extra = list.length - shown.length;
   const avatarsHtml = shown.map(p => {
     const name = capitalizeName([p.first_name, p.last_name].filter(Boolean).join(' ')) || 'Üye';
-    const initial = (p.first_name || p.last_name || '?').charAt(0).toLocaleUpperCase('tr-TR');
-    const inner = p.avatar_url
-      ? `<img src="${Palette.avatarSrc(p.avatar_url)}" alt="">`
-      : initial;
+    const inner = IstAvatar.html(p.avatar_url, p.avatar_hair, p.avatar_hat, p.avatar_accessory, p.avatar_shirt);
     return `<span class="poll-voter-avatar" title="${escapeText(name)}">${inner}</span>`;
   }).join('');
   const moreHtml = extra > 0
@@ -2477,6 +2791,20 @@ async function submitPollVote(poll, option, container) {
   loadAndRenderPoll(poll);
 }
 
+// Hovering a news/event card highlights its neighborhood on the map (no-op
+// for city-wide rows with no neighborhood). Shared by both feeds.
+function attachCardMapHover(el, nbId) {
+  if (!nbId) return;
+  el.addEventListener('mouseenter', () => {
+    const nbEl = document.getElementById(nbId);
+    if (nbEl) nbEl.classList.add('card-hover');
+  });
+  el.addEventListener('mouseleave', () => {
+    const nbEl = document.getElementById(nbId);
+    if (nbEl) nbEl.classList.remove('card-hover');
+  });
+}
+
 function renderBreakingNewsFeedNow(feed, rows) {
   if (!rows.length) {
     feed.innerHTML = '';
@@ -2498,13 +2826,14 @@ function renderBreakingNewsFeedNow(feed, rows) {
   }).join('');
 
   feed.querySelectorAll('.article.openable').forEach(el => {
+    const n = rowsById.get(el.dataset.newsId);
     el.addEventListener('click', () => {
-      const n = rowsById.get(el.dataset.newsId);
       if (n) {
         openDetail(buildNewsDetailHtml(n));
         (n.breaking_news_polls || []).forEach(p => loadAndRenderPoll(p));
       }
     });
+    if (n) attachCardMapHover(el, n.neighborhood);
   });
 
   applyFlashingNewsCard();
@@ -2555,7 +2884,7 @@ async function loadBreakingNews() {
   });
 }
 
-// ── Events (right column) ──────────────────
+// ── Events (left column) ──────────────────
 const MONTH_ABBR_TR = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
 const MONTH_ABBR_EN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
@@ -2577,7 +2906,7 @@ let allEvents = [];
 let eventsRequestSeq = 0;
 let rsvpCounts = {};   // event_id -> attendee count
 let myRsvpIds = new Set(); // event_ids the current user has RSVP'd to
-let rsvpAttendees = {}; // event_id -> [{ id, first_name, last_name, avatar_url }, ...] (capped)
+let rsvpAttendees = {}; // event_id -> [{ id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt }, ...] (capped)
 const MAX_ATTENDEE_AVATARS = 6;
 
 function capitalizeName(s) {
@@ -2627,7 +2956,7 @@ async function loadRsvps() {
   const userIds = Array.from(new Set((data || []).map(r => r.user_id)));
   if (userIds.length) {
     const { data: profs, error: profErr } = await sb.from('profiles')
-      .select('id, first_name, last_name, avatar_url')
+      .select('id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt')
       .in('id', userIds);
     if (profErr) { console.error('[anahane rsvp attendees]', profErr); return; }
     const profMap = new Map((profs || []).map(p => [p.id, p]));
@@ -2646,10 +2975,7 @@ function buildAttendeeAvatarsHtml(eventId) {
   const extra = list.length - shown.length;
   const avatarsHtml = shown.map(p => {
     const name = capitalizeName([p.first_name, p.last_name].filter(Boolean).join(' ')) || 'Üye';
-    const initial = (p.first_name || p.last_name || '?').charAt(0).toLocaleUpperCase('tr-TR');
-    const inner = p.avatar_url
-      ? `<img src="${Palette.avatarSrc(p.avatar_url)}" alt="">`
-      : initial;
+    const inner = IstAvatar.html(p.avatar_url, p.avatar_hair, p.avatar_hat, p.avatar_accessory, p.avatar_shirt);
     return `<span class="ev-attendee-avatar" title="${escapeText(name)}">${inner}</span>`;
   }).join('');
   const moreHtml = extra > 0
@@ -2687,6 +3013,10 @@ async function toggleRsvp(eventId, btn) {
   if (countEl) countEl.textContent = `${rsvpCounts[eventId] || 0} ${I18N.t('home.events.rsvp.count')}`;
   const avatarsEl = row?.querySelector('.ev-attendees');
   if (avatarsEl) avatarsEl.innerHTML = buildAttendeeAvatarsHtml(eventId);
+  // Also patch the (separate) preview card in the events list behind the
+  // overlay, so its attendee stack matches without waiting for a reload.
+  const previewEl = document.querySelector(`.event-item[data-event-id="${CSS.escape(eventId)}"] .ev-attendees-preview`);
+  if (previewEl) previewEl.innerHTML = buildAttendeeAvatarsHtml(eventId);
   btn.disabled = false;
 }
 
@@ -2695,7 +3025,7 @@ function renderEvents(instant) {
   if (!panel) return;
   let rows = allEvents;
   if (activeNeighborhood) rows = rows.filter(ev => ev.neighborhood === activeNeighborhood);
-  animateFeedSwap(panel, 'right', () => renderEventsNow(panel, rows), instant);
+  animateFeedSwap(panel, 'left', () => renderEventsNow(panel, rows), instant);
 }
 
 // Full detail markup for an event — rendered into the detail overlay's
@@ -2754,16 +3084,18 @@ function renderEventsNow(panel, rows) {
         <div class="ev-body">
           <div class="ev-kicker">${escapeText(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
           <div class="ev-title">${escapeText(ev.title)}</div>
+          <span class="ev-attendees ev-attendees-preview">${buildAttendeeAvatarsHtml(ev.id)}</span>
         </div>
       </div>
     `;
   }).join('');
 
   panel.querySelectorAll('.event-item.openable').forEach(el => {
+    const ev = rowsById.get(el.dataset.eventId);
     el.addEventListener('click', () => {
-      const ev = rowsById.get(el.dataset.eventId);
       if (ev) openDetail(buildEventDetailHtml(ev));
     });
+    if (ev) attachCardMapHover(el, ev.neighborhood);
   });
 }
 
