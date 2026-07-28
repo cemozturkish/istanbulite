@@ -642,12 +642,12 @@
       margin: 0 auto;
       margin-top: 0;
     }
-    /* Bugünün Sonuçları: tap a row to reveal that player's result as an
-       emoji bar, reusing the same 🟫/🟧 squares as the game's own share
-       grid. We only ever know attempts + won/lost (game_results doesn't
-       store per-letter guess data), so the bar shows attempt progress —
-       🟧 per try, the final square flipping to 🟫 only on a win — not a
-       real per-letter Wordle pattern. */
+    /* Bugünün Sonuçları: tap a row to reveal that player's actual guess
+       grid (one line per guess), reusing the same 🟫/🟧/⬜ squares as the
+       game's own share grid — built from the per-letter pattern stored in
+       game_results.guesses. Rows recorded before that column existed fall
+       back to a plain attempt-progress bar (🟧 per try, 🟫 only on the
+       final square of a win). */
     #today-results-list-takeover .scoreboard-item.result-toggle {
       cursor: pointer;
       flex-wrap: wrap;
@@ -664,7 +664,7 @@
       text-align: center;
     }
     #today-results-list-takeover .scoreboard-item.expanded .scoreboard-result-reveal { display: block; }
-    #today-results-list-takeover .emoji-bar { font-size: 1rem; letter-spacing: 3px; }
+    #today-results-list-takeover .emoji-bar { font-size: 1rem; letter-spacing: 3px; line-height: 1.5; }
     #today-results-list-takeover .result-caption {
       margin-top: 4px;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
@@ -1854,7 +1854,7 @@ const neighborhoodNames = {
 })();
 
 // ── Record game result to Supabase ──
-async function recordGameResult(game, date, attempts, won, neighborhood) {
+async function recordGameResult(game, date, attempts, won, neighborhood, guesses) {
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return;
@@ -1864,7 +1864,8 @@ async function recordGameResult(game, date, attempts, won, neighborhood) {
       date: date,
       attempts: attempts,
       won: won,
-      neighborhood: neighborhood
+      neighborhood: neighborhood,
+      guesses: guesses || null
     }]);
     if (error) console.error('[sozcel game_results]', error);
     // A win can unlock the next gated game — refresh nav locks so the
@@ -4052,7 +4053,7 @@ function submitGuess() {
       gameOver = true;
       // Check before inserting — count = 0 means no one has won today yet.
       const isFirstWinner = await checkFirstWinner(dailySeed);
-      await recordGameResult('sozcel', dailySeed, rowSnap + 1, true, userNeighborhood);
+      await recordGameResult('sozcel', dailySeed, rowSnap + 1, true, userNeighborhood, guessResults);
       await saveState();
       renderStats();
       enableShareButton(true, isFirstWinner);
@@ -4064,7 +4065,7 @@ function submitGuess() {
       document.getElementById('game-message').className = 'game-message lose';
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
-      await recordGameResult('sozcel', dailySeed, 7, false, userNeighborhood);
+      await recordGameResult('sozcel', dailySeed, 7, false, userNeighborhood, guessResults);
       await saveState();
       renderStats();
       enableShareButton(false);
@@ -4333,7 +4334,7 @@ async function loadTodayResults() {
   let results = null;
   try {
     const { data, error } = await sb.from('game_results')
-      .select('user_id, neighborhood, won, attempts, created_at')
+      .select('user_id, neighborhood, won, attempts, guesses, created_at')
       .eq('game', 'sozcel')
       .eq('date', dailySeed)
       .gte('attempts', 1)
@@ -4372,7 +4373,7 @@ async function loadTodayResults() {
     const playerLabel = nbName ? `${nbName}${suffix} ${escapeHtml(name)}` : escapeHtml(name);
     const resultLabel = r.won ? `${r.attempts}/6` : 'X/6';
     const rankClass = i < 3 ? ' r' + (i + 1) : '';
-    const emojiBar = buildResultEmojiBar(r.attempts, r.won);
+    const emojiBar = buildResultEmojiBar(r.attempts, r.won, r.guesses);
     const caption = r.won ? `${r.attempts}. denemede buldu` : '6 denemede bulamadı';
     return `<li class="scoreboard-item${rankClass} result-toggle" data-user-id="${r.user_id}">` +
       `<span class="scoreboard-rank">${i + 1}.</span>` +
@@ -4389,13 +4390,18 @@ async function loadTodayResults() {
   });
 }
 
-// Abstracted attempt-progress bar for another player's result, reusing the
-// same 🟫 (correct)/🟧 (present) squares as buildShareText()'s own share
-// grid: 🟧 per try, flipping to 🟫 on the final square only for a win. We
-// don't know their actual per-letter guess pattern — game_results only
-// stores attempts + won/lost — so this shows how many tries it took
-// rather than a real Wordle-style grid.
-function buildResultEmojiBar(attempts, won) {
+// Renders another player's actual guess grid (one row per guess, same
+// 🟫 correct / 🟧 present / ⬜ absent squares as buildShareText()'s own
+// share grid) using the per-letter pattern stored in game_results.guesses.
+// Older rows recorded before that column existed have guesses = null —
+// for those we fall back to an attempt-count bar (🟧 per try, flipping to
+// 🟫 on the final square only for a win) since the real pattern is gone.
+function buildResultEmojiBar(attempts, won, guesses) {
+  if (Array.isArray(guesses) && guesses.length > 0) {
+    return guesses.map(row =>
+      (row || []).map(r => r === 'correct' ? '🟫' : r === 'present' ? '🟧' : '⬜').join('')
+    ).join('<br>');
+  }
   const used = won ? Math.max(1, Math.min(6, attempts || 1)) : 6;
   const squares = [];
   for (let i = 0; i < used; i++) {
@@ -4902,12 +4908,14 @@ function enterSozculTakeoverMode(status) {
   }
 }
 
-// Shared results block dropped into every takeover state so the Sözcü —
-// who can't play their own game and gets the play surface replaced entirely
-// — still has somewhere to see how everyone else did on today's word:
-// who played, and on which attempt they solved it (or that they missed
-// it). loadTodayResults() re-populates it (by id) right after each render
-// since takeover.innerHTML gets fully replaced on every state change.
+// Results block for a Sözcü's *own* word only — used solely by
+// renderTakeoverDone (today's word is theirs and already submitted).
+// Deliberately left out of renderTakeoverForm (their assignment is always
+// a future date, so today's word belongs to someone else) and
+// renderTakeoverMissed (they missed the deadline, so the admin's fallback
+// word — not theirs — is what's being played today). Shows who played
+// today's word and on which attempt they solved it (or that they missed
+// it). loadTodayResults() re-populates it (by id) right after render.
 function sozculTakeoverScoreboardHTML() {
   return `
     <div class="scoreboard stk-scoreboard">
@@ -4955,6 +4963,9 @@ function renderTakeoverDone(takeover, date) {
 
 function renderTakeoverMissed(takeover, date) {
   if (_takeoverCountdownInterval) { clearInterval(_takeoverCountdownInterval); _takeoverCountdownInterval = null; }
+  // No "Bugünün Sonuçları" here: today's word was the game admin's
+  // fallback pick, not this Sözcü's own — they missed the deadline, so
+  // today's results aren't theirs to see.
   takeover.innerHTML = `
     <div class="stk-eyebrow">Sözcü Görevi · ${escapeHtml(formatISOTurkish(date))}</div>
     <h2>Süre Kaçtı</h2>
@@ -4962,9 +4973,7 @@ function renderTakeoverMissed(takeover, date) {
       <strong>Kelime girilmedi</strong>
       <span>${escapeHtml(formatISOTurkish(date))} için Sözcü sen seçildin ama kelimeyi gece yarısından önce gönderemedin. Bugün oyun yöneticinin seçtiği kelimeyle oynanıyor.</span>
     </div>
-    ${sozculTakeoverScoreboardHTML()}
   `;
-  loadTodayResults();
 }
 
 function renderTakeoverForm(takeover, status) {
@@ -5019,9 +5028,11 @@ function renderTakeoverForm(takeover, status) {
       <button type="button" class="stk-submit" id="stk-submit">${existing ? 'Değişikliği Kaydet' : 'Onayla ve Kaydet'}</button>
       <div class="stk-status" id="stk-status"></div>
     </div>
-    ${sozculTakeoverScoreboardHTML()}
   `;
-  loadTodayResults();
+  // No "Bugünün Sonuçları" here: status.targetDate is always a future
+  // assignment (today's Sözcü-picking deadline has already passed by the
+  // time this mode is reachable), so today's word — and its results —
+  // belong to someone else's assignment, not this one.
 
   const wordInput = takeover.querySelector('#stk-word-input');
   const submitBtn = takeover.querySelector('#stk-submit');
