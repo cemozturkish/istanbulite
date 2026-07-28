@@ -3472,6 +3472,10 @@ async function loadPoliticiansTab() {
       istOpt.value = 'istanbul';
       istOpt.textContent = 'İstanbul (Büyükşehir)';
       seatSel.appendChild(istOpt);
+      const cbOpt = document.createElement('option');
+      cbOpt.value = 'cumhurbaskani';
+      cbOpt.textContent = 'Cumhurbaşkanı';
+      seatSel.appendChild(cbOpt);
       data.forEach(n => {
         if (n.id === 'istanbul_disi') return;
         politiciansNeighborhoodNames[n.id] = n.name_tr;
@@ -3500,7 +3504,9 @@ async function populateSeatPersonDropdown() {
 }
 
 function politicianSeatLabel(seatId) {
-  return seatId === 'istanbul' ? 'İstanbul (Büyükşehir)' : (politiciansNeighborhoodNames[seatId] || seatId);
+  if (seatId === 'istanbul') return 'İstanbul (Büyükşehir)';
+  if (seatId === 'cumhurbaskani') return 'Cumhurbaşkanı';
+  return politiciansNeighborhoodNames[seatId] || seatId;
 }
 
 async function loadPoliticiansList() {
@@ -3510,7 +3516,7 @@ async function loadPoliticiansList() {
   if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
   const byId = {};
   (data || []).forEach(s => { byId[s.id] = s; });
-  const seatIds = ['istanbul', ...Object.keys(politiciansNeighborhoodNames)];
+  const seatIds = ['istanbul', 'cumhurbaskani', ...Object.keys(politiciansNeighborhoodNames)];
 
   listEl.innerHTML = seatIds.map(seatId => {
     const seat = byId[seatId];
@@ -3569,7 +3575,7 @@ document.getElementById('p-submit-btn').addEventListener('click', async () => {
 
   const { error } = await sb.from('political_seats').upsert([{
     id: seatId,
-    neighborhood: seatId === 'istanbul' ? null : seatId,
+    neighborhood: (seatId === 'istanbul' || seatId === 'cumhurbaskani') ? null : seatId,
     title, politician_id,
   }]);
 
