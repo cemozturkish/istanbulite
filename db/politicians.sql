@@ -52,8 +52,15 @@ create table if not exists public.political_seats (
   title        text        not null default '',
   updated_at   timestamptz not null default now(),
   constraint political_seats_seat_matches_neighborhood
-    check ((id = 'istanbul' and neighborhood is null) or (neighborhood = id))
+    check ((id in ('istanbul', 'cumhurbaskani') and neighborhood is null) or (neighborhood = id))
 );
+
+-- Widen the check constraint for an earlier version of this table (only
+-- 'istanbul' allowed a null neighborhood) to also allow the Cumhurbaşkanı
+-- seat, shown on Kütüphane's top-right card.
+alter table public.political_seats drop constraint if exists political_seats_seat_matches_neighborhood;
+alter table public.political_seats add constraint political_seats_seat_matches_neighborhood
+  check ((id in ('istanbul', 'cumhurbaskani') and neighborhood is null) or (neighborhood = id));
 
 create table if not exists public.politicians (
   id           uuid        primary key default gen_random_uuid(),

@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="profile-card.css">
   <script src="avatar.js" defer></script>
   <script src="tbmm.js" defer></script>
+  <script src="politician-card.js" defer></script>
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
@@ -199,6 +200,21 @@
       flex-direction: column;
       overflow-y: auto;
     }
+    /* Wraps everything in .col-right except #politician-card, mirroring
+       .col-left-slide -- keeps the politician card visually still during
+       the slide/view-transition animations below while the shelves list
+       slides (see anahane.html's own .col-right-slide for the same
+       pattern). */
+    .col-right-slide {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    /* Mirrors #library-card's layout: avatar on the right, name/title
+       text right-aligned next to it -- see politician-card.js. */
+    .politician-card .card-id { text-align: right; }
+    .politician-card { cursor: pointer; }
 
     main {
       grid-column: 2;
@@ -679,6 +695,56 @@
       border-top: 1px solid var(--rule);
     }
     .tbmm-detail-bio {
+      text-align: left;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-top: 12px;
+      white-space: pre-wrap;
+    }
+
+    /* Politician detail sheet -- opened from #politician-card (see
+       politician-card.js). Same treatment as .tbmm-detail above, just a
+       different class name (the shared module hardcodes these class
+       names so it renders identically on every page that uses it). */
+    .politician-detail {
+      max-width: 420px;
+      margin: 0 auto;
+      background: var(--paper-card);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      box-shadow: var(--frame-shadow);
+      padding: 24px;
+      text-align: center;
+    }
+    .politician-detail-avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 2px solid var(--ink);
+      background: var(--paper-dark);
+      overflow: hidden;
+      position: relative;
+      margin: 0 auto 14px;
+    }
+    .politician-detail-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .politician-detail-title {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 2px;
+      margin-bottom: 16px;
+    }
+    .politician-detail-row {
+      text-align: left;
+      font-size: 0.86rem;
+      padding: 8px 0;
+      border-top: 1px solid var(--rule);
+    }
+    .politician-detail-bio {
       text-align: left;
       font-size: 0.88rem;
       line-height: 1.5;
@@ -2087,6 +2153,9 @@
       body:not(.ist-viewing-other) #mobile-top,
       body:not(.ist-viewing-other) .col-left { display: none !important; }
       body.ist-viewing-other #ist-pc-mount { display: none !important; }
+      /* Politician card (top-right, desktop) is a desktop-only artifact,
+         same as #library-card -- nothing replaces it on mobile. */
+      #politician-card { display: none !important; }
 
       /* ── Mobile top: compact profile card + countdowns ── */
       #mobile-top {
@@ -2197,7 +2266,7 @@
        left edge, right column toward the right edge — regardless of nav
        direction; nav stays ── */
     @media (min-width: 769px) {
-      .col-left-slide, .col-right {
+      .col-left-slide, .col-right-slide {
         transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: transform;
         backface-visibility: hidden;
@@ -2207,8 +2276,8 @@
         transform: translateX(-100vw);
         transition: none;
       }
-      html.ist-entering-forward .col-right,
-      html.ist-entering-backward .col-right {
+      html.ist-entering-forward .col-right-slide,
+      html.ist-entering-backward .col-right-slide {
         transform: translateX(100vw);
         transition: none;
       }
@@ -2216,8 +2285,8 @@
       body.ist-exiting-backward .col-left-slide {
         transform: translateX(-100vw);
       }
-      body.ist-exiting-forward .col-right,
-      body.ist-exiting-backward .col-right {
+      body.ist-exiting-forward .col-right-slide,
+      body.ist-exiting-backward .col-right-slide {
         transform: translateX(100vw);
       }
     }
@@ -2244,7 +2313,7 @@
     }
 
     .col-left-slide { view-transition-name: ist-col-left; }
-    .col-right { view-transition-name: ist-col-right; }
+    .col-right-slide { view-transition-name: ist-col-right; }
 
     /* The browser's own view-transition-group animation interpolates this
        named box's size/position between the outgoing and incoming page's
@@ -2552,8 +2621,15 @@
   </main>
 
   <aside class="col-right">
-    <div class="shelves" id="shelves">
-      <div class="empty-state" style="padding:24px 16px;"><span class="spinner"></span></div>
+    <!-- Mirrors #library-card at the top of col-left: the Cumhurbaşkanı,
+         see politician-card.js's mount(). Reuses the .library-card class
+         outright for pixel-identical styling; .politician-card's own CSS
+         above flips the avatar to the right side. -->
+    <div class="library-card politician-card" id="politician-card"><div class="loading"><span class="spinner"></span></div></div>
+    <div class="col-right-slide">
+      <div class="shelves" id="shelves">
+        <div class="empty-state" style="padding:24px 16px;"><span class="spinner"></span></div>
+      </div>
     </div>
   </aside>
   </div>
@@ -3411,6 +3487,29 @@ async function openTBMMSeatDetail(seatNumber) {
   positionReaderSheet();
 }
 
+// Generic bottom-sheet opener for #politician-card (see politician-card.js
+// mount()'s openDetail callback) -- unlike the TBMM seat detail above,
+// there's no "back to a list" to return to, so the back button just
+// closes the sheet.
+function openPoliticianDetailSheet(html) {
+  const overlay = document.getElementById('reader-overlay');
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !area) return;
+  area.innerHTML = `
+    <div class="shelf-path">
+      <div class="path-head">
+        <button class="path-back" type="button" id="politician-detail-back">← Kütüphane</button>
+      </div>
+      ${html}
+    </div>
+  `;
+  document.getElementById('politician-detail-back').addEventListener('click', closeReaderOverlay);
+  positionReaderSheet();
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  _closeReaderOverlay = closeReaderOverlay;
+}
+
 const tbmmOpenBtn = document.getElementById('tbmm-open-btn');
 if (tbmmOpenBtn) tbmmOpenBtn.addEventListener('click', openTBMMSheet);
 
@@ -4227,6 +4326,21 @@ Palette.setPalette(palettePref);
 function mount() {
   loadProfile();
   bootstrapLibraryNav();
+  // politician-card.js is deferred -- on a fresh real page load this
+  // mount() call runs synchronously during parsing, before any deferred
+  // script has executed, so a plain `if (window.IstPoliticianCard)` check
+  // here would silently miss it. Poll briefly instead (same idiom as
+  // __mountIstPc's tryOnb below).
+  (function tryPoliticianCard(tries) {
+    if (window.IstPoliticianCard) {
+      IstPoliticianCard.mount({
+        sb, mountElId: 'politician-card', seatId: 'cumhurbaskani', seatLabel: 'Cumhurbaşkanı',
+        openDetail: openPoliticianDetailSheet,
+      });
+    } else if (tries > 0) {
+      setTimeout(() => tryPoliticianCard(tries - 1), 60);
+    }
+  })(10);
 }
 function unmount() {}
 
