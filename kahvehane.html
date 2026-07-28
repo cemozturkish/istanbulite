@@ -308,8 +308,11 @@
 
     /* Hover: dim the artwork under the cursor (matches anahane) — a
        transparent ink tint, not an element-opacity fade, so the black
-       stroke borders stay black instead of washing out to gray. */
-    .neighborhood:hover { fill: rgba(var(--ink-rgb), 0.18); }
+       stroke borders stay black instead of washing out to gray.
+       .hover-active is toggled via JS on every polygon sharing the same
+       data-neighborhood, so multi-polygon districts (e.g. Şişli) light
+       up as one unit instead of just the piece under the cursor. */
+    .neighborhood:hover, .neighborhood.hover-active { fill: rgba(var(--ink-rgb), 0.18); }
     /* Clicked/active: darker tint + outline (matches anahane exactly —
        was a much stronger brown-1 tint before, which read as the
        district turning solid brown instead of just a darker shade of
@@ -327,7 +330,7 @@
       stroke-width: 4;
       stroke-dasharray: 10 6;
     }
-    .neighborhood.home:hover { fill: rgba(130, 55, 48, 0.26); }
+    .neighborhood.home:hover, .neighborhood.home.hover-active { fill: rgba(130, 55, 48, 0.26); }
     .neighborhood.home.active { fill: rgba(130, 55, 48, 0.38); stroke: var(--brown-4); stroke-dasharray: none; }
 
     /* Plain text, no frame/shadow — matches the HANE/KÜTÜPHANE/KAHVEHANE
@@ -2626,11 +2629,14 @@ document.addEventListener('mouseover', (e) => {
   const nb = e.target.closest('.neighborhood');
   if (!nb) return;
   document.getElementById('map-label').textContent = nb.getAttribute('data-name') || nb.id;
+  const nbId = nb.dataset.neighborhood || nb.id;
+  getMapNeighborhoods().forEach(n => n.classList.toggle('hover-active', (n.dataset.neighborhood || n.id) === nbId));
 });
 document.addEventListener('mouseout', (e) => {
   const nb = e.target.closest('.neighborhood');
   if (!nb || nb.contains(e.relatedTarget)) return;
   document.getElementById('map-label').textContent = baseMapLabel();
+  getMapNeighborhoods().forEach(n => n.classList.remove('hover-active'));
 });
 
 // ── Paginated comment feed ──
