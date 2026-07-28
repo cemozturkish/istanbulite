@@ -396,6 +396,16 @@
       flex-direction: column;
       overflow-y: auto;
     }
+    /* Wraps everything in .col-right except #politician-card, mirroring
+       .col-left-slide -- keeps the politician card visually still during
+       the slide/view-transition animations below while the news feed
+       slides. */
+    .col-right-slide {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
 
     main {
       grid-column: 2;
@@ -1159,6 +1169,9 @@
          on mobile — the desktop-only #library-card would otherwise
          duplicate it. */
       #library-card { display: none; }
+      /* Politician card is desktop-only (see #politician-card usage note
+         at its markup) -- nothing replaces it on mobile. */
+      #politician-card { display: none; }
 
       .sidebar-left {
         overflow: visible;
@@ -1269,7 +1282,7 @@
        left edge, right column toward the right edge — regardless of nav
        direction; map, datetime bar, and nav stay ── */
     @media (min-width: 769px) {
-      .col-left-slide, .col-right {
+      .col-left-slide, .col-right-slide {
         transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: transform;
         backface-visibility: hidden;
@@ -1279,8 +1292,8 @@
         transform: translateX(-100vw);
         transition: none;
       }
-      html.ist-entering-forward .col-right,
-      html.ist-entering-backward .col-right {
+      html.ist-entering-forward .col-right-slide,
+      html.ist-entering-backward .col-right-slide {
         transform: translateX(100vw);
         transition: none;
       }
@@ -1288,8 +1301,8 @@
       body.ist-exiting-backward .col-left-slide {
         transform: translateX(-100vw);
       }
-      body.ist-exiting-forward .col-right,
-      body.ist-exiting-backward .col-right {
+      body.ist-exiting-forward .col-right-slide,
+      body.ist-exiting-backward .col-right-slide {
         transform: translateX(100vw);
       }
     }
@@ -1316,7 +1329,7 @@
     }
 
     .col-left-slide { view-transition-name: ist-col-left; }
-    .col-right { view-transition-name: ist-col-right; }
+    .col-right-slide { view-transition-name: ist-col-right; }
 
     /* The browser's own view-transition-group animation interpolates this
        named box's size/position between the outgoing and incoming page's
@@ -1914,9 +1927,17 @@
   </main>
 
   <aside class="col-right">
-    <section class="sidebar-right">
-      <div id="breaking-news-feed"></div>
-    </section>
+    <!-- Mirrors #library-card at the top of col-left: İstanbul's Büyükşehir
+         Belediye Başkanı by default, swapped for the clicked district's
+         Belediye Başkanı via renderPoliticianCard() below. Reuses the
+         .library-card class outright for pixel-identical styling instead
+         of duplicating it under a new name. -->
+    <div class="library-card" id="politician-card"><div class="card-loading"><span class="spinner"></span></div></div>
+    <div class="col-right-slide">
+      <section class="sidebar-right">
+        <div id="breaking-news-feed"></div>
+      </section>
+    </div>
   </aside>
   </div>
 </div>
@@ -2019,6 +2040,7 @@ function mount() {
   IstRouter.onTick(tickNewsAgo);
   loadBreakingNews();
   loadEvents();
+  renderPoliticianCard(activeNeighborhood || 'istanbul');
 }
 
 function unmount() {
@@ -2247,6 +2269,53 @@ function baseMapLabel() {
   return (active && active.getAttribute('data-name')) || activeNeighborhood;
 }
 
+// ── Politician card (top-right, desktop) ───────────────────────
+// Mirrors #library-card at the top-left: the İstanbul Büyükşehir Belediye
+// Başkanı by default, swapped for the clicked district's Belediye Başkanı
+// (see public.politicians, managed from admin.html — nothing here is
+// hardcoded, since officeholders change). Fetched once and cached, since
+// there are only ever 26 rows (İstanbul + the 25 districts) and they
+// rarely change.
+let politiciansById = null;
+
+async function loadPoliticians() {
+  if (politiciansById) return politiciansById;
+  const { data } = await sb.from('politicians').select('*');
+  politiciansById = {};
+  (data || []).forEach(p => { politiciansById[p.id] = p; });
+  return politiciansById;
+}
+
+function politicianInitials(p) {
+  return ((p.first_name || '')[0] || '') + ((p.last_name || '')[0] || '');
+}
+
+async function renderPoliticianCard(seatId) {
+  const card = document.getElementById('politician-card');
+  if (!card) return;
+  const byId = await loadPoliticians();
+  const p = byId[seatId || 'istanbul'];
+  const seatLabel = seatId && seatId !== 'istanbul' ? (districtNames[seatId] || seatId) : 'İstanbul';
+
+  card.innerHTML = `
+    <div class="card-top">
+      <div class="avatar">${p && p.photo_url
+        ? `<img src="${esc(p.photo_url)}" alt="">`
+        : esc(p ? politicianInitials(p) : '—')}</div>
+      <div class="card-id">
+        <div class="card-name">${esc(p ? `${p.first_name} ${p.last_name}`.trim() : seatLabel)}</div>
+        <div class="card-meta">${esc(p ? p.title : 'Henüz eklenmedi')}</div>
+      </div>
+    </div>
+  `;
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
 document.addEventListener('click', (e) => {
   const nb = e.target.closest('.neighborhood');
   if (!nb) {
@@ -2257,6 +2326,7 @@ document.addEventListener('click', (e) => {
       flashingNewsCardId = null;
       applyNewsFilter(activeNewsFilter, true);
       loadEvents(true);
+      renderPoliticianCard('istanbul');
     }
     return;
   }
@@ -2276,6 +2346,7 @@ document.addEventListener('click', (e) => {
   // in as if it were leaving and re-entering the screen.
   applyNewsFilter(activeNewsFilter, true);
   loadEvents(true);
+  renderPoliticianCard(nbId);
 });
 document.addEventListener('mouseover', (e) => {
   const nb = e.target.closest('.neighborhood');

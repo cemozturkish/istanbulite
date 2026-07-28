@@ -775,6 +775,7 @@
     <button class="admin-tab" data-tab="sozcel">Sözcel</button>
     <button class="admin-tab" data-tab="tumcel">Tümcel</button>
     <button class="admin-tab" data-tab="quotes">Alıntılar</button>
+    <button class="admin-tab" data-tab="politicians">Siyasetçiler</button>
     <button class="admin-tab" data-tab="notifications">Notifications</button>
     <button class="admin-tab" data-tab="users">Users</button>
   </div>
@@ -1239,6 +1240,47 @@
 
   </div>
 
+  <div class="admin-body" id="politicians-tab" style="display:none;">
+
+    <!-- LEFT: Edit a Seat -->
+    <div class="panel">
+      <div class="panel-title" id="p-form-mode-label">Edit Seat</div>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        Shown on Anahane's top-right card: İstanbul Büyükşehir Belediye Başkanı by default, or the clicked district's Belediye Başkanı. One seat per district plus the citywide seat — pick a seat, fill in who holds it now.
+      </p>
+
+      <label>Seat</label>
+      <select id="p-seat"></select>
+
+      <label>First Name</label>
+      <input type="text" id="p-first-name" placeholder="Ad..."/>
+
+      <label>Last Name</label>
+      <input type="text" id="p-last-name" placeholder="Soyad..."/>
+
+      <label>Title</label>
+      <input type="text" id="p-title" placeholder="Örn. İstanbul Büyükşehir Belediye Başkanı"/>
+
+      <label>Photo URL (optional)</label>
+      <input type="text" id="p-photo-url" placeholder="https://..."/>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="p-submit-btn">Save Seat</button>
+        <button class="btn btn-secondary" id="p-clear-btn" style="display:none;">Clear Seat</button>
+      </div>
+      <div class="status-msg" id="p-form-status"></div>
+    </div>
+
+    <!-- RIGHT: All Seats -->
+    <div class="panel">
+      <div class="panel-title">Seats</div>
+      <div class="articles-list" id="politicians-list">
+        <div class="empty-state"><span class="spinner"></span></div>
+      </div>
+    </div>
+
+  </div>
+
   <div class="admin-body" id="notifications-tab" style="display:none;">
 
     <!-- LEFT: Post Notification -->
@@ -1397,6 +1439,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('sozcel-tab').style.display = (tab === 'sozcel') ? 'grid' : 'none';
     document.getElementById('tumcel-tab').style.display = (tab === 'tumcel') ? 'grid' : 'none';
     document.getElementById('quotes-tab').style.display = (tab === 'quotes') ? '' : 'none';
+    document.getElementById('politicians-tab').style.display = (tab === 'politicians') ? '' : 'none';
     document.getElementById('notifications-tab').style.display = (tab === 'notifications') ? '' : 'none';
     document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
     if (tab === 'kutuphane') showKutuphaneIndex();
@@ -1405,6 +1448,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'sozcel') loadSozcelSchedule();
     if (tab === 'tumcel') loadTumcelPuzzles();
     if (tab === 'quotes') loadQuotesList();
+    if (tab === 'politicians') loadPoliticiansTab();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'users') loadUsersList();
   });
@@ -3065,6 +3109,144 @@ async function deleteQuote(id) {
   if (error) { alert('Error: ' + error.message); return; }
   loadQuotesList();
 }
+
+// ── Politicians: mayors shown on Anahane's top-right card ──
+// Fixed set of 26 "seats" (İstanbul Büyükşehir + 25 ilçe) rather than
+// freeform rows like quotes/events — admin edits who currently holds each
+// seat instead of creating/deleting arbitrary entries.
+let politiciansSeatsLoaded = false;
+let politiciansNeighborhoodNames = {};
+
+async function loadPoliticiansTab() {
+  if (!politiciansSeatsLoaded) {
+    const { data, error } = await sb.from('neighborhoods').select('id, name_tr').order('name_tr');
+    if (!error && data) {
+      const seatSel = document.getElementById('p-seat');
+      const istOpt = document.createElement('option');
+      istOpt.value = 'istanbul';
+      istOpt.textContent = 'İstanbul (Büyükşehir)';
+      seatSel.appendChild(istOpt);
+      data.forEach(n => {
+        if (n.id === 'istanbul_disi') return;
+        politiciansNeighborhoodNames[n.id] = n.name_tr;
+        const opt = document.createElement('option');
+        opt.value = n.id;
+        opt.textContent = n.name_tr;
+        seatSel.appendChild(opt);
+      });
+      politiciansSeatsLoaded = true;
+    }
+  }
+  loadPoliticiansList();
+}
+
+function politicianSeatLabel(seatId) {
+  return seatId === 'istanbul' ? 'İstanbul (Büyükşehir)' : (politiciansNeighborhoodNames[seatId] || seatId);
+}
+
+async function loadPoliticiansList() {
+  const listEl = document.getElementById('politicians-list');
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const { data, error } = await sb.from('politicians').select('*');
+  if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
+  const byId = {};
+  (data || []).forEach(p => { byId[p.id] = p; });
+  const seatIds = ['istanbul', ...Object.keys(politiciansNeighborhoodNames)];
+
+  listEl.innerHTML = seatIds.map(seatId => {
+    const p = byId[seatId];
+    const filled = !!(p && (p.first_name || p.last_name));
+    return `
+      <div class="article-card" data-id="${seatId}">
+        <div class="a-neighborhood">${escapeHtml(politicianSeatLabel(seatId))}</div>
+        ${filled
+          ? `<p>${escapeHtml(`${p.first_name} ${p.last_name}`.trim())}</p><p style="color:var(--muted);">${escapeHtml(p.title || '')}</p>`
+          : `<p style="color:var(--muted);font-style:italic;">— boş —</p>`}
+        <div class="card-actions">
+          <button class="btn-edit" data-act="p-edit" data-id="${seatId}">Edit</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('button[data-act="p-edit"]').forEach(btn => {
+    btn.addEventListener('click', () => editPoliticianSeat(btn.dataset.id, byId[btn.dataset.id]));
+  });
+}
+
+function editPoliticianSeat(seatId, p) {
+  document.getElementById('p-seat').value = seatId;
+  document.getElementById('p-first-name').value = p?.first_name || '';
+  document.getElementById('p-last-name').value = p?.last_name || '';
+  document.getElementById('p-title').value = p?.title || '';
+  document.getElementById('p-photo-url').value = p?.photo_url || '';
+  document.getElementById('p-form-mode-label').textContent = 'Editing: ' + politicianSeatLabel(seatId);
+  document.getElementById('p-clear-btn').style.display = p ? 'inline-block' : 'none';
+  document.querySelector('#politicians-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetPoliticianForm() {
+  document.getElementById('p-first-name').value = '';
+  document.getElementById('p-last-name').value = '';
+  document.getElementById('p-title').value = '';
+  document.getElementById('p-photo-url').value = '';
+  document.getElementById('p-form-mode-label').textContent = 'Edit Seat';
+  document.getElementById('p-clear-btn').style.display = 'none';
+}
+
+document.getElementById('p-seat').addEventListener('change', async () => {
+  const seatId = document.getElementById('p-seat').value;
+  const { data } = await sb.from('politicians').select('*').eq('id', seatId).maybeSingle();
+  editPoliticianSeat(seatId, data);
+});
+
+document.getElementById('p-submit-btn').addEventListener('click', async () => {
+  const seatId = document.getElementById('p-seat').value;
+  const first_name = document.getElementById('p-first-name').value.trim();
+  const last_name = document.getElementById('p-last-name').value.trim();
+  const title = document.getElementById('p-title').value.trim();
+  const photo_url = document.getElementById('p-photo-url').value.trim();
+  const statusEl = document.getElementById('p-form-status');
+  const btn = document.getElementById('p-submit-btn');
+
+  if (!seatId || !first_name || !last_name || !title) {
+    statusEl.textContent = 'Seat, first name, last name, and title are all required.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const { error } = await sb.from('politicians').upsert([{
+    id: seatId,
+    neighborhood: seatId === 'istanbul' ? null : seatId,
+    first_name, last_name, title,
+    photo_url: photo_url || null,
+  }]);
+
+  btn.textContent = 'Save Seat';
+
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = 'Seat saved!';
+  statusEl.className = 'status-msg ok';
+  document.getElementById('p-clear-btn').style.display = 'inline-block';
+  loadPoliticiansList();
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+document.getElementById('p-clear-btn').addEventListener('click', async () => {
+  const seatId = document.getElementById('p-seat').value;
+  if (!confirm('Clear this seat back to empty?')) return;
+  const { error } = await sb.from('politicians').delete().eq('id', seatId);
+  if (error) { alert('Error: ' + error.message); return; }
+  resetPoliticianForm();
+  loadPoliticiansList();
+});
 
 // ── Sözcel: Sözcü assignment + day status ──
 function sozcelIstanbulDateISO(offsetDays = 0) {
