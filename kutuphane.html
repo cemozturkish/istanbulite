@@ -272,8 +272,11 @@
 
     /* Hover: dim the artwork under the cursor (matches anahane) — a
        transparent ink tint, not an element-opacity fade, so the black
-       stroke borders stay black instead of washing out to gray. */
-    .neighborhood:hover { fill: rgba(var(--ink-rgb), 0.18); }
+       stroke borders stay black instead of washing out to gray.
+       .hover-active is toggled via JS on every polygon sharing the same
+       data-neighborhood, so multi-polygon districts (e.g. Şişli) light
+       up as one unit instead of just the piece under the cursor. */
+    .neighborhood:hover, .neighborhood.hover-active { fill: rgba(var(--ink-rgb), 0.18); }
     /* Same fix as hover — bake the alpha into the fill color instead of
        element opacity, so the accent-colored stroke doesn't wash out. */
     .neighborhood.active {
@@ -3690,12 +3693,15 @@ const neighborhoodNames = {
     if (!nb) return;
     const mapLabel = document.getElementById('map-label');
     if (mapLabel) mapLabel.textContent = nb.getAttribute('data-name') || nb.id;
+    const nbId = nb.dataset.neighborhood || nb.id;
+    getMapNeighborhoods().forEach(n => n.classList.toggle('hover-active', (n.dataset.neighborhood || n.id) === nbId));
   });
   document.addEventListener('mouseout', (e) => {
     const nb = e.target.closest('.neighborhood');
     if (!nb || nb.contains(e.relatedTarget)) return;
     const mapLabel = document.getElementById('map-label');
     if (mapLabel) mapLabel.textContent = baseMapLabel();
+    getMapNeighborhoods().forEach(n => n.classList.remove('hover-active'));
   });
 })();
 

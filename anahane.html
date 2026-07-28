@@ -496,8 +496,13 @@
       pointer-events: none;
     }
 
-    /* Hover: dim the artwork under the cursor */
-    .neighborhood:hover { fill: rgba(var(--ink-rgb), 0.18); }
+    /* Hover: dim the artwork under the cursor. .hover-active is toggled
+       via JS on every polygon sharing the same data-neighborhood (see
+       the mouseover/mouseout listeners below), so multi-polygon
+       districts like Şişli light up as one unit instead of just the
+       piece under the cursor; :hover stays as a no-JS fallback for the
+       single polygon actually being pointed at. */
+    .neighborhood:hover, .neighborhood.hover-active { fill: rgba(var(--ink-rgb), 0.18); }
     /* Clicked/active: darker tint + outline */
     .neighborhood.active {
       fill: rgba(var(--ink-rgb), 0.32);
@@ -514,7 +519,7 @@
       stroke-width: 4;
       stroke-dasharray: 10 6;
     }
-    .neighborhood.home:hover { fill: rgba(130, 55, 48, 0.26); }
+    .neighborhood.home:hover, .neighborhood.home.hover-active { fill: rgba(130, 55, 48, 0.26); }
     .neighborhood.home.active { fill: rgba(130, 55, 48, 0.38); stroke: var(--brown-4); stroke-dasharray: none; }
 
     /* Plain text, no frame/shadow — matches the HANE/KÜTÜPHANE/KAHVEHANE
@@ -2276,11 +2281,14 @@ document.addEventListener('mouseover', (e) => {
   const nb = e.target.closest('.neighborhood');
   if (!nb) return;
   document.getElementById('map-label').textContent = nb.getAttribute('data-name') || nb.id;
+  const nbId = nb.dataset.neighborhood || nb.id;
+  getNeighborhoods().forEach(n => n.classList.toggle('hover-active', (n.dataset.neighborhood || n.id) === nbId));
 });
 document.addEventListener('mouseout', (e) => {
   const nb = e.target.closest('.neighborhood');
   if (!nb || nb.contains(e.relatedTarget)) return;
   document.getElementById('map-label').textContent = baseMapLabel();
+  getNeighborhoods().forEach(n => n.classList.remove('hover-active'));
 });
 
 // ── Breaking News (from public.breaking_news) ──────────────────
