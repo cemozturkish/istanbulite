@@ -1018,7 +1018,7 @@
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
           "map map"
-          "events news";
+          "news events";
         align-content: start;
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
@@ -2633,16 +2633,22 @@ function safeUrl(u) {
 
 // Slides a feed panel's current cards out toward their column's outer
 // screen edge, then rebuilds it and slides the fresh cards back in from
-// that same edge. `direction` is 'left' (events, left column) or
-// 'right' (breaking news, right column) -- see the .card-entering-*/.card-leaving-*
+// that same edge. `direction` is 'left' (breaking news, left column) or
+// 'right' (events, right column) -- see the .card-entering-*/.card-leaving-*
 // CSS. Renders immediately (no leave animation) on first paint, when the
 // panel starts out empty. Cards enter with a staggered delay by list
 // position, so the topmost card arrives first and lower ones follow.
-// Skips that entrance animation on the first call after arriving via the
-// swipe-pagination nav (see window.__istSuppressFirstCardAnim, seeded
-// pre-body): the whole column is already sliding in from that same edge,
-// so animating the cards inside it too would look like the content
-// arriving twice.
+// Used to skip this entrance animation on the first call after arriving
+// via the swipe-pagination nav (window.__istSuppressFirstCardAnim,
+// seeded pre-body), on the theory that the whole column is already
+// sliding in from that same edge so animating the cards too would look
+// like the content arriving twice -- but loadBreakingNews()/loadEvents()
+// always hit Supabase fresh on every mount(), so in practice the data
+// (and this first render) lands well after the ~400ms column-slide has
+// already finished, not alongside it. Suppressing then just made the
+// cards pop in with no animation at all instead of preventing a double
+// animation that wasn't happening anyway -- so this no longer consults
+// that flag and always plays the entrance.
 // `instant`: rebuilds in place with no leave/enter animation at all --
 // used for map neighborhood clicks, where the slide-out/in read as the
 // whole feed leaving and re-entering the screen instead of just updating.
@@ -2650,13 +2656,10 @@ const CARD_SWAP_MS = 300;
 const CARD_STAGGER_MS = 160;
 function animateFeedSwap(container, direction, buildFn, instant) {
   if (instant) { buildFn(); return; }
-  const suppress = window.__istSuppressFirstCardAnim && window.__istSuppressFirstCardAnim[direction];
-  if (suppress) window.__istSuppressFirstCardAnim[direction] = false;
   const enterClass = direction === 'left' ? 'card-entering-left' : 'card-entering-right';
   const leaveClass = direction === 'left' ? 'card-leaving-left' : 'card-leaving-right';
   const playEnter = () => {
     buildFn();
-    if (suppress) return;
     Array.from(container.children).forEach((el, i) => {
       el.style.animationDelay = `${i * CARD_STAGGER_MS}ms`;
       el.classList.add(enterClass);
@@ -2675,7 +2678,7 @@ function animateFeedSwap(container, direction, buildFn, instant) {
 function renderBreakingNewsFeed(rows, instant) {
   const feed = document.getElementById('breaking-news-feed');
   if (!feed) return;
-  animateFeedSwap(feed, 'right', () => renderBreakingNewsFeedNow(feed, rows), instant);
+  animateFeedSwap(feed, 'left', () => renderBreakingNewsFeedNow(feed, rows), instant);
 }
 
 // Full detail markup for a news article — rendered into the detail
@@ -3094,7 +3097,7 @@ function renderEvents(instant) {
   if (!panel) return;
   let rows = allEvents;
   if (activeNeighborhood) rows = rows.filter(ev => ev.neighborhood === activeNeighborhood);
-  animateFeedSwap(panel, 'left', () => renderEventsNow(panel, rows), instant);
+  animateFeedSwap(panel, 'right', () => renderEventsNow(panel, rows), instant);
 }
 
 // Full detail markup for an event — rendered into the detail overlay's
