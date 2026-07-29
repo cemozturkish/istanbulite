@@ -1231,7 +1231,7 @@
         bottom: 0;
         left: 0;
         right: 0;
-        height: 38px;
+        height: calc(38px + env(safe-area-inset-bottom));
         padding: 0 0 env(safe-area-inset-bottom);
         margin: 0;
         border-top: 1px solid var(--rule);
@@ -2118,6 +2118,17 @@ async function highlightHomeNeighborhood(user) {
 // the login overlay, mounting the profile card, the onboarding/mahalle-
 // picker/admin-notification nudges).
 function mount() {
+  // #main-site's pointer-events lock (see its CSS) is only unlocked by
+  // the .active class -- kutuphane/kahvehane don't need this (their
+  // #main-site has no pointer-events:none to begin with), but anahane's
+  // full-bleed map layer does. #main-site is one shared, persistent node
+  // across virtual navigations, and its *live* CSS rules are whichever
+  // page's stylesheet setActiveStylesheet last enabled -- so this has to
+  // be reasserted on every entry into anahane, not just showSite()'s
+  // one-time login-gateway run, or a virtual re-entry (which skips
+  // showSite() entirely) leaves the nav bar and profile card inheriting
+  // pointer-events:none with nothing to unlock it.
+  document.getElementById('main-site').classList.add('active');
   // First: its cached-value pre-apply (see highlightHomeNeighborhood) has
   // to land before router.js's post-mount MapZoom.init runs, or that
   // call's forced layout read locks in a frame with no .home class and
@@ -2151,7 +2162,9 @@ function unmount() {
 
 async function showSite(user) {
   document.getElementById('login-overlay').style.display = 'none';
-  document.getElementById('main-site').classList.add('active');
+  // #main-site's .active toggle now lives in mount() (see its comment) --
+  // showSite() calls mount() below regardless, so adding it here too
+  // would just be a redundant duplicate.
   // Capture user id so seenKey() can scope per-user.
   window.__currentUser = user;
   I18N.syncFromSupabase(sb, user.id);
