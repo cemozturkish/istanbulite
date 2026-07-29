@@ -165,7 +165,6 @@
   // fromPopstate skips pushState (the URL already changed by the time a
   // popstate handler runs) -- see the popstate listener below.
   async function navigateTo(targetSlug, dir, fromPopstate) {
-    if (!global.Capacitor) return; // website keeps using initSwipePagination's own VT path
     if (virtualNavInFlight) return;
     if (!PAGES.includes(targetSlug)) return;
     const currentSlug = activeSlug;
@@ -175,7 +174,7 @@
     try {
       const exitClass = dir === 'forward' ? 'ist-exiting-forward' : 'ist-exiting-backward';
       document.body.classList.add(exitClass);
-      await new Promise(resolve => setTimeout(resolve, 370)); // matches initSwipePagination's DURATION-30
+      await new Promise(resolve => setTimeout(resolve, 370)); // matches the swipe-pagination transition's 400ms minus a 30ms head start
 
       if (pages[currentSlug] && pages[currentSlug].unmount) {
         try { pages[currentSlug].unmount(); } catch (e) { console.error(e); }
@@ -310,16 +309,17 @@
   // ══════════════════════════════════════════
   function initSwipePagination() {
     const NAV_PAGES = ['kutuphane.html', 'anahane.html', 'kahvehane.html'];
-    const DURATION = 400;
     const MIN_DX = 50;
     const MAX_TIME = 700;
-    // Prefer the View Transitions API when available — it snapshots the
-    // outgoing page and holds it until the new one is rendered, which
-    // eliminates the white flash the manual slide-out can't hide. Cross-
-    // document VT is new enough that Capacitor's embedded WKWebView can
-    // report the API as present without actually completing the
-    // navigation, silently swallowing tab-bar taps — so skip it inside
-    // the native app and always use the manual slide/timeout fallback.
+    // navigate()'s own tab-bar/swipe navigation always uses navigateTo's
+    // virtual (client-side) path now, everywhere -- a real cross-document
+    // navigation, even with View Transitions, briefly flashes the
+    // browser's own status-bar/home-indicator tinting before it
+    // re-samples the new page's colors. supportsVT is only still used
+    // below to tag direction on genuine external/real navigations (a
+    // shared link, browser history from outside this site, etc.), which
+    // still get the browser's own automatic transition via each page's
+    // own `@view-transition { navigation: auto; }` CSS rule.
     const supportsVT = 'startViewTransition' in document && !global.Capacitor;
 
     function isMobile() { return window.innerWidth <= 768; }
@@ -383,175 +383,20 @@
       if (targetIdx === curr) return;
       navigating = true;
       recordDir(dir);
-      if (supportsVT) {
-        // The browser will trigger a view transition on this navigation.
-        location.href = NAV_PAGES[targetIdx];
-        return;
-      }
-      if (global.Capacitor) {
-        // Virtual (client-side) navigation -- no reload, no flash, shared
-        // chrome (profile card, nav bar) never leaves the DOM. See
-        // navigateTo above.
-        navigateTo(PAGES[targetIdx], dir).finally(() => { navigating = false; });
-        return;
-      }
-      // Non-Capacitor browser that also lacks View Transitions support --
-      // fall back to the original manual slide + real reload.
-      const exitClass = dir === 'forward' ? 'ist-exiting-forward' : 'ist-exiting-backward';
-      document.body.classList.add(exitClass);
-      setTimeout(() => { location.href = NAV_PAGES[targetIdx]; }, DURATION - 30);
+      // Virtual (client-side) navigation -- no reload, no flash, shared
+      // chrome (profile card, nav bar) never leaves the DOM. See
+      // navigateTo above. Used everywhere now, not just inside Capacitor:
+      // a real cross-document navigation -- even with View Transitions --
+      // still briefly flashes the browser's own status-bar/home-indicator
+      // tinting before it re-samples the new page's colors, which this
+      // avoids entirely by never leaving the document. Any distance
+      // (including a 2-hop Kütüphane<->Kahvehane jump) goes straight to
+      // the target in one hop instead of flashing through the middle tab.
+      navigateTo(PAGES[targetIdx], dir).finally(() => { navigating = false; });
     }
 
-    // Chain-slide through intermediate tabs when the user jumps 2+ away.
-    // Fetch each hop in parallel, extract its .col-left / .col-right, stack
-    // the clones in a fixed overlay, then translate the stack to reveal
-    // each frame in sequence. The final hop ends with a real navigation so
-    // the destination's scripts run normally; we strip the direction class
-    // and kill the cross-document VT animation so there's no double-
-    // animation on arrival. Only ever exercised when supportsVT is true
-    // (i.e. never inside Capacitor, where dist>=2 taps just fall through
-    // to a single navigate() call instead).
-    async function multiHopSlide(curr, target) {
-      if (navigating) return;
-      const dir = target > curr ? 'forward' : 'backward';
-      const step = dir === 'forward' ? 1 : -1;
-      const hopIdxs = [];
-      for (let i = curr + step; i !== target + step; i += step) hopIdxs.push(i);
-      if (hopIdxs.length === 0) return;
-      navigating = true;
-
-      const fetches = hopIdxs.map(i => fetch(NAV_PAGES[i]).then(r => r.text()).catch(() => null));
-      const leftEl = document.querySelector('.col-left-slide');
-      const rightEl = document.querySelector('.col-right');
-      if (!leftEl || !rightEl) { recordDir(dir); location.href = NAV_PAGES[target]; return; }
-      const leftRect = leftEl.getBoundingClientRect();
-      const rightRect = rightEl.getBoundingClientRect();
-      const mobile = window.innerWidth <= 768;
-
-      const htmls = await Promise.all(fetches);
-      if (htmls.some(h => h == null)) {
-        navigating = false;
-        recordDir(dir);
-        location.href = NAV_PAGES[target];
-        return;
-      }
-      const parser = new DOMParser();
-      const fragments = htmls.map(html => {
-        const doc = parser.parseFromString(html, 'text/html');
-        return {
-          left: doc.querySelector('.col-left-slide'),
-          right: doc.querySelector('.col-right'),
-        };
-      });
-
-      function buildStack(origEl, origRect, key) {
-        const wrap = document.createElement('div');
-        Object.assign(wrap.style, {
-          position: 'fixed',
-          left: origRect.left + 'px',
-          top: origRect.top + 'px',
-          width: origRect.width + 'px',
-          height: origRect.height + 'px',
-          overflow: 'hidden',
-          pointerEvents: 'none',
-          zIndex: '90',
-          background: '#ffffff',
-        });
-        const stack = document.createElement('div');
-        Object.assign(stack.style, {
-          position: 'absolute',
-          inset: '0',
-          willChange: 'transform',
-        });
-        wrap.appendChild(stack);
-
-        function placeFrame(node, i) {
-          Object.assign(node.style, {
-            position: 'absolute',
-            top: '0',
-            left: '0',
-            width: '100%',
-            height: '100%',
-            margin: '0',
-            boxSizing: 'border-box',
-            overflow: 'hidden',
-          });
-          node.style.viewTransitionName = 'none';
-          // Mobile: whole page travels one way, keyed off nav direction.
-          // Desktop: left column always sweeps toward the left edge and the
-          // right column toward the right edge, regardless of nav direction
-          // -- so frames are stacked toward the opposite edge here and swept
-          // back by the container's own animation below.
-          const pct = mobile
-            ? (dir === 'forward' ? i : -i) * 100
-            : (key === 'right' ? -i : i) * 100;
-          node.style.transform = 'translateX(' + pct + '%)';
-          stack.appendChild(node);
-        }
-        const frame0 = origEl.cloneNode(true);
-        placeFrame(frame0, 0);
-        fragments.forEach((frag, i) => {
-          const src = frag[key];
-          const node = src ? src.cloneNode(true) : document.createElement('div');
-          placeFrame(node, i + 1);
-        });
-        return { wrap, stack };
-      }
-
-      const leftStack = buildStack(leftEl, leftRect, 'left');
-      const rightStack = buildStack(rightEl, rightRect, 'right');
-      document.body.appendChild(leftStack.wrap);
-      document.body.appendChild(rightStack.wrap);
-      // These clones are only ever meant to be visible for the duration of this
-      // navigation. If left in the DOM they can survive into a bfcache snapshot
-      // of this document (or linger through a stalled cross-document view
-      // transition) and reappear — showing another page's column content — the
-      // next time this document is shown. pagehide fires after the VT snapshot
-      // is taken but before the document is torn down/cached, so removing here
-      // is invisible to the departing animation but keeps the clones out of
-      // whatever gets cached or rendered next.
-      window.addEventListener('pagehide', () => {
-        leftStack.wrap.remove();
-        rightStack.wrap.remove();
-      }, { once: true });
-
-      leftEl.style.visibility = 'hidden';
-      rightEl.style.visibility = 'hidden';
-      leftEl.style.viewTransitionName = 'none';
-      rightEl.style.viewTransitionName = 'none';
-
-      const hops = hopIdxs.length;
-      const perHop = hops === 2 ? 260 : 220;
-      const totalMs = perHop * hops;
-      const opts = { duration: totalMs, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' };
-      // Mobile: both stacks travel together, keyed off nav direction.
-      // Desktop: left stack always slides left, right stack always slides
-      // right, regardless of nav direction (see placeFrame above).
-      const mobileEndPct = dir === 'forward' ? -hops * 100 : hops * 100;
-      const leftKeyframes = [
-        { transform: 'translateX(0%)' },
-        { transform: 'translateX(' + (mobile ? mobileEndPct : -hops * 100) + '%)' },
-      ];
-      const rightKeyframes = [
-        { transform: 'translateX(0%)' },
-        { transform: 'translateX(' + (mobile ? mobileEndPct : hops * 100) + '%)' },
-      ];
-      const a1 = leftStack.stack.animate(leftKeyframes, opts);
-      const a2 = rightStack.stack.animate(rightKeyframes, opts);
-
-      try { await Promise.all([a1.finished, a2.finished]); } catch (e) {}
-
-      try { sessionStorage.removeItem('ist-page-enter-dir'); } catch(e) {}
-      document.documentElement.classList.remove('vt-forward', 'vt-backward');
-      const killVT = document.createElement('style');
-      killVT.textContent = '::view-transition-group(*),::view-transition-image-pair(*),::view-transition-old(*),::view-transition-new(*){animation:none !important;}';
-      document.head.appendChild(killVT);
-
-      location.href = NAV_PAGES[target];
-    }
-
-    // Intercept tab-bar clicks: direct-neighbor hops ride the built-in VT;
-    // jumps of 2+ go through multiHopSlide so intermediate tabs flash past.
+    // Intercept tab-bar clicks -- always goes through navigate()'s virtual
+    // navigation now (see its comment).
     document.addEventListener('click', (e) => {
       const link = e.target.closest('nav a');
       if (!link) return;
@@ -560,13 +405,6 @@
       const curr = currentIdx();
       if (targetIdx === -1 || targetIdx === curr) return;
       const dir = targetIdx > curr ? 'forward' : 'backward';
-      const dist = Math.abs(targetIdx - curr);
-      if (supportsVT && dist >= 2) {
-        e.preventDefault();
-        multiHopSlide(curr, targetIdx);
-        return;
-      }
-      if (supportsVT) { recordDir(dir); return; }
       e.preventDefault();
       navigate(targetIdx, dir);
     }, true);
