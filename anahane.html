@@ -2587,6 +2587,18 @@ function formatAgoTRLong(iso) {
   return `${formatAgoTR(iso)} ${en ? 'ago' : 'önce'}`;
 }
 
+// A story's timeline can hold gelişme entries backdated years into its
+// history (admin.html lets an editor pick the date), so past a month the
+// "N gün önce" form stops being readable — show the actual date instead.
+function formatTimelineWhen(iso) {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days >= 30) {
+    const locale = I18N.isEnglish() ? 'en-US' : 'tr-TR';
+    return new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  return formatAgoTRLong(iso);
+}
+
 function safeUrl(u) {
   const s = String(u || '').trim();
   if (/^https?:\/\//i.test(s)) return s;
@@ -2674,7 +2686,7 @@ function buildNewsDetailHtml(n) {
           <div class="timeline-item timeline-item-poll">
             <div class="timeline-item-date">
               <span class="timeline-tick"></span>
-              <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatAgoTRLong(ev.created_at))}</div>
+              <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatTimelineWhen(ev.created_at))}</div>
             </div>
             <div class="poll-block" id="poll-${escapeText(ev.data.id)}"></div>
           </div>
@@ -2682,7 +2694,7 @@ function buildNewsDetailHtml(n) {
           <div class="timeline-item">
             <div class="timeline-item-date">
               <span class="timeline-tick"></span>
-              <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatAgoTRLong(ev.created_at))}</div>
+              <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatTimelineWhen(ev.created_at))}</div>
             </div>
             <strong>${escapeText(ev.data.title)}</strong>
             ${ev.data.body ? `<p>${escapeText(ev.data.body)}</p>` : ''}
