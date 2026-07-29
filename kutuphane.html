@@ -29,13 +29,15 @@
   <script src="sozcul-mascot.js" defer></script>
   <script src="admin-notification.js" defer></script>
   <script src="map-zoom.js" defer></script>
-  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis) -->
+  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis).
+       ist-entering-* (the manual transform-transition fallback) is only for browsers WITHOUT View Transitions support -- on VT-capable browsers the native cross-document transition already slides the column in as a snapshot, so also applying the fallback class made the real DOM run its own second, independent slide underneath once DOMContentLoaded released it mid-transition, producing a visible double entrance. vt-* (which drives the VT pseudo-element keyframes) is unaffected and still always seeded. -->
   <script>
     (function(){
       try {
         var _d = sessionStorage.getItem('ist-page-enter-dir');
         if (_d) {
-          document.documentElement.classList.add('ist-entering-' + _d);
+          var _vt = ('startViewTransition' in document) && !window.Capacitor;
+          if (!_vt) document.documentElement.classList.add('ist-entering-' + _d);
           document.documentElement.classList.add('vt-' + _d);
         }
       } catch(e) {}

@@ -28,13 +28,15 @@
   <script src="sozcul-mascot.js" defer></script>
   <script src="admin-notification.js" defer></script>
   <script src="map-zoom.js" defer></script>
-  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in. Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot, and a one-shot flag so the posts/scoreboard card-entrance animation (see animateFeedSwap) skips its first run here -- the column itself is already sliding in from the same edge, so animating the cards inside it too would look like the content arriving twice. -->
+  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in. Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot, and a one-shot flag so the posts/scoreboard card-entrance animation (see animateFeedSwap) skips its first run here -- the column itself is already sliding in from the same edge, so animating the cards inside it too would look like the content arriving twice.
+       ist-entering-* (the manual transform-transition fallback, see .col-right-slide/.game-link-enter below) is only for browsers WITHOUT View Transitions support -- on VT-capable browsers the native cross-document transition already slides the whole column in as a snapshot, so also applying the fallback class made the real DOM run its own second, independent slide underneath once DOMContentLoaded released it mid-transition, producing a visible double entrance. vt-* (which drives the VT pseudo-element keyframes) is unaffected and still always seeded. -->
   <script>
     (function(){
       try {
         var _d = sessionStorage.getItem('ist-page-enter-dir');
         if (_d) {
-          document.documentElement.classList.add('ist-entering-' + _d);
+          var _vt = ('startViewTransition' in document) && !window.Capacitor;
+          if (!_vt) document.documentElement.classList.add('ist-entering-' + _d);
           document.documentElement.classList.add('vt-' + _d);
           window.__istSuppressFirstCardAnim = { left: true, right: true };
         }
