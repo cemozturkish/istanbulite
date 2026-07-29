@@ -459,10 +459,10 @@
          svg uses preserveAspectRatio="slice" so this only shows briefly
          during image load, not as a letterbox gap. */
       background: #f7f7f7;
-      /* Hands touch gestures on the map entirely to map-zoom.js (pinch
-         to zoom, drag to pan when zoomed) instead of the browser's own
-         page-zoom/scroll handling, which would otherwise fight it. */
-      touch-action: none;
+      /* Pinch-to-zoom is disabled for now (see map-zoom.js's
+         ZOOM_ENABLED) -- touch-action stays at the browser default so a
+         touch that starts on the map still scrolls the page normally. */
+      touch-action: auto;
     }
 
     /* Wraps the photo + hit-region overlay so map-zoom.js can scale/pan
@@ -1059,11 +1059,13 @@
         overflow: visible;
         margin-left: calc(-1 * var(--frame-pad, 10px));
         margin-right: calc(-1 * var(--frame-pad, 10px));
-        /* Room for the floating profile card (now offset by the same
-           safe-area amount, plus extra breathing room below the card)
-           so it still sits over empty "sea", not over the districts
-           themselves. */
-        margin-top: calc(env(safe-area-inset-top) + 40px);
+        /* Room for the floating profile card (offset by the same
+           safe-area amount so the gap stays constant across notch
+           sizes) so it still sits over empty "sea", not over the
+           districts themselves. Trimmed the old 40px extra down to 16px
+           to reclaim the leftover dead space above the map and pull the
+           whole map (and the events/news below it) further up. */
+        margin-top: calc(env(safe-area-inset-top) + 16px);
         box-shadow: none !important;
       }
       .map-panel {
@@ -1267,6 +1269,9 @@
         color: var(--muted);
         border: none;
         text-decoration: none;
+        /* Same fix as .neighborhood: without this, tapping a tab flashes
+           the browser's default gray tap-highlight box over it. */
+        -webkit-tap-highlight-color: transparent;
       }
       nav a.active { color: var(--ink); font-weight: 700; }
 

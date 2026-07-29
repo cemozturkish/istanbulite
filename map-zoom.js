@@ -20,11 +20,16 @@
 // each page's CSS) so news/events (or comments/games) stay visible,
 // covering the map wherever they overlap it -- which is fine, expected.
 (function (global) {
+  // Pinch-to-zoom disabled for now (2026-07-29) -- flip back to true to
+  // restore it. Left the rest of the module intact rather than ripping
+  // it out since this is meant to be temporary.
+  const ZOOM_ENABLED = false;
   const MIN_SCALE = 1;
   const MAX_SCALE = 4;
   const MOVE_THRESHOLD = 6; // px of screen movement before a 1-finger touch counts as a drag, not a tap
 
   function initMapZoom(panel) {
+    if (!ZOOM_ENABLED) return;
     // A virtual navigation can call this again on a .map-panel it already
     // wired up (e.g. re-entering a cached page) -- guard so a revisit
     // doesn't double-register touch listeners on the same node.
