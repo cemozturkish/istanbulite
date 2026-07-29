@@ -583,7 +583,7 @@
     .upd-row .btn-del { padding: 0 8px; font-size: 0.9rem; line-height: 1; }
     .upd-form {
       display: grid;
-      grid-template-columns: 1fr 1fr auto;
+      grid-template-columns: 1fr 1fr auto auto;
       gap: 6px;
       margin-top: 8px;
       align-items: start;
@@ -596,10 +596,12 @@
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       resize: vertical;
     }
+    .upd-form input.upd-datetime { width: 170px; }
     .upd-form button { white-space: nowrap; padding: 6px 10px; font-size: 0.75rem; }
     .upd-status { grid-column: 1 / -1; margin: 0; font-size: 0.75rem; }
     @media (max-width: 600px) {
       .upd-form { grid-template-columns: 1fr; }
+      .upd-form input.upd-datetime { width: 100%; }
     }
     .upd-row .btn-edit { padding: 0 8px; font-size: 0.75rem; }
     .upd-edit-form {
@@ -2457,10 +2459,10 @@ function renderNewsList() {
     const cat = n.category || n.neighborhood || 'turkiye';
     const updates = (n.breaking_news_updates || [])
       .slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    const updatesHtml = updates.length ? updates.map((u, idx) => `
+    const updatesHtml = updates.length ? updates.map(u => `
       <div class="upd-row" data-upd-id="${u.id}">
         <div class="upd-info">
-          <span class="upd-time">${formatAgo(u.created_at)}</span>
+          <span class="upd-time">${formatUpdateWhen(u.created_at)}</span>
           <strong>${escapeHtml(u.title)}</strong>
           ${u.body ? `<span class="upd-body-text">${escapeHtml(u.body)}</span>` : ''}
         </div>
@@ -2470,8 +2472,9 @@ function renderNewsList() {
       <div class="upd-edit-form" data-upd-edit-id="${u.id}">
         <input type="text" class="ue-title" value="${escapeHtml(u.title)}"/>
         <textarea class="ue-body" rows="2">${escapeHtml(u.body || '')}</textarea>
+        <input type="datetime-local" class="ue-datetime" value="${toLocalDatetimeInputValue(u.created_at)}"/>
         <div class="btn-row">
-          <button class="btn btn-primary" data-act="save-update-edit" data-id="${u.id}" data-news-id="${n.id}" data-is-latest="${idx === 0 ? '1' : '0'}">Kaydet</button>
+          <button class="btn btn-primary" data-act="save-update-edit" data-id="${u.id}" data-news-id="${n.id}">Kaydet</button>
           <button class="btn btn-secondary" data-act="cancel-update-edit" data-id="${u.id}">İptal</button>
         </div>
         <div class="ue-status status-msg"></div>
@@ -2518,6 +2521,7 @@ function renderNewsList() {
           <div class="upd-form">
             <input type="text" class="upd-title" placeholder="Yeni başlık (haberin güncel hali)"/>
             <textarea class="upd-body" rows="1" placeholder="Ek detay (opsiyonel)"></textarea>
+            <input type="datetime-local" class="upd-datetime" title="Gelişme tarihi" value="${nowLocalDatetimeValue()}"/>
             <button class="btn btn-secondary" data-act="add-update" data-news-id="${n.id}">+ Gelişme Ekle</button>
             <div class="upd-status status-msg"></div>
           </div>
@@ -2612,10 +2616,10 @@ function hideUpdateEditForm(id) {
 async function saveNewsUpdateEdit(btn) {
   const id = btn.dataset.id;
   const newsId = btn.dataset.newsId;
-  const isLatest = btn.dataset.isLatest === '1';
   const form = document.querySelector(`.upd-edit-form[data-upd-edit-id="${id}"]`);
   const title = form.querySelector('.ue-title').value.trim();
   const body = form.querySelector('.ue-body').value.trim();
+  const dateVal = form.querySelector('.ue-datetime').value;
   const statusEl = form.querySelector('.ue-status');
 
   if (!title) {
@@ -2629,8 +2633,11 @@ async function saveNewsUpdateEdit(btn) {
   btn.innerHTML = '<span class="spinner"></span>';
   statusEl.textContent = '';
 
+  const payload = { title, body: body || null };
+  if (dateVal) payload.created_at = new Date(dateVal).toISOString();
+
   const { error } = await sb.from('breaking_news_updates')
-    .update({ title, body: body || null })
+    .update(payload)
     .eq('id', id);
 
   if (error) {
@@ -2641,9 +2648,19 @@ async function saveNewsUpdateEdit(btn) {
     return;
   }
 
-  // The most recent update snapshot mirrors the story's current headline
+  // The most recent update (by date, not edit order — a backdated entry
+  // can move in or out of that spot) mirrors the story's current headline
   // shown to readers on the map/feed — keep the two in sync when edited.
-  if (isLatest) {
+  const { data: latest, error: latestErr } = await sb.from('breaking_news_updates')
+    .select('id').eq('news_id', newsId).order('created_at', { ascending: false }).limit(1);
+  if (latestErr) {
+    btn.disabled = false;
+    btn.textContent = origText;
+    statusEl.textContent = latestErr.message;
+    statusEl.className = 'ue-status status-msg err';
+    return;
+  }
+  if (latest.length && latest[0].id === id) {
     const { error: syncErr } = await sb.from('breaking_news')
       .update({ title, body: body || null })
       .eq('id', newsId);
@@ -2821,9 +2838,11 @@ async function addNewsUpdate(btn) {
   const newsId = btn.dataset.newsId;
   const titleEl = card.querySelector('.upd-title');
   const bodyEl = card.querySelector('.upd-body');
+  const dateEl = card.querySelector('.upd-datetime');
   const statusEl = card.querySelector('.upd-status');
   const title = titleEl.value.trim();
   const body = bodyEl.value.trim();
+  const createdAt = dateEl.value ? new Date(dateEl.value).toISOString() : new Date().toISOString();
 
   statusEl.textContent = '';
   statusEl.className = 'upd-status status-msg';
@@ -2842,13 +2861,14 @@ async function addNewsUpdate(btn) {
   // timeline (at its original created_at) before overwriting it, so the
   // original post isn't lost.
   const { data: existing, error: existingErr } = await sb.from('breaking_news_updates')
-    .select('id').eq('news_id', newsId).limit(1);
+    .select('created_at').eq('news_id', newsId).order('created_at', { ascending: false }).limit(1);
   if (existingErr) {
     btn.disabled = false; btn.textContent = origText;
     statusEl.textContent = existingErr.message;
     statusEl.className = 'upd-status status-msg err';
     return;
   }
+  let latestExistingAt = existing.length ? existing[0].created_at : null;
   if (!existing.length) {
     const { data: current, error: curErr } = await sb.from('breaking_news')
       .select('title, body, created_at').eq('id', newsId).single();
@@ -2867,10 +2887,11 @@ async function addNewsUpdate(btn) {
       statusEl.className = 'upd-status status-msg err';
       return;
     }
+    latestExistingAt = current.created_at;
   }
 
   const { error } = await sb.from('breaking_news_updates')
-    .insert([{ news_id: newsId, title, body: body || null }]);
+    .insert([{ news_id: newsId, title, body: body || null, created_at: createdAt }]);
   if (error) {
     btn.disabled = false; btn.textContent = origText;
     statusEl.textContent = error.message;
@@ -2878,18 +2899,25 @@ async function addNewsUpdate(btn) {
     return;
   }
 
-  const { error: updErr } = await sb.from('breaking_news')
-    .update({ title, body: body || null, updated_at: new Date().toISOString() })
-    .eq('id', newsId);
-  if (updErr) {
-    btn.disabled = false; btn.textContent = origText;
-    statusEl.textContent = updErr.message;
-    statusEl.className = 'upd-status status-msg err';
-    return;
+  // A backdated gelişme (filling in a story's earlier history) must not
+  // steal the story's current displayed headline or bump it back into the
+  // active 24h feed — only the genuinely latest entry does that.
+  const isNewLatest = !latestExistingAt || new Date(createdAt) >= new Date(latestExistingAt);
+  if (isNewLatest) {
+    const { error: updErr } = await sb.from('breaking_news')
+      .update({ title, body: body || null, updated_at: new Date().toISOString() })
+      .eq('id', newsId);
+    if (updErr) {
+      btn.disabled = false; btn.textContent = origText;
+      statusEl.textContent = updErr.message;
+      statusEl.className = 'upd-status status-msg err';
+      return;
+    }
   }
 
   titleEl.value = '';
   bodyEl.value = '';
+  dateEl.value = nowLocalDatetimeValue();
   btn.textContent = '✓ Eklendi';
   statusEl.textContent = '';
   setTimeout(() => loadBreakingNews(), 500);
@@ -2911,6 +2939,29 @@ function formatAgo(iso) {
   if (hrs < 24) return hrs + ' h ago';
   const days = Math.floor(hrs / 24);
   return days + ' d ago';
+}
+
+// Gelişme timestamps can be backdated years into a story's history (see
+// addNewsUpdate), so beyond ~a month the relative "N d ago" form stops
+// being readable — fall back to an absolute date.
+function formatUpdateWhen(iso) {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days >= 30) {
+    return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  return formatAgo(iso);
+}
+
+// Converts an ISO timestamp to the value a <input type="datetime-local">
+// expects, in the browser's local time (not toISOString's UTC digits).
+function toLocalDatetimeInputValue(iso) {
+  const d = new Date(iso);
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function nowLocalDatetimeValue() {
+  return toLocalDatetimeInputValue(new Date().toISOString());
 }
 
 document.getElementById('news-view-recent').addEventListener('click', () => {
