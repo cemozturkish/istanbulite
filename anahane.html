@@ -2894,6 +2894,15 @@ async function submitPollVote(poll, option, container) {
 // neighborhood (see attachCardMapHover's mosqueSticker option below).
 const MOSQUE_STICKER_SERIES = 'Rıhtım Camii';
 
+// Turkish-aware, whitespace-tolerant name match -- a plain === would miss
+// admin-entered variants that differ only by case, since JS's default
+// toLowerCase() doesn't fold Turkish dotted/dotless I the way 'tr'
+// collation does ("İ"/"i" and "I"/"ı" are matched, but "i"/"ı" stay apart).
+function trNameEquals(a, b) {
+  if (!a || !b) return false;
+  return a.trim().localeCompare(b.trim(), 'tr', { sensitivity: 'base' }) === 0;
+}
+
 // Hovering a news/event card highlights its neighborhood on the map (no-op
 // for city-wide rows with no neighborhood). Shared by both feeds. Pass
 // { mosqueSticker: true } to also toggle #mosque-sticker in lockstep --
@@ -2963,7 +2972,7 @@ function renderBreakingNewsFeedNow(feed, rows) {
     });
     if (n) {
       attachCardMapHover(el, n.neighborhood, {
-        mosqueSticker: n.breaking_news_series && n.breaking_news_series.name === MOSQUE_STICKER_SERIES,
+        mosqueSticker: !!(n.breaking_news_series && trNameEquals(n.breaking_news_series.name, MOSQUE_STICKER_SERIES)),
       });
     }
   });
