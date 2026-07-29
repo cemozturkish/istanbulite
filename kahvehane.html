@@ -19,6 +19,7 @@
   <script src="game-locks.js"></script>
   <link rel="stylesheet" href="profile-card.css">
   <script src="avatar.js" defer></script>
+  <script src="person-mentions.js" defer></script>
   <script src="politician-card.js" defer></script>
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
@@ -28,13 +29,15 @@
   <script src="sozcul-mascot.js" defer></script>
   <script src="admin-notification.js" defer></script>
   <script src="map-zoom.js" defer></script>
-  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in. Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot, and a one-shot flag so the posts/scoreboard card-entrance animation (see animateFeedSwap) skips its first run here -- the column itself is already sliding in from the same edge, so animating the cards inside it too would look like the content arriving twice. -->
+  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in. Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot, and a one-shot flag so the posts/scoreboard card-entrance animation (see animateFeedSwap) skips its first run here -- the column itself is already sliding in from the same edge, so animating the cards inside it too would look like the content arriving twice.
+       ist-entering-* (the manual transform-transition fallback, see .col-right-slide/.game-link-enter below) is only for browsers WITHOUT View Transitions support -- on VT-capable browsers the native cross-document transition already slides the whole column in as a snapshot, so also applying the fallback class made the real DOM run its own second, independent slide underneath once DOMContentLoaded released it mid-transition, producing a visible double entrance. vt-* (which drives the VT pseudo-element keyframes) is unaffected and still always seeded. -->
   <script>
     (function(){
       try {
         var _d = sessionStorage.getItem('ist-page-enter-dir');
         if (_d) {
-          document.documentElement.classList.add('ist-entering-' + _d);
+          var _vt = ('startViewTransition' in document) && !window.Capacitor;
+          if (!_vt) document.documentElement.classList.add('ist-entering-' + _d);
           document.documentElement.classList.add('vt-' + _d);
           window.__istSuppressFirstCardAnim = { left: true, right: true };
         }
@@ -1721,6 +1724,21 @@
       margin-top: 12px;
       white-space: pre-wrap;
     }
+    /* A person's name mentioned inside a post or comment body (see
+       person-mentions.js) -- dotted rather than a solid underline so it
+       doesn't read as an outbound link, tap/click opens the same
+       .politician-detail sheet as the mayor card above. */
+    .person-mention {
+      color: var(--accent);
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 2px;
+      cursor: pointer;
+    }
+    .person-mention:hover,
+    .person-mention:focus-visible {
+      text-decoration-style: solid;
+    }
     @media (max-width: 1240px) {
       body:has(.detail-overlay.open) .col-left,
       body:has(.detail-overlay.open) .col-right {
@@ -2149,6 +2167,7 @@ function openDetail(html) {
   const body = document.getElementById('detail-overlay-body');
   if (!overlay || !body) return;
   body.innerHTML = html;
+  if (window.IstPersonMentions) IstPersonMentions.linkify(body, personMentionsRoster, openDetail);
   positionDetailSheet();
   overlay.hidden = false;
   requestAnimationFrame(() => overlay.classList.add('open'));
@@ -2326,6 +2345,18 @@ function syncColumnHeights() {
 }
 window.addEventListener('resize', syncColumnHeights);
 
+// person-mentions.js is deferred -- poll briefly (same idiom as
+// IstPoliticianCard elsewhere) so a fast mount() on a slow connection
+// doesn't silently skip the initial roster load.
+let personMentionsRoster = [];
+function loadPersonMentionsRoster(tries) {
+  if (window.IstPersonMentions) {
+    IstPersonMentions.loadPeople(sb).then(people => { personMentionsRoster = people; });
+  } else if ((tries === undefined ? 40 : tries) > 0) {
+    setTimeout(() => loadPersonMentionsRoster((tries === undefined ? 40 : tries) - 1), 60);
+  }
+}
+
 async function mount() {
   await refreshHomeNeighborhood();
   // Default politician card is this user's own neighborhood's mayor (not
@@ -2340,6 +2371,7 @@ async function mount() {
       openDetail,
     });
   }
+  loadPersonMentionsRoster();
   updateSubmitFormVisibility();
   syncColumnHeights();
   // header's own safe-area-inset-bottom padding can resolve a moment
@@ -2964,6 +2996,7 @@ function appendPosts(rows) {
   const lm = postsEl.querySelector('.load-more-wrap');
   if (lm) lm.insertAdjacentHTML('beforebegin', html);
   else postsEl.insertAdjacentHTML('beforeend', html);
+  if (window.IstPersonMentions) IstPersonMentions.linkify(postsEl, personMentionsRoster, openDetail);
 }
 
 function renderLoadMore() {

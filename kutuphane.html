@@ -19,6 +19,7 @@
   <script src="game-locks.js"></script>
   <link rel="stylesheet" href="profile-card.css">
   <script src="avatar.js" defer></script>
+  <script src="person-mentions.js" defer></script>
   <script src="tbmm.js" defer></script>
   <script src="politician-card.js" defer></script>
   <script src="profile-card.js" defer></script>
@@ -29,13 +30,15 @@
   <script src="sozcul-mascot.js" defer></script>
   <script src="admin-notification.js" defer></script>
   <script src="map-zoom.js" defer></script>
-  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis) -->
+  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in (mobile: horizontal, desktop: vertical — CSS picks the axis).
+       ist-entering-* (the manual transform-transition fallback) is only for browsers WITHOUT View Transitions support -- on VT-capable browsers the native cross-document transition already slides the column in as a snapshot, so also applying the fallback class made the real DOM run its own second, independent slide underneath once DOMContentLoaded released it mid-transition, producing a visible double entrance. vt-* (which drives the VT pseudo-element keyframes) is unaffected and still always seeded. -->
   <script>
     (function(){
       try {
         var _d = sessionStorage.getItem('ist-page-enter-dir');
         if (_d) {
-          document.documentElement.classList.add('ist-entering-' + _d);
+          var _vt = ('startViewTransition' in document) && !window.Capacitor;
+          if (!_vt) document.documentElement.classList.add('ist-entering-' + _d);
           document.documentElement.classList.add('vt-' + _d);
         }
       } catch(e) {}
@@ -750,6 +753,21 @@
       line-height: 1.5;
       margin-top: 12px;
       white-space: pre-wrap;
+    }
+    /* A person's name mentioned inside an article/comment body (see
+       person-mentions.js) -- dotted rather than a solid underline so it
+       doesn't read as an outbound link, tap/click opens the same
+       .politician-detail sheet as the Cumhurbaşkanı card above. */
+    .person-mention {
+      color: var(--accent);
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 2px;
+      cursor: pointer;
+    }
+    .person-mention:hover,
+    .person-mention:focus-visible {
+      text-decoration-style: solid;
     }
 
     /* ── Reader overlay: a bottom sheet that rises over the map and
@@ -2971,6 +2989,7 @@ function renderArticleDetail(categoryId, article) {
     </div>
   `;
   document.getElementById('back-to-list').addEventListener('click', () => renderCategoryList(categoryId));
+  if (window.IstPersonMentions) IstPersonMentions.linkify(area, personMentionsRoster, openPoliticianDetailSheet);
   loadComments(article.id);
   loadReactions(article.id);
   document.getElementById('comment-composer').addEventListener('submit', (e) => {
@@ -3065,6 +3084,7 @@ async function loadComments(articleId) {
       </div>
     `;
   }).join('');
+  if (window.IstPersonMentions) IstPersonMentions.linkify(listEl, personMentionsRoster, openPoliticianDetailSheet);
 
   listEl.querySelectorAll('.comment-delete').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -3791,6 +3811,7 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
 
     hydrateVoteWidgets(area, refreshNextGate);
     refreshNextGate();
+    if (window.IstPersonMentions) IstPersonMentions.linkify(area, personMentionsRoster, openPoliticianDetailSheet);
 
     if (onPoll) mountPoll(article);
     const scrollEl = area.querySelector('.reader-scroll');
@@ -4323,9 +4344,19 @@ Palette.setPalette(palettePref);
 // real load. No timers or page-specific top-level listeners get set up
 // by either call (both re-render their target elements via innerHTML,
 // which is self-cleaning), so there's nothing for unmount() to undo.
+let personMentionsRoster = [];
+function loadPersonMentionsRoster(tries) {
+  if (window.IstPersonMentions) {
+    IstPersonMentions.loadPeople(sb).then(people => { personMentionsRoster = people; });
+  } else if ((tries === undefined ? 40 : tries) > 0) {
+    setTimeout(() => loadPersonMentionsRoster((tries === undefined ? 40 : tries) - 1), 60);
+  }
+}
+
 function mount() {
   loadProfile();
   bootstrapLibraryNav();
+  loadPersonMentionsRoster();
   // politician-card.js is deferred -- on a fresh real page load this
   // mount() call runs synchronously during parsing, before any deferred
   // script has executed, so a plain `if (window.IstPoliticianCard)` check
