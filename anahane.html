@@ -19,6 +19,7 @@
   <script src="game-locks.js"></script>
   <link rel="stylesheet" href="profile-card.css">
   <script src="avatar.js" defer></script>
+  <script src="person-mentions.js" defer></script>
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
@@ -1736,6 +1737,21 @@
       margin-top: 12px;
       white-space: pre-wrap;
     }
+    /* A person's name mentioned inside news/event body text (see
+       person-mentions.js) -- dotted rather than a solid underline so it
+       doesn't read as an outbound link, tap/click opens the same
+       .politician-detail sheet as the seat cards above. */
+    .person-mention {
+      color: var(--accent);
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 2px;
+      cursor: pointer;
+    }
+    .person-mention:hover,
+    .person-mention:focus-visible {
+      text-decoration-style: solid;
+    }
     @media (max-width: 768px) {
       .detail-overlay-sheet {
         /* Inset on 3 sides (frame-pad gap) so a sliver of the map/page
@@ -2100,6 +2116,19 @@ function mount() {
   loadBreakingNews();
   loadEvents();
   renderPoliticianCard(activeNeighborhood || 'istanbul');
+  loadPersonMentionsRoster();
+}
+
+// person-mentions.js is deferred -- poll briefly the same way tryOnb/
+// tryMahallePicker above do, so a fast mount() on a slow connection
+// doesn't silently skip the initial load.
+let personMentionsRoster = [];
+function loadPersonMentionsRoster(tries) {
+  if (window.IstPersonMentions) {
+    IstPersonMentions.loadPeople(sb).then(people => { personMentionsRoster = people; });
+  } else if ((tries === undefined ? 40 : tries) > 0) {
+    setTimeout(() => loadPersonMentionsRoster((tries === undefined ? 40 : tries) - 1), 60);
+  }
 }
 
 function unmount() {
@@ -3108,6 +3137,7 @@ function openDetail(html) {
   const body = document.getElementById('detail-overlay-body');
   if (!overlay || !body) return;
   body.innerHTML = html;
+  if (window.IstPersonMentions) IstPersonMentions.linkify(body, personMentionsRoster, openDetail);
   overlay.hidden = false;
   requestAnimationFrame(() => overlay.classList.add('open'));
 }
