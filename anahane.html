@@ -989,6 +989,21 @@
       stroke-width: 3;
     }
 
+    /* Rıhtım Camii series landmark sticker over Kadıköy -- shown/hidden in
+       lockstep with .card-hover by attachCardMapHover's mosqueSticker
+       option (mirrors the .card-hover fade so it can't outlive the
+       highlight it decorates). Grayscale matches the locked-badge look
+       used elsewhere for sticker art (see profile-card.css). */
+    .map-sticker {
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      filter: grayscale(100%);
+      pointer-events: none;
+    }
+    .map-sticker.show {
+      opacity: 1;
+    }
+
     /* ── MOBILE RESPONSIVE ──
        Stacked flow instead of desktop's floating-over-fullscreen-map
        layout: the map sits at the very top like a hero banner with the
@@ -2016,6 +2031,12 @@
         <g id="Layer_24" data-name="Layer 24">
           <polygon id="bahcelievler" class="neighborhood" data-name="Bahçelievler" points="1622.68 1693.32 1637.83 1671.21 1632.58 1649.59 1519.4 1624.55 1328.74 1616.93 1272.58 1737 1359.01 1780.79 1448.51 1767.02 1613.73 1703.92 1622.68 1693.32" fill="none" stroke="#000" stroke-miterlimit="10"/>
         </g>
+        <!-- Rıhtım Camii series landmark sticker, centered over Kadıköy's
+             polygon (see attachCardMapHover's mosqueSticker option) --
+             painted last so it always sits above every neighborhood
+             fill/stroke regardless of layer order above. -->
+        <image id="mosque-sticker" class="map-sticker" href="assets/mosque.png"
+               x="2532" y="1473" width="190" height="190" preserveAspectRatio="xMidYMid meet"/>
       </svg>
       </div>
 
@@ -2868,17 +2889,33 @@ async function submitPollVote(poll, option, container) {
   loadAndRenderPoll(poll);
 }
 
+// News series that gets its own map decoration: hovering/tapping a card
+// from this series also drops a grayscale landmark sticker on its
+// neighborhood (see attachCardMapHover's mosqueSticker option below).
+const MOSQUE_STICKER_SERIES = 'Rıhtım Camii';
+
 // Hovering a news/event card highlights its neighborhood on the map (no-op
-// for city-wide rows with no neighborhood). Shared by both feeds.
-function attachCardMapHover(el, nbId) {
+// for city-wide rows with no neighborhood). Shared by both feeds. Pass
+// { mosqueSticker: true } to also toggle #mosque-sticker in lockstep --
+// used for Rıhtım Camii series cards, whose neighborhood is Kadıköy.
+function attachCardMapHover(el, nbId, opts) {
   if (!nbId) return;
+  const showMosqueSticker = !!(opts && opts.mosqueSticker);
   el.addEventListener('mouseenter', () => {
     const nbEl = document.getElementById(nbId);
     if (nbEl) nbEl.classList.add('card-hover');
+    if (showMosqueSticker) {
+      const sticker = document.getElementById('mosque-sticker');
+      if (sticker) sticker.classList.add('show');
+    }
   });
   el.addEventListener('mouseleave', () => {
     const nbEl = document.getElementById(nbId);
     if (nbEl) nbEl.classList.remove('card-hover');
+    if (showMosqueSticker) {
+      const sticker = document.getElementById('mosque-sticker');
+      if (sticker) sticker.classList.remove('show');
+    }
   });
 }
 
@@ -2924,7 +2961,11 @@ function renderBreakingNewsFeedNow(feed, rows) {
         (n.breaking_news_polls || []).forEach(p => loadAndRenderPoll(p));
       }
     });
-    if (n) attachCardMapHover(el, n.neighborhood);
+    if (n) {
+      attachCardMapHover(el, n.neighborhood, {
+        mosqueSticker: n.breaking_news_series && n.breaking_news_series.name === MOSQUE_STICKER_SERIES,
+      });
+    }
   });
 
   // Re-render (filter change, map click, live refresh) rebuilds every card
