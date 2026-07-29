@@ -242,6 +242,13 @@
       transition: stroke-width 0.1s, opacity 0.1s;
     }
     .tbmm-seat:hover { stroke-width: 3; opacity: 0.85; }
+    .tbmm-hover-name {
+      margin-top: 10px;
+      min-height: 1.2em;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
     .tb-party-row {
       display: flex;
       align-items: center;
@@ -1435,6 +1442,7 @@
     <div class="panel">
       <div class="panel-title">Meclis (600 koltuk)</div>
       <div id="tbmm-admin-chart"><div class="empty-state"><span class="spinner"></span></div></div>
+      <div class="tbmm-hover-name" id="tbmm-admin-hover-name"></div>
     </div>
 
   </div>
@@ -3620,9 +3628,26 @@ async function refreshTBMMChart() {
   tbmmSeatsById = {};
   (data || []).forEach(s => { tbmmSeatsById[s.seat_number] = s; });
   chartEl.innerHTML = IstTBMM.renderSVG(tbmmSeatsById);
-  chartEl.querySelector('.tbmm-svg').addEventListener('click', (e) => {
+  const svg = chartEl.querySelector('.tbmm-svg');
+  svg.addEventListener('click', (e) => {
     const dot = e.target.closest('.tbmm-seat');
     if (dot) selectTBMMSeat(parseInt(dot.dataset.seatNumber, 10));
+  });
+  // mouseover/mouseout (not mouseenter/mouseleave) because they bubble,
+  // so one delegated pair on the svg covers all 600 seat paths.
+  const hoverName = document.getElementById('tbmm-admin-hover-name');
+  svg.addEventListener('mouseover', (e) => {
+    const dot = e.target.closest('.tbmm-seat');
+    if (!dot || !hoverName) return;
+    const seat = tbmmSeatsById[parseInt(dot.dataset.seatNumber, 10)];
+    const p = seat?.politicians || null;
+    hoverName.textContent = p ? `${p.first_name} ${p.last_name}`.trim() : '';
+  });
+  svg.addEventListener('mouseout', (e) => {
+    const dot = e.target.closest('.tbmm-seat');
+    if (!dot || !hoverName) return;
+    if (dot.contains(e.relatedTarget)) return; // still inside the same seat
+    hoverName.textContent = '';
   });
 }
 

@@ -655,6 +655,19 @@
     }
     .tbmm-seat:hover { stroke-width: 3; opacity: 0.85; }
 
+    /* Name of the seat currently under the pointer, shown centered below
+       the chart (see the mouseover/mouseout listeners in openTBMMSheet).
+       Reserves its line height up front so hovering doesn't jump the
+       chart above it. */
+    .tbmm-hover-name {
+      margin-top: 10px;
+      min-height: 1.2em;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--ink);
+    }
+
     /* Seat detail view -- swapped into the same sheet when a seat is
        clicked (see openTBMMSeatDetail); "← TBMM" returns to the chart
        instead of closing the sheet. Same profile-card treatment as
@@ -3456,6 +3469,7 @@ async function openTBMMSheet() {
       </div>
       <div class="tbmm-page">
         <div class="tbmm-chart" id="tbmm-chart"><div class="empty-state"><span class="spinner"></span></div></div>
+        <div class="tbmm-hover-name" id="tbmm-hover-name"></div>
       </div>
     </div>
   `;
@@ -3473,6 +3487,22 @@ async function openTBMMSheet() {
     const dot = e.target.closest('.tbmm-seat');
     if (!dot) return;
     openTBMMSeatDetail(parseInt(dot.dataset.seatNumber, 10));
+  });
+  // mouseover/mouseout (not mouseenter/mouseleave) because they bubble,
+  // so one delegated pair on the chart covers all 600 seat paths.
+  const hoverName = document.getElementById('tbmm-hover-name');
+  chart.addEventListener('mouseover', (e) => {
+    const dot = e.target.closest('.tbmm-seat');
+    if (!dot || !hoverName) return;
+    const seat = byId[parseInt(dot.dataset.seatNumber, 10)];
+    const p = seat?.politicians || null;
+    hoverName.textContent = p ? `${p.first_name} ${p.last_name}`.trim() : '';
+  });
+  chart.addEventListener('mouseout', (e) => {
+    const dot = e.target.closest('.tbmm-seat');
+    if (!dot || !hoverName) return;
+    if (dot.contains(e.relatedTarget)) return; // still inside the same seat
+    hoverName.textContent = '';
   });
 }
 
