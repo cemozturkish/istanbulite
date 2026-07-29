@@ -131,6 +131,24 @@
     + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>'
     + '</svg>';
 
+  // Kahvehane's library-card button icon -- opens game stats (see
+  // openGameStatsOverlay) instead of the settings gear.
+  const COFFEE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>'
+    + '<path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4Z"></path>'
+    + '<line x1="6" y1="1" x2="6" y2="4"></line>'
+    + '<line x1="10" y1="1" x2="10" y2="4"></line>'
+    + '<line x1="14" y1="1" x2="14" y2="4"></line>'
+    + '</svg>';
+
+  // Hane's library-card button icon -- not wired to anything yet.
+  const HOME_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path>'
+    + '<polyline points="9 22 9 12 15 12 15 22"></polyline>'
+    + '</svg>';
+
   const ARROW_ICON_LEFT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
     + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>';
   const ARROW_ICON_RIGHT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
@@ -654,6 +672,23 @@
 
   let _ovResizeListener = null;
 
+  // Reveals the (already body-filled) shared bottom sheet -- common to
+  // openProfileOverlay's settings page and openGameStatsOverlay's read-only
+  // stats page below.
+  function showProfileOverlaySheet() {
+    const overlay = document.getElementById('profile-overlay');
+    positionProfileSheet();
+    overlay.hidden = false;
+    requestAnimationFrame(() => overlay.classList.add('open'));
+    if (!_ovResizeListener) {
+      _ovResizeListener = () => {
+        const ov = document.getElementById('profile-overlay');
+        if (ov && ov.classList.contains('open')) positionProfileSheet();
+      };
+      window.addEventListener('resize', _ovResizeListener);
+    }
+  }
+
   function openProfileOverlay(opts) {
     ensureProfileOverlay();
     _ov = Object.assign({ sozculCount: 0, kefaletCount: 0, kefilOfUser: null }, opts);
@@ -668,17 +703,28 @@
     // this back to false on its own.
     _ov.customizing = false;
     renderOverlayBody();
-    const overlay = document.getElementById('profile-overlay');
-    positionProfileSheet();
-    overlay.hidden = false;
-    requestAnimationFrame(() => overlay.classList.add('open'));
-    if (!_ovResizeListener) {
-      _ovResizeListener = () => {
-        const ov = document.getElementById('profile-overlay');
-        if (ov && ov.classList.contains('open')) positionProfileSheet();
-      };
-      window.addEventListener('resize', _ovResizeListener);
-    }
+    showProfileOverlaySheet();
+  }
+
+  // Kahvehane's library-card button opens this instead of the settings
+  // overlay above: same shared bottom sheet, but read-only and limited to
+  // this week's game results (see getWeekGameStatus/weekGridHTML) -- no
+  // account info or personalization here, so no _ov state and no
+  // settings-page event wiring needed.
+  function openGameStatsOverlay(opts) {
+    ensureProfileOverlay();
+    const { sb, I18N, user } = opts;
+    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
+    const body = document.getElementById('profile-overlay-body');
+    body.innerHTML = `
+      <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
+      <div id="po-weekgrid-mount"></div>
+    `;
+    showProfileOverlaySheet();
+    getWeekGameStatus(sb, user.id).then(status => {
+      const m = document.getElementById('po-weekgrid-mount');
+      if (m) m.innerHTML = weekGridHTML(status, I18N);
+    });
   }
 
   function closeProfileOverlay() {
@@ -1267,19 +1313,29 @@
   }
 
   // ══════════════════════════════════════════════════════════════
-  // Shared desktop identity card: avatar, name, neighborhood, "Profil"
-  // button — opens the same bottom-sheet overlay used everywhere else.
-  // Mirrors kütüphane.html's own top-of-col-left `.library-card` (kept
-  // local there — see the comment above .library-card in profile-card.css).
-  // Desktop-only; each page hides #library-card on mobile in its own
-  // <768px query since #ist-pc-mount already covers that.
+  // Shared desktop identity card: avatar, name, neighborhood, top-right
+  // button. Mirrors kütüphane.html's own top-of-col-left `.library-card`
+  // (kept local there — see the comment above .library-card in
+  // profile-card.css). Desktop-only; each page hides #library-card on
+  // mobile in its own <768px query since #ist-pc-mount already covers that.
   //
-  // Usage: IstProfileCard.mountLibraryCard({ sb, I18N });
+  // Each page that calls this wants a different button: kütüphane's own
+  // local card (not this shared one) keeps the settings gear; anahane and
+  // kahvehane call this and pass their own `icon` + `onEdit` so the same
+  // card markup can open a different (or no) overlay per page.
+  //
+  // Usage: IstProfileCard.mountLibraryCard({ sb, I18N, icon, onEdit }).
+  //   icon: button SVG string (defaults to GEAR_SVG, which opens the
+  //     settings overlay by default too).
+  //   onEdit({ sb, I18N, user, profile, sozculCount, kefaletCount,
+  //     kefilOfUser, state }): called on click instead of the default
+  //     settings overlay. Pass a no-op to leave the button inert for now.
   // Assumes a <div id="library-card"> exists in the page.
   // ══════════════════════════════════════════════════════════════
   async function mountLibraryCard(opts) {
     const sb = opts.sb;
     const I18N = opts.I18N;
+    const icon = opts.icon || GEAR_SVG;
     const cardEl = opts.mountEl || document.getElementById('library-card');
     if (!cardEl || !sb) return;
 
@@ -1310,10 +1366,14 @@
             <div class="card-name">${esc(displayName)}</div>
             <div class="card-meta">${esc(yasadigiDisplay)}</div>
           </div>
-          <button type="button" class="edit-btn" id="lc-edit-btn" aria-label="${esc(t('profile.toggle'))}" title="${esc(t('profile.toggle'))}">${GEAR_SVG}</button>
+          <button type="button" class="edit-btn" id="lc-edit-btn" aria-label="${esc(t('profile.toggle'))}" title="${esc(t('profile.toggle'))}">${icon}</button>
         </div>
       `;
       document.getElementById('lc-edit-btn').addEventListener('click', () => {
+        if (opts.onEdit) {
+          opts.onEdit({ sb, I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, state });
+          return;
+        }
         openProfileOverlay({
           sb, I18N, user, profile,
           sozculCount, kefaletCount, kefilOfUser,
@@ -1343,6 +1403,7 @@
     unmount,
     mountLibraryCard,
     openProfileOverlay,
+    openGameStatsOverlay,
     closeProfileOverlay,
     AVATAR_SHIRT_OPTIONS,
     AVATAR_HAIR_OPTIONS,
@@ -1350,6 +1411,8 @@
     AVATAR_ACCESSORY_OPTIONS,
     AVATAR_LOCK_SVG,
     GEAR_SVG,
+    COFFEE_SVG,
+    HOME_SVG,
     coverHTML,
     getWeekGameStatus,
     weekGridHTML,
