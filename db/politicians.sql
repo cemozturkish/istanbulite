@@ -196,3 +196,31 @@ drop trigger if exists set_politicians_updated_at on public.politicians;
 create trigger set_politicians_updated_at
   before update on public.politicians
   for each row execute function public.set_politicians_updated_at();
+
+-- Every person's name is stored ALL CAPS (admin.html's Kişiler tab
+-- convention). Postgres's built-in upper() isn't Turkish-locale-aware by
+-- default (dotted/dotless i is ambiguous outside a tr_TR collation), so
+-- map the native alphabet explicitly first and only fall back to upper()
+-- for anything else (foreign letters, punctuation).
+create or replace function public.tr_upper(t text)
+  returns text language sql immutable as $$
+  select upper(translate(
+    t,
+    'abcçdefgğhıijklmnoöprsştuüvyz',
+    'ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ'
+  ));
+$$;
+
+create or replace function public.uppercase_politician_name()
+  returns trigger language plpgsql as $$
+begin
+  new.first_name := public.tr_upper(new.first_name);
+  new.last_name := public.tr_upper(new.last_name);
+  return new;
+end;
+$$;
+
+drop trigger if exists uppercase_politician_name on public.politicians;
+create trigger uppercase_politician_name
+  before insert or update on public.politicians
+  for each row execute function public.uppercase_politician_name();

@@ -1372,6 +1372,7 @@
     <!-- RIGHT: People List -->
     <div class="panel">
       <div class="panel-title">People</div>
+      <input type="text" id="people-search" placeholder="İsimde veya partide ara..." style="margin-bottom:10px;"/>
       <div class="articles-list" id="people-list">
         <div class="empty-state"><span class="spinner"></span></div>
       </div>
@@ -3403,9 +3404,22 @@ async function loadPeopleList() {
   const { data, error } = await sb.from('politicians').select('*').order('first_name');
   if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
   peopleCache = data || [];
+  renderPeopleList();
+}
+
+function renderPeopleList() {
+  const listEl = document.getElementById('people-list');
   if (!peopleCache.length) { listEl.innerHTML = '<div class="empty-state">No people yet.</div>'; return; }
 
-  listEl.innerHTML = peopleCache.map(p => `
+  const q = document.getElementById('people-search').value.trim().toLocaleLowerCase('tr-TR');
+  const data = q
+    ? peopleCache.filter(p =>
+        `${p.first_name || ''} ${p.last_name || ''}`.trim().toLocaleLowerCase('tr-TR').includes(q) ||
+        (p.party || '').toLocaleLowerCase('tr-TR').includes(q))
+    : peopleCache;
+  if (!data.length) { listEl.innerHTML = '<div class="empty-state">No matching people.</div>'; return; }
+
+  listEl.innerHTML = data.map(p => `
     <div class="article-card" data-id="${p.id}">
       <div style="display:flex;align-items:center;gap:10px;">
         <div style="width:40px;height:40px;border-radius:50%;border:2px solid var(--ink);overflow:hidden;flex-shrink:0;position:relative;background:var(--field-bg);">${personAvatarHTML(p)}</div>
@@ -3425,6 +3439,8 @@ async function loadPeopleList() {
     if (btn.dataset.act === 'pp-del') btn.addEventListener('click', () => deletePerson(p.id));
   });
 }
+
+document.getElementById('people-search').addEventListener('input', renderPeopleList);
 
 function editPerson(p) {
   document.getElementById('pp-editing-id').value = p.id;
