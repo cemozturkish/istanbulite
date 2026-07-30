@@ -21,7 +21,7 @@
 (function (global) {
   const BASE_URL = 'assets/avatar/avatar-base.png';
   const SHIRT_URLS = { black: 'assets/avatar/avatar-shirt-black.png' };
-  const HAIR_URLS = { short: 'assets/avatar/avatar-hair-short.png', long: 'assets/avatar/avatar-hair-long.png' };
+  const HAIR_URLS = { buzz: 'assets/avatar/avatar-hair-buzz.png', short: 'assets/avatar/avatar-hair-short.png', long: 'assets/avatar/avatar-hair-long.png' };
   const HAT_URLS = { crown: 'assets/avatar/avatar-hat-crown.png' };
   const ACCESSORY_URLS = { glasses: 'assets/avatar/avatar-accessory-glasses.png' };
   // Not a pickable option -- admin-only, set per-politician (public.
