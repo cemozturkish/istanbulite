@@ -226,6 +226,38 @@
     }[c]));
   }
 
+  // The "Kefil Olduğu" account row -- when this user has sponsored anyone
+  // (profiles.referred_by = this user's id), wraps the row in a <details>
+  // so the list of names is one tap away instead of always taking up
+  // vertical space in the settings page's already-tight account column.
+  // No JS wiring needed: <details>/<summary> handles the open/close state
+  // natively.
+  function sponsoredListHTML(sponsoredList, t) {
+    const count = (sponsoredList || []).length;
+    if (count === 0) {
+      return `
+        <div class="ist-pc-info-row">
+          <div class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</div>
+          <div class="ist-pc-info-value">0 ${esc(t('profile.people'))}</div>
+        </div>
+      `;
+    }
+    const items = sponsoredList.map(p => {
+      const name = capitalizeName(`${p.first_name || ''} ${p.last_name || ''}`.trim()) || t('profile.unnamed');
+      const nb = p.neighborhood ? (NB_NAMES[p.neighborhood] || p.neighborhood) : '';
+      return `<li class="ist-pc-sponsored-item"><span>${esc(name)}</span>${nb ? `<span class="ist-pc-sponsored-nb">${esc(nb)}</span>` : ''}</li>`;
+    }).join('');
+    return `
+      <details class="ist-pc-sponsored-row">
+        <summary class="ist-pc-info-row">
+          <span class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</span>
+          <span class="ist-pc-info-value">${count} ${esc(t('profile.people'))}</span>
+        </summary>
+        <ul class="ist-pc-sponsored-list">${items}</ul>
+      </details>
+    `;
+  }
+
   // Read game scores from Supabase, aggregated per game. Currently unused —
   // the Oyun Skorları cards were pulled from the Profil tab (kept for now
   // in case they come back in some form) in favor of the weekly grid.
@@ -525,11 +557,13 @@
   async function fetchProfileData(sb, I18N, user) {
     const today = istanbulTodayISO();
 
-    const [{ data: profile }, { count: kefaletCount }, { count: sozculCount }] = await Promise.all([
+    const [{ data: profile }, { data: sponsoredRows }, { count: sozculCount }] = await Promise.all([
       sb.from('profiles').select('*').eq('id', user.id).single(),
-      sb.from('profiles').select('*', { count: 'exact', head: true }).eq('referred_by', user.id),
+      sb.from('profiles').select('id, first_name, last_name, neighborhood, joined_at').eq('referred_by', user.id).order('joined_at', { ascending: true }),
       sb.from('sozcel_sozcul_assignments').select('*', { count: 'exact', head: true }).eq('user_id', user.id).lte('game_date', today),
     ]);
+    const sponsoredList = sponsoredRows || [];
+    const kefaletCount = sponsoredList.length;
 
     let kefilOfUser = null;
     if (profile && profile.referred_by) {
@@ -549,7 +583,7 @@
     if (global.Palette) global.Palette.setPalette(palettePref);
 
     return {
-      sb, I18N, user, profile, kefaletCount, sozculCount, kefilOfUser,
+      sb, I18N, user, profile, kefaletCount, sponsoredList, sozculCount, kefilOfUser,
       avatarUrl: profile?.avatar_url || null,
       avatarHair: profile?.avatar_hair || null,
       avatarHat: profile?.avatar_hat || null,
@@ -565,7 +599,7 @@
   // bottom-sheet overlay (see openProfileOverlay below) — the actual
   // editing/settings/badges UI no longer lives in this compact card.
   function renderPage(container, page, state) {
-    const { I18N, user, profile, kefaletCount, sozculCount, kefilOfUser } = state;
+    const { I18N, user, profile, kefaletCount, sponsoredList, sozculCount, kefilOfUser } = state;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
     const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
@@ -600,7 +634,7 @@
     document.getElementById('ist-pc-toggle').addEventListener('click', () => {
       openProfileOverlay({
         sb: state.sb, I18N, user, profile,
-        sozculCount, kefaletCount, kefilOfUser,
+        sozculCount, kefaletCount, sponsoredList, kefilOfUser,
         avatarUrl: state.avatarUrl,
         avatarHair: state.avatarHair,
         avatarHat: state.avatarHat,
@@ -692,7 +726,7 @@
 
   function openProfileOverlay(opts) {
     ensureProfileOverlay();
-    _ov = Object.assign({ sozculCount: 0, kefaletCount: 0, kefilOfUser: null }, opts);
+    _ov = Object.assign({ sozculCount: 0, kefaletCount: 0, sponsoredList: [], kefilOfUser: null }, opts);
     if (_ov.avatarUrl === undefined) _ov.avatarUrl = _ov.profile?.avatar_url || null;
     if (_ov.avatarHair === undefined) _ov.avatarHair = _ov.profile?.avatar_hair || null;
     if (_ov.avatarHat === undefined) _ov.avatarHat = _ov.profile?.avatar_hat || null;
@@ -876,7 +910,7 @@
   // above, kept intact so it can be re-added later; already-placed cover
   // badges still render via coverHTML.
   function settingsPageHTML(state) {
-    const { I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
+    const { I18N, user, profile, sozculCount, sponsoredList, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
@@ -933,10 +967,7 @@
             <div class="ist-pc-info-label">${esc(t('profile.kefil'))}</div>
             <div class="ist-pc-info-value">${kefilLabel}</div>
           </div>` : ''}
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</div>
-            <div class="ist-pc-info-value">${kefaletCount ?? 0} ${esc(t('profile.people'))}</div>
-          </div>
+          ${sponsoredListHTML(sponsoredList, t)}
           <div class="ist-pc-info-row">
             <div class="ist-pc-info-label">${esc(t('profile.sozculcount'))}</div>
             <div class="ist-pc-info-value">${sozculCount ?? 0} ${esc(t('profile.times'))}</div>
@@ -1346,7 +1377,7 @@
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
 
     const state = await fetchProfileData(sb, I18N, user);
-    const { profile, kefaletCount, sozculCount, kefilOfUser } = state;
+    const { profile, kefaletCount, sponsoredList, sozculCount, kefilOfUser } = state;
 
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
@@ -1372,12 +1403,12 @@
       `;
       document.getElementById('lc-edit-btn').addEventListener('click', () => {
         if (opts.onEdit) {
-          opts.onEdit({ sb, I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, state });
+          opts.onEdit({ sb, I18N, user, profile, sozculCount, kefaletCount, sponsoredList, kefilOfUser, state });
           return;
         }
         openProfileOverlay({
           sb, I18N, user, profile,
-          sozculCount, kefaletCount, kefilOfUser,
+          sozculCount, kefaletCount, sponsoredList, kefilOfUser,
           avatarUrl: state.avatarUrl,
           avatarHair: state.avatarHair,
           avatarHat: state.avatarHat,
