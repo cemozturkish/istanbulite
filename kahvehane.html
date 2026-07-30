@@ -2362,6 +2362,22 @@ function loadPersonMentionsRoster(tries) {
   }
 }
 
+// profile-card.js is deferred, so on a real page load a fast init() can
+// call mount() (and thus this) before it has executed, leaving
+// #library-card stuck on its spinner placeholder forever since mount()
+// only fires again on a later virtual re-entry -- poll briefly the same way
+// loadPersonMentionsRoster does instead of silently skipping.
+function mountLibraryCardWhenReady(tries) {
+  if (window.IstProfileCard) {
+    IstProfileCard.mountLibraryCard({
+      sb, I18N, icon: IstProfileCard.COFFEE_SVG,
+      onEdit: (ctx) => IstProfileCard.openGameStatsOverlay(ctx),
+    });
+  } else if ((tries === undefined ? 40 : tries) > 0) {
+    setTimeout(() => mountLibraryCardWhenReady((tries === undefined ? 40 : tries) - 1), 60);
+  }
+}
+
 async function mount() {
   await refreshHomeNeighborhood();
   // Default politician card is this user's own neighborhood's mayor (not
@@ -2382,12 +2398,7 @@ async function mount() {
   // #ist-pc-mount (outside #ist-content, kept alive via IstProfileCard.
   // setPage), this has to be re-mounted every time, not just once from
   // init() on the real page load. See the same fix on anahane.html.
-  if (window.IstProfileCard) {
-    IstProfileCard.mountLibraryCard({
-      sb, I18N, icon: IstProfileCard.COFFEE_SVG,
-      onEdit: (ctx) => IstProfileCard.openGameStatsOverlay(ctx),
-    });
-  }
+  mountLibraryCardWhenReady();
   loadPersonMentionsRoster();
   updateSubmitFormVisibility();
   syncColumnHeights();
