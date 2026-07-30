@@ -244,10 +244,18 @@
     .tbmm-seat:hover { stroke-width: 3; opacity: 0.85; }
     .tbmm-hover-name {
       margin-top: 10px;
-      min-height: 1.2em;
+      min-height: 2.3rem;
       text-align: center;
+    }
+    .tbmm-hover-fullname {
       font-weight: 700;
       font-size: 0.95rem;
+    }
+    .tbmm-hover-party {
+      margin-top: 2px;
+      font-weight: 400;
+      font-size: 0.78rem;
+      color: var(--muted);
     }
     .tb-party-row {
       display: flex;
@@ -1444,7 +1452,10 @@
     <div class="panel">
       <div class="panel-title">Meclis (600 koltuk)</div>
       <div id="tbmm-admin-chart"><div class="empty-state"><span class="spinner"></span></div></div>
-      <div class="tbmm-hover-name" id="tbmm-admin-hover-name"></div>
+      <div class="tbmm-hover-name" id="tbmm-admin-hover-name">
+        <div class="tbmm-hover-fullname" id="tbmm-admin-hover-fullname"></div>
+        <div class="tbmm-hover-party" id="tbmm-admin-hover-party"></div>
+      </div>
     </div>
 
   </div>
@@ -3682,19 +3693,22 @@ async function refreshTBMMChart() {
   });
   // mouseover/mouseout (not mouseenter/mouseleave) because they bubble,
   // so one delegated pair on the svg covers all 600 seat paths.
-  const hoverName = document.getElementById('tbmm-admin-hover-name');
+  const hoverName = document.getElementById('tbmm-admin-hover-fullname');
+  const hoverParty = document.getElementById('tbmm-admin-hover-party');
   svg.addEventListener('mouseover', (e) => {
     const dot = e.target.closest('.tbmm-seat');
-    if (!dot || !hoverName) return;
+    if (!dot || !hoverName || !hoverParty) return;
     const seat = tbmmSeatsById[parseInt(dot.dataset.seatNumber, 10)];
     const p = seat?.politicians || null;
     hoverName.textContent = p ? `${p.first_name} ${p.last_name}`.trim() : '';
+    hoverParty.textContent = p ? (p.party || seat?.party || '') : '';
   });
   svg.addEventListener('mouseout', (e) => {
     const dot = e.target.closest('.tbmm-seat');
-    if (!dot || !hoverName) return;
+    if (!dot || !hoverName || !hoverParty) return;
     if (dot.contains(e.relatedTarget)) return; // still inside the same seat
     hoverName.textContent = '';
+    hoverParty.textContent = '';
   });
 }
 
