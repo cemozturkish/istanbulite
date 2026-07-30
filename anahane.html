@@ -1488,8 +1488,12 @@
     }
     .event-item.openable { cursor: pointer; }
     /* Plain hover: just a lighter background + a small nudge inward
-       toward the center — text/border stay put. */
-    .event-item.openable:hover {
+       toward the center — text/border stay put. .is-open (see
+       markOpenEventCard) mirrors the same look while that card's detail
+       sheet is open, so it stays visually "pressed" even after the mouse
+       moves off it (e.g. onto the sheet itself). */
+    .event-item.openable:hover,
+    .event-item.openable.is-open {
       background: #e8e8e8;
       transform: translateX(-6px);
     }
@@ -2592,6 +2596,7 @@ let allBreakingNews = []; // cached for client-side filter
 let activeNewsFilter = 'all';
 let flashingNewsCardId = null; // news id whose card should flash while its neighborhood is active
 let openNewsCardId = null; // news id whose card stays visually "hovered" while its detail sheet is open (see markOpenNewsCard)
+let openEventCardId = null; // event id whose card stays visually "hovered" while its detail sheet is open (see markOpenEventCard)
 
 function seenKey() {
   // Capture current user once available; fallback to anonymous bucket.
@@ -3220,6 +3225,19 @@ async function toggleRsvp(eventId, btn) {
   btn.disabled = false;
 }
 
+// Keeps exactly one #events-panel card looking "hovered" (see the
+// .is-open CSS above) for as long as its detail sheet is open, regardless
+// of where the mouse actually is. Pass null to clear (sheet closed, or a
+// non-event detail opened instead).
+function markOpenEventCard(id) {
+  openEventCardId = id == null ? null : String(id);
+  document.querySelectorAll('#events-panel .event-item.openable.is-open')
+    .forEach(el => el.classList.remove('is-open'));
+  if (openEventCardId == null) return;
+  const el = document.querySelector(`#events-panel [data-event-id="${CSS.escape(openEventCardId)}"]`);
+  if (el) el.classList.add('is-open');
+}
+
 function renderEvents(instant) {
   const panel = document.getElementById('events-panel');
   if (!panel) return;
@@ -3293,10 +3311,18 @@ function renderEventsNow(panel, rows) {
   panel.querySelectorAll('.event-item.openable').forEach(el => {
     const ev = rowsById.get(el.dataset.eventId);
     el.addEventListener('click', () => {
-      if (ev) openDetail(buildEventDetailHtml(ev));
+      if (ev) {
+        openDetail(buildEventDetailHtml(ev));
+        markOpenEventCard(ev.id);
+      }
     });
     if (ev) attachCardMapHover(el, ev.neighborhood);
   });
+
+  // Re-render (map click, live refresh) rebuilds every card from scratch,
+  // wiping .is-open along with it -- restore it if the card that was open
+  // is still in this batch.
+  if (openEventCardId != null && rowsById.has(openEventCardId)) markOpenEventCard(openEventCardId);
 }
 
 // Detail overlay: a bottom sheet for a news article or event's full
@@ -3307,11 +3333,12 @@ function openDetail(html) {
   const overlay = document.getElementById('detail-overlay');
   const body = document.getElementById('detail-overlay-body');
   if (!overlay || !body) return;
-  // Whatever's about to show is not the previously-marked news card (the
-  // news click handler re-marks its own card right after calling this) --
-  // clear so an event's or a person mention's detail doesn't leave a stale
-  // news card looking "hovered".
+  // Whatever's about to show is not the previously-marked news/event card
+  // (the news/event click handler re-marks its own card right after
+  // calling this) -- clear so a person mention's detail (or the other
+  // feed's card) doesn't leave a stale card looking "hovered".
   markOpenNewsCard(null);
+  markOpenEventCard(null);
   body.innerHTML = html;
   if (window.IstPersonMentions) IstPersonMentions.linkify(body, personMentionsRoster, openDetail);
   overlay.hidden = false;
@@ -3321,6 +3348,7 @@ function closeDetail() {
   const overlay = document.getElementById('detail-overlay');
   if (!overlay) return;
   markOpenNewsCard(null);
+  markOpenEventCard(null);
   overlay.classList.remove('open');
   // Matches the sheet's own 0.55s transition (see .detail-overlay-sheet)
   // so hiding doesn't cut the closing slide-down short.
