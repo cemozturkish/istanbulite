@@ -2182,9 +2182,20 @@ function mount() {
   // #ist-pc-mount (outside #ist-content, kept alive via IstProfileCard.
   // setPage), this has to be re-mounted every time, not just once from
   // showSite() on the real page load. See the same fix on kahvehane.html.
+  mountLibraryCardWhenReady();
+}
+
+// profile-card.js is deferred, so on a real page load a fast checkSession()
+// can call mount() (and thus this) before it has executed, leaving
+// #library-card stuck on its spinner placeholder forever since mount()
+// only fires again on a later virtual re-entry -- poll briefly the same way
+// tryOnb/loadPersonMentionsRoster do instead of silently skipping.
+function mountLibraryCardWhenReady(tries) {
   if (window.IstProfileCard) {
     // Home icon; not wired to anything yet.
     IstProfileCard.mountLibraryCard({ sb, I18N, icon: IstProfileCard.HOME_SVG, onEdit() {} });
+  } else if ((tries === undefined ? 40 : tries) > 0) {
+    setTimeout(() => mountLibraryCardWhenReady((tries === undefined ? 40 : tries) - 1), 60);
   }
 }
 
