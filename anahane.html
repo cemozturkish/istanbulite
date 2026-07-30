@@ -2176,6 +2176,16 @@ function mount() {
   loadEvents();
   renderPoliticianCard(activeNeighborhood || 'istanbul');
   loadPersonMentionsRoster();
+  // #library-card lives inside #ist-content, so a virtual re-entry into
+  // this page (router.js's navigateTo) resets it back to its spinner
+  // placeholder along with the rest of the swapped HTML -- unlike
+  // #ist-pc-mount (outside #ist-content, kept alive via IstProfileCard.
+  // setPage), this has to be re-mounted every time, not just once from
+  // showSite() on the real page load. See the same fix on kahvehane.html.
+  if (window.IstProfileCard) {
+    // Home icon; not wired to anything yet.
+    IstProfileCard.mountLibraryCard({ sb, I18N, icon: IstProfileCard.HOME_SVG, onEdit() {} });
+  }
 }
 
 // person-mentions.js is deferred -- poll briefly the same way tryOnb/
@@ -2207,12 +2217,12 @@ async function showSite(user) {
   // Mount the shared mobile profile card. profile-card.js is deferred, so
   // wait until it's loaded (DOMContentLoaded guarantees that) — otherwise a
   // fast session check can beat the deferred script on mobile and the card
-  // silently never mounts.
+  // silently never mounts. #library-card's own mount happens in mount()
+  // instead (see there for why), since showSite() only ever runs once, on
+  // the real page load.
   function mountProfileCard() {
     if (window.IstProfileCard) {
       IstProfileCard.mount({ sb, I18N, page: 'anahane' });
-      // Home icon; not wired to anything yet.
-      IstProfileCard.mountLibraryCard({ sb, I18N, icon: IstProfileCard.HOME_SVG, onEdit() {} });
     }
   }
   if (document.readyState === 'loading') {

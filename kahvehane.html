@@ -2376,6 +2376,18 @@ async function mount() {
       openDetail,
     });
   }
+  // #library-card lives inside #ist-content, so a virtual re-entry into
+  // this page (router.js's navigateTo) resets it back to its spinner
+  // placeholder along with the rest of the swapped HTML -- unlike
+  // #ist-pc-mount (outside #ist-content, kept alive via IstProfileCard.
+  // setPage), this has to be re-mounted every time, not just once from
+  // init() on the real page load. See the same fix on anahane.html.
+  if (window.IstProfileCard) {
+    IstProfileCard.mountLibraryCard({
+      sb, I18N, icon: IstProfileCard.COFFEE_SVG,
+      onEdit: (ctx) => IstProfileCard.openGameStatsOverlay(ctx),
+    });
+  }
   loadPersonMentionsRoster();
   updateSubmitFormVisibility();
   syncColumnHeights();
@@ -2435,15 +2447,12 @@ async function init() {
   // Mount the shared mobile profile card. profile-card.js is deferred, so
   // wait until it's loaded (DOMContentLoaded guarantees that) — otherwise a
   // fast session check can beat the deferred script on mobile and the card
-  // silently never mounts.
+  // silently never mounts. #library-card's own mount happens in mount()
+  // instead (see there for why), since init() only ever runs once, on the
+  // real page load.
   function mountProfileCard() {
     if (window.IstProfileCard) {
       IstProfileCard.mount({ sb, I18N, page: 'kahvehane' });
-      // Coffee icon; opens this week's game stats instead of the settings overlay.
-      IstProfileCard.mountLibraryCard({
-        sb, I18N, icon: IstProfileCard.COFFEE_SVG,
-        onEdit: (ctx) => IstProfileCard.openGameStatsOverlay(ctx),
-      });
     }
   }
   if (document.readyState === 'loading') {
