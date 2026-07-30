@@ -662,17 +662,26 @@
     }
     .tbmm-seat:hover { stroke-width: 3; opacity: 0.85; }
 
-    /* Name of the seat currently under the pointer, shown centered below
-       the chart (see the mouseover/mouseout listeners in openTBMMSheet).
-       Reserves its line height up front so hovering doesn't jump the
-       chart above it. */
+    /* Name + party of the seat currently under the pointer, shown centered
+       below the chart (see the mouseover/mouseout listeners in
+       openTBMMSheet). Reserves two lines' height up front (in rem, not em,
+       since the party line's font-size differs) so hovering doesn't jump
+       the chart above it. */
     .tbmm-hover-name {
       margin-top: 10px;
-      min-height: 1.2em;
+      min-height: 2.3rem;
       text-align: center;
+    }
+    .tbmm-hover-fullname {
       font-weight: 700;
       font-size: 0.95rem;
       color: var(--ink);
+    }
+    .tbmm-hover-party {
+      margin-top: 2px;
+      font-weight: 400;
+      font-size: 0.78rem;
+      color: var(--muted);
     }
 
     /* Seat detail view -- swapped into the same sheet when a seat is
@@ -3485,7 +3494,10 @@ async function openTBMMSheet() {
       </div>
       <div class="tbmm-page">
         <div class="tbmm-chart" id="tbmm-chart"><div class="empty-state"><span class="spinner"></span></div></div>
-        <div class="tbmm-hover-name" id="tbmm-hover-name"></div>
+        <div class="tbmm-hover-name" id="tbmm-hover-name">
+          <div class="tbmm-hover-fullname" id="tbmm-hover-fullname"></div>
+          <div class="tbmm-hover-party" id="tbmm-hover-party"></div>
+        </div>
       </div>
     </div>
   `;
@@ -3506,19 +3518,22 @@ async function openTBMMSheet() {
   });
   // mouseover/mouseout (not mouseenter/mouseleave) because they bubble,
   // so one delegated pair on the chart covers all 600 seat paths.
-  const hoverName = document.getElementById('tbmm-hover-name');
+  const hoverName = document.getElementById('tbmm-hover-fullname');
+  const hoverParty = document.getElementById('tbmm-hover-party');
   chart.addEventListener('mouseover', (e) => {
     const dot = e.target.closest('.tbmm-seat');
-    if (!dot || !hoverName) return;
+    if (!dot || !hoverName || !hoverParty) return;
     const seat = byId[parseInt(dot.dataset.seatNumber, 10)];
     const p = seat?.politicians || null;
     hoverName.textContent = p ? `${p.first_name} ${p.last_name}`.trim() : '';
+    hoverParty.textContent = p ? (p.party || seat?.party || '') : '';
   });
   chart.addEventListener('mouseout', (e) => {
     const dot = e.target.closest('.tbmm-seat');
-    if (!dot || !hoverName) return;
+    if (!dot || !hoverName || !hoverParty) return;
     if (dot.contains(e.relatedTarget)) return; // still inside the same seat
     hoverName.textContent = '';
+    hoverParty.textContent = '';
   });
 }
 
