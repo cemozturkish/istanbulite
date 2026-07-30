@@ -1062,7 +1062,7 @@
     <div class="panel">
       <div class="panel-title">Breaking News</div>
       <div class="btn-row" style="margin-bottom:10px;">
-        <button class="btn btn-primary" id="news-view-recent">Son 24 Saat</button>
+        <button class="btn btn-primary" id="news-view-recent">Son 3 Gün</button>
         <button class="btn btn-secondary" id="news-view-all">Tümü</button>
       </div>
       <input type="text" id="news-search" placeholder="Başlıkta veya metinde ara..." style="margin-bottom:10px;"/>
@@ -2425,8 +2425,8 @@ document.getElementById('series-add-btn').addEventListener('click', async () => 
   loadSeries();
 });
 
-// 'recent' mirrors the public 24h window readers see; 'all' drops the
-// cutoff so the admin can find and revive a story that already expired
+// 'recent' mirrors the public 3-day (72h) window readers see; 'all' drops
+// the cutoff so the admin can find and revive a story that already expired
 // out of the feed (e.g. to post a new "gelişme" on it).
 let newsViewMode = 'recent';
 let allAdminNews = [];
@@ -2438,7 +2438,7 @@ async function loadBreakingNews() {
     .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*, breaking_news_poll_option_votes(option))')
     .order('updated_at', { ascending: false });
   if (newsViewMode === 'recent') {
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
     query = query.gte('updated_at', cutoff);
   } else {
     query = query.limit(300);
@@ -2844,7 +2844,7 @@ async function deleteSource(id) {
 // headline/body become the story's current title/body (shown on the
 // card and map), while the previous state is preserved as a
 // breaking_news_updates row. Also bumps updated_at so an actively
-// developing story doesn't drop out of the 24h feed just because it's old.
+// developing story doesn't drop out of the 3-day feed just because it's old.
 async function addNewsUpdate(btn) {
   const card = btn.closest('.article-card');
   const newsId = btn.dataset.newsId;
@@ -2913,7 +2913,7 @@ async function addNewsUpdate(btn) {
 
   // A backdated gelişme (filling in a story's earlier history) must not
   // steal the story's current displayed headline or bump it back into the
-  // active 24h feed — only the genuinely latest entry does that.
+  // active 3-day feed — only the genuinely latest entry does that.
   const isNewLatest = !latestExistingAt || new Date(createdAt) >= new Date(latestExistingAt);
   if (isNewLatest) {
     const { error: updErr } = await sb.from('breaking_news')

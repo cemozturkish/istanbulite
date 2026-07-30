@@ -2112,7 +2112,7 @@ async function checkSession() {
 // setInterval, which a revisit via virtual navigation would duplicate.
 function tickNewsAgo() {
   document.querySelectorAll('#breaking-news-feed .ago[data-iso]').forEach(el => {
-    el.textContent = formatAgoTR(el.dataset.iso);
+    el.textContent = formatNewsAge(el.dataset.iso);
   });
 }
 
@@ -2577,10 +2577,13 @@ document.addEventListener('mouseout', (e) => {
 });
 
 // ── Breaking News (from public.breaking_news) ──────────────────
-// Rows expire client-side 24h after updated_at (falls back to
+// Rows expire client-side 3 days (72h) after updated_at (falls back to
 // created_at for stories with no timeline updates yet), so a story
 // that keeps getting "gelişme" updates stays in the feed instead of
-// silently vanishing at the 24h mark. A row with a neighborhood pulses
+// silently vanishing at the 72h mark. The lastTouch age badge (see
+// formatNewsAge) shows an hour count for the first day, then "DÜN" for
+// the second day and "evvelsi gün" for the third, before the row drops
+// out of the feed entirely. A row with a neighborhood pulses
 // that district on the map until the *current user* has clicked it;
 // "seen" state is local to the browser (localStorage key:
 // ist-news-seen-<userId>).
@@ -2668,6 +2671,25 @@ function formatAgoTR(iso) {
   if (months < 12) return en ? `${months}mo` : `${months} ay`;
   const years = Math.floor(days / 365);
   return en ? `${years}y` : `${years} yıl`;
+}
+
+// Age label for a news card/detail's lastTouch badge specifically -- news
+// rows only live 3 days (see loadBreakingNews's cutoff), so once a story
+// crosses the 24h mark this switches from the hour count straight to
+// "DÜN", then "evvelsi gün" for the following day, instead of ever
+// showing "1 gün"/"2 gün". Kept separate from formatAgoTR, which still
+// counts in open-ended days/months/years for the timeline's gelişme
+// entries (those can be backdated years into a story's history).
+function formatNewsAge(iso) {
+  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  const en = I18N.isEnglish();
+  if (secs < 60) return en ? 'now' : 'şimdi';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return en ? `${mins}m` : `${mins} dk`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return en ? `${hrs}h` : `${hrs} sa`;
+  if (hrs < 48) return en ? 'yesterday' : 'DÜN';
+  return en ? '2 days ago' : 'evvelsi gün';
 }
 
 // Spelled-out "X sa önce" / "Xh ago" form used in the timeline, where the
@@ -2795,7 +2817,7 @@ function buildNewsDetailHtml(n) {
     <div class="article">
       <div class="meta-row">
         <div class="kicker">${escapeText(newsKickerLabel(n))}</div>
-        <div class="ago" data-iso="${escapeText(lastTouch)}">${escapeText(formatAgoTR(lastTouch))}</div>
+        <div class="ago" data-iso="${escapeText(lastTouch)}">${escapeText(formatNewsAge(lastTouch))}</div>
       </div>
       <h3>${escapeText(n.title)}</h3>
       ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
@@ -2985,7 +3007,7 @@ function renderBreakingNewsFeedNow(feed, rows) {
       <div class="article openable" data-news-id="${escapeText(n.id)}">
         <div class="meta-row">
           <div class="kicker">${escapeText(newsKickerLabel(n))}</div>
-          <div class="ago" data-iso="${escapeText(lastTouch)}">${escapeText(formatAgoTR(lastTouch))}</div>
+          <div class="ago" data-iso="${escapeText(lastTouch)}">${escapeText(formatNewsAge(lastTouch))}</div>
         </div>
         <h3>${escapeText(n.title)}</h3>
         ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
@@ -3037,7 +3059,7 @@ document.querySelectorAll('.news-filter-btn').forEach(btn => {
 });
 
 async function loadBreakingNews() {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('breaking_news')
     .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*), breaking_news_series(name)').gte('updated_at', cutoff)
     .order('updated_at', { ascending: false });
