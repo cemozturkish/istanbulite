@@ -943,15 +943,6 @@
       background: var(--paper-banner);
       transform: translateX(4px);
     }
-    .shelf-btn.shelf-empty {
-      background: var(--paper-dark);
-      color: var(--muted);
-      cursor: default;
-      opacity: 0.7;
-    }
-    .shelf-btn.shelf-empty:hover { transform: none; background: var(--paper-dark); }
-    .shelf-btn.shelf-empty .shelf-title { color: var(--muted); }
-
     /* ── Chapter nav (right column, while the reader sheet is open) ──
        Replaces the shelves grid with the open article's own table of
        contents, so a reader can jump chapters without closing the sheet —
@@ -3267,20 +3258,23 @@ function renderShelfButtons(activeShelfId = null) {
   const shelvesEl = document.getElementById('shelves');
   if (!shelvesEl) return;
   animateFeedSwap(shelvesEl, 'right', () => {
-    shelvesEl.innerHTML = SHELVES_CACHE.map(s => {
-      const count = SHELF_COUNTS[s.id] || 0;
-      const empty = count === 0;
+    const filledShelves = SHELVES_CACHE.filter(s => (SHELF_COUNTS[s.id] || 0) > 0);
+    if (!filledShelves.length) {
+      shelvesEl.innerHTML = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Henüz raf yok.</div>`;
+      return;
+    }
+    shelvesEl.innerHTML = filledShelves.map(s => {
       const active = s.id === activeShelfId;
       const name = (s.name_tr || '').trim();
       const subtitle = (s.subtitle_tr || '').trim();
-      const display = empty ? 'Çok Yakında' : (name || `Raf ${s.id}`);
-      const subtitleHtml = !empty && subtitle ? `<div class="shelf-subtitle">${libEsc(subtitle)}</div>` : '';
-      const progress = !empty ? shelfProgress(s.id) : null;
+      const display = name || `Raf ${s.id}`;
+      const subtitleHtml = subtitle ? `<div class="shelf-subtitle">${libEsc(subtitle)}</div>` : '';
+      const progress = shelfProgress(s.id);
       const progressHtml = progress
         ? `<div class="shelf-progress">${progress.done}/${progress.total}</div>`
         : '';
       return `
-        <a class="shelf-btn ${empty ? 'shelf-empty' : ''}${active ? ' shelf-active' : ''}" data-shelf="${s.id}" href="#">
+        <a class="shelf-btn${active ? ' shelf-active' : ''}" data-shelf="${s.id}" href="#">
           <div>
             <div class="shelf-title">${libEsc(display)}</div>
             ${subtitleHtml}
@@ -3292,7 +3286,6 @@ function renderShelfButtons(activeShelfId = null) {
     shelvesEl.querySelectorAll('.shelf-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        if (btn.classList.contains('shelf-empty')) return;
         const id = Number(btn.dataset.shelf);
         shelvesEl.querySelectorAll('.shelf-btn').forEach(b => b.classList.toggle('shelf-active', b === btn));
         openShelfPath(id);
