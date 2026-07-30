@@ -135,11 +135,18 @@
     // one in <head>, which always comes first in document order.
     const bareScripts = doc.querySelectorAll('script:not([src])');
     const bigScript = bareScripts[bareScripts.length - 1];
+    // Not every page's <head> loads the same script set (e.g. politician-
+    // card.js/tbmm.js are only on kütüphane/kahvehane, not hane) -- capture
+    // every src'd <script> here so navigateTo can load whichever ones this
+    // document doesn't already have before running the target page's own
+    // script (see loadMissingScripts below).
+    const scriptSrcs = Array.from(doc.querySelectorAll('script[src]')).map(s => s.getAttribute('src'));
     const cached = {
       styleCSS: styleEl ? styleEl.textContent : '',
       contentHTML: contentEl ? contentEl.innerHTML : '',
       overlayHTML,
       scriptText: bigScript ? bigScript.textContent : '',
+      scriptSrcs,
       title: doc.title,
     };
     pageCache[slug] = cached;
@@ -150,6 +157,35 @@
     document.querySelectorAll('style[data-page]').forEach(s => {
       s.disabled = s.getAttribute('data-page') !== slug;
     });
+  }
+
+  // Loads a single <script src> once, resolving whether it succeeds or
+  // fails so one broken/blocked script can't hang navigation forever.
+  function loadScriptOnce(src) {
+    if (document.querySelector('script[src="' + src + '"]')) return Promise.resolve();
+    return new Promise((resolve) => {
+      const el = document.createElement('script');
+      el.src = src;
+      el.onload = () => resolve();
+      el.onerror = () => resolve();
+      document.head.appendChild(el);
+    });
+  }
+
+  // Real page loads pull in every <head> script the page declares; a
+  // virtual navigation only ever injects the target page's own inline body
+  // script (see ensurePageLoaded above), so any <script src> that page's
+  // <head> has but the currently-live document doesn't (e.g. politician-
+  // card.js/tbmm.js, which only kütüphane/kahvehane load, not hane) would
+  // otherwise never arrive -- leaving anything gated on that module (e.g.
+  // window.IstPoliticianCard) silently broken for the rest of the session.
+  // Loaded sequentially, in the target page's own document order, so
+  // scripts that assume an earlier one already ran (e.g. profile-card.js
+  // reading IstAvatar at its own top level) still see it defined.
+  async function loadMissingScripts(cached) {
+    for (const src of cached.scriptSrcs) {
+      await loadScriptOnce(src);
+    }
   }
 
   let virtualNavInFlight = false;
@@ -215,6 +251,12 @@
           else document.body.append(...newNodes);
         }
       }
+
+      // Load any <script src> this page's <head> declares that the live
+      // document doesn't already have (see loadMissingScripts above) --
+      // must finish before the page's own script/mount runs below, since
+      // that's what actually reads window.IstPoliticianCard and friends.
+      await loadMissingScripts(cached);
 
       // First visit to this page this session -- execute its script once
       // to register mount/unmount (see registerPage above). Guarded so a
