@@ -132,8 +132,8 @@
     + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>'
     + '</svg>';
 
-  // Kahvehane's library-card button icon -- opens game stats (see
-  // openGameStatsOverlay) instead of the settings gear.
+  // Kahvehane's library-card button icon -- opens the same settings
+  // overlay as the gear icon elsewhere, just with a coffee cup instead.
   const COFFEE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
     + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
     + '<path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>'
@@ -635,6 +635,11 @@
       openProfileOverlay({
         sb: state.sb, I18N, user, profile,
         sozculCount, kefaletCount, sponsoredList, kefilOfUser,
+        // Kütüphane's context is books/articles, not games -- the weekly
+        // game grid doesn't belong in its profile popup (kutuphane.html's
+        // own desktop library-card gear button makes the same call, see
+        // there for the reasoning).
+        hideWeekGrid: page === 'kutuphane',
         avatarUrl: state.avatarUrl,
         avatarHair: state.avatarHair,
         avatarHat: state.avatarHat,
@@ -707,9 +712,7 @@
 
   let _ovResizeListener = null;
 
-  // Reveals the (already body-filled) shared bottom sheet -- common to
-  // openProfileOverlay's settings page and openGameStatsOverlay's read-only
-  // stats page below.
+  // Reveals the (already body-filled) shared bottom sheet.
   function showProfileOverlaySheet() {
     const overlay = document.getElementById('profile-overlay');
     positionProfileSheet();
@@ -726,7 +729,7 @@
 
   function openProfileOverlay(opts) {
     ensureProfileOverlay();
-    _ov = Object.assign({ sozculCount: 0, kefaletCount: 0, sponsoredList: [], kefilOfUser: null }, opts);
+    _ov = Object.assign({ sozculCount: 0, kefaletCount: 0, sponsoredList: [], kefilOfUser: null, hideWeekGrid: false }, opts);
     if (_ov.avatarUrl === undefined) _ov.avatarUrl = _ov.profile?.avatar_url || null;
     if (_ov.avatarHair === undefined) _ov.avatarHair = _ov.profile?.avatar_hair || null;
     if (_ov.avatarHat === undefined) _ov.avatarHat = _ov.profile?.avatar_hat || null;
@@ -739,27 +742,6 @@
     _ov.customizing = false;
     renderOverlayBody();
     showProfileOverlaySheet();
-  }
-
-  // Kahvehane's library-card button opens this instead of the settings
-  // overlay above: same shared bottom sheet, but read-only and limited to
-  // this week's game results (see getWeekGameStatus/weekGridHTML) -- no
-  // account info or personalization here, so no _ov state and no
-  // settings-page event wiring needed.
-  function openGameStatsOverlay(opts) {
-    ensureProfileOverlay();
-    const { sb, I18N, user } = opts;
-    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
-    const body = document.getElementById('profile-overlay-body');
-    body.innerHTML = `
-      <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
-      <div id="po-weekgrid-mount"></div>
-    `;
-    showProfileOverlaySheet();
-    getWeekGameStatus(sb, user.id).then(status => {
-      const m = document.getElementById('po-weekgrid-mount');
-      if (m) m.innerHTML = weekGridHTML(status, I18N);
-    });
   }
 
   function closeProfileOverlay() {
@@ -910,7 +892,7 @@
   // above, kept intact so it can be re-added later; already-placed cover
   // badges still render via coverHTML.
   function settingsPageHTML(state) {
-    const { I18N, user, profile, sozculCount, sponsoredList, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
+    const { I18N, user, profile, sozculCount, sponsoredList, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing, hideWeekGrid } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
@@ -939,8 +921,10 @@
           ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText: yasadigiDisplay, editable: true, customizing, sozculCount })}
           <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
 
+          ${hideWeekGrid ? '' : `
           <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
           <div id="po-weekgrid-mount"></div>
+          `}
         </div>
 
         <div class="ist-pc-settings-col ist-pc-settings-right">
@@ -1046,10 +1030,12 @@
     wireHatCarousel(state);
     wireAccessoryCarousel(state);
     wireShirtCarousel(state);
-    getWeekGameStatus(sb, user.id).then(status => {
-      const m = document.getElementById('po-weekgrid-mount');
-      if (m) m.innerHTML = weekGridHTML(status, I18N);
-    });
+    if (!state.hideWeekGrid) {
+      getWeekGameStatus(sb, user.id).then(status => {
+        const m = document.getElementById('po-weekgrid-mount');
+        if (m) m.innerHTML = weekGridHTML(status, I18N);
+      });
+    }
     document.getElementById('po-save').addEventListener('click', () => {
       if (state.customizing) {
         saveSettings(state);
@@ -1435,7 +1421,6 @@
     unmount,
     mountLibraryCard,
     openProfileOverlay,
-    openGameStatsOverlay,
     closeProfileOverlay,
     AVATAR_SHIRT_OPTIONS,
     AVATAR_HAIR_OPTIONS,
