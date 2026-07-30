@@ -61,6 +61,7 @@
   // hair PNG on top — see avatar.js). `null` is kel (bald, no overlay).
   const AVATAR_HAIR_OPTIONS = [
     { value: null,    label: 'Kel' },
+    { value: 'buzz',  label: 'Çok kısa saç' },
     { value: 'short', label: 'Kısa saç' },
     { value: 'long',  label: 'Uzun saç' },
   ];
