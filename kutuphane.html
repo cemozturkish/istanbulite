@@ -785,18 +785,47 @@
     }
     /* A person's name mentioned inside an article/comment body (see
        person-mentions.js) -- dotted rather than a solid underline so it
-       doesn't read as an outbound link, tap/click opens the same
-       .politician-detail sheet as the Cumhurbaşkanı card above. */
+       doesn't read as an outbound link. If the person currently holds a
+       title (data-tip), hovering/focusing reveals it in a small label
+       above the name -- a quick "who is this" reminder, not the full
+       .politician-detail sheet the Cumhurbaşkanı card above opens. */
     .person-mention {
       color: var(--accent);
       text-decoration: underline;
       text-decoration-style: dotted;
       text-underline-offset: 2px;
-      cursor: pointer;
     }
     .person-mention:hover,
     .person-mention:focus-visible {
       text-decoration-style: solid;
+    }
+    .person-mention[data-tip] {
+      position: relative;
+      cursor: help;
+    }
+    .person-mention[data-tip]::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--ink);
+      color: var(--paper);
+      padding: 4px 10px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      border-radius: 4px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms ease;
+      z-index: 5;
+    }
+    .person-mention[data-tip]:hover::after,
+    .person-mention[data-tip]:focus-visible::after {
+      opacity: 1;
     }
 
     /* ── Reader overlay: a bottom sheet that rises over the map and
@@ -3018,7 +3047,7 @@ function renderArticleDetail(categoryId, article) {
     </div>
   `;
   document.getElementById('back-to-list').addEventListener('click', () => renderCategoryList(categoryId));
-  if (window.IstPersonMentions) IstPersonMentions.linkify(area, personMentionsRoster, openPoliticianDetailSheet);
+  if (window.IstPersonMentions) IstPersonMentions.linkify(area, personMentionsRoster);
   loadComments(article.id);
   loadReactions(article.id);
   document.getElementById('comment-composer').addEventListener('submit', (e) => {
@@ -3113,7 +3142,7 @@ async function loadComments(articleId) {
       </div>
     `;
   }).join('');
-  if (window.IstPersonMentions) IstPersonMentions.linkify(listEl, personMentionsRoster, openPoliticianDetailSheet);
+  if (window.IstPersonMentions) IstPersonMentions.linkify(listEl, personMentionsRoster);
 
   listEl.querySelectorAll('.comment-delete').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -3865,7 +3894,7 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
 
     hydrateVoteWidgets(area, refreshNextGate);
     refreshNextGate();
-    if (window.IstPersonMentions) IstPersonMentions.linkify(area, personMentionsRoster, openPoliticianDetailSheet);
+    if (window.IstPersonMentions) IstPersonMentions.linkify(area, personMentionsRoster);
 
     if (onPoll) mountPoll(article);
     const scrollEl = area.querySelector('.reader-scroll');
