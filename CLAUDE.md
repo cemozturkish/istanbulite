@@ -126,6 +126,12 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 - Admin-managed via the "Alıntılar" tab in `admin.html`; not yet surfaced anywhere on the site — where/how they're shown is still undecided, this just holds the data set to draw from. Not related to `tumcel_quote_suggestions`/`tumcel_puzzles`, which are specific to the Tümcel game's daily puzzle pipeline.
 - RLS: authenticated users SELECT all; admin-only INSERT/UPDATE/DELETE.
 
+**Table: `game_day_toggles`** — admin on/off switch for a game on a given day (`db/game_day_toggles.sql`).
+- `game text` (`sozcel`/`tumcel`/`bulmaca`), `game_date date`, `disabled_by`, `disabled_at`. PK `(game, game_date)`.
+- Presence of a row = that game is disabled that day; absence = runs normally. Managed from the on/off board in admin.html's Oyunlar tab (toggling on deletes the row, toggling off upserts it).
+- Read by `game-locks.js` on every game page (and Kahvehane) to lock the game's nav card and, if a user hits the game page directly, bounce them to Kahvehane with "Bugün `<Oyun>` yok!".
+- RLS: authenticated users SELECT all; admin-only INSERT/UPDATE/DELETE.
+
 ### Key DB functions / triggers
 - `public.is_admin()` — returns true if `auth.uid()`'s email matches the admin email; used in every admin-only RLS policy.
 - `public.handle_new_user()` — trigger on `auth.users insert`. Reads `raw_user_meta_data` (first_name, last_name, phone, neighborhood, birth_neighborhood, birth_place, referral_code), validates the kefil code, resolves the referrer, generates a unique 8-char `referral_code`, inserts the matching `profiles` row. Atomic with the auth user creation — failure rolls everything back.
@@ -194,6 +200,12 @@ sb.from('articles').delete().eq('id', id)
 - Account management: create and assign user accounts to neighborhoods
 - Filter articles by neighborhood
 - Edit/delete with inline form population
+- **Oyunlar tab** combines all three games' admin panels in one place: a shared per-day
+  on/off board (next 7 days × Sözcel/Tümcel/Bulmaca, backed by `game_day_toggles`) at the
+  top, then sub-nav pills to switch between each game's own management panel (Sözcel sözcü
+  assignments, Tümcel puzzle editor, Bulmaca which has no manual content — puzzles are
+  generated, so its panel is just a pointer back to the on/off board). Toggling a game off
+  for a day locks it site-wide for that day (enforced by `game-locks.js`, see Database Schema above and Assets/coding conventions below).
 
 ### `kahvehane.html` — Coffeehouse
 - Community discussion section
