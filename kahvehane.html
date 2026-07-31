@@ -1732,18 +1732,47 @@
     }
     /* A person's name mentioned inside a post or comment body (see
        person-mentions.js) -- dotted rather than a solid underline so it
-       doesn't read as an outbound link, tap/click opens the same
-       .politician-detail sheet as the mayor card above. */
+       doesn't read as an outbound link. If the person currently holds a
+       title (data-tip), hovering/focusing reveals it in a small label
+       above the name -- a quick "who is this" reminder, not the full
+       .politician-detail sheet the mayor card above opens. */
     .person-mention {
       color: var(--accent);
       text-decoration: underline;
       text-decoration-style: dotted;
       text-underline-offset: 2px;
-      cursor: pointer;
     }
     .person-mention:hover,
     .person-mention:focus-visible {
       text-decoration-style: solid;
+    }
+    .person-mention[data-tip] {
+      position: relative;
+      cursor: help;
+    }
+    .person-mention[data-tip]::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--ink);
+      color: var(--paper);
+      padding: 4px 10px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      border-radius: 4px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms ease;
+      z-index: 5;
+    }
+    .person-mention[data-tip]:hover::after,
+    .person-mention[data-tip]:focus-visible::after {
+      opacity: 1;
     }
     @media (max-width: 1240px) {
       body:has(.detail-overlay.open) .col-left,
@@ -2172,7 +2201,7 @@ function openDetail(html) {
   const body = document.getElementById('detail-overlay-body');
   if (!overlay || !body) return;
   body.innerHTML = html;
-  if (window.IstPersonMentions) IstPersonMentions.linkify(body, personMentionsRoster, openDetail);
+  if (window.IstPersonMentions) IstPersonMentions.linkify(body, personMentionsRoster);
   positionDetailSheet();
   overlay.hidden = false;
   requestAnimationFrame(() => overlay.classList.add('open'));
@@ -3022,7 +3051,7 @@ function appendPosts(rows) {
   const lm = postsEl.querySelector('.load-more-wrap');
   if (lm) lm.insertAdjacentHTML('beforebegin', html);
   else postsEl.insertAdjacentHTML('beforeend', html);
-  if (window.IstPersonMentions) IstPersonMentions.linkify(postsEl, personMentionsRoster, openDetail);
+  if (window.IstPersonMentions) IstPersonMentions.linkify(postsEl, personMentionsRoster);
 }
 
 function renderLoadMore() {
