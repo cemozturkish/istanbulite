@@ -53,6 +53,16 @@
     return peoplePromise;
   }
 
+  // public.politicians names are stored ALL CAPS (see db/politicians.sql's
+  // uppercase_politician_name trigger), but article/timeline text writes
+  // them in normal case ("Ekrem İmamoğlu") -- plain JS regex 'i' matching
+  // can't fold that correctly for Turkish (dotted/dotless İ/I), so
+  // matching is done against a tr-TR-lowercased copy of both the name and
+  // the haystack text instead (see linkify below).
+  function trLower(s) {
+    return String(s).toLocaleLowerCase('tr-TR');
+  }
+
   // Longest-name-first alternation so e.g. "Ahmet Yılmaz" doesn't shadow
   // a longer "Ahmet Yılmaz Kaya" match earlier in the same string.
   function buildMatcher(people) {
@@ -61,8 +71,9 @@
       .filter(x => x.name.length > 2)
       .sort((a, b) => b.name.length - a.name.length);
     if (!named.length) return null;
-    const byName = new Map(named.map(x => [x.name, x.p]));
-    return { re: new RegExp(named.map(x => escapeRegExp(x.name)).join('|'), 'g'), byName };
+    const byLowerName = new Map(named.map(x => [trLower(x.name), x.p]));
+    const re = new RegExp(named.map(x => escapeRegExp(trLower(x.name))).join('|'), 'g');
+    return { re, byLowerName };
   }
 
   // Walks root's text nodes and wraps every full-name match in a
@@ -74,7 +85,7 @@
     if (!root || !people || !people.length) return;
     const matcher = buildMatcher(people);
     if (!matcher) return;
-    const { re, byName } = matcher;
+    const { re, byLowerName } = matcher;
 
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
@@ -90,18 +101,21 @@
 
     nodes.forEach(n => {
       const text = n.nodeValue;
+      // Turkish case-folding is 1:1 per character, so matched indices/
+      // lengths against the lowercased text line up with the original.
+      const lower = trLower(text);
       re.lastIndex = 0;
-      if (!re.test(text)) return;
+      if (!re.test(lower)) return;
       re.lastIndex = 0;
       const frag = document.createDocumentFragment();
       let last = 0, m;
-      while ((m = re.exec(text))) {
+      while ((m = re.exec(lower))) {
         if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
         const span = document.createElement('span');
         span.className = 'person-mention';
-        span.textContent = m[0];
-        const p = byName.get(m[0]);
-        if (p.seatTitle) {
+        span.textContent = text.slice(m.index, re.lastIndex);
+        const p = byLowerName.get(m[0]);
+        if (p && p.seatTitle) {
           span.tabIndex = 0;
           span.dataset.tip = p.seatTitle;
         }
