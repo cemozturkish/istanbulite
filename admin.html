@@ -764,6 +764,78 @@
       border: none;
     }
 
+    /* ── Oyunlar tab: game on/off board + sub-nav between games ── */
+    .game-status-group-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .game-status-days {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .game-status-day-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 6px 10px;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      color: var(--ink);
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      min-width: 58px;
+    }
+    .game-status-day-btn .gsd-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .game-status-day-btn .gsd-state {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .game-status-day-btn.on { border-color: var(--accent); }
+    .game-status-day-btn.on .gsd-state { color: var(--accent); }
+    .game-status-day-btn.off { border-color: var(--ink-red); background: var(--paper); }
+    .game-status-day-btn.off .gsd-state { color: var(--ink-red); }
+    .game-status-day-btn.today { border-width: 2px; }
+
+    .games-subnav {
+      display: flex;
+      gap: 6px;
+      margin: 24px 0 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--rule);
+      flex-wrap: wrap;
+    }
+    .games-subtab {
+      padding: 6px 14px;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .games-subtab.active {
+      background: var(--ink);
+      color: var(--paper);
+      border-color: var(--ink);
+    }
+
     /* ── MOBILE RESPONSIVE ── */
     @media (max-width: 768px) {
       html, body {
@@ -871,8 +943,7 @@
     <button class="admin-tab active" data-tab="kutuphane">Kütüphane</button>
     <button class="admin-tab" data-tab="news">Breaking News</button>
     <button class="admin-tab" data-tab="events">Events</button>
-    <button class="admin-tab" data-tab="sozcel">Sözcel</button>
-    <button class="admin-tab" data-tab="tumcel">Tümcel</button>
+    <button class="admin-tab" data-tab="games">Oyunlar</button>
     <button class="admin-tab" data-tab="quotes">Alıntılar</button>
     <button class="admin-tab" data-tab="people">Kişiler</button>
     <button class="admin-tab" data-tab="politicians">Koltuklar</button>
@@ -1143,50 +1214,66 @@
 
   </div>
 
-  <div class="admin-body" id="sozcel-tab" style="display:none; grid-template-columns: 1fr; max-width: 760px;">
+  <!-- ── OYUNLAR TAB (Sözcel + Tümcel + Bulmaca, combined) ── -->
+  <div class="admin-body" id="games-tab" style="display:none; grid-template-columns: 1fr; max-width: 900px;">
 
-    <!-- Sözcü picker + day status -->
     <div class="panel">
-      <div class="panel-title">Sözcel — Sözcü Atamaları</div>
+
+      <!-- Per-day on/off switch, shared by all three games -->
+      <div class="panel-title">Oyun Takvimi — Açık / Kapalı</div>
       <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-        Pick a member to be the Sözcü for an upcoming day. They will enter the word and its
-        dictionary entry on sozcel.html before midnight Istanbul. You can't enter words from here —
-        only assignments and status are managed here.
+        Bir oyunu belirli bir gün için kapatın. O gün oyuna girmeye çalışan üyeler
+        "Bugün &lt;Oyun&gt; yok!" uyarısını görür; oyun kartı da kilitli görünür.
       </p>
-
-      <div class="sozcul-assign-row">
-        <div>
-          <label style="margin-top:0;">Gün</label>
-          <select id="sozcul-assign-date"></select>
-        </div>
-        <div>
-          <label style="margin-top:0;">Üye</label>
-          <select id="sozcul-assign-user"><option value="">— Üye yükleniyor —</option></select>
-        </div>
-        <button class="btn btn-primary" id="sozcul-assign-btn" style="padding:9px 14px;white-space:nowrap;">Ata</button>
+      <div id="game-status-board" style="display:flex;flex-direction:column;gap:16px;">
+        <div class="empty-state"><span class="spinner"></span></div>
       </div>
-      <div class="status-msg" id="sozcul-assign-status" style="margin-top:8px;"></div>
 
-      <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--rule);">
-        <div class="panel-title" style="margin:0 0 14px;">Sonraki 7 Gün</div>
+      <!-- Sub-nav between each game's own management panel -->
+      <div class="games-subnav">
+        <button class="games-subtab active" data-subtab="sozcel">Sözcel</button>
+        <button class="games-subtab" data-subtab="tumcel">Tümcel</button>
+        <button class="games-subtab" data-subtab="bulmaca">Bulmaca</button>
+      </div>
+
+      <!-- SÖZCEL -->
+      <div class="games-subpanel" id="games-sozcel-panel">
+        <div class="panel-title">Sözcel — Sözcü Atamaları</div>
         <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-          Status of upcoming Sözcel games. Sözcü selection lasts until midnight Istanbul on the
-          day before the game; after that the assignment is locked.
+          Pick a member to be the Sözcü for an upcoming day. They will enter the word and its
+          dictionary entry on sozcel.html before midnight Istanbul. You can't enter words from here —
+          only assignments and status are managed here.
         </p>
-        <div id="sozcel-schedule" style="display:flex;flex-direction:column;gap:10px;">
-          <div class="empty-state"><span class="spinner"></span></div>
+
+        <div class="sozcul-assign-row">
+          <div>
+            <label style="margin-top:0;">Gün</label>
+            <select id="sozcul-assign-date"></select>
+          </div>
+          <div>
+            <label style="margin-top:0;">Üye</label>
+            <select id="sozcul-assign-user"><option value="">— Üye yükleniyor —</option></select>
+          </div>
+          <button class="btn btn-primary" id="sozcul-assign-btn" style="padding:9px 14px;white-space:nowrap;">Ata</button>
         </div>
-        <div class="status-msg" id="sozcel-status"></div>
+        <div class="status-msg" id="sozcul-assign-status" style="margin-top:8px;"></div>
+
+        <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--rule);">
+          <div class="panel-title" style="margin:0 0 14px;">Sonraki 7 Gün</div>
+          <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
+            Status of upcoming Sözcel games. Sözcü selection lasts until midnight Istanbul on the
+            day before the game; after that the assignment is locked.
+          </p>
+          <div id="sozcel-schedule" style="display:flex;flex-direction:column;gap:10px;">
+            <div class="empty-state"><span class="spinner"></span></div>
+          </div>
+          <div class="status-msg" id="sozcel-status"></div>
+        </div>
       </div>
-    </div>
 
-  </div>
-
-  <!-- ── TÜMCEL TAB ── -->
-  <div class="admin-body" id="tumcel-tab" style="display:none; grid-template-columns: 1fr; max-width: 760px;">
-
-    <div class="panel">
-      <div class="panel-title" id="tc-form-mode-label">New Tümcel Puzzle</div>
+      <!-- TÜMCEL -->
+      <div class="games-subpanel" id="games-tumcel-panel" style="display:none;">
+        <div class="panel-title" id="tc-form-mode-label">New Tümcel Puzzle</div>
 
       <label>Puzzle Date</label>
       <input type="date" id="tc-date"/>
@@ -1292,18 +1379,29 @@
         <textarea id="tc-fullquote-4" rows="2" placeholder="Boş bırakırsan 4 parça birleştirilir; farklıysa burayı doldur"></textarea>
       </div>
 
-      <div class="btn-row" style="margin-top:24px;">
-        <button class="btn btn-primary" id="tc-submit-btn">Bulmacayı Kaydet</button>
-        <button class="btn btn-secondary" id="tc-cancel-btn" style="display:none;">İptal</button>
-      </div>
-      <div class="status-msg" id="tc-form-status"></div>
+        <div class="btn-row" style="margin-top:24px;">
+          <button class="btn btn-primary" id="tc-submit-btn">Bulmacayı Kaydet</button>
+          <button class="btn btn-secondary" id="tc-cancel-btn" style="display:none;">İptal</button>
+        </div>
+        <div class="status-msg" id="tc-form-status"></div>
 
-      <div style="margin-top:24px;">
-        <div class="panel-title" style="margin:0 0 14px;">Mevcut Bulmacalar</div>
-        <div class="articles-list" id="tc-list">
-          <div class="empty-state"><span class="spinner"></span></div>
+        <div style="margin-top:24px;">
+          <div class="panel-title" style="margin:0 0 14px;">Mevcut Bulmacalar</div>
+          <div class="articles-list" id="tc-list">
+            <div class="empty-state"><span class="spinner"></span></div>
+          </div>
         </div>
       </div>
+
+      <!-- BULMACA -->
+      <div class="games-subpanel" id="games-bulmaca-panel" style="display:none;">
+        <div class="panel-title">Bulmaca</div>
+        <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
+          Bulmaca'nın günlük bilmeceleri otomatik üretilir — buradan manuel içerik girişi yapılmaz.
+          Oyunu belirli bir gün için açıp kapatmak için yukarıdaki Oyun Takvimi'ni kullanın.
+        </p>
+      </div>
+
     </div>
 
   </div>
@@ -1644,8 +1742,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('kutuphane-tab').style.display = (tab === 'kutuphane') ? '' : 'none';
     document.getElementById('news-tab').style.display = (tab === 'news') ? '' : 'none';
     document.getElementById('events-tab').style.display = (tab === 'events') ? '' : 'none';
-    document.getElementById('sozcel-tab').style.display = (tab === 'sozcel') ? 'grid' : 'none';
-    document.getElementById('tumcel-tab').style.display = (tab === 'tumcel') ? 'grid' : 'none';
+    document.getElementById('games-tab').style.display = (tab === 'games') ? 'grid' : 'none';
     document.getElementById('quotes-tab').style.display = (tab === 'quotes') ? '' : 'none';
     document.getElementById('people-tab').style.display = (tab === 'people') ? '' : 'none';
     document.getElementById('politicians-tab').style.display = (tab === 'politicians') ? '' : 'none';
@@ -1655,14 +1752,24 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'kutuphane') showKutuphaneIndex();
     if (tab === 'news') { loadSeries(); loadBreakingNews(); }
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
-    if (tab === 'sozcel') loadSozcelSchedule();
-    if (tab === 'tumcel') loadTumcelPuzzles();
+    if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); }
     if (tab === 'quotes') loadQuotesList();
     if (tab === 'people') loadPeopleTab();
     if (tab === 'politicians') loadPoliticiansTab();
     if (tab === 'tbmm') loadTBMMTab();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'users') loadUsersList();
+  });
+});
+
+// ── Oyunlar tab: sub-nav between Sözcel / Tümcel / Bulmaca ──
+document.querySelectorAll('.games-subtab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const sub = btn.dataset.subtab;
+    document.querySelectorAll('.games-subtab').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('games-sozcel-panel').style.display = (sub === 'sozcel') ? '' : 'none';
+    document.getElementById('games-tumcel-panel').style.display = (sub === 'tumcel') ? '' : 'none';
+    document.getElementById('games-bulmaca-panel').style.display = (sub === 'bulmaca') ? '' : 'none';
   });
 });
 
@@ -4000,6 +4107,76 @@ document.getElementById('tb-parties-apply-btn').addEventListener('click', async 
   setTimeout(() => { statusEl.textContent = ''; }, 3000);
 });
 
+// ── Oyunlar: per-day on/off board (game_day_toggles) ──
+const GAME_STATUS_GAMES = [
+  { game: 'sozcel', label: 'Sözcel' },
+  { game: 'tumcel', label: 'Tümcel' },
+  { game: 'bulmaca', label: 'Bulmaca' },
+];
+
+function gameStatusDayLabel(iso, offset) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const weekday = dt.toLocaleDateString('tr-TR', { weekday: 'short', timeZone: 'UTC' });
+  const day = dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const tag = offset === 0 ? 'Bugün' : offset === 1 ? 'Yarın' : `${weekday.charAt(0).toLocaleUpperCase('tr-TR') + weekday.slice(1)} ${day}`;
+  return tag;
+}
+
+async function loadGameStatusBoard() {
+  const wrap = document.getElementById('game-status-board');
+  wrap.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+
+  const dates = Array.from({ length: 7 }, (_, i) => sozcelIstanbulDateISO(i));
+  const { data, error } = await sb
+    .from('game_day_toggles')
+    .select('game, game_date')
+    .in('game_date', dates);
+
+  if (error) {
+    wrap.innerHTML = `<div class="empty-state">Error loading: ${escapeHtml(error.message)}</div>`;
+    return;
+  }
+
+  const offSet = new Set((data || []).map(r => `${r.game}_${r.game_date}`));
+
+  wrap.innerHTML = GAME_STATUS_GAMES.map(({ game, label }) => `
+    <div class="game-status-group">
+      <div class="game-status-group-title">${escapeHtml(label)}</div>
+      <div class="game-status-days">
+        ${dates.map((iso, i) => {
+          const isOff = offSet.has(`${game}_${iso}`);
+          return `
+            <button type="button" class="game-status-day-btn ${isOff ? 'off' : 'on'}${i === 0 ? ' today' : ''}"
+                    data-game="${escapeHtml(game)}" data-date="${escapeHtml(iso)}" data-off="${isOff ? '1' : '0'}">
+              <span class="gsd-label">${escapeHtml(gameStatusDayLabel(iso, i))}</span>
+              <span class="gsd-state">${isOff ? 'Kapalı' : 'Açık'}</span>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  wrap.querySelectorAll('.game-status-day-btn').forEach(btn => {
+    btn.addEventListener('click', () => toggleGameDay(btn.dataset.game, btn.dataset.date, btn.dataset.off === '1'));
+  });
+}
+
+async function toggleGameDay(game, date, currentlyOff) {
+  if (currentlyOff) {
+    const { error } = await sb.from('game_day_toggles').delete().eq('game', game).eq('game_date', date);
+    if (error) { alert('Hata: ' + error.message); return; }
+  } else {
+    const { data: { session } } = await sb.auth.getSession();
+    const disabledBy = session && session.user ? session.user.id : null;
+    const { error } = await sb.from('game_day_toggles')
+      .upsert({ game, game_date: date, disabled_by: disabledBy, disabled_at: new Date().toISOString() }, { onConflict: 'game,game_date' });
+    if (error) { alert('Hata: ' + error.message); return; }
+  }
+  loadGameStatusBoard();
+}
+
 // ── Sözcel: Sözcü assignment + day status ──
 function sozcelIstanbulDateISO(offsetDays = 0) {
   const now = new Date();
@@ -4412,7 +4589,7 @@ function fillTumcelForm(puzzle) {
   document.getElementById('tc-form-mode-label').textContent = 'Edit Tümcel Puzzle';
   document.getElementById('tc-cancel-btn').style.display = 'inline-block';
   document.getElementById('tc-submit-btn').textContent = 'Güncelle';
-  document.querySelector('#tumcel-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+  document.querySelector('#games-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function resetTumcelForm() {

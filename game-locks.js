@@ -8,8 +8,14 @@
 //
 // Rules:
 //   - Bulmaca is locked until the user has won Tümcel at least once.
+//   - Any game the admin has switched off for the current Istanbul day
+//     (via admin.html's Oyunlar tab / the game_day_toggles table) is
+//     locked for everyone, regardless of the rule above.
 
 (function () {
+  const GAME_LABELS = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Bulmaca' };
+  const ALL_GAMES = Object.keys(GAME_LABELS);
+
   const GATES = [
     {
       game: 'bulmaca',
@@ -17,6 +23,19 @@
       message: () => "Bulmaca'yı oynayabilmek için önce Tümcel'i kazanman gerekiyor.",
     },
   ];
+
+  function offMessage(game) {
+    return `Bugün ${GAME_LABELS[game] || game} yok!`;
+  }
+
+  function istanbulDateISO() {
+    const now = new Date();
+    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+    const y = ist.getFullYear();
+    const m = String(ist.getMonth() + 1).padStart(2, '0');
+    const d = String(ist.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
 
   let _stylesInjected = false;
   function injectStyles() {
@@ -85,56 +104,98 @@
     });
   }
 
+  // Games the admin has switched off for today (Istanbul time). Independent
+  // of who's logged in, so this is fetched before any session check.
+  async function fetchOffGamesToday(sb) {
+    const off = new Set();
+    try {
+      const { data, error } = await sb
+        .from('game_day_toggles')
+        .select('game')
+        .eq('game_date', istanbulDateISO())
+        .in('game', ALL_GAMES);
+      if (!error && data) data.forEach(r => off.add(r.game));
+    } catch (_) {}
+    return off;
+  }
+
+  function lockLink(link, msg) {
+    link.classList.add('locked');
+    link.dataset.lockMsg = msg;
+  }
+  function unlockLink(link) {
+    link.classList.remove('locked');
+    delete link.dataset.lockMsg;
+  }
+
   async function applyGameLocks(sb) {
     injectStyles();
     wireClicks();
     if (!sb || !sb.auth) return;
+
+    const offGames = await fetchOffGamesToday(sb);
+
+    // Bounce direct/bookmark loads of the game the user is currently on if
+    // it's off today, or if it's a win-gated game they haven't unlocked.
+    // The active link tells us which page we're on. Sending them back to
+    // kahvehane both surfaces the lock state and prevents the game UI from
+    // writing game_results.
+    const activeLink = document.querySelector('.game-link.active[data-game]');
+    if (activeLink) {
+      const g = activeLink.dataset.game;
+      if (offGames.has(g)) {
+        try { sessionStorage.setItem('game_lock_bounce_msg', offMessage(g)); } catch (_) {}
+        window.location.replace('kahvehane.html');
+        return true;
+      }
+    }
 
     let userId = null;
     try {
       const { data } = await sb.auth.getSession();
       userId = data && data.session && data.session.user ? data.session.user.id : null;
     } catch (_) {}
-    if (!userId) return;
 
     const stats = { tumcelWon: false };
-    try {
-      const { data, error } = await sb
-        .from('game_results')
-        .select('game, won')
-        .eq('user_id', userId)
-        .eq('game', 'tumcel')
-        .eq('won', true);
-      if (!error && data) {
-        stats.tumcelWon = data.length > 0;
-      }
-    } catch (_) {}
+    if (userId) {
+      try {
+        const { data, error } = await sb
+          .from('game_results')
+          .select('game, won')
+          .eq('user_id', userId)
+          .eq('game', 'tumcel')
+          .eq('won', true);
+        if (!error && data) {
+          stats.tumcelWon = data.length > 0;
+        }
+      } catch (_) {}
 
-    // Bounce direct/bookmark loads of a gated game the user hasn't unlocked.
-    // The active link tells us which page we're on. Sending them back to
-    // kahvehane both surfaces the lock state and prevents the game UI from
-    // writing game_results.
-    const activeLink = document.querySelector('.game-link.active[data-game]');
-    if (activeLink) {
-      const gate = GATES.find(g => g.game === activeLink.dataset.game);
-      if (gate && !gate.requires(stats)) {
-        try { sessionStorage.setItem('game_lock_bounce_msg', gate.message(stats)); } catch (_) {}
-        window.location.replace('kahvehane.html');
-        return true;
+      if (activeLink) {
+        const g = activeLink.dataset.game;
+        const gate = GATES.find(x => x.game === g);
+        if (gate && !gate.requires(stats)) {
+          try { sessionStorage.setItem('game_lock_bounce_msg', gate.message(stats)); } catch (_) {}
+          window.location.replace('kahvehane.html');
+          return true;
+        }
       }
     }
 
-    GATES.forEach(g => {
-      const link = document.querySelector(`.game-link[data-game="${g.game}"]`);
+    ALL_GAMES.forEach(g => {
+      const link = document.querySelector(`.game-link[data-game="${g}"]`);
       if (!link) return;
       // Don't lock the breadcrumb to the page the user is already on.
       if (link.classList.contains('active')) return;
-      if (g.requires(stats)) {
-        link.classList.remove('locked');
-        delete link.dataset.lockMsg;
+
+      if (offGames.has(g)) {
+        lockLink(link, offMessage(g));
+        return;
+      }
+      const gate = GATES.find(x => x.game === g);
+      if (gate && !gate.requires(stats)) {
+        lockLink(link, gate.message(stats));
       } else {
-        link.classList.add('locked');
-        link.dataset.lockMsg = g.message(stats);
+        unlockLink(link);
       }
     });
   }
@@ -155,20 +216,21 @@
   window.applyGameLocks = applyGameLocks;
   document.addEventListener('DOMContentLoaded', consumeBounceMessage);
 
-  // Pre-lock every gated game-link as soon as the DOM is ready, regardless of
-  // user state. applyGameLocks will unlock the ones the user qualifies for
+  // Pre-lock every game-link as soon as the DOM is ready, regardless of user
+  // state. applyGameLocks will unlock the ones that turn out to be playable
   // once the DB roundtrip completes. This closes the window where the page
   // was rendered, the script tag had loaded, but applyGameLocks hadn't yet
   // resolved — clicking a gated link in that window otherwise sneaks past
-  // the gate entirely.
+  // the gate entirely. All three games can end up locked now (admin
+  // off-switch applies to any of them, not just the win-gated ones), so all
+  // are pre-locked, not just the ones in GATES.
   document.addEventListener('DOMContentLoaded', () => {
     injectStyles();
     wireClicks();
-    GATES.forEach(g => {
-      const link = document.querySelector(`.game-link[data-game="${g.game}"]`);
+    ALL_GAMES.forEach(g => {
+      const link = document.querySelector(`.game-link[data-game="${g}"]`);
       if (!link || link.classList.contains('active')) return;
-      link.classList.add('locked');
-      link.dataset.lockMsg = 'Yükleniyor…';
+      lockLink(link, 'Yükleniyor…');
     });
   });
 })();
