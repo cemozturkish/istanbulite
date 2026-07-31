@@ -2615,7 +2615,10 @@ document.addEventListener('mouseout', (e) => {
 // silently vanishing at the 72h mark. The lastTouch age badge (see
 // formatNewsAge) shows an hour count for the first day, then "DÜN" for
 // the second day and "evvelsi gün" for the third, before the row drops
-// out of the feed entirely. A row with a neighborhood pulses
+// out of the feed entirely. The admin can also archive a row early
+// (breaking_news.archived_at) to pull it from this feed before the 72h
+// mark; the query below excludes archived rows outright. A row with a
+// neighborhood pulses
 // that district on the map until the *current user* has clicked it;
 // "seen" state is local to the browser (localStorage key:
 // ist-news-seen-<userId>).
@@ -3097,6 +3100,7 @@ async function loadBreakingNews() {
   const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await sb.from('breaking_news')
     .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*), breaking_news_series(name)').gte('updated_at', cutoff)
+    .is('archived_at', null)
     .order('updated_at', { ascending: false });
   if (error) { console.error('[anahane breaking_news]', error); return; }
   allBreakingNews = data || [];

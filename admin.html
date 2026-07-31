@@ -2449,9 +2449,11 @@ document.getElementById('series-add-btn').addEventListener('click', async () => 
   loadSeries();
 });
 
-// 'recent' mirrors the public 3-day (72h) window readers see; 'all' drops
-// the cutoff so the admin can find and revive a story that already expired
-// out of the feed (e.g. to post a new "gelişme" on it).
+// 'recent' mirrors the public 3-day (72h) window readers see (and also
+// hides archived items, same as the public feed); 'all' drops both the
+// cutoff and the archived filter so the admin can find and revive a story
+// that already expired out of the feed (e.g. to post a new "gelişme" on
+// it) or un-archive one manually pulled early.
 let newsViewMode = 'recent';
 let allAdminNews = [];
 
@@ -2463,7 +2465,7 @@ async function loadBreakingNews() {
     .order('updated_at', { ascending: false });
   if (newsViewMode === 'recent') {
     const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
-    query = query.gte('updated_at', cutoff);
+    query = query.gte('updated_at', cutoff).is('archived_at', null);
   } else {
     query = query.limit(300);
   }
@@ -2547,8 +2549,8 @@ function renderNewsList() {
     const newsDatetimeVal = n.created_at ? new Date(n.created_at).toISOString().slice(0, 16) : '';
     const seriesName = n.series_id ? SERIES_BY_ID.get(n.series_id) : null;
     return `
-      <div class="article-card" data-id="${n.id}">
-        <div class="a-neighborhood">${escapeHtml(categoryLabel(cat))}${seriesName ? ' · SERİ: ' + escapeHtml(seriesName) : ''} · ${ago}</div>
+      <div class="article-card" data-id="${n.id}"${n.archived_at ? ' style="opacity:0.6;"' : ''}>
+        <div class="a-neighborhood">${escapeHtml(categoryLabel(cat))}${seriesName ? ' · SERİ: ' + escapeHtml(seriesName) : ''} · ${ago}${n.archived_at ? ' · ARŞİVLENDİ' : ''}</div>
         <h4>${escapeHtml(n.title)}</h4>
         ${n.body ? `<p>${escapeHtml(n.body)}</p>` : ''}
         <div class="sources-block">
@@ -2586,6 +2588,9 @@ function renderNewsList() {
         </div>
         <div class="card-actions">
           <button class="btn-edit" data-act="edit-news" data-id="${n.id}">Düzenle</button>
+          ${n.archived_at
+            ? `<button class="btn-edit" data-act="unarchive-news" data-id="${n.id}">Arşivden Çıkar</button>`
+            : `<button class="btn-edit" data-act="archive-news" data-id="${n.id}">Arşivle</button>`}
           <button class="btn-del" data-act="del-news" data-id="${n.id}">Sil</button>
         </div>
         <div class="news-edit-form" data-id="${n.id}">
@@ -2623,6 +2628,8 @@ document.getElementById('news-list').addEventListener('click', function(e) {
   const act = btn.dataset.act;
   const card = btn.closest('.article-card');
   if (act === 'del-news') deleteBreakingNews(btn.dataset.id);
+  else if (act === 'archive-news') archiveBreakingNews(btn.dataset.id, true);
+  else if (act === 'unarchive-news') archiveBreakingNews(btn.dataset.id, false);
   else if (act === 'del-src') deleteSource(btn.dataset.id);
   else if (act === 'add-src') addSource(btn);
   else if (act === 'del-update') deleteNewsUpdate(btn.dataset.id);
@@ -3091,6 +3098,16 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
 async function deleteBreakingNews(id) {
   if (!confirm('Delete this breaking news item?')) return;
   const { error } = await sb.from('breaking_news').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadBreakingNews();
+}
+
+// Pulls a story from the public Anahane feed before its normal 72h
+// expiry (or restores it back into that window).
+async function archiveBreakingNews(id, archive) {
+  const { error } = await sb.from('breaking_news')
+    .update({ archived_at: archive ? new Date().toISOString() : null })
+    .eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   loadBreakingNews();
 }
