@@ -885,12 +885,15 @@
 
     <!-- LEFT PANEL: swaps between shelves-grid (index) and shelf settings + article form (editor) -->
     <div class="panel">
-      <!-- INDEX: 6 shelf cards -->
+      <!-- INDEX: shelf cards, one per row in library_shelves -->
       <div id="shelves-index-block">
         <div class="panel-title">Kütüphane — Shelves (Rafs)</div>
         <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
           Click a shelf to set its name and add the articles inside. Empty shelves render as "Coming Soon" to readers.
         </p>
+        <div class="btn-row" style="margin-bottom:14px;">
+          <button class="btn btn-primary" id="add-shelf-btn">+ Add Shelf</button>
+        </div>
         <div id="shelves-grid">
           <div class="empty-state"><span class="spinner"></span></div>
         </div>
@@ -911,6 +914,7 @@
 
         <div class="btn-row">
           <button class="btn btn-primary" id="se-save-btn">Save Shelf</button>
+          <button class="btn btn-danger" id="se-delete-btn">Delete Shelf</button>
         </div>
         <div class="status-msg" id="se-status"></div>
 
@@ -1763,7 +1767,7 @@ document.getElementById('signout-btn').addEventListener('click', async () => {
 let currentShelfId = null;
 let currentShelfArticles = [];
 
-// Show the index view: 6 shelf cards on the left, sidebar counters on the right.
+// Show the index view: shelf cards on the left, sidebar counters on the right.
 function showKutuphaneIndex() {
   currentShelfId = null;
   document.getElementById('shelves-index-block').style.display = '';
@@ -1775,7 +1779,7 @@ function showKutuphaneIndex() {
   loadCounters();
 }
 
-// Render the 6 shelves as clickable cards in the index. Each card shows
+// Render the shelves as clickable cards in the index. Each card shows
 // the name, subtitle, and article count — click to open the editor.
 async function loadShelfCards() {
   const gridEl = document.getElementById('shelves-grid');
@@ -1800,7 +1804,7 @@ async function loadShelfCards() {
   });
 
   if (!SHELVES.length) {
-    gridEl.innerHTML = '<div class="empty-state">Shelves not seeded. Run db/library_shelves_v5.sql.</div>';
+    gridEl.innerHTML = '<div class="empty-state">No shelves yet. Click + Add Shelf to create one.</div>';
     return;
   }
 
@@ -1821,6 +1825,24 @@ async function loadShelfCards() {
     card.addEventListener('click', () => openShelfEditor(Number(card.dataset.shelf)));
   });
 }
+
+// Add a new shelf (persisted immediately, like publishing a news article)
+// and jump straight into its editor to name it.
+document.getElementById('add-shelf-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('add-shelf-btn');
+  btn.disabled = true;
+  const { data, error } = await sb.from('library_shelves')
+    .insert([{ name_tr: '', subtitle_tr: '' }])
+    .select('*').single();
+  btn.disabled = false;
+  if (error) {
+    alert('Failed to add shelf: ' + error.message);
+    return;
+  }
+  SHELVES.push(data);
+  SHELF_LABELS[data.id] = `Raf ${data.id}`;
+  openShelfEditor(data.id);
+});
 
 // Switch to the shelf editor: shelf metadata on the left, article path on the right.
 async function openShelfEditor(shelfId) {
@@ -1917,6 +1939,25 @@ document.getElementById('se-save-btn').addEventListener('click', async () => {
   document.getElementById('shelf-edit-title').textContent = name ? `Edit — ${name}` : `Edit Raf ${shelfId}`;
   document.getElementById('shelf-articles-title').textContent = name ? `${name} · Articles` : `Raf ${shelfId} · Articles`;
   setTimeout(() => { statusEl.textContent = ''; }, 2000);
+});
+
+document.getElementById('se-delete-btn').addEventListener('click', async () => {
+  const shelfId = Number(document.getElementById('se-shelf-id').value);
+  const shelf = SHELVES.find(s => s.id === shelfId);
+  const label = (shelf && shelf.name_tr && shelf.name_tr.trim()) || `Raf ${shelfId}`;
+  const articleCount = currentShelfArticles.length;
+  const warning = articleCount
+    ? `Delete "${label}"? Its ${articleCount} article${articleCount === 1 ? '' : 's'} will be unassigned, not deleted.`
+    : `Delete "${label}"?`;
+  if (!confirm(warning)) return;
+  const { error } = await sb.from('library_shelves').delete().eq('id', shelfId);
+  if (error) {
+    alert('Failed to delete shelf: ' + error.message);
+    return;
+  }
+  SHELVES = SHELVES.filter(s => s.id !== shelfId);
+  delete SHELF_LABELS[shelfId];
+  showKutuphaneIndex();
 });
 
 // ── Pages editor ──
