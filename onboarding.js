@@ -1027,6 +1027,11 @@
     if (!sb || !user) return false;
     const page = opts.page || 'anahane';
 
+    // Admin kill switch (app_settings.onboarding_enabled). Missing row = enabled.
+    const { data: setting } = await sb.from('app_settings')
+      .select('value').eq('key', 'onboarding_enabled').maybeSingle();
+    if (setting && setting.value === false) { clearState(); return false; }
+
     // Always confirm we're not done already.
     const { data: profile } = await sb.from('profiles')
       .select('onboarded_at, referral_code, referred_by, neighborhood')
