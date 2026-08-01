@@ -49,16 +49,18 @@
       --hairline-border: 1px solid var(--whisper);
       --rule-strong: 1px solid var(--ink);
       --rule-double: 4px double var(--ink);
-      /* Quote source-type fills: cat1 spoken, cat2 sung, cat3 written, cat4 oral tradition */
-      --cat1: #a85c52;
-      --cat2: #8a6a96;
-      --cat3: #5b5650;
-      --cat4: #9a9288;
-      /* cat4's fill is light in the default (earth) palette, so dark ink
-         text reads fine — but palette.css's mono override turns --cat4
-         into a near-black gray, at which point default --ink-deep text
-         (also black in mono) becomes invisible. This token lets the mono
-         override flip just this one category's text to light. */
+      /* Quote source-type fills: cat1 Sözlü/red, cat2 Ezgi/purple,
+         cat3 Yazılı/black, cat4 Halk Ağzı/gray — matches the color names
+         already used in admin.html's Tümcel category dropdown. */
+      --cat1: #B93631;
+      --cat2: #695F79;
+      --cat3: #171616;
+      --cat4: #8F8A92;
+      /* cat4's fill is light, so dark ink text reads fine — but palette.css's
+         mono override turns --cat4 into a near-black gray, at which point
+         default --ink-deep text (also black in mono) becomes invisible.
+         This token lets the mono override flip just this one category's
+         text to light. */
       --cat4-ink: var(--ink-deep);
     }
 
@@ -304,10 +306,20 @@
       color: var(--ink-deep);
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       animation: slideIn 0.3s ease;
+      /* All four solved boxes are equalized to a shared height by JS
+         (equalizeSolvedGroupHeights()), floored to the word-card tuş's own
+         min-height — this just centers each box's content within that
+         shared height instead of letting it sit top-aligned. */
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow: hidden;
     }
 
-    .solved-group.cat1 { background: var(--cat1); }
-    .solved-group.cat2 { background: var(--cat2); }
+    /* cat1 (red) and cat2 (purple) are dark fills, so they need light text;
+       cat3 (near-black) already did. cat4 (light gray) keeps dark ink. */
+    .solved-group.cat1 { background: var(--cat1); color: var(--paper); }
+    .solved-group.cat2 { background: var(--cat2); color: var(--paper); }
     .solved-group.cat3 { background: var(--cat3); color: var(--paper); }
     .solved-group.cat4 { background: var(--cat4); color: var(--cat4-ink); }
 
@@ -898,25 +910,6 @@
     }
     .suggest-section .my-wins .row .date { color: var(--success); font-weight: 700; }
 
-    /* Günün Tümcülleri line below the game */
-    .tumculler-line {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.66rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--accent);
-      text-align: center;
-      padding: 6px 12px;
-      border-top: 1px solid var(--hairline);
-      flex-shrink: 0;
-      min-height: 18px;
-    }
-    .tumculler-line .tag { color: var(--muted); margin-right: 6px; }
-    .tumculler-line .name { color: var(--ink-red); cursor: pointer; }
-    .tumculler-line .name:hover { text-decoration: underline; }
-    .tumculler-line .sep { color: var(--muted); margin: 0 6px; opacity: 0.5; }
-
     /* ── Embedded mode: opened inside kahvehane.html's game-overlay bottom
        sheet (an iframe). The masthead, top nav, and left/right columns are
        already visible on kahvehane itself, so showing them again here just
@@ -1141,7 +1134,6 @@
         </div>
 
         <div class="reset-info" id="reset-info"></div>
-        <div class="tumculler-line" id="tumculler-line"></div>
       </div>
     </section>
   </main>
@@ -1338,6 +1330,20 @@ function escapeHtml(s) {
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// All four solved-group boxes should read as the same-size rectangle,
+// floored to the word-card tuş's own min-height (60px desktop / 52px
+// mobile — kept in sync with the .word-card rule in the <style> above).
+// Re-measured on every reveal since quote length varies per box.
+function equalizeSolvedGroupHeights() {
+  const groups = document.querySelectorAll('.solved-group');
+  if (!groups.length) return;
+  groups.forEach(g => { g.style.height = ''; });
+  const tileMinHeight = window.innerWidth <= 768 ? 52 : 60;
+  let max = tileMinHeight;
+  groups.forEach(g => { max = Math.max(max, g.offsetHeight); });
+  groups.forEach(g => { g.style.height = max + 'px'; });
+}
+
 // ── Render ──
 function renderFragments() {
   const grid = document.getElementById('words-grid');
@@ -1404,10 +1410,11 @@ async function checkGuess() {
     const fullText = quote.full_quote || ordered.map(f => f.text).join(' ');
     groupDiv.innerHTML = `
       <div class="solved-quote">${escapeHtml(fullText)}</div>
-      <div class="solved-source">${escapeHtml(quote.source)}</div>
+      <div class="solved-source">${tumcelCategoryLabel(quote) ? escapeHtml(tumcelCategoryLabel(quote)) + ' · ' : ''}${escapeHtml(quote.source)}</div>
       ${tumculTagHtml(quote)}
     `;
     solvedDiv.appendChild(groupDiv);
+    equalizeSolvedGroupHeights();
 
     selectedFragments = [];
     renderFragments();
@@ -1501,10 +1508,11 @@ function revealUnsolvedQuotes() {
       const fullText = quote.full_quote || (quote.fragments || []).join(' ');
       groupDiv.innerHTML = `
         <div class="solved-quote">${escapeHtml(fullText)}</div>
-        <div class="solved-source">${escapeHtml(quote.source)}</div>
+        <div class="solved-source">${tumcelCategoryLabel(quote) ? escapeHtml(tumcelCategoryLabel(quote)) + ' · ' : ''}${escapeHtml(quote.source)}</div>
         ${tumculTagHtml(quote)}
       `;
       solvedDiv.appendChild(groupDiv);
+      equalizeSolvedGroupHeights();
     }, 260 + i * 260);
   });
 }
@@ -1611,11 +1619,12 @@ async function restoreState() {
       const fullText = quote.full_quote || (quote.fragments || []).join(' ');
       groupDiv.innerHTML = `
         <div class="solved-quote">${escapeHtml(fullText)}</div>
-        <div class="solved-source">${escapeHtml(quote.source)}</div>
+        <div class="solved-source">${tumcelCategoryLabel(quote) ? escapeHtml(tumcelCategoryLabel(quote)) + ' · ' : ''}${escapeHtml(quote.source)}</div>
         ${tumculTagHtml(quote)}
       `;
       solvedDiv.appendChild(groupDiv);
     });
+    equalizeSolvedGroupHeights();
 
     renderMistakesHearts();
 
@@ -1872,7 +1881,6 @@ async function markPlayedGames() {
   renderStats();
   loadScoreboard();
   markPlayedGames();
-  renderTumculler(puzzle);
   renderTumcelSuggestionPanel();
   if (typeof applyGameLocks === 'function') applyGameLocks(sb);
 })();
@@ -1926,17 +1934,11 @@ function tumculTagHtml(quote) {
   return `<div class="solved-tumcul">Tümcül: <span class="name author-link" data-user-id="${quote.tumcul_id}">${escapeHtml(label)}</span></div>`;
 }
 
-function renderTumculler(puzzle) {
-  const el = document.getElementById('tumculler-line');
-  if (!el) return;
-  const tumculIds = [...new Set(((puzzle && puzzle.quotes) || []).map(q => q.tumcul_id).filter(Boolean))];
-  const tag = tumculIds.length === 1 ? 'Günün Tümcülü:' : 'Günün Tümcülleri:';
-  const names = tumculIds.map(id => {
-    const label = tumculLabel(id);
-    if (!label) return '';
-    return `<span class="name author-link" data-user-id="${id}">${escapeHtml(label)}</span>`;
-  }).filter(Boolean).join('<span class="sep">·</span>');
-  el.innerHTML = names ? `<span class="tag">${tag}</span>${names}` : '';
+// Category type names, matching admin.html's Tümcel color-picker labels
+// (cat1 Sözlü/red, cat2 Ezgi/purple, cat3 Yazılı/black, cat4 Halk Ağzı/gray).
+const TUMCEL_CATEGORY_LABELS = { cat1: 'Sözlü', cat2: 'Ezgi', cat3: 'Yazılı', cat4: 'Halk Ağzı' };
+function tumcelCategoryLabel(quote) {
+  return (quote && TUMCEL_CATEGORY_LABELS[quote.color]) || '';
 }
 
 // ── Alıntı önerisi: one pending per user, globally unique ──
