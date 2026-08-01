@@ -54,6 +54,12 @@
       --cat2: #8a6a96;
       --cat3: #5b5650;
       --cat4: #9a9288;
+      /* cat4's fill is light in the default (earth) palette, so dark ink
+         text reads fine — but palette.css's mono override turns --cat4
+         into a near-black gray, at which point default --ink-deep text
+         (also black in mono) becomes invisible. This token lets the mono
+         override flip just this one category's text to light. */
+      --cat4-ink: var(--ink-deep);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -303,7 +309,7 @@
     .solved-group.cat1 { background: var(--cat1); }
     .solved-group.cat2 { background: var(--cat2); }
     .solved-group.cat3 { background: var(--cat3); color: var(--paper); }
-    .solved-group.cat4 { background: var(--cat4); }
+    .solved-group.cat4 { background: var(--cat4); color: var(--cat4-ink); }
 
     .solved-quote {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
@@ -670,6 +676,26 @@
     @keyframes slideIn {
       from { opacity: 0; transform: translateY(-8px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Game-over reveal: the tile grid + controls fade out first, then the
+       remaining unsolved quotes slide in one at a time (see
+       revealUnsolvedQuotes()), instead of everything popping in at once. */
+    .words-grid, .controls {
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    .words-grid.fade-out,
+    .controls.fade-out {
+      opacity: 0;
+      transform: translateY(6px) scale(0.98);
+      pointer-events: none;
+    }
+    @keyframes revealUnsolved {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 0.6; transform: translateY(0); }
+    }
+    .solved-group.reveal-unsolved {
+      animation: revealUnsolved 0.4s ease forwards;
     }
 
     /* Profile popup */
@@ -1450,19 +1476,36 @@ async function checkGuess() {
 }
 
 function revealUnsolvedQuotes() {
+  // Out of guesses: the remaining tiles no longer mean anything, so drop
+  // them (renderFragments() is always called again right after this by
+  // both call sites — checkGuess() and restoreState() — so clearing here
+  // is enough to keep them from reappearing under the reveal) and fade
+  // the now-empty grid + controls out instead of yanking them away.
+  allFragments = [];
+  const grid = document.getElementById('words-grid');
+  const controls = document.querySelector('.controls');
+  if (grid) grid.classList.add('fade-out');
+  if (controls) controls.classList.add('fade-out');
+
   const solvedDiv = document.getElementById('solved-groups');
-  todaysPuzzle.quotes.forEach((quote, qi) => {
-    if (solvedQuotes.includes(qi)) return;
-    const groupDiv = document.createElement('div');
-    groupDiv.className = `solved-group ${quote.color}`;
-    groupDiv.style.opacity = '0.5';
-    const fullText = quote.full_quote || (quote.fragments || []).join(' ');
-    groupDiv.innerHTML = `
-      <div class="solved-quote">${escapeHtml(fullText)}</div>
-      <div class="solved-source">${escapeHtml(quote.source)}</div>
-      ${tumculTagHtml(quote)}
-    `;
-    solvedDiv.appendChild(groupDiv);
+  const unsolved = todaysPuzzle.quotes
+    .map((quote, qi) => ({ quote, qi }))
+    .filter(({ qi }) => !solvedQuotes.includes(qi));
+
+  // Reveal one quote at a time, like Connections does when it auto-solves
+  // the remaining categories after your last mistake.
+  unsolved.forEach(({ quote }, i) => {
+    setTimeout(() => {
+      const groupDiv = document.createElement('div');
+      groupDiv.className = `solved-group ${quote.color} reveal-unsolved`;
+      const fullText = quote.full_quote || (quote.fragments || []).join(' ');
+      groupDiv.innerHTML = `
+        <div class="solved-quote">${escapeHtml(fullText)}</div>
+        <div class="solved-source">${escapeHtml(quote.source)}</div>
+        ${tumculTagHtml(quote)}
+      `;
+      solvedDiv.appendChild(groupDiv);
+    }, 260 + i * 260);
   });
 }
 
