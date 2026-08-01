@@ -810,6 +810,16 @@
     .game-status-day-btn.off .gsd-state { color: var(--ink-red); }
     .game-status-day-btn.today { border-width: 2px; }
 
+    /* ── Users tab: onboarding on/off switch (reuses game-status-day-btn look) ── */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .setting-row-label { font-size: 0.82rem; }
+    .setting-row-sub { font-size: 0.72rem; color: var(--muted); font-style: italic; margin-top: 2px; }
+
     .games-subnav {
       display: flex;
       gap: 6px;
@@ -1626,7 +1636,19 @@
 
     <!-- LEFT: Create User -->
     <div class="panel">
-      <div class="panel-title">Create User Account</div>
+      <div class="panel-title">Onboarding</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row-label">New-account welcome flow</div>
+          <div class="setting-row-sub">Off = new users skip straight into the site, no welcome/tour modal.</div>
+        </div>
+        <button type="button" class="game-status-day-btn on" id="onboarding-toggle-btn" data-on="1">
+          <span class="gsd-label">Onboarding</span>
+          <span class="gsd-state" id="onboarding-toggle-state">Açık</span>
+        </button>
+      </div>
+
+      <div class="panel-title" style="margin-top:22px;">Create User Account</div>
 
       <label>First Name</label>
       <input type="text" id="u-first-name" placeholder="Ad"/>
@@ -1758,7 +1780,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'politicians') loadPoliticiansTab();
     if (tab === 'tbmm') loadTBMMTab();
     if (tab === 'notifications') loadNotifications();
-    if (tab === 'users') loadUsersList();
+    if (tab === 'users') { loadUsersList(); loadOnboardingToggle(); }
   });
 });
 
@@ -3259,6 +3281,33 @@ async function archiveBreakingNews(id, archive) {
   if (error) { alert('Error: ' + error.message); return; }
   loadBreakingNews();
 }
+
+// ══════════════════════════════════════════
+// Users tab — onboarding on/off switch (app_settings)
+// ══════════════════════════════════════════
+async function loadOnboardingToggle() {
+  const btn = document.getElementById('onboarding-toggle-btn');
+  const stateEl = document.getElementById('onboarding-toggle-state');
+  const { data, error } = await sb.from('app_settings').select('value').eq('key', 'onboarding_enabled').maybeSingle();
+  if (error) { stateEl.textContent = 'Hata'; return; }
+  // Missing row = treated as enabled (matches onboarding.js default).
+  const enabled = !data || data.value !== false;
+  btn.dataset.on = enabled ? '1' : '0';
+  btn.classList.toggle('on', enabled);
+  btn.classList.toggle('off', !enabled);
+  stateEl.textContent = enabled ? 'Açık' : 'Kapalı';
+}
+
+document.getElementById('onboarding-toggle-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('onboarding-toggle-btn');
+  const nextEnabled = btn.dataset.on !== '1';
+  const { data: { session } } = await sb.auth.getSession();
+  const updatedBy = session && session.user ? session.user.id : null;
+  const { error } = await sb.from('app_settings')
+    .upsert({ key: 'onboarding_enabled', value: nextEnabled, updated_by: updatedBy, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) { alert('Hata: ' + error.message); return; }
+  loadOnboardingToggle();
+});
 
 // ══════════════════════════════════════════
 // Users tab — list

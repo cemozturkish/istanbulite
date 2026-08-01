@@ -132,6 +132,11 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 - Read by `game-locks.js` on every game page (and Kahvehane) to lock the game's nav card and, if a user hits the game page directly, bounce them to Kahvehane with "Bugün `<Oyun>` yok!".
 - RLS: authenticated users SELECT all; admin-only INSERT/UPDATE/DELETE.
 
+**Table: `app_settings`** — generic admin-managed key/value feature toggle table (`db/app_settings.sql`).
+- `key text pk`, `value boolean`, `updated_by`, `updated_at`.
+- Currently one row: `onboarding_enabled` — global on/off switch for the new-account onboarding flow. Read by `onboarding.js`'s `maybeRun()` (missing row or `value = true` = enabled); a row with `value = false` disables it site-wide. Managed from the "Onboarding" panel at the top of admin.html's Users tab.
+- RLS: authenticated users SELECT all; admin-only INSERT/UPDATE/DELETE.
+
 ### Key DB functions / triggers
 - `public.is_admin()` — returns true if `auth.uid()`'s email matches the admin email; used in every admin-only RLS policy.
 - `public.handle_new_user()` — trigger on `auth.users insert`. Reads `raw_user_meta_data` (first_name, last_name, phone, neighborhood, birth_neighborhood, birth_place, referral_code), validates the kefil code, resolves the referrer, generates a unique 8-char `referral_code`, inserts the matching `profiles` row. Atomic with the auth user creation — failure rolls everything back.
