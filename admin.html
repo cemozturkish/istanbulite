@@ -951,6 +951,7 @@
 
   <div class="admin-tabs">
     <button class="admin-tab active" data-tab="kutuphane">Kütüphane</button>
+    <button class="admin-tab" data-tab="mektuplar">Mektuplar</button>
     <button class="admin-tab" data-tab="news">Breaking News</button>
     <button class="admin-tab" data-tab="events">Events</button>
     <button class="admin-tab" data-tab="games">Oyunlar</button>
@@ -971,12 +972,9 @@
         <div class="panel-title">Kütüphane — Shelves (Rafs)</div>
         <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
           Click a shelf to set its name and add the articles inside. Empty shelves render as "Coming Soon" to readers.
-          A shelf marked Mektup shows up in the site's Mektuplar box instead of Makaleler — a letter is usually just
-          one shelf with a single article, same as any other shelf.
         </p>
         <div class="btn-row" style="margin-bottom:14px;">
-          <button class="btn btn-primary" id="add-shelf-btn">+ Add Shelf (Makale)</button>
-          <button class="btn btn-secondary" id="add-letter-btn">+ Add Letter (Mektup)</button>
+          <button class="btn btn-primary" id="add-shelf-btn">+ Add Shelf</button>
         </div>
         <div id="shelves-grid">
           <div class="empty-state"><span class="spinner"></span></div>
@@ -993,12 +991,6 @@
 
         <label>Subtitle (optional)</label>
         <input type="text" id="se-subtitle" placeholder="Short description"/>
-
-        <label>Type</label>
-        <select id="se-is-letter">
-          <option value="0">Makale (shows in Makaleler)</option>
-          <option value="1">Mektup (shows in Mektuplar)</option>
-        </select>
 
         <input type="hidden" id="se-shelf-id"/>
 
@@ -1109,6 +1101,43 @@
         <div class="articles-list" id="articles-list">
           <div class="empty-state"><span class="spinner"></span></div>
         </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="admin-body" id="mektuplar-tab" style="display:none;">
+
+    <!-- LEFT: Add / Edit Letter -->
+    <div class="panel">
+      <div class="panel-title" id="lt-form-mode-label">Add New Letter</div>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        A letter is just a title, a date, and a body — shown to readers as one scrollable page, no chapters, no shelf.
+      </p>
+
+      <label>Title</label>
+      <input type="text" id="lt-title" placeholder="Letter title..."/>
+
+      <label>Date</label>
+      <input type="date" id="lt-date"/>
+
+      <label>Body</label>
+      <textarea id="lt-body" rows="12" placeholder="The letter's text. Blank lines separate paragraphs."></textarea>
+
+      <input type="hidden" id="lt-editing-id"/>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="lt-submit-btn">Add Letter</button>
+        <button class="btn btn-secondary" id="lt-cancel-btn" style="display:none;">Cancel Edit</button>
+      </div>
+      <div class="status-msg" id="lt-form-status"></div>
+    </div>
+
+    <!-- RIGHT: Letters List -->
+    <div class="panel">
+      <div class="panel-title">Mektuplar</div>
+      <div class="articles-list" id="letters-list">
+        <div class="empty-state"><span class="spinner"></span></div>
       </div>
     </div>
 
@@ -1771,6 +1800,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     const tab = btn.dataset.tab;
     document.querySelectorAll('.admin-tab').forEach(b => b.classList.toggle('active', b === btn));
     document.getElementById('kutuphane-tab').style.display = (tab === 'kutuphane') ? '' : 'none';
+    document.getElementById('mektuplar-tab').style.display = (tab === 'mektuplar') ? '' : 'none';
     document.getElementById('news-tab').style.display = (tab === 'news') ? '' : 'none';
     document.getElementById('events-tab').style.display = (tab === 'events') ? '' : 'none';
     document.getElementById('games-tab').style.display = (tab === 'games') ? 'grid' : 'none';
@@ -1781,6 +1811,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('notifications-tab').style.display = (tab === 'notifications') ? '' : 'none';
     document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
     if (tab === 'kutuphane') showKutuphaneIndex();
+    if (tab === 'mektuplar') loadLettersList();
     if (tab === 'news') { loadSeries(); loadBreakingNews(); }
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
     if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); }
@@ -1950,10 +1981,9 @@ async function loadShelfCards() {
     const name = (s.name_tr && s.name_tr.trim()) ? escapeHtml(s.name_tr.trim()) : '<span style="color:var(--muted);font-style:italic;">(unnamed)</span>';
     const subtitle = s.subtitle_tr ? escapeHtml(s.subtitle_tr) : '';
     const count = counts[s.id] || 0;
-    const kindLabel = s.is_letter ? 'MEKTUP' : 'MAKALE';
     return `
       <div class="article-card" data-shelf="${s.id}" style="cursor:pointer;">
-        <div class="a-neighborhood">Raf ${s.id} · ${kindLabel} · ${count} article${count === 1 ? '' : 's'}</div>
+        <div class="a-neighborhood">Raf ${s.id} · ${count} article${count === 1 ? '' : 's'}</div>
         <h4>${name}</h4>
         ${subtitle ? `<p>${subtitle}</p>` : ''}
       </div>
@@ -1967,25 +1997,21 @@ async function loadShelfCards() {
 
 // Add a new shelf (persisted immediately, like publishing a news article)
 // and jump straight into its editor to name it.
-// Shared by both "+ Add" buttons below -- only the is_letter flag differs,
-// so a letter starts life exactly like a shelf, just filed under Mektuplar
-// instead of Makaleler from the first save onward.
-async function addShelf(isLetter, btn) {
+document.getElementById('add-shelf-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('add-shelf-btn');
   btn.disabled = true;
   const { data, error } = await sb.from('library_shelves')
-    .insert([{ name_tr: '', subtitle_tr: '', is_letter: isLetter }])
+    .insert([{ name_tr: '', subtitle_tr: '' }])
     .select('*').single();
   btn.disabled = false;
   if (error) {
-    alert('Failed to add ' + (isLetter ? 'letter' : 'shelf') + ': ' + error.message);
+    alert('Failed to add shelf: ' + error.message);
     return;
   }
   SHELVES.push(data);
   SHELF_LABELS[data.id] = `Raf ${data.id}`;
   openShelfEditor(data.id);
-}
-document.getElementById('add-shelf-btn').addEventListener('click', (e) => addShelf(false, e.currentTarget));
-document.getElementById('add-letter-btn').addEventListener('click', (e) => addShelf(true, e.currentTarget));
+});
 
 // Switch to the shelf editor: shelf metadata on the left, article path on the right.
 async function openShelfEditor(shelfId) {
@@ -2004,7 +2030,6 @@ async function openShelfEditor(shelfId) {
   document.getElementById('se-shelf-id').value = String(shelfId);
   document.getElementById('se-name').value = shelf ? (shelf.name_tr || '') : '';
   document.getElementById('se-subtitle').value = shelf ? (shelf.subtitle_tr || '') : '';
-  document.getElementById('se-is-letter').value = shelf && shelf.is_letter ? '1' : '0';
   document.getElementById('se-status').textContent = '';
 
   loadArticlesForShelf(shelfId);
@@ -2064,11 +2089,10 @@ document.getElementById('se-save-btn').addEventListener('click', async () => {
   const shelfId = Number(document.getElementById('se-shelf-id').value);
   const name = document.getElementById('se-name').value.trim();
   const subtitle = document.getElementById('se-subtitle').value.trim();
-  const isLetter = document.getElementById('se-is-letter').value === '1';
   const statusEl = document.getElementById('se-status');
   statusEl.textContent = ''; statusEl.className = 'status-msg';
   const { error } = await sb.from('library_shelves')
-    .update({ name_tr: name, subtitle_tr: subtitle, is_letter: isLetter })
+    .update({ name_tr: name, subtitle_tr: subtitle })
     .eq('id', shelfId);
   if (error) {
     statusEl.textContent = error.message;
@@ -2079,7 +2103,7 @@ document.getElementById('se-save-btn').addEventListener('click', async () => {
   statusEl.className = 'status-msg ok';
   // Update local cache so labels stay in sync.
   const cached = SHELVES.find(s => s.id === shelfId);
-  if (cached) { cached.name_tr = name; cached.subtitle_tr = subtitle; cached.is_letter = isLetter; }
+  if (cached) { cached.name_tr = name; cached.subtitle_tr = subtitle; }
   SHELF_LABELS[shelfId] = name || `Raf ${shelfId}`;
   document.getElementById('shelf-edit-title').textContent = name ? `Edit — ${name}` : `Edit Raf ${shelfId}`;
   document.getElementById('shelf-articles-title').textContent = name ? `${name} · Articles` : `Raf ${shelfId} · Articles`;
@@ -3494,6 +3518,103 @@ async function deleteEvent(id) {
   const { error } = await sb.from('events').delete().eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   loadEventsList();
+}
+
+// ── Mektuplar: flat letters (title/date/body), no shelf/article path ──
+async function loadLettersList() {
+  const listEl = document.getElementById('letters-list');
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const { data, error } = await sb.from('library_letters')
+    .select('*').order('letter_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+  if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
+  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No letters yet.</div>'; return; }
+
+  listEl.innerHTML = data.map(l => `
+    <div class="article-card" data-id="${l.id}">
+      <div class="a-neighborhood">${l.letter_date ? escapeHtml(l.letter_date) : 'no date'}</div>
+      <h4>${escapeHtml(l.title)}</h4>
+      <div class="card-actions">
+        <button class="btn-edit" data-act="lt-edit" data-id="${l.id}">Edit</button>
+        <button class="btn-del"  data-act="lt-del"  data-id="${l.id}">Delete</button>
+      </div>
+    </div>
+  `).join('');
+
+  listEl.querySelectorAll('button[data-act]').forEach(btn => {
+    const l = data.find(x => x.id === btn.dataset.id);
+    if (!l) return;
+    if (btn.dataset.act === 'lt-edit') btn.addEventListener('click', () => editLetter(l));
+    if (btn.dataset.act === 'lt-del') btn.addEventListener('click', () => deleteLetter(l.id));
+  });
+}
+
+function editLetter(l) {
+  document.getElementById('lt-editing-id').value = l.id;
+  document.getElementById('lt-title').value = l.title || '';
+  document.getElementById('lt-date').value = l.letter_date || '';
+  document.getElementById('lt-body').value = l.body || '';
+  document.getElementById('lt-submit-btn').textContent = 'Update Letter';
+  document.getElementById('lt-form-mode-label').textContent = 'Editing Letter';
+  document.getElementById('lt-cancel-btn').style.display = 'inline-block';
+  document.querySelector('#mektuplar-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetLetterForm() {
+  document.getElementById('lt-editing-id').value = '';
+  document.getElementById('lt-title').value = '';
+  document.getElementById('lt-date').value = '';
+  document.getElementById('lt-body').value = '';
+  document.getElementById('lt-submit-btn').textContent = 'Add Letter';
+  document.getElementById('lt-form-mode-label').textContent = 'Add New Letter';
+  document.getElementById('lt-cancel-btn').style.display = 'none';
+}
+
+document.getElementById('lt-cancel-btn').addEventListener('click', resetLetterForm);
+
+document.getElementById('lt-submit-btn').addEventListener('click', async () => {
+  const editingId = document.getElementById('lt-editing-id').value;
+  const title = document.getElementById('lt-title').value.trim();
+  const letter_date = document.getElementById('lt-date').value || null;
+  const body = document.getElementById('lt-body').value.trim();
+  const statusEl = document.getElementById('lt-form-status');
+  const btn = document.getElementById('lt-submit-btn');
+
+  if (!title || !body) {
+    statusEl.textContent = 'Title and body are both required.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  let result;
+  if (editingId) {
+    result = await sb.from('library_letters').update({ title, letter_date, body }).eq('id', editingId);
+  } else {
+    result = await sb.from('library_letters').insert([{ title, letter_date, body }]);
+  }
+
+  btn.textContent = editingId ? 'Update Letter' : 'Add Letter';
+
+  if (result.error) {
+    statusEl.textContent = result.error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = editingId ? 'Letter updated!' : 'Letter added!';
+  statusEl.className = 'status-msg ok';
+  resetLetterForm();
+  loadLettersList();
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+async function deleteLetter(id) {
+  if (!confirm('Delete this letter? This cannot be undone.')) return;
+  const { error } = await sb.from('library_letters').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadLettersList();
 }
 
 // ── Quotes: general-purpose quote bank ──

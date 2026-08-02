@@ -518,11 +518,11 @@
        reused here for Kütüphane's own top-level sections: Makaleler opens
        the shelf browser (formerly always-open in the left column, now
        tucked behind this box, see openLibraryShelvesSheet), Mektuplar
-       opens its own placeholder sheet, and the third box is left
-       intentionally blank for a future section. Stays in .col-left at
-       every breakpoint -- on mobile .col-left becomes its own grid column
-       (see the "boxes" grid-area below), same idea as Kahvehane's own
-       .games-section column. */
+       opens its own flat title/date/body list (see openMektuplarSheet),
+       and the third box is left intentionally blank for a future section.
+       Stays in .col-left at every breakpoint -- on mobile .col-left
+       becomes its own grid column (see the "boxes" grid-area below), same
+       idea as Kahvehane's own .games-section column. */
     .lib-boxes {
       display: flex;
       flex-direction: column;
@@ -3555,13 +3555,13 @@ function staggerEntrance(elements, direction) {
 
 // Builds the shelf-grid markup alone (no wrapping sheet chrome) -- shared
 // by renderShelfButtons (the sheet's top level) below.
-function shelfListInnerHtml(activeShelfId, isLetter) {
+function shelfListInnerHtml(activeShelfId) {
   if (SHELVES_LOAD_ERROR) {
     return `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Raflar yüklenemedi.</div>`;
   }
-  const filledShelves = SHELVES_CACHE.filter(s => !!s.is_letter === !!isLetter && (SHELF_COUNTS[s.id] || 0) > 0);
+  const filledShelves = SHELVES_CACHE.filter(s => (SHELF_COUNTS[s.id] || 0) > 0);
   if (!filledShelves.length) {
-    return `<div class="empty-state" style="padding:20px;font-size:0.78rem;">${isLetter ? 'Henüz mektup yok.' : 'Henüz raf yok.'}</div>`;
+    return `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Henüz raf yok.</div>`;
   }
   return `<div class="shelves">${filledShelves.map(s => {
     const active = s.id === activeShelfId;
@@ -3585,39 +3585,35 @@ function shelfListInnerHtml(activeShelfId, isLetter) {
   }).join('')}</div>`;
 }
 
-// Sheet's top level -- the shelf list itself. Reached from the Makaleler/
-// Mektuplar boxes (openLibraryShelvesSheet) and from a shelf-path's
-// "← Raflar" back button (renderShelfPathView, openShelfPath's error/empty
-// branches), which return here without closing the sheet. `isLetter`
-// picks which of the two lists shows -- shelves flagged is_letter=true
-// (public.library_shelves) are Mektuplar, everything else is Makaleler
-// (see db/library_shelves_v7_letters.sql).
-function renderShelfButtons(activeShelfId = null, isLetter = false) {
+// Sheet's top level -- the shelf list itself. Reached from the "Makaleler"
+// box (openLibraryShelvesSheet) and from a shelf-path's "← Raflar" back
+// button (renderShelfPathView, openShelfPath's error/empty branches),
+// which return here without closing the sheet.
+function renderShelfButtons(activeShelfId = null) {
   const area = document.getElementById('reader-overlay-sheet');
   if (!area) return;
   area.innerHTML = `
     <div class="shelf-path">
       <div class="path-head">
         <button class="path-back" type="button" id="shelves-back">← Kütüphane</button>
-        <h2 class="path-title">${isLetter ? 'Mektuplar' : 'Makaleler'}</h2>
+        <h2 class="path-title">Makaleler</h2>
       </div>
-      ${shelfListInnerHtml(activeShelfId, isLetter)}
+      ${shelfListInnerHtml(activeShelfId)}
     </div>
   `;
   document.getElementById('shelves-back').addEventListener('click', closeReaderOverlay);
   area.querySelectorAll('.shelf-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      openShelfPath(Number(btn.dataset.shelf), isLetter);
+      openShelfPath(Number(btn.dataset.shelf));
     });
   });
 }
 
-// Entry point for both the Makaleler and Mektuplar boxes (see .lib-boxes
-// markup) -- rises the reader overlay straight into the matching shelf
-// list, fetching shelves first if this is the first time either's been
-// opened this session (both lists share the same SHELVES_CACHE).
-async function openLibraryShelvesSheet(isLetter = false) {
+// Entry point for the "Makaleler" box (see .lib-boxes markup) -- rises the
+// reader overlay straight into the shelf list, fetching it first if this
+// is the first time it's been opened this session.
+async function openLibraryShelvesSheet() {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
@@ -3627,10 +3623,116 @@ async function openLibraryShelvesSheet(isLetter = false) {
   requestAnimationFrame(() => overlay.classList.add('open'));
   _closeReaderOverlay = closeReaderOverlay;
   if (!SHELVES_LOADED) await loadShelvesUI();
-  renderShelfButtons(null, isLetter);
+  renderShelfButtons();
 }
-document.getElementById('lib-box-makaleler')?.addEventListener('click', () => openLibraryShelvesSheet(false));
-document.getElementById('lib-box-mektuplar')?.addEventListener('click', () => openLibraryShelvesSheet(true));
+document.getElementById('lib-box-makaleler')?.addEventListener('click', openLibraryShelvesSheet);
+
+// ══════════════════════════════════════════
+// Mektuplar (letters) -- deliberately flat: no shelf, no chapters, just a
+// title/date/body list reading public.library_letters (see
+// db/library_letters.sql). Reuses the same reader-overlay sheet as
+// Makaleler, but with its own much simpler list + single-page views.
+// ══════════════════════════════════════════
+let LETTERS_CACHE = null; // null = not fetched yet this session
+
+async function loadLetters() {
+  if (LETTERS_CACHE) return LETTERS_CACHE;
+  const { data, error } = await sb.from('library_letters')
+    .select('*')
+    .order('letter_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('[kutuphane letters]', error);
+    LETTERS_CACHE = [];
+    return LETTERS_CACHE;
+  }
+  LETTERS_CACHE = data || [];
+  return LETTERS_CACHE;
+}
+
+function formatLetterDate(dateStr) {
+  if (!dateStr) return '';
+  // dateStr is a plain YYYY-MM-DD (Postgres `date`) -- parse as local, not
+  // UTC-midnight, so it doesn't roll back a day in western timezones.
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// Entry point for the "Mektuplar" box (see .lib-boxes markup).
+async function openMektuplarSheet() {
+  const overlay = document.getElementById('reader-overlay');
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !area) return;
+  area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  positionReaderSheet();
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  _closeReaderOverlay = closeReaderOverlay;
+  renderLettersList(await loadLetters());
+}
+
+function renderLettersList(letters) {
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!area) return;
+  const listHtml = letters.length
+    ? `<div class="shelves">${letters.map(l => `
+        <a class="shelf-btn" data-letter="${libEsc(l.id)}" href="#">
+          <div>
+            <div class="shelf-title">${libEsc(l.title)}</div>
+            ${l.letter_date ? `<div class="shelf-subtitle">${libEsc(formatLetterDate(l.letter_date))}</div>` : ''}
+          </div>
+        </a>
+      `).join('')}</div>`
+    : `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Henüz mektup yok.</div>`;
+  area.innerHTML = `
+    <div class="shelf-path">
+      <div class="path-head">
+        <button class="path-back" type="button" id="letters-back">← Kütüphane</button>
+        <h2 class="path-title">Mektuplar</h2>
+      </div>
+      ${listHtml}
+    </div>
+  `;
+  document.getElementById('letters-back').addEventListener('click', closeReaderOverlay);
+  area.querySelectorAll('.shelf-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const letter = letters.find(l => l.id === btn.dataset.letter);
+      if (letter) openLetterReader(letter, letters);
+    });
+  });
+}
+
+// Plain paragraphs only -- no page-splitting, no vote widgets, no vocab
+// tooltips (those are Makaleler-specific pedagogical features a letter
+// has no use for). Blank lines separate paragraphs.
+function renderLetterBodyHtml(body) {
+  const escaped = libEsc(body || '');
+  return escaped.split(/\n{2,}/).map(p => p.trim() ? `<p>${p.replace(/\n/g, '<br>')}</p>` : '').join('');
+}
+
+// A letter is one scrollable page -- title, date, body -- with a back
+// button to the letters list, no chapters/steps/next-button to click
+// through (unlike openArticleReader's Duolingo-style Makaleler reader).
+function openLetterReader(letter, letters) {
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!area) return;
+  area.innerHTML = `
+    <div class="shelf-path">
+      <div class="path-head">
+        <button class="path-back" type="button" id="letter-back">← Mektuplar</button>
+      </div>
+      <h2 class="path-title" style="margin-bottom:4px;">${libEsc(letter.title)}</h2>
+      ${letter.letter_date ? `<p class="path-subtitle">${libEsc(formatLetterDate(letter.letter_date))}</p>` : ''}
+      <div class="reader-section-body" style="margin-top:14px;">${renderLetterBodyHtml(letter.body)}</div>
+    </div>
+  `;
+  document.getElementById('letter-back').addEventListener('click', () => renderLettersList(letters));
+  _closeReaderOverlay = closeReaderOverlay;
+  const pathEl = area.querySelector('.shelf-path');
+  if (pathEl) pathEl.scrollTop = 0;
+}
+document.getElementById('lib-box-mektuplar')?.addEventListener('click', openMektuplarSheet);
 
 // ══════════════════════════════════════════
 // Dünya (world) news feed — left column (col-right), replacing the shelf
@@ -4009,7 +4111,7 @@ window.addEventListener('resize', () => {
   if (overlay && overlay.classList.contains('open')) positionReaderSheet();
 });
 
-async function openShelfPath(shelfId, isLetter = false) {
+async function openShelfPath(shelfId) {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
@@ -4036,7 +4138,7 @@ async function openShelfPath(shelfId, isLetter = false) {
         <div class="empty-state">Yüklenemedi.</div>
       </div>
     `;
-    document.getElementById('path-back').addEventListener('click', () => renderShelfButtons(null, isLetter));
+    document.getElementById('path-back').addEventListener('click', () => renderShelfButtons());
     return;
   }
   if (!articles || !articles.length) {
@@ -4049,7 +4151,7 @@ async function openShelfPath(shelfId, isLetter = false) {
         <div class="empty-state">Bu rafta henüz makale yok.</div>
       </div>
     `;
-    document.getElementById('path-back').addEventListener('click', () => renderShelfButtons(null, isLetter));
+    document.getElementById('path-back').addEventListener('click', () => renderShelfButtons());
     return;
   }
 
@@ -4066,11 +4168,11 @@ async function openShelfPath(shelfId, isLetter = false) {
     // Chapters aren't mandatory: a shelf with a single article (e.g. a
     // standalone letter) has nothing to pick between, so it skips the
     // table of contents and opens straight into the reader.
-    openArticleReader(articles[0], shelf, shelfId, articles, lockState, completedSet, isLetter);
+    openArticleReader(articles[0], shelf, shelfId, articles, lockState, completedSet);
     return;
   }
 
-  renderShelfPathView(shelf, shelfId, articles, lockState, completedSet, isLetter);
+  renderShelfPathView(shelf, shelfId, articles, lockState, completedSet);
 }
 
 // Closes the reader overlay entirely, whichever view (shelf list, table of
@@ -4219,7 +4321,7 @@ if (tbmmOpenBtn) tbmmOpenBtn.addEventListener('click', openTBMMSheet);
 // rises from the bottom like the reader itself. Reused both when a shelf
 // is first opened and when the reader's back button returns here without
 // closing the sheet.
-function renderShelfPathView(shelf, shelfId, articles, lockState, completedSet, isLetter = false) {
+function renderShelfPathView(shelf, shelfId, articles, lockState, completedSet) {
   const area = document.getElementById('reader-overlay-sheet');
   if (!area) return;
   const title = (shelf && shelf.name_tr && shelf.name_tr.trim()) || `Raf ${shelfId}`;
@@ -4261,10 +4363,10 @@ function renderShelfPathView(shelf, shelfId, articles, lockState, completedSet, 
       const a = articles.find(x => x.id === node.dataset.art);
       if (!a) return;
       const i = articles.indexOf(a);
-      showChapterIntro(a, i, () => openArticleReader(a, shelf, shelfId, articles, lockState, completedSet, isLetter));
+      showChapterIntro(a, i, () => openArticleReader(a, shelf, shelfId, articles, lockState, completedSet));
     });
   });
-  document.getElementById('path-back').addEventListener('click', () => renderShelfButtons(shelf ? shelf.id : null, isLetter));
+  document.getElementById('path-back').addEventListener('click', () => renderShelfButtons(shelf ? shelf.id : null));
   _closeReaderOverlay = closeReaderOverlay;
   const pathEl = area.querySelector('.shelf-path');
   if (pathEl) pathEl.scrollTop = 0;
@@ -4363,7 +4465,7 @@ function hydrateVoteWidgets(root, onAnswerChange) {
   });
 }
 
-function openArticleReader(article, shelf, shelfId, articles, lockState, completedSet, isLetter = false) {
+function openArticleReader(article, shelf, shelfId, articles, lockState, completedSet) {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
@@ -4377,7 +4479,7 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
   const hasChapters = articles && articles.length > 1;
   function backToPath() {
     if (hasChapters) {
-      renderShelfPathView(shelf, shelfId, articles, lockState, completedSet, isLetter);
+      renderShelfPathView(shelf, shelfId, articles, lockState, completedSet);
     } else {
       closeReaderOverlay();
     }
