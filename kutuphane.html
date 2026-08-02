@@ -514,6 +514,58 @@
       min-width: 0;
     }
 
+    /* ── Library boxes (right column) — Kahvehane's game-picker tiles,
+       reused here for Kütüphane's own top-level sections: Makaleler opens
+       the shelf browser (formerly always-open in the left column, now
+       tucked behind this box, see openLibraryShelvesSheet), Mektuplar
+       opens its own placeholder sheet, and the third box is left
+       intentionally blank for a future section. Relocated into
+       .col-right-slide on mobile (see applyLayout() below) since
+       .col-left itself is hidden there in favor of #ist-pc-mount. */
+    .lib-boxes {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 0 12px 16px;
+      flex-shrink: 0;
+    }
+    .lib-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      background: var(--paper-warm);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      padding: 16px 14px;
+      text-align: center;
+      color: var(--ink);
+      transition: background 0.2s, transform 0.2s;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+    }
+    /* .lib-boxes only ever renders in .col-left (right-hand column) on
+       desktop -- inward is leftward, mirrors .info-card:hover above. */
+    .lib-box:hover { background: var(--paper-dark); transform: translateX(-4px); }
+    .lib-box-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .lib-box-subtitle {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-top: 4px;
+    }
+    .lib-box-empty {
+      cursor: default;
+      opacity: 0.45;
+      border-style: dashed;
+    }
+    .lib-box-empty:hover { background: var(--paper-warm); transform: none; }
+
     .loading {
       text-align: center;
       font-style: italic;
@@ -915,15 +967,14 @@
       .shelf-path { padding: 16px 20px; }
     }
 
-    /* ── Shelves (right column) — 6 horizontal rectangle buttons styled like bookshelves ── */
+    /* ── Shelves — horizontal rectangle buttons styled like bookshelves.
+       Rendered inside the reader-overlay sheet now (see renderShelfButtons
+       / openLibraryShelvesSheet), reached via the "Makaleler" box, rather
+       than always-open in a column of their own. */
     .shelves {
-      flex: 1;
       display: flex;
       flex-direction: column;
       gap: 12px;
-      padding: 16px;
-      overflow-y: auto;
-      min-height: 0;
     }
     .shelf-btn {
       display: flex;
@@ -981,69 +1032,226 @@
       background: var(--paper-banner);
       transform: translateX(4px);
     }
-    /* ── Chapter nav (right column, while the reader sheet is open) ──
-       Replaces the shelves grid with the open article's own table of
-       contents, so a reader can jump chapters without closing the sheet —
-       styled like a compact shelf-btn to stay in the same visual family. */
-    .chapter-nav-title {
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--muted);
-      padding: 0 4px 4px;
-      flex-shrink: 0;
-    }
-    .chapter-nav-item {
+    /* ── Dünya (world) news feed — left column, replacing the shelves
+       grid that used to live there always-open (see .lib-boxes above for
+       where that moved). Mirrors anahane.html's #breaking-news-feed
+       .article cards (same public.breaking_news table, category='dunya')
+       but re-themed with this page's own warm ink/paper tokens instead of
+       anahane's fixed light-card palette, to match the rest of Kütüphane's
+       own card family (.shelf-btn, .path-node, .info-card). */
+    #dunya-news-feed {
+      flex: 1;
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      gap: 2px;
-      background: var(--paper-warm);
+      gap: 12px;
+      padding: 16px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .article {
+      background: var(--paper-card);
       border: 2px solid var(--ink);
       border-bottom: 5px solid var(--ink);
-      padding: 10px 14px;
-      text-align: left;
-      cursor: pointer;
-      font-family: inherit;
+      padding: 16px 18px;
       color: var(--ink);
-      position: relative;
-      width: 100%;
-      flex-shrink: 0;
-      transition: background 0.2s, transform 0.15s;
+      transition: background 0.15s, transform 0.15s ease;
     }
-    .chapter-nav-item:hover { background: var(--paper-dark); transform: translateX(-4px); }
-    .chapter-nav-item.current { background: var(--paper-banner); cursor: default; }
-    .chapter-nav-item.current:hover { transform: none; }
-    .chapter-nav-item.locked {
-      background: var(--paper-dark);
-      opacity: 0.55;
-      cursor: not-allowed;
-      border-color: var(--rule);
-      border-bottom-color: var(--rule);
+    .article .meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 4px;
     }
-    .chapter-nav-item.locked:hover { transform: none; background: var(--paper-dark); }
-    .chapter-nav-step {
+    .article .kicker {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.6rem;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--ink-red);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .article h3 {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: 8px;
+      color: var(--ink);
+      text-wrap: balance;
+    }
+    .article p {
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: var(--ink);
+    }
+    .article .ago {
+      font-size: 0.65rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-style: italic;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .article.openable {
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+    }
+    .article.openable h3 { margin-top: auto; }
+    /* .article.openable only ever renders in #dunya-news-feed (col-right,
+       the left-hand column) -- inward is rightward, same convention as
+       .shelf-btn:hover above. */
+    .article.openable:hover { background: var(--paper-dark); transform: translateX(6px); }
+    .sidebar-label {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--ink-red);
+      margin-bottom: 2px;
+    }
+    .article .sources {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--rule);
+    }
+    .article .sources-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+      text-align: left;
+    }
+    .article .sources-toggle .sidebar-label { margin: 0; }
+    .article .sources-toggle-icon {
+      font-size: 0.7rem;
+      color: var(--muted);
+      transition: transform 0.15s ease;
+      flex-shrink: 0;
+    }
+    .article .sources.open .sources-toggle-icon { transform: rotate(180deg); }
+    .article .sources-body { display: none; margin-top: 8px; }
+    .article .sources.open .sources-body { display: block; }
+    .article .src-item {
+      padding: 6px 0;
+      border-bottom: 1px dotted var(--whisper);
+      font-size: 0.78rem;
+    }
+    .article .src-item:last-child { border-bottom: none; }
+    .article .src-item .src-name {
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-size: 0.65rem;
+      display: block;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .article .src-item a {
+      color: var(--ink);
+      text-decoration: none;
+      border-bottom: 1px solid currentColor;
+      line-height: 1.4;
+    }
+    .article .src-item a:hover { opacity: 0.7; }
+    .article .sources-empty { font-size: 0.75rem; font-style: italic; color: var(--muted); }
+
+    .article .timeline {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--rule);
+    }
+    .article .timeline-item { border-left: 2px solid var(--ink-red); padding: 10px 0; }
+    .article .timeline-item:first-child { padding-top: 0; }
+    .article .timeline-item:last-child { padding-bottom: 0; }
+    .article .timeline-item-date { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+    .article .timeline-tick { flex: 0 0 12px; height: 2px; background: var(--ink-red); }
+    .article .timeline-item .ago { display: block; }
+    .article .timeline-item strong,
+    .article .timeline-item p,
+    .article .timeline-item .poll-block { display: block; margin-left: 26px; }
+    .article .timeline-item strong { font-size: 0.85rem; color: var(--ink); }
+    .article .timeline-item p { margin-top: 2px; font-size: 0.78rem; }
+    .article .timeline-item .poll-block { margin-top: 6px; padding-top: 0; border-top: none; }
+
+    .article .poll-block {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--rule);
+    }
+    .article .poll-question {
+      font-size: 0.68rem;
       font-weight: 700;
       letter-spacing: 2px;
       text-transform: uppercase;
-      color: var(--muted);
+      color: var(--ink-red);
+      margin-bottom: 8px;
     }
-    .chapter-nav-art-title {
-      font-size: 0.9rem;
-      font-weight: 700;
-    }
-    .chapter-nav-badge {
+    .article .poll-options { display: flex; flex-direction: column; gap: 8px; }
+    .article .poll-opt-btn {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.58rem;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--accent-2);
+      font-size: 0.82rem;
+      text-align: left;
+      padding: 9px 12px;
+      background: var(--paper-card);
+      border: 1px solid var(--ink);
+      color: var(--ink);
+      cursor: pointer;
+      transition: background 0.15s;
     }
-    .chapter-nav-item.locked .chapter-nav-badge { color: var(--muted); }
+    .article .poll-opt-btn:hover:not(:disabled) { background: var(--paper-dark); }
+    .article .poll-opt-btn:disabled { cursor: default; opacity: 0.6; }
+    .article .poll-result-labels {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 0.78rem;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .article .poll-label-a, .article .poll-label-b { min-width: 0; }
+    .article .poll-label-b { text-align: right; }
+    .article .poll-label-mine { font-weight: 700; }
+    .article .poll-bar-track { display: flex; height: 10px; background: var(--whisper); overflow: hidden; }
+    .article .poll-bar-fill-a { height: 100%; background: var(--ink-red); transition: width 0.3s ease; }
+    .article .poll-bar-fill-b { height: 100%; background: var(--ink); transition: width 0.3s ease; }
+    .article .poll-voters-row { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; }
+    .article .poll-voters { display: flex; align-items: center; }
+    .article .poll-voter-avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--paper-dark);
+      border: 1.5px solid var(--paper-card);
+      box-shadow: 0 0 0 1px var(--rule);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--accent);
+      overflow: hidden;
+      margin-left: -8px;
+    }
+    .article .poll-voter-avatar:first-child { margin-left: 0; }
+    .article .poll-voter-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .article .poll-voter-avatar.poll-voter-more { font-size: 0.56rem; color: var(--muted); }
+    .article .poll-status.err { color: var(--ink-red); font-size: 0.72rem; margin-top: 6px; }
 
     /* ── Shelf path (article list inside a shelf) ── */
     /* Now rendered as the reader-overlay-sheet's content (see .reader
@@ -2137,6 +2345,31 @@
       }
       .shelf-subtitle { font-size: 0.68rem; margin-top: 2px; }
       .shelf-progress { font-size: 0.56rem; margin-top: 3px; }
+
+      /* Library boxes -- relocated into .col-right-slide above the Dünya
+         feed on mobile (see applyLayout() in the script below), styled as
+         a compact 2-up grid matching the shelves grid's own mobile
+         treatment just above. */
+      .lib-boxes {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        padding: 12px;
+      }
+      .lib-box { padding: 10px 8px; border-bottom-width: 4px; }
+      .lib-box-title { font-size: 0.78rem; letter-spacing: 1px; }
+      .lib-box-subtitle { font-size: 0.68rem; margin-top: 2px; }
+
+      /* Cancels the desktop rule's flex:1/overflow-y:auto (a fixed-height
+         internally-scrolling column there) -- on mobile the whole page
+         scrolls instead, so this just sizes to its own content, matching
+         .shelves' own mobile treatment above. */
+      #dunya-news-feed { padding: 10px 12px 16px; gap: 8px; flex: none; overflow: visible; min-height: auto; }
+      .article { padding: 8px 12px; }
+      .article .kicker { font-size: 10px; margin-bottom: 2px; letter-spacing: 1px; }
+      .article h3 { font-size: 18px; margin-bottom: 3px; line-height: 1.25; }
+      .article p { font-size: 12px; line-height: 1.35; }
+
       .article-area {
         padding: 16px;
         overflow-y: visible;
@@ -2683,6 +2916,20 @@
     </div>
     <div class="col-left-slide">
       <div class="profile-right"></div>
+      <div class="lib-boxes" id="lib-boxes">
+        <button type="button" class="lib-box" id="lib-box-makaleler">
+          <div>
+            <div class="lib-box-title">Makaleler</div>
+            <div class="lib-box-subtitle">Kütüphane Rafları</div>
+          </div>
+        </button>
+        <button type="button" class="lib-box" id="lib-box-mektuplar">
+          <div>
+            <div class="lib-box-title">Mektuplar</div>
+          </div>
+        </button>
+        <div class="lib-box lib-box-empty" aria-hidden="true"></div>
+      </div>
     </div>
   </aside>
 
@@ -2703,7 +2950,7 @@
          above flips the avatar to the right side. -->
     <div class="library-card politician-card" id="politician-card"><div class="loading"><span class="spinner"></span></div></div>
     <div class="col-right-slide">
-      <div class="shelves" id="shelves">
+      <div id="dunya-news-feed">
         <div class="empty-state" style="padding:24px 16px;"><span class="spinner"></span></div>
       </div>
     </div>
@@ -2768,6 +3015,39 @@ window.addEventListener('resize', updateTabStripOffset);
   window.addEventListener('resize', () => {
     if (raf) cancelAnimationFrame(raf);
     raf = requestAnimationFrame(applyLayout);
+  });
+}());
+
+// Mobile layout (≤768px): .col-left (the library boxes' desktop home) is
+// hidden outright in favor of #ist-pc-mount there (see the CSS), so the
+// boxes themselves get physically relocated into .col-right-slide, above
+// the Dünya feed -- same DOM-relocation trick as the profile card above,
+// just unconditional (the boxes need to be reachable on mobile regardless
+// of ist-viewing-other).
+(function () {
+  const MOBILE_BP = 768;
+  const libBoxes = document.getElementById('lib-boxes');
+  const colLeftSlide = document.querySelector('.col-left-slide');
+  const colRightSlide = document.querySelector('.col-right-slide');
+  if (!libBoxes || !colLeftSlide || !colRightSlide) return;
+
+  let inMobile = null;
+  function applyBoxesLayout() {
+    const mobile = window.innerWidth <= MOBILE_BP;
+    if (mobile === inMobile) return;
+    inMobile = mobile;
+    if (mobile) {
+      colRightSlide.insertBefore(libBoxes, colRightSlide.firstChild);
+    } else {
+      colLeftSlide.appendChild(libBoxes);
+    }
+  }
+  applyBoxesLayout();
+
+  let raf = null;
+  window.addEventListener('resize', () => {
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(applyBoxesLayout);
   });
 }());
 
@@ -3199,24 +3479,30 @@ async function bootstrapLibraryNav() {
 
 // ══════════════════════════════════════════
 // Kütüphane v5 reader: shelves → article path → article reader
+// Shelves used to render always-open in the left column; that spot is now
+// Dünya news (see below), so browsing shelves lives entirely inside the
+// reader-overlay sheet, opened via the "Makaleler" box (see .lib-boxes
+// markup and openLibraryShelvesSheet).
 // ══════════════════════════════════════════
 let SHELVES_CACHE = [];
 let SHELF_COUNTS = {};
 let SHELF_ARTICLE_IDS = {};
 let LIB_USER_ID = null;
+let SHELVES_LOADED = false;
+let SHELVES_LOAD_ERROR = false;
 
 async function loadShelvesUI() {
-  const shelvesEl = document.getElementById('shelves');
-  if (!shelvesEl) return;
   const [shRes, artRes, userId] = await Promise.all([
     sb.from('library_shelves').select('*').order('id', { ascending: true }),
     sb.from('library_articles').select('id, shelf_id'),
     libGetCurrentUserId(),
   ]);
+  SHELVES_LOADED = true;
   if (shRes.error) {
-    shelvesEl.innerHTML = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Raflar yüklenemedi.</div>`;
+    SHELVES_LOAD_ERROR = true;
     return;
   }
+  SHELVES_LOAD_ERROR = false;
   SHELVES_CACHE = shRes.data || [];
   LIB_USER_ID = userId;
   SHELF_COUNTS = {};
@@ -3226,13 +3512,6 @@ async function loadShelvesUI() {
     SHELF_COUNTS[r.shelf_id] = (SHELF_COUNTS[r.shelf_id] || 0) + 1;
     (SHELF_ARTICLE_IDS[r.shelf_id] || (SHELF_ARTICLE_IDS[r.shelf_id] = [])).push(r.id);
   });
-
-  if (!SHELVES_CACHE.length) {
-    shelvesEl.innerHTML = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Henüz raf yok.</div>`;
-    return;
-  }
-
-  renderShelfButtons();
 }
 
 // Chapters read vs. total for a shelf, for the "3/6" style progress badge
@@ -3285,44 +3564,396 @@ function staggerEntrance(elements, direction) {
   });
 }
 
+// Builds the shelf-grid markup alone (no wrapping sheet chrome) -- shared
+// by renderShelfButtons (the sheet's top level) below.
+function shelfListInnerHtml(activeShelfId) {
+  if (SHELVES_LOAD_ERROR) {
+    return `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Raflar yüklenemedi.</div>`;
+  }
+  const filledShelves = SHELVES_CACHE.filter(s => (SHELF_COUNTS[s.id] || 0) > 0);
+  if (!filledShelves.length) {
+    return `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Henüz raf yok.</div>`;
+  }
+  return `<div class="shelves">${filledShelves.map(s => {
+    const active = s.id === activeShelfId;
+    const name = (s.name_tr || '').trim();
+    const subtitle = (s.subtitle_tr || '').trim();
+    const display = name || `Raf ${s.id}`;
+    const subtitleHtml = subtitle ? `<div class="shelf-subtitle">${libEsc(subtitle)}</div>` : '';
+    const progress = shelfProgress(s.id);
+    const progressHtml = progress
+      ? `<div class="shelf-progress">${progress.done}/${progress.total}</div>`
+      : '';
+    return `
+      <a class="shelf-btn${active ? ' shelf-active' : ''}" data-shelf="${s.id}" href="#">
+        <div>
+          <div class="shelf-title">${libEsc(display)}</div>
+          ${subtitleHtml}
+          ${progressHtml}
+        </div>
+      </a>
+    `;
+  }).join('')}</div>`;
+}
+
+// Sheet's top level -- the shelf list itself. Reached from the "Makaleler"
+// box (openLibraryShelvesSheet) and from a shelf-path's "← Raflar" back
+// button (renderShelfPathView, openShelfPath's error/empty branches),
+// which return here without closing the sheet.
 function renderShelfButtons(activeShelfId = null) {
-  const shelvesEl = document.getElementById('shelves');
-  if (!shelvesEl) return;
-  animateFeedSwap(shelvesEl, 'right', () => {
-    const filledShelves = SHELVES_CACHE.filter(s => (SHELF_COUNTS[s.id] || 0) > 0);
-    if (!filledShelves.length) {
-      shelvesEl.innerHTML = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Henüz raf yok.</div>`;
-      return;
-    }
-    shelvesEl.innerHTML = filledShelves.map(s => {
-      const active = s.id === activeShelfId;
-      const name = (s.name_tr || '').trim();
-      const subtitle = (s.subtitle_tr || '').trim();
-      const display = name || `Raf ${s.id}`;
-      const subtitleHtml = subtitle ? `<div class="shelf-subtitle">${libEsc(subtitle)}</div>` : '';
-      const progress = shelfProgress(s.id);
-      const progressHtml = progress
-        ? `<div class="shelf-progress">${progress.done}/${progress.total}</div>`
-        : '';
-      return `
-        <a class="shelf-btn${active ? ' shelf-active' : ''}" data-shelf="${s.id}" href="#">
-          <div>
-            <div class="shelf-title">${libEsc(display)}</div>
-            ${subtitleHtml}
-            ${progressHtml}
-          </div>
-        </a>
-      `;
-    }).join('');
-    shelvesEl.querySelectorAll('.shelf-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const id = Number(btn.dataset.shelf);
-        shelvesEl.querySelectorAll('.shelf-btn').forEach(b => b.classList.toggle('shelf-active', b === btn));
-        openShelfPath(id);
-      });
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!area) return;
+  area.innerHTML = `
+    <div class="shelf-path">
+      <div class="path-head">
+        <button class="path-back" type="button" id="shelves-back">← Kütüphane</button>
+        <h2 class="path-title">Makaleler</h2>
+      </div>
+      ${shelfListInnerHtml(activeShelfId)}
+    </div>
+  `;
+  document.getElementById('shelves-back').addEventListener('click', closeReaderOverlay);
+  area.querySelectorAll('.shelf-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openShelfPath(Number(btn.dataset.shelf));
     });
   });
+}
+
+// Entry point for the "Makaleler" box (see .lib-boxes markup) -- rises the
+// reader overlay straight into the shelf list, fetching it first if this
+// is the first time it's been opened this session.
+async function openLibraryShelvesSheet() {
+  const overlay = document.getElementById('reader-overlay');
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !area) return;
+  area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  positionReaderSheet();
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  _closeReaderOverlay = closeReaderOverlay;
+  if (!SHELVES_LOADED) await loadShelvesUI();
+  renderShelfButtons();
+}
+
+// Entry point for the "Mektuplar" box (see .lib-boxes markup) -- no backing
+// content/feature yet, just a placeholder sheet.
+function openMektuplarSheet() {
+  const overlay = document.getElementById('reader-overlay');
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !area) return;
+  area.innerHTML = `
+    <div class="shelf-path">
+      <div class="path-head">
+        <button class="path-back" type="button" id="mektuplar-back">← Kütüphane</button>
+        <h2 class="path-title">Mektuplar</h2>
+      </div>
+      <!-- Placeholder -- fill in with the actual letter content (e.g. Deniz
+           Göktaş'ın mektubu) whenever that's ready. -->
+      <div class="empty-state">Yakında.</div>
+    </div>
+  `;
+  document.getElementById('mektuplar-back').addEventListener('click', closeReaderOverlay);
+  positionReaderSheet();
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  _closeReaderOverlay = closeReaderOverlay;
+}
+document.getElementById('lib-box-makaleler')?.addEventListener('click', openLibraryShelvesSheet);
+document.getElementById('lib-box-mektuplar')?.addEventListener('click', openMektuplarSheet);
+
+// ══════════════════════════════════════════
+// Dünya (world) news feed — left column (col-right), replacing the shelf
+// grid that used to live there always-open. Reads public.breaking_news
+// (same table as anahane.html's own feed), scoped to category='dunya'.
+// ══════════════════════════════════════════
+let DUNYA_NEWS_CACHE = [];
+
+function libFormatNewsAge(iso) {
+  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  const en = I18N.isEnglish();
+  if (secs < 60) return en ? 'now' : 'şimdi';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return en ? `${mins}m` : `${mins} dk`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return en ? `${hrs}h` : `${hrs} sa`;
+  if (hrs < 48) return en ? 'yesterday' : 'DÜN';
+  return en ? '2 days ago' : 'evvelsi gün';
+}
+function libFormatAgoTR(iso) {
+  const d = new Date(iso);
+  const secs = Math.floor((Date.now() - d.getTime()) / 1000);
+  const en = I18N.isEnglish();
+  if (secs < 60) return en ? 'now' : 'şimdi';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return en ? `${mins}m` : `${mins} dk`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return en ? `${hrs}h` : `${hrs} sa`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return en ? `${days}d` : `${days} gün`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return en ? `${months}mo` : `${months} ay`;
+  const years = Math.floor(days / 365);
+  const remMonths = Math.floor((days - years * 365) / 30);
+  if (remMonths <= 0) return en ? `${years}y` : `${years} yıl`;
+  return en ? `${years}y ${remMonths}mo` : `${years} yıl ${remMonths} ay`;
+}
+function libFormatAgoTRLong(iso) {
+  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  const en = I18N.isEnglish();
+  if (secs < 60) return en ? 'now' : 'şimdi';
+  return `${libFormatAgoTR(iso)} ${en ? 'ago' : 'önce'}`;
+}
+function dunyaKickerLabel(n) {
+  const seriesName = n.breaking_news_series && n.breaking_news_series.name;
+  return seriesName ? seriesName.toLocaleUpperCase('tr-TR') : 'DÜNYA';
+}
+function libSafeUrl(u) {
+  const s = String(u || '').trim();
+  return /^https?:\/\//i.test(s) ? s : null;
+}
+
+async function loadDunyaNews() {
+  const feed = document.getElementById('dunya-news-feed');
+  if (!feed) return;
+  const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
+  const { data, error } = await sb.from('breaking_news')
+    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*), breaking_news_series(name)')
+    .eq('category', 'dunya')
+    .gte('updated_at', cutoff)
+    .order('updated_at', { ascending: false });
+  if (error) {
+    console.error('[kutuphane dunya news]', error);
+    feed.innerHTML = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Dünya haberleri yüklenemedi.</div>`;
+    return;
+  }
+  DUNYA_NEWS_CACHE = data || [];
+  renderDunyaNewsFeed();
+}
+
+function renderDunyaNewsFeed() {
+  const feed = document.getElementById('dunya-news-feed');
+  if (!feed) return;
+  animateFeedSwap(feed, 'right', () => {
+    if (!DUNYA_NEWS_CACHE.length) {
+      feed.innerHTML = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Şu anda dünya haberi yok.</div>`;
+      return;
+    }
+    const rowsById = new Map(DUNYA_NEWS_CACHE.map(n => [String(n.id), n]));
+    feed.innerHTML = DUNYA_NEWS_CACHE.map(n => {
+      const lastTouch = n.updated_at || n.created_at;
+      return `
+        <div class="article openable" data-news-id="${libEsc(n.id)}">
+          <div class="meta-row">
+            <div class="kicker">${libEsc(dunyaKickerLabel(n))}</div>
+            <div class="ago" data-iso="${libEsc(lastTouch)}">${libEsc(libFormatNewsAge(lastTouch))}</div>
+          </div>
+          <h3>${libEsc(n.title)}</h3>
+          ${n.body ? `<p>${libEsc(n.body)}</p>` : ''}
+        </div>
+      `;
+    }).join('');
+    feed.querySelectorAll('.article.openable').forEach(el => {
+      const n = rowsById.get(el.dataset.newsId);
+      if (!n) return;
+      el.addEventListener('click', () => openDunyaNewsDetail(n));
+    });
+  });
+}
+
+function tickDunyaNewsAgo() {
+  document.querySelectorAll('#dunya-news-feed .ago[data-iso]').forEach(el => {
+    el.textContent = libFormatNewsAge(el.dataset.iso);
+  });
+}
+
+// Full detail markup for a Dünya news item -- rendered into the reader
+// overlay sheet (see openDunyaNewsDetail). Reuses the feed card's own
+// .article styling so it looks like the same card, just full-size.
+function buildDunyaNewsDetailHtml(n) {
+  const sources = (n.breaking_news_sources || [])
+    .slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const sourcesHtml = sources.length
+    ? sources.map(s => {
+        const url = libSafeUrl(s.url);
+        const inner = `<span class="src-name">${libEsc(s.name)}</span>${libEsc(s.headline)}`;
+        return `<div class="src-item">${
+          url ? `<a href="${libEsc(url)}" target="_blank" rel="noopener">${inner}</a>` : inner
+        }</div>`;
+      }).join('')
+    : '<div class="sources-empty">Henüz kaynak eklenmedi.</div>';
+  const timelineEvents = (n.breaking_news_updates || []).map(u => ({ type: 'update', created_at: u.created_at, data: u }))
+    .concat((n.breaking_news_polls || []).map(p => ({ type: 'poll', created_at: p.created_at, data: p })))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const timelineHtml = timelineEvents.length ? `
+    <div class="timeline">
+      <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Zaman Akışı</div>
+      <div class="timeline-track">
+        ${timelineEvents.map(ev => ev.type === 'poll' ? `
+          <div class="timeline-item timeline-item-poll">
+            <div class="timeline-item-date">
+              <span class="timeline-tick"></span>
+              <div class="ago" data-iso="${libEsc(ev.created_at)}">${libEsc(libFormatAgoTRLong(ev.created_at))}</div>
+            </div>
+            <div class="poll-block" id="dunya-poll-${libEsc(ev.data.id)}"></div>
+          </div>
+        ` : `
+          <div class="timeline-item">
+            <div class="timeline-item-date">
+              <span class="timeline-tick"></span>
+              <div class="ago" data-iso="${libEsc(ev.created_at)}">${libEsc(libFormatAgoTRLong(ev.created_at))}</div>
+            </div>
+            <strong>${libEsc(ev.data.title)}</strong>
+            ${ev.data.body ? `<p>${libEsc(ev.data.body)}</p>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
+  const lastTouch = n.updated_at || n.created_at;
+  return `
+    <div class="article">
+      <div class="meta-row">
+        <div class="kicker">${libEsc(dunyaKickerLabel(n))}</div>
+        <div class="ago" data-iso="${libEsc(lastTouch)}">${libEsc(libFormatNewsAge(lastTouch))}</div>
+      </div>
+      <h3>${libEsc(n.title)}</h3>
+      ${n.body ? `<p>${libEsc(n.body)}</p>` : ''}
+      ${timelineHtml}
+      <div class="sources">
+        <button type="button" class="sources-toggle" aria-expanded="false">
+          <div class="sidebar-label" style="padding:0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">${I18N.t('news.sources')} (${sources.length})</div>
+          <span class="sources-toggle-icon">▾</span>
+        </button>
+        <div class="sources-body">${sourcesHtml}</div>
+      </div>
+    </div>
+  `;
+}
+
+function openDunyaNewsDetail(n) {
+  const overlay = document.getElementById('reader-overlay');
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !area) return;
+  area.innerHTML = `
+    <div class="shelf-path">
+      <div class="path-head">
+        <button class="path-back" type="button" id="dunya-detail-back">← Kütüphane</button>
+      </div>
+      ${buildDunyaNewsDetailHtml(n)}
+    </div>
+  `;
+  document.getElementById('dunya-detail-back').addEventListener('click', closeReaderOverlay);
+  positionReaderSheet();
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  _closeReaderOverlay = closeReaderOverlay;
+  (n.breaking_news_polls || []).forEach(p => loadAndRenderDunyaPoll(p));
+}
+
+// Fetches a Dünya news poll's votes and renders either the voting buttons
+// or the result bars into its #dunya-poll-<id> container -- mirrors
+// anahane.html's loadAndRenderPoll, using libGetCurrentUserId() in place of
+// window.__currentUser (this page never sets that global).
+const MAX_POLL_VOTER_AVATARS = 6;
+
+async function loadAndRenderDunyaPoll(poll) {
+  const container = document.getElementById('dunya-poll-' + poll.id);
+  if (!container) return;
+  const { data, error } = await sb.from('breaking_news_poll_option_votes')
+    .select('user_id, option').eq('poll_id', poll.id);
+  if (error) { console.error('[dunya poll]', error); return; }
+  const uid = await libGetCurrentUserId();
+  const votersA = [], votersB = [];
+  let mine = null;
+  (data || []).forEach(v => {
+    if (v.option === 1) votersA.push(v.user_id);
+    else if (v.option === 2) votersB.push(v.user_id);
+    if (uid && v.user_id === uid) mine = v.option;
+  });
+
+  let profilesById = new Map();
+  const userIds = Array.from(new Set([...votersA, ...votersB]));
+  if (mine != null && userIds.length) {
+    const { data: profs, error: profErr } = await sb.from('profiles')
+      .select('id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt').in('id', userIds);
+    if (profErr) console.error('[dunya poll voter profiles]', profErr);
+    else profilesById = new Map(profs.map(p => [p.id, p]));
+  }
+
+  renderDunyaPollInto(container, poll, votersA, votersB, mine, profilesById);
+}
+
+function buildDunyaVoterAvatarsHtml(userIds, profilesById) {
+  const list = userIds.map(id => profilesById.get(id)).filter(Boolean);
+  if (!list.length) return '';
+  const shown = list.slice(0, MAX_POLL_VOTER_AVATARS);
+  const extra = list.length - shown.length;
+  const avatarsHtml = shown.map(p => {
+    const name = capitalizeName([p.first_name, p.last_name].filter(Boolean).join(' ')) || 'Üye';
+    const inner = IstAvatar.html(p.avatar_url, p.avatar_hair, p.avatar_hat, p.avatar_accessory, p.avatar_shirt);
+    return `<span class="poll-voter-avatar" title="${libEsc(name)}">${inner}</span>`;
+  }).join('');
+  const moreHtml = extra > 0
+    ? `<span class="poll-voter-avatar poll-voter-more" title="+${extra}">+${extra}</span>`
+    : '';
+  return avatarsHtml + moreHtml;
+}
+
+function renderDunyaPollInto(container, poll, votersA, votersB, mine, profilesById) {
+  const countA = votersA.length, countB = votersB.length;
+  const total = countA + countB;
+  if (mine == null) {
+    container.innerHTML = `
+      <div class="poll-question">${libEsc(poll.question)}</div>
+      <div class="poll-options">
+        <button class="poll-opt-btn" type="button" data-option="1">${libEsc(poll.option_a)}</button>
+        <button class="poll-opt-btn" type="button" data-option="2">${libEsc(poll.option_b)}</button>
+      </div>
+      <div class="poll-status"></div>
+    `;
+    container.querySelectorAll('.poll-opt-btn').forEach(btn => {
+      btn.addEventListener('click', () => submitDunyaPollVote(poll, parseInt(btn.dataset.option, 10), container));
+    });
+  } else {
+    const pctA = total ? Math.round((countA / total) * 100) : 0;
+    const pctB = total ? 100 - pctA : 0;
+    container.innerHTML = `
+      <div class="poll-question">${libEsc(poll.question)}</div>
+      <div class="poll-result-labels">
+        <span class="poll-label-a${mine === 1 ? ' poll-label-mine' : ''}">${libEsc(poll.option_a)} · ${pctA}%</span>
+        <span class="poll-label-b${mine === 2 ? ' poll-label-mine' : ''}">${pctB}% · ${libEsc(poll.option_b)}</span>
+      </div>
+      <div class="poll-bar-track">
+        <div class="poll-bar-fill-a" style="width:${pctA}%"></div>
+        <div class="poll-bar-fill-b" style="width:${pctB}%"></div>
+      </div>
+      <div class="poll-voters-row">
+        <div class="poll-voters poll-voters-a">${buildDunyaVoterAvatarsHtml(votersA, profilesById)}</div>
+        <div class="poll-voters poll-voters-b">${buildDunyaVoterAvatarsHtml(votersB, profilesById)}</div>
+      </div>
+    `;
+  }
+}
+
+async function submitDunyaPollVote(poll, option, container) {
+  const uid = await libGetCurrentUserId();
+  if (!uid) return;
+  container.querySelectorAll('.poll-opt-btn').forEach(b => b.disabled = true);
+  const { error } = await sb.from('breaking_news_poll_option_votes')
+    .insert([{ poll_id: poll.id, user_id: uid, option }]);
+  if (error) {
+    console.error('[dunya poll vote]', error);
+    const statusEl = container.querySelector('.poll-status');
+    if (statusEl) {
+      statusEl.textContent = 'Oy kaydedilemedi, tekrar deneyin.';
+      statusEl.className = 'poll-status err';
+    }
+    container.querySelectorAll('.poll-opt-btn').forEach(b => b.disabled = false);
+    return;
+  }
+  loadAndRenderDunyaPoll(poll);
 }
 
 // ── Sequential chapter unlock state (per-user, localStorage) ──
@@ -3436,7 +4067,7 @@ async function openShelfPath(shelfId) {
         <div class="empty-state">Yüklenemedi.</div>
       </div>
     `;
-    document.getElementById('path-back').addEventListener('click', closeReaderOverlay);
+    document.getElementById('path-back').addEventListener('click', () => renderShelfButtons());
     return;
   }
   if (!articles || !articles.length) {
@@ -3449,7 +4080,7 @@ async function openShelfPath(shelfId) {
         <div class="empty-state">Bu rafta henüz makale yok.</div>
       </div>
     `;
-    document.getElementById('path-back').addEventListener('click', closeReaderOverlay);
+    document.getElementById('path-back').addEventListener('click', () => renderShelfButtons());
     return;
   }
 
@@ -3473,8 +4104,8 @@ async function openShelfPath(shelfId) {
   renderShelfPathView(shelf, shelfId, articles, lockState, completedSet);
 }
 
-// Closes the reader overlay entirely, whichever view (table of contents or
-// reader) is currently showing, and restores the plain shelves grid.
+// Closes the reader overlay entirely, whichever view (shelf list, table of
+// contents, reader, Dünya detail, ...) is currently showing.
 function closeReaderOverlay() {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
@@ -3483,7 +4114,6 @@ function closeReaderOverlay() {
   // Matches the sheet's own 0.55s transition (see .reader-overlay-sheet)
   // so hiding doesn't cut the closing slide-down short.
   setTimeout(() => { overlay.hidden = true; area.innerHTML = ''; }, 550);
-  renderShelfButtons();
 }
 
 // TBMM page -- opened from the centered #tbmm-open-btn in the reading
@@ -3665,9 +4295,8 @@ function renderShelfPathView(shelf, shelfId, articles, lockState, completedSet) 
       showChapterIntro(a, i, () => openArticleReader(a, shelf, shelfId, articles, lockState, completedSet));
     });
   });
-  document.getElementById('path-back').addEventListener('click', closeReaderOverlay);
+  document.getElementById('path-back').addEventListener('click', () => renderShelfButtons(shelf ? shelf.id : null));
   _closeReaderOverlay = closeReaderOverlay;
-  renderShelfButtons(shelf ? shelf.id : null);
   const pathEl = area.querySelector('.shelf-path');
   if (pathEl) pathEl.scrollTop = 0;
 }
@@ -3871,13 +4500,13 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
       area.querySelector('.reader-actions').replaceWith(done);
       const uid = await libGetCurrentUserId();
       libWriteArticleCompleted(uid, article.id);
-      // Reflect the unlock live in the chapter nav without waiting for the
-      // sheet to close: mark this chapter read and open the next one.
+      // Unlocks the next chapter for whenever the reader returns to the
+      // table of contents (← Raf) -- there's no persistent sidebar nav to
+      // refresh live anymore, so nothing further to do here.
       if (hasChapters) {
         completedSet.add(article.id);
         const idx = articles.indexOf(article);
         if (idx > -1 && idx + 1 < articles.length) lockState[idx + 1] = false;
-        renderChapterNav(shelfId, articles, article.id, lockState, completedSet, shelf);
       }
     });
 
@@ -3905,53 +4534,6 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
   positionReaderSheet();
   overlay.hidden = false;
   requestAnimationFrame(() => overlay.classList.add('open'));
-
-  // Contextual swap: while the reader sheet is up, the right column shows
-  // this article's own chapter list instead of the shelves grid, mirroring
-  // how the map swaps news/events on Hane and the game swaps the
-  // scoreboard on Kahvehane. A single-article shelf has no chapters to
-  // list, so the shelves grid (already showing, already highlighted by
-  // the click that got us here) just stays put.
-  if (hasChapters) {
-    renderChapterNav(shelfId, articles, article.id, lockState, completedSet, shelf);
-  }
-}
-
-// Right column, while the reader sheet is open: this article's own table
-// of contents in place of the shelves grid. Clicking an unlocked chapter
-// jumps straight to it (via the same intro modal) without closing the sheet.
-function renderChapterNav(shelfId, articles, currentArticleId, lockState, completedSet, shelf) {
-  const shelvesEl = document.getElementById('shelves');
-  if (!shelvesEl) return;
-  const title = (shelf && shelf.name_tr && shelf.name_tr.trim()) || `Raf ${shelfId}`;
-  animateFeedSwap(shelvesEl, 'right', () => {
-    shelvesEl.innerHTML = `
-      <div class="chapter-nav-title">${libEsc(title)}</div>
-      ${articles.map((a, i) => {
-        const locked = lockState[i];
-        const current = a.id === currentArticleId;
-        const completed = completedSet.has(a.id);
-        const badge = locked ? 'Kilitli' : (current ? 'Şu an burada' : (completed ? 'Okundu' : ''));
-        return `
-          <button class="chapter-nav-item${current ? ' current' : ''}${locked ? ' locked' : ''}"
-                  data-art="${a.id}" type="button" ${(locked || current) ? 'aria-disabled="true"' : ''}>
-            <span class="chapter-nav-step">Bölüm ${i + 1}</span>
-            <span class="chapter-nav-art-title">${libEsc(a.title)}</span>
-            ${badge ? `<span class="chapter-nav-badge">${badge}</span>` : ''}
-          </button>
-        `;
-      }).join('')}
-    `;
-    shelvesEl.querySelectorAll('.chapter-nav-item').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (btn.classList.contains('locked') || btn.classList.contains('current')) return;
-        const a = articles.find(x => x.id === btn.dataset.art);
-        if (!a) return;
-        const i = articles.indexOf(a);
-        showChapterIntro(a, i, () => openArticleReader(a, shelf, shelfId, articles, lockState, completedSet));
-      });
-    });
-  });
 }
 
 // Wires the reader overlay's backdrop-click/Escape close once; which
@@ -3961,10 +4543,22 @@ let _closeReaderOverlay = null;
 (function initReaderOverlay() {
   const overlay = document.getElementById('reader-overlay');
   const backdrop = document.getElementById('reader-overlay-backdrop');
-  if (!overlay || !backdrop) return;
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !backdrop || !area) return;
   backdrop.addEventListener('click', () => { if (_closeReaderOverlay) _closeReaderOverlay(); });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && overlay.classList.contains('open') && _closeReaderOverlay) _closeReaderOverlay();
+  });
+  // Delegated so it keeps working across re-renders of the sheet (e.g. a
+  // Dünya news detail's "Kaynaklar" toggle) -- mirrors anahane.html's own
+  // detail-overlay handler.
+  area.addEventListener('click', (e) => {
+    const toggle = e.target.closest('.sources-toggle');
+    if (!toggle) return;
+    const wrap = toggle.closest('.sources');
+    if (!wrap) return;
+    const isOpen = wrap.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
   });
 })();
 
@@ -4446,6 +5040,8 @@ function loadPersonMentionsRoster(tries) {
 function mount() {
   loadProfile();
   bootstrapLibraryNav();
+  loadDunyaNews();
+  IstRouter.onTick(tickDunyaNewsAgo);
   loadPersonMentionsRoster();
   // politician-card.js is deferred -- on a fresh real page load this
   // mount() call runs synchronously during parsing, before any deferred
@@ -4463,7 +5059,7 @@ function mount() {
     }
   })(10);
 }
-function unmount() {}
+function unmount() { IstRouter.offTick(tickDunyaNewsAgo); }
 
 // Skipped when this script is being injected by a virtual navigation (see
 // router.js's navigateTo) -- that path calls the registered mount()
