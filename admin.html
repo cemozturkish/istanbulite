@@ -971,9 +971,12 @@
         <div class="panel-title">Kütüphane — Shelves (Rafs)</div>
         <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
           Click a shelf to set its name and add the articles inside. Empty shelves render as "Coming Soon" to readers.
+          A shelf marked Mektup shows up in the site's Mektuplar box instead of Makaleler — a letter is usually just
+          one shelf with a single article, same as any other shelf.
         </p>
         <div class="btn-row" style="margin-bottom:14px;">
-          <button class="btn btn-primary" id="add-shelf-btn">+ Add Shelf</button>
+          <button class="btn btn-primary" id="add-shelf-btn">+ Add Shelf (Makale)</button>
+          <button class="btn btn-secondary" id="add-letter-btn">+ Add Letter (Mektup)</button>
         </div>
         <div id="shelves-grid">
           <div class="empty-state"><span class="spinner"></span></div>
@@ -990,6 +993,12 @@
 
         <label>Subtitle (optional)</label>
         <input type="text" id="se-subtitle" placeholder="Short description"/>
+
+        <label>Type</label>
+        <select id="se-is-letter">
+          <option value="0">Makale (shows in Makaleler)</option>
+          <option value="1">Mektup (shows in Mektuplar)</option>
+        </select>
 
         <input type="hidden" id="se-shelf-id"/>
 
@@ -1941,9 +1950,10 @@ async function loadShelfCards() {
     const name = (s.name_tr && s.name_tr.trim()) ? escapeHtml(s.name_tr.trim()) : '<span style="color:var(--muted);font-style:italic;">(unnamed)</span>';
     const subtitle = s.subtitle_tr ? escapeHtml(s.subtitle_tr) : '';
     const count = counts[s.id] || 0;
+    const kindLabel = s.is_letter ? 'MEKTUP' : 'MAKALE';
     return `
       <div class="article-card" data-shelf="${s.id}" style="cursor:pointer;">
-        <div class="a-neighborhood">Raf ${s.id} · ${count} article${count === 1 ? '' : 's'}</div>
+        <div class="a-neighborhood">Raf ${s.id} · ${kindLabel} · ${count} article${count === 1 ? '' : 's'}</div>
         <h4>${name}</h4>
         ${subtitle ? `<p>${subtitle}</p>` : ''}
       </div>
@@ -1957,21 +1967,25 @@ async function loadShelfCards() {
 
 // Add a new shelf (persisted immediately, like publishing a news article)
 // and jump straight into its editor to name it.
-document.getElementById('add-shelf-btn').addEventListener('click', async () => {
-  const btn = document.getElementById('add-shelf-btn');
+// Shared by both "+ Add" buttons below -- only the is_letter flag differs,
+// so a letter starts life exactly like a shelf, just filed under Mektuplar
+// instead of Makaleler from the first save onward.
+async function addShelf(isLetter, btn) {
   btn.disabled = true;
   const { data, error } = await sb.from('library_shelves')
-    .insert([{ name_tr: '', subtitle_tr: '' }])
+    .insert([{ name_tr: '', subtitle_tr: '', is_letter: isLetter }])
     .select('*').single();
   btn.disabled = false;
   if (error) {
-    alert('Failed to add shelf: ' + error.message);
+    alert('Failed to add ' + (isLetter ? 'letter' : 'shelf') + ': ' + error.message);
     return;
   }
   SHELVES.push(data);
   SHELF_LABELS[data.id] = `Raf ${data.id}`;
   openShelfEditor(data.id);
-});
+}
+document.getElementById('add-shelf-btn').addEventListener('click', (e) => addShelf(false, e.currentTarget));
+document.getElementById('add-letter-btn').addEventListener('click', (e) => addShelf(true, e.currentTarget));
 
 // Switch to the shelf editor: shelf metadata on the left, article path on the right.
 async function openShelfEditor(shelfId) {
@@ -1990,6 +2004,7 @@ async function openShelfEditor(shelfId) {
   document.getElementById('se-shelf-id').value = String(shelfId);
   document.getElementById('se-name').value = shelf ? (shelf.name_tr || '') : '';
   document.getElementById('se-subtitle').value = shelf ? (shelf.subtitle_tr || '') : '';
+  document.getElementById('se-is-letter').value = shelf && shelf.is_letter ? '1' : '0';
   document.getElementById('se-status').textContent = '';
 
   loadArticlesForShelf(shelfId);
@@ -2049,10 +2064,11 @@ document.getElementById('se-save-btn').addEventListener('click', async () => {
   const shelfId = Number(document.getElementById('se-shelf-id').value);
   const name = document.getElementById('se-name').value.trim();
   const subtitle = document.getElementById('se-subtitle').value.trim();
+  const isLetter = document.getElementById('se-is-letter').value === '1';
   const statusEl = document.getElementById('se-status');
   statusEl.textContent = ''; statusEl.className = 'status-msg';
   const { error } = await sb.from('library_shelves')
-    .update({ name_tr: name, subtitle_tr: subtitle })
+    .update({ name_tr: name, subtitle_tr: subtitle, is_letter: isLetter })
     .eq('id', shelfId);
   if (error) {
     statusEl.textContent = error.message;
@@ -2063,7 +2079,7 @@ document.getElementById('se-save-btn').addEventListener('click', async () => {
   statusEl.className = 'status-msg ok';
   // Update local cache so labels stay in sync.
   const cached = SHELVES.find(s => s.id === shelfId);
-  if (cached) { cached.name_tr = name; cached.subtitle_tr = subtitle; }
+  if (cached) { cached.name_tr = name; cached.subtitle_tr = subtitle; cached.is_letter = isLetter; }
   SHELF_LABELS[shelfId] = name || `Raf ${shelfId}`;
   document.getElementById('shelf-edit-title').textContent = name ? `Edit — ${name}` : `Edit Raf ${shelfId}`;
   document.getElementById('shelf-articles-title').textContent = name ? `${name} · Articles` : `Raf ${shelfId} · Articles`;
