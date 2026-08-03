@@ -1695,28 +1695,44 @@
     /* ── Detail overlay: bottom sheet for a news article or event's full
        details, opened instead of the old expand-in-place toggle —
        mirrors Kahvehane's game overlay / Kütüphane's reader overlay.
-       Background/border/shadow come from frames.css's shared flat-card
-       rule (it targets .detail-overlay-sheet alongside the other two). */
+       Unlike those, the outer sheet itself carries no visible frame here
+       (see the #detail-overlay-sheet override below, which strips the
+       background/border/shadow frames.css's shared flat-card rule would
+       otherwise give it) — the card underneath (.article/.event-item/
+       .politician-detail) is the only visible "paper". Scrolling lives
+       on .detail-overlay (the fixed, full-viewport root) rather than on
+       the sheet, so there's no separate clipped "window" with its own
+       scrollbar: the card is tall enough to run off the bottom of the
+       screen, and dragging anywhere moves it directly, like pulling a
+       sheet of paper up off the bottom edge rather than scrolling
+       through a fixed window onto it. */
     .detail-overlay {
       position: fixed;
       inset: 0;
       z-index: 500;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .detail-overlay[hidden] { display: none; }
     .detail-overlay-backdrop {
       /* Transparent, like the other two overlays — still catches
-         outside clicks to close. */
-      position: absolute;
+         outside clicks to close. Fixed (not absolute) so it stays
+         pinned to the viewport instead of scrolling away with the
+         sheet when .detail-overlay's own scroll moves. */
+      position: fixed;
       inset: 0;
       background: transparent;
     }
     .detail-overlay-sheet {
       position: absolute;
       left: 50%;
-      bottom: 0;
+      /* Top-anchored instead of bottom-anchored: a card taller than the
+         visible area now grows downward, off the bottom of the screen
+         (revealed by scrolling .detail-overlay), rather than upward off
+         the top the way a bottom-anchored box with capped height would. */
+      top: max(6vh, 40px);
+      min-height: min(88vh, 860px);
       width: min(680px, 86vw);
-      height: min(88vh, 860px);
-      overflow-y: auto;
       transform: translate(-50%, 100%);
       /* Ease-out-quint: fast off the bottom edge, then settles into place
          slowly instead of arriving at a constant speed. Slower overall
@@ -1725,10 +1741,20 @@
       transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
     }
     .detail-overlay.open .detail-overlay-sheet { transform: translate(-50%, 0); }
+    /* Kill the shared flat-card frame (frames.css targets
+       .detail-overlay-sheet by class); the id selector's higher
+       specificity wins regardless of load order. Only affects this
+       page's #detail-overlay-sheet — kahvehane's own element with the
+       same class/id lives in a different document and is untouched. */
+    #detail-overlay-sheet {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
     .detail-overlay-close {
       position: absolute;
-      top: 10px;
-      right: 14px;
+      top: 28px;
+      right: 28px;
       z-index: 2;
       width: 32px;
       height: 32px;
@@ -1748,15 +1774,20 @@
       display: block;
     }
     .detail-overlay-body {
-      padding: 48px 24px 24px;
+      padding: 16px 16px 20px;
     }
-    /* Comfortable reading width for the card sitting inside the sheet,
-       centered rather than stretched edge-to-edge. */
+    /* The card fills the sheet's full width now that the sheet itself
+       has no visible frame (no more narrower card centered inside a
+       wider bordered box) — its own border/shadow is the only frame the
+       user sees. Extra padding-top clears room for .detail-overlay-close
+       to sit inside the card's own top-right corner instead of floating
+       above it. The strong shadow is what now separates the card from
+       the busy map/page behind it, in place of the removed sheet frame. */
     .detail-overlay-body .article,
     .detail-overlay-body .event-item,
     .detail-overlay-body .politician-detail {
-      max-width: 520px;
-      margin: 0 auto;
+      padding-top: 44px;
+      box-shadow: var(--frame-shadow-strong);
     }
 
     /* Politician detail sheet -- opened from #politician-card (see
@@ -1854,23 +1885,22 @@
       .detail-overlay-sheet {
         /* Inset on 3 sides (frame-pad gap) so a sliver of the map/page
            canvas peeks through above and beside it, like a page rising
-           from below -- flush at the bottom (see frames.css's
-           border-bottom-width: 0 for this class) so it reads as
-           continuing past the screen edge instead of stopping short.
-           Rises to cover only the area below the map instead of nearly
-           the full screen -- the map stays visible above it. Its top
-           matches where the map hero's own box ends: #main-site's
+           from below. Rises to cover only the area below the map instead
+           of nearly the full screen -- the map stays visible above it.
+           Its top matches where the map hero's own box ends: #main-site's
            frame-pad top inset (frames.css) plus the map's own height
            (100vw, same square as .map-panel's width:100%;aspect-ratio:
-           1/1) plus one more frame-pad gap. bottom:0 (rather than an
-           explicit height) lets it still reach the true bottom behind
-           the tab bar, matching the other overlays. */
+           1/1) plus one more frame-pad gap. min-height (rather than a
+           bottom:0 + height:auto pin) reaches the true bottom by default
+           for short cards, matching the other overlays, but lets a card
+           taller than that run on past the bottom of the screen instead
+           of being clipped -- scrolling .detail-overlay pulls it up into
+           view instead of scrolling within a fixed window. */
         left: var(--frame-pad, 10px);
         right: var(--frame-pad, 10px);
         width: auto;
         top: calc(var(--frame-pad, 10px) + 100vw + var(--frame-pad, 10px));
-        bottom: 0;
-        height: auto;
+        min-height: calc(100vh - (var(--frame-pad, 10px) + 100vw + var(--frame-pad, 10px)));
         transform: translateY(100%);
       }
       .detail-overlay.open .detail-overlay-sheet { transform: translateY(0); }
@@ -3413,6 +3443,10 @@ function openDetail(html) {
   body.innerHTML = html;
   if (window.IstPersonMentions) IstPersonMentions.linkify(body, personMentionsRoster);
   overlay.hidden = false;
+  // .detail-overlay is the scroll container now (see .detail-overlay-sheet's
+  // top-anchored, unclipped height) -- reset so a tall card left scrolled
+  // from a previous open doesn't reopen mid-scroll on the next one.
+  overlay.scrollTop = 0;
   requestAnimationFrame(() => overlay.classList.add('open'));
 }
 function closeDetail() {
