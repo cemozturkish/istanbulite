@@ -2662,6 +2662,15 @@ function gamePoints(attempts, won) {
   return attempts >= 1 ? 1 : 0;
 }
 
+// Points the Sözcü earns from each solver's result on their word: 5/1/2/3/2/1
+// for a win found on the 1st–6th guess; 0 if the solver didn't find it.
+// Mirrors sozcel.html's sozcuPoints() — keep both in sync.
+function sozcuPoints(attempts, won) {
+  if (!won) return 0;
+  const pts = [5, 1, 2, 3, 2, 1];
+  return pts[attempts - 1] ?? 0;
+}
+
 // Seven-square week tracker (Monday first, matching the scoring week):
 // days already passed are dark, today is double-bordered, days to come are plain.
 function renderWeekProgress() {
@@ -2786,17 +2795,57 @@ async function loadScoreboard(neighborhoodFilter = null, instant = false) {
     scores.set(entry.user_id, prev);
   });
 
+  // Sözcü bonus: credit each day's word-setter with the points every
+  // solver earned off their word (sozcuPoints), so picking a word people
+  // enjoy pays off on the same weekly board as playing does. Skipped for
+  // the per-neighborhood filtered view — that list is about who solved
+  // the puzzle from that neighborhood, not who set the word.
+  if (!neighborhoodFilter) {
+    try {
+      const cutoffISO = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
+      const { data: sozcuRows } = await sb
+        .from('sozcel_used_answers')
+        .select('used_on, sozcul_id')
+        .gte('used_on', cutoffISO);
+      const sozculByDay = new Map();
+      (sozcuRows || []).forEach(r => {
+        const d = parseGameDate(r.used_on);
+        if (d && r.sozcul_id) sozculByDay.set(d.getTime(), r.sozcul_id);
+      });
+      if (sozculByDay.size > 0) {
+        const creditedPlayerDay = new Set();
+        weekly.forEach(r => {
+          if (!r.user_id) return;
+          const d = parseGameDate(r.date);
+          if (!d) return;
+          const sozculId = sozculByDay.get(d.getTime());
+          if (!sozculId || sozculId === r.user_id) return;
+          const dedupKey = r.user_id + '|' + d.getTime();
+          if (creditedPlayerDay.has(dedupKey)) return;
+          creditedPlayerDay.add(dedupKey);
+          const bonus = sozcuPoints(r.attempts, r.won);
+          if (bonus <= 0) return;
+          const prev = scores.get(sozculId) || { score: 0, neighborhood: null, lastDate: null };
+          prev.score += bonus;
+          scores.set(sozculId, prev);
+        });
+      }
+    } catch (e) { /* Sözcü bonus is best-effort */ }
+  }
+
   // Resolve display names from the profiles table.
   const userIds = Array.from(scores.keys());
   const nameMap = new Map();
+  const nbFallbackMap = new Map();
   try {
     if (userIds.length > 0) {
       const { data: profs } = await sb
         .from('profiles')
-        .select('id, first_name')
+        .select('id, first_name, neighborhood')
         .in('id', userIds);
       (profs || []).forEach(p => {
         if (p.first_name) nameMap.set(p.id, p.first_name.toLocaleUpperCase('tr-TR'));
+        if (p.neighborhood) nbFallbackMap.set(p.id, p.neighborhood);
       });
     }
   } catch (e) { /* name lookup is best-effort */ }
@@ -2805,7 +2854,7 @@ async function loadScoreboard(neighborhoodFilter = null, instant = false) {
     .map(([uid, v]) => ({
       uid,
       score: v.score,
-      neighborhood: v.neighborhood,
+      neighborhood: v.neighborhood || nbFallbackMap.get(uid) || null,
       name: nameMap.get(uid) || 'Anonim'
     }))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'tr'))
