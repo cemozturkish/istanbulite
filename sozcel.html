@@ -358,87 +358,10 @@
     .sozcul-line .sozcul-name { color: var(--ink-red); cursor: pointer; }
     .sozcul-line .sozcul-name:hover { text-decoration: underline; }
 
-    /* Sözcü assignment panel in left column */
-    .sozcul-panel {
-      padding: 10px 12px;
-      border-top: 1px solid var(--rule);
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .sozcul-panel .panel-title { margin-bottom: 4px; }
-    .sozcul-panel .sozcul-hint {
-      font-size: 0.62rem;
-      color: var(--muted);
-      font-style: italic;
-      line-height: 1.35;
-    }
-    .sozcul-panel .sozcul-countdown {
-      font-size: 1.3rem;
-      font-weight: 700;
-      letter-spacing: 3px;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      color: var(--ink);
-      text-align: center;
-      padding: 4px 0;
-    }
-    .sozcul-panel .sozcul-countdown.urgent { color: var(--ink-red); }
-    .sozcul-panel .sozcul-form { display: flex; gap: 4px; }
-    .sozcul-panel input[type="text"] {
-      flex: 1;
-      min-width: 0;
-      padding: 6px 8px;
-      border: 1px solid var(--rule);
-      background: var(--field-bg);
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--ink);
-      outline: none;
-    }
-    .sozcul-panel input[type="text"]:focus { border-color: var(--accent); }
-    .sozcul-panel button {
-      padding: 6px 10px;
-      background: var(--ink);
-      color: var(--paper);
-      border: none;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      cursor: pointer;
-    }
-    .sozcul-panel button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .sozcul-panel .sozcul-status {
-      font-size: 0.62rem;
-      min-height: 14px;
-      font-style: italic;
-    }
-    .sozcul-panel .sozcul-status.ok { color: var(--success); }
-    .sozcul-panel .sozcul-status.err { color: var(--ink-red); }
-    .sozcul-panel .sozcul-done {
-      padding: 8px;
-      background: var(--paper-dark);
-      border: 1px solid var(--rule);
-      font-size: 0.7rem;
-      color: var(--muted);
-      text-align: center;
-    }
-    .sozcul-panel .sozcul-done strong {
-      display: block;
-      font-size: 0.95rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      color: var(--ink);
-      margin-bottom: 4px;
-    }
-
-    /* ── Sözcül takeover: the centre column when the signed-in user is
-       today's Sözcül. Replaces the play grid + keyboard with a word
-       picker + dictionary entry form. ── */
+    /* ── Sözcül takeover form: rendered inside the "Sözcü Görevi" popup
+       (opened from the game-controls button, left of Help) instead of
+       replacing the play screen — the game itself stays accessible to
+       everyone at all times. ── */
     .sozcul-takeover {
       flex: 1;
       display: none;
@@ -1675,7 +1598,6 @@
   <aside class="col-left">
     <div class="nb-highlight" id="user-nb-badge"></div>
     <section class="stats-left" id="stats-left"></section>
-    <section class="sozcul-panel" id="sozcul-panel" style="display:none;"></section>
     <section class="suggest-section" id="suggest-section">
       <div class="panel-title">Sözcük Öner</div>
       <div class="suggest-hint">Bekleyen tek bir öneri tutabilirsiniz. Vazgeçip yenisini önerebilirsiniz. Bir sözcüğü başka bir üye önerdiyse aynı sözcük tekrar önerilemez.</div>
@@ -1721,9 +1643,9 @@
     </script>
     <div class="game-controls-left" id="game-controls-left">
       <button class="game-ctrl-btn" id="mobile-score-btn" type="button" aria-label="Skor Tablosu" title="Skor Tablosu">≡</button>
-      <button class="game-ctrl-btn" id="mobile-sozcul-btn" type="button" aria-label="Sözcü Görevi" title="Sözcü Görevi" style="display:none;">✎</button>
     </div>
     <div class="game-controls">
+      <button class="game-ctrl-btn" id="sozcul-task-btn" type="button" aria-label="Sözcü Görevi" title="Sözcü Görevi" style="display:none;">✎</button>
       <button class="game-ctrl-btn" id="share-btn" type="button" aria-label="Paylaş" title="Paylaş" disabled>↗</button>
       <button class="game-ctrl-btn" id="help-btn" type="button" aria-label="Nasıl oynanır" title="Nasıl oynanır">?</button>
     </div>
@@ -1734,7 +1656,6 @@
       <div class="keyboard" id="keyboard"></div>
       <div class="sozcul-line" id="sozcul-line"></div>
     </section>
-    <section class="sozcul-takeover" id="sozcul-takeover"></section>
   </main>
 
   <aside class="col-right">
@@ -1813,11 +1734,13 @@
     </div>
   </div>
 
-  <!-- Mobile Sözcü picker popup -->
-  <div class="result-overlay" id="sozcul-mobile-overlay">
+  <!-- Sözcü Görevi popup: word-picker / status form for an assigned Sözcü.
+       Opened from the game-controls button next to Help so the assignment
+       never takes over the play screen — everyone can always play. -->
+  <div class="result-overlay" id="sozcul-task-overlay">
     <div class="result-card" style="padding-bottom:16px;">
-      <button class="result-close" id="sozcul-mobile-close" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-      <section class="sozcul-panel" id="sozcul-panel-mobile" style="padding:0;border:none;"></section>
+      <button class="result-close" id="sozcul-task-close" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
+      <div class="sozcul-takeover active" id="sozcul-task-body" style="padding:0;"></div>
     </div>
   </div>
 
@@ -4612,7 +4535,7 @@ function showShareToast(msg) {
   }
 })();
 
-// ── Mobile top-left buttons: scoreboard + sözcü ──
+// ── Mobile top-left button: scoreboard ──
 (function initMobileControls() {
   const scoreOverlay = document.getElementById('score-mobile-overlay');
   const scoreBtn = document.getElementById('mobile-score-btn');
@@ -4628,29 +4551,20 @@ function showShareToast(msg) {
       if (e.target === scoreOverlay) scoreOverlay.classList.remove('open');
     });
   }
+})();
 
-  const sozcuOverlay = document.getElementById('sozcul-mobile-overlay');
-  const sozcuBtn = document.getElementById('mobile-sozcul-btn');
-  const sozcuClose = document.getElementById('sozcul-mobile-close');
-  if (sozcuBtn && sozcuOverlay) {
-    sozcuBtn.addEventListener('click', () => {
-      const mPanel = document.getElementById('sozcul-panel-mobile');
-      if (mPanel && _sozculPendingDate && _sozculPendingSession) {
-        if (_sozculSubmitted) {
-          _renderSozculDone(mPanel, _sozculPendingDate);
-        } else {
-          _renderSozculInput(mPanel, _sozculPendingDate, _sozculPendingSession);
-        }
-      }
-      sozcuOverlay.classList.add('open');
-    });
+// ── Sözcü Görevi button (top-right, left of Help): opens the assigned
+// Sözcü's word/status form in a dismissible popup instead of taking over
+// the whole play screen — the game itself stays playable for everyone. ──
+(function initSozculTaskButton() {
+  const overlay = document.getElementById('sozcul-task-overlay');
+  const close = document.getElementById('sozcul-task-close');
+  if (close && overlay) {
+    close.addEventListener('click', () => overlay.classList.remove('open'));
   }
-  if (sozcuClose && sozcuOverlay) {
-    sozcuClose.addEventListener('click', () => sozcuOverlay.classList.remove('open'));
-  }
-  if (sozcuOverlay) {
-    sozcuOverlay.addEventListener('click', (e) => {
-      if (e.target === sozcuOverlay) sozcuOverlay.classList.remove('open');
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.classList.remove('open');
     });
   }
 })();
@@ -4702,20 +4616,18 @@ initKeyboard();
     if (bounced) return;
   }
 
-  // The Sözcül can't play their own game — if the signed-in user has a
-  // pending Sözcül assignment (or is the picked Sözcül for today), take
-  // over the centre column with a word + dictionary entry form / status
-  // panel and skip the normal daily target pick.
+  // A Sözcü assignment (today's or an upcoming one) never takes over the
+  // play screen anymore — it only surfaces the "Sözcü Görevi" button next
+  // to Help so the assigned word/status form is one click away. The single
+  // exception: if *today* is this user's assigned day, they can't guess
+  // their own word, so guessing gets locked further down once the daily
+  // target is known.
   const takeoverStatus = await checkSozculTakeoverStatus();
   if (takeoverStatus && takeoverStatus.mode !== 'none') {
-    enterSozculTakeoverMode(takeoverStatus);
-    renderStats();
-    loadScoreboard();
-    markPlayedGames();
-    initSuggestionForm();
-    loadMySuggestions();
-    return;
+    setupSozculTaskButton(takeoverStatus);
   }
+  const lockOwnWordToday = !!(takeoverStatus &&
+    (takeoverStatus.mode === 'today-done' || takeoverStatus.mode === 'today-missed'));
 
   TARGET_WORD = await pickDailyTarget(dailySeed);
   if (!TARGET_WORD) {
@@ -4738,11 +4650,21 @@ initKeyboard();
   } else {
     await restoreState();
   }
+  if (lockOwnWordToday && !gameOver) {
+    // Today's word is this user's own Sözcü pick — leave the grid visible
+    // (the game stays accessible/consistent for everyone) but lock guessing.
+    gameOver = true;
+    currentGuess = '';
+    const msg = document.getElementById('game-message');
+    if (msg) {
+      msg.textContent = 'Bugünün sözcüsü sensin — kendi kelimeni tahmin edemezsin. Sözcü Görevi\'ne bak.';
+      msg.className = 'game-message';
+    }
+  }
   renderStats();
   loadScoreboard();
   markPlayedGames();
   loadSozculOfTheDay();
-  initSozculPanel();
   initSuggestionForm();
   loadMySuggestions();
 })();
@@ -4826,14 +4748,7 @@ function formatISOTurkish(iso) {
   return `${d} ${months[m - 1]}`;
 }
 
-let _sozculCountdownInterval = null;
-let _sozculPendingDate = null;
-let _sozculPendingSession = null;
-let _sozculSubmitted = false;
-
-// ── Sözcül takeover (today's picked Sözcül) ──
-// The signed-in user can't play their own game, so the centre column
-// turns into a word + dictionary entry form for the rest of the day.
+// ── Sözcül takeover form (rendered inside the Sözcü Görevi popup) ──
 const SOZCUL_WORD_CLASSES = ['isim', 'fiil', 'sıfat', 'zarf', 'bağlaç', 'edat', 'zamir', 'ünlem'];
 let _takeoverCountdownInterval = null;
 
@@ -4897,34 +4812,35 @@ async function checkSozculTakeoverStatus() {
   }
 }
 
-function enterSozculTakeoverMode(status) {
-  // Hide the play surface entirely. The keyboard, grid, and Günün
-  // Sözcülü line are all part of #game-panel.
-  const gp = document.getElementById('game-panel');
-  if (gp) gp.style.display = 'none';
-  // The Sözcü Görevi mobile button + col-left panel are redundant when
-  // the takeover is up — keep them hidden.
-  const mBtn = document.getElementById('mobile-sozcul-btn');
-  if (mBtn) mBtn.style.display = 'none';
-  const sharebtn = document.getElementById('share-btn');
-  if (sharebtn) sharebtn.style.display = 'none';
-
-  const takeover = document.getElementById('sozcul-takeover');
-  if (!takeover) return;
-  takeover.classList.add('active');
-
-  if (status.mode === 'pending-input') {
-    renderTakeoverForm(takeover, status);
-  } else if (status.mode === 'today-done') {
-    renderTakeoverDone(takeover, status.targetDate);
-  } else if (status.mode === 'today-missed') {
-    renderTakeoverMissed(takeover, status.targetDate);
-  }
+// Shows the "Sözcü Görevi" button (top-right, left of Help) whenever the
+// signed-in user has any Sözcü business — a future word yet to submit, or
+// today's own word already locked in / missed. Clicking it opens the form
+// in a dismissible popup; the play screen underneath is never touched.
+function setupSozculTaskButton(status) {
+  const btn = document.getElementById('sozcul-task-btn');
+  if (!btn) return;
+  btn.style.display = '';
+  btn.onclick = () => openSozculTaskModal(status);
 
   // Mascot greeting (only fires the first time per assignment date).
   if (window.IstSozcul) {
     window.IstSozcul.greet({ sb, page: 'sozcel' });
   }
+}
+
+function openSozculTaskModal(status) {
+  const overlay = document.getElementById('sozcul-task-overlay');
+  const body = document.getElementById('sozcul-task-body');
+  if (!overlay || !body) return;
+
+  if (status.mode === 'pending-input') {
+    renderTakeoverForm(body, status);
+  } else if (status.mode === 'today-done') {
+    renderTakeoverDone(body, status.targetDate);
+  } else if (status.mode === 'today-missed') {
+    renderTakeoverMissed(body, status.targetDate);
+  }
+  overlay.classList.add('open');
 }
 
 // Results block for a Sözcü's *own* word only — used solely by
@@ -5218,194 +5134,6 @@ async function submitTakeover(status, wordInput, submitBtn, statusEl, defsEl, ta
     }
   } else {
     renderTakeoverDone(takeover, targetDate);
-  }
-}
-
-async function initSozculPanel() {
-  const panel = document.getElementById('sozcul-panel');
-  if (!panel) return;
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) return;
-  const today = getIstanbulDateISO();
-  const now = new Date();
-
-  // Load assignments for this user from today onwards
-  const { data: assignments, error: aErr } = await sb
-    .from('sozcel_sozcul_assignments')
-    .select('game_date')
-    .eq('user_id', session.user.id)
-    .gte('game_date', today)
-    .order('game_date', { ascending: true });
-  if (aErr || !assignments || assignments.length === 0) return;
-
-  const assignedDates = assignments.map(a => a.game_date);
-
-  // Sözcü must not play on the day they pick the word.
-  if (assignedDates.includes(today)) {
-    gameOver = true;
-    currentGuess = '';
-    const msg = document.getElementById('game-message');
-    if (msg) {
-      msg.textContent = 'Bugünün sözcüsüsün — oyunu oynayamazsın.';
-      msg.className = 'game-message';
-    }
-  }
-
-  // Check which dates already have a word submitted
-  const { data: existing } = await sb
-    .from('sozcel_used_answers')
-    .select('used_on')
-    .in('used_on', assignedDates);
-  const submittedDates = new Set((existing || []).map(r => r.used_on));
-
-  // Find the earliest date that still needs a word and whose deadline hasn't passed
-  let targetDate = null;
-  for (const date of assignedDates) {
-    if (!submittedDates.has(date) && getSozculDeadline(date) > now) {
-      targetDate = date;
-      break;
-    }
-  }
-
-  if (!targetDate) {
-    // All pending dates are either submitted or expired.
-    // Show a done state if today's date was in the list and already submitted.
-    if (submittedDates.has(today) && assignedDates.includes(today)) {
-      _sozculPendingDate = today;
-      _sozculPendingSession = session;
-      _sozculSubmitted = true;
-      _renderSozculDone(panel, today);
-      panel.style.display = '';
-      const mBtn = document.getElementById('mobile-sozcul-btn');
-      if (mBtn) mBtn.style.display = '';
-    }
-    return;
-  }
-
-  _sozculPendingDate = targetDate;
-  _sozculPendingSession = session;
-  _sozculSubmitted = false;
-  _renderSozculInput(panel, targetDate, session);
-  panel.style.display = '';
-  const mBtn = document.getElementById('mobile-sozcul-btn');
-  if (mBtn) mBtn.style.display = '';
-}
-
-function _renderSozculDone(panel, date) {
-  if (_sozculCountdownInterval) { clearInterval(_sozculCountdownInterval); _sozculCountdownInterval = null; }
-  _sozculSubmitted = true;
-  panel.innerHTML = `
-    <div class="panel-title">Sözcü Görevin</div>
-    <div class="sozcul-done">
-      <strong>✓</strong>
-      <span>${formatISOTurkish(date)} için sözcüğünü seçtin.</span>
-    </div>
-  `;
-}
-
-function _renderSozculInput(panel, date, session) {
-  if (_sozculCountdownInterval) { clearInterval(_sozculCountdownInterval); _sozculCountdownInterval = null; }
-  const today = getIstanbulDateISO();
-  const isToday = date === today;
-  const dateLabel = isToday ? 'bugün' : formatISOTurkish(date);
-  const wordLen = sozcelWordLengthForISO(date);
-  const deadline = getSozculDeadline(date);
-
-  panel.innerHTML = `
-    <div class="panel-title">Sözcü Görevin</div>
-    <div class="sozcul-hint">${formatISOTurkish(date)} için ${wordLen} harfli sözcüğünü seç. Gece yarısına kadar girilmesi gerek.</div>
-    <div class="sozcul-countdown" id="sozcul-countdown"></div>
-    <div class="sozcul-form">
-      <input type="text" id="sozcul-word-input" maxlength="${wordLen}"
-             placeholder="${'◯'.repeat(wordLen)}"
-             autocomplete="off" autocorrect="off" spellcheck="false">
-      <button type="button" id="sozcul-submit-btn">Onayla</button>
-    </div>
-    <div class="sozcul-status" id="sozcul-panel-status"></div>
-  `;
-
-  const input = panel.querySelector('#sozcul-word-input');
-  const submitBtn = panel.querySelector('#sozcul-submit-btn');
-  const countdownEl = panel.querySelector('#sozcul-countdown');
-  const statusEl = panel.querySelector('#sozcul-panel-status');
-
-  if (input) {
-    input.addEventListener('input', () => {
-      input.value = turkishUpper(input.value).replace(/[^A-ZÇĞİÖŞÜ]/g, '');
-    });
-  }
-
-  // Live countdown to deadline
-  function updateCountdown() {
-    if (!countdownEl) return;
-    const remaining = deadline - new Date();
-    if (remaining <= 0) {
-      countdownEl.textContent = 'Süre doldu.';
-      countdownEl.className = 'sozcul-countdown urgent';
-      if (submitBtn) submitBtn.disabled = true;
-      clearInterval(_sozculCountdownInterval);
-      _sozculCountdownInterval = null;
-      return;
-    }
-    const totalSecs = Math.floor(remaining / 1000);
-    const h = Math.floor(totalSecs / 3600);
-    const min = Math.floor((totalSecs % 3600) / 60);
-    const s = totalSecs % 60;
-    countdownEl.textContent =
-      `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    countdownEl.className = 'sozcul-countdown' + (totalSecs < 3600 ? ' urgent' : '');
-  }
-  updateCountdown();
-  _sozculCountdownInterval = setInterval(updateCountdown, 1000);
-
-  if (submitBtn) {
-    submitBtn.addEventListener('click', async () => {
-      const word = input ? input.value.trim() : '';
-      // Store uppercase — matches WORD_LIST casing and the turkishUpper()'d guesses
-      // checkWord() compares against; a lowercase TARGET_WORD never matches.
-      const wordNorm = turkishUpper(word);
-      if (word.length !== wordLen) {
-        statusEl.textContent = `${wordLen} harfli bir sözcük gir.`;
-        statusEl.className = 'sozcul-status err';
-        return;
-      }
-      if (new Date() >= deadline) {
-        statusEl.textContent = 'Süre doldu.';
-        statusEl.className = 'sozcul-status err';
-        return;
-      }
-      submitBtn.disabled = true;
-      statusEl.textContent = '';
-      statusEl.className = 'sozcul-status';
-
-      // Guard: check if date already has a word (race condition safety)
-      const { data: guard } = await sb
-        .from('sozcel_used_answers')
-        .select('word')
-        .eq('used_on', date)
-        .maybeSingle();
-      if (guard && guard.word) {
-        statusEl.textContent = 'Bu gün için zaten sözcük seçilmiş.';
-        statusEl.className = 'sozcul-status err';
-        submitBtn.disabled = false;
-        return;
-      }
-
-      // Insert the word with this user as sozcul_id
-      const { error } = await sb
-        .from('sozcel_used_answers')
-        .insert({ used_on: date, word: wordNorm, sozcul_id: session.user.id });
-      if (error) {
-        statusEl.textContent = 'Hata: ' + (error.message || 'Bilinmeyen hata');
-        statusEl.className = 'sozcul-status err';
-        submitBtn.disabled = false;
-        return;
-      }
-
-      const panelEl = document.getElementById('sozcul-panel');
-      if (panelEl) _renderSozculDone(panelEl, date);
-      if (date === getIstanbulDateISO()) loadSozculOfTheDay();
-    });
   }
 }
 
