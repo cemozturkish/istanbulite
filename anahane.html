@@ -1695,17 +1695,18 @@
     /* ── Detail overlay: bottom sheet for a news article or event's full
        details, opened instead of the old expand-in-place toggle —
        mirrors Kahvehane's game overlay / Kütüphane's reader overlay.
-       Unlike those, the outer sheet itself carries no visible frame here
-       (see the #detail-overlay-sheet override below, which strips the
-       background/border/shadow frames.css's shared flat-card rule would
-       otherwise give it) — the card underneath (.article/.event-item/
-       .politician-detail) is the only visible "paper". Scrolling lives
-       on .detail-overlay (the fixed, full-viewport root) rather than on
-       the sheet, so there's no separate clipped "window" with its own
-       scrollbar: the card is tall enough to run off the bottom of the
-       screen, and dragging anywhere moves it directly, like pulling a
-       sheet of paper up off the bottom edge rather than scrolling
-       through a fixed window onto it. */
+       Unlike those, the outer sheet has no border here (see the
+       #detail-overlay-sheet override below, which swaps frames.css's
+       shared flat-card rule's gray fill for solid opaque white and
+       drops the border, so it reads as one plain white "window" rather
+       than a bordered gray box) -- just its own drop shadow standing it
+       off the map/page behind it. Scrolling lives on .detail-overlay
+       (the fixed, full-viewport root) rather than on the sheet, so
+       there's no separate clipped "window" with its own scrollbar: the
+       card is tall enough to run off the bottom of the screen, and
+       dragging anywhere moves it directly, like pulling a sheet of
+       paper up off the bottom edge rather than scrolling through a
+       fixed window onto it. */
     .detail-overlay {
       position: fixed;
       inset: 0;
@@ -1741,15 +1742,21 @@
       transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
     }
     .detail-overlay.open .detail-overlay-sheet { transform: translate(-50%, 0); }
-    /* Kill the shared flat-card frame (frames.css targets
-       .detail-overlay-sheet by class); the id selector's higher
-       specificity wins regardless of load order. Only affects this
-       page's #detail-overlay-sheet — kahvehane's own element with the
-       same class/id lives in a different document and is untouched. */
+    /* Override frames.css's shared flat-card rule (it targets
+       .detail-overlay-sheet by class, so the id selector's higher
+       specificity wins regardless of load order): solid opaque white
+       instead of the class rule's gray fill, no border -- and the
+       shadow lives here now instead of on the card, since this panel
+       (not the card) is "the window" the shadow sits behind. Solid,
+       not var(--paper-card) -- that's 85% opacity for the map to peek
+       through in the feed list, which is exactly the see-through look
+       we don't want on this panel. Only affects this page's own
+       #detail-overlay-sheet — kahvehane's element with the same
+       class/id lives in a different document and is untouched. */
     #detail-overlay-sheet {
-      background: transparent !important;
+      background: #fff !important;
       border: none !important;
-      box-shadow: none !important;
+      box-shadow: var(--frame-shadow-strong) !important;
     }
     .detail-overlay-close {
       position: absolute;
@@ -1777,17 +1784,16 @@
       padding: 16px 16px 20px;
     }
     /* The card fills the sheet's full width now that the sheet itself
-       has no visible frame (no more narrower card centered inside a
-       wider bordered box) — its own border/shadow is the only frame the
-       user sees. Extra padding-top clears room for .detail-overlay-close
-       to sit inside the card's own top-right corner instead of floating
-       above it. The strong shadow is what now separates the card from
-       the busy map/page behind it, in place of the removed sheet frame. */
+       has no separate narrower card centered inside it — the sheet's
+       own opaque white fill (see #detail-overlay-sheet) sits right
+       behind it, so they read as one continuous white panel; only the
+       card's own black border stands out on top of it. Extra
+       padding-top clears room for .detail-overlay-close to sit inside
+       the card's own top-right corner instead of floating above it. */
     .detail-overlay-body .article,
     .detail-overlay-body .event-item,
     .detail-overlay-body .politician-detail {
       padding-top: 44px;
-      box-shadow: var(--frame-shadow-strong);
     }
 
     /* Politician detail sheet -- opened from #politician-card (see
