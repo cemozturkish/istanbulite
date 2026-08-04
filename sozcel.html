@@ -4003,11 +4003,11 @@ function submitGuess() {
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
       // Check before inserting — count = 0 means no one has won today yet.
-      const isFirstWinner = await checkFirstWinner(dailySeed);
+      const firstTier = await checkFirstWinner(dailySeed, userNeighborhood);
       await recordGameResult('sozcel', dailySeed, rowSnap + 1, true, userNeighborhood, guessResults);
       await saveState();
       renderStats();
-      enableShareButton(true, isFirstWinner);
+      enableShareButton(true, firstTier);
       // Longer pause lets the user see the final row flip + win message before
       // the popup covers it. The popup auto-opens only on first completion.
       setTimeout(() => showResultPopup(true), 1500);
@@ -4150,6 +4150,16 @@ function gamePoints(attempts, won) {
   return attempts >= 1 ? 1 : 0;
 }
 
+// First-solver bonuses: Istanbul's first solver of the day (10) also counts
+// as their district's first solver, so the separate district bonus (5) only
+// ever goes to someone who is first within their district but not first
+// in all of Istanbul.
+const ISTANBUL_FIRST_BONUS = 10;
+const NEIGHBORHOOD_FIRST_BONUS = 5;
+function firstSolverBonus(tier) {
+  return tier === 'istanbul' ? ISTANBUL_FIRST_BONUS : tier === 'neighborhood' ? NEIGHBORHOOD_FIRST_BONUS : 0;
+}
+
 // Seven-square week tracker (Monday first, matching the scoring week):
 // days already passed are dark, today is double-bordered, days to come are plain.
 function renderWeekProgress() {
@@ -4208,22 +4218,39 @@ async function loadScoreboard() {
     setListHTML('');
     return;
   }
-  // Find the first winner per date (earliest created_at among won=true rows).
-  const firstWinnerByDate = new Map();
+  // Find the first winner per date, both Istanbul-wide and per-district
+  // (earliest created_at among won=true rows). Istanbul's first solver is
+  // necessarily also their district's first solver, so the district bonus
+  // only ever applies to someone who isn't the Istanbul winner.
+  const istanbulFirstByDate = new Map();
+  const districtFirstByDate = new Map(); // date -> Map(neighborhood -> { user_id, created_at })
   weekly.filter(r => r.won).forEach(r => {
-    const existing = firstWinnerByDate.get(r.date);
+    const existing = istanbulFirstByDate.get(r.date);
     if (!existing || r.created_at < existing.created_at) {
-      firstWinnerByDate.set(r.date, { user_id: r.user_id, created_at: r.created_at });
+      istanbulFirstByDate.set(r.date, { user_id: r.user_id, created_at: r.created_at });
+    }
+    if (r.neighborhood) {
+      if (!districtFirstByDate.has(r.date)) districtFirstByDate.set(r.date, new Map());
+      const nbMap = districtFirstByDate.get(r.date);
+      const nbExisting = nbMap.get(r.neighborhood);
+      if (!nbExisting || r.created_at < nbExisting.created_at) {
+        nbMap.set(r.neighborhood, { user_id: r.user_id, created_at: r.created_at });
+      }
     }
   });
+  function firstTierFor(r) {
+    if (istanbulFirstByDate.get(r.date)?.user_id === r.user_id) return 'istanbul';
+    const nbMap = districtFirstByDate.get(r.date);
+    if (r.neighborhood && nbMap?.get(r.neighborhood)?.user_id === r.user_id) return 'neighborhood';
+    return null;
+  }
 
   // Deduplicate per (user, date): keep the best (highest-scoring) result per day.
   const byUserDate = new Map();
   weekly.forEach(r => {
     if (!r.user_id) return;
     const key = r.user_id + '|' + r.date;
-    const isFirst = firstWinnerByDate.get(r.date)?.user_id === r.user_id;
-    const pts = gamePoints(r.attempts, r.won) + (isFirst ? 10 : 0);
+    const pts = gamePoints(r.attempts, r.won) + firstSolverBonus(firstTierFor(r));
     const existing = byUserDate.get(key);
     if (!existing || pts > existing.pts) {
       byUserDate.set(key, { user_id: r.user_id, neighborhood: r.neighborhood, date: r.date, pts });
@@ -4425,26 +4452,39 @@ function getAblativeSuffix(name) {
 // Tracks whether the player won, so the manual share button (top-right) can
 // reopen the same result card after the game is over.
 let lastResultWon = false;
-let lastResultIsFirstWinner = false;
+let lastResultFirstTier = null; // 'istanbul' | 'neighborhood' | null
 
-function enableShareButton(won, isFirstWinner) {
+function enableShareButton(won, firstTier) {
   lastResultWon = !!won;
-  lastResultIsFirstWinner = !!isFirstWinner;
+  lastResultFirstTier = firstTier || null;
   const btn = document.getElementById('share-btn');
   if (btn) btn.disabled = false;
 }
 
-// Returns true if no other player has already won today's Sözcel.
-async function checkFirstWinner(date) {
+// Istanbul's first solver of the day gets 10 bonus points. Since being
+// first in all of Istanbul necessarily makes you first within your own
+// district too, that title is already spoken for — no one else in that
+// district gets the separate 5-point district bonus that day. Returns
+// 'istanbul', 'neighborhood' (first in own district only), or null.
+async function checkFirstWinner(date, neighborhood) {
   try {
-    const { count, error } = await sb.from('game_results')
+    const { count: istanbulCount, error: e1 } = await sb.from('game_results')
       .select('*', { count: 'exact', head: true })
       .eq('game', 'sozcel')
       .eq('date', date)
       .eq('won', true);
-    if (error) return false;
-    return count === 0;
-  } catch (e) { return false; }
+    if (e1) return null;
+    if (istanbulCount === 0) return 'istanbul';
+    if (!neighborhood) return null;
+    const { count: nbCount, error: e2 } = await sb.from('game_results')
+      .select('*', { count: 'exact', head: true })
+      .eq('game', 'sozcel')
+      .eq('date', date)
+      .eq('won', true)
+      .eq('neighborhood', neighborhood);
+    if (e2) return null;
+    return nbCount === 0 ? 'neighborhood' : null;
+  } catch (e) { return null; }
 }
 
 // ── Result popup ──
@@ -4495,7 +4535,9 @@ function buildShareText() {
   const grid = guessResults.map(result =>
     result.map(r => r === 'correct' ? '🟫' : r === 'present' ? '🟧' : '⬜').join('')
   ).join('\n');
-  const bonus = won && lastResultIsFirstWinner ? ' ⭐ İlk Çözücü +10' : '';
+  const bonus = won && lastResultFirstTier === 'istanbul' ? ` ⭐ İlk Çözücü +${ISTANBUL_FIRST_BONUS}`
+    : won && lastResultFirstTier === 'neighborhood' ? ` ⭐ İlçenin İlk Çözücüsü +${NEIGHBORHOOD_FIRST_BONUS}`
+    : '';
   return `Sözcel ${score}/6${bonus}\n\n${grid}\n\nistanbulite.net`;
 }
 
@@ -4505,14 +4547,15 @@ function showResultPopup(won) {
   const score = won ? guessResults.length : 'X';
   document.getElementById('result-icon-box').textContent = won ? '★' : '✕';
   document.getElementById('result-icon-box').style.background = won ? 'var(--success)' : 'var(--ink)';
-  const isFirst = won && lastResultIsFirstWinner;
-  document.getElementById('result-title').textContent = I18N.sozcelResultTitle(isFirst, won);
+  const firstTier = won ? lastResultFirstTier : null;
+  document.getElementById('result-title').textContent = I18N.sozcelResultTitle(firstTier, won);
   const basePts = gamePoints(won ? guessResults.length : 7, won);
-  const totalPts = basePts + (isFirst ? 10 : 0);
+  const bonusPts = firstSolverBonus(firstTier);
+  const totalPts = basePts + bonusPts;
   const subtitleEl = document.getElementById('result-subtitle');
   if (won) {
-    subtitleEl.innerHTML = isFirst
-      ? I18N.formatFoundInGuessesFirst(score, basePts, totalPts)
+    subtitleEl.innerHTML = firstTier
+      ? I18N.formatFoundInGuessesFirst(score, basePts, bonusPts, totalPts, firstTier)
       : I18N.formatFoundInGuesses(score, totalPts);
   } else {
     subtitleEl.textContent = I18N.formatTodaysWordPoints(TARGET_WORD, totalPts);

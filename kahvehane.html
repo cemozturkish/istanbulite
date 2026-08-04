@@ -2682,6 +2682,16 @@ function gamePoints(attempts, won) {
   return attempts >= 1 ? 1 : 0;
 }
 
+// First-solver bonuses: Istanbul's first solver of the day (10) also counts
+// as their district's first solver, so the separate district bonus (5) only
+// ever goes to someone who is first within their district but not first
+// in all of Istanbul.
+const ISTANBUL_FIRST_BONUS = 10;
+const NEIGHBORHOOD_FIRST_BONUS = 5;
+function firstSolverBonus(tier) {
+  return tier === 'istanbul' ? ISTANBUL_FIRST_BONUS : tier === 'neighborhood' ? NEIGHBORHOOD_FIRST_BONUS : 0;
+}
+
 // Points the Sözcü earns from each solver's result on their word: 5/1/2/3/2/1
 // for a win found on the 1st–6th guess; 0 if the solver didn't find it.
 // Mirrors sozcel.html's sozcuPoints() — keep both in sync.
@@ -2766,37 +2776,57 @@ async function loadScoreboard(neighborhoodFilter = null, instant = false) {
   const daysFromMonday = dow === 0 ? 6 : dow - 1;
   const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - daysFromMonday);
 
-  let weekly = results.filter(r => {
+  const weeklyAll = results.filter(r => {
     const d = parseGameDate(r.date);
     return d && d >= cutoff;
   });
 
-  // When filtered by a neighborhood, keep only that neighborhood's players.
-  if (neighborhoodFilter) {
-    weekly = weekly.filter(r => r.neighborhood === neighborhoodFilter);
+  // Find the first winner per date, both Istanbul-wide and per-district
+  // (earliest created_at among won=true rows). Always computed from the
+  // full weekly set — not the neighborhood-filtered one below — since
+  // "Istanbul's first solver" must be judged against every district, not
+  // just the one being viewed. Istanbul's first solver is necessarily also
+  // their district's first solver, so the district bonus only ever applies
+  // to someone who isn't the Istanbul winner.
+  const istanbulFirstByDate = new Map();
+  const districtFirstByDate = new Map(); // date -> Map(neighborhood -> { user_id, created_at })
+  weeklyAll.filter(r => r.won).forEach(r => {
+    const existing = istanbulFirstByDate.get(r.date);
+    if (!existing || r.created_at < existing.created_at) {
+      istanbulFirstByDate.set(r.date, { user_id: r.user_id, created_at: r.created_at });
+    }
+    if (r.neighborhood) {
+      if (!districtFirstByDate.has(r.date)) districtFirstByDate.set(r.date, new Map());
+      const nbMap = districtFirstByDate.get(r.date);
+      const nbExisting = nbMap.get(r.neighborhood);
+      if (!nbExisting || r.created_at < nbExisting.created_at) {
+        nbMap.set(r.neighborhood, { user_id: r.user_id, created_at: r.created_at });
+      }
+    }
+  });
+  function firstTierFor(r) {
+    if (istanbulFirstByDate.get(r.date)?.user_id === r.user_id) return 'istanbul';
+    const nbMap = districtFirstByDate.get(r.date);
+    if (r.neighborhood && nbMap?.get(r.neighborhood)?.user_id === r.user_id) return 'neighborhood';
+    return null;
   }
+
+  // When filtered by a neighborhood, keep only that neighborhood's players.
+  const weekly = neighborhoodFilter
+    ? weeklyAll.filter(r => r.neighborhood === neighborhoodFilter)
+    : weeklyAll;
 
   if (weekly.length === 0) {
     setList('');
     return;
   }
 
-  // Find the first winner per date (earliest created_at among won=true rows).
-  const firstWinnerByDate = new Map();
-  weekly.filter(r => r.won).forEach(r => {
-    const existing = firstWinnerByDate.get(r.date);
-    if (!existing || r.created_at < existing.created_at) {
-      firstWinnerByDate.set(r.date, { user_id: r.user_id, created_at: r.created_at });
-    }
-  });
-
   // Deduplicate per (user, date): keep the best (highest-scoring) result per day.
   const byUserDate = new Map();
   weekly.forEach(r => {
     if (!r.user_id) return;
     const key = r.user_id + '|' + r.date;
-    const isFirst = firstWinnerByDate.get(r.date)?.user_id === r.user_id;
-    const pts = gamePoints(r.attempts, r.won) + (isFirst ? 10 : 0);
+    const pts = gamePoints(r.attempts, r.won) + firstSolverBonus(firstTierFor(r));
     const existing = byUserDate.get(key);
     if (!existing || pts > existing.pts) {
       byUserDate.set(key, { user_id: r.user_id, neighborhood: r.neighborhood, date: r.date, pts });
