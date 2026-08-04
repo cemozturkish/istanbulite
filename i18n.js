@@ -247,19 +247,23 @@
       ? `You found the word on guess ${guessNum}. +${points} points`
       : `Kelimeyi ${guessNum}. tahminde buldunuz. +${points} puan`;
   }
-  // Same, with the first-solver bonus line.
-  function formatFoundInGuessesFirst(guessNum, basePts, totalPts) {
+  // Same, with the first-solver bonus line. tier is 'istanbul' or 'neighborhood'.
+  function formatFoundInGuessesFirst(guessNum, basePts, bonusPts, totalPts, tier) {
+    const label = tier === 'neighborhood'
+      ? (isEnglish() ? 'district first-solver' : 'ilçe ilk çözücü')
+      : (isEnglish() ? 'first-solver' : 'ilk çözücü');
     return isEnglish()
-      ? `You found the word on guess ${guessNum}.<br><strong>+${basePts} points &nbsp;+&nbsp; 10 first-solver bonus = ${totalPts} points</strong>`
-      : `Kelimeyi ${guessNum}. tahminde buldunuz.<br><strong>+${basePts} puan &nbsp;+&nbsp; 10 ilk çözücü bonusu = ${totalPts} puan</strong>`;
+      ? `You found the word on guess ${guessNum}.<br><strong>+${basePts} points &nbsp;+&nbsp; ${bonusPts} ${label} bonus = ${totalPts} points</strong>`
+      : `Kelimeyi ${guessNum}. tahminde buldunuz.<br><strong>+${basePts} puan &nbsp;+&nbsp; ${bonusPts} ${label} bonusu = ${totalPts} puan</strong>`;
   }
   // Loss subtitle: "Bugünkü kelime: KALEM — +2 puan"
   function formatTodaysWordPoints(word, points) {
     return isEnglish() ? `Today's word: ${word} — +${points} points` : `Bugünkü kelime: ${word} — +${points} puan`;
   }
-  // Result-popup title: won / first-solver / lost.
-  function sozcelResultTitle(isFirst, won) {
-    if (isFirst) return isEnglish() ? "Today's First Solver!" : 'Günün İlk Çözücüsü!';
+  // Result-popup title: won / first-solver ('istanbul' or 'neighborhood' tier) / lost.
+  function sozcelResultTitle(tier, won) {
+    if (tier === 'istanbul') return isEnglish() ? "Istanbul's First Solver!" : "İstanbul'un İlk Çözücüsü!";
+    if (tier === 'neighborhood') return isEnglish() ? "Your District's First Solver!" : 'İlçenin İlk Çözücüsü!';
     if (won) return t('games.congrats');
     return isEnglish() ? 'Better Luck Tomorrow' : 'Bugünlük Bu Kadar';
   }
