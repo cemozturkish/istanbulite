@@ -666,7 +666,7 @@
        as oversized for a one-word action. */
     .submit-form-row {
       display: flex;
-      align-items: center;
+      align-items: flex-end;
       gap: 8px;
       /* A flex item's default min-width is auto (its own content's
          natural width), not 0 -- without this, the textarea (and this
@@ -681,14 +681,15 @@
        the thin gray outline + rounded corners these had before, which
        read as a generic form control rather than one of this site's own
        cards. */
-    /* Explicit, matching height on both -- padding/border/line-height
-       alone left the button a different height than the resizable
-       textarea. resize:vertical still lets the textarea grow taller on
-       drag; the button just stays put at that shared baseline height. */
+    /* Taller than the button -- the send button is now a small square icon
+       (see .submit-form button below), so the width it used to take up as a
+       full text button goes straight to this box instead. align-items:
+       flex-end on .submit-form-row keeps the square pinned to the textarea's
+       bottom-right corner as it's resized taller. */
     .submit-form textarea {
       flex: 1;
       min-width: 0;
-      height: 44px;
+      height: 76px;
       padding: 10px;
       border: 2px solid var(--ink);
       border-bottom: 5px solid var(--ink);
@@ -699,23 +700,29 @@
       resize: vertical;
     }
 
+    /* Small square icon button instead of a full-width "GÖNDER" bar --
+       that read as oversized for a one-tap send action next to the
+       (now bigger) textarea. */
     .submit-form button {
       flex-shrink: 0;
-      width: auto;
-      height: 44px;
-      padding: 0 18px;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       background: var(--ink);
       color: var(--paper);
       border: 2px solid var(--ink);
       border-bottom: 5px solid var(--ink);
       border-radius: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.85rem;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
       cursor: pointer;
       transition: background 0.2s;
+    }
+
+    .submit-form button svg {
+      width: 16px;
+      height: 16px;
     }
 
     .submit-form button:hover { background: var(--accent); }
@@ -1221,14 +1228,17 @@
         margin-bottom: 4px;
       }
       .submit-form textarea {
-        height: 38px;
+        height: 56px;
         padding: 5px 7px;
         font-size: 11px;
       }
       .submit-form button {
-        height: 38px;
-        padding: 0 14px;
-        font-size: 11px;
+        width: 34px;
+        height: 34px;
+      }
+      .submit-form button svg {
+        width: 14px;
+        height: 14px;
       }
 
       /* Games: normal in-flow column below the map, to the right --
@@ -1915,7 +1925,9 @@
           <span id="home-nb-badge" class="home-nb-badge" style="display:none;"></span>
           <div class="submit-form-row">
             <textarea id="post-content" placeholder="Ne söylemek istersiniz?"></textarea>
-            <button id="submit-btn">Gönder</button>
+            <button id="submit-btn" aria-label="Gönder" title="Gönder">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 20l18-8L3 4v6l12 2-12 2z"/></svg>
+            </button>
           </div>
           <div class="submit-form-note" id="submit-form-note" style="display:none;"></div>
           <div class="submit-status" id="submit-status"></div>
@@ -2516,29 +2528,21 @@ async function init() {
   })(40);
 }
 
-// Resident-only: the submit form is shown only when the user is posting to
-// their own residence neighborhood (RLS would reject otherwise). Admin can
-// post anywhere. When the user has clicked a non-resident neighborhood we
-// swap in a note explaining the restriction.
+// The composer is always visible, regardless of which neighborhood is being
+// viewed (Tüm İstanbul included) -- selectedNeighborhood already resolves to
+// where the post will actually land (home neighborhood for regular users;
+// the viewed neighborhood for admin, who can post anywhere), so the badge
+// just mirrors that. Only hidden before we know the user's own neighborhood.
 function updateSubmitFormVisibility() {
   const formEl = document.getElementById('submit-form');
   if (!formEl) return;
-  const target = activeMapNeighborhood;
-  const canPost = !!target && target === homeNeighborhood;
-  const noteEl = document.getElementById('submit-form-note');
-
-  if (canPost) {
-    formEl.style.display = 'block';
-    if (noteEl) noteEl.style.display = 'none';
-    document.getElementById('post-content').style.display = '';
-    document.getElementById('submit-btn').style.display = '';
-    const badge = document.getElementById('home-nb-badge');
-    if (badge) badge.textContent = neighborhoodNames[target] || target;
-  } else {
-    // Hide the composer entirely when viewing Tüm İstanbul or a neighborhood
-    // the user isn't from — no "jump back" to the home neighborhood.
+  if (!selectedNeighborhood) {
     formEl.style.display = 'none';
+    return;
   }
+  formEl.style.display = 'block';
+  const badge = document.getElementById('home-nb-badge');
+  if (badge) badge.textContent = neighborhoodNames[selectedNeighborhood] || selectedNeighborhood;
 }
 
 // Today's date in Europe/Istanbul, matching the dailySeed format used by each game
