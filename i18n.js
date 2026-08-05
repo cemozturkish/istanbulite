@@ -90,8 +90,8 @@
 
     // sozcel "Nasıl Oynanır" body
     'sozcel.help.intro':   {
-      default: 'Gizli beş harfli Türkçe sözcüğü <strong>altı denemede</strong> bulun.',
-      more_english: 'Guess the hidden five-letter Turkish word in <strong>six tries</strong>.',
+      default: 'Gizli Türkçe sözcüğü <strong>altı denemede</strong> bulun. Sözcük, hecelerine ayrılmış petek düzeninde gösterilir — her hece bir alt basamakta başlar. Önceki tahminlerin, tahtanın altında küçük renkli taşlar olarak durur.',
+      more_english: 'Guess the hidden Turkish word in <strong>six tries</strong>. The word is laid out by its syllables in a honeycomb staircase — each syllable starts one step lower. Your previous guesses stay under the board as small colored tiles.',
     },
     'sozcel.help.green':   { default: 'Doğru harf, doğru yer',     more_english: 'Right letter, right spot' },
     'sozcel.help.yellow':  { default: 'Doğru harf, yanlış yer',    more_english: 'Right letter, wrong spot' },
