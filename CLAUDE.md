@@ -11,24 +11,128 @@ This file provides context for AI assistants working in this repository.
 **Live site:** https://istanbulite.net
 **Hosting:** GitHub Pages with custom domain (CNAME)
 **Backend:** Supabase (auth + PostgreSQL database)
+**iOS app:** Capacitor wrapper around the same static site (`ios/`, `capacitor.config.json`) — see README.md
+
+---
+
+## Vision & Product Philosophy
+
+This section is the source of truth for **why** the app is shaped the way it is. When a product,
+layout, or feature decision is ambiguous, resolve it in favor of these principles.
+
+### The mall-stairway principle
+
+Whatever a user opens the app for — the games, the news, the political content, or just checking
+the cheapest coffee in their neighborhood — the layout must route them **through** the rest of the
+city on the way, the way a mall deliberately places its stairways so you physically walk past the
+shops to go up, down, or out. Users can absolutely come just for the games; but the app is designed
+so that on the way there they *see* at least some of everything else. Never build a shortcut that
+lets a user reach their one destination without passing through anything. The three-page swipe
+carousel **is** this stairway: you enter in the middle, and every destination requires traversal.
+
+### Always in the middle (Avrupa ↔ Anadolu)
+
+Istanbul's essence is being permanently *in between* — Europe on one side, Asia on the other, its
+people crossing left and right and back again every single day, belonging to both and reducible to
+neither. The app's architecture mirrors this. The user always enters on the **middle page** and
+swipes left/right from there — and no matter which way they go, they should feel like they are
+still in the middle. Not this, not that: **both**.
+
+The three pages, and what each direction *means*:
+
+- **Middle — `anahane.html` (Hane, "home"):** the self and the city. The Istanbul district map,
+  the user's own profile and avatar, events, breaking news. "No matter where you are in Istanbul,
+  Istanbul is your home first." Personal customization (avatar creation, profile) belongs to the
+  middle — it is the user's anchor point.
+- **One direction — `kahvehane.html` (zoom IN, the local):** deeper into the neighborhood. The
+  district/mahalle-level map, the **coffee price index** and local economy, the daily games, the
+  scoreboards (who got what score), and neighborhood comments. This is the *interactive* side of
+  the app — where you engage with other Istanbulites.
+- **Other direction — `kutuphane.html` (zoom OUT, Turkey):** the national layer. The Turkey map,
+  articles, letters, politicians, TBMM. Deliberately **less interactive** than the local side:
+  this page is for reading and observing, not for peer-to-peer interaction at a national level.
+  Istanbulite is not a place to argue about Turkey with strangers.
+
+The zoom levels tell one story: mahalle → Istanbul → Türkiye, with the user standing in the middle.
+
+### No DMs — ever
+
+Users can never directly message each other. This is a permanent, foundational decision, not a
+missing feature. Istanbulite does not care what its users say to each other in private — and that
+is where its power comes from. It does not need to track your conversations, interpret your data,
+or use it against your future endeavors. Istanbulite does not feel the need to control you; it is
+confident enough to just be a safe space from what is out there. Users can see each other's
+profiles and acknowledge that such people with such opinions exist — that is enough.
+
+### Anti-screen-time: remind, don't retain
+
+The app's job is to remind users that **life is outside and they have to go get it** — not to
+build a life inside the internet. Every feature should push attention outward. The formula has
+three points: **people → their ideas → our opinions on those ideas.** The app reminds you that
+these people exist, they are doing these things, here is what they think — now go outside and
+meet them. Engagement-maximizing patterns (infinite scroll, notification pressure, streak guilt)
+are anti-goals.
+
+### An events app at heart
+
+Strip everything away and Istanbulite is an **events and local-economy app**: it shows you the
+nearest cheapest coffee (the coffee index), and it shows you events — real opportunities to
+socialize with real people. It tells you almost nothing about who those people are except their
+Istanbulite profile, and that is deliberate, because of how trust works here (next section).
+
+### Trust and the earned avatar
+
+A user trusts another Istanbulite through their profile card: the badges, the membership tenure
+("member since…"), and the specific clothes/items on their avatar. These signal legitimacy
+because **they cannot be bought** — avatar items and badges are earned only through real-world
+participation: showing up to events, being with people, interacting outside. You customize your
+avatar based on how much you participate in the outside world. Never add a purchase or shortcut
+path to avatar/profile cosmetics.
+
+### Istanbulites and visitors
+
+The app is only for people actually **in** Istanbul. Identity is expressed as "Cem from Ataşehir,"
+"Cem from Beşiktaş." A future idea: tourists could become Istanbulites for the duration of their
+visit — "Sam from Kenya" — with their own distinct interface (not the residents' app, something
+better suited to a visitor), letting a tourist feel like an Istanbulite for the moment they're in
+the city and interact with locals in a meaningful way. Not built yet; keep the door open for it.
+
+### Platform priority: the app comes first
+
+At least at first, ~90% of users will use the **iOS App Store app** (the Capacitor wrapper). That
+is the main target: every change must feel smooth in the app first, then in mobile Safari, then on
+desktop. The two runtimes already have divergent code paths where needed (e.g. `router.js` uses
+in-document virtual navigation inside Capacitor vs. cross-document View Transitions on the web) —
+keeping the app buttery is worth that duplication. Desktop is the third-priority layout, not the
+default one.
 
 ---
 
 ```
 /home/user/istanbulite/
-├── index.html          # Main site: login screen + interactive Istanbul map
-├── admin.html          # Admin dashboard (admin-only)
-├── kahvehane.html      # Community/discussion page and the games (Coffeehouse)
-├── kutuphane.html      # Articles and profile display
-├── tumcel.html         # Turkish quote-fragment Connections-style game (replaced Bağlantılar)
-├── bulmaca.html        # Turkish mini crossword
-├── sozcel.html         # Turkish Wordle-style word guessing game
-├── style.css           # Legacy global stylesheet (mostly unused; prefer inline <style>)
-├── main.js             # Empty placeholder (unused)
-├── CNAME               # GitHub Pages custom domain config: istanbulite.net
-├── README.md           # Empty
-└── assets/
-    └── istanbul-map.png  # High-res Istanbul map (416 KB), used in SVG viewport
+├── index.html            # Login/signup gate ONLY — redirects to anahane.html once authenticated
+├── anahane.html          # MIDDLE page: home — Istanbul map, profile/avatar, events, breaking news
+├── kutuphane.html        # LEFT page (zoom out): Library — Turkey map, articles, letters, TBMM/politicians
+├── kahvehane.html        # RIGHT page (zoom in): Coffeehouse — district map, games hub, scoreboards, comments
+├── sozcel.html           # Turkish Wordle-style daily word game
+├── tumcel.html           # Turkish quote-fragment Connections-style daily game (replaced Bağlantılar)
+├── bulmaca.html          # Turkish daily mini crossword
+├── admin.html            # Admin dashboard (admin-only)
+├── router.js             # Shared shell: single Supabase client, swipe carousel, virtual navigation, clock
+├── profile-card.js/.css  # Floating profile card, avatar, badges — shared across pages
+├── onboarding.js/.css    # New-account onboarding flow
+├── game-locks.js         # Per-day game on/off enforcement (game_day_toggles)
+├── i18n.js               # TR/EN language toggle
+├── palette.js/.css       # Theme tokens
+├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js,
+│   tbmm.js, sozcul-mascot.js, admin-notification.js, loading-screen.js/.css,
+│   safe-area-ready.js, frames.css        # Focused shared modules
+├── capacitor.config.json # iOS app config (Capacitor wraps the same site — see README.md)
+├── ios/                  # Generated Capacitor Xcode project (committed, minus Pods/build output)
+├── scripts/sync-web.js   # Copies site files into www/ for the Capacitor build
+├── db/                   # SQL migration files — SOURCE OF TRUTH for the full Supabase schema
+├── CNAME                 # GitHub Pages custom domain config: istanbulite.net
+└── assets/               # map/, avatar/, mascot/, loading/ subfolders + one-off images
 ```
 
 ---
@@ -44,6 +148,8 @@ This file provides context for AI assistants working in this repository.
 | Backend | Supabase (auth + REST API + PostgreSQL) |
 | Supabase SDK | `@supabase/supabase-js@2` via CDN (jsdelivr.net) | |
 | Hosting | GitHub Pages |
+| iOS app | Capacitor (wraps the same static site; `www/` generated by `scripts/sync-web.js`) |
+| Navigation | 3-page swipe carousel (Kütüphane ← Anahane → Kahvehane) via `router.js` |
 
 ---
 
@@ -96,6 +202,13 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 ---
 
 ## Database Schema
+
+> **Note:** the tables documented below are the core set. The complete, current schema lives in
+> `db/*.sql` — later features each have their own migration file there (events + `event_rsvps`,
+> `breaking_news` + polls/series/updates, `library_articles`/shelves/letters/categories,
+> `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians`, TBMM
+> seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, and more). When in
+> doubt, read the relevant `db/` file — it is the source of truth.
 
 **Table: `neighborhoods`** — lookup of valid neighborhood IDs.
 - `id text pk` (kebab-case slug), `name_tr text` (Turkish display name).
@@ -193,11 +306,17 @@ sb.from('articles').delete().eq('id', id)
 
 ## Page-by-Page Summary
 
-### `index.html` — Main Site
-- Shows a **sign-in only** screen on first load (no self-signup; accounts are admin-distributed)
-- After auth: renders an interactive SVG map of Istanbul
-- Clicking a neighborhood fetches and displays that district's content
-- User experience is customized based on their assigned neighborhood
+### `index.html` — Login Gate
+- Login / kefil-code signup screen only — no content of its own anymore
+- Once a session exists (or right after sign-in), redirects to `anahane.html` (the real home)
+
+### `anahane.html` — Hane (MIDDLE page, home)
+- The entry point and anchor of the three-page carousel — the user always starts here
+- Interactive Istanbul district map in the center; clicking a district opens its detail sheet
+- Left column: events panel (with RSVPs — `events` / `event_rsvps` tables)
+- Right column: breaking news feed (with polls, series, updates)
+- The personal layer lives here: the user's own profile, avatar, home identity
+- Vision: this page is "you + Istanbul" — see Vision & Product Philosophy above
 
 ### `admin.html` — Admin Dashboard
 - Login restricted to ADMIN_EMAIL
@@ -212,20 +331,21 @@ sb.from('articles').delete().eq('id', id)
   generated, so its panel is just a pointer back to the on/off board). Toggling a game off
   for a day locks it site-wide for that day (enforced by `game-locks.js`, see Database Schema above and Assets/coding conventions below).
 
-### `kahvehane.html` — Coffeehouse
-- Community discussion section
-- Partially implemented; structure and styles complete
+### `kahvehane.html` — Coffeehouse (RIGHT page, zoom IN — the local, interactive side)
+- Istanbul district map with mahalle-level picker; community discussion per neighborhood
 - Users can only comment on their own neighborhood, but can view and read all
-- This is where the NYTimes-like games are, there are three of them:
-- Sözcel: Turkish Wordle
-- Tümcel: Turkish quote-fragment Connections (replaced Bağlantılar)
-- Bulmaca: Turkish crossword
-- The games change every day and the scores are kept track of
+- This is where the NYTimes-like games live, there are three of them:
+  - Sözcel: Turkish Wordle
+  - Tümcel: Turkish quote-fragment Connections (replaced Bağlantılar)
+  - Bulmaca: Turkish crossword
+- The games change every day; scores and scoreboards are tracked (`game_results`)
+- Planned here per the vision: the **coffee price index** / local-economy layer
 
-### `kutuphane.html` — Library
-- Content archive
-- Partially implemented
-- This is where the articles where everyone can read, like, and comment on are
+### `kutuphane.html` — Library (LEFT page, zoom OUT — the Turkey/national side)
+- Turkey map; articles, shelves, letters (Posta Kutusu), politicians, TBMM seat chart
+- Everyone can read, like, and comment on articles
+- Per the vision, this side stays *less* interactive than Kahvehane — reading and observing
+  the national level, not peer-to-peer engagement about it
 
 ### `tumcel.html` — Tümcel
 - Connections-style game where 16 sentence fragments must be regrouped into 4 quotes
@@ -255,9 +375,9 @@ There is no test suite, no linting configuration, and no CI/CD pipeline. QA is m
 ```bash
 git add <files>
 git commit -m "Descriptive commit message"
-git push origin master
+git push origin main
 ```
-GitHub Pages serves the site automatically after each push to `master`.
+GitHub Pages serves the site automatically after each push to `main`.
 
 ### Key Git Commands
 ```bash
@@ -301,16 +421,20 @@ Admin creates the account in Supabase (or via admin panel) and assigns a neighbo
 Open `admin.html` in browser, log in as admin, use the form.
 
 ### Add a new neighborhood
-1. Add a new SVG polygon group to the map in `index.html` with matching class and data attribute
+1. Add the hit-region to the map overlays in `anahane.html` and `kahvehane.html` (traced against
+   `assets/map/istanbul-map.svg`, the source of truth — keep them in sync)
 2. Ensure the neighborhood ID string matches the kebab-case format used in Supabase
 
 ### Add a new page
-1. Create a new `.html` file
-2. Follow the structure of existing pages (inline `<style>`, inline `<script>`, grayscale tokens)
-3. Add a navigation link in the relevant pages
+1. Prefer NOT to: the three-page carousel (Kütüphane ← Anahane → Kahvehane) is the intended
+   full surface of the app — new features should find their home inside one of the three
+   layers per the Vision section, not as a fourth page
+2. If a page is truly needed (like the game pages), follow the structure of existing pages
+   (inline `<style>`, inline `<script>`, grayscale tokens) and wire it into the shared modules
+   (`router.js` conventions, `game-locks.js` if it's a game, profile card, i18n)
 
 ### Modify article display
-Edit the `renderArticles()` function (or equivalent) in `index.html`.
+Edit the article/library rendering in `kutuphane.html`.
 
 ### Modify admin CRUD logic
 Edit the form submission and Supabase call handlers in `admin.html`.
