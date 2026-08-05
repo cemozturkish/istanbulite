@@ -1,6 +1,10 @@
 # Istanbulite
 
-Private, referral-gated community platform for people who live in Istanbul. See `CLAUDE.md` for full project context.
+Private, referral-gated community platform for people who live in Istanbul. See `CLAUDE.md` for full project context, including the **Vision & Product Philosophy** section that governs product decisions.
+
+## The idea in one paragraph
+
+Istanbulite is, at heart, an events and local-economy app that tries to *reduce* screen time, not grow it: people → their ideas → our opinions on those ideas — then go outside and meet them. The app is three pages you swipe between, the way Istanbul itself moves between Europe and Asia: you enter in the **middle** (Anahane — you and Istanbul: profile, avatar, events, breaking news), swipe one way to zoom **in** to the neighborhood (Kahvehane — coffee index, daily games, scoreboards, local comments), and the other way to zoom **out** to Turkey (Kütüphane — articles, letters, politics; read-only in spirit). Like a mall that places its stairways so you walk past the shops, every destination routes you through the rest of the city. There are no DMs and never will be; trust comes from profile badges, tenure, and avatar items that can only be **earned** by showing up in the real world — never bought. The App Store app (Capacitor) is the primary target; mobile Safari second, desktop third.
 
 ## Website
 
