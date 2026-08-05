@@ -251,3 +251,73 @@ main,
 /* Game pages render their boards inside <main>. Inner sub-panels
    (e.g. the daily-game cards on kahvehane) keep their existing
    look; only the top-level frames change. */
+
+/* ── HEX FRAME (hand-drawn elongated hexagon) ────────────────── */
+/* The site-wide small-element frame: replaces the old circular
+   avatar frames and Sözcel's square tiles/keys with the
+   hand-drawn elongated hexagon (assets/frame.png). Two pieces:
+   1. clip-path cuts the element to the hexagon. The polygon runs
+      along the MIDLINE of the drawn stroke, so the straight cut
+      edge always hides underneath the wobbly drawn ring;
+   2. an ::after overlay paints the drawn stroke itself on top,
+      using assets/frame-ring.png (the drawing with its interior
+      knocked out, alpha-only) as a mask, tinted via
+      --hexframe-stroke so it follows the palette and dark mode.
+   The shape stretches to each element's own box (100% 100%), so
+   squares get a squatter hexagon and tall boxes a slimmer one —
+   same drawing everywhere.
+   Generic .hexframe/.hexframe::after is for elements without a
+   dedicated class (e.g. admin.html's inline avatar previews). */
+:root {
+  --hexframe-clip: polygon(50% 1.8%, 95.3% 15.6%, 95.3% 84.4%,
+                           50% 98.2%, 4.7% 84.4%, 4.7% 15.6%);
+}
+
+.hexframe,
+.ist-pc-avatar,
+.ist-pc-cover-avatar,
+.library-card .avatar,
+.avatar,
+.poll-voter-avatar,
+.ev-attendee-avatar,
+.politician-detail-avatar,
+.tbmm-detail-avatar,
+.letter-box,
+.key {
+  position: relative;
+  border: none !important;
+  border-radius: 0 !important;
+  -webkit-clip-path: var(--hexframe-clip);
+  clip-path: var(--hexframe-clip);
+}
+
+/* The drawn stroke, painted over the clipped content. .key is
+   deliberately absent: keys never had a border, so the colored
+   key shape alone carries the hexagon. */
+.hexframe::after,
+.ist-pc-avatar::after,
+.ist-pc-cover-avatar::after,
+.library-card .avatar::after,
+.avatar::after,
+.poll-voter-avatar::after,
+.ev-attendee-avatar::after,
+.politician-detail-avatar::after,
+.tbmm-detail-avatar::after,
+.letter-box::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  background: var(--hexframe-stroke, var(--ink));
+  -webkit-mask: url("assets/frame-ring.png") center / 100% 100% no-repeat;
+  mask: url("assets/frame-ring.png") center / 100% 100% no-repeat;
+}
+
+/* Stroke tints mirroring the border colors each element had. */
+.ist-pc-cover-avatar { --hexframe-stroke: #1a1a1a; } /* fixed dark border over cover art */
+.letter-box          { --hexframe-stroke: var(--rule); }
+.letter-box.filled   { --hexframe-stroke: var(--accent); }
+.letter-box.correct  { --hexframe-stroke: var(--success); }
+.letter-box.present  { --hexframe-stroke: var(--present); }
+.letter-box.absent   { --hexframe-stroke: var(--absent); }
