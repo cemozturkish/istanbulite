@@ -375,9 +375,9 @@ There is no test suite, no linting configuration, and no CI/CD pipeline. QA is m
 ```bash
 git add <files>
 git commit -m "Descriptive commit message"
-git push origin master
+git push origin main
 ```
-GitHub Pages serves the site automatically after each push to `master`.
+GitHub Pages serves the site automatically after each push to `main`.
 
 ### Key Git Commands
 ```bash
