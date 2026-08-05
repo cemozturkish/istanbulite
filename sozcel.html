@@ -738,24 +738,25 @@
     .help-body .swatch.present { background: var(--present); border-color: var(--present); }
     .help-body .swatch.absent { background: var(--absent); border-color: var(--absent); }
 
+    /* The board: one syllable-staircase skeleton (the current guess) on
+       top, the compact colored history of submitted guesses under it,
+       then the six attempt pips. Tile positions/sizes are computed in
+       buildBoard() — each syllable sits one level lower, its first tile
+       tucked half a tile left of the previous syllable's last tile,
+       nesting into the hexagons' tapered corners (see the mock). */
     .word-grid {
       display: flex;
       flex-direction: column;
-      gap: 3px;
-      width: 240px; /* JS always overrides this with a fixed px value */
+      align-items: center;
+      gap: 10px;
       flex-shrink: 0;
     }
 
-    .word-row {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 3px;
-    }
+    .syl-board { position: relative; margin: 0 auto; }
+    .syl-board .letter-box { position: absolute; }
 
     .letter-box {
-      aspect-ratio: 1;
       overflow: hidden;
-      border: 2px solid var(--rule);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -763,28 +764,62 @@
       font-weight: 700;
       text-transform: uppercase;
       background: var(--paper);
-      transition: background 0.2s, border-color 0.2s, color 0.2s;
+      transition: background 0.2s, color 0.2s;
     }
 
-    .letter-box.filled { border-color: var(--accent); }
     .letter-box.correct {
       background: var(--success);
-      border-color: var(--success);
       color: var(--paper);
       animation: flip 0.5s ease;
     }
     .letter-box.present {
       background: var(--present);
-      border-color: var(--present);
       color: var(--paper);
       animation: flip 0.5s ease;
     }
     .letter-box.absent {
       background: var(--absent);
-      border-color: var(--absent);
       color: var(--ink);
       animation: flip 0.5s ease;
     }
+
+    /* Compact past-guess rows: same hexagon (frames.css mask vars), no
+       ring — the state color alone carries each mini tile. */
+    .guess-history {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .guess-history:empty { display: none; }
+    .mini-row { display: flex; gap: 2px; }
+    .mini-box {
+      width: 17px;
+      aspect-ratio: var(--hexframe-ratio);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.55rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: var(--rule);
+      -webkit-mask: var(--hexframe-mask);
+      mask: var(--hexframe-mask);
+    }
+    .mini-box.correct { background: var(--success); color: var(--paper); }
+    .mini-box.present { background: var(--present); color: var(--paper); }
+    .mini-box.absent  { background: var(--absent);  color: var(--ink); }
+
+    /* Six attempt pips: filled = used. */
+    .attempt-pips { display: flex; gap: 6px; }
+    .attempt-pips span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 1.5px solid var(--ink);
+      background: transparent;
+    }
+    .attempt-pips span.used { background: var(--ink); }
 
     @keyframes flip {
       0%, 100% { transform: rotateX(0); }
@@ -795,7 +830,7 @@
       20%, 60% { transform: translateX(-6px); }
       40%, 80% { transform: translateX(6px); }
     }
-    .word-row.shake { animation: shake 0.4s ease; }
+    .syl-board.shake { animation: shake 0.4s ease; }
 
     .keyboard {
       display: flex;
@@ -1467,8 +1502,7 @@
         flex: 1;
       }
       .word-grid {
-        width: min(72vw, 52vh);
-        gap: 6px;
+        max-width: 100%;
         /* Pairs with .keyboard's own margin-top:auto below: previously
            only the keyboard had an auto margin, so it alone soaked up
            all the leftover vertical space, leaving the grid pinned to
@@ -1477,12 +1511,7 @@
            without losing the keyboard's dock-to-bottom feel. */
         margin-top: auto;
       }
-      .word-row { gap: 6px; }
-      .letter-box {
-        border-width: 3px;
-        font-size: clamp(1.35rem, 4.5vh, 2.15rem);
-        border-radius: 5px;
-      }
+      .mini-box { width: 20px; font-size: 0.62rem; }
       /* Native-keyboard placement: key width is fixed to what the 12-key
          top row (Q W E R T Y U I O P Ğ Ü) needs to span edge-to-edge, and
          every row reuses that same width. The 11-key middle row (A S D F
@@ -1724,7 +1753,7 @@
       <button class="result-close" id="help-close" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
       <div class="result-title" style="margin-bottom:14px;" data-i18n="games.howto">Nasıl Oynanır</div>
       <div class="help-body">
-        <p data-i18n="sozcel.help.intro">Gizli beş harfli Türkçe sözcüğü <strong>altı denemede</strong> bulun.</p>
+        <p data-i18n="sozcel.help.intro">Gizli Türkçe sözcüğü <strong>altı denemede</strong> bulun. Sözcük, hecelerine ayrılmış petek düzeninde gösterilir — her hece bir alt basamakta başlar. Önceki tahminlerin, tahtanın altında küçük renkli taşlar olarak durur.</p>
         <p data-i18n="sozcel.help.colors">Her tahminin ardından kutular renklenir:</p>
         <p>
           <span class="swatch correct"></span> <span data-i18n="sozcel.help.green2">Harf doğru ve doğru yerde.</span><br>
@@ -3702,6 +3731,10 @@ let TODAY_DEFINITION = null;
 let currentRow = 0;
 let currentGuess = '';
 let gameOver = false;
+// True while a submitted guess's flip/reveal is playing on the skeleton —
+// input is held so typing can't scribble over the colored reveal (there is
+// no separate next row to type into anymore).
+let revealing = false;
 const keyStates = {};
 const guessResults = []; // result arrays per row, used to build the share emoji grid
 const submittedGuesses = []; // authoritative list of submitted guess strings (never read from DOM)
@@ -3768,20 +3801,14 @@ async function restoreState() {
     // could sneak in from older saves where saveState read from the DOM.
     const validGuesses = state.guesses.filter(w => typeof w === 'string' && w.length === WORD_LENGTH);
 
-    validGuesses.forEach((word, rowIdx) => {
-      currentRow = rowIdx;
-      currentGuess = word;
+    // Replay each submitted guess into the compact history and onto the
+    // keyboard; the staircase skeleton stays empty for the next attempt.
+    validGuesses.forEach((word) => {
       submittedGuesses.push(word);
-      for (let i = 0; i < WORD_LENGTH; i++) {
-        const box = document.getElementById(`box-${rowIdx}-${i}`);
-        box.textContent = word[i] || '';
-        box.className = 'letter-box filled';
-      }
       const result = checkWord(word);
       guessResults.push(result);
+      renderHistoryRow(word, result);
       for (let i = 0; i < WORD_LENGTH; i++) {
-        const box = document.getElementById(`box-${rowIdx}-${i}`);
-        box.className = `letter-box filled ${result[i]}`;
         const letter = word[i];
         const keyBtn = document.getElementById(`key-${letter}`);
         if (keyBtn) {
@@ -3792,11 +3819,17 @@ async function restoreState() {
         }
       }
     });
+    updatePips();
 
     gameOver = state.gameOver;
+    currentRow = validGuesses.length;
+    currentGuess = '';
     if (gameOver) {
       const lastGuess = validGuesses[validGuesses.length - 1];
       const wasWon = lastGuess === TARGET_WORD;
+      // The skeleton shows the game's final state: the solved word, or the
+      // last (wrong) attempt colored as it landed.
+      paintSkeleton(lastGuess, guessResults[guessResults.length - 1]);
       if (wasWon) {
         document.getElementById('game-message').textContent = I18N.t('games.congrats');
         document.getElementById('game-message').className = 'game-message win';
@@ -3805,13 +3838,9 @@ async function restoreState() {
         document.getElementById('game-message').className = 'game-message lose';
       }
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
-      currentRow = validGuesses.length;
       // Do NOT auto-open the result popup on revisit — the share button stays
       // available in the top-right for the user to reopen it manually.
       enableShareButton(wasWon);
-    } else {
-      currentRow = validGuesses.length;
-      currentGuess = '';
     }
     return true;
   } catch (e) { return false; }
@@ -3830,34 +3859,142 @@ const KEYBOARD_LAYOUT = [
 const WIDE_KEYS = new Set(['GİR', '←']);
 const DISABLED_KEYS = new Set(['Q', 'W', 'X']);
 
+// ── Turkish syllabification ──
+// TDK line-breaking rule: of the consonants between two vowels, only the
+// LAST one moves to the next syllable — a consonant directly followed by a
+// vowel starts a new syllable (SÖZ-CÜ-LÜK, İS-TAN-BUL, E-LEKT-RİK). The
+// guard against closing a vowel-less chunk keeps loanword-initial clusters
+// together (TREN stays one syllable). Input is already turkishUpper()'d.
+const TR_VOWELS = 'AEIİOÖUÜ';
+function syllabifyTr(word) {
+  const isVowel = ch => TR_VOWELS.includes(ch);
+  if (!word.split('').some(isVowel)) return [word];
+  const sylls = [];
+  let start = 0;
+  for (let i = 1; i < word.length - 1; i++) {
+    if (!isVowel(word[i]) && isVowel(word[i + 1])) {
+      const chunk = word.slice(start, i);
+      if (chunk.split('').some(isVowel)) { sylls.push(chunk); start = i; }
+    }
+  }
+  sylls.push(word.slice(start));
+  return sylls;
+}
+
+// Geometry of the hexframe tile shape (see frames.css): width / height.
+const TILE_RATIO = 0.5713;
+// Consecutive syllable levels nest into the hexagons' tapered corners, so
+// each level steps down by less than a full tile height.
+const LEVEL_STEP = 0.86;
+
+// Syllable layout: syllable s starts half a tile left of syllable s-1's
+// LAST tile, one level lower, then runs right — measured in half-tile
+// columns: start(s) = start(s-1) + 2·len(s-1) − 3 (normalized to ≥ 0).
+function syllableLayout(sylls) {
+  const starts = [0];
+  for (let s = 1; s < sylls.length; s++) {
+    starts.push(starts[s - 1] + 2 * sylls[s - 1].length - 3);
+  }
+  const min = Math.min(...starts);
+  const norm = starts.map(v => v - min);
+  const totalHalfCols = Math.max(...norm.map((st, s) => st + 2 * sylls[s].length));
+  return { starts: norm, totalHalfCols };
+}
+
+// Build the board: ONE syllable-staircase skeleton (the active guess),
+// the compact colored history of past guesses, and six attempt pips.
+// Called after TARGET_WORD is known — the skeleton depends on the word's
+// actual syllable structure, not just its length.
 function initWordGrid() {
   const grid = document.getElementById('word-grid');
-  // Clear any existing rows so this function is idempotent — a second call
-  // after a word-length mismatch rebuild won't append duplicate rows with
-  // duplicate box-* ids.
   grid.innerHTML = '';
-  // Compute a fixed pixel width once at init time rather than using a live
-  // vh value. A live `min(Xpx, Y*vh)` inline style would cause the grid to
-  // resize whenever the browser chrome (address bar) shows or hides on
-  // mobile, which makes the squares appear to jump/grow on first interaction.
-  // Tiles are hexframe-shaped (see frames.css): height = width / 0.5713,
-  // so the per-tile viewport-height budget that was 0.076vh for square
-  // tiles caps the WIDTH at 0.076 * 0.5713 ≈ 0.0434vh to keep all six
-  // rows fitting the same vertical space. The px cap shrinks with it.
-  const maxByPx = 36 * WORD_LENGTH;
-  const maxByVh = Math.round((window.innerHeight || 600) * 0.0434 * WORD_LENGTH);
-  grid.style.width = Math.min(maxByPx, maxByVh) + 'px';
-  for (let i = 0; i < 6; i++) {
-    const row = document.createElement('div');
-    row.className = 'word-row';
-    row.style.gridTemplateColumns = `repeat(${WORD_LENGTH}, 1fr)`;
-    for (let j = 0; j < WORD_LENGTH; j++) {
+  if (!TARGET_WORD) return;
+
+  const sylls = syllabifyTr(TARGET_WORD);
+  const { starts, totalHalfCols } = syllableLayout(sylls);
+  const levels = sylls.length;
+
+  // Tile width from the width budget and the vertical budget. Fixed px at
+  // init time (not live vh) so the board doesn't resize when the mobile
+  // browser chrome shows/hides.
+  const availW = Math.min(360, Math.round((window.innerWidth || 420) * 0.86));
+  const availH = Math.round((window.innerHeight || 600) * 0.30);
+  const gapOf = w => Math.max(2, Math.round(w * 0.06));
+  let tileW = Math.min(48, Math.floor(availW / (totalHalfCols / 2)) - gapOf(48));
+  const levelFactor = 1 + (levels - 1) * LEVEL_STEP;
+  tileW = Math.min(tileW, Math.floor(availH * TILE_RATIO / levelFactor));
+  tileW = Math.max(tileW, 18);
+  const gap = gapOf(tileW);
+  const tileH = Math.round(tileW / TILE_RATIO);
+  const halfStep = (tileW + gap) / 2;
+  const vStep = Math.round(tileH * LEVEL_STEP);
+
+  const board = document.createElement('div');
+  board.className = 'syl-board';
+  board.id = 'syl-board';
+  board.style.width = Math.ceil(totalHalfCols * halfStep - gap) + 'px';
+  board.style.height = (vStep * (levels - 1) + tileH) + 'px';
+
+  let letterIdx = 0;
+  sylls.forEach((syl, s) => {
+    for (let j = 0; j < syl.length; j++) {
       const box = document.createElement('div');
       box.className = 'letter-box';
-      box.id = `box-${i}-${j}`;
-      row.appendChild(box);
+      box.id = `box-${letterIdx}`;
+      box.style.left = Math.round((starts[s] + 2 * j) * halfStep) + 'px';
+      box.style.top = (s * vStep) + 'px';
+      box.style.width = tileW + 'px';
+      box.style.fontSize = Math.max(11, Math.round(tileW * 0.42)) + 'px';
+      board.appendChild(box);
+      letterIdx++;
     }
-    grid.appendChild(row);
+  });
+  grid.appendChild(board);
+
+  const hist = document.createElement('div');
+  hist.className = 'guess-history';
+  hist.id = 'guess-history';
+  grid.appendChild(hist);
+
+  const pips = document.createElement('div');
+  pips.className = 'attempt-pips';
+  pips.id = 'attempt-pips';
+  for (let i = 0; i < 6; i++) pips.appendChild(document.createElement('span'));
+  grid.appendChild(pips);
+  updatePips();
+}
+
+function updatePips() {
+  const pips = document.getElementById('attempt-pips');
+  if (!pips) return;
+  [...pips.children].forEach((dot, i) => {
+    dot.className = i < submittedGuesses.length ? 'used' : '';
+  });
+}
+
+// Append a submitted guess to the compact history under the skeleton.
+function renderHistoryRow(word, result) {
+  const hist = document.getElementById('guess-history');
+  if (!hist) return;
+  const row = document.createElement('div');
+  row.className = 'mini-row';
+  word.split('').forEach((ch, i) => {
+    const b = document.createElement('div');
+    b.className = 'mini-box ' + (result[i] || 'absent');
+    b.textContent = ch;
+    row.appendChild(b);
+  });
+  hist.appendChild(row);
+}
+
+// Paint the skeleton with a full word + its result colors (used for the
+// final row on game over and on restore).
+function paintSkeleton(word, result) {
+  for (let i = 0; i < WORD_LENGTH; i++) {
+    const box = document.getElementById(`box-${i}`);
+    if (!box) continue;
+    box.textContent = word[i] || '';
+    box.className = `letter-box filled ${result[i]}`;
   }
 }
 
@@ -3906,7 +4043,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 function handleKey(key) {
-  if (gameOver) return;
+  if (gameOver || revealing) return;
+  if (!TARGET_WORD) return; // board not built yet — nothing to type into
 
   if (key === '←') {
     if (currentGuess.length > 0) {
@@ -3915,11 +4053,13 @@ function handleKey(key) {
     }
   } else if (key === 'GİR') {
     if (currentGuess.length === WORD_LENGTH) {
-      if (!VALID_WORDS.has(currentGuess)) {
-        const row = document.getElementById('word-grid').children[currentRow];
-        if (row) {
-          row.classList.add('shake');
-          row.addEventListener('animationend', () => row.classList.remove('shake'), { once: true });
+      // Dictionary check only for lengths we have a word list for (5/6);
+      // other lengths accept any full fill — no dictionary exists for them.
+      if (VALID_WORDS && !VALID_WORDS.has(currentGuess)) {
+        const board = document.getElementById('syl-board');
+        if (board) {
+          board.classList.add('shake');
+          board.addEventListener('animationend', () => board.classList.remove('shake'), { once: true });
         }
         const msgEl = document.getElementById('game-message');
         msgEl.textContent = 'Kelime listede yok';
@@ -3959,7 +4099,8 @@ async function markAsPlayed() {
 
 function updateDisplay() {
   for (let i = 0; i < WORD_LENGTH; i++) {
-    const box = document.getElementById(`box-${currentRow}-${i}`);
+    const box = document.getElementById(`box-${i}`);
+    if (!box) return; // board not built yet (daily target still loading)
     box.textContent = currentGuess[i] || '';
     box.className = 'letter-box' + (currentGuess[i] ? ' filled' : '');
   }
@@ -3978,17 +4119,17 @@ function submitGuess() {
   if (guessSnap === TARGET_WORD || rowSnap === 5) {
     gameOver = true;
   } else {
-    // Advance immediately so that backspace presses during the flip animation
-    // can't clear the just-submitted row's DOM text before saveState() reads it.
     currentRow++;
     currentGuess = '';
   }
+  revealing = true;
 
+  // Flip the skeleton tiles one by one, coloring keys as they land.
   for (let i = 0; i < WORD_LENGTH; i++) {
     setTimeout(() => {
-      const box = document.getElementById(`box-${rowSnap}-${i}`);
+      const box = document.getElementById(`box-${i}`);
       const letter = guessSnap[i];
-      box.className = `letter-box filled ${result[i]}`;
+      if (box) box.className = `letter-box filled ${result[i]}`;
 
       const keyBtn = document.getElementById(`key-${letter}`);
       if (keyBtn) {
@@ -4000,19 +4141,26 @@ function submitGuess() {
     }, i * 100);
   }
 
+  // Wait for the staggered flips plus a beat to let the colors read, then
+  // either finish the game (skeleton keeps the final colored word) or move
+  // the attempt down into the compact history and clear the skeleton.
+  const revealMs = WORD_LENGTH * 100 + 700;
   setTimeout(async () => {
+    revealing = false;
+    updatePips();
     if (guessSnap === TARGET_WORD) {
       document.getElementById('game-message').textContent = I18N.t('games.congrats');
       document.getElementById('game-message').className = 'game-message win';
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
+      renderHistoryRow(guessSnap, result);
       // Check before inserting — count = 0 means no one has won today yet.
       const firstTier = await checkFirstWinner(dailySeed, userNeighborhood);
       await recordGameResult('sozcel', dailySeed, rowSnap + 1, true, userNeighborhood, guessResults);
       await saveState();
       renderStats();
       enableShareButton(true, firstTier);
-      // Longer pause lets the user see the final row flip + win message before
+      // Longer pause lets the user see the final flip + win message before
       // the popup covers it. The popup auto-opens only on first completion.
       setTimeout(() => showResultPopup(true), 1500);
     } else if (rowSnap === 5) {
@@ -4020,15 +4168,18 @@ function submitGuess() {
       document.getElementById('game-message').className = 'game-message lose';
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
+      renderHistoryRow(guessSnap, result);
       await recordGameResult('sozcel', dailySeed, 7, false, userNeighborhood, guessResults);
       await saveState();
       renderStats();
       enableShareButton(false);
       setTimeout(() => showResultPopup(false), 1500);
     } else {
+      renderHistoryRow(guessSnap, result);
+      updateDisplay(); // clears the skeleton for the next attempt
       saveState();
     }
-  }, 500);
+  }, revealMs);
 }
 
 function checkWord(guess) {
@@ -4704,7 +4855,8 @@ async function markPlayedGames() {
 }
 
 // ── Init ──
-initWordGrid();
+// The board is built after the daily target is fetched — the syllable
+// staircase depends on the word's actual structure, not just its length.
 initKeyboard();
 (async () => {
   // Enforce game-lock gating BEFORE picking today's word or wiring up the
@@ -4739,15 +4891,15 @@ initKeyboard();
       msg.className = 'game-message';
     }
     gameOver = true;
-  } else if (TARGET_WORD.length !== WORD_LENGTH) {
-    // Scheduled word length differs from the day rule — trust the scheduled
-    // word and adapt the game to its actual length.
-    WORD_LENGTH = TARGET_WORD.length;
-    WORD_LIST   = WORD_LENGTH === 6 ? WORD_LIST_6 : WORD_LIST_5;
-    VALID_WORDS = WORD_LENGTH === 6 ? VALID_WORDS_6 : VALID_WORDS_5;
-    initWordGrid();
-    await restoreState();
   } else {
+    // Words are any length now (the sözcü picks freely) — adapt the game
+    // to the actual word. The 5/6-letter dictionaries still gate guesses
+    // when they apply; other lengths have no dictionary, so any full fill
+    // is accepted (see handleKey).
+    WORD_LENGTH = TARGET_WORD.length;
+    WORD_LIST   = WORD_LENGTH === 6 ? WORD_LIST_6 : (WORD_LENGTH === 5 ? WORD_LIST_5 : []);
+    VALID_WORDS = WORD_LENGTH === 6 ? VALID_WORDS_6 : (WORD_LENGTH === 5 ? VALID_WORDS_5 : null);
+    initWordGrid();
     await restoreState();
   }
   if (lockOwnWordToday && !gameOver) {
@@ -4835,11 +4987,6 @@ function getSozculDeadline(iso) {
 }
 
 // Returns the expected Sözcel word length for a given game date.
-function sozcelWordLengthForISO(iso) {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).getDay() === 0 ? 6 : 5;
-}
-
 // Format ISO date as Turkish short form (e.g. "30 Haziran").
 function formatISOTurkish(iso) {
   const [y, m, d] = iso.split('-').map(Number);
@@ -5013,7 +5160,6 @@ function renderTakeoverMissed(takeover, date) {
 
 function renderTakeoverForm(takeover, status) {
   const date = status.targetDate;
-  const wordLen = sozcelWordLengthForISO(date);
   const deadline = getSozculDeadline(date);
   const dateLabel = formatISOTurkish(date);
   const existing = status.existing || null;
@@ -5026,17 +5172,18 @@ function renderTakeoverForm(takeover, status) {
     <div class="stk-eyebrow">Sözcü Görevin · ${escapeHtml(dateLabel)}</div>
     <h2>${escapeHtml(dateLabel)} Kelimesini Sen Seç</h2>
     <p class="stk-hint">
-      ${wordLen} harfli bir Türkçe sözcük gir ve sözlük bilgisini doldur.
+      İstediğin uzunlukta (3–12 harf) bir Türkçe sözcük gir ve sözlük bilgisini
+      doldur — oyunda kelime hecelerine ayrılarak gösterilecek.
       ${escapeHtml(dateLabel)} günü diğer İstanbullular bu kelimeyi tahmin edecek.
       ${existing ? 'Gece yarısına kadar dilediğin kadar değiştirebilirsin.' : ''}
     </p>
     <div class="stk-countdown" id="stk-countdown"></div>
     <div class="stk-form">
       <div>
-        <label class="stk-label">Sözcük (${wordLen} harf)</label>
+        <label class="stk-label">Sözcük (3–12 harf)</label>
         <input type="text" class="stk-word-input" id="stk-word-input"
-               maxlength="${wordLen}" autocomplete="off" autocorrect="off"
-               spellcheck="false" placeholder="${'◯'.repeat(wordLen)}"
+               maxlength="12" autocomplete="off" autocorrect="off"
+               spellcheck="false" placeholder="◯◯◯◯◯"
                value="${escapeHtml(existing ? existing.word : '')}">
       </div>
 
@@ -5161,15 +5308,13 @@ async function submitTakeover(status, wordInput, submitBtn, statusEl, defsEl, ta
   // Store uppercase — matches WORD_LIST casing and the turkishUpper()'d guesses
   // checkWord() compares against; a lowercase TARGET_WORD never matches.
   const wordNorm = turkishUpper(word);
-  const expectedLen = sozcelWordLengthForISO(targetDate);
 
-  if (word.length !== expectedLen) {
-    statusEl.textContent = `${expectedLen} harfli bir Türkçe sözcük gir.`;
+  if (word.length < 3 || word.length > 12) {
+    statusEl.textContent = '3–12 harfli bir Türkçe sözcük gir.';
     statusEl.className = 'stk-status err';
     return;
   }
-  const lenRegex = new RegExp(`^[A-ZÇĞİÖŞÜ]{${expectedLen}}$`);
-  if (!lenRegex.test(wordNorm)) {
+  if (!/^[A-ZÇĞİÖŞÜ]{3,12}$/.test(wordNorm)) {
     statusEl.textContent = 'Sadece Türkçe harfler kullan.';
     statusEl.className = 'stk-status err';
     return;
@@ -5283,7 +5428,7 @@ async function renderSuggestionPanel() {
   } else {
     body.innerHTML = `
       <div class="suggest-form">
-        <input type="text" id="suggest-input" maxlength="5" placeholder="5 HARF" autocomplete="off"/>
+        <input type="text" id="suggest-input" maxlength="12" placeholder="3–12 HARF" autocomplete="off"/>
         <button type="button" id="suggest-btn">Öner</button>
       </div>
     `;
@@ -5319,8 +5464,8 @@ async function submitSuggestion() {
   if (!input || !btn) return;
   const word = input.value.toLocaleUpperCase('tr-TR');
   setSuggestStatus('', null);
-  if (!/^[A-ZÇĞİÖŞÜ]{5}$/.test(word)) {
-    setSuggestStatus('Sözcük 5 Türkçe harf olmalı.', 'err');
+  if (!/^[A-ZÇĞİÖŞÜ]{3,12}$/.test(word)) {
+    setSuggestStatus('Sözcük 3–12 Türkçe harf olmalı.', 'err');
     return;
   }
   const { data: { session } } = await sb.auth.getSession();
