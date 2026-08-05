@@ -251,3 +251,137 @@ main,
 /* Game pages render their boards inside <main>. Inner sub-panels
    (e.g. the daily-game cards on kahvehane) keep their existing
    look; only the top-level frames change. */
+
+/* ── HEX FRAME (hand-drawn elongated hexagon) ────────────────── */
+/* The site-wide small-element frame: replaces the old circular
+   avatar frames and Sözcel's square tiles/keys with the
+   hand-drawn elongated hexagon (assets/frame.png), used at its
+   EXACT drawn proportions — the shape is never stretched. Two
+   masks cut from the same drawing (same canvas, so they always
+   align pixel-perfect at center/contain):
+   1. assets/frame-fill.png — the full silhouette, masking the
+      element itself, so content is cut to the drawing's own
+      wobbly outline (no polygon approximation);
+   2. assets/frame-ring.png — the drawn stroke only (interior
+      knocked out), painted on top by an ::after overlay, tinted
+      via --hexframe-stroke so it follows the palette/dark mode.
+   Avatar boxes adopt the drawing's aspect ratio (height stays,
+   width follows) and the avatar art anchors to the BOTTOM of the
+   frame; letters in Sözcel tiles/keys stay centered.
+   Generic .hexframe/.hexframe::after is for elements without a
+   dedicated class (e.g. admin.html's inline avatar previews). */
+:root {
+  /* aspect ratio of the drawing's cropped silhouette */
+  --hexframe-ratio: 1362 / 2384;
+  --hexframe-mask: url("assets/frame-fill.png") center / contain no-repeat;
+  --hexframe-ring: url("assets/frame-ring.png") center / contain no-repeat;
+}
+
+.hexframe,
+.ist-pc-avatar,
+.ist-pc-cover-avatar,
+.library-card .avatar,
+.avatar,
+.poll-voter-avatar,
+.ev-attendee-avatar,
+.politician-detail-avatar,
+.tbmm-detail-avatar,
+.letter-box,
+.key {
+  position: relative;
+  border: none !important;
+  border-radius: 0 !important;
+  -webkit-mask: var(--hexframe-mask);
+  mask: var(--hexframe-mask);
+}
+
+/* The drawn stroke, painted over the masked content. .key is
+   deliberately absent: keys never had a border, so the colored
+   key shape alone carries the hexagon. */
+.hexframe::after,
+.ist-pc-avatar::after,
+.ist-pc-cover-avatar::after,
+.library-card .avatar::after,
+.avatar::after,
+.poll-voter-avatar::after,
+.ev-attendee-avatar::after,
+.politician-detail-avatar::after,
+.tbmm-detail-avatar::after,
+.letter-box::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  background: var(--hexframe-stroke, var(--ink));
+  -webkit-mask: var(--hexframe-ring);
+  mask: var(--hexframe-ring);
+}
+
+/* Avatar boxes take the drawing's own proportions: the page-set
+   height stays, the width follows the shape instead. width:auto
+   needs !important to also beat admin.html's inline widths. */
+.hexframe,
+.ist-pc-avatar,
+.ist-pc-cover-avatar,
+.library-card .avatar,
+.avatar,
+.poll-voter-avatar,
+.ev-attendee-avatar,
+.politician-detail-avatar,
+.tbmm-detail-avatar {
+  aspect-ratio: var(--hexframe-ratio);
+  width: auto !important;
+}
+
+/* The avatar art stands at the bottom of the tall frame (the
+   frame's pointed base clips the art's lower corners — wanted).
+   Covers both lone <img> avatars and the layered
+   .ist-avatar-stack imgs, which all share the same canvas so the
+   layers stay aligned. */
+.hexframe img,
+.ist-pc-avatar img,
+.ist-pc-cover-avatar img,
+.library-card .avatar img,
+.avatar img,
+.poll-voter-avatar img,
+.ev-attendee-avatar img,
+.politician-detail-avatar img,
+.tbmm-detail-avatar img {
+  object-fit: contain !important;
+  object-position: center bottom !important;
+}
+
+/* Image-bearing avatars: the art PNGs carry their own light card
+   background (~#f5f5f5), so match the frame interior to it — the
+   empty upper part of the tall frame reads as the same card
+   instead of a seam above the bottom-anchored art. Initials-only
+   avatars (e.g. the "+N" counters) keep their page-set colors. */
+.hexframe:has(img),
+.ist-pc-avatar:has(img),
+.ist-pc-cover-avatar:has(img),
+.library-card .avatar:has(img),
+.avatar:has(img),
+.poll-voter-avatar:has(img),
+.ev-attendee-avatar:has(img),
+.politician-detail-avatar:has(img),
+.tbmm-detail-avatar:has(img) {
+  background: #f5f5f5 !important;
+}
+
+/* Sözcel tiles keep their grid-set width and take their height
+   from the drawing's ratio (letters stay flex-centered). Keys
+   keep their row-set widths; a fixed height gives the centered
+   hexagon room to span a normal key's width. The GİR label
+   shrinks a touch so it fits inside the hexagon window. */
+.letter-box { aspect-ratio: var(--hexframe-ratio); }
+.key { height: 52px; }
+.key.wide { font-size: 11px; }
+
+/* Stroke tints mirroring the border colors each element had. */
+.ist-pc-cover-avatar { --hexframe-stroke: #1a1a1a; } /* fixed dark border over cover art */
+.letter-box          { --hexframe-stroke: var(--rule); }
+.letter-box.filled   { --hexframe-stroke: var(--accent); }
+.letter-box.correct  { --hexframe-stroke: var(--success); }
+.letter-box.present  { --hexframe-stroke: var(--present); }
+.letter-box.absent   { --hexframe-stroke: var(--absent); }
