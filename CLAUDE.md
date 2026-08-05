@@ -207,8 +207,9 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > `db/*.sql` — later features each have their own migration file there (events + `event_rsvps`,
 > `breaking_news` + polls/series/updates, `library_articles`/shelves/letters/categories,
 > `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians`, TBMM
-> seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, and more). When in
-> doubt, read the relevant `db/` file — it is the source of truth.
+> seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `coffee_prices`
+> (the Kahve Endeksi), and more). When in doubt, read the relevant `db/` file — it is the
+> source of truth.
 
 **Table: `neighborhoods`** — lookup of valid neighborhood IDs.
 - `id text pk` (kebab-case slug), `name_tr text` (Turkish display name).
@@ -339,7 +340,11 @@ sb.from('articles').delete().eq('id', id)
   - Tümcel: Turkish quote-fragment Connections (replaced Bağlantılar)
   - Bulmaca: Turkish crossword
 - The games change every day; scores and scoreboards are tracked (`game_results`)
-- Planned here per the vision: the **coffee price index** / local-economy layer
+- The **coffee price index** (Kahve Endeksi, `coffee_prices` table): the "Kahve Endeksi" pill
+  above the map label opens a bottom sheet (detail-overlay) listing the cheapest reported cup
+  of coffee per venue, scoped to the selected district or Tüm İstanbul. Residents report/update
+  prices for venues in their own district only (admin: any district) — same residency rule and
+  RLS pattern as `neighborhood_comments`
 
 ### `kutuphane.html` — Library (LEFT page, zoom OUT — the Turkey/national side)
 - Turkey map; articles, shelves, letters (Posta Kutusu), politicians, TBMM seat chart
