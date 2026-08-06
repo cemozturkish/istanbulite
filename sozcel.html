@@ -738,6 +738,17 @@
     .help-body .swatch.present { background: var(--present); border-color: var(--present); }
     .help-body .swatch.absent { background: var(--absent); border-color: var(--absent); }
 
+    /* Row pairing the vertical attempt list (left) with the syllable
+       skeleton (right) so the used-guess pips sit at eye level next to
+       the board instead of stacked underneath it. */
+    .board-row {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+
     /* The board: one syllable-staircase skeleton (the current guess) on
        top, the compact colored history of submitted guesses under it,
        then the six attempt pips. Tile positions/sizes are computed in
@@ -783,17 +794,42 @@
       animation: flip 0.5s ease;
     }
 
-    /* Six attempt pips: filled = used. Sits between the word and the
-       keyboard (not inside .word-grid) so it never grows/shifts with it. */
-    .attempt-pips { display: flex; gap: 6px; flex-shrink: 0; }
+    /* Six attempt pips, stacked vertically to the left of the board.
+       Unused = a small empty dot. Used = grows into a small pill showing
+       the actual word the player submitted for that attempt, so the
+       column reads as a compact guess history. Lives in .board-row (not
+       inside .word-grid) so it never grows/shifts the skeleton board. */
+    .attempt-pips {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
     .attempt-pips span {
       width: 8px;
       height: 8px;
       border-radius: 50%;
       border: 1.5px solid var(--ink);
       background: transparent;
+      transition: all 0.2s ease;
     }
-    .attempt-pips span.used { background: var(--ink); }
+    .attempt-pips span.used {
+      width: auto;
+      height: auto;
+      min-width: 8px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--ink);
+      border-color: var(--ink);
+      color: var(--paper);
+      font-size: 0.56rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
 
     @keyframes flip {
       0%, 100% { transform: rotateX(0); }
@@ -1477,6 +1513,9 @@
       }
       .word-grid {
         max-width: 100%;
+      }
+      .board-row {
+        max-width: 100%;
         /* Pairs with .keyboard's own margin-top:auto below: previously
            only the keyboard had an auto margin, so it alone soaked up
            all the leftover vertical space, leaving the grid pinned to
@@ -1674,10 +1713,12 @@
       <button class="game-ctrl-btn" id="help-btn" type="button" aria-label="Nasıl oynanır" title="Nasıl oynanır">?</button>
     </div>
     <section class="game-panel" id="game-panel">
-      <div class="word-grid" id="word-grid"></div>
+      <div class="board-row" id="board-row">
+        <div class="attempt-pips" id="attempt-pips"></div>
+        <div class="word-grid" id="word-grid"></div>
+      </div>
       <div class="game-message" id="game-message"></div>
       <div class="reset-info" id="reset-info"></div>
-      <div class="attempt-pips" id="attempt-pips"></div>
       <div class="keyboard" id="keyboard"></div>
       <div class="sozcul-line" id="sozcul-line"></div>
     </section>
@@ -3903,8 +3944,14 @@ function initWordGrid() {
 
   // Tile width from the width budget and the vertical budget. Fixed px at
   // init time (not live vh) so the board doesn't resize when the mobile
-  // browser chrome shows/hides.
-  const availW = Math.min(360, Math.round((window.innerWidth || 420) * 0.86));
+  // browser chrome shows/hides. On narrow (mobile-layout) screens the
+  // board shares .board-row with the vertical attempt-pips column, so
+  // reserve space for it up front instead of letting the pills push the
+  // board wider than the viewport. Desktop's board width is already
+  // capped at 360 with plenty of room beside it, so no reserve needed.
+  const isMobileLayout = (window.innerWidth || 420) <= 768;
+  const pipsReserve = isMobileLayout ? 64 : 0;
+  const availW = Math.min(360, Math.round((window.innerWidth || 420) * 0.86)) - pipsReserve;
   const availH = Math.round((window.innerHeight || 600) * 0.30);
   const gapOf = w => Math.max(2, Math.round(w * 0.06));
   let tileW = Math.min(48, Math.floor(availW / (totalHalfCols / 2)) - gapOf(48));
@@ -3938,9 +3985,9 @@ function initWordGrid() {
   });
   grid.appendChild(board);
 
-  // The six attempt pips live in their own static container between the
-  // word and the keyboard (see the <div id="attempt-pips"> in the page
-  // markup) so they never resize/move .word-grid.
+  // The six attempt pips live in their own static container to the left
+  // of the board, inside .board-row (see the <div id="attempt-pips"> in
+  // the page markup) so they never resize/move .word-grid.
   const pips = document.getElementById('attempt-pips');
   if (pips) {
     pips.innerHTML = '';
@@ -3953,7 +4000,14 @@ function updatePips() {
   const pips = document.getElementById('attempt-pips');
   if (!pips) return;
   [...pips.children].forEach((dot, i) => {
-    dot.className = i < submittedGuesses.length ? 'used' : '';
+    const guess = submittedGuesses[i];
+    if (guess) {
+      dot.textContent = guess;
+      dot.className = 'used';
+    } else {
+      dot.textContent = '';
+      dot.className = '';
+    }
   });
 }
 
