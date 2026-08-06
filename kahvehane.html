@@ -232,12 +232,18 @@
       display: flex;
       flex-direction: column;
       padding: 14px;
-      /* Solid-enough white (not the fully transparent frameless look the
-         rest of this page's columns use) since this panel has to fully
-         cover the discussion feed underneath while it's showing, not
-         blend with it -- matches the map panel's own #f7f7f7 fallback. */
-      background: rgba(247, 247, 247, 0.97);
-      box-shadow: 4px 0 20px rgba(0, 0, 0, 0.18);
+      /* Same "chapter-box" bottom-sheet treatment as .game-overlay-sheet/
+         .detail-overlay-sheet (see frames.css) -- solid frame-bg behind a
+         2px ink border, no box-shadow (the border alone carries the
+         weight there, and a shadow here bled a few px past the element's
+         own edge into col-left even while off-screen, showing as a
+         stray sliver at the column's left edge). No border-left, mirroring
+         those sheets' own "no bottom border" treatment: this panel slides
+         in from the left, so its left edge is the one meant to read as
+         continuing past the screen instead of stopping. */
+      background: var(--frame-bg);
+      border: 2px solid var(--ink);
+      border-left-width: 0;
       transform: translateX(-100%);
       transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
       pointer-events: none;
@@ -409,7 +415,9 @@
     /* ── Kahve Endeksi pill — opens the coffee price index sheet ──
        Sits right above the map label so the pair reads "district name +
        what it costs to sit down there". Fixed white/ink frame matching
-       the games h2 / .game-link chapter boxes over the map photo. */
+       the games h2 / .game-link chapter boxes over the map photo.
+       Mobile-only (see the display:none override right below) -- on
+       desktop the index is already visible at all times in col-right. */
     .coffee-pill {
       position: fixed;
       bottom: 52px;
@@ -429,6 +437,14 @@
       transition: background 0.15s ease, color 0.15s ease;
     }
     .coffee-pill:hover { background: #1a1a1a; color: #fff; }
+    /* Redundant on desktop now that the coffee index shows persistently
+       in col-right (see .coffee-index-panel) -- the pill (and the sheet
+       it opens) stay as the index's only entry point on mobile, where
+       that persistent panel has no room (see .coffee-index-panel's own
+       mobile display:none). */
+    @media (min-width: 769px) {
+      .coffee-pill { display: none; }
+    }
 
     .discussion-section {
       display: flex;
@@ -1908,6 +1924,20 @@
       min-height: 0;
       overflow-y: auto;
     }
+    /* The report form (admin-only here, see opts.adminOnlyForm) was built
+       for the ~520px-wide mobile sheet -- a single row of venue input +
+       price input + button overflowed this much narrower sidebar column.
+       Stack every field full-width instead so it always fits. */
+    .coffee-index-panel .coffee-form {
+      flex-direction: column;
+    }
+    .coffee-index-panel .coffee-venue-input,
+    .coffee-index-panel .coffee-price-input,
+    .coffee-index-panel .coffee-form button {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .coffee-index-panel .coffee-price-input { text-align: left; }
 
     /* Politician detail sheet -- opened from #politician-card. Same card
        treatment as the rest of the page (background/border/shadow via
@@ -3677,12 +3707,16 @@ async function fetchCoffeeRows(nbFilter) {
   return out.slice(0, COFFEE_MAX_ROWS);
 }
 
-// Shared by both surfaces (the coffee-pill sheet and the always-visible
-// col-right panel) -- element lookups below are always scoped relative to
-// the clicked element's own .coffee-form/.coffee-detail ancestor rather
-// than by id, since both surfaces can be in the DOM at once and ids must
-// stay unique per document.
-function renderCoffeeSheetHTML(scopeNb, rows) {
+// Shared by both surfaces (the coffee-pill sheet, mobile-only, and the
+// always-visible col-right panel) -- element lookups below are always
+// scoped relative to the clicked element's own .coffee-form/.coffee-detail
+// ancestor rather than by id, since both surfaces can be in the DOM at
+// once and ids must stay unique per document.
+// opts.adminOnlyForm restricts the report form to admin -- used by the
+// col-right panel (regular users shouldn't get a typing surface sitting
+// permanently in that column); the mobile sheet leaves it unset so any
+// resident can still report their own district's price there.
+function renderCoffeeSheetHTML(scopeNb, rows, opts = {}) {
   const uid = window.__currentUser ? window.__currentUser.id : null;
   const scopeName = scopeNb
     ? (neighborhoodNames[scopeNb] || scopeNb)
@@ -3717,7 +3751,7 @@ function renderCoffeeSheetHTML(scopeNb, rows) {
   // the admin may report into whichever district the sheet is scoped to.
   const reportNb = (isAdmin && scopeNb) ? scopeNb : homeNeighborhood;
   let formHTML = '';
-  if (reportNb) {
+  if (reportNb && (!opts.adminOnlyForm || isAdmin)) {
     const reportNbName = neighborhoodNames[reportNb] || reportNb;
     formHTML = `<div class="coffee-form">
         <input class="coffee-venue-input" maxlength="80" placeholder="${I18N.t('kahve.venue')}">
@@ -3776,7 +3810,7 @@ async function refreshCoffeeIndexPanel() {
   const content = document.getElementById('coffee-index-content');
   if (!content) return;
   const rows = await fetchCoffeeRows(coffeePanelScope);
-  content.innerHTML = renderCoffeeSheetHTML(coffeePanelScope, rows);
+  content.innerHTML = renderCoffeeSheetHTML(coffeePanelScope, rows, { adminOnlyForm: true });
 }
 
 // Refreshes whichever coffee-index surface(s) are actually on screen after
