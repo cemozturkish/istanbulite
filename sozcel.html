@@ -783,35 +783,9 @@
       animation: flip 0.5s ease;
     }
 
-    /* Compact past-guess rows: same hexagon (frames.css mask vars), no
-       ring — the state color alone carries each mini tile. */
-    .guess-history {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-    }
-    .guess-history:empty { display: none; }
-    .mini-row { display: flex; gap: 2px; }
-    .mini-box {
-      width: 17px;
-      aspect-ratio: var(--hexframe-ratio);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.55rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      background: var(--rule);
-      -webkit-mask: var(--hexframe-mask);
-      mask: var(--hexframe-mask);
-    }
-    .mini-box.correct { background: var(--success); color: var(--paper); }
-    .mini-box.present { background: var(--present); color: var(--paper); }
-    .mini-box.absent  { background: var(--absent);  color: var(--ink); }
-
-    /* Six attempt pips: filled = used. */
-    .attempt-pips { display: flex; gap: 6px; }
+    /* Six attempt pips: filled = used. Sits between the word and the
+       keyboard (not inside .word-grid) so it never grows/shifts with it. */
+    .attempt-pips { display: flex; gap: 6px; flex-shrink: 0; }
     .attempt-pips span {
       width: 8px;
       height: 8px;
@@ -1511,7 +1485,6 @@
            without losing the keyboard's dock-to-bottom feel. */
         margin-top: auto;
       }
-      .mini-box { width: 20px; font-size: 0.62rem; }
       /* Native-keyboard placement: key width is fixed to what the 12-key
          top row (Q W E R T Y U I O P Ğ Ü) needs to span edge-to-edge, and
          every row reuses that same width. The 11-key middle row (A S D F
@@ -1704,6 +1677,7 @@
       <div class="word-grid" id="word-grid"></div>
       <div class="game-message" id="game-message"></div>
       <div class="reset-info" id="reset-info"></div>
+      <div class="attempt-pips" id="attempt-pips"></div>
       <div class="keyboard" id="keyboard"></div>
       <div class="sozcul-line" id="sozcul-line"></div>
     </section>
@@ -1753,7 +1727,7 @@
       <button class="result-close" id="help-close" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
       <div class="result-title" style="margin-bottom:14px;" data-i18n="games.howto">Nasıl Oynanır</div>
       <div class="help-body">
-        <p data-i18n="sozcel.help.intro">Gizli Türkçe sözcüğü <strong>altı denemede</strong> bulun. Sözcük, hecelerine ayrılmış petek düzeninde gösterilir — her hece bir alt basamakta başlar. Önceki tahminlerin, tahtanın altında küçük renkli taşlar olarak durur.</p>
+        <p data-i18n="sozcel.help.intro">Gizli Türkçe sözcüğü <strong>altı denemede</strong> bulun. Sözcük, hecelerine ayrılmış petek düzeninde gösterilir — her hece bir alt basamakta başlar. Doğru yerde bulduğun bir harf kutusuna kilitlenir ve sonraki denemelerde öyle kalır; sen sadece kalan harfleri girersin.</p>
         <p data-i18n="sozcel.help.colors">Her tahminin ardından kutular renklenir:</p>
         <p>
           <span class="swatch correct"></span> <span data-i18n="sozcel.help.green2">Harf doğru ve doğru yerde.</span><br>
@@ -3730,6 +3704,10 @@ let TODAY_DEFINITION = null;
 
 let currentRow = 0;
 let currentGuess = '';
+// Per-letter lock state: null = still guessable, or the correct letter once
+// a guess has landed it in this box (see unlockedIndices()/buildFullGuess()
+// below). Reset to an all-null array sized WORD_LENGTH in initWordGrid().
+let lockedLetters = [];
 let gameOver = false;
 // True while a submitted guess's flip/reveal is playing on the skeleton —
 // input is held so typing can't scribble over the colored reveal (there is
@@ -3801,15 +3779,16 @@ async function restoreState() {
     // could sneak in from older saves where saveState read from the DOM.
     const validGuesses = state.guesses.filter(w => typeof w === 'string' && w.length === WORD_LENGTH);
 
-    // Replay each submitted guess into the compact history and onto the
-    // keyboard; the staircase skeleton stays empty for the next attempt.
+    // Replay each submitted guess onto the keyboard and re-lock any letter
+    // it landed correctly — the skeleton has no separate history anymore,
+    // just its persistent locked letters plus an empty slot for the rest.
     validGuesses.forEach((word) => {
       submittedGuesses.push(word);
       const result = checkWord(word);
       guessResults.push(result);
-      renderHistoryRow(word, result);
       for (let i = 0; i < WORD_LENGTH; i++) {
         const letter = word[i];
+        if (result[i] === 'correct') lockedLetters[i] = letter;
         const keyBtn = document.getElementById(`key-${letter}`);
         if (keyBtn) {
           const cur = keyStates[letter] || '';
@@ -3841,6 +3820,10 @@ async function restoreState() {
       // Do NOT auto-open the result popup on revisit — the share button stays
       // available in the top-right for the user to reopen it manually.
       enableShareButton(wasWon);
+    } else {
+      // Not finished — show the locked letters in place, empty boxes for
+      // the rest, ready for the next attempt.
+      updateDisplay();
     }
     return true;
   } catch (e) { return false; }
@@ -3901,14 +3884,18 @@ function syllableLayout(sylls) {
   return { starts: norm, totalHalfCols };
 }
 
-// Build the board: ONE syllable-staircase skeleton (the active guess),
-// the compact colored history of past guesses, and six attempt pips.
-// Called after TARGET_WORD is known — the skeleton depends on the word's
-// actual syllable structure, not just its length.
+// Build the board: ONE syllable-staircase skeleton. Letters found in the
+// right spot lock into their box (see lockedLetters/unlockedIndices below)
+// and stay there for every later attempt — there is no separate guess
+// history anymore, just this one persistent word. Called after TARGET_WORD
+// is known — the skeleton depends on the word's actual syllable structure,
+// not just its length.
 function initWordGrid() {
   const grid = document.getElementById('word-grid');
   grid.innerHTML = '';
   if (!TARGET_WORD) return;
+
+  lockedLetters = new Array(WORD_LENGTH).fill(null);
 
   const sylls = syllabifyTr(TARGET_WORD);
   const { starts, totalHalfCols } = syllableLayout(sylls);
@@ -3951,16 +3938,14 @@ function initWordGrid() {
   });
   grid.appendChild(board);
 
-  const hist = document.createElement('div');
-  hist.className = 'guess-history';
-  hist.id = 'guess-history';
-  grid.appendChild(hist);
-
-  const pips = document.createElement('div');
-  pips.className = 'attempt-pips';
-  pips.id = 'attempt-pips';
-  for (let i = 0; i < 6; i++) pips.appendChild(document.createElement('span'));
-  grid.appendChild(pips);
+  // The six attempt pips live in their own static container between the
+  // word and the keyboard (see the <div id="attempt-pips"> in the page
+  // markup) so they never resize/move .word-grid.
+  const pips = document.getElementById('attempt-pips');
+  if (pips) {
+    pips.innerHTML = '';
+    for (let i = 0; i < 6; i++) pips.appendChild(document.createElement('span'));
+  }
   updatePips();
 }
 
@@ -3972,19 +3957,27 @@ function updatePips() {
   });
 }
 
-// Append a submitted guess to the compact history under the skeleton.
-function renderHistoryRow(word, result) {
-  const hist = document.getElementById('guess-history');
-  if (!hist) return;
-  const row = document.createElement('div');
-  row.className = 'mini-row';
-  word.split('').forEach((ch, i) => {
-    const b = document.createElement('div');
-    b.className = 'mini-box ' + (result[i] || 'absent');
-    b.textContent = ch;
-    row.appendChild(b);
-  });
-  hist.appendChild(row);
+// Indices of the letters not yet locked in — these are the only boxes the
+// player can still type into. Locked indices always hold their correct
+// letter (see lockedLetters, set in submitGuess()/restoreState()).
+function unlockedIndices() {
+  const arr = [];
+  for (let i = 0; i < WORD_LENGTH; i++) {
+    if (!lockedLetters[i]) arr.push(i);
+  }
+  return arr;
+}
+
+// Merge the locked letters with the in-progress currentGuess (one char per
+// unlocked slot, in left-to-right order) into a full WORD_LENGTH guess.
+function buildFullGuess() {
+  const unlocked = unlockedIndices();
+  const chars = new Array(WORD_LENGTH).fill('');
+  for (let i = 0; i < WORD_LENGTH; i++) {
+    if (lockedLetters[i]) chars[i] = lockedLetters[i];
+  }
+  unlocked.forEach((idx, j) => { chars[idx] = currentGuess[j] || ''; });
+  return chars.join('');
 }
 
 // Paint the skeleton with a full word + its result colors (used for the
@@ -4046,16 +4039,19 @@ function handleKey(key) {
   if (gameOver || revealing) return;
   if (!TARGET_WORD) return; // board not built yet — nothing to type into
 
+  const unlockedCount = unlockedIndices().length;
+
   if (key === '←') {
     if (currentGuess.length > 0) {
       currentGuess = currentGuess.slice(0, -1);
       updateDisplay();
     }
   } else if (key === 'GİR') {
-    if (currentGuess.length === WORD_LENGTH) {
+    if (currentGuess.length === unlockedCount) {
+      const fullGuess = buildFullGuess();
       // Dictionary check only for lengths we have a word list for (5/6);
       // other lengths accept any full fill — no dictionary exists for them.
-      if (VALID_WORDS && !VALID_WORDS.has(currentGuess)) {
+      if (VALID_WORDS && !VALID_WORDS.has(fullGuess)) {
         const board = document.getElementById('syl-board');
         if (board) {
           board.classList.add('shake');
@@ -4067,9 +4063,9 @@ function handleKey(key) {
         setTimeout(() => { if (msgEl.textContent === 'Kelime listede yok') msgEl.textContent = ''; }, 1500);
         return;
       }
-      submitGuess();
+      submitGuess(fullGuess);
     }
-  } else if (currentGuess.length < WORD_LENGTH) {
+  } else if (currentGuess.length < unlockedCount) {
     currentGuess += key;
     updateDisplay();
     markAsPlayed();
@@ -4098,21 +4094,35 @@ async function markAsPlayed() {
 }
 
 function updateDisplay() {
+  const unlocked = unlockedIndices();
   for (let i = 0; i < WORD_LENGTH; i++) {
     const box = document.getElementById(`box-${i}`);
     if (!box) return; // board not built yet (daily target still loading)
-    box.textContent = currentGuess[i] || '';
-    box.className = 'letter-box' + (currentGuess[i] ? ' filled' : '');
+    if (lockedLetters[i]) {
+      // Locked in from an earlier guess — always shown, never editable.
+      box.textContent = lockedLetters[i];
+      box.className = 'letter-box filled correct';
+    } else {
+      const j = unlocked.indexOf(i);
+      const ch = j >= 0 ? (currentGuess[j] || '') : '';
+      box.textContent = ch;
+      box.className = 'letter-box' + (ch ? ' filled' : '');
+    }
   }
 }
 
-function submitGuess() {
+function submitGuess(fullGuess) {
   if (!TARGET_WORD) return; // daily target still being fetched
-  const guessSnap = currentGuess;
+  const guessSnap = fullGuess;
   const rowSnap = currentRow;
   const result = checkWord(guessSnap);
   guessResults.push(result);
   submittedGuesses.push(guessSnap);
+
+  // Only the boxes that were still unlocked going into this guess actually
+  // change — already-locked boxes keep showing their earlier result and
+  // don't need to re-flip.
+  const revealIndices = unlockedIndices();
 
   // Set gameOver immediately (not inside the setTimeout) so that pressing Enter
   // during the flip animation can't submit a phantom 7th guess.
@@ -4125,7 +4135,7 @@ function submitGuess() {
   revealing = true;
 
   // Flip the skeleton tiles one by one, coloring keys as they land.
-  for (let i = 0; i < WORD_LENGTH; i++) {
+  revealIndices.forEach((i, k) => {
     setTimeout(() => {
       const box = document.getElementById(`box-${i}`);
       const letter = guessSnap[i];
@@ -4138,22 +4148,23 @@ function submitGuess() {
         else if (result[i] === 'present' && cs !== 'correct') { keyStates[letter] = 'present'; keyBtn.className = 'key present'; }
         else if (!cs) { keyStates[letter] = 'absent'; keyBtn.className = 'key absent'; }
       }
-    }, i * 100);
-  }
+    }, k * 100);
+  });
 
   // Wait for the staggered flips plus a beat to let the colors read, then
-  // either finish the game (skeleton keeps the final colored word) or move
-  // the attempt down into the compact history and clear the skeleton.
-  const revealMs = WORD_LENGTH * 100 + 700;
+  // lock in any newly-correct letters and either finish the game (skeleton
+  // keeps the final colored word) or clear the still-unlocked boxes for
+  // the next attempt.
+  const revealMs = revealIndices.length * 100 + 700;
   setTimeout(async () => {
     revealing = false;
+    revealIndices.forEach(i => { if (result[i] === 'correct') lockedLetters[i] = guessSnap[i]; });
     updatePips();
     if (guessSnap === TARGET_WORD) {
       document.getElementById('game-message').textContent = I18N.t('games.congrats');
       document.getElementById('game-message').className = 'game-message win';
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
-      renderHistoryRow(guessSnap, result);
       // Check before inserting — count = 0 means no one has won today yet.
       const firstTier = await checkFirstWinner(dailySeed, userNeighborhood);
       await recordGameResult('sozcel', dailySeed, rowSnap + 1, true, userNeighborhood, guessResults);
@@ -4168,15 +4179,13 @@ function submitGuess() {
       document.getElementById('game-message').className = 'game-message lose';
       document.getElementById('reset-info').textContent = getTimeUntilMidnight();
       gameOver = true;
-      renderHistoryRow(guessSnap, result);
       await recordGameResult('sozcel', dailySeed, 7, false, userNeighborhood, guessResults);
       await saveState();
       renderStats();
       enableShareButton(false);
       setTimeout(() => showResultPopup(false), 1500);
     } else {
-      renderHistoryRow(guessSnap, result);
-      updateDisplay(); // clears the skeleton for the next attempt
+      updateDisplay(); // shows the newly-locked letters, clears the rest for the next attempt
       saveState();
     }
   }, revealMs);
