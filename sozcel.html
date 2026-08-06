@@ -426,21 +426,6 @@
       margin-bottom: 4px;
       display: block;
     }
-    .sozcul-takeover .stk-word-input {
-      width: 100%;
-      padding: 12px 14px;
-      border: 2px solid var(--ink);
-      background: var(--field-bg);
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 1.4rem;
-      font-weight: 700;
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      text-align: center;
-      color: var(--ink);
-      outline: none;
-    }
-    .sozcul-takeover .stk-word-input:focus { border-color: var(--ink-red); }
     .sozcul-takeover .stk-text-input {
       width: 100%;
       padding: 8px 10px;
@@ -512,6 +497,26 @@
       margin-top: 4px;
     }
     .sozcul-takeover .stk-add-def:hover { border-color: var(--accent); color: var(--ink); }
+    /* Syllable rows reuse .stk-def-row's grid (num / input / remove) —
+       just the input itself reads like a mini word-input tile. */
+    .sozcul-takeover .stk-syl-input {
+      text-align: center;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+    .sozcul-takeover .stk-word-preview {
+      margin-top: 8px;
+      text-align: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: var(--ink);
+      min-height: 1.4em;
+    }
+    .sozcul-takeover .stk-word-preview::before { content: '→ '; color: var(--muted); }
+    .sozcul-takeover .stk-word-preview:empty::before { content: ''; }
     .sozcul-takeover .stk-submit {
       align-self: center;
       padding: 12px 28px;
@@ -602,7 +607,7 @@
          of sitting underneath them. */
       .sozcul-takeover { padding: 60px 14px 24px; }
       .sozcul-takeover h2 { font-size: 1.35rem; }
-      .sozcul-takeover .stk-word-input { font-size: 1.2rem; letter-spacing: 4px; padding: 10px 12px; }
+      .sozcul-takeover .stk-word-preview { font-size: 1rem; letter-spacing: 3px; }
     }
 
     .panel-title {
@@ -3699,13 +3704,14 @@ async function pickDailyTarget(seed) {
     const today = getIstanbulDateISO();
     const { data: existing } = await sb
       .from('sozcel_used_answers')
-      .select('word, definition')
+      .select('word, definition, syllables')
       .eq('used_on', today)
       .maybeSingle();
     // Trust the admin/scheduled word regardless of length — a mismatch
     // with today's WORD_LENGTH is caught at boot and surfaced to the user.
     if (existing && existing.word) {
       TODAY_DEFINITION = existing.definition || null;
+      TODAY_SYLLABLES = existing.syllables || null;
       return existing.word;
     }
 
@@ -3725,11 +3731,12 @@ async function pickDailyTarget(seed) {
     await sb.from('sozcel_used_answers').insert({ used_on: today, word: pick });
     const { data: settled } = await sb
       .from('sozcel_used_answers')
-      .select('word, definition')
+      .select('word, definition, syllables')
       .eq('used_on', today)
       .maybeSingle();
     if (settled && settled.word) {
       TODAY_DEFINITION = settled.definition || null;
+      TODAY_SYLLABLES = settled.syllables || null;
       return settled.word;
     }
     return pick;
@@ -3742,6 +3749,11 @@ async function pickDailyTarget(seed) {
 const dailySeed = getDailySeed();
 let TARGET_WORD = null;
 let TODAY_DEFINITION = null;
+// The Sözcü's own syllable breakdown for today's word (array of 2–3
+// strings), when they supplied one. null for auto-picked pool words and
+// legacy rows saved before this existed — initWordGrid() falls back to
+// syllabifyTr() in that case.
+let TODAY_SYLLABLES = null;
 
 let currentRow = 0;
 let currentGuess = '';
@@ -3938,7 +3950,13 @@ function initWordGrid() {
 
   lockedLetters = new Array(WORD_LENGTH).fill(null);
 
-  const sylls = syllabifyTr(TARGET_WORD);
+  // Prefer the Sözcü's own syllable breakdown (see TODAY_SYLLABLES) over
+  // the auto-splitter — but only if it actually reconstructs today's
+  // word, guarding against any stale/mismatched data ever reaching here.
+  const sylls = (TODAY_SYLLABLES && TODAY_SYLLABLES.length >= 2 &&
+                 TODAY_SYLLABLES.join('') === TARGET_WORD)
+    ? TODAY_SYLLABLES
+    : syllabifyTr(TARGET_WORD);
   const { starts, totalHalfCols } = syllableLayout(sylls);
   const levels = sylls.length;
 
@@ -5094,7 +5112,7 @@ async function checkSozculTakeoverStatus() {
 
     const { data: words } = await sb
       .from('sozcel_used_answers')
-      .select('used_on, word, definition')
+      .select('used_on, word, definition, syllables')
       .in('used_on', assignedDates);
     const wordByDate = new Map((words || []).filter(w => w.word).map(w => [w.used_on, w]));
 
@@ -5235,19 +5253,19 @@ function renderTakeoverForm(takeover, status) {
     <div class="stk-eyebrow">Sözcü Görevin · ${escapeHtml(dateLabel)}</div>
     <h2>${escapeHtml(dateLabel)} Kelimesini Sen Seç</h2>
     <p class="stk-hint">
-      İstediğin uzunlukta (3–12 harf) bir Türkçe sözcük gir ve sözlük bilgisini
-      doldur — oyunda kelime hecelerine ayrılarak gösterilecek.
+      İstediğin uzunlukta bir Türkçe sözcük seç, ama hecelerine kendin ayır —
+      en az 2, en fazla 3 hece gir. Oyunda kelime senin ayırdığın hecelerle
+      gösterilecek, her hece bir alt basamakta. Sözlük bilgisini de doldur.
       ${escapeHtml(dateLabel)} günü diğer İstanbullular bu kelimeyi tahmin edecek.
       ${existing ? 'Gece yarısına kadar dilediğin kadar değiştirebilirsin.' : ''}
     </p>
     <div class="stk-countdown" id="stk-countdown"></div>
     <div class="stk-form">
-      <div>
-        <label class="stk-label">Sözcük (3–12 harf)</label>
-        <input type="text" class="stk-word-input" id="stk-word-input"
-               maxlength="12" autocomplete="off" autocorrect="off"
-               spellcheck="false" placeholder="◯◯◯◯◯"
-               value="${escapeHtml(existing ? existing.word : '')}">
+      <div class="stk-section">
+        <label class="stk-label">Kelime — Hecelerine Ayır (2–3 hece)</label>
+        <div class="stk-syls" id="stk-syls"></div>
+        <button type="button" class="stk-add-def" id="stk-add-syl">+ Hece Ekle</button>
+        <div class="stk-word-preview" id="stk-word-preview"></div>
       </div>
 
       <div class="stk-section">
@@ -5279,20 +5297,61 @@ function renderTakeoverForm(takeover, status) {
   // time this mode is reachable), so today's word — and its results —
   // belong to someone else's assignment, not this one.
 
-  const wordInput = takeover.querySelector('#stk-word-input');
   const submitBtn = takeover.querySelector('#stk-submit');
   const countdownEl = takeover.querySelector('#stk-countdown');
   const statusEl = takeover.querySelector('#stk-status');
   const defsEl = takeover.querySelector('#stk-defs');
+  const sylsEl = takeover.querySelector('#stk-syls');
+  const addSylBtn = takeover.querySelector('#stk-add-syl');
+  const previewEl = takeover.querySelector('#stk-word-preview');
+
+  function updateWordPreview() {
+    const parts = [...sylsEl.querySelectorAll('.stk-syl-input')].map(i => i.value.trim());
+    previewEl.textContent = parts.some(p => p) ? parts.join('') : '';
+  }
+  function syncAddSylBtn() {
+    addSylBtn.style.display = sylsEl.querySelectorAll('.stk-syl-row').length >= 3 ? 'none' : '';
+  }
+
+  // Pre-fill syllable rows from the saved breakdown; fall back to
+  // auto-splitting the saved word (rows written before this feature
+  // existed never got one) normalized to fit the 2–3 row form.
+  const sylsToRender = (existing && existing.syllables && existing.syllables.length >= 2)
+    ? existing.syllables
+    : (existing && existing.word ? normalizeSyllablesForEdit(existing.word) : ['', '']);
+  sylsToRender.forEach((s, i) => sylsEl.insertAdjacentHTML('beforeend', buildTakeoverSylRow(i, s)));
+  syncAddSylBtn();
+  updateWordPreview();
+
+  sylsEl.addEventListener('input', e => {
+    if (!e.target.classList.contains('stk-syl-input')) return;
+    e.target.value = e.target.value.toLocaleUpperCase('tr-TR').replace(/[^A-ZÇĞİÖŞÜ]/g, '');
+    updateWordPreview();
+  });
+
+  addSylBtn.addEventListener('click', () => {
+    const idx = sylsEl.querySelectorAll('.stk-syl-row').length;
+    if (idx >= 3) return;
+    sylsEl.insertAdjacentHTML('beforeend', buildTakeoverSylRow(idx, ''));
+    renumberTakeoverSyls();
+    syncAddSylBtn();
+    updateWordPreview();
+  });
+
+  sylsEl.addEventListener('click', e => {
+    const removeBtn = e.target.closest('.stk-syl-remove');
+    if (!removeBtn) return;
+    if (sylsEl.querySelectorAll('.stk-syl-row').length <= 2) return;
+    removeBtn.closest('.stk-syl-row').remove();
+    renumberTakeoverSyls();
+    syncAddSylBtn();
+    updateWordPreview();
+  });
 
   // Pre-fill definition rows from the saved dictionary entry, or start
   // with one empty row if there's nothing saved yet.
   const defsToRender = (dict && dict.defs && dict.defs.length) ? dict.defs : [{ cls: SOZCUL_WORD_CLASSES[0], text: '' }];
   defsToRender.forEach((d, i) => defsEl.insertAdjacentHTML('beforeend', buildTakeoverDefRow(i, d.cls, d.text)));
-
-  wordInput.addEventListener('input', () => {
-    wordInput.value = wordInput.value.toLocaleUpperCase('tr-TR').replace(/[^A-ZÇĞİÖŞÜ]/g, '');
-  });
 
   takeover.querySelector('#stk-add-def').addEventListener('click', () => {
     const idx = defsEl.querySelectorAll('.stk-def-row').length;
@@ -5331,7 +5390,42 @@ function renderTakeoverForm(takeover, status) {
   updateCountdown();
   _takeoverCountdownInterval = setInterval(updateCountdown, 1000);
 
-  submitBtn.addEventListener('click', () => submitTakeover(status, wordInput, submitBtn, statusEl, defsEl, takeover));
+  submitBtn.addEventListener('click', () => submitTakeover(status, sylsEl, submitBtn, statusEl, defsEl, takeover));
+}
+
+// Best-effort starting point for the syllable-row editor when there's no
+// saved breakdown yet (a word from before this feature existed): run the
+// old auto-splitter and squeeze the result into 2–3 rows. The Sözcü can
+// freely retype any row afterwards — this only has to be a reasonable
+// default, not a linguistically perfect split.
+function normalizeSyllablesForEdit(word) {
+  let sylls = syllabifyTr(word);
+  if (sylls.length > 3) sylls = [...sylls.slice(0, 2), sylls.slice(2).join('')];
+  if (sylls.length === 1) {
+    const w = sylls[0];
+    const mid = Math.max(1, w.length - Math.ceil(w.length / 2));
+    sylls = [w.slice(0, mid), w.slice(mid)];
+    if (!sylls[1]) sylls = [w.slice(0, -1), w.slice(-1)];
+  }
+  return sylls;
+}
+
+function buildTakeoverSylRow(idx, value) {
+  return `
+    <div class="stk-def-row stk-syl-row">
+      <span class="stk-def-num">${idx + 1}.</span>
+      <input type="text" class="stk-text-input stk-syl-input" maxlength="10"
+             autocomplete="off" autocorrect="off" spellcheck="false"
+             placeholder="hece" value="${escapeHtml(value || '')}">
+      <button type="button" class="stk-def-remove stk-syl-remove" aria-label="Heceyi kaldır">×</button>
+    </div>
+  `;
+}
+
+function renumberTakeoverSyls() {
+  document.querySelectorAll('#stk-syls .stk-def-num').forEach((el, i) => {
+    el.textContent = (i + 1) + '.';
+  });
 }
 
 function buildTakeoverDefRow(idx, cls, text) {
@@ -5365,23 +5459,32 @@ function serializeTakeoverDict(takeover) {
   return JSON.stringify({ note, root, defs });
 }
 
-async function submitTakeover(status, wordInput, submitBtn, statusEl, defsEl, takeover) {
+async function submitTakeover(status, sylsEl, submitBtn, statusEl, defsEl, takeover) {
   const targetDate = status.targetDate;
-  const word = (wordInput.value || '').trim();
+
+  // No letter-count limit anymore — the word is just whatever the
+  // syllables concatenate to. The real constraint is the syllable count
+  // itself (2–3), enforced both here and by the DB check constraint.
+  const syllables = [...sylsEl.querySelectorAll('.stk-syl-input')]
+    .map(i => turkishUpper((i.value || '').trim()));
+  if (syllables.length < 2 || syllables.length > 3) {
+    statusEl.textContent = 'Kelime 2 ile 3 hece arasında olmalı.';
+    statusEl.className = 'stk-status err';
+    return;
+  }
+  if (syllables.some(s => !s)) {
+    statusEl.textContent = 'Her hece dolu olmalı.';
+    statusEl.className = 'stk-status err';
+    return;
+  }
+  if (syllables.some(s => !/^[A-ZÇĞİÖŞÜ]+$/.test(s))) {
+    statusEl.textContent = 'Hecelerde sadece Türkçe harfler kullan.';
+    statusEl.className = 'stk-status err';
+    return;
+  }
   // Store uppercase — matches WORD_LIST casing and the turkishUpper()'d guesses
   // checkWord() compares against; a lowercase TARGET_WORD never matches.
-  const wordNorm = turkishUpper(word);
-
-  if (word.length < 3 || word.length > 12) {
-    statusEl.textContent = '3–12 harfli bir Türkçe sözcük gir.';
-    statusEl.className = 'stk-status err';
-    return;
-  }
-  if (!/^[A-ZÇĞİÖŞÜ]{3,12}$/.test(wordNorm)) {
-    statusEl.textContent = 'Sadece Türkçe harfler kullan.';
-    statusEl.className = 'stk-status err';
-    return;
-  }
+  const wordNorm = syllables.join('');
   const defRows = [...defsEl.querySelectorAll('.stk-def-row')];
   const hasAnyDef = defRows.some(r => (r.querySelector('.stk-def-text').value || '').trim());
   if (!hasAnyDef) {
@@ -5417,7 +5520,7 @@ async function submitTakeover(status, wordInput, submitBtn, statusEl, defsEl, ta
   const definition = serializeTakeoverDict(takeover);
   const { error } = await sb
     .from('sozcel_used_answers')
-    .upsert({ used_on: targetDate, word: wordNorm, definition, sozcul_id: status.session.user.id }, { onConflict: 'used_on' });
+    .upsert({ used_on: targetDate, word: wordNorm, syllables, definition, sozcul_id: status.session.user.id }, { onConflict: 'used_on' });
   if (error) {
     statusEl.textContent = 'Hata: ' + (error.message || 'Bilinmeyen hata');
     statusEl.className = 'stk-status err';
