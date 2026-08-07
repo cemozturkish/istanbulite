@@ -873,10 +873,16 @@
       transition: background 0.15s, transform 0.15s ease;
     }
     /* Hover just lightens the background a touch and nudges the post
-       inward toward the center, same feedback as the Anahane cards. */
-    .post:hover {
-      background: #e8e8e8;
-      transform: translateX(6px);
+       inward toward the center, same feedback as the Anahane cards.
+       Gated on a real hover-capable pointer: on touch, :hover latches
+       onto the last-tapped card and stays there, which left that one
+       post sitting 6px to the right of every other post (and of the
+       composer/profile card it's supposed to line up with). */
+    @media (hover: hover) {
+      .post:hover {
+        background: #e8e8e8;
+        transform: translateX(6px);
+      }
     }
 
     .post-meta {
@@ -1106,8 +1112,15 @@
            the floating card clears it as a unit instead of padding its
            insides (which just stretches the card with dead space). */
         top: calc(12px + env(safe-area-inset-top));
-        left: 12px;
-        right: 12px;
+        /* 18px = the shared screen inset the whole page lines up on
+           (frames.css's 10px frame padding + the 8px inner padding the
+           columns use). Offsets resolve against body's padding box, and
+           frames.css zeroes body's padding on pages that wrap their grid
+           in #main-site, so these land 18px from the true screen edges --
+           the same line as the comment cards and composer on the left and
+           the game tiles on the right. */
+        left: 18px;
+        right: 18px;
         z-index: 20;
         max-height: none;
         overflow: visible;
@@ -1289,9 +1302,15 @@
       }
       /* Scrolls internally instead of growing .discussion-section past
          its allotted (fixed, non-scrolling-page) height -- flex:1 lets
-         it take exactly the space left after the label and composer. */
+         it take exactly the space left after the label and composer.
+         8px side padding (on top of #main-site's own 10px frame padding)
+         puts the post cards on the shared 18px screen inset -- the same
+         line as the floating profile card, the composer below, and the
+         game tiles' outer edge. Extra bottom padding so the last card's
+         heavy 5px bottom border isn't shaved off by this box's own
+         overflow clip. */
       .discussion-posts {
-        padding: 6px 10px;
+        padding: 6px 8px 10px;
         flex: 1;
         min-height: 0;
         overflow-y: auto;
@@ -1313,14 +1332,20 @@
         line-height: 1.4;
       }
       .submit-form {
-        /* Bottom padding matches .games-section-inner's own so the send
-           row's bottom edge lands flush with the game tiles' bottom. */
-        padding: 8px 10px 8px;
+        /* Same 8px as .games-section-inner all round: the bottom edge
+           lands flush with the game tiles' bottom, and the sides put the
+           textarea on the shared 18px screen inset (see
+           .discussion-posts above). */
+        padding: 8px;
         /* Transparent -- reads as floating over the map/page background
            like the rest of this column instead of a separate white
            panel (matches .col-left .nb-highlight's own reasoning). */
         background: none;
-        margin-top: 56px;
+        /* No margin-top: .discussion-posts's flex:1 already pushes this
+           to the bottom of the column, so a fixed 56px here didn't move
+           the composer at all -- it just carved 56px out of the feed
+           above it, which was enough to clip the bottom border off the
+           last comment while leaving an empty band under it. */
         /* Stays fixed at the bottom of the column, right after
            .discussion-posts's flex:1 -- that's what takes up the
            leftover space (and scrolls internally if there's too much
@@ -1477,8 +1502,13 @@
         gap: 0;
         /* Pull KÜTÜPHANE/KAHVEHANE in from the screen's rounded corners --
            at full-bleed width:100% the outer tabs sat right under the
-           curve. */
-        padding: 0 20px;
+           curve. 18px specifically (was 20px): that's the shared screen
+           inset the rest of the page lines up on -- frames.css's 10px
+           frame padding plus the 8px inner padding the columns use --
+           so with the edge alignment below, the tab labels land on the
+           same vertical lines as the floating profile card, the comment
+           cards, the composer and the game tiles. */
+        padding: 0 18px;
         flex-wrap: nowrap;
         justify-content: stretch;
       }
@@ -1500,6 +1530,18 @@
         -webkit-tap-highlight-color: transparent;
       }
       nav a.active { color: var(--ink); font-weight: 700; }
+      /* The two outer tabs align their label to the bar's own edge
+         instead of centering it inside their third of the bar, which is
+         what actually puts the K of KÜTÜPHANE and the E of KAHVEHANE on
+         the 18px inset line (see nav's padding above). HANE, in the
+         middle, stays centered. The -0.5px pull cancels the trailing
+         letter-spacing that CSS adds after the final E, which would
+         otherwise sit between the glyph and the flex-end edge. */
+      nav a:first-child { justify-content: flex-start; }
+      nav a:last-child {
+        justify-content: flex-end;
+        margin-right: -0.5px;
+      }
 
       /* ── Mobile swipe pagination: full page (map + datetime + columns) slides; fixed bottom nav stays ── */
       .col-left, .col-right {
