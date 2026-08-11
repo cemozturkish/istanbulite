@@ -105,12 +105,11 @@
     // kahvehane — discussion feed
     'kahvehane.allistanbul': { default: 'Tüm İstanbul',      more_english: 'All Istanbul' },
 
-    // kahvehane — coffee price index (Kahve Endeksi)
+    // kahvehane — coffee price index (Kahve Endeksi), read-only: the
+    // index is curated from the admin portal, not reported by users.
     'kahve.index':   { default: 'Kahve Endeksi',            more_english: 'Coffee Index' },
-    'kahve.empty':   { default: 'Henüz fiyat yok — ilk bildiren siz olun!', more_english: 'No prices yet — be the first to report one!' },
-    'kahve.venue':   { default: 'Mekan',                    more_english: 'Venue' },
-    'kahve.report':  { default: 'Bildir',                   more_english: 'Report' },
-    'kahve.note':    { default: 'Fiyatı yalnızca kendi semtiniz için bildirebilirsiniz', more_english: 'You can only report prices for your own district' },
+    'kahve.empty':   { default: 'Henüz fiyat yok.',         more_english: 'No prices yet.' },
+    'kahve.note':    { default: 'Fiyatlar istanbulite tarafından derlenir', more_english: 'Prices are compiled by istanbulite' },
     'kahve.loading': { default: 'Yükleniyor...',            more_english: 'Loading...' },
     'kahve.failed':  { default: 'Endeks yüklenemedi.',      more_english: 'Could not load the index.' },
 

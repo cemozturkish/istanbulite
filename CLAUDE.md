@@ -325,6 +325,9 @@ sb.from('articles').delete().eq('id', id)
 - Account management: create and assign user accounts to neighborhoods
 - Filter articles by neighborhood
 - Edit/delete with inline form population
+- **Kahve tab** is the only place the Kahve Endeksi (`coffee_prices`) is edited: pick a
+  district, enter venue + price, and the list on the right (filterable by district,
+  cheapest first) edits/deletes existing entries. Kahvehane renders the index read-only
 - **Oyunlar tab** combines all three games' admin panels in one place: a shared per-day
   on/off board (next 7 days × Sözcel/Tümcel/Bulmaca, backed by `game_day_toggles`) at the
   top, then sub-nav pills to switch between each game's own management panel (Sözcel sözcü
@@ -341,10 +344,11 @@ sb.from('articles').delete().eq('id', id)
   - Bulmaca: Turkish crossword
 - The games change every day; scores and scoreboards are tracked (`game_results`)
 - The **coffee price index** (Kahve Endeksi, `coffee_prices` table): the "Kahve Endeksi" pill
-  above the map label opens a bottom sheet (detail-overlay) listing the cheapest reported cup
-  of coffee per venue, scoped to the selected district or Tüm İstanbul. Residents report/update
-  prices for venues in their own district only (admin: any district) — same residency rule and
-  RLS pattern as `neighborhood_comments`
+  above the map label opens a bottom sheet (detail-overlay) listing the cheapest cup of coffee
+  per venue, scoped to the selected district or Tüm İstanbul; on desktop the same list also
+  shows permanently in col-right. **Read-only for everyone** — the index is curated from the
+  admin portal only (admin.html's "Kahve" tab), and RLS allows writes to the admin alone
+  (`db/coffee_prices_v2_admin_only.sql`)
 
 ### `kutuphane.html` — Library (LEFT page, zoom OUT — the Turkey/national side)
 - Turkey map; articles, shelves, letters (Posta Kutusu), politicians, TBMM seat chart
