@@ -2257,23 +2257,33 @@
         border-bottom: 5px solid #1a1a1a !important;
       }
 
-      /* Map: real artwork + traced SVG hit-regions, now a normal
-         in-flow square block instead of a fixed full-bleed background
-         layer sitting behind everything. Bleeds past body's own left/
-         right frame padding (frames.css) so it reaches the true screen
-         edges instead of sitting in a gutter -- no shadow to strip here
-         since, unlike anahane/kahvehane, this page's frameless rule
-         above already zeroes out main's shadow and .map-panel was never
-         one of frames.css's shadowed panels to begin with. Height is a
-         definite 100vw rather than aspect-ratio: main's row track in
-         kahvehane's CSS Grid turned out to size unreliably from an
-         aspect-ratio child, and while this page uses flexbox (which
-         doesn't have that specific failure mode), 100vw keeps the same
-         square deterministically either way, with one fewer thing that
-         could behave differently across browsers. */
+      /* Map: mobile draft artwork, a normal in-flow block instead of a
+         fixed full-bleed background layer sitting behind everything.
+         Bleeds past body's own left/right frame padding (frames.css) so
+         it reaches the true screen edges instead of sitting in a gutter
+         -- no shadow to strip here since, unlike anahane/kahvehane, this
+         page's frameless rule above already zeroes out main's shadow and
+         .map-panel was never one of frames.css's shadowed panels to
+         begin with.
+
+         Height was a 100vw square back when mobile showed the same
+         landscape Turkey photo as desktop. The mobile draft is portrait
+         (1080x1920), so a square slot cropped Turkey's whole top half
+         away under object-fit:cover. Sized in dvh now -- a definite
+         length, not aspect-ratio, since main's row track in kahvehane's
+         CSS Grid sized unreliably from an aspect-ratio child and this
+         keeps one fewer thing that could behave differently across
+         browsers. The value is a budget, not the art's ratio: the panel
+         takes a bit over half the screen and the news/boxes columns keep
+         the rest, with .map-photo's `contain` below fitting the whole
+         drawing inside whatever that works out to. */
       .map-panel {
         position: relative;
         inset: auto;
+        /* The draft is drawn on white; letterboxing it against the
+           panel's own #f7f7f7 would outline the artwork in a faint
+           rectangle. Matching white makes the fitted bars invisible. */
+        background: #fff;
         /* No explicit width here -- a fixed width (100%) only shifts
            position with negative margins, it doesn't grow to absorb
            them, which was leaving a ~20px gap on the right (the
@@ -2282,12 +2292,28 @@
            the flex item's default align-items:stretch fill the
            container's cross size *minus its own margins*, which does
            expand with negative margins as intended. */
-        height: 100vw;
+        height: 56dvh;
         z-index: auto;
         overflow: hidden;
         margin-left: calc(-1 * var(--frame-pad, 10px));
         margin-right: calc(-1 * var(--frame-pad, 10px));
         flex-shrink: 0;
+      }
+
+      /* `contain`, not the shared `cover` above: cover fills the panel by
+         cropping whatever doesn't fit, which on portrait art in a wider
+         slot means slicing off the top and bottom of the drawing. contain
+         guarantees the entire draft is on screen on every phone, at the
+         cost of white margins left and right (invisible against the
+         panel's white background). Anchored to the top so the drawing
+         hangs from the header rather than floating mid-panel.
+         To review the alternative framing -- Turkey filling the full
+         width, edge to edge, with the lower half of the drawing cropped
+         off -- swap these two lines for
+         `object-fit: cover; object-position: center top;`. */
+      .map-panel img.map-photo {
+        object-fit: contain;
+        object-position: center top;
       }
       /* Kütüphane's map photo is Turkey-wide, but the clickable overlay
          underneath is still traced against the old Istanbul map and
@@ -2818,12 +2844,15 @@
        see the .reading-area vs .reader background split below for how the
        map stays visible behind shelves but gets covered once reading. -->
   <section class="map-panel">
-    <!-- Mobile gets a resized/quantized copy (1400px wide, ~97KB) instead
-         of the 5046px/1.5MB desktop source -- the browser picks one before
-         fetching, so phones on slow connections never download the big
-         file. Swap point matches the page's 768px mobile breakpoint. -->
+    <!-- Mobile gets its own portrait draft (1080x1920, ~340KB) rather than a
+         shrunken copy of the 5046x2300/1.5MB desktop landscape source -- the
+         browser picks one before fetching, so phones never download the big
+         file. Swap point matches the page's 768px mobile breakpoint. The
+         mobile art is drawn tall (9:16) instead of wide, so the mobile
+         media query re-fits .map-panel around it -- see the .map-panel /
+         .map-photo rules in that query. -->
     <picture>
-      <source media="(max-width: 768px)" srcset="assets/map/turkey-map-mobile.png">
+      <source media="(max-width: 768px)" srcset="assets/map/kutuphane-map-mobile.png">
       <img class="map-photo" id="map-photo-img" src="assets/map/turkey-map.png" alt="">
     </picture>
 
