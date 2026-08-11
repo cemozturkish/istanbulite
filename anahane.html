@@ -1923,7 +1923,14 @@
     .person-mention[data-tip]:focus-visible::after {
       opacity: 1;
     }
-    @media (max-width: 768px) {
+    /* The pull layout is for touch devices only -- `pointer: coarse`, not
+       just a narrow viewport. A narrow desktop window (or a tablet driven
+       by a mouse) is ≤768px too, and there the sheet has to stay a plain
+       native scroller: it takes the desktop rules above unchanged, since
+       initDetailPull's touch gesture is the only thing that could move a
+       sheet laid out the way the block below lays it out. Keep this
+       condition and initDetailPull's own matchMedia in step. */
+    @media (max-width: 768px) and (pointer: coarse) {
       .detail-overlay {
         /* Where the sheet comes to rest when it first opens: right where
            the map hero's box ends -- #main-site's frame-pad top inset
@@ -3586,7 +3593,12 @@ function closeDetail() {
   });
 })();
 
-// ── Mobile: pulling the detail sheet ──
+// ── Touch mobile: pulling the detail sheet ──
+// Only on touch devices (max-width:768px AND pointer:coarse, matching the
+// stylesheet's own condition exactly) -- a narrow desktop window or a
+// mouse-driven tablet keeps the desktop layout, where .detail-overlay is
+// an ordinary native scroller and none of this runs.
+//
 // The sheet is pulled by hand, not scrolled by the browser. Native
 // scrolling could do neither of the two things this gesture has to do:
 // stop the sheet from climbing over the profile card, and never let its
@@ -3607,7 +3619,7 @@ detailPull = (function initDetailPull() {
   const overlay = document.getElementById('detail-overlay');
   const sheet = document.getElementById('detail-overlay-sheet');
   if (!overlay || !sheet) return null;
-  const mobile = window.matchMedia('(max-width: 768px)');
+  const mobile = window.matchMedia('(max-width: 768px) and (pointer: coarse)');
 
   const DISMISS_PX = 70;    // pull-down past the rest point that closes the sheet
   const DISMISS_VEL = 0.6;  // ...or a downward flick this fast (px/ms)
@@ -3640,10 +3652,22 @@ detailPull = (function initDetailPull() {
     // keeps its bottom edge off-screen at rest and exactly on the bottom
     // edge once fully raised.
     overlay.style.setProperty('--detail-top-clamp', clamp + 'px');
+    // A sheet already pulled up to the clamp stays pulled up to the NEW
+    // clamp (rotation, a taller profile card, a sources block opening),
+    // keeping whatever it had scrolled; anything else just gets clamped
+    // into the new range. Both are read against the OLD limits, so this
+    // has to happen either side of the recompute.
+    const wasRaised = maxPos > 0 && pos >= maxRise;
+    const wasScrolled = Math.max(0, pos - maxRise);
     maxRise = Math.max(0, sheet.offsetTop - clamp);
     maxScroll = Math.max(0, sheet.scrollHeight - sheet.clientHeight);
     maxPos = maxRise + maxScroll;
-    if (pos > maxPos) { pos = maxPos; render(); }
+    pos = wasRaised ? maxRise + Math.min(wasScrolled, maxScroll) : Math.min(pos, maxPos);
+    // Re-apply: the rise the old numbers produced is stale even when pos
+    // itself still fits, so the sheet would otherwise sit above the new
+    // clamp or hang off the bottom. Skipped only for the untouched
+    // just-opened sheet, whose slide-up is CSS's to run.
+    if (pos !== 0 || sheet.style.transform) render();
   }
 
   function render() {
@@ -3738,7 +3762,80 @@ detailPull = (function initDetailPull() {
   sheet.addEventListener('touchend', end);
   sheet.addEventListener('touchcancel', end);
 
+  // A device can report pointer:coarse and still have a trackpad or a
+  // keyboard attached (an iPad with a Magic Keyboard is the obvious one).
+  // Those land on this layout, where the sheet is not a native scroller,
+  // so wheel and key input drive the very same pull. Both jump straight
+  // to their new position: only a finger gets momentum.
+  let inputIdle = 0;
+  function nudge(delta) {
+    stopAnim();
+    measure();
+    if (maxPos <= 0 && pos === 0) return false;
+    vel = 0;
+    pos = Math.min(Math.max(pos + delta, 0), maxPos);
+    sheet.style.transition = 'none';
+    render();
+    // Back under CSS control once the wheel/keys go quiet, so a close
+    // still slides instead of cutting.
+    clearTimeout(inputIdle);
+    inputIdle = setTimeout(finish, 160);
+    return true;
+  }
+
+  sheet.addEventListener('wheel', (e) => {
+    if (!mobile.matches || dragging) return;
+    // deltaMode: 0 px, 1 lines, 2 pages.
+    const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? sheet.clientHeight : 1;
+    if (nudge(e.deltaY * unit) && e.cancelable) e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('keydown', (e) => {
+    if (!mobile.matches || dragging || overlay.hidden || !overlay.isConnected) return;
+    if (!overlay.classList.contains('open')) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
+    // Page-sized steps off the sheet's own height; End/Home just overshoot
+    // and let nudge() clamp, so they don't need the limits measured first.
+    const page = Math.max(120, sheet.clientHeight * 0.85);
+    let delta;
+    if (e.key === 'ArrowDown') delta = 60;
+    else if (e.key === 'ArrowUp') delta = -60;
+    else if (e.key === 'PageDown') delta = page;
+    else if (e.key === 'PageUp') delta = -page;
+    else if (e.key === 'End') delta = 1e9;
+    else if (e.key === 'Home') delta = -1e9;
+    else return;
+    if (nudge(delta)) e.preventDefault();
+  });
+
+  // overflow:hidden boxes are still scrollable programmatically, and the
+  // browser does exactly that when focus lands on something below the fold
+  // (tabbing through an article's links with a keyboard attached). Left
+  // alone it would scroll the sheet out from under `pos`: pin the overlay,
+  // and take the sheet's own scroll as truth when it moves on its own.
+  overlay.addEventListener('scroll', () => {
+    if (mobile.matches && overlay.scrollTop) overlay.scrollTop = 0;
+  });
+  sheet.addEventListener('scroll', () => {
+    if (!mobile.matches || dragging || raf) return;
+    const ours = Math.min(Math.max(pos - maxRise, 0), maxScroll);
+    if (Math.abs(sheet.scrollTop - ours) > 1) pos = maxRise + sheet.scrollTop;
+  });
+
   window.addEventListener('resize', () => { if (!overlay.hidden) measure(); });
+  // Gaining/losing a fine pointer swaps the whole layout out from under
+  // the sheet -- drop anything this handler had applied so the desktop
+  // rules (and its native scrolling) take over cleanly.
+  mobile.addEventListener('change', () => {
+    stopAnim();
+    clearTimeout(inputIdle);
+    dragging = false; pos = 0; vel = 0;
+    sheet.style.transition = '';
+    sheet.style.transform = '';
+    sheet.scrollTop = 0;
+    if (!overlay.hidden) measure();
+  });
 
   return {
     measure,
@@ -3746,6 +3843,7 @@ detailPull = (function initDetailPull() {
     // unscrolled, CSS back in charge of the slide-up.
     reset() {
       stopAnim();
+      clearTimeout(inputIdle);
       dragging = false; pos = 0; vel = 0;
       sheet.style.transition = '';
       sheet.style.transform = '';
@@ -3756,6 +3854,7 @@ detailPull = (function initDetailPull() {
     // pull left the sheet down to off-screen.
     release() {
       stopAnim();
+      clearTimeout(inputIdle);
       dragging = false; pos = 0; vel = 0;
       sheet.style.transition = '';
       sheet.style.transform = '';
