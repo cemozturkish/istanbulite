@@ -482,12 +482,18 @@
 
     /* Wraps the heading + 3 game links; stays visible while a game's bottom
        sheet is open so the buttons and the full weekly scoreboard both
-       stay on screen. */
+       stay on screen. The three tiles share one row -- they're square
+       (see .game-link below), so a stack of them would eat the whole
+       column -- with the heading forced onto its own line above by
+       flex-basis:100%. */
     .game-picker {
       display: flex;
-      flex-direction: column;
+      flex-flow: row wrap;
       gap: 10px;
       flex-shrink: 0;
+    }
+    .game-picker > h2 {
+      flex: 0 0 100%;
     }
 
     /* Fixed white/transparent, matching the .post / Anahane news+event
@@ -634,11 +640,18 @@
        news+event cards over the map photo, instead of the palette-driven
        --paper-warm/--ink these used to retheme with under earth/mono. */
     .game-link {
-      display: block;
+      /* Square, and centred on its own content -- the three tiles sit
+         side by side in one row (see .game-picker above), so the width
+         is a third of the column and aspect-ratio squares it off. */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      aspect-ratio: 1 / 1;
       background: rgba(255, 255, 255, 0.85);
       border: 2px solid #1a1a1a;
       border-bottom: 5px solid #1a1a1a;
-      padding: 14px;
+      padding: 0;
       text-align: center;
       text-decoration: none;
       color: #1a1a1a;
@@ -659,8 +672,11 @@
       transform: translateX(-2px) translateY(2px);
     }
 
+    /* 0.78rem, not the old 1.1rem: three squares in a row are each about
+       a third of the column wide, and "Bulmaca" has to stay on one line
+       inside that. */
     .game-link-title {
-      font-size: 1.1rem;
+      font-size: 0.78rem;
       font-weight: 700;
     }
 
@@ -671,10 +687,21 @@
       display: none;
     }
 
-    /* Sözcel's wordmark. Only the square mobile tiles have a box shaped
-       for it (see the media query below) -- the desktop tiles are wide
-       short rectangles, so they stay text-only. */
+    /* Sözcel's wordmark, filling the square tile in place of the text
+       title -- the artwork spells the name out, and alt= carries it for
+       screen readers. object-fit:contain keeps it square inside the
+       padding whatever size the tile ends up; the padding is a
+       percentage so that margin stays proportional from the ~70px
+       desktop tile up to the ~130px one on a large phone. */
     .game-link-logo {
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      height: 100%;
+      padding: 6%;
+      object-fit: contain;
+    }
+    .game-link[data-game="sozcel"] .game-link-title {
       display: none;
     }
 
@@ -709,6 +736,10 @@
        sharing one property between two different-speed transitions
        would make that feedback sluggish too. */
     .game-link-enter {
+      /* Equal thirds of the row (min-width:0 so a long title can't push
+         a tile wider than its share and break the equal split). */
+      flex: 1 1 0;
+      min-width: 0;
       transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.32s ease;
     }
     .game-link-enter:nth-of-type(1) { transition-delay: 0ms; }
@@ -1434,6 +1465,11 @@
          -- otherwise the game-link-enter tiles below have nothing
          concrete to grow into despite their own flex:1. */
       .game-picker {
+        /* Back to a stack: the desktop rule rows the three squares up
+           side by side, which only works in a column wide enough for
+           them -- here the games column is the narrow strip beside the
+           comments. */
+        flex-direction: column;
         gap: 8px;
         flex: 1;
         min-height: 0;
@@ -1468,6 +1504,11 @@
            fallback -- the old fixed width, so a tile is never sized
            wrong if the measurement hasn't landed yet. */
         width: var(--game-tile-size, clamp(96px, 26vw, 128px));
+        /* The desktop rule's aspect-ratio would be inert here anyway
+           (both axes are already definite: the width above, the height
+           from the stretch below), but it's dropped rather than left to
+           race the measured width. */
+        aspect-ratio: auto;
         /* No explicit height/flex here -- .game-link-enter (its parent,
            a row-direction flex container) stretches it to fill that
            wrapper's height by default (align-items:stretch), which is
@@ -1489,23 +1530,6 @@
            no longer fits on one line. */
         font-size: min(15px, calc(var(--game-tile-size, 96px) * 0.16));
         font-weight: 700;
-      }
-      /* Square tile = a box the wordmark actually fits in, so Sözcel
-         shows its logo instead of its name (the artwork spells it out).
-         object-fit:contain keeps the artwork square inside the padding
-         no matter what height the column hands the tile; the padding is
-         a percentage so the margin around it stays proportional at every
-         tile size. */
-      .game-link-logo {
-        display: block;
-        box-sizing: border-box;
-        width: 100%;
-        height: 100%;
-        padding: 6%;
-        object-fit: contain;
-      }
-      .game-link[data-game="sozcel"] .game-link-title {
-        display: none;
       }
       .game-link-subtitle {
         font-size: 9px;
