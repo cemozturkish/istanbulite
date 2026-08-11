@@ -75,18 +75,16 @@ alter table public.coffee_prices
   add constraint coffee_prices_happy_needs_end
   check ((happy_price is null) = (happy_end is null));
 
--- Weekday indices only, matching the `hours` keys.
+-- Weekday indices only, matching the `hours` keys. `<@` ("is contained
+-- by") is true when every element of the left array appears in the right
+-- one, and trivially true for an empty array -- the same test as
+-- unnesting the column, but without a subquery, which a check constraint
+-- may not contain.
 alter table public.coffee_prices
   drop constraint if exists coffee_prices_happy_days_range;
 alter table public.coffee_prices
   add constraint coffee_prices_happy_days_range
-  check (
-    happy_days is null
-    or (
-      array_length(happy_days, 1) is null
-      or (select bool_and(d between 0 and 6) from unnest(happy_days) as d)
-    )
-  );
+  check (happy_days is null or happy_days <@ array[0,1,2,3,4,5,6]::smallint[]);
 
 alter table public.coffee_prices
   drop constraint if exists coffee_prices_happy_label_len;
