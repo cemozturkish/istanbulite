@@ -2118,12 +2118,13 @@
         overflow: hidden;
       }
       /* Lives on #main-site (not body directly) for the same reason as
-         the desktop rule above -- see that rule's comment. Map on top
-         (its own grid area), then two columns below it -- Dünya news on
-         the left (matching Hane's own "news" grid-area) and the library
-         boxes on the right (matching Kahvehane's games column) -- same
-         "map map / news events"-style pattern anahane.html uses for its
-         own mobile layout. */
+         the desktop rule above -- see that rule's comment. The map no
+         longer takes a row here: it's the fixed full-screen backdrop
+         behind this grid (see .map-panel below), so the grid holds only
+         the two columns -- Dünya news on the left (matching Hane's own
+         "news" grid-area) and the library boxes on the right (matching
+         Kahvehane's games column) -- floated down onto the blank lower
+         half of the artwork by the padding-top. */
       #main-site {
         height: 100dvh;
         display: grid;
@@ -2131,9 +2132,7 @@
            tiles' content width instead of stretching to half the screen
            -- matches Kahvehane's own "1fr auto" games-column proportion. */
         grid-template-columns: 1fr auto;
-        grid-template-areas:
-          "map map"
-          "news boxes";
+        grid-template-areas: "news boxes";
         align-content: start;
         overflow-y: auto;
         overflow-x: hidden;
@@ -2146,27 +2145,34 @@
            own mobile gap treatment). */
         row-gap: 0 !important;
         column-gap: calc(var(--frame-gap) / 2) !important;
+        /* Clears the artwork's Turkey half so the columns land on its
+           blank lower portion -- keeps frames.css's own frame-pad ring
+           on top of that, and needs !important for the same reason the
+           gaps above do (frames.css targets #main-site at equal
+           specificity and loads after this stylesheet). */
+        padding-top: calc(var(--map-art-clear) + var(--frame-pad, 10px)) !important;
         /* Reserve space for fixed bottom tab bar + a frame-gap so the
            cards don't visually press against the nav (frames.css design). */
         padding-bottom: calc(38px + env(safe-area-inset-bottom) + var(--frame-gap, 10px));
         box-sizing: border-box;
       }
-      /* body always fills the full viewport height, but its content
-         (map + columns) often doesn't -- the leftover space at the
-         bottom belongs to no grid item and was showing frames.css's
-         raw page canvas instead of the map/card #f7f7f7. Coloring the
-         container itself means any such gap matches by default.
-         frames.css's html,body rule also sets a background with
+      /* Transparent, not a color: the map is a fixed layer *behind* this
+         grid now, so any background painted on body or #main-site would
+         cover it outright rather than just filling gaps (which is what
+         the old #f7f7f7 was for, back when the map was an in-flow block
+         and the leftover space below it showed frames.css's raw page
+         canvas). frames.css's html,body rule sets a background with
          !important, so this needs the extra "html" qualifier to win on
          specificity regardless of source order. */
-      html body {
-        background: #f7f7f7 !important;
+      html body,
+      html #main-site {
+        background: transparent !important;
       }
 
       /* .map-panel is a sibling of main (see its markup comment) so it
          keeps rendering underneath the reader-overlay sheet's own
-         full-bleed rise, independent of main's display:none below. */
-      .map-panel { grid-area: map; }
+         full-bleed rise, independent of main's display:none below. It
+         takes no grid area at all now -- it's out of flow. */
       .col-right { grid-area: news; }
       .col-left { grid-area: boxes; }
 
@@ -2257,64 +2263,53 @@
         border-bottom: 5px solid #1a1a1a !important;
       }
 
-      /* Map: mobile draft artwork, a normal in-flow block instead of a
-         fixed full-bleed background layer sitting behind everything.
-         Bleeds past body's own left/right frame padding (frames.css) so
-         it reaches the true screen edges instead of sitting in a gutter
-         -- no shadow to strip here since, unlike anahane/kahvehane, this
-         page's frameless rule above already zeroes out main's shadow and
-         .map-panel was never one of frames.css's shadowed panels to
-         begin with.
+      /* Map: the mobile draft is a full-screen backdrop, not a block in
+         the column flow. The art is drawn at 1080x1920 -- a phone
+         screen, not a map slot -- with Turkey in its top half and a
+         deliberately sparse lower half for the news/boxes columns to sit
+         over. So the panel goes back to the same fixed full-bleed layer
+         the desktop rule uses, and the columns below are pushed down
+         onto the empty part of the drawing (see #main-site's padding-top
+         and --map-art-clear).
 
-         Height was a 100vw square back when mobile showed the same
-         landscape Turkey photo as desktop. The mobile draft is portrait
-         (1080x1920), so a square slot cropped Turkey's whole top half
-         away under object-fit:cover. Sized in dvh now -- a definite
-         length, not aspect-ratio, since main's row track in kahvehane's
-         CSS Grid sized unreliably from an aspect-ratio child and this
-         keeps one fewer thing that could behave differently across
-         browsers. The value is a budget, not the art's ratio: the panel
-         takes a bit over half the screen and the news/boxes columns keep
-         the rest, with .map-photo's `contain` below fitting the whole
-         drawing inside whatever that works out to. */
+         Nothing left to bleed past here: inset:0 already reaches the
+         true screen edges, so the negative frame-pad margins the
+         in-flow version needed are gone. */
       .map-panel {
-        position: relative;
-        inset: auto;
-        /* The draft is drawn on white; letterboxing it against the
-           panel's own #f7f7f7 would outline the artwork in a faint
-           rectangle. Matching white makes the fitted bars invisible. */
-        background: #fff;
-        /* No explicit width here -- a fixed width (100%) only shifts
-           position with negative margins, it doesn't grow to absorb
-           them, which was leaving a ~20px gap on the right (the
-           left margin shifted the box left, but its fixed width never
-           extended to reach the right edge). Leaving width unset lets
-           the flex item's default align-items:stretch fill the
-           container's cross size *minus its own margins*, which does
-           expand with negative margins as intended. */
-        height: 56dvh;
-        z-index: auto;
+        position: fixed;
+        inset: 0;
+        height: auto;
+        margin: 0;
+        z-index: -1;
         overflow: hidden;
-        margin-left: calc(-1 * var(--frame-pad, 10px));
-        margin-right: calc(-1 * var(--frame-pad, 10px));
-        flex-shrink: 0;
+        /* The draft is drawn on white, and `contain` below leaves the
+           strip under the artwork bare on tall screens. Matching white
+           makes that strip read as more of the drawing's own paper
+           rather than a panel edge. */
+        background: #fff;
       }
 
-      /* `contain`, not the shared `cover` above: cover fills the panel by
-         cropping whatever doesn't fit, which on portrait art in a wider
-         slot means slicing off the top and bottom of the drawing. contain
-         guarantees the entire draft is on screen on every phone, at the
-         cost of white margins left and right (invisible against the
-         panel's white background). Anchored to the top so the drawing
-         hangs from the header rather than floating mid-panel.
-         To review the alternative framing -- Turkey filling the full
-         width, edge to edge, with the lower half of the drawing cropped
-         off -- swap these two lines for
-         `object-fit: cover; object-position: center top;`. */
+      /* `contain`, not the shared `cover` above. The art (9:16) is
+         relatively wider than a modern phone (~9:19.5), so cover fills
+         the screen by cropping the sides -- and Turkey is drawn all the
+         way out to the source's right edge, so it's the eastern border
+         that gets shaved. contain instead fits the art to the full
+         screen *width*, exactly as composed, and leaves the leftover
+         height as white below it. Anchored top so the drawing hangs from
+         the top of the screen and that leftover collects at the bottom,
+         behind the columns, where the art is already blank. */
       .map-panel img.map-photo {
         object-fit: contain;
         object-position: center top;
       }
+
+      /* Rendered art height is 100vw / (1080/1920) = 177.8vw, and
+         Turkey's southern coastline sits at ~53% of the source's height
+         -- so the drawing goes blank below ~94vw. Clearing that much
+         puts the columns on the empty lower half instead of over the
+         map. Being a vw (the art is fitted to width) means the two track
+         each other on every screen. */
+      :root { --map-art-clear: 95vw; }
       /* Kütüphane's map photo is Turkey-wide, but the clickable overlay
          underneath is still traced against the old Istanbul map and
          doesn't line up with Turkey's provinces (see the TEST comment
@@ -2324,9 +2319,14 @@
       .map-panel svg.map-svg {
         display: none;
       }
+      /* Sits on the art's own clearance line -- under Turkey, just above
+         where the columns start -- rather than at the panel's bottom
+         edge, which is now the bottom of the screen (behind the tab
+         bar) since the panel went full-screen. */
       .map-label {
         position: absolute;
-        bottom: 8px;
+        top: calc(var(--map-art-clear) - 26px);
+        bottom: auto;
         left: 50%;
         right: auto;
         transform: translateX(-50%);
@@ -2470,17 +2470,18 @@
         flex-direction: column;
         overflow: visible;
       }
-      /* The desktop rule near the top of this file (body .col-left/
-         .col-right) sets background:none!important so these read as
-         frameless text floating on the always-visible map behind them.
-         On mobile the map isn't behind this row anymore (it's the block
-         above), so "none" was showing body's own raw page-canvas color
-         instead -- a visible mismatch right under the map's #f7f7f7.
-         Matches the desktop rule's body-qualified specificity so it
-         actually wins. */
+      /* Back to the desktop treatment (body .col-left/.col-right near the
+         top of this file: background:none!important) -- frameless text
+         floating on the map. The #f7f7f7 fill this rule used to carry was
+         for the layout where the map was a block *above* this row rather
+         than behind it, so "none" exposed the raw page canvas; now that
+         the artwork is the full-screen backdrop again, a fill here would
+         paint a gray slab over the lower half of the drawing. Kept as a
+         rule (rather than deleted) so the mobile intent stays explicit
+         next to the layout it belongs to. */
       body .col-left,
       body .col-right {
-        background: #f7f7f7 !important;
+        background: transparent !important;
       }
       .library-card { padding: 14px 16px; }
       .library-card .avatar { width: 48px; height: 48px; font-size: 1.2rem; border-width: 2px; }
