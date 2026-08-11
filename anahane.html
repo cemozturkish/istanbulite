@@ -1727,13 +1727,17 @@
        gray shared flat-card fill) plus a drop shadow lifting it off the
        map, and the card rule further down strips the inner .article/
        .event-item/.politician-detail's own border/background so it's
-       just content sitting in the sheet's padding. Scrolling lives on .detail-overlay
-       (the fixed, full-viewport root) rather than on the sheet, so
-       there's no separate clipped "window" with its own scrollbar: the
-       card is tall enough to run off the bottom of the screen, and
-       dragging anywhere moves it directly, like pulling a sheet of
-       paper up off the bottom edge rather than scrolling through a
-       fixed window onto it. */
+       just content sitting in the sheet's padding. On desktop, scrolling
+       lives on .detail-overlay (the fixed, full-viewport root) rather
+       than on the sheet, so there's no separate clipped "window" with
+       its own scrollbar: the card is tall enough to run off the bottom
+       of the screen, and dragging anywhere moves it directly, like
+       pulling a sheet of paper up off the bottom edge rather than
+       scrolling through a fixed window onto it. On mobile that same
+       feel is driven by initDetailPull instead (see the ≤768px block at
+       the end of this stylesheet) -- native scrolling here had no way to
+       stop the sheet from climbing over the profile card, or to keep its
+       bottom edge from surfacing mid-screen. */
     .detail-overlay {
       position: fixed;
       inset: 0;
@@ -1920,28 +1924,65 @@
       opacity: 1;
     }
     @media (max-width: 768px) {
+      .detail-overlay {
+        /* Where the sheet comes to rest when it first opens: right where
+           the map hero's box ends -- #main-site's frame-pad top inset
+           (frames.css) plus the map's own height (100vw, same square as
+           .map-panel's width:100%;aspect-ratio:1/1) plus one more
+           frame-pad gap. */
+        --detail-rest-top: calc(var(--frame-pad, 10px) + 100vw + var(--frame-pad, 10px));
+        /* ...never so low that the sheet arrives (nearly) off-screen, on
+           a viewport short relative to its width. */
+        --detail-rest: min(var(--detail-rest-top), calc(100vh - 180px));
+        /* The highest the sheet's top edge may ever climb -- it must
+           never cover the profile card at the top of the page. The pull
+           handler (initDetailPull) overwrites this with the card's real
+           measured bottom edge; this is just the pre-measurement
+           fallback (frame-pad ring + the card's ~60px row + gap). */
+        --detail-top-clamp: calc(var(--frame-pad, 10px) * 2 + 60px);
+        /* The overlay itself no longer scrolls on mobile: dragging the
+           sheet is handled by initDetailPull, which raises the sheet to
+           the clamp and then feeds the rest of the pull into the sheet's
+           own scroll -- one continuous motion, with a hard ceiling. */
+        overflow: hidden;
+      }
       .detail-overlay-sheet {
         /* Inset on 3 sides (frame-pad gap) so a sliver of the map/page
            canvas peeks through above and beside it, like a page rising
-           from below. Rises to cover only the area below the map instead
-           of nearly the full screen -- the map stays visible above it.
-           Its top matches where the map hero's own box ends: #main-site's
-           frame-pad top inset (frames.css) plus the map's own height
-           (100vw, same square as .map-panel's width:100%;aspect-ratio:
-           1/1) plus one more frame-pad gap. min-height (rather than a
-           bottom:0 + height:auto pin) reaches the true bottom by default
-           for short cards, matching the other overlays, but lets a card
-           taller than that run on past the bottom of the screen instead
-           of being clipped -- scrolling .detail-overlay pulls it up into
-           view instead of scrolling within a fixed window. */
+           from below. Rests below the map so the map stays visible above
+           it. Height is measured from the CLAMP, not from its resting
+           top: the sheet is always tall enough that, once pulled all the
+           way up to the clamp, its bottom edge lands on the bottom of the
+           screen. At rest it therefore hangs (rest-top - clamp) past the
+           bottom edge -- the paper always continues off-screen and its
+           bottom edge is never exposed mid-screen, however short the
+           article is. */
         left: var(--frame-pad, 10px);
         right: var(--frame-pad, 10px);
         width: auto;
-        top: calc(var(--frame-pad, 10px) + 100vw + var(--frame-pad, 10px));
-        min-height: calc(100vh - (var(--frame-pad, 10px) + 100vw + var(--frame-pad, 10px)));
-        transform: translateY(100%);
+        top: var(--detail-rest);
+        height: calc(100% - var(--detail-top-clamp));
+        min-height: 0;
+        /* Content that outruns the sheet scrolls inside it, but only
+           under initDetailPull's control (overflow:hidden still allows
+           programmatic scrollTop) -- so the pull can't hand the gesture
+           over to a native scroller that would happily run past the
+           clamp. touch-action:none for the same reason: this element
+           owns its vertical gesture. */
+        overflow: hidden;
+        touch-action: none;
+        /* Closed: sitting exactly on the bottom edge of the screen,
+           ready to be pulled up (not a full 100% of its own now-taller
+           height, which would start it needlessly far down). */
+        transform: translateY(calc(100vh - var(--detail-rest)));
       }
       .detail-overlay.open .detail-overlay-sheet { transform: translateY(0); }
+      /* Clears the iOS Safari toolbar / bottom tab bar sitting over the
+         bottom of the (layout-viewport-sized) sheet, so the end of a long
+         article can actually be read once it's scrolled all the way up. */
+      .detail-overlay-body {
+        padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+      }
     }
   </style>
   <link rel="stylesheet" href="frames.css">
@@ -3468,6 +3509,10 @@ function renderEventsNow(panel, rows) {
 // details, opened instead of the old expand-in-place toggle — mirrors
 // Kahvehane's game overlay / Kütüphane's reader overlay. Content is
 // built by buildNewsDetailHtml/buildEventDetailHtml above.
+// The mobile pull handler, assigned by initDetailPull() below (it stays
+// null only if the overlay markup isn't on the page; on desktop it's
+// assigned but every entry point no-ops).
+let detailPull = null;
 function openDetail(html) {
   const overlay = document.getElementById('detail-overlay');
   const body = document.getElementById('detail-overlay-body');
@@ -3481,17 +3526,28 @@ function openDetail(html) {
   body.innerHTML = html;
   if (window.IstPersonMentions) IstPersonMentions.linkify(body, personMentionsRoster);
   overlay.hidden = false;
-  // .detail-overlay is the scroll container now (see .detail-overlay-sheet's
-  // top-anchored, unclipped height) -- reset so a tall card left scrolled
-  // from a previous open doesn't reopen mid-scroll on the next one.
+  // On desktop .detail-overlay is itself the scroll container (see
+  // .detail-overlay-sheet's top-anchored, unclipped height) -- reset so a
+  // tall card left scrolled from a previous open doesn't reopen
+  // mid-scroll on the next one. detailPull.reset() does the same for the
+  // mobile pull (sheet offset + the sheet's own scroll).
   overlay.scrollTop = 0;
-  requestAnimationFrame(() => overlay.classList.add('open'));
+  if (detailPull) detailPull.reset();
+  requestAnimationFrame(() => {
+    overlay.classList.add('open');
+    // Measured now that the content is laid out and the sheet's real
+    // height is resolvable.
+    if (detailPull) detailPull.measure();
+  });
 }
 function closeDetail() {
   const overlay = document.getElementById('detail-overlay');
   if (!overlay) return;
   markOpenNewsCard(null);
   markOpenEventCard(null);
+  // Hands the sheet back to its CSS transition from wherever the pull
+  // left it, so it slides down from there instead of jumping first.
+  if (detailPull) detailPull.release();
   overlay.classList.remove('open');
   // Matches the sheet's own 0.55s transition (see .detail-overlay-sheet)
   // so hiding doesn't cut the closing slide-down short.
@@ -3517,6 +3573,9 @@ function closeDetail() {
       if (wrap) {
         const isOpen = wrap.classList.toggle('open');
         toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        // The sheet just got taller/shorter -- re-measure how much paper
+        // is left to pull (see initDetailPull).
+        if (detailPull) detailPull.measure();
       }
       return;
     }
@@ -3525,6 +3584,183 @@ function closeDetail() {
     e.stopPropagation();
     toggleRsvp(btn.dataset.eventId, btn);
   });
+})();
+
+// ── Mobile: pulling the detail sheet ──
+// The sheet is pulled by hand, not scrolled by the browser. Native
+// scrolling could do neither of the two things this gesture has to do:
+// stop the sheet from climbing over the profile card, and never let its
+// bottom edge surface mid-screen (a scroller happily runs the whole card
+// past the top of the window, page showing through underneath).
+//
+// Everything runs off one number, `pos` — how far the paper has been
+// pulled, in px:
+//   0 .. maxRise      lifts the sheet itself, up to the clamp just under
+//                     the profile card (see --detail-top-clamp)
+//   maxRise .. maxPos scrolls the sheet's own content
+// so a single uninterrupted pull first raises the sheet, then keeps
+// feeding paper up from the bottom edge of the screen — a receipt coming
+// out of a slot — with a hard ceiling on how high the sheet itself goes.
+// Below 0 the sheet rubber-bands downward and lets go: pull it past the
+// rest point and it closes.
+detailPull = (function initDetailPull() {
+  const overlay = document.getElementById('detail-overlay');
+  const sheet = document.getElementById('detail-overlay-sheet');
+  if (!overlay || !sheet) return null;
+  const mobile = window.matchMedia('(max-width: 768px)');
+
+  const DISMISS_PX = 70;    // pull-down past the rest point that closes the sheet
+  const DISMISS_VEL = 0.6;  // ...or a downward flick this fast (px/ms)
+  const RUBBER = 0.5;       // resistance on a pull below the rest point
+  const SNAP_AT = 0.35;     // fraction of the rise that settles upward on release
+  const FRICTION = 0.93;    // momentum decay per 16ms frame
+  const STOP_VEL = 0.08;    // momentum below this (px/ms) is a crawl -- settle instead
+
+  let pos = 0, maxRise = 0, maxScroll = 0, maxPos = 0;
+  let dragging = false, startY = 0, startPos = 0, lastY = 0, lastT = 0, vel = 0, raf = 0;
+
+  // The sheet's ceiling: the profile card's real bottom edge plus the
+  // frame gap, measured rather than assumed so it stays right whatever
+  // the card ends up containing (badges, longer names, notch insets).
+  function topClamp() {
+    const padVal = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-pad'));
+    const pad = isNaN(padVal) ? 10 : padVal;
+    const card = document.getElementById('ist-pc-mount');
+    const bottom = card && card.offsetHeight ? card.getBoundingClientRect().bottom : pad + 60;
+    return Math.max(pad, bottom + pad);
+  }
+
+  function measure() {
+    // isConnected: a virtual navigation (router.js) swaps in fresh
+    // overlay markup and re-runs this script, leaving the old instance's
+    // resize listener pointed at a detached sheet.
+    if (!mobile.matches || overlay.hidden || !overlay.isConnected) { maxRise = maxScroll = maxPos = 0; return; }
+    const clamp = topClamp();
+    // Feeds the sheet's height too (height: 100% - clamp), which is what
+    // keeps its bottom edge off-screen at rest and exactly on the bottom
+    // edge once fully raised.
+    overlay.style.setProperty('--detail-top-clamp', clamp + 'px');
+    maxRise = Math.max(0, sheet.offsetTop - clamp);
+    maxScroll = Math.max(0, sheet.scrollHeight - sheet.clientHeight);
+    maxPos = maxRise + maxScroll;
+    if (pos > maxPos) { pos = maxPos; render(); }
+  }
+
+  function render() {
+    let y;
+    if (pos >= 0) {
+      y = -Math.min(pos, maxRise);
+      sheet.scrollTop = Math.min(Math.max(pos - maxRise, 0), maxScroll);
+    } else {
+      y = -pos * RUBBER;
+      sheet.scrollTop = 0;
+    }
+    sheet.style.transform = 'translateY(' + y + 'px)';
+  }
+
+  function stopAnim() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
+
+  // Hands the sheet back to CSS once it's stopped moving, so the closing
+  // slide-down (a plain class change) runs from wherever it ended up.
+  function finish() {
+    raf = 0;
+    sheet.style.transition = '';
+    if (pos === 0) sheet.style.transform = '';
+  }
+
+  // Release: coast on the flick's own momentum, then settle. A sheet
+  // left half-raised lands on one of its two rest points (down, or
+  // parked at the clamp); past the clamp it's ordinary content scroll,
+  // so it stays wherever it stopped.
+  function settle() {
+    stopAnim();
+    let last = performance.now();
+    const step = (now) => {
+      const dt = Math.min(34, Math.max(1, now - last));
+      last = now;
+      if (Math.abs(vel) > STOP_VEL) {
+        pos += vel * dt;
+        vel *= Math.pow(FRICTION, dt / 16);
+        if (pos <= 0) { pos = 0; vel = 0; }
+        else if (pos >= maxPos) { pos = maxPos; vel = 0; }
+        render();
+        raf = requestAnimationFrame(step);
+        return;
+      }
+      vel = 0;
+      const target = pos >= maxRise ? pos : (pos > maxRise * SNAP_AT ? maxRise : 0);
+      const gap = target - pos;
+      if (Math.abs(gap) < 0.5) { pos = target; render(); finish(); return; }
+      pos += gap * Math.min(1, dt / 90);
+      render();
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+  }
+
+  sheet.addEventListener('touchstart', (e) => {
+    if (!mobile.matches || e.touches.length !== 1) return;
+    stopAnim();
+    // Re-measured per gesture: the sources accordion, late images and
+    // rotation all change how much paper there is to pull.
+    measure();
+    dragging = true;
+    startPos = pos;
+    startY = lastY = e.touches[0].clientY;
+    lastT = e.timeStamp || performance.now();
+    vel = 0;
+    sheet.style.transition = 'none';
+  }, { passive: true });
+
+  sheet.addEventListener('touchmove', (e) => {
+    if (!dragging || e.touches.length !== 1) return;
+    const y = e.touches[0].clientY;
+    const now = e.timeStamp || performance.now();
+    const dt = now - lastT;
+    // Weighted toward the newest sample so a flick's final speed wins
+    // over the slow start of the same drag.
+    if (dt > 0) vel = 0.7 * ((lastY - y) / dt) + 0.3 * vel;
+    lastY = y;
+    lastT = now;
+    // Hard stop at the top -- nothing left to give once the sheet is at
+    // the clamp and its content is scrolled through.
+    pos = Math.min(startPos + (startY - y), maxPos);
+    render();
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
+
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    if (pos < 0 && (pos < -DISMISS_PX || vel < -DISMISS_VEL)) { closeDetail(); return; }
+    settle();
+  };
+  sheet.addEventListener('touchend', end);
+  sheet.addEventListener('touchcancel', end);
+
+  window.addEventListener('resize', () => { if (!overlay.hidden) measure(); });
+
+  return {
+    measure,
+    // A fresh open starts flat: sheet at its resting top, content
+    // unscrolled, CSS back in charge of the slide-up.
+    reset() {
+      stopAnim();
+      dragging = false; pos = 0; vel = 0;
+      sheet.style.transition = '';
+      sheet.style.transform = '';
+      sheet.scrollTop = 0;
+    },
+    // Closing: drop the inline transform in the same tick the .open
+    // class goes away, so the CSS transition interpolates from where the
+    // pull left the sheet down to off-screen.
+    release() {
+      stopAnim();
+      dragging = false; pos = 0; vel = 0;
+      sheet.style.transition = '';
+      sheet.style.transform = '';
+    },
+  };
 })();
 
 // loadBreakingNews() is called from showSite() once the user is known
