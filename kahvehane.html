@@ -671,6 +671,13 @@
       display: none;
     }
 
+    /* Sözcel's wordmark. Only the square mobile tiles have a box shaped
+       for it (see the media query below) -- the desktop tiles are wide
+       short rectangles, so they stay text-only. */
+    .game-link-logo {
+      display: none;
+    }
+
     /* Started today (brighter/more opaque white) vs completed today (dark
        tinted, dimmed) -- same fixed white/black frosted-glass treatment
        as the base tile, not the palette's --paper-card/--brown-3. */
@@ -1449,7 +1456,18 @@
       }
       .game-link {
         padding: 0;
-        width: clamp(96px, 26vw, 128px);
+        /* Square tiles. The height is untouched -- it's still the
+           column's own height split three ways by .game-link-enter's
+           flex:1 above -- and --game-tile-size mirrors that measured
+           height back into the width, so squaring these only ever moves
+           the width. The var is set by syncGameTileSize() in the script
+           below (CSS can't express "as wide as you are tall" here: the
+           column is content-sized, so an aspect-ratio would have to
+           resolve the width from a height that isn't known yet at
+           intrinsic-sizing time). The clamp is the pre-measurement
+           fallback -- the old fixed width, so a tile is never sized
+           wrong if the measurement hasn't landed yet. */
+        width: var(--game-tile-size, clamp(96px, 26vw, 128px));
         /* No explicit height/flex here -- .game-link-enter (its parent,
            a row-direction flex container) stretches it to fill that
            wrapper's height by default (align-items:stretch), which is
@@ -1465,8 +1483,29 @@
         position: relative;
       }
       .game-link-title {
-        font-size: 15px;
+        /* Tracks the tile, capped at the old 15px: square tiles are only
+           as wide as the column is tall, so on a short screen (an SE in
+           particular) they get narrow enough that a fixed 15px "Bulmaca"
+           no longer fits on one line. */
+        font-size: min(15px, calc(var(--game-tile-size, 96px) * 0.16));
         font-weight: 700;
+      }
+      /* Square tile = a box the wordmark actually fits in, so Sözcel
+         shows its logo instead of its name (the artwork spells it out).
+         object-fit:contain keeps the artwork square inside the padding
+         no matter what height the column hands the tile; the padding is
+         a percentage so the margin around it stays proportional at every
+         tile size. */
+      .game-link-logo {
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        height: 100%;
+        padding: 6%;
+        object-fit: contain;
+      }
+      .game-link[data-game="sozcel"] .game-link-title {
+        display: none;
       }
       .game-link-subtitle {
         font-size: 9px;
@@ -2322,6 +2361,7 @@
 
           <div class="game-link-enter">
           <a href="sozcel.html" class="game-link" data-game="sozcel">
+            <img class="game-link-logo" src="assets/sozcel-logo.png" alt="Sözcel" width="512" height="512" decoding="async">
             <div class="game-link-title">Sözcel</div>
             <div class="game-link-subtitle">Türkçe Wordle</div>
           </a>
@@ -2638,6 +2678,7 @@ function syncColumnHeights() {
   if (window.innerWidth > 768) {
     colLeft.style.height = '';
     colRight.style.height = '';
+    syncGameTileSize();
     return;
   }
   const frameGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-gap')) || 10;
@@ -2646,8 +2687,47 @@ function syncColumnHeights() {
   const height = Math.max(0, navTop - colTop - frameGap);
   colLeft.style.height = height + 'px';
   colRight.style.height = height + 'px';
+  syncGameTileSize();
 }
 window.addEventListener('resize', syncColumnHeights);
+
+// Mobile only: keeps the game tiles square. Their height is decided by
+// the column above (see .game-link in the mobile media query) and the
+// width has to follow it, so measure the wrapper -- .game-link-enter,
+// whose height is a third of the games column and, unlike the tile's own
+// box, doesn't move when we change the tile's width -- and hand that
+// number back to CSS. Nothing here touches height; only --game-tile-size.
+// The column's height keeps moving after mount()'s own two passes -- the
+// profile card above the tiles finishes its async mount, the safe-area
+// insets settle a beat into a fresh WKWebView paint -- so the wrapper is
+// also watched, not just re-measured on resize. Widening a tile takes
+// width from the comments column, never from the map (main spans both
+// grid columns at a viewport-based height), so this can't feed back into
+// the height it just measured.
+const gameTileObserver = window.ResizeObserver
+  ? new ResizeObserver(() => syncGameTileSize())
+  : null;
+let observedGameTile = null;
+
+function syncGameTileSize() {
+  const picker = document.getElementById('game-picker');
+  const wrapper = picker && picker.querySelector('.game-link-enter');
+  if (!wrapper) return;
+  // Re-attached rather than set up once: router.js's virtual navigation
+  // swaps #ist-content wholesale, so a re-entry into this page hands us a
+  // brand new wrapper element each time.
+  if (gameTileObserver && wrapper !== observedGameTile) {
+    gameTileObserver.disconnect();
+    gameTileObserver.observe(wrapper);
+    observedGameTile = wrapper;
+  }
+  if (window.innerWidth > 768) {
+    picker.style.removeProperty('--game-tile-size');
+    return;
+  }
+  const size = Math.round(wrapper.getBoundingClientRect().height);
+  if (size > 0) picker.style.setProperty('--game-tile-size', size + 'px');
+}
 
 // person-mentions.js is deferred -- poll briefly (same idiom as
 // IstPoliticianCard elsewhere) so a fast mount() on a slow connection
