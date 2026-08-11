@@ -107,11 +107,19 @@
 
     // kahvehane — coffee price index (Kahve Endeksi), read-only: the
     // index is curated from the admin portal, not reported by users.
+    // The status words below label a live board: a venue is on it only
+    // while it is open, and trades at its discounted price only while
+    // the discount window runs (see coffee-index.js).
     'kahve.index':   { default: 'Kahve Endeksi',            more_english: 'Coffee Index' },
     'kahve.empty':   { default: 'Henüz fiyat yok.',         more_english: 'No prices yet.' },
-    'kahve.note':    { default: 'Fiyatlar istanbulite tarafından derlenir', more_english: 'Prices are compiled by istanbulite' },
     'kahve.loading': { default: 'Yükleniyor...',            more_english: 'Loading...' },
     'kahve.failed':  { default: 'Endeks yüklenemedi.',      more_english: 'Could not load the index.' },
+    'kahve.open':    { default: 'Açık',                     more_english: 'Open' },
+    'kahve.closed':  { default: 'Kapalı',                   more_english: 'Closed' },
+    'kahve.discount':{ default: 'İndirim',                  more_english: 'Discount' },
+    // Prefixed to the minutes left before closing: "Son 45 dk".
+    'kahve.lastcall':{ default: 'Son',                      more_english: 'Last' },
+    'kahve.tomorrow':{ default: 'Yarın',                    more_english: 'Tomorrow' },
 
     // anahane — breaking news detail sheet
     'news.sources':        { default: 'Kaynaklar',           more_english: 'Sources' },

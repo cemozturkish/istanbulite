@@ -17,6 +17,9 @@
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
   <script src="game-locks.js"></script>
+  <!-- Live open/closed + scheduled-discount evaluation for the Kahve
+       Endeksi board below. Shared with admin.html. -->
+  <script src="coffee-index.js"></script>
   <link rel="stylesheet" href="profile-card.css">
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
@@ -1869,16 +1872,7 @@
       padding: 10px 12px;
       margin-bottom: 4px;
     }
-    .coffee-scope {
-      font-size: 0.62rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      text-align: center;
-      color: var(--muted);
-      margin-bottom: 12px;
-    }
-    .coffee-rows { display: flex; flex-direction: column; gap: 4px; }
+    .coffee-rows { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
     .coffee-row {
       display: flex;
       align-items: center;
@@ -1887,28 +1881,46 @@
       background: rgba(255, 255, 255, 0.7);
       border: 1px solid rgba(26, 26, 26, 0.2);
       font-size: 0.8rem;
+      /* Hovering a row lights up the district it is in on the map (see
+         the coffee-row hover handlers in the script below) -- the row
+         no longer prints its district name, the map answers instead. */
+      cursor: default;
+      transition: background 0.15s, border-color 0.15s;
     }
+    .coffee-row:hover { border-color: rgba(26, 26, 26, 0.55); }
     .coffee-row.cheapest { background: rgba(26, 26, 26, 0.75); color: #fff; border-color: #1a1a1a; }
+    /* Closed venues are off the board: still listed (so you know they
+       exist and what they charge) but visibly out of the running, and
+       never ranked as the cheapest. */
+    .coffee-row.closed { opacity: 0.45; background: rgba(255, 255, 255, 0.35); }
     .coffee-row-venue { flex: 1; min-width: 0; overflow-wrap: break-word; font-weight: 700; }
     .coffee-row-meta { display: block; font-size: 0.6rem; font-weight: 400; opacity: 0.75; letter-spacing: 0.5px; margin-top: 2px; }
-    .coffee-row-price { font-weight: 700; font-size: 0.9rem; white-space: nowrap; }
+    /* Discount and last-call markers -- the two things that make the
+       board move on its own. Weight rather than hue, to stay inside the
+       page's fixed white/ink language. */
+    .coffee-row-meta .mk-discount,
+    .coffee-row-meta .mk-last,
+    .coffee-row-meta .mk-closed { font-weight: 700; letter-spacing: 1px; }
+    .coffee-row-price { font-weight: 700; font-size: 0.9rem; white-space: nowrap; text-align: right; }
+    /* Undiscounted price, kept visible next to the live one so the size
+       of the discount reads at a glance. */
+    .coffee-price-was {
+      display: block;
+      font-size: 0.6rem;
+      font-weight: 400;
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
     .coffee-empty {
       font-size: 0.75rem; color: var(--muted); font-style: italic;
       text-align: center; padding: 14px 4px;
-    }
-    /* The index is curated from the admin portal (admin.html's "Kahve"
-       tab) -- both surfaces here are read-only, so there is no composer,
-       row edit or delete affordance to style. */
-    .coffee-note {
-      font-size: 0.62rem; color: var(--muted); text-align: center;
-      margin-top: 10px; font-style: italic;
     }
 
     /* ── Coffee index panel (right column) ──
        Replaces the old scoreboard here -- the score table now only shows
        in the game-score-slide panel while a game is actually open (see
        above). Reuses .coffee-detail and friends verbatim (same markup as
-       the coffee-pill sheet, built by the same renderCoffeeSheetHTML) so
+       the coffee-pill sheet, built by the same renderCoffeeBoardHTML) so
        both surfaces look and behave identically, just always-visible here
        instead of opened on demand. */
     .coffee-index-panel {
@@ -2344,7 +2356,7 @@
 
         <!-- Kahve Endeksi, always visible here (see .coffee-index-panel
              CSS + loadCoffeeIndexPanel/refreshCoffeeIndexPanel JS below).
-             Content is rendered entirely by JS via renderCoffeeSheetHTML
+             Content is rendered entirely by JS via renderCoffeeBoardHTML
              -- the same function the coffee-pill sheet uses -- so both
              surfaces share one implementation, including the admin-only
              inline edit (✎) added there. -->
@@ -2724,6 +2736,11 @@ async function mount() {
   I18N.onChange(onI18NChangeForCountdown);
   if (discussionTickIntervalId) clearInterval(discussionTickIntervalId);
   discussionTickIntervalId = setInterval(tickDiscussionPosts, 30000);
+  // The coffee board re-ranks itself off the clock (venues opening and
+  // closing, discount windows starting and ending) -- see tickCoffeeIndex.
+  if (coffeeTickIntervalId) clearInterval(coffeeTickIntervalId);
+  coffeeTickIntervalId = setInterval(tickCoffeeIndex, COFFEE_TICK_MS);
+  I18N.onChange(tickCoffeeIndex);
 
   // If the current user is the picked sözcül with a pending word,
   // glow the Sözcel tile and surface a one-time mascot popup.
@@ -2741,6 +2758,8 @@ function unmount() {
   IstRouter.offTick(tickScoreboardCountdown);
   if (onI18NChangeForCountdown) { I18N.offChange(onI18NChangeForCountdown); onI18NChangeForCountdown = null; }
   if (discussionTickIntervalId) { clearInterval(discussionTickIntervalId); discussionTickIntervalId = null; }
+  if (coffeeTickIntervalId) { clearInterval(coffeeTickIntervalId); coffeeTickIntervalId = null; }
+  I18N.offChange(tickCoffeeIndex);
 }
 
 async function init() {
@@ -3651,17 +3670,41 @@ function showToast(text, kind) {
 // The local-economy layer per the Vision section of CLAUDE.md: the
 // cheapest cup of coffee, per district. Opens in the detail-overlay
 // bottom sheet via the .coffee-pill button on the map panel, scoped to
-// the currently selected district (or Tüm İstanbul), and also shows
+// the currently selected district (or all of Istanbul), and also shows
 // always-visible in col-right on desktop.
+//
+// The board is LIVE, like a market board rather than a printed list. Two
+// things move it without anyone touching the data (see coffee-index.js
+// for the evaluation and db/coffee_prices_v3_live.sql for the shape):
+//   - Opening hours. A venue that has closed drops out of the ranking
+//     and sinks to the bottom of the board, dimmed; the cheapest cup is
+//     the cheapest cup you can actually go and buy right now.
+//   - Scheduled discounts. Inside its happy window a venue trades at the
+//     discounted price and re-ranks accordingly, then snaps back the
+//     moment the window ends.
+// Because both are clock-driven, the board re-ranks itself on a timer
+// (COFFEE_TICK_MS) off the already-fetched rows — no refetch needed for
+// a venue to close or a discount to expire.
+//
 // Read-only on both surfaces: the index is curated exclusively from the
 // admin portal (admin.html's "Kahve" tab) — RLS on coffee_prices allows
 // writes to the admin only (see db/coffee_prices_v2_admin_only.sql).
 const COFFEE_MAX_ROWS = 15;
+// Re-rank cadence, and how stale the fetched rows may get before the
+// next tick re-reads them from Supabase (admin edits are rare, the clock
+// is what actually moves the board).
+const COFFEE_TICK_MS = 30000;
+const COFFEE_REFETCH_MS = 5 * 60 * 1000;
 // The district the always-visible col-right panel (see
 // .coffee-index-panel) is currently scoped to — kept so the map's
 // district clicks can re-scope it (loadCoffeeIndexPanel) without the
 // sheet, which reads the map selection at open time, having to agree.
 let coffeePanelScope = null;
+// Last fetch's rows, kept so the tick can re-rank without another round
+// trip. `scope` is the district filter they were fetched under; `rows` is
+// null when the fetch itself failed.
+let coffeeCache = { scope: undefined, rows: null, at: 0 };
+let coffeeTickIntervalId = null;
 
 function formatCoffeePrice(p) {
   const locale = (window.I18N && I18N.isEnglish()) ? 'en-US' : 'tr-TR';
@@ -3670,18 +3713,13 @@ function formatCoffeePrice(p) {
   } catch (_) { return p + ' TL'; }
 }
 
-function formatCoffeeDate(iso) {
-  const locale = (window.I18N && I18N.isEnglish()) ? 'en-US' : 'tr-TR';
-  return new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
-}
-
 // Newest-first fetch, deduped to the newest entry per (district, venue)
 // — legacy rows predating the admin-curated index can still hold the
-// same venue twice, once per original reporter — then re-sorted
-// cheapest-first, the index's whole point.
+// same venue twice, once per original reporter. Ranking happens at
+// render time instead of here, because it depends on the clock.
 async function fetchCoffeeRows(nbFilter) {
   let query = sb.from('coffee_prices')
-    .select('id, neighborhood, venue, price, updated_at')
+    .select('id, neighborhood, venue, price, hours, happy_price, happy_days, happy_start, happy_end, happy_label')
     .order('updated_at', { ascending: false })
     .limit(300);
   if (nbFilter) query = query.eq('neighborhood', nbFilter);
@@ -3695,67 +3733,135 @@ async function fetchCoffeeRows(nbFilter) {
     seen.add(key);
     out.push(r);
   }
-  out.sort((a, b) => Number(a.price) - Number(b.price));
-  return out.slice(0, COFFEE_MAX_ROWS);
+  return out;
+}
+
+// Fetch, or reuse the cached rows when they're for the same scope and
+// still fresh. Every render path goes through here so the tick can
+// re-render cheaply while a scope change still hits the network.
+async function getCoffeeRows(nbFilter, { force = false } = {}) {
+  const scope = nbFilter || null;
+  const fresh = coffeeCache.scope === scope
+    && coffeeCache.rows !== null
+    && (Date.now() - coffeeCache.at) < COFFEE_REFETCH_MS;
+  if (!force && fresh) return coffeeCache.rows;
+  const rows = await fetchCoffeeRows(scope);
+  coffeeCache = { scope, rows, at: Date.now() };
+  return rows;
+}
+
+// Live ranking: open venues cheapest-first, then the closed ones (also
+// cheapest-first) so the board still tells you what a shut place charges
+// without letting it win. Cut to COFFEE_MAX_ROWS only after ranking, so
+// a venue opening or a discount starting can pull it onto the board.
+function rankCoffeeRows(rows, now) {
+  return rows
+    .map(r => ({ row: r, live: IstCoffee.evaluate(r, now) }))
+    .sort((a, b) => {
+      if (a.live.open !== b.live.open) return a.live.open ? -1 : 1;
+      return a.live.price - b.live.price;
+    })
+    .slice(0, COFFEE_MAX_ROWS);
+}
+
+// The one line under a venue's name: why its price is what it is, and
+// when that changes. Returns HTML (the markers are styled spans), with
+// every interpolated value either escaped or generated here.
+function coffeeStatusMeta(live, now) {
+  const en = !!(window.I18N && I18N.isEnglish());
+  const parts = [];
+
+  if (!live.open) {
+    parts.push(`<span class="mk-closed">${I18N.t('kahve.closed')}</span>`);
+    if (live.opensAt != null) {
+      const at = IstCoffee.formatHM(live.opensAt);
+      if (live.opensInDays === 0) parts.push(at);
+      else if (live.opensInDays === 1) parts.push(`${I18N.t('kahve.tomorrow')} ${at}`);
+      else {
+        const d = new Date(now);
+        d.setDate(d.getDate() + live.opensInDays);
+        parts.push(`${escapeHtml(I18N.formatWeekday(d, { weekday: 'short' }))} ${at}`);
+      }
+    }
+    return parts.join(' · ');
+  }
+
+  // "→ 18:00" reads as "until 18:00" without needing a Turkish case
+  // suffix, which would have to change with each time's spoken form.
+  if (live.discounted) {
+    const label = live.discount.label ? escapeHtml(live.discount.label) : I18N.t('kahve.discount');
+    parts.push(`<span class="mk-discount">${label} → ${IstCoffee.formatHM(live.discount.endsAt)}</span>`);
+  }
+  if (live.minutesToClose != null && live.minutesToClose <= 60) {
+    parts.push(`<span class="mk-last">${I18N.t('kahve.lastcall')} ${live.minutesToClose} ${en ? 'min' : 'dk'}</span>`);
+  } else if (live.closesAt != null && !live.discounted) {
+    parts.push(`${I18N.t('kahve.open')} → ${IstCoffee.formatHM(live.closesAt)}`);
+  }
+  return parts.join(' · ');
 }
 
 // Shared by both surfaces (the coffee-pill sheet, mobile-only, and the
 // always-visible col-right panel) so the two stay identical -- the sheet
 // just opens on demand. Purely presentational: prices are entered in the
-// admin portal, so there is nothing interactive to wire up here.
-function renderCoffeeSheetHTML(scopeNb, rows) {
-  const scopeName = scopeNb
-    ? (neighborhoodNames[scopeNb] || scopeNb)
-    : I18N.t('kahvehane.allistanbul');
-
+// admin portal, so there is nothing interactive to wire up here beyond
+// the district hover (see the handlers below).
+function renderCoffeeBoardHTML(rows, now) {
   let listHTML;
   if (rows === null) {
     listHTML = `<div class="coffee-empty">${I18N.t('kahve.failed')}</div>`;
   } else if (rows.length === 0) {
     listHTML = `<div class="coffee-empty">${I18N.t('kahve.empty')}</div>`;
   } else {
-    listHTML = '<div class="coffee-rows">' + rows.map((r, i) => {
-      const meta = [
-        scopeNb ? '' : (neighborhoodNames[r.neighborhood] || r.neighborhood),
-        formatCoffeeDate(r.updated_at),
-      ].filter(Boolean).join(' · ');
-      return `<div class="coffee-row${i === 0 ? ' cheapest' : ''}">
-        <div class="coffee-row-venue">${escapeHtml(r.venue)}<span class="coffee-row-meta">${escapeHtml(meta)}</span></div>
-        <div class="coffee-row-price">${formatCoffeePrice(r.price)}</div>
+    const ranked = rankCoffeeRows(rows, now);
+    listHTML = '<div class="coffee-rows">' + ranked.map(({ row, live }, i) => {
+      const meta = coffeeStatusMeta(live, now);
+      const cls = [
+        'coffee-row',
+        // Only an open venue can be the cheapest cup in the district.
+        (i === 0 && live.open) ? 'cheapest' : '',
+        live.open ? '' : 'closed',
+      ].filter(Boolean).join(' ');
+      // data-nb drives the map highlight on hover — it replaces the
+      // district name this row used to print.
+      return `<div class="${cls}" data-nb="${escapeHtml(row.neighborhood)}">
+        <div class="coffee-row-venue">${escapeHtml(row.venue)}${meta ? `<span class="coffee-row-meta">${meta}</span>` : ''}</div>
+        <div class="coffee-row-price">${live.discounted ? `<span class="coffee-price-was">${formatCoffeePrice(live.basePrice)}</span>` : ''}${formatCoffeePrice(live.price)}</div>
       </div>`;
     }).join('') + '</div>';
   }
 
   return `<div class="coffee-detail">
     <h2>${I18N.t('kahve.index')}</h2>
-    <div class="coffee-scope">${escapeHtml(scopeName)}</div>
     ${listHTML}
-    <div class="coffee-note">${I18N.t('kahve.note')}</div>
   </div>`;
+}
+
+// True while the detail-overlay is showing the coffee board (as opposed
+// to a district sheet, a politician, etc.) — the tick re-renders it in
+// place only then.
+function coffeeSheetBody() {
+  const overlay = document.getElementById('detail-overlay');
+  const body = document.getElementById('detail-overlay-body');
+  if (!overlay || overlay.hidden || !body) return null;
+  return body.querySelector('.coffee-detail') ? body : null;
 }
 
 // Swaps the loading placeholder for the fetched rows in place, instead
 // of re-running openDetail's open animation on the already-open sheet.
-function renderCoffeeSheet(scopeNb, rows) {
-  const overlay = document.getElementById('detail-overlay');
-  const body = document.getElementById('detail-overlay-body');
-  const html = renderCoffeeSheetHTML(scopeNb, rows);
-  if (overlay && !overlay.hidden && body) body.innerHTML = html;
+function renderCoffeeSheet(rows) {
+  const html = renderCoffeeBoardHTML(rows, new Date());
+  const body = coffeeSheetBody();
+  if (body) body.innerHTML = html;
   else openDetail(html);
 }
 
 async function openCoffeeIndex() {
-  const scopeNb = activeMapNeighborhood;
-  const scopeName = scopeNb
-    ? (neighborhoodNames[scopeNb] || scopeNb)
-    : I18N.t('kahvehane.allistanbul');
   openDetail(`<div class="coffee-detail">
     <h2>${I18N.t('kahve.index')}</h2>
-    <div class="coffee-scope">${escapeHtml(scopeName)}</div>
     <div class="coffee-empty">${I18N.t('kahve.loading')}</div>
   </div>`);
-  const rows = await fetchCoffeeRows(scopeNb);
-  renderCoffeeSheet(scopeNb, rows);
+  const rows = await getCoffeeRows(activeMapNeighborhood);
+  renderCoffeeSheet(rows);
 }
 
 // The always-visible col-right panel (see .coffee-index-panel) -- same
@@ -3768,8 +3874,25 @@ async function loadCoffeeIndexPanel(nbFilter = null) {
 async function refreshCoffeeIndexPanel() {
   const content = document.getElementById('coffee-index-content');
   if (!content) return;
-  const rows = await fetchCoffeeRows(coffeePanelScope);
-  content.innerHTML = renderCoffeeSheetHTML(coffeePanelScope, rows);
+  const rows = await getCoffeeRows(coffeePanelScope);
+  content.innerHTML = renderCoffeeBoardHTML(rows, new Date());
+}
+
+// Re-rank both surfaces off the clock. Cheap by design: it re-reads the
+// cached rows, and only goes back to Supabase once they're stale enough
+// (getCoffeeRows decides) and the tab is actually being looked at.
+async function tickCoffeeIndex() {
+  const panel = document.getElementById('coffee-index-content');
+  const sheet = coffeeSheetBody();
+  if (!panel && !sheet) return;
+  if (coffeeCache.scope === undefined) return;
+  if (document.visibilityState === 'hidden') return;
+  const rows = await getCoffeeRows(coffeeCache.scope);
+  const html = renderCoffeeBoardHTML(rows, new Date());
+  if (panel) panel.innerHTML = html;
+  // Re-resolve the sheet: the await above gives it time to be closed.
+  const stillOpen = coffeeSheetBody();
+  if (stillOpen) stillOpen.innerHTML = html;
 }
 
 // Delegated on document (see the game-link handler's reasoning): the
@@ -3777,6 +3900,30 @@ async function refreshCoffeeIndexPanel() {
 // re-entry, so one persistent listener outlives all of those rebuilds.
 document.addEventListener('click', (e) => {
   if (e.target.closest('#coffee-pill')) openCoffeeIndex();
+});
+
+// ── Coffee row → map district highlight ──
+// The board no longer prints each venue's district (it used to sit in
+// the row's meta line, next to a report date). Hovering the row lights
+// the district up on the map instead — the same .hover-active tint the
+// map's own hover uses, so "where is this place" is answered by the map
+// rather than by more text in the row. Desktop-shaped by nature: on
+// mobile the board opens as a sheet over the map, so there is nothing to
+// light up and nothing to hover with.
+document.addEventListener('mouseover', (e) => {
+  const row = e.target.closest('.coffee-row[data-nb]');
+  if (!row) return;
+  const nbId = row.dataset.nb;
+  getMapNeighborhoods().forEach(n => n.classList.toggle('hover-active', (n.dataset.neighborhood || n.id) === nbId));
+  const label = document.getElementById('map-label');
+  if (label) label.textContent = neighborhoodNames[nbId] || nbId;
+});
+document.addEventListener('mouseout', (e) => {
+  const row = e.target.closest('.coffee-row[data-nb]');
+  if (!row || row.contains(e.relatedTarget)) return;
+  getMapNeighborhoods().forEach(n => n.classList.remove('hover-active'));
+  const label = document.getElementById('map-label');
+  if (label) label.textContent = baseMapLabel();
 });
 
 // ── Profile popup: opens when an author name is clicked ──

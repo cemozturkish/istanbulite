@@ -122,6 +122,7 @@ default one.
 ├── profile-card.js/.css  # Floating profile card, avatar, badges — shared across pages
 ├── onboarding.js/.css    # New-account onboarding flow
 ├── game-locks.js         # Per-day game on/off enforcement (game_day_toggles)
+├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js,
@@ -208,7 +209,8 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > `breaking_news` + polls/series/updates, `library_articles`/shelves/letters/categories,
 > `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians`, TBMM
 > seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `coffee_prices`
-> (the Kahve Endeksi), and more). When in doubt, read the relevant `db/` file — it is the
+> (the Kahve Endeksi — v3 adds the opening-hours and scheduled-discount columns that make it
+> live), and more). When in doubt, read the relevant `db/` file — it is the
 > source of truth.
 
 **Table: `neighborhoods`** — lookup of valid neighborhood IDs.
@@ -327,7 +329,16 @@ sb.from('articles').delete().eq('id', id)
 - Edit/delete with inline form population
 - **Kahve tab** is the only place the Kahve Endeksi (`coffee_prices`) is edited: pick a
   district, enter venue + price, and the list on the right (filterable by district,
-  cheapest first) edits/deletes existing entries. Kahvehane renders the index read-only
+  cheapest first) edits/deletes existing entries. Kahvehane renders the index read-only.
+  Two optional per-venue nuances make the index behave like a live market board rather
+  than a printed list (`db/coffee_prices_v3_live.sql`, evaluated by `coffee-index.js`):
+  **Opening Hours** (a weekly schedule; outside it the venue drops out of the ranking on
+  Kahvehane) and a **Scheduled Discount** (a cheaper price on chosen weekdays inside a
+  time window — "Jay's is cheaper until 18:00 on weekdays" — applied and withdrawn by the
+  clock, with nothing to switch off by hand). Leaving Opening Hours off means "hours not
+  recorded", which keeps the venue listed around the clock — the behaviour of every row
+  entered before this existed. A live preview under the form shows what the venue being
+  edited is doing at this exact minute, and each row in the list carries the same read-out
 - **Oyunlar tab** combines all three games' admin panels in one place: a shared per-day
   on/off board (next 7 days × Sözcel/Tümcel/Bulmaca, backed by `game_day_toggles`) at the
   top, then sub-nav pills to switch between each game's own management panel (Sözcel sözcü
@@ -345,10 +356,22 @@ sb.from('articles').delete().eq('id', id)
 - The games change every day; scores and scoreboards are tracked (`game_results`)
 - The **coffee price index** (Kahve Endeksi, `coffee_prices` table): the "Kahve Endeksi" pill
   above the map label opens a bottom sheet (detail-overlay) listing the cheapest cup of coffee
-  per venue, scoped to the selected district or Tüm İstanbul; on desktop the same list also
+  per venue, scoped to the selected district or all of Istanbul; on desktop the same list also
   shows permanently in col-right. **Read-only for everyone** — the index is curated from the
   admin portal only (admin.html's "Kahve" tab), and RLS allows writes to the admin alone
   (`db/coffee_prices_v2_admin_only.sql`)
+- The index is a **live board, not a printed list** — it is meant to be accurate about the cup
+  you could go and buy right now, the way a market board is accurate about a price. A venue
+  outside its opening hours drops out of the ranking and sinks to the bottom of the board,
+  dimmed and labelled "Kapalı"; a venue inside a scheduled discount window trades at the
+  discounted price, re-ranks accordingly, and snaps back when the window ends. Both are
+  clock-driven, so the board re-ranks itself on a timer off the already-fetched rows — no one
+  edits anything for a shop to close or a discount to expire. The evaluation lives in
+  `coffee-index.js` (shared with admin.html so its preview matches exactly); the schema is
+  `db/coffee_prices_v3_live.sql`
+- Rows print **no district name and no date** — hovering a row highlights the district it is in
+  on the map instead (the same `.hover-active` tint the map's own hover uses), which keeps the
+  board terse and answers "where is this" with the map rather than more text
 
 ### `kutuphane.html` — Library (LEFT page, zoom OUT — the Turkey/national side)
 - Turkey map; articles, shelves, letters (Posta Kutusu), politicians, TBMM seat chart

@@ -14,6 +14,9 @@
   <script src="palette.js"></script>
   <script src="avatar.js"></script>
   <script src="tbmm.js"></script>
+  <!-- Shared with kahvehane.html so the Kahve tab's live preview reads a
+       venue's schedule exactly the way the public board does. -->
+  <script src="coffee-index.js"></script>
   <link rel="stylesheet" href="palette.css">
   <style>
     :root {
@@ -353,7 +356,7 @@
     }
     label:first-of-type { margin-top: 0; }
 
-    select, input[type="text"], input[type="email"], input[type="tel"], input[type="password"], input[type="date"], input[type="datetime-local"], textarea {
+    select, input[type="text"], input[type="email"], input[type="tel"], input[type="password"], input[type="date"], input[type="datetime-local"], input[type="time"], textarea {
       width: 100%;
       padding: 9px 12px;
       border: 1px solid var(--rule);
@@ -911,6 +914,111 @@
       .tb-party-row { flex-wrap: wrap; }
       .tb-party-row input[type="text"] { flex-basis: 100%; order: 1; }
       .tb-party-row input[type="number"] { order: 2; }
+    }
+
+    /* ── Kahve tab: opening-hours + discount editor ──
+       The two nuances that make the Kahve Endeksi a live board rather
+       than a printed list (see db/coffee_prices_v3_live.sql). Both are
+       optional per venue, so each sits behind its own toggle and the
+       fields below it collapse away when it is off. */
+    .cf-toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .cf-toggle-row label {
+      margin: 0;
+      cursor: pointer;
+    }
+    .cf-toggle-row input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
+    /* Collapsed by default; the toggle above flips .on. */
+    .cf-section { display: none; padding: 10px 12px; border: 1px solid var(--rule); background: var(--paper); margin-top: 8px; }
+    .cf-section.on { display: block; }
+    .cf-hint {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-style: italic;
+      line-height: 1.4;
+      margin: 0 0 10px;
+    }
+    /* One row per weekday: [open?] [name] [from] – [to] */
+    .cf-day-row {
+      display: grid;
+      grid-template-columns: auto 3.2rem 1fr auto 1fr;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 5px;
+    }
+    .cf-day-row input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
+    .cf-day-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .cf-day-dash { font-size: 0.8rem; color: var(--muted); }
+    /* A day that is switched off keeps its times (so switching it back on
+       doesn't lose them) but reads as inactive. */
+    .cf-day-row.off .cf-day-name { color: var(--muted); }
+    .cf-day-row.off input[type="time"] { opacity: 0.4; }
+    .cf-mini-btn {
+      padding: 4px 10px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .cf-mini-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .cf-mini-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    /* Weekday picker for the discount window. */
+    .cf-daypicker { display: flex; flex-wrap: wrap; gap: 5px; }
+    .cf-daypicker button {
+      padding: 5px 9px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .cf-daypicker button.on { border-color: var(--accent); background: var(--accent); color: var(--paper); }
+    .cf-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    /* Live read-out of what the row being edited is doing right now —
+       the same evaluation Kahvehane renders the board with
+       (coffee-index.js), so the admin can see the effect immediately. */
+    .cf-preview {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.76rem;
+      color: var(--ink);
+    }
+    .cf-preview strong { letter-spacing: 1px; text-transform: uppercase; font-size: 0.7rem; }
+    /* Status line on each row of the price list (right panel). */
+    .cf-list-status {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .cf-list-status .cf-on { color: var(--accent); font-weight: 700; }
+    .cf-list-status .cf-off { color: var(--ink-red); font-weight: 700; }
+
+    @media (max-width: 720px) {
+      .cf-day-row { grid-template-columns: auto 3rem 1fr auto 1fr; gap: 4px; }
+      .cf-grid-2 { grid-template-columns: 1fr; }
     }
 
     /* Stacked avatar layers for the politicians tab's live preview + list
@@ -1515,6 +1623,68 @@
 
       <label>Price (₺)</label>
       <input type="text" id="cf-price" inputmode="decimal" placeholder="e.g. 45 or 45,50"/>
+
+      <!-- ── Opening hours ──
+           A venue is only on the Kahvehane board while it is actually
+           open; outside its hours it drops out of the ranking and sinks
+           to the bottom, dimmed. Leaving this off means "hours not
+           recorded", which keeps the venue listed at all times (that is
+           how every row entered before this existed behaves). -->
+      <div class="cf-toggle-row">
+        <input type="checkbox" id="cf-hours-on"/>
+        <label for="cf-hours-on">Opening Hours</label>
+      </div>
+      <div class="cf-section" id="cf-hours-section">
+        <p class="cf-hint">
+          Unticked days count as closed all day. A closing time at or before the opening
+          time runs past midnight (20:00 → 02:00). Leave the toggle above off to keep the
+          venue listed around the clock.
+        </p>
+        <div id="cf-days"><!-- weekday rows built by renderCoffeeDayRows() --></div>
+        <div class="cf-mini-row">
+          <button type="button" class="cf-mini-btn" id="cf-hours-copy">Copy Mon → all</button>
+          <button type="button" class="cf-mini-btn" id="cf-hours-weekdays">Weekdays only</button>
+          <button type="button" class="cf-mini-btn" id="cf-hours-everyday">Every day</button>
+        </div>
+      </div>
+
+      <!-- ── Scheduled discount ──
+           "Jay's is cheaper until 18:00 on weekdays": inside the window
+           the venue trades at the discounted price on the board and
+           re-ranks accordingly, then snaps back when the window ends. -->
+      <div class="cf-toggle-row">
+        <input type="checkbox" id="cf-happy-on"/>
+        <label for="cf-happy-on">Scheduled Discount</label>
+      </div>
+      <div class="cf-section" id="cf-happy-section">
+        <p class="cf-hint">
+          The price charged inside the window below. Outside it the venue goes back to its
+          normal price above, on its own, with nothing to switch off here.
+        </p>
+        <label>Discount Price (₺)</label>
+        <input type="text" id="cf-happy-price" inputmode="decimal" placeholder="e.g. 35"/>
+
+        <div class="cf-grid-2">
+          <div>
+            <label>From</label>
+            <input type="time" id="cf-happy-start"/>
+          </div>
+          <div>
+            <label>Until</label>
+            <input type="time" id="cf-happy-end"/>
+          </div>
+        </div>
+
+        <label>Days</label>
+        <div class="cf-daypicker" id="cf-happy-days"><!-- built by renderCoffeeDayPicker() --></div>
+
+        <label>Label (optional)</label>
+        <input type="text" id="cf-happy-label" maxlength="40" placeholder="e.g. Öğrenciye, Mutlu saatler"/>
+      </div>
+
+      <!-- What the venue as configured is doing at this exact moment,
+           evaluated with the same coffee-index.js the site renders with. -->
+      <div class="cf-preview" id="cf-preview">—</div>
 
       <input type="hidden" id="cf-editing-id"/>
 
@@ -3780,6 +3950,26 @@ async function deleteQuote(id) {
 // reported_by is kept pointing at the admin's own profile so the FK and
 // the (neighborhood, reported_by, lower(venue)) unique index still hold —
 // with a single writer that index means one entry per venue per district.
+// Two optional nuances per venue turn the flat list into a live board
+// (db/coffee_prices_v3_live.sql), and both are edited here:
+//   `hours`   — the weekly opening schedule. Outside it, Kahvehane drops
+//               the venue out of the ranking instead of pretending you
+//               can go buy that cup right now.
+//   `happy_*` — a scheduled discount ("cheaper until 18:00 on weekdays").
+//               The board applies it inside the window and drops it after,
+//               with nothing to switch off by hand.
+// The evaluation itself is shared with the site (coffee-index.js) so the
+// preview under the form is literally what members will see.
+
+// Monday-first for the UI; the stored keys are JS getDay() indices.
+const CF_DAYS = [
+  { dow: 1, label: 'Mon' }, { dow: 2, label: 'Tue' }, { dow: 3, label: 'Wed' },
+  { dow: 4, label: 'Thu' }, { dow: 5, label: 'Fri' }, { dow: 6, label: 'Sat' },
+  { dow: 0, label: 'Sun' },
+];
+const CF_DEFAULT_OPEN = '08:00';
+const CF_DEFAULT_CLOSE = '22:00';
+
 function parseCoffeePrice(raw) {
   // Accept both "45,50" and "45.50".
   return Math.round(parseFloat(String(raw).trim().replace(',', '.')) * 100) / 100;
@@ -3791,13 +3981,171 @@ function formatCoffeePrice(p) {
   } catch (_) { return p + ' TL'; }
 }
 
+// ── Schedule form: build, fill, collect ──
+
+function renderCoffeeDayRows() {
+  document.getElementById('cf-days').innerHTML = CF_DAYS.map(d => `
+    <div class="cf-day-row off" id="cf-day-row-${d.dow}">
+      <input type="checkbox" id="cf-day-${d.dow}-on" aria-label="${d.label} open"/>
+      <span class="cf-day-name">${d.label}</span>
+      <input type="time" id="cf-day-${d.dow}-open" value="${CF_DEFAULT_OPEN}"/>
+      <span class="cf-day-dash">–</span>
+      <input type="time" id="cf-day-${d.dow}-close" value="${CF_DEFAULT_CLOSE}"/>
+    </div>
+  `).join('');
+}
+
+function renderCoffeeDayPicker() {
+  document.getElementById('cf-happy-days').innerHTML = CF_DAYS.map(d =>
+    `<button type="button" class="on" data-dow="${d.dow}">${d.label}</button>`
+  ).join('');
+}
+
+// Reflect each day's checkbox into the row's dimmed/undimmed look.
+function syncCoffeeDayRows() {
+  CF_DAYS.forEach(d => {
+    const on = document.getElementById(`cf-day-${d.dow}-on`).checked;
+    document.getElementById(`cf-day-row-${d.dow}`).classList.toggle('off', !on);
+  });
+}
+
+// The form's hours as the jsonb shape the column stores, or null when
+// the toggle is off ("hours not recorded" — the venue stays listed).
+function collectCoffeeHours() {
+  if (!document.getElementById('cf-hours-on').checked) return null;
+  const hours = {};
+  for (const d of CF_DAYS) {
+    if (!document.getElementById(`cf-day-${d.dow}-on`).checked) continue;
+    const open = document.getElementById(`cf-day-${d.dow}-open`).value;
+    const close = document.getElementById(`cf-day-${d.dow}-close`).value;
+    if (!open || !close) continue;
+    hours[String(d.dow)] = { open, close };
+  }
+  return hours;
+}
+
+// The discount fields, as the columns store them. All null when off.
+function collectCoffeeHappy() {
+  if (!document.getElementById('cf-happy-on').checked) {
+    return { happy_price: null, happy_days: null, happy_start: null, happy_end: null, happy_label: null };
+  }
+  const selected = Array.from(document.querySelectorAll('#cf-happy-days button.on'))
+    .map(b => Number(b.dataset.dow));
+  const label = document.getElementById('cf-happy-label').value.trim();
+  return {
+    happy_price: parseCoffeePrice(document.getElementById('cf-happy-price').value),
+    // All seven days is the same thing as "every day" — store the
+    // simpler null, which coffee-index.js reads identically.
+    happy_days: selected.length === 7 ? null : selected,
+    happy_start: document.getElementById('cf-happy-start').value || null,
+    happy_end: document.getElementById('cf-happy-end').value || null,
+    happy_label: label || null,
+  };
+}
+
+// Postgres returns `time` as "HH:MM:SS"; <input type="time"> wants "HH:MM".
+function toTimeInputValue(v) {
+  if (!v) return '';
+  const m = String(v).match(/^(\d{2}:\d{2})/);
+  return m ? m[1] : '';
+}
+
+function fillCoffeeSchedule(row) {
+  const hasHours = !!row.hours && typeof row.hours === 'object' && Object.keys(row.hours).length > 0;
+  document.getElementById('cf-hours-on').checked = hasHours;
+  CF_DAYS.forEach(d => {
+    const entry = hasHours ? row.hours[String(d.dow)] : null;
+    const on = !!(entry && typeof entry === 'object' && entry.open && entry.close);
+    document.getElementById(`cf-day-${d.dow}-on`).checked = on;
+    document.getElementById(`cf-day-${d.dow}-open`).value = on ? toTimeInputValue(entry.open) : CF_DEFAULT_OPEN;
+    document.getElementById(`cf-day-${d.dow}-close`).value = on ? toTimeInputValue(entry.close) : CF_DEFAULT_CLOSE;
+  });
+
+  const hasHappy = row.happy_price != null && row.happy_end;
+  document.getElementById('cf-happy-on').checked = !!hasHappy;
+  document.getElementById('cf-happy-price').value = hasHappy ? row.happy_price : '';
+  document.getElementById('cf-happy-start').value = hasHappy ? toTimeInputValue(row.happy_start) : '';
+  document.getElementById('cf-happy-end').value = hasHappy ? toTimeInputValue(row.happy_end) : '';
+  document.getElementById('cf-happy-label').value = hasHappy ? (row.happy_label || '') : '';
+  // Null/empty happy_days means every day (see coffee-index.js).
+  const days = (hasHappy && Array.isArray(row.happy_days) && row.happy_days.length)
+    ? row.happy_days.map(Number)
+    : [0, 1, 2, 3, 4, 5, 6];
+  document.querySelectorAll('#cf-happy-days button').forEach(b => {
+    b.classList.toggle('on', days.indexOf(Number(b.dataset.dow)) !== -1);
+  });
+
+  syncCoffeeSections();
+}
+
+function clearCoffeeSchedule() {
+  document.getElementById('cf-hours-on').checked = false;
+  CF_DAYS.forEach(d => {
+    document.getElementById(`cf-day-${d.dow}-on`).checked = false;
+    document.getElementById(`cf-day-${d.dow}-open`).value = CF_DEFAULT_OPEN;
+    document.getElementById(`cf-day-${d.dow}-close`).value = CF_DEFAULT_CLOSE;
+  });
+  document.getElementById('cf-happy-on').checked = false;
+  document.getElementById('cf-happy-price').value = '';
+  document.getElementById('cf-happy-start').value = '';
+  document.getElementById('cf-happy-end').value = '';
+  document.getElementById('cf-happy-label').value = '';
+  document.querySelectorAll('#cf-happy-days button').forEach(b => b.classList.add('on'));
+  syncCoffeeSections();
+}
+
+// Collapse/expand the two sections and refresh the live preview.
+function syncCoffeeSections() {
+  document.getElementById('cf-hours-section').classList.toggle('on', document.getElementById('cf-hours-on').checked);
+  document.getElementById('cf-happy-section').classList.toggle('on', document.getElementById('cf-happy-on').checked);
+  syncCoffeeDayRows();
+  updateCoffeePreview();
+}
+
+// ── Live preview ──
+// Evaluated with the very module Kahvehane renders the board with, so
+// what the admin reads here is what a member sees at this same minute.
+
+function describeCoffeeLive(live) {
+  const parts = [];
+  if (!live.hoursKnown) {
+    parts.push('Always listed (no hours recorded)');
+  } else if (live.open) {
+    parts.push(live.closesAt != null
+      ? `Open now, until ${IstCoffee.formatHM(live.closesAt)}`
+      : 'Open now');
+  } else {
+    parts.push(live.opensAt != null
+      ? `Closed — off the index until ${IstCoffee.formatHM(live.opensAt)}${live.opensInDays ? ` (+${live.opensInDays}d)` : ''}`
+      : 'Closed — never open on any recorded day');
+  }
+  if (live.discounted) {
+    parts.push(`discount running until ${IstCoffee.formatHM(live.discount.endsAt)}`);
+  } else if (live.discount) {
+    parts.push('discount not running right now');
+  }
+  return parts.join(' · ');
+}
+
+function updateCoffeePreview() {
+  const el = document.getElementById('cf-preview');
+  if (!el) return;
+  const price = parseCoffeePrice(document.getElementById('cf-price').value);
+  if (!isFinite(price) || price <= 0) { el.textContent = 'Enter a price to preview.'; return; }
+  const row = Object.assign({ price, hours: collectCoffeeHours() }, collectCoffeeHappy());
+  const live = IstCoffee.evaluate(row);
+  el.innerHTML = `<strong>Right now:</strong> ${escapeHtml(formatCoffeePrice(live.price))}`
+    + (live.discounted ? ` <span style="text-decoration:line-through;opacity:0.6;">${escapeHtml(formatCoffeePrice(live.basePrice))}</span>` : '')
+    + ` — ${escapeHtml(describeCoffeeLive(live))}`;
+}
+
 async function loadCoffeeList() {
   const listEl = document.getElementById('kahve-list');
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   const filter = document.getElementById('cf-filter').value;
   // District, then cheapest first — the order the index is read in.
   let query = sb.from('coffee_prices')
-    .select('id, neighborhood, venue, price, updated_at')
+    .select('id, neighborhood, venue, price, hours, happy_price, happy_days, happy_start, happy_end, happy_label')
     .order('neighborhood', { ascending: true })
     .order('price', { ascending: true });
   if (filter) query = query.eq('neighborhood', filter);
@@ -3805,16 +4153,26 @@ async function loadCoffeeList() {
   if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
   if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No prices yet.</div>'; return; }
 
-  listEl.innerHTML = data.map(c => `
+  listEl.innerHTML = data.map(c => {
+    const live = IstCoffee.evaluate(c);
+    const openCls = (!live.hoursKnown || live.open) ? 'cf-on' : 'cf-off';
+    // Show the live price alongside the base one when they differ, so a
+    // running discount is obvious without opening the row.
+    const priceText = live.discounted
+      ? `${formatCoffeePrice(live.price)} (normally ${formatCoffeePrice(live.basePrice)})`
+      : formatCoffeePrice(c.price);
+    return `
     <div class="article-card" data-id="${c.id}">
       <div class="a-neighborhood">${escapeHtml(NEIGHBORHOOD_NAMES[c.neighborhood] || c.neighborhood)}</div>
-      <h4>${escapeHtml(c.venue)} — ${escapeHtml(formatCoffeePrice(c.price))}</h4>
+      <h4>${escapeHtml(c.venue)} — ${escapeHtml(priceText)}</h4>
+      <div class="cf-list-status"><span class="${openCls}">${escapeHtml(describeCoffeeLive(live))}</span></div>
       <div class="card-actions">
         <button class="btn-edit" data-act="cf-edit" data-id="${c.id}">Edit</button>
         <button class="btn-del"  data-act="cf-del"  data-id="${c.id}">Delete</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   listEl.querySelectorAll('button[data-act]').forEach(btn => {
     const c = data.find(x => x.id === btn.dataset.id);
@@ -3829,6 +4187,7 @@ function editCoffeePrice(c) {
   document.getElementById('cf-neighborhood').value = c.neighborhood;
   document.getElementById('cf-venue').value = c.venue || '';
   document.getElementById('cf-price').value = c.price;
+  fillCoffeeSchedule(c);
   document.getElementById('cf-submit-btn').textContent = 'Update Price';
   document.getElementById('cf-form-mode-label').textContent = 'Editing Price';
   document.getElementById('cf-cancel-btn').style.display = 'inline-block';
@@ -3840,13 +4199,66 @@ function resetCoffeeForm() {
   document.getElementById('cf-neighborhood').value = '';
   document.getElementById('cf-venue').value = '';
   document.getElementById('cf-price').value = '';
+  clearCoffeeSchedule();
   document.getElementById('cf-submit-btn').textContent = 'Add Price';
   document.getElementById('cf-form-mode-label').textContent = 'Add New Price';
   document.getElementById('cf-cancel-btn').style.display = 'none';
 }
 
+renderCoffeeDayRows();
+renderCoffeeDayPicker();
+syncCoffeeSections();
+
 document.getElementById('cf-cancel-btn').addEventListener('click', resetCoffeeForm);
 document.getElementById('cf-filter').addEventListener('change', loadCoffeeList);
+// One delegated listener for the whole Kahve form rather than one per
+// field: every input in it feeds the preview, and the two toggles also
+// collapse/expand their section. The day rows and the day picker are
+// generated markup, so delegation is what keeps them wired.
+document.getElementById('kahve-tab').addEventListener('change', syncCoffeeSections);
+document.getElementById('kahve-tab').addEventListener('input', updateCoffeePreview);
+document.getElementById('cf-happy-days').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-dow]');
+  if (!btn) return;
+  btn.classList.toggle('on');
+  updateCoffeePreview();
+});
+
+// Quick-fills for the weekly schedule — most venues keep one set of
+// hours, so entering it seven times is the common case worth removing.
+function setCoffeeDays(dows, open, close) {
+  CF_DAYS.forEach(d => {
+    const on = dows.indexOf(d.dow) !== -1;
+    document.getElementById(`cf-day-${d.dow}-on`).checked = on;
+    if (on) {
+      document.getElementById(`cf-day-${d.dow}-open`).value = open;
+      document.getElementById(`cf-day-${d.dow}-close`).value = close;
+    }
+  });
+  syncCoffeeSections();
+}
+document.getElementById('cf-hours-copy').addEventListener('click', () => {
+  const open = document.getElementById('cf-day-1-open').value || CF_DEFAULT_OPEN;
+  const close = document.getElementById('cf-day-1-close').value || CF_DEFAULT_CLOSE;
+  const dows = CF_DAYS.filter(d => document.getElementById(`cf-day-${d.dow}-on`).checked).map(d => d.dow);
+  // Nothing ticked yet: reading "copy Monday to all" as "open all week".
+  setCoffeeDays(dows.length ? dows : CF_DAYS.map(d => d.dow), open, close);
+});
+document.getElementById('cf-hours-weekdays').addEventListener('click', () => {
+  setCoffeeDays([1, 2, 3, 4, 5], document.getElementById('cf-day-1-open').value || CF_DEFAULT_OPEN,
+    document.getElementById('cf-day-1-close').value || CF_DEFAULT_CLOSE);
+});
+document.getElementById('cf-hours-everyday').addEventListener('click', () => {
+  setCoffeeDays(CF_DAYS.map(d => d.dow), document.getElementById('cf-day-1-open').value || CF_DEFAULT_OPEN,
+    document.getElementById('cf-day-1-close').value || CF_DEFAULT_CLOSE);
+});
+
+// Keep the preview honest as the clock moves past an opening, a closing
+// or the end of a discount window, not just when a field is touched.
+setInterval(() => {
+  if (document.getElementById('kahve-tab').style.display === 'none') return;
+  updateCoffeePreview();
+}, 30000);
 
 document.getElementById('cf-submit-btn').addEventListener('click', async () => {
   const editingId = document.getElementById('cf-editing-id').value;
@@ -3856,35 +4268,55 @@ document.getElementById('cf-submit-btn').addEventListener('click', async () => {
   const statusEl = document.getElementById('cf-form-status');
   const btn = document.getElementById('cf-submit-btn');
 
-  if (!neighborhood || !venue) {
-    statusEl.textContent = 'District and venue are both required.';
+  const fail = (msg) => {
+    statusEl.textContent = msg;
     statusEl.className = 'status-msg err';
-    return;
-  }
+  };
+
+  if (!neighborhood || !venue) return fail('District and venue are both required.');
   // Mirrors the coffee_prices_price_range check constraint.
-  if (!isFinite(price) || price <= 0 || price > 5000) {
-    statusEl.textContent = 'Enter a valid price between 0 and 5000.';
-    statusEl.className = 'status-msg err';
-    return;
+  if (!isFinite(price) || price <= 0 || price > 5000) return fail('Enter a valid price between 0 and 5000.');
+
+  const hours = collectCoffeeHours();
+  if (hours && !Object.keys(hours).length) {
+    return fail('Tick at least one open day, or switch Opening Hours off to keep the venue listed around the clock.');
+  }
+  if (document.getElementById('cf-hours-on').checked) {
+    const incomplete = CF_DAYS.some(d =>
+      document.getElementById(`cf-day-${d.dow}-on`).checked
+      && !(document.getElementById(`cf-day-${d.dow}-open`).value && document.getElementById(`cf-day-${d.dow}-close`).value));
+    if (incomplete) return fail('Every ticked day needs both an opening and a closing time.');
+  }
+
+  const happy = collectCoffeeHappy();
+  if (document.getElementById('cf-happy-on').checked) {
+    if (!isFinite(happy.happy_price) || happy.happy_price <= 0 || happy.happy_price > 5000) {
+      return fail('Enter a valid discount price between 0 and 5000.');
+    }
+    // A discount with no end would never expire — the one thing the live
+    // board exists to avoid (mirrors coffee_prices_happy_needs_end).
+    if (!happy.happy_end) return fail('A discount needs an "Until" time.');
+    if (Array.isArray(happy.happy_days) && !happy.happy_days.length) {
+      return fail('Pick at least one day for the discount.');
+    }
+    if (happy.happy_price >= price) {
+      return fail('The discount price has to be below the normal price.');
+    }
   }
 
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) {
-    statusEl.textContent = 'Failed: not logged in.';
-    statusEl.className = 'status-msg err';
-    return;
-  }
+  if (!session) return fail('Failed: not logged in.');
 
   statusEl.textContent = ''; statusEl.className = 'status-msg';
   btn.innerHTML = '<span class="spinner"></span>';
 
+  const fields = Object.assign({ neighborhood, venue, price, hours }, happy);
   let result;
   if (editingId) {
-    result = await sb.from('coffee_prices')
-      .update({ neighborhood, venue, price }).eq('id', editingId);
+    result = await sb.from('coffee_prices').update(fields).eq('id', editingId);
   } else {
     result = await sb.from('coffee_prices')
-      .insert([{ neighborhood, venue, price, reported_by: session.user.id }]);
+      .insert([Object.assign({ reported_by: session.user.id }, fields)]);
   }
 
   btn.textContent = editingId ? 'Update Price' : 'Add Price';
@@ -3892,10 +4324,9 @@ document.getElementById('cf-submit-btn').addEventListener('click', async () => {
   if (result.error) {
     // The unique index fires when the same venue is already listed in
     // this district — say so instead of leaking the raw constraint name.
-    statusEl.textContent = result.error.code === '23505'
+    fail(result.error.code === '23505'
       ? 'That venue is already in this district’s index — edit the existing entry instead.'
-      : result.error.message;
-    statusEl.className = 'status-msg err';
+      : result.error.message);
     return;
   }
   statusEl.textContent = editingId ? 'Price updated!' : 'Price added!';
