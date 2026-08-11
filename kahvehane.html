@@ -1892,67 +1892,17 @@
     .coffee-row-venue { flex: 1; min-width: 0; overflow-wrap: break-word; font-weight: 700; }
     .coffee-row-meta { display: block; font-size: 0.6rem; font-weight: 400; opacity: 0.75; letter-spacing: 0.5px; margin-top: 2px; }
     .coffee-row-price { font-weight: 700; font-size: 0.9rem; white-space: nowrap; }
-    .coffee-row-del, .coffee-row-edit {
-      border: none; background: none; color: inherit; opacity: 0.5;
-      font-size: 0.85rem; line-height: 1; cursor: pointer; padding: 2px 4px;
-    }
-    .coffee-row-del:hover, .coffee-row-edit:hover { opacity: 1; }
-    /* Admin inline edit -- row swaps to two inputs + a save checkmark in
-       place of the venue/price/buttons, same row shell. */
-    .coffee-row-edit-venue, .coffee-row-edit-price {
-      border: 1px solid rgba(26, 26, 26, 0.35);
-      background: rgba(255, 255, 255, 0.9);
-      color: #1a1a1a;
-      font-family: inherit;
-      font-size: 0.78rem;
-      padding: 4px 6px;
-      min-width: 0;
-    }
-    .coffee-row-edit-venue { flex: 1; }
-    .coffee-row-edit-price { width: 70px; text-align: right; }
-    .coffee-row-save {
-      border: none; background: none; color: inherit; opacity: 0.7;
-      font-size: 0.95rem; line-height: 1; cursor: pointer; padding: 2px 4px;
-    }
-    .coffee-row-save:hover { opacity: 1; }
     .coffee-empty {
       font-size: 0.75rem; color: var(--muted); font-style: italic;
       text-align: center; padding: 14px 4px;
     }
-    .coffee-form { display: flex; gap: 6px; margin-top: 14px; }
-    .coffee-form input {
-      border: 1px solid rgba(26, 26, 26, 0.35);
-      background: rgba(255, 255, 255, 0.85);
-      color: #1a1a1a;
-      font-family: inherit;
-      font-size: 0.8rem;
-      padding: 8px 10px;
-      min-width: 0;
+    /* The index is curated from the admin portal (admin.html's "Kahve"
+       tab) -- both surfaces here are read-only, so there is no composer,
+       row edit or delete affordance to style. */
+    .coffee-note {
+      font-size: 0.62rem; color: var(--muted); text-align: center;
+      margin-top: 10px; font-style: italic;
     }
-    .coffee-form input:focus { outline: none; border-color: #1a1a1a; }
-    .coffee-venue-input { flex: 1; }
-    .coffee-price-input { width: 84px; text-align: right; }
-    .coffee-form button {
-      border: 2px solid #1a1a1a;
-      background: rgba(255, 255, 255, 0.85);
-      color: #1a1a1a;
-      font-family: inherit;
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      padding: 0 14px;
-      cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease;
-    }
-    .coffee-form button:hover:not(:disabled) { background: #1a1a1a; color: #fff; }
-    .coffee-form button:disabled { opacity: 0.5; cursor: default; }
-    .coffee-form-note {
-      font-size: 0.62rem; color: var(--muted); text-align: center; margin-top: 6px;
-    }
-    .coffee-status { font-size: 0.68rem; text-align: center; margin-top: 6px; min-height: 1em; }
-    .coffee-status.err { color: #b00020; }
-    .coffee-status.ok { color: #1a1a1a; }
 
     /* ── Coffee index panel (right column) ──
        Replaces the old scoreboard here -- the score table now only shows
@@ -1980,20 +1930,6 @@
       min-height: 0;
       overflow-y: auto;
     }
-    /* The report form (admin-only here, see opts.adminOnlyForm) was built
-       for the ~520px-wide mobile sheet -- a single row of venue input +
-       price input + button overflowed this much narrower sidebar column.
-       Stack every field full-width instead so it always fits. */
-    .coffee-index-panel .coffee-form {
-      flex-direction: column;
-    }
-    .coffee-index-panel .coffee-venue-input,
-    .coffee-index-panel .coffee-price-input,
-    .coffee-index-panel .coffee-form button {
-      width: 100%;
-      box-sizing: border-box;
-    }
-    .coffee-index-panel .coffee-price-input { text-align: left; }
 
     /* Politician detail sheet -- opened from #politician-card. Same card
        treatment as the rest of the page (background/border/shadow via
@@ -3713,20 +3649,18 @@ function showToast(text, kind) {
 
 // ── Kahve Endeksi (coffee price index) ──
 // The local-economy layer per the Vision section of CLAUDE.md: the
-// cheapest cup of coffee, per district, reported by the residents
-// themselves. Opens in the detail-overlay bottom sheet via the
-// .coffee-pill button on the map panel, scoped to the currently
-// selected district (or Tüm İstanbul). Reporting mirrors the comment
-// composer's residency rule: you can only report prices for your own
-// district (admin override) — RLS on coffee_prices enforces the same.
+// cheapest cup of coffee, per district. Opens in the detail-overlay
+// bottom sheet via the .coffee-pill button on the map panel, scoped to
+// the currently selected district (or Tüm İstanbul), and also shows
+// always-visible in col-right on desktop.
+// Read-only on both surfaces: the index is curated exclusively from the
+// admin portal (admin.html's "Kahve" tab) — RLS on coffee_prices allows
+// writes to the admin only (see db/coffee_prices_v2_admin_only.sql).
 const COFFEE_MAX_ROWS = 15;
-// The district scope the currently open sheet was rendered for — kept
-// so a submit/delete refresh re-renders the same view even if the map
-// selection changed underneath the open sheet.
-let coffeeSheetScope = null;
-// Same idea for the always-visible col-right panel (see
-// .coffee-index-panel), tracked separately since the sheet and the panel
-// can be scoped to different districts at once.
+// The district the always-visible col-right panel (see
+// .coffee-index-panel) is currently scoped to — kept so the map's
+// district clicks can re-scope it (loadCoffeeIndexPanel) without the
+// sheet, which reads the map selection at open time, having to agree.
 let coffeePanelScope = null;
 
 function formatCoffeePrice(p) {
@@ -3741,11 +3675,13 @@ function formatCoffeeDate(iso) {
   return new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 }
 
-// Newest-first fetch, deduped to the newest report per (district, venue),
-// then re-sorted cheapest-first — the index's whole point.
+// Newest-first fetch, deduped to the newest entry per (district, venue)
+// — legacy rows predating the admin-curated index can still hold the
+// same venue twice, once per original reporter — then re-sorted
+// cheapest-first, the index's whole point.
 async function fetchCoffeeRows(nbFilter) {
   let query = sb.from('coffee_prices')
-    .select('id, neighborhood, venue, price, updated_at, reported_by, profiles:reported_by(first_name)')
+    .select('id, neighborhood, venue, price, updated_at')
     .order('updated_at', { ascending: false })
     .limit(300);
   if (nbFilter) query = query.eq('neighborhood', nbFilter);
@@ -3764,16 +3700,10 @@ async function fetchCoffeeRows(nbFilter) {
 }
 
 // Shared by both surfaces (the coffee-pill sheet, mobile-only, and the
-// always-visible col-right panel) -- element lookups below are always
-// scoped relative to the clicked element's own .coffee-form/.coffee-detail
-// ancestor rather than by id, since both surfaces can be in the DOM at
-// once and ids must stay unique per document.
-// opts.adminOnlyForm restricts the report form to admin -- used by the
-// col-right panel (regular users shouldn't get a typing surface sitting
-// permanently in that column); the mobile sheet leaves it unset so any
-// resident can still report their own district's price there.
-function renderCoffeeSheetHTML(scopeNb, rows, opts = {}) {
-  const uid = window.__currentUser ? window.__currentUser.id : null;
+// always-visible col-right panel) so the two stay identical -- the sheet
+// just opens on demand. Purely presentational: prices are entered in the
+// admin portal, so there is nothing interactive to wire up here.
+function renderCoffeeSheetHTML(scopeNb, rows) {
   const scopeName = scopeNb
     ? (neighborhoodNames[scopeNb] || scopeNb)
     : I18N.t('kahvehane.allistanbul');
@@ -3785,49 +3715,27 @@ function renderCoffeeSheetHTML(scopeNb, rows, opts = {}) {
     listHTML = `<div class="coffee-empty">${I18N.t('kahve.empty')}</div>`;
   } else {
     listHTML = '<div class="coffee-rows">' + rows.map((r, i) => {
-      const canDel = uid && (r.reported_by === uid || isAdmin);
-      // Admin may fix any report's venue/price in place (RLS allows it --
-      // see db/coffee_prices.sql's "update own or admin" policy).
-      const canEdit = isAdmin;
       const meta = [
         scopeNb ? '' : (neighborhoodNames[r.neighborhood] || r.neighborhood),
-        (r.profiles && r.profiles.first_name) || '',
         formatCoffeeDate(r.updated_at),
       ].filter(Boolean).join(' · ');
-      return `<div class="coffee-row${i === 0 ? ' cheapest' : ''}" data-id="${r.id}" data-venue="${escapeHtml(r.venue)}" data-price="${r.price}">
+      return `<div class="coffee-row${i === 0 ? ' cheapest' : ''}">
         <div class="coffee-row-venue">${escapeHtml(r.venue)}<span class="coffee-row-meta">${escapeHtml(meta)}</span></div>
         <div class="coffee-row-price">${formatCoffeePrice(r.price)}</div>
-        ${canEdit ? '<button type="button" class="coffee-row-edit" title="Düzenle" aria-label="Düzenle">✎</button>' : ''}
-        ${canDel ? '<button type="button" class="coffee-row-del" title="Sil" aria-label="Sil">✕</button>' : ''}
       </div>`;
     }).join('') + '</div>';
-  }
-
-  // Same rule as the comment composer: reports go to your own district;
-  // the admin may report into whichever district the sheet is scoped to.
-  const reportNb = (isAdmin && scopeNb) ? scopeNb : homeNeighborhood;
-  let formHTML = '';
-  if (reportNb && (!opts.adminOnlyForm || isAdmin)) {
-    const reportNbName = neighborhoodNames[reportNb] || reportNb;
-    formHTML = `<div class="coffee-form">
-        <input class="coffee-venue-input" maxlength="80" placeholder="${I18N.t('kahve.venue')}">
-        <input class="coffee-price-input" inputmode="decimal" placeholder="₺">
-        <button type="button" class="coffee-submit-btn" data-nb="${reportNb}">${I18N.t('kahve.report')}</button>
-      </div>
-      <div class="coffee-form-note">${I18N.t('kahve.note')} (${escapeHtml(reportNbName)})</div>
-      <div class="coffee-status"></div>`;
   }
 
   return `<div class="coffee-detail">
     <h2>${I18N.t('kahve.index')}</h2>
     <div class="coffee-scope">${escapeHtml(scopeName)}</div>
     ${listHTML}
-    ${formHTML}
+    <div class="coffee-note">${I18N.t('kahve.note')}</div>
   </div>`;
 }
 
-// Re-render in place when the sheet is already open (submit/delete
-// refresh) instead of re-running openDetail's open animation.
+// Swaps the loading placeholder for the fetched rows in place, instead
+// of re-running openDetail's open animation on the already-open sheet.
 function renderCoffeeSheet(scopeNb, rows) {
   const overlay = document.getElementById('detail-overlay');
   const body = document.getElementById('detail-overlay-body');
@@ -3837,22 +3745,17 @@ function renderCoffeeSheet(scopeNb, rows) {
 }
 
 async function openCoffeeIndex() {
-  coffeeSheetScope = activeMapNeighborhood;
-  const scopeName = coffeeSheetScope
-    ? (neighborhoodNames[coffeeSheetScope] || coffeeSheetScope)
+  const scopeNb = activeMapNeighborhood;
+  const scopeName = scopeNb
+    ? (neighborhoodNames[scopeNb] || scopeNb)
     : I18N.t('kahvehane.allistanbul');
   openDetail(`<div class="coffee-detail">
     <h2>${I18N.t('kahve.index')}</h2>
     <div class="coffee-scope">${escapeHtml(scopeName)}</div>
     <div class="coffee-empty">${I18N.t('kahve.loading')}</div>
   </div>`);
-  const rows = await fetchCoffeeRows(coffeeSheetScope);
-  renderCoffeeSheet(coffeeSheetScope, rows);
-}
-
-async function refreshCoffeeSheet() {
-  const rows = await fetchCoffeeRows(coffeeSheetScope);
-  renderCoffeeSheet(coffeeSheetScope, rows);
+  const rows = await fetchCoffeeRows(scopeNb);
+  renderCoffeeSheet(scopeNb, rows);
 }
 
 // The always-visible col-right panel (see .coffee-index-panel) -- same
@@ -3866,145 +3769,14 @@ async function refreshCoffeeIndexPanel() {
   const content = document.getElementById('coffee-index-content');
   if (!content) return;
   const rows = await fetchCoffeeRows(coffeePanelScope);
-  content.innerHTML = renderCoffeeSheetHTML(coffeePanelScope, rows, { adminOnlyForm: true });
-}
-
-// Refreshes whichever coffee-index surface(s) are actually on screen after
-// a submit/delete/edit -- the sheet only if it's currently open (otherwise
-// renderCoffeeSheet's own fallback would wrongly pop it open), the panel
-// always (it's a permanent fixture of col-right).
-async function refreshCoffeeSurfaces() {
-  const overlay = document.getElementById('detail-overlay');
-  const tasks = [refreshCoffeeIndexPanel()];
-  if (overlay && !overlay.hidden) tasks.push(refreshCoffeeSheet());
-  await Promise.all(tasks);
-}
-
-function setCoffeeStatus(container, msg, kind) {
-  const el = container && container.querySelector('.coffee-status');
-  if (!el) return;
-  el.textContent = msg;
-  el.className = 'coffee-status ' + (kind || '');
-}
-
-async function submitCoffeeReport(btn) {
-  const form = btn.closest('.coffee-form');
-  const detail = btn.closest('.coffee-detail');
-  if (!form) return;
-  const venueEl = form.querySelector('.coffee-venue-input');
-  const priceEl = form.querySelector('.coffee-price-input');
-  if (!venueEl || !priceEl) return;
-  const venue = venueEl.value.trim();
-  // Accept both "45,50" and "45.50".
-  const price = Math.round(parseFloat(priceEl.value.trim().replace(',', '.')) * 100) / 100;
-  const reportNb = btn.getAttribute('data-nb');
-
-  if (!venue) { setCoffeeStatus(detail, 'Lütfen mekan adı yazın', 'err'); return; }
-  if (!isFinite(price) || price <= 0 || price > 5000) {
-    setCoffeeStatus(detail, 'Lütfen geçerli bir fiyat yazın', 'err');
-    return;
-  }
-  // Residency guard mirrors the RLS policy — the DB rejects bypasses.
-  if (!isAdmin && reportNb !== homeNeighborhood) {
-    setCoffeeStatus(detail, 'Sadece kendi semtiniz için fiyat bildirebilirsiniz.', 'err');
-    return;
-  }
-
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) { setCoffeeStatus(detail, 'Bildirmek için giriş yapın', 'err'); return; }
-
-  btn.disabled = true;
-  try {
-    // One report per venue per reporter (unique index in the DB): update
-    // an existing own report for this venue instead of inserting a twin.
-    // % and _ are LIKE wildcards — escape them so a venue name containing
-    // them matches literally.
-    const likePattern = venue.replace(/[\\%_]/g, m => '\\' + m);
-    const { data: existing } = await sb.from('coffee_prices')
-      .select('id')
-      .eq('reported_by', session.user.id)
-      .eq('neighborhood', reportNb)
-      .ilike('venue', likePattern)
-      .maybeSingle();
-
-    let error = null;
-    if (existing) {
-      ({ error } = await sb.from('coffee_prices')
-        .update({ price, venue })
-        .eq('id', existing.id));
-    } else {
-      ({ error } = await sb.from('coffee_prices')
-        .insert([{ neighborhood: reportNb, venue, price, reported_by: session.user.id }]));
-    }
-    if (error) {
-      console.error('[kahve endeksi submit]', error);
-      setCoffeeStatus(detail, 'Hata: ' + (error.message || 'bildirilemedi'), 'err');
-      return;
-    }
-    await refreshCoffeeSurfaces();
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-// Admin-only inline edit: swaps a row's venue/price display for two
-// inputs + a save checkmark, in place, no confirm dialog (mirrors the
-// lightweight feel of the delete ✕ next to it).
-function startEditCoffeeRow(row) {
-  if (!row || row.classList.contains('editing')) return;
-  row.classList.add('editing');
-  const venue = row.getAttribute('data-venue') || '';
-  const price = row.getAttribute('data-price') || '';
-  row.innerHTML = `
-    <input type="text" class="coffee-row-edit-venue" maxlength="80" value="${escapeHtml(venue)}">
-    <input type="text" inputmode="decimal" class="coffee-row-edit-price" value="${escapeHtml(price)}">
-    <button type="button" class="coffee-row-save" title="Kaydet" aria-label="Kaydet">✓</button>
-  `;
-  const venueInput = row.querySelector('.coffee-row-edit-venue');
-  if (venueInput) venueInput.focus();
-}
-
-async function saveCoffeeRowEdit(row) {
-  const id = row && row.getAttribute('data-id');
-  const venueEl = row.querySelector('.coffee-row-edit-venue');
-  const priceEl = row.querySelector('.coffee-row-edit-price');
-  if (!id || !venueEl || !priceEl) return;
-  const venue = venueEl.value.trim();
-  const price = Math.round(parseFloat(priceEl.value.trim().replace(',', '.')) * 100) / 100;
-  if (!venue || !isFinite(price) || price <= 0 || price > 5000) return;
-  const saveBtn = row.querySelector('.coffee-row-save');
-  if (saveBtn) saveBtn.disabled = true;
-  const { error } = await sb.from('coffee_prices').update({ venue, price }).eq('id', id);
-  if (error) {
-    console.error('[kahve endeksi admin edit]', error);
-    if (saveBtn) saveBtn.disabled = false;
-    return;
-  }
-  await refreshCoffeeSurfaces();
+  content.innerHTML = renderCoffeeSheetHTML(coffeePanelScope, rows);
 }
 
 // Delegated on document (see the game-link handler's reasoning): the
 // pill lives inside #ist-content and is rebuilt on every virtual
-// re-entry; the sheet's/panel's form/row buttons are re-rendered on every
-// refresh. One persistent listener covers all of them, in both surfaces.
-document.addEventListener('click', async (e) => {
-  if (e.target.closest('#coffee-pill')) { openCoffeeIndex(); return; }
-  const submitBtn = e.target.closest('.coffee-submit-btn');
-  if (submitBtn) { submitCoffeeReport(submitBtn); return; }
-  const editBtn = e.target.closest('.coffee-row-edit');
-  if (editBtn) { startEditCoffeeRow(editBtn.closest('.coffee-row')); return; }
-  const saveBtn = e.target.closest('.coffee-row-save');
-  if (saveBtn) { saveCoffeeRowEdit(saveBtn.closest('.coffee-row')); return; }
-  const delBtn = e.target.closest('.coffee-row-del');
-  if (delBtn) {
-    const row = delBtn.closest('.coffee-row');
-    const id = row && row.getAttribute('data-id');
-    if (!id) return;
-    delBtn.disabled = true;
-    const { error } = await sb.from('coffee_prices').delete().eq('id', id);
-    if (error) { console.error('[kahve endeksi delete]', error); delBtn.disabled = false; return; }
-    refreshCoffeeSurfaces();
-  }
+// re-entry, so one persistent listener outlives all of those rebuilds.
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#coffee-pill')) openCoffeeIndex();
 });
 
 // ── Profile popup: opens when an author name is clicked ──

@@ -956,6 +956,7 @@
     <button class="admin-tab" data-tab="events">Events</button>
     <button class="admin-tab" data-tab="games">Oyunlar</button>
     <button class="admin-tab" data-tab="quotes">Alıntılar</button>
+    <button class="admin-tab" data-tab="kahve">Kahve</button>
     <button class="admin-tab" data-tab="people">Kişiler</button>
     <button class="admin-tab" data-tab="politicians">Koltuklar</button>
     <button class="admin-tab" data-tab="tbmm">TBMM</button>
@@ -1491,6 +1492,52 @@
 
   </div>
 
+  <!-- ── KAHVE ENDEKSİ TAB ──
+       The coffee price index shown in Kahvehane (coffee_prices). Curated
+       here only: the site renders it read-only and RLS allows writes to
+       the admin alone (db/coffee_prices_v2_admin_only.sql). -->
+  <div class="admin-body" id="kahve-tab" style="display:none;">
+
+    <!-- LEFT: Add / Edit Price -->
+    <div class="panel">
+      <div class="panel-title" id="cf-form-mode-label">Add New Price</div>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        The Kahve Endeksi in Kahvehane — the cheapest cup of coffee per district. Members only read it; every entry is made here.
+      </p>
+
+      <label>District</label>
+      <select id="cf-neighborhood">
+        <option value="">— Select district —</option>
+      </select>
+
+      <label>Venue</label>
+      <input type="text" id="cf-venue" maxlength="80" placeholder="Cafe or shop name..."/>
+
+      <label>Price (₺)</label>
+      <input type="text" id="cf-price" inputmode="decimal" placeholder="e.g. 45 or 45,50"/>
+
+      <input type="hidden" id="cf-editing-id"/>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="cf-submit-btn">Add Price</button>
+        <button class="btn btn-secondary" id="cf-cancel-btn" style="display:none;">Cancel Edit</button>
+      </div>
+      <div class="status-msg" id="cf-form-status"></div>
+    </div>
+
+    <!-- RIGHT: Price List (cheapest first, filterable by district) -->
+    <div class="panel">
+      <div class="panel-title">Coffee Index</div>
+      <select id="cf-filter" style="margin-bottom:12px;">
+        <option value="">— All districts —</option>
+      </select>
+      <div class="articles-list" id="kahve-list">
+        <div class="empty-state"><span class="spinner"></span></div>
+      </div>
+    </div>
+
+  </div>
+
   <div class="admin-body" id="people-tab" style="display:none;">
 
     <!-- LEFT: Add / Edit Person -->
@@ -1805,6 +1852,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('events-tab').style.display = (tab === 'events') ? '' : 'none';
     document.getElementById('games-tab').style.display = (tab === 'games') ? 'grid' : 'none';
     document.getElementById('quotes-tab').style.display = (tab === 'quotes') ? '' : 'none';
+    document.getElementById('kahve-tab').style.display = (tab === 'kahve') ? '' : 'none';
     document.getElementById('people-tab').style.display = (tab === 'people') ? '' : 'none';
     document.getElementById('politicians-tab').style.display = (tab === 'politicians') ? '' : 'none';
     document.getElementById('tbmm-tab').style.display = (tab === 'tbmm') ? '' : 'none';
@@ -1816,6 +1864,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
     if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); }
     if (tab === 'quotes') loadQuotesList();
+    if (tab === 'kahve') loadCoffeeList();
     if (tab === 'people') loadPeopleTab();
     if (tab === 'politicians') loadPoliticiansTab();
     if (tab === 'tbmm') loadTBMMTab();
@@ -1842,6 +1891,8 @@ async function loadAllNeighborhoodDropdowns() {
   const resSel = document.getElementById('u-neighborhood');
   const birthSel = document.getElementById('u-birth-neighborhood');
   const nCat = document.getElementById('n-category');
+  const cfSel = document.getElementById('cf-neighborhood');
+  const cfFilter = document.getElementById('cf-filter');
   data.forEach(n => {
     const opt = document.createElement('option');
     opt.value = n.id;
@@ -1858,6 +1909,15 @@ async function loadAllNeighborhoodDropdowns() {
       catOpt.value = n.id;
       catOpt.textContent = n.name_tr;
       nCat.appendChild(catOpt);
+
+      // Coffee index: entries and the list filter, districts only —
+      // there is no coffee to price outside Istanbul (check constraint
+      // on coffee_prices.neighborhood).
+      const cfOpt = document.createElement('option');
+      cfOpt.value = n.id;
+      cfOpt.textContent = n.name_tr;
+      cfSel.appendChild(cfOpt);
+      cfFilter.appendChild(cfOpt.cloneNode(true));
     }
   });
 }
@@ -3712,6 +3772,144 @@ async function deleteQuote(id) {
   const { error } = await sb.from('quotes').delete().eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   loadQuotesList();
+}
+
+// ── Kahve Endeksi: the coffee price index shown in Kahvehane ──
+// Admin-curated end to end (see db/coffee_prices_v2_admin_only.sql): the
+// site only reads coffee_prices, every row is written from this tab.
+// reported_by is kept pointing at the admin's own profile so the FK and
+// the (neighborhood, reported_by, lower(venue)) unique index still hold —
+// with a single writer that index means one entry per venue per district.
+function parseCoffeePrice(raw) {
+  // Accept both "45,50" and "45.50".
+  return Math.round(parseFloat(String(raw).trim().replace(',', '.')) * 100) / 100;
+}
+
+function formatCoffeePrice(p) {
+  try {
+    return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(p);
+  } catch (_) { return p + ' TL'; }
+}
+
+async function loadCoffeeList() {
+  const listEl = document.getElementById('kahve-list');
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const filter = document.getElementById('cf-filter').value;
+  // District, then cheapest first — the order the index is read in.
+  let query = sb.from('coffee_prices')
+    .select('id, neighborhood, venue, price, updated_at')
+    .order('neighborhood', { ascending: true })
+    .order('price', { ascending: true });
+  if (filter) query = query.eq('neighborhood', filter);
+  const { data, error } = await query;
+  if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
+  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No prices yet.</div>'; return; }
+
+  listEl.innerHTML = data.map(c => `
+    <div class="article-card" data-id="${c.id}">
+      <div class="a-neighborhood">${escapeHtml(NEIGHBORHOOD_NAMES[c.neighborhood] || c.neighborhood)}</div>
+      <h4>${escapeHtml(c.venue)} — ${escapeHtml(formatCoffeePrice(c.price))}</h4>
+      <div class="card-actions">
+        <button class="btn-edit" data-act="cf-edit" data-id="${c.id}">Edit</button>
+        <button class="btn-del"  data-act="cf-del"  data-id="${c.id}">Delete</button>
+      </div>
+    </div>
+  `).join('');
+
+  listEl.querySelectorAll('button[data-act]').forEach(btn => {
+    const c = data.find(x => x.id === btn.dataset.id);
+    if (!c) return;
+    if (btn.dataset.act === 'cf-edit') btn.addEventListener('click', () => editCoffeePrice(c));
+    if (btn.dataset.act === 'cf-del') btn.addEventListener('click', () => deleteCoffeePrice(c.id));
+  });
+}
+
+function editCoffeePrice(c) {
+  document.getElementById('cf-editing-id').value = c.id;
+  document.getElementById('cf-neighborhood').value = c.neighborhood;
+  document.getElementById('cf-venue').value = c.venue || '';
+  document.getElementById('cf-price').value = c.price;
+  document.getElementById('cf-submit-btn').textContent = 'Update Price';
+  document.getElementById('cf-form-mode-label').textContent = 'Editing Price';
+  document.getElementById('cf-cancel-btn').style.display = 'inline-block';
+  document.querySelector('#kahve-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetCoffeeForm() {
+  document.getElementById('cf-editing-id').value = '';
+  document.getElementById('cf-neighborhood').value = '';
+  document.getElementById('cf-venue').value = '';
+  document.getElementById('cf-price').value = '';
+  document.getElementById('cf-submit-btn').textContent = 'Add Price';
+  document.getElementById('cf-form-mode-label').textContent = 'Add New Price';
+  document.getElementById('cf-cancel-btn').style.display = 'none';
+}
+
+document.getElementById('cf-cancel-btn').addEventListener('click', resetCoffeeForm);
+document.getElementById('cf-filter').addEventListener('change', loadCoffeeList);
+
+document.getElementById('cf-submit-btn').addEventListener('click', async () => {
+  const editingId = document.getElementById('cf-editing-id').value;
+  const neighborhood = document.getElementById('cf-neighborhood').value;
+  const venue = document.getElementById('cf-venue').value.trim();
+  const price = parseCoffeePrice(document.getElementById('cf-price').value);
+  const statusEl = document.getElementById('cf-form-status');
+  const btn = document.getElementById('cf-submit-btn');
+
+  if (!neighborhood || !venue) {
+    statusEl.textContent = 'District and venue are both required.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  // Mirrors the coffee_prices_price_range check constraint.
+  if (!isFinite(price) || price <= 0 || price > 5000) {
+    statusEl.textContent = 'Enter a valid price between 0 and 5000.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    statusEl.textContent = 'Failed: not logged in.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  let result;
+  if (editingId) {
+    result = await sb.from('coffee_prices')
+      .update({ neighborhood, venue, price }).eq('id', editingId);
+  } else {
+    result = await sb.from('coffee_prices')
+      .insert([{ neighborhood, venue, price, reported_by: session.user.id }]);
+  }
+
+  btn.textContent = editingId ? 'Update Price' : 'Add Price';
+
+  if (result.error) {
+    // The unique index fires when the same venue is already listed in
+    // this district — say so instead of leaking the raw constraint name.
+    statusEl.textContent = result.error.code === '23505'
+      ? 'That venue is already in this district’s index — edit the existing entry instead.'
+      : result.error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = editingId ? 'Price updated!' : 'Price added!';
+  statusEl.className = 'status-msg ok';
+  resetCoffeeForm();
+  loadCoffeeList();
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+async function deleteCoffeePrice(id) {
+  if (!confirm('Delete this price?')) return;
+  const { error } = await sb.from('coffee_prices').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadCoffeeList();
 }
 
 // ── People: roster of persons assignable to political seats ──
