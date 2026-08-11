@@ -1,4 +1,11 @@
 -- =====================================================================
+-- SUPERSEDED by coffee_prices_v2_admin_only.sql — the index is now
+-- curated from the admin portal, not reported by residents. That file is
+-- self-contained (it creates the table too), so run it instead of this
+-- one; this is kept for the history of how the table came to be.
+-- =====================================================================
+
+-- =====================================================================
 -- coffee_prices — the Kahve Endeksi (coffee price index): user-reported
 -- price of a cup of coffee at a venue, per district. The local-economy
 -- layer of Kahvehane per the Vision section of CLAUDE.md ("nearest
