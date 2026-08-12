@@ -1744,6 +1744,12 @@
       z-index: 500;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
+      /* Where the sheet's top edge sits at rest. Just under the page's
+         own top chrome here; the ≤768px + coarse-pointer block at the end
+         of this stylesheet moves it below the map instead. Both the top
+         and the height below are driven off this one value so the sheet's
+         bottom always lands on (or past) the bottom edge of the screen. */
+      --detail-rest: max(6vh, 40px);
     }
     .detail-overlay[hidden] { display: none; }
     .detail-overlay-backdrop {
@@ -1762,8 +1768,14 @@
          visible area now grows downward, off the bottom of the screen
          (revealed by scrolling .detail-overlay), rather than upward off
          the top the way a bottom-anchored box with capped height would. */
-      top: max(6vh, 40px);
-      min-height: min(88vh, 860px);
+      top: var(--detail-rest);
+      /* Down to the bottom edge of the window exactly -- never a capped
+         box that stops short and shows its own bottom edge (and the page
+         underneath it) mid-screen. Taller content just runs on past the
+         bottom, and since the sheet moves up 1:1 with the overlay's
+         scroll, the bottom edge stays off-screen at every scroll position
+         until the very end, where it lands flush with the window's. */
+      min-height: calc(100vh - var(--detail-rest));
       width: min(680px, 86vw);
       transform: translate(-50%, 100%);
       /* Ease-out-quint: fast off the bottom edge, then settles into place
