@@ -240,7 +240,11 @@
       z-index: 20;
       display: flex;
       flex-direction: column;
-      padding: 14px;
+      /* No left padding: the board runs straight off the panel's open left
+         edge (see border-left-width: 0 below) instead of sitting in a
+         gutter, so it reads as having come in from outside the column
+         rather than as a card parked inside it. */
+      padding: 14px 14px 14px 0;
       /* Same "chapter-box" bottom-sheet treatment as .game-overlay-sheet/
          .detail-overlay-sheet (see frames.css) -- solid frame-bg behind a
          2px ink border, no box-shadow (the border alone carries the
@@ -875,29 +879,38 @@
       font-size: 0.58rem;
       color: var(--muted);
       text-align: center;
-      padding: 2px 4px 0;
+      /* No horizontal padding: it wraps the week strip, which has to match
+         the heading box's width exactly (see .week-progress below). */
+      padding: 0 0 5px;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       letter-spacing: 1px;
       font-style: italic;
     }
+    /* Emptied while a neighborhood filter is on (clearWeekProgress) — collapse
+       it so no stray gap opens above the heading. */
+    .scoreboard-countdown:empty { display: none; }
     /* Seven-square week tracker replacing the old countdown text: past days
-       dark, today double-bordered, future days plain. */
+       dark, today double-bordered, future days plain. Sits ABOVE the
+       scoreboard heading and spans exactly its width — seven equal columns
+       across the full content box, so Monday's left edge and Sunday's right
+       edge line up with the heading box's own edges. The squares grow to
+       whatever a seventh of that width allows. */
     .week-progress {
-      display: flex;
-      justify-content: center;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
       gap: 5px;
-      padding: 2px 4px 4px;
+      padding: 0;
     }
     .week-day {
       box-sizing: border-box;
-      width: 16px;
-      height: 16px;
+      width: 100%;
+      aspect-ratio: 1;
       display: flex;
       align-items: center;
       justify-content: center;
       background: rgba(255, 255, 255, 0.85);
       border: 1px solid rgba(26, 26, 26, 0.25);
-      font-size: 0.5rem;
+      font-size: 0.7rem;
       font-weight: 700;
       color: #868686;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
@@ -909,6 +922,14 @@
        nudge left on hover, same feel as the game-link cards above. */
     .scoreboard-item.author-link { cursor: pointer; transition: transform 0.15s ease; }
     .scoreboard-item.author-link:hover { transform: translateX(-4px); text-decoration: none; }
+
+    /* The board bleeds off the slide-in panel's open left edge (no left
+       padding, see .game-score-slide above): drop every left border along
+       that edge too, so nothing draws a stopping line there and the whole
+       table reads as continuing out past the column. */
+    .game-score-slide .scoreboard h2,
+    .game-score-slide .scoreboard-item,
+    .game-score-slide .week-day:first-child { border-left-width: 0; }
 
     /* Chapter-box style, matching the Kütüphane reading-path nodes
        (.path-node): thick ink border with a heavier bottom edge. Fixed
@@ -2541,8 +2562,10 @@
          instead (see .coffee-index-panel below). -->
     <div class="game-score-slide" id="game-score-slide">
       <div class="scoreboard">
-        <h2 id="scoreboard-title" data-i18n="games.weeklyscoreboard">Haftanın Skor Tahtası</h2>
+        <!-- Week strip sits above the heading and spans its exact width —
+             see .week-progress in the stylesheet. -->
         <div class="scoreboard-countdown" id="scoreboard-countdown"></div>
+        <h2 id="scoreboard-title" data-i18n="games.weeklyscoreboard">Haftanın Skor Tahtası</h2>
         <ol class="scoreboard-list" id="scoreboard-list">
           <li class="scoreboard-empty">Yükleniyor...</li>
         </ol>
