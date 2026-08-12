@@ -354,6 +354,10 @@
       flex-shrink: 0;
       min-height: 18px;
     }
+    /* No sözcü for today (the line is emptied, not hidden, by
+       loadSozculLine): collapse it entirely instead of leaving a ruled
+       blank band between the keyboard and the bottom of the panel. */
+    .sozcul-line:empty { display: none; }
     .sozcul-line .sozcul-tag { color: var(--muted); margin-right: 6px; }
     .sozcul-line .sozcul-name { color: var(--ink-red); cursor: pointer; }
     .sozcul-line .sozcul-name:hover { text-decoration: underline; }
@@ -752,6 +756,14 @@
       align-items: center;
       gap: 14px;
       flex-shrink: 0;
+      /* Pairs with .keyboard's own margin-top:auto below to dock the
+         keyboard to the bottom of the panel (the mobile layout already
+         did this — see the <=768px block). .game-panel centers its
+         children as a group, which parked the keyboard mid-panel with a
+         dead gap underneath; splitting the leftover space between here
+         and the keyboard pushes the keyboard flush to the bottom while
+         the board/message group still sits comfortably below the top. */
+      margin-top: auto;
     }
 
     /* The board: one syllable-staircase skeleton (the current guess) on
@@ -855,6 +867,9 @@
       width: 100%;
       max-width: 420px;
       flex-shrink: 0;
+      /* See .board-row above: the two auto margins together dock the
+         keyboard against the bottom of the panel. */
+      margin-top: auto;
     }
 
     .keyboard-row {
@@ -1132,11 +1147,14 @@
       font-size: 0.58rem;
       color: var(--muted);
       text-align: center;
-      padding: 2px 4px 0;
+      /* No horizontal padding: it wraps the week strip, which spans the
+         heading's full width (see .week-progress below). */
+      padding: 0 0 5px;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       letter-spacing: 1px;
       font-style: italic;
     }
+    .scoreboard-countdown:empty { display: none; }
     /* Now lives in .col-left (moved off .col-right, which was too short to
        fit the game nav + full scoreboard together — see .col-left .scoreboard
        below). Bound its list to its own scroll so a long weekly board can't
@@ -1153,23 +1171,30 @@
       min-height: 0;
     }
     /* Seven-square week tracker replacing the old countdown text: past days
-       dark, today double-bordered, future days plain. */
+       dark, today double-bordered, future days plain. Sits ABOVE the
+       scoreboard heading, matching Kahvehane's copy of this strip. Seven
+       equal columns rather than fixed-width squares, but capped and centred:
+       unlike Kahvehane's 260px column, the containers here (this column at
+       1fr of the page grid, and the mobile popup card at up to 480px) are
+       wide enough that a true full-width span would balloon the squares. */
     .week-progress {
-      display: flex;
-      justify-content: center;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
       gap: 5px;
-      padding: 2px 4px 4px;
+      padding: 0;
+      max-width: 220px;
+      margin: 0 auto;
     }
     .week-day {
       box-sizing: border-box;
-      width: 16px;
-      height: 16px;
+      width: 100%;
+      aspect-ratio: 1;
       display: flex;
       align-items: center;
       justify-content: center;
       background: #fff;
       border: 1px solid var(--rule);
-      font-size: 0.5rem;
+      font-size: 0.7rem;
       font-weight: 700;
       color: var(--muted);
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
@@ -1713,8 +1738,10 @@
     <div class="nb-highlight" id="user-nb-badge"></div>
     <section class="stats-left" id="stats-left"></section>
     <div class="scoreboard">
-      <h2 data-i18n="games.weeklyscoreboard">Haftanın Skor Tahtası</h2>
+      <!-- Week strip sits above the heading and spans its width — see
+           .week-progress in the stylesheet. -->
       <div class="scoreboard-countdown" id="scoreboard-countdown"></div>
+      <h2 data-i18n="games.weeklyscoreboard">Haftanın Skor Tahtası</h2>
       <ol class="scoreboard-list" id="scoreboard-list">
         <li class="scoreboard-empty">Yükleniyor...</li>
       </ol>
@@ -4178,15 +4205,13 @@ function handleKey(key) {
       // Dictionary check only for lengths we have a word list for (5/6);
       // other lengths accept any full fill — no dictionary exists for them.
       if (VALID_WORDS && !VALID_WORDS.has(fullGuess)) {
-        const board = document.getElementById('syl-board');
-        if (board) {
-          board.classList.add('shake');
-          board.addEventListener('animationend', () => board.classList.remove('shake'), { once: true });
-        }
-        const msgEl = document.getElementById('game-message');
-        msgEl.textContent = 'Kelime listede yok';
-        msgEl.className = 'game-message';
-        setTimeout(() => { if (msgEl.textContent === 'Kelime listede yok') msgEl.textContent = ''; }, 1500);
+        rejectGuess('Kelime listede yok');
+        return;
+      }
+      // Already submitted this exact word — its colors are still on the
+      // board, so re-entering it would burn an attempt for no information.
+      if (submittedGuesses.includes(fullGuess)) {
+        rejectGuess('Bu kelimeyi zaten girdiniz');
         return;
       }
       submitGuess(fullGuess);
@@ -4196,6 +4221,22 @@ function handleKey(key) {
     updateDisplay();
     markAsPlayed();
   }
+}
+
+// Bounce a guess that can't be submitted: shake the board and flash a reason
+// under it, without consuming an attempt. The message clears itself only if
+// nothing else has written over it in the meantime.
+function rejectGuess(message) {
+  const board = document.getElementById('syl-board');
+  if (board) {
+    board.classList.add('shake');
+    board.addEventListener('animationend', () => board.classList.remove('shake'), { once: true });
+  }
+  const msgEl = document.getElementById('game-message');
+  if (!msgEl) return;
+  msgEl.textContent = message;
+  msgEl.className = 'game-message';
+  setTimeout(() => { if (msgEl.textContent === message) msgEl.textContent = ''; }, 1500);
 }
 
 // Record an "in progress" game_results row on first interaction so Kahvehane
