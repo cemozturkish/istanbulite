@@ -492,6 +492,11 @@
     .game-picker {
       display: flex;
       flex-flow: row wrap;
+      /* No stretch: the tiles' height comes from their aspect-ratio and
+         nothing else. Letting the row stretch them too leaves two rules
+         claiming the same axis, which is precisely what WebKit resolved
+         the other way on the mobile tiles. */
+      align-items: flex-start;
       gap: 10px;
       flex-shrink: 0;
     }
@@ -1471,8 +1476,11 @@
         /* Back to a stack: the desktop rule rows the three squares up
            side by side, which only works in a column wide enough for
            them -- here the games column is the narrow strip beside the
-           comments. */
-        flex-direction: column;
+           comments. Both halves of the desktop `flex-flow: row wrap`
+           have to be undone, not just the direction: leaving wrap on let
+           WebKit break the stack into a second and third column the
+           moment the three tiles didn't fit the height exactly. */
+        flex-flow: column nowrap;
         gap: 8px;
         flex: 1;
         min-height: 0;
@@ -1497,23 +1505,20 @@
         padding: 0;
         /* Square tiles. The height is untouched -- it's still the
            column's own height split three ways by .game-link-enter's
-           flex:1 above -- and only the width follows it, two ways over:
-             - aspect-ratio transfers the (definite, stretched) height
-               into the auto width with no script involved, so the very
-               first painted frame is already square. Verified in
-               Chromium; whether an engine resolves it depends on it
-               carrying that transferred size out through the
-               content-sized column, which is the shaky part.
-             - --game-tile-size, once syncGameTileSize() has measured the
-               wrapper, pins the same number explicitly and makes the
-               ratio inert. That's the engine-independent path, and it's
-               set before the first paint (see the call at the very end
-               of this page's script) rather than waiting on mount().
-           Neither is a fallback for a slow round-trip anymore: both land
-           before anything is on screen, which is what keeps the tiles
-           from flashing through a non-square shape on open. */
-        width: var(--game-tile-size, auto);
-        aspect-ratio: 1 / 1;
+           flex:1 above -- and --game-tile-size mirrors that measured
+           height back into the width, so squaring these only ever moves
+           the width. syncGameTileSize() sets it, and sets it before the
+           first paint (see the call at the very end of this page's
+           script), so the clamp below is a never-seen last resort rather
+           than the shape the tiles open in.
+           Deliberately NOT `width: auto` + aspect-ratio, which is the
+           tidier way to say "as wide as you are tall" and does resolve
+           in Chromium: on WebKit the ratio fought the flex stretch and
+           the tiles came out the wrong height, so the measured width is
+           the one that renders right on the phones this is built for.
+           The desktop rule's ratio is dropped for the same reason. */
+        width: var(--game-tile-size, clamp(96px, 26vw, 128px));
+        aspect-ratio: auto;
         /* No explicit height/flex here -- .game-link-enter (its parent,
            a row-direction flex container) stretches it to fill that
            wrapper's height by default (align-items:stretch), which is
