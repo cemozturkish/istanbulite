@@ -95,12 +95,17 @@
 
   // Where a newly-placed badge lands before the user drags it anywhere —
   // cycles by how many badges are already placed. profiles.cover_badges is
-  // a jsonb array of {id, x, y} (x/y are 0-100 percentages of the cover's
-  // own width/height, so a saved spot scales sensibly between the wider
-  // overlay sheet and the narrower read-only popup).
+  // a jsonb array of {id, x, y} (x/y are 0-100 percentages of the hexagon
+  // frame's own width/height, so a saved spot scales sensibly between the
+  // settings sheet's large frame and the read-only popup's smaller one).
+  // Pulled well inside the box because the frame is a hexagon, not a
+  // rectangle: its mask cuts the corners off, so a sticker parked near one
+  // would be sliced (see BADGE_DRAG_BOUNDS, which clamps dragging to the
+  // same safe area).
   const DEFAULT_BADGE_SLOTS = [
-    { x: 20, y: 25 }, { x: 80, y: 25 }, { x: 20, y: 75 }, { x: 80, y: 75 },
+    { x: 32, y: 34 }, { x: 68, y: 34 }, { x: 32, y: 66 }, { x: 68, y: 66 },
   ];
+  const BADGE_DRAG_BOUNDS = { minX: 24, maxX: 76, minY: 22, maxY: 78 };
 
   // profiles.cover_badges briefly shipped as a plain text[] of ids (before
   // drag-and-drop positioning existed) — db/profile_badges.sql migrates any
@@ -764,10 +769,13 @@
     return IstAvatar.html(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt);
   }
 
-  // The white "pano" cover — the avatar sits on it like a Twitter cover
-  // photo, and any rozetler (badges) picked on the settings page (see
-  // settingsPageHTML/toggleCoverBadge) are dragged freely around it (see
-  // wireCoverDragging). Shared between the self-editing settings page
+  // The "pano" — the hexagon frame itself, with any rozetler (badges)
+  // picked on the settings page (see settingsPageHTML/toggleCoverBadge)
+  // dragged freely around *inside* it (see wireCoverDragging), over its
+  // drawn background and under the avatar art. There is no cover rectangle
+  // behind the frame anymore: the frame is the pano, and it's sized off
+  // the name printed under it (see .ist-pc-cover in profile-card.css).
+  // Shared between the self-editing settings page
   // (settingsPageHTML below, editable: true) and kutuphane.html's read-only
   // "someone else's profile" popup (exposed as IstProfileCard.coverHTML,
   // editable omitted) so both surfaces render badges identically — the
@@ -781,9 +789,10 @@
   // same size, so no category reads as more "primary" than another. When
   // editable but not customizing, it's just a plain read-only avatar — same
   // as the non-editable popup — until Kişiselleştir turns the arrows on
-  // (see settingsPageHTML). The cover box itself (.ist-pc-cover) has a
-  // fixed height in CSS regardless of which of these two renders, so the
-  // pano stickers sit on never resizes under them. `sozculCount` is only
+  // (see settingsPageHTML). The arrow columns hang outside the frame in
+  // both cases (absolutely positioned, see .ist-pc-cover-pick-col), so the
+  // pano stickers sit on stays the exact same size and place whether or
+  // not they're showing. `sozculCount` is only
   // needed in the customizing case, to know whether the locked Sözcü hat
   // should show unlocked (the accessory row's lock is unconditional — see
   // AVATAR_ACCESSORY_OPTIONS — so it doesn't need it).
@@ -795,38 +804,47 @@
       if (!badge) return '';
       return `<img class="ist-pc-cover-badge" data-id="${badge.id}" draggable="false" style="left:${p.x}%; top:${p.y}%;" src="${badge.src}" alt="${esc(badge.label)}" title="${esc(badge.label)}">`;
     }).join('');
-    let avatarBlockHTML;
+    // The avatar art layer. It is always its own element inside the frame
+    // (never the frame box itself) because the carousels replace its whole
+    // innerHTML on every arrow press — sharing a parent with the stickers
+    // would wipe them (see .ist-pc-cover-art in profile-card.css).
+    let artHTML, arrowsHTML = '';
     if (editable && customizing) {
       const hairOpt = AVATAR_HAIR_OPTIONS[hairOptionIndex(avatarHair)];
       const hatOpt = AVATAR_HAT_OPTIONS[hatOptionIndex(avatarHat)];
       const accessoryOpt = AVATAR_ACCESSORY_OPTIONS[accessoryOptionIndex(avatarAccessory)];
       const shirtOpt = AVATAR_SHIRT_OPTIONS[shirtOptionIndex(avatarShirt)];
       const title = `${hairOpt.label} · ${hatOpt.label} · ${accessoryOpt.label} · ${shirtOpt.label}`;
-      avatarBlockHTML = `
-        <div class="ist-pc-cover-picker">
-          <div class="ist-pc-cover-pick-col">
-            <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-prev" aria-label="Önceki şapka">${ARROW_ICON_LEFT}</button>
-            <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-prev" aria-label="Önceki saç">${ARROW_ICON_LEFT}</button>
-            <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-prev" aria-label="Önceki aksesuar">${ARROW_ICON_LEFT}</button>
-            <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-prev" aria-label="Önceki tişört">${ARROW_ICON_LEFT}</button>
-          </div>
-          <div class="ist-pc-cover-avatar" id="po-avatar-preview" title="${esc(title)}">${avatarPreviewHTML(avatarHair, avatarHat, avatarAccessory, avatarShirt, false)}</div>
-          <div class="ist-pc-cover-pick-col">
-            <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-next" aria-label="Sonraki şapka">${ARROW_ICON_RIGHT}</button>
-            <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-next" aria-label="Sonraki saç">${ARROW_ICON_RIGHT}</button>
-            <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-next" aria-label="Sonraki aksesuar">${ARROW_ICON_RIGHT}</button>
-            <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-next" aria-label="Sonraki tişört">${ARROW_ICON_RIGHT}</button>
-          </div>
+      artHTML = `<div class="ist-pc-cover-art" id="po-avatar-preview" title="${esc(title)}">${avatarPreviewHTML(avatarHair, avatarHat, avatarAccessory, avatarShirt, false)}</div>`;
+      arrowsHTML = `
+        <div class="ist-pc-cover-pick-col ist-pc-cover-pick-prev">
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-prev" aria-label="Önceki şapka">${ARROW_ICON_LEFT}</button>
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-prev" aria-label="Önceki saç">${ARROW_ICON_LEFT}</button>
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-prev" aria-label="Önceki aksesuar">${ARROW_ICON_LEFT}</button>
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-prev" aria-label="Önceki tişört">${ARROW_ICON_LEFT}</button>
+        </div>
+        <div class="ist-pc-cover-pick-col ist-pc-cover-pick-next">
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-next" aria-label="Sonraki şapka">${ARROW_ICON_RIGHT}</button>
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-next" aria-label="Sonraki saç">${ARROW_ICON_RIGHT}</button>
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-next" aria-label="Sonraki aksesuar">${ARROW_ICON_RIGHT}</button>
+          <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-next" aria-label="Sonraki tişört">${ARROW_ICON_RIGHT}</button>
         </div>
       `;
     } else {
-      avatarBlockHTML = `<div class="ist-pc-cover-avatar">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>`;
+      artHTML = `<div class="ist-pc-cover-art">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>`;
     }
     const customizingClass = (editable && customizing) ? ' ist-pc-cover-customizing' : '';
+    // The frame box carries the badges (id po-cover — it's the drag surface
+    // now that stickers live inside the frame rather than around it).
     return `
-      <div class="ist-pc-cover${editable ? ' ist-pc-cover-editable' : ''}${customizingClass}"${editable ? ' id="po-cover"' : ''}>
-        ${badgesHTML}
-        ${avatarBlockHTML}
+      <div class="ist-pc-cover${editable ? ' ist-pc-cover-editable' : ''}${customizingClass}">
+        <div class="ist-pc-cover-picker">
+          ${arrowsHTML}
+          <div class="ist-pc-cover-avatar"${editable ? ' id="po-cover"' : ''}>
+            ${badgesHTML}
+            ${artHTML}
+          </div>
+        </div>
         <div class="ist-pc-cover-name">${esc(displayName)}</div>
         <div class="ist-pc-cover-meta">${esc(metaText)}</div>
       </div>
@@ -835,9 +853,10 @@
 
   // Drag-and-drop repositioning of cover badges (Profil tab only — the
   // read-only popup never passes editable: true to coverHTML, so it has no
-  // .ist-pc-cover-badge with pointer-events enabled to drag). Position is
-  // tracked as a percentage of the cover's own box so it scales sensibly
-  // if the same profile is later viewed in a differently-sized container.
+  // .ist-pc-cover-badge with pointer-events enabled to drag). `#po-cover`
+  // is the hexagon frame the stickers live inside. Position is tracked as
+  // a percentage of that frame's own box so it scales sensibly if the same
+  // profile is later viewed in a differently-sized container.
   function wireCoverDragging(state) {
     const cover = document.getElementById('po-cover');
     if (!cover) return;
@@ -861,8 +880,9 @@
     function onPointerMove(e) {
       if (!dragEl) return;
       const rect = cover.getBoundingClientRect();
-      const x = clamp(startLeft + ((e.clientX - startClientX) / rect.width) * 100, 10, 90);
-      const y = clamp(startTop + ((e.clientY - startClientY) / rect.height) * 100, 15, 85);
+      const b = BADGE_DRAG_BOUNDS;
+      const x = clamp(startLeft + ((e.clientX - startClientX) / rect.width) * 100, b.minX, b.maxX);
+      const y = clamp(startTop + ((e.clientY - startClientY) / rect.height) * 100, b.minY, b.maxY);
       dragEl.style.left = x + '%';
       dragEl.style.top = y + '%';
     }
