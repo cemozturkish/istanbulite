@@ -271,8 +271,11 @@ main,
    Generic .hexframe/.hexframe::after is for elements without a
    dedicated class (e.g. admin.html's inline avatar previews). */
 :root {
-  /* aspect ratio of the drawing's cropped silhouette */
-  --hexframe-ratio: 780 / 1375;
+  /* Shared canvas for the whole hexframe asset family (frame.png,
+     frame-fill.png, frame-ring.png, frame-background.png, avatar-base.png,
+     and every future clothing/hair/hat overlay) — all drawn uncropped at
+     1024×1536 so they stay pixel-registered without per-file crop math. */
+  --hexframe-ratio: 1024 / 1536;
   --hexframe-mask: url("assets/frame-fill.png") center / contain no-repeat;
   --hexframe-ring: url("assets/frame-ring.png") center / contain no-repeat;
 }
@@ -352,11 +355,14 @@ main,
   object-position: center bottom !important;
 }
 
-/* Image-bearing avatars: the art PNGs carry their own light card
-   background (~#f5f5f5), so match the frame interior to it — the
-   empty upper part of the tall frame reads as the same card
-   instead of a seam above the bottom-anchored art. Initials-only
-   avatars (e.g. the "+N" counters) keep their page-set colors. */
+/* Image-bearing avatars: the hand-drawn frame-background.png (same
+   uncropped canvas as the frame/avatar art, see --hexframe-ratio above)
+   paints behind the avatar/sticker layers, standing in for the old flat
+   #f5f5f5 fill — it's inset slightly from the frame's drawn stroke on
+   purpose, so the stroke (painted on top via ::after) covers the seam
+   between the two. #f5f5f5 stays as the background-color fallback in
+   case the image fails to load. Initials-only avatars (e.g. the "+N"
+   counters) keep their page-set colors. */
 .hexframe:has(img),
 .ist-pc-avatar:has(img),
 .ist-pc-cover-avatar:has(img),
@@ -366,7 +372,7 @@ main,
 .ev-attendee-avatar:has(img),
 .politician-detail-avatar:has(img),
 .tbmm-detail-avatar:has(img) {
-  background: #f5f5f5 !important;
+  background: #f5f5f5 url("assets/frame-background.png") center / contain no-repeat !important;
 }
 
 /* Sözcel tiles keep their grid-set width and take their height

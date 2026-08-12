@@ -19,16 +19,20 @@
 // can load just this file instead of all of profile-card.js. profile-card.js
 // itself also uses these constants/helpers for the self-edit picker.
 (function (global) {
-  const BASE_URL = 'assets/avatar/avatar-base.png';
-  const SHIRT_URLS = { black: 'assets/avatar/avatar-shirt-black.png' };
-  const HAIR_URLS = { buzz: 'assets/avatar/avatar-hair-buzz.png', short: 'assets/avatar/avatar-hair-short.png', long: 'assets/avatar/avatar-hair-long.png' };
-  const HAT_URLS = { crown: 'assets/avatar/avatar-hat-crown.png' };
-  const ACCESSORY_URLS = { glasses: 'assets/avatar/avatar-accessory-glasses.png' };
+  // All overlays share the hexframe family's uncropped 1024x1536 canvas
+  // (see --hexframe-ratio in frames.css) and live flat under assets/,
+  // matching where frame.png/frame-background.png were uploaded — no
+  // assets/avatar/ subfolder anymore.
+  const BASE_URL = 'assets/avatar-base.png';
+  const SHIRT_URLS = { black: 'assets/avatar-shirt-black.png' };
+  const HAIR_URLS = { buzz: 'assets/avatar-hair-buzz.png', short: 'assets/avatar-hair-short.png', long: 'assets/avatar-hair-long.png' };
+  const HAT_URLS = { crown: 'assets/avatar-hat-crown.png' };
+  const ACCESSORY_URLS = { glasses: 'assets/avatar-accessory-glasses.png' };
   // Not a pickable option -- admin-only, set per-politician (public.
   // politicians.in_jail) from admin.html's Kişiler tab, never something a
   // regular user can put on their own avatar. Always the topmost layer,
   // over hat included, regardless of what else is worn.
-  const JAIL_URL = 'assets/avatar/jail.png';
+  const JAIL_URL = 'assets/avatar-jail.png';
   const SOZCU_REQUIRED_COUNT = 10;
 
   function shirtUrl(shirt) {
