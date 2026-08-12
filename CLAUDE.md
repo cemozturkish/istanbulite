@@ -210,7 +210,7 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians`, TBMM
 > seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `coffee_prices`
 > (the Kahve Endeksi — v3 adds the opening-hours and scheduled-discount columns that make it
-> live), and more). When in doubt, read the relevant `db/` file — it is the
+> live) and `coffee_comments` (what members say about a venue), and more). When in doubt, read the relevant `db/` file — it is the
 > source of truth.
 
 **Table: `neighborhoods`** — lookup of valid neighborhood IDs.
@@ -232,6 +232,12 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 **Table: `neighborhood_comments`** — Kahvehane forum posts.
 - `id uuid pk`, `author_id` (FK profiles, cascade), `neighborhood` (FK neighborhoods), `body text` (1–5000 chars), `created_at`.
 - RLS: authenticated users SELECT all; INSERT only if `author_id = auth.uid()` AND the commenter's `profiles.neighborhood = neighborhood`; DELETE own or admin; no edits (admin UPDATE only).
+
+**Table: `coffee_comments`** — what members say about a Kahve Endeksi venue (`db/coffee_comments.sql`).
+- `id uuid pk`, `coffee_id` (FK coffee_prices, cascade), `author_id` (FK profiles, cascade), `body text` (1–1000 chars), `created_at`.
+- The members' half of the index: prices, hours and discounts stay admin-only, but anyone signed in may leave a note about the coffee. Surfaced in the venue panel opened by clicking a row on the Kahvehane board.
+- **No district gate**, unlike `neighborhood_comments` — that gate keeps a district's feed with the people who live there, whereas a note about a café is worth most from someone who actually went, and going elsewhere in the city is the behaviour the app wants to encourage.
+- RLS: authenticated users SELECT all; INSERT only if `author_id = auth.uid()`; DELETE own or admin; no edits (admin UPDATE only).
 
 **Table: `article_comments`**
 - `id uuid pk`, `author_id` (FK profiles, cascade), `article_id` (FK articles, cascade), `body`, `created_at`.
@@ -371,7 +377,18 @@ sb.from('articles').delete().eq('id', id)
   `db/coffee_prices_v3_live.sql`
 - Rows print **no district name and no date** — hovering a row highlights the district it is in
   on the map instead (the same `.hover-active` tint the map's own hover uses), which keeps the
-  board terse and answers "where is this" with the map rather than more text
+  board terse and answers "where is this" with the map rather than more text. Hovering also
+  nudges the row toward the map (`translateX(-4px)`), matching `.game-link` and the scoreboard
+- **Clicking a row opens that venue.** On desktop it arrives as a left-hand slide-in panel
+  (`.coffee-venue-slide`) over the discussion feed — deliberately the same move the weekly
+  scoreboard makes when a game opens, so "I tapped something on the right, its detail arrived
+  on the left" reads as one consistent gesture. On mobile the board is itself a bottom sheet,
+  so the sheet drills into the venue with a back link instead. Both surfaces are built by the
+  same `renderVenueHTML()`. The panel carries the venue's live price and status, its week's
+  opening hours (today's line inked), and **`coffee_comments`** — the members' half of the
+  index. The venue's district stays lit on the map for as long as its panel is open, and the
+  panel's live block re-renders on the same 30s tick as the board without disturbing the
+  comment list or a half-typed comment
 
 ### `kutuphane.html` — Library (LEFT page, zoom OUT — the Turkey/national side)
 - Turkey map; articles, shelves, letters (Posta Kutusu), politicians, TBMM seat chart

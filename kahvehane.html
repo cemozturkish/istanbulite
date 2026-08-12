@@ -225,7 +225,13 @@
        visibility:hidden -- see the game-overlay breakpoint further down);
        off-screen and non-interactive otherwise so it never blocks the
        discussion feed underneath. */
-    @media (min-width: 1241px) {
+    /* Containing block for BOTH left-hand slide-in panels: the game
+       scoreboard above and the coffee venue panel below. The scoreboard
+       only ever opens above 1240px (see its own gate), but the venue
+       panel opens anywhere col-left has its desktop layout, so this
+       starts at the same 769px the desktop layout itself does. Parked
+       panels are clipped by col-left's own overflow:hidden. */
+    @media (min-width: 769px) {
       .col-left { position: relative; }
     }
     .game-score-slide {
@@ -257,6 +263,268 @@
         pointer-events: auto;
       }
     }
+
+    /* ── Coffee venue slide-in panel ──
+       Clicking a row on the Kahve Endeksi board (col-right) opens that
+       venue here, over the discussion feed -- the same left-hand slide
+       the scoreboard uses when a game opens, so "I tapped something on
+       the right, its detail arrived on the left" is one consistent move
+       across the page. Carries the venue's live status, its week's
+       hours, and the members' comments about the coffee there.
+       Mobile has no col-left to slide into (the board itself is a bottom
+       sheet there), so the sheet drills into the same content instead --
+       see openCoffeeVenue() in the script. */
+    .coffee-venue-slide {
+      position: absolute;
+      inset: 0;
+      z-index: 21;
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      background: var(--frame-bg);
+      border: 2px solid var(--ink);
+      border-left-width: 0;
+      transform: translateX(-100%);
+      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: none;
+    }
+    .coffee-venue-slide.open {
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+    /* Same reasoning as .game-score-slide's own mobile rule: col-left
+       keeps overflow:visible on mobile, so a panel parked at -100% would
+       show its right edge as a framed strip in the left gutter. */
+    @media (max-width: 768px) {
+      .coffee-venue-slide { display: none; }
+    }
+    /* A game takes the column back: the scoreboard's slide is the whole
+       point of opening one, so park the venue panel underneath it rather
+       than stacking two panels in the same space. It slides back in on
+       its own when the game closes, which is what you want -- you were
+       reading about a café, you played a round, the café is still there.
+       Below 1241px col-left is hidden outright while a game is open, so
+       this band is the only one where the two can collide. */
+    @media (min-width: 1241px) {
+      body:has(.game-overlay.open) .coffee-venue-slide.open {
+        transform: translateX(-100%);
+        pointer-events: none;
+      }
+    }
+
+    /* ── Venue detail content ──
+       Shared by the slide panel above and the mobile sheet, so both read
+       identically (renderVenueHTML builds one string for both). Fixed
+       white/ink language, matching .post and the board's own rows. */
+    /* Desktop dismiss: floats over the panel's top-right corner, clear of
+       the venue name (which is why .cv-head reserves padding there). */
+    .cv-close {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      z-index: 2;
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      line-height: 1;
+      color: var(--ink);
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+    /* Mobile dismiss: a plain in-flow link above the venue, reading as
+       "back to the board" -- the sheet already has its own ✕ in the
+       corner, and a second floating control there would fight it. */
+    .cv-back {
+      display: block;
+      background: none;
+      border: none;
+      padding: 0;
+      margin-bottom: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    /* Fills the slide panel so .cv-comments' flex:1 has real height to
+       claim -- otherwise the whole detail sizes to its content and the
+       composer floats halfway up the column instead of sitting at its
+       foot. The mobile sheet overrides this back to a plain block (see
+       .detail-overlay-body .cv-detail below), where the sheet itself
+       does the scrolling. */
+    .coffee-venue-slide .cv-detail {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    .cv-head { flex-shrink: 0; padding-right: 26px; }
+    .cv-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--ink);
+      overflow-wrap: break-word;
+    }
+    /* The district the board's rows deliberately do not print -- here
+       there is room for it, and it is the first thing you want once you
+       have picked a venue out of the list. */
+    .cv-district {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--ink-red);
+      margin-top: 2px;
+    }
+    .cv-price-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .cv-price {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .cv-was { font-size: 0.85rem; text-decoration: line-through; opacity: 0.55; }
+    .cv-status {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .cv-status.closed { color: var(--ink-red); }
+    /* The venue's week, today's line inked so "am I too late" is one
+       glance rather than a calculation. */
+    .cv-hours { margin-top: 12px; }
+    .cv-hours-title,
+    .cv-comments-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .cv-day {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.72rem;
+      color: var(--ink);
+      padding: 1px 0;
+    }
+    .cv-day.today { font-weight: 700; }
+    .cv-day .cv-day-hours { color: var(--muted); }
+    .cv-day.today .cv-day-hours { color: var(--ink); }
+    .cv-section-rule { border-top: 1px solid var(--rule); margin: 14px 0 12px; flex-shrink: 0; }
+    /* Comments: scrolls on its own so the composer below stays reachable
+       without the whole panel scrolling away from the venue's name. */
+    .cv-comments {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .cv-comment {
+      position: relative;
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(26, 26, 26, 0.25);
+      border-bottom-width: 3px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      color: #1a1a1a;
+    }
+    .cv-comment-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+    .cv-comment-time { color: var(--muted); font-weight: 400; letter-spacing: 0.5px; }
+    .cv-comment-body { font-size: 0.8rem; line-height: 1.45; overflow-wrap: break-word; }
+    .cv-comment-delete {
+      position: absolute;
+      top: 4px;
+      right: 5px;
+      background: none;
+      border: none;
+      font-size: 0.9rem;
+      line-height: 1;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 0 3px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .cv-comment:hover .cv-comment-delete { opacity: 1; }
+    .cv-empty {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-style: italic;
+      padding: 8px 2px;
+    }
+    /* Composer, mirroring .submit-form's textarea + arrow button. */
+    .cv-form { flex-shrink: 0; margin-top: 10px; }
+    .cv-form-row { display: flex; gap: 6px; align-items: flex-end; }
+    .cv-form textarea {
+      flex: 1;
+      min-width: 0;
+      min-height: 38px;
+      max-height: 96px;
+      resize: vertical;
+      padding: 8px 10px;
+      border: 1px solid rgba(26, 26, 26, 0.35);
+      background: rgba(255, 255, 255, 0.85);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.8rem;
+      color: #1a1a1a;
+      outline: none;
+    }
+    .cv-form textarea:focus { border-color: #1a1a1a; }
+    .cv-form button {
+      flex-shrink: 0;
+      width: 38px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a1a;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+    .cv-form button:disabled { opacity: 0.45; cursor: default; }
+    .cv-form button svg { width: 17px; height: 17px; }
+    .cv-status-msg {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.65rem;
+      margin-top: 5px;
+      min-height: 0.8rem;
+    }
+    .cv-status-msg.err { color: var(--ink-red); }
+    .cv-status-msg.ok { color: var(--accent); }
+
+    /* In the mobile sheet the panel chrome is the sheet's own, so the
+       content lays out as a plain column with the sheet doing the
+       scrolling -- no internal scroller, no absolute close button. */
+    .detail-overlay-body .cv-comments { overflow: visible; }
+    .detail-overlay-body .cv-detail { display: block; max-width: 520px; margin: 0 auto; position: relative; }
 
     /* ── Right column: same reasoning as .col-left above ── */
     .col-right {
@@ -1883,11 +2151,25 @@
       font-size: 0.8rem;
       /* Hovering a row lights up the district it is in on the map (see
          the coffee-row hover handlers in the script below) -- the row
-         no longer prints its district name, the map answers instead. */
-      cursor: default;
-      transition: background 0.15s, border-color 0.15s;
+         no longer prints its district name, the map answers instead.
+         Clicking opens the venue's own panel (see .coffee-venue-slide). */
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.15s ease;
     }
-    .coffee-row:hover { border-color: rgba(26, 26, 26, 0.55); }
+    /* Nudges toward the map on hover, the same feedback as .game-link and
+       the scoreboard rows. Gated on a real hover-capable pointer for the
+       same reason .post is: on touch, :hover latches onto the last-tapped
+       row and leaves it sitting offset from every other row. */
+    @media (hover: hover) {
+      .coffee-row:hover {
+        border-color: rgba(26, 26, 26, 0.55);
+        transform: translateX(-4px);
+      }
+    }
+    .coffee-row:active { transform: translateX(-2px) translateY(1px); }
+    /* The row whose panel is currently open, so the board still shows
+       what you are looking at after the panel covers the feed. */
+    .coffee-row.selected { border-color: #1a1a1a; box-shadow: inset 3px 0 0 #1a1a1a; }
     .coffee-row.cheapest { background: rgba(26, 26, 26, 0.75); color: #fff; border-color: #1a1a1a; }
     /* Closed venues are off the board: still listed (so you know they
        exist and what they charge) but visibly out of the running, and
@@ -2196,6 +2478,11 @@
         </ol>
       </div>
     </div>
+    <!-- Slides in over the discussion feed the same way, when a venue is
+         clicked on the Kahve Endeksi board in col-right. Content is
+         rendered by renderVenueHTML() (shared with the mobile sheet) --
+         see .coffee-venue-slide CSS and openCoffeeVenue() below. -->
+    <div class="coffee-venue-slide" id="coffee-venue-slide" aria-live="polite"></div>
   </aside>
 
   <main>
@@ -2491,6 +2778,9 @@ function openDetail(html) {
 function closeDetail() {
   const overlay = document.getElementById('detail-overlay');
   if (!overlay) return;
+  // On mobile a coffee venue lives inside this sheet (the board drills
+  // into it), so dismissing the sheet dismisses the venue with it.
+  if (openVenueId && !isDesktopBoard()) closeCoffeeVenue();
   overlay.classList.remove('open');
   setTimeout(() => { overlay.hidden = true; }, 550);
 }
@@ -2760,6 +3050,10 @@ function unmount() {
   if (discussionTickIntervalId) { clearInterval(discussionTickIntervalId); discussionTickIntervalId = null; }
   if (coffeeTickIntervalId) { clearInterval(coffeeTickIntervalId); coffeeTickIntervalId = null; }
   I18N.offChange(tickCoffeeIndex);
+  // A virtual navigation rebuilds #ist-content, so the venue panel's DOM
+  // goes with it — drop the selection too, or coming back would light a
+  // district on the map for a panel that no longer exists.
+  closeCoffeeVenue();
 }
 
 async function init() {
@@ -3820,10 +4114,12 @@ function renderCoffeeBoardHTML(rows, now) {
         // Only an open venue can be the cheapest cup in the district.
         (i === 0 && live.open) ? 'cheapest' : '',
         live.open ? '' : 'closed',
+        row.id === openVenueId ? 'selected' : '',
       ].filter(Boolean).join(' ');
       // data-nb drives the map highlight on hover — it replaces the
-      // district name this row used to print.
-      return `<div class="${cls}" data-nb="${escapeHtml(row.neighborhood)}">
+      // district name this row used to print. data-id opens the venue's
+      // own panel on click (see openCoffeeVenue).
+      return `<div class="${cls}" data-nb="${escapeHtml(row.neighborhood)}" data-id="${escapeHtml(row.id)}">
         <div class="coffee-row-venue">${escapeHtml(row.venue)}${meta ? `<span class="coffee-row-meta">${meta}</span>` : ''}</div>
         <div class="coffee-row-price">${live.discounted ? `<span class="coffee-price-was">${formatCoffeePrice(live.basePrice)}</span>` : ''}${formatCoffeePrice(live.price)}</div>
       </div>`;
@@ -3856,6 +4152,9 @@ function renderCoffeeSheet(rows) {
 }
 
 async function openCoffeeIndex() {
+  // The pill always lands on the board itself, never on whatever venue
+  // was last drilled into.
+  if (openVenueId) closeCoffeeVenue();
   openDetail(`<div class="coffee-detail">
     <h2>${I18N.t('kahve.index')}</h2>
     <div class="coffee-empty">${I18N.t('kahve.loading')}</div>
@@ -3893,6 +4192,19 @@ async function tickCoffeeIndex() {
   // Re-resolve the sheet: the await above gives it time to be closed.
   const stillOpen = coffeeSheetBody();
   if (stillOpen) stillOpen.innerHTML = html;
+  tickOpenVenue(rows);
+}
+
+// The open venue's own price/status/hours move with the same clock as
+// the board. Only #cv-live is replaced — the comment list below it and
+// anything half-typed in the composer stay exactly as they are.
+function tickOpenVenue(rows) {
+  if (!openVenueId) return;
+  const surface = venueSurface();
+  if (!surface) return;
+  const row = (rows || []).find(r => r.id === openVenueId);
+  const live = surface.querySelector('#cv-live');
+  if (row && live) live.innerHTML = venueLiveHTML(row, new Date());
 }
 
 // Delegated on document (see the game-link handler's reasoning): the
@@ -3900,6 +4212,273 @@ async function tickCoffeeIndex() {
 // re-entry, so one persistent listener outlives all of those rebuilds.
 document.addEventListener('click', (e) => {
   if (e.target.closest('#coffee-pill')) openCoffeeIndex();
+});
+
+// ── Coffee venue detail: live status, the week's hours, and comments ──
+// Clicking a row on the board opens the venue. On desktop that is the
+// left-hand slide-in panel (.coffee-venue-slide), landing over the
+// discussion feed exactly the way the scoreboard does when a game opens.
+// On mobile the board is itself a bottom sheet, so the sheet drills into
+// the same content with a back link instead.
+//
+// The index stays admin-curated -- nothing here writes to coffee_prices.
+// What members add is comments about the coffee (coffee_comments, see
+// db/coffee_comments.sql), which anyone signed in may post regardless of
+// which district they live in.
+const COFFEE_COMMENT_LIMIT = 50;
+// The venue whose panel is open, so the board's 30s tick can refresh its
+// live status without disturbing the comments or a half-typed comment.
+let openVenueId = null;
+
+function isDesktopBoard() {
+  return window.matchMedia('(min-width: 769px)').matches;
+}
+
+// The venue's week, Monday-first, today's row marked. Reads the same
+// `hours` object the board evaluates (see coffee-index.js).
+function venueWeekHTML(row, now) {
+  if (!row.hours || !Object.keys(row.hours).length) {
+    return `<div class="cv-empty">${I18N.t('kahve.hoursunknown')}</div>`;
+  }
+  const todayDow = now.getDay();
+  // Monday-first ordering over getDay() indices.
+  return [1, 2, 3, 4, 5, 6, 0].map(dow => {
+    const w = IstCoffee.dayWindow(row.hours, dow);
+    // Any date with the right weekday works; I18N handles the locale.
+    const d = new Date(now);
+    d.setDate(d.getDate() + ((dow - todayDow) + 7) % 7);
+    const name = I18N.formatWeekday(d, { weekday: 'short' });
+    const hours = w
+      ? `${IstCoffee.formatHM(w.open)} – ${IstCoffee.formatHM(w.close)}`
+      : I18N.t('kahve.closed');
+    return `<div class="cv-day${dow === todayDow ? ' today' : ''}">
+      <span>${escapeHtml(name)}</span><span class="cv-day-hours">${escapeHtml(hours)}</span>
+    </div>`;
+  }).join('');
+}
+
+// Price + status + week. Split out from renderVenueHTML so the board's
+// tick can refresh just this block, leaving the comment list and a
+// half-typed comment alone.
+function venueLiveHTML(row, now) {
+  const live = IstCoffee.evaluate(row, now);
+  const meta = coffeeStatusMeta(live, now);
+  return `
+    <div class="cv-price-row">
+      ${live.discounted ? `<span class="cv-was">${formatCoffeePrice(live.basePrice)}</span>` : ''}
+      <span class="cv-price">${formatCoffeePrice(live.price)}</span>
+    </div>
+    <div class="cv-status${live.open ? '' : ' closed'}">${meta || '&nbsp;'}</div>
+    <div class="cv-hours">
+      <div class="cv-hours-title">${I18N.t('kahve.hours')}</div>
+      ${venueWeekHTML(row, now)}
+    </div>`;
+}
+
+// `undefined` means the fetch is still out, `null` means it failed, `[]`
+// means the venue has no comments yet — three different things to say.
+function venueCommentsHTML(comments, currentUserId) {
+  if (comments === undefined) return `<div class="cv-empty">${I18N.t('kahve.loading')}</div>`;
+  if (comments === null) return `<div class="cv-empty">${I18N.t('kahve.commentsfailed')}</div>`;
+  if (!comments.length) return `<div class="cv-empty">${I18N.t('kahve.nocomments')}</div>`;
+  return comments.map(c => {
+    const { first, last } = c._authorName || {};
+    const name = [first, last].filter(Boolean).join(' ') || I18N.t('profile.unnamed');
+    // .author-link is picked up by the page's existing profile popup.
+    const author = c.author_id
+      ? `<span class="author-link" data-user-id="${c.author_id}" title="Profili görüntüle">${escapeHtml(name)}</span>`
+      : escapeHtml(name);
+    const canDelete = isAdmin || (c.author_id && c.author_id === currentUserId);
+    return `<div class="cv-comment" data-comment-id="${c.id}">
+      ${canDelete ? `<button class="cv-comment-delete" data-cv-delete="${c.id}" aria-label="Yorumu sil" title="Yorumu sil">×</button>` : ''}
+      <div class="cv-comment-meta">
+        <span>${author}</span>
+        <span class="cv-comment-time">${escapeHtml(formatRelativeTime(c.created_at))}</span>
+      </div>
+      <div class="cv-comment-body">${escapeHtml(c.body)}</div>
+    </div>`;
+  }).join('');
+}
+
+// One markup builder for both surfaces. `chrome` picks the dismiss
+// affordance: a ✕ that closes the desktop panel, or a back link that
+// returns the mobile sheet to the board.
+function renderVenueHTML(row, comments, currentUserId, chrome) {
+  const now = new Date();
+  const district = neighborhoodNames[row.neighborhood] || row.neighborhood;
+  const dismiss = chrome === 'back'
+    ? `<button type="button" class="cv-back" id="cv-back">← ${I18N.t('kahve.index')}</button>`
+    : `<button type="button" class="cv-close" id="cv-close" aria-label="Kapat">×</button>`;
+  return `<div class="cv-detail">
+    ${dismiss}
+    <div class="cv-head"${chrome === 'back' ? ' style="padding-right:0;"' : ''}>
+      <div class="cv-title">${escapeHtml(row.venue)}</div>
+      <div class="cv-district">${escapeHtml(district)}</div>
+      <div id="cv-live">${venueLiveHTML(row, now)}</div>
+    </div>
+    <div class="cv-section-rule"></div>
+    <div class="cv-comments-title">${I18N.t('kahve.comments')}</div>
+    <div class="cv-comments" id="cv-comments">${venueCommentsHTML(comments, currentUserId)}</div>
+    <div class="cv-form">
+      <div class="cv-form-row">
+        <textarea id="cv-input" maxlength="1000" placeholder="${escapeHtml(I18N.t('kahve.commentph'))}"></textarea>
+        <button type="button" id="cv-send" aria-label="${escapeHtml(I18N.t('kahve.send'))}" title="${escapeHtml(I18N.t('kahve.send'))}">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 20l18-8L3 4v6l12 2-12 2z"/></svg>
+        </button>
+      </div>
+      <div class="cv-status-msg" id="cv-status"></div>
+    </div>
+  </div>`;
+}
+
+// Newest first, with author names resolved in one batched follow-up —
+// the same two-step the discussion feed uses (profiles is a separate
+// table and PostgREST cannot join across the RLS boundary here).
+async function fetchVenueComments(coffeeId) {
+  const { data, error } = await sb.from('coffee_comments')
+    .select('id, author_id, body, created_at')
+    .eq('coffee_id', coffeeId)
+    .order('created_at', { ascending: false })
+    .limit(COFFEE_COMMENT_LIMIT);
+  if (error) { console.error('[kahve yorumlari]', error); return null; }
+  const rows = data || [];
+  const ids = Array.from(new Set(rows.map(c => c.author_id).filter(Boolean)));
+  const nameMap = new Map();
+  if (ids.length) {
+    const { data: profs } = await sb.from('profiles')
+      .select('id, first_name, last_name').in('id', ids);
+    (profs || []).forEach(p => nameMap.set(p.id, {
+      first: capitalizeName(p.first_name || ''),
+      last: capitalizeName(p.last_name || ''),
+    }));
+  }
+  return rows.map(c => ({ ...c, _authorName: nameMap.get(c.author_id) || { first: '', last: '' } }));
+}
+
+// Where the venue content currently lives: the desktop slide panel, or
+// the mobile sheet once it has drilled in.
+function venueSurface() {
+  const slide = document.getElementById('coffee-venue-slide');
+  if (slide && slide.classList.contains('open')) return slide;
+  const body = document.getElementById('detail-overlay-body');
+  if (body && body.querySelector('.cv-detail')) return body;
+  return null;
+}
+
+async function openCoffeeVenue(coffeeId) {
+  const rows = coffeeCache.rows || [];
+  const row = rows.find(r => r.id === coffeeId);
+  if (!row) return;
+  openVenueId = coffeeId;
+  markSelectedCoffeeRow(coffeeId);
+  // Keep the venue's district lit on the map for as long as its panel is
+  // open, so the row hover's answer to "where is this" persists.
+  applyCoffeeHighlight(row.neighborhood);
+
+  const desktop = isDesktopBoard();
+  const slide = document.getElementById('coffee-venue-slide');
+  const chrome = desktop ? 'close' : 'back';
+  const paint = (comments) => {
+    const html = renderVenueHTML(row, comments, feedState.currentUserId, chrome);
+    if (desktop && slide) { slide.innerHTML = html; slide.classList.add('open'); }
+    else {
+      const body = document.getElementById('detail-overlay-body');
+      if (body) body.innerHTML = html;
+    }
+  };
+  // Paint the venue immediately (it is already in hand), then fill the
+  // comments in — a round trip should not delay the price and hours.
+  paint(undefined);
+  const comments = await fetchVenueComments(coffeeId);
+  // Bail if the user closed or switched venue while the fetch was out.
+  if (openVenueId !== coffeeId) return;
+  const list = document.querySelector('#cv-comments');
+  if (list) list.innerHTML = venueCommentsHTML(comments, feedState.currentUserId);
+  else paint(comments);
+}
+
+function closeCoffeeVenue() {
+  openVenueId = null;
+  const slide = document.getElementById('coffee-venue-slide');
+  if (slide) slide.classList.remove('open');
+  markSelectedCoffeeRow(null);
+  applyCoffeeHighlight(null);
+}
+
+function markSelectedCoffeeRow(coffeeId) {
+  document.querySelectorAll('.coffee-row[data-id]').forEach(r => {
+    r.classList.toggle('selected', r.dataset.id === coffeeId);
+  });
+}
+
+async function submitVenueComment() {
+  const surface = venueSurface();
+  if (!surface || !openVenueId) return;
+  const input = surface.querySelector('#cv-input');
+  const statusEl = surface.querySelector('#cv-status');
+  const btn = surface.querySelector('#cv-send');
+  const body = (input.value || '').trim();
+  if (!body) return;
+
+  btn.disabled = true;
+  statusEl.textContent = '';
+  statusEl.className = 'cv-status-msg';
+
+  const { error } = await sb.from('coffee_comments')
+    .insert([{ coffee_id: openVenueId, author_id: feedState.currentUserId, body }]);
+  btn.disabled = false;
+
+  if (error) {
+    console.error('[kahve yorum gonderme]', error);
+    statusEl.textContent = I18N.t('kahve.commentfailed');
+    statusEl.className = 'cv-status-msg err';
+    return;
+  }
+  input.value = '';
+  const comments = await fetchVenueComments(openVenueId);
+  const list = surface.querySelector('#cv-comments');
+  if (list) list.innerHTML = venueCommentsHTML(comments, feedState.currentUserId);
+}
+
+async function deleteVenueComment(id) {
+  if (!confirm('Yorumu sil?')) return;
+  const { error } = await sb.from('coffee_comments').delete().eq('id', id);
+  if (error) { showToast('Yorum silinemedi.', 'err'); return; }
+  if (!openVenueId) return;
+  const comments = await fetchVenueComments(openVenueId);
+  const surface = venueSurface();
+  const list = surface && surface.querySelector('#cv-comments');
+  if (list) list.innerHTML = venueCommentsHTML(comments, feedState.currentUserId);
+}
+
+// Delegated for the same reason every other handler on this page is:
+// #ist-content is rebuilt wholesale on each virtual re-entry.
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#cv-close')) { closeCoffeeVenue(); return; }
+  // Mobile: back out of the venue and re-render the board in the sheet.
+  if (e.target.closest('#cv-back')) {
+    openVenueId = null;
+    applyCoffeeHighlight(null);
+    renderCoffeeSheet(coffeeCache.rows);
+    return;
+  }
+  const del = e.target.closest('[data-cv-delete]');
+  if (del) { deleteVenueComment(del.getAttribute('data-cv-delete')); return; }
+  if (e.target.closest('#cv-send')) { submitVenueComment(); return; }
+
+  // A row on the board opens its venue. Ignore clicks on the author
+  // links inside an already-open panel, which belong to the profile popup.
+  const row = e.target.closest('.coffee-row[data-id]');
+  if (row && !e.target.closest('.author-link')) openCoffeeVenue(row.dataset.id);
+});
+
+// Enter sends, Shift+Enter makes a new line — the convention the rest of
+// the site's composers use.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.shiftKey) return;
+  if (!e.target.closest('#cv-input')) return;
+  e.preventDefault();
+  submitVenueComment();
 });
 
 // ── Coffee row → map district highlight ──
@@ -3910,20 +4489,33 @@ document.addEventListener('click', (e) => {
 // rather than by more text in the row. Desktop-shaped by nature: on
 // mobile the board opens as a sheet over the map, so there is nothing to
 // light up and nothing to hover with.
+// Light one district (or none) and name it on the map label. Shared by
+// the row hover and by the open venue panel, which keeps its district
+// lit for as long as it is open.
+function applyCoffeeHighlight(nbId) {
+  getMapNeighborhoods().forEach(n =>
+    n.classList.toggle('hover-active', !!nbId && (n.dataset.neighborhood || n.id) === nbId));
+  const label = document.getElementById('map-label');
+  if (label) label.textContent = nbId ? (neighborhoodNames[nbId] || nbId) : baseMapLabel();
+}
+
+// The district to fall back to when a row hover ends: the open venue's,
+// if a panel is showing one, otherwise nothing.
+function restingCoffeeHighlight() {
+  if (!openVenueId) return null;
+  const row = (coffeeCache.rows || []).find(r => r.id === openVenueId);
+  return row ? row.neighborhood : null;
+}
+
 document.addEventListener('mouseover', (e) => {
   const row = e.target.closest('.coffee-row[data-nb]');
   if (!row) return;
-  const nbId = row.dataset.nb;
-  getMapNeighborhoods().forEach(n => n.classList.toggle('hover-active', (n.dataset.neighborhood || n.id) === nbId));
-  const label = document.getElementById('map-label');
-  if (label) label.textContent = neighborhoodNames[nbId] || nbId;
+  applyCoffeeHighlight(row.dataset.nb);
 });
 document.addEventListener('mouseout', (e) => {
   const row = e.target.closest('.coffee-row[data-nb]');
   if (!row || row.contains(e.relatedTarget)) return;
-  getMapNeighborhoods().forEach(n => n.classList.remove('hover-active'));
-  const label = document.getElementById('map-label');
-  if (label) label.textContent = baseMapLabel();
+  applyCoffeeHighlight(restingCoffeeHighlight());
 });
 
 // ── Profile popup: opens when an author name is clicked ──

@@ -120,6 +120,16 @@
     // Prefixed to the minutes left before closing: "Son 45 dk".
     'kahve.lastcall':{ default: 'Son',                      more_english: 'Last' },
     'kahve.tomorrow':{ default: 'Yarın',                    more_english: 'Tomorrow' },
+    // Venue detail panel: opened by clicking a row on the board, carries
+    // the week's hours and what members say about the coffee there.
+    'kahve.hours':        { default: 'Çalışma Saatleri',    more_english: 'Opening Hours' },
+    'kahve.hoursunknown': { default: 'Saatler kayıtlı değil', more_english: 'Hours not recorded' },
+    'kahve.comments':     { default: 'Kahve Hakkında',      more_english: 'About the Coffee' },
+    'kahve.nocomments':   { default: 'Henüz yorum yok. İlk yorumu sen yaz.', more_english: 'No comments yet. Be the first.' },
+    'kahve.commentph':    { default: 'Buranın kahvesi nasıl?', more_english: 'How is the coffee here?' },
+    'kahve.send':         { default: 'Gönder',              more_english: 'Send' },
+    'kahve.commentfailed':{ default: 'Yorum gönderilemedi.', more_english: 'Could not post the comment.' },
+    'kahve.commentsfailed':{ default: 'Yorumlar yüklenemedi.', more_english: 'Could not load the comments.' },
 
     // anahane — breaking news detail sheet
     'news.sources':        { default: 'Kaynaklar',           more_english: 'Sources' },
