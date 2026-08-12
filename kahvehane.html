@@ -1494,21 +1494,23 @@
         padding: 0;
         /* Square tiles. The height is untouched -- it's still the
            column's own height split three ways by .game-link-enter's
-           flex:1 above -- and --game-tile-size mirrors that measured
-           height back into the width, so squaring these only ever moves
-           the width. The var is set by syncGameTileSize() in the script
-           below (CSS can't express "as wide as you are tall" here: the
-           column is content-sized, so an aspect-ratio would have to
-           resolve the width from a height that isn't known yet at
-           intrinsic-sizing time). The clamp is the pre-measurement
-           fallback -- the old fixed width, so a tile is never sized
-           wrong if the measurement hasn't landed yet. */
-        width: var(--game-tile-size, clamp(96px, 26vw, 128px));
-        /* The desktop rule's aspect-ratio would be inert here anyway
-           (both axes are already definite: the width above, the height
-           from the stretch below), but it's dropped rather than left to
-           race the measured width. */
-        aspect-ratio: auto;
+           flex:1 above -- and only the width follows it, two ways over:
+             - aspect-ratio transfers the (definite, stretched) height
+               into the auto width with no script involved, so the very
+               first painted frame is already square. Verified in
+               Chromium; whether an engine resolves it depends on it
+               carrying that transferred size out through the
+               content-sized column, which is the shaky part.
+             - --game-tile-size, once syncGameTileSize() has measured the
+               wrapper, pins the same number explicitly and makes the
+               ratio inert. That's the engine-independent path, and it's
+               set before the first paint (see the call at the very end
+               of this page's script) rather than waiting on mount().
+           Neither is a fallback for a slow round-trip anymore: both land
+           before anything is on screen, which is what keeps the tiles
+           from flashing through a non-square shape on open. */
+        width: var(--game-tile-size, auto);
+        aspect-ratio: 1 / 1;
         /* No explicit height/flex here -- .game-link-enter (its parent,
            a row-direction flex container) stretches it to fill that
            wrapper's height by default (align-items:stretch), which is
@@ -2721,13 +2723,19 @@ window.addEventListener('resize', syncColumnHeights);
 // whose height is a third of the games column and, unlike the tile's own
 // box, doesn't move when we change the tile's width -- and hand that
 // number back to CSS. Nothing here touches height; only --game-tile-size.
-// The column's height keeps moving after mount()'s own two passes -- the
+// The column's height keeps moving after mount()'s own passes -- the
 // profile card above the tiles finishes its async mount, the safe-area
 // insets settle a beat into a fresh WKWebView paint -- so the wrapper is
 // also watched, not just re-measured on resize. Widening a tile takes
 // width from the comments column, never from the map (main spans both
 // grid columns at a viewport-based height), so this can't feed back into
 // the height it just measured.
+//
+// The value lands on the root element, not on #game-picker: router.js's
+// virtual navigation replaces #ist-content (and with it the picker) on
+// every entry into this page, and the swapped-in markup can paint before
+// mount() gets to re-measure. On the root it outlives the swap, so a
+// re-entry starts from the last known size instead of an unset var.
 const gameTileObserver = window.ResizeObserver
   ? new ResizeObserver(() => syncGameTileSize())
   : null;
@@ -2745,12 +2753,13 @@ function syncGameTileSize() {
     gameTileObserver.observe(wrapper);
     observedGameTile = wrapper;
   }
+  const root = document.documentElement;
   if (window.innerWidth > 768) {
-    picker.style.removeProperty('--game-tile-size');
+    root.style.removeProperty('--game-tile-size');
     return;
   }
   const size = Math.round(wrapper.getBoundingClientRect().height);
-  if (size > 0) picker.style.setProperty('--game-tile-size', size + 'px');
+  if (size > 0) root.style.setProperty('--game-tile-size', size + 'px');
 }
 
 // person-mentions.js is deferred -- poll briefly (same idiom as
@@ -2779,6 +2788,11 @@ function mountLibraryCardWhenReady(tries) {
 }
 
 async function mount() {
+  // Before the first await, so a virtual navigation (router.js swaps
+  // #ist-content, then calls this) has the column heights and the square
+  // tile width in place for the frame it paints on arrival -- everything
+  // past the await lands well after that frame is on screen.
+  syncColumnHeights();
   await refreshHomeNeighborhood();
   // Default politician card is this user's own neighborhood's mayor (not
   // İstanbul's, unlike Anahane's map-driven card) -- see politician-card.js.
@@ -3969,6 +3983,14 @@ document.addEventListener('click', (e) => {
 })();
 
 IstRouter.registerPage('kahvehane', { mount, unmount });
+
+// Runs here, at the tail of a script that sits at the end of <body>, so
+// the columns are sized and the game tiles are square in the first frame
+// the user sees. mount() re-runs it, but mount() is gated on the session
+// check, and on a real device that round-trip is long enough to paint --
+// which is exactly how long the tiles used to sit there in the wrong
+// shape before snapping square.
+syncColumnHeights();
 })();
 </script>
 
