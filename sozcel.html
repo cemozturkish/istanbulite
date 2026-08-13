@@ -11,6 +11,7 @@
   <meta name="theme-color" content="#f0f0f0">
   <title>Sözcel — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="ist-date.js"></script>
   <script src="i18n.js"></script>
   <script src="palette.js"></script>
   <script src="avatar.js"></script>
@@ -1984,19 +1985,15 @@ function lettersMatch(a, b) {
 }
 
 // ── Daily seed ──
+// "YYYY-M-D" Istanbul-local — the historical key format of game_results.date
+// and the per-day localStorage keys, so it stays unpadded.
 function getDailySeed() {
-  const now = new Date();
-  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-  return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
+  return IstDate.daySeed();
 }
 
 function getTimeUntilMidnight() {
-  const now = new Date();
-  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-  const tomorrow = new Date(ist);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
-  const diff = tomorrow - ist;
+  const ist = IstDate.now();
+  const diff = IstDate.nextMidnight() - ist;
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   return I18N.formatCountdown(hours, minutes);
@@ -3739,9 +3736,7 @@ const VALID_WORDS_6 = new Set([
 // Sundays use 6-letter words; all other days are 5-letter. The day-of-week
 // is evaluated in Europe/Istanbul time so it matches the daily roll-over.
 function sozcelWordLengthFor(date) {
-  const now = date || new Date();
-  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-  return ist.getDay() === 0 ? 6 : 5;
+  return IstDate.now(date).getDay() === 0 ? 6 : 5;
 }
 let WORD_LENGTH = sozcelWordLengthFor();
 
@@ -3749,73 +3744,93 @@ let WORD_LENGTH = sozcelWordLengthFor();
 let WORD_LIST = WORD_LENGTH === 6 ? WORD_LIST_6 : WORD_LIST_5;
 let VALID_WORDS = WORD_LENGTH === 6 ? VALID_WORDS_6 : VALID_WORDS_5;
 
-function seededRandom(seed) { return seededIndex(seed, WORD_LIST.length || 1); }
+// (No unseeded local fallback exists anymore — the day's word comes from
+// sozcel_daily_word(); see pickDailyTarget.)
 
 // Ensure every possible answer is always accepted as a guess.
 WORD_LIST_5.forEach(w => VALID_WORDS_5.add(w));
 
 // Istanbul-local ISO date (YYYY-MM-DD) for the sozcel_used_answers table.
 function getIstanbulDateISO() {
-  const now = new Date();
-  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-  const y = ist.getFullYear();
-  const m = String(ist.getMonth() + 1).padStart(2, '0');
-  const d = String(ist.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return IstDate.iso();
 }
 
-// Pick today's answer: prefer a word already recorded for today;
-// otherwise deterministically pick from the words not yet used, then
-// record it. Falls back to the legacy unseeded pick if Supabase fails.
+// How many words the client offers the database when the day has no word
+// yet. Only the first one is normally taken — the rest are there so the
+// day still gets a word if earlier candidates turn out to have been used
+// on some past day (the server skips those).
+const DAILY_CANDIDATE_COUNT = 24;
+
+// The client's preference list for today: its seeded pick first, then the
+// words following it in the pool. This is only a *proposal* — which one
+// becomes the day's word is decided and recorded by the database, so two
+// clients proposing different lists no longer means two different games.
+//
+// The used-word read just keeps the proposal inside the not-yet-played
+// pool, the way the seeding always worked. If it fails we propose from the
+// full list instead of giving up: the server filters used words anyway,
+// and a day with no word at all is worse than a slightly worse proposal.
+async function buildDailyCandidates(seed) {
+  if (!WORD_LIST || WORD_LIST.length === 0) return [];
+  let pool = WORD_LIST;
+  const { data: usedRows, error: usedErr } = await sb
+    .from('sozcel_used_answers')
+    .select('word');
+  if (!usedErr) {
+    const used = new Set((usedRows || []).map(r => r.word));
+    const unused = WORD_LIST.filter(w => !used.has(w));
+    if (unused.length > 0) pool = unused;
+  }
+  const start = seededIndex(seed, pool.length);
+  const out = [];
+  for (let i = 0; i < Math.min(DAILY_CANDIDATE_COUNT, pool.length); i++) {
+    out.push(pool[(start + i) % pool.length]);
+  }
+  return out;
+}
+
+// Today's answer, as decided by the database (db/sozcel_used_answers_v5_server_pick.sql).
+// sozcel_daily_word() resolves the Istanbul date server-side, returns the
+// day's word if it has one, and otherwise records the first unused
+// candidate — atomically, so simultaneous first-players of the day can't
+// end up on two different words.
+//
+// This function returns null rather than inventing a word locally when
+// anything goes wrong. A locally-invented word is worse than no game: it
+// looks completely normal while being a puzzle nobody else is playing,
+// and its result lands on the shared scoreboard as if it counted.
 async function pickDailyTarget(seed) {
   try {
-    const today = getIstanbulDateISO();
-    const { data: existing } = await sb
-      .from('sozcel_used_answers')
-      .select('word, definition, syllables')
-      .eq('used_on', today)
-      .maybeSingle();
-    // Trust the admin/scheduled word regardless of length — a mismatch
-    // with today's WORD_LENGTH is caught at boot and surfaced to the user.
-    if (existing && existing.word) {
-      TODAY_DEFINITION = existing.definition || null;
-      TODAY_SYLLABLES = existing.syllables || null;
-      return existing.word;
+    const candidates = await buildDailyCandidates(seed);
+    const { data, error } = await sb.rpc('sozcel_daily_word', {
+      candidates: candidates.length > 0 ? candidates : null,
+    });
+    if (error) {
+      console.error('[sozcel pickDailyTarget]', error);
+      TODAY_WORD_UNREACHABLE = true;
+      return null;
     }
-
-    // Auto-pick from today's pool. If the pool is empty (e.g. Sunday with
-    // no 6-letter list yet) bail out and let the caller render an empty
-    // state.
-    if (!WORD_LIST || WORD_LIST.length === 0) return null;
-
-    const { data: usedRows, error: usedErr } = await sb
-      .from('sozcel_used_answers')
-      .select('word');
-    if (usedErr) throw usedErr;
-    const used = new Set((usedRows || []).map(r => r.word));
-    const candidates = WORD_LIST.filter(w => !used.has(w));
-    const pool = candidates.length > 0 ? candidates : WORD_LIST;
-    const pick = pool[seededIndex(seed, pool.length)];
-    await sb.from('sozcel_used_answers').insert({ used_on: today, word: pick });
-    const { data: settled } = await sb
-      .from('sozcel_used_answers')
-      .select('word, definition, syllables')
-      .eq('used_on', today)
-      .maybeSingle();
-    if (settled && settled.word) {
-      TODAY_DEFINITION = settled.definition || null;
-      TODAY_SYLLABLES = settled.syllables || null;
-      return settled.word;
-    }
-    return pick;
+    // The RPC returns a table — supabase-js hands back an array of rows.
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row || !row.word) return null;
+    // Trust the stored word regardless of length — a mismatch with today's
+    // WORD_LENGTH is handled at boot by adapting the grid to the word.
+    TODAY_DEFINITION = row.definition || null;
+    TODAY_SYLLABLES = row.syllables || null;
+    return row.word;
   } catch (e) {
-    if (!WORD_LIST || WORD_LIST.length === 0) return null;
-    return WORD_LIST[seededRandom(seed)];
+    console.error('[sozcel pickDailyTarget]', e);
+    TODAY_WORD_UNREACHABLE = true;
+    return null;
   }
 }
 
 const dailySeed = getDailySeed();
 let TARGET_WORD = null;
+// True when today's word couldn't be reached at all (offline, expired
+// session, RPC error) — as opposed to the day legitimately not having one
+// yet. Only changes which empty state the player is shown.
+let TODAY_WORD_UNREACHABLE = false;
 let TODAY_DEFINITION = null;
 // The Sözcü's own syllable breakdown for today's word (array of 2–3
 // strings), when they supplied one. null for auto-picked pool words and
@@ -3843,7 +3858,10 @@ const SAVE_KEY = 'sozcel_state_' + dailySeed;
 async function saveState() {
   // Use the JS-tracked array as the authoritative source — never read from
   // the DOM, which can be empty on mobile due to rendering timing issues.
-  const state = { currentRow, currentGuess, gameOver, guesses: submittedGuesses.slice() };
+  // `word` stamps the board with the answer it was played against, so a
+  // board saved against a different word for the same date is recognisable
+  // as stale instead of being replayed against the wrong answer.
+  const state = { currentRow, currentGuess, gameOver, guesses: submittedGuesses.slice(), word: TARGET_WORD };
   localStorage.setItem(SAVE_KEY, JSON.stringify(state));
   // Mirror to Supabase so the board syncs across devices. Awaited by callers
   // that follow it with a win/loss popup so a mobile tab closed right after
@@ -3895,6 +3913,18 @@ async function restoreState() {
   try {
     const state = JSON.parse(raw);
     if (!state.guesses || state.guesses.length === 0) return false;
+
+    // Board saved against a different answer than today's actual word.
+    // This is the wreckage of the client-side word picking that
+    // db/sozcel_used_answers_v5_server_pick.sql retires: replaying those
+    // guesses would color them against a word the player never saw. Drop
+    // the board and let them start today's real puzzle. (Boards saved
+    // before `word` was stamped have no way to be checked and are
+    // restored as before.)
+    if (state.word && state.word !== TARGET_WORD) {
+      localStorage.removeItem(SAVE_KEY);
+      return false;
+    }
 
     // Filter out any corrupted entries (empty or wrong-length guesses) that
     // could sneak in from older saves where saveState read from the DOM.
@@ -4481,7 +4511,7 @@ function firstSolverBonus(tier) {
 // Seven-square week tracker (Monday first, matching the scoring week):
 // days already passed are dark, today is double-bordered, days to come are plain.
 function renderWeekProgress() {
-  const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  const nowIst = IstDate.now();
   const dow = nowIst.getDay(); // 0=Sun … 6=Sat
   const todayIdx = dow === 0 ? 6 : dow - 1; // Monday=0 … Sunday=6
   const en = I18N.isEnglish();
@@ -4527,7 +4557,7 @@ async function loadScoreboard() {
     return;
   }
   // Weekly cutoff: Monday 00:00 of the current Istanbul week.
-  const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  const nowIst = IstDate.now();
   const dow = nowIst.getDay(); // 0=Sun … 6=Sat
   const daysFromMonday = dow === 0 ? 6 : dow - 1;
   const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - daysFromMonday);
@@ -5046,11 +5076,14 @@ initKeyboard();
 
   TARGET_WORD = await pickDailyTarget(dailySeed);
   if (!TARGET_WORD) {
-    // Sunday with no scheduled word and no 6-letter pool yet — show a
-    // friendly empty state and disable input.
+    // Either the day genuinely has no word yet (e.g. Sunday with no
+    // scheduled 6-letter word), or the word couldn't be reached. Never
+    // substitute a locally-picked word here — see pickDailyTarget.
     const msg = document.getElementById('game-message');
     if (msg) {
-      msg.textContent = 'Bugünkü sözcük henüz hazır değil.';
+      msg.textContent = TODAY_WORD_UNREACHABLE
+        ? 'Bugünün kelimesine ulaşılamadı. Bağlantını kontrol edip sayfayı yenile.'
+        : 'Bugünkü sözcük henüz hazır değil.';
       msg.className = 'game-message';
     }
     gameOver = true;

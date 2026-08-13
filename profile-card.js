@@ -264,10 +264,9 @@
   async function getGameScores(sb, userId) {
     function currentStreakFor(winDates) {
       function seedForOffset(off) {
-        const now = new Date();
-        const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-        ist.setDate(ist.getDate() - off);
-        return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
+        // Unpadded "Y-M-D", matching game_results.date.
+        const [y, m, d] = IstDate.iso(-off).split('-').map(Number);
+        return `${y}-${m}-${d}`;
       }
       let streak = 0;
       let offset = winDates.has(seedForOffset(0)) ? 0 : 1;
@@ -342,7 +341,7 @@
   }
 
   function mondayOfIstWeek() {
-    const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+    const nowIst = IstDate.now();
     return new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - istWeekdayIdx(nowIst));
   }
 
@@ -418,7 +417,7 @@
     const dayNames = en
       ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
       : ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
-    const todayIdx = istWeekdayIdx(new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' })));
+    const todayIdx = istWeekdayIdx(IstDate.now());
 
     const header = `
       <div class="ist-pc-weekgrid-header">
@@ -542,12 +541,7 @@
   }
 
   function istanbulTodayISO() {
-    const now = new Date();
-    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-    const y = ist.getFullYear();
-    const m = String(ist.getMonth() + 1).padStart(2, '0');
-    const d = String(ist.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    return IstDate.iso();
   }
 
   // Fetches everything the card/overlay needs exactly once per session.
