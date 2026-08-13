@@ -461,7 +461,13 @@
       padding: 12px 14px;
       background: var(--paper-dark);
     }
-    .sozcul-takeover .stk-def-row {
+    /* The three-column row grid (num / field / remove), shared by the
+       definition rows and the syllable rows. Listed as two selectors rather
+       than putting .stk-def-row on both kinds of row: that made
+       "is a .stk-def-row" mean two different things, and code asking for
+       definition rows silently collected syllable rows as well. */
+    .sozcul-takeover .stk-def-row,
+    .sozcul-takeover .stk-syl-row {
       display: grid;
       grid-template-columns: auto 1fr auto;
       gap: 6px;
@@ -504,8 +510,8 @@
       margin-top: 4px;
     }
     .sozcul-takeover .stk-add-def:hover { border-color: var(--accent); color: var(--ink); }
-    /* Syllable rows reuse .stk-def-row's grid (num / input / remove) —
-       just the input itself reads like a mini word-input tile. */
+    /* Syllable rows share the row grid above; just the input itself reads
+       like a mini word-input tile. */
     .sozcul-takeover .stk-syl-input {
       text-align: center;
       text-transform: uppercase;
@@ -5643,7 +5649,7 @@ function normalizeSyllablesForEdit(word) {
 
 function buildTakeoverSylRow(idx, value) {
   return `
-    <div class="stk-def-row stk-syl-row">
+    <div class="stk-syl-row">
       <span class="stk-def-num">${idx + 1}.</span>
       <input type="text" class="stk-text-input stk-syl-input" maxlength="10"
              autocomplete="off" autocorrect="off" spellcheck="false"
@@ -5680,12 +5686,28 @@ function renumberTakeoverDefs() {
 }
 
 function serializeTakeoverDict(takeover) {
-  const note = (takeover.querySelector('#stk-note-input').value || '').trim() || null;
-  const root = (takeover.querySelector('#stk-root-input').value || '').trim() || null;
-  const defs = [...takeover.querySelectorAll('.stk-def-row')].map(row => ({
-    cls: row.querySelector('.stk-def-cls').value,
-    text: (row.querySelector('.stk-def-text').value || '').trim(),
-  })).filter(d => d.text);
+  const noteEl = takeover.querySelector('#stk-note-input');
+  const rootEl = takeover.querySelector('#stk-root-input');
+  const note = ((noteEl && noteEl.value) || '').trim() || null;
+  const root = ((rootEl && rootEl.value) || '').trim() || null;
+
+  // Scope to the definitions container, and read each row's fields
+  // defensively. This used to collect `.stk-def-row` from the whole panel,
+  // back when the syllable rows carried that class for its grid — so it
+  // picked up every syllable row too, and since #stk-syls renders above
+  // #stk-defs the very first match had no .stk-def-cls to read. That threw
+  // `null is not an object` on every single save. The class no longer does
+  // double duty; this stays scoped and null-safe so it can't come back.
+  const defsRoot = takeover.querySelector('#stk-defs');
+  const defs = (defsRoot ? [...defsRoot.querySelectorAll('.stk-def-row')] : [])
+    .map(row => {
+      const clsEl = row.querySelector('.stk-def-cls');
+      const textEl = row.querySelector('.stk-def-text');
+      if (!clsEl || !textEl) return null;
+      return { cls: clsEl.value, text: (textEl.value || '').trim() };
+    })
+    .filter(d => d && d.text);
+
   if (!note && !root && !defs.length) return null;
   return JSON.stringify({ note, root, defs });
 }
@@ -5717,7 +5739,10 @@ async function submitTakeover(status, sylsEl, submitBtn, statusEl, defsEl, takeo
   // checkWord() compares against; a lowercase TARGET_WORD never matches.
   const wordNorm = syllables.join('');
   const defRows = [...defsEl.querySelectorAll('.stk-def-row')];
-  const hasAnyDef = defRows.some(r => (r.querySelector('.stk-def-text').value || '').trim());
+  const hasAnyDef = defRows.some(r => {
+    const textEl = r.querySelector('.stk-def-text');
+    return !!(textEl && (textEl.value || '').trim());
+  });
   if (!hasAnyDef) {
     statusEl.textContent = 'En az bir anlam gir.';
     statusEl.className = 'stk-status err';
