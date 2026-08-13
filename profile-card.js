@@ -37,14 +37,19 @@
   // they act on (the settings sliders and the account), so they live
   // with them on Kütüphane.
   //
+  // Anahane is the one page where the cover isn't rendered on its own:
+  // there the frame becomes the middle cell of the hane honeycomb (see
+  // hiveHTML), with the six member slots around it. Same frame, same
+  // avatar, same stickers — it just has neighbours.
+  //
   // Nothing here scrolls: each page's profile fits inside the sheet the
   // way a politician's does (see .profile-overlay-body in
   // profile-card.css). Adding a block to a page means checking it still
   // fits, not adding a scrollbar.
   const PROFILE_SECTIONS = {
-    anahane:   { week: false, account: false, settings: false },
-    kahvehane: { week: true,  account: false, settings: false },
-    kutuphane: { week: false, account: true,  settings: true },
+    anahane:   { hive: true,  week: false, account: false, settings: false },
+    kahvehane: { hive: false, week: true,  account: false, settings: false },
+    kutuphane: { hive: false, week: false, account: true,  settings: true },
   };
   const DEFAULT_PAGE = 'anahane';
 
@@ -901,14 +906,17 @@
   // needed in the customizing case, to know whether the locked Sözcü hat
   // should show unlocked (the accessory row's lock is unconditional — see
   // AVATAR_ACCESSORY_OPTIONS — so it doesn't need it).
-  function coverHTML(opts) {
-    const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText, editable, customizing, sozculCount } = opts;
-    const placed = normalizedCoverBadges(profile);
-    const badgesHTML = placed.map(p => {
+  function coverBadgesHTML(profile) {
+    return normalizedCoverBadges(profile).map(p => {
       const badge = BADGES.find(b => b.id === p.id);
       if (!badge) return '';
       return `<img class="ist-pc-cover-badge" data-id="${badge.id}" draggable="false" style="left:${p.x}%; top:${p.y}%;" src="${badge.src}" alt="${esc(badge.label)}" title="${esc(badge.label)}">`;
     }).join('');
+  }
+
+  function coverHTML(opts) {
+    const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText, editable, customizing, sozculCount } = opts;
+    const badgesHTML = coverBadgesHTML(profile);
     // The avatar art layer. It is always its own element inside the frame
     // (never the frame box itself) because the carousels replace its whole
     // innerHTML on every arrow press — sharing a parent with the stickers
@@ -954,6 +962,123 @@
         <div class="ist-pc-cover-meta">${esc(metaText)}</div>
       </div>
     `;
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // THE HANE HONEYCOMB (anahane's profile page)
+  //
+  // Your own frame in the middle cell, six slots packed around it. A
+  // slot is a place the user puts *another member*, so that opening
+  // their own profile on the middle page is also how they look in on
+  // the handful of people they keep close — the profile stays the
+  // anchor point of the middle page, but it stops being only about the
+  // person holding the phone.
+  //
+  // Reading the honeycomb as three rows of 2 / 3 / 2 cells (the middle
+  // cell of the middle row being the user) is what packs them: the
+  // short rows are centred against the long one, which offsets them by
+  // exactly half a cell, and the rows overlap slightly so the frames
+  // interlock instead of sitting in a table (see .ist-hive in
+  // profile-card.css). Each slot's readout — what that member is up to
+  // — is printed on the outer side of its own row, so the pairs read
+  // outward from the middle rather than into it.
+  //
+  // The slots hold nobody yet: who may be put in one, and what of them
+  // is shown, is a rule that doesn't exist yet. Until it does, every
+  // slot renders empty (a muted frame with a "+") and the readout beside
+  // it is placeholder ruling, not data. When that rule lands, fill
+  // `members` below with the profiles in each slot — the layout does not
+  // need to change for it.
+  // ══════════════════════════════════════════════════════════════
+  const HIVE_SLOT_COUNT = 6;
+
+  // How the three rows are laid out, in slot order (0-5, clockwise-ish
+  // from the top-left): two slots up top, one either side of the user,
+  // two along the bottom. `me` marks where the user's own frame goes.
+  const HIVE_ROWS = [
+    { slots: [0, 1] },
+    { slots: [2, 3], me: 1 },   // user sits between the two middle slots
+    { slots: [4, 5] },
+  ];
+
+  // Placeholder ruling for a slot's readout — the lines are what a
+  // member's stats will occupy once there is something to print, so
+  // they're deliberately uneven (a rendered stat block is never a
+  // rectangle) and purely decorative, hence aria-hidden.
+  const HIVE_LINE_WIDTHS = [
+    [96, 72, 88],
+    [82, 96, 64],
+    [90, 66, 80],
+    [70, 92, 78],
+    [88, 74, 94],
+    [76, 90, 68],
+  ];
+
+  function hiveLinesHTML(slot, side) {
+    const widths = HIVE_LINE_WIDTHS[slot % HIVE_LINE_WIDTHS.length];
+    const lines = widths.map(w => `<span class="ist-hive-line" style="width:${w}%"></span>`).join('');
+    return `<div class="ist-hive-lines ist-hive-lines-${side}" aria-hidden="true">${lines}</div>`;
+  }
+
+  // One slot cell. `member` is always null for now (see the block
+  // comment above); the filled branch is written out so wiring a member
+  // in later is a matter of passing one, not of rebuilding the cell.
+  function hiveSlotHTML(slot, member, t) {
+    if (member) {
+      return `
+        <div class="ist-hive-cell ist-hive-slot-filled" data-slot="${slot}" data-user-id="${esc(member.id)}">
+          <div class="ist-pc-cover-avatar ist-hive-frame">
+            ${coverBadgesHTML(member)}
+            <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
+          </div>
+        </div>
+      `;
+    }
+    const label = t('profile.hive.empty');
+    return `
+      <div class="ist-hive-cell" data-slot="${slot}">
+        <div class="hexframe ist-hive-frame ist-hive-slot" title="${esc(label)}" aria-label="${esc(label)}" role="img">
+          <span class="ist-hive-plus" aria-hidden="true">+</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function hiveMeHTML(opts) {
+    const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName } = opts;
+    return `
+      <div class="ist-hive-cell ist-hive-me">
+        <div class="ist-pc-cover-avatar ist-hive-frame" title="${esc(displayName)}">
+          ${coverBadgesHTML(profile)}
+          <div class="ist-pc-cover-art">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function hiveHTML(opts) {
+    const t = opts.t;
+    // Slot → member map, once slots can actually hold anyone. Empty
+    // until that rule exists, which is what makes every cell render as
+    // an empty frame today.
+    const members = opts.members || {};
+    const rows = HIVE_ROWS.map(row => {
+      const cells = [];
+      row.slots.forEach((slot, i) => {
+        if (row.me === i) cells.push(hiveMeHTML(opts));
+        cells.push(hiveSlotHTML(slot, members[slot] || null, t));
+      });
+      if (row.me === row.slots.length) cells.push(hiveMeHTML(opts));
+      const [leftSlot, rightSlot] = [row.slots[0], row.slots[row.slots.length - 1]];
+      return `
+        <div class="ist-hive-row">
+          ${hiveLinesHTML(leftSlot, 'left')}
+          <div class="ist-hive-cells">${cells.join('')}</div>
+          ${hiveLinesHTML(rightSlot, 'right')}
+        </div>
+      `;
+    }).join('');
+    return `<div class="ist-hive" data-slots="${HIVE_SLOT_COUNT}">${rows}</div>`;
   }
 
   // Drag-and-drop repositioning of cover badges (Profil tab only — the
@@ -1044,8 +1169,10 @@
     return `
       <div class="ist-pc-settings-grid">
         <div class="ist-pc-settings-col ist-pc-settings-left">
-          ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText: yasadigiDisplay, editable: true, customizing, sozculCount })}
-          <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
+          ${show.hive
+            ? hiveHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, t })
+            : `${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText: yasadigiDisplay, editable: true, customizing, sozculCount })}
+          <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>`}
 
           ${show.week ? `
           <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>

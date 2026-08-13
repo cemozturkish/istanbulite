@@ -133,6 +133,15 @@
 .ist-sheet-body.profile-overlay-body {
   overflow: auto;
 }
+/* Anahane's page is the honeycomb and nothing else (see hiveHTML in
+   profile-card.js) — one fixed shape rather than a column of blocks read
+   top-down, so it's centred in the sheet instead of stacked from the top
+   with the whole void left under it. Centring happens inside the body's
+   padding box, so the close button's 48px of headroom is still clear. */
+.ist-sheet-body.profile-overlay-body:has(.ist-hive) {
+  display: grid;
+  align-content: center;
+}
 @media (max-width: 768px) {
   /* The shared phone rule leaves a scrolling sheet a generous run-out at
      the bottom. This page doesn't scroll, so that run-out is just room
@@ -394,6 +403,122 @@
   color: var(--muted);
 }
 
+/* ── The hane honeycomb (anahane's profile page) ──
+   Your own frame in the middle, six member slots packed around it (see
+   hiveHTML in profile-card.js). Anahane renders this INSTEAD of the plain
+   cover: the middle cell is that same cover frame — same mask, same drawn
+   ring, same stickers dropped on it — it just has neighbours here, so
+   there is no second frame treatment to keep in sync.
+
+   The packing is done by the rows themselves rather than by any per-cell
+   offset: the row of three is the widest, the two rows of two are centred
+   against it, and centring 2 cells over 3 lands each of them exactly over
+   a gap — a half-cell offset, for free, at any cell size. The rows then
+   pull up into each other slightly so the frames interlock instead of
+   reading as a table of avatars.
+
+   Cell size is capped against the window's height as well as in px,
+   because this page never scrolls (see .profile-overlay-body): three rows
+   of a tall hexagon is the whole height budget of the sheet, so on a short
+   window the cells give room up rather than pushing the bottom row out. */
+.ist-hive {
+  /* Height follows from the drawing's own ratio (frames.css), so the
+     width is the only size knob: 3 rows ≈ 3.8 × this tall. */
+  --ist-hive-cell-w: min(150px, 18.5vh);
+  /* The drawn hexagon doesn't fill its own box — the art is centred in a
+     1024×1536 canvas with the silhouette 780×1375 of it (the whole
+     hexframe family shares that canvas so the layers stay registered, see
+     --hexframe-ratio). That leaves ~11.9% of the width transparent on
+     each side and ~5.2% of the height top and bottom, so packing the
+     cells means pulling them into each other by that padding first: the
+     gaps below are what's left over on top of closing it, which is why
+     they're negative. Written against the cell width so the packing holds
+     at every size the honeycomb is drawn at. */
+  --ist-hive-gap: calc(var(--ist-hive-cell-w) * -0.215);
+  --ist-hive-row-overlap: calc(var(--ist-hive-cell-w) * -0.20);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 2px 0;
+}
+.ist-hive-row {
+  display: grid;
+  /* readout · cells · readout — the cells column is the same width in
+     every row (see .ist-hive-cells), so the readouts either side of it
+     line up down the honeycomb. */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+/* The interlock. Past closing the canvas padding it's kept shallow on
+   purpose: these hexagons are elongated, so pulling them a proper
+   honeycomb quarter-height into each other would bury the avatar art
+   standing at each frame's base. */
+.ist-hive-row + .ist-hive-row { margin-top: var(--ist-hive-row-overlap); }
+/* Every row's cell block is as wide as the widest row (the row of three),
+   so all three rows leave their readouts exactly the same room — and a
+   row of two centred in a box three cells wide still lands each of its
+   cells over a gap in the row of three, which is the offset that packs
+   the honeycomb. */
+.ist-hive-cells {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--ist-hive-gap);
+  width: calc(var(--ist-hive-cell-w) * 3 + var(--ist-hive-gap) * 2);
+}
+.ist-hive-cell {
+  position: relative;
+  width: var(--ist-hive-cell-w);
+  flex: 0 0 auto;
+}
+/* The frame fills its cell and takes its height from the drawing's ratio
+   (frames.css pins width:auto !important on every hexframe, so the cell
+   is what carries the width). */
+.ist-hive-frame {
+  width: auto;
+  height: auto;
+}
+/* An empty slot: the same drawn frame in muted ink, with a "+" where a
+   member will stand. Nothing behind it — no paper fill, so a slot nobody
+   is in reads as an opening in the honeycomb rather than as a filled cell
+   whose member failed to load, and the one frame that IS filled (yours,
+   in the middle) is the only one carrying weight. */
+.ist-hive-slot {
+  --hexframe-stroke: var(--muted);
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ist-hive-plus {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+  font-size: calc(var(--ist-hive-cell-w) * 0.26);
+  font-weight: 300;
+  line-height: 1;
+  color: var(--muted);
+}
+/* Each slot's readout, printed on the outer side of its own row. Until
+   there is anything to print (no rule yet for who goes in a slot, let
+   alone what of them is shown), these are placeholder rules — decorative,
+   hence aria-hidden in the markup. */
+.ist-hive-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.ist-hive-lines-left { align-items: flex-end; }
+.ist-hive-lines-right { align-items: flex-start; }
+.ist-hive-line {
+  display: block;
+  height: 8px;
+  max-width: 100%;
+  background: var(--ink);
+  border-radius: 4px;
+}
+
 /* ── Weekly game grid ── 3 rows (Sözcel/Tümcel/Bulmaca) × 7 days
    (Monday…Sunday, Istanbul time). See GAME_SCHEDULE / weekGridHTML in
    profile-card.js for which weekdays each game runs on and how a cell's
@@ -582,6 +707,14 @@
   .ist-pc-cover-pick-arrow svg { width: 8px; height: 8px; }
   .ist-pc-cover-name { max-width: 180px; margin-top: 6px; font-size: 1.05rem; }
   .ist-pc-cover-meta { margin-top: 1px; font-size: 0.62rem; }
+  /* The honeycomb is width-bound on a phone rather than height-bound: the
+     middle row is three cells plus two gaps wide, and the readouts either
+     side still need room to be legible. Smaller cells, tighter gaps,
+     thinner rules. */
+  .ist-hive { --ist-hive-cell-w: min(88px, 12vh); }
+  .ist-hive-row { gap: 8px; }
+  .ist-hive-lines { gap: 5px; }
+  .ist-hive-line { height: 5px; border-radius: 3px; }
   .ist-pc-weekgrid { margin-bottom: 0; }
   .ist-pc-daycell { max-width: 16px; }
   .ist-pc-weekgrid-row { margin-bottom: 1px; gap: 3px; }

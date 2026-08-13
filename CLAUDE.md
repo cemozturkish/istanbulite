@@ -333,6 +333,8 @@ sb.from('articles').delete().eq('id', id)
 - Left column: events panel (with RSVPs — `events` / `event_rsvps` tables)
 - Right column: breaking news feed (with polls, series, updates)
 - The personal layer lives here: the user's own profile, avatar, home identity
+- Opening your profile card here opens the **hane honeycomb** — your frame in the middle,
+  six slots for other members around it (see `PROFILE_SECTIONS` under Site-wide defaults)
 - Vision: this page is "you + Istanbul" — see Vision & Product Philosophy above
 
 ### `admin.html` — Admin Dashboard
@@ -497,9 +499,14 @@ stays: its body-level overlay markup, and every listener its script ever bound t
 
 The profile card opens your profile as the sheet above, but **what it contains depends on which of
 the three pages you opened it from** (`PROFILE_SECTIONS` in `profile-card.js`): the cover (frame,
-avatar, name, district) is on all three; the week's game grid is Kahvehane's; your account and
-settings — with the Kişiselleştir and Çıkış Yap buttons that act on them — are Kütüphane's.
-Anahane shows the cover alone until something is assigned to it.
+avatar, name, district) is Kahvehane's and Kütüphane's; the week's game grid is Kahvehane's; your
+account and settings — with the Kişiselleştir and Çıkış Yap buttons that act on them — are
+Kütüphane's. Anahane is **the hane honeycomb** (`hiveHTML`): your own cover frame as the middle
+cell of seven, with six slots packed around it for other members — so the middle page's profile is
+both who you are and who you keep close. The slots hold nobody yet; who may go in one, and what of
+them is shown beside it, is a rule that hasn't been designed (the readout next to each slot is
+placeholder ruling until it is). The honeycomb reuses the cover's own frame for its middle cell —
+same mask, same drawn ring, same badges — so there is no second frame treatment to keep in sync.
 
 None of the three scrolls: every set fits inside the sheet, the way a politician's page does. If a
 new block stops fitting, drop a block from that page — do not turn the page into a scroller.
