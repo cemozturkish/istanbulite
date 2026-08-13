@@ -232,9 +232,25 @@
        only ever opens above 1240px (see its own gate), but the venue
        panel opens anywhere col-left has its desktop layout, so this
        starts at the same 769px the desktop layout itself does. Parked
-       panels are clipped by col-left's own overflow:hidden. */
+       panels are clipped by col-left's own overflow:hidden.
+       The column also reaches out over the page's own canvas gutter
+       (frames.css rings the whole page in --frame-pad, so grid column 1
+       starts one pad in from the screen). Both panels are meant to read
+       as having come in from OUTSIDE the screen, and that gutter left a
+       strip of bare canvas showing to the left of a panel that was
+       supposed to be running off it -- dropping the panels' own left
+       padding and left borders (see below) couldn't close it, since the
+       gap is outside the panel entirely. So: pull the column's box left
+       by one pad and hand the same amount back as padding. In-flow
+       content (the discussion feed, the profile card) lands exactly
+       where it did, while the panels -- positioned against the padding
+       box -- now start at x=0 and run clean off the screen edge. */
     @media (min-width: 769px) {
-      .col-left { position: relative; }
+      .col-left {
+        position: relative;
+        margin-left: calc(-1 * var(--frame-pad, 10px));
+        padding-left: var(--frame-pad, 10px);
+      }
     }
     .game-score-slide {
       position: absolute;
@@ -2289,6 +2305,82 @@
       opacity: 1;
     }
 
+    /* ── Profile popup ── */
+    .profile-popup-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .profile-popup-overlay.open { display: flex; }
+    .profile-popup {
+      background: var(--paper);
+      border: 1px solid var(--ink);
+      width: 360px;
+      max-width: calc(100vw - 40px);
+      max-height: calc(100vh - 80px);
+      overflow: auto;
+      padding: 24px;
+      position: relative;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+    }
+    .profile-popup .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 26px;
+      height: 26px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .profile-popup .close-btn:hover { color: var(--ink); }
+    .profile-popup .close-btn .close-icon {
+      width: 17px;
+      height: 17px;
+      display: block;
+    }
+    /* Cover reuses the shared .ist-pc-cover markup from profile-card.css
+       (IstProfileCard.coverHTML): the hexagon frame itself, one fixed size
+       for every member, with no box around it. Only pushed down a bit
+       here so it clears the close button in this corner instead of
+       overlapping it — its height comes from the frame's own drawing. */
+    .profile-popup .ist-pc-cover {
+      margin-top: 16px;
+    }
+    /* The weekly game grid (.ist-pc-weekgrid) gets a frame added below
+       since it has no border of its own in the shared
+       CSS. */
+    .profile-popup .ist-pc-weekgrid {
+      border: 1px solid var(--ink);
+      padding: 8px 8px 6px;
+    }
+    .profile-popup .pp-since {
+      text-align: center;
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 1px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e5e5;
+    }
+    .profile-popup .pp-since-kefil { margin-top: 4px; text-transform: uppercase; }
+    .profile-popup .pp-loading,
+    .profile-popup .pp-error {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 30px 0;
+    }
     .author-link {
       cursor: pointer;
       text-decoration: none;
