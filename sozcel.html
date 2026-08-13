@@ -3754,27 +3754,72 @@ async function buildDailyCandidates(seed) {
 // looks completely normal while being a puzzle nobody else is playing,
 // and its result lands on the shared scoreboard as if it counted.
 async function pickDailyTarget(seed) {
+  let rpcFailure = null;
   try {
     const candidates = await buildDailyCandidates(seed);
     const { data, error } = await sb.rpc('sozcel_daily_word', {
       candidates: candidates.length > 0 ? candidates : null,
     });
+    if (error) rpcFailure = error;
+    else {
+      // The RPC returns a table — supabase-js hands back an array of rows.
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row || !row.word) return null;
+      return adoptDailyRow(row);
+    }
+  } catch (e) {
+    rpcFailure = e;
+  }
+
+  // The RPC itself couldn't be called. Read the day's row directly instead:
+  // that is still the word the database recorded — the read just can't
+  // *create* one the way the RPC can — so a day that already has a word
+  // (every Sözcü day, and any day another client already opened) stays
+  // playable through an outage of the function itself. This is not a local
+  // pick: if there is no row, the player is told, never handed a word of
+  // this client's own invention.
+  console.error('[sozcel pickDailyTarget] sozcel_daily_word failed', rpcFailure);
+  const recorded = await readRecordedWordForToday();
+  if (recorded) return adoptDailyRow(recorded);
+
+  TODAY_WORD_UNREACHABLE = true;
+  // A missing function is not a connectivity problem and no amount of
+  // refreshing fixes it — it means db/sozcel_used_answers_v5_server_pick.sql
+  // hasn't been applied to this database (or PostgREST's schema cache is
+  // still stale). Say which of the two the player is looking at.
+  TODAY_WORD_ERROR_IS_SETUP = (rpcFailure && (rpcFailure.code === 'PGRST202' ||
+    rpcFailure.code === 'PGRST203' || rpcFailure.code === '42883')) || false;
+  return null;
+}
+
+// Store a fetched day row into the game's per-day state, and hand back its
+// word. Trust the stored word regardless of length — a mismatch with today's
+// WORD_LENGTH is handled at boot by adapting the grid to the word.
+function adoptDailyRow(row) {
+  TODAY_DEFINITION = row.definition || null;
+  TODAY_SYLLABLES = row.syllables || null;
+  return row.word;
+}
+
+// Direct read of today's recorded answer, used only as the fallback above.
+// The date key is this client's Istanbul date (IstDate, built from
+// Intl parts — not a re-parsed localized string), and it is only ever used
+// to *look up* a row: getting it wrong finds nothing and shows the empty
+// state, it can never write a word onto the wrong day.
+async function readRecordedWordForToday() {
+  try {
+    const { data, error } = await sb
+      .from('sozcel_used_answers')
+      .select('word, definition, syllables')
+      .eq('used_on', getIstanbulDateISO())
+      .maybeSingle();
     if (error) {
-      console.error('[sozcel pickDailyTarget]', error);
-      TODAY_WORD_UNREACHABLE = true;
+      console.error('[sozcel readRecordedWordForToday]', error);
       return null;
     }
-    // The RPC returns a table — supabase-js hands back an array of rows.
-    const row = Array.isArray(data) ? data[0] : data;
-    if (!row || !row.word) return null;
-    // Trust the stored word regardless of length — a mismatch with today's
-    // WORD_LENGTH is handled at boot by adapting the grid to the word.
-    TODAY_DEFINITION = row.definition || null;
-    TODAY_SYLLABLES = row.syllables || null;
-    return row.word;
+    return data && data.word ? data : null;
   } catch (e) {
-    console.error('[sozcel pickDailyTarget]', e);
-    TODAY_WORD_UNREACHABLE = true;
+    console.error('[sozcel readRecordedWordForToday]', e);
     return null;
   }
 }
@@ -3785,6 +3830,10 @@ let TARGET_WORD = null;
 // session, RPC error) — as opposed to the day legitimately not having one
 // yet. Only changes which empty state the player is shown.
 let TODAY_WORD_UNREACHABLE = false;
+// Narrows the above: the word's database function is missing rather than
+// unreachable, so telling the player to check their connection would be
+// wrong — nothing on their side can fix it.
+let TODAY_WORD_ERROR_IS_SETUP = false;
 let TODAY_DEFINITION = null;
 // The Sözcü's own syllable breakdown for today's word (array of 2–3
 // strings), when they supplied one. null for auto-picked pool words and
@@ -5035,9 +5084,11 @@ initKeyboard();
     // substitute a locally-picked word here — see pickDailyTarget.
     const msg = document.getElementById('game-message');
     if (msg) {
-      msg.textContent = TODAY_WORD_UNREACHABLE
-        ? 'Bugünün kelimesine ulaşılamadı. Bağlantını kontrol edip sayfayı yenile.'
-        : 'Bugünkü sözcük henüz hazır değil.';
+      msg.textContent = !TODAY_WORD_UNREACHABLE
+        ? 'Bugünkü sözcük henüz hazır değil.'
+        : (TODAY_WORD_ERROR_IS_SETUP
+            ? 'Bugünün kelimesi hazırlanamadı. Sorun bizde — birazdan tekrar dene.'
+            : 'Bugünün kelimesine ulaşılamadı. Bağlantını kontrol edip sayfayı yenile.');
       msg.className = 'game-message';
     }
     gameOver = true;
