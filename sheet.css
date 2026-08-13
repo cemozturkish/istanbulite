@@ -120,8 +120,11 @@
    defaults to just under a compact profile card row. */
 @media (max-width: 768px) {
   .ist-sheet {
-    left: var(--frame-pad, 10px);
-    right: var(--frame-pad, 10px);
+    /* The same line the profile card floating over the map sits on (see
+       --screen-inset in frames.css). They are the two things stacked
+       over the same map, so their side gaps have to be the one gap. */
+    left: var(--screen-inset, 18px);
+    right: var(--screen-inset, 18px);
     width: auto;
     top: var(--ist-sheet-top, calc(var(--frame-pad, 10px) * 2 + 60px));
     height: auto;
@@ -132,5 +135,74 @@
      bottom of the sheet, so the end of a long page can be read. */
   .ist-sheet-body {
     padding: 40px 16px calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* The pull is for touch devices only — `pointer: coarse`, not merely a
+   narrow window. A narrow desktop window (or a mouse-driven tablet) is
+   ≤768px too, and there a sheet resting below the map with no finger to
+   lift it would just hang off the bottom of the screen with its content
+   out of reach; those keep the ordinary sheet above, which scrolls.
+   Keep this condition and IstSheet.pull's own matchMedia in step. */
+@media (max-width: 768px) and (pointer: coarse) {
+  /* ── The pulled sheet ──────────────────────────────────────────
+     The phone default for a page opened *over the map*: a news item, an
+     event, an article, the meclis, a country. It does not fill the
+     screen — it comes to rest half-way down, right under the map, so
+     you can still see where you tapped; then you drag it up as far as
+     the profile card and no further, and past that point the reading
+     goes on inside it. Dragged back down past its resting point, it
+     closes. IstSheet.pull (sheet.js) drives the gesture; this block is
+     the geometry it drives.
+
+     A sheet opts in with .ist-sheet-pull. Sheets that open *from* the
+     profile card (your profile, a member's) keep the plain rules above
+     — they belong to the card, not to the map.
+
+     Two values steer it, both live: --ist-sheet-rest, where it comes to
+     rest, and --ist-sheet-clamp, the highest its top edge may go
+     (measured off the profile card by sheet.js). The height is measured
+     from the CLAMP, not from the resting top, so a fully-raised sheet
+     lands its bottom edge exactly on the bottom of the screen and at
+     rest it simply hangs off it — the paper always continues past the
+     screen, its bottom edge never exposed mid-screen however short the
+     content is. */
+  .ist-sheet-overlay.ist-sheet-pull {
+    /* Where it comes to rest: where the map hero's box ends (frame-pad +
+       the map's own 100vw square + one more gap), but never so low that
+       it arrives nearly off-screen on a short viewport. A page with a
+       different hero sets --ist-sheet-rest-top itself. */
+    --ist-sheet-rest-top: calc(var(--frame-pad, 10px) + 100vw + var(--frame-pad, 10px));
+    --ist-sheet-rest: min(var(--ist-sheet-rest-top), calc(100vh - 180px));
+    /* Pre-measurement fallback for the ceiling — sheet.js replaces it
+       with the profile card's real bottom edge. */
+    --ist-sheet-clamp: calc(var(--frame-pad, 10px) * 2 + 60px);
+    /* The overlay never scrolls: the gesture owns the vertical axis. */
+    overflow: hidden;
+  }
+  .ist-sheet-pull .ist-sheet {
+    top: var(--ist-sheet-rest);
+    height: calc(100% - var(--ist-sheet-clamp));
+    /* Content that outruns the sheet scrolls inside it, but under the
+       gesture's control (overflow:hidden still allows programmatic
+       scrollTop) — a native scroller here would happily run past the
+       clamp. touch-action follows: this element owns its vertical
+       gesture, except where a scrollable region inside it takes over
+       once the sheet is fully raised (see sheet.js). */
+    overflow: hidden;
+    touch-action: none;
+    /* Closed: resting on the bottom edge of the screen, ready to be
+       pulled up — not a full 100% of its own (taller) height, which
+       would start it needlessly far down. */
+    transform: translateY(calc(100vh - var(--ist-sheet-rest)));
+  }
+  .ist-sheet-pull.open .ist-sheet { transform: translateY(0); }
+  /* The sheet itself is the scroller under the gesture, so its body
+     hands its own scroll back. Bottom padding clears the fixed tab bar
+     over the sheet's lower edge. */
+  .ist-sheet-pull .ist-sheet-body {
+    height: auto;
+    overflow: visible;
+    padding: 48px 24px calc(96px + env(safe-area-inset-bottom, 0px));
   }
 }

@@ -461,11 +461,17 @@ geometry and no centred modal anywhere on the site.
   content styling (`class="ist-sheet detail-overlay-sheet"`), never for size or position.
 - **Behaviour:** `IstSheet.open(overlay)` / `IstSheet.close(overlay, after)` — do not hand-roll
   the unhide → rAF → `.open` dance or the 550ms hide timeout.
-- **Phones:** a sheet rests under whatever the page pins at the top, via `--ist-sheet-top`
-  (`IstSheet.position` measures the compact profile card). The resting point is the only part a
-  page decides for itself. anahane's news/event sheet is the one documented exception: on touch
-  devices it is *dragged* (`initDetailPull`) rather than scrolled, so it hands the body's scroll
-  back to the sheet.
+- **Phones:** the sheet's side gaps are the same `--screen-inset` (frames.css) the mobile profile
+  card sits on — the two things stacked over the same map line up, always.
+  - A sheet opened **from the profile card** (your profile, a member's) rests under that card,
+    via `--ist-sheet-top` (`IstSheet.position` measures it live).
+  - A sheet opened **over the map** — a news item, an event, an article, the meclis, later a
+    country — carries `ist-sheet-pull` and is *dragged*: it comes to rest half-way down, under
+    the map, so you still see what you tapped; drag it up and it stops at the profile card;
+    past that the reading continues inside it; drag it back down and it closes. One
+    implementation, `IstSheet.pull(overlay, { onDismiss })` — attach it once and
+    `IstSheet.open/close` drive it from there. Touch only (`pointer: coarse`); a narrow desktop
+    window keeps the ordinary sheet.
 - **Chrome:** background/border come from `frames.css`'s `.ist-sheet` rule (2px ink border, no
   bottom border, no shadow).
 
