@@ -26,6 +26,21 @@
     return PAGES.includes(path) ? path : PAGES[0];
   }
 
+  // Marks the body-level overlay nodes this document really loaded with as
+  // belonging to the page that loaded them — navigateTo stamps the ones it
+  // injects the same way, so an id clash between two pages can be told
+  // apart from "already injected" (see its overlay injection below).
+  (function stampNativeOverlays() {
+    const mainSite = document.getElementById('main-site');
+    if (!mainSite) return;
+    const slug = currentPage();
+    let node = mainSite.nextElementSibling;
+    while (node && node.tagName !== 'SCRIPT') {
+      if (node.id) node.dataset.istPage = slug;
+      node = node.nextElementSibling;
+    }
+  }());
+
   // For pages that just want "redirect to index.html if not signed in"
   // (today's kutuphane.html/kahvehane.html behavior). anahane.html manages
   // its own login/signup overlay and session check, so it should not call
@@ -244,7 +259,24 @@
       if (cached.overlayHTML) {
         const wrap = document.createElement('div');
         wrap.innerHTML = cached.overlayHTML;
-        const newNodes = Array.from(wrap.children).filter(el => !el.id || !document.getElementById(el.id));
+        const newNodes = Array.from(wrap.children).filter(el => {
+          if (!el.id) return true;
+          const clash = document.getElementById(el.id);
+          if (!clash) return true;
+          // Already injected on an earlier virtual visit, or this page was
+          // the real initial load -- normal, skip it. But if the node that
+          // owns the id came from a DIFFERENT page, this page's overlay is
+          // being silently dropped and its script will drive the other
+          // page's node instead (both write the same sheet, the wrong one
+          // wins). Ids of body-level overlays MUST be unique across the
+          // three carousel pages -- say so loudly instead of failing quietly.
+          if (clash.dataset.istPage && clash.dataset.istPage !== targetSlug) {
+            console.warn(`[router] overlay id "${el.id}" is already owned by ${clash.dataset.istPage}; ` +
+                         `${targetSlug}'s copy was dropped. Give it a page-unique id.`);
+          }
+          return false;
+        });
+        newNodes.forEach(el => { if (el.id) el.dataset.istPage = targetSlug; });
         if (newNodes.length) {
           const mainSite = document.getElementById('main-site');
           if (mainSite) mainSite.after(...newNodes);

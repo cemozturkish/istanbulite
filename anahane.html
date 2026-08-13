@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="profile-card.css">
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
+  <script src="politician-card.js" defer></script>
   <script src="profile-card.js" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
@@ -1725,7 +1726,7 @@
 
        The one thing this page does differently is the box itself: there
        is exactly one visible box, not a gray outer sheet with a second
-       white card nested inside it. The #detail-overlay-sheet override
+       white card nested inside it. The #anahane-detail-sheet override
        below gives the SHEET the white chapter-box border/background
        (swapping out frames.css's gray shared fill) plus a drop shadow
        lifting it off the map, and the card rule further down strips the
@@ -1736,14 +1737,14 @@
        see the ≤768px block at the end of this stylesheet): native
        scrolling had no way to stop it from climbing over the profile
        card at the top of the page. */
-    #detail-overlay-sheet {
+    #anahane-detail-sheet {
       background: #fff !important;
       border: 2px solid var(--card-border-color, #1a1a1a) !important;
       border-bottom-width: 0 !important;
       box-shadow: var(--frame-shadow-strong) !important;
     }
     /* The card's own border/background are dropped inside the detail
-       overlay -- #detail-overlay-sheet now carries that box itself, so
+       overlay -- #anahane-detail-sheet now carries that box itself, so
        the card is just its content (kicker, headline, timeline) sitting
        in the sheet's padding, not a second bordered box nested inside
        the first. */
@@ -1755,8 +1756,8 @@
       padding: 0;
     }
 
-    /* Politician detail sheet -- opened from #politician-card (see
-       buildPoliticianDetailHtml). Same card treatment as .article
+    /* Politician detail sheet -- opened from #politician-card (built by
+       the shared politician-card.js). Same card treatment as .article
        (background/border/shadow), but a centered profile layout instead
        of an article's kicker+headline. */
     .politician-detail {
@@ -2179,11 +2180,11 @@
      details, opened instead of the old expand-in-place toggle — see
      openDetail/closeDetail and buildNewsDetailHtml/buildEventDetailHtml
      further down. -->
-<div class="ist-sheet-overlay detail-overlay" id="detail-overlay" hidden>
-  <div class="ist-sheet-backdrop" id="detail-overlay-backdrop"></div>
-  <div class="ist-sheet detail-overlay-sheet" id="detail-overlay-sheet">
-    <button type="button" class="ist-sheet-close" id="detail-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-    <div class="ist-sheet-body detail-overlay-body" id="detail-overlay-body"></div>
+<div class="ist-sheet-overlay detail-overlay" id="anahane-detail" hidden>
+  <div class="ist-sheet-backdrop" id="anahane-detail-backdrop"></div>
+  <div class="ist-sheet detail-overlay-sheet" id="anahane-detail-sheet">
+    <button type="button" class="ist-sheet-close" id="anahane-detail-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
+    <div class="ist-sheet-body detail-overlay-body" id="anahane-detail-body"></div>
   </div>
 </div>
 
@@ -2569,61 +2570,26 @@ async function loadPoliticalSeats() {
   return politicalSeatsById;
 }
 
-function politicianAvatarHTML(p) {
-  // Same illustrated avatar system as user profiles (bald base + optional
-  // shirt/accessory/hair/hat overlays) -- an empty/vacant seat just
-  // renders the plain bare base, same as a brand-new user with no picks.
-  return IstAvatar.html(null, p?.avatar_hair, p?.avatar_hat, p?.avatar_accessory, p?.avatar_shirt, p?.in_jail);
-}
-
+// The card and its detail view are drawn by the shared module
+// (politician-card.js) -- the same markup kahvehane and kütüphane print,
+// so a politician looks the same wherever you meet one. What stays here
+// is the part that is genuinely anahane's: the whole seat table is
+// cached and the card swaps seats as the district selection changes,
+// which the other two pages (one fixed seat each) never do.
 async function renderPoliticianCard(seatId) {
   const card = document.getElementById('politician-card');
   if (!card) return;
   const byId = await loadPoliticalSeats();
-  const seat = byId[seatId || 'istanbul'];
-  const p = seat?.politicians || null;
-  const seatLabel = seatId && seatId !== 'istanbul' ? (districtNames[seatId] || seatId) : 'İstanbul';
-
-  card.innerHTML = `
-    <div class="card-top">
-      <div class="card-id">
-        <div class="card-name">${esc(p ? `${p.first_name} ${p.last_name}`.trim() : seatLabel)}</div>
-        <div class="card-meta">${esc(seat?.title || 'Henüz eklenmedi')}</div>
-      </div>
-      <div class="avatar">${politicianAvatarHTML(p)}</div>
-    </div>
-  `;
-}
-
-// Opens the shared bottom-sheet (see openDetail) with the currently-shown
-// seat's full info -- looked up fresh from the cache at click time rather
-// than stashed on the card, so it always reflects whatever seat/district
-// is currently active on the map.
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('#politician-card') || !politicalSeatsById) return;
-  const seatId = activeNeighborhood || 'istanbul';
-  const seat = politicalSeatsById[seatId];
-  const seatLabel = seatId !== 'istanbul' ? (districtNames[seatId] || seatId) : 'İstanbul';
-  openDetail(buildPoliticianDetailHtml(seat, seatLabel));
-});
-
-function buildPoliticianDetailHtml(seat, seatLabel) {
-  const p = seat?.politicians || null;
-  const name = p ? `${p.first_name} ${p.last_name}`.trim() : seatLabel;
-  const birthParts = [];
-  if (p?.birth_date) birthParts.push(I18N.formatDate(p.birth_date, { year: 'numeric', month: 'long', day: 'numeric' }));
-  if (p?.birth_place) birthParts.push(p.birth_place);
-  return `
-    <div class="politician-detail">
-      <div class="politician-detail-avatar">${politicianAvatarHTML(p)}</div>
-      <div class="politician-detail-name">${esc(name)}</div>
-      <div class="politician-detail-title">${esc(seat?.title || 'Henüz eklenmedi')}</div>
-      ${p?.party ? `<div class="politician-detail-row"><strong>Parti:</strong> ${esc(p.party)}</div>` : ''}
-      ${birthParts.length ? `<div class="politician-detail-row"><strong>Doğum:</strong> ${esc(birthParts.join(', '))}</div>` : ''}
-      ${p?.bio ? `<p class="politician-detail-bio">${esc(p.bio)}</p>` : ''}
-      ${!p ? `<p class="politician-detail-bio" style="font-style:italic;color:var(--muted);">Bu koltuğa henüz kimse atanmadı.</p>` : ''}
-    </div>
-  `;
+  const id = seatId || 'istanbul';
+  const seat = byId[id];
+  const seatLabel = id !== 'istanbul' ? (districtNames[id] || id) : 'İstanbul';
+  card.innerHTML = IstPoliticianCard.cardHTML(seat, seatLabel);
+  // Bound to the card element, never delegated on document: #politician-card
+  // exists on all three carousel pages, and a document-level listener would
+  // survive a virtual navigation (see router.js) and keep firing on the
+  // other pages' cards -- opening anahane's sheet on top of theirs. The
+  // card lives inside #ist-content, so this binding leaves with it.
+  card.onclick = () => openDetail(IstPoliticianCard.detailHTML(seat, seatLabel));
 }
 
 function esc(s) {
@@ -3449,8 +3415,8 @@ function renderEventsNow(panel, rows) {
 // assigned but every entry point no-ops).
 let detailPull = null;
 function openDetail(html) {
-  const overlay = document.getElementById('detail-overlay');
-  const body = document.getElementById('detail-overlay-body');
+  const overlay = document.getElementById('anahane-detail');
+  const body = document.getElementById('anahane-detail-body');
   if (!overlay || !body) return;
   // Whatever's about to show is not the previously-marked news/event card
   // (the news/event click handler re-marks its own card right after
@@ -3475,7 +3441,7 @@ function openDetail(html) {
   });
 }
 function closeDetail() {
-  const overlay = document.getElementById('detail-overlay');
+  const overlay = document.getElementById('anahane-detail');
   if (!overlay) return;
   markOpenNewsCard(null);
   markOpenEventCard(null);
@@ -3488,10 +3454,10 @@ function closeDetail() {
   setTimeout(() => { overlay.hidden = true; }, 550);
 }
 (function initDetailOverlay() {
-  const overlay = document.getElementById('detail-overlay');
-  const backdrop = document.getElementById('detail-overlay-backdrop');
-  const closeBtn = document.getElementById('detail-overlay-close');
-  const body = document.getElementById('detail-overlay-body');
+  const overlay = document.getElementById('anahane-detail');
+  const backdrop = document.getElementById('anahane-detail-backdrop');
+  const closeBtn = document.getElementById('anahane-detail-close');
+  const body = document.getElementById('anahane-detail-body');
   if (!overlay || !backdrop || !closeBtn || !body) return;
   backdrop.addEventListener('click', closeDetail);
   closeBtn.addEventListener('click', closeDetail);
@@ -3543,8 +3509,8 @@ function closeDetail() {
 // Below 0 the sheet rubber-bands downward and lets go: pull it past the
 // rest point and it closes.
 detailPull = (function initDetailPull() {
-  const overlay = document.getElementById('detail-overlay');
-  const sheet = document.getElementById('detail-overlay-sheet');
+  const overlay = document.getElementById('anahane-detail');
+  const sheet = document.getElementById('anahane-detail-sheet');
   if (!overlay || !sheet) return null;
   const mobile = window.matchMedia('(max-width: 768px) and (pointer: coarse)');
 
