@@ -484,6 +484,17 @@ geometry and no centred modal anywhere on the site.
 - **Chrome:** background/border come from `frames.css`'s `.ist-sheet` rule (2px ink border, no
   bottom border, no shadow).
 
+### The phone's hero line — `--map-hero-end`
+
+On a phone all three carousel pages are one screen: a square map at the top, everything else
+below it. **Everything below starts on the same line** — Anahane's news and events, Kahvehane's
+comments and game tiles, Kütüphane's Dünya column and shelf boxes — and each map's caption sits
+just above it. A sheet pulled up over the map comes to rest there too. That line is
+`--map-hero-end` (frames.css: frame ring + `--map-hero-top` + the map's own `100vw` square); the
+profile card floating over the map sits on `--screen-inset`, and so do the sheets' side gaps.
+Never restate any of these as a number — swiping between the three pages must not shift the
+layout under the reader.
+
 ### The three carousel pages share one document
 
 `router.js` navigates Kütüphane ↔ Anahane ↔ Kahvehane **without a page load** — on the web too, not
