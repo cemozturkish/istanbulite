@@ -119,6 +119,7 @@ default one.
 ├── bulmaca.html          # Turkish daily mini crossword
 ├── admin.html            # Admin dashboard (admin-only)
 ├── router.js             # Shared shell: single Supabase client, swipe carousel, virtual navigation, clock
+├── sheet.css/.js         # THE sheet: the one page that rises from the bottom — see "Site-wide defaults"
 ├── profile-card.js/.css  # Floating profile card, avatar, badges — shared across pages
 ├── onboarding.js/.css    # New-account onboarding flow
 ├── game-locks.js         # Per-day game on/off enforcement (game_day_toggles)
@@ -436,9 +437,48 @@ git diff            # Check changes before committing
 
 ---
 
+## Site-wide defaults
+
+Some things on this site are **one object with one implementation**, not a pattern each page
+re-types. Before writing layout or chrome for a new surface, check whether it is one of these.
+If it is, use it as it is — do not restate its geometry, its transition or its markup in a page's
+own stylesheet, and do not invent a second version "just for this page". If the default is wrong
+for everyone, change the default.
+
+### THE sheet — `sheet.css` + `sheet.js`
+
+Every surface that opens *over* a page rises from the bottom centre of the window as the same
+object: a news item, an event, a game, an article, a shelf, a letter, the TBMM/meclis page, a
+politician, a Kahve Endeksi venue, your own profile, another member's profile. There is no second
+geometry and no centred modal anywhere on the site.
+
+- **Geometry** (desktop): anchored to the bottom edge, `min(680px, 86vw)` wide,
+  `min(88vh, 860px)` tall, sliding up from off-screen over 0.55s. The sheet's own bottom edge is
+  never left exposed mid-screen; content taller than the cap scrolls **inside** the sheet
+  (`.ist-sheet-body`), never by scrolling the overlay root.
+- **Markup:** `.ist-sheet-overlay` > `.ist-sheet-backdrop` + `.ist-sheet` >
+  `.ist-sheet-close` + `.ist-sheet-body`. A page may add its own class alongside these for
+  content styling (`class="ist-sheet detail-overlay-sheet"`), never for size or position.
+- **Behaviour:** `IstSheet.open(overlay)` / `IstSheet.close(overlay, after)` — do not hand-roll
+  the unhide → rAF → `.open` dance or the 550ms hide timeout.
+- **Phones:** a sheet rests under whatever the page pins at the top, via `--ist-sheet-top`
+  (`IstSheet.position` measures the compact profile card). The resting point is the only part a
+  page decides for itself. anahane's news/event sheet is the one documented exception: on touch
+  devices it is *dragged* (`initDetailPull`) rather than scrolled, so it hands the body's scroll
+  back to the sheet.
+- **Chrome:** background/border come from `frames.css`'s `.ist-sheet` rule (2px ink border, no
+  bottom border, no shadow).
+
+### Another member's profile — `IstProfileCard.initMemberSheet({ sb, I18N })`
+
+Clicking any `.author-link` / `.kefil-link` anywhere on the site opens that member's read-only
+profile as the sheet above (cover + weekly grid + member since + kefil chain). One implementation,
+in `profile-card.js`; each page just calls `initMemberSheet` once. Do not write a page-local
+profile popup.
+
 ## Coding Conventions
 
-1. **Self-contained pages:** Each `.html` file includes its own `<style>` and `<script>` tags inline. Do not create shared JS modules unless asked.
+1. **Self-contained pages, but never at the cost of a site-wide default:** Each `.html` file includes its own `<style>` and `<script>` tags inline for what is genuinely its own. Anything listed under **Site-wide defaults** above is not — reuse it. If the same block appears in two pages, it belongs in a shared file, not in a third page too.
 2. **No frameworks:** Stick to vanilla JavaScript. Do not introduce React, Vue, or any framework.
 3. **No build tools:** Do not add npm, webpack, vite, or any bundler.
 4. **Vanilla DOM:** Use `document.querySelector`, `innerHTML`, `addEventListener` — standard DOM APIs.

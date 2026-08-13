@@ -43,6 +43,8 @@
       } catch(e) {}
     })();
   </script>
+  <script src="sheet.js"></script>
+  <link rel="stylesheet" href="sheet.css">
   <style data-page="anahane">
     :root {
       /* Core ink & paper — cool cream newspaper palette */
@@ -1717,119 +1719,28 @@
       .sidebar-right-inner { padding: 6px 6px; }
     }
 
-    /* ── Detail overlay: bottom sheet for a news article or event's full
-       details, opened instead of the old expand-in-place toggle —
-       mirrors Kahvehane's game overlay / Kütüphane's reader overlay.
-       Unlike those, there's exactly one visible box here, not a gray
-       outer sheet with a second white card nested inside it: the
-       #detail-overlay-sheet override below gives the SHEET itself the
-       white chapter-box border/background (swapping out frames.css's
-       gray shared flat-card fill) plus a drop shadow lifting it off the
-       map, and the card rule further down strips the inner .article/
-       .event-item/.politician-detail's own border/background so it's
-       just content sitting in the sheet's padding. On desktop, scrolling
-       lives on .detail-overlay (the fixed, full-viewport root) rather
-       than on the sheet, so there's no separate clipped "window" with
-       its own scrollbar: the card is tall enough to run off the bottom
-       of the screen, and dragging anywhere moves it directly, like
-       pulling a sheet of paper up off the bottom edge rather than
-       scrolling through a fixed window onto it. On mobile that same
-       feel is driven by initDetailPull instead (see the ≤768px block at
-       the end of this stylesheet) -- native scrolling here had no way to
-       stop the sheet from climbing over the profile card, or to keep its
-       bottom edge from surfacing mid-screen. */
-    .detail-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 500;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      /* Where the sheet's top edge sits at rest. Just under the page's
-         own top chrome here; the ≤768px + coarse-pointer block at the end
-         of this stylesheet moves it below the map instead. Both the top
-         and the height below are driven off this one value so the sheet's
-         bottom always lands on (or past) the bottom edge of the screen. */
-      --detail-rest: max(6vh, 40px);
-    }
-    .detail-overlay[hidden] { display: none; }
-    .detail-overlay-backdrop {
-      /* Transparent, like the other two overlays — still catches
-         outside clicks to close. Fixed (not absolute) so it stays
-         pinned to the viewport instead of scrolling away with the
-         sheet when .detail-overlay's own scroll moves. */
-      position: fixed;
-      inset: 0;
-      background: transparent;
-    }
-    .detail-overlay-sheet {
-      position: absolute;
-      left: 50%;
-      /* Top-anchored instead of bottom-anchored: a card taller than the
-         visible area now grows downward, off the bottom of the screen
-         (revealed by scrolling .detail-overlay), rather than upward off
-         the top the way a bottom-anchored box with capped height would. */
-      top: var(--detail-rest);
-      /* Down to the bottom edge of the window exactly -- never a capped
-         box that stops short and shows its own bottom edge (and the page
-         underneath it) mid-screen. Taller content just runs on past the
-         bottom, and since the sheet moves up 1:1 with the overlay's
-         scroll, the bottom edge stays off-screen at every scroll position
-         until the very end, where it lands flush with the window's. */
-      min-height: calc(100vh - var(--detail-rest));
-      width: min(680px, 86vw);
-      transform: translate(-50%, 100%);
-      /* Ease-out-quint: fast off the bottom edge, then settles into place
-         slowly instead of arriving at a constant speed. Slower overall
-         duration than a typical UI transition so that initial burst
-         doesn't feel abrupt. */
-      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-    .detail-overlay.open .detail-overlay-sheet { transform: translate(-50%, 0); }
-    /* Override frames.css's shared flat-card rule (it targets
-       .detail-overlay-sheet by class, so the id selector's higher
-       specificity wins regardless of load order): this panel IS the
-       window now -- white with the same black border as .article,
-       plus a shadow to lift it off the map. The inner card no longer
-       draws its own border/background (see the rule below that strips
-       it), so there's exactly one visible box, not two nested ones.
-       No bottom border, on purpose (unlike .article's own thicker
-       bottom border) -- min-height below always fills down to the
-       viewport's true bottom edge, or past it once content is taller,
-       so the box's bottom edge is never sitting exposed mid-screen; a
-       drawn border there would show exactly the "here's where the
-       paper ends" line the whole point is to avoid. Only affects this
-       page's own #detail-overlay-sheet — kahvehane's element with the
-       same class/id lives in a different document and is untouched. */
+    /* ── News / event detail: opened as THE sheet (see sheet.css) —
+       the same object a game, an article or a profile opens as, so its
+       size, anchor and slide are not restated here.
+
+       The one thing this page does differently is the box itself: there
+       is exactly one visible box, not a gray outer sheet with a second
+       white card nested inside it. The #detail-overlay-sheet override
+       below gives the SHEET the white chapter-box border/background
+       (swapping out frames.css's gray shared fill) plus a drop shadow
+       lifting it off the map, and the card rule further down strips the
+       inner .article/.event-item/.politician-detail's own border and
+       background so it's just content sitting in the sheet's padding.
+
+       On mobile the sheet is dragged rather than scrolled (initDetailPull,
+       see the ≤768px block at the end of this stylesheet): native
+       scrolling had no way to stop it from climbing over the profile
+       card at the top of the page. */
     #detail-overlay-sheet {
       background: #fff !important;
       border: 2px solid var(--card-border-color, #1a1a1a) !important;
       border-bottom-width: 0 !important;
       box-shadow: var(--frame-shadow-strong) !important;
-    }
-    .detail-overlay-close {
-      position: absolute;
-      top: 10px;
-      right: 14px;
-      z-index: 2;
-      width: 32px;
-      height: 32px;
-      border: none;
-      background: none;
-      color: var(--ink);
-      font-size: 1rem;
-      line-height: 1;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .detail-overlay-close .close-icon {
-      width: 22px;
-      height: 22px;
-      display: block;
-    }
-    .detail-overlay-body {
-      padding: 48px 24px 24px;
     }
     /* The card's own border/background are dropped inside the detail
        overlay -- #detail-overlay-sheet now carries that box itself, so
@@ -1937,11 +1848,11 @@
     }
     /* The pull layout is for touch devices only -- `pointer: coarse`, not
        just a narrow viewport. A narrow desktop window (or a tablet driven
-       by a mouse) is ≤768px too, and there the sheet has to stay a plain
-       native scroller: it takes the desktop rules above unchanged, since
-       initDetailPull's touch gesture is the only thing that could move a
-       sheet laid out the way the block below lays it out. Keep this
-       condition and initDetailPull's own matchMedia in step. */
+       by a mouse) is ≤768px too, and there the sheet stays a plain native
+       scroller (sheet.css's own phone rules), since initDetailPull's
+       touch gesture is the only thing that could move a sheet laid out
+       the way the block below lays it out. Keep this condition and
+       initDetailPull's own matchMedia in step. */
     @media (max-width: 768px) and (pointer: coarse) {
       .detail-overlay {
         /* Where the sheet comes to rest when it first opens: right where
@@ -1996,11 +1907,16 @@
         transform: translateY(calc(100vh - var(--detail-rest)));
       }
       .detail-overlay.open .detail-overlay-sheet { transform: translateY(0); }
-      /* Clears the iOS Safari toolbar / bottom tab bar sitting over the
-         bottom of the (layout-viewport-sized) sheet, so the end of a long
-         article can actually be read once it's scrolled all the way up. */
+      /* The sheet itself is the scroller under the pull gesture here, so
+         the body hands its scroll back (sheet.css makes the body the
+         scroller everywhere else). Bottom padding clears the iOS Safari
+         toolbar / bottom tab bar sitting over the bottom of the
+         (layout-viewport-sized) sheet, so the end of a long article can
+         actually be read once it's pulled all the way up. */
       .detail-overlay-body {
-        padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+        height: auto;
+        overflow: visible;
+        padding: 48px 24px calc(96px + env(safe-area-inset-bottom, 0px));
       }
     }
   </style>
@@ -2263,11 +2179,11 @@
      details, opened instead of the old expand-in-place toggle — see
      openDetail/closeDetail and buildNewsDetailHtml/buildEventDetailHtml
      further down. -->
-<div class="detail-overlay" id="detail-overlay" hidden>
-  <div class="detail-overlay-backdrop" id="detail-overlay-backdrop"></div>
-  <div class="detail-overlay-sheet" id="detail-overlay-sheet">
-    <button type="button" class="detail-overlay-close" id="detail-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-    <div class="detail-overlay-body" id="detail-overlay-body"></div>
+<div class="ist-sheet-overlay detail-overlay" id="detail-overlay" hidden>
+  <div class="ist-sheet-backdrop" id="detail-overlay-backdrop"></div>
+  <div class="ist-sheet detail-overlay-sheet" id="detail-overlay-sheet">
+    <button type="button" class="ist-sheet-close" id="detail-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
+    <div class="ist-sheet-body detail-overlay-body" id="detail-overlay-body"></div>
   </div>
 </div>
 
@@ -3545,12 +3461,11 @@ function openDetail(html) {
   body.innerHTML = html;
   if (window.IstPersonMentions) IstPersonMentions.linkify(body, personMentionsRoster);
   overlay.hidden = false;
-  // On desktop .detail-overlay is itself the scroll container (see
-  // .detail-overlay-sheet's top-anchored, unclipped height) -- reset so a
+  // The sheet's body is the scroll container (see sheet.css) -- reset so a
   // tall card left scrolled from a previous open doesn't reopen
   // mid-scroll on the next one. detailPull.reset() does the same for the
   // mobile pull (sheet offset + the sheet's own scroll).
-  overlay.scrollTop = 0;
+  body.scrollTop = 0;
   if (detailPull) detailPull.reset();
   requestAnimationFrame(() => {
     overlay.classList.add('open');
@@ -3884,6 +3799,18 @@ detailPull = (function initDetailPull() {
 // profile card's already mounted from the real page load that got them
 // into the app in the first place.
 if (!window.__istVirtualNavInjecting) checkSession();
+
+// Another member's profile: one sheet for the whole site (see
+// openMemberSheet in profile-card.js). This page prints no member links
+// of its own yet, but wiring it here means one will work the day it does
+// -- and that the sheet is the same object it is everywhere else.
+// profile-card.js is deferred, so this waits for it rather than reaching
+// for it mid-parse.
+(function wireMemberSheet() {
+  const wire = () => { if (window.IstProfileCard) IstProfileCard.initMemberSheet({ sb, I18N }); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+  else wire();
+})();
 
 IstRouter.registerPage('anahane', { mount, unmount });
 })();

@@ -1,0 +1,136 @@
+/* ══════════════════════════════════════════════════════════════════
+   sheet.css — THE sheet: the one page that rises from the bottom.
+
+   Site-wide default, defined exactly once. Every surface that opens
+   *over* a page — a news item, an event, a game, an article, a shelf,
+   the TBMM page, a politician, a venue, your own profile, another
+   member's profile — is this same object: a narrow page anchored to
+   the bottom centre of the window, sliding up from below the screen.
+
+   There is no second geometry. A page needing a sheet uses these
+   classes as they are; it does not restate the size, the anchor or
+   the transition in its own stylesheet. What a page may add is what
+   is genuinely its own: the content inside the sheet, and (where the
+   layout demands it) the ≤768px resting position, since on phones a
+   sheet comes to rest under whatever that page keeps at the top.
+
+   Markup (ids are per page; the classes below carry the behaviour):
+
+     <div class="ist-sheet-overlay …" hidden>
+       <div class="ist-sheet-backdrop"></div>
+       <div class="ist-sheet …">
+         <button class="ist-sheet-close">…</button>
+         <div class="ist-sheet-body …"></div>
+       </div>
+     </div>
+
+   Opening = set hidden = false, then add .open on the next frame.
+   Closing = remove .open, then hidden = true after the 0.55s slide.
+
+   Background/border come from frames.css's shared bottom-sheet rule.
+   ══════════════════════════════════════════════════════════════════ */
+
+.ist-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+}
+.ist-sheet-overlay[hidden] { display: none; }
+
+/* Transparent: nothing behind the sheet gets tinted — the page it rose
+   from stays fully legible beside it. Still present so a click outside
+   the sheet closes it. */
+.ist-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}
+
+.ist-sheet {
+  position: absolute;
+  left: 50%;
+  /* Anchored to the bottom edge of the window and capped in height, so
+     the sheet's own bottom edge is never left sitting exposed
+     mid-screen: it either fills to the bottom or runs past it. Content
+     taller than the cap scrolls *inside* the sheet (.ist-sheet-body) —
+     the overlay itself never scrolls, so the sheet cannot drift off its
+     anchor and the close button stays put while you read. */
+  bottom: 0;
+  width: min(680px, 86vw);
+  height: min(88vh, 860px);
+  overflow: hidden;
+  transform: translate(-50%, 100%);
+  /* Ease-out-quint: fast off the bottom edge, then settles into place
+     slowly instead of arriving at a constant speed. Slower overall than
+     a typical UI transition so that initial burst doesn't feel abrupt. */
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ist-sheet-overlay.open .ist-sheet { transform: translate(-50%, 0); }
+
+/* The scrolling half of the sheet. Absolute-positioned chrome (the
+   close button) sits outside it, so it stays pinned while this scrolls. */
+.ist-sheet-body {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 48px 24px 24px;
+}
+
+.ist-sheet-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ist-sheet-close .close-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
+/* Below ~1240px the window isn't wide enough for a centred 680px sheet
+   to clear the 260px side columns — the columns step aside instead of
+   the sheet cramping into the same space. */
+@media (max-width: 1240px) {
+  body:has(.ist-sheet-overlay.open) .col-left,
+  body:has(.ist-sheet-overlay.open) .col-right {
+    visibility: hidden;
+  }
+}
+
+/* ── Phones ────────────────────────────────────────────────────────
+   Same object, sized to the screen: inset by the frame gap on three
+   sides so a sliver of the page canvas still shows around it, flush
+   against the bottom edge (frames.css drops the bottom border to
+   match) so it reads as continuing past the screen.
+
+   Where its top edge rests is the one thing a page decides for itself:
+   --ist-sheet-top, set by the page's stylesheet or measured live in JS,
+   defaults to just under a compact profile card row. */
+@media (max-width: 768px) {
+  .ist-sheet {
+    left: var(--frame-pad, 10px);
+    right: var(--frame-pad, 10px);
+    width: auto;
+    top: var(--ist-sheet-top, calc(var(--frame-pad, 10px) * 2 + 60px));
+    height: auto;
+    transform: translateY(100%);
+  }
+  .ist-sheet-overlay.open .ist-sheet { transform: translateY(0); }
+  /* Clears the iOS Safari toolbar / bottom tab bar sitting over the
+     bottom of the sheet, so the end of a long page can be read. */
+  .ist-sheet-body {
+    padding: 40px 16px calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+}

@@ -18,6 +18,8 @@
   <script src="game-locks.js"></script>
   <link rel="stylesheet" href="profile-card.css">
   <script src="profile-card.js" defer></script>
+  <script src="sheet.js"></script>
+  <link rel="stylesheet" href="sheet.css">
   <style>
     :root {
       --ink: #4C382A;
@@ -2136,80 +2138,15 @@ async function loadMyTumceHistory() {
   }
 }
 
-// ── Profile popup ──
-(function initProfilePopup() {
-  const overlay = document.createElement('div');
-  overlay.className = 'profile-popup-overlay';
-  overlay.innerHTML = `
-    <div class="profile-popup" role="dialog" aria-modal="true">
-      <button class="close-btn" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-      <div class="pp-body"><div class="pp-loading">Yükleniyor…</div></div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
 
-  const body = overlay.querySelector('.pp-body');
-  function close() { overlay.classList.remove('open'); }
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-  overlay.querySelector('.close-btn').addEventListener('click', close);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && overlay.classList.contains('open')) close();
-  });
-
-  function nbLabel(id) {
-    if (!id) return '—';
-    if (id === 'istanbul_disi') return 'İstanbul Dışı';
-    return (typeof neighborhoodNames !== 'undefined' && neighborhoodNames[id]) || id;
-  }
-
-  function capitalizeName(s) {
-    if (!s) return '';
-    return s.trim().split(/\s+/).map(w => w ? w.charAt(0).toLocaleUpperCase('tr-TR') + w.slice(1).toLocaleLowerCase('tr-TR') : '').join(' ');
-  }
-
-  async function open(userId) {
-    overlay.classList.add('open');
-    body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
-    const [{ data, error }, weekStatus] = await Promise.all([
-      sb.from('profiles')
-        .select('id, first_name, last_name, neighborhood, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt, cover_badges, joined_at, referred_by')
-        .eq('id', userId)
-        .maybeSingle(),
-      IstProfileCard.getWeekGameStatus(sb, userId),
-    ]);
-    if (error || !data) {
-      body.innerHTML = '<div class="pp-error">Profil yüklenemedi.</div>';
-      return;
-    }
-    let kefilName = null, kefilId = null;
-    if (data.referred_by) {
-      const { data: kp } = await sb
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('id', data.referred_by)
-        .maybeSingle();
-      if (kp) {
-        kefilName = capitalizeName(`${kp.first_name || ''} ${kp.last_name || ''}`.trim()) || 'İsimsiz Üye';
-        kefilId = kp.id;
-      }
-    }
-    const fullName = capitalizeName(`${data.first_name || ''} ${data.last_name || ''}`.trim()) || 'İsimsiz Üye';
-    body.innerHTML = `
-      ${IstProfileCard.coverHTML({ profile: data, avatarUrl: data.avatar_url, avatarHair: data.avatar_hair, avatarHat: data.avatar_hat, avatarAccessory: data.avatar_accessory, avatarShirt: data.avatar_shirt, displayName: fullName, metaText: nbLabel(data.neighborhood) })}
-      ${IstProfileCard.weekGridHTML(weekStatus, I18N)}
-      <div class="pp-since">
-        <div>${I18N.formatMemberSince(data.joined_at)}</div>
-        ${kefilName ? `<div class="pp-since-kefil">${I18N.t('profile.kefil')}: <span class="author-link" data-user-id="${kefilId}">${kefilName}</span></div>` : ''}
-      </div>
-    `;
-  }
-
-  document.addEventListener('click', (e) => {
-    const link = e.target.closest('.author-link');
-    if (!link) return;
-    const id = link.getAttribute('data-user-id');
-    if (id) open(id);
-  });
+// Another member's profile: one sheet for the whole site (see
+// openMemberSheet in profile-card.js), opened by any .author-link /
+// .kefil-link on this page. profile-card.js is deferred, so this waits
+// for it instead of reaching for it mid-parse.
+(function wireMemberSheet() {
+  const wire = () => { if (window.IstProfileCard) IstProfileCard.initMemberSheet({ sb, I18N }); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+  else wire();
 })();
 </script>
 </body>

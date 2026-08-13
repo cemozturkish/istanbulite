@@ -44,6 +44,8 @@
       } catch(e) {}
     })();
   </script>
+  <script src="sheet.js"></script>
+  <link rel="stylesheet" href="sheet.css">
   <style data-page="kutuphane">
     :root {
       /* Core ink & paper — warm cream newspaper palette */
@@ -881,86 +883,23 @@
       opacity: 1;
     }
 
-    /* ── Reader overlay: a bottom sheet that rises over the map and
-       shelves when a shelf is opened, mirroring kahvehane's game overlay.
-       Houses two interchangeable views rendered into the same sheet: a
-       shelf's table of contents (renderShelfPathView) and the article
-       reader itself (openArticleReader) — picking a chapter swaps the
-       sheet's content without closing/reopening it. A shelf with only one
-       article skips the table of contents and opens straight into the
-       reader (chapters aren't mandatory). Closing (← Raf/Raflar, backdrop
-       click, Esc) hides the sheet and returns to the shelves grid.
-       Unlike the game overlay (a floating centered card), this sheet stays
-       flush against the bottom edge it rose from — inset from the left,
-       right and top so the map/shelves still show around it, but with no
-       gap below. Mobile falls back to full-bleed, same as the game overlay. */
-    .reader-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 500;
-    }
-    .reader-overlay[hidden] { display: none; }
-    .reader-overlay-backdrop {
-      /* No dimming for now — the side column is the point of the
-         swap, so nothing behind the sheet gets tinted. Still present
-         (transparent) so clicking outside the sheet still closes it. */
-      position: absolute;
-      inset: 0;
-      background: transparent;
-    }
-    .reader-overlay-sheet {
-      /* Background/border/shadow come from frames.css's shared flat-card
-         rule, matching every other panel on the page. Scrolling happens
-         inside each view's own content region (.shelf-path / .reader-scroll)
-         instead of here, so the reader's bottom action bar can stay
-         pinned in place regardless of scroll position. */
-      position: absolute;
-      left: 50%;
-      bottom: 0;
-      width: min(680px, 86vw);
-      height: min(88vh, 860px);
-      overflow: hidden;
-      transform: translate(-50%, 100%);
-      /* Ease-out-quint: fast off the bottom edge, then settles into place
-         slowly instead of arriving at a constant speed. Slower overall
-         duration than a typical UI transition so that initial burst
-         doesn't feel abrupt. */
-      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-    .reader-overlay.open .reader-overlay-sheet { transform: translate(-50%, 0); }
-    /* Below ~1240px the viewport isn't wide enough for a centered 680px
-       sheet to avoid the 260px side columns (mirrors kahvehane's game
-       overlay fix) — the columns step aside instead of cramping into the
-       same space while a shelf/article is open. */
-    @media (max-width: 1240px) {
-      body:has(.reader-overlay.open) .col-left,
-      body:has(.reader-overlay.open) .col-right {
-        visibility: hidden;
-      }
-    }
+    /* ── The reader: articles, shelves, letters and the TBMM page all
+       open as THE sheet (see sheet.css) — the same object a news item, a
+       game or a profile opens as, so nothing about how it rises is
+       restated here. It houses interchangeable views rendered into the
+       same sheet: a shelf's table of contents (renderShelfPathView) and
+       the article reader itself (openArticleReader) — picking a chapter
+       swaps the sheet's content without closing/reopening it. A shelf
+       with only one article skips the table of contents and opens
+       straight into the reader (chapters aren't mandatory). Closing
+       (← Raf/Raflar, backdrop click, Esc) hides the sheet and returns to
+       the shelves grid.
+
+       Each view scrolls inside its own content region (.shelf-path /
+       .reader-scroll, both height:100% inside the sheet) rather than the
+       sheet scrolling as a whole, so the reader's bottom action bar
+       stays pinned regardless of scroll position. */
     @media (max-width: 768px) {
-      .reader-overlay-sheet {
-        /* Rises as high as it can -- right up under the profile card
-           floating over the map (#ist-pc-mount, z-index: 20), with the
-           same gap below the card as the sheet's own left/right gap,
-           rather than clearing the whole map. The card's height varies
-           with its content, so this top value is only a same-viewport
-           fallback (in case JS hasn't run yet) -- positionReaderSheet()
-           (near initReaderOverlay) sets the real, measured value inline
-           every time the sheet opens. Left/right get the frame-pad gap
-           so the map peeks through on 3 sides, like a page rising from
-           below -- flush at the bottom (see frames.css's
-           border-bottom-width: 0 for this class) so it reads as
-           continuing past the screen edge instead of stopping short. */
-        top: var(--frame-pad, 10px);
-        left: var(--frame-pad, 10px);
-        right: var(--frame-pad, 10px);
-        bottom: 0;
-        width: auto;
-        height: auto;
-        transform: translateY(100%);
-      }
-      .reader-overlay.open .reader-overlay-sheet { transform: translateY(0); }
       .reader-top { padding: 16px 20px 12px; }
       .reader-scroll { padding: 22px 20px 8px; }
       .reader-actions { padding: 14px 20px 18px; }
@@ -2178,8 +2117,8 @@
 
       /* On mobile, the kütüphane page is one screen: the map plus its two
          columns. Both the chapter list and the reader itself rise over it
-         as the same full-bleed .reader-overlay sheet (see
-         .reader-overlay-sheet's mobile rule below) rather than swapping
+         as the same full-bleed sheet (see sheet.css's phone rules)
+         rather than swapping
          #reading-area into view. */
       main {
         display: none;
@@ -3037,9 +2976,9 @@
   <!-- Article reader overlay: bottom sheet housing the chapter reader,
        opened instead of swapping it into #reading-area in place — see
        initReaderOverlay and openArticleReader further down. -->
-  <div class="reader-overlay" id="reader-overlay" hidden>
-    <div class="reader-overlay-backdrop" id="reader-overlay-backdrop"></div>
-    <div class="reader-overlay-sheet" id="reader-overlay-sheet"></div>
+  <div class="ist-sheet-overlay reader-overlay" id="reader-overlay" hidden>
+    <div class="ist-sheet-backdrop" id="reader-overlay-backdrop"></div>
+    <div class="ist-sheet reader-overlay-sheet" id="reader-overlay-sheet"></div>
   </div>
 
 <script>
@@ -3671,9 +3610,7 @@ async function openLibraryShelvesSheet() {
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
   area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
-  positionReaderSheet();
-  overlay.hidden = false;
-  requestAnimationFrame(() => overlay.classList.add('open'));
+  IstSheet.open(overlay);
   _closeReaderOverlay = closeReaderOverlay;
   if (!SHELVES_LOADED) await loadShelvesUI();
   renderShelfButtons();
@@ -3717,9 +3654,7 @@ async function openMektuplarSheet() {
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
   area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
-  positionReaderSheet();
-  overlay.hidden = false;
-  requestAnimationFrame(() => overlay.classList.add('open'));
+  IstSheet.open(overlay);
   _closeReaderOverlay = closeReaderOverlay;
   renderLettersList(await loadLetters());
 }
@@ -3969,9 +3904,7 @@ function openDunyaNewsDetail(n) {
     </div>
   `;
   document.getElementById('dunya-detail-back').addEventListener('click', closeReaderOverlay);
-  positionReaderSheet();
-  overlay.hidden = false;
-  requestAnimationFrame(() => overlay.classList.add('open'));
+  IstSheet.open(overlay);
   _closeReaderOverlay = closeReaderOverlay;
   (n.breaking_news_polls || []).forEach(p => loadAndRenderDunyaPoll(p));
 }
@@ -4150,20 +4083,6 @@ function showChapterIntro(article, index, onStart) {
 // measured rather than hardcoded. No-ops (clears the inline override)
 // above the mobile breakpoint, where the sheet is centered/floating
 // and doesn't sit under the card at all.
-function positionReaderSheet() {
-  const area = document.getElementById('reader-overlay-sheet');
-  if (!area) return;
-  if (!window.matchMedia('(max-width: 768px)').matches) { area.style.top = ''; return; }
-  const framePad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-pad')) || 10;
-  const pcMount = document.getElementById('ist-pc-mount');
-  const cardBottom = pcMount ? pcMount.getBoundingClientRect().bottom : 0;
-  area.style.top = `${Math.max(cardBottom, 0) + framePad}px`;
-}
-window.addEventListener('resize', () => {
-  const overlay = document.getElementById('reader-overlay');
-  if (overlay && overlay.classList.contains('open')) positionReaderSheet();
-});
-
 async function openShelfPath(shelfId) {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
@@ -4175,9 +4094,7 @@ async function openShelfPath(shelfId) {
   // fetch resolves, so this gets the same page-rising treatment as the
   // reader itself instead of appearing flat in the center column.
   area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
-  positionReaderSheet();
-  overlay.hidden = false;
-  requestAnimationFrame(() => overlay.classList.add('open'));
+  IstSheet.open(overlay);
   _closeReaderOverlay = closeReaderOverlay;
 
   const { data: articles, error } = await sb.from('library_articles')
@@ -4234,10 +4151,9 @@ function closeReaderOverlay() {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
-  overlay.classList.remove('open');
-  // Matches the sheet's own 0.55s transition (see .reader-overlay-sheet)
-  // so hiding doesn't cut the closing slide-down short.
-  setTimeout(() => { overlay.hidden = true; area.innerHTML = ''; }, 550);
+  // Content is cleared only once the sheet is off-screen, so it doesn't
+  // empty mid-slide (see sheet.js).
+  IstSheet.close(overlay, () => { area.innerHTML = ''; });
 }
 
 // TBMM page -- opened from the centered #tbmm-open-btn in the reading
@@ -4278,9 +4194,7 @@ async function openTBMMSheet() {
     </div>
   `;
   document.getElementById('tbmm-back').addEventListener('click', closeReaderOverlay);
-  positionReaderSheet();
-  overlay.hidden = false;
-  requestAnimationFrame(() => overlay.classList.add('open'));
+  IstSheet.open(overlay);
   _closeReaderOverlay = closeReaderOverlay;
 
   const byId = await loadTBMMSeats();
@@ -4341,7 +4255,6 @@ async function openTBMMSeatDetail(seatNumber) {
     </div>
   `;
   document.getElementById('tbmm-detail-back').addEventListener('click', openTBMMSheet);
-  positionReaderSheet();
 }
 
 // Generic bottom-sheet opener for #politician-card (see politician-card.js
@@ -4361,9 +4274,7 @@ function openPoliticianDetailSheet(html) {
     </div>
   `;
   document.getElementById('politician-detail-back').addEventListener('click', closeReaderOverlay);
-  positionReaderSheet();
-  overlay.hidden = false;
-  requestAnimationFrame(() => overlay.classList.add('open'));
+  IstSheet.open(overlay);
   _closeReaderOverlay = closeReaderOverlay;
 }
 
@@ -4655,9 +4566,7 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
   }
 
   renderStep();
-  positionReaderSheet();
-  overlay.hidden = false;
-  requestAnimationFrame(() => overlay.classList.add('open'));
+  IstSheet.open(overlay);
 }
 
 // Wires the reader overlay's backdrop-click/Escape close once; which
@@ -5228,96 +5137,15 @@ if (!window.__istVirtualNavInjecting) {
   }
 }
 
-// ── Profile popup — opens on any .kefil-link click, navigates in-place for the chain ──
-(function() {
-  const overlay = document.createElement('div');
-  overlay.className = 'profile-popup-overlay';
-  // Belt-and-suspenders like the game/reader overlays elsewhere: this
-  // element is created once, up front, and lives in the DOM for the rest
-  // of the session (outside #ist-content) -- once a virtual navigation
-  // (see router.js) disables this page's own stylesheet, the CSS class
-  // alone (.profile-popup-overlay{display:none}) stops applying and it'd
-  // render as bare, unstyled content. The `hidden` attribute's display:
-  // none comes from the browser's own built-in stylesheet, not this
-  // page's, so it stays correct regardless.
-  overlay.hidden = true;
-  overlay.innerHTML = `
-    <div class="profile-popup" role="dialog" aria-modal="true">
-      <button class="close-btn" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-      <div class="pp-body"><div class="pp-loading">Yükleniyor…</div></div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
 
-  const body = overlay.querySelector('.pp-body');
-
-  function close() { overlay.classList.remove('open'); overlay.hidden = true; }
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-  overlay.querySelector('.close-btn').addEventListener('click', close);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && overlay.classList.contains('open')) close();
-  });
-
-  function nbLabel(id) {
-    if (!id) return '—';
-    if (id === 'istanbul_disi') return 'İstanbul Dışı';
-    return neighborhoodNames[id] || id;
-  }
-
-  async function open(userId) {
-    overlay.hidden = false;
-    overlay.classList.add('open');
-    body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
-
-    const [{ data: prof, error }, weekStatus] = await Promise.all([
-      sb.from('profiles')
-        .select('id, first_name, last_name, neighborhood, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt, cover_badges, joined_at, referred_by')
-        .eq('id', userId)
-        .maybeSingle(),
-      IstProfileCard.getWeekGameStatus(sb, userId),
-    ]);
-
-    if (error || !prof) {
-      body.innerHTML = '<div class="pp-error">Profil yüklenemedi.</div>';
-      return;
-    }
-
-    let kefilName = null, kefilId = null;
-    if (prof.referred_by) {
-      const { data: kp } = await sb
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('id', prof.referred_by)
-        .maybeSingle();
-      if (kp) {
-        kefilName = capitalizeName((`${kp.first_name || ''} ${kp.last_name || ''}`).trim()) || 'İsimsiz Üye';
-        kefilId = kp.id;
-      }
-    }
-
-    const fullName = capitalizeName((`${prof.first_name || ''} ${prof.last_name || ''}`).trim()) || 'İsimsiz Üye';
-
-    // Cover (avatar + placed rozetler) and the weekly game grid reuse the
-    // same shared markup/logic as the self-editing Profil tab (see
-    // IstProfileCard.coverHTML/getWeekGameStatus/weekGridHTML in
-    // profile-card.js) instead of a page-local avatar circle.
-    body.innerHTML = `
-      ${IstProfileCard.coverHTML({ profile: prof, avatarUrl: prof.avatar_url, avatarHair: prof.avatar_hair, avatarHat: prof.avatar_hat, avatarAccessory: prof.avatar_accessory, avatarShirt: prof.avatar_shirt, displayName: fullName, metaText: nbLabel(prof.neighborhood) })}
-      ${IstProfileCard.weekGridHTML(weekStatus, I18N)}
-      <div class="pp-since">
-        <div>${I18N.formatMemberSince(prof.joined_at)}</div>
-        ${kefilName ? `<div class="pp-since-kefil">${I18N.t('profile.kefil')}: <button class="kefil-link" data-user-id="${kefilId}">${kefilName}</button></div>` : ''}
-      </div>
-    `;
-  }
-
-  // Delegate all .kefil-link clicks to open the popup
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.kefil-link');
-    if (!btn) return;
-    const id = btn.getAttribute('data-user-id');
-    if (id) open(id);
-  });
+// Another member's profile: one sheet for the whole site (see
+// openMemberSheet in profile-card.js), opened by any .author-link /
+// .kefil-link on this page. profile-card.js is deferred, so this waits
+// for it instead of reaching for it mid-parse.
+(function wireMemberSheet() {
+  const wire = () => { if (window.IstProfileCard) IstProfileCard.initMemberSheet({ sb, I18N }); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+  else wire();
 })();
 
 IstRouter.registerPage('kutuphane', { mount, unmount });
