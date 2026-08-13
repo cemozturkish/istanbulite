@@ -847,8 +847,9 @@
   // picked on the settings page (see settingsPageHTML/toggleCoverBadge)
   // dragged freely around *inside* it (see wireCoverDragging), over its
   // drawn background and under the avatar art. There is no cover rectangle
-  // behind the frame anymore: the frame is the pano, and it's sized off
-  // the name printed under it (see .ist-pc-cover in profile-card.css).
+  // behind the frame anymore: the frame is the pano, and it's the same
+  // fixed size for every member regardless of how long their name is
+  // (see .ist-pc-cover in profile-card.css).
   // Shared between the self-editing settings page
   // (settingsPageHTML below, editable: true) and kutuphane.html's read-only
   // "someone else's profile" popup (exposed as IstProfileCard.coverHTML,
