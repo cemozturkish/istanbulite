@@ -124,6 +124,7 @@ default one.
 ├── onboarding.js/.css    # New-account onboarding flow
 ├── game-locks.js         # Per-day game on/off enforcement (game_day_toggles)
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
+├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js,
@@ -254,6 +255,12 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 - Presence of a row = that game is disabled that day; absence = runs normally. Managed from the on/off board in admin.html's Oyunlar tab (toggling on deletes the row, toggling off upserts it).
 - Read by `game-locks.js` on every game page (and Kahvehane) to lock the game's nav card and, if a user hits the game page directly, bounce them to Kahvehane with "Bugün `<Oyun>` yok!".
 - RLS: authenticated users SELECT all; admin-only INSERT/UPDATE/DELETE.
+
+**Table: `sozcel_used_answers`** — one row per Istanbul day: that day's Sözcel answer (`db/sozcel_used_answers*.sql`).
+- `used_on date pk`, `word` (unique across all days, so an answer never repeats), `definition`, `syllables`, `sozcul_id`, `created_at`.
+- **The word is server-authoritative.** Clients never write today's row; they call `public.sozcel_daily_word(candidates text[])`, which resolves the Istanbul date server-side, returns the day's word if it has one, and otherwise records the first unused candidate — atomically, so simultaneous first-players of the day converge on one word (`db/sozcel_used_answers_v5_server_pick.sql`). The client's candidate list is only a proposal.
+- This exists because the pick used to be client-side: the answer's index was `hash(date) % pool.length`, so two clients whose snapshot of the used rows differed by a single row computed different words, and whoever lost the insert race kept playing their own word anyway. Never reintroduce a client-side fallback pick — a locally-invented word looks normal while being a puzzle nobody else is playing, and its result lands on the shared scoreboard.
+- RLS: authenticated users SELECT all; direct INSERT only for an assigned Sözcü's *own* row before its deadline (midnight Istanbul at the start of `used_on`), matching the UPDATE policy; DELETE admin-only.
 
 **Table: `app_settings`** — generic admin-managed key/value feature toggle table (`db/app_settings.sql`).
 - `key text pk`, `value boolean`, `updated_by`, `updated_at`.
@@ -515,7 +522,14 @@ profile popup.
 7. **Supabase SDK v2:** All database and auth calls go through `const sb = supabase.createClient(...)`.
 8. **Inline comments:** Add comments in English above significant code blocks.
 9. **Commit style:** Short, imperative commit messages (e.g. "Add profile page layout", "Fix map hover state").
-10. **Cross-cutting changes touch the game pages too.** When changing anything that lives on more than one page — nav, profile popup, scoreboard, lock rules, header layout, theme tokens — explicitly check **sozcel.html, tumcel.html, bulmaca.html** as well as anahane / kahvehane / kutuphane. The game pages are the easiest to forget and their right-column game nav must stay in sync. Shared logic that risks drift belongs in a dedicated `*.js` (see `game-locks.js`, `profile-card.js`) rather than copy-pasted into each page. **There is no `baglantilar.html`** — Bağlantılar was retired and replaced by Tümcel; do not recreate that file or add `baglantilar` to the games list. The `'baglantilar'` value lingering in the `game_results.game` CHECK constraint is for historical rows only; no new code should write it.
+10. **Never compute an Istanbul date by parsing a formatted one.** Anything that needs the Istanbul
+    date/time — daily seeds, `used_on` keys, game locks, opening hours, weekly cutoffs — goes
+    through `ist-date.js` (`IstDate.now()`, `.iso()`, `.daySeed()`, `.nextMidnight()`). The old
+    `new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }))` round-trip asks the
+    Date constructor to re-parse a human-readable string, which is engine-dependent (modern ICU
+    even inserts U+202F before AM/PM) — a device where it fails gets `NaN` fields and silently
+    addresses the wrong day.
+11. **Cross-cutting changes touch the game pages too.** When changing anything that lives on more than one page — nav, profile popup, scoreboard, lock rules, header layout, theme tokens — explicitly check **sozcel.html, tumcel.html, bulmaca.html** as well as anahane / kahvehane / kutuphane. The game pages are the easiest to forget and their right-column game nav must stay in sync. Shared logic that risks drift belongs in a dedicated `*.js` (see `game-locks.js`, `profile-card.js`) rather than copy-pasted into each page. **There is no `baglantilar.html`** — Bağlantılar was retired and replaced by Tümcel; do not recreate that file or add `baglantilar` to the games list. The `'baglantilar'` value lingering in the `game_results.game` CHECK constraint is for historical rows only; no new code should write it.
 
 ---
 

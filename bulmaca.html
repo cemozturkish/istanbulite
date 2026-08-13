@@ -798,6 +798,7 @@
   </style>
   <link rel="stylesheet" href="frames.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="ist-date.js"></script>
   <script src="i18n.js"></script>
   <script src="palette.js"></script>
   <script src="avatar.js"></script>
@@ -983,18 +984,12 @@ I18N.onChange(updateDateTime);
 
 // Daily seed for puzzle rotation
 function getDailySeed() {
-  const now = new Date();
-  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-  return `${ist.getFullYear()}-${ist.getMonth() + 1}-${ist.getDate()}`;
+  return IstDate.daySeed();
 }
 
 function getTimeUntilMidnight() {
-  const now = new Date();
-  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-  const tomorrow = new Date(ist);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
-  const diff = tomorrow - ist;
+  const ist = IstDate.now();
+  const diff = IstDate.nextMidnight() - ist;
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   return I18N.formatCountdown(hours, minutes, { prefixTr: 'Yeni bulmaca', prefixEn: 'New puzzle in' });
@@ -1531,7 +1526,7 @@ async function loadScoreboard() {
     listEl.innerHTML = '';
     return;
   }
-  const nowIst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+  const nowIst = IstDate.now();
   const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - 6);
   const weekly = results.filter(r => { const d = parseGameDate(r.date); return d && d >= cutoff; });
   if (weekly.length === 0) {

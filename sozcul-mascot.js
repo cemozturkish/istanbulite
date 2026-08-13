@@ -17,13 +17,7 @@
   let stylesInjected = false;
 
   function istanbulDateISO(offsetDays = 0) {
-    const now = new Date();
-    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-    ist.setDate(ist.getDate() + offsetDays);
-    const y = ist.getFullYear();
-    const m = String(ist.getMonth() + 1).padStart(2, '0');
-    const d = String(ist.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    return IstDate.iso(offsetDays);
   }
 
   // Returns either null (no session) or

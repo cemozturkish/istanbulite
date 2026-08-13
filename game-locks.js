@@ -29,12 +29,7 @@
   }
 
   function istanbulDateISO() {
-    const now = new Date();
-    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-    const y = ist.getFullYear();
-    const m = String(ist.getMonth() + 1).padStart(2, '0');
-    const d = String(ist.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    return IstDate.iso();
   }
 
   let _stylesInjected = false;
