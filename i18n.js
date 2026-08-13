@@ -63,6 +63,9 @@
     'profile.email':        { default: 'E-posta',             more_english: 'Email' },
     'profile.thisweek':     { default: 'Bu Hafta',             more_english: 'This Week' },
     'profile.profileinfo':  { default: 'Profil Bilgileri',     more_english: 'Profile Info' },
+    // The hane honeycomb on anahane: the six slots around your own frame
+    // (see hiveHTML in profile-card.js). Nobody can be put in one yet.
+    'profile.hive.empty':   { default: 'Boş yer',               more_english: 'Empty slot' },
 
     // login / signup (index.html)
     'auth.email':          { default: 'E-posta',             more_english: 'Email' },
