@@ -777,14 +777,15 @@
     .help-body .swatch.present { background: var(--present); border-color: var(--present); }
     .help-body .swatch.absent { background: var(--absent); border-color: var(--absent); opacity: 0.4; }
 
-    /* Row pairing the vertical attempt list (left) with the syllable
-       skeleton (right) so the used-guess pips sit at eye level next to
-       the board instead of stacked underneath it. */
+    /* The board's own row. It used to pair a vertical attempt list on the
+       left with the syllable skeleton on the right; the pips have moved
+       under the board, so the skeleton now has the full width to itself
+       and this is what carries the docking margin below. */
     .board-row {
       display: flex;
       flex-direction: row;
       align-items: center;
-      gap: 14px;
+      justify-content: center;
       flex-shrink: 0;
       /* Pairs with .keyboard's own margin-top:auto below to dock the
          keyboard to the bottom of the panel (the mobile layout already
@@ -796,10 +797,9 @@
       margin-top: auto;
     }
 
-    /* The board: one syllable-staircase skeleton (the current guess) on
-       top, the compact colored history of submitted guesses under it,
-       then the six attempt pips. Tile positions/sizes are computed in
-       buildBoard() — each syllable sits one level lower, its first tile
+    /* The board: one syllable-staircase skeleton, and that's all it holds
+       — no guess history under it. Tile positions/sizes are computed in
+       initWordGrid() — each syllable sits one level lower, its first tile
        tucked half a tile left of the previous syllable's last tile,
        nesting into the hexagons' tapered corners (see the mock). */
     .word-grid {
@@ -842,41 +842,31 @@
       animation: flip 0.5s ease;
     }
 
-    /* Six attempt pips, stacked vertically to the left of the board.
-       Unused = a small empty dot. Used = grows into a small pill showing
-       the actual word the player submitted for that attempt, so the
-       column reads as a compact guess history. Lives in .board-row (not
-       inside .word-grid) so it never grows/shifts the skeleton board. */
+    /* Six attempt pips in a horizontal row between the board and the
+       keyboard: how many guesses you have left, and nothing else. Empty
+       dot = still yours, filled = spent. They used to stand in a column
+       beside the board, each spent one growing into a pill printing the
+       word guessed — that history is gone on purpose (see updatePips).
+       Sits outside .word-grid so it never grows/shifts the board. */
     .attempt-pips {
       display: flex;
-      flex-direction: column;
-      align-items: flex-start;
+      flex-direction: row;
+      align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 12px;
       flex-shrink: 0;
     }
     .attempt-pips span {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       border: 1.5px solid var(--ink);
       background: transparent;
-      transition: all 0.2s ease;
+      transition: background 0.2s ease, opacity 0.2s ease;
     }
     .attempt-pips span.used {
-      width: auto;
-      height: auto;
-      min-width: 8px;
-      padding: 2px 6px;
-      border-radius: 4px;
       background: var(--ink);
-      border-color: var(--ink);
-      color: var(--paper);
-      font-size: 0.56rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      white-space: nowrap;
+      opacity: 0.5;
     }
 
     @keyframes flip {
@@ -1747,9 +1737,9 @@
     </div>
     <section class="game-panel" id="game-panel">
       <div class="board-row" id="board-row">
-        <div class="attempt-pips" id="attempt-pips"></div>
         <div class="word-grid" id="word-grid"></div>
       </div>
+      <div class="attempt-pips" id="attempt-pips"></div>
       <div class="game-message" id="game-message"></div>
       <div class="reset-info" id="reset-info"></div>
       <div class="keyboard" id="keyboard"></div>
@@ -4032,8 +4022,29 @@ function syllabifyTr(word) {
 // Geometry of the hexframe tile shape (see frames.css): width / height.
 const TILE_RATIO = 0.5713;
 // Consecutive syllable levels nest into the hexagons' tapered corners, so
-// each level steps down by less than a full tile height.
-const LEVEL_STEP = 0.86;
+// each level steps down by less than a full tile height. Lower = the
+// levels sit deeper into each other.
+const LEVEL_STEP = 0.82;
+// Widest a tile may get. The board is the page's one object worth looking
+// at, so it takes the room it can — the budgets below still shrink it to
+// whatever actually fits.
+const TILE_MAX_W = 96;
+// Narrowest before the letters stop being readable. Deliberately well
+// under TILE_MAX_W: this overrides the width budget, so a floor set too
+// high pushes the board off the side of a small screen.
+const TILE_MIN_W = 24;
+// The hexframe art does not fill its box: assets/frame-fill.png carries
+// ~11.9% transparent margin on each side (only ~5.2% top and bottom), so
+// the drawn hexagon is 76% of the box's width but 90% of its height.
+// Spacing measured box-to-box is therefore ~24% of a tile looser
+// horizontally than it looks — which is why the board read wide across
+// while the syllable levels, stepped by height, already nested tightly.
+const TILE_ART_PAD_X = 0.1191;
+// Gap wanted between the *drawn* hexagons, as a share of tile width.
+// Converted to a box-to-box gap below, which comes out negative: the
+// boxes overlap so that the artwork inside them nearly touches.
+const TILE_VISUAL_GAP = 0.08;
+const TILE_GAP_RATIO = TILE_VISUAL_GAP - 2 * TILE_ART_PAD_X;
 
 // Syllable layout: syllable s starts half a tile left of syllable s-1's
 // LAST tile, one level lower, then runs right — measured in half-tile
@@ -4074,20 +4085,23 @@ function initWordGrid() {
 
   // Tile width from the width budget and the vertical budget. Fixed px at
   // init time (not live vh) so the board doesn't resize when the mobile
-  // browser chrome shows/hides. On narrow (mobile-layout) screens the
-  // board shares .board-row with the vertical attempt-pips column, so
-  // reserve space for it up front instead of letting the pills push the
-  // board wider than the viewport. Desktop's board width is already
-  // capped at 360 with plenty of room beside it, so no reserve needed.
-  const isMobileLayout = (window.innerWidth || 420) <= 768;
-  const pipsReserve = isMobileLayout ? 64 : 0;
-  const availW = Math.min(360, Math.round((window.innerWidth || 420) * 0.86)) - pipsReserve;
-  const availH = Math.round((window.innerHeight || 600) * 0.30);
-  const gapOf = w => Math.max(2, Math.round(w * 0.06));
-  let tileW = Math.min(48, Math.floor(availW / (totalHalfCols / 2)) - gapOf(48));
+  // browser chrome shows/hides. The attempt pips no longer sit beside the
+  // board — they're a horizontal row under it now — so the full width is
+  // the board's to use.
+  const availW = Math.min(420, Math.round((window.innerWidth || 420) * 0.92));
+  // 0.46 is as much height as the board can take: past it a three-level
+  // word on a 320×568 screen pushes the keyboard out of .game-panel, which
+  // clips rather than scrolls.
+  const availH = Math.round((window.innerHeight || 600) * 0.46);
+  const gapOf = w => Math.round(w * TILE_GAP_RATIO);
+  // Solve the width budget for tileW instead of estimating the gap from
+  // the cap: board width is totalHalfCols·(tileW+gap)/2 − gap, and gap is
+  // itself a multiple of tileW, so the whole thing is linear in tileW.
+  const widthPerTile = totalHalfCols * (1 + TILE_GAP_RATIO) / 2 - TILE_GAP_RATIO;
+  let tileW = Math.min(TILE_MAX_W, Math.floor(availW / widthPerTile));
   const levelFactor = 1 + (levels - 1) * LEVEL_STEP;
   tileW = Math.min(tileW, Math.floor(availH * TILE_RATIO / levelFactor));
-  tileW = Math.max(tileW, 18);
+  tileW = Math.max(tileW, TILE_MIN_W);
   const gap = gapOf(tileW);
   const tileH = Math.round(tileW / TILE_RATIO);
   const halfStep = (tileW + gap) / 2;
@@ -4115,9 +4129,9 @@ function initWordGrid() {
   });
   grid.appendChild(board);
 
-  // The six attempt pips live in their own static container to the left
-  // of the board, inside .board-row (see the <div id="attempt-pips"> in
-  // the page markup) so they never resize/move .word-grid.
+  // The six attempt pips live in their own static container between the
+  // board and the keyboard (see the <div id="attempt-pips"> in the page
+  // markup) so they never resize/move .word-grid.
   const pips = document.getElementById('attempt-pips');
   if (pips) {
     pips.innerHTML = '';
@@ -4129,15 +4143,12 @@ function initWordGrid() {
 function updatePips() {
   const pips = document.getElementById('attempt-pips');
   if (!pips) return;
+  // Spent or not — nothing more. These used to print the word guessed at
+  // each attempt; the board already carries everything those guesses
+  // taught, and a standing list of what you got wrong is the kind of
+  // backward-looking detail this app deliberately doesn't keep.
   [...pips.children].forEach((dot, i) => {
-    const guess = submittedGuesses[i];
-    if (guess) {
-      dot.textContent = guess;
-      dot.className = 'used';
-    } else {
-      dot.textContent = '';
-      dot.className = '';
-    }
+    dot.className = submittedGuesses[i] ? 'used' : '';
   });
 }
 
