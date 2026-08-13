@@ -47,6 +47,8 @@
       } catch(e) {}
     })();
   </script>
+  <script src="sheet.js"></script>
+  <link rel="stylesheet" href="sheet.css">
   <style data-page="kahvehane">
     :root {
       /* Core ink & paper — warm cream newspaper palette */
@@ -222,7 +224,7 @@
        feed the moment a game is actually open -- the moment it's actually
        relevant. Confined to the same >1240px band where col-left stays
        visible at all while a game is open (below that, col-left goes
-       visibility:hidden -- see the game-overlay breakpoint further down);
+       visibility:hidden -- see sheet.css's own 1240px rule);
        off-screen and non-interactive otherwise so it never blocks the
        discussion feed underneath. */
     /* Containing block for BOTH left-hand slide-in panels: the game
@@ -245,8 +247,8 @@
          gutter, so it reads as having come in from outside the column
          rather than as a card parked inside it. */
       padding: 14px 14px 14px 0;
-      /* Same "chapter-box" bottom-sheet treatment as .game-overlay-sheet/
-         .detail-overlay-sheet (see frames.css) -- solid frame-bg behind a
+      /* Same "chapter-box" treatment as the sheets themselves (.ist-sheet
+         in frames.css) -- solid frame-bg behind a
          2px ink border, no box-shadow (the border alone carries the
          weight there, and a shadow here bled a few px past the element's
          own edge into col-left even while off-screen, showing as a
@@ -2047,57 +2049,12 @@
     }
 
     /* ══════════════════════════════════════════════
-       Game overlay: a small floating window that rises over
-       the map instead of navigating to a separate page. The
-       game itself renders in an iframe (sozcel.html etc.
-       stay self-contained, unmodified pages) — see the
-       markup near .col-right below and the script at the
-       bottom of the file for open/close wiring. On desktop it's
-       a card sized to the game and attached to the bottom edge,
-       so kahvehane's own top nav and left/right columns stay
-       visible around it when there's room; below ~1240px the columns
-       step aside instead of cramping into the same space (see the
-       @media (max-width: 1240px) rule below), and on narrow screens
-       there's no room for any of it, so it falls back to a full-bleed
-       bottom sheet instead. Sized identically to kütüphane's
-       .reader-overlay-sheet so both bottom sheets read as the same
-       window. */
-    .game-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 500;
-    }
-    .game-overlay[hidden] { display: none; }
-    .game-overlay-backdrop {
-      /* No dimming for now — the side columns are the point of the
-         swap, so nothing behind the sheet gets tinted. Still present
-         (transparent) so clicking outside the sheet still closes it. */
-      position: absolute;
-      inset: 0;
-      background: transparent;
-    }
-    .game-overlay-sheet {
-      /* Background/border/shadow come from frames.css's shared flat-card
-         rule, matching every other panel on the page. Same width formula
-         as .reader-overlay-sheet in kutuphane.html — see .game-overlay-frame
-         below for how the embedded game still avoids its own mobile
-         breakpoint at this narrower width. */
-      position: absolute;
-      left: 50%;
-      bottom: 0;
-      width: min(680px, 86vw);
-      height: min(88vh, 860px);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      transform: translate(-50%, 100%);
-      /* Ease-out-quint: fast off the bottom edge, then settles into place
-         slowly instead of arriving at a constant speed. Slower overall
-         duration than a typical UI transition so that initial burst
-         doesn't feel abrupt. */
-      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-    .game-overlay.open .game-overlay-sheet { transform: translate(-50%, 0); }
+       Game overlay: the game itself renders in an iframe (sozcel.html
+       etc. stay self-contained, unmodified pages) inside THE sheet (see
+       sheet.css) — the same object a news item, an article or a profile
+       opens as. Only the iframe inside it is this page's business; see
+       the markup near .col-right below and the script at the bottom of
+       the file for open/close wiring. */
     /* The sheet itself now matches kütüphane's narrower width, but the game
        (sozcel.html etc.) has its own @media (max-width: 768px) mobile
        layout that reads the *iframe's* rendered width — a 680px iframe
@@ -2119,96 +2076,22 @@
       transform: translateX(-50%);
       border: none;
     }
-    /* Below ~1240px there isn't room for both 260px side columns and the
-       sheet, so the side columns step aside instead of cramping into the
-       same space while a game is open, leaving the centered sheet with a
-       clear lane the full width of the viewport. Matches kütüphane's
-       .reader-overlay-sheet breakpoint and the .col-left/.col-right
-       stacking breakpoint (768px) below, so there's no gap where neither
-       rule applies. */
-    @media (max-width: 1240px) {
-      body:has(.game-overlay.open) .col-left,
-      body:has(.game-overlay.open) .col-right {
-        visibility: hidden;
-      }
-    }
     @media (max-width: 768px) {
-      .game-overlay-sheet {
-        /* Rises as high as it can -- right up under the profile card
-           floating over the map (#ist-pc-mount, z-index: 20), with the
-           same gap below the card as the sheet's own left/right gap,
-           rather than clearing the whole map. The card's height varies
-           with its content, so this top value is only a same-viewport
-           fallback (in case JS hasn't run yet) -- initGameOverlay's
-           positionGameSheet() sets the real, measured value inline
-           every time the sheet opens. Left/right get the frame-pad gap
-           so the map peeks through on 3 sides, like a page rising from
-           below -- flush at the bottom (see frames.css's
-           border-bottom-width: 0 for this class) so it reads as
-           continuing past the screen edge instead of stopping short. */
-        top: var(--frame-pad, 10px);
-        left: var(--frame-pad, 10px);
-        right: var(--frame-pad, 10px);
-        bottom: 0;
-        width: auto;
-        height: auto;
-        transform: translateY(100%);
-      }
-      .game-overlay.open .game-overlay-sheet { transform: translateY(0); }
+      /* At a real phone width the iframe reverts to a plain full-size
+         child, matching a real mobile viewport one-to-one so the game's
+         own mobile layout kicks in correctly. */
       .game-overlay-frame {
         position: static;
         width: 100%;
         height: 100%;
         transform: none;
-        flex: 1;
       }
     }
 
-    /* ── Detail overlay: bottom sheet for #politician-card's full info
-       (see politician-card.js). A plain HTML-content sheet, unlike
-       .game-overlay's iframe -- same sizing/positioning formula as
-       .game-overlay-sheet above so both read as the same kind of window. */
-    .detail-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 500;
-    }
-    .detail-overlay[hidden] { display: none; }
-    .detail-overlay-backdrop {
-      position: absolute;
-      inset: 0;
-      background: transparent;
-    }
-    .detail-overlay-sheet {
-      position: absolute;
-      left: 50%;
-      bottom: 0;
-      width: min(680px, 86vw);
-      height: min(88vh, 860px);
-      overflow-y: auto;
-      transform: translate(-50%, 100%);
-      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-    .detail-overlay.open .detail-overlay-sheet { transform: translate(-50%, 0); }
-    .detail-overlay-close {
-      position: absolute;
-      top: 10px;
-      right: 14px;
-      z-index: 2;
-      width: 32px;
-      height: 32px;
-      border: none;
-      background: none;
-      color: var(--ink);
-      font-size: 1rem;
-      line-height: 1;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .detail-overlay-close .close-icon { width: 22px; height: 22px; display: block; }
-    .detail-overlay-body { padding: 48px 24px 24px; }
+    /* ── Detail sheet: #politician-card's full info (see
+       politician-card.js) and a Kahve Endeksi venue. Plain HTML content
+       rather than .game-overlay's iframe, but the same object either way
+       (see sheet.css) — nothing about how it opens is restated here. */
     .detail-overlay-body .politician-detail { max-width: 520px; margin: 0 auto; }
 
     /* ── Kahve Endeksi sheet content (rendered via openDetail) ──
@@ -2405,101 +2288,7 @@
     .person-mention[data-tip]:focus-visible::after {
       opacity: 1;
     }
-    @media (max-width: 1240px) {
-      body:has(.detail-overlay.open) .col-left,
-      body:has(.detail-overlay.open) .col-right {
-        visibility: hidden;
-      }
-    }
-    @media (max-width: 768px) {
-      .detail-overlay-sheet {
-        top: var(--frame-pad, 10px);
-        left: var(--frame-pad, 10px);
-        right: var(--frame-pad, 10px);
-        bottom: 0;
-        width: auto;
-        height: auto;
-        transform: translateY(100%);
-      }
-      .detail-overlay.open .detail-overlay-sheet { transform: translateY(0); }
-    }
 
-    /* ── Profile popup ── */
-    .profile-popup-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.4);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-    .profile-popup-overlay.open { display: flex; }
-    .profile-popup {
-      background: var(--paper);
-      border: 1px solid var(--ink);
-      width: 360px;
-      max-width: calc(100vw - 40px);
-      max-height: calc(100vh - 80px);
-      overflow: auto;
-      padding: 24px;
-      position: relative;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-    }
-    .profile-popup .close-btn {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      width: 26px;
-      height: 26px;
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--muted);
-      line-height: 1;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .profile-popup .close-btn:hover { color: var(--ink); }
-    .profile-popup .close-btn .close-icon {
-      width: 17px;
-      height: 17px;
-      display: block;
-    }
-    /* Cover reuses the shared .ist-pc-cover markup from profile-card.css
-       (IstProfileCard.coverHTML): the hexagon frame itself, sized off the
-       name printed under it, with no box around it. Only pushed down a bit
-       here so it clears the close button in this corner instead of
-       overlapping it — its height comes from the frame's own drawing. */
-    .profile-popup .ist-pc-cover {
-      margin-top: 16px;
-    }
-    /* The weekly game grid (.ist-pc-weekgrid) gets a frame added below
-       since it has no border of its own in the shared
-       CSS. */
-    .profile-popup .ist-pc-weekgrid {
-      border: 1px solid var(--ink);
-      padding: 8px 8px 6px;
-    }
-    .profile-popup .pp-since {
-      text-align: center;
-      font-size: 0.68rem;
-      color: var(--muted);
-      letter-spacing: 1px;
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid #e5e5e5;
-    }
-    .profile-popup .pp-since-kefil { margin-top: 4px; text-transform: uppercase; }
-    .profile-popup .pp-loading,
-    .profile-popup .pp-error {
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.85rem;
-      padding: 30px 0;
-    }
     .author-link {
       cursor: pointer;
       text-decoration: none;
@@ -2757,20 +2546,20 @@
   <!-- Game overlay: bottom sheet housing an iframe, opened instead of
        navigating to sozcel.html/tumcel.html/bulmaca.html — see the
        initGameOverlay script further down. -->
-  <div class="game-overlay" id="game-overlay" hidden>
-    <div class="game-overlay-backdrop" id="game-overlay-backdrop"></div>
-    <div class="game-overlay-sheet" id="game-overlay-sheet">
+  <div class="ist-sheet-overlay game-overlay" id="game-overlay" hidden>
+    <div class="ist-sheet-backdrop" id="game-overlay-backdrop"></div>
+    <div class="ist-sheet game-overlay-sheet" id="game-overlay-sheet">
       <iframe class="game-overlay-frame" id="game-overlay-frame" title="Oyun"></iframe>
     </div>
   </div>
 
   <!-- Detail overlay: bottom sheet for #politician-card's full info (see
        politician-card.js and initDetailOverlay further down). -->
-  <div class="detail-overlay" id="detail-overlay" hidden>
-    <div class="detail-overlay-backdrop" id="detail-overlay-backdrop"></div>
-    <div class="detail-overlay-sheet" id="detail-overlay-sheet">
-      <button type="button" class="detail-overlay-close" id="detail-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-      <div class="detail-overlay-body" id="detail-overlay-body"></div>
+  <div class="ist-sheet-overlay detail-overlay" id="detail-overlay" hidden>
+    <div class="ist-sheet-backdrop" id="detail-overlay-backdrop"></div>
+    <div class="ist-sheet detail-overlay-sheet" id="detail-overlay-sheet">
+      <button type="button" class="ist-sheet-close" id="detail-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
+      <div class="ist-sheet-body detail-overlay-body" id="detail-overlay-body"></div>
     </div>
   </div>
 
@@ -2800,39 +2589,16 @@
   const backdrop = document.getElementById('game-overlay-backdrop');
   if (!overlay || !sheet || !frame || !backdrop) return;
 
-  // On mobile the sheet should rise right up under the profile card
-  // floating over the map (#ist-pc-mount), with the same gap below the
-  // card as the sheet's own left/right gap -- the card's height varies
-  // with its content (name/neighborhood length), so that gap has to be
-  // measured rather than hardcoded. No-ops (clears the inline override)
-  // above the mobile breakpoint, where the sheet is centered/floating
-  // and doesn't sit under the card at all.
-  function positionGameSheet() {
-    if (!window.matchMedia('(max-width: 768px)').matches) { sheet.style.top = ''; return; }
-    const framePad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-pad')) || 10;
-    const pcMount = document.getElementById('ist-pc-mount');
-    const cardBottom = pcMount ? pcMount.getBoundingClientRect().bottom : 0;
-    sheet.style.top = `${Math.max(cardBottom, 0) + framePad}px`;
-  }
-
+  // Opening/closing/positioning are the shared sheet's (see sheet.js);
+  // the iframe's src is the only part that belongs to this page, and it
+  // is cleared only once the sheet is off-screen.
   function openGame(href) {
-    positionGameSheet();
     frame.src = href;
-    overlay.hidden = false;
-    requestAnimationFrame(() => overlay.classList.add('open'));
+    IstSheet.open(overlay);
   }
   function closeGame() {
-    overlay.classList.remove('open');
-    // Matches the sheet's own 0.55s transition (see .game-overlay-sheet)
-    // so hiding doesn't cut the closing slide-down short.
-    setTimeout(() => {
-      overlay.hidden = true;
-      frame.src = 'about:blank';
-    }, 550);
+    IstSheet.close(overlay, () => { frame.src = 'about:blank'; });
   }
-  window.addEventListener('resize', () => {
-    if (overlay.classList.contains('open')) positionGameSheet();
-  });
 
   // Delegated on document (not bound per-node) -- a virtual navigation
   // (see router.js) replaces #ist-content's whole subtree on every
@@ -2854,19 +2620,18 @@
   });
 })();
 
-// Detail overlay: a plain HTML-content bottom sheet for #politician-card
-// (see politician-card.js), separate from .game-overlay since that one's
-// iframe-only. Same sizing/mobile-positioning formula as the game overlay
-// above so both read as the same kind of window.
+// The detail sheet: plain HTML content (a politician, the Kahve
+// Endeksi board, a venue) rather than the game sheet's iframe -- the
+// same object either way, opened and closed by the shared sheet
+// helpers (see sheet.js).
 function openDetail(html) {
   const overlay = document.getElementById('detail-overlay');
   const body = document.getElementById('detail-overlay-body');
   if (!overlay || !body) return;
   body.innerHTML = html;
   if (window.IstPersonMentions) IstPersonMentions.linkify(body, personMentionsRoster);
-  positionDetailSheet();
-  overlay.hidden = false;
-  requestAnimationFrame(() => overlay.classList.add('open'));
+  body.scrollTop = 0;
+  IstSheet.open(overlay);
 }
 function closeDetail() {
   const overlay = document.getElementById('detail-overlay');
@@ -2874,17 +2639,7 @@ function closeDetail() {
   // On mobile a coffee venue lives inside this sheet (the board drills
   // into it), so dismissing the sheet dismisses the venue with it.
   if (openVenueId && !isDesktopBoard()) closeCoffeeVenue();
-  overlay.classList.remove('open');
-  setTimeout(() => { overlay.hidden = true; }, 550);
-}
-function positionDetailSheet() {
-  const sheet = document.getElementById('detail-overlay-sheet');
-  if (!sheet) return;
-  if (!window.matchMedia('(max-width: 768px)').matches) { sheet.style.top = ''; return; }
-  const framePad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-pad')) || 10;
-  const pcMount = document.getElementById('ist-pc-mount');
-  const cardBottom = pcMount ? pcMount.getBoundingClientRect().bottom : 0;
-  sheet.style.top = `${Math.max(cardBottom, 0) + framePad}px`;
+  IstSheet.close(overlay);
 }
 (function initDetailOverlay() {
   const overlay = document.getElementById('detail-overlay');
@@ -2895,9 +2650,6 @@ function positionDetailSheet() {
   closeBtn.addEventListener('click', closeDetail);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && overlay.classList.contains('open')) closeDetail();
-  });
-  window.addEventListener('resize', () => {
-    if (overlay.classList.contains('open')) positionDetailSheet();
   });
 })();
 
@@ -4663,89 +4415,15 @@ document.addEventListener('mouseout', (e) => {
   applyCoffeeHighlight(restingCoffeeHighlight());
 });
 
-// ── Profile popup: opens when an author name is clicked ──
-(function initProfilePopup() {
-  const overlay = document.createElement('div');
-  overlay.className = 'profile-popup-overlay';
-  // Belt-and-suspenders like the game/reader overlays elsewhere: this
-  // element is created once, up front, and lives in the DOM for the rest
-  // of the session (outside #ist-content) -- once a virtual navigation
-  // (see router.js) disables this page's own stylesheet, the CSS class
-  // alone (.profile-popup-overlay{display:none}) stops applying and it'd
-  // render as bare, unstyled content. The `hidden` attribute's display:
-  // none comes from the browser's own built-in stylesheet, not this
-  // page's, so it stays correct regardless.
-  overlay.hidden = true;
-  overlay.innerHTML = `
-    <div class="profile-popup" role="dialog" aria-modal="true">
-      <button class="close-btn" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-      <div class="pp-body"><div class="pp-loading">Yükleniyor…</div></div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
 
-  const popup = overlay.querySelector('.profile-popup');
-  const body = overlay.querySelector('.pp-body');
-
-  function close() { overlay.classList.remove('open'); overlay.hidden = true; }
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-  overlay.querySelector('.close-btn').addEventListener('click', close);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && overlay.classList.contains('open')) close();
-  });
-
-  function nbLabel(id) {
-    if (!id) return '—';
-    if (id === 'istanbul_disi') return 'İstanbul Dışı';
-    return neighborhoodNames[id] || id;
-  }
-
-  async function open(userId) {
-    overlay.hidden = false;
-    overlay.classList.add('open');
-    body.innerHTML = '<div class="pp-loading">Yükleniyor…</div>';
-    const [{ data, error }, weekStatus] = await Promise.all([
-      sb.from('profiles')
-        .select('id, first_name, last_name, neighborhood, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt, cover_badges, joined_at, referred_by')
-        .eq('id', userId)
-        .maybeSingle(),
-      IstProfileCard.getWeekGameStatus(sb, userId),
-    ]);
-    if (error || !data) {
-      body.innerHTML = '<div class="pp-error">Profil yüklenemedi.</div>';
-      return;
-    }
-
-    let kefilName = null, kefilId = null;
-    if (data.referred_by) {
-      const { data: kp } = await sb
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('id', data.referred_by)
-        .maybeSingle();
-      if (kp) {
-        kefilName = capitalizeName(`${kp.first_name || ''} ${kp.last_name || ''}`.trim()) || 'İsimsiz Üye';
-        kefilId = kp.id;
-      }
-    }
-
-    const fullName = capitalizeName(`${data.first_name || ''} ${data.last_name || ''}`.trim()) || 'İsimsiz Üye';
-    body.innerHTML = `
-      ${IstProfileCard.coverHTML({ profile: data, avatarUrl: data.avatar_url, avatarHair: data.avatar_hair, avatarHat: data.avatar_hat, avatarAccessory: data.avatar_accessory, avatarShirt: data.avatar_shirt, displayName: fullName, metaText: nbLabel(data.neighborhood) })}
-      ${IstProfileCard.weekGridHTML(weekStatus, I18N)}
-      <div class="pp-since">
-        <div>${I18N.formatMemberSince(data.joined_at)}</div>
-        ${kefilName ? `<div class="pp-since-kefil">${I18N.t('profile.kefil')}: <span class="author-link" data-user-id="${kefilId}">${kefilName}</span></div>` : ''}
-      </div>
-    `;
-  }
-
-  document.addEventListener('click', (e) => {
-    const link = e.target.closest('.author-link');
-    if (!link) return;
-    const id = link.getAttribute('data-user-id');
-    if (id) open(id);
-  });
+// Another member's profile: one sheet for the whole site (see
+// openMemberSheet in profile-card.js), opened by any .author-link /
+// .kefil-link on this page. profile-card.js is deferred, so this waits
+// for it instead of reaching for it mid-parse.
+(function wireMemberSheet() {
+  const wire = () => { if (window.IstProfileCard) IstProfileCard.initMemberSheet({ sb, I18N }); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+  else wire();
 })();
 
 IstRouter.registerPage('kahvehane', { mount, unmount });

@@ -682,14 +682,14 @@
   function ensureProfileOverlay() {
     if (document.getElementById('profile-overlay')) return;
     const el = document.createElement('div');
-    el.className = 'profile-overlay';
+    el.className = 'ist-sheet-overlay profile-overlay';
     el.id = 'profile-overlay';
     el.hidden = true;
     el.innerHTML = `
-      <div class="profile-overlay-backdrop" id="profile-overlay-backdrop"></div>
-      <div class="profile-overlay-sheet" id="profile-overlay-sheet">
-        <button type="button" class="profile-overlay-close" id="profile-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-        <div class="profile-overlay-body" id="profile-overlay-body"></div>
+      <div class="ist-sheet-backdrop" id="profile-overlay-backdrop"></div>
+      <div class="ist-sheet profile-overlay-sheet" id="profile-overlay-sheet">
+        <button type="button" class="ist-sheet-close" id="profile-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
+        <div class="ist-sheet-body profile-overlay-body" id="profile-overlay-body"></div>
       </div>
     `;
     document.body.appendChild(el);
@@ -699,37 +699,6 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && el.classList.contains('open')) closeProfileOverlay();
     });
-  }
-
-  // On mobile, the sheet rises from just below the compact #ist-pc-mount
-  // card (same convention as kahvehane's game-overlay / kutuphane's
-  // reader-overlay) rather than clearing the whole viewport — measured
-  // live since the mount card's height varies with its content.
-  function positionProfileSheet() {
-    const sheet = document.getElementById('profile-overlay-sheet');
-    if (!sheet) return;
-    if (!window.matchMedia('(max-width: 768px)').matches) { sheet.style.top = ''; return; }
-    const framePad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-pad')) || 10;
-    const pcMount = document.getElementById('ist-pc-mount');
-    const cardBottom = pcMount ? pcMount.getBoundingClientRect().bottom : 0;
-    sheet.style.top = `${Math.max(cardBottom, 0) + framePad}px`;
-  }
-
-  let _ovResizeListener = null;
-
-  // Reveals the (already body-filled) shared bottom sheet.
-  function showProfileOverlaySheet() {
-    const overlay = document.getElementById('profile-overlay');
-    positionProfileSheet();
-    overlay.hidden = false;
-    requestAnimationFrame(() => overlay.classList.add('open'));
-    if (!_ovResizeListener) {
-      _ovResizeListener = () => {
-        const ov = document.getElementById('profile-overlay');
-        if (ov && ov.classList.contains('open')) positionProfileSheet();
-      };
-      window.addEventListener('resize', _ovResizeListener);
-    }
   }
 
   function openProfileOverlay(opts) {
@@ -746,16 +715,12 @@
     // this back to false on its own.
     _ov.customizing = false;
     renderOverlayBody();
-    showProfileOverlaySheet();
+    document.getElementById('profile-overlay-body').scrollTop = 0;
+    IstSheet.open('profile-overlay');
   }
 
   function closeProfileOverlay() {
-    const overlay = document.getElementById('profile-overlay');
-    if (!overlay) return;
-    overlay.classList.remove('open');
-    // Matches the sheet's own 0.55s transition (see profile-card.css)
-    // so hiding doesn't cut the closing slide-down short.
-    setTimeout(() => { overlay.hidden = true; }, 550);
+    IstSheet.close('profile-overlay');
   }
 
   function renderOverlayBody() {
@@ -763,6 +728,115 @@
     if (!body || !_ov) return;
     body.innerHTML = settingsPageHTML(_ov);
     wireSettingsEvents(_ov);
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // ANOTHER MEMBER'S PROFILE
+  //
+  // The read-only half of the profile sheet: cover, weekly grid, member
+  // since, kefil. Opens from any .author-link / .kefil-link anywhere on
+  // the site — a comment byline, a scoreboard row, the kefil line inside
+  // this very sheet (which is how the chain is walked: clicking a kefil
+  // re-fills the same sheet rather than stacking a second one).
+  //
+  // One implementation for the whole site. Every page called
+  // IstProfileCard.initMemberSheet({ sb, I18N }) once; it used to be a
+  // centred modal copy-pasted into five pages, each with its own CSS.
+  // ══════════════════════════════════════════════════════════════
+  let _member = null;          // { sb, I18N } — set by initMemberSheet
+  let _memberDelegated = false;
+
+  function ensureMemberSheet() {
+    if (document.getElementById('member-sheet')) return;
+    const el = document.createElement('div');
+    el.className = 'ist-sheet-overlay';
+    el.id = 'member-sheet';
+    // Created up front and left in the DOM for the rest of the session:
+    // a virtual navigation (see router.js) disables the page's own
+    // stylesheet, so an element relying on a page class alone would end
+    // up unstyled. The `hidden` attribute's display:none comes from the
+    // browser's own stylesheet, so it stays correct regardless.
+    el.hidden = true;
+    el.innerHTML = `
+      <div class="ist-sheet-backdrop" id="member-sheet-backdrop"></div>
+      <div class="ist-sheet" id="member-sheet-sheet" role="dialog" aria-modal="true">
+        <button type="button" class="ist-sheet-close" id="member-sheet-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
+        <div class="ist-sheet-body ist-member-body" id="member-sheet-body"></div>
+      </div>
+    `;
+    document.body.appendChild(el);
+
+    document.getElementById('member-sheet-backdrop').addEventListener('click', closeMemberSheet);
+    document.getElementById('member-sheet-close').addEventListener('click', closeMemberSheet);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && el.classList.contains('open')) closeMemberSheet();
+    });
+  }
+
+  function closeMemberSheet() {
+    IstSheet.close('member-sheet');
+  }
+
+  async function openMemberSheet(userId) {
+    if (!_member || !userId) return;
+    const { sb, I18N } = _member;
+    ensureMemberSheet();
+    const body = document.getElementById('member-sheet-body');
+    body.scrollTop = 0;
+    IstSheet.open('member-sheet');
+    body.innerHTML = '<div class="ist-member-loading">Yükleniyor…</div>';
+
+    const [{ data, error }, weekStatus] = await Promise.all([
+      sb.from('profiles')
+        .select('id, first_name, last_name, neighborhood, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt, cover_badges, joined_at, referred_by')
+        .eq('id', userId)
+        .maybeSingle(),
+      getWeekGameStatus(sb, userId),
+    ]);
+    if (error || !data) {
+      body.innerHTML = '<div class="ist-member-error">Profil yüklenemedi.</div>';
+      return;
+    }
+
+    let kefilName = null, kefilId = null;
+    if (data.referred_by) {
+      const { data: kp } = await sb
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .eq('id', data.referred_by)
+        .maybeSingle();
+      if (kp) {
+        kefilName = capitalizeName(`${kp.first_name || ''} ${kp.last_name || ''}`.trim()) || 'İsimsiz Üye';
+        kefilId = kp.id;
+      }
+    }
+
+    const fullName = capitalizeName(`${data.first_name || ''} ${data.last_name || ''}`.trim()) || 'İsimsiz Üye';
+    const nb = data.neighborhood ? (NB_NAMES[data.neighborhood] || data.neighborhood) : '—';
+    body.innerHTML = `
+      ${coverHTML({ profile: data, avatarUrl: data.avatar_url, avatarHair: data.avatar_hair, avatarHat: data.avatar_hat, avatarAccessory: data.avatar_accessory, avatarShirt: data.avatar_shirt, displayName: fullName, metaText: nb })}
+      ${weekGridHTML(weekStatus, I18N)}
+      <div class="ist-member-since">
+        <div>${I18N.formatMemberSince(data.joined_at)}</div>
+        ${kefilName ? `<div class="ist-member-kefil">${I18N.t('profile.kefil')}: <button type="button" class="kefil-link" data-user-id="${kefilId}">${esc(kefilName)}</button></div>` : ''}
+      </div>
+    `;
+  }
+
+  // Called once per page. The click delegation is registered on the
+  // document, so it keeps working across virtual navigations and covers
+  // links rendered long after this ran.
+  function initMemberSheet(opts) {
+    _member = { sb: opts.sb, I18N: opts.I18N };
+    ensureMemberSheet();
+    if (_memberDelegated) return;
+    _memberDelegated = true;
+    document.addEventListener('click', (e) => {
+      const link = e.target.closest('.author-link, .kefil-link');
+      if (!link) return;
+      const id = link.getAttribute('data-user-id');
+      if (id) openMemberSheet(id);
+    });
   }
 
   function coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt) {
@@ -1442,6 +1516,9 @@
     mountLibraryCard,
     openProfileOverlay,
     closeProfileOverlay,
+    initMemberSheet,
+    openMemberSheet,
+    closeMemberSheet,
     AVATAR_SHIRT_OPTIONS,
     AVATAR_HAIR_OPTIONS,
     AVATAR_HAT_OPTIONS,

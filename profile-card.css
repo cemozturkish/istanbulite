@@ -105,108 +105,57 @@
 
 .ist-pc-toggle:hover { background: var(--accent); }
 
-/* ── Profile overlay: bottom sheet for Profil/Ayarlar/Rozetler ──
-   Mirrors Kahvehane's game overlay / Kütüphane's reader overlay / Anahane's
-   detail overlay exactly — same markup shape, same slide-up transition —
-   so opening your profile reads as the same kind of surface as opening a
-   news item, an event, an article, or a game. Injected into <body> by
-   profile-card.js (ensureProfileOverlay), so it needs no per-page markup.
-   Background/border/shadow come from frames.css's shared flat-card rule
-   (it targets .profile-overlay-sheet alongside the other three). */
-.profile-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 500;
-  /* Scrolling lives on the overlay root, not the sheet — same as anahane's
-     news/event detail overlay: the sheet is a single sheet of paper pulled
-     up off the bottom edge, and a taller one simply runs off the bottom of
-     the screen instead of becoming its own scrollable window. */
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  /* Where the sheet's top edge sits at rest — the same rest offset the
-     news/event detail sheet uses on anahane. */
-  --profile-rest: max(6vh, 40px);
-}
-.profile-overlay[hidden] { display: none; }
-.profile-overlay-backdrop {
-  /* Fixed (not absolute) so it stays pinned to the viewport instead of
-     scrolling away with the sheet when .profile-overlay scrolls. */
-  position: fixed;
-  inset: 0;
-  background: transparent;
-}
-.profile-overlay-sheet {
-  /* Same geometry as the news/event detail sheet on anahane: a narrow,
-     top-anchored page rather than a wide short box. It used to hug its
-     content in a 820px-wide box, which read as a stretched panel instead
-     of "a page opened" — the one gesture every other surface in the app
-     shares (a game, an article, a news item). Content is a single column
-     now (see .ist-pc-settings-grid), so it fills this shape naturally. */
-  position: absolute;
-  left: 50%;
-  top: var(--profile-rest);
-  /* Down to the bottom edge of the window exactly — taller content runs
-     on past it (revealed by scrolling .profile-overlay) instead of the
-     sheet's bottom edge surfacing mid-screen. */
-  min-height: calc(100vh - var(--profile-rest));
-  width: min(680px, 86vw);
-  padding: 44px 24px 24px;
-  transform: translate(-50%, 100%);
-  /* Ease-out-quint: fast off the bottom edge, then settles into place
-     slowly instead of arriving at a constant speed. */
-  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.profile-overlay.open .profile-overlay-sheet { transform: translate(-50%, 0); }
-.profile-overlay-close {
-  position: absolute;
-  top: 10px;
-  right: 14px;
-  z-index: 2;
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: none;
-  color: var(--ink);
-  font-size: 1rem;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.profile-overlay-close .close-icon {
-  width: 22px;
-  height: 22px;
-  display: block;
-}
-@media (max-width: 768px) {
-  .profile-overlay-sheet {
-    /* top is set inline by positionProfileSheet() (profile-card.js) to
-       clear the compact #ist-pc-mount card; this is only the pre-JS/
-       same-viewport fallback. Left/right get the frame-pad gap so the
-       page canvas peeks through on 3 sides, like a page rising from
-       below — flush at the bottom (frames.css's border-bottom-width: 0
-       for this class) so it reads as continuing past the screen edge. */
-    top: var(--frame-pad, 10px);
-    left: var(--frame-pad, 10px);
-    right: var(--frame-pad, 10px);
-    bottom: 0;
-    width: auto;
-    height: auto;
-    /* The mobile sheet is pinned between the mount card and the bottom
-       edge, so it can't grow past the screen the way the desktop one does
-       — it scrolls internally instead. */
-    min-height: 0;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 40px 16px 20px;
-    transform: translateY(100%);
-  }
-  .profile-overlay.open .profile-overlay-sheet { transform: translateY(0); }
-}
+/* ── Profile sheet ──
+   Your own profile (Profil/Ayarlar/Rozetler) and another member's
+   profile both open as THE sheet — the same object as a news item, an
+   event, a game, an article. Its geometry, chrome and transition all
+   come from sheet.css; there is nothing page- or profile-specific about
+   how it opens, so nothing about that is restated here. The markup is
+   injected into <body> by profile-card.js (ensureProfileOverlay /
+   ensureMemberSheet), so no page needs its own copy either.
 
-.profile-overlay-body {
-  height: 100%;
+   What belongs here is only what goes *inside* the sheet. */
+
+/* Another member's profile: the read-only card (cover + week grid +
+   "member since" + kefil chain), opened from any .author-link /
+   .kefil-link by openMemberSheet in profile-card.js.
+
+   The weekly game grid carries no border of its own in the shared CSS
+   (on your own settings page it sits in a titled section) — here it's a
+   standalone block, so it gets a frame. */
+.ist-member-body .ist-pc-weekgrid {
+  border: 1px solid var(--ink);
+  padding: 8px 8px 6px;
+}
+.ist-member-since {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline, #e5e5e5);
+  text-align: center;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ist-member-kefil { margin-top: 4px; }
+.ist-member-kefil .kefil-link,
+.ist-member-kefil .author-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ist-member-loading,
+.ist-member-error {
+  padding: 24px 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 /* ── Settings page cover ("pano") ──
@@ -552,7 +501,7 @@
    one column top to bottom — identity, the week's games, account info,
    personalization — read down like a page. It was a two-column split back
    when the sheet was a wide short box; in the narrow, page-shaped sheet it
-   now opens in (see .profile-overlay-sheet) the two halves would only be
+   now opens in (see sheet.css) the two halves would only be
    squeezed against each other. Kept as a grid (rather than plain flow) so
    the gap between the two halves stays consistent with the rest. */
 .ist-pc-settings-grid {
@@ -918,8 +867,8 @@
   text-transform: uppercase;
 }
 /* .card-top/.edit-btn are the only states .library-card ever renders now
-   — editing/settings/badges all live in the shared profile-overlay bottom
-   sheet (IstProfileCard.openProfileOverlay) instead of an inline swap.
+   — editing/settings/badges all live in the shared sheet
+   (IstProfileCard.openProfileOverlay) instead of an inline swap.
    .edit-btn is an icon-only button sitting inline inside .card-top (to the
    right of the avatar/name/district), not a separate line below it, so the
    card stays a single compact row. */
