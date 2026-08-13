@@ -4019,32 +4019,74 @@ function syllabifyTr(word) {
   return sylls;
 }
 
-// Geometry of the hexframe tile shape (see frames.css): width / height.
-const TILE_RATIO = 0.5713;
-// Consecutive syllable levels nest into the hexagons' tapered corners, so
-// each level steps down by less than a full tile height. Lower = the
-// levels sit deeper into each other.
-const LEVEL_STEP = 0.82;
+// ── Board geometry ────────────────────────────────────────────────────
+// The tiles are hexframe tiles (frames.css) laid out as a syllable
+// staircase. Everything below is measured against ONE drawn hexagon, not
+// against its box, because the two are quite different things — see
+// TILE_ART_* — and spacing the boxes evenly does not space the hexagons
+// evenly.
+
+// Tile shape: width / height. Must stay the number frames.css gives
+// .letter-box as its aspect-ratio (--hexframe-ratio, the 1024×1536 asset
+// canvas). It read 0.5713 here, making every tile 17% taller in the
+// arithmetic than on screen, so the board reserved height it never used
+// and the vertical budget bought smaller tiles than it had room for.
+const TILE_RATIO = 1024 / 1536;
+
 // Widest a tile may get. The board is the page's one object worth looking
-// at, so it takes the room it can — the budgets below still shrink it to
-// whatever actually fits.
+// at, so it takes the room it can — the budgets in initWordGrid() still
+// shrink it to whatever actually fits.
 const TILE_MAX_W = 96;
 // Narrowest before the letters stop being readable. Deliberately well
 // under TILE_MAX_W: this overrides the width budget, so a floor set too
 // high pushes the board off the side of a small screen.
 const TILE_MIN_W = 24;
-// The hexframe art does not fill its box: assets/frame-fill.png carries
-// ~11.9% transparent margin on each side (only ~5.2% top and bottom), so
-// the drawn hexagon is 76% of the box's width but 90% of its height.
-// Spacing measured box-to-box is therefore ~24% of a tile looser
-// horizontally than it looks — which is why the board read wide across
-// while the syllable levels, stepped by height, already nested tightly.
+
+// The drawn hexagon does not fill its box. Measured off
+// assets/frame-fill.png: it spans 76.2% of the box's width (11.9%
+// transparent margin per side) but 89.5% of its height, and each end
+// tapers to a point over ~19% of that drawn height.
 const TILE_ART_PAD_X = 0.1191;
-// Gap wanted between the *drawn* hexagons, as a share of tile width.
-// Converted to a box-to-box gap below, which comes out negative: the
-// boxes overlap so that the artwork inside them nearly touches.
+const TILE_ART_W = 1 - 2 * TILE_ART_PAD_X;
+const TILE_ART_H = 0.8952 / TILE_RATIO;   // in tile-width units
+// One tapered end. Calibrated against the rendered board rather than read
+// off the artwork's width profile: the silhouette's corners are rounded
+// and its sides bow outward slightly, so "where the taper ends" is a
+// judgement call on the profile but an exact number on the result.
+const TILE_CAP_H = 0.158 * TILE_ART_H;
+
+// The one number that sets how tight the board looks: the gap left
+// between neighbouring hexagons, as a share of tile width. Both
+// directions are solved from it below, so they stay equal to each other.
 const TILE_VISUAL_GAP = 0.08;
+
+// Horizontal. Box-to-box gap is the visual gap plus the two transparent
+// margins that face each other — which makes it negative: the boxes
+// overlap so the artwork inside them doesn't.
 const TILE_GAP_RATIO = TILE_VISUAL_GAP - 2 * TILE_ART_PAD_X;
+
+// Vertical, as a share of tile height. Consecutive syllable levels are
+// offset by half a column (see syllableLayout), so they can interlock the
+// way a honeycomb does — each lower hexagon's point rising into the notch
+// between the two above it — but only if the step is short enough for the
+// tapered caps to pass each other. Step a full tile height instead and
+// the rows meet point-to-point with a void flaring out on either side,
+// which reads as a far bigger gap than the flat-sided horizontal one even
+// when the two measure the same.
+//
+// Two levels touch when the lower one's shoulder lands on the upper one's
+// slanted edge, which works out to artH − capH·(offset / shoulder); the
+// second term opens that back up until the slanted edges stand
+// TILE_VISUAL_GAP apart measured perpendicular, exactly like the vertical
+// edges do across.
+const LEVEL_STEP = (function () {
+  const shoulderX = TILE_ART_W / 2;               // centre → straight side
+  const offsetX = (1 + TILE_GAP_RATIO) / 2;       // half a column
+  const touching = TILE_ART_H - TILE_CAP_H * (offsetX / shoulderX);
+  const slantLen = Math.hypot(shoulderX, TILE_CAP_H);
+  const opened = TILE_VISUAL_GAP * slantLen / shoulderX;
+  return (touching + opened) * TILE_RATIO;        // tile widths → heights
+})();
 
 // Syllable layout: syllable s starts half a tile left of syllable s-1's
 // LAST tile, one level lower, then runs right — measured in half-tile
