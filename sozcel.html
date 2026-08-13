@@ -1836,6 +1836,11 @@ const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Same client-side admin check the rest of the site uses (kahvehane,
+// kutuphane, profile-card). It only decides what UI to offer — the actual
+// permission is public.is_admin() in the RLS policies, which this can't
+// talk its way past.
+const ADMIN_EMAIL = 'cemwozturk@gmail.com';
 
 // ── Get user neighborhood from session ──
 let userNeighborhood = '';
@@ -5212,12 +5217,23 @@ let _takeoverCountdownInterval = null;
 //   'today-missed'  — user is today's Sözcül but never submitted before
 //                     the deadline passed
 //   'none'          — show the normal play screen
+//   'admin'         — the signed-in user is the admin and has no Sözcü
+//                     assignment of their own to deal with. The same form
+//                     opens on any date they pick, with no deadline: see
+//                     db/sozcel_used_answers_v6_admin_override.sql.
 async function checkSozculTakeoverStatus() {
   const today = getIstanbulDateISO();
-  const empty = { session: null, today, mode: 'none', targetDate: null };
+  const empty = { session: null, today, mode: 'none', targetDate: null, isAdmin: false };
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return empty;
+    const isAdmin = session.user.email === ADMIN_EMAIL;
+    // The admin's own fallback: whatever their assignments say, they can
+    // always open the form. Resolved last, so an admin who *is* also an
+    // assigned Sözcü still gets their assignment first.
+    const adminFallback = isAdmin
+      ? { session, today, isAdmin, mode: 'admin', targetDate: today }
+      : { ...empty, session, isAdmin };
     const now = new Date();
 
     // All upcoming assignments for this user (today + future).
@@ -5228,7 +5244,7 @@ async function checkSozculTakeoverStatus() {
       .gte('game_date', today)
       .order('game_date', { ascending: true });
     const assignedDates = (assignments || []).map(a => a.game_date);
-    if (assignedDates.length === 0) return { ...empty, session };
+    if (assignedDates.length === 0) return adminFallback;
 
     const { data: words } = await sb
       .from('sozcel_used_answers')
@@ -5241,7 +5257,7 @@ async function checkSozculTakeoverStatus() {
     // like right up until midnight, whether or not one is already saved.
     const editable = assignedDates.find(d => getSozculDeadline(d) > now);
     if (editable) {
-      return { session, today, mode: 'pending-input', targetDate: editable, existing: wordByDate.get(editable) || null };
+      return { session, today, isAdmin, mode: 'pending-input', targetDate: editable, existing: wordByDate.get(editable) || null };
     }
 
     // No editable entry left — but if today is the user's assigned day, the
@@ -5250,11 +5266,12 @@ async function checkSozculTakeoverStatus() {
       return {
         session,
         today,
+        isAdmin,
         mode: wordByDate.has(today) ? 'today-done' : 'today-missed',
         targetDate: today,
       };
     }
-    return { ...empty, session };
+    return adminFallback;
   } catch (e) {
     return empty;
   }
@@ -5268,6 +5285,13 @@ function setupSozculTaskButton(status) {
   const btn = document.getElementById('sozcul-task-btn');
   if (!btn) return;
   btn.style.display = '';
+  // For the admin with no assignment of their own, the same button is the
+  // way into the day editor — say so, or it reads as a Sözcü task they
+  // don't have.
+  if (status.mode === 'admin') {
+    btn.setAttribute('aria-label', 'Sözcel Yönetimi');
+    btn.title = 'Sözcel Yönetimi';
+  }
   btn.onclick = () => openSozculTaskModal(status);
 
   // Mascot greeting (only fires the first time per assignment date).
@@ -5282,13 +5306,49 @@ function openSozculTaskModal(status) {
   if (!overlay || !body) return;
 
   if (status.mode === 'pending-input') {
+    // The admin gets the same form with its date picker and no deadline;
+    // renderTakeoverForm reads status.isAdmin for that.
     renderTakeoverForm(body, status);
+  } else if (status.isAdmin) {
+    // Every other mode is a locked one — the word is in and the day has
+    // started, or the deadline was missed. Those are exactly the states the
+    // admin exists to unstick, so the editor opens instead of the notice.
+    // The mode itself is left alone: if the admin is also today's Sözcü,
+    // it still stops them guessing their own word.
+    body.innerHTML = '<div class="stk-eyebrow">Sözcel Yönetimi</div><p class="stk-hint">Yükleniyor…</p>';
+    loadAdminDayStatus(status.session, status.targetDate || status.today)
+      .then(next => renderTakeoverForm(body, next))
+      .catch(e => {
+        console.error('[sozcel openSozculTaskModal admin]', e);
+        body.innerHTML = '<div class="stk-eyebrow">Sözcel Yönetimi</div>' +
+          '<p class="stk-hint">Gün bilgisi alınamadı. Sayfayı yenileyip tekrar dene.</p>';
+      });
   } else if (status.mode === 'today-done') {
     renderTakeoverDone(body, status.targetDate);
   } else if (status.mode === 'today-missed') {
     renderTakeoverMissed(body, status.targetDate);
   }
   overlay.classList.add('open');
+}
+
+// Builds the admin's editing context for one date: whatever is stored for
+// that day, if anything. Used when the admin opens the panel and every time
+// they pick a different day in it.
+async function loadAdminDayStatus(session, date) {
+  const { data, error } = await sb
+    .from('sozcel_used_answers')
+    .select('used_on, word, definition, syllables, sozcul_id')
+    .eq('used_on', date)
+    .maybeSingle();
+  if (error) throw error;
+  return {
+    session,
+    today: getIstanbulDateISO(),
+    isAdmin: true,
+    mode: 'admin',
+    targetDate: date,
+    existing: data || null,
+  };
 }
 
 // Results block for a Sözcü's *own* word only — used solely by
@@ -5369,18 +5429,35 @@ function renderTakeoverForm(takeover, status) {
     try { dict = JSON.parse(existing.definition); } catch (e) { dict = null; }
   }
 
+  // The admin edits any day, including one already being played, so the
+  // header, the day picker and the countdown all change meaning for them.
+  const isAdminMode = !!status.isAdmin;
+  const adminPicker = isAdminMode ? `
+      <div class="stk-section">
+        <label class="stk-label">Hangi gün</label>
+        <input type="date" class="stk-text-input" id="stk-admin-date" value="${escapeHtml(date)}">
+      </div>
+  ` : '';
+
   takeover.innerHTML = `
-    <div class="stk-eyebrow">Sözcü Görevin · ${escapeHtml(dateLabel)}</div>
-    <h2>${escapeHtml(dateLabel)} Kelimesini Sen Seç</h2>
+    <div class="stk-eyebrow">${isAdminMode ? 'Sözcel Yönetimi' : 'Sözcü Görevin'} · ${escapeHtml(dateLabel)}</div>
+    <h2>${isAdminMode ? escapeHtml(dateLabel) + ' Kelimesini Düzenle' : escapeHtml(dateLabel) + ' Kelimesini Sen Seç'}</h2>
     <p class="stk-hint">
+      ${isAdminMode ? `
+      Yönetici olarak istediğin günün kelimesini süre sınırı olmadan
+      değiştirebilirsin — oynanmakta olan günü de. Kelimeyi hecelerine ayır
+      (en az 2, en fazla 3 hece); oyunda senin ayırdığın hecelerle gösterilir.
+      ` : `
       İstediğin uzunlukta bir Türkçe sözcük seç, ama hecelerine kendin ayır —
       en az 2, en fazla 3 hece gir. Oyunda kelime senin ayırdığın hecelerle
       gösterilecek, her hece bir alt basamakta. Sözlük bilgisini de doldur.
       ${escapeHtml(dateLabel)} günü diğer İstanbullular bu kelimeyi tahmin edecek.
       ${existing ? 'Gece yarısına kadar dilediğin kadar değiştirebilirsin.' : ''}
+      `}
     </p>
     <div class="stk-countdown" id="stk-countdown"></div>
     <div class="stk-form">
+      ${adminPicker}
       <div class="stk-section">
         <label class="stk-label">Kelime — Hecelerine Ayır (2–3 hece)</label>
         <div class="stk-syls" id="stk-syls"></div>
@@ -5409,13 +5486,17 @@ function renderTakeoverForm(takeover, status) {
       </div>
 
       <button type="button" class="stk-submit" id="stk-submit">${existing ? 'Değişikliği Kaydet' : 'Onayla ve Kaydet'}</button>
+      ${isAdminMode && existing && existing.sozcul_id && existing.sozcul_id !== status.session.user.id
+        ? '<div class="stk-hint" style="margin-top:6px;">Bu günün Sözcüsü başka biri — kaydedince kelime değişir ama gün onun adına kalır.</div>'
+        : ''}
       <div class="stk-status" id="stk-status"></div>
     </div>
   `;
-  // No "Bugünün Sonuçları" here: status.targetDate is always a future
-  // assignment (today's Sözcü-picking deadline has already passed by the
+  // No "Bugünün Sonuçları" here: a Sözcü's status.targetDate is always a
+  // future assignment (today's picking deadline has already passed by the
   // time this mode is reachable), so today's word — and its results —
-  // belong to someone else's assignment, not this one.
+  // belong to someone else's assignment, not this one. The admin can land
+  // on today, but they're here to edit the day, not to read its scoreboard.
 
   const submitBtn = takeover.querySelector('#stk-submit');
   const countdownEl = takeover.querySelector('#stk-countdown');
@@ -5507,8 +5588,38 @@ function renderTakeoverForm(takeover, status) {
       `Kalan süre  ${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
     countdownEl.className = 'stk-countdown' + (totalSecs < 3600 ? ' urgent' : '');
   }
-  updateCountdown();
-  _takeoverCountdownInterval = setInterval(updateCountdown, 1000);
+  if (isAdminMode) {
+    // No countdown for the admin: the deadline is the one thing their
+    // access is for. Running it would tick down to disabling the very
+    // button they came here to press.
+    const passed = deadline <= new Date();
+    countdownEl.textContent = passed
+      ? 'Süre dolmuş — yönetici olarak yine de değiştirebilirsin.'
+      : 'Yönetici olarak süre sınırı olmadan değiştirebilirsin.';
+    countdownEl.className = 'stk-countdown';
+  } else {
+    updateCountdown();
+    _takeoverCountdownInterval = setInterval(updateCountdown, 1000);
+  }
+
+  // Admin day picker: reload the form against whichever day they choose,
+  // pre-filled with whatever that day already has.
+  const adminDateEl = takeover.querySelector('#stk-admin-date');
+  if (adminDateEl) {
+    adminDateEl.addEventListener('change', async () => {
+      const picked = adminDateEl.value;
+      if (!picked || picked === date) return;
+      statusEl.textContent = 'Yükleniyor…';
+      statusEl.className = 'stk-status';
+      try {
+        renderTakeoverForm(takeover, await loadAdminDayStatus(status.session, picked));
+      } catch (e) {
+        console.error('[sozcel admin day picker]', e);
+        statusEl.textContent = 'O günün bilgisi alınamadı. Tekrar dene.';
+        statusEl.className = 'stk-status err';
+      }
+    });
+  }
 
   submitBtn.addEventListener('click', () => submitTakeover(status, sylsEl, submitBtn, statusEl, defsEl, takeover));
 }
@@ -5612,7 +5723,11 @@ async function submitTakeover(status, sylsEl, submitBtn, statusEl, defsEl, takeo
     statusEl.className = 'stk-status err';
     return;
   }
-  if (new Date() >= getSozculDeadline(targetDate)) {
+  // The deadline binds the Sözcü, not the admin — an admin blocked by it
+  // could never fix the word on the day it is actually being played, which
+  // is the only day the fix matters. RLS agrees
+  // (db/sozcel_used_answers_v6_admin_override.sql).
+  if (!status.isAdmin && new Date() >= getSozculDeadline(targetDate)) {
     statusEl.textContent = 'Süre doldu.';
     statusEl.className = 'stk-status err';
     return;
@@ -5650,16 +5765,23 @@ async function submitTakeover(status, sylsEl, submitBtn, statusEl, defsEl, takeo
     } catch (e) {
       console.error('[sozcel submitTakeover guard]', e);
     }
-    if (guard && guard.word && guard.sozcul_id && guard.sozcul_id !== status.session.user.id) {
+    // Someone else's day stops a Sözcü, not the admin — overriding it is
+    // the whole point of their access.
+    if (!status.isAdmin && guard && guard.word && guard.sozcul_id && guard.sozcul_id !== status.session.user.id) {
       statusEl.textContent = 'Bu gün için zaten kelime kaydedilmiş.';
       statusEl.className = 'stk-status err';
       return;
     }
 
+    // Correcting a day doesn't take it over: a row that already belongs to
+    // a Sözcü keeps their name on it, so "Günün Sözcülü" still credits the
+    // person whose day it is. Only a day nobody owns is attributed to the
+    // person writing it.
+    const owner = (guard && guard.sozcul_id) || status.session.user.id;
     const definition = serializeTakeoverDict(takeover);
     const { error } = await withSaveTimeout(sb
       .from('sozcel_used_answers')
-      .upsert({ used_on: targetDate, word: wordNorm, syllables, definition, sozcul_id: status.session.user.id }, { onConflict: 'used_on' }));
+      .upsert({ used_on: targetDate, word: wordNorm, syllables, definition, sozcul_id: owner }, { onConflict: 'used_on' }));
     if (error) throw error;
     saved = true;
   } catch (e) {
@@ -5686,8 +5808,13 @@ async function submitTakeover(status, sylsEl, submitBtn, statusEl, defsEl, takeo
     // midnight, so re-render the (now pre-filled) form instead of locking.
     // Only move on to the next assignment or the "done" state once this
     // day's deadline has actually passed.
-    const next = await checkSozculTakeoverStatus();
-    if (next && next.mode === 'pending-input') {
+    // The admin's panel never closes into a "done" screen — they may want
+    // the next day, or this one again — so it reopens on the day they just
+    // saved, showing what is now stored for it.
+    const next = status.isAdmin
+      ? await loadAdminDayStatus(status.session, targetDate)
+      : await checkSozculTakeoverStatus();
+    if (next && (next.mode === 'pending-input' || next.mode === 'admin')) {
       renderTakeoverForm(takeover, next);
       const savedStatusEl = takeover.querySelector('#stk-status');
       if (savedStatusEl) {
