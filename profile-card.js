@@ -25,6 +25,43 @@
     fatih:'Fatih', istanbul_disi:'İstanbul Dışı'
   };
 
+  // ── What your profile page shows, per page ──
+  // Your profile is one page opened from three places, and where you
+  // opened it from decides what it is *for* there: the week's games
+  // belong to Kahvehane, where the games are; your account and your
+  // settings to Kütüphane. The cover — frame, avatar, name, district —
+  // shows on all three, because that is who you are rather than what
+  // you are doing.
+  //
+  // The Kişiselleştir/Kaydet button and Çıkış Yap travel with the blocks
+  // they act on (the settings sliders and the account), so they live
+  // with them on Kütüphane.
+  //
+  // Nothing here scrolls: each page's profile fits inside the sheet the
+  // way a politician's does (see .profile-overlay-body in
+  // profile-card.css). Adding a block to a page means checking it still
+  // fits, not adding a scrollbar.
+  const PROFILE_SECTIONS = {
+    anahane:   { week: false, account: false, settings: false },
+    kahvehane: { week: true,  account: false, settings: false },
+    kutuphane: { week: false, account: true,  settings: true },
+  };
+  const DEFAULT_PAGE = 'anahane';
+
+  // Which of the three carousel pages we're on. router.js stamps
+  // body.dataset.page on every virtual navigation; on a real page load
+  // the filename is the source of truth.
+  function currentPageSlug() {
+    const stamped = document.body && document.body.dataset ? document.body.dataset.page : '';
+    if (PROFILE_SECTIONS[stamped]) return stamped;
+    const file = (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
+    return PROFILE_SECTIONS[file] ? file : DEFAULT_PAGE;
+  }
+
+  function sectionsFor(page) {
+    return PROFILE_SECTIONS[page] || PROFILE_SECTIONS[DEFAULT_PAGE];
+  }
+
   // Two-option toggles. Legacy `more_turkish` and `system` values are
   // remapped via normalize* below to their nearest neighbour.
   // palette_pref reuses the column written by onboarding.js: 'mono' = siyah-beyaz, 'earth' = kahverengi.
@@ -640,11 +677,9 @@
       openProfileOverlay({
         sb: state.sb, I18N, user, profile,
         sozculCount, kefaletCount, sponsoredList, kefilOfUser,
-        // Kütüphane's context is books/articles, not games -- the weekly
-        // game grid doesn't belong in its profile popup (kutuphane.html's
-        // own desktop library-card gear button makes the same call, see
-        // there for the reasoning).
-        hideWeekGrid: page === 'kutuphane',
+        // Which blocks this profile page shows is the page's call, not
+        // this card's (see PROFILE_SECTIONS).
+        page,
         avatarUrl: state.avatarUrl,
         avatarHair: state.avatarHair,
         avatarHat: state.avatarHat,
@@ -703,7 +738,8 @@
 
   function openProfileOverlay(opts) {
     ensureProfileOverlay();
-    _ov = Object.assign({ sozculCount: 0, kefaletCount: 0, sponsoredList: [], kefilOfUser: null, hideWeekGrid: false }, opts);
+    _ov = Object.assign({ sozculCount: 0, kefaletCount: 0, sponsoredList: [], kefilOfUser: null, page: currentPageSlug() }, opts);
+    if (!PROFILE_SECTIONS[_ov.page]) _ov.page = currentPageSlug();
     if (_ov.avatarUrl === undefined) _ov.avatarUrl = _ov.profile?.avatar_url || null;
     if (_ov.avatarHair === undefined) _ov.avatarHair = _ov.profile?.avatar_hair || null;
     if (_ov.avatarHat === undefined) _ov.avatarHat = _ov.profile?.avatar_hat || null;
@@ -987,7 +1023,8 @@
   // above, kept intact so it can be re-added later; already-placed cover
   // badges still render via coverHTML.
   function settingsPageHTML(state) {
-    const { I18N, user, profile, sozculCount, sponsoredList, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing, hideWeekGrid } = state;
+    const { I18N, user, profile, sozculCount, sponsoredList, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
+    const show = sectionsFor(state.page);
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
@@ -1016,13 +1053,14 @@
           ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText: yasadigiDisplay, editable: true, customizing, sozculCount })}
           <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
 
-          ${hideWeekGrid ? '' : `
+          ${show.week ? `
           <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
           <div id="po-weekgrid-mount"></div>
-          `}
+          ` : ''}
         </div>
 
         <div class="ist-pc-settings-col ist-pc-settings-right">
+          ${show.account ? `
           <div class="ist-pc-section-title">${esc(t('profile.account'))}</div>
           <div class="ist-pc-info-row">
             <div class="ist-pc-info-label">${esc(t('profile.email'))}</div>
@@ -1059,7 +1097,9 @@
               <button type="button" class="ist-pc-copy" id="po-copy">${esc(t('profile.copy'))}</button>
             </div>
           </div>` : ''}
+          ` : ''}
 
+          ${show.settings ? `
           <div class="ist-pc-section-title">${esc(t('profile.tab.ayarlar'))}</div>
           ${customizing ? `
           <div class="ist-pc-field">
@@ -1104,10 +1144,11 @@
             <button type="button" class="ist-pc-save" id="po-save">${esc(customizing ? t('profile.save') : t('profile.customize'))}</button>
           </div>
           <div class="ist-pc-msg" id="po-save-msg"></div>
+          ` : ''}
         </div>
       </div>
 
-      <button type="button" class="ist-pc-signout" id="po-signout">${esc(t('profile.signout'))}</button>
+      ${show.account ? `<button type="button" class="ist-pc-signout" id="po-signout">${esc(t('profile.signout'))}</button>` : ''}
     `;
   }
 
@@ -1125,13 +1166,16 @@
     wireHatCarousel(state);
     wireAccessoryCarousel(state);
     wireShirtCarousel(state);
-    if (!state.hideWeekGrid) {
+    // Every block below is optional: which ones exist depends on the page
+    // this was opened from (see PROFILE_SECTIONS).
+    if (document.getElementById('po-weekgrid-mount')) {
       getWeekGameStatus(sb, user.id).then(status => {
         const m = document.getElementById('po-weekgrid-mount');
         if (m) m.innerHTML = weekGridHTML(status, I18N);
       });
     }
-    document.getElementById('po-save').addEventListener('click', () => {
+    const saveBtn = document.getElementById('po-save');
+    if (saveBtn) saveBtn.addEventListener('click', () => {
       if (state.customizing) {
         saveSettings(state);
       } else {
@@ -1151,7 +1195,8 @@
     syncTicks('po-language', 'po-language-ticks');
     syncTicks('po-palette', 'po-palette-ticks');
     syncTicks('po-theme', 'po-theme-ticks');
-    document.getElementById('po-signout').addEventListener('click', async () => {
+    const signoutBtn = document.getElementById('po-signout');
+    if (signoutBtn) signoutBtn.addEventListener('click', async () => {
       await sb.auth.signOut();
       window.location.href = 'index.html';
     });
@@ -1166,9 +1211,17 @@
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const msgEl = document.getElementById('po-save-msg');
     const btn = document.getElementById('po-save');
-    const newLang = LANG_VALUES[parseInt(document.getElementById('po-language').value, 10)] || 'default';
-    const newTheme = THEME_VALUES[parseInt(document.getElementById('po-theme').value, 10)] || 'light';
-    const newPalette = PALETTE_VALUES[parseInt(document.getElementById('po-palette').value, 10)] || 'mono';
+    // The sliders only exist on the page that renders the settings block
+    // (see PROFILE_SECTIONS) -- elsewhere Kaydet is saving avatar picks
+    // alone, so each preference keeps whatever is already stored.
+    const sliderValue = (id, values, fallback) => {
+      const el = document.getElementById(id);
+      if (!el) return fallback;
+      return values[parseInt(el.value, 10)] || values[0];
+    };
+    const newLang = sliderValue('po-language', LANG_VALUES, normalizeLang(state.profile?.language_pref));
+    const newTheme = sliderValue('po-theme', THEME_VALUES, normalizeTheme(state.profile?.theme_pref));
+    const newPalette = sliderValue('po-palette', PALETTE_VALUES, normalizePalette(state.profile?.palette_pref));
 
     const payload = {
       language_pref: newLang,
@@ -1488,7 +1541,7 @@
           return;
         }
         openProfileOverlay({
-          sb, I18N, user, profile,
+          sb, I18N, user, profile, page: opts.page || currentPageSlug(),
           sozculCount, kefaletCount, sponsoredList, kefilOfUser,
           avatarUrl: state.avatarUrl,
           avatarHair: state.avatarHair,

@@ -116,6 +116,33 @@
 
    What belongs here is only what goes *inside* the sheet. */
 
+/* Your own profile page is meant to be read at a glance, not scrolled:
+   each of the three pages shows a different, deliberately short set of
+   blocks (see PROFILE_SECTIONS in profile-card.js) and every set fits
+   inside the sheet, the way a politician's or an event's page does. Room
+   is made for that here — a tighter bottom run-out, and a cover that
+   gives up size on a short window (see --ist-cover-frame-w below).
+
+   overflow stays `auto` rather than `hidden` purely as a safety valve:
+   below roughly 640px of window height there is no honest way to fit the
+   account block, and a page you can scroll beats a Çıkış Yap button
+   quietly clipped off the bottom edge. At every real size it never
+   scrolls. If a new block stops fitting, the fix is fewer blocks on that
+   page — not letting it scroll. (Doubled class beats sheet.css's own
+   .ist-sheet-body padding, which is written for sheets that do scroll.) */
+.ist-sheet-body.profile-overlay-body {
+  overflow: auto;
+}
+@media (max-width: 768px) {
+  /* The shared phone rule leaves a scrolling sheet a generous run-out at
+     the bottom. This page doesn't scroll, so that run-out is just room
+     taken from the blocks — it only has to clear the fixed tab bar
+     (38px + the home-indicator inset, see frames.css). */
+  .ist-sheet-body.profile-overlay-body {
+    padding-bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* Another member's profile: the read-only card (cover + week grid +
    "member since" + kefil chain), opened from any .author-link /
    .kefil-link by openMemberSheet in profile-card.js.
@@ -178,7 +205,12 @@
    max-width) so a longer name keeps to one line instead of wrapping — only
    the frame itself is pinned, centered in the track. */
 .ist-pc-cover {
-  --ist-cover-frame-w: 150px;
+  /* One size for every profile — but capped against the window's height
+     too, since the profile page never scrolls (see .profile-overlay-body):
+     on a short window the frame gives up room so the blocks under it still
+     land inside the sheet. The px value is what it is on any normal
+     screen; the vh term only bites below ~750px of height. */
+  --ist-cover-frame-w: min(150px, 16vh);
   position: relative;
   display: grid;
   grid-template-columns: minmax(var(--ist-cover-frame-w), max-content);
@@ -199,15 +231,26 @@
    same badges at their saved spot but pointer-events stay off.
    Sized as a fraction of the frame rather than in pixels so a sticker
    keeps its proportion to the frame at every size the frame is rendered
-   at (settings sheet, popup, mobile). */
+   at (settings sheet, member sheet, mobile). */
 .ist-pc-cover-badge {
   position: absolute;
-  width: 42%;
-  aspect-ratio: 1;
-  object-fit: contain;
   filter: grayscale(100%);
   transform: translate(-50%, -50%);
   pointer-events: none;
+}
+/* Size and fit need the tag in the selector to outrank the generic
+   `.ist-pc-cover-avatar img` rule below (and frames.css's !important
+   object-fit/object-position for the avatar art, which anchors art to the
+   bottom of the frame). Without that, every sticker was drawn at the full
+   width and height of the frame, bottom-anchored — a decal across the
+   whole pano rather than a mark placed where it was dropped. It sits at
+   a quarter of that now, centred on its own saved spot. */
+.ist-pc-cover-avatar img.ist-pc-cover-badge {
+  width: 25%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain !important;
+  object-position: center !important;
 }
 .ist-pc-cover-editable.ist-pc-cover-customizing .ist-pc-cover-badge {
   pointer-events: auto;
@@ -531,7 +574,7 @@
      pinned under the compact #ist-pc-mount card, see positionProfileSheet),
      so trim harder here: a smaller frame, smaller day cells and badge
      icons, no badge hint copy, tighter row padding. */
-  .ist-pc-cover { --ist-cover-frame-w: 112px; margin-bottom: 6px; }
+  .ist-pc-cover { --ist-cover-frame-w: min(112px, 13vh); margin-bottom: 6px; }
   .ist-pc-cover-pick-prev { margin-right: 8px; }
   .ist-pc-cover-pick-next { margin-left: 8px; }
   .ist-pc-cover-pick-col { gap: 5px; }
