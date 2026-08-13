@@ -469,6 +469,23 @@ geometry and no centred modal anywhere on the site.
 - **Chrome:** background/border come from `frames.css`'s `.ist-sheet` rule (2px ink border, no
   bottom border, no shadow).
 
+### The three carousel pages share one document
+
+`router.js` navigates Kütüphane ↔ Anahane ↔ Kahvehane **without a page load** — on the web too, not
+just in the app. Each page's `#ist-content` is swapped in, but everything else it leaves behind
+stays: its body-level overlay markup, and every listener its script ever bound to `document` or
+`window`. Two rules follow, and breaking either one fails silently:
+
+- **Body-level overlay ids must be unique across the three pages.** Anahane and Kahvehane both
+  called their sheet `#detail-overlay`; the second page's markup was skipped as a duplicate, so it
+  drove the first page's node instead (`#anahane-detail` / `#kahvehane-detail` now). `router.js`
+  warns in the console when an id clashes across pages — do not ignore that warning.
+- **A page script must not delegate on `document` for anything another page also has.**
+  `#politician-card`, `.neighborhood`, `.author-link` and friends exist on more than one page: a
+  document-level handler keeps firing after you've navigated away. Bind to the element instead
+  (it lives inside `#ist-content`, so the binding leaves with it) — or put the behaviour in a
+  shared module that every page uses, which is what the member sheet does.
+
 ### Another member's profile — `IstProfileCard.initMemberSheet({ sb, I18N })`
 
 Clicking any `.author-link` / `.kefil-link` anywhere on the site opens that member's read-only

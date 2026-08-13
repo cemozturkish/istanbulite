@@ -4,12 +4,17 @@
 // .politician-card CSS), plus the "who is this" detail view opened when
 // it's clicked.
 //
-// Used by kutuphane.html (the fixed Cumhurbaşkanı seat) and kahvehane.html
-// (the viewer's own neighborhood's mayor seat). anahane.html has its own,
-// older copy of this same logic (its card also switches seats on map
-// clicks, which predates this shared module) — it hasn't been refactored
-// onto this to avoid touching already-working code for no user-visible
-// gain; keep the two in sync if this changes.
+// Used by all three carousel pages: kutuphane.html (the fixed
+// Cumhurbaşkanı seat), kahvehane.html (the viewer's own neighborhood's
+// mayor seat) and anahane.html (whichever district is selected on the
+// map — it keeps its own seat cache and calls cardHTML/detailHTML
+// directly, since mount()'s one-seat fetch can't express that).
+//
+// Whoever wires the click must bind it to the card element, never
+// delegate it on document: #politician-card exists on all three pages and
+// a document-level listener survives a virtual navigation (see router.js),
+// so it would keep firing on the other pages' cards — which is exactly
+// how anahane's sheet used to open on top of kütüphane's.
 //
 // Backed by public.political_seats (id -> politician_id + title) joined
 // with public.politicians, the people roster shared with mayors — see
