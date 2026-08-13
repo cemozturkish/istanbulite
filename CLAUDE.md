@@ -486,6 +486,17 @@ stays: its body-level overlay markup, and every listener its script ever bound t
   (it lives inside `#ist-content`, so the binding leaves with it) — or put the behaviour in a
   shared module that every page uses, which is what the member sheet does.
 
+### Your own profile — one page, three versions (`PROFILE_SECTIONS`)
+
+The profile card opens your profile as the sheet above, but **what it contains depends on which of
+the three pages you opened it from** (`PROFILE_SECTIONS` in `profile-card.js`): the cover (frame,
+avatar, name, district) is on all three; the week's game grid is Kahvehane's; your account and
+settings — with the Kişiselleştir and Çıkış Yap buttons that act on them — are Kütüphane's.
+Anahane shows the cover alone until something is assigned to it.
+
+None of the three scrolls: every set fits inside the sheet, the way a politician's page does. If a
+new block stops fitting, drop a block from that page — do not turn the page into a scroller.
+
 ### Another member's profile — `IstProfileCard.initMemberSheet({ sb, I18N })`
 
 Clicking any `.author-link` / `.kefil-link` anywhere on the site opens that member's read-only
