@@ -120,7 +120,7 @@ default one.
 ├── admin.html            # Admin dashboard (admin-only)
 ├── router.js             # Shared shell: single Supabase client, swipe carousel, virtual navigation, clock
 ├── sheet.css/.js         # THE sheet: the one page that rises from the bottom — see "Site-wide defaults"
-├── profile-card.js/.css  # Floating profile card, avatar, badges — shared across pages
+├── profile-card.js/.css  # Profile bar (the phone's top bar), avatar, badges — shared across pages
 ├── onboarding.js/.css    # New-account onboarding flow
 ├── game-locks.js         # Per-day game on/off enforcement (game_day_toggles)
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
@@ -471,13 +471,13 @@ geometry and no centred modal anywhere on the site.
   content styling (`class="ist-sheet detail-overlay-sheet"`), never for size or position.
 - **Behaviour:** `IstSheet.open(overlay)` / `IstSheet.close(overlay, after)` — do not hand-roll
   the unhide → rAF → `.open` dance or the 550ms hide timeout.
-- **Phones:** the sheet's side gaps are the same `--screen-inset` (frames.css) the mobile profile
-  card sits on — the two things stacked over the same map line up, always.
-  - A sheet opened **from the profile card** (your profile, a member's) rests under that card,
+- **Phones:** the sheet's side gaps are the same `--screen-inset` (frames.css) the profile bar's
+  row is padded to — everything stacked over the same map lines up, always.
+  - A sheet opened **from the profile bar** (your profile, a member's) rests under that bar,
     via `--ist-sheet-top` (`IstSheet.position` measures it live).
   - A sheet opened **over the map** — a news item, an event, an article, the meclis, later a
     country — carries `ist-sheet-pull` and is *dragged*: it comes to rest half-way down, under
-    the map, so you still see what you tapped; drag it up and it stops at the profile card;
+    the map, so you still see what you tapped; drag it up and it stops at the profile bar;
     past that the reading continues inside it; drag it back down and it closes. One
     implementation, `IstSheet.pull(overlay, { onDismiss })` — attach it once and
     `IstSheet.open/close` drive it from there. Touch only (`pointer: coarse`); a narrow desktop
@@ -491,10 +491,22 @@ On a phone all three carousel pages are one screen: a square map at the top, eve
 below it. **Everything below starts on the same line** — Anahane's news and events, Kahvehane's
 comments and game tiles, Kütüphane's Dünya column and shelf boxes — and each map's caption sits
 just above it. A sheet pulled up over the map comes to rest there too. That line is
-`--map-hero-end` (frames.css: frame ring + `--map-hero-top` + the map's own `100vw` square); the
-profile card floating over the map sits on `--screen-inset`, and so do the sheets' side gaps.
-Never restate any of these as a number — swiping between the three pages must not shift the
-layout under the reader.
+`--map-hero-end` (frames.css: frame ring + `--map-hero-top` + the map's own `100vw` square); what
+is printed on the two bars sits on `--screen-inset`, and so do the sheets' side gaps. Never
+restate any of these as a number — swiping between the three pages must not shift the layout
+under the reader.
+
+### The phone's two bars — `#ist-pc-mount` (top) and `.section-rule > header` (bottom)
+
+A phone shows the city between two fixed charcoal bars: **who you are** at the top (the profile
+bar — avatar, name, district, the gear that opens your profile) and **where you can go** at the
+bottom (Kütüphane / Hane / Kahvehane). Both run full-bleed edge to edge, both are 38px plus the
+device's own inset (notch at the top, home indicator at the bottom), both print their contents on
+`--screen-inset`, and neither moves while the three pages swipe underneath. Their colors are the
+`--navbar-ink*` tokens in frames.css — deliberately palette-independent, the same in light, mono
+and dark. The bottom bar's rules live in frames.css ("MOBILE FIXED BOTTOM NAV"), the top bar's in
+profile-card.css ("THE TOP BAR"); a page must not restate either one's geometry or color. The
+game pages hide the bottom bar outright for their fullscreen board.
 
 ### The three carousel pages share one document
 
