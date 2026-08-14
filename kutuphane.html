@@ -2101,8 +2101,18 @@
            by its content first and only then positions the shorter track
            in the container, so a 1fr row sizes to one short card stack
            and never claims the leftover space -- the same trap
-           kahvehane.html hit (see its own grid-template-rows comment). */
-        grid-template-rows: 1fr;
+           kahvehane.html hit (see its own grid-template-rows comment).
+
+           minmax(0, 1fr), not a bare 1fr: a bare `1fr` is minmax(auto,
+           1fr), and that `auto` minimum is the row's min-content height,
+           so once the Dünya feed held more than the band under the map
+           could show, the row GREW past #main-site's content box instead
+           of the feed staying pinned to the bottom of it -- the stack ran
+           down behind the fixed tab bar and the last card was sliced
+           mid-headline. Zero as the minimum lets the row be exactly the
+           leftover height, and the columns scroll inside it (see
+           .col-*-slide below) rather than the page growing under the bar. */
+        grid-template-rows: minmax(0, 1fr);
         overflow-y: auto;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
@@ -2160,10 +2170,39 @@
          sit in a flex column (the slide) and neither grows -- .lib-boxes
          is flex-shrink:0, #dunya-news-feed is flex:none on mobile.
          Deliberately an auto margin rather than justify-content:flex-end:
-         once a stack outgrows the screen the margin resolves to zero and
-         #main-site scrolls it as usual, where flex-end would push the top
-         of the stack out of the grid area and out of reach. */
+         once a stack outgrows the band the margin resolves to zero and the
+         column scrolls it as usual, where flex-end would push the top of
+         the stack out of the scroller and out of reach. */
       .lib-boxes, #dunya-news-feed { margin-top: auto; }
+
+      /* ...and where a stack outgrows the band, THIS is what it scrolls
+         in. The band between the hero line and the tab bar is all the
+         height either column ever gets (see #main-site's minmax(0, 1fr)
+         above), so the overflow has to be absorbed here, inside the
+         column, rather than by the page growing behind the fixed tab bar.
+         The scroller is the slide and not .col-* itself because the feed
+         is the slide's own child: scrolling the column would leave the
+         feed overflowing a mid-height slide box, and how much of that
+         overflow counts as scrollable is exactly the kind of thing
+         engines disagree about.
+         min-height:0 on the columns for the same reason the row needs a
+         zero minimum -- a flex/grid item's automatic minimum size is its
+         content, so without this the column refuses to be shorter than
+         the whole stack and hands the overflow straight back to the page. */
+      .col-left, .col-right { min-height: 0; }
+      .col-left-slide, .col-right-slide {
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        /* No scrollbar: these columns are frameless text floating on the
+           map, so a track drawn down the middle of the artwork would read
+           as a seam in the drawing rather than as chrome. */
+        scrollbar-width: none;
+      }
+      .col-left-slide::-webkit-scrollbar,
+      .col-right-slide::-webkit-scrollbar { display: none; }
       /* The blank third box holds a slot for a future section. With the
          stack growing upward it belongs at the TOP of the column, where
          the next box would land -- and that puts Posta Kutusu itself in
@@ -2432,12 +2471,14 @@
       .lib-box:hover { transform: translateX(4px); }
 
       /* Cancels the desktop rule's flex:1/overflow-y:auto (a fixed-height
-         internally-scrolling column there) -- on mobile the whole page
-         scrolls instead, so this just sizes to its own content, matching
-         .shelves' own mobile treatment above. The 12px under the last
-         card is .lib-boxes' own bottom padding too, so the two
-         bottom-aligned stacks end on the same line above the tab bar. */
-      #dunya-news-feed { padding: 10px 12px; gap: 8px; flex: none; overflow: visible; min-height: auto; }
+         internally-scrolling column there) -- on mobile the scroller is
+         the slide around it (see .col-*-slide above), so the feed itself
+         just sizes to its own content, matching .shelves' own mobile
+         treatment above. Padding is the same 12px .lib-boxes carries, so
+         the two bottom-aligned stacks end on the same line above the tab
+         bar -- it was 10px, which left the Dünya cards sitting 2px lower
+         than the boxes beside them. */
+      #dunya-news-feed { padding: 12px; gap: 8px; flex: none; overflow: visible; min-height: auto; }
       .article { padding: 8px 12px; }
       /* Inward is leftward here: the Dünya feed is the right-hand column
          on a phone, the mirror of where it sits on desktop. */
