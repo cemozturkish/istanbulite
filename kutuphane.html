@@ -2081,19 +2081,28 @@
          the desktop rule above -- see that rule's comment. The map no
          longer takes a row here: it's the fixed full-screen backdrop
          behind this grid (see .map-panel below), so the grid holds only
-         the two columns -- Dünya news on the left (matching Hane's own
-         "news" grid-area) and the library boxes on the right (matching
-         Kahvehane's games column) -- floated down onto the blank lower
-         half of the artwork by the padding-top. */
+         the two columns -- the library boxes (Posta Kutusu, Makaleler) on
+         the left and the Dünya news on the right -- floated down onto the
+         blank lower half of the artwork by the padding-top, and resting
+         on the bottom of the screen (see their auto margin below). The
+         two sat the other way round until now (news left, boxes right). */
       #main-site {
         height: 100dvh;
         display: grid;
         /* News gets the remaining space, boxes column sizes to its own
            tiles' content width instead of stretching to half the screen
-           -- matches Kahvehane's own "1fr auto" games-column proportion. */
-        grid-template-columns: 1fr auto;
-        grid-template-areas: "news boxes";
-        align-content: start;
+           -- matches Kahvehane's own games-column proportion, mirrored. */
+        grid-template-columns: auto 1fr;
+        grid-template-areas: "boxes news";
+        /* The single row takes the whole screen under the hero line, so
+           both columns have a full-height box to sit at the bottom of.
+           Left as the default align-content (stretch, not the `start`
+           this used to pin): with anything else, grid track-sizes the row
+           by its content first and only then positions the shorter track
+           in the container, so a 1fr row sizes to one short card stack
+           and never claims the leftover space -- the same trap
+           kahvehane.html hit (see its own grid-template-rows comment). */
+        grid-template-rows: 1fr;
         overflow-y: auto;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
@@ -2140,6 +2149,27 @@
          takes no grid area at all now -- it's out of flow. */
       .col-right { grid-area: news; }
       .col-left { grid-area: boxes; }
+      /* Both columns rest on the bottom of the screen: the boxes stack up
+         from the tab bar in the left corner, the Dünya cards from it in
+         the right one, and a newer card is laid on top of the stack
+         rather than the column hanging off the hero line. The auto margin
+         goes on the box/feed itself rather than on .col-*-slide: the
+         slides carry flex:1 and fill the column, and flex hands the free
+         space to a growing item before any margin sees it, so an auto
+         margin one level up is silently ignored. Both of these already
+         sit in a flex column (the slide) and neither grows -- .lib-boxes
+         is flex-shrink:0, #dunya-news-feed is flex:none on mobile.
+         Deliberately an auto margin rather than justify-content:flex-end:
+         once a stack outgrows the screen the margin resolves to zero and
+         #main-site scrolls it as usual, where flex-end would push the top
+         of the stack out of the grid area and out of reach. */
+      .lib-boxes, #dunya-news-feed { margin-top: auto; }
+      /* The blank third box holds a slot for a future section. With the
+         stack growing upward it belongs at the TOP of the column, where
+         the next box would land -- and that puts Posta Kutusu itself in
+         the bottom corner. Mobile only: on desktop the boxes hang from
+         the top of the column and the placeholder stays last. */
+      .lib-box-empty { order: -1; }
 
       /* Lifted over the country overlay (z-index 2, see .map-svg-world) so
          both stay usable in the same half of the screen: the columns take
@@ -2396,13 +2426,22 @@
         word-break: break-word;
         max-width: 100%;
       }
+      /* Inward is rightward here: the boxes are the left-hand column on a
+         phone (see the "boxes news" grid above), the mirror of where they
+         sit on desktop -- so the nudge mirrors with them. */
+      .lib-box:hover { transform: translateX(4px); }
 
       /* Cancels the desktop rule's flex:1/overflow-y:auto (a fixed-height
          internally-scrolling column there) -- on mobile the whole page
          scrolls instead, so this just sizes to its own content, matching
-         .shelves' own mobile treatment above. */
-      #dunya-news-feed { padding: 10px 12px 16px; gap: 8px; flex: none; overflow: visible; min-height: auto; }
+         .shelves' own mobile treatment above. The 12px under the last
+         card is .lib-boxes' own bottom padding too, so the two
+         bottom-aligned stacks end on the same line above the tab bar. */
+      #dunya-news-feed { padding: 10px 12px; gap: 8px; flex: none; overflow: visible; min-height: auto; }
       .article { padding: 8px 12px; }
+      /* Inward is leftward here: the Dünya feed is the right-hand column
+         on a phone, the mirror of where it sits on desktop. */
+      .article.openable:hover { transform: translateX(-6px); }
       .article .kicker { font-size: 10px; margin-bottom: 2px; letter-spacing: 1px; }
       .article h3 { font-size: 18px; margin-bottom: 3px; line-height: 1.25; }
       .article p { font-size: 12px; line-height: 1.35; }

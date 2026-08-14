@@ -1066,7 +1066,17 @@
         grid-template-areas:
           "map map"
           "news events";
-        align-content: start;
+        /* Row 2 takes everything the map leaves, so the two card columns
+           have a full-height box to sit at the BOTTOM of (see the feeds'
+           auto margin below) instead of hanging off the map's lower edge.
+           Left as the default
+           align-content (stretch, not the `start` this used to pin): with
+           anything else, grid track-sizes the rows by their content first
+           and only then positions the shorter track set in the container,
+           so row 2 sizes to one short card stack and never claims the
+           leftover space -- the same trap kahvehane.html hit (see its own
+           grid-template-rows comment). */
+        grid-template-rows: auto 1fr;
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
            the map -- a different color from the map's own #f7f7f7,
@@ -1081,11 +1091,12 @@
         column-gap: calc(var(--frame-gap) / 2) !important;
         /* #main-site always fills the full viewport height (height:100%
            above), but its content (map + one short row of cards) often
-           doesn't -- with align-content:start packing everything at the
-           top, the leftover space at the bottom belongs to no grid item
-           and was showing the raw page canvas instead of the map/card
-           #f7f7f7. Coloring the container itself means any such gap
-           matches by default instead of needing a fix per element. */
+           doesn't -- and the columns are transparent by design (see
+           .col-left/.col-right below), so the run of empty page above the
+           bottom-aligned cards would show the raw page canvas instead of
+           the map/card #f7f7f7. Coloring the container itself means any
+           such gap matches by default instead of needing a fix per
+           element. */
         background: #f7f7f7;
         /* Clears the fixed bottom tab bar so the last row of cards isn't
            hidden behind it. */
@@ -1185,22 +1196,55 @@
       }
 
       /* Events (left) + news (right): normal in-flow columns below the
-         map, each stacking its own cards top to bottom. Explicit z-index
-         (above main's own 0, see main{} above) so they stay on top of
-         the map even once it's zoomed in and spilling past its own
-         little square -- otherwise DOM order alone would leave one of
-         the two columns stacked below it. */
+         map, each stacking its cards from the BOTTOM of the screen up --
+         one news item rests just above the tab bar, and a second one is
+         laid on top of it rather than the stack hanging off the map's
+         lower edge. Flex columns (not blocks) so the auto margin below
+         can do that. Explicit z-index (above main's own 0, see main{}
+         above) so they stay on top of the map even once it's zoomed in
+         and spilling past its own little square -- otherwise DOM order
+         alone would leave one of the two columns stacked below it. */
       .col-left, .col-right {
         position: static;
         top: auto; bottom: auto; left: auto; right: auto;
         height: auto;
         width: auto;
-        display: block;
+        display: flex;
+        flex-direction: column;
         overflow: visible;
         z-index: 1;
       }
       .col-left { grid-area: events; }
       .col-right { grid-area: news; }
+      /* What actually bottom-aligns each column. The two wrappers between
+         the column and its feed (.col-*-slide, then .sidebar-*) both
+         carry flex:1 and so fill the column's full height -- the auto
+         margin therefore has to go on the feed itself, the innermost box,
+         with flex:none to stop it growing into the space it is supposed
+         to be pushed down through. (An auto margin on a wrapper that
+         grows is silently ignored: flex distributes the free space before
+         margins ever see it.) .sidebar-* go back to flex here for the
+         same reason -- an auto margin does nothing to a block child.
+
+         Deliberately an auto margin rather than justify-content:flex-end:
+         once a stack outgrows the space, an auto margin resolves to zero
+         and the row simply grows, scrolling in #main-site as usual, where
+         flex-end would push the top of the stack out of the grid area and
+         out of reach. */
+      #events-panel, #breaking-news-feed {
+        flex: none;
+        margin-top: auto;
+      }
+      /* The two stacks end on the same line: the feeds' own bottom
+         padding is all that separates the last card from the tab bar
+         (#main-site's padding-bottom), so the trailing card margin --
+         which only ever existed to space one card off the next -- goes.
+         Top alignment used to be the thing worth matching here (see
+         #events-panel's own padding note further down); now it's the
+         bottom. */
+      #breaking-news-feed { padding-bottom: 10px; }
+      #breaking-news-feed > :last-child,
+      #events-panel > :last-child { margin-bottom: 0; }
       /* Transparent (inherits the desktop rule's background:none) so
          these read as frameless text floating over the map, same as
          desktop -- #main-site's own background is the same #f7f7f7, so
@@ -1219,12 +1263,17 @@
          #library-card/#politician-card above. */
       .corner-card { display: none; }
 
-      .sidebar-left {
-        overflow: visible;
-        display: block;
-      }
+      /* Both sidebars keep their desktop flex column (see the feeds' auto
+         margin above, which needs a flex parent to mean anything) and
+         only drop the internal scrolling: on mobile the page scrolls, the
+         columns don't. .sidebar-right also takes the flex:1 its left
+         counterpart already has in the desktop rule -- without it the
+         news sidebar is only as tall as its own cards, and pushing the
+         feed to the bottom of a box that is exactly the feed's height
+         moves nothing. */
+      .sidebar-left { overflow: visible; }
       #breaking-news-feed, #events-panel { overflow: visible; }
-      .sidebar-right { overflow: visible; display: block; }
+      .sidebar-right { overflow: visible; flex: 1; }
       .sidebar-label {
         font-size: 9px;
         letter-spacing: 1.5px;
