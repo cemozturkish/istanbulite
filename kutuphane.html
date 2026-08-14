@@ -320,19 +320,18 @@
        up as one unit instead of just the piece under the cursor. */
     .neighborhood:hover, .neighborhood.hover-active,
     .country:hover, .country.hover-active { fill: rgba(var(--ink-rgb), 0.18); }
-    /* Same fix as hover — bake the alpha into the fill color instead of
+    /* Clicked/active: darker tint + outline. The same declaration anahane
+       and kahvehane use, so a selected country here reads exactly like a
+       selected district there — a darker shade of the same neutral ink tint
+       hover already uses. This page had kept an older, much stronger brown-1
+       fill that the other two had already moved off, which read as the
+       region turning solid brown rather than just darkening. Same fix as
+       hover: the alpha is baked into the fill color instead of applied as
        element opacity, so the accent-colored stroke doesn't wash out. */
     .neighborhood.active, .country.active {
-      fill: rgba(184, 148, 122, 0.7); /* --brown-1 */
+      fill: rgba(var(--ink-rgb), 0.32);
       stroke: var(--accent);
-      stroke-width: 1.4;
     }
-    /* The two overlays are drawn at wildly different scales -- the İstanbul
-       trace is 5046 units across, the phone's country trace 1080 -- so the
-       same stroke-width number lands at a different thickness on screen.
-       Widened here so the selected country's outline reads as the same
-       hairline the district map's does once scaled down to a phone. */
-    .country.active { stroke-width: 4; }
     /* Plain text, no frame/shadow — matches the HANE/KÜTÜPHANE/KAHVEHANE
        nav tab style (nav a above), not a floating pill. */
     .map-label {
@@ -2142,6 +2141,15 @@
       .col-right { grid-area: news; }
       .col-left { grid-area: boxes; }
 
+      /* Lifted over the country overlay (z-index 2, see .map-svg-world) so
+         both stay usable in the same half of the screen: the columns take
+         the taps that land on them, the map takes the rest. Without this the
+         overlay would be the topmost thing over the whole lower half and a
+         news card underneath it could not be opened.
+         z-index alone, no position: these are grid items, and z-index
+         applies to grid items as-is (same as frames.css relies on). */
+      .col-left, .col-right { z-index: 3; }
+
       /* On mobile, the kütüphane page is one screen: the map plus its two
          columns. Both the chapter list and the reader itself rise over it
          as the same full-bleed sheet (see sheet.css's phone rules)
@@ -2261,26 +2269,30 @@
          where a country is drawn -- the sea between them, and the empty lower
          half of the artwork, still scroll and tap through to the page.
 
-         Clipped to the band of map the reader can actually see: the profile
-         bar covers the top of the artwork and the columns start at the hero
-         line, so a country reaching past either edge (Rusya into the bar,
-         Mısır down behind the Dünya feed) would be swallowing taps meant for
-         the bar's buttons or a news card. clip-path takes hit-testing with
-         it, so clipping the sheet is the same statement as "only the visible
-         map is touchable". */
+         The whole drawing is live, top to bottom -- the countries in the
+         lower half are as touchable as the ones above the hero line, even
+         though the columns are drawn over that half. What keeps both working
+         is the z-index below: the columns sit ABOVE this overlay, so a news
+         card or a shelf box always wins the tap where it is actually drawn,
+         and the map answers everywhere they are not (the margins around
+         them, the gaps between them, the run of empty page under them).
+
+         Only the top is clipped, and only as far as the profile bar reaches:
+         the bar is drawn over the artwork, so a country under it (Rusya) had
+         no business taking taps meant for the bar's buttons. clip-path takes
+         hit-testing with it, which is what makes clipping the right tool
+         here rather than a second stacking rule. */
       svg.map-svg-world {
         display: block;
         position: fixed;
         inset: 0;
         width: 100%;
         height: 100%;
-        /* Over #main-site (unpositioned), under the profile bar (20), the tab
-           bar (100) and the sheets (500). */
+        /* Over #main-site (unpositioned), under the columns (3), the profile
+           bar (20), the tab bar (100) and the sheets (500). */
         z-index: 2;
         pointer-events: none;
-        clip-path: inset(
-          calc(var(--navbar-h, 38px) + env(safe-area-inset-top)) 0
-          calc(100% - var(--map-hero-end)) 0);
+        clip-path: inset(calc(var(--navbar-h, 38px) + env(safe-area-inset-top)) 0 0 0);
       }
       /* Sits just above the hero line, where the columns start --
          exactly where Hane's and Kahvehane's captions sit over their own
@@ -4839,6 +4851,13 @@ const neighborhoodNames = {
       getMapRegions().forEach(n => n.classList.toggle('active', regionId(n) === nbId));
       if (mapLabel) mapLabel.textContent = regionName(nb);
       activeRegionName = regionName(nb);
+      // Ankara is the one region on this map that goes somewhere. It is the
+      // only city drawn on the phone artwork and the only thing inked red on
+      // it, and what this page holds of Ankara is the meclis -- so tapping it
+      // opens the same TBMM sheet the button in the boxes column does. The
+      // tint and caption above still run first, so the map reads as selected
+      // behind the sheet that rises over it.
+      if (nbId === 'ankara') openTBMMSheet();
       return;
     }
     // Snap back to the idle caption only when clicking empty space inside
