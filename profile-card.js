@@ -114,7 +114,7 @@
   // before profiles.avatar_hat existed — see db/avatar_hat.sql).
   const AVATAR_HAT_OPTIONS = [
     { value: null,    label: 'Yok' },
-    { value: 'crown', label: 'Sözcü Tacı', requiresSozculCount: IstAvatar.SOZCU_REQUIRED_COUNT },
+    { value: 'crown', label: 'Sözcü Tacı', requiresSozcuCount: IstAvatar.SOZCU_REQUIRED_COUNT },
   ];
 
   // Accessory overlays — a third independent layer, stacked above hat (see
@@ -598,7 +598,7 @@
   async function fetchProfileData(sb, I18N, user) {
     const today = istanbulTodayISO();
 
-    const [{ data: profile }, { data: sponsoredRows }, { count: sozculCount }] = await Promise.all([
+    const [{ data: profile }, { data: sponsoredRows }, { count: sozcuCount }] = await Promise.all([
       sb.from('profiles').select('*').eq('id', user.id).single(),
       sb.from('profiles').select('id, first_name, last_name, neighborhood, joined_at').eq('referred_by', user.id).order('joined_at', { ascending: true }),
       sb.from('sozcel_sozcul_assignments').select('*', { count: 'exact', head: true }).eq('user_id', user.id).lte('game_date', today),
@@ -624,7 +624,7 @@
     if (global.Palette) global.Palette.setPalette(palettePref);
 
     return {
-      sb, I18N, user, profile, kefaletCount, sponsoredList, sozculCount, kefilOfUser,
+      sb, I18N, user, profile, kefaletCount, sponsoredList, sozcuCount, kefilOfUser,
       avatarUrl: profile?.avatar_url || null,
       avatarHair: profile?.avatar_hair || null,
       avatarHat: profile?.avatar_hat || null,
@@ -640,7 +640,7 @@
   // bottom-sheet overlay (see openProfileOverlay below) — the actual
   // editing/settings/badges UI no longer lives in this compact card.
   function renderPage(container, page, state) {
-    const { I18N, user, profile, kefaletCount, sponsoredList, sozculCount, kefilOfUser } = state;
+    const { I18N, user, profile, kefaletCount, sponsoredList, sozcuCount, kefilOfUser } = state;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
     const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
@@ -675,7 +675,7 @@
     document.getElementById('ist-pc-toggle').addEventListener('click', () => {
       openProfileOverlay({
         sb: state.sb, I18N, user, profile,
-        sozculCount, kefaletCount, sponsoredList, kefilOfUser,
+        sozcuCount, kefaletCount, sponsoredList, kefilOfUser,
         // Which blocks this profile page shows is the page's call, not
         // this card's (see PROFILE_SECTIONS).
         page,
@@ -711,7 +711,7 @@
   // Injected into <body> lazily (once) so every page that loads this
   // script gets it without needing its own overlay markup.
   // ══════════════════════════════════════════════════════════════
-  let _ov = null; // { sb, I18N, user, profile, sozculCount, kefaletCount, kefilOfUser, avatarUrl, activeTab, onAvatarChange }
+  let _ov = null; // { sb, I18N, user, profile, sozcuCount, kefaletCount, kefilOfUser, avatarUrl, activeTab, onAvatarChange }
 
   function ensureProfileOverlay() {
     if (document.getElementById('profile-overlay')) return;
@@ -737,7 +737,7 @@
 
   function openProfileOverlay(opts) {
     ensureProfileOverlay();
-    _ov = Object.assign({ sozculCount: 0, kefaletCount: 0, sponsoredList: [], kefilOfUser: null, page: currentPageSlug() }, opts);
+    _ov = Object.assign({ sozcuCount: 0, kefaletCount: 0, sponsoredList: [], kefilOfUser: null, page: currentPageSlug() }, opts);
     if (!PROFILE_SECTIONS[_ov.page]) _ov.page = currentPageSlug();
     if (_ov.avatarUrl === undefined) _ov.avatarUrl = _ov.profile?.avatar_url || null;
     if (_ov.avatarHair === undefined) _ov.avatarHair = _ov.profile?.avatar_hair || null;
@@ -902,7 +902,7 @@
   // (see settingsPageHTML). The arrow columns hang outside the frame in
   // both cases (absolutely positioned, see .ist-pc-cover-pick-col), so the
   // pano stickers sit on stays the exact same size and place whether or
-  // not they're showing. `sozculCount` is only
+  // not they're showing. `sozcuCount` is only
   // needed in the customizing case, to know whether the locked Sözcü hat
   // should show unlocked (the accessory row's lock is unconditional — see
   // AVATAR_ACCESSORY_OPTIONS — so it doesn't need it).
@@ -915,7 +915,7 @@
   }
 
   function coverHTML(opts) {
-    const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText, editable, customizing, sozculCount } = opts;
+    const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText, editable, customizing, sozcuCount } = opts;
     const badgesHTML = coverBadgesHTML(profile);
     // The avatar art layer. It is always its own element inside the frame
     // (never the frame box itself) because the carousels replace its whole
@@ -1142,7 +1142,7 @@
   // above, kept intact so it can be re-added later; already-placed cover
   // badges still render via coverHTML.
   function settingsPageHTML(state) {
-    const { I18N, user, profile, sozculCount, sponsoredList, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
+    const { I18N, user, profile, sozcuCount, sponsoredList, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
     const show = sectionsFor(state.page);
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
@@ -1171,7 +1171,7 @@
         <div class="ist-pc-settings-col ist-pc-settings-left">
           ${show.hive
             ? hiveHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, t })
-            : `${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText: yasadigiDisplay, editable: true, customizing, sozculCount })}
+            : `${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText: yasadigiDisplay, editable: true, customizing, sozcuCount })}
           <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>`}
 
           ${show.week ? `
@@ -1207,8 +1207,8 @@
           </div>` : ''}
           ${sponsoredListHTML(sponsoredList, t)}
           <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.sozculcount'))}</div>
-            <div class="ist-pc-info-value">${sozculCount ?? 0} ${esc(t('profile.times'))}</div>
+            <div class="ist-pc-info-label">${esc(t('profile.sozcucount'))}</div>
+            <div class="ist-pc-info-value">${sozcuCount ?? 0} ${esc(t('profile.times'))}</div>
           </div>
           ${referralCode ? `
           <div class="ist-pc-info-row">
@@ -1426,7 +1426,7 @@
 
     function render() {
       const opt = AVATAR_HAT_OPTIONS[idx];
-      const locked = !!opt.requiresSozculCount && (state.sozculCount || 0) < opt.requiresSozculCount;
+      const locked = !!opt.requiresSozcuCount && (state.sozcuCount || 0) < opt.requiresSozcuCount;
       previewEl.innerHTML = avatarPreviewHTML(state.avatarHair, opt.value, state.avatarAccessory, state.avatarShirt, locked);
       previewEl.classList.toggle('locked', locked);
     }
@@ -1508,11 +1508,11 @@
   }
 
   async function pickOverlayHat(hat, state) {
-    const { sb, user, sozculCount } = state;
+    const { sb, user, sozcuCount } = state;
     if (state.avatarHat === hat) return;
     const opt = AVATAR_HAT_OPTIONS.find(o => o.value === hat);
-    if (opt && opt.requiresSozculCount && (sozculCount || 0) < opt.requiresSozculCount) {
-      showOverlayAvatarMsg(`Bu şapka kilitli — ${opt.requiresSozculCount} kez Sözcü olmak gerekiyor (${sozculCount || 0}/${opt.requiresSozculCount}).`);
+    if (opt && opt.requiresSozcuCount && (sozcuCount || 0) < opt.requiresSozcuCount) {
+      showOverlayAvatarMsg(`Bu şapka kilitli — ${opt.requiresSozcuCount} kez Sözcü olmak gerekiyor (${sozcuCount || 0}/${opt.requiresSozcuCount}).`);
       return;
     }
     const { data, error } = await sb.from('profiles').update({ avatar_hat: hat }).eq('id', user.id).select('id');
@@ -1614,7 +1614,7 @@
   // Usage: IstProfileCard.mountLibraryCard({ sb, I18N, icon, onEdit }).
   //   icon: button SVG string (defaults to GEAR_SVG, which opens the
   //     settings overlay by default too).
-  //   onEdit({ sb, I18N, user, profile, sozculCount, kefaletCount,
+  //   onEdit({ sb, I18N, user, profile, sozcuCount, kefaletCount,
   //     kefilOfUser, state }): called on click instead of the default
   //     settings overlay. Pass a no-op to leave the button inert for now.
   // Assumes a <div id="library-card"> exists in the page.
@@ -1632,7 +1632,7 @@
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
 
     const state = await fetchProfileData(sb, I18N, user);
-    const { profile, kefaletCount, sponsoredList, sozculCount, kefilOfUser } = state;
+    const { profile, kefaletCount, sponsoredList, sozcuCount, kefilOfUser } = state;
 
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
@@ -1658,12 +1658,12 @@
       `;
       document.getElementById('lc-edit-btn').addEventListener('click', () => {
         if (opts.onEdit) {
-          opts.onEdit({ sb, I18N, user, profile, sozculCount, kefaletCount, sponsoredList, kefilOfUser, state });
+          opts.onEdit({ sb, I18N, user, profile, sozcuCount, kefaletCount, sponsoredList, kefilOfUser, state });
           return;
         }
         openProfileOverlay({
           sb, I18N, user, profile, page: opts.page || currentPageSlug(),
-          sozculCount, kefaletCount, sponsoredList, kefilOfUser,
+          sozcuCount, kefaletCount, sponsoredList, kefilOfUser,
           avatarUrl: state.avatarUrl,
           avatarHair: state.avatarHair,
           avatarHat: state.avatarHat,
