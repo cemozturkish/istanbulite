@@ -12,7 +12,7 @@
 //   <script src="admin-notification.js" defer></script>
 //   IstAdminNotification.show({ sb });
 //
-// Reuses the same visual language as sozcul-mascot.js so the bubble
+// Reuses the same visual language as sozcu-mascot.js so the bubble
 // looks native on every page.
 // ══════════════════════════════════════════════════════════════
 (function (global) {

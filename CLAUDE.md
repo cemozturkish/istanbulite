@@ -128,7 +128,7 @@ default one.
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js,
-│   tbmm.js, sozcul-mascot.js, admin-notification.js, loading-screen.js/.css,
+│   tbmm.js, sozcu-mascot.js, admin-notification.js, loading-screen.js/.css,
 │   safe-area-ready.js, frames.css        # Focused shared modules
 ├── capacitor.config.json # iOS app config (Capacitor wraps the same site — see README.md)
 ├── ios/                  # Generated Capacitor Xcode project (committed, minus Pods/build output)
@@ -418,6 +418,18 @@ sb.from('articles').delete().eq('id', id)
 ### `sozcel.html` — Word Game
 - Turkish Wordle variant
 - 6 attempts, color-coded feedback
+- **The screen sizes itself, on every device.** `layoutGame()` owns every measurement on
+  this page and works off what `.game-panel` *measures* — never a fraction of
+  `window.innerHeight`. It sizes the keyboard first (the page's fixed furniture, one key
+  width shared by all three rows via `--kb-key` / `--kb-key-h` / `--kb-gap`), then
+  `layoutBoard()` gives the hexagon board whatever is genuinely left. `.play-area`'s
+  `1fr / auto / 1fr` grid is what puts the board dead centre between the floating top
+  buttons and the keys, and the attempt pips dead centre of the band under it. Do not
+  reintroduce a viewport-fraction size or a `margin-top: auto` here: two auto margins
+  competing for leftover space is what used to push the board up under the buttons and
+  clip it, and a centred overflow has no scrollbar to recover it. `fitSozcuLine()` keeps
+  the "Günün Sözcüsü: …" credit on **one line** at any name length — it must never wrap,
+  because a second line moves the keyboard and re-flows the board under the reader's thumb
 
 ---
 
@@ -570,6 +582,13 @@ profile popup.
     even inserts U+202F before AM/PM) — a device where it fails gets `NaN` fields and silently
     addresses the wrong day.
 11. **Cross-cutting changes touch the game pages too.** When changing anything that lives on more than one page — nav, profile popup, scoreboard, lock rules, header layout, theme tokens — explicitly check **sozcel.html, tumcel.html, bulmaca.html** as well as anahane / kahvehane / kutuphane. The game pages are the easiest to forget and their right-column game nav must stay in sync. Shared logic that risks drift belongs in a dedicated `*.js` (see `game-locks.js`, `profile-card.js`) rather than copy-pasted into each page. **There is no `baglantilar.html`** — Bağlantılar was retired and replaced by Tümcel; do not recreate that file or add `baglantilar` to the games list. The `'baglantilar'` value lingering in the `game_results.game` CHECK constraint is for historical rows only; no new code should write it.
+
+12. **The role is "Sözcü", never "Sözcül".** The day's word-picker is a *sözcü* everywhere a
+    human can read it and everywhere the code names it (`IstSozcu`, `sozcu-mascot.js`,
+    `.sozcu-line`, `sozcuCount`, `profile.sozcucount`). The only survivors of the old
+    spelling are the database identifiers `sozcel_sozcul_assignments` and
+    `sozcel_used_answers.sozcul_id`, which stay as they are because renaming a live column
+    is a migration, not a rename. Do not spell the role "Sözcül" in new copy or new names.
 
 ---
 

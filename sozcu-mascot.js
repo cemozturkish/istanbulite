@@ -1,8 +1,8 @@
 // ══════════════════════════════════════════════════════════════
-// Sözcül-of-the-day helper.
+// Sözcü-of-the-day helper.
 //
 // Resolves whether the signed-in user has been picked as today's
-// Sözcül (or an upcoming Sözcül who still owes a word) and surfaces
+// Sözcü (or an upcoming Sözcü who still owes a word) and surfaces
 // a one-time mascot popup announcing it.
 //
 // Used by kahvehane.html (announce + glow the Sözcel tile) and
@@ -21,7 +21,7 @@
   }
 
   // Returns either null (no session) or
-  //   { session, today, isTodaySozcul, hasSubmittedToday,
+  //   { session, today, isTodaySozcu, hasSubmittedToday,
   //     pendingDates, nextPendingDate, assignedDates, allSubmittedAhead }
   async function getStatus(sb) {
     if (cachedStatus && Date.now() - cachedAt < 30 * 1000) return cachedStatus;
@@ -47,12 +47,12 @@
     cachedStatus = {
       session,
       today,
-      isTodaySozcul: assignedDates.includes(today),
+      isTodaySozcu: assignedDates.includes(today),
       hasSubmittedToday: submitted.has(today),
       assignedDates,
       pendingDates: pending,
       nextPendingDate: pending[0] || null,
-      // Future-only sözcül whose pending word still needs to be entered.
+      // Future-only sözcü whose pending word still needs to be entered.
       hasPendingFuture: pending.some(d => d !== today),
     };
     cachedAt = Date.now();
@@ -80,7 +80,7 @@
     if (stylesInjected) return;
     stylesInjected = true;
     const css = `
-      #sozcul-mascot-popup {
+      #sozcu-mascot-popup {
         position: fixed;
         right: 18px;
         bottom: 18px;
@@ -96,8 +96,8 @@
         transition: opacity 280ms ease, transform 280ms ease;
         pointer-events: none;
       }
-      #sozcul-mascot-popup.szm-show { opacity: 1; transform: translateY(0); pointer-events: auto; }
-      #sozcul-mascot-popup .szm-bubble {
+      #sozcu-mascot-popup.szm-show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+      #sozcu-mascot-popup .szm-bubble {
         position: relative;
         background: var(--paper, #eddbd0);
         color: var(--ink, #4C382A);
@@ -109,8 +109,8 @@
         box-shadow: 0 10px 30px rgba(0,0,0,0.22);
         max-width: 100%;
       }
-      #sozcul-mascot-popup .szm-bubble strong { color: var(--ink-red, #B93631); }
-      #sozcul-mascot-popup .szm-close {
+      #sozcu-mascot-popup .szm-bubble strong { color: var(--ink-red, #B93631); }
+      #sozcu-mascot-popup .szm-close {
         position: absolute;
         top: 6px;
         right: 8px;
@@ -122,37 +122,37 @@
         cursor: pointer;
         padding: 2px 6px;
       }
-      #sozcul-mascot-popup .szm-close:hover { color: var(--ink, #4C382A); }
-      #sozcul-mascot-popup .szm-mascot-row {
+      #sozcu-mascot-popup .szm-close:hover { color: var(--ink, #4C382A); }
+      #sozcu-mascot-popup .szm-mascot-row {
         display: flex;
         align-items: flex-end;
         gap: 8px;
       }
-      #sozcul-mascot-popup .szm-mascot {
+      #sozcu-mascot-popup .szm-mascot {
         width: 84px;
         height: 84px;
         flex-shrink: 0;
       }
-      #sozcul-mascot-popup .szm-mascot img {
+      #sozcu-mascot-popup .szm-mascot img {
         width: 100%; height: 100%; object-fit: contain;
       }
       @media (max-width: 768px) {
-        #sozcul-mascot-popup {
+        #sozcu-mascot-popup {
           left: 12px;
           right: 12px;
           bottom: calc(38px + env(safe-area-inset-bottom) + 12px);
           max-width: none;
           align-items: stretch;
         }
-        #sozcul-mascot-popup .szm-mascot { width: 64px; height: 64px; }
-        #sozcul-mascot-popup .szm-bubble { font-size: 0.95rem; }
+        #sozcu-mascot-popup .szm-mascot { width: 64px; height: 64px; }
+        #sozcu-mascot-popup .szm-bubble { font-size: 0.95rem; }
       }
       /* Glow used by the Kahvehane game-link tile when the user is the
-         picked Sözcül and still owes a word. */
-      .game-link.picked-sozcul {
-        animation: sozcul-glow 2200ms ease-in-out infinite;
+         picked Sözcü and still owes a word. */
+      .game-link.picked-sozcu {
+        animation: sozcu-glow 2200ms ease-in-out infinite;
       }
-      @keyframes sozcul-glow {
+      @keyframes sozcu-glow {
         0%, 100% {
           box-shadow:
             0 0 0 0 rgba(185, 54, 49, 0.0),
@@ -166,7 +166,7 @@
       }
     `;
     const style = document.createElement('style');
-    style.id = 'sozcul-mascot-styles';
+    style.id = 'sozcu-mascot-styles';
     style.textContent = css;
     document.head.appendChild(style);
   }
@@ -190,10 +190,10 @@
   // close with the X or by clicking the bubble/mascot.
   function showPopup({ mascot, html, onDismiss }) {
     injectStyles();
-    const old = document.getElementById('sozcul-mascot-popup');
+    const old = document.getElementById('sozcu-mascot-popup');
     if (old) old.remove();
     const root = document.createElement('div');
-    root.id = 'sozcul-mascot-popup';
+    root.id = 'sozcu-mascot-popup';
     // TEMP: dog art isn't uploaded yet — use the cat PNG for dog mascots too
     // so the popup doesn't show a broken image. Restore the dog branch once
     // assets/mascot-dog-right.png exists.
@@ -227,7 +227,7 @@
   }
 
   function notifiedKey(page, date) {
-    return `sozcul_mascot_seen_${page}_${date}`;
+    return `sozcu_mascot_seen_${page}_${date}`;
   }
   function markNotified(page, date) {
     try { localStorage.setItem(notifiedKey(page, date), '1'); } catch (_) {}
@@ -246,21 +246,21 @@
 
   const DEFAULT_COPY = {
     kahvehane: {
-      tr: 'Tebrikler — bugün <strong>Sözcül</strong> sen seçildin! Bugünün kelimesini ve sözlük bilgisini girmek için <strong>Sözcel</strong>e geç.',
-      en: 'Congrats — you have been picked as today\'s <strong>Sözcül</strong>! Head into <strong>Sözcel</strong> to enter the word and its dictionary info.',
+      tr: 'Tebrikler — bugün <strong>Sözcü</strong> sen seçildin! Bugünün kelimesini ve sözlük bilgisini girmek için <strong>Sözcel</strong>e geç.',
+      en: 'Congrats — you have been picked as today\'s <strong>Sözcü</strong>! Head into <strong>Sözcel</strong> to enter the word and its dictionary info.',
     },
     sozcelEntry: {
-      tr: 'Bugünün <strong>Sözcülü</strong> sensin. Kendi oyununu oynayamazsın — bunun yerine kelimeyi ve sözlük bilgisini sen seç. Diğer İstanbullular bu kelimeyi tahmin edecek.',
-      en: 'You are today\'s <strong>Sözcül</strong>. You can\'t play your own game — instead, pick the word and its dictionary entry. The rest of Istanbul will guess it.',
+      tr: 'Bugünün <strong>Sözcüsü</strong> sensin. Kendi oyununu oynayamazsın — bunun yerine kelimeyi ve sözlük bilgisini sen seç. Diğer İstanbullular bu kelimeyi tahmin edecek.',
+      en: 'You are today\'s <strong>Sözcü</strong>. You can\'t play your own game — instead, pick the word and its dictionary entry. The rest of Istanbul will guess it.',
     },
     kahvehaneFuture: {
-      tr: 'Yaklaşan bir gün için <strong>Sözcül</strong> sen seçildin. Kelimeyi girmek için <strong>Sözcel</strong>e bak.',
-      en: 'You have been picked as an upcoming <strong>Sözcül</strong>. Check <strong>Sözcel</strong> to enter the word.',
+      tr: 'Yaklaşan bir gün için <strong>Sözcü</strong> sen seçildin. Kelimeyi girmek için <strong>Sözcel</strong>e bak.',
+      en: 'You have been picked as an upcoming <strong>Sözcü</strong>. Check <strong>Sözcel</strong> to enter the word.',
     },
   };
 
-  // Public entrypoint for any page that wants to greet the picked Sözcül.
-  //   await IstSozcul.greet({ sb, page, copy?, onlyOnce? })
+  // Public entrypoint for any page that wants to greet the picked Sözcü.
+  //   await IstSozcu.greet({ sb, page, copy?, onlyOnce? })
   // Returns the same status object as getStatus() (plus { popup } if shown).
   async function greet({ sb, page, copy, onlyOnce = true }) {
     const status = await getStatus(sb);
@@ -273,18 +273,18 @@
     let dateForFlag = status.today;
     if (page === 'sozcel') {
       // Greet anytime the takeover is showing — either today's locked-in
-      // sözcül or a future pending assignment that's still open.
+      // sözcü or a future pending assignment that's still open.
       if (status.pendingDates.length > 0) {
         key = 'sozcelEntry';
         dateForFlag = status.nextPendingDate;
-      } else if (status.isTodaySozcul) {
+      } else if (status.isTodaySozcu) {
         key = 'sozcelEntry';
       } else {
         return status;
       }
     } else {
       // Kahvehane (or any other page): greet for today first, fall back to future.
-      if (status.isTodaySozcul && !status.hasSubmittedToday) key = 'kahvehane';
+      if (status.isTodaySozcu && !status.hasSubmittedToday) key = 'kahvehane';
       else if (status.hasPendingFuture) {
         key = 'kahvehaneFuture';
         dateForFlag = status.nextPendingDate;
@@ -301,17 +301,17 @@
   }
 
   // Glow the Sözcel game-link tile inside the right-column nav when the
-  // current user is the picked sözcül with a pending word.
+  // current user is the picked sözcü with a pending word.
   async function glowGameLink(sb) {
     injectStyles();
     const status = await getStatus(sb);
     if (!status || !status.pendingDates.length) return;
     document.querySelectorAll('.game-link[data-game="sozcel"]').forEach(el => {
-      el.classList.add('picked-sozcul');
+      el.classList.add('picked-sozcu');
     });
   }
 
-  global.IstSozcul = {
+  global.IstSozcu = {
     getStatus, invalidate, getMascot, showPopup, greet, glowGameLink,
     istanbulDateISO,
   };
