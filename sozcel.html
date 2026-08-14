@@ -711,31 +711,40 @@
       flex: 1;
     }
 
-    /* Everything between the top buttons and the keyboard. The 1fr / auto
-       / 1fr rows put the board dead centre of that space; the pips centre
-       themselves inside the bottom band, which is exactly the gap between
-       the board's lowest hexagon and the keyboard. The message shares that
-       band, pinned to its bottom edge just above the keys, so it never
-       moves the board when it appears. */
+    /* Everything between the top buttons and the keyboard, in four rows:
+       spacer / board / band / status. The two 1fr rows put the board dead
+       centre of whatever is left once the status has taken its line at the
+       bottom, and the band between them IS the gap from the board's lowest
+       hexagon to the top of whatever comes next — so the pips centred in it
+       land exactly halfway, whether that next thing is the message or the
+       keyboard itself. The status is furniture like the keyboard, never a
+       thing the pips share a row with: the two used to overlap in the one
+       state where the message is actually there to be read. */
     .play-area {
       flex: 1 1 auto;
       min-height: 0;
       width: 100%;
       display: grid;
       grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: 1fr auto 1fr;
+      grid-template-rows: 1fr auto 1fr auto;
       justify-items: center;
     }
     .play-area > .board-row    { grid-area: 2 / 1; }
     .play-area > .attempt-pips { grid-area: 3 / 1; align-self: center; }
     .play-area > .game-status  {
-      grid-area: 3 / 1;
-      align-self: end;
+      grid-area: 4 / 1;
       width: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 2px;
+      /* Keeps the last line off the top row of keys. */
+      padding-bottom: 6px;
+      /* One line's worth is always reserved, so the toasts that come and go
+         while playing ("Kelime listesinde yok!") can't re-flow the board
+         under the reader's thumb. Only the end of the game, which adds the
+         countdown under the message, actually grows this. */
+      min-height: 22px;
     }
 
     /* Floating top-right controls (desktop): share + help */
@@ -4176,6 +4185,9 @@ function initWordGrid() {
   // board can be re-laid-out (rotation, resize, the app coming back)
   // without rebuilding the tiles and losing what is written in them.
   BOARD_GEOM = { sylls, starts, totalHalfCols, levels };
+  // New word, new tile positions: forget the last size so layoutBoard()
+  // can't mistake this board for the one it already placed.
+  _lastTileW = 0;
 
   // The six attempt pips live in their own static container between the
   // board and the keyboard (see the <div id="attempt-pips"> in the page
@@ -4211,13 +4223,16 @@ const KB_ROW_GAP = 5;   // … and between rows
 // a short screen (a landscape phone), where it is the thing that keeps a
 // full-width keyboard from leaving nothing to play on.
 const KB_MAX_SHARE = 0.44;
-// Room kept clear under the board for the pips and the message, so the
-// two can never land on top of each other.
-const BOARD_BAND_MIN = 62;
+// The band the pips stand in, above and below the board (the play-area
+// grid keeps the two equal). Everything else the play area has goes to the
+// board — the board is the one thing on this page worth looking at, so a
+// bigger reserve here is just a void printed above it.
+const PIPS_BAND = 34;
 
 // The word currently on the board — see initWordGrid().
 let BOARD_GEOM = null;
 let _lastKeyW = 0;
+let _lastTileW = 0;
 
 function layoutGame() {
   const panel = document.getElementById('game-panel');
@@ -4262,15 +4277,14 @@ function layoutBoard() {
 
   const availW = area.clientWidth - 4;
   const areaH = area.clientHeight;
-  // The board is centred in the play area, so the band under it is half of
-  // what the board leaves over. The pips sit at that band's midpoint and
-  // the message at its bottom edge, so the band has to be worth more than
-  // twice the message for the two never to touch — measured, because the
-  // message is one line while playing and two after the game ends.
+  // What the board may take: the play area minus the status line at the
+  // bottom (measured — it is one line while playing, two once the game ends
+  // and the countdown joins it) and minus the pips' band above and below.
+  // Everything left is the board's; nothing else is held back, which is
+  // what keeps the space over the first hexagon from reading as a void.
   const status = area.querySelector('.game-status');
-  const statusH = Math.max(20, status ? status.offsetHeight : 0);
-  const bandMin = Math.max(BOARD_BAND_MIN, 2 * statusH + 14);
-  const availH = Math.max(56, areaH - 2 * bandMin);
+  const statusH = status ? status.offsetHeight : 0;
+  const availH = Math.max(56, areaH - statusH - 2 * PIPS_BAND);
   if (!(availW > 0) || !(availH > 0)) return;
 
   // Solve the width budget for tileW instead of estimating the gap from
@@ -4282,27 +4296,18 @@ function layoutBoard() {
   tileW = Math.min(tileW, Math.floor(availH * TILE_RATIO / levelFactor));
   tileW = Math.max(tileW, TILE_MIN_W);
 
+  // Same size as last time means nothing to write — which is what lets the
+  // play area be observed below without the observer feeding itself.
+  if (tileW === _lastTileW) return;
+  _lastTileW = tileW;
+
   const gap = Math.round(tileW * TILE_GAP_RATIO);
   const tileH = Math.round(tileW / TILE_RATIO);
   const halfStep = (tileW + gap) / 2;
   const vStep = Math.round(tileH * LEVEL_STEP);
 
-  const boardH = vStep * (levels - 1) + tileH;
   board.style.width = Math.ceil(totalHalfCols * halfStep - gap) + 'px';
-  board.style.height = boardH + 'px';
-
-  // The pips centre themselves in the band under the board (the play-area
-  // grid does that). On a screen so short that the board has already hit
-  // TILE_MIN_W and can't give the band any more room — a landscape phone —
-  // lift them by exactly the shortfall instead of letting the message
-  // print over them. On an ordinary screen the shortfall is zero and this
-  // is a no-op.
-  const band = Math.max(0, (areaH - boardH) / 2);
-  const pipsEl = document.getElementById('attempt-pips');
-  if (pipsEl) {
-    const shortfall = bandMin - band;
-    pipsEl.style.transform = shortfall > 0 ? `translateY(${-Math.round(shortfall / 2)}px)` : '';
-  }
+  board.style.height = (vStep * (levels - 1) + tileH) + 'px';
 
   let letterIdx = 0;
   sylls.forEach((syl, s) => {
@@ -5306,6 +5311,11 @@ if (window.ResizeObserver) {
   // is how the board makes room for it instead of the two colliding.
   const statusEl = document.querySelector('.game-status');
   if (statusEl) ro.observe(statusEl);
+  // And the play area itself: the sözcü credit line arrives from the
+  // database after first paint, and the board has to give back the height
+  // that line takes rather than keep the space it measured before it.
+  const areaEl = document.getElementById('play-area');
+  if (areaEl) ro.observe(areaEl);
 }
 
 (async () => {
