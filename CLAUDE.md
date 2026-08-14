@@ -508,6 +508,23 @@ is printed on the two bars sits on `--screen-inset`, and so do the sheets' side 
 restate any of these as a number — swiping between the three pages must not shift the layout
 under the reader.
 
+### The phone's feeds hang from the bottom, not the top
+
+The hero line is where each page's columns *begin*; it is not where their cards sit. On a phone
+every stack below the map is **bottom-aligned**: one news item, one event, one comment, one
+library box rests just above the tab bar, and the next one is laid **on top of** it, so the
+stack grows upward toward the map instead of downward away from the thumb. It is the same move
+on all three pages — Anahane's news and events, Kahvehane's comments (they rest on the composer),
+Kütüphane's Dünya feed and library boxes — and each pair of columns ends on the same line.
+
+One implementation note, because it fails silently: the space is pushed down with an **auto top
+margin on the innermost box** (the feed itself), never `justify-content: flex-end`. A stack that
+outgrows the screen resolves its auto margin to zero and simply scrolls, where flex-end would
+push the top of the stack out of the scroller and out of reach. The margin also has to sit on a
+box that does *not* grow — every wrapper between a column and its feed carries `flex: 1`, and
+flex hands the free space to a growing item before any margin sees it, so an auto margin one
+level too high does nothing at all.
+
 ### The phone's two bars — `#ist-pc-mount` (top) and `.section-rule > header` (bottom)
 
 A phone shows the city between two fixed charcoal bars: **who you are** at the top (the profile
