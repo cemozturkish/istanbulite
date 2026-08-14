@@ -3835,6 +3835,116 @@ function openLetterReader(letter, letters) {
 document.getElementById('lib-box-mektuplar')?.addEventListener('click', openMektuplarSheet);
 
 // ══════════════════════════════════════════
+// Ülkeler — what a country on the map opens.
+//
+// Same shape as Posta Kutusu above, and deliberately so: the sheet lists
+// that country's entries, touching one opens it as a single scrollable
+// page, and its back button returns to the list rather than closing.
+// Reads public.country_entries (admin-only writes, see
+// db/country_entries.sql); the map's data-country is the key.
+// ══════════════════════════════════════════
+// Per country, so a second visit to the same country is instant while a
+// different one still fetches. Not preloaded: most countries are never
+// touched in a session.
+const COUNTRY_ENTRIES_CACHE = {};
+
+async function loadCountryEntries(countryId) {
+  if (COUNTRY_ENTRIES_CACHE[countryId]) return COUNTRY_ENTRIES_CACHE[countryId];
+  const { data, error } = await sb.from('country_entries')
+    .select('*')
+    .eq('country', countryId)
+    .order('entry_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('[kutuphane country entries]', error);
+    // Not cached: a failed fetch is a network blip, not an empty country,
+    // and caching it would keep the country empty for the whole session.
+    return null;
+  }
+  COUNTRY_ENTRIES_CACHE[countryId] = data || [];
+  return COUNTRY_ENTRIES_CACHE[countryId];
+}
+
+// countryName comes from the map shape's own data-name, so the sheet is
+// titled with the same word the caption under the map just changed to.
+async function openCountrySheet(countryId, countryName) {
+  const overlay = document.getElementById('reader-overlay');
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !area) return;
+  area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  IstSheet.open(overlay);
+  _closeReaderOverlay = closeReaderOverlay;
+  const entries = await loadCountryEntries(countryId);
+  // The reader may have closed this sheet, or opened another country,
+  // while the fetch was in flight -- don't paint over what they did.
+  if (!overlay.classList.contains('open')) return;
+  renderCountryEntriesList(entries, countryId, countryName);
+}
+
+function renderCountryEntriesList(entries, countryId, countryName) {
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!area) return;
+  let listHtml;
+  if (entries === null) {
+    listHtml = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">${libEsc(countryName)} yüklenemedi.</div>`;
+  } else if (!entries.length) {
+    listHtml = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">${libEsc(countryName)} için henüz bir şey yok.</div>`;
+  } else {
+    listHtml = `<div class="shelves">${entries.map(en => `
+      <a class="shelf-btn" data-entry="${libEsc(en.id)}" href="#">
+        <div>
+          <div class="shelf-title">${libEsc(en.title)}</div>
+          ${en.entry_date ? `<div class="shelf-subtitle">${libEsc(formatLetterDate(en.entry_date))}</div>` : ''}
+        </div>
+      </a>
+    `).join('')}</div>`;
+  }
+  area.innerHTML = `
+    <div class="shelf-path">
+      <div class="path-head">
+        <button class="path-back" type="button" id="country-back">← Kütüphane</button>
+        <h2 class="path-title">${libEsc(countryName)}</h2>
+      </div>
+      ${listHtml}
+    </div>
+  `;
+  document.getElementById('country-back').addEventListener('click', closeReaderOverlay);
+  area.querySelectorAll('.shelf-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const entry = (entries || []).find(en => en.id === btn.dataset.entry);
+      if (entry) openCountryEntryReader(entry, entries, countryId, countryName);
+    });
+  });
+}
+
+// One scrollable page — title, date, body, an optional source link — with
+// a back button to the country's list. Same reader a letter gets, and it
+// reuses renderLetterBodyHtml: blank lines separate paragraphs, nothing
+// else is interpreted.
+function openCountryEntryReader(entry, entries, countryId, countryName) {
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!area) return;
+  const url = libSafeUrl(entry.source_url);
+  area.innerHTML = `
+    <div class="shelf-path">
+      <div class="path-head">
+        <button class="path-back" type="button" id="country-entry-back">← ${libEsc(countryName)}</button>
+      </div>
+      <h2 class="path-title" style="margin-bottom:4px;">${libEsc(entry.title)}</h2>
+      ${entry.entry_date ? `<p class="path-subtitle">${libEsc(formatLetterDate(entry.entry_date))}</p>` : ''}
+      <div class="reader-section-body" style="margin-top:14px;">${renderLetterBodyHtml(entry.body)}</div>
+      ${url ? `<p style="margin-top:16px;"><a href="${libEsc(url)}" target="_blank" rel="noopener noreferrer">Kaynak</a></p>` : ''}
+    </div>
+  `;
+  document.getElementById('country-entry-back').addEventListener('click',
+    () => renderCountryEntriesList(entries, countryId, countryName));
+  _closeReaderOverlay = closeReaderOverlay;
+  const pathEl = area.querySelector('.shelf-path');
+  if (pathEl) pathEl.scrollTop = 0;
+}
+
+// ══════════════════════════════════════════
 // Dünya (world) news feed — left column (col-right), replacing the shelf
 // grid that used to live there always-open. Reads public.breaking_news
 // (same table as anahane.html's own feed), scoped to category='dunya'.
@@ -4851,13 +4961,20 @@ const neighborhoodNames = {
       getMapRegions().forEach(n => n.classList.toggle('active', regionId(n) === nbId));
       if (mapLabel) mapLabel.textContent = regionName(nb);
       activeRegionName = regionName(nb);
-      // Ankara is the one region on this map that goes somewhere. It is the
-      // only city drawn on the phone artwork and the only thing inked red on
-      // it, and what this page holds of Ankara is the meclis -- so tapping it
-      // opens the same TBMM sheet the button in the boxes column does. The
-      // tint and caption above still run first, so the map reads as selected
-      // behind the sheet that rises over it.
-      if (nbId === 'ankara') openTBMMSheet();
+      // Every country on the phone map opens: its entries rise in the same
+      // half-page sheet a news item does (see openCountrySheet). Ankara is
+      // the exception -- the only city drawn, the only thing inked red on
+      // the artwork, and what this page holds of Ankara is the meclis, so it
+      // opens the TBMM sheet the button in the boxes column opens.
+      //
+      // The tint and caption above run first either way, so the map reads as
+      // selected behind whichever sheet rises over it. Gated on .country so
+      // the desktop overlay's districts keep behaving as they did -- they
+      // have no pages to open.
+      if (nb.classList.contains('country')) {
+        if (nbId === 'ankara') openTBMMSheet();
+        else openCountrySheet(nbId, regionName(nb));
+      }
       return;
     }
     // Snap back to the idle caption only when clicking empty space inside
