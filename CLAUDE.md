@@ -512,11 +512,13 @@ under the reader.
 
 A phone shows the city between two fixed charcoal bars: **who you are** at the top (the profile
 bar — avatar, name, district, the gear that opens your profile) and **where you can go** at the
-bottom (Kütüphane / Hane / Kahvehane). Both run full-bleed edge to edge, both stand at
-`--navbar-h` plus the device's own inset (notch at the top, home indicator at the bottom), both
-print their contents on `--screen-inset`, and neither moves while the three pages swipe
-underneath. Height and colors are the `--navbar-h` / `--navbar-ink*` tokens in frames.css — the
-colors deliberately palette-independent, the same in light, mono and dark. The top bar is one
+bottom (Kütüphane / Hane / Kahvehane). Both run full-bleed edge to edge, both add the device's own
+inset on top of their height (notch at the top, home indicator at the bottom), both print their
+contents on `--screen-inset`, and neither moves while the three pages swipe underneath. The top
+bar stands taller (`--navbar-h-top`) than the bottom one (`--navbar-h`) because it carries a
+portrait and two lines of type against the tab bar's one word. Heights and colors are the
+`--navbar-h` / `--navbar-h-top` / `--navbar-ink*` tokens in frames.css — the colors deliberately
+palette-independent, the same in light, mono and dark. The top bar is one
 implementation in profile-card.css ("THE TOP BAR"); the bottom bar's colors live in frames.css
 ("MOBILE FIXED BOTTOM NAV") while each page still positions its own `<header>`. Never write
 either bar's height as a number — the same value also reserves the space each page leaves at the
