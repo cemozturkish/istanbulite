@@ -48,7 +48,7 @@
     'profile.lastseen':    { default: 'Son Görülme',         more_english: 'Last Seen' },
     'profile.referralcode':{ default: 'Kefalet Kodu',        more_english: 'Sponsor Code' },
     'profile.sponsoredcount':{ default: 'Kefil Olduğu',      more_english: 'Vouched For' },
-    'profile.sozculcount': { default: 'Sözcül Olduğu',       more_english: 'Sözcül Picks' },
+    'profile.sozcucount': { default: 'Sözcü Olduğu',       more_english: 'Sözcü Picks' },
     'profile.times':       { default: 'kez',                 more_english: 'times' },
     'profile.copy':        { default: 'Kopyala',             more_english: 'Copy' },
     'profile.copied':      { default: 'Kopyalandı',          more_english: 'Copied' },

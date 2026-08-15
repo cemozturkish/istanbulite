@@ -343,33 +343,43 @@
     }
     .suggest-section .pending-row button:hover { background: var(--ink-red); color: var(--paper); }
 
-    /* Günün Sözcülü display below the game */
-    .sozcul-line {
+    /* Günün Sözcüsü display below the game. It is ONE line on every
+       screen, always: a wrap here would push the keyboard up and re-flow
+       the whole board, so fitSozcuLine() shrinks the type and its tracking
+       until the name fits instead of letting it break. The two sizes are
+       custom properties for exactly that reason — nothing else should
+       hardcode them. */
+    .sozcu-line {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.66rem;
+      font-size: var(--sozcu-size, 11px);
       font-weight: 700;
-      letter-spacing: 2.5px;
+      letter-spacing: var(--sozcu-track, 2.5px);
       text-transform: uppercase;
       color: var(--accent);
       text-align: center;
-      padding: 6px 12px;
+      padding: 6px 8px 0;
+      margin-top: 10px;
       border-top: 1px solid var(--hairline);
       flex-shrink: 0;
+      width: 100%;
       min-height: 18px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     /* No sözcü for today (the line is emptied, not hidden, by
-       loadSozculLine): collapse it entirely instead of leaving a ruled
+       loadSozcuLine): collapse it entirely instead of leaving a ruled
        blank band between the keyboard and the bottom of the panel. */
-    .sozcul-line:empty { display: none; }
-    .sozcul-line .sozcul-tag { color: var(--muted); margin-right: 6px; }
-    .sozcul-line .sozcul-name { color: var(--ink-red); cursor: pointer; }
-    .sozcul-line .sozcul-name:hover { text-decoration: underline; }
+    .sozcu-line:empty { display: none; }
+    .sozcu-line .sozcu-tag { color: var(--muted); margin-right: 6px; }
+    .sozcu-line .sozcu-name { color: var(--ink-red); cursor: pointer; }
+    .sozcu-line .sozcu-name:hover { text-decoration: underline; }
 
-    /* ── Sözcül takeover form: rendered inside the "Sözcü Görevi" popup
+    /* ── Sözcü takeover form: rendered inside the "Sözcü Görevi" popup
        (opened from the game-controls button, left of Help) instead of
        replacing the play screen — the game itself stays accessible to
        everyone at all times. ── */
-    .sozcul-takeover {
+    .sozcu-takeover {
       flex: 1;
       display: none;
       flex-direction: column;
@@ -378,8 +388,8 @@
       overflow-y: auto;
       min-height: 0;
     }
-    .sozcul-takeover.active { display: flex; }
-    .sozcul-takeover .stk-eyebrow {
+    .sozcu-takeover.active { display: flex; }
+    .sozcu-takeover .stk-eyebrow {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.62rem;
       font-weight: 700;
@@ -388,7 +398,7 @@
       color: var(--ink-red);
       text-align: center;
     }
-    .sozcul-takeover h2 {
+    .sozcu-takeover h2 {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       font-size: 1.65rem;
       font-weight: 700;
@@ -396,7 +406,7 @@
       color: var(--ink);
       line-height: 1.15;
     }
-    .sozcul-takeover .stk-hint {
+    .sozcu-takeover .stk-hint {
       font-size: 0.85rem;
       color: var(--muted);
       text-align: center;
@@ -405,7 +415,7 @@
       max-width: 520px;
       margin: 0 auto;
     }
-    .sozcul-takeover .stk-countdown {
+    .sozcu-takeover .stk-countdown {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 1.35rem;
       font-weight: 700;
@@ -414,8 +424,8 @@
       text-align: center;
       padding: 4px 0;
     }
-    .sozcul-takeover .stk-countdown.urgent { color: var(--ink-red); }
-    .sozcul-takeover .stk-form {
+    .sozcu-takeover .stk-countdown.urgent { color: var(--ink-red); }
+    .sozcu-takeover .stk-form {
       max-width: 540px;
       width: 100%;
       margin: 0 auto;
@@ -423,7 +433,7 @@
       flex-direction: column;
       gap: 14px;
     }
-    .sozcul-takeover .stk-label {
+    .sozcu-takeover .stk-label {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.62rem;
       font-weight: 700;
@@ -433,7 +443,7 @@
       margin-bottom: 4px;
       display: block;
     }
-    .sozcul-takeover .stk-text-input {
+    .sozcu-takeover .stk-text-input {
       width: 100%;
       padding: 8px 10px;
       border: 1px solid var(--rule);
@@ -443,8 +453,8 @@
       color: var(--ink);
       outline: none;
     }
-    .sozcul-takeover .stk-text-input:focus { border-color: var(--accent); }
-    .sozcul-takeover .stk-textarea {
+    .sozcu-takeover .stk-text-input:focus { border-color: var(--accent); }
+    .sozcu-takeover .stk-textarea {
       width: 100%;
       padding: 8px 10px;
       border: 1px solid var(--rule);
@@ -456,27 +466,33 @@
       resize: vertical;
       min-height: 60px;
     }
-    .sozcul-takeover .stk-section {
+    .sozcu-takeover .stk-section {
       border: 1px solid var(--rule);
       padding: 12px 14px;
       background: var(--paper-dark);
     }
-    .sozcul-takeover .stk-def-row {
+    /* The three-column row grid (num / field / remove), shared by the
+       definition rows and the syllable rows. Listed as two selectors rather
+       than putting .stk-def-row on both kinds of row: that made
+       "is a .stk-def-row" mean two different things, and code asking for
+       definition rows silently collected syllable rows as well. */
+    .sozcu-takeover .stk-def-row,
+    .sozcu-takeover .stk-syl-row {
       display: grid;
       grid-template-columns: auto 1fr auto;
       gap: 6px;
       align-items: center;
       margin-bottom: 6px;
     }
-    .sozcul-takeover .stk-def-num {
+    .sozcu-takeover .stk-def-num {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.78rem;
       font-weight: 700;
       color: var(--muted);
       padding-right: 4px;
     }
-    .sozcul-takeover select.stk-text-input { padding: 6px 8px; }
-    .sozcul-takeover .stk-def-remove {
+    .sozcu-takeover select.stk-text-input { padding: 6px 8px; }
+    .sozcu-takeover .stk-def-remove {
       background: transparent;
       border: 1px solid var(--rule);
       color: var(--muted);
@@ -485,11 +501,11 @@
       font-size: 0.85rem;
       line-height: 1;
     }
-    .sozcul-takeover .stk-def-remove:hover {
+    .sozcu-takeover .stk-def-remove:hover {
       color: var(--ink-red);
       border-color: var(--ink-red);
     }
-    .sozcul-takeover .stk-add-def {
+    .sozcu-takeover .stk-add-def {
       align-self: flex-start;
       background: transparent;
       border: 1px dashed var(--rule);
@@ -503,16 +519,16 @@
       cursor: pointer;
       margin-top: 4px;
     }
-    .sozcul-takeover .stk-add-def:hover { border-color: var(--accent); color: var(--ink); }
-    /* Syllable rows reuse .stk-def-row's grid (num / input / remove) —
-       just the input itself reads like a mini word-input tile. */
-    .sozcul-takeover .stk-syl-input {
+    .sozcu-takeover .stk-add-def:hover { border-color: var(--accent); color: var(--ink); }
+    /* Syllable rows share the row grid above; just the input itself reads
+       like a mini word-input tile. */
+    .sozcu-takeover .stk-syl-input {
       text-align: center;
       text-transform: uppercase;
       font-weight: 700;
       letter-spacing: 2px;
     }
-    .sozcul-takeover .stk-word-preview {
+    .sozcu-takeover .stk-word-preview {
       margin-top: 8px;
       text-align: center;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
@@ -522,9 +538,9 @@
       color: var(--ink);
       min-height: 1.4em;
     }
-    .sozcul-takeover .stk-word-preview::before { content: '→ '; color: var(--muted); }
-    .sozcul-takeover .stk-word-preview:empty::before { content: ''; }
-    .sozcul-takeover .stk-submit {
+    .sozcu-takeover .stk-word-preview::before { content: '→ '; color: var(--muted); }
+    .sozcu-takeover .stk-word-preview:empty::before { content: ''; }
+    .sozcu-takeover .stk-submit {
       align-self: center;
       padding: 12px 28px;
       background: var(--ink);
@@ -538,23 +554,23 @@
       cursor: pointer;
       margin-top: 8px;
     }
-    .sozcul-takeover .stk-submit:hover { background: var(--ink-red); }
-    .sozcul-takeover .stk-submit:disabled { opacity: 0.45; cursor: not-allowed; }
-    .sozcul-takeover .stk-status {
+    .sozcu-takeover .stk-submit:hover { background: var(--ink-red); }
+    .sozcu-takeover .stk-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+    .sozcu-takeover .stk-status {
       text-align: center;
       font-size: 0.82rem;
       min-height: 1.2em;
       font-style: italic;
     }
-    .sozcul-takeover .stk-status.ok { color: var(--success); }
-    .sozcul-takeover .stk-status.err { color: var(--ink-red); }
-    .sozcul-takeover .stk-done {
+    .sozcu-takeover .stk-status.ok { color: var(--success); }
+    .sozcu-takeover .stk-status.err { color: var(--ink-red); }
+    .sozcu-takeover .stk-done {
       text-align: center;
       padding: 22px 16px;
       border: 1px solid var(--rule);
       background: var(--paper-dark);
     }
-    .sozcul-takeover .stk-done strong {
+    .sozcu-takeover .stk-done strong {
       display: block;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
       font-size: 1.45rem;
@@ -562,7 +578,7 @@
       color: var(--ink);
       margin-bottom: 6px;
     }
-    .sozcul-takeover .stk-done span {
+    .sozcu-takeover .stk-done span {
       display: block;
       font-size: 0.92rem;
       color: var(--muted);
@@ -571,7 +587,7 @@
     /* The takeover panel's own flex gap already separates this from what's
        above it, so drop the .scoreboard block's own top margin to avoid a
        doubled gap; keep the rule line for visual separation. */
-    .sozcul-takeover .stk-scoreboard {
+    .sozcu-takeover .stk-scoreboard {
       width: 100%;
       max-width: 340px;
       margin: 0 auto;
@@ -612,9 +628,9 @@
       /* Top padding matches .game-panel's mobile top padding (60px) so the
          eyebrow/title clear the fixed back/scoreboard/help buttons instead
          of sitting underneath them. */
-      .sozcul-takeover { padding: 60px 14px 24px; }
-      .sozcul-takeover h2 { font-size: 1.35rem; }
-      .sozcul-takeover .stk-word-preview { font-size: 1rem; letter-spacing: 3px; }
+      .sozcu-takeover { padding: 60px 14px 24px; }
+      .sozcu-takeover h2 { font-size: 1.35rem; }
+      .sozcu-takeover .stk-word-preview { font-size: 1rem; letter-spacing: 3px; }
     }
 
     .panel-title {
@@ -672,16 +688,63 @@
     .stats-left .district-rank { font-size: 0.65rem; padding: 1px 0; }
 
     /* ── Center: game ── */
+    /* One vertical stack on every device: the play area (board + pips +
+       message), then the keyboard, then the sözcü credit line. Nothing in
+       here is sized from a viewport fraction — layoutGame() measures this
+       panel and hands the keyboard and the board what actually fits — so
+       the screen lands the same way on a phone, in the kahvehane sheet and
+       on a desktop column. */
     .game-panel {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 8px 16px;
+      /* Clears the floating back / scoreboard / help buttons (top: 10px,
+         38px tall): the board must never start underneath them. */
+      padding: 52px 12px 10px;
       overflow: hidden;
       min-height: 0;
-      gap: 6px;
+      /* No gap: the play area has to end exactly where the keyboard
+         begins, or the pips centred in it would sit half a gap above the
+         real midpoint between the board and the keys. The credit line
+         carries its own margin instead. */
+      gap: 0;
       flex: 1;
+    }
+
+    /* Everything between the top buttons and the keyboard, in four rows:
+       spacer / board / band / status. The two 1fr rows put the board dead
+       centre of whatever is left once the status has taken its line at the
+       bottom, and the band between them IS the gap from the board's lowest
+       hexagon to the top of whatever comes next — so the pips centred in it
+       land exactly halfway, whether that next thing is the message or the
+       keyboard itself. The status is furniture like the keyboard, never a
+       thing the pips share a row with: the two used to overlap in the one
+       state where the message is actually there to be read. */
+    .play-area {
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: 1fr auto 1fr auto;
+      justify-items: center;
+    }
+    .play-area > .board-row    { grid-area: 2 / 1; }
+    .play-area > .attempt-pips { grid-area: 3 / 1; align-self: center; }
+    .play-area > .game-status  {
+      grid-area: 4 / 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      /* Keeps the last line off the top row of keys. */
+      padding-bottom: 6px;
+      /* One line's worth is always reserved, so the toasts that come and go
+         while playing ("Kelime listesinde yok!") can't re-flow the board
+         under the reader's thumb. Only the end of the game, which adds the
+         countdown under the message, actually grows this. */
+      min-height: 22px;
     }
 
     /* Floating top-right controls (desktop): share + help */
@@ -713,6 +776,27 @@
     }
     .game-ctrl-btn:hover { background: var(--paper-dark); }
     .game-ctrl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Hand-drawn icon variant of .game-ctrl-btn. Same hit box, but the
+       circle/border/fill come off so the drawing reads as ink on the
+       page — the treatment every hand-drawn icon on this site already
+       gets (.game-back-btn's arrow, .ist-sheet-close's cross). The
+       buttons still on a typographic glyph (↗ share, ✎ sözcü) keep
+       their circle until they have drawings of their own. */
+    .game-ctrl-btn.icon-btn {
+      border: none;
+      background: none;
+      border-radius: 0;
+      transition: opacity 0.15s;
+    }
+    .game-ctrl-btn.icon-btn:hover { background: none; opacity: 0.6; }
+    /* The ink is centered on both axes inside the square canvas, so a
+       square box centers the drawing without any nudging. */
+    .game-ctrl-btn .ctrl-icon {
+      width: 26px;
+      height: 26px;
+      display: block;
+    }
 
     /* Mobile-only floating controls on the top-left (scoreboard + sözcü) */
     .game-controls-left {
@@ -750,29 +834,25 @@
     .help-body .swatch.present { background: var(--present); border-color: var(--present); }
     .help-body .swatch.absent { background: var(--absent); border-color: var(--absent); opacity: 0.4; }
 
-    /* Row pairing the vertical attempt list (left) with the syllable
-       skeleton (right) so the used-guess pips sit at eye level next to
-       the board instead of stacked underneath it. */
+    /* The board's own row. It used to pair a vertical attempt list on the
+       left with the syllable skeleton on the right; the pips have moved
+       under the board, so the skeleton now has the full width to itself.
+       Its vertical placement is the play-area grid's job — this row used
+       to carry a margin-top:auto that fought the keyboard's for the
+       leftover space, which is what let the board drift up under the
+       buttons on a screen where the two didn't both fit. */
     .board-row {
       display: flex;
       flex-direction: row;
       align-items: center;
-      gap: 14px;
+      justify-content: center;
       flex-shrink: 0;
-      /* Pairs with .keyboard's own margin-top:auto below to dock the
-         keyboard to the bottom of the panel (the mobile layout already
-         did this — see the <=768px block). .game-panel centers its
-         children as a group, which parked the keyboard mid-panel with a
-         dead gap underneath; splitting the leftover space between here
-         and the keyboard pushes the keyboard flush to the bottom while
-         the board/message group still sits comfortably below the top. */
-      margin-top: auto;
+      max-width: 100%;
     }
 
-    /* The board: one syllable-staircase skeleton (the current guess) on
-       top, the compact colored history of submitted guesses under it,
-       then the six attempt pips. Tile positions/sizes are computed in
-       buildBoard() — each syllable sits one level lower, its first tile
+    /* The board: one syllable-staircase skeleton, and that's all it holds
+       — no guess history under it. Tile positions/sizes are computed in
+       initWordGrid() — each syllable sits one level lower, its first tile
        tucked half a tile left of the previous syllable's last tile,
        nesting into the hexagons' tapered corners (see the mock). */
     .word-grid {
@@ -815,41 +895,31 @@
       animation: flip 0.5s ease;
     }
 
-    /* Six attempt pips, stacked vertically to the left of the board.
-       Unused = a small empty dot. Used = grows into a small pill showing
-       the actual word the player submitted for that attempt, so the
-       column reads as a compact guess history. Lives in .board-row (not
-       inside .word-grid) so it never grows/shifts the skeleton board. */
+    /* Six attempt pips in a horizontal row between the board and the
+       keyboard: how many guesses you have left, and nothing else. Empty
+       dot = still yours, filled = spent. They used to stand in a column
+       beside the board, each spent one growing into a pill printing the
+       word guessed — that history is gone on purpose (see updatePips).
+       Sits outside .word-grid so it never grows/shifts the board. */
     .attempt-pips {
       display: flex;
-      flex-direction: column;
-      align-items: flex-start;
+      flex-direction: row;
+      align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 12px;
       flex-shrink: 0;
     }
     .attempt-pips span {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       border: 1.5px solid var(--ink);
       background: transparent;
-      transition: all 0.2s ease;
+      transition: background 0.2s ease, opacity 0.2s ease;
     }
     .attempt-pips span.used {
-      width: auto;
-      height: auto;
-      min-width: 8px;
-      padding: 2px 6px;
-      border-radius: 4px;
       background: var(--ink);
-      border-color: var(--ink);
-      color: var(--paper);
-      font-size: 0.56rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      white-space: nowrap;
+      opacity: 0.5;
     }
 
     @keyframes flip {
@@ -863,32 +933,40 @@
     }
     .syl-board.shake { animation: shake 0.4s ease; }
 
+    /* The keyboard is the page's fixed furniture, so it is sized first and
+       the board takes what is left (see layoutGame). Every measurement
+       comes down as a custom property — one key width for all three rows,
+       the way a real keyboard is built — instead of a max-width picked for
+       one screen. --kb-key-h is the key width times the drawn hexagon's
+       own ratio, so the hexagon fills its key exactly: the dead band that
+       `contain` used to leave above, below and beside each hexagon is what
+       read as "too much space between the keys". */
     .keyboard {
       display: flex;
       flex-direction: column;
-      gap: 3px;
-      width: 100%;
-      max-width: 420px;
+      gap: var(--kb-row-gap, 5px);
+      max-width: 100%;
       flex-shrink: 0;
-      /* See .board-row above: the two auto margins together dock the
-         keyboard against the bottom of the panel. */
-      margin-top: auto;
+      /* From 12·key + 11·gap across, nine letters and ten gaps leave this
+         much for each of GİR / ← — so the bottom row ends flush with the
+         top one, the way shift and backspace fill out a real keyboard. */
+      --kb-key-wide: calc(var(--kb-key, 30px) * 1.5 + var(--kb-gap, 3px) * 0.5);
     }
 
     .keyboard-row {
       display: flex;
-      gap: 2px;
+      gap: var(--kb-gap, 3px);
       justify-content: center;
     }
 
     .key {
-      padding: 7px 2px;
-      min-width: 28px;
+      flex: 0 0 var(--kb-key, 30px);
+      width: var(--kb-key, 30px);
+      padding: 0;
       background: var(--rule);
       border: none;
-      border-radius: 3px;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.65rem;
+      font-size: var(--kb-font, 15px);
       font-weight: 700;
       cursor: pointer;
       text-transform: uppercase;
@@ -897,7 +975,11 @@
     }
 
     .key:hover { background: var(--rule); }
-    .key.wide { min-width: 42px; font-size: 0.6rem; }
+    .key.wide {
+      flex-basis: var(--kb-key-wide);
+      width: var(--kb-key-wide);
+      font-size: var(--kb-font-wide, 11px);
+    }
     .key.correct { background: var(--success); color: var(--paper); }
     .key.present { background: var(--present); color: var(--paper); }
     .key.absent { background: var(--rule); color: var(--absent-key); opacity: 0.4; }
@@ -1471,12 +1553,10 @@
        the sheet, so this only needs to appear once the game truly falls
        back to the full-bleed mobile layout (see the media query below,
        which already turns it on there for both embedded and standalone). */
-    /* Extra headroom so the fixed back/controls buttons (top:10px, ~30px
-       tall) don't crowd the word grid, which sat right under them with
-       the standalone page's normal 8px top padding. */
-    body.embedded-game .game-panel {
-      padding-top: 44px;
-    }
+    /* The headroom that clears the floating back/controls buttons is now
+       .game-panel's own padding-top on every layout (see the base rule),
+       so embedded needs no extra — only the mobile block below adjusts it,
+       to drop the safe-area inset an iframe must not add twice. */
     /* Embedded on desktop, kahvehane's iframe renders 820px wide (see
        kahvehane.html's .game-overlay-frame comment) so this page's own
        ≤768px breakpoint never trips, but the sheet around it is only
@@ -1521,7 +1601,11 @@
          .game-back-btn / .game-controls-left, which are already fixed to the viewport. */
       .game-controls {
         position: fixed;
-        top: 10px;
+        /* Same inset as .game-back-btn / .game-controls-left below: this
+           one used to sit on a bare 10px, so on any device with a notch
+           the share/help buttons stood higher than the back arrow they
+           are meant to line up with. */
+        top: calc(10px + env(safe-area-inset-top));
         right: 10px;
         z-index: 200;
       }
@@ -1533,6 +1617,14 @@
         background: var(--paper);
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       }
+      /* The hand-drawn ones stay bare here too — no paper disc, no
+         shadow — so they sit on the board exactly like the back arrow
+         does, at the same 34px-in-a-38px-box scale as .back-icon. */
+      .game-ctrl-btn.icon-btn {
+        background: none;
+        box-shadow: none;
+      }
+      .game-ctrl-btn .ctrl-icon { width: 34px; height: 34px; }
       .game-controls-left { display: flex; }
 
       /* Floating back button (top-left) */
@@ -1564,73 +1656,35 @@
         top: 10px;
       }
 
-      /* Main: fullscreen game area */
+      /* Main: fullscreen game area. It does NOT scroll: everything inside
+         is sized to the space that exists (see layoutGame), so a scroll
+         here would only ever mean something overflowed — and with the
+         panel centred, the part that overflowed off the top was
+         unreachable anyway, which is exactly how the board ended up
+         clipped under the buttons. */
       main {
         flex: 1 1 auto;
         min-height: 0;
         width: 100%;
         height: 100dvh;
-        overflow-y: auto;
-        overflow-x: hidden;
+        overflow: hidden;
         display: flex;
         flex-direction: column;
-        -webkit-overflow-scrolling: touch;
       }
+      /* Same 52px of button headroom as the base rule, plus the device's
+         own top inset (notch / Dynamic Island) — the floating buttons
+         carry that inset too. The bottom inset keeps the sözcü line clear
+         of the home indicator. */
       .game-panel {
-        padding: 60px 12px 24px 12px;
-        gap: 18px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        flex: 1;
+        padding: calc(52px + env(safe-area-inset-top)) 8px calc(8px + env(safe-area-inset-bottom));
       }
-      .word-grid {
-        max-width: 100%;
+      /* Embedded in kahvehane's sheet the iframe already sits below the
+         status bar, so the inset would be counted twice. */
+      body.embedded-game .game-panel {
+        padding-top: 52px;
+        padding-bottom: 8px;
       }
-      .board-row {
-        max-width: 100%;
-        /* Pairs with .keyboard's own margin-top:auto below: previously
-           only the keyboard had an auto margin, so it alone soaked up
-           all the leftover vertical space, leaving the grid pinned to
-           the top padding. Splitting the leftover space between here and
-           there instead moves the grid/message group down into the gap
-           without losing the keyboard's dock-to-bottom feel. */
-        margin-top: auto;
-      }
-      /* Native-keyboard placement: key width is fixed to what the 12-key
-         top row (Q W E R T Y U I O P Ğ Ü) needs to span edge-to-edge, and
-         every row reuses that same width. The 11-key middle row (A S D F
-         ... Ş İ) falls short of full width and gets centered by the row's
-         justify-content, producing the inset/staggered look of a real
-         QWERTY keyboard instead of every row stretching independently.
-         The bottom row's GİR/← keys widen to soak up the remaining space,
-         mirroring how shift/backspace fill out a physical keyboard row. */
-      .keyboard {
-        max-width: 100%;
-        gap: 6px;
-        --kb-gap: 4px;
-        --kb-key: calc((100% - (11 * var(--kb-gap))) / 12);
-        /* .game-panel centers its children as a group (justify-content:
-           center from the base rule), which left a big gap under the
-           keyboard instead of docking it to the bottom like a real
-           on-screen keyboard. An auto top margin eats all the leftover
-           vertical space itself, so the grid/message stay put near the
-           top and the keyboard gets pushed flush to the bottom. */
-        margin-top: auto;
-      }
-      .keyboard-row { gap: var(--kb-gap); }
-      .key {
-        padding: 16px 2px;
-        font-size: 16px;
-        font-weight: 700;
-        border-radius: 6px;
-        flex: 0 0 var(--kb-key);
-        min-width: 0;
-      }
-      .key.wide {
-        flex: 0 0 calc((100% - (9 * var(--kb-key)) - (10 * var(--kb-gap))) / 2);
-        font-size: 13px;
-      }
+      .word-grid { max-width: 100%; }
       .game-message { font-size: 15px; min-height: 18px; }
       .reset-info { font-size: 12px; }
 
@@ -1703,22 +1757,32 @@
       }
     </script>
     <div class="game-controls-left" id="game-controls-left">
-      <button class="game-ctrl-btn" id="mobile-score-btn" type="button" aria-label="Skor Tablosu" title="Skor Tablosu">≡</button>
+      <button class="game-ctrl-btn icon-btn" id="mobile-score-btn" type="button" aria-label="Skor Tablosu" title="Skor Tablosu"><img class="ctrl-icon" src="assets/ranking.png" alt=""></button>
     </div>
     <div class="game-controls">
-      <button class="game-ctrl-btn" id="sozcul-task-btn" type="button" aria-label="Sözcü Görevi" title="Sözcü Görevi" style="display:none;">✎</button>
+      <button class="game-ctrl-btn" id="sozcu-task-btn" type="button" aria-label="Sözcü Görevi" title="Sözcü Görevi" style="display:none;">✎</button>
       <button class="game-ctrl-btn" id="share-btn" type="button" aria-label="Paylaş" title="Paylaş" disabled>↗</button>
-      <button class="game-ctrl-btn" id="help-btn" type="button" aria-label="Nasıl oynanır" title="Nasıl oynanır">?</button>
+      <button class="game-ctrl-btn icon-btn" id="help-btn" type="button" aria-label="Nasıl oynanır" title="Nasıl oynanır"><img class="ctrl-icon" src="assets/question-mark.png" alt=""></button>
     </div>
     <section class="game-panel" id="game-panel">
-      <div class="board-row" id="board-row">
+      <!-- The play area is everything between the floating top buttons and
+           the keyboard. It is one three-row grid — spacer / board / band —
+           so the board rests exactly halfway between the buttons and the
+           keys, and the attempt pips rest exactly halfway between the
+           board's last hexagon and the keys. Both follow from the grid, on
+           any screen; neither is a number tuned for one phone. -->
+      <div class="play-area" id="play-area">
+        <div class="board-row" id="board-row">
+          <div class="word-grid" id="word-grid"></div>
+        </div>
         <div class="attempt-pips" id="attempt-pips"></div>
-        <div class="word-grid" id="word-grid"></div>
+        <div class="game-status">
+          <div class="game-message" id="game-message"></div>
+          <div class="reset-info" id="reset-info"></div>
+        </div>
       </div>
-      <div class="game-message" id="game-message"></div>
-      <div class="reset-info" id="reset-info"></div>
       <div class="keyboard" id="keyboard"></div>
-      <div class="sozcul-line" id="sozcul-line"></div>
+      <div class="sozcu-line" id="sozcu-line"></div>
     </section>
   </main>
 
@@ -1794,10 +1858,10 @@
   <!-- Sözcü Görevi popup: word-picker / status form for an assigned Sözcü.
        Opened from the game-controls button next to Help so the assignment
        never takes over the play screen — everyone can always play. -->
-  <div class="result-overlay" id="sozcul-task-overlay">
+  <div class="result-overlay" id="sozcu-task-overlay">
     <div class="result-card" style="padding-bottom:16px;">
-      <button class="result-close" id="sozcul-task-close" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-      <div class="sozcul-takeover active" id="sozcul-task-body" style="padding:0;"></div>
+      <button class="result-close" id="sozcu-task-close" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
+      <div class="sozcu-takeover active" id="sozcu-task-body" style="padding:0;"></div>
     </div>
   </div>
 
@@ -1807,6 +1871,11 @@ const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Same client-side admin check the rest of the site uses (kahvehane,
+// kutuphane, profile-card). It only decides what UI to offer — the actual
+// permission is public.is_admin() in the RLS policies, which this can't
+// talk its way past.
+const ADMIN_EMAIL = 'cemwozturk@gmail.com';
 
 // ── Get user neighborhood from session ──
 let userNeighborhood = '';
@@ -3725,27 +3794,72 @@ async function buildDailyCandidates(seed) {
 // looks completely normal while being a puzzle nobody else is playing,
 // and its result lands on the shared scoreboard as if it counted.
 async function pickDailyTarget(seed) {
+  let rpcFailure = null;
   try {
     const candidates = await buildDailyCandidates(seed);
     const { data, error } = await sb.rpc('sozcel_daily_word', {
       candidates: candidates.length > 0 ? candidates : null,
     });
+    if (error) rpcFailure = error;
+    else {
+      // The RPC returns a table — supabase-js hands back an array of rows.
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row || !row.word) return null;
+      return adoptDailyRow(row);
+    }
+  } catch (e) {
+    rpcFailure = e;
+  }
+
+  // The RPC itself couldn't be called. Read the day's row directly instead:
+  // that is still the word the database recorded — the read just can't
+  // *create* one the way the RPC can — so a day that already has a word
+  // (every Sözcü day, and any day another client already opened) stays
+  // playable through an outage of the function itself. This is not a local
+  // pick: if there is no row, the player is told, never handed a word of
+  // this client's own invention.
+  console.error('[sozcel pickDailyTarget] sozcel_daily_word failed', rpcFailure);
+  const recorded = await readRecordedWordForToday();
+  if (recorded) return adoptDailyRow(recorded);
+
+  TODAY_WORD_UNREACHABLE = true;
+  // A missing function is not a connectivity problem and no amount of
+  // refreshing fixes it — it means db/sozcel_used_answers_v5_server_pick.sql
+  // hasn't been applied to this database (or PostgREST's schema cache is
+  // still stale). Say which of the two the player is looking at.
+  TODAY_WORD_ERROR_IS_SETUP = (rpcFailure && (rpcFailure.code === 'PGRST202' ||
+    rpcFailure.code === 'PGRST203' || rpcFailure.code === '42883')) || false;
+  return null;
+}
+
+// Store a fetched day row into the game's per-day state, and hand back its
+// word. Trust the stored word regardless of length — a mismatch with today's
+// WORD_LENGTH is handled at boot by adapting the grid to the word.
+function adoptDailyRow(row) {
+  TODAY_DEFINITION = row.definition || null;
+  TODAY_SYLLABLES = row.syllables || null;
+  return row.word;
+}
+
+// Direct read of today's recorded answer, used only as the fallback above.
+// The date key is this client's Istanbul date (IstDate, built from
+// Intl parts — not a re-parsed localized string), and it is only ever used
+// to *look up* a row: getting it wrong finds nothing and shows the empty
+// state, it can never write a word onto the wrong day.
+async function readRecordedWordForToday() {
+  try {
+    const { data, error } = await sb
+      .from('sozcel_used_answers')
+      .select('word, definition, syllables')
+      .eq('used_on', getIstanbulDateISO())
+      .maybeSingle();
     if (error) {
-      console.error('[sozcel pickDailyTarget]', error);
-      TODAY_WORD_UNREACHABLE = true;
+      console.error('[sozcel readRecordedWordForToday]', error);
       return null;
     }
-    // The RPC returns a table — supabase-js hands back an array of rows.
-    const row = Array.isArray(data) ? data[0] : data;
-    if (!row || !row.word) return null;
-    // Trust the stored word regardless of length — a mismatch with today's
-    // WORD_LENGTH is handled at boot by adapting the grid to the word.
-    TODAY_DEFINITION = row.definition || null;
-    TODAY_SYLLABLES = row.syllables || null;
-    return row.word;
+    return data && data.word ? data : null;
   } catch (e) {
-    console.error('[sozcel pickDailyTarget]', e);
-    TODAY_WORD_UNREACHABLE = true;
+    console.error('[sozcel readRecordedWordForToday]', e);
     return null;
   }
 }
@@ -3756,6 +3870,10 @@ let TARGET_WORD = null;
 // session, RPC error) — as opposed to the day legitimately not having one
 // yet. Only changes which empty state the player is shown.
 let TODAY_WORD_UNREACHABLE = false;
+// Narrows the above: the word's database function is missing rather than
+// unreachable, so telling the player to check their connection would be
+// wrong — nothing on their side can fix it.
+let TODAY_WORD_ERROR_IS_SETUP = false;
 let TODAY_DEFINITION = null;
 // The Sözcü's own syllable breakdown for today's word (array of 2–3
 // strings), when they supplied one. null for auto-picked pool words and
@@ -3940,11 +4058,74 @@ function syllabifyTr(word) {
   return sylls;
 }
 
-// Geometry of the hexframe tile shape (see frames.css): width / height.
-const TILE_RATIO = 0.5713;
-// Consecutive syllable levels nest into the hexagons' tapered corners, so
-// each level steps down by less than a full tile height.
-const LEVEL_STEP = 0.86;
+// ── Board geometry ────────────────────────────────────────────────────
+// The tiles are hexframe tiles (frames.css) laid out as a syllable
+// staircase. Everything below is measured against ONE drawn hexagon, not
+// against its box, because the two are quite different things — see
+// TILE_ART_* — and spacing the boxes evenly does not space the hexagons
+// evenly.
+
+// Tile shape: width / height. Must stay the number frames.css gives
+// .letter-box as its aspect-ratio (--hexframe-ratio, the 1024×1536 asset
+// canvas). It read 0.5713 here, making every tile 17% taller in the
+// arithmetic than on screen, so the board reserved height it never used
+// and the vertical budget bought smaller tiles than it had room for.
+const TILE_RATIO = 1024 / 1536;
+
+// Widest a tile may get. The board is the page's one object worth looking
+// at, so it takes the room it can — the budgets in initWordGrid() still
+// shrink it to whatever actually fits.
+const TILE_MAX_W = 96;
+// Narrowest before the letters stop being readable. Deliberately well
+// under TILE_MAX_W: this overrides the width budget, so a floor set too
+// high pushes the board off the side of a small screen.
+const TILE_MIN_W = 24;
+
+// The drawn hexagon does not fill its box. Measured off
+// assets/frame-fill.png: it spans 76.2% of the box's width (11.9%
+// transparent margin per side) but 89.5% of its height, and each end
+// tapers to a point over ~19% of that drawn height.
+const TILE_ART_PAD_X = 0.1191;
+const TILE_ART_W = 1 - 2 * TILE_ART_PAD_X;
+const TILE_ART_H = 0.8952 / TILE_RATIO;   // in tile-width units
+// One tapered end. Calibrated against the rendered board rather than read
+// off the artwork's width profile: the silhouette's corners are rounded
+// and its sides bow outward slightly, so "where the taper ends" is a
+// judgement call on the profile but an exact number on the result.
+const TILE_CAP_H = 0.158 * TILE_ART_H;
+
+// The one number that sets how tight the board looks: the gap left
+// between neighbouring hexagons, as a share of tile width. Both
+// directions are solved from it below, so they stay equal to each other.
+const TILE_VISUAL_GAP = 0.08;
+
+// Horizontal. Box-to-box gap is the visual gap plus the two transparent
+// margins that face each other — which makes it negative: the boxes
+// overlap so the artwork inside them doesn't.
+const TILE_GAP_RATIO = TILE_VISUAL_GAP - 2 * TILE_ART_PAD_X;
+
+// Vertical, as a share of tile height. Consecutive syllable levels are
+// offset by half a column (see syllableLayout), so they can interlock the
+// way a honeycomb does — each lower hexagon's point rising into the notch
+// between the two above it — but only if the step is short enough for the
+// tapered caps to pass each other. Step a full tile height instead and
+// the rows meet point-to-point with a void flaring out on either side,
+// which reads as a far bigger gap than the flat-sided horizontal one even
+// when the two measure the same.
+//
+// Two levels touch when the lower one's shoulder lands on the upper one's
+// slanted edge, which works out to artH − capH·(offset / shoulder); the
+// second term opens that back up until the slanted edges stand
+// TILE_VISUAL_GAP apart measured perpendicular, exactly like the vertical
+// edges do across.
+const LEVEL_STEP = (function () {
+  const shoulderX = TILE_ART_W / 2;               // centre → straight side
+  const offsetX = (1 + TILE_GAP_RATIO) / 2;       // half a column
+  const touching = TILE_ART_H - TILE_CAP_H * (offsetX / shoulderX);
+  const slantLen = Math.hypot(shoulderX, TILE_CAP_H);
+  const opened = TILE_VISUAL_GAP * slantLen / shoulderX;
+  return (touching + opened) * TILE_RATIO;        // tile widths → heights
+})();
 
 // Syllable layout: syllable s starts half a tile left of syllable s-1's
 // LAST tile, one level lower, then runs right — measured in half-tile
@@ -3983,72 +4164,200 @@ function initWordGrid() {
   const { starts, totalHalfCols } = syllableLayout(sylls);
   const levels = sylls.length;
 
-  // Tile width from the width budget and the vertical budget. Fixed px at
-  // init time (not live vh) so the board doesn't resize when the mobile
-  // browser chrome shows/hides. On narrow (mobile-layout) screens the
-  // board shares .board-row with the vertical attempt-pips column, so
-  // reserve space for it up front instead of letting the pills push the
-  // board wider than the viewport. Desktop's board width is already
-  // capped at 360 with plenty of room beside it, so no reserve needed.
-  const isMobileLayout = (window.innerWidth || 420) <= 768;
-  const pipsReserve = isMobileLayout ? 64 : 0;
-  const availW = Math.min(360, Math.round((window.innerWidth || 420) * 0.86)) - pipsReserve;
-  const availH = Math.round((window.innerHeight || 600) * 0.30);
-  const gapOf = w => Math.max(2, Math.round(w * 0.06));
-  let tileW = Math.min(48, Math.floor(availW / (totalHalfCols / 2)) - gapOf(48));
-  const levelFactor = 1 + (levels - 1) * LEVEL_STEP;
-  tileW = Math.min(tileW, Math.floor(availH * TILE_RATIO / levelFactor));
-  tileW = Math.max(tileW, 18);
-  const gap = gapOf(tileW);
-  const tileH = Math.round(tileW / TILE_RATIO);
-  const halfStep = (tileW + gap) / 2;
-  const vStep = Math.round(tileH * LEVEL_STEP);
-
   const board = document.createElement('div');
   board.className = 'syl-board';
   board.id = 'syl-board';
-  board.style.width = Math.ceil(totalHalfCols * halfStep - gap) + 'px';
-  board.style.height = (vStep * (levels - 1) + tileH) + 'px';
 
   let letterIdx = 0;
-  sylls.forEach((syl, s) => {
+  sylls.forEach(syl => {
     for (let j = 0; j < syl.length; j++) {
       const box = document.createElement('div');
       box.className = 'letter-box';
       box.id = `box-${letterIdx}`;
-      box.style.left = Math.round((starts[s] + 2 * j) * halfStep) + 'px';
-      box.style.top = (s * vStep) + 'px';
-      box.style.width = tileW + 'px';
-      box.style.fontSize = Math.max(11, Math.round(tileW * 0.42)) + 'px';
       board.appendChild(box);
       letterIdx++;
     }
   });
   grid.appendChild(board);
 
-  // The six attempt pips live in their own static container to the left
-  // of the board, inside .board-row (see the <div id="attempt-pips"> in
-  // the page markup) so they never resize/move .word-grid.
+  // Where every tile goes is layoutBoard()'s job, off measurements taken
+  // from the play area — this is just the word's own shape, kept so the
+  // board can be re-laid-out (rotation, resize, the app coming back)
+  // without rebuilding the tiles and losing what is written in them.
+  BOARD_GEOM = { sylls, starts, totalHalfCols, levels };
+  // New word, new tile positions: forget the last size so layoutBoard()
+  // can't mistake this board for the one it already placed.
+  _lastTileW = 0;
+
+  // The six attempt pips live in their own static container between the
+  // board and the keyboard (see the <div id="attempt-pips"> in the page
+  // markup) so they never resize/move .word-grid.
   const pips = document.getElementById('attempt-pips');
   if (pips) {
     pips.innerHTML = '';
     for (let i = 0; i < 6; i++) pips.appendChild(document.createElement('span'));
   }
   updatePips();
+  layoutGame();
+}
+
+// ── Fitting the screen ────────────────────────────────────────────────
+// One function owns every size on this page, and it works off what the
+// panel MEASURES — never off a fraction of window.innerHeight. The board
+// used to claim 46% of the viewport whatever else was on screen, so on a
+// device whose real playing area was smaller than the viewport (a browser
+// bar, a notch, the kahvehane sheet) the board plus the keyboard came to
+// more than the panel held and the overflow went off the TOP, under the
+// buttons, where centred content puts it. Sizing from the measured panel
+// instead is what makes one screen land the same way on every device.
+
+// Key height ÷ key width: the ratio at which the drawn hexagon fills a key
+// exactly, since the silhouette covers 76.18% of the asset's width but
+// 89.52% of its height (see the .key mask-size rule in frames.css).
+const KEY_ASPECT = (0.8952 / 0.7618) * (1536 / 1024);
+const KEY_MAX_W = 38;   // a key never needs to be wider than a thumb
+const KEY_MIN_W = 16;
+const KB_GAP = 3;       // between keys …
+const KB_ROW_GAP = 5;   // … and between rows
+// Share of the panel the keyboard may take at most. The cap only bites on
+// a short screen (a landscape phone), where it is the thing that keeps a
+// full-width keyboard from leaving nothing to play on.
+const KB_MAX_SHARE = 0.44;
+// The band the pips stand in, above and below the board (the play-area
+// grid keeps the two equal). Everything else the play area has goes to the
+// board — the board is the one thing on this page worth looking at, so a
+// bigger reserve here is just a void printed above it.
+const PIPS_BAND = 34;
+
+// The word currently on the board — see initWordGrid().
+let BOARD_GEOM = null;
+let _lastKeyW = 0;
+let _lastTileW = 0;
+
+function layoutGame() {
+  const panel = document.getElementById('game-panel');
+  const kb = document.getElementById('keyboard');
+  if (!panel || !kb) return;
+  const cs = getComputedStyle(panel);
+  const innerW = panel.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const innerH = panel.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  if (!(innerW > 0) || !(innerH > 0)) return;
+
+  // The keyboard is the page's fixed furniture, so it is sized first: the
+  // widest key that fits twelve across (the Q…Ü row, which every other row
+  // then reuses, the way a real keyboard is built), capped by the height
+  // share above and by a thumb's width.
+  const byWidth = (innerW - 11 * KB_GAP) / 12;
+  const byHeight = (innerH * KB_MAX_SHARE - 2 * KB_ROW_GAP) / (3 * KEY_ASPECT);
+  const keyW = Math.max(KEY_MIN_W, Math.min(KEY_MAX_W, Math.floor(Math.min(byWidth, byHeight))));
+  // Writing nothing when nothing changed is what keeps the ResizeObserver
+  // below from driving itself in a loop.
+  if (keyW !== _lastKeyW) {
+    _lastKeyW = keyW;
+    kb.style.setProperty('--kb-key', keyW + 'px');
+    kb.style.setProperty('--kb-key-h', Math.round(keyW * KEY_ASPECT) + 'px');
+    kb.style.setProperty('--kb-gap', KB_GAP + 'px');
+    kb.style.setProperty('--kb-row-gap', KB_ROW_GAP + 'px');
+    kb.style.setProperty('--kb-font', Math.max(11, Math.round(keyW * 0.55)) + 'px');
+    kb.style.setProperty('--kb-font-wide', Math.max(9, Math.round(keyW * 0.40)) + 'px');
+  }
+
+  layoutBoard();
+  fitSozcuLine();
+}
+
+// Place the tiles inside whatever the play area turned out to be. Called
+// by layoutGame(), so it always runs after the keyboard has taken its
+// share — the space this measures is the real leftover, not an estimate.
+function layoutBoard() {
+  const area = document.getElementById('play-area');
+  const board = document.getElementById('syl-board');
+  if (!BOARD_GEOM || !area || !board) return;
+  const { sylls, starts, totalHalfCols, levels } = BOARD_GEOM;
+
+  const availW = area.clientWidth - 4;
+  const areaH = area.clientHeight;
+  // What the board may take: the play area minus the status line at the
+  // bottom (measured — it is one line while playing, two once the game ends
+  // and the countdown joins it) and minus the pips' band above and below.
+  // Everything left is the board's; nothing else is held back, which is
+  // what keeps the space over the first hexagon from reading as a void.
+  const status = area.querySelector('.game-status');
+  const statusH = status ? status.offsetHeight : 0;
+  const availH = Math.max(56, areaH - statusH - 2 * PIPS_BAND);
+  if (!(availW > 0) || !(availH > 0)) return;
+
+  // Solve the width budget for tileW instead of estimating the gap from
+  // the cap: board width is totalHalfCols·(tileW+gap)/2 − gap, and gap is
+  // itself a multiple of tileW, so the whole thing is linear in tileW.
+  const widthPerTile = totalHalfCols * (1 + TILE_GAP_RATIO) / 2 - TILE_GAP_RATIO;
+  const levelFactor = 1 + (levels - 1) * LEVEL_STEP;
+  let tileW = Math.min(TILE_MAX_W, Math.floor(availW / widthPerTile));
+  tileW = Math.min(tileW, Math.floor(availH * TILE_RATIO / levelFactor));
+  tileW = Math.max(tileW, TILE_MIN_W);
+
+  // Same size as last time means nothing to write — which is what lets the
+  // play area be observed below without the observer feeding itself.
+  if (tileW === _lastTileW) return;
+  _lastTileW = tileW;
+
+  const gap = Math.round(tileW * TILE_GAP_RATIO);
+  const tileH = Math.round(tileW / TILE_RATIO);
+  const halfStep = (tileW + gap) / 2;
+  const vStep = Math.round(tileH * LEVEL_STEP);
+
+  board.style.width = Math.ceil(totalHalfCols * halfStep - gap) + 'px';
+  board.style.height = (vStep * (levels - 1) + tileH) + 'px';
+
+  let letterIdx = 0;
+  sylls.forEach((syl, s) => {
+    for (let j = 0; j < syl.length; j++) {
+      const box = document.getElementById(`box-${letterIdx}`);
+      if (box) {
+        box.style.left = Math.round((starts[s] + 2 * j) * halfStep) + 'px';
+        box.style.top = (s * vStep) + 'px';
+        box.style.width = tileW + 'px';
+        box.style.fontSize = Math.max(11, Math.round(tileW * 0.42)) + 'px';
+      }
+      letterIdx++;
+    }
+  });
+}
+
+// The credit line under the keyboard is ONE line on every screen, always:
+// wrapping it would push the keyboard up and re-flow the board under the
+// reader's thumb. Shrink the type and its tracking together until the name
+// measures inside the panel — a long name on a narrow phone gets smaller,
+// never a second line.
+function fitSozcuLine() {
+  const el = document.getElementById('sozcu-line');
+  if (!el || !el.firstChild) return;
+  const MAX = 11, MIN = 7;   // px
+  let size = MAX, track = 2.5;
+  const apply = () => {
+    el.style.setProperty('--sozcu-size', size.toFixed(2) + 'px');
+    el.style.setProperty('--sozcu-track', track.toFixed(2) + 'px');
+  };
+  apply();
+  // Tracking goes first (it buys width without costing legibility), then
+  // the type; the ellipsis in the stylesheet is the last resort for a name
+  // that still won't fit at 7px.
+  for (let i = 0; i < 12 && el.scrollWidth > el.clientWidth; i++) {
+    track = Math.max(0, track - 0.3);
+    if (size > MIN) size = Math.max(MIN, size - 0.35);
+    apply();
+  }
 }
 
 function updatePips() {
   const pips = document.getElementById('attempt-pips');
   if (!pips) return;
+  // Spent or not — nothing more. These used to print the word guessed at
+  // each attempt; the board already carries everything those guesses
+  // taught, and a standing list of what you got wrong is the kind of
+  // backward-looking detail this app deliberately doesn't keep.
   [...pips.children].forEach((dot, i) => {
-    const guess = submittedGuesses[i];
-    if (guess) {
-      dot.textContent = guess;
-      dot.className = 'used';
-    } else {
-      dot.textContent = '';
-      dot.className = '';
-    }
+    dot.className = submittedGuesses[i] ? 'used' : '';
   });
 }
 
@@ -4550,27 +4859,27 @@ async function loadScoreboard() {
       .from('sozcel_used_answers')
       .select('used_on, sozcul_id')
       .gte('used_on', cutoffISO);
-    const sozculByDay = new Map();
+    const sozcuByDay = new Map();
     (sozcuRows || []).forEach(r => {
       const d = parseGameDate(r.used_on);
-      if (d && r.sozcul_id) sozculByDay.set(d.getTime(), r.sozcul_id);
+      if (d && r.sozcul_id) sozcuByDay.set(d.getTime(), r.sozcul_id);
     });
-    if (sozculByDay.size > 0) {
+    if (sozcuByDay.size > 0) {
       const creditedPlayerDay = new Set();
       weekly.forEach(r => {
         if (!r.user_id) return;
         const d = parseGameDate(r.date);
         if (!d) return;
-        const sozculId = sozculByDay.get(d.getTime());
-        if (!sozculId || sozculId === r.user_id) return;
+        const sozcuId = sozcuByDay.get(d.getTime());
+        if (!sozcuId || sozcuId === r.user_id) return;
         const dedupKey = r.user_id + '|' + d.getTime();
         if (creditedPlayerDay.has(dedupKey)) return;
         creditedPlayerDay.add(dedupKey);
         const bonus = sozcuPoints(r.attempts, r.won);
         if (bonus <= 0) return;
-        const prev = scores.get(sozculId) || { score: 0, neighborhood: null, lastDate: null };
+        const prev = scores.get(sozcuId) || { score: 0, neighborhood: null, lastDate: null };
         prev.score += bonus;
-        scores.set(sozculId, prev);
+        scores.set(sozcuId, prev);
       });
     }
   } catch (e) { /* Sözcü bonus is best-effort */ }
@@ -4925,9 +5234,9 @@ function showShareToast(msg) {
 // ── Sözcü Görevi button (top-right, left of Help): opens the assigned
 // Sözcü's word/status form in a dismissible popup instead of taking over
 // the whole play screen — the game itself stays playable for everyone. ──
-(function initSozculTaskButton() {
-  const overlay = document.getElementById('sozcul-task-overlay');
-  const close = document.getElementById('sozcul-task-close');
+(function initSozcuTaskButton() {
+  const overlay = document.getElementById('sozcu-task-overlay');
+  const close = document.getElementById('sozcu-task-close');
   if (close && overlay) {
     close.addEventListener('click', () => overlay.classList.remove('open'));
   }
@@ -4976,9 +5285,42 @@ async function markPlayedGames() {
 // The board is built after the daily target is fetched — the syllable
 // staircase depends on the word's actual structure, not just its length.
 initKeyboard();
+layoutGame();
+
+// Re-fit on anything that can change the space layoutGame() measured:
+// rotation, a resized window, the iOS browser bar, the app returning to
+// the foreground, the kahvehane sheet settling around the iframe. The
+// ResizeObserver is the one that catches all of those at once; layoutGame
+// writes nothing when the numbers come out the same, so it can't feed
+// itself.
+let _layoutPending = false;
+function requestGameLayout() {
+  if (_layoutPending) return;
+  _layoutPending = true;
+  requestAnimationFrame(() => { _layoutPending = false; layoutGame(); });
+}
+window.addEventListener('resize', requestGameLayout);
+window.addEventListener('orientationchange', requestGameLayout);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', requestGameLayout);
+if (window.ResizeObserver) {
+  const ro = new ResizeObserver(requestGameLayout);
+  const panelEl = document.getElementById('game-panel');
+  if (panelEl) ro.observe(panelEl);
+  // The status block grows when the game ends (message + countdown), which
+  // is the one thing inside the panel that can crowd the pips — watching it
+  // is how the board makes room for it instead of the two colliding.
+  const statusEl = document.querySelector('.game-status');
+  if (statusEl) ro.observe(statusEl);
+  // And the play area itself: the sözcü credit line arrives from the
+  // database after first paint, and the board has to give back the height
+  // that line takes rather than keep the space it measured before it.
+  const areaEl = document.getElementById('play-area');
+  if (areaEl) ro.observe(areaEl);
+}
+
 (async () => {
   // Enforce game-lock gating BEFORE picking today's word or wiring up the
-  // Sözcül takeover — a direct URL / bookmark load of a still-locked game
+  // Sözcü takeover — a direct URL / bookmark load of a still-locked game
   // (or a day the admin switched off) must bounce to kahvehane without
   // giving the user a chance to play.
   if (typeof applyGameLocks === 'function') {
@@ -4992,9 +5334,9 @@ initKeyboard();
   // exception: if *today* is this user's assigned day, they can't guess
   // their own word, so guessing gets locked further down once the daily
   // target is known.
-  const takeoverStatus = await checkSozculTakeoverStatus();
+  const takeoverStatus = await checkSozcuTakeoverStatus();
   if (takeoverStatus && takeoverStatus.mode !== 'none') {
-    setupSozculTaskButton(takeoverStatus);
+    setupSozcuTaskButton(takeoverStatus);
   }
   const lockOwnWordToday = !!(takeoverStatus &&
     (takeoverStatus.mode === 'today-done' || takeoverStatus.mode === 'today-missed'));
@@ -5006,9 +5348,11 @@ initKeyboard();
     // substitute a locally-picked word here — see pickDailyTarget.
     const msg = document.getElementById('game-message');
     if (msg) {
-      msg.textContent = TODAY_WORD_UNREACHABLE
-        ? 'Bugünün kelimesine ulaşılamadı. Bağlantını kontrol edip sayfayı yenile.'
-        : 'Bugünkü sözcük henüz hazır değil.';
+      msg.textContent = !TODAY_WORD_UNREACHABLE
+        ? 'Bugünkü sözcük henüz hazır değil.'
+        : (TODAY_WORD_ERROR_IS_SETUP
+            ? 'Bugünün kelimesi hazırlanamadı. Sorun bizde — birazdan tekrar dene.'
+            : 'Bugünün kelimesine ulaşılamadı. Bağlantını kontrol edip sayfayı yenile.');
       msg.className = 'game-message';
     }
     gameOver = true;
@@ -5037,12 +5381,12 @@ initKeyboard();
   renderStats();
   loadScoreboard();
   markPlayedGames();
-  loadSozculOfTheDay();
+  loadSozcuOfTheDay();
   initSuggestionForm();
   loadMySuggestions();
 })();
 
-// ── Günün Sözcülü: shows whoever's suggestion the admin picked today,
+// ── Günün Sözcüsü: shows whoever's suggestion the admin picked today,
 // or the admin themselves if nobody suggested it. ──
 function turkishLocative(name) {
   if (!name) return '';
@@ -5060,8 +5404,8 @@ function turkishLocative(name) {
   return upper + d + suffixVowel + 'N';
 }
 
-async function loadSozculOfTheDay() {
-  const el = document.getElementById('sozcul-line');
+async function loadSozcuOfTheDay() {
+  const el = document.getElementById('sozcu-line');
   if (!el) return;
   try {
     const today = getIstanbulDateISO();
@@ -5071,28 +5415,31 @@ async function loadSozculOfTheDay() {
       .eq('used_on', today)
       .maybeSingle();
     if (error) { el.innerHTML = ''; return; }
-    let sozculId = data?.sozcul_id || null;
+    let sozcuId = data?.sozcul_id || null;
     // Fall back to the assignment table if no sozcul_id on today's word
-    if (!sozculId) {
+    if (!sozcuId) {
       const { data: assign } = await sb
         .from('sozcel_sozcul_assignments')
         .select('user_id')
         .eq('game_date', today)
         .maybeSingle();
-      if (assign) sozculId = assign.user_id;
+      if (assign) sozcuId = assign.user_id;
     }
-    if (!sozculId) { el.innerHTML = ''; return; }
+    if (!sozcuId) { el.innerHTML = ''; return; }
     const { data: prof } = await sb
       .from('profiles')
       .select('id, first_name, neighborhood')
-      .eq('id', sozculId)
+      .eq('id', sozcuId)
       .maybeSingle();
     if (!prof) { el.innerHTML = ''; return; }
     const firstName = (prof.first_name || 'İSİMSİZ').toLocaleUpperCase('tr-TR');
     const nbId = prof.neighborhood;
     const nbName = (typeof neighborhoodNames !== 'undefined' && neighborhoodNames[nbId]) || nbId || '';
     const label = nbName ? `${turkishLocative(nbName)} ${firstName}` : firstName;
-    el.innerHTML = `<span class="sozcul-tag">Günün Sözcülü:</span><span class="sozcul-name author-link" data-user-id="${prof.id}">${escapeHtml(label)}</span>`;
+    el.innerHTML = `<span class="sozcu-tag">Günün Sözcüsü:</span><span class="sozcu-name author-link" data-user-id="${prof.id}">${escapeHtml(label)}</span>`;
+    // Now that there is a name in it, size it down to one line if the name
+    // is long — see fitSozcuLine().
+    fitSozcuLine();
   } catch (e) {
     el.innerHTML = '';
   }
@@ -5102,7 +5449,7 @@ async function loadSozculOfTheDay() {
 
 // Returns midnight IST (UTC+3) at the START of the given ISO date as a UTC Date.
 // That is the deadline for submitting the word for that date.
-function getSozculDeadline(iso) {
+function getSozcuDeadline(iso) {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d) - 3 * 3600 * 1000);
 }
@@ -5116,28 +5463,39 @@ function formatISOTurkish(iso) {
   return `${d} ${months[m - 1]}`;
 }
 
-// ── Sözcül takeover form (rendered inside the Sözcü Görevi popup) ──
-const SOZCUL_WORD_CLASSES = ['isim', 'fiil', 'sıfat', 'zarf', 'bağlaç', 'edat', 'zamir', 'ünlem'];
+// ── Sözcü takeover form (rendered inside the Sözcü Görevi popup) ──
+const SOZCU_WORD_CLASSES = ['isim', 'fiil', 'sıfat', 'zarf', 'bağlaç', 'edat', 'zamir', 'ünlem'];
 let _takeoverCountdownInterval = null;
 
-// Resolves what (if anything) should be shown in the Sözcül takeover.
+// Resolves what (if anything) should be shown in the Sözcü takeover.
 // Modes:
 //   'pending-input' — user has an upcoming assignment whose deadline
 //                     hasn't passed yet. A word may already be entered
-//                     (status.existing is set) — the Sözcül can freely
+//                     (status.existing is set) — the Sözcü can freely
 //                     keep changing it until the deadline hits.
-//   'today-done'    — user is today's Sözcül, the deadline for today has
+//   'today-done'    — user is today's Sözcü, the deadline for today has
 //                     passed and a word was submitted in time (the play
 //                     screen is hidden — they can't guess their own word)
-//   'today-missed'  — user is today's Sözcül but never submitted before
+//   'today-missed'  — user is today's Sözcü but never submitted before
 //                     the deadline passed
 //   'none'          — show the normal play screen
-async function checkSozculTakeoverStatus() {
+//   'admin'         — the signed-in user is the admin and has no Sözcü
+//                     assignment of their own to deal with. The same form
+//                     opens on any date they pick, with no deadline: see
+//                     db/sozcel_used_answers_v6_admin_override.sql.
+async function checkSozcuTakeoverStatus() {
   const today = getIstanbulDateISO();
-  const empty = { session: null, today, mode: 'none', targetDate: null };
+  const empty = { session: null, today, mode: 'none', targetDate: null, isAdmin: false };
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return empty;
+    const isAdmin = session.user.email === ADMIN_EMAIL;
+    // The admin's own fallback: whatever their assignments say, they can
+    // always open the form. Resolved last, so an admin who *is* also an
+    // assigned Sözcü still gets their assignment first.
+    const adminFallback = isAdmin
+      ? { session, today, isAdmin, mode: 'admin', targetDate: today }
+      : { ...empty, session, isAdmin };
     const now = new Date();
 
     // All upcoming assignments for this user (today + future).
@@ -5148,7 +5506,7 @@ async function checkSozculTakeoverStatus() {
       .gte('game_date', today)
       .order('game_date', { ascending: true });
     const assignedDates = (assignments || []).map(a => a.game_date);
-    if (assignedDates.length === 0) return { ...empty, session };
+    if (assignedDates.length === 0) return adminFallback;
 
     const { data: words } = await sb
       .from('sozcel_used_answers')
@@ -5157,11 +5515,11 @@ async function checkSozculTakeoverStatus() {
     const wordByDate = new Map((words || []).filter(w => w.word).map(w => [w.used_on, w]));
 
     // The earliest assignment whose deadline hasn't passed yet stays
-    // editable — the Sözcül can change the word as many times as they
+    // editable — the Sözcü can change the word as many times as they
     // like right up until midnight, whether or not one is already saved.
-    const editable = assignedDates.find(d => getSozculDeadline(d) > now);
+    const editable = assignedDates.find(d => getSozcuDeadline(d) > now);
     if (editable) {
-      return { session, today, mode: 'pending-input', targetDate: editable, existing: wordByDate.get(editable) || null };
+      return { session, today, isAdmin, mode: 'pending-input', targetDate: editable, existing: wordByDate.get(editable) || null };
     }
 
     // No editable entry left — but if today is the user's assigned day, the
@@ -5170,11 +5528,12 @@ async function checkSozculTakeoverStatus() {
       return {
         session,
         today,
+        isAdmin,
         mode: wordByDate.has(today) ? 'today-done' : 'today-missed',
         targetDate: today,
       };
     }
-    return { ...empty, session };
+    return adminFallback;
   } catch (e) {
     return empty;
   }
@@ -5184,31 +5543,74 @@ async function checkSozculTakeoverStatus() {
 // signed-in user has any Sözcü business — a future word yet to submit, or
 // today's own word already locked in / missed. Clicking it opens the form
 // in a dismissible popup; the play screen underneath is never touched.
-function setupSozculTaskButton(status) {
-  const btn = document.getElementById('sozcul-task-btn');
+function setupSozcuTaskButton(status) {
+  const btn = document.getElementById('sozcu-task-btn');
   if (!btn) return;
   btn.style.display = '';
-  btn.onclick = () => openSozculTaskModal(status);
+  // For the admin with no assignment of their own, the same button is the
+  // way into the day editor — say so, or it reads as a Sözcü task they
+  // don't have.
+  if (status.mode === 'admin') {
+    btn.setAttribute('aria-label', 'Sözcel Yönetimi');
+    btn.title = 'Sözcel Yönetimi';
+  }
+  btn.onclick = () => openSozcuTaskModal(status);
 
   // Mascot greeting (only fires the first time per assignment date).
-  if (window.IstSozcul) {
-    window.IstSozcul.greet({ sb, page: 'sozcel' });
+  if (window.IstSozcu) {
+    window.IstSozcu.greet({ sb, page: 'sozcel' });
   }
 }
 
-function openSozculTaskModal(status) {
-  const overlay = document.getElementById('sozcul-task-overlay');
-  const body = document.getElementById('sozcul-task-body');
+function openSozcuTaskModal(status) {
+  const overlay = document.getElementById('sozcu-task-overlay');
+  const body = document.getElementById('sozcu-task-body');
   if (!overlay || !body) return;
 
   if (status.mode === 'pending-input') {
+    // The admin gets the same form with its date picker and no deadline;
+    // renderTakeoverForm reads status.isAdmin for that.
     renderTakeoverForm(body, status);
+  } else if (status.isAdmin) {
+    // Every other mode is a locked one — the word is in and the day has
+    // started, or the deadline was missed. Those are exactly the states the
+    // admin exists to unstick, so the editor opens instead of the notice.
+    // The mode itself is left alone: if the admin is also today's Sözcü,
+    // it still stops them guessing their own word.
+    body.innerHTML = '<div class="stk-eyebrow">Sözcel Yönetimi</div><p class="stk-hint">Yükleniyor…</p>';
+    loadAdminDayStatus(status.session, status.targetDate || status.today)
+      .then(next => renderTakeoverForm(body, next))
+      .catch(e => {
+        console.error('[sozcel openSozcuTaskModal admin]', e);
+        body.innerHTML = '<div class="stk-eyebrow">Sözcel Yönetimi</div>' +
+          '<p class="stk-hint">Gün bilgisi alınamadı. Sayfayı yenileyip tekrar dene.</p>';
+      });
   } else if (status.mode === 'today-done') {
     renderTakeoverDone(body, status.targetDate);
   } else if (status.mode === 'today-missed') {
     renderTakeoverMissed(body, status.targetDate);
   }
   overlay.classList.add('open');
+}
+
+// Builds the admin's editing context for one date: whatever is stored for
+// that day, if anything. Used when the admin opens the panel and every time
+// they pick a different day in it.
+async function loadAdminDayStatus(session, date) {
+  const { data, error } = await sb
+    .from('sozcel_used_answers')
+    .select('used_on, word, definition, syllables, sozcul_id')
+    .eq('used_on', date)
+    .maybeSingle();
+  if (error) throw error;
+  return {
+    session,
+    today: getIstanbulDateISO(),
+    isAdmin: true,
+    mode: 'admin',
+    targetDate: date,
+    existing: data || null,
+  };
 }
 
 // Results block for a Sözcü's *own* word only — used solely by
@@ -5219,7 +5621,7 @@ function openSozculTaskModal(status) {
 // word — not theirs — is what's being played today). Shows who played
 // today's word and on which attempt they solved it (or that they missed
 // it). loadTodayResults() re-populates it (by id) right after render.
-function sozculTakeoverScoreboardHTML() {
+function sozcuTakeoverScoreboardHTML() {
   return `
     <div class="scoreboard stk-scoreboard">
       <h2>Bugünün Sonuçları</h2>
@@ -5257,7 +5659,7 @@ function renderTakeoverDone(takeover, date) {
       <span>${escapeHtml(body)}</span>
     </div>
     ${playToday}
-    ${sozculTakeoverScoreboardHTML()}
+    ${sozcuTakeoverScoreboardHTML()}
   `;
   const playBtn = takeover.querySelector('#stk-play-today');
   if (playBtn) playBtn.addEventListener('click', () => window.location.reload());
@@ -5281,7 +5683,7 @@ function renderTakeoverMissed(takeover, date) {
 
 function renderTakeoverForm(takeover, status) {
   const date = status.targetDate;
-  const deadline = getSozculDeadline(date);
+  const deadline = getSozcuDeadline(date);
   const dateLabel = formatISOTurkish(date);
   const existing = status.existing || null;
   let dict = null;
@@ -5289,18 +5691,35 @@ function renderTakeoverForm(takeover, status) {
     try { dict = JSON.parse(existing.definition); } catch (e) { dict = null; }
   }
 
+  // The admin edits any day, including one already being played, so the
+  // header, the day picker and the countdown all change meaning for them.
+  const isAdminMode = !!status.isAdmin;
+  const adminPicker = isAdminMode ? `
+      <div class="stk-section">
+        <label class="stk-label">Hangi gün</label>
+        <input type="date" class="stk-text-input" id="stk-admin-date" value="${escapeHtml(date)}">
+      </div>
+  ` : '';
+
   takeover.innerHTML = `
-    <div class="stk-eyebrow">Sözcü Görevin · ${escapeHtml(dateLabel)}</div>
-    <h2>${escapeHtml(dateLabel)} Kelimesini Sen Seç</h2>
+    <div class="stk-eyebrow">${isAdminMode ? 'Sözcel Yönetimi' : 'Sözcü Görevin'} · ${escapeHtml(dateLabel)}</div>
+    <h2>${isAdminMode ? escapeHtml(dateLabel) + ' Kelimesini Düzenle' : escapeHtml(dateLabel) + ' Kelimesini Sen Seç'}</h2>
     <p class="stk-hint">
+      ${isAdminMode ? `
+      Yönetici olarak istediğin günün kelimesini süre sınırı olmadan
+      değiştirebilirsin — oynanmakta olan günü de. Kelimeyi hecelerine ayır
+      (en az 2, en fazla 3 hece); oyunda senin ayırdığın hecelerle gösterilir.
+      ` : `
       İstediğin uzunlukta bir Türkçe sözcük seç, ama hecelerine kendin ayır —
       en az 2, en fazla 3 hece gir. Oyunda kelime senin ayırdığın hecelerle
       gösterilecek, her hece bir alt basamakta. Sözlük bilgisini de doldur.
       ${escapeHtml(dateLabel)} günü diğer İstanbullular bu kelimeyi tahmin edecek.
       ${existing ? 'Gece yarısına kadar dilediğin kadar değiştirebilirsin.' : ''}
+      `}
     </p>
     <div class="stk-countdown" id="stk-countdown"></div>
     <div class="stk-form">
+      ${adminPicker}
       <div class="stk-section">
         <label class="stk-label">Kelime — Hecelerine Ayır (2–3 hece)</label>
         <div class="stk-syls" id="stk-syls"></div>
@@ -5329,13 +5748,17 @@ function renderTakeoverForm(takeover, status) {
       </div>
 
       <button type="button" class="stk-submit" id="stk-submit">${existing ? 'Değişikliği Kaydet' : 'Onayla ve Kaydet'}</button>
+      ${isAdminMode && existing && existing.sozcul_id && existing.sozcul_id !== status.session.user.id
+        ? '<div class="stk-hint" style="margin-top:6px;">Bu günün Sözcüsü başka biri — kaydedince kelime değişir ama gün onun adına kalır.</div>'
+        : ''}
       <div class="stk-status" id="stk-status"></div>
     </div>
   `;
-  // No "Bugünün Sonuçları" here: status.targetDate is always a future
-  // assignment (today's Sözcü-picking deadline has already passed by the
+  // No "Bugünün Sonuçları" here: a Sözcü's status.targetDate is always a
+  // future assignment (today's picking deadline has already passed by the
   // time this mode is reachable), so today's word — and its results —
-  // belong to someone else's assignment, not this one.
+  // belong to someone else's assignment, not this one. The admin can land
+  // on today, but they're here to edit the day, not to read its scoreboard.
 
   const submitBtn = takeover.querySelector('#stk-submit');
   const countdownEl = takeover.querySelector('#stk-countdown');
@@ -5390,7 +5813,7 @@ function renderTakeoverForm(takeover, status) {
 
   // Pre-fill definition rows from the saved dictionary entry, or start
   // with one empty row if there's nothing saved yet.
-  const defsToRender = (dict && dict.defs && dict.defs.length) ? dict.defs : [{ cls: SOZCUL_WORD_CLASSES[0], text: '' }];
+  const defsToRender = (dict && dict.defs && dict.defs.length) ? dict.defs : [{ cls: SOZCU_WORD_CLASSES[0], text: '' }];
   defsToRender.forEach((d, i) => defsEl.insertAdjacentHTML('beforeend', buildTakeoverDefRow(i, d.cls, d.text)));
 
   takeover.querySelector('#stk-add-def').addEventListener('click', () => {
@@ -5427,8 +5850,38 @@ function renderTakeoverForm(takeover, status) {
       `Kalan süre  ${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
     countdownEl.className = 'stk-countdown' + (totalSecs < 3600 ? ' urgent' : '');
   }
-  updateCountdown();
-  _takeoverCountdownInterval = setInterval(updateCountdown, 1000);
+  if (isAdminMode) {
+    // No countdown for the admin: the deadline is the one thing their
+    // access is for. Running it would tick down to disabling the very
+    // button they came here to press.
+    const passed = deadline <= new Date();
+    countdownEl.textContent = passed
+      ? 'Süre dolmuş — yönetici olarak yine de değiştirebilirsin.'
+      : 'Yönetici olarak süre sınırı olmadan değiştirebilirsin.';
+    countdownEl.className = 'stk-countdown';
+  } else {
+    updateCountdown();
+    _takeoverCountdownInterval = setInterval(updateCountdown, 1000);
+  }
+
+  // Admin day picker: reload the form against whichever day they choose,
+  // pre-filled with whatever that day already has.
+  const adminDateEl = takeover.querySelector('#stk-admin-date');
+  if (adminDateEl) {
+    adminDateEl.addEventListener('change', async () => {
+      const picked = adminDateEl.value;
+      if (!picked || picked === date) return;
+      statusEl.textContent = 'Yükleniyor…';
+      statusEl.className = 'stk-status';
+      try {
+        renderTakeoverForm(takeover, await loadAdminDayStatus(status.session, picked));
+      } catch (e) {
+        console.error('[sozcel admin day picker]', e);
+        statusEl.textContent = 'O günün bilgisi alınamadı. Tekrar dene.';
+        statusEl.className = 'stk-status err';
+      }
+    });
+  }
 
   submitBtn.addEventListener('click', () => submitTakeover(status, sylsEl, submitBtn, statusEl, defsEl, takeover));
 }
@@ -5452,7 +5905,7 @@ function normalizeSyllablesForEdit(word) {
 
 function buildTakeoverSylRow(idx, value) {
   return `
-    <div class="stk-def-row stk-syl-row">
+    <div class="stk-syl-row">
       <span class="stk-def-num">${idx + 1}.</span>
       <input type="text" class="stk-text-input stk-syl-input" maxlength="10"
              autocomplete="off" autocorrect="off" spellcheck="false"
@@ -5469,7 +5922,7 @@ function renumberTakeoverSyls() {
 }
 
 function buildTakeoverDefRow(idx, cls, text) {
-  const opts = SOZCUL_WORD_CLASSES.map(c => `<option value="${c}"${c === cls ? ' selected' : ''}>${c}</option>`).join('');
+  const opts = SOZCU_WORD_CLASSES.map(c => `<option value="${c}"${c === cls ? ' selected' : ''}>${c}</option>`).join('');
   return `
     <div class="stk-def-row">
       <span class="stk-def-num">${idx + 1}.</span>
@@ -5489,12 +5942,28 @@ function renumberTakeoverDefs() {
 }
 
 function serializeTakeoverDict(takeover) {
-  const note = (takeover.querySelector('#stk-note-input').value || '').trim() || null;
-  const root = (takeover.querySelector('#stk-root-input').value || '').trim() || null;
-  const defs = [...takeover.querySelectorAll('.stk-def-row')].map(row => ({
-    cls: row.querySelector('.stk-def-cls').value,
-    text: (row.querySelector('.stk-def-text').value || '').trim(),
-  })).filter(d => d.text);
+  const noteEl = takeover.querySelector('#stk-note-input');
+  const rootEl = takeover.querySelector('#stk-root-input');
+  const note = ((noteEl && noteEl.value) || '').trim() || null;
+  const root = ((rootEl && rootEl.value) || '').trim() || null;
+
+  // Scope to the definitions container, and read each row's fields
+  // defensively. This used to collect `.stk-def-row` from the whole panel,
+  // back when the syllable rows carried that class for its grid — so it
+  // picked up every syllable row too, and since #stk-syls renders above
+  // #stk-defs the very first match had no .stk-def-cls to read. That threw
+  // `null is not an object` on every single save. The class no longer does
+  // double duty; this stays scoped and null-safe so it can't come back.
+  const defsRoot = takeover.querySelector('#stk-defs');
+  const defs = (defsRoot ? [...defsRoot.querySelectorAll('.stk-def-row')] : [])
+    .map(row => {
+      const clsEl = row.querySelector('.stk-def-cls');
+      const textEl = row.querySelector('.stk-def-text');
+      if (!clsEl || !textEl) return null;
+      return { cls: clsEl.value, text: (textEl.value || '').trim() };
+    })
+    .filter(d => d && d.text);
+
   if (!note && !root && !defs.length) return null;
   return JSON.stringify({ note, root, defs });
 }
@@ -5526,13 +5995,20 @@ async function submitTakeover(status, sylsEl, submitBtn, statusEl, defsEl, takeo
   // checkWord() compares against; a lowercase TARGET_WORD never matches.
   const wordNorm = syllables.join('');
   const defRows = [...defsEl.querySelectorAll('.stk-def-row')];
-  const hasAnyDef = defRows.some(r => (r.querySelector('.stk-def-text').value || '').trim());
+  const hasAnyDef = defRows.some(r => {
+    const textEl = r.querySelector('.stk-def-text');
+    return !!(textEl && (textEl.value || '').trim());
+  });
   if (!hasAnyDef) {
     statusEl.textContent = 'En az bir anlam gir.';
     statusEl.className = 'stk-status err';
     return;
   }
-  if (new Date() >= getSozculDeadline(targetDate)) {
+  // The deadline binds the Sözcü, not the admin — an admin blocked by it
+  // could never fix the word on the day it is actually being played, which
+  // is the only day the fix matters. RLS agrees
+  // (db/sozcel_used_answers_v6_admin_override.sql).
+  if (!status.isAdmin && new Date() >= getSozcuDeadline(targetDate)) {
     statusEl.textContent = 'Süre doldu.';
     statusEl.className = 'stk-status err';
     return;
@@ -5542,50 +6018,140 @@ async function submitTakeover(status, sylsEl, submitBtn, statusEl, defsEl, takeo
   statusEl.textContent = 'Kaydediliyor...';
   statusEl.className = 'stk-status';
 
-  // Guard: only block if someone else already owns this day's word.
-  // The assigned Sözcül can freely overwrite their own entry up until
-  // the deadline, so this is not a "first write wins" check anymore.
-  const { data: guard } = await sb
-    .from('sozcel_used_answers')
-    .select('word, sozcul_id')
-    .eq('used_on', targetDate)
-    .maybeSingle();
-  if (guard && guard.word && guard.sozcul_id && guard.sozcul_id !== status.session.user.id) {
-    statusEl.textContent = 'Bu gün için zaten kelime kaydedilmiş.';
-    statusEl.className = 'stk-status err';
-    submitBtn.disabled = false;
-    return;
-  }
-
-  const definition = serializeTakeoverDict(takeover);
-  const { error } = await sb
-    .from('sozcel_used_answers')
-    .upsert({ used_on: targetDate, word: wordNorm, syllables, definition, sozcul_id: status.session.user.id }, { onConflict: 'used_on' });
-  if (error) {
-    statusEl.textContent = 'Hata: ' + (error.message || 'Bilinmeyen hata');
-    statusEl.className = 'stk-status err';
-    submitBtn.disabled = false;
-    return;
-  }
-
-  if (window.IstSozcul && window.IstSozcul.invalidate) window.IstSozcul.invalidate();
-
-  // The deadline hasn't necessarily passed just because we saved — the
-  // Sözcül can keep changing this same day's word right up until
-  // midnight, so re-render the (now pre-filled) form instead of locking.
-  // Only move on to the next assignment or the "done" state once this
-  // day's deadline has actually passed.
-  const next = await checkSozculTakeoverStatus();
-  if (next && next.mode === 'pending-input') {
-    renderTakeoverForm(takeover, next);
-    const savedStatusEl = takeover.querySelector('#stk-status');
-    if (savedStatusEl) {
-      savedStatusEl.textContent = 'Kaydedildi — istersen değiştirmeye devam edebilirsin.';
-      savedStatusEl.className = 'stk-status ok';
+  // From here on, every exit has to land on a message and a usable button.
+  // A Sözcü left staring at "Kaydediliyor..." can't tell whether their word
+  // saved, can't retry (the button stays disabled), and the deadline is a
+  // hard one — so a thrown error or a request that never comes back must
+  // not be allowed to end the story. That was the whole of this block's
+  // error handling before: none.
+  let saved = false;
+  try {
+    // Guard: only block if someone else already owns this day's word.
+    // The assigned Sözcü can freely overwrite their own entry up until
+    // the deadline, so this is not a "first write wins" check anymore.
+    //
+    // Best-effort on purpose. RLS is the real gate — the update policy only
+    // accepts a row whose sozcul_id is the caller — so this read exists to
+    // give a clearer message, not to protect anything. A hiccup reading it
+    // must not cost the Sözcü a save the database would have accepted.
+    let guard = null;
+    try {
+      const res = await withSaveTimeout(sb
+        .from('sozcel_used_answers')
+        .select('word, sozcul_id')
+        .eq('used_on', targetDate)
+        .maybeSingle());
+      if (res.error) console.error('[sozcel submitTakeover guard]', res.error);
+      else guard = res.data;
+    } catch (e) {
+      console.error('[sozcel submitTakeover guard]', e);
     }
-  } else {
-    renderTakeoverDone(takeover, targetDate);
+    // Someone else's day stops a Sözcü, not the admin — overriding it is
+    // the whole point of their access.
+    if (!status.isAdmin && guard && guard.word && guard.sozcul_id && guard.sozcul_id !== status.session.user.id) {
+      statusEl.textContent = 'Bu gün için zaten kelime kaydedilmiş.';
+      statusEl.className = 'stk-status err';
+      return;
+    }
+
+    // Correcting a day doesn't take it over: a row that already belongs to
+    // a Sözcü keeps their name on it, so "Günün Sözcüsü" still credits the
+    // person whose day it is. Only a day nobody owns is attributed to the
+    // person writing it.
+    const owner = (guard && guard.sozcul_id) || status.session.user.id;
+    const definition = serializeTakeoverDict(takeover);
+    const { error } = await withSaveTimeout(sb
+      .from('sozcel_used_answers')
+      .upsert({ used_on: targetDate, word: wordNorm, syllables, definition, sozcul_id: owner }, { onConflict: 'used_on' }));
+    if (error) throw error;
+    saved = true;
+  } catch (e) {
+    console.error('[sozcel submitTakeover]', e);
+    statusEl.textContent = describeSaveError(e);
+    statusEl.className = 'stk-status err';
+    return;
+  } finally {
+    // Re-enable on every path that isn't a completed save — the completed
+    // one replaces this whole form below.
+    if (!saved) submitBtn.disabled = false;
   }
+
+  if (window.IstSozcu && window.IstSozcu.invalidate) window.IstSozcu.invalidate();
+
+  // The word is in. Anything that fails past this point is presentation,
+  // so it must not read as a failed save: confirm first, then re-render.
+  statusEl.textContent = 'Kaydedildi.';
+  statusEl.className = 'stk-status ok';
+
+  try {
+    // The deadline hasn't necessarily passed just because we saved — the
+    // Sözcü can keep changing this same day's word right up until
+    // midnight, so re-render the (now pre-filled) form instead of locking.
+    // Only move on to the next assignment or the "done" state once this
+    // day's deadline has actually passed.
+    // The admin's panel never closes into a "done" screen — they may want
+    // the next day, or this one again — so it reopens on the day they just
+    // saved, showing what is now stored for it.
+    const next = status.isAdmin
+      ? await loadAdminDayStatus(status.session, targetDate)
+      : await checkSozcuTakeoverStatus();
+    if (next && (next.mode === 'pending-input' || next.mode === 'admin')) {
+      renderTakeoverForm(takeover, next);
+      const savedStatusEl = takeover.querySelector('#stk-status');
+      if (savedStatusEl) {
+        savedStatusEl.textContent = 'Kaydedildi — istersen değiştirmeye devam edebilirsin.';
+        savedStatusEl.className = 'stk-status ok';
+      }
+    } else {
+      renderTakeoverDone(takeover, targetDate);
+    }
+  } catch (e) {
+    // The save landed; only the redraw didn't. Leave the confirmation up.
+    console.error('[sozcel submitTakeover post-save render]', e);
+  }
+}
+
+// How long a single save request may take before we stop waiting on it.
+// supabase-js turns its own network errors into a returned `error`, but a
+// request that never comes back at all — a connection stalled in the iOS
+// webview, a proxy holding the socket open — leaves the await pending
+// forever, and the Sözcü watching "Kaydediliyor..." with it.
+const SAVE_TIMEOUT_MS = 20000;
+
+// Bound a PostgREST call. Losing the race doesn't cancel the request, so a
+// save that was actually in flight may still land; that's harmless here —
+// the write is an upsert keyed on used_on and the Sözcü may re-save as
+// often as they like until the deadline — and the message says as much.
+function withSaveTimeout(query) {
+  let timer = null;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error('save request timed out');
+      err.code = 'IST_TIMEOUT';
+      reject(err);
+    }, SAVE_TIMEOUT_MS);
+  });
+  // Promise.resolve() first: a PostgrestBuilder is a thenable, not a Promise.
+  return Promise.race([Promise.resolve(query), timeout])
+    .finally(() => { if (timer) clearTimeout(timer); });
+}
+
+// Turn a save failure into something the Sözcü can act on, and carry the
+// code so a report of it is diagnosable.
+function describeSaveError(e) {
+  if (!e) return 'Kaydedilemedi. Tekrar dene.';
+  if (e.code === 'IST_TIMEOUT') {
+    return 'Sunucu yanıt vermedi. Kelimen kaydedilmiş olabilir — tekrar dene, sonra sayfayı yenileyip kontrol et.';
+  }
+  // Postgres/PostgREST refusals worth naming, because the fix differs.
+  if (e.code === '42501' || /row-level security/i.test(e.message || '')) {
+    return 'Bu gün için kelime kaydetme yetkin yok — süre dolmuş olabilir. Sayfayı yenile.';
+  }
+  if (e.code === '23505') {
+    return 'Bu kelime daha önce kullanılmış. Başka bir kelime seç.';
+  }
+  const detail = e.message || 'Bilinmeyen hata';
+  return 'Kaydedilemedi: ' + detail + (e.code ? ' (' + e.code + ')' : '');
 }
 
 // ── Word suggestion form ──
@@ -5713,7 +6279,7 @@ async function loadMySuggestions() {
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { wrap.innerHTML = ''; return; }
-    // Past wins: picked suggestions where this user is credited as sözcül.
+    // Past wins: picked suggestions where this user is credited as sözcü.
     const { data: picks } = await sb
       .from('sozcel_used_answers')
       .select('word, used_on')
@@ -5724,7 +6290,7 @@ async function loadMySuggestions() {
     wrap.innerHTML = picks.map(p => `
       <div class="mine-row">
         <span class="mine-word">${escapeHtml(p.word)}</span>
-        <span class="mine-status picked">Sözcül · ${p.used_on}</span>
+        <span class="mine-status picked">Sözcü · ${p.used_on}</span>
       </div>
     `).join('');
   } catch (e) {

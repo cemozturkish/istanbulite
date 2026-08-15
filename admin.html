@@ -682,7 +682,7 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .sozcul-assign-row {
+    .sozcu-assign-row {
       display: grid;
       grid-template-columns: 1fr 1fr auto;
       gap: 10px;
@@ -907,10 +907,10 @@
         mask-image: linear-gradient(to right, transparent, black 14px, black calc(100% - 14px), transparent);
       }
 
-      .sozcul-assign-row {
+      .sozcu-assign-row {
         grid-template-columns: 1fr;
       }
-      .sozcul-assign-row button { width: 100%; }
+      .sozcu-assign-row button { width: 100%; }
 
       .tb-party-row { flex-wrap: wrap; }
       .tb-party-row input[type="text"] { flex-basis: 100%; order: 1; }
@@ -965,6 +965,41 @@
        doesn't lose them) but reads as inactive. */
     .cf-day-row.off .cf-day-name { color: var(--muted); }
     .cf-day-row.off input[type="time"] { opacity: 0.4; }
+    /* Ülke picker on the breaking-news forms (the post form and each
+       card's edit form). A scrolling grid of checkboxes rather than a
+       native <select multiple>: with 27 countries the native control
+       hides most of what is ticked behind its own scroll, and one stray
+       click without the modifier key clears every pick silently. Here
+       what is ticked stays visible and a click is a click. */
+    .country-picker {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+      gap: 1px 10px;
+      max-height: 172px;
+      overflow-y: auto;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      padding: 8px 10px;
+    }
+    .country-picker label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0;
+      font-size: 0.78rem;
+      font-weight: 400;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .country-picker input[type="checkbox"] {
+      width: 14px; height: 14px; margin: 0; cursor: pointer; accent-color: var(--accent);
+    }
+    /* Only Dünya stories are read on Kütüphane's world map, so the picker
+       is only offered for that category (see syncNewsCountryPicker). */
+    .country-picker-block { display: none; }
+    .country-picker-block.on { display: block; }
     .cf-mini-btn {
       padding: 4px 10px;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
@@ -1061,6 +1096,7 @@
   <div class="admin-tabs">
     <button class="admin-tab active" data-tab="kutuphane">Kütüphane</button>
     <button class="admin-tab" data-tab="mektuplar">Posta Kutusu</button>
+    <button class="admin-tab" data-tab="countries">Ülkeler</button>
     <button class="admin-tab" data-tab="news">Breaking News</button>
     <button class="admin-tab" data-tab="events">Events</button>
     <button class="admin-tab" data-tab="games">Oyunlar</button>
@@ -1253,6 +1289,56 @@
 
   </div>
 
+  <!-- ÜLKELER — what opens when a reader touches a country on Kütüphane's
+       phone map. Same shape as Posta Kutusu, plus the country the entry
+       belongs to. -->
+  <div class="admin-body" id="countries-tab" style="display:none;">
+
+    <!-- LEFT: Add / Edit Country Entry -->
+    <div class="panel">
+      <div class="panel-title" id="ce-form-mode-label">Add New Country Entry</div>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        Touching a country on Kütüphane's phone map opens its entries, newest first, in the same
+        half-page sheet the letters use. A country with no entries still opens — it just says so.
+        Ankara is the exception: it opens the TBMM page instead, so entries filed under it are never shown.
+      </p>
+
+      <label>Country</label>
+      <select id="ce-country"></select>
+
+      <label>Title</label>
+      <input type="text" id="ce-title" placeholder="Entry title..."/>
+
+      <label>Date (optional)</label>
+      <input type="date" id="ce-date"/>
+
+      <label>Body</label>
+      <textarea id="ce-body" rows="12" placeholder="The entry's text. Blank lines separate paragraphs."></textarea>
+
+      <label>Source URL (optional)</label>
+      <input type="text" id="ce-source" placeholder="https://..."/>
+
+      <input type="hidden" id="ce-editing-id"/>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="ce-submit-btn">Add Entry</button>
+        <button class="btn btn-secondary" id="ce-cancel-btn" style="display:none;">Cancel Edit</button>
+      </div>
+      <div class="status-msg" id="ce-form-status"></div>
+    </div>
+
+    <!-- RIGHT: Country Entries List -->
+    <div class="panel">
+      <div class="panel-title">Ülkeler</div>
+      <label>Filter by country</label>
+      <select id="ce-filter"><option value="">— All countries —</option></select>
+      <div class="articles-list" id="country-entries-list" style="margin-top:14px;">
+        <div class="empty-state"><span class="spinner"></span></div>
+      </div>
+    </div>
+
+  </div>
+
   <div class="admin-body" id="news-tab" style="display:none;">
 
     <!-- LEFT: Add Breaking News -->
@@ -1274,6 +1360,15 @@
       <p style="margin-top:-4px;font-size:0.7rem;color:var(--muted);font-style:italic;">
         Picking a neighborhood also pulses it on the map.
       </p>
+
+      <div class="country-picker-block" id="n-countries-block">
+        <label>Ülkeler (opsiyonel)</label>
+        <p style="margin-top:-4px;margin-bottom:6px;font-size:0.7rem;color:var(--muted);font-style:italic;">
+          Haberin geçtiği ülkeleri işaretleyin — Kütüphane'de o habere basıldığında
+          bu ülkeler haritada vurgulanır. Boş bırakılabilir.
+        </p>
+        <div class="country-picker" id="n-countries"></div>
+      </div>
 
       <label>Seri (opsiyonel)</label>
       <select id="n-series">
@@ -1403,18 +1498,18 @@
           only assignments and status are managed here.
         </p>
 
-        <div class="sozcul-assign-row">
+        <div class="sozcu-assign-row">
           <div>
             <label style="margin-top:0;">Gün</label>
-            <select id="sozcul-assign-date"></select>
+            <select id="sozcu-assign-date"></select>
           </div>
           <div>
             <label style="margin-top:0;">Üye</label>
-            <select id="sozcul-assign-user"><option value="">— Üye yükleniyor —</option></select>
+            <select id="sozcu-assign-user"><option value="">— Üye yükleniyor —</option></select>
           </div>
-          <button class="btn btn-primary" id="sozcul-assign-btn" style="padding:9px 14px;white-space:nowrap;">Ata</button>
+          <button class="btn btn-primary" id="sozcu-assign-btn" style="padding:9px 14px;white-space:nowrap;">Ata</button>
         </div>
-        <div class="status-msg" id="sozcul-assign-status" style="margin-top:8px;"></div>
+        <div class="status-msg" id="sozcu-assign-status" style="margin-top:8px;"></div>
 
         <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--rule);">
           <div class="panel-title" style="margin:0 0 14px;">Sonraki 7 Gün</div>
@@ -2019,6 +2114,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.querySelectorAll('.admin-tab').forEach(b => b.classList.toggle('active', b === btn));
     document.getElementById('kutuphane-tab').style.display = (tab === 'kutuphane') ? '' : 'none';
     document.getElementById('mektuplar-tab').style.display = (tab === 'mektuplar') ? '' : 'none';
+    document.getElementById('countries-tab').style.display = (tab === 'countries') ? '' : 'none';
     document.getElementById('news-tab').style.display = (tab === 'news') ? '' : 'none';
     document.getElementById('events-tab').style.display = (tab === 'events') ? '' : 'none';
     document.getElementById('games-tab').style.display = (tab === 'games') ? 'grid' : 'none';
@@ -2031,6 +2127,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
     if (tab === 'kutuphane') showKutuphaneIndex();
     if (tab === 'mektuplar') loadLettersList();
+    if (tab === 'countries') loadCountriesTab();
     if (tab === 'news') { loadSeries(); loadBreakingNews(); }
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
     if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); }
@@ -2901,8 +2998,20 @@ let allAdminNews = [];
 async function loadBreakingNews() {
   const listEl = document.getElementById('news-list');
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  // Needed to print each card's countries and to build the pickers below.
+  // A failure here is not fatal to the news list: the pickers say so and
+  // the stories still load.
+  await ensureCountriesLoaded().catch(err => console.error('[admin countries]', err));
+  // Filled once, not on every re-render — the list reloads after every
+  // source/update/poll added, and refilling would clear ticks the admin
+  // had already made on a story they are still composing.
+  const postPicker = document.getElementById('n-countries');
+  if (postPicker && !postPicker.children.length) {
+    postPicker.innerHTML = countryPickerHTML([]);
+    syncNewsCountryPicker();
+  }
   let query = sb.from('breaking_news')
-    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*, breaking_news_poll_option_votes(option))')
+    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*, breaking_news_poll_option_votes(option)), breaking_news_countries(country)')
     .order('updated_at', { ascending: false });
   if (newsViewMode === 'recent') {
     const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
@@ -2989,9 +3098,13 @@ function renderNewsList() {
     }).join('') : '';
     const newsDatetimeVal = n.created_at ? new Date(n.created_at).toISOString().slice(0, 16) : '';
     const seriesName = n.series_id ? SERIES_BY_ID.get(n.series_id) : null;
+    const newsCountries = (n.breaking_news_countries || []).map(c => c.country);
+    const countriesLabel = newsCountries.length
+      ? ' · ' + newsCountries.map(id => countryNameTr(id).toLocaleUpperCase('tr-TR')).join(', ')
+      : '';
     return `
       <div class="article-card" data-id="${n.id}"${n.archived_at ? ' style="opacity:0.6;"' : ''}>
-        <div class="a-neighborhood">${escapeHtml(categoryLabel(cat))}${seriesName ? ' · SERİ: ' + escapeHtml(seriesName) : ''} · ${ago}${n.archived_at ? ' · ARŞİVLENDİ' : ''}</div>
+        <div class="a-neighborhood">${escapeHtml(categoryLabel(cat))}${seriesName ? ' · SERİ: ' + escapeHtml(seriesName) : ''}${escapeHtml(countriesLabel)} · ${ago}${n.archived_at ? ' · ARŞİVLENDİ' : ''}</div>
         <h4>${escapeHtml(n.title)}</h4>
         ${n.body ? `<p>${escapeHtml(n.body)}</p>` : ''}
         <div class="sources-block">
@@ -3038,6 +3151,13 @@ function renderNewsList() {
           <input type="text" class="ne-title" value="${escapeHtml(n.title)}"/>
           <textarea class="ne-body" rows="3">${escapeHtml(n.body || '')}</textarea>
           <select class="ne-category">${catOptions}</select>
+          <div class="country-picker-block ne-countries-block">
+            <label style="margin:0 0 4px;font-size:0.75rem;color:var(--muted);">Ülkeler</label>
+            <!-- Filled when the form is actually opened (see
+                 ensureCardCountryPicker); the story's current countries
+                 ride along here until then. -->
+            <div class="country-picker ne-countries" data-countries="${escapeHtml(newsCountries.join(','))}"></div>
+          </div>
           <select class="ne-series">${seriesOptions}</select>
           <label style="margin:0;font-size:0.75rem;color:var(--muted);">Tarih ve saat</label>
           <input type="datetime-local" class="ne-datetime" value="${newsDatetimeVal}"/>
@@ -3058,9 +3178,50 @@ function renderNewsList() {
     if (form) {
       form.querySelector('.ne-category').value = cat;
       form.querySelector('.ne-series').value = n.series_id || '';
+      // Same rule as the post form: countries are only read on Kütüphane's
+      // Dünya feed, so the picker only stands open for that category.
+      form.querySelector('.ne-countries-block').classList.toggle('on', cat === 'dunya');
     }
   });
 }
+
+// Built when an edit form is opened rather than with the card: the
+// "Tümü" view renders up to 300 cards, and a picker inside each would be
+// thousands of checkboxes nobody has asked to see.
+function ensureCardCountryPicker(form) {
+  const box = form && form.querySelector('.ne-countries');
+  if (!box || box.children.length) return;
+  box.innerHTML = countryPickerHTML((box.dataset.countries || '').split(',').filter(Boolean));
+}
+
+// What a form's picker says now -- or, if it was never built (the story
+// isn't Dünya, or the admin fixed a typo without ever opening the
+// countries block), what the story already had. Saving a headline must
+// not silently drop a story's countries.
+function formCountries(form) {
+  const box = form.querySelector('.ne-countries');
+  if (!box) return [];
+  if (box.children.length) return pickedCountries(box);
+  return (box.dataset.countries || '').split(',').filter(Boolean);
+}
+
+// Keep each edit form's ülke picker in step with its category select --
+// delegated, so it survives every re-render of the list.
+document.getElementById('news-list').addEventListener('change', function(e) {
+  const sel = e.target.closest('.ne-category');
+  if (!sel) return;
+  const form = sel.closest('.news-edit-form');
+  if (sel.value === 'dunya') ensureCardCountryPicker(form);
+  form.querySelector('.ne-countries-block').classList.toggle('on', sel.value === 'dunya');
+});
+
+// The post form's own picker follows its category select the same way.
+function syncNewsCountryPicker() {
+  const block = document.getElementById('n-countries-block');
+  if (!block) return;
+  block.classList.toggle('on', document.getElementById('n-category').value === 'dunya');
+}
+document.getElementById('n-category').addEventListener('change', syncNewsCountryPicker);
 
 // Single delegated listener — set up once, survives every re-render.
 document.getElementById('news-list').addEventListener('click', function(e) {
@@ -3162,7 +3323,9 @@ async function saveNewsUpdateEdit(btn) {
 
 function showNewsEditForm(card) {
   card.querySelector('.card-actions').style.display = 'none';
-  card.querySelector('.news-edit-form').classList.add('open');
+  const form = card.querySelector('.news-edit-form');
+  form.classList.add('open');
+  ensureCardCountryPicker(form);
   card.querySelector('.ne-title').focus();
 }
 
@@ -3202,12 +3365,25 @@ async function saveNewsEdit(newsId, card) {
     .update({ title, body: body || null, category, neighborhood, series_id: seriesId, ...timestamps })
     .eq('id', newsId);
 
+  // A story moved off Dünya keeps no countries: they would sit there
+  // unreadable and come back the moment it was moved onto Dünya again.
+  // Untouched countries are left alone rather than rewritten, so fixing a
+  // headline is one request, not three.
+  const nextCountries = category === 'dunya' ? formCountries(form) : [];
+  const prevCountries = (form.querySelector('.ne-countries').dataset.countries || '')
+    .split(',').filter(Boolean);
+  const countriesChanged =
+    nextCountries.slice().sort().join(',') !== prevCountries.slice().sort().join(',');
+  const countriesErr = (error || !countriesChanged)
+    ? null : await saveNewsCountries(newsId, nextCountries);
+
   saveBtn.disabled = false;
   saveBtn.textContent = 'Kaydet';
 
-  if (error) {
-    statusEl.textContent = error.message;
+  if (error || countriesErr) {
+    statusEl.textContent = (error || countriesErr).message;
     statusEl.className = 'ne-status status-msg err';
+    if (countriesErr) loadBreakingNews();
     return;
   }
   loadBreakingNews();
@@ -3507,6 +3683,21 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
     title, body: body || null, neighborhood, category, series_id: seriesId, ...timestamps,
   }]).select().single();
 
+  // Countries only mean something on a Dünya story (that is the only feed
+  // that reads them), so ticks left behind from an earlier draft on another
+  // category are dropped rather than saved invisibly.
+  if (!error && category === 'dunya') {
+    const cErr = await saveNewsCountries(data.id, pickedCountries(document.getElementById('n-countries')));
+    if (cErr) {
+      btn.disabled = false;
+      btn.textContent = 'Post Breaking News';
+      statusEl.textContent = 'Posted, but the countries failed to save: ' + cErr.message;
+      statusEl.className = 'status-msg err';
+      loadBreakingNews();
+      return;
+    }
+  }
+
   if (!error && pollFieldsFilled === 3) {
     const { error: pollErr } = await sb.from('breaking_news_polls')
       .insert([{ news_id: data.id, question: pollQ, option_a: pollA, option_b: pollB }]);
@@ -3532,6 +3723,8 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   statusEl.className = 'status-msg ok';
   ['n-title','n-body','n-datetime','n-poll-q','n-poll-a','n-poll-b'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('n-category').value = 'turkiye';
+  document.querySelectorAll('#n-countries input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+  syncNewsCountryPicker();
   loadBreakingNews();
   setTimeout(() => { statusEl.textContent = ''; }, 3000);
 });
@@ -3846,6 +4039,199 @@ async function deleteLetter(id) {
   const { error } = await sb.from('library_letters').delete().eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   loadLettersList();
+}
+
+// ── Ülkeler: per-country entries behind Kütüphane's phone map ──
+// The country list is read from public.countries rather than hardcoded
+// here: that table's ids are exactly the data-country slugs the map
+// overlay carries, so a country only ever appears in this picker if it is
+// a shape a reader can actually touch.
+let COUNTRIES_LIST = [];
+let COUNTRIES_LOAD = null;
+
+// Fetched once per session and shared by this tab's pickers and the
+// breaking-news country picker (see countryPickerHTML) — they sit in two
+// different tabs and either can be opened first. The in-flight promise is
+// cached as well as the result, so opening both back to back still makes
+// one request.
+async function ensureCountriesLoaded() {
+  if (COUNTRIES_LIST.length) return COUNTRIES_LIST;
+  if (!COUNTRIES_LOAD) {
+    COUNTRIES_LOAD = sb.from('countries').select('*').then(({ data, error }) => {
+      // Cleared on failure so a later tab retries rather than inheriting
+      // a rejected promise for the rest of the session.
+      if (error) { COUNTRIES_LOAD = null; throw error; }
+      COUNTRIES_LIST = (data || []).sort((a, b) => a.name_tr.localeCompare(b.name_tr, 'tr'));
+      return COUNTRIES_LIST;
+    });
+  }
+  return COUNTRIES_LOAD;
+}
+
+async function loadCountriesTab() {
+  const alreadyBuilt = COUNTRIES_LIST.length > 0;
+  try {
+    await ensureCountriesLoaded();
+  } catch (error) {
+    document.getElementById('country-entries-list').innerHTML =
+      '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>';
+    return;
+  }
+  if (!alreadyBuilt) {
+    const opts = COUNTRIES_LIST.map(c =>
+      `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name_tr)}</option>`).join('');
+    document.getElementById('ce-country').innerHTML = opts;
+    document.getElementById('ce-filter').innerHTML =
+      '<option value="">— All countries —</option>' + opts;
+  }
+  loadCountryEntriesList();
+}
+
+// ── The ülke picker shared by the breaking-news forms ──
+// Which countries a Dünya story is about (db/breaking_news_countries.sql):
+// ticked here, lit on Kütüphane's phone map when a reader opens the story.
+// Ankara is left out of the list even though it is in the lookup — it is
+// the one city drawn on that map and touching it opens the meclis, so it
+// is not a place a story can be filed under.
+function newsCountryOptions() {
+  return COUNTRIES_LIST.filter(c => c.id !== 'ankara');
+}
+
+function countryPickerHTML(selected) {
+  if (!COUNTRIES_LIST.length) {
+    return '<div style="font-size:0.78rem;color:var(--muted);">Ülke listesi yüklenemedi.</div>';
+  }
+  const picked = new Set(selected || []);
+  return newsCountryOptions().map(c => `
+    <label><input type="checkbox" value="${escapeHtml(c.id)}"${picked.has(c.id) ? ' checked' : ''}/>${escapeHtml(c.name_tr)}</label>
+  `).join('');
+}
+
+function pickedCountries(container) {
+  if (!container) return [];
+  return [...container.querySelectorAll('input[type="checkbox"]:checked')].map(i => i.value);
+}
+
+// Replace a story's countries with what is ticked now. The rows carry no
+// state of their own beyond existing, so delete-then-insert is the whole
+// update and there is no diff to compute. Returns an error or null.
+async function saveNewsCountries(newsId, countries) {
+  const { error: delErr } = await sb.from('breaking_news_countries')
+    .delete().eq('news_id', newsId);
+  if (delErr) return delErr;
+  if (!countries.length) return null;
+  const { error } = await sb.from('breaking_news_countries')
+    .insert(countries.map(country => ({ news_id: newsId, country })));
+  return error || null;
+}
+
+function countryNameTr(id) {
+  const c = COUNTRIES_LIST.find(x => x.id === id);
+  return c ? c.name_tr : id;
+}
+
+async function loadCountryEntriesList() {
+  const listEl = document.getElementById('country-entries-list');
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const filter = document.getElementById('ce-filter').value;
+  let q = sb.from('country_entries').select('*');
+  if (filter) q = q.eq('country', filter);
+  const { data, error } = await q
+    .order('entry_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+  if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
+  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No entries yet.</div>'; return; }
+
+  listEl.innerHTML = data.map(en => `
+    <div class="article-card" data-id="${en.id}">
+      <div class="a-neighborhood">${escapeHtml(countryNameTr(en.country))}${en.entry_date ? ' · ' + escapeHtml(en.entry_date) : ''}</div>
+      <h4>${escapeHtml(en.title)}</h4>
+      <div class="card-actions">
+        <button class="btn-edit" data-act="ce-edit" data-id="${en.id}">Edit</button>
+        <button class="btn-del"  data-act="ce-del"  data-id="${en.id}">Delete</button>
+      </div>
+    </div>
+  `).join('');
+
+  listEl.querySelectorAll('button[data-act]').forEach(btn => {
+    const en = data.find(x => x.id === btn.dataset.id);
+    if (!en) return;
+    if (btn.dataset.act === 'ce-edit') btn.addEventListener('click', () => editCountryEntry(en));
+    if (btn.dataset.act === 'ce-del') btn.addEventListener('click', () => deleteCountryEntry(en.id));
+  });
+}
+
+document.getElementById('ce-filter').addEventListener('change', loadCountryEntriesList);
+
+function editCountryEntry(en) {
+  document.getElementById('ce-editing-id').value = en.id;
+  document.getElementById('ce-country').value = en.country || '';
+  document.getElementById('ce-title').value = en.title || '';
+  document.getElementById('ce-date').value = en.entry_date || '';
+  document.getElementById('ce-body').value = en.body || '';
+  document.getElementById('ce-source').value = en.source_url || '';
+  document.getElementById('ce-submit-btn').textContent = 'Update Entry';
+  document.getElementById('ce-form-mode-label').textContent = 'Editing Country Entry';
+  document.getElementById('ce-cancel-btn').style.display = 'inline-block';
+  document.querySelector('#countries-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetCountryEntryForm() {
+  document.getElementById('ce-editing-id').value = '';
+  document.getElementById('ce-title').value = '';
+  document.getElementById('ce-date').value = '';
+  document.getElementById('ce-body').value = '';
+  document.getElementById('ce-source').value = '';
+  document.getElementById('ce-submit-btn').textContent = 'Add Entry';
+  document.getElementById('ce-form-mode-label').textContent = 'Add New Country Entry';
+  document.getElementById('ce-cancel-btn').style.display = 'none';
+}
+
+document.getElementById('ce-cancel-btn').addEventListener('click', resetCountryEntryForm);
+
+document.getElementById('ce-submit-btn').addEventListener('click', async () => {
+  const editingId = document.getElementById('ce-editing-id').value;
+  const country = document.getElementById('ce-country').value;
+  const title = document.getElementById('ce-title').value.trim();
+  const entry_date = document.getElementById('ce-date').value || null;
+  const body = document.getElementById('ce-body').value.trim();
+  const source_url = document.getElementById('ce-source').value.trim() || null;
+  const statusEl = document.getElementById('ce-form-status');
+  const btn = document.getElementById('ce-submit-btn');
+
+  if (!country || !title || !body) {
+    statusEl.textContent = 'Country, title and body are all required.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const row = { country, title, entry_date, body, source_url };
+  const result = editingId
+    ? await sb.from('country_entries').update(row).eq('id', editingId)
+    : await sb.from('country_entries').insert([row]);
+
+  btn.textContent = editingId ? 'Update Entry' : 'Add Entry';
+
+  if (result.error) {
+    statusEl.textContent = result.error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = editingId ? 'Entry updated!' : 'Entry added!';
+  statusEl.className = 'status-msg ok';
+  resetCountryEntryForm();
+  loadCountryEntriesList();
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+async function deleteCountryEntry(id) {
+  if (!confirm('Delete this entry? This cannot be undone.')) return;
+  const { error } = await sb.from('country_entries').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadCountryEntriesList();
 }
 
 // ── Quotes: general-purpose quote bank ──
@@ -5007,15 +5393,15 @@ function sozcelFormatLabel(iso, offset) {
   return `${weekday.charAt(0).toLocaleUpperCase('tr-TR') + weekday.slice(1)}, ${day}${dayTag}`;
 }
 
-let _sozculMembersList = null;
+let _sozcuMembersList = null;
 
-async function ensureSozculMembersList() {
-  if (_sozculMembersList) return _sozculMembersList;
+async function ensureSozcuMembersList() {
+  if (_sozcuMembersList) return _sozcuMembersList;
   const { data } = await sb.from('profiles')
     .select('id, first_name, last_name, neighborhood')
     .order('first_name', { ascending: true });
-  if (data) _sozculMembersList = data;
-  return _sozculMembersList || [];
+  if (data) _sozcuMembersList = data;
+  return _sozcuMembersList || [];
 }
 
 async function loadSozcelSchedule() {
@@ -5066,12 +5452,12 @@ async function loadSozcelSchedule() {
 
   wrap.innerHTML = dates.map((iso, i) => renderSozcelDayRow(iso, i, byDate, byAssignment)).join('');
 
-  wrap.querySelectorAll('[data-sozcul-clear]').forEach(btn => {
-    btn.addEventListener('click', () => sozculClearAssignment(btn.dataset.sozculClear));
+  wrap.querySelectorAll('[data-sozcu-clear]').forEach(btn => {
+    btn.addEventListener('click', () => sozcuClearAssignment(btn.dataset.sozcuClear));
   });
 
   // Populate the assignment dropdowns above the schedule
-  populateSozculAssignmentUI(dates);
+  populateSozcuAssignmentUI(dates);
 }
 
 function renderSozcelDayRow(iso, offset, byDate, byAssignment) {
@@ -5100,7 +5486,7 @@ function renderSozcelDayRow(iso, offset, byDate, byAssignment) {
         ? `<span class="day-tag warn">Kelime bekleniyor</span>`
         : `<span class="day-tag">Henüz kelime yok</span>`);
   const removeBtn = (assignment && !isToday && !word)
-    ? `<button class="btn-del" data-sozcul-clear="${escapeHtml(iso)}"
+    ? `<button class="btn-del" data-sozcu-clear="${escapeHtml(iso)}"
          style="background:var(--ink-red);color:var(--paper);">Kaldır</button>`
     : '';
   return `
@@ -5120,9 +5506,9 @@ function renderSozcelDayRow(iso, offset, byDate, byAssignment) {
   `;
 }
 
-async function populateSozculAssignmentUI(dates) {
+async function populateSozcuAssignmentUI(dates) {
   // Tomorrow through 6 days from now — today's deadline already passed.
-  const dateSel = document.getElementById('sozcul-assign-date');
+  const dateSel = document.getElementById('sozcu-assign-date');
   if (dateSel) {
     dateSel.innerHTML = dates.slice(1).map(iso => {
       const [y, m, d] = iso.split('-').map(Number);
@@ -5133,10 +5519,10 @@ async function populateSozculAssignmentUI(dates) {
   }
 
   // Populate members dropdown
-  const userSel = document.getElementById('sozcul-assign-user');
+  const userSel = document.getElementById('sozcu-assign-user');
   if (userSel) {
     userSel.innerHTML = '<option value="">— Sözcü seç —</option>';
-    const members = await ensureSozculMembersList();
+    const members = await ensureSozcuMembersList();
     members.forEach(p => {
       const name = capitalizeName((`${p.first_name || ''} ${p.last_name || ''}`).trim()) || 'İsimsiz';
       const nb = NEIGHBORHOOD_NAMES[p.neighborhood] || '';
@@ -5148,10 +5534,10 @@ async function populateSozculAssignmentUI(dates) {
   }
 }
 
-document.getElementById('sozcul-assign-btn').addEventListener('click', async () => {
-  const date = document.getElementById('sozcul-assign-date').value;
-  const userId = document.getElementById('sozcul-assign-user').value;
-  const statusEl = document.getElementById('sozcul-assign-status');
+document.getElementById('sozcu-assign-btn').addEventListener('click', async () => {
+  const date = document.getElementById('sozcu-assign-date').value;
+  const userId = document.getElementById('sozcu-assign-user').value;
+  const statusEl = document.getElementById('sozcu-assign-status');
   statusEl.textContent = '';
   statusEl.className = 'status-msg';
 
@@ -5161,7 +5547,7 @@ document.getElementById('sozcul-assign-btn').addEventListener('click', async () 
     return;
   }
 
-  const btn = document.getElementById('sozcul-assign-btn');
+  const btn = document.getElementById('sozcu-assign-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>';
 
@@ -5187,7 +5573,7 @@ document.getElementById('sozcul-assign-btn').addEventListener('click', async () 
   loadSozcelSchedule();
 });
 
-async function sozculClearAssignment(date) {
+async function sozcuClearAssignment(date) {
   if (!confirm(`${date} tarihli sözcü atamasını kaldır?`)) return;
   const { error } = await sb.from('sozcel_sozcul_assignments').delete().eq('game_date', date);
   if (error) { alert('Silinemedi: ' + error.message); return; }

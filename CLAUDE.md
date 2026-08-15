@@ -120,7 +120,7 @@ default one.
 ├── admin.html            # Admin dashboard (admin-only)
 ├── router.js             # Shared shell: single Supabase client, swipe carousel, virtual navigation, clock
 ├── sheet.css/.js         # THE sheet: the one page that rises from the bottom — see "Site-wide defaults"
-├── profile-card.js/.css  # Floating profile card, avatar, badges — shared across pages
+├── profile-card.js/.css  # Profile bar (the phone's top bar), avatar, badges — shared across pages
 ├── onboarding.js/.css    # New-account onboarding flow
 ├── game-locks.js         # Per-day game on/off enforcement (game_day_toggles)
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
@@ -128,7 +128,7 @@ default one.
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js,
-│   tbmm.js, sozcul-mascot.js, admin-notification.js, loading-screen.js/.css,
+│   tbmm.js, sozcu-mascot.js, admin-notification.js, loading-screen.js/.css,
 │   safe-area-ready.js, frames.css        # Focused shared modules
 ├── capacitor.config.json # iOS app config (Capacitor wraps the same site — see README.md)
 ├── ios/                  # Generated Capacitor Xcode project (committed, minus Pods/build output)
@@ -212,7 +212,9 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians`, TBMM
 > seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `coffee_prices`
 > (the Kahve Endeksi — v3 adds the opening-hours and scheduled-discount columns that make it
-> live) and `coffee_comments` (what members say about a venue), and more). When in doubt, read the relevant `db/` file — it is the
+> live), `coffee_comments` (what members say about a venue), `countries` + `country_entries`
+> (what a country on Kütüphane's map opens) and `breaking_news_countries` (which countries a
+> Dünya story is about, lit on that map when the story opens), and more). When in doubt, read the relevant `db/` file — it is the
 > source of truth.
 
 **Table: `neighborhoods`** — lookup of valid neighborhood IDs.
@@ -261,6 +263,7 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 - **The word is server-authoritative.** Clients never write today's row; they call `public.sozcel_daily_word(candidates text[])`, which resolves the Istanbul date server-side, returns the day's word if it has one, and otherwise records the first unused candidate — atomically, so simultaneous first-players of the day converge on one word (`db/sozcel_used_answers_v5_server_pick.sql`). The client's candidate list is only a proposal.
 - This exists because the pick used to be client-side: the answer's index was `hash(date) % pool.length`, so two clients whose snapshot of the used rows differed by a single row computed different words, and whoever lost the insert race kept playing their own word anyway. Never reintroduce a client-side fallback pick — a locally-invented word looks normal while being a puzzle nobody else is playing, and its result lands on the shared scoreboard.
 - RLS: authenticated users SELECT all; direct INSERT only for an assigned Sözcü's *own* row before its deadline (midnight Istanbul at the start of `used_on`), matching the UPDATE policy; DELETE admin-only.
+- **The admin is never locked out** (`db/sozcel_used_answers_v6_admin_override.sql`): admin INSERT/UPDATE policies sit alongside the Sözcü ones, with no `sozcul_id` match and no deadline, because a word that is wrong *on the day it is being played* is exactly the case that has to be fixable and the one moment every other policy refuses. The admin reaches it through the same Sözcü Görevi form on `sozcel.html` — the button opens a day picker instead of an assignment, and saving preserves whoever the row already belonged to, so correcting a day never takes it over. `game-locks.js` matches: the admin isn't bounced off a game they switched off for the day (they own the switch), though the win-gates still apply to everyone since those are the game's own progression.
 
 **Tables: `hive_codes` + `hive_slots`** — the hane honeycomb on Anahane (`db/hive_slots.sql`).
 - `hive_codes`: `(user_id, week_start)` PK, `code` (6 chars, no I/O/0/1), unique per `(week_start, code)`.
@@ -423,6 +426,14 @@ sb.from('articles').delete().eq('id', id)
 - Everyone can read, like, and comment on articles
 - Per the vision, this side stays *less* interactive than Kahvehane — reading and observing
   the national level, not peer-to-peer engagement about it
+- The Dünya feed (`breaking_news` where `category = 'dunya'`) is **tied to the map**: the admin
+  ticks the countries a story is about while posting it (`breaking_news_countries`, a join table
+  — a story can be about Rusya *and* Ukrayna at once), and opening that story here lights every
+  one of them on the phone map behind the sheet, which rests under the map so the reader sees
+  where the story they just opened is happening. The story also names those countries under its
+  body — on a desktop, where the world map isn't the drawing on screen, that line is the whole of
+  it. Country names come off the map's own `data-name`, not a second fetch, so a story names a
+  place with the same word the caption prints when you touch it
 
 ### `tumcel.html` — Tümcel
 - Connections-style game where 16 sentence fragments must be regrouped into 4 quotes
@@ -435,6 +446,18 @@ sb.from('articles').delete().eq('id', id)
 ### `sozcel.html` — Word Game
 - Turkish Wordle variant
 - 6 attempts, color-coded feedback
+- **The screen sizes itself, on every device.** `layoutGame()` owns every measurement on
+  this page and works off what `.game-panel` *measures* — never a fraction of
+  `window.innerHeight`. It sizes the keyboard first (the page's fixed furniture, one key
+  width shared by all three rows via `--kb-key` / `--kb-key-h` / `--kb-gap`), then
+  `layoutBoard()` gives the hexagon board whatever is genuinely left. `.play-area`'s
+  `1fr / auto / 1fr` grid is what puts the board dead centre between the floating top
+  buttons and the keys, and the attempt pips dead centre of the band under it. Do not
+  reintroduce a viewport-fraction size or a `margin-top: auto` here: two auto margins
+  competing for leftover space is what used to push the board up under the buttons and
+  clip it, and a centred overflow has no scrollbar to recover it. `fitSozcuLine()` keeps
+  the "Günün Sözcüsü: …" credit on **one line** at any name length — it must never wrap,
+  because a second line moves the keyboard and re-flows the board under the reader's thumb
 
 ---
 
@@ -488,13 +511,64 @@ geometry and no centred modal anywhere on the site.
   content styling (`class="ist-sheet detail-overlay-sheet"`), never for size or position.
 - **Behaviour:** `IstSheet.open(overlay)` / `IstSheet.close(overlay, after)` — do not hand-roll
   the unhide → rAF → `.open` dance or the 550ms hide timeout.
-- **Phones:** a sheet rests under whatever the page pins at the top, via `--ist-sheet-top`
-  (`IstSheet.position` measures the compact profile card). The resting point is the only part a
-  page decides for itself. anahane's news/event sheet is the one documented exception: on touch
-  devices it is *dragged* (`initDetailPull`) rather than scrolled, so it hands the body's scroll
-  back to the sheet.
+- **Phones:** the sheet's side gaps are the same `--screen-inset` (frames.css) the profile bar's
+  row is padded to — everything stacked over the same map lines up, always.
+  - A sheet opened **from the profile bar** (your profile, a member's) rests under that bar,
+    via `--ist-sheet-top` (`IstSheet.position` measures it live).
+  - A sheet opened **over the map** — a news item, an event, an article, the meclis, later a
+    country — carries `ist-sheet-pull` and is *dragged*: it comes to rest half-way down, under
+    the map, so you still see what you tapped; drag it up and it stops at the profile bar;
+    past that the reading continues inside it; drag it back down and it closes. One
+    implementation, `IstSheet.pull(overlay, { onDismiss })` — attach it once and
+    `IstSheet.open/close` drive it from there. Touch only (`pointer: coarse`); a narrow desktop
+    window keeps the ordinary sheet.
 - **Chrome:** background/border come from `frames.css`'s `.ist-sheet` rule (2px ink border, no
   bottom border, no shadow).
+
+### The phone's hero line — `--map-hero-end`
+
+On a phone all three carousel pages are one screen: a square map at the top, everything else
+below it. **Everything below starts on the same line** — Anahane's news and events, Kahvehane's
+comments and game tiles, Kütüphane's Dünya column and shelf boxes — and each map's caption sits
+just above it. A sheet pulled up over the map comes to rest there too. That line is
+`--map-hero-end` (frames.css: frame ring + `--map-hero-top` + the map's own `100vw` square); what
+is printed on the two bars sits on `--screen-inset`, and so do the sheets' side gaps. Never
+restate any of these as a number — swiping between the three pages must not shift the layout
+under the reader.
+
+### The phone's feeds hang from the bottom, not the top
+
+The hero line is where each page's columns *begin*; it is not where their cards sit. On a phone
+every stack below the map is **bottom-aligned**: one news item, one event, one comment, one
+library box rests just above the tab bar, and the next one is laid **on top of** it, so the
+stack grows upward toward the map instead of downward away from the thumb. It is the same move
+on all three pages — Anahane's news and events, Kahvehane's comments (they rest on the composer),
+Kütüphane's Dünya feed and library boxes — and each pair of columns ends on the same line.
+
+One implementation note, because it fails silently: the space is pushed down with an **auto top
+margin on the innermost box** (the feed itself), never `justify-content: flex-end`. A stack that
+outgrows the screen resolves its auto margin to zero and simply scrolls, where flex-end would
+push the top of the stack out of the scroller and out of reach. The margin also has to sit on a
+box that does *not* grow — every wrapper between a column and its feed carries `flex: 1`, and
+flex hands the free space to a growing item before any margin sees it, so an auto margin one
+level too high does nothing at all.
+
+### The phone's two bars — `#ist-pc-mount` (top) and `.section-rule > header` (bottom)
+
+A phone shows the city between two fixed charcoal bars: **who you are** at the top (the profile
+bar — avatar, name, district, the gear that opens your profile) and **where you can go** at the
+bottom (Kütüphane / Hane / Kahvehane). Both run full-bleed edge to edge, both add the device's own
+inset on top of their height (notch at the top, home indicator at the bottom), both print their
+contents on `--screen-inset`, and neither moves while the three pages swipe underneath. The top
+bar stands taller (`--navbar-h-top`) than the bottom one (`--navbar-h`) because it carries a
+portrait and two lines of type against the tab bar's one word. Heights and colors are the
+`--navbar-h` / `--navbar-h-top` / `--navbar-ink*` tokens in frames.css — the colors deliberately
+palette-independent, the same in light, mono and dark. The top bar is one
+implementation in profile-card.css ("THE TOP BAR"); the bottom bar's colors live in frames.css
+("MOBILE FIXED BOTTOM NAV") while each page still positions its own `<header>`. Never write
+either bar's height as a number — the same value also reserves the space each page leaves at the
+bottom so its last row of cards clears the tab bar, and one copy left behind is how the two bars
+end up different heights. The game pages hide the bottom bar outright for their fullscreen board.
 
 ### The three carousel pages share one document
 
@@ -565,6 +639,13 @@ profile popup.
     even inserts U+202F before AM/PM) — a device where it fails gets `NaN` fields and silently
     addresses the wrong day.
 11. **Cross-cutting changes touch the game pages too.** When changing anything that lives on more than one page — nav, profile popup, scoreboard, lock rules, header layout, theme tokens — explicitly check **sozcel.html, tumcel.html, bulmaca.html** as well as anahane / kahvehane / kutuphane. The game pages are the easiest to forget and their right-column game nav must stay in sync. Shared logic that risks drift belongs in a dedicated `*.js` (see `game-locks.js`, `profile-card.js`) rather than copy-pasted into each page. **There is no `baglantilar.html`** — Bağlantılar was retired and replaced by Tümcel; do not recreate that file or add `baglantilar` to the games list. The `'baglantilar'` value lingering in the `game_results.game` CHECK constraint is for historical rows only; no new code should write it.
+
+12. **The role is "Sözcü", never "Sözcül".** The day's word-picker is a *sözcü* everywhere a
+    human can read it and everywhere the code names it (`IstSozcu`, `sozcu-mascot.js`,
+    `.sozcu-line`, `sozcuCount`, `profile.sozcucount`). The only survivors of the old
+    spelling are the database identifiers `sozcel_sozcul_assignments` and
+    `sozcel_used_answers.sozcul_id`, which stay as they are because renaming a live column
+    is a migration, not a rename. Do not spell the role "Sözcül" in new copy or new names.
 
 ---
 

@@ -28,6 +28,18 @@
 -- Run this in Supabase SQL editor. It's idempotent.
 -- =====================================================================
 
+-- Prerequisites, restated so this file can be run on its own. The
+-- function below selects all five of these columns, so if v2/v4 were
+-- never applied the CREATE FUNCTION fails outright — and a database left
+-- without sozcel_daily_word() is exactly the state in which every player
+-- is told the day's word can't be reached.
+alter table public.sozcel_used_answers
+  add column if not exists definition text;
+alter table public.sozcel_used_answers
+  add column if not exists syllables text[];
+alter table public.sozcel_used_answers
+  add column if not exists sozcul_id uuid references public.profiles(id) on delete set null;
+
 -- Today's date in Istanbul, decided by the database rather than by
 -- whatever the player's device thinks the date is.
 create or replace function public.sozcel_istanbul_today()
@@ -61,24 +73,24 @@ set search_path = public, pg_temp
 as $$
 declare
   d date := public.sozcel_istanbul_today();
+  has_word boolean;
 begin
   if auth.uid() is null then
     raise exception 'sozcel_daily_word: authentication required'
       using errcode = '42501';
   end if;
 
-  -- Fast path: the day already has a word (a Sözcü's submission or an
-  -- earlier player's auto-pick). This is what every client after the
-  -- first one of the day gets.
-  return query
-    select a.used_on, a.word, a.definition, a.syllables, a.sozcul_id
-    from public.sozcel_used_answers a
-    where a.used_on = d;
-  if found then
-    return;
-  end if;
+  -- Does the day already have a word (a Sözcü's submission, or an earlier
+  -- player's auto-pick)? This is the case for every client after the first
+  -- one of the day. Asked as its own question rather than by returning the
+  -- row and testing FOUND: a single RETURN QUERY at the end means the
+  -- result set can never be emitted twice, whatever FOUND does after a
+  -- RETURN QUERY.
+  select exists (
+    select 1 from public.sozcel_used_answers a where a.used_on = d
+  ) into has_word;
 
-  if candidates is not null and array_length(candidates, 1) > 0 then
+  if not has_word and candidates is not null and array_length(candidates, 1) > 0 then
     -- Take the first candidate that has never been used. `on conflict do
     -- nothing` covers both guards at once: the used_on primary key (another
     -- client got here first) and the unique index on word (the candidate
@@ -130,3 +142,16 @@ create policy "sozcel_used_answers insert own future word"
     sozcul_id = auth.uid()
     and now() < (used_on::timestamp at time zone 'utc') - interval '3 hours'
   );
+
+-- PostgREST answers /rest/v1/rpc/* out of a cached schema, so a function
+-- it hasn't reloaded yet is a 404 (PGRST202) to the game even though the
+-- function exists in the database. Supabase reloads on DDL, but ask
+-- explicitly — the cost is nothing and the failure it prevents looks to
+-- players like the word being permanently unreachable.
+notify pgrst, 'reload schema';
+
+-- Verify: this should print today's Istanbul date and, once a client has
+-- opened the game, today's word.
+--   select public.sozcel_istanbul_today();
+--   select * from public.sozcel_used_answers
+--    where used_on = public.sozcel_istanbul_today();

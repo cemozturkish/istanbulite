@@ -15,6 +15,11 @@
 (function () {
   const GAME_LABELS = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Bulmaca' };
   const ALL_GAMES = Object.keys(GAME_LABELS);
+  // The admin owns the off-switch, so it isn't pointed at them: switching a
+  // game off and then being unable to open it to check what everyone else
+  // can't see makes the switch unusable. The win-gates below still apply to
+  // everyone — those are the game's own progression, not an admin control.
+  const ADMIN_EMAIL = 'cemwozturk@gmail.com';
 
   const GATES = [
     {
@@ -130,6 +135,17 @@
 
     const offGames = await fetchOffGamesToday(sb);
 
+    // Resolved before the bounce below, because whether the off-switch
+    // applies depends on who is asking.
+    let userId = null;
+    let isAdmin = false;
+    try {
+      const { data } = await sb.auth.getSession();
+      const user = data && data.session && data.session.user ? data.session.user : null;
+      userId = user ? user.id : null;
+      isAdmin = !!(user && user.email === ADMIN_EMAIL);
+    } catch (_) {}
+
     // Bounce direct/bookmark loads of the game the user is currently on if
     // it's off today, or if it's a win-gated game they haven't unlocked.
     // The active link tells us which page we're on. Sending them back to
@@ -139,17 +155,17 @@
     if (activeLink) {
       const g = activeLink.dataset.game;
       if (offGames.has(g)) {
-        try { sessionStorage.setItem('game_lock_bounce_msg', offMessage(g)); } catch (_) {}
-        window.location.replace('kahvehane.html');
-        return true;
+        // The admin walks in anyway — they flipped the switch, and a day
+        // they can't open is a day they can't fix. Told, not stopped.
+        if (isAdmin) {
+          showToast(`${offMessage(g)} Yönetici olarak açık.`);
+        } else {
+          try { sessionStorage.setItem('game_lock_bounce_msg', offMessage(g)); } catch (_) {}
+          window.location.replace('kahvehane.html');
+          return true;
+        }
       }
     }
-
-    let userId = null;
-    try {
-      const { data } = await sb.auth.getSession();
-      userId = data && data.session && data.session.user ? data.session.user.id : null;
-    } catch (_) {}
 
     const stats = { tumcelWon: false };
     if (userId) {
@@ -183,9 +199,17 @@
       if (link.classList.contains('active')) return;
 
       if (offGames.has(g)) {
+        // Same rule in the nav: the admin keeps the link open, but it says
+        // the game is off so they don't mistake it for a normal day.
+        if (isAdmin) {
+          unlockLink(link);
+          link.title = `${offMessage(g)} Yönetici olarak açık.`;
+          return;
+        }
         lockLink(link, offMessage(g));
         return;
       }
+      if (isAdmin) link.removeAttribute('title');
       const gate = GATES.find(x => x.game === g);
       if (gate && !gate.requires(stats)) {
         lockLink(link, gate.message(stats));

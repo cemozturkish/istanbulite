@@ -23,6 +23,51 @@
      off the canvas despite their square corners. */
   --frame-gap: 10px;
   --frame-pad: 10px;
+  /* The line everything over the map lines up on, measured from the true
+     screen edge: the frame padding plus the inner padding the columns
+     use. The two bars run full-bleed, but what is printed on them starts
+     here — the profile bar's row at the top, the tab bar's outer labels
+     at the bottom — and so does every sheet that rises from the bottom
+     (sheet.css). One token, so they cannot drift. */
+  --screen-inset: 18px;
+
+  /* Mobile bottom tab bar (see "MOBILE FIXED BOTTOM NAV" below) —
+     charcoal bar, light-gray labels, near-white for the page you are on.
+     Deliberately palette-independent: the same three values in light,
+     mono and dark. */
+  --navbar-ink: #2e2e2e;
+  --navbar-ink-label: #9b9b9b;
+  --navbar-ink-label-active: #f4f4f4;
+  /* The tab bar's height, and the height every page reserves at the bottom
+     so its last row of cards isn't hidden behind it. It was written out as
+     38px in six places, which is five chances for the bar and the space
+     kept clear for it to drift apart. The device's own inset (the notch
+     above, the home indicator below) is added on top of these by each bar —
+     this is the bar's own body, not what it clears. */
+  --navbar-h: 46px;
+  /* The profile bar stands taller than the tab bar it answers to: it
+     carries an avatar and two lines of type (name over district), where
+     the tab bar carries one word. */
+  --navbar-h-top: 56px;
+
+  /* ── The phone's hero line ──
+     On a phone all three carousel pages are one screen: a square map at
+     the top, everything else below it. Two values fix where that line
+     falls, and every page reads them rather than restating the sum:
+
+       --map-hero-top  how far the map sits below the top of the grid
+                       (the notch/status bar, plus a 16px breath)
+       --map-hero-end  where the map ends, measured from the top of the
+                       SCREEN — the frame ring, the offset above, and
+                       the map's own 100vw square
+
+     Everything that comes after the map starts on --map-hero-end: the
+     news and events on Anahane, the games and comments on Kahvehane, the
+     Dünya column and the shelf boxes on Kütüphane. The map's own caption
+     sits just above it. They are the same line on all three, so swiping
+     between the pages doesn't shift the layout under the reader. */
+  --map-hero-top: calc(env(safe-area-inset-top) + 16px);
+  --map-hero-end: calc(var(--frame-pad, 10px) + var(--map-hero-top) + 100vw);
   --frame-shadow:
     0 12px 28px -6px rgba(76, 56, 42, 0.42),
     0 4px 10px -2px rgba(76, 56, 42, 0.28),
@@ -226,12 +271,23 @@ main,
 /* On mobile, .section-rule > header is repositioned to a fixed
    bottom tab bar (anahane/kahvehane/kutuphane/sozcel/tumcel/
    bulmaca). Scoped to .section-rule > header so admin.html's top
-   header is untouched. */
+   header is untouched.
+
+   The bar is BLACK on every page and in every palette (light, mono,
+   dark) with light-gray labels — it is the one piece of chrome that
+   never moves while the three pages swipe under it, so it reads as
+   the device's own edge rather than as part of whichever page is
+   showing. The three pages each restate the bar's geometry inside
+   their own media query; its color lives here only, so the three
+   cannot drift apart. */
 @media (max-width: 768px) {
   .section-rule > header {
     border: none !important;
     box-shadow: none !important;
+    background: var(--navbar-ink) !important;
   }
+  .section-rule > header nav a { color: var(--navbar-ink-label); }
+  .section-rule > header nav a.active { color: var(--navbar-ink-label-active); }
 }
 
 /* ── LOGIN / SIGNUP BOX ──────────────────────────────────────── */
@@ -374,12 +430,24 @@ main,
 
 /* Sözcel tiles keep their grid-set width and take their height
    from the drawing's ratio (letters stay flex-centered). Keys
-   keep their row-set widths; a fixed height gives the centered
-   hexagon room to span a normal key's width. The GİR label
-   shrinks a touch so it fits inside the hexagon window. */
+   keep their row-set widths and fill them (see below); the two
+   wide keys (GİR / ←) are the one place the hexagon does widen
+   with its key, which is what makes them read as wide keys. */
 .letter-box { aspect-ratio: var(--hexframe-ratio); }
-.key { height: 52px; }
-.key.wide { font-size: 11px; }
+/* Keys take their height from the width Sözcel hands down (--kb-key-h,
+   computed in layoutGame alongside --kb-key) instead of a fixed 52px, and
+   the mask is scaled past `contain` so the drawn hexagon reaches the key's
+   own edges. The silhouette covers only 76.18% of the asset's width and
+   89.52% of its height, so at `contain` every key carried a transparent
+   margin all the way around it — which, on top of the row gap, is what
+   made the keyboard read as mostly space. 1/0.7618 and 1/0.8952 undo it,
+   and --kb-key-h is set to the ratio at which those two scale the artwork
+   evenly, so the hexagon is enlarged, never stretched. */
+.key {
+  height: var(--kb-key-h, 52px);
+  -webkit-mask-size: 131.27% 111.71%;
+  mask-size: 131.27% 111.71%;
+}
 
 /* Stroke tints. Sözcel tiles carry the bold drawn ink stroke while
    empty/typed (per the board mock); revealed states tint the ring

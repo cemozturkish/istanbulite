@@ -30,7 +30,7 @@
   <script src="onboarding.js" defer></script>
   <link rel="stylesheet" href="mahalle-picker.css">
   <script src="mahalle-picker.js" defer></script>
-  <script src="sozcul-mascot.js" defer></script>
+  <script src="sozcu-mascot.js" defer></script>
   <script src="admin-notification.js" defer></script>
   <script src="map-zoom.js" defer></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in. Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot, and a one-shot flag so the posts/scoreboard card-entrance animation (see animateFeedSwap) skips its first run here -- the column itself is already sliding in from the same edge, so animating the cards inside it too would look like the content arriving twice.
@@ -1406,7 +1406,7 @@
            is exactly the leftover space and no more -- content that
            doesn't fit scrolls inside .discussion-posts instead of
            growing this row or the page. */
-        grid-template-rows: calc(100vw + env(safe-area-inset-top) + 16px) 1fr;
+        grid-template-rows: calc(100vw + var(--map-hero-top)) 1fr;
         /* align-content other than the default (stretch) makes grid
            track-size its rows by content first and only then position
            the resulting (shorter) track set within the container -- so
@@ -1430,7 +1430,7 @@
         row-gap: 0 !important;
         /* Reserve space for fixed bottom tab bar + a frame-gap so the
            cards don't visually press against the nav (frames.css design). */
-        padding-bottom: calc(38px + env(safe-area-inset-bottom) + var(--frame-gap, 10px));
+        padding-bottom: calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom) + var(--frame-gap, 10px));
       }
       /* Defensive fallback, not the primary fix (see grid-template-rows'
          own comment above): row 2 now stretches to fill the viewport, so
@@ -1450,38 +1450,14 @@
         grid-column: unset; grid-row: unset;
       }
 
-      /* Profile bar: floats over the top (empty/sea) band of the map
-         instead of taking its own row -- absolutely positioned against
-         body (already position:fixed, so it's a valid containing block
-         for this), which places it right at the top since the map is
-         the first grid row. #f7f7f7 (the map's own background) made it
-         blend invisibly into the map instead of reading as a card, so
-         it's back to a light gray fill with the same chapter-box
-         border the post/game cards use (2px + a heavier 5px bottom
-         edge), just floating on the map rather than stacked in the
-         column flow below it. */
-      #ist-pc-mount {
-        position: absolute;
-        /* 12px margin from the map, plus the notch/status bar height so
-           the floating card clears it as a unit instead of padding its
-           insides (which just stretches the card with dead space). */
-        top: calc(12px + env(safe-area-inset-top));
-        /* 18px = the shared screen inset the whole page lines up on
-           (frames.css's 10px frame padding + the 8px inner padding the
-           columns use). Offsets resolve against body's padding box, and
-           frames.css zeroes body's padding on pages that wrap their grid
-           in #main-site, so these land 18px from the true screen edges --
-           the same line as the comment cards and composer on the left and
-           the game tiles on the right. */
-        left: 18px;
-        right: 18px;
-        z-index: 20;
-        max-height: none;
-        overflow: visible;
-        background: #eeeeee;
-        border: 2px solid #1a1a1a;
-        border-bottom: 5px solid #1a1a1a;
-      }
+      /* The profile bar (#ist-pc-mount) is the fixed top bar — the
+         counterpart of the tab bar at the bottom. Its geometry and colors
+         are in profile-card.css, one implementation for all three pages;
+         nothing about it is page-specific, so nothing about it is restated
+         here. It used to be a light card floating over the map's top
+         (empty/sea) band, which each of the three pages spelled out again
+         in its own mobile query. */
+
       /* Capacitor's WKWebView reports env(safe-area-inset-top) as 0 for a
          real (measured, ~80-200ms) window after every fresh page load
          before self-correcting on its own -- with no gating, the card
@@ -1494,14 +1470,6 @@
       html.ist-safe-area-pending main {
         visibility: hidden;
       }
-      /* frames.css drops a card shadow on #ist-pc-mount's child (the
-         same treatment every other panel gets) -- here that shadow was
-         casting a visible dark band onto the map below, breaking the
-         color match above even though the fill itself was correct. */
-      #ist-pc-mount > * {
-        box-shadow: none !important;
-      }
-
       /* .section-rule no longer renders a floating brand bar -- its
          only visible content (the tab nav) is pulled out via the
          <header> position:fixed rule below and pinned to the viewport
@@ -1535,13 +1503,13 @@
         pointer-events: auto;
         margin-left: calc(-1 * var(--frame-pad, 10px));
         margin-right: calc(-1 * var(--frame-pad, 10px));
-        /* Room for the floating profile card (offset by the same
-           safe-area amount so the gap stays constant across notch
-           sizes) so it still sits over empty "sea", not over the
+        /* Room under the profile bar (offset by the same safe-area
+           amount so the gap stays constant across notch sizes), so the
+           bar overlaps only the map's empty "sea" band and never the
            districts themselves. Trimmed from 40px to 16px to match
            anahane's same fix -- keep in sync with grid-template-rows
            above. */
-        margin-top: calc(env(safe-area-inset-top) + 16px);
+        margin-top: var(--map-hero-top);
         box-shadow: none !important;
       }
       .map-panel {
@@ -1669,7 +1637,27 @@
         min-height: 0;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
+        /* The comments sit at the BOTTOM of the feed, right above the
+           composer -- one comment rests on the composer instead of
+           floating up under the map, and each newer one is laid on top of
+           the stack (newest first is the order they already load in, see
+           fetchPostsPage). Same move as Hane's news and events columns.
+           An auto margin on the first card, not justify-content:flex-end:
+           once the comments outgrow the feed the margin resolves to zero
+           and this box scrolls them normally, where flex-end would push
+           the newest ones past the top edge of a scroller that cannot
+           reach them. */
+        display: flex;
+        flex-direction: column;
       }
+      .discussion-posts > :first-child { margin-top: auto; }
+      /* This box has a fixed height (flex:1 of a fixed column) and now
+         lays its cards out as flex items, so without this they would be
+         squeezed shorter to fit instead of overflowing into the scroll. */
+      .discussion-posts > * { flex-shrink: 0; }
+      /* No trailing gap under the last card: the feed's own bottom
+         padding is what separates the stack from the composer. */
+      .discussion-posts > :last-child { margin-bottom: 0; }
       .post {
         padding: 10px 12px;
         margin-bottom: 6px;
@@ -1866,7 +1854,7 @@
         bottom: 0;
         left: 0;
         right: 0;
-        height: calc(38px + env(safe-area-inset-bottom));
+        height: calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom));
         padding: 0 0 env(safe-area-inset-bottom);
         margin: 0;
         border-top: 1px solid var(--rule);
@@ -2596,7 +2584,7 @@
 // Kahvehane itself was never actually left. The scoreboard stays on the
 // full weekly board throughout — opening a game doesn't narrow it to that
 // game's own scores. The left column (discussion feed) is left alone —
-// the game already has its own "?" help button, so a duplicate
+// the game already has its own help (question-mark) button, so a duplicate
 // instructions blurb here was redundant.
 
 (function initGameOverlay() {
@@ -2946,12 +2934,12 @@ async function mount() {
   coffeeTickIntervalId = setInterval(tickCoffeeIndex, COFFEE_TICK_MS);
   I18N.onChange(tickCoffeeIndex);
 
-  // If the current user is the picked sözcül with a pending word,
+  // If the current user is the picked sözcü with a pending word,
   // glow the Sözcel tile and surface a one-time mascot popup.
   (function tryGreet(tries) {
-    if (window.IstSozcul) {
-      window.IstSozcul.glowGameLink(sb);
-      window.IstSozcul.greet({ sb, page: 'kahvehane' });
+    if (window.IstSozcu) {
+      window.IstSozcu.glowGameLink(sb);
+      window.IstSozcu.greet({ sb, page: 'kahvehane' });
     } else if (tries > 0) {
       setTimeout(() => tryGreet(tries - 1), 80);
     }
@@ -3325,27 +3313,27 @@ async function loadScoreboard(neighborhoodFilter = null, instant = false) {
         .from('sozcel_used_answers')
         .select('used_on, sozcul_id')
         .gte('used_on', cutoffISO);
-      const sozculByDay = new Map();
+      const sozcuByDay = new Map();
       (sozcuRows || []).forEach(r => {
         const d = parseGameDate(r.used_on);
-        if (d && r.sozcul_id) sozculByDay.set(d.getTime(), r.sozcul_id);
+        if (d && r.sozcul_id) sozcuByDay.set(d.getTime(), r.sozcul_id);
       });
-      if (sozculByDay.size > 0) {
+      if (sozcuByDay.size > 0) {
         const creditedPlayerDay = new Set();
         weekly.forEach(r => {
           if (!r.user_id) return;
           const d = parseGameDate(r.date);
           if (!d) return;
-          const sozculId = sozculByDay.get(d.getTime());
-          if (!sozculId || sozculId === r.user_id) return;
+          const sozcuId = sozcuByDay.get(d.getTime());
+          if (!sozcuId || sozcuId === r.user_id) return;
           const dedupKey = r.user_id + '|' + d.getTime();
           if (creditedPlayerDay.has(dedupKey)) return;
           creditedPlayerDay.add(dedupKey);
           const bonus = sozcuPoints(r.attempts, r.won);
           if (bonus <= 0) return;
-          const prev = scores.get(sozculId) || { score: 0, neighborhood: null, lastDate: null };
+          const prev = scores.get(sozcuId) || { score: 0, neighborhood: null, lastDate: null };
           prev.score += bonus;
-          scores.set(sozculId, prev);
+          scores.set(sozcuId, prev);
         });
       }
     } catch (e) { /* Sözcü bonus is best-effort */ }

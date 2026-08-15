@@ -27,7 +27,7 @@
   <script src="onboarding.js" defer></script>
   <link rel="stylesheet" href="mahalle-picker.css">
   <script src="mahalle-picker.js" defer></script>
-  <script src="sozcul-mascot.js" defer></script>
+  <script src="sozcu-mascot.js" defer></script>
   <script src="admin-notification.js" defer></script>
   <script src="map-zoom.js" defer></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in. Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot, and a one-shot flag so the news/events card-entrance animation (see animateFeedSwap) skips its first run here -- the column itself is already sliding in from the same edge, so animating the cards inside it too would look like the content arriving twice.
@@ -1058,15 +1058,47 @@
       #main-site {
         position: relative;
         height: 100%;
-        overflow-y: auto;
-        overflow-x: hidden;
+        overflow: hidden;
         -webkit-overflow-scrolling: touch;
         display: grid;
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
           "map map"
           "news events";
-        align-content: start;
+        /* Row 2 takes everything the map leaves, so the two card columns
+           have a full-height box to sit at the BOTTOM of (see the feeds'
+           auto margin below) instead of hanging off the map's lower edge.
+           Left as the default
+           align-content (stretch, not the `start` this used to pin): with
+           anything else, grid track-sizes the rows by their content first
+           and only then positions the shorter track set in the container,
+           so row 2 sizes to one short card stack and never claims the
+           leftover space -- the same trap kahvehane.html hit (see its own
+           grid-template-rows comment).
+
+           Both tracks are stated, neither is left to content, and that is
+           the whole point -- kahvehane.html's row 1 already reads exactly
+           like this, and this is the page catching up to it:
+
+           Row 1 is the map's square written out (main bleeds to the true
+           screen edges, so its rendered width is always 100vw, and the
+           extra term matches main's own margin-top below). Left as `auto`,
+           the track's base size was main's MIN-content height, which for
+           an aspect-ratio panel is next to nothing -- so as soon as row 2
+           wanted more than the leftover space, the grid paid it out of the
+           map: with three days of news the square collapsed from 393px to
+           250px on a phone, taking the shared hero line down with it and
+           sliding Hane's cards up out of line with Kütüphane's and
+           Kahvehane's.
+
+           Row 2 is minmax(0, 1fr), not a bare `1fr` -- a bare one is
+           minmax(auto, 1fr), and that auto minimum is the news/events
+           stacks' own height, which is the demand that squeezed row 1 in
+           the first place. Zero as the minimum makes row 2 exactly the
+           leftover space and no more; a feed with more cards than that
+           scrolls inside its own sidebar (see .sidebar-left/.sidebar-right
+           below) instead of growing the row. */
+        grid-template-rows: calc(100vw + var(--map-hero-top)) minmax(0, 1fr);
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
            the map -- a different color from the map's own #f7f7f7,
@@ -1081,15 +1113,16 @@
         column-gap: calc(var(--frame-gap) / 2) !important;
         /* #main-site always fills the full viewport height (height:100%
            above), but its content (map + one short row of cards) often
-           doesn't -- with align-content:start packing everything at the
-           top, the leftover space at the bottom belongs to no grid item
-           and was showing the raw page canvas instead of the map/card
-           #f7f7f7. Coloring the container itself means any such gap
-           matches by default instead of needing a fix per element. */
+           doesn't -- and the columns are transparent by design (see
+           .col-left/.col-right below), so the run of empty page above the
+           bottom-aligned cards would show the raw page canvas instead of
+           the map/card #f7f7f7. Coloring the container itself means any
+           such gap matches by default instead of needing a fix per
+           element. */
         background: #f7f7f7;
         /* Clears the fixed bottom tab bar so the last row of cards isn't
            hidden behind it. */
-        padding-bottom: calc(38px + env(safe-area-inset-bottom) + 16px);
+        padding-bottom: calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom) + 16px);
       }
 
       /* Map: same real desktop artwork + traced SVG hit-regions (no more
@@ -1106,13 +1139,13 @@
         overflow: visible;
         margin-left: calc(-1 * var(--frame-pad, 10px));
         margin-right: calc(-1 * var(--frame-pad, 10px));
-        /* Room for the floating profile card (offset by the same
-           safe-area amount so the gap stays constant across notch
-           sizes) so it still sits over empty "sea", not over the
+        /* Room under the profile bar (offset by the same safe-area
+           amount so the gap stays constant across notch sizes), so the
+           bar overlaps only the map's empty "sea" band and never the
            districts themselves. Trimmed the old 40px extra down to 16px
            to reclaim the leftover dead space above the map and pull the
            whole map (and the events/news below it) further up. */
-        margin-top: calc(env(safe-area-inset-top) + 16px);
+        margin-top: var(--map-hero-top);
         box-shadow: none !important;
       }
       .map-panel {
@@ -1148,38 +1181,14 @@
         letter-spacing: 1px;
       }
 
-      /* Profile bar: floats over the top (empty/sea) band of the map
-         instead of taking its own row -- absolutely positioned against
-         #main-site (the nearest positioned ancestor), which places it
-         right at the top since the map is the first grid row. #f7f7f7
-         (the map's own background) made it blend invisibly into the
-         map instead of reading as a card, so it's back to a light gray
-         fill with the same chapter-box border the news/event cards use
-         (2px + a heavier 5px bottom edge), just floating on the map
-         rather than stacked in the column flow below it. */
-      #ist-pc-mount {
-        position: absolute;
-        /* 12px margin from the map, plus the notch/status bar height so
-           the floating card clears it as a unit instead of padding its
-           insides (which just stretches the card with dead space). */
-        top: calc(12px + env(safe-area-inset-top));
-        /* 18px = the shared screen inset the carousel lines up on
-           (frames.css's 10px frame padding + the 8px inner padding the
-           columns use). Offsets resolve against #main-site's padding box
-           (it's position:relative on mobile, see above) -- the padding
-           box is the border box, frames.css's own 10px frame padding
-           included, so this is 18px from the true screen edge, matching
-           Kahvehane/Kütüphane so the card doesn't shift as the user
-           swipes between the three pages. */
-        left: 18px;
-        right: 18px;
-        z-index: 20;
-        max-height: none;
-        overflow: visible;
-        background: #eeeeee;
-        border: 2px solid #1a1a1a;
-        border-bottom: 5px solid #1a1a1a;
-      }
+      /* The profile bar (#ist-pc-mount) is the fixed top bar — the
+         counterpart of the tab bar at the bottom. Its geometry and colors
+         are in profile-card.css, one implementation for all three pages;
+         nothing about it is page-specific, so nothing about it is restated
+         here. It used to be a light card floating over the map's top
+         (empty/sea) band, which each of the three pages spelled out again
+         in its own mobile query. */
+
       /* Capacitor's WKWebView reports env(safe-area-inset-top) as 0 for a
          real (measured, ~80-200ms) window after every fresh page load
          before self-correcting on its own -- with no gating, the card
@@ -1192,14 +1201,6 @@
       html.ist-safe-area-pending main {
         visibility: hidden;
       }
-      /* frames.css drops a card shadow on #ist-pc-mount's child (the
-         same treatment every other panel gets) -- here that shadow was
-         casting a visible dark band onto the map below, breaking the
-         color match above even though the fill itself was correct. */
-      #ist-pc-mount > * {
-        box-shadow: none !important;
-      }
-
       /* .section-rule no longer renders a floating masthead bar -- its
          only visible content (the tab nav) is pulled out via the
          <header> position:fixed rule below and pinned to the viewport
@@ -1217,22 +1218,55 @@
       }
 
       /* Events (left) + news (right): normal in-flow columns below the
-         map, each stacking its own cards top to bottom. Explicit z-index
-         (above main's own 0, see main{} above) so they stay on top of
-         the map even once it's zoomed in and spilling past its own
-         little square -- otherwise DOM order alone would leave one of
-         the two columns stacked below it. */
+         map, each stacking its cards from the BOTTOM of the screen up --
+         one news item rests just above the tab bar, and a second one is
+         laid on top of it rather than the stack hanging off the map's
+         lower edge. Flex columns (not blocks) so the auto margin below
+         can do that. Explicit z-index (above main's own 0, see main{}
+         above) so they stay on top of the map even once it's zoomed in
+         and spilling past its own little square -- otherwise DOM order
+         alone would leave one of the two columns stacked below it. */
       .col-left, .col-right {
         position: static;
         top: auto; bottom: auto; left: auto; right: auto;
         height: auto;
         width: auto;
-        display: block;
+        display: flex;
+        flex-direction: column;
         overflow: visible;
         z-index: 1;
       }
       .col-left { grid-area: events; }
       .col-right { grid-area: news; }
+      /* What actually bottom-aligns each column. The two wrappers between
+         the column and its feed (.col-*-slide, then .sidebar-*) both
+         carry flex:1 and so fill the column's full height -- the auto
+         margin therefore has to go on the feed itself, the innermost box,
+         with flex:none to stop it growing into the space it is supposed
+         to be pushed down through. (An auto margin on a wrapper that
+         grows is silently ignored: flex distributes the free space before
+         margins ever see it.) .sidebar-* go back to flex here for the
+         same reason -- an auto margin does nothing to a block child.
+
+         Deliberately an auto margin rather than justify-content:flex-end:
+         once a stack outgrows the space, an auto margin resolves to zero
+         and the row simply grows, scrolling in #main-site as usual, where
+         flex-end would push the top of the stack out of the grid area and
+         out of reach. */
+      #events-panel, #breaking-news-feed {
+        flex: none;
+        margin-top: auto;
+      }
+      /* The two stacks end on the same line: the feeds' own bottom
+         padding is all that separates the last card from the tab bar
+         (#main-site's padding-bottom), so the trailing card margin --
+         which only ever existed to space one card off the next -- goes.
+         Top alignment used to be the thing worth matching here (see
+         #events-panel's own padding note further down); now it's the
+         bottom. */
+      #breaking-news-feed { padding-bottom: 10px; }
+      #breaking-news-feed > :last-child,
+      #events-panel > :last-child { margin-bottom: 0; }
       /* Transparent (inherits the desktop rule's background:none) so
          these read as frameless text floating over the map, same as
          desktop -- #main-site's own background is the same #f7f7f7, so
@@ -1251,12 +1285,41 @@
          #library-card/#politician-card above. */
       .corner-card { display: none; }
 
-      .sidebar-left {
-        overflow: visible;
-        display: block;
+      /* Both sidebars keep their desktop flex column (see the feeds' auto
+         margin above, which needs a flex parent to mean anything) and
+         keep the internal scrolling too -- the page itself does not scroll
+         (see #main-site's overflow above), so row 2's band between the
+         hero line and the tab bar is all the height either column ever
+         gets, and a stack taller than the band has to absorb the overflow
+         here. It used to be handed back to the page, which grew the row,
+         squeezed the map and ran the last card down behind the fixed tab
+         bar. The scroller is the sidebar rather than the feed inside it so
+         that the feed stays a plain in-flow box whose auto margin can push
+         it to the bottom of the scrollable area.
+         .sidebar-right also takes the flex:1 its left counterpart already
+         has in the desktop rule -- without it the news sidebar is only as
+         tall as its own cards, and pushing the feed to the bottom of a box
+         that is exactly the feed's height moves nothing. min-height:0 on
+         both (and on the columns) because a flex/grid item's automatic
+         minimum size is its content: without it the box refuses to be
+         shorter than the whole stack and the overflow escapes upward
+         again, one level at a time. */
+      .col-left, .col-right { min-height: 0; }
+      .sidebar-left, .sidebar-right {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        /* No scrollbar: these columns are frameless cards floating on the
+           map, so a track drawn down the middle of the artwork would read
+           as a seam in the drawing rather than as chrome. */
+        scrollbar-width: none;
       }
+      .sidebar-left::-webkit-scrollbar,
+      .sidebar-right::-webkit-scrollbar { display: none; }
       #breaking-news-feed, #events-panel { overflow: visible; }
-      .sidebar-right { overflow: visible; display: block; }
       .sidebar-label {
         font-size: 9px;
         letter-spacing: 1.5px;
@@ -1292,7 +1355,7 @@
         bottom: 0;
         left: 0;
         right: 0;
-        height: calc(38px + env(safe-area-inset-bottom));
+        height: calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom));
         padding: 0 0 env(safe-area-inset-bottom);
         margin: 0;
         border-top: 1px solid var(--rule);
@@ -1848,79 +1911,10 @@
     .person-mention[data-tip]:focus-visible::after {
       opacity: 1;
     }
-    /* The pull layout is for touch devices only -- `pointer: coarse`, not
-       just a narrow viewport. A narrow desktop window (or a tablet driven
-       by a mouse) is ≤768px too, and there the sheet stays a plain native
-       scroller (sheet.css's own phone rules), since initDetailPull's
-       touch gesture is the only thing that could move a sheet laid out
-       the way the block below lays it out. Keep this condition and
-       initDetailPull's own matchMedia in step. */
-    @media (max-width: 768px) and (pointer: coarse) {
-      .detail-overlay {
-        /* Where the sheet comes to rest when it first opens: right where
-           the map hero's box ends -- #main-site's frame-pad top inset
-           (frames.css) plus the map's own height (100vw, same square as
-           .map-panel's width:100%;aspect-ratio:1/1) plus one more
-           frame-pad gap. */
-        --detail-rest-top: calc(var(--frame-pad, 10px) + 100vw + var(--frame-pad, 10px));
-        /* ...never so low that the sheet arrives (nearly) off-screen, on
-           a viewport short relative to its width. */
-        --detail-rest: min(var(--detail-rest-top), calc(100vh - 180px));
-        /* The highest the sheet's top edge may ever climb -- it must
-           never cover the profile card at the top of the page. The pull
-           handler (initDetailPull) overwrites this with the card's real
-           measured bottom edge; this is just the pre-measurement
-           fallback (frame-pad ring + the card's ~60px row + gap). */
-        --detail-top-clamp: calc(var(--frame-pad, 10px) * 2 + 60px);
-        /* The overlay itself no longer scrolls on mobile: dragging the
-           sheet is handled by initDetailPull, which raises the sheet to
-           the clamp and then feeds the rest of the pull into the sheet's
-           own scroll -- one continuous motion, with a hard ceiling. */
-        overflow: hidden;
-      }
-      .detail-overlay-sheet {
-        /* Inset on 3 sides (frame-pad gap) so a sliver of the map/page
-           canvas peeks through above and beside it, like a page rising
-           from below. Rests below the map so the map stays visible above
-           it. Height is measured from the CLAMP, not from its resting
-           top: the sheet is always tall enough that, once pulled all the
-           way up to the clamp, its bottom edge lands on the bottom of the
-           screen. At rest it therefore hangs (rest-top - clamp) past the
-           bottom edge -- the paper always continues off-screen and its
-           bottom edge is never exposed mid-screen, however short the
-           article is. */
-        left: var(--frame-pad, 10px);
-        right: var(--frame-pad, 10px);
-        width: auto;
-        top: var(--detail-rest);
-        height: calc(100% - var(--detail-top-clamp));
-        min-height: 0;
-        /* Content that outruns the sheet scrolls inside it, but only
-           under initDetailPull's control (overflow:hidden still allows
-           programmatic scrollTop) -- so the pull can't hand the gesture
-           over to a native scroller that would happily run past the
-           clamp. touch-action:none for the same reason: this element
-           owns its vertical gesture. */
-        overflow: hidden;
-        touch-action: none;
-        /* Closed: sitting exactly on the bottom edge of the screen,
-           ready to be pulled up (not a full 100% of its own now-taller
-           height, which would start it needlessly far down). */
-        transform: translateY(calc(100vh - var(--detail-rest)));
-      }
-      .detail-overlay.open .detail-overlay-sheet { transform: translateY(0); }
-      /* The sheet itself is the scroller under the pull gesture here, so
-         the body hands its scroll back (sheet.css makes the body the
-         scroller everywhere else). Bottom padding clears the iOS Safari
-         toolbar / bottom tab bar sitting over the bottom of the
-         (layout-viewport-sized) sheet, so the end of a long article can
-         actually be read once it's pulled all the way up. */
-      .detail-overlay-body {
-        height: auto;
-        overflow: visible;
-        padding: 48px 24px calc(96px + env(safe-area-inset-bottom, 0px));
-      }
-    }
+    /* The phone layout for this sheet — resting under the map, pulled up
+       to the profile card — is the shared one now (.ist-sheet-pull in
+       sheet.css, driven by IstSheet.pull). This page only opts in, on the
+       markup, and keeps its own white single-box treatment above. */
   </style>
   <link rel="stylesheet" href="frames.css">
 </head>
@@ -2181,7 +2175,7 @@
      details, opened instead of the old expand-in-place toggle — see
      openDetail/closeDetail and buildNewsDetailHtml/buildEventDetailHtml
      further down. -->
-<div class="ist-sheet-overlay detail-overlay" id="anahane-detail" hidden>
+<div class="ist-sheet-overlay ist-sheet-pull detail-overlay" id="anahane-detail" hidden>
   <div class="ist-sheet-backdrop" id="anahane-detail-backdrop"></div>
   <div class="ist-sheet detail-overlay-sheet" id="anahane-detail-sheet">
     <button type="button" class="ist-sheet-close" id="anahane-detail-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
@@ -3411,9 +3405,9 @@ function renderEventsNow(panel, rows) {
 // details, opened instead of the old expand-in-place toggle — mirrors
 // Kahvehane's game overlay / Kütüphane's reader overlay. Content is
 // built by buildNewsDetailHtml/buildEventDetailHtml above.
-// The mobile pull handler, assigned by initDetailPull() below (it stays
-// null only if the overlay markup isn't on the page; on desktop it's
-// assigned but every entry point no-ops).
+// The phone pull handler (IstSheet.pull, assigned below). Kept so the
+// sources accordion can tell it the sheet's height changed; opening and
+// closing need nothing from it, since IstSheet drives it itself.
 let detailPull = null;
 function openDetail(html) {
   const overlay = document.getElementById('anahane-detail');
@@ -3427,32 +3421,18 @@ function openDetail(html) {
   markOpenEventCard(null);
   body.innerHTML = html;
   if (window.IstPersonMentions) IstPersonMentions.linkify(body, personMentionsRoster);
-  overlay.hidden = false;
-  // The sheet's body is the scroll container (see sheet.css) -- reset so a
-  // tall card left scrolled from a previous open doesn't reopen
-  // mid-scroll on the next one. detailPull.reset() does the same for the
-  // mobile pull (sheet offset + the sheet's own scroll).
+  // The sheet's body is the scroll container on desktop (see sheet.css) --
+  // reset so a tall card left scrolled from a previous open doesn't reopen
+  // mid-scroll. IstSheet.open does the same for the phone pull.
   body.scrollTop = 0;
-  if (detailPull) detailPull.reset();
-  requestAnimationFrame(() => {
-    overlay.classList.add('open');
-    // Measured now that the content is laid out and the sheet's real
-    // height is resolvable.
-    if (detailPull) detailPull.measure();
-  });
+  IstSheet.open(overlay);
 }
 function closeDetail() {
   const overlay = document.getElementById('anahane-detail');
   if (!overlay) return;
   markOpenNewsCard(null);
   markOpenEventCard(null);
-  // Hands the sheet back to its CSS transition from wherever the pull
-  // left it, so it slides down from there instead of jumping first.
-  if (detailPull) detailPull.release();
-  overlay.classList.remove('open');
-  // Matches the sheet's own 0.55s transition (see .detail-overlay-sheet)
-  // so hiding doesn't cut the closing slide-down short.
-  setTimeout(() => { overlay.hidden = true; }, 550);
+  IstSheet.close(overlay);
 }
 (function initDetailOverlay() {
   const overlay = document.getElementById('anahane-detail');
@@ -3475,7 +3455,7 @@ function closeDetail() {
         const isOpen = wrap.classList.toggle('open');
         toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         // The sheet just got taller/shorter -- re-measure how much paper
-        // is left to pull (see initDetailPull).
+        // is left to pull (see IstSheet.pull in sheet.js).
         if (detailPull) detailPull.measure();
       }
       return;
@@ -3487,274 +3467,11 @@ function closeDetail() {
   });
 })();
 
-// ── Touch mobile: pulling the detail sheet ──
-// Only on touch devices (max-width:768px AND pointer:coarse, matching the
-// stylesheet's own condition exactly) -- a narrow desktop window or a
-// mouse-driven tablet keeps the desktop layout, where .detail-overlay is
-// an ordinary native scroller and none of this runs.
-//
-// The sheet is pulled by hand, not scrolled by the browser. Native
-// scrolling could do neither of the two things this gesture has to do:
-// stop the sheet from climbing over the profile card, and never let its
-// bottom edge surface mid-screen (a scroller happily runs the whole card
-// past the top of the window, page showing through underneath).
-//
-// Everything runs off one number, `pos` — how far the paper has been
-// pulled, in px:
-//   0 .. maxRise      lifts the sheet itself, up to the clamp just under
-//                     the profile card (see --detail-top-clamp)
-//   maxRise .. maxPos scrolls the sheet's own content
-// so a single uninterrupted pull first raises the sheet, then keeps
-// feeding paper up from the bottom edge of the screen — a receipt coming
-// out of a slot — with a hard ceiling on how high the sheet itself goes.
-// Below 0 the sheet rubber-bands downward and lets go: pull it past the
-// rest point and it closes.
-detailPull = (function initDetailPull() {
-  const overlay = document.getElementById('anahane-detail');
-  const sheet = document.getElementById('anahane-detail-sheet');
-  if (!overlay || !sheet) return null;
-  const mobile = window.matchMedia('(max-width: 768px) and (pointer: coarse)');
-
-  const DISMISS_PX = 70;    // pull-down past the rest point that closes the sheet
-  const DISMISS_VEL = 0.6;  // ...or a downward flick this fast (px/ms)
-  const RUBBER = 0.5;       // resistance on a pull below the rest point
-  const SNAP_AT = 0.35;     // fraction of the rise that settles upward on release
-  const FRICTION = 0.93;    // momentum decay per 16ms frame
-  const STOP_VEL = 0.08;    // momentum below this (px/ms) is a crawl -- settle instead
-
-  let pos = 0, maxRise = 0, maxScroll = 0, maxPos = 0;
-  let dragging = false, startY = 0, startPos = 0, lastY = 0, lastT = 0, vel = 0, raf = 0;
-
-  // The sheet's ceiling: the profile card's real bottom edge plus the
-  // frame gap, measured rather than assumed so it stays right whatever
-  // the card ends up containing (badges, longer names, notch insets).
-  function topClamp() {
-    const padVal = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-pad'));
-    const pad = isNaN(padVal) ? 10 : padVal;
-    const card = document.getElementById('ist-pc-mount');
-    const bottom = card && card.offsetHeight ? card.getBoundingClientRect().bottom : pad + 60;
-    return Math.max(pad, bottom + pad);
-  }
-
-  function measure() {
-    // isConnected: a virtual navigation (router.js) swaps in fresh
-    // overlay markup and re-runs this script, leaving the old instance's
-    // resize listener pointed at a detached sheet.
-    if (!mobile.matches || overlay.hidden || !overlay.isConnected) { maxRise = maxScroll = maxPos = 0; return; }
-    const clamp = topClamp();
-    // Feeds the sheet's height too (height: 100% - clamp), which is what
-    // keeps its bottom edge off-screen at rest and exactly on the bottom
-    // edge once fully raised.
-    overlay.style.setProperty('--detail-top-clamp', clamp + 'px');
-    // A sheet already pulled up to the clamp stays pulled up to the NEW
-    // clamp (rotation, a taller profile card, a sources block opening),
-    // keeping whatever it had scrolled; anything else just gets clamped
-    // into the new range. Both are read against the OLD limits, so this
-    // has to happen either side of the recompute.
-    const wasRaised = maxPos > 0 && pos >= maxRise;
-    const wasScrolled = Math.max(0, pos - maxRise);
-    maxRise = Math.max(0, sheet.offsetTop - clamp);
-    maxScroll = Math.max(0, sheet.scrollHeight - sheet.clientHeight);
-    maxPos = maxRise + maxScroll;
-    pos = wasRaised ? maxRise + Math.min(wasScrolled, maxScroll) : Math.min(pos, maxPos);
-    // Re-apply: the rise the old numbers produced is stale even when pos
-    // itself still fits, so the sheet would otherwise sit above the new
-    // clamp or hang off the bottom. Skipped only for the untouched
-    // just-opened sheet, whose slide-up is CSS's to run.
-    if (pos !== 0 || sheet.style.transform) render();
-  }
-
-  function render() {
-    let y;
-    if (pos >= 0) {
-      y = -Math.min(pos, maxRise);
-      sheet.scrollTop = Math.min(Math.max(pos - maxRise, 0), maxScroll);
-    } else {
-      y = -pos * RUBBER;
-      sheet.scrollTop = 0;
-    }
-    sheet.style.transform = 'translateY(' + y + 'px)';
-  }
-
-  function stopAnim() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
-
-  // Hands the sheet back to CSS once it's stopped moving, so the closing
-  // slide-down (a plain class change) runs from wherever it ended up.
-  function finish() {
-    raf = 0;
-    sheet.style.transition = '';
-    if (pos === 0) sheet.style.transform = '';
-  }
-
-  // Release: coast on the flick's own momentum, then settle. A sheet
-  // left half-raised lands on one of its two rest points (down, or
-  // parked at the clamp); past the clamp it's ordinary content scroll,
-  // so it stays wherever it stopped.
-  function settle() {
-    stopAnim();
-    let last = performance.now();
-    const step = (now) => {
-      const dt = Math.min(34, Math.max(1, now - last));
-      last = now;
-      if (Math.abs(vel) > STOP_VEL) {
-        pos += vel * dt;
-        vel *= Math.pow(FRICTION, dt / 16);
-        if (pos <= 0) { pos = 0; vel = 0; }
-        else if (pos >= maxPos) { pos = maxPos; vel = 0; }
-        render();
-        raf = requestAnimationFrame(step);
-        return;
-      }
-      vel = 0;
-      const target = pos >= maxRise ? pos : (pos > maxRise * SNAP_AT ? maxRise : 0);
-      const gap = target - pos;
-      if (Math.abs(gap) < 0.5) { pos = target; render(); finish(); return; }
-      pos += gap * Math.min(1, dt / 90);
-      render();
-      raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-  }
-
-  sheet.addEventListener('touchstart', (e) => {
-    if (!mobile.matches || e.touches.length !== 1) return;
-    stopAnim();
-    // Re-measured per gesture: the sources accordion, late images and
-    // rotation all change how much paper there is to pull.
-    measure();
-    dragging = true;
-    startPos = pos;
-    startY = lastY = e.touches[0].clientY;
-    lastT = e.timeStamp || performance.now();
-    vel = 0;
-    sheet.style.transition = 'none';
-  }, { passive: true });
-
-  sheet.addEventListener('touchmove', (e) => {
-    if (!dragging || e.touches.length !== 1) return;
-    const y = e.touches[0].clientY;
-    const now = e.timeStamp || performance.now();
-    const dt = now - lastT;
-    // Weighted toward the newest sample so a flick's final speed wins
-    // over the slow start of the same drag.
-    if (dt > 0) vel = 0.7 * ((lastY - y) / dt) + 0.3 * vel;
-    lastY = y;
-    lastT = now;
-    // Hard stop at the top -- nothing left to give once the sheet is at
-    // the clamp and its content is scrolled through.
-    pos = Math.min(startPos + (startY - y), maxPos);
-    render();
-    if (e.cancelable) e.preventDefault();
-  }, { passive: false });
-
-  const end = () => {
-    if (!dragging) return;
-    dragging = false;
-    if (pos < 0 && (pos < -DISMISS_PX || vel < -DISMISS_VEL)) { closeDetail(); return; }
-    settle();
-  };
-  sheet.addEventListener('touchend', end);
-  sheet.addEventListener('touchcancel', end);
-
-  // A device can report pointer:coarse and still have a trackpad or a
-  // keyboard attached (an iPad with a Magic Keyboard is the obvious one).
-  // Those land on this layout, where the sheet is not a native scroller,
-  // so wheel and key input drive the very same pull. Both jump straight
-  // to their new position: only a finger gets momentum.
-  let inputIdle = 0;
-  function nudge(delta) {
-    stopAnim();
-    measure();
-    if (maxPos <= 0 && pos === 0) return false;
-    vel = 0;
-    pos = Math.min(Math.max(pos + delta, 0), maxPos);
-    sheet.style.transition = 'none';
-    render();
-    // Back under CSS control once the wheel/keys go quiet, so a close
-    // still slides instead of cutting.
-    clearTimeout(inputIdle);
-    inputIdle = setTimeout(finish, 160);
-    return true;
-  }
-
-  sheet.addEventListener('wheel', (e) => {
-    if (!mobile.matches || dragging) return;
-    // deltaMode: 0 px, 1 lines, 2 pages.
-    const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? sheet.clientHeight : 1;
-    if (nudge(e.deltaY * unit) && e.cancelable) e.preventDefault();
-  }, { passive: false });
-
-  document.addEventListener('keydown', (e) => {
-    if (!mobile.matches || dragging || overlay.hidden || !overlay.isConnected) return;
-    if (!overlay.classList.contains('open')) return;
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
-    // Page-sized steps off the sheet's own height; End/Home just overshoot
-    // and let nudge() clamp, so they don't need the limits measured first.
-    const page = Math.max(120, sheet.clientHeight * 0.85);
-    let delta;
-    if (e.key === 'ArrowDown') delta = 60;
-    else if (e.key === 'ArrowUp') delta = -60;
-    else if (e.key === 'PageDown') delta = page;
-    else if (e.key === 'PageUp') delta = -page;
-    else if (e.key === 'End') delta = 1e9;
-    else if (e.key === 'Home') delta = -1e9;
-    else return;
-    if (nudge(delta)) e.preventDefault();
-  });
-
-  // overflow:hidden boxes are still scrollable programmatically, and the
-  // browser does exactly that when focus lands on something below the fold
-  // (tabbing through an article's links with a keyboard attached). Left
-  // alone it would scroll the sheet out from under `pos`: pin the overlay,
-  // and take the sheet's own scroll as truth when it moves on its own.
-  overlay.addEventListener('scroll', () => {
-    if (mobile.matches && overlay.scrollTop) overlay.scrollTop = 0;
-  });
-  sheet.addEventListener('scroll', () => {
-    if (!mobile.matches || dragging || raf) return;
-    const ours = Math.min(Math.max(pos - maxRise, 0), maxScroll);
-    if (Math.abs(sheet.scrollTop - ours) > 1) pos = maxRise + sheet.scrollTop;
-  });
-
-  window.addEventListener('resize', () => { if (!overlay.hidden) measure(); });
-  // Gaining/losing a fine pointer swaps the whole layout out from under
-  // the sheet -- drop anything this handler had applied so the desktop
-  // rules (and its native scrolling) take over cleanly.
-  mobile.addEventListener('change', () => {
-    stopAnim();
-    clearTimeout(inputIdle);
-    dragging = false; pos = 0; vel = 0;
-    sheet.style.transition = '';
-    sheet.style.transform = '';
-    sheet.scrollTop = 0;
-    if (!overlay.hidden) measure();
-  });
-
-  return {
-    measure,
-    // A fresh open starts flat: sheet at its resting top, content
-    // unscrolled, CSS back in charge of the slide-up.
-    reset() {
-      stopAnim();
-      clearTimeout(inputIdle);
-      dragging = false; pos = 0; vel = 0;
-      sheet.style.transition = '';
-      sheet.style.transform = '';
-      sheet.scrollTop = 0;
-    },
-    // Closing: drop the inline transform in the same tick the .open
-    // class goes away, so the CSS transition interpolates from where the
-    // pull left the sheet down to off-screen.
-    release() {
-      stopAnim();
-      clearTimeout(inputIdle);
-      dragging = false; pos = 0; vel = 0;
-      sheet.style.transition = '';
-      sheet.style.transform = '';
-    },
-  };
-})();
+// The pull is the shared sheet's (see IstSheet.pull in sheet.js) — the
+// same gesture Kütüphane's reader opens with, so a news item and the
+// meclis behave identically in the hand. Only the dismissal is this
+// page's: closeDetail clears the marked card as well as hiding the sheet.
+detailPull = IstSheet.pull('anahane-detail', { onDismiss: closeDetail });
 
 // loadBreakingNews() is called from showSite() once the user is known
 // so the per-user "seen" set is in play immediately.
