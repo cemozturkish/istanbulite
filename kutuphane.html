@@ -3840,7 +3840,6 @@ async function openLibraryShelvesSheet() {
   if (!SHELVES_LOADED) await loadShelvesUI();
   renderShelfButtons();
 }
-document.getElementById('lib-box-makaleler')?.addEventListener('click', openLibraryShelvesSheet);
 
 // ══════════════════════════════════════════
 // Mektuplar (letters) -- deliberately flat: no shelf, no chapters, just a
@@ -3945,7 +3944,6 @@ function openLetterReader(letter, letters) {
   const pathEl = area.querySelector('.shelf-path');
   if (pathEl) pathEl.scrollTop = 0;
 }
-document.getElementById('lib-box-mektuplar')?.addEventListener('click', openMektuplarSheet);
 
 // ══════════════════════════════════════════
 // Ülkeler — what a country on the map opens.
@@ -4686,8 +4684,21 @@ function openPoliticianDetailSheet(html) {
   _closeReaderOverlay = closeReaderOverlay;
 }
 
-const tbmmOpenBtn = document.getElementById('tbmm-open-btn');
-if (tbmmOpenBtn) tbmmOpenBtn.addEventListener('click', openTBMMSheet);
+// The three buttons that open this page's sheets -- Makaleler, Posta
+// Kutusu and TBMM -- all live inside #ist-content, which the router
+// replaces wholesale on every re-entry to this page (see router.js's
+// navigateTo). Bound once at script-parse time they went dead the first
+// time you swiped away and back: the handlers stayed attached to nodes
+// that were no longer in the document, so the boxes just did nothing.
+// Re-bound from mount() against freshly-queried nodes instead -- the same
+// reason initLibraryMap re-queries its regions. Not delegated on document:
+// #ist-content is shared with the other two carousel pages, so a delegated
+// handler would keep firing after navigating away (see CLAUDE.md).
+function wireLibraryEntryPoints() {
+  document.getElementById('lib-box-makaleler')?.addEventListener('click', openLibraryShelvesSheet);
+  document.getElementById('lib-box-mektuplar')?.addEventListener('click', openMektuplarSheet);
+  document.getElementById('tbmm-open-btn')?.addEventListener('click', openTBMMSheet);
+}
 
 // Table of contents view, rendered into the reader overlay sheet so it
 // rises from the bottom like the reader itself. Reused both when a shelf
@@ -5529,6 +5540,9 @@ function loadPersonMentionsRoster(tries) {
 function mount() {
   loadProfile();
   bootstrapLibraryNav();
+  // Re-attach the Makaleler / Posta Kutusu / TBMM click handlers to this
+  // re-entry's fresh markup (see wireLibraryEntryPoints).
+  wireLibraryEntryPoints();
   // The map caption ships in the markup as "İstanbul" (the desktop map's
   // idle text) and the router hands this page a fresh copy of that markup on
   // every re-entry -- see resetMapLabel in initLibraryMap.
