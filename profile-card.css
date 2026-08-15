@@ -216,8 +216,11 @@
    profile-card.js) — one fixed shape rather than a column of blocks read
    top-down, so it's centred in the sheet instead of stacked from the top
    with the whole void left under it. Centring happens inside the body's
-   padding box, so the close button's 48px of headroom is still clear. */
-.ist-sheet-body.profile-overlay-body:has(.ist-hive) {
+   padding box, so the close button's 48px of headroom is still clear.
+   Keyed to the mount rather than to .ist-hive itself so a slot's panel,
+   which replaces the honeycomb inside that mount, stays centred too
+   instead of jumping to the top of the sheet. */
+.ist-sheet-body.profile-overlay-body:has(#po-hive-mount) {
   display: grid;
   align-content: center;
 }
@@ -504,7 +507,7 @@
 .ist-hive {
   /* Height follows from the drawing's own ratio (frames.css), so the
      width is the only size knob: 3 rows ≈ 3.8 × this tall. */
-  --ist-hive-cell-w: min(150px, 18.5vh);
+  --ist-hive-cell-w: min(136px, 16.5vh);
   /* The drawn hexagon doesn't fill its own box — the art is centred in a
      1024×1536 canvas with the silhouette 780×1375 of it (the whole
      hexframe family shares that canvas so the layers stay registered, see
@@ -548,11 +551,33 @@
   gap: var(--ist-hive-gap);
   width: calc(var(--ist-hive-cell-w) * 3 + var(--ist-hive-gap) * 2);
 }
+/* Every slot is a button (the middle cell, which is you, is not): an
+   empty one opens the code form, a filled one opens its occupant's
+   panel. Stripped back to the frame itself — the drawn hexagon is the
+   affordance, there is no button chrome around it. */
 .ist-hive-cell {
   position: relative;
   width: var(--ist-hive-cell-w);
   flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
 }
+button.ist-hive-cell { cursor: pointer; }
+/* Hover lifts the empty frame out of "muted" and into full ink, which is
+   the whole hint that it is a place something goes. */
+button.ist-hive-cell:hover .ist-hive-slot,
+button.ist-hive-cell:focus-visible .ist-hive-slot {
+  --hexframe-stroke: var(--ink);
+}
+button.ist-hive-cell:hover .ist-hive-plus,
+button.ist-hive-cell:focus-visible .ist-hive-plus { color: var(--ink); }
+button.ist-hive-cell:focus-visible { outline: none; }
+.ist-hive-frame { transition: opacity 160ms; }
+button.ist-hive-slot-filled:hover .ist-hive-frame { opacity: 0.82; }
 /* The frame fills its cell and takes its height from the drawing's ratio
    (frames.css pins width:auto !important on every hexframe, so the cell
    is what carries the width). */
@@ -597,6 +622,162 @@
   max-width: 100%;
   background: var(--ink);
   border-radius: 4px;
+}
+
+/* An occupied slot's readout replaces that ruling with the little that
+   is actually settled: who they are, where they live, and how much of
+   their week is left. It keeps the ruling's alignment — text runs
+   outward from the honeycomb on both sides. */
+.ist-hive-readout { gap: 2px; }
+.ist-hive-lines-left.ist-hive-readout { text-align: right; }
+.ist-hive-lines-right.ist-hive-readout { text-align: left; }
+.ist-hive-readout-name {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  line-height: 1.15;
+  color: var(--ink);
+}
+.ist-hive-readout-meta,
+.ist-hive-readout-left {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Your own code for the week, under the honeycomb — the other half of
+   the exchange (see db/hive_slots.sql: a slot can only be filled by
+   someone who was handed a code, so the code has to be somewhere the
+   owner can read it out). */
+.ist-hive-code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px 8px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ist-hive-code-value {
+  font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--ink);
+}
+.ist-hive-code-hint { font-size: 0.55rem; letter-spacing: 0.6px; text-transform: none; }
+/* Holds the line's height while the code is still being fetched, so the
+   honeycomb doesn't jump up the sheet when it lands. */
+.ist-hive-code-empty { border-top-color: transparent; }
+
+/* ── A single slot's panel ──
+   Shown in the honeycomb's place inside this same sheet rather than as a
+   second sheet stacked over the profile: the site has one sheet
+   geometry, so drilling in happens inside the box, the way the Kahve
+   Endeksi board drills into a venue on a phone. */
+.ist-hive-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  /* Narrower than the sheet so the back link sits beside the panel's own
+     content instead of drifting off to the sheet's far edge. */
+  width: min(320px, 100%);
+  margin: 0 auto;
+  padding: 8px 0;
+  text-align: center;
+}
+.ist-hive-back {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ist-hive-back:hover { color: var(--ink); }
+/* A plain wrapper carrying the width, because the frame inside it is
+   width:auto !important (frames.css) and would otherwise shrink to
+   nothing inside this centred flex column. */
+.ist-hive-panel-frame { width: 120px; }
+.ist-hive-panel-title {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.ist-hive-panel-name {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.ist-hive-panel-hint {
+  max-width: 30ch;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.ist-hive-panel-meta {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+/* The code is typed, read back and compared against a screen someone
+   else is holding, so it's set wide and monospaced — a mistyped
+   character has to be visible at a glance. */
+/* Doubled class so the width beats .ist-pc-input's own width:100%,
+   which is written for the full-width fields further down this file. */
+.ist-pc-input.ist-hive-input {
+  width: min(220px, 100%);
+  text-align: center;
+  font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 16px; /* prevent iOS zoom */
+  font-weight: 700;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+}
+.ist-hive-submit { width: min(220px, 100%); }
+.ist-hive-remove {
+  margin-top: 4px;
+  padding: 6px 18px;
+  border: 1px solid var(--rule);
+  background: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--ink);
+  cursor: pointer;
+}
+.ist-hive-remove:hover { background: var(--hover); }
+.ist-hive-panel-msg {
+  min-height: 1em;
+  font-size: 0.66rem;
+  color: var(--accent);
 }
 
 /* ── Weekly game grid ── 3 rows (Sözcel/Tümcel/Bulmaca) × 7 days
@@ -791,10 +972,15 @@
      middle row is three cells plus two gaps wide, and the readouts either
      side still need room to be legible. Smaller cells, tighter gaps,
      thinner rules. */
-  .ist-hive { --ist-hive-cell-w: min(88px, 12vh); }
+  .ist-hive { --ist-hive-cell-w: min(84px, 11vh); }
   .ist-hive-row { gap: 8px; }
   .ist-hive-lines { gap: 5px; }
   .ist-hive-line { height: 5px; border-radius: 3px; }
+  .ist-hive-readout-name { font-size: 0.62rem; }
+  .ist-hive-readout-meta,
+  .ist-hive-readout-left { font-size: 0.5rem; letter-spacing: 0.6px; }
+  .ist-hive-code { margin-top: 10px; padding-top: 8px; gap: 3px 6px; }
+  .ist-hive-panel-frame { width: 96px; }
   .ist-pc-weekgrid { margin-bottom: 0; }
   .ist-pc-daycell { max-width: 16px; }
   .ist-pc-weekgrid-row { margin-bottom: 1px; gap: 3px; }

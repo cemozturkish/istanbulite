@@ -749,6 +749,11 @@
     // settingsPageHTML/coverHTML), Kaydet saves and the page reload resets
     // this back to false on its own.
     _ov.customizing = false;
+    // The honeycomb always opens on the honeycomb itself, never on the
+    // slot panel someone left open last time, and re-fetches so the
+    // week left on each placement is current (see loadHive).
+    _ov.hivePanel = null;
+    _ov.hiveLoaded = false;
     renderOverlayBody();
     document.getElementById('profile-overlay-body').scrollTop = 0;
     IstSheet.open('profile-overlay');
@@ -983,14 +988,22 @@
   // — is printed on the outer side of its own row, so the pairs read
   // outward from the middle rather than into it.
   //
-  // The slots hold nobody yet: who may be put in one, and what of them
-  // is shown, is a rule that doesn't exist yet. Until it does, every
-  // slot renders empty (a muted frame with a "+") and the readout beside
-  // it is placeholder ruling, not data. When that rule lands, fill
-  // `members` below with the profiles in each slot — the layout does not
-  // need to change for it.
+  // A slot is filled hand-to-hand, by code (see db/hive_slots.sql): every
+  // member holds one code per Istanbul week, tapping a "+" asks for
+  // someone else's, and whoever it belongs to stands in that slot for a
+  // week. There is no member search and no follow button on purpose —
+  // to put someone in your honeycomb you have to have been told their
+  // code, which means you saw them, and both the code and the placement
+  // run out, so the honeycomb empties itself unless that keeps
+  // happening. It is a record of contact, not a follower list.
+  //
+  // What is *shown* of an occupant beside their frame is still the
+  // undesigned half: name, district and the week running down, no more.
+  // The rest of that readout stays placeholder ruling until there's a
+  // rule for it.
   // ══════════════════════════════════════════════════════════════
   const HIVE_SLOT_COUNT = 6;
+  const HIVE_CODE_LENGTH = 6;
 
   // How the three rows are laid out, in slot order (0-5, clockwise-ish
   // from the top-left): two slots up top, one either side of the user,
@@ -1014,33 +1027,64 @@
     [76, 90, 68],
   ];
 
-  function hiveLinesHTML(slot, side) {
+  // Whole days left on a placement, rounded up, so the last day reads
+  // "1 gün" rather than "0". Plain duration arithmetic on an ISO
+  // timestamp — no date formatting is parsed back (see ist-date.js).
+  function hiveDaysLeft(expiresAt) {
+    const ms = new Date(expiresAt).getTime() - Date.now();
+    return Math.max(0, Math.ceil(ms / 86400000));
+  }
+
+  function hiveMemberName(member) {
+    return capitalizeName(`${member.first_name || ''} ${member.last_name || ''}`.trim()) || 'İsimsiz Üye';
+  }
+
+  // The readout beside a slot. An occupant gets the little that is
+  // settled — who they are, where they live, how much of their week is
+  // left — and an empty slot keeps the placeholder ruling: deliberately
+  // uneven (a rendered stat block is never a rectangle) and purely
+  // decorative, hence aria-hidden.
+  function hiveReadoutHTML(slot, side, member, t) {
+    if (member) {
+      const days = hiveDaysLeft(member.expires_at);
+      const left = `${days} ${t(days === 1 ? 'profile.hive.dayleft' : 'profile.hive.daysleft')}`;
+      const nb = member.neighborhood ? (NB_NAMES[member.neighborhood] || member.neighborhood) : '';
+      return `
+        <div class="ist-hive-lines ist-hive-lines-${side} ist-hive-readout">
+          <div class="ist-hive-readout-name">${esc(hiveMemberName(member))}</div>
+          ${nb ? `<div class="ist-hive-readout-meta">${esc(nb)}</div>` : ''}
+          <div class="ist-hive-readout-left">${esc(left)}</div>
+        </div>
+      `;
+    }
     const widths = HIVE_LINE_WIDTHS[slot % HIVE_LINE_WIDTHS.length];
     const lines = widths.map(w => `<span class="ist-hive-line" style="width:${w}%"></span>`).join('');
     return `<div class="ist-hive-lines ist-hive-lines-${side}" aria-hidden="true">${lines}</div>`;
   }
 
-  // One slot cell. `member` is always null for now (see the block
-  // comment above); the filled branch is written out so wiring a member
-  // in later is a matter of passing one, not of rebuilding the cell.
+  // One slot cell — a button either way: an empty one opens the code
+  // form, a filled one opens that occupant's little panel (which is
+  // where the slot is emptied again). Both stay inside this same sheet
+  // rather than opening a second one over it (see hivePanelHTML).
   function hiveSlotHTML(slot, member, t) {
     if (member) {
+      const name = hiveMemberName(member);
       return `
-        <div class="ist-hive-cell ist-hive-slot-filled" data-slot="${slot}" data-user-id="${esc(member.id)}">
+        <button type="button" class="ist-hive-cell ist-hive-slot-filled" data-slot="${slot}" title="${esc(name)}" aria-label="${esc(name)}">
           <div class="ist-pc-cover-avatar ist-hive-frame">
             ${coverBadgesHTML(member)}
             <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
           </div>
-        </div>
+        </button>
       `;
     }
     const label = t('profile.hive.empty');
     return `
-      <div class="ist-hive-cell" data-slot="${slot}">
-        <div class="hexframe ist-hive-frame ist-hive-slot" title="${esc(label)}" aria-label="${esc(label)}" role="img">
+      <button type="button" class="ist-hive-cell" data-slot="${slot}" title="${esc(label)}" aria-label="${esc(label)}">
+        <div class="hexframe ist-hive-frame ist-hive-slot">
           <span class="ist-hive-plus" aria-hidden="true">+</span>
         </div>
-      </div>
+      </button>
     `;
   }
 
@@ -1056,12 +1100,23 @@
     `;
   }
 
+  // Your own code for the week, printed under the honeycomb — the other
+  // half of the exchange, and the only way anyone can put you in theirs.
+  function hiveCodeHTML(hive, t) {
+    if (!hive || !hive.code) return `<div class="ist-hive-code ist-hive-code-empty">&nbsp;</div>`;
+    return `
+      <div class="ist-hive-code">
+        <span class="ist-hive-code-label">${esc(t('profile.hive.codelabel'))}</span>
+        <span class="ist-hive-code-value">${esc(hive.code)}</span>
+        <button type="button" class="ist-pc-copy" id="po-hive-copy">${esc(t('profile.copy'))}</button>
+        <span class="ist-hive-code-hint">${esc(t('profile.hive.codehint'))}</span>
+      </div>
+    `;
+  }
+
   function hiveHTML(opts) {
     const t = opts.t;
-    // Slot → member map, once slots can actually hold anyone. Empty
-    // until that rule exists, which is what makes every cell render as
-    // an empty frame today.
-    const members = opts.members || {};
+    const members = (opts.hive && opts.hive.slots) || {};
     const rows = HIVE_ROWS.map(row => {
       const cells = [];
       row.slots.forEach((slot, i) => {
@@ -1072,13 +1127,209 @@
       const [leftSlot, rightSlot] = [row.slots[0], row.slots[row.slots.length - 1]];
       return `
         <div class="ist-hive-row">
-          ${hiveLinesHTML(leftSlot, 'left')}
+          ${hiveReadoutHTML(leftSlot, 'left', members[leftSlot] || null, t)}
           <div class="ist-hive-cells">${cells.join('')}</div>
-          ${hiveLinesHTML(rightSlot, 'right')}
+          ${hiveReadoutHTML(rightSlot, 'right', members[rightSlot] || null, t)}
         </div>
       `;
     }).join('');
-    return `<div class="ist-hive" data-slots="${HIVE_SLOT_COUNT}">${rows}</div>`;
+    return `
+      <div class="ist-hive" data-slots="${HIVE_SLOT_COUNT}">${rows}</div>
+      ${hiveCodeHTML(opts.hive, t)}
+    `;
+  }
+
+  // The one slot's panel, shown in the honeycomb's place inside the same
+  // sheet — the site's one sheet geometry means a second surface here
+  // would have to be a second sheet stacked over the profile, so the
+  // honeycomb drills in the way the Kahve Endeksi board drills into a
+  // venue on mobile instead: same box, back link, one thing at a time.
+  function hivePanelHTML(state) {
+    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
+    const panel = state.hivePanel;
+    const member = (state.hive && state.hive.slots && state.hive.slots[panel.slot]) || null;
+    const back = `<button type="button" class="ist-hive-back" id="po-hive-back">${esc(t('profile.hive.back'))}</button>`;
+
+    if (member) {
+      const days = hiveDaysLeft(member.expires_at);
+      const nb = member.neighborhood ? (NB_NAMES[member.neighborhood] || member.neighborhood) : '—';
+      return `
+        <div class="ist-hive-panel">
+          ${back}
+          <div class="ist-hive-panel-frame">
+            <div class="ist-pc-cover-avatar">
+              ${coverBadgesHTML(member)}
+              <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
+            </div>
+          </div>
+          <div class="ist-hive-panel-name">${esc(hiveMemberName(member))}</div>
+          <div class="ist-hive-panel-meta">${esc(nb)}</div>
+          <div class="ist-hive-panel-meta">${esc(`${days} ${t(days === 1 ? 'profile.hive.dayleft' : 'profile.hive.daysleft')}`)}</div>
+          <button type="button" class="ist-hive-remove" id="po-hive-remove">${esc(t('profile.hive.remove'))}</button>
+          <div class="ist-hive-panel-msg" id="po-hive-msg">${esc(panel.error || '')}</div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="ist-hive-panel">
+        ${back}
+        <div class="ist-hive-panel-title">${esc(t('profile.hive.addtitle'))}</div>
+        <div class="ist-hive-panel-hint">${esc(t('profile.hive.addhint'))}</div>
+        <input class="ist-pc-input ist-hive-input" id="po-hive-code" type="text"
+               inputmode="latin" autocomplete="off" autocapitalize="characters" spellcheck="false"
+               maxlength="${HIVE_CODE_LENGTH}" placeholder="${'•'.repeat(HIVE_CODE_LENGTH)}"
+               value="${esc(panel.value || '')}">
+        <button type="button" class="ist-pc-save ist-hive-submit" id="po-hive-submit">${esc(t('profile.hive.add'))}</button>
+        <div class="ist-hive-panel-msg" id="po-hive-msg">${esc(panel.error || '')}</div>
+      </div>
+    `;
+  }
+
+  // ── The honeycomb's own little render/fetch loop ──
+  // It re-renders in place (into #po-hive-mount) rather than through
+  // renderOverlayBody, so tapping a slot or coming back from the code
+  // form doesn't rebuild the rest of the profile page under it.
+  function hiveMountHTML() {
+    return `<div id="po-hive-mount"></div>`;
+  }
+
+  function renderHive(state) {
+    const mount = document.getElementById('po-hive-mount');
+    if (!mount) return;
+    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
+    mount.innerHTML = state.hivePanel
+      ? hivePanelHTML(state)
+      : hiveHTML({
+          profile: state.profile,
+          avatarUrl: state.avatarUrl, avatarHair: state.avatarHair, avatarHat: state.avatarHat,
+          avatarAccessory: state.avatarAccessory, avatarShirt: state.avatarShirt,
+          displayName: state.hiveDisplayName || '',
+          hive: state.hive, t,
+        });
+    wireHiveEvents(state);
+  }
+
+  // Both calls are best-effort: before db/hive_slots.sql has been run the
+  // RPCs simply aren't there, and the honeycomb should still draw (six
+  // empty frames, no code) rather than the profile page failing to open.
+  async function loadHive(state) {
+    state.hiveLoaded = true;
+    const { sb } = state;
+    const [codeRes, slotsRes] = await Promise.all([
+      sb.rpc('hive_my_code'),
+      sb.rpc('hive_my_slots'),
+    ]);
+    const code = Array.isArray(codeRes.data) ? codeRes.data[0] : codeRes.data;
+    const slots = {};
+    (slotsRes.data || []).forEach(row => { slots[row.slot] = row; });
+    state.hive = { code: code ? code.code : null, slots };
+    renderHive(state);
+  }
+
+  async function reloadHiveSlots(state) {
+    const { data } = await state.sb.rpc('hive_my_slots');
+    const slots = {};
+    (data || []).forEach(row => { slots[row.slot] = row; });
+    state.hive = Object.assign({}, state.hive, { slots });
+  }
+
+  function wireHiveEvents(state) {
+    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
+    const mount = document.getElementById('po-hive-mount');
+    if (!mount) return;
+
+    // Bound to the mount, never to `document`: all three carousel pages
+    // share one document (see router.js), so a document-level handler
+    // would keep firing after navigating away from Anahane.
+    mount.querySelectorAll('.ist-hive-cell[data-slot]').forEach(cell => {
+      cell.addEventListener('click', () => {
+        state.hivePanel = { slot: parseInt(cell.dataset.slot, 10) };
+        renderHive(state);
+      });
+    });
+
+    const backBtn = document.getElementById('po-hive-back');
+    if (backBtn) backBtn.addEventListener('click', () => {
+      state.hivePanel = null;
+      renderHive(state);
+    });
+
+    const copyBtn = document.getElementById('po-hive-copy');
+    if (copyBtn) copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText((state.hive && state.hive.code) || '');
+      const orig = copyBtn.textContent;
+      copyBtn.textContent = t('profile.copied');
+      setTimeout(() => { copyBtn.textContent = orig; }, 1500);
+    });
+
+    const input = document.getElementById('po-hive-code');
+    const submit = document.getElementById('po-hive-submit');
+    if (input && submit) {
+      input.addEventListener('input', () => {
+        // The codes are printed uppercase and read off a screen, so type
+        // them in whatever case and drop anything that isn't in the
+        // alphabet (see db/hive_slots.sql).
+        const cleaned = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, HIVE_CODE_LENGTH);
+        if (cleaned !== input.value) input.value = cleaned;
+        state.hivePanel.value = cleaned;
+      });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit.click(); });
+      submit.addEventListener('click', () => claimHiveSlot(state, input.value));
+      input.focus();
+    }
+
+    const removeBtn = document.getElementById('po-hive-remove');
+    if (removeBtn) removeBtn.addEventListener('click', () => releaseHiveSlot(state));
+  }
+
+  async function claimHiveSlot(state, rawCode) {
+    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
+    const panel = state.hivePanel;
+    const code = String(rawCode || '').trim().toUpperCase();
+    const msgEl = document.getElementById('po-hive-msg');
+    const btn = document.getElementById('po-hive-submit');
+    if (code.length !== HIVE_CODE_LENGTH) {
+      if (msgEl) msgEl.textContent = t('profile.hive.err.short');
+      return;
+    }
+
+    btn.disabled = true;
+    if (msgEl) msgEl.textContent = '';
+    const { data, error } = await state.sb.rpc('hive_claim_code', { p_code: code, p_slot: panel.slot });
+    const row = Array.isArray(data) ? data[0] : data;
+    const status = error ? 'failed' : ((row && row.status) || 'failed');
+
+    if (status !== 'ok') {
+      btn.disabled = false;
+      panel.value = code;
+      if (msgEl) msgEl.textContent = t(`profile.hive.err.${status}`);
+      return;
+    }
+
+    await reloadHiveSlots(state);
+    state.hivePanel = null;
+    renderHive(state);
+  }
+
+  async function releaseHiveSlot(state) {
+    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
+    const slot = state.hivePanel.slot;
+    const btn = document.getElementById('po-hive-remove');
+    btn.disabled = true;
+    const { error } = await state.sb
+      .from('hive_slots').delete()
+      .eq('owner_id', state.user.id)
+      .eq('slot', slot);
+    if (error) {
+      btn.disabled = false;
+      const msgEl = document.getElementById('po-hive-msg');
+      if (msgEl) msgEl.textContent = t('profile.hive.err.failed');
+      return;
+    }
+    await reloadHiveSlots(state);
+    state.hivePanel = null;
+    renderHive(state);
   }
 
   // Drag-and-drop repositioning of cover badges (Profil tab only — the
@@ -1289,6 +1540,14 @@
     wireShirtCarousel(state);
     // Every block below is optional: which ones exist depends on the page
     // this was opened from (see PROFILE_SECTIONS).
+    if (document.getElementById('po-hive-mount')) {
+      // Draws immediately from whatever is already cached (empty frames
+      // on the first open) and fills itself in when the fetch lands, so
+      // the sheet never opens onto a blank body.
+      state.hiveDisplayName = `${state.profile?.first_name || ''} ${state.profile?.last_name || ''}`.trim() || state.user.email;
+      renderHive(state);
+      if (!state.hiveLoaded) loadHive(state);
+    }
     if (document.getElementById('po-weekgrid-mount')) {
       getWeekGameStatus(sb, user.id).then(status => {
         const m = document.getElementById('po-weekgrid-mount');
