@@ -67,16 +67,13 @@
     // filled by handing someone your weekly code (see hiveHTML in
     // profile-card.js and db/hive_slots.sql).
     'profile.hive.empty':   { default: 'Boş yer',               more_english: 'Empty slot' },
-    'profile.hive.addtitle':{ default: 'Bu yere birini koy',    more_english: 'Put someone here' },
-    'profile.hive.addhint': { default: 'Bu haftaki hane kodunu gir. Bir hafta boyunca burada durur.',
-                              more_english: 'Enter their code for this week. They stay here for a week.' },
+    'profile.hive.codeprompt':{ default: 'HANE KODU',           more_english: 'HANE CODE' },
     'profile.hive.add':     { default: 'Ekle',                  more_english: 'Add' },
-    'profile.hive.back':    { default: '← Geri',                more_english: '← Back' },
     'profile.hive.remove':  { default: 'Çıkar',                 more_english: 'Remove' },
     'profile.hive.dayleft': { default: 'gün kaldı',             more_english: 'day left' },
     'profile.hive.daysleft':{ default: 'gün kaldı',             more_english: 'days left' },
     'profile.hive.codelabel':{ default: 'BU HAFTAKİ HANE KODUN', more_english: 'YOUR CODE THIS WEEK' },
-    'profile.hive.codehint':{ default: 'pazartesi yenilenir',   more_english: 'renews Monday' },
+    'profile.hive.codehint':{ default: 'pazar günü yenilenir',  more_english: 'renews Sunday' },
     'profile.hive.err.short':          { default: 'Kod 6 karakter.',            more_english: 'The code is 6 characters.' },
     'profile.hive.err.invalid_code':   { default: 'Bu hafta böyle bir kod yok.', more_english: 'No such code this week.' },
     'profile.hive.err.self':           { default: 'Bu senin kendi kodun.',       more_english: "That's your own code." },

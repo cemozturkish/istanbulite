@@ -267,8 +267,12 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 
 **Tables: `hive_codes` + `hive_slots`** — the hane honeycomb on Anahane (`db/hive_slots.sql`).
 - `hive_codes`: `(user_id, week_start)` PK, `code` (6 chars, no I/O/0/1), unique per `(week_start, code)`.
-  One code per member per Istanbul week — `week_start` is Monday, resolved server-side by
-  `public.hive_week_start()`. RLS: a member may SELECT **only their own** row and there is no client
+  One code per member per Istanbul week — `week_start` is the **Sunday** on or before today
+  (`db/hive_slots_v2_sunday_week.sql`), resolved server-side by `public.hive_week_start()`. Note
+  this is the one week on the site that does *not* start Monday like the profile's game grid: the
+  code week is the rhythm of seeing people, and it turns over on Sunday. Only the live week's codes
+  resolve, which is what makes them renew — last week's rows are left alone and simply stop
+  matching. RLS: a member may SELECT **only their own** row and there is no client
   write policy at all; that a code cannot be looked up is precisely why holding one means it was
   handed to you.
 - `hive_slots`: `(owner_id, slot)` PK with `slot` 0–5, plus `member_id`, `placed_at`, `expires_at`.
@@ -606,9 +610,16 @@ flow — to put someone in your honeycomb you have to have been told their code,
 them, and since both the code and the placement run out, the honeycomb empties itself unless that
 keeps happening. It is a record of contact, not a follower list, and it is the closest thing to a
 connection the site has (still no DMs — ever). What is *shown* of an occupant beside their frame is
-the undesigned half: name, district, and the week running down, no more; the rest of that readout
-is still placeholder ruling. Tapping a slot opens its panel **inside the same sheet** (the code
-form, or the occupant with a Çıkar button) — never a second sheet stacked over the profile.
+the undesigned half: name, district, and the week running down, no more.
+
+Each slot owns the space on the outer side of its own row, and that one space does both jobs: it
+prints the occupant, and it is what the frame **extends into** when pressed — the code field for an
+empty slot, a Çıkar button for a filled one. Pressing a frame never opens a page or a second sheet:
+the honeycomb stays on screen and the frame that was pressed stays under the finger (pressing it
+again folds the extension back up, which is why there is no close button in it). The two side
+columns stay equal whether or not a slot is open — an extension that took the row's free width for
+itself would shove the honeycomb sideways; on a phone, where there is no free width to take, the
+frames give up size instead and the honeycomb draws back in place.
 
 None of the three scrolls: every set fits inside the sheet, the way a politician's page does. If a
 new block stops fitting, drop a block from that page — do not turn the page into a scroller.
