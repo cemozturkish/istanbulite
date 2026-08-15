@@ -63,9 +63,26 @@
     'profile.email':        { default: 'E-posta',             more_english: 'Email' },
     'profile.thisweek':     { default: 'Bu Hafta',             more_english: 'This Week' },
     'profile.profileinfo':  { default: 'Profil Bilgileri',     more_english: 'Profile Info' },
-    // The hane honeycomb on anahane: the six slots around your own frame
-    // (see hiveHTML in profile-card.js). Nobody can be put in one yet.
+    // The hane honeycomb on anahane: the six slots around your own frame,
+    // filled by handing someone your weekly code (see hiveHTML in
+    // profile-card.js and db/hive_slots.sql).
     'profile.hive.empty':   { default: 'Boş yer',               more_english: 'Empty slot' },
+    'profile.hive.addtitle':{ default: 'Bu yere birini koy',    more_english: 'Put someone here' },
+    'profile.hive.addhint': { default: 'Bu haftaki hane kodunu gir. Bir hafta boyunca burada durur.',
+                              more_english: 'Enter their code for this week. They stay here for a week.' },
+    'profile.hive.add':     { default: 'Ekle',                  more_english: 'Add' },
+    'profile.hive.back':    { default: '← Geri',                more_english: '← Back' },
+    'profile.hive.remove':  { default: 'Çıkar',                 more_english: 'Remove' },
+    'profile.hive.dayleft': { default: 'gün kaldı',             more_english: 'day left' },
+    'profile.hive.daysleft':{ default: 'gün kaldı',             more_english: 'days left' },
+    'profile.hive.codelabel':{ default: 'BU HAFTAKİ HANE KODUN', more_english: 'YOUR CODE THIS WEEK' },
+    'profile.hive.codehint':{ default: 'pazartesi yenilenir',   more_english: 'renews Monday' },
+    'profile.hive.err.short':          { default: 'Kod 6 karakter.',            more_english: 'The code is 6 characters.' },
+    'profile.hive.err.invalid_code':   { default: 'Bu hafta böyle bir kod yok.', more_english: 'No such code this week.' },
+    'profile.hive.err.self':           { default: 'Bu senin kendi kodun.',       more_english: "That's your own code." },
+    'profile.hive.err.slot_taken':     { default: 'Bu yer dolu.',                more_english: 'That slot is taken.' },
+    'profile.hive.err.already_in_hive':{ default: 'Bu üye zaten hanende.',       more_english: 'They are already in your hane.' },
+    'profile.hive.err.failed':         { default: 'Olmadı, tekrar dene.',        more_english: "That didn't work, try again." },
 
     // login / signup (index.html)
     'auth.email':          { default: 'E-posta',             more_english: 'Email' },

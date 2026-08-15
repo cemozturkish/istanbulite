@@ -262,6 +262,23 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 - This exists because the pick used to be client-side: the answer's index was `hash(date) % pool.length`, so two clients whose snapshot of the used rows differed by a single row computed different words, and whoever lost the insert race kept playing their own word anyway. Never reintroduce a client-side fallback pick — a locally-invented word looks normal while being a puzzle nobody else is playing, and its result lands on the shared scoreboard.
 - RLS: authenticated users SELECT all; direct INSERT only for an assigned Sözcü's *own* row before its deadline (midnight Istanbul at the start of `used_on`), matching the UPDATE policy; DELETE admin-only.
 
+**Tables: `hive_codes` + `hive_slots`** — the hane honeycomb on Anahane (`db/hive_slots.sql`).
+- `hive_codes`: `(user_id, week_start)` PK, `code` (6 chars, no I/O/0/1), unique per `(week_start, code)`.
+  One code per member per Istanbul week — `week_start` is Monday, resolved server-side by
+  `public.hive_week_start()`. RLS: a member may SELECT **only their own** row and there is no client
+  write policy at all; that a code cannot be looked up is precisely why holding one means it was
+  handed to you.
+- `hive_slots`: `(owner_id, slot)` PK with `slot` 0–5, plus `member_id`, `placed_at`, `expires_at`.
+  Unique `(owner_id, member_id)` so one person can't hold two of your six. RLS: SELECT/DELETE your
+  own rows (emptying a slot early is a plain delete); no client INSERT/UPDATE — filling a slot means
+  resolving a code you aren't allowed to read.
+- Functions: `hive_my_code()` (SECURITY DEFINER, issues this week's code on first ask),
+  `hive_claim_code(code, slot)` (SECURITY DEFINER; returns a *status* — `ok` / `invalid_code` /
+  `self` / `slot_taken` / `already_in_hive` — that the UI words itself, see `profile.hive.err.*` in
+  `i18n.js`; places for 7 days and sweeps the owner's expired rows first), and `hive_my_slots()`
+  (SECURITY INVOKER, the caller's live slots joined to each occupant's public profile fields, with
+  expiry settled by the database rather than the device clock).
+
 **Table: `app_settings`** — generic admin-managed key/value feature toggle table (`db/app_settings.sql`).
 - `key text pk`, `value boolean`, `updated_by`, `updated_at`.
 - Currently one row: `onboarding_enabled` — global on/off switch for the new-account onboarding flow. Read by `onboarding.js`'s `maybeRun()` (missing row or `value = true` = enabled); a row with `value = false` disables it site-wide. Managed from the "Onboarding" panel at the top of admin.html's Users tab.
@@ -334,7 +351,8 @@ sb.from('articles').delete().eq('id', id)
 - Right column: breaking news feed (with polls, series, updates)
 - The personal layer lives here: the user's own profile, avatar, home identity
 - Opening your profile card here opens the **hane honeycomb** — your frame in the middle,
-  six slots for other members around it (see `PROFILE_SECTIONS` under Site-wide defaults)
+  six slots for other members around it, each filled by entering that member's weekly code
+  (see `PROFILE_SECTIONS` under Site-wide defaults and `db/hive_slots.sql`)
 - Vision: this page is "you + Istanbul" — see Vision & Product Philosophy above
 
 ### `admin.html` — Admin Dashboard
@@ -503,10 +521,20 @@ avatar, name, district) is Kahvehane's and Kütüphane's; the week's game grid i
 account and settings — with the Kişiselleştir and Çıkış Yap buttons that act on them — are
 Kütüphane's. Anahane is **the hane honeycomb** (`hiveHTML`): your own cover frame as the middle
 cell of seven, with six slots packed around it for other members — so the middle page's profile is
-both who you are and who you keep close. The slots hold nobody yet; who may go in one, and what of
-them is shown beside it, is a rule that hasn't been designed (the readout next to each slot is
-placeholder ruling until it is). The honeycomb reuses the cover's own frame for its middle cell —
-same mask, same drawn ring, same badges — so there is no second frame treatment to keep in sync.
+both who you are and who you keep close. The honeycomb reuses the cover's own frame for its middle
+cell — same mask, same drawn ring, same badges — so there is no second frame treatment to keep in
+sync.
+
+A slot is filled **hand-to-hand, by code** (`db/hive_slots.sql`): every member holds one code per
+Istanbul week, tapping an empty slot asks for someone else's, and whoever it belongs to stands
+there for a week. There is deliberately no member search, no follow button and no request-accept
+flow — to put someone in your honeycomb you have to have been told their code, which means you saw
+them, and since both the code and the placement run out, the honeycomb empties itself unless that
+keeps happening. It is a record of contact, not a follower list, and it is the closest thing to a
+connection the site has (still no DMs — ever). What is *shown* of an occupant beside their frame is
+the undesigned half: name, district, and the week running down, no more; the rest of that readout
+is still placeholder ruling. Tapping a slot opens its panel **inside the same sheet** (the code
+form, or the occupant with a Çıkar button) — never a second sheet stacked over the profile.
 
 None of the three scrolls: every set fits inside the sheet, the way a politician's page does. If a
 new block stops fitting, drop a block from that page — do not turn the page into a scroller.
