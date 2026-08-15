@@ -1058,8 +1058,7 @@
       #main-site {
         position: relative;
         height: 100%;
-        overflow-y: auto;
-        overflow-x: hidden;
+        overflow: hidden;
         -webkit-overflow-scrolling: touch;
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -1075,8 +1074,31 @@
            and only then positions the shorter track set in the container,
            so row 2 sizes to one short card stack and never claims the
            leftover space -- the same trap kahvehane.html hit (see its own
-           grid-template-rows comment). */
-        grid-template-rows: auto 1fr;
+           grid-template-rows comment).
+
+           Both tracks are stated, neither is left to content, and that is
+           the whole point -- kahvehane.html's row 1 already reads exactly
+           like this, and this is the page catching up to it:
+
+           Row 1 is the map's square written out (main bleeds to the true
+           screen edges, so its rendered width is always 100vw, and the
+           extra term matches main's own margin-top below). Left as `auto`,
+           the track's base size was main's MIN-content height, which for
+           an aspect-ratio panel is next to nothing -- so as soon as row 2
+           wanted more than the leftover space, the grid paid it out of the
+           map: with three days of news the square collapsed from 393px to
+           250px on a phone, taking the shared hero line down with it and
+           sliding Hane's cards up out of line with Kütüphane's and
+           Kahvehane's.
+
+           Row 2 is minmax(0, 1fr), not a bare `1fr` -- a bare one is
+           minmax(auto, 1fr), and that auto minimum is the news/events
+           stacks' own height, which is the demand that squeezed row 1 in
+           the first place. Zero as the minimum makes row 2 exactly the
+           leftover space and no more; a feed with more cards than that
+           scrolls inside its own sidebar (see .sidebar-left/.sidebar-right
+           below) instead of growing the row. */
+        grid-template-rows: calc(100vw + var(--map-hero-top)) minmax(0, 1fr);
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
            the map -- a different color from the map's own #f7f7f7,
@@ -1265,15 +1287,39 @@
 
       /* Both sidebars keep their desktop flex column (see the feeds' auto
          margin above, which needs a flex parent to mean anything) and
-         only drop the internal scrolling: on mobile the page scrolls, the
-         columns don't. .sidebar-right also takes the flex:1 its left
-         counterpart already has in the desktop rule -- without it the
-         news sidebar is only as tall as its own cards, and pushing the
-         feed to the bottom of a box that is exactly the feed's height
-         moves nothing. */
-      .sidebar-left { overflow: visible; }
+         keep the internal scrolling too -- the page itself does not scroll
+         (see #main-site's overflow above), so row 2's band between the
+         hero line and the tab bar is all the height either column ever
+         gets, and a stack taller than the band has to absorb the overflow
+         here. It used to be handed back to the page, which grew the row,
+         squeezed the map and ran the last card down behind the fixed tab
+         bar. The scroller is the sidebar rather than the feed inside it so
+         that the feed stays a plain in-flow box whose auto margin can push
+         it to the bottom of the scrollable area.
+         .sidebar-right also takes the flex:1 its left counterpart already
+         has in the desktop rule -- without it the news sidebar is only as
+         tall as its own cards, and pushing the feed to the bottom of a box
+         that is exactly the feed's height moves nothing. min-height:0 on
+         both (and on the columns) because a flex/grid item's automatic
+         minimum size is its content: without it the box refuses to be
+         shorter than the whole stack and the overflow escapes upward
+         again, one level at a time. */
+      .col-left, .col-right { min-height: 0; }
+      .sidebar-left, .sidebar-right {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        /* No scrollbar: these columns are frameless cards floating on the
+           map, so a track drawn down the middle of the artwork would read
+           as a seam in the drawing rather than as chrome. */
+        scrollbar-width: none;
+      }
+      .sidebar-left::-webkit-scrollbar,
+      .sidebar-right::-webkit-scrollbar { display: none; }
       #breaking-news-feed, #events-panel { overflow: visible; }
-      .sidebar-right { overflow: visible; flex: 1; }
       .sidebar-label {
         font-size: 9px;
         letter-spacing: 1.5px;
