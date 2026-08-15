@@ -332,6 +332,18 @@
       fill: rgba(var(--ink-rgb), 0.32);
       stroke: var(--accent);
     }
+    /* The countries a Dünya story is about, lit for as long as that
+       story's sheet is open (see setNewsCountryHighlight). Same
+       declaration Hane gives a district while its news card is open
+       (.neighborhood.card-hover there) -- one story, one treatment, on
+       whichever map the story's places are drawn. Listed after .active so
+       a story's countries stay lit even over a country the reader had
+       selected before opening it. */
+    .country.news-active {
+      fill: rgba(var(--ink-rgb), 0.32);
+      stroke: var(--accent);
+      stroke-width: 3;
+    }
     /* Plain text, no frame/shadow — matches the HANE/KÜTÜPHANE/KAHVEHANE
        nav tab style (nav a above), not a floating pill. */
     .map-label {
@@ -1058,6 +1070,27 @@
       font-style: italic;
       white-space: nowrap;
       flex-shrink: 0;
+    }
+    /* The countries a story is about, named under its body in the open
+       sheet -- the caption to what the map is lighting behind it (see
+       .country.news-active). Quiet on purpose: the map is doing the
+       telling, this is only there so the story still says where it is on
+       a screen where that map isn't the drawing. */
+    .news-countries {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 10px;
+    }
+    .news-countries span {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      border: 1px solid var(--rule);
+      padding: 2px 7px;
     }
     .article.openable {
       cursor: pointer;
@@ -3951,6 +3984,10 @@ async function openCountrySheet(countryId, countryName) {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
+  // Touching the map can happen while a Dünya story's sheet is open (it
+  // rests under the map): this country's page replaces that story, so the
+  // story's highlight goes with it -- what is lit stays what is open.
+  clearNewsCountryHighlight();
   area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   IstSheet.open(overlay);
   _closeReaderOverlay = closeReaderOverlay;
@@ -4075,12 +4112,49 @@ function libSafeUrl(u) {
   return /^https?:\/\//i.test(s) ? s : null;
 }
 
+// ── Which countries a Dünya story is about ──
+// The admin ticks them while posting it (db/breaking_news_countries.sql);
+// opening the story here lights every one of them on the phone map, so a
+// story about Suriye and Irak shows the reader where it is happening
+// instead of naming two places they then have to find.
+//
+// Names are read off the map's own shapes rather than fetched from
+// public.countries: the story then names a country with exactly the word
+// the caption under the map prints when you touch it, and the feed costs
+// one query, not two.
+function newsCountryIds(n) {
+  return (n.breaking_news_countries || []).map(c => c.country).filter(Boolean);
+}
+
+// A country can be several polygons (Türkiye's two halves, Yunanistan
+// plus Girit, Azerbaycan plus Nahçıvan) -- data-country is what makes
+// them one country, so all of them light together.
+function countryShapes(countryId) {
+  return document.querySelectorAll(`.country[data-country="${CSS.escape(countryId)}"]`);
+}
+
+function newsCountryName(countryId) {
+  const shape = countryShapes(countryId)[0];
+  return (shape && shape.getAttribute('data-name')) || countryId;
+}
+
+// Lit for as long as the story's sheet is open. Cleared by whatever
+// replaces it -- closing the sheet, or touching a country on the map,
+// which opens that country's own page over the story.
+function setNewsCountryHighlight(countryIds) {
+  document.querySelectorAll('.country.news-active')
+    .forEach(el => el.classList.remove('news-active'));
+  (countryIds || []).forEach(id =>
+    countryShapes(id).forEach(el => el.classList.add('news-active')));
+}
+function clearNewsCountryHighlight() { setNewsCountryHighlight([]); }
+
 async function loadDunyaNews() {
   const feed = document.getElementById('dunya-news-feed');
   if (!feed) return;
   const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
   const { data, error } = await sb.from('breaking_news')
-    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*), breaking_news_series(name)')
+    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*), breaking_news_series(name), breaking_news_countries(country)')
     .eq('category', 'dunya')
     .gte('updated_at', cutoff)
     .order('updated_at', { ascending: false });
@@ -4173,6 +4247,19 @@ function buildDunyaNewsDetailHtml(n) {
     </div>
   ` : '';
   const lastTouch = n.updated_at || n.created_at;
+  // The same countries the map is lighting behind this sheet, named. On a
+  // phone this is the caption to the highlight; on a desktop, where the
+  // world map isn't the drawing on screen, it is the whole of it.
+  const countryIds = newsCountryIds(n);
+  const countriesHtml = countryIds.length ? `
+    <div class="news-countries">
+      ${countryIds.map(id =>
+        // Cased in JS with tr-TR, like the kicker above it: leaving it to
+        // CSS turns Sırbistan's dotless ı and dotted i into the wrong
+        // letters on any engine that doesn't read the page's lang.
+        `<span>${libEsc(newsCountryName(id).toLocaleUpperCase('tr-TR'))}</span>`).join('')}
+    </div>
+  ` : '';
   return `
     <div class="article">
       <div class="meta-row">
@@ -4181,6 +4268,7 @@ function buildDunyaNewsDetailHtml(n) {
       </div>
       <h3>${libEsc(n.title)}</h3>
       ${n.body ? `<p>${libEsc(n.body)}</p>` : ''}
+      ${countriesHtml}
       ${timelineHtml}
       <div class="sources">
         <button type="button" class="sources-toggle" aria-expanded="false">
@@ -4208,6 +4296,10 @@ function openDunyaNewsDetail(n) {
   document.getElementById('dunya-detail-back').addEventListener('click', closeReaderOverlay);
   IstSheet.open(overlay);
   _closeReaderOverlay = closeReaderOverlay;
+  // Light the story's countries behind the sheet. The sheet comes to rest
+  // under the map (see IstSheet.pull), so the reader sees where the story
+  // they just opened is happening while they read it.
+  setNewsCountryHighlight(newsCountryIds(n));
   (n.breaking_news_polls || []).forEach(p => loadAndRenderDunyaPoll(p));
 }
 
@@ -4460,6 +4552,10 @@ function closeReaderOverlay() {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
+  // Every way out of the sheet lands here (back button, backdrop, Escape,
+  // dragging it down), so a story's map highlight is dropped here rather
+  // than at each of them.
+  clearNewsCountryHighlight();
   // Content is cleared only once the sheet is off-screen, so it doesn't
   // empty mid-slide (see sheet.js).
   IstSheet.close(overlay, () => { area.innerHTML = ''; });
@@ -4487,6 +4583,9 @@ async function openTBMMSheet() {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
+  // Same as openCountrySheet: this page replaces whatever story was open,
+  // so that story's country highlight goes with it.
+  clearNewsCountryHighlight();
   area.innerHTML = `
     <div class="shelf-path">
       <div class="path-head">

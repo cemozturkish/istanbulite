@@ -212,7 +212,9 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians`, TBMM
 > seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `coffee_prices`
 > (the Kahve Endeksi — v3 adds the opening-hours and scheduled-discount columns that make it
-> live) and `coffee_comments` (what members say about a venue), and more). When in doubt, read the relevant `db/` file — it is the
+> live), `coffee_comments` (what members say about a venue), `countries` + `country_entries`
+> (what a country on Kütüphane's map opens) and `breaking_news_countries` (which countries a
+> Dünya story is about, lit on that map when the story opens), and more). When in doubt, read the relevant `db/` file — it is the
 > source of truth.
 
 **Table: `neighborhoods`** — lookup of valid neighborhood IDs.
@@ -406,6 +408,14 @@ sb.from('articles').delete().eq('id', id)
 - Everyone can read, like, and comment on articles
 - Per the vision, this side stays *less* interactive than Kahvehane — reading and observing
   the national level, not peer-to-peer engagement about it
+- The Dünya feed (`breaking_news` where `category = 'dunya'`) is **tied to the map**: the admin
+  ticks the countries a story is about while posting it (`breaking_news_countries`, a join table
+  — a story can be about Rusya *and* Ukrayna at once), and opening that story here lights every
+  one of them on the phone map behind the sheet, which rests under the map so the reader sees
+  where the story they just opened is happening. The story also names those countries under its
+  body — on a desktop, where the world map isn't the drawing on screen, that line is the whole of
+  it. Country names come off the map's own `data-name`, not a second fetch, so a story names a
+  place with the same word the caption prints when you touch it
 
 ### `tumcel.html` — Tümcel
 - Connections-style game where 16 sentence fragments must be regrouped into 4 quotes
