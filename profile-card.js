@@ -1421,7 +1421,7 @@
       <div class="ist-pc-settings-grid">
         <div class="ist-pc-settings-col ist-pc-settings-left">
           ${show.hive
-            ? hiveHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, t })
+            ? hiveMountHTML()
             : `${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText: yasadigiDisplay, editable: true, customizing, sozcuCount })}
           <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>`}
 
@@ -1547,6 +1547,15 @@
       state.hiveDisplayName = `${state.profile?.first_name || ''} ${state.profile?.last_name || ''}`.trim() || state.user.email;
       renderHive(state);
       if (!state.hiveLoaded) loadHive(state);
+    } else if (sectionsFor(state.page).hive) {
+      // The honeycomb only ever comes from renderHive: settingsPageHTML
+      // emits the empty mount and nothing else. Printing hiveHTML
+      // straight into the page instead draws a honeycomb that LOOKS
+      // right and is completely dead — the frames hover, and no slot
+      // ever opens, because none of the wiring below ran. That is what a
+      // bad merge did to this call site once, silently, so it says so
+      // out loud now rather than shipping an inert page again.
+      console.warn('profile-card: hive page rendered without #po-hive-mount — slots will not respond. settingsPageHTML must emit hiveMountHTML().');
     }
     if (document.getElementById('po-weekgrid-mount')) {
       getWeekGameStatus(sb, user.id).then(status => {
