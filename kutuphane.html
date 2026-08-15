@@ -2106,9 +2106,33 @@
        fixed full-bleed background layer for the stacking order to fall
        out correctly), with the tab bar pinned fixed at the very bottom. */
     @media (max-width: 768px) {
-      html {
+      /* html AND body, the same lock anahane.html and kahvehane.html
+         already carry -- this page only ever set `html`, and that is what
+         put the boxes and the Dünya cards behind the tab bar in mobile
+         Safari.
+
+         Everything below the map is positioned off the bottom of
+         #main-site, and frames.css sizes #main-site to `height: 100%`
+         (!important) -- of BODY. Body was left on its desktop
+         `height: 100vh` here, and on iOS `vh` is the LARGE viewport: the
+         page is sized as though Safari's bottom URL bar weren't there. The
+         tab bar meanwhile is position:fixed/bottom:0, which lands it above
+         that bar, on the SMALL viewport. So the page reserved its
+         navbar-height of space from a line roughly a URL bar lower than
+         the line the navbar is actually drawn on, and both stacks ended up
+         under it -- on a phone with the bar showing, which is every phone
+         that isn't the installed app.
+
+         dvh is the viewport as it is right now, and position:fixed +
+         width:100% pins the document to it so the value cannot drift
+         out from under the layout as the bar collapses on scroll. 100vh
+         stays as the fallback for engines without dvh. */
+      html, body {
+        height: 100vh;
         height: 100dvh;
         overflow: hidden;
+        position: fixed;
+        width: 100%;
       }
       /* Lives on #main-site (not body directly) for the same reason as
          the desktop rule above -- see that rule's comment. The map no
@@ -2120,7 +2144,11 @@
          on the bottom of the screen (see their auto margin below). The
          two sat the other way round until now (news left, boxes right). */
       #main-site {
-        height: 100dvh;
+        /* 100% of the body pinned above, not a viewport unit of its own:
+           frames.css sets `height: 100% !important` on #main-site, so a
+           100dvh written here never applied and only made it look as
+           though this element owned its own height. It follows body. */
+        height: 100%;
         display: grid;
         /* News gets the remaining space, boxes column sizes to its own
            tiles' content width instead of stretching to half the screen
