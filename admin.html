@@ -965,6 +965,41 @@
        doesn't lose them) but reads as inactive. */
     .cf-day-row.off .cf-day-name { color: var(--muted); }
     .cf-day-row.off input[type="time"] { opacity: 0.4; }
+    /* Ülke picker on the breaking-news forms (the post form and each
+       card's edit form). A scrolling grid of checkboxes rather than a
+       native <select multiple>: with 27 countries the native control
+       hides most of what is ticked behind its own scroll, and one stray
+       click without the modifier key clears every pick silently. Here
+       what is ticked stays visible and a click is a click. */
+    .country-picker {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+      gap: 1px 10px;
+      max-height: 172px;
+      overflow-y: auto;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      padding: 8px 10px;
+    }
+    .country-picker label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0;
+      font-size: 0.78rem;
+      font-weight: 400;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .country-picker input[type="checkbox"] {
+      width: 14px; height: 14px; margin: 0; cursor: pointer; accent-color: var(--accent);
+    }
+    /* Only Dünya stories are read on Kütüphane's world map, so the picker
+       is only offered for that category (see syncNewsCountryPicker). */
+    .country-picker-block { display: none; }
+    .country-picker-block.on { display: block; }
     .cf-mini-btn {
       padding: 4px 10px;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
@@ -1325,6 +1360,15 @@
       <p style="margin-top:-4px;font-size:0.7rem;color:var(--muted);font-style:italic;">
         Picking a neighborhood also pulses it on the map.
       </p>
+
+      <div class="country-picker-block" id="n-countries-block">
+        <label>Ülkeler (opsiyonel)</label>
+        <p style="margin-top:-4px;margin-bottom:6px;font-size:0.7rem;color:var(--muted);font-style:italic;">
+          Haberin geçtiği ülkeleri işaretleyin — Kütüphane'de o habere basıldığında
+          bu ülkeler haritada vurgulanır. Boş bırakılabilir.
+        </p>
+        <div class="country-picker" id="n-countries"></div>
+      </div>
 
       <label>Seri (opsiyonel)</label>
       <select id="n-series">
@@ -2954,8 +2998,20 @@ let allAdminNews = [];
 async function loadBreakingNews() {
   const listEl = document.getElementById('news-list');
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  // Needed to print each card's countries and to build the pickers below.
+  // A failure here is not fatal to the news list: the pickers say so and
+  // the stories still load.
+  await ensureCountriesLoaded().catch(err => console.error('[admin countries]', err));
+  // Filled once, not on every re-render — the list reloads after every
+  // source/update/poll added, and refilling would clear ticks the admin
+  // had already made on a story they are still composing.
+  const postPicker = document.getElementById('n-countries');
+  if (postPicker && !postPicker.children.length) {
+    postPicker.innerHTML = countryPickerHTML([]);
+    syncNewsCountryPicker();
+  }
   let query = sb.from('breaking_news')
-    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*, breaking_news_poll_option_votes(option))')
+    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*, breaking_news_poll_option_votes(option)), breaking_news_countries(country)')
     .order('updated_at', { ascending: false });
   if (newsViewMode === 'recent') {
     const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
@@ -3042,9 +3098,13 @@ function renderNewsList() {
     }).join('') : '';
     const newsDatetimeVal = n.created_at ? new Date(n.created_at).toISOString().slice(0, 16) : '';
     const seriesName = n.series_id ? SERIES_BY_ID.get(n.series_id) : null;
+    const newsCountries = (n.breaking_news_countries || []).map(c => c.country);
+    const countriesLabel = newsCountries.length
+      ? ' · ' + newsCountries.map(id => countryNameTr(id).toLocaleUpperCase('tr-TR')).join(', ')
+      : '';
     return `
       <div class="article-card" data-id="${n.id}"${n.archived_at ? ' style="opacity:0.6;"' : ''}>
-        <div class="a-neighborhood">${escapeHtml(categoryLabel(cat))}${seriesName ? ' · SERİ: ' + escapeHtml(seriesName) : ''} · ${ago}${n.archived_at ? ' · ARŞİVLENDİ' : ''}</div>
+        <div class="a-neighborhood">${escapeHtml(categoryLabel(cat))}${seriesName ? ' · SERİ: ' + escapeHtml(seriesName) : ''}${escapeHtml(countriesLabel)} · ${ago}${n.archived_at ? ' · ARŞİVLENDİ' : ''}</div>
         <h4>${escapeHtml(n.title)}</h4>
         ${n.body ? `<p>${escapeHtml(n.body)}</p>` : ''}
         <div class="sources-block">
@@ -3091,6 +3151,13 @@ function renderNewsList() {
           <input type="text" class="ne-title" value="${escapeHtml(n.title)}"/>
           <textarea class="ne-body" rows="3">${escapeHtml(n.body || '')}</textarea>
           <select class="ne-category">${catOptions}</select>
+          <div class="country-picker-block ne-countries-block">
+            <label style="margin:0 0 4px;font-size:0.75rem;color:var(--muted);">Ülkeler</label>
+            <!-- Filled when the form is actually opened (see
+                 ensureCardCountryPicker); the story's current countries
+                 ride along here until then. -->
+            <div class="country-picker ne-countries" data-countries="${escapeHtml(newsCountries.join(','))}"></div>
+          </div>
           <select class="ne-series">${seriesOptions}</select>
           <label style="margin:0;font-size:0.75rem;color:var(--muted);">Tarih ve saat</label>
           <input type="datetime-local" class="ne-datetime" value="${newsDatetimeVal}"/>
@@ -3111,9 +3178,50 @@ function renderNewsList() {
     if (form) {
       form.querySelector('.ne-category').value = cat;
       form.querySelector('.ne-series').value = n.series_id || '';
+      // Same rule as the post form: countries are only read on Kütüphane's
+      // Dünya feed, so the picker only stands open for that category.
+      form.querySelector('.ne-countries-block').classList.toggle('on', cat === 'dunya');
     }
   });
 }
+
+// Built when an edit form is opened rather than with the card: the
+// "Tümü" view renders up to 300 cards, and a picker inside each would be
+// thousands of checkboxes nobody has asked to see.
+function ensureCardCountryPicker(form) {
+  const box = form && form.querySelector('.ne-countries');
+  if (!box || box.children.length) return;
+  box.innerHTML = countryPickerHTML((box.dataset.countries || '').split(',').filter(Boolean));
+}
+
+// What a form's picker says now -- or, if it was never built (the story
+// isn't Dünya, or the admin fixed a typo without ever opening the
+// countries block), what the story already had. Saving a headline must
+// not silently drop a story's countries.
+function formCountries(form) {
+  const box = form.querySelector('.ne-countries');
+  if (!box) return [];
+  if (box.children.length) return pickedCountries(box);
+  return (box.dataset.countries || '').split(',').filter(Boolean);
+}
+
+// Keep each edit form's ülke picker in step with its category select --
+// delegated, so it survives every re-render of the list.
+document.getElementById('news-list').addEventListener('change', function(e) {
+  const sel = e.target.closest('.ne-category');
+  if (!sel) return;
+  const form = sel.closest('.news-edit-form');
+  if (sel.value === 'dunya') ensureCardCountryPicker(form);
+  form.querySelector('.ne-countries-block').classList.toggle('on', sel.value === 'dunya');
+});
+
+// The post form's own picker follows its category select the same way.
+function syncNewsCountryPicker() {
+  const block = document.getElementById('n-countries-block');
+  if (!block) return;
+  block.classList.toggle('on', document.getElementById('n-category').value === 'dunya');
+}
+document.getElementById('n-category').addEventListener('change', syncNewsCountryPicker);
 
 // Single delegated listener — set up once, survives every re-render.
 document.getElementById('news-list').addEventListener('click', function(e) {
@@ -3215,7 +3323,9 @@ async function saveNewsUpdateEdit(btn) {
 
 function showNewsEditForm(card) {
   card.querySelector('.card-actions').style.display = 'none';
-  card.querySelector('.news-edit-form').classList.add('open');
+  const form = card.querySelector('.news-edit-form');
+  form.classList.add('open');
+  ensureCardCountryPicker(form);
   card.querySelector('.ne-title').focus();
 }
 
@@ -3255,12 +3365,25 @@ async function saveNewsEdit(newsId, card) {
     .update({ title, body: body || null, category, neighborhood, series_id: seriesId, ...timestamps })
     .eq('id', newsId);
 
+  // A story moved off Dünya keeps no countries: they would sit there
+  // unreadable and come back the moment it was moved onto Dünya again.
+  // Untouched countries are left alone rather than rewritten, so fixing a
+  // headline is one request, not three.
+  const nextCountries = category === 'dunya' ? formCountries(form) : [];
+  const prevCountries = (form.querySelector('.ne-countries').dataset.countries || '')
+    .split(',').filter(Boolean);
+  const countriesChanged =
+    nextCountries.slice().sort().join(',') !== prevCountries.slice().sort().join(',');
+  const countriesErr = (error || !countriesChanged)
+    ? null : await saveNewsCountries(newsId, nextCountries);
+
   saveBtn.disabled = false;
   saveBtn.textContent = 'Kaydet';
 
-  if (error) {
-    statusEl.textContent = error.message;
+  if (error || countriesErr) {
+    statusEl.textContent = (error || countriesErr).message;
     statusEl.className = 'ne-status status-msg err';
+    if (countriesErr) loadBreakingNews();
     return;
   }
   loadBreakingNews();
@@ -3560,6 +3683,21 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
     title, body: body || null, neighborhood, category, series_id: seriesId, ...timestamps,
   }]).select().single();
 
+  // Countries only mean something on a Dünya story (that is the only feed
+  // that reads them), so ticks left behind from an earlier draft on another
+  // category are dropped rather than saved invisibly.
+  if (!error && category === 'dunya') {
+    const cErr = await saveNewsCountries(data.id, pickedCountries(document.getElementById('n-countries')));
+    if (cErr) {
+      btn.disabled = false;
+      btn.textContent = 'Post Breaking News';
+      statusEl.textContent = 'Posted, but the countries failed to save: ' + cErr.message;
+      statusEl.className = 'status-msg err';
+      loadBreakingNews();
+      return;
+    }
+  }
+
   if (!error && pollFieldsFilled === 3) {
     const { error: pollErr } = await sb.from('breaking_news_polls')
       .insert([{ news_id: data.id, question: pollQ, option_a: pollA, option_b: pollB }]);
@@ -3585,6 +3723,8 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   statusEl.className = 'status-msg ok';
   ['n-title','n-body','n-datetime','n-poll-q','n-poll-a','n-poll-b'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('n-category').value = 'turkiye';
+  document.querySelectorAll('#n-countries input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+  syncNewsCountryPicker();
   loadBreakingNews();
   setTimeout(() => { statusEl.textContent = ''; }, 3000);
 });
@@ -3907,16 +4047,37 @@ async function deleteLetter(id) {
 // overlay carries, so a country only ever appears in this picker if it is
 // a shape a reader can actually touch.
 let COUNTRIES_LIST = [];
+let COUNTRIES_LOAD = null;
+
+// Fetched once per session and shared by this tab's pickers and the
+// breaking-news country picker (see countryPickerHTML) — they sit in two
+// different tabs and either can be opened first. The in-flight promise is
+// cached as well as the result, so opening both back to back still makes
+// one request.
+async function ensureCountriesLoaded() {
+  if (COUNTRIES_LIST.length) return COUNTRIES_LIST;
+  if (!COUNTRIES_LOAD) {
+    COUNTRIES_LOAD = sb.from('countries').select('*').then(({ data, error }) => {
+      // Cleared on failure so a later tab retries rather than inheriting
+      // a rejected promise for the rest of the session.
+      if (error) { COUNTRIES_LOAD = null; throw error; }
+      COUNTRIES_LIST = (data || []).sort((a, b) => a.name_tr.localeCompare(b.name_tr, 'tr'));
+      return COUNTRIES_LIST;
+    });
+  }
+  return COUNTRIES_LOAD;
+}
 
 async function loadCountriesTab() {
-  if (!COUNTRIES_LIST.length) {
-    const { data, error } = await sb.from('countries').select('*');
-    if (error) {
-      document.getElementById('country-entries-list').innerHTML =
-        '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>';
-      return;
-    }
-    COUNTRIES_LIST = (data || []).sort((a, b) => a.name_tr.localeCompare(b.name_tr, 'tr'));
+  const alreadyBuilt = COUNTRIES_LIST.length > 0;
+  try {
+    await ensureCountriesLoaded();
+  } catch (error) {
+    document.getElementById('country-entries-list').innerHTML =
+      '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>';
+    return;
+  }
+  if (!alreadyBuilt) {
     const opts = COUNTRIES_LIST.map(c =>
       `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name_tr)}</option>`).join('');
     document.getElementById('ce-country').innerHTML = opts;
@@ -3924,6 +4085,44 @@ async function loadCountriesTab() {
       '<option value="">— All countries —</option>' + opts;
   }
   loadCountryEntriesList();
+}
+
+// ── The ülke picker shared by the breaking-news forms ──
+// Which countries a Dünya story is about (db/breaking_news_countries.sql):
+// ticked here, lit on Kütüphane's phone map when a reader opens the story.
+// Ankara is left out of the list even though it is in the lookup — it is
+// the one city drawn on that map and touching it opens the meclis, so it
+// is not a place a story can be filed under.
+function newsCountryOptions() {
+  return COUNTRIES_LIST.filter(c => c.id !== 'ankara');
+}
+
+function countryPickerHTML(selected) {
+  if (!COUNTRIES_LIST.length) {
+    return '<div style="font-size:0.78rem;color:var(--muted);">Ülke listesi yüklenemedi.</div>';
+  }
+  const picked = new Set(selected || []);
+  return newsCountryOptions().map(c => `
+    <label><input type="checkbox" value="${escapeHtml(c.id)}"${picked.has(c.id) ? ' checked' : ''}/>${escapeHtml(c.name_tr)}</label>
+  `).join('');
+}
+
+function pickedCountries(container) {
+  if (!container) return [];
+  return [...container.querySelectorAll('input[type="checkbox"]:checked')].map(i => i.value);
+}
+
+// Replace a story's countries with what is ticked now. The rows carry no
+// state of their own beyond existing, so delete-then-insert is the whole
+// update and there is no diff to compute. Returns an error or null.
+async function saveNewsCountries(newsId, countries) {
+  const { error: delErr } = await sb.from('breaking_news_countries')
+    .delete().eq('news_id', newsId);
+  if (delErr) return delErr;
+  if (!countries.length) return null;
+  const { error } = await sb.from('breaking_news_countries')
+    .insert(countries.map(country => ({ news_id: newsId, country })));
+  return error || null;
 }
 
 function countryNameTr(id) {
