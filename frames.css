@@ -351,9 +351,9 @@ main,
   mask: var(--hexframe-mask);
 }
 
-/* The drawn stroke, painted over the masked content. .key is
-   deliberately absent: keys never had a border, so the colored
-   key shape alone carries the hexagon. */
+/* The drawn stroke, painted over the masked content. Sözcel's keys
+   carry it too (see the .key::after mask-size below) — a key's fill
+   alone left the hexagon reading as a soft blob against the page. */
 .hexframe::after,
 .ist-pc-avatar::after,
 .ist-pc-cover-avatar::after,
@@ -363,7 +363,8 @@ main,
 .ev-attendee-avatar::after,
 .politician-detail-avatar::after,
 .tbmm-detail-avatar::after,
-.letter-box::after {
+.letter-box::after,
+.key::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -448,6 +449,14 @@ main,
   -webkit-mask-size: 131.27% 111.71%;
   mask-size: 131.27% 111.71%;
 }
+/* The ring is cut from the same canvas as the key's own silhouette, so
+   it has to be enlarged by exactly the same amounts — at `contain` it
+   would draw a stroke floating inside the key's edges instead of on
+   them. Keeps the two in lockstep if the scale is ever retuned. */
+.key::after {
+  -webkit-mask-size: 131.27% 111.71%;
+  mask-size: 131.27% 111.71%;
+}
 
 /* Stroke tints. Sözcel tiles carry the bold drawn ink stroke while
    empty/typed (per the board mock); revealed states tint the ring
@@ -457,6 +466,16 @@ main,
    cover now, see .ist-pc-cover in profile-card.css) and the frame sits
    directly on the sheet, so its stroke follows the palette like every other
    hexframe — a fixed #1a1a1a would vanish against a dark sheet. */
-.letter-box.correct  { --hexframe-stroke: var(--success); }
-.letter-box.present  { --hexframe-stroke: var(--present); }
-.letter-box.absent   { --hexframe-stroke: var(--absent); }
+/* Sözcel's board and keyboard are the one place the stroke is pinned to
+   pure black instead of following --ink: every fill these hexagons can
+   take — the paper of an empty tile, the greys of a revealed one, the
+   key colors — is something other than #000, so a black frame stays
+   drawn on all of them, in every palette and in either state of the
+   flip. Revealed tiles used to tint the ring with their own fill so it
+   melted into the tile, which left the played half of the board as
+   frameless blocks beside the framed half. */
+.letter-box,
+.letter-box.correct,
+.letter-box.present,
+.letter-box.absent,
+.key { --hexframe-stroke: #000; }
