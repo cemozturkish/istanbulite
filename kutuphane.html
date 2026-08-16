@@ -4562,6 +4562,13 @@ function closeReaderOverlay() {
   // dragging it down), so a story's map highlight is dropped here rather
   // than at each of them.
   clearNewsCountryHighlight();
+  // Same for the selection the map made when the reader touched a country
+  // to open this sheet: what is lit is what is open, so the tint and the
+  // caption go out with the page they belong to. Without this the country
+  // stayed inked after the sheet slid away -- the backdrop covers the map,
+  // so the tap that closed the sheet never reached the map to clear it, and
+  // it took a second tap on empty sea to put the map back.
+  if (_mapSelectionOpenedSheet && window.__istResetMapLabel) window.__istResetMapLabel();
   // Content is cleared only once the sheet is off-screen, so it doesn't
   // empty mid-slide (see sheet.js).
   IstSheet.close(overlay, () => { area.innerHTML = ''; });
@@ -5000,6 +5007,13 @@ function openArticleReader(article, shelf, shelfId, articles, lockState, complet
 // chapter is currently open (and how to close it) is set by
 // openArticleReader each time it runs, via _closeReaderOverlay.
 let _closeReaderOverlay = null;
+
+// True while the sheet on screen is the one the map itself opened (a
+// country's page, or the meclis from Ankara) -- set by the map's click
+// handler, cleared by resetMapLabel. closeReaderOverlay clears the map's
+// selection only then: on desktop a district can be selected on its own,
+// with no page behind it, and closing an unrelated sheet must not drop it.
+let _mapSelectionOpenedSheet = false;
 (function initReaderOverlay() {
   const overlay = document.getElementById('reader-overlay');
   const backdrop = document.getElementById('reader-overlay-backdrop');
@@ -5146,6 +5160,7 @@ const neighborhoodNames = {
     const mapLabel = document.getElementById('map-label');
     getMapRegions().forEach(n => n.classList.remove('active', 'hover-active'));
     activeRegionName = null;
+    _mapSelectionOpenedSheet = false;
     if (mapLabel) mapLabel.textContent = idleMapLabel();
   }
   window.__istResetMapLabel = resetMapLabel;
@@ -5170,6 +5185,10 @@ const neighborhoodNames = {
       // the desktop overlay's districts keep behaving as they did -- they
       // have no pages to open.
       if (nb.classList.contains('country')) {
+        // This selection belongs to the sheet about to rise, so closing
+        // that sheet takes the tint and the caption with it (see
+        // closeReaderOverlay).
+        _mapSelectionOpenedSheet = true;
         if (nbId === 'ankara') openTBMMSheet();
         else openCountrySheet(nbId, regionName(nb));
       }
@@ -5182,6 +5201,7 @@ const neighborhoodNames = {
     getMapRegions().forEach(n => n.classList.remove('active'));
     if (mapLabel) mapLabel.textContent = idleMapLabel();
     activeRegionName = null;
+    _mapSelectionOpenedSheet = false;
   });
   document.addEventListener('mouseover', (e) => {
     const nb = e.target.closest(MAP_REGION_SEL);
