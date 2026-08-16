@@ -553,8 +553,7 @@
        reused here for Kütüphane's own top-level sections: Makaleler opens
        the shelf browser (formerly always-open in the left column, now
        tucked behind this box, see openLibraryShelvesSheet), Mektuplar
-       opens its own flat title/date/body list (see openMektuplarSheet),
-       and the third box is left intentionally blank for a future section.
+       opens its own flat title/date/body list (see openMektuplarSheet).
        Stays in .col-left at every breakpoint -- on mobile .col-left
        becomes its own grid column (see the "boxes" grid-area below), same
        idea as Kahvehane's own .games-section column. */
@@ -595,13 +594,6 @@
       font-style: italic;
       margin-top: 4px;
     }
-    .lib-box-empty {
-      cursor: default;
-      opacity: 0.45;
-      border-style: dashed;
-    }
-    .lib-box-empty:hover { background: var(--paper-warm); transform: none; }
-
     .loading {
       text-align: center;
       font-style: italic;
@@ -2264,13 +2256,6 @@
       }
       .col-left-slide::-webkit-scrollbar,
       .col-right-slide::-webkit-scrollbar { display: none; }
-      /* The blank third box holds a slot for a future section. With the
-         stack growing upward it belongs at the TOP of the column, where
-         the next box would land -- and that puts Posta Kutusu itself in
-         the bottom corner. Mobile only: on desktop the boxes hang from
-         the top of the column and the placeholder stays last. */
-      .lib-box-empty { order: -1; }
-
       /* Lifted over the country overlay (z-index 2, see .map-svg-world) so
          both stay usable in the same half of the screen: the columns take
          the taps that land on them, the map takes the rest. Without this the
@@ -2500,7 +2485,7 @@
       /* Library boxes -- .col-left's own grid column now (see "boxes"
          above), stacked vertically same as Kahvehane's game tiles in its
          own games column (not a 2-up grid like the shelves grid above --
-         these three boxes read as one column of stacked cards). */
+         these boxes read as one column of stacked cards). */
       .lib-boxes { gap: 8px; padding: 12px; }
       /* Sized to its own tile, not stretched to the flex column's full
          width -- same clamp() kahvehane's .game-link mobile tiles use, so
@@ -2933,17 +2918,13 @@
 
     <!-- Spinner shown until the map image above finishes loading -- without
          it the empty .map-panel background (matched to the map's own
-         sea color) gave no sign anything was still happening. -->
+         sea color) gave no sign anything was still happening. Cleared by
+         clearMapLoading() from mount(), NOT by an inline script tag here:
+         this markup lives inside #ist-content, which the router re-injects
+         with innerHTML on every re-entry -- and a script tag arriving that
+         way never executes, so the spinner would sit and spin over the
+         middle of the map forever. -->
     <div class="map-loading" id="map-loading"><span class="spinner"></span></div>
-    <script>
-      (function() {
-        var img = document.getElementById('map-photo-img');
-        var loading = document.getElementById('map-loading');
-        if (img.complete) { loading.remove(); return; }
-        img.addEventListener('load', function() { loading.remove(); });
-        img.addEventListener('error', function() { loading.remove(); });
-      })();
-    </script>
 
     <!-- DESKTOP overlay. Still the İstanbul trace (the Istanbul map's
          5046x2300 layout, same aspect ratio as turkey-map.png) laid over the
@@ -3195,7 +3176,6 @@
             <div class="lib-box-title">Posta Kutusu</div>
           </div>
         </button>
-        <div class="lib-box lib-box-empty" aria-hidden="true"></div>
       </div>
     </div>
   </aside>
@@ -5565,7 +5545,22 @@ function loadPersonMentionsRoster(tries) {
   }
 }
 
+// Drops the map spinner once the map image is there. Runs on every mount
+// because the router hands this page a fresh copy of the .map-panel markup
+// -- spinner included -- on every re-entry. On a re-entry the image is
+// already in cache and img.complete is true, so the spinner never paints.
+function clearMapLoading() {
+  const img = document.getElementById('map-photo-img');
+  const loading = document.getElementById('map-loading');
+  if (!loading) return;
+  if (!img || img.complete) { loading.remove(); return; }
+  const done = () => loading.remove();
+  img.addEventListener('load', done, { once: true });
+  img.addEventListener('error', done, { once: true });
+}
+
 function mount() {
+  clearMapLoading();
   loadProfile();
   bootstrapLibraryNav();
   // Re-attach the Makaleler / Posta Kutusu / TBMM click handlers to this
