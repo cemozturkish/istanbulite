@@ -127,6 +127,7 @@ default one.
 ├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
+├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
 ├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js,
 │   tbmm.js, sozcu-mascot.js, admin-notification.js, loading-screen.js/.css,
 │   safe-area-ready.js, frames.css        # Focused shared modules
@@ -556,6 +557,42 @@ push the top of the stack out of the scroller and out of reach. The margin also 
 box that does *not* grow — every wrapper between a column and its feed carries `flex: 1`, and
 flex hands the free space to a growing item before any margin sees it, so an auto margin one
 level too high does nothing at all.
+
+### The map is scenery, and it drifts — `map-parallax.js`
+
+The map is the one thing on all three carousel pages that is *scenery* rather than content:
+everything else — the two bars, the columns, every sheet — is printed **on** the screen, while the
+map is what the screen is a window **onto**. On a phone that is literal: tilt the device and the
+drawing behind the window shifts against you, the way the view through a real window does. Nothing
+else moves — not the profile bar, not the tab bar, not the feeds, not the caption over the map, not
+a sheet resting on the hero line. One implementation for all three pages; each page just loads the
+script, and `router.js` re-aims it after a virtual navigation swaps `#ist-content`.
+
+Three things about it are load-bearing:
+
+- **The window never moves — the artwork does.** `.map-panel` is the window and is never
+  transformed. What moves is each drawing inside it, and *every* drawing moves by exactly the same
+  amount: the photo **and** the traced SVG overlay that carries the hit-regions. A parallax that
+  moved the picture out from under its own hit-regions would quietly mis-aim every tap on the map.
+  Kütüphane's phone overlay is a **sibling** of its panel rather than a child (it has to escape the
+  panel's stacking context to be touchable at all), so the module collects siblings too — it is the
+  same drawing over the same box and it moves with it.
+- **The room to move into is drawn, not borrowed.** The artwork is scaled a few percent past its
+  window (`OVERSCAN`) and the drift is clamped to exactly half that surplus per side, so the edge
+  of the drawing cannot come into view however far the phone is tilted. The scale happens **about
+  the point the artwork is anchored to** — centre for the maps drawn `cover`, top for Kütüphane's,
+  which hangs from the top of the screen — read off each layer's own `object-position` /
+  `preserveAspectRatio` rather than hardcoded per page, so the two stay registered by construction.
+- **The neutral pose is wherever the phone was already being held.** The first reading defines
+  "level", so a reader lying on a sofa gets the same range as one sitting upright, and an ordinary
+  tilt never makes it creep. Only a tilt held *past* the end of the range drags the neutral pose
+  along — which is the one case (lying down, handing the phone over) the old pose can no longer
+  describe.
+
+Off entirely on desktop, under `prefers-reduced-motion: reduce`, and while the page is hidden. On
+iOS the sensor is permission-gated and the request must come from a user gesture, so it is asked
+once per session on the first tap — never on load. The native app needs `NSMotionUsageDescription`
+in `ios/App/App/Info.plist` for that same prompt.
 
 ### The phone's two bars — `#ist-pc-mount` (top) and `.section-rule > header` (bottom)
 

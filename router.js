@@ -348,6 +348,10 @@
       if (liveContent && global.MapZoom) {
         liveContent.querySelectorAll('.map-panel').forEach(global.MapZoom.init);
       }
+      // Same reason: the map that just arrived is a different node from the
+      // one that was drifting under the previous page, so the tilt parallax
+      // has to be pointed at it (see map-parallax.js).
+      if (global.IstMapParallax) global.IstMapParallax.refresh();
       if (global.IstProfileCard) global.IstProfileCard.setPage(targetSlug);
     } finally {
       virtualNavInFlight = false;
