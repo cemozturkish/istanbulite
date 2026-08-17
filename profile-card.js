@@ -38,11 +38,15 @@
   // with them on Kütüphane.
   //
   // The hane honeycomb used to be Anahane's profile page. It is its own
-  // surface now, opened by the PETEK button over Anahane's map (see
-  // HIVE_SECTIONS / openHiveOverlay below) rather than through the gear
-  // in the profile bar — the honeycomb is who you keep close, which is a
-  // destination on the middle page, not a page of your account. Anahane's
-  // profile is therefore the cover alone: who you are, nothing else.
+  // sheet now (#hive-overlay, see openHiveOverlay below), opened by the
+  // PETEK button over Anahane's map rather than through the gear in the
+  // profile bar — the honeycomb is who you keep close, which is a
+  // destination on the middle page, not a page of your account, and
+  // being reached from the map rather than the profile bar is also what
+  // lets it swipe-to-dismiss the way a news item or the meclis does (see
+  // IstSheet.pull in sheet.js), which this profile sheet does not.
+  // Anahane's own profile is therefore the cover alone: who you are,
+  // nothing else.
   //
   // Nothing here scrolls: each page's profile fits inside the sheet the
   // way a politician's does (see .profile-overlay-body in
@@ -54,11 +58,6 @@
     kutuphane: { hive: false, week: false, account: true,  settings: true },
   };
   const DEFAULT_PAGE = 'anahane';
-
-  // The PETEK sheet: the honeycomb on its own, in the same sheet the
-  // profile opens in. Not keyed to a page — it is passed straight to
-  // openProfileOverlay as `sections` (see openHiveOverlay).
-  const HIVE_SECTIONS = { hive: true, week: false, account: false, settings: false };
 
   // Which of the three carousel pages we're on. router.js stamps
   // body.dataset.page on every virtual navigation; on a real page load
@@ -72,13 +71,6 @@
 
   function sectionsFor(page) {
     return PROFILE_SECTIONS[page] || PROFILE_SECTIONS[DEFAULT_PAGE];
-  }
-
-  // Which blocks the open sheet shows: normally the page it was opened
-  // from, unless the caller handed it an explicit set (the PETEK button,
-  // which opens the honeycomb from no page in particular).
-  function sectionsForState(state) {
-    return (state && state.sections) || sectionsFor(state && state.page);
   }
 
   // Two-option toggles. Legacy `more_turkish` and `system` values are
@@ -753,9 +745,6 @@
     ensureProfileOverlay();
     _ov = Object.assign({ sozcuCount: 0, kefaletCount: 0, sponsoredList: [], kefilOfUser: null, page: currentPageSlug() }, opts);
     if (!PROFILE_SECTIONS[_ov.page]) _ov.page = currentPageSlug();
-    // A caller may hand over the exact set of blocks instead (see
-    // HIVE_SECTIONS); `page` then only says where we are, not what shows.
-    if (!_ov.sections) _ov.sections = null;
     if (_ov.avatarUrl === undefined) _ov.avatarUrl = _ov.profile?.avatar_url || null;
     if (_ov.avatarHair === undefined) _ov.avatarHair = _ov.profile?.avatar_hair || null;
     if (_ov.avatarHat === undefined) _ov.avatarHat = _ov.profile?.avatar_hat || null;
@@ -766,11 +755,6 @@
     // settingsPageHTML/coverHTML), Kaydet saves and the page reload resets
     // this back to false on its own.
     _ov.customizing = false;
-    // The honeycomb always opens folded up, never on the slot extension
-    // someone left open last time, and re-fetches so the week left on
-    // each placement is current (see loadHive).
-    _ov.hiveOpen = null;
-    _ov.hiveLoaded = false;
     renderOverlayBody();
     document.getElementById('profile-overlay-body').scrollTop = 0;
     IstSheet.open('profile-overlay');
@@ -784,27 +768,32 @@
     const body = document.getElementById('profile-overlay-body');
     if (!body || !_ov) return;
     body.innerHTML = settingsPageHTML(_ov);
-    // The honeycomb, and Anahane's profile (the cover and nothing else),
-    // are each one fixed shape rather than a column of blocks read
-    // top-down — so they sit centred in the sheet instead of stacked
-    // against its top edge with the whole void left under them. See
-    // .profile-overlay-centred in profile-card.css.
-    const show = sectionsForState(_ov);
+    // Anahane's profile (the cover and nothing else) is one fixed shape
+    // rather than a column of blocks read top-down — so it sits centred
+    // in the sheet instead of stacked against its top edge with the
+    // whole void left under it. See .profile-overlay-centred in
+    // profile-card.css.
+    const show = sectionsFor(_ov.page);
     body.classList.toggle('profile-overlay-centred', !show.week && !show.account && !show.settings);
     wireSettingsEvents(_ov);
   }
 
   // ── THE PETEK SHEET ──
-  // The hane honeycomb on its own, opened by the PETEK button over
-  // Anahane's map rather than from the profile bar's gear. Same sheet as
-  // the profile (so it rests under the top bar and is centred by
-  // .profile-overlay-body:has(#po-hive-mount) in profile-card.css) — only
-  // the blocks differ, which is what `sections` carries.
+  // The hane honeycomb, opened by the PETEK button over Anahane's map.
+  // Its own overlay (#hive-overlay) rather than the shared profile sheet
+  // above: a sheet opened over the map swipes to dismiss like a news
+  // item or the meclis (IstSheet.pull, see sheet.js), which the profile
+  // sheet — reached from the profile bar, not the map — does not, and
+  // the two can't share one DOM node and disagree about that. It reuses
+  // hiveHTML/hiveMountHTML/renderHive/loadHive wholesale: those only
+  // ever look up #po-hive-mount by id, so they don't care which overlay
+  // wraps them.
   //
   // It fetches the profile itself: the compact card doesn't mount on
   // desktop (see mount), so there is no fetched state to borrow there,
   // and the button has to work either way.
   let _sharedState = null;
+  let _hive = null; // { sb, I18N, user, profile, ..., hive, hiveOpen, hiveLoaded }
 
   async function ensureProfileState(sb, I18N) {
     if (_state) return _state;
@@ -815,20 +804,65 @@
     return _sharedState;
   }
 
+  function ensureHiveOverlay() {
+    if (document.getElementById('hive-overlay')) return;
+    const el = document.createElement('div');
+    el.className = 'ist-sheet-overlay ist-sheet-pull hive-overlay';
+    el.id = 'hive-overlay';
+    el.hidden = true;
+    el.innerHTML = `
+      <div class="ist-sheet-backdrop" id="hive-overlay-backdrop"></div>
+      <div class="ist-sheet profile-overlay-sheet" id="hive-overlay-sheet">
+        <button type="button" class="ist-sheet-close" id="hive-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
+        <div class="ist-sheet-body profile-overlay-body profile-overlay-centred" id="hive-overlay-body"></div>
+      </div>
+    `;
+    document.body.appendChild(el);
+
+    document.getElementById('hive-overlay-backdrop').addEventListener('click', closeHiveOverlay);
+    document.getElementById('hive-overlay-close').addEventListener('click', closeHiveOverlay);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && el.classList.contains('open')) closeHiveOverlay();
+    });
+    // A page whose pull sheet is baked into its own markup wires
+    // IstSheet.pull once at load (see anahane.html's detailPull). This
+    // one is injected lazily instead, so it's wired here, on first
+    // creation — guarded by the "already exists" check up top, so it
+    // never runs twice.
+    IstSheet.pull('hive-overlay', { onDismiss: closeHiveOverlay });
+  }
+
+  function closeHiveOverlay() {
+    IstSheet.close('hive-overlay');
+  }
+
+  function renderHiveOverlayBody() {
+    const body = document.getElementById('hive-overlay-body');
+    if (!body || !_hive) return;
+    body.innerHTML = hiveMountHTML();
+    // Draws immediately from whatever is already cached (empty frames on
+    // the first open) and fills itself in when the fetch lands, same as
+    // the shared sheet's own settings blocks do.
+    _hive.hiveDisplayName = `${_hive.profile?.first_name || ''} ${_hive.profile?.last_name || ''}`.trim() || _hive.user.email;
+    renderHive(_hive);
+    if (!_hive.hiveLoaded) loadHive(_hive);
+  }
+
   async function openHiveOverlay(opts) {
     const sb = opts && opts.sb;
     const I18N = opts && opts.I18N;
     if (!sb) return;
     const st = await ensureProfileState(sb, I18N);
     if (!st) return;
-    openProfileOverlay({
-      sb, I18N, user: st.user, profile: st.profile,
-      sozcuCount: st.sozcuCount, kefaletCount: st.kefaletCount,
-      sponsoredList: st.sponsoredList, kefilOfUser: st.kefilOfUser,
-      avatarUrl: st.avatarUrl, avatarHair: st.avatarHair, avatarHat: st.avatarHat,
-      avatarAccessory: st.avatarAccessory, avatarShirt: st.avatarShirt,
-      sections: HIVE_SECTIONS,
-    });
+    ensureHiveOverlay();
+    // Fresh every open: folded up, never on the slot extension someone
+    // left open last time, and re-fetches so the week left on each
+    // placement is current (see loadHive).
+    _hive = Object.assign({}, st, { sb, I18N, hiveOpen: null, hiveLoaded: false });
+    renderHiveOverlayBody();
+    const body = document.getElementById('hive-overlay-body');
+    if (body) body.scrollTop = 0;
+    IstSheet.open('hive-overlay');
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -1473,7 +1507,7 @@
   // badges still render via coverHTML.
   function settingsPageHTML(state) {
     const { I18N, user, profile, sozcuCount, sponsoredList, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
-    const show = sectionsForState(state);
+    const show = sectionsFor(state.page);
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
@@ -1499,10 +1533,8 @@
     return `
       <div class="ist-pc-settings-grid">
         <div class="ist-pc-settings-col ist-pc-settings-left">
-          ${show.hive
-            ? hiveMountHTML()
-            : `${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText: yasadigiDisplay, editable: true, customizing, sozcuCount })}
-          <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>`}
+          ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText: yasadigiDisplay, editable: true, customizing, sozcuCount })}
+          <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
 
           ${show.week ? `
           <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
@@ -1618,24 +1650,9 @@
     wireAccessoryCarousel(state);
     wireShirtCarousel(state);
     // Every block below is optional: which ones exist depends on the page
-    // this was opened from (see PROFILE_SECTIONS).
-    if (document.getElementById('po-hive-mount')) {
-      // Draws immediately from whatever is already cached (empty frames
-      // on the first open) and fills itself in when the fetch lands, so
-      // the sheet never opens onto a blank body.
-      state.hiveDisplayName = `${state.profile?.first_name || ''} ${state.profile?.last_name || ''}`.trim() || state.user.email;
-      renderHive(state);
-      if (!state.hiveLoaded) loadHive(state);
-    } else if (sectionsForState(state).hive) {
-      // The honeycomb only ever comes from renderHive: settingsPageHTML
-      // emits the empty mount and nothing else. Printing hiveHTML
-      // straight into the page instead draws a honeycomb that LOOKS
-      // right and is completely dead — the frames hover, and no slot
-      // ever opens, because none of the wiring below ran. That is what a
-      // bad merge did to this call site once, silently, so it says so
-      // out loud now rather than shipping an inert page again.
-      console.warn('profile-card: hive page rendered without #po-hive-mount — slots will not respond. settingsPageHTML must emit hiveMountHTML().');
-    }
+    // this was opened from (see PROFILE_SECTIONS). The honeycomb is no
+    // longer one of them — it has its own overlay and its own render
+    // path now (see openHiveOverlay/renderHiveOverlayBody).
     if (document.getElementById('po-weekgrid-mount')) {
       getWeekGameStatus(sb, user.id).then(status => {
         const m = document.getElementById('po-weekgrid-mount');

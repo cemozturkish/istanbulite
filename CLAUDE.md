@@ -400,11 +400,13 @@ sb.from('articles').delete().eq('id', id)
   - Bulmaca: Turkish crossword
 - The games change every day; scores and scoreboards are tracked (`game_results`)
 - The **coffee price index** (Kahve Endeksi, `coffee_prices` table): the "Kahve Endeksi" pill
-  above the map label opens a bottom sheet (detail-overlay) listing the cheapest cup of coffee
-  per venue, scoped to the selected district or all of Istanbul; on desktop the same list also
-  shows permanently in col-right. **Read-only for everyone** — the index is curated from the
-  admin portal only (admin.html's "Kahve" tab), and RLS allows writes to the admin alone
-  (`db/coffee_prices_v2_admin_only.sql`)
+  above the map label opens a bottom sheet (`#kahvehane-detail`) listing the cheapest cup of
+  coffee per venue, scoped to the selected district or all of Istanbul; on desktop the same list
+  also shows permanently in col-right. Opened from the map, it carries `.ist-sheet-pull` like
+  Anahane's news/event sheet and the PETEK sheet do — on a phone it rests half-way under the map
+  and swipes down to dismiss (`IstSheet.pull`, see sheet.js). **Read-only for everyone** — the
+  index is curated from the admin portal only (admin.html's "Kahve" tab), and RLS allows writes
+  to the admin alone (`db/coffee_prices_v2_admin_only.sql`)
 - The index is a **live board, not a printed list** — it is meant to be accurate about the cup
   you could go and buy right now, the way a market board is accurate about a price. A venue
   outside its opening hours drops out of the ranking and sinks to the bottom of the board,
@@ -524,7 +526,8 @@ geometry and no centred modal anywhere on the site.
   - A sheet opened **from the profile bar** (your profile, a member's) rests under that bar,
     via `--ist-sheet-top` (`IstSheet.position` measures it live).
   - A sheet opened **over the map** — a news item, an event, an article, the meclis, later a
-    country — carries `ist-sheet-pull` and is *dragged*: it comes to rest half-way down, under
+    country, the PETEK honeycomb, the Kahve Endeksi board — carries `ist-sheet-pull` and is
+    *dragged*: it comes to rest half-way down, under
     the map, so you still see what you tapped; drag it up and it stops at the profile bar;
     past that the reading continues inside it; drag it back down and it closes. One
     implementation, `IstSheet.pull(overlay, { onDismiss })` — attach it once and
@@ -642,12 +645,15 @@ Anahane's is the cover and nothing else.
 ### The hane honeycomb — the PETEK sheet (`IstProfileCard.openHiveOverlay`)
 
 The honeycomb (`hiveHTML`) is your own cover frame as the middle cell of seven, with six slots
-packed around it for other members. It opens from the **PETEK button over Anahane's map**, in the
-same sheet the profile opens in (`openHiveOverlay` passes it the block set directly, rather than
-through `PROFILE_SECTIONS`) — who you keep close is a destination on the middle page, not a page
-of your account, which is why it is reached from the city rather than from the gear in the profile
-bar. The honeycomb reuses the cover's own frame for its middle cell — same mask, same drawn ring,
-same badges — so there is no second frame treatment to keep in sync.
+packed around it for other members. It opens from the **PETEK button over Anahane's map**, into
+its own sheet (`#hive-overlay`, built lazily by `ensureHiveOverlay` on first open) rather than the
+shared profile sheet — who you keep close is a destination on the middle page, not a page of your
+account, which is why it is reached from the city rather than from the gear in the profile bar.
+Being reached from the map rather than the profile bar is also what earns it `.ist-sheet-pull`: on
+a phone it rests half-way down under the map and swipes to dismiss, the same gesture a news item or
+the meclis opens with (`IstSheet.pull`, see sheet.js) — the profile sheet, opened from the profile
+bar, keeps the plain rules instead. The honeycomb reuses the cover's own frame for its middle cell —
+same mask, same drawn ring, same badges — so there is no second frame treatment to keep in sync.
 
 A slot is filled **hand-to-hand, by code** (`db/hive_slots.sql`): every member holds one code per
 Istanbul week, tapping an empty slot asks for someone else's, and whoever it belongs to stands
