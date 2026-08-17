@@ -705,6 +705,18 @@ profile popup.
     `sozcel_used_answers.sozcul_id`, which stay as they are because renaming a live column
     is a migration, not a rename. Do not spell the role "Sözcül" in new copy or new names.
 
+13. **Bump `?v=` when you change a shared `.js` / `.css`.** GitHub Pages serves the assets with
+    `max-age=600` and the app's WKWebView caches harder still, while the HTML that references them
+    updates on its own schedule — so for a window after every deploy a returning user runs **new
+    HTML against an old shared script**. That is not a subtle degradation: a page that has just
+    learned a new `data-i18n` key prints the key itself (`HANE.PETEK`) because the cached `i18n.js`
+    has never heard of it, and a button wired to a brand-new function silently throws. The shared
+    files carry a version query (`i18n.js?v=2`, `profile-card.js?v=2`, `profile-card.css?v=2`,
+    `loading-screen.js?v=2`); changing one of them means bumping its number **in every page at
+    once**. All pages must spell the URL identically — `router.js`'s `loadScriptOnce` matches on
+    the exact `src` string, so one page left on `i18n.js` while another says `i18n.js?v=3` makes a
+    swipe load and re-execute the module a second time.
+
 ---
 
 ## Security Notes
