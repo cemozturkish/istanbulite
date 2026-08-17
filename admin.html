@@ -609,11 +609,17 @@
       resize: vertical;
     }
     .upd-form input.upd-datetime { width: 170px; }
+    /* A country timeline moment is a plain date, not a datetime (see
+       db/country_entry_events.sql), so its field is narrower — and its
+       row reads date-first, which is the order the moment is written in. */
+    .upd-form input.upd-date { width: 150px; }
+    .upd-form.ce-ev-form { grid-template-columns: auto 1fr 1fr auto; }
     .upd-form button { white-space: nowrap; padding: 6px 10px; font-size: 0.75rem; }
     .upd-status { grid-column: 1 / -1; margin: 0; font-size: 0.75rem; }
     @media (max-width: 600px) {
       .upd-form { grid-template-columns: 1fr; }
       .upd-form input.upd-datetime { width: 100%; }
+      .upd-form input.upd-date { width: 100%; }
     }
     .upd-row .btn-edit { padding: 0 8px; font-size: 0.75rem; }
     .upd-edit-form {
@@ -1301,6 +1307,11 @@
         Touching a country on Kütüphane's phone map opens its entries, newest first, in the same
         half-page sheet the letters use. A country with no entries still opens — it just says so.
         Ankara is the exception: it opens the TBMM page instead, so entries filed under it are never shown.
+      </p>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        An entry can also carry a <strong>Zaman Akışı</strong> — a chain of dated key moments, the way a
+        breaking news story grows gelişmeler. Add one entry here first, then build its timeline from its
+        card on the right. The reader gets it oldest-first under the entry's text, so it reads forwards.
       </p>
 
       <label>Country</label>
@@ -4134,7 +4145,7 @@ async function loadCountryEntriesList() {
   const listEl = document.getElementById('country-entries-list');
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   const filter = document.getElementById('ce-filter').value;
-  let q = sb.from('country_entries').select('*');
+  let q = sb.from('country_entries').select('*, country_entry_events(*)');
   if (filter) q = q.eq('country', filter);
   const { data, error } = await q
     .order('entry_date', { ascending: false, nullsFirst: false })
@@ -4142,23 +4153,166 @@ async function loadCountryEntriesList() {
   if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
   if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No entries yet.</div>'; return; }
 
-  listEl.innerHTML = data.map(en => `
+  listEl.innerHTML = data.map(en => {
+    // Oldest first, exactly as Kütüphane prints it, so what the admin
+    // is arranging here is the order the reader will read.
+    const events = countryEntryEventsSorted(en);
+    const eventsHtml = events.length ? events.map(ev => `
+      <div class="upd-row" data-ev-id="${ev.id}">
+        <div class="upd-info">
+          <span class="upd-time">${escapeHtml(ev.event_date)}</span>
+          <strong>${escapeHtml(ev.title)}</strong>
+          ${ev.body ? `<span class="upd-body-text">${escapeHtml(ev.body)}</span>` : ''}
+        </div>
+        <button class="btn-edit" data-act="ce-ev-edit" data-id="${ev.id}">Düzenle</button>
+        <button class="btn-del"  data-act="ce-ev-del"  data-id="${ev.id}">×</button>
+      </div>
+      <div class="upd-edit-form" data-ev-edit-id="${ev.id}">
+        <input type="date" class="cee-date" value="${escapeHtml(ev.event_date || '')}"/>
+        <input type="text" class="cee-title" value="${escapeHtml(ev.title)}"/>
+        <textarea class="cee-body" rows="2">${escapeHtml(ev.body || '')}</textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary"   data-act="ce-ev-save"   data-id="${ev.id}">Kaydet</button>
+          <button class="btn btn-secondary" data-act="ce-ev-cancel" data-id="${ev.id}">İptal</button>
+        </div>
+        <div class="ue-status status-msg"></div>
+      </div>
+    `).join('') : '<div style="color:var(--muted);font-size:0.8rem;">Henüz kilit an eklenmedi.</div>';
+    return `
     <div class="article-card" data-id="${en.id}">
       <div class="a-neighborhood">${escapeHtml(countryNameTr(en.country))}${en.entry_date ? ' · ' + escapeHtml(en.entry_date) : ''}</div>
       <h4>${escapeHtml(en.title)}</h4>
+      <div class="sources-block">
+        <div class="sources-label">Zaman Akışı (${events.length})</div>
+        ${eventsHtml}
+        <div class="ce-ev-form upd-form">
+          <input type="date" class="upd-date cee-new-date" title="Tarih"/>
+          <input type="text" class="cee-new-title" placeholder="Kilit an (başlık)"/>
+          <input type="text" class="cee-new-body" placeholder="Ek detay (opsiyonel)"/>
+          <button class="btn btn-secondary" data-act="ce-ev-add" data-entry-id="${en.id}">+ An Ekle</button>
+          <div class="upd-status status-msg"></div>
+        </div>
+      </div>
       <div class="card-actions">
         <button class="btn-edit" data-act="ce-edit" data-id="${en.id}">Edit</button>
         <button class="btn-del"  data-act="ce-del"  data-id="${en.id}">Delete</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   listEl.querySelectorAll('button[data-act]').forEach(btn => {
+    const act = btn.dataset.act;
+    if (act === 'ce-ev-add') {
+      btn.addEventListener('click', () => addCountryEntryEvent(btn));
+      return;
+    }
+    if (act === 'ce-ev-del') {
+      btn.addEventListener('click', () => deleteCountryEntryEvent(btn.dataset.id));
+      return;
+    }
+    if (act === 'ce-ev-edit' || act === 'ce-ev-cancel') {
+      btn.addEventListener('click', () => {
+        const form = listEl.querySelector(`.upd-edit-form[data-ev-edit-id="${btn.dataset.id}"]`);
+        if (form) form.classList.toggle('open', act === 'ce-ev-edit');
+      });
+      return;
+    }
+    if (act === 'ce-ev-save') {
+      btn.addEventListener('click', () => saveCountryEntryEvent(btn));
+      return;
+    }
     const en = data.find(x => x.id === btn.dataset.id);
     if (!en) return;
-    if (btn.dataset.act === 'ce-edit') btn.addEventListener('click', () => editCountryEntry(en));
-    if (btn.dataset.act === 'ce-del') btn.addEventListener('click', () => deleteCountryEntry(en.id));
+    if (act === 'ce-edit') btn.addEventListener('click', () => editCountryEntry(en));
+    if (act === 'ce-del') btn.addEventListener('click', () => deleteCountryEntry(en.id));
   });
+}
+
+// ── A country entry's chain (db/country_entry_events.sql) ──
+// The "key timeline" a country page can carry: dated moments hanging off
+// one entry, the way a breaking news story grows gelişmeler. Printed
+// oldest first on both sides, because a timeline only explains anything
+// read forwards.
+function countryEntryEventsSorted(entry) {
+  return (entry.country_entry_events || []).slice()
+    .sort((a, b) => (a.event_date < b.event_date ? -1 : a.event_date > b.event_date ? 1 : 0));
+}
+
+async function addCountryEntryEvent(btn) {
+  const form = btn.closest('.ce-ev-form');
+  const statusEl = form.querySelector('.upd-status');
+  const dateEl = form.querySelector('.cee-new-date');
+  const titleEl = form.querySelector('.cee-new-title');
+  const bodyEl = form.querySelector('.cee-new-body');
+  const event_date = dateEl.value;
+  const title = titleEl.value.trim();
+
+  if (!event_date || !title) {
+    statusEl.textContent = 'Tarih ve başlık zorunlu.';
+    statusEl.className = 'upd-status status-msg err';
+    return;
+  }
+
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  statusEl.textContent = ''; statusEl.className = 'upd-status status-msg';
+
+  const { error } = await sb.from('country_entry_events').insert([{
+    entry_id: btn.dataset.entryId,
+    event_date,
+    title,
+    body: bodyEl.value.trim() || null,
+  }]);
+
+  btn.disabled = false;
+  btn.textContent = origText;
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'upd-status status-msg err';
+    return;
+  }
+  dateEl.value = ''; titleEl.value = ''; bodyEl.value = '';
+  loadCountryEntriesList();
+}
+
+async function saveCountryEntryEvent(btn) {
+  const form = btn.closest('.upd-edit-form');
+  const statusEl = form.querySelector('.ue-status');
+  const event_date = form.querySelector('.cee-date').value;
+  const title = form.querySelector('.cee-title').value.trim();
+
+  if (!event_date || !title) {
+    statusEl.textContent = 'Tarih ve başlık zorunlu.';
+    statusEl.className = 'ue-status status-msg err';
+    return;
+  }
+
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  statusEl.textContent = ''; statusEl.className = 'ue-status status-msg';
+
+  const { error } = await sb.from('country_entry_events')
+    .update({ event_date, title, body: form.querySelector('.cee-body').value.trim() || null })
+    .eq('id', btn.dataset.id);
+
+  btn.disabled = false;
+  btn.textContent = origText;
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'ue-status status-msg err';
+    return;
+  }
+  loadCountryEntriesList();
+}
+
+async function deleteCountryEntryEvent(id) {
+  if (!confirm('Bu kilit anı sil?')) return;
+  const { error } = await sb.from('country_entry_events').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadCountryEntriesList();
 }
 
 document.getElementById('ce-filter').addEventListener('change', loadCountryEntriesList);

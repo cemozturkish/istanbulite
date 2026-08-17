@@ -1283,6 +1283,100 @@
       font-style: italic;
       margin: 0 0 6px;
     }
+
+    /* ── Ülke sayfası (what a country on the phone map opens) ──
+       Titled like a chapter rather than like a shelf: the country's name
+       centred on the very top line, and the way out is the same
+       hand-drawn arrow the game pages use (assets/back.png) alone in the
+       corner — no word, no rule of its own. A country's page is the one
+       thing here the reader arrives at by touching the drawing rather
+       than by reading a list, so it is titled with the drawing's own
+       word and nothing else. */
+    .country-head {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 30px;
+      padding-bottom: 14px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid var(--rule);
+    }
+    /* Out of flow so the title is centred on the page, not on what is
+       left of it beside the arrow. The 30px box is the hit area; the
+       PNG's own transparent padding (~27% a side) is part of that
+       target, same as .game-back-btn. */
+    .country-back {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .country-back:hover { opacity: 0.6; }
+    .country-back img { width: 26px; height: 26px; display: block; }
+    .country-title {
+      margin: 0;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.2;
+      /* Both sides, so a long name breaks symmetrically instead of
+         drifting off the arrow. */
+      padding: 0 38px;
+    }
+    .country-entry-date {
+      margin: -10px 0 0;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--accent);
+      font-style: italic;
+    }
+
+    /* The chain a country entry carries: the same ticked track a Dünya
+       story's Zaman Akışı gets (.article .timeline above), but printed
+       oldest first and dated rather than aged — see
+       db/country_entry_events.sql for why. */
+    .country-timeline {
+      margin-top: 20px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--rule);
+    }
+    .country-timeline-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .ctl-item { border-left: 2px solid var(--ink-red); padding: 10px 0; }
+    .ctl-item:first-child { padding-top: 0; }
+    .ctl-item:last-child { padding-bottom: 0; }
+    .ctl-date {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--ink-red);
+    }
+    .ctl-tick { flex: 0 0 12px; height: 2px; background: var(--ink-red); }
+    .ctl-item strong,
+    .ctl-item p { display: block; margin-left: 26px; }
+    .ctl-item strong { font-size: 0.85rem; color: var(--ink); }
+    .ctl-item p { margin-top: 2px; font-size: 0.78rem; color: var(--accent); line-height: 1.5; }
     .path-list {
       display: flex;
       flex-direction: column;
@@ -3970,8 +4064,12 @@ const COUNTRY_ENTRIES_CACHE = {};
 
 async function loadCountryEntries(countryId) {
   if (COUNTRY_ENTRIES_CACHE[countryId]) return COUNTRY_ENTRIES_CACHE[countryId];
+  // The entry's chain rides along with it (db/country_entry_events.sql):
+  // a timeline is the point of most of these pages, so fetching it
+  // separately when the reader opens one would put a spinner in the
+  // middle of a page that is otherwise already here.
   const { data, error } = await sb.from('country_entries')
-    .select('*')
+    .select('*, country_entry_events(*)')
     .eq('country', countryId)
     .order('entry_date', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
@@ -4005,6 +4103,49 @@ async function openCountrySheet(countryId, countryName) {
   renderCountryEntriesList(entries, countryId, countryName);
 }
 
+// The head every country page wears: the hand-drawn arrow alone in the
+// corner, the name centred on the top line. `label` is what the arrow
+// goes back to -- it is never printed, only announced, because the
+// drawing says everything a word would.
+function countryHeadHTML(title, backId, backLabel) {
+  return `
+    <div class="country-head">
+      <button class="country-back" type="button" id="${libEsc(backId)}"
+              aria-label="${libEsc(backLabel)}" title="${libEsc(backLabel)}">
+        <img src="assets/back.png" alt=""/>
+      </button>
+      <h2 class="country-title">${libEsc(title)}</h2>
+    </div>
+  `;
+}
+
+// A country entry's own chain, oldest first: you read down the page and
+// the thing builds. Sorted here rather than in the query because the
+// events arrive embedded in their entry (see loadCountryEntries), and an
+// embedded select carries no order of its own.
+function countryTimelineHTML(entry) {
+  const events = (entry.country_entry_events || []).slice()
+    .sort((a, b) => (a.event_date < b.event_date ? -1 : a.event_date > b.event_date ? 1 : 0));
+  if (!events.length) return '';
+  return `
+    <div class="country-timeline">
+      <div class="country-timeline-label">Zaman Akışı</div>
+      <div class="ctl-track">
+        ${events.map(ev => `
+          <div class="ctl-item">
+            <div class="ctl-date">
+              <span class="ctl-tick"></span>
+              <span>${libEsc(formatLetterDate(ev.event_date))}</span>
+            </div>
+            <strong>${libEsc(ev.title)}</strong>
+            ${ev.body ? `<p>${libEsc(ev.body)}</p>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function renderCountryEntriesList(entries, countryId, countryName) {
   const area = document.getElementById('reader-overlay-sheet');
   if (!area) return;
@@ -4014,21 +4155,27 @@ function renderCountryEntriesList(entries, countryId, countryName) {
   } else if (!entries.length) {
     listHtml = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">${libEsc(countryName)} için henüz bir şey yok.</div>`;
   } else {
-    listHtml = `<div class="shelves">${entries.map(en => `
-      <a class="shelf-btn" data-entry="${libEsc(en.id)}" href="#">
-        <div>
-          <div class="shelf-title">${libEsc(en.title)}</div>
-          ${en.entry_date ? `<div class="shelf-subtitle">${libEsc(formatLetterDate(en.entry_date))}</div>` : ''}
-        </div>
-      </a>
-    `).join('')}</div>`;
+    listHtml = `<div class="shelves">${entries.map(en => {
+      // What the row says under its title: the entry's own date if it
+      // has one, otherwise the length of its chain -- an entry that is a
+      // timeline is worth announcing as one before it is opened.
+      const stepCount = (en.country_entry_events || []).length;
+      const sub = en.entry_date
+        ? formatLetterDate(en.entry_date)
+        : (stepCount ? `${stepCount} kilit an` : '');
+      return `
+        <a class="shelf-btn" data-entry="${libEsc(en.id)}" href="#">
+          <div>
+            <div class="shelf-title">${libEsc(en.title)}</div>
+            ${sub ? `<div class="shelf-subtitle">${libEsc(sub)}</div>` : ''}
+          </div>
+        </a>
+      `;
+    }).join('')}</div>`;
   }
   area.innerHTML = `
     <div class="shelf-path">
-      <div class="path-head">
-        <button class="path-back" type="button" id="country-back">← Kütüphane</button>
-        <h2 class="path-title">${libEsc(countryName)}</h2>
-      </div>
+      ${countryHeadHTML(countryName, 'country-back', 'Kütüphane')}
       ${listHtml}
     </div>
   `;
@@ -4042,22 +4189,20 @@ function renderCountryEntriesList(entries, countryId, countryName) {
   });
 }
 
-// One scrollable page — title, date, body, an optional source link — with
-// a back button to the country's list. Same reader a letter gets, and it
-// reuses renderLetterBodyHtml: blank lines separate paragraphs, nothing
-// else is interpreted.
+// One scrollable page — title, date, body, its chain of key moments, an
+// optional source link — with a back button to the country's list. Same
+// reader a letter gets, and it reuses renderLetterBodyHtml: blank lines
+// separate paragraphs, nothing else is interpreted.
 function openCountryEntryReader(entry, entries, countryId, countryName) {
   const area = document.getElementById('reader-overlay-sheet');
   if (!area) return;
   const url = libSafeUrl(entry.source_url);
   area.innerHTML = `
     <div class="shelf-path">
-      <div class="path-head">
-        <button class="path-back" type="button" id="country-entry-back">← ${libEsc(countryName)}</button>
-      </div>
-      <h2 class="path-title" style="margin-bottom:4px;">${libEsc(entry.title)}</h2>
-      ${entry.entry_date ? `<p class="path-subtitle">${libEsc(formatLetterDate(entry.entry_date))}</p>` : ''}
+      ${countryHeadHTML(entry.title, 'country-entry-back', countryName)}
+      ${entry.entry_date ? `<p class="country-entry-date">${libEsc(formatLetterDate(entry.entry_date))}</p>` : ''}
       <div class="reader-section-body" style="margin-top:14px;">${renderLetterBodyHtml(entry.body)}</div>
+      ${countryTimelineHTML(entry)}
       ${url ? `<p style="margin-top:16px;"><a href="${libEsc(url)}" target="_blank" rel="noopener noreferrer">Kaynak</a></p>` : ''}
     </div>
   `;
