@@ -357,9 +357,12 @@ sb.from('articles').delete().eq('id', id)
 - Left column: events panel (with RSVPs — `events` / `event_rsvps` tables)
 - Right column: breaking news feed (with polls, series, updates)
 - The personal layer lives here: the user's own profile, avatar, home identity
-- Opening your profile card here opens the **hane honeycomb** — your frame in the middle,
-  six slots for other members around it, each filled by entering that member's weekly code
-  (see `PROFILE_SECTIONS` under Site-wide defaults and `db/hive_slots.sql`)
+- The **PETEK** button over the map (the counterpart of Kahvehane's Kahve Endeksi pill, sitting
+  just above the map label) opens the **hane honeycomb** — your frame in the middle, six slots
+  for other members around it, each filled by entering that member's weekly code
+  (`IstProfileCard.openHiveOverlay`, see Site-wide defaults and `db/hive_slots.sql`).
+  Opening your profile card here shows the cover alone — the honeycomb is a destination on the
+  map, not a page of your account
 - Vision: this page is "you + Istanbul" — see Vision & Product Philosophy above
 
 ### `admin.html` — Admin Dashboard
@@ -595,13 +598,19 @@ stays: its body-level overlay markup, and every listener its script ever bound t
 
 The profile card opens your profile as the sheet above, but **what it contains depends on which of
 the three pages you opened it from** (`PROFILE_SECTIONS` in `profile-card.js`): the cover (frame,
-avatar, name, district) is Kahvehane's and Kütüphane's; the week's game grid is Kahvehane's; your
-account and settings — with the Kişiselleştir and Çıkış Yap buttons that act on them — are
-Kütüphane's. Anahane is **the hane honeycomb** (`hiveHTML`): your own cover frame as the middle
-cell of seven, with six slots packed around it for other members — so the middle page's profile is
-both who you are and who you keep close. The honeycomb reuses the cover's own frame for its middle
-cell — same mask, same drawn ring, same badges — so there is no second frame treatment to keep in
-sync.
+avatar, name, district) shows on all three; the week's game grid is Kahvehane's; your account and
+settings — with the Kişiselleştir and Çıkış Yap buttons that act on them — are Kütüphane's.
+Anahane's is the cover and nothing else.
+
+### The hane honeycomb — the PETEK sheet (`IstProfileCard.openHiveOverlay`)
+
+The honeycomb (`hiveHTML`) is your own cover frame as the middle cell of seven, with six slots
+packed around it for other members. It opens from the **PETEK button over Anahane's map**, in the
+same sheet the profile opens in (`openHiveOverlay` passes it the block set directly, rather than
+through `PROFILE_SECTIONS`) — who you keep close is a destination on the middle page, not a page
+of your account, which is why it is reached from the city rather than from the gear in the profile
+bar. The honeycomb reuses the cover's own frame for its middle cell — same mask, same drawn ring,
+same badges — so there is no second frame treatment to keep in sync.
 
 A slot is filled **hand-to-hand, by code** (`db/hive_slots.sql`): every member holds one code per
 Istanbul week, tapping an empty slot asks for someone else's, and whoever it belongs to stands
@@ -621,8 +630,9 @@ columns stay equal whether or not a slot is open — an extension that took the 
 itself would shove the honeycomb sideways; on a phone, where there is no free width to take, the
 frames give up size instead and the honeycomb draws back in place.
 
-None of the three scrolls: every set fits inside the sheet, the way a politician's page does. If a
-new block stops fitting, drop a block from that page — do not turn the page into a scroller.
+Neither the honeycomb nor any of the three profile sets scrolls: each fits inside the sheet, the
+way a politician's page does. If a new block stops fitting, drop a block from that page — do not
+turn the page into a scroller.
 
 ### Another member's profile — `IstProfileCard.initMemberSheet({ sb, I18N })`
 

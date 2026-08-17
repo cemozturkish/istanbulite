@@ -594,6 +594,32 @@
       color: var(--accent);
     }
 
+    /* ── PETEK pill — opens the hane honeycomb ──
+       Sits right above the map label, the same white/ink frame Kahvehane's
+       Kahve Endeksi pill wears over its own map, so the one button each
+       page carries over the city reads as the same kind of button. Unlike
+       that one it stays on desktop too: the honeycomb has no persistent
+       column of its own to be redundant with. */
+    .petek-pill {
+      position: fixed;
+      bottom: 52px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 6;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      border: 2px solid #1a1a1a;
+      background: rgba(255, 255, 255, 0.85);
+      color: #1a1a1a;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .petek-pill:hover { background: #1a1a1a; color: #fff; }
+
     /* ── LEFT SIDEBAR ── */
     .sidebar-left {
       display: flex;
@@ -1179,6 +1205,16 @@
         transform: translateX(-50%);
         font-size: 11px;
         letter-spacing: 1px;
+      }
+      /* Mobile: .map-panel is position:relative here (not the fixed
+         full-viewport backdrop), so the pill anchors inside the map's
+         own square, just above the label — same as Kahvehane's. */
+      .petek-pill {
+        position: absolute;
+        bottom: 28px;
+        font-size: 9px;
+        letter-spacing: 1.2px;
+        padding: 4px 10px;
       }
 
       /* The profile bar (#ist-pc-mount) is the fixed top bar — the
@@ -2148,6 +2184,9 @@
       </div>
 
       <div class="map-label" id="map-label">İstanbul</div>
+      <!-- Opens the hane honeycomb — your frame in the middle, six slots
+           around it (see openHiveOverlay in profile-card.js). -->
+      <button type="button" class="petek-pill" id="petek-pill" data-i18n="hane.petek">Petek</button>
     </section>
   </main>
 
@@ -2282,6 +2321,7 @@ function mount() {
   loadEvents();
   renderPoliticianCard(activeNeighborhood || 'istanbul');
   loadPersonMentionsRoster();
+  wirePetekPill();
   // #library-card lives inside #ist-content, so a virtual re-entry into
   // this page (router.js's navigateTo) resets it back to its spinner
   // placeholder along with the rest of the swapped HTML -- unlike
@@ -2302,6 +2342,19 @@ function mountLibraryCardWhenReady(tries) {
   } else if ((tries === undefined ? 40 : tries) > 0) {
     setTimeout(() => mountLibraryCardWhenReady((tries === undefined ? 40 : tries) - 1), 60);
   }
+}
+
+// The PETEK button over the map opens the hane honeycomb (see
+// openHiveOverlay in profile-card.js). Bound to the button itself, not to
+// `document` -- the three carousel pages share one document (router.js),
+// and the button lives inside #ist-content, so the binding leaves with the
+// page and is made again on every re-entry (mount).
+function wirePetekPill() {
+  const pill = document.getElementById('petek-pill');
+  if (!pill) return;
+  pill.addEventListener('click', () => {
+    if (window.IstProfileCard) IstProfileCard.openHiveOverlay({ sb, I18N });
+  });
 }
 
 // person-mentions.js is deferred -- poll briefly the same way tryOnb/
@@ -2602,7 +2655,10 @@ document.addEventListener('click', (e) => {
   // bar silently cleared the map filter and kicked off a full,
   // unnecessary events reload in the background.
   if (!nb) {
-    if (!e.target.closest('.map-panel')) return;
+    // The PETEK pill sits inside the map panel but is not part of the
+    // map: pressing it opens the honeycomb, it doesn't deselect a
+    // district (same guard Kahvehane gives its Kahve Endeksi pill).
+    if (!e.target.closest('.map-panel') || e.target.closest('.petek-pill')) return;
     getNeighborhoods().forEach(n => n.classList.remove('active'));
     document.getElementById('map-label').textContent = 'İstanbul';
     if (activeNeighborhood !== null) {

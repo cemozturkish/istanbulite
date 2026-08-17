@@ -63,9 +63,9 @@
     'profile.email':        { default: 'E-posta',             more_english: 'Email' },
     'profile.thisweek':     { default: 'Bu Hafta',             more_english: 'This Week' },
     'profile.profileinfo':  { default: 'Profil Bilgileri',     more_english: 'Profile Info' },
-    // The hane honeycomb on anahane: the six slots around your own frame,
-    // filled by handing someone your weekly code (see hiveHTML in
-    // profile-card.js and db/hive_slots.sql).
+    // The hane honeycomb — the PETEK sheet, opened from Anahane's map:
+    // the six slots around your own frame, filled by handing someone your
+    // weekly code (see hiveHTML in profile-card.js and db/hive_slots.sql).
     'profile.hive.empty':   { default: 'Boş yer',               more_english: 'Empty slot' },
     'profile.hive.codeprompt':{ default: 'HANE KODU',           more_english: 'HANE CODE' },
     'profile.hive.add':     { default: 'Ekle',                  more_english: 'Add' },
@@ -121,6 +121,11 @@
 
     // kahvehane — discussion feed
     'kahvehane.allistanbul': { default: 'Tüm İstanbul',      more_english: 'All Istanbul' },
+
+    // anahane — the PETEK button over the map, opening the hane
+    // honeycomb (see openHiveOverlay in profile-card.js). The word
+    // stands in both languages, the way "hane" does.
+    'hane.petek':    { default: 'Petek',                    more_english: 'Petek' },
 
     // kahvehane — coffee price index (Kahve Endeksi), read-only: the
     // index is curated from the admin portal, not reported by users.
