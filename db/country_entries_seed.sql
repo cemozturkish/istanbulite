@@ -21,6 +21,21 @@
 -- Run in Supabase SQL editor.
 -- =====================================================================
 
+-- Runs before anything else so a missing table says which file to run
+-- rather than "relation public.country_entry_events does not exist"
+-- from twelve lines inside a pg_temp function.
+do $$
+begin
+  if to_regclass('public.country_entries') is null then
+    raise exception 'Önce db/country_entries.sql çalıştırılmalı: public.country_entries tablosu yok.'
+      using hint = 'Sıra: country_entries.sql -> country_entry_events.sql -> country_entries_seed.sql';
+  end if;
+  if to_regclass('public.country_entry_events') is null then
+    raise exception 'Önce db/country_entry_events.sql çalıştırılmalı: public.country_entry_events tablosu yok.'
+      using hint = 'Sıra: country_entries.sql -> country_entry_events.sql -> country_entries_seed.sql';
+  end if;
+end $$;
+
 create or replace function pg_temp.seed_country_entry(
   p_country text,
   p_title   text,
