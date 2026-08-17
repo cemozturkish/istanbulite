@@ -658,14 +658,17 @@ keeps happening. It is a record of contact, not a follower list, and it is the c
 connection the site has (still no DMs — ever). What is *shown* of an occupant beside their frame is
 the undesigned half: name, district, and the week running down, no more.
 
-Each slot owns the space on the outer side of its own row, and that one space does both jobs: it
-prints the occupant, and it is what the frame **extends into** when pressed — the code field for an
-empty slot, a Çıkar button for a filled one. Pressing a frame never opens a page or a second sheet:
-the honeycomb stays on screen and the frame that was pressed stays under the finger (pressing it
-again folds the extension back up, which is why there is no close button in it). The two side
-columns stay equal whether or not a slot is open — an extension that took the row's free width for
-itself would shove the honeycomb sideways; on a phone, where there is no free width to take, the
-frames give up size instead and the honeycomb draws back in place.
+Each slot owns the space on the outer side of its own row, which just prints the occupant — name,
+district, days left — and never changes for a tap. What a tap needs lands in **the dock**, one
+fixed spot below the honeycomb (`hiveDockHTML`): your own code at rest, or the tapped slot's panel
+while one is open — the code field for an empty slot, a Çıkar button for a filled one. The
+honeycomb itself is fixed furniture: no cell resizes and no row shifts when a slot opens, on a
+phone or anywhere else — the tapped hex is marked instead (`.ist-hive-cell-open` inks its ring and
+lifts it slightly via `transform`, which never moves a neighbour). This replaced an earlier design
+where the frame itself grew sideways into the row's own gutter — workable on desktop, but the
+gutter was too narrow on a phone to hold a real field without shrinking every hexagon to make room,
+which read as the whole honeycomb flinching at a tap. Pressing the same hex again folds the dock
+back to the resting code display, which is why there is no close button in it.
 
 Neither the honeycomb nor any of the three profile sets scrolls: each fits inside the sheet, the
 way a politician's page does. If a new block stops fitting, drop a block from that page — do not
