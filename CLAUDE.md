@@ -214,7 +214,8 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `coffee_prices`
 > (the Kahve Endeksi — v3 adds the opening-hours and scheduled-discount columns that make it
 > live), `coffee_comments` (what members say about a venue), `countries` + `country_entries`
-> (what a country on Kütüphane's map opens) and `breaking_news_countries` (which countries a
+> + `country_entry_events` (what a country on Kütüphane's map opens, and the key-moment
+> timeline an entry can carry) and `breaking_news_countries` (which countries a
 > Dünya story is about, lit on that map when the story opens), and more). When in doubt, read the relevant `db/` file — it is the
 > source of truth.
 
@@ -444,6 +445,18 @@ sb.from('articles').delete().eq('id', id)
   body — on a desktop, where the world map isn't the drawing on screen, that line is the whole of
   it. Country names come off the map's own `data-name`, not a second fetch, so a story names a
   place with the same word the caption prints when you touch it
+- **Touching a country opens that country's page** (`country_entries`). It is titled the way a
+  chapter is, not the way a shelf is: the country's name centred on the very top line, and the
+  hand-drawn arrow (`assets/back.png`, the same one the game pages use) alone in the corner as
+  the way out — no worded back button, because the reader arrived here by touching the drawing
+  and the drawing's own word is the whole title. `countryHeadHTML()` builds that head for both
+  the country's list of entries and each entry's own page
+- An entry can carry a **Zaman Akışı** (`country_entry_events`) — a chain of dated key moments,
+  the way a `breaking_news` story grows `breaking_news_updates`. The difference is the order:
+  a news chain is printed newest-first because the story is developing under the reader, while
+  a country's chain is history and is printed **oldest first**, so reading down the page is
+  reading forwards. Curated from admin.html's Ülkeler tab; `db/country_entries_seed.sql` holds
+  the starting set (Rusya–Ukrayna, Filistin–İsrail, Suriye, Karabağ, Kıbrıs, Putin Rusyası)
 
 ### `tumcel.html` — Tümcel
 - Connections-style game where 16 sentence fragments must be regrouped into 4 quotes
