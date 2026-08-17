@@ -542,11 +542,9 @@
    standing at each frame's base. */
 .ist-hive-row + .ist-hive-row { margin-top: var(--ist-hive-row-overlap); }
 /* Each child is pinned to its own column. The two side tracks stay equal
-   at all times, open or closed — an extension that took the row's free
-   width for itself would push the honeycomb bodily sideways, and the
-   honeycomb is the thing the reader is holding their place in. Room for
-   the extension is made by the frames giving up size instead (see
-   .ist-hive-open below), which is symmetric and leaves it centred. */
+   at all times, and neither ever changes size for a tap — what a slot
+   needs when opened lives in the dock below the honeycomb instead (see
+   .ist-hive-dock), so the honeycomb itself is fixed furniture. */
 .ist-hive-side-left  { grid-column: 1; }
 .ist-hive-cells      { grid-column: 2; }
 .ist-hive-side-right { grid-column: 3; }
@@ -554,26 +552,26 @@
    so all three rows leave their readouts exactly the same room — and a
    row of two centred in a box three cells wide still lands each of its
    cells over a gap in the row of three, which is the offset that packs
-   the honeycomb. */
+   the honeycomb. Fixed width, no open/closed state: the hexagons are
+   fixed furniture on this page, never resized by what's tapped (see the
+   dock below). */
 .ist-hive-cells {
   display: flex;
   justify-content: center;
   align-items: center;
   gap: var(--ist-hive-gap);
   width: calc(var(--ist-hive-cell-w) * 3 + var(--ist-hive-gap) * 2);
-  transition: width 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 /* Every slot is a button (the middle cell, which is you, is not): an
    empty one opens the code form, a filled one opens its occupant's
-   panel. Stripped back to the frame itself — the drawn hexagon is the
-   affordance, there is no button chrome around it. */
+   panel — both land in the dock below, never here (see .ist-hive-cell-
+   open and hiveDockHTML in profile-card.js). Stripped back to the frame
+   itself — the drawn hexagon is the affordance, there is no button
+   chrome around it, and it never changes size for being pressed. */
 .ist-hive-cell {
   position: relative;
   width: var(--ist-hive-cell-w);
   flex: 0 0 auto;
-  /* So the frames visibly draw back when a slot opens on a phone, rather
-     than snapping to their smaller size (see .ist-hive-open). */
-  transition: width 220ms cubic-bezier(0.22, 1, 0.36, 1);
   padding: 0;
   border: none;
   background: none;
@@ -591,14 +589,18 @@ button.ist-hive-cell:focus-visible .ist-hive-slot {
 button.ist-hive-cell:hover .ist-hive-plus,
 button.ist-hive-cell:focus-visible .ist-hive-plus { color: var(--ink); }
 button.ist-hive-cell:focus-visible { outline: none; }
-/* The open slot stays inked for as long as its extension is out, so it
-   is obvious which frame the form hanging beside it belongs to. */
+/* The open slot stays inked for as long as its panel is out in the dock,
+   so it's obvious which frame that panel belongs to. It lifts slightly
+   too (transform only — nothing about its box size changes, so neighbour
+   cells never move), since a filled slot is already ink-stroked by
+   default and the ink alone wouldn't read as "selected" against itself. */
 button.ist-hive-cell-open .ist-hive-slot { --hexframe-stroke: var(--ink); }
 button.ist-hive-cell-open .ist-hive-plus { color: var(--ink); }
-.ist-hive-frame { transition: opacity 160ms; }
+.ist-hive-frame { transition: opacity 160ms, transform 200ms cubic-bezier(0.22, 1, 0.36, 1); }
+button.ist-hive-cell-open .ist-hive-frame { transform: scale(1.05); }
 button.ist-hive-slot-filled:hover .ist-hive-frame { opacity: 0.82; }
-/* An open occupant is not dimmed: the Çıkar button standing beside them
-   is the state, and a faded portrait next to it reads as "leaving". */
+/* An open occupant is not dimmed: the Çıkar button in the dock is the
+   state, and a faded portrait next to it reads as "leaving". */
 button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
 /* The frame fills its cell and takes its height from the drawing's ratio
    (frames.css pins width:auto !important on every hexframe, so the cell
@@ -627,12 +629,10 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
   color: var(--muted);
 }
 /* ── The space beside a slot ──
-   Each slot owns the outer side of its own row, and that one space does
-   both jobs: it prints the occupant, and it is what the slot extends
-   into when tapped (the code form, or the occupant with a Çıkar button).
-   An empty, unopened slot prints nothing — the column still holds its
-   width, so the honeycomb never shifts as slots fill, empty, open and
-   close. */
+   Each slot owns the outer side of its own row, printing the occupant
+   when there is one. Fixed content, fixed width — nothing here reacts
+   to a tap (see the dock below), so the honeycomb never shifts as slots
+   fill or empty either. */
 .ist-hive-side {
   display: flex;
   flex-direction: column;
@@ -659,19 +659,32 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
   color: var(--muted);
 }
 
-/* Your own code for the week, under the honeycomb — the other half of
-   the exchange (see db/hive_slots.sql: a slot can only be filled by
-   someone who was handed a code, so the code has to be somewhere the
-   owner can read it out). */
+/* ── The dock ──
+   One fixed spot under the honeycomb, always the same width as the rows
+   above it. At rest it holds your own code — the other half of the
+   exchange (db/hive_slots.sql: a slot can only be filled by someone who
+   was handed a code, so the code has to be somewhere the owner can read
+   it out). Tapping a hex swaps its content to that slot's panel instead
+   of growing the hex itself (see .ist-hive-cell in profile-card.js's
+   hiveSlotHTML) — the honeycomb never resizes or shifts for a tap, only
+   this one spot's content changes. The border/height live here, on the
+   wrapper, rather than on whichever content happens to be inside it, so
+   the divider and the room for it never flicker between states. */
+.ist-hive-dock {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline);
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .ist-hive-code {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: center;
   gap: 4px 8px;
-  margin-top: 14px;
-  padding-top: 10px;
-  border-top: 1px solid var(--hairline);
   font-size: 0.6rem;
   font-weight: 600;
   letter-spacing: 1px;
@@ -686,36 +699,38 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
   color: var(--ink);
 }
 .ist-hive-code-hint { font-size: 0.55rem; letter-spacing: 0.6px; text-transform: none; }
-/* Holds the line's height while the code is still being fetched, so the
-   honeycomb doesn't jump up the sheet when it lands. */
-.ist-hive-code-empty { border-top-color: transparent; }
 
-/* ── A slot's extension ──
-   Pressing a frame does not open a page of its own: it extends the frame
-   sideways into the space that slot already owns beside it (see
-   .ist-hive-side above), so the honeycomb stays on screen and the thing
-   that was tapped stays under the finger. The code form for an empty
-   slot, the occupant plus a Çıkar button for a filled one. Pressing the
-   same frame again folds it back up, which is why there is no close
-   button in here. */
-.ist-hive-side-open {
+/* ── A slot's panel ──
+   Pressing a hex does not open a page of its own: its panel lands in the
+   dock, which stays on screen exactly where it was — the honeycomb above
+   it doesn't move, so the tapped hex (ringed via .ist-hive-cell-open) is
+   still exactly under the finger that pressed it. The code form for an
+   empty slot, the occupant plus a Çıkar button for a filled one.
+   Pressing the same hex again folds it back to the resting code display,
+   which is why there is no close button in here. Centred and free to use
+   the dock's full width — a real field and a real button, not squeezed
+   into a row's narrow side gutter the way the old inline extension was. */
+.ist-hive-dock-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 5px;
-  /* Slides out of the frame it belongs to. Short, and only the first
-     time it appears — this is the frame growing, not a panel arriving. */
-  animation: ist-hive-ext-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  width: min(220px, 100%);
+  text-align: center;
 }
-.ist-hive-side-left.ist-hive-side-open  { animation-name: ist-hive-ext-in-left; }
-.ist-hive-side-right.ist-hive-side-open { animation-name: ist-hive-ext-in-right; }
-@keyframes ist-hive-ext-in-left {
-  from { opacity: 0; transform: translateX(14px); }
-  to   { opacity: 1; transform: none; }
+/* Whatever just landed in the dock — the resting code or a slot's panel
+   — fades and lifts gently into place instead of snapping in, since both
+   are a full replace of the dock's content on every render. */
+.ist-hive-dock > * {
+  animation: ist-hive-dock-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-@keyframes ist-hive-ext-in-right {
-  from { opacity: 0; transform: translateX(-14px); }
+@keyframes ist-hive-dock-in {
+  from { opacity: 0; transform: translateY(5px); }
   to   { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ist-hive-side-open { animation: none; }
+  .ist-hive-dock > * { animation: none; }
+  .ist-hive-frame { transition: opacity 160ms; }
 }
 .ist-hive-ext-label {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
@@ -728,28 +743,26 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
 /* The code is typed off a screen someone else is holding up, so it is
    set monospaced and spaced out — a mistyped character has to be
    visible at a glance. Doubled class so the width beats .ist-pc-input's
-   own width:100%, written for the full-width fields further down. */
+   own width:100%. */
 .ist-pc-input.ist-hive-input {
-  /* Fills the column it is in and nothing wider — the extension lives
-     inside the space its slot already owns, so it never widens the row. */
   width: 100%;
   box-sizing: border-box;
-  padding: 4px 5px;
+  padding: 6px 5px;
   text-align: center;
   font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
   font-size: 16px; /* prevent iOS zoom */
   font-weight: 700;
-  letter-spacing: 2px;
+  letter-spacing: 3px;
   text-transform: uppercase;
 }
 .ist-hive-submit { width: 100%; }
 .ist-hive-remove {
   margin-top: 2px;
-  padding: 4px 12px;
+  padding: 5px 14px;
   border: 1px solid var(--rule);
   background: none;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 0.6rem;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 1.2px;
   text-transform: uppercase;
@@ -759,7 +772,7 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
 .ist-hive-remove:hover { background: var(--hover); }
 .ist-hive-ext-msg:empty { display: none; }
 .ist-hive-ext-msg {
-  font-size: 0.58rem;
+  font-size: 0.6rem;
   line-height: 1.25;
   color: var(--accent);
 }
@@ -955,25 +968,16 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
   /* The honeycomb is width-bound on a phone rather than height-bound: the
      middle row is three cells plus two gaps wide, and the readouts either
      side still need room to be legible. Smaller cells, tighter gaps,
-     thinner rules. */
+     thinner rules — one fixed size, since the dock (not the honeycomb)
+     is what makes room for a tap now. */
   .ist-hive { --ist-hive-cell-w: min(84px, 11vh); }
-  /* A phone has no free width to spare either side of the honeycomb, so
-     while a slot is extended the frames themselves give some up — the
-     code field needs to be typed into, and a field squeezed into 50px is
-     not. Both side columns widen equally as they do, so the honeycomb
-     draws back in place rather than sliding; it returns to full size
-     when the slot folds. */
-  .ist-hive.ist-hive-open { --ist-hive-cell-w: min(62px, 8.5vh); }
   .ist-hive-row { gap: 8px; }
   .ist-hive-readout-name { font-size: 0.62rem; }
   .ist-hive-readout-meta,
   .ist-hive-readout-left { font-size: 0.5rem; letter-spacing: 0.6px; }
-  .ist-hive-code { margin-top: 10px; padding-top: 8px; gap: 3px 6px; }
-  /* The field is down to the six characters themselves at this width, so
-     the tracking goes and the label sheds a step. */
-  .ist-pc-input.ist-hive-input { padding: 4px 2px; letter-spacing: 0; }
+  .ist-hive-dock { margin-top: 10px; padding-top: 8px; }
+  .ist-hive-code { gap: 3px 6px; }
   .ist-hive-ext-label { font-size: 0.5rem; letter-spacing: 0.6px; }
-  .ist-hive-remove { padding: 4px 6px; font-size: 0.55rem; letter-spacing: 0.6px; }
   .ist-pc-weekgrid { margin-bottom: 0; }
   .ist-pc-daycell { max-width: 16px; }
   .ist-pc-weekgrid-row { margin-bottom: 1px; gap: 3px; }

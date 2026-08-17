@@ -1088,20 +1088,19 @@
   }
 
   // ── What stands beside a slot ──
-  // Each slot owns the space on the outer side of its own row, and that
-  // one space serves both jobs: it prints the occupant when there is
-  // one, and it is where the slot *opens out* when tapped — the code
-  // form for an empty slot, the Çıkar button for a filled one. Tapping a
-  // frame therefore extends it sideways rather than replacing the
-  // honeycomb with a page of its own: the reader never leaves the
-  // honeycomb, and the thing they tapped is still under their finger.
+  // Each slot owns the space on the outer side of its own row, printing
+  // the occupant when there is one — name, district, the week running
+  // down, no more. This never changes when a slot is tapped: the frames
+  // are fixed furniture (see .ist-hive-cell in profile-card.css), so
+  // what a tap needs — the code form, an occupant's Çıkar — lands in the
+  // dock below the honeycomb instead (see hiveDockHTML), not beside the
+  // row.
   //
-  // An empty, unopened slot prints nothing at all. It used to carry
-  // placeholder ruling standing in for a member's stats; that was only
-  // ever a note about where writing would go.
-  function hiveSideHTML(slot, side, member, open, t) {
+  // An empty slot prints nothing at all. It used to carry placeholder
+  // ruling standing in for a member's stats; that was only ever a note
+  // about where writing would go.
+  function hiveSideHTML(side, member, t) {
     const cls = `ist-hive-side ist-hive-side-${side}`;
-    if (open) return `<div class="${cls} ist-hive-side-open">${hiveExtensionHTML(member, open, t)}</div>`;
     if (!member) return `<div class="${cls}"></div>`;
 
     const days = hiveDaysLeft(member.expires_at);
@@ -1116,7 +1115,8 @@
     `;
   }
 
-  // The extension itself: what the tapped slot grows. `open` is
+  // What the open slot puts in the dock: the code form for an empty
+  // slot, the occupant plus a Çıkar button for a filled one. `open` is
   // state.hiveOpen — { slot, value, error } — and the ids below are
   // unique because only ever one slot is open at a time.
   function hiveExtensionHTML(member, open, t) {
@@ -1143,8 +1143,10 @@
   }
 
   // One slot cell — a button either way, and pressing it opens (or
-  // closes) that slot's extension beside it: the code form when empty,
-  // the occupant with a Çıkar button when filled.
+  // closes) that slot's panel in the dock below: the code form when
+  // empty, the occupant with a Çıkar button when filled. The frame
+  // itself never resizes for this — .ist-hive-cell-open just inks its
+  // ring, so the tapped hex stays exactly where it was, only marked.
   function hiveSlotHTML(slot, member, isOpen, t) {
     const openCls = isOpen ? ' ist-hive-cell-open' : '';
     const expanded = isOpen ? 'true' : 'false';
@@ -1181,8 +1183,9 @@
     `;
   }
 
-  // Your own code for the week, printed under the honeycomb — the other
-  // half of the exchange, and the only way anyone can put you in theirs.
+  // Your own code for the week — the other half of the exchange, and the
+  // only way anyone can put you in theirs. The dock's resting content:
+  // whatever is showing whenever no slot is open (see hiveDockHTML).
   function hiveCodeHTML(hive, t) {
     if (!hive || !hive.code) return `<div class="ist-hive-code ist-hive-code-empty">&nbsp;</div>`;
     return `
@@ -1193,6 +1196,25 @@
         <span class="ist-hive-code-hint">${esc(t('profile.hive.codehint'))}</span>
       </div>
     `;
+  }
+
+  // ── The dock ──
+  // One fixed spot under the honeycomb that a tap on a hex talks to,
+  // instead of the hex growing sideways into it (see hiveSlotHTML). It
+  // rests on your own code when nothing is selected, and swaps to the
+  // tapped slot's panel — the code form for an empty one, the occupant
+  // and a Çıkar button for a filled one — while a slot is open. Full
+  // honeycomb width rather than a row's narrow side gutter, so the code
+  // field and buttons land at a real size on a phone instead of the
+  // cramped column the old side-extension had to fit into.
+  function hiveDockHTML(opts) {
+    const t = opts.t;
+    const open = opts.open;
+    if (open) {
+      const members = (opts.hive && opts.hive.slots) || {};
+      return `<div class="ist-hive-dock-panel">${hiveExtensionHTML(members[open.slot] || null, open, t)}</div>`;
+    }
+    return hiveCodeHTML(opts.hive, t);
   }
 
   function hiveHTML(opts) {
@@ -1209,15 +1231,15 @@
       const [leftSlot, rightSlot] = [row.slots[0], row.slots[row.slots.length - 1]];
       return `
         <div class="ist-hive-row">
-          ${hiveSideHTML(leftSlot, 'left', members[leftSlot] || null, open && open.slot === leftSlot ? open : null, t)}
+          ${hiveSideHTML('left', members[leftSlot] || null, t)}
           <div class="ist-hive-cells">${cells.join('')}</div>
-          ${hiveSideHTML(rightSlot, 'right', members[rightSlot] || null, open && open.slot === rightSlot ? open : null, t)}
+          ${hiveSideHTML('right', members[rightSlot] || null, t)}
         </div>
       `;
     }).join('');
     return `
-      <div class="ist-hive${open ? ' ist-hive-open' : ''}" data-slots="${HIVE_SLOT_COUNT}">${rows}</div>
-      ${hiveCodeHTML(opts.hive, t)}
+      <div class="ist-hive" data-slots="${HIVE_SLOT_COUNT}">${rows}</div>
+      <div class="ist-hive-dock" id="po-hive-dock">${hiveDockHTML(opts)}</div>
     `;
   }
 
