@@ -1091,10 +1091,14 @@
       flex-direction: column;
     }
     .article.openable h3 { margin-top: auto; }
-    /* .article.openable only ever renders in #dunya-news-feed (col-right,
-       the left-hand column) -- inward is rightward, same convention as
-       .shelf-btn:hover above. */
+    /* In #dunya-news-feed (col-right, the left-hand column) inward is
+       rightward, same convention as .shelf-btn:hover above. Inside a
+       sheet there is no map to slide toward, so .country-entries takes
+       the slide back off below. */
     .article.openable:hover { background: var(--paper-dark); transform: translateX(6px); }
+    /* Multi-paragraph bodies: a news card's body is one paragraph, but a
+       country entry's is prose split on blank lines (renderLetterBodyHtml). */
+    .article p + p { margin-top: 10px; }
     .sidebar-label {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.68rem;
@@ -1334,49 +1338,14 @@
          drifting off the arrow. */
       padding: 0 38px;
     }
-    .country-entry-date {
-      margin: -10px 0 0;
-      text-align: center;
-      font-size: 0.8rem;
-      color: var(--accent);
-      font-style: italic;
-    }
-
-    /* The chain a country entry carries: the same ticked track a Dünya
-       story's Zaman Akışı gets (.article .timeline above), but printed
-       oldest first and dated rather than aged — see
-       db/country_entry_events.sql for why. */
-    .country-timeline {
-      margin-top: 20px;
-      padding-top: 12px;
-      border-top: 1px dashed var(--rule);
-    }
-    .country-timeline-label {
-      font-size: 0.6rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 8px;
-    }
-    .ctl-item { border-left: 2px solid var(--ink-red); padding: 10px 0; }
-    .ctl-item:first-child { padding-top: 0; }
-    .ctl-item:last-child { padding-bottom: 0; }
-    .ctl-date {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 4px;
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 1px;
-      color: var(--ink-red);
-    }
-    .ctl-tick { flex: 0 0 12px; height: 2px; background: var(--ink-red); }
-    .ctl-item strong,
-    .ctl-item p { display: block; margin-left: 26px; }
-    .ctl-item strong { font-size: 0.85rem; color: var(--ink); }
-    .ctl-item p { margin-top: 2px; font-size: 0.78rem; color: var(--accent); line-height: 1.5; }
+    /* An entry's own page carries no title of its own here — the arrow
+       stands alone over an .article, exactly the way a Dünya story's
+       page does, and the .article's h3 is the headline. */
+    .country-head.country-head-bare { min-height: 26px; }
+    /* A country's entries are the same cards the Dünya feed prints, so
+       tapping one reads exactly like tapping a story. */
+    .country-entries { display: flex; flex-direction: column; gap: 12px; }
+    .country-entries .article.openable:hover { transform: none; }
     .path-list {
       display: flex;
       flex-direction: column;
@@ -4103,39 +4072,50 @@ async function openCountrySheet(countryId, countryName) {
   renderCountryEntriesList(entries, countryId, countryName);
 }
 
-// The head every country page wears: the hand-drawn arrow alone in the
-// corner, the name centred on the top line. `label` is what the arrow
-// goes back to -- it is never printed, only announced, because the
-// drawing says everything a word would.
+// The head a country page wears: the hand-drawn arrow alone in the
+// corner. `backLabel` is what the arrow goes back to -- never printed,
+// only announced, because the drawing says everything a word would.
+// `title` is the country's own name, centred on the top line; an entry's
+// page passes none, because there the .article's h3 is the headline,
+// exactly as it is on a Dünya story's page.
 function countryHeadHTML(title, backId, backLabel) {
   return `
-    <div class="country-head">
+    <div class="country-head${title ? '' : ' country-head-bare'}">
       <button class="country-back" type="button" id="${libEsc(backId)}"
               aria-label="${libEsc(backLabel)}" title="${libEsc(backLabel)}">
         <img src="assets/back.png" alt=""/>
       </button>
-      <h2 class="country-title">${libEsc(title)}</h2>
+      ${title ? `<h2 class="country-title">${libEsc(title)}</h2>` : ''}
     </div>
   `;
 }
 
-// A country entry's own chain, oldest first: you read down the page and
-// the thing builds. Sorted here rather than in the query because the
-// events arrive embedded in their entry (see loadCountryEntries), and an
-// embedded select carries no order of its own.
+// A country entry's chain, newest first -- the same order, and the same
+// ticked track, a Dünya story's Zaman Akışı is printed in. The one
+// difference is that a moment here is stamped with its date rather than
+// its age: these chains reach back to 1917, and "109 yıl önce" tells a
+// reader nothing.
+//
+// Sorted here rather than in the query because the events arrive
+// embedded in their entry (see loadCountryEntries), and an embedded
+// select carries no order of its own.
+function countryEntryEvents(entry) {
+  return (entry.country_entry_events || []).slice()
+    .sort((a, b) => (a.event_date < b.event_date ? 1 : a.event_date > b.event_date ? -1 : 0));
+}
+
 function countryTimelineHTML(entry) {
-  const events = (entry.country_entry_events || []).slice()
-    .sort((a, b) => (a.event_date < b.event_date ? -1 : a.event_date > b.event_date ? 1 : 0));
+  const events = countryEntryEvents(entry);
   if (!events.length) return '';
   return `
-    <div class="country-timeline">
-      <div class="country-timeline-label">Zaman Akışı</div>
-      <div class="ctl-track">
+    <div class="timeline">
+      <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Zaman Akışı</div>
+      <div class="timeline-track">
         ${events.map(ev => `
-          <div class="ctl-item">
-            <div class="ctl-date">
-              <span class="ctl-tick"></span>
-              <span>${libEsc(formatLetterDate(ev.event_date))}</span>
+          <div class="timeline-item">
+            <div class="timeline-item-date">
+              <span class="timeline-tick"></span>
+              <div class="ago">${libEsc(formatLetterDate(ev.event_date))}</div>
             </div>
             <strong>${libEsc(ev.title)}</strong>
             ${ev.body ? `<p>${libEsc(ev.body)}</p>` : ''}
@@ -4144,6 +4124,15 @@ function countryTimelineHTML(entry) {
       </div>
     </div>
   `;
+}
+
+// What goes where a news card prints its age: the entry's own date if it
+// has one, otherwise the date of the newest moment on its chain -- which
+// is the same thing a story's `updated_at` says, "when this last moved".
+function countryEntryStamp(entry) {
+  if (entry.entry_date) return formatLetterDate(entry.entry_date);
+  const newest = countryEntryEvents(entry)[0];
+  return newest ? formatLetterDate(newest.event_date) : '';
 }
 
 function renderCountryEntriesList(entries, countryId, countryName) {
@@ -4155,23 +4144,24 @@ function renderCountryEntriesList(entries, countryId, countryName) {
   } else if (!entries.length) {
     listHtml = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">${libEsc(countryName)} için henüz bir şey yok.</div>`;
   } else {
-    listHtml = `<div class="shelves">${entries.map(en => {
-      // What the row says under its title: the entry's own date if it
-      // has one, otherwise the length of its chain -- an entry that is a
-      // timeline is worth announcing as one before it is opened.
-      const stepCount = (en.country_entry_events || []).length;
-      const sub = en.entry_date
-        ? formatLetterDate(en.entry_date)
-        : (stepCount ? `${stepCount} kilit an` : '');
+    // The same card the Dünya feed prints, so a country's entries are
+    // tapped exactly the way a story is -- kicker, headline, opening
+    // paragraph -- rather than as a shelf of chapters.
+    const kicker = countryName.toLocaleUpperCase('tr-TR');
+    listHtml = `<div class="country-entries">` + entries.map(en => {
+      const lead = (en.body || '').split(/\n{2,}/)[0].trim();
+      const stamp = countryEntryStamp(en);
       return `
-        <a class="shelf-btn" data-entry="${libEsc(en.id)}" href="#">
-          <div>
-            <div class="shelf-title">${libEsc(en.title)}</div>
-            ${sub ? `<div class="shelf-subtitle">${libEsc(sub)}</div>` : ''}
+        <div class="article openable" data-entry="${libEsc(en.id)}">
+          <div class="meta-row">
+            <div class="kicker">${libEsc(kicker)}</div>
+            ${stamp ? `<div class="ago">${libEsc(stamp)}</div>` : ''}
           </div>
-        </a>
+          <h3>${libEsc(en.title)}</h3>
+          ${lead ? `<p>${libEsc(lead)}</p>` : ''}
+        </div>
       `;
-    }).join('')}</div>`;
+    }).join('') + `</div>`;
   }
   area.innerHTML = `
     <div class="shelf-path">
@@ -4180,30 +4170,38 @@ function renderCountryEntriesList(entries, countryId, countryName) {
     </div>
   `;
   document.getElementById('country-back').addEventListener('click', closeReaderOverlay);
-  area.querySelectorAll('.shelf-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const entry = (entries || []).find(en => en.id === btn.dataset.entry);
+  area.querySelectorAll('.article.openable').forEach(card => {
+    card.addEventListener('click', () => {
+      const entry = (entries || []).find(en => en.id === card.dataset.entry);
       if (entry) openCountryEntryReader(entry, entries, countryId, countryName);
     });
   });
 }
 
-// One scrollable page — title, date, body, its chain of key moments, an
-// optional source link — with a back button to the country's list. Same
-// reader a letter gets, and it reuses renderLetterBodyHtml: blank lines
+// An entry opens exactly the way a Dünya story does: the arrow alone
+// over one .article -- kicker, headline, body, its Zaman Akışı, and an
+// optional source. Same markup buildDunyaNewsDetailHtml builds, so a
+// country page and a news page are one page type, not two that resemble
+// each other. Body paragraphs come off renderLetterBodyHtml: blank lines
 // separate paragraphs, nothing else is interpreted.
 function openCountryEntryReader(entry, entries, countryId, countryName) {
   const area = document.getElementById('reader-overlay-sheet');
   if (!area) return;
   const url = libSafeUrl(entry.source_url);
+  const stamp = countryEntryStamp(entry);
   area.innerHTML = `
     <div class="shelf-path">
-      ${countryHeadHTML(entry.title, 'country-entry-back', countryName)}
-      ${entry.entry_date ? `<p class="country-entry-date">${libEsc(formatLetterDate(entry.entry_date))}</p>` : ''}
-      <div class="reader-section-body" style="margin-top:14px;">${renderLetterBodyHtml(entry.body)}</div>
-      ${countryTimelineHTML(entry)}
-      ${url ? `<p style="margin-top:16px;"><a href="${libEsc(url)}" target="_blank" rel="noopener noreferrer">Kaynak</a></p>` : ''}
+      ${countryHeadHTML(null, 'country-entry-back', countryName)}
+      <div class="article">
+        <div class="meta-row">
+          <div class="kicker">${libEsc(countryName.toLocaleUpperCase('tr-TR'))}</div>
+          ${stamp ? `<div class="ago">${libEsc(stamp)}</div>` : ''}
+        </div>
+        <h3>${libEsc(entry.title)}</h3>
+        ${renderLetterBodyHtml(entry.body)}
+        ${countryTimelineHTML(entry)}
+        ${url ? `<p style="margin-top:16px;"><a href="${libEsc(url)}" target="_blank" rel="noopener noreferrer">Kaynak</a></p>` : ''}
+      </div>
     </div>
   `;
   document.getElementById('country-entry-back').addEventListener('click',
