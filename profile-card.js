@@ -37,21 +37,28 @@
   // they act on (the settings sliders and the account), so they live
   // with them on Kütüphane.
   //
-  // Anahane is the one page where the cover isn't rendered on its own:
-  // there the frame becomes the middle cell of the hane honeycomb (see
-  // hiveHTML), with the six member slots around it. Same frame, same
-  // avatar, same stickers — it just has neighbours.
+  // The hane honeycomb used to be Anahane's profile page. It is its own
+  // surface now, opened by the PETEK button over Anahane's map (see
+  // HIVE_SECTIONS / openHiveOverlay below) rather than through the gear
+  // in the profile bar — the honeycomb is who you keep close, which is a
+  // destination on the middle page, not a page of your account. Anahane's
+  // profile is therefore the cover alone: who you are, nothing else.
   //
   // Nothing here scrolls: each page's profile fits inside the sheet the
   // way a politician's does (see .profile-overlay-body in
   // profile-card.css). Adding a block to a page means checking it still
   // fits, not adding a scrollbar.
   const PROFILE_SECTIONS = {
-    anahane:   { hive: true,  week: false, account: false, settings: false },
+    anahane:   { hive: false, week: false, account: false, settings: false },
     kahvehane: { hive: false, week: true,  account: false, settings: false },
     kutuphane: { hive: false, week: false, account: true,  settings: true },
   };
   const DEFAULT_PAGE = 'anahane';
+
+  // The PETEK sheet: the honeycomb on its own, in the same sheet the
+  // profile opens in. Not keyed to a page — it is passed straight to
+  // openProfileOverlay as `sections` (see openHiveOverlay).
+  const HIVE_SECTIONS = { hive: true, week: false, account: false, settings: false };
 
   // Which of the three carousel pages we're on. router.js stamps
   // body.dataset.page on every virtual navigation; on a real page load
@@ -65,6 +72,13 @@
 
   function sectionsFor(page) {
     return PROFILE_SECTIONS[page] || PROFILE_SECTIONS[DEFAULT_PAGE];
+  }
+
+  // Which blocks the open sheet shows: normally the page it was opened
+  // from, unless the caller handed it an explicit set (the PETEK button,
+  // which opens the honeycomb from no page in particular).
+  function sectionsForState(state) {
+    return (state && state.sections) || sectionsFor(state && state.page);
   }
 
   // Two-option toggles. Legacy `more_turkish` and `system` values are
@@ -739,6 +753,9 @@
     ensureProfileOverlay();
     _ov = Object.assign({ sozcuCount: 0, kefaletCount: 0, sponsoredList: [], kefilOfUser: null, page: currentPageSlug() }, opts);
     if (!PROFILE_SECTIONS[_ov.page]) _ov.page = currentPageSlug();
+    // A caller may hand over the exact set of blocks instead (see
+    // HIVE_SECTIONS); `page` then only says where we are, not what shows.
+    if (!_ov.sections) _ov.sections = null;
     if (_ov.avatarUrl === undefined) _ov.avatarUrl = _ov.profile?.avatar_url || null;
     if (_ov.avatarHair === undefined) _ov.avatarHair = _ov.profile?.avatar_hair || null;
     if (_ov.avatarHat === undefined) _ov.avatarHat = _ov.profile?.avatar_hat || null;
@@ -767,7 +784,51 @@
     const body = document.getElementById('profile-overlay-body');
     if (!body || !_ov) return;
     body.innerHTML = settingsPageHTML(_ov);
+    // The honeycomb, and Anahane's profile (the cover and nothing else),
+    // are each one fixed shape rather than a column of blocks read
+    // top-down — so they sit centred in the sheet instead of stacked
+    // against its top edge with the whole void left under them. See
+    // .profile-overlay-centred in profile-card.css.
+    const show = sectionsForState(_ov);
+    body.classList.toggle('profile-overlay-centred', !show.week && !show.account && !show.settings);
     wireSettingsEvents(_ov);
+  }
+
+  // ── THE PETEK SHEET ──
+  // The hane honeycomb on its own, opened by the PETEK button over
+  // Anahane's map rather than from the profile bar's gear. Same sheet as
+  // the profile (so it rests under the top bar and is centred by
+  // .profile-overlay-body:has(#po-hive-mount) in profile-card.css) — only
+  // the blocks differ, which is what `sections` carries.
+  //
+  // It fetches the profile itself: the compact card doesn't mount on
+  // desktop (see mount), so there is no fetched state to borrow there,
+  // and the button has to work either way.
+  let _sharedState = null;
+
+  async function ensureProfileState(sb, I18N) {
+    if (_state) return _state;
+    if (_sharedState) return _sharedState;
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return null;
+    _sharedState = await fetchProfileData(sb, I18N, session.user);
+    return _sharedState;
+  }
+
+  async function openHiveOverlay(opts) {
+    const sb = opts && opts.sb;
+    const I18N = opts && opts.I18N;
+    if (!sb) return;
+    const st = await ensureProfileState(sb, I18N);
+    if (!st) return;
+    openProfileOverlay({
+      sb, I18N, user: st.user, profile: st.profile,
+      sozcuCount: st.sozcuCount, kefaletCount: st.kefaletCount,
+      sponsoredList: st.sponsoredList, kefilOfUser: st.kefilOfUser,
+      avatarUrl: st.avatarUrl, avatarHair: st.avatarHair, avatarHat: st.avatarHat,
+      avatarAccessory: st.avatarAccessory, avatarShirt: st.avatarShirt,
+      sections: HIVE_SECTIONS,
+    });
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -1390,7 +1451,7 @@
   // badges still render via coverHTML.
   function settingsPageHTML(state) {
     const { I18N, user, profile, sozcuCount, sponsoredList, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
-    const show = sectionsFor(state.page);
+    const show = sectionsForState(state);
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
@@ -1543,7 +1604,7 @@
       state.hiveDisplayName = `${state.profile?.first_name || ''} ${state.profile?.last_name || ''}`.trim() || state.user.email;
       renderHive(state);
       if (!state.hiveLoaded) loadHive(state);
-    } else if (sectionsFor(state.page).hive) {
+    } else if (sectionsForState(state).hive) {
       // The honeycomb only ever comes from renderHive: settingsPageHTML
       // emits the empty mount and nothing else. Printing hiveHTML
       // straight into the page instead draws a honeycomb that LOOKS
@@ -1955,6 +2016,7 @@
     mountLibraryCard,
     openProfileOverlay,
     closeProfileOverlay,
+    openHiveOverlay,
     initMemberSheet,
     openMemberSheet,
     closeMemberSheet,
