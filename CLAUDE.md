@@ -443,18 +443,23 @@ sb.from('articles').delete().eq('id', id)
   body — on a desktop, where the world map isn't the drawing on screen, that line is the whole of
   it. Country names come off the map's own `data-name`, not a second fetch, so a story names a
   place with the same word the caption prints when you touch it
-- **Touching a country opens that country's page** (`country_entries`). It is titled the way a
-  chapter is, not the way a shelf is: the country's name centred on the very top line, and the
-  hand-drawn arrow (`assets/back.png`, the same one the game pages use) alone in the corner as
-  the way out — no worded back button, because the reader arrived here by touching the drawing
-  and the drawing's own word is the whole title. `countryHeadHTML()` builds that head for both
-  the country's list of entries and each entry's own page
+- **Touching a country opens that country's page** (`country_entries`), and that page is a
+  **news page, not a chapter**: the country's entries are the same `.article.openable` cards
+  the Dünya feed prints, and opening one gives the same `.article` a story gives — kicker
+  (the country's name), headline, body, its Zaman Akışı, source. There is deliberately no
+  second page type here; a country reads the way a story reads. The one thing that is the
+  country page's own is its head: the hand-drawn arrow (`assets/back.png`, the same one the
+  game pages use) alone in the corner, with the country's name centred on the top line — no
+  worded back button, because the reader arrived by touching the drawing. `countryHeadHTML()`
+  builds it, and an entry's own page passes no title, so the arrow stands alone over the
+  article exactly as it does on a story's page
 - An entry can carry a **Zaman Akışı** (`country_entry_events`) — a chain of dated key moments,
-  the way a `breaking_news` story grows `breaking_news_updates`. The difference is the order:
-  a news chain is printed newest-first because the story is developing under the reader, while
-  a country's chain is history and is printed **oldest first**, so reading down the page is
-  reading forwards. Curated from admin.html's Ülkeler tab; `db/country_entries_seed.sql` holds
-  the starting set (Rusya–Ukrayna, Filistin–İsrail, Suriye, Karabağ, Kıbrıs, Putin Rusyası)
+  the way a `breaking_news` story grows `breaking_news_updates`, reusing that timeline's own
+  `.timeline-*` markup and printed **newest first** just like it. The only difference is the
+  stamp: a moment carries its date rather than its age, because these chains reach back to 1917
+  and "109 yıl önce" tells a reader nothing. Curated from admin.html's Ülkeler tab;
+  `db/country_entries_seed.sql` holds the starting set (Rusya–Ukrayna, Filistin–İsrail, Suriye,
+  Karabağ, Kıbrıs, Putin Rusyası)
 
 ### `tumcel.html` — Tümcel
 - Connections-style game where 16 sentence fragments must be regrouped into 4 quotes

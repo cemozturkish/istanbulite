@@ -3,19 +3,17 @@
 --
 -- The chain a country entry can carry: a "key timeline" of dated
 -- moments hanging off one entry, the way a breaking_news story grows a
--- chain of breaking_news_updates as it develops.
+-- chain of breaking_news_updates as it develops -- and printed the same
+-- way one is, **newest first**. A country page is a news page here, not
+-- a history chapter: the reader opens Ukrayna to see where the thing
+-- stands, and what it stands at belongs at the top.
 --
--- The difference is what the chain is *for*. A news story's chain is
--- the story developing under the reader while they watch, so it is
--- printed newest first. A country's chain is history that was already
--- over before the reader touched the map -- the Rusya-Ukrayna war, the
--- Filistin question, the Suriye civil war -- so it is printed **oldest
--- first**: you read down the page and the thing builds, which is the
--- only order in which a timeline explains anything.
---
--- Hence `event_date` is a plain date and is NOT NULL, where a country
--- entry's own `entry_date` is optional: an entry may be undated prose,
--- but a moment on a timeline is nothing without its date.
+-- The one difference from a news chain is the stamp. A moment is dated,
+-- not aged: these chains reach back to 1917, and "109 yıl önce" tells a
+-- reader nothing. Hence `event_date` is a plain date and is NOT NULL,
+-- where a country entry's own `entry_date` is optional -- an entry may
+-- be undated prose, but a moment on a timeline is nothing without its
+-- date.
 --
 -- Deliberately not folded into country_entries.body as hand-typed
 -- lines: the admin has to be able to insert a moment into the middle of
@@ -38,9 +36,9 @@ create table if not exists public.country_entry_events (
   updated_at timestamptz not null default now()
 );
 
--- The one query the reader makes: one entry's moments, oldest first.
+-- The one query the reader makes: one entry's moments, newest first.
 create index if not exists country_entry_events_entry_idx
-  on public.country_entry_events (entry_id, event_date asc, created_at asc);
+  on public.country_entry_events (entry_id, event_date desc, created_at desc);
 
 create or replace function public.country_entry_events_set_updated_at()
 returns trigger language plpgsql as $$
