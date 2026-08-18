@@ -245,6 +245,12 @@
       if (liveContent) {
         liveContent.innerHTML = cached.contentHTML;
       }
+      // The seat card sits in the profile bar on a phone, and the bar is
+      // deliberately outside #ist-content -- so unlike everything the swap
+      // above just replaced, the seat survives it. Drop it here; the
+      // arriving page's mount() paints its own. Leaving it would show (and
+      // on a tap, open) the page you just left. See politician-card.js.
+      if (global.IstPoliticianCard) global.IstPoliticianCard.clearSeat();
       document.title = cached.title || document.title;
       document.body.dataset.page = targetSlug;
       document.body.classList.remove(exitClass);

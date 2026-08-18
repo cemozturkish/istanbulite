@@ -18,12 +18,11 @@
   <link rel="stylesheet" href="palette.css">
   <link rel="stylesheet" href="loading-screen.css?v=2">
   <script src="game-locks.js"></script>
-  <link rel="stylesheet" href="profile-card.css?v=3">
+  <link rel="stylesheet" href="profile-card.css?v=4">
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
   <script src="politician-card.js" defer></script>
-  <link rel="stylesheet" href="politician-card.css?v=1">
-  <script src="profile-card.js?v=3" defer></script>
+  <script src="profile-card.js?v=4" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
   <link rel="stylesheet" href="mahalle-picker.css">
@@ -1316,19 +1315,16 @@
          on mobile — the desktop-only #library-card would otherwise
          duplicate it. */
       #library-card { display: none; }
-      /* The politician card is NOT desktop-only (it used to be): on a
-         phone it keeps its desktop place -- the top of col-right, above
-         the breaking-news feed -- in the compact shape shared with the
-         other two pages' seat cards (politician-card.css). It still
-         follows the map here, so tapping a district swaps the card to
-         that district's Belediye Başkanı on a phone too.
-
+      /* The politician card as a card is desktop-only -- but the seat it
+         names is NOT hidden on a phone any more: it moves into the
+         profile bar's left end (#ist-pc-seat, see "THE TOP BAR" in
+         profile-card.css). It still follows the map there, so tapping a
+         district swaps the bar's seat to that district's Belediye
+         Başkanı on a phone too. politician-card.js paints both.
          Bottom corner cards stay desktop-only -- same reasoning
          #library-card carries above (nothing to show in them yet). */
+      #politician-card { display: none; }
       .corner-card { display: none; }
-      /* Lines the card's edges up with the news cards right below it
-         (#breaking-news-feed's own 14px side padding). */
-      #politician-card { --seat-card-inset: 14px; }
 
       /* Both sidebars keep their desktop flex column (see the feeds' auto
          margin above, which needs a flex parent to mean anything) and
@@ -2634,19 +2630,18 @@ async function loadPoliticalSeats() {
 // cached and the card swaps seats as the district selection changes,
 // which the other two pages (one fixed seat each) never do.
 async function renderPoliticianCard(seatId) {
-  const card = document.getElementById('politician-card');
-  if (!card) return;
   const byId = await loadPoliticalSeats();
   const id = seatId || 'istanbul';
   const seat = byId[id];
   const seatLabel = id !== 'istanbul' ? (districtNames[id] || id) : 'İstanbul';
-  card.innerHTML = IstPoliticianCard.cardHTML(seat, seatLabel);
-  // Bound to the card element, never delegated on document: #politician-card
-  // exists on all three carousel pages, and a document-level listener would
-  // survive a virtual navigation (see router.js) and keep firing on the
-  // other pages' cards -- opening anahane's sheet on top of theirs. The
-  // card lives inside #ist-content, so this binding leaves with it.
-  card.onclick = () => openDetail(IstPoliticianCard.detailHTML(seat, seatLabel));
+  // render() paints both of the seat's surfaces -- the desktop card here in
+  // col-right and the phone's slot in the profile bar -- and wires this
+  // page's openDetail to each. The click is bound to those elements, never
+  // delegated on document: #politician-card exists on all three carousel
+  // pages, and a document-level listener would survive a virtual navigation
+  // (see router.js) and keep firing on the other pages' cards, opening
+  // anahane's sheet on top of theirs.
+  IstPoliticianCard.render({ mountElId: 'politician-card', seat, seatLabel, openDetail });
 }
 
 function esc(s) {

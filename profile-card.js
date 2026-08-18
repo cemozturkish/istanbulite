@@ -668,6 +668,12 @@
     container.innerHTML = `
       <div class="ist-pc" id="ist-pc-root">
         <div class="ist-pc-row">
+          <!-- Left end of the bar: whoever holds power over what this page
+               is showing. Filled by politician-card.js (see its paintBar),
+               never by this module -- the bar only keeps the slot. Empty,
+               and on the two pages that have no seat at all, the row falls
+               back to its original layout (see .ist-pc-has-seat). -->
+          <div class="ist-pc-seat" id="ist-pc-seat"></div>
           <div class="ist-pc-avatar" id="ist-pc-avatar">${avatarHTML()}</div>
           <div class="ist-pc-id">
             <div class="ist-pc-name">${esc(displayName)}</div>
@@ -677,6 +683,10 @@
         </div>
       </div>
     `;
+
+    // The row above was just rebuilt from scratch, which empties the seat
+    // slot; the seat's own module knows what belonged there.
+    if (global.IstPoliticianCard) global.IstPoliticianCard.paintBar();
 
     document.getElementById('ist-pc-toggle').addEventListener('click', () => {
       openProfileOverlay({
