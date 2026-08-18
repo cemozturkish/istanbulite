@@ -1,0 +1,85 @@
+/* ── The seat card on a phone ──
+   The politician card (#politician-card, built by politician-card.js) is
+   the one card each carousel page carries about who holds power over what
+   you are looking at: the Cumhurbaşkanı on Kütüphane, your own district's
+   Belediye Başkanı on Kahvehane, the selected district's on Anahane. It
+   was desktop-only — the phone hid it outright, so the whole political
+   layer of the app was invisible on the runtime ~90% of users are on.
+
+   It shows on a phone now, as the first thing in its own column: it rests
+   on the shared hero line (--map-hero-end in frames.css, where every
+   page's content starts under the map) with the column's feed hanging
+   from the bottom below it, which is exactly the desktop arrangement —
+   the seat pinned at the top of the column, the feed under it.
+
+   Two notes on why this file exists at all rather than three mobile
+   blocks in the three pages:
+     - the card is one object across the carousel, and a phone must not
+       show three different versions of it as the reader swipes;
+     - the pages style it through .library-card (it reuses that class for
+       pixel-identical desktop chrome), so every rule here is scoped to
+       the id — (1,x,0) beats the pages' own (0,x,0) .library-card mobile
+       rules whatever the load order turns out to be.
+
+   The desktop card is untouched: it lives in each page's own stylesheet,
+   as does the .politician-detail sheet this card opens (which already
+   worked on a phone — it is THE sheet, see sheet.css). */
+
+@media (max-width: 768px) {
+  #politician-card {
+    /* The card stands directly above its column's own feed, so it lines
+       up with THAT — not with some inset of its own. Each page declares
+       --seat-card-inset in its mobile block as whatever horizontal
+       padding its feed carries (Kütüphane's Dünya cards, Anahane's news,
+       Kahvehane's comments all sit on a different one), and the card's
+       edges land on the same verticals as the cards under it. */
+    margin: 0 var(--seat-card-inset, 12px) 8px;
+    padding: 8px 10px;
+    gap: 0;
+    /* The feeds below carry margin-top:auto and hang from the bottom of
+       the column (see "the phone's feeds hang from the bottom" in
+       CLAUDE.md); this must not grow into that free space with them. */
+    flex: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #politician-card .card-top { gap: 8px; }
+  /* Small enough to read as a stamp on the column rather than a second
+     portrait competing with the reader's own on the bar above. */
+  #politician-card .avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+    border-width: 2px;
+  }
+  #politician-card .card-name {
+    font-size: 0.75rem;
+    /* A long name wraps (the desktop card's own behaviour) and the card
+       simply gets taller — it must NOT be held to one line with
+       nowrap/ellipsis. The columns here sit in `auto 1fr` grid tracks
+       whose automatic minimum is their content's min-content width, so a
+       name that refuses to wrap widens the whole column and pushes the
+       feed under it off the side of the screen. */
+    line-height: 1.2;
+  }
+  #politician-card .card-meta {
+    font-size: 0.55rem;
+    letter-spacing: 1px;
+    margin-top: 1px;
+  }
+  /* There is no hover on a phone, so the card says it is a button by
+     answering the press instead. */
+  #politician-card:active {
+    background: color-mix(in srgb, var(--hover) 90%, transparent);
+  }
+  /* Its own mount spinner (.loading on Kütüphane, .card-loading on the
+     other two) keeps the card at its resting height, so the column below
+     doesn't jump when the seat arrives. */
+  #politician-card .loading,
+  #politician-card .card-loading {
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
