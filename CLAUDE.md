@@ -128,7 +128,7 @@ default one.
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
-├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js,
+├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js/.css,
 │   tbmm.js, sozcu-mascot.js, admin-notification.js, loading-screen.js/.css,
 │   safe-area-ready.js, frames.css        # Focused shared modules
 ├── capacitor.config.json # iOS app config (Capacitor wraps the same site — see README.md)
@@ -704,6 +704,24 @@ Clicking any `.author-link` / `.kefil-link` anywhere on the site opens that memb
 profile as the sheet above (cover + weekly grid + member since + kefil chain). One implementation,
 in `profile-card.js`; each page just calls `initMemberSheet` once. Do not write a page-local
 profile popup.
+
+### The seat card — `#politician-card` (`politician-card.js` + `.css`)
+
+Each carousel page carries exactly one card naming who holds power over what the page is showing:
+the **Cumhurbaşkanı** on Kütüphane, the viewer's own district's **Belediye Başkanı** on Kahvehane,
+and on Anahane whichever district is selected on the map (it swaps as you tap). All three print the
+same markup and open the same `.politician-detail` view as THE sheet — `politician-card.js` builds
+both, each page only supplies its seat and its own `openDetail`.
+
+It is **not desktop-only**, and must not be made desktop-only again: the phone is the platform ~90%
+of users are on (see Vision), and hiding it there hid the app's whole political layer from almost
+everyone. On a phone it keeps its desktop place — the top of its own column, resting on the shared
+hero line with that column's feed hanging from the bottom below it — in a compact shape that lives
+once, in `politician-card.css`, rather than three times in the three pages' mobile blocks. Every
+rule there is scoped to the id, because the pages style the card through `.library-card` (it reuses
+that class for the desktop chrome) and an id beats a class whatever the load order is. The one thing
+a page declares for itself is `--seat-card-inset`: the horizontal padding of *that page's* feed, so
+the card's edges land on the same verticals as the cards directly under it.
 
 ## Coding Conventions
 
