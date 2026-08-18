@@ -566,6 +566,7 @@
       flex-shrink: 0;
     }
     .lib-box {
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -594,6 +595,33 @@
       color: var(--muted);
       font-style: italic;
       margin-top: 4px;
+    }
+    /* Unread count on Posta Kutusu — the app-icon badge, sitting on the
+       box's top-right corner and carrying the number of letters this
+       member has never opened. It is the one red thing in the column, so
+       it stays even in the mono palette (an explicit red, not var(--ink),
+       which mono flattens to charcoal): a badge that isn't red isn't a
+       badge. Removed outright at zero rather than emptied, so no ring is
+       left sitting on the corner (see refreshLetterBadge). */
+    .lib-box-badge {
+      position: absolute;
+      top: -9px;
+      right: -9px;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      box-sizing: border-box;
+      border-radius: 11px;
+      background: #c8322b;
+      border: 2px solid var(--paper);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      line-height: 18px;
+      text-align: center;
+      letter-spacing: 0;
+      pointer-events: none;
     }
     .loading {
       text-align: center;
@@ -984,6 +1012,30 @@
       font-style: italic;
       margin-top: 4px;
     }
+    /* A letter in Posta Kutusu, unread: the same red dot the box's badge
+       is, so the number on the corner and the letters it counts read as
+       one thing. Read letters lose the dot and go quiet — the card
+       itself doesn't change shape, so the list never jumps when one
+       flips. */
+    .letter-dot {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #c8322b;
+    }
+    .letter-state {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    .letter-btn.letter-read .shelf-title { font-weight: 400; }
     .shelf-progress {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.62rem;
@@ -1288,15 +1340,15 @@
       margin: 0 0 6px;
     }
 
-    /* ── Ülke sayfası (what a country on the phone map opens) ──
-       Titled like a chapter rather than like a shelf: the country's name
-       centred on the very top line, and the way out is the same
-       hand-drawn arrow the game pages use (assets/back.png) alone in the
-       corner — no word, no rule of its own. A country's page is the one
-       thing here the reader arrives at by touching the drawing rather
-       than by reading a list, so it is titled with the drawing's own
-       word and nothing else. */
-    .country-head {
+    /* ── The arrow head — what every page inside the reader sheet wears ──
+       The page's own name centred on the very top line, and the way out
+       is the hand-drawn arrow the game pages use (assets/back.png) alone
+       in the corner — no word, no rule of its own. Started as the country
+       page's head and now carries Makaleler and Posta Kutusu too: a
+       worded "← KÜTÜPHANE" said where you came from, which is the one
+       thing the reader already knows, while the page's own title is what
+       they need. */
+    .arrow-head {
       position: relative;
       display: flex;
       align-items: center;
@@ -1310,7 +1362,7 @@
        left of it beside the arrow. The 30px box is the hit area; the
        PNG's own transparent padding (~27% a side) is part of that
        target, same as .game-back-btn. */
-    .country-back {
+    .arrow-back {
       position: absolute;
       left: 0;
       top: 0;
@@ -1325,9 +1377,9 @@
       cursor: pointer;
       transition: opacity 0.15s;
     }
-    .country-back:hover { opacity: 0.6; }
-    .country-back img { width: 26px; height: 26px; display: block; }
-    .country-title {
+    .arrow-back:hover { opacity: 0.6; }
+    .arrow-back img { width: 26px; height: 26px; display: block; }
+    .arrow-title {
       margin: 0;
       text-align: center;
       font-size: 1.5rem;
@@ -1341,7 +1393,7 @@
     /* An entry's own page carries no title of its own here — the arrow
        stands alone over an .article, exactly the way a Dünya story's
        page does, and the .article's h3 is the headline. */
-    .country-head.country-head-bare { min-height: 26px; }
+    .arrow-head.arrow-head-bare { min-height: 26px; }
     /* A country's entries are the same cards the Dünya feed prints, so
        tapping one reads exactly like tapping a story. */
     .country-entries { display: flex; flex-direction: column; gap: 12px; }
@@ -3883,10 +3935,7 @@ function renderShelfButtons(activeShelfId = null) {
   if (!area) return;
   area.innerHTML = `
     <div class="shelf-path">
-      <div class="path-head">
-        <button class="path-back" type="button" id="shelves-back">← Kütüphane</button>
-        <h2 class="path-title">Makaleler</h2>
-      </div>
+      ${arrowHeadHTML('Makaleler', 'shelves-back', 'Kütüphane')}
       ${shelfListInnerHtml(activeShelfId)}
     </div>
   `;
@@ -3920,6 +3969,9 @@ async function openLibraryShelvesSheet() {
 // Makaleler, but with its own much simpler list + single-page views.
 // ══════════════════════════════════════════
 let LETTERS_CACHE = null; // null = not fetched yet this session
+// Which letters this member has already opened (library_letter_reads).
+// A Set of letter ids, null until fetched.
+let LETTER_READS = null;
 
 async function loadLetters() {
   if (LETTERS_CACHE) return LETTERS_CACHE;
@@ -3934,6 +3986,71 @@ async function loadLetters() {
   }
   LETTERS_CACHE = data || [];
   return LETTERS_CACHE;
+}
+
+// The member's own read receipts. Fetched once per session and kept in
+// step by hand afterwards (openLetterReader adds to it), so opening a
+// letter drops the count on the box immediately rather than after a
+// round-trip.
+async function loadLetterReads() {
+  if (LETTER_READS) return LETTER_READS;
+  const uid = await libGetCurrentUserId();
+  if (!uid) { LETTER_READS = new Set(); return LETTER_READS; }
+  const { data, error } = await sb.from('library_letter_reads')
+    .select('letter_id')
+    .eq('user_id', uid);
+  if (error) {
+    console.error('[kutuphane letter reads]', error);
+    // Left unset so the next open tries again -- a failed fetch must not
+    // become "everything is unread" for the rest of the session.
+    return new Set();
+  }
+  LETTER_READS = new Set((data || []).map(r => r.letter_id));
+  return LETTER_READS;
+}
+
+function letterIsRead(letter) {
+  return !!(LETTER_READS && LETTER_READS.has(letter.id));
+}
+
+// Writes the receipt and keeps the local set in step. Ignores duplicates
+// rather than checking first: opening a letter twice is the ordinary
+// case, and the primary key already says what should happen.
+async function markLetterRead(letter) {
+  if (letterIsRead(letter)) return;
+  const uid = await libGetCurrentUserId();
+  if (!uid) return;
+  if (LETTER_READS) LETTER_READS.add(letter.id);
+  refreshLetterBadge();
+  const { error } = await sb.from('library_letter_reads')
+    .upsert({ user_id: uid, letter_id: letter.id }, { onConflict: 'user_id,letter_id', ignoreDuplicates: true });
+  if (error) console.error('[kutuphane letter read]', error);
+}
+
+// The app-icon badge on the Posta Kutusu box: how many letters this
+// member has never opened. Removed entirely at zero -- an empty ring
+// sitting on the corner would still read as "something is waiting".
+function refreshLetterBadge() {
+  const box = document.getElementById('lib-box-mektuplar');
+  if (!box) return;
+  const unread = (LETTERS_CACHE || []).filter(l => !letterIsRead(l)).length;
+  let badge = box.querySelector('.lib-box-badge');
+  if (!unread) { if (badge) badge.remove(); return; }
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'lib-box-badge';
+    box.appendChild(badge);
+  }
+  badge.textContent = unread > 99 ? '99+' : String(unread);
+  badge.setAttribute('aria-label', unread + ' okunmamış mektup');
+}
+
+// Called from mount(), on every entry to the page (a virtual navigation
+// rebuilds the box, so the badge has to be put back on it), and cheap on
+// a revisit because both fetches are cached for the session.
+async function initLetterBadge() {
+  await Promise.all([loadLetters(), loadLetterReads()]);
+  refreshLetterBadge();
 }
 
 function formatLetterDate(dateStr) {
@@ -3952,28 +4069,35 @@ async function openMektuplarSheet() {
   area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   IstSheet.open(overlay);
   _closeReaderOverlay = closeReaderOverlay;
-  renderLettersList(await loadLetters());
+  const [letters] = await Promise.all([loadLetters(), loadLetterReads()]);
+  renderLettersList(letters);
 }
 
 function renderLettersList(letters) {
   const area = document.getElementById('reader-overlay-sheet');
   if (!area) return;
+  // Each letter says whether it has been opened: an unread one is dotted
+  // (the same red the box's badge wears, so the count on the corner and
+  // the letters it stands for are visibly the same thing), a read one
+  // says "Okundu" the way a finished chapter does on a shelf.
   const listHtml = letters.length
-    ? `<div class="shelves">${letters.map(l => `
-        <a class="shelf-btn" data-letter="${libEsc(l.id)}" href="#">
+    ? `<div class="shelves">${letters.map(l => {
+        const read = letterIsRead(l);
+        return `
+        <a class="shelf-btn letter-btn${read ? ' letter-read' : ''}" data-letter="${libEsc(l.id)}" href="#">
+          ${read ? '' : '<span class="letter-dot" aria-hidden="true"></span>'}
           <div>
             <div class="shelf-title">${libEsc(l.title)}</div>
             ${l.letter_date ? `<div class="shelf-subtitle">${libEsc(formatLetterDate(l.letter_date))}</div>` : ''}
+            <div class="letter-state">${read ? 'Okundu' : 'Okunmadı'}</div>
           </div>
         </a>
-      `).join('')}</div>`
+        `;
+      }).join('')}</div>`
     : `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Henüz mektup yok.</div>`;
   area.innerHTML = `
     <div class="shelf-path">
-      <div class="path-head">
-        <button class="path-back" type="button" id="letters-back">← Kütüphane</button>
-        <h2 class="path-title">Posta Kutusu</h2>
-      </div>
+      ${arrowHeadHTML('Posta Kutusu', 'letters-back', 'Kütüphane')}
       ${listHtml}
     </div>
   `;
@@ -4003,14 +4127,16 @@ function openLetterReader(letter, letters) {
   if (!area) return;
   area.innerHTML = `
     <div class="shelf-path">
-      <div class="path-head">
-        <button class="path-back" type="button" id="letter-back">← Posta Kutusu</button>
-      </div>
+      ${arrowHeadHTML(null, 'letter-back', 'Posta Kutusu')}
       <h2 class="path-title" style="margin-bottom:4px;">${libEsc(letter.title)}</h2>
       ${letter.letter_date ? `<p class="path-subtitle">${libEsc(formatLetterDate(letter.letter_date))}</p>` : ''}
       <div class="reader-section-body" style="margin-top:14px;">${renderLetterBodyHtml(letter.body)}</div>
     </div>
   `;
+  // Opening it is reading it -- there is nothing to click through here,
+  // the whole letter is on this one page. The badge drops by one now;
+  // the receipt is written behind it.
+  markLetterRead(letter);
   document.getElementById('letter-back').addEventListener('click', () => renderLettersList(letters));
   _closeReaderOverlay = closeReaderOverlay;
   const pathEl = area.querySelector('.shelf-path');
@@ -4072,20 +4198,24 @@ async function openCountrySheet(countryId, countryName) {
   renderCountryEntriesList(entries, countryId, countryName);
 }
 
-// The head a country page wears: the hand-drawn arrow alone in the
+// The head every page inside the reader sheet wears -- a country, a
+// shelf, Posta Kutusu, a letter: the hand-drawn arrow alone in the
 // corner. `backLabel` is what the arrow goes back to -- never printed,
 // only announced, because the drawing says everything a word would.
-// `title` is the country's own name, centred on the top line; an entry's
-// page passes none, because there the .article's h3 is the headline,
-// exactly as it is on a Dünya story's page.
-function countryHeadHTML(title, backId, backLabel) {
+// `title` is the page's own name, centred on the top line; a page whose
+// body already carries its headline (a country entry, a letter) passes
+// none, and the arrow stands alone over it.
+//
+// Declared here among the country code but hoisted, so the letters and
+// shelves above reach it too.
+function arrowHeadHTML(title, backId, backLabel) {
   return `
-    <div class="country-head${title ? '' : ' country-head-bare'}">
-      <button class="country-back" type="button" id="${libEsc(backId)}"
+    <div class="arrow-head${title ? '' : ' arrow-head-bare'}">
+      <button class="arrow-back" type="button" id="${libEsc(backId)}"
               aria-label="${libEsc(backLabel)}" title="${libEsc(backLabel)}">
         <img src="assets/back.png" alt=""/>
       </button>
-      ${title ? `<h2 class="country-title">${libEsc(title)}</h2>` : ''}
+      ${title ? `<h2 class="arrow-title">${libEsc(title)}</h2>` : ''}
     </div>
   `;
 }
@@ -4165,7 +4295,7 @@ function renderCountryEntriesList(entries, countryId, countryName) {
   }
   area.innerHTML = `
     <div class="shelf-path">
-      ${countryHeadHTML(countryName, 'country-back', 'Kütüphane')}
+      ${arrowHeadHTML(countryName, 'country-back', 'Kütüphane')}
       ${listHtml}
     </div>
   `;
@@ -4191,7 +4321,7 @@ function openCountryEntryReader(entry, entries, countryId, countryName) {
   const stamp = countryEntryStamp(entry);
   area.innerHTML = `
     <div class="shelf-path">
-      ${countryHeadHTML(null, 'country-entry-back', countryName)}
+      ${arrowHeadHTML(null, 'country-entry-back', countryName)}
       <div class="article">
         <div class="meta-row">
           <div class="kicker">${libEsc(countryName.toLocaleUpperCase('tr-TR'))}</div>
@@ -4650,7 +4780,7 @@ async function openShelfPath(shelfId) {
   if (error) {
     area.innerHTML = `
       <div class="shelf-path">
-        <div class="path-head"><button class="path-back" type="button" id="path-back">← Raflar</button></div>
+        ${arrowHeadHTML(null, 'path-back', 'Raflar')}
         <div class="empty-state">Yüklenemedi.</div>
       </div>
     `;
@@ -4660,10 +4790,7 @@ async function openShelfPath(shelfId) {
   if (!articles || !articles.length) {
     area.innerHTML = `
       <div class="shelf-path">
-        <div class="path-head">
-          <button class="path-back" type="button" id="path-back">← Raflar</button>
-          <h2 class="path-title">${libEsc((shelf && shelf.name_tr && shelf.name_tr.trim()) || `Raf ${shelfId}`)}</h2>
-        </div>
+        ${arrowHeadHTML((shelf && shelf.name_tr && shelf.name_tr.trim()) || `Raf ${shelfId}`, 'path-back', 'Raflar')}
         <div class="empty-state">Bu rafta henüz makale yok.</div>
       </div>
     `;
@@ -4858,6 +4985,7 @@ function openPoliticianDetailSheet(html) {
 function wireLibraryEntryPoints() {
   document.getElementById('lib-box-makaleler')?.addEventListener('click', openLibraryShelvesSheet);
   document.getElementById('lib-box-mektuplar')?.addEventListener('click', openMektuplarSheet);
+  initLetterBadge();
   document.getElementById('tbmm-open-btn')?.addEventListener('click', openTBMMSheet);
 }
 
@@ -4873,11 +5001,8 @@ function renderShelfPathView(shelf, shelfId, articles, lockState, completedSet) 
 
   area.innerHTML = `
     <div class="shelf-path">
-      <div class="path-head">
-        <button class="path-back" type="button" id="path-back">← Raflar</button>
-        <h2 class="path-title">${libEsc(title)}</h2>
-        ${subtitle ? `<p class="path-subtitle">${libEsc(subtitle)}</p>` : ''}
-      </div>
+      ${arrowHeadHTML(title, 'path-back', 'Raflar')}
+      ${subtitle ? `<p class="path-subtitle" style="text-align:center;margin:-10px 0 18px;">${libEsc(subtitle)}</p>` : ''}
       <div class="path-list">
         ${articles.map((a, i) => {
           const meta = [
@@ -5280,6 +5405,15 @@ const neighborhoodNames = {
   function regionId(el) { return el.dataset.neighborhood || el.dataset.country || el.id; }
   function regionName(el) { return el.getAttribute('data-name') || regionId(el); }
 
+  // The caption a region puts under the map when it is touched or hovered.
+  // On the world overlay that is nothing at all: touching a country opens
+  // its page, and that page already carries the country's name on its top
+  // line -- printing it under the map too says the same word twice. The
+  // İstanbul overlay (desktop) keeps naming the district it lit, since
+  // nothing else on screen does. The country's own name is still passed to
+  // the sheet (regionName below), it just never reaches the caption.
+  function regionLabel(el) { return el.classList.contains('country') ? '' : regionName(el); }
+
   // What the caption reads with nothing selected, which is not the same
   // sentence on the two artworks: the desktop map is İstanbul's districts,
   // the phone map is Türkiye among its neighbours. Read off which overlay is
@@ -5322,8 +5456,8 @@ const neighborhoodNames = {
     if (nb) {
       const nbId = regionId(nb);
       getMapRegions().forEach(n => n.classList.toggle('active', regionId(n) === nbId));
-      if (mapLabel) mapLabel.textContent = regionName(nb);
-      activeRegionName = regionName(nb);
+      if (mapLabel) mapLabel.textContent = regionLabel(nb);
+      activeRegionName = regionLabel(nb);
       // Every country on the phone map opens: its entries rise in the same
       // half-page sheet a news item does (see openCountrySheet). Ankara is
       // the exception -- the only city drawn, the only thing inked red on
@@ -5357,7 +5491,7 @@ const neighborhoodNames = {
     const nb = e.target.closest(MAP_REGION_SEL);
     if (!nb) return;
     const mapLabel = document.getElementById('map-label');
-    if (mapLabel) mapLabel.textContent = regionName(nb);
+    if (mapLabel) mapLabel.textContent = regionLabel(nb);
     const nbId = regionId(nb);
     getMapRegions().forEach(n => n.classList.toggle('hover-active', regionId(n) === nbId));
   });
