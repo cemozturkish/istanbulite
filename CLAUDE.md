@@ -128,7 +128,7 @@ default one.
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
-├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js/.css,
+├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js,
 │   tbmm.js, sozcu-mascot.js, admin-notification.js, loading-screen.js/.css,
 │   safe-area-ready.js, frames.css        # Focused shared modules
 ├── capacitor.config.json # iOS app config (Capacitor wraps the same site — see README.md)
@@ -620,9 +620,11 @@ in `ios/App/App/Info.plist` for that same prompt.
 
 ### The phone's two bars — `#ist-pc-mount` (top) and `.section-rule > header` (bottom)
 
-A phone shows the city between two fixed charcoal bars: **who you are** at the top (the profile
-bar — avatar, name, district, the gear that opens your profile) and **where you can go** at the
-bottom (Kütüphane / Hane / Kahvehane). Both run full-bleed edge to edge, both add the device's own
+A phone shows the city between two fixed charcoal bars: **who is here** at the top (the profile
+bar) and **where you can go** at the bottom (Kütüphane / Hane / Kahvehane). The top bar carries two
+people, facing outward from the middle: **you** on the right (avatar, name, district, the gear that
+opens your profile) and, on the left, **whoever holds power over what the page is showing** — the
+seat card, see its own section below. Both run full-bleed edge to edge, both add the device's own
 inset on top of their height (notch at the top, home indicator at the bottom), both print their
 contents on `--screen-inset`, and neither moves while the three pages swipe underneath. The top
 bar stands taller (`--navbar-h-top`) than the bottom one (`--navbar-h`) because it carries a
@@ -715,13 +717,21 @@ both, each page only supplies its seat and its own `openDetail`.
 
 It is **not desktop-only**, and must not be made desktop-only again: the phone is the platform ~90%
 of users are on (see Vision), and hiding it there hid the app's whole political layer from almost
-everyone. On a phone it keeps its desktop place — the top of its own column, resting on the shared
-hero line with that column's feed hanging from the bottom below it — in a compact shape that lives
-once, in `politician-card.css`, rather than three times in the three pages' mobile blocks. Every
-rule there is scoped to the id, because the pages style the card through `.library-card` (it reuses
-that class for the desktop chrome) and an id beats a class whatever the load order is. The one thing
-a page declares for itself is `--seat-card-inset`: the horizontal padding of *that page's* feed, so
-the card's edges land on the same verticals as the cards directly under it.
+everyone. On a phone the card as a card *is* hidden — there is no room for a second card beside a
+full-bleed map — and the seat moves into **the left end of the profile bar** instead (`#ist-pc-seat`,
+"THE TOP BAR" in profile-card.css), with you pushed to the right end. `render()` paints both
+surfaces at once and wires the same detail sheet to each; it is painted in the bar's own classes
+(`.ist-pc-avatar` / `.ist-pc-id` / `.ist-pc-name` / `.ist-pc-meta`), so there is one portrait
+treatment and one type scale on that bar rather than a second set to keep in sync. The whole seated
+layout hangs off one class, `.ist-pc-has-seat`, which the module puts on the row — a page with no
+seat keeps the bar's original single left-aligned block.
+
+Two things about the bar seat fail silently if forgotten. The bar lives **outside `#ist-content`**,
+so the seat survives a virtual navigation that replaces everything else: `router.js` calls
+`clearSeat()` the moment it swaps the content, or Kahvehane wears the Cumhurbaşkanı until its own
+fetch lands (and a tap in that window opens Kütüphane's sheet). And profile-card.js rebuilds its row
+wholesale whenever the profile re-renders, which empties the slot — it calls `paintBar()` afterwards
+to put the seat back.
 
 ## Coding Conventions
 
