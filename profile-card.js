@@ -674,12 +674,19 @@
                and on the two pages that have no seat at all, the row falls
                back to its original layout (see .ist-pc-has-seat). -->
           <div class="ist-pc-seat" id="ist-pc-seat"></div>
-          <div class="ist-pc-avatar" id="ist-pc-avatar">${avatarHTML()}</div>
-          <div class="ist-pc-id">
-            <div class="ist-pc-name">${esc(displayName)}</div>
-            <div class="ist-pc-meta">${esc(yasadigiDisplay)}</div>
+          <!-- You. The whole block is the button that opens your profile --
+               there is no gear beside it any more: on a bar where the other
+               end is a person you press to read about them, pressing a
+               person is already the gesture, and a gear would be a second
+               way to do what pressing yourself does. -->
+          <div class="ist-pc-me" id="ist-pc-me" role="button" tabindex="0"
+               aria-label="${esc(toggleLabel)}" title="${esc(toggleLabel)}">
+            <div class="ist-pc-avatar" id="ist-pc-avatar">${avatarHTML()}</div>
+            <div class="ist-pc-id">
+              <div class="ist-pc-name">${esc(displayName)}</div>
+              <div class="ist-pc-meta">${esc(yasadigiDisplay)}</div>
+            </div>
           </div>
-          <button type="button" class="ist-pc-toggle" id="ist-pc-toggle" aria-label="${esc(toggleLabel)}" title="${esc(toggleLabel)}">${GEAR_SVG}</button>
         </div>
       </div>
     `;
@@ -688,7 +695,8 @@
     // slot; the seat's own module knows what belonged there.
     if (global.IstPoliticianCard) global.IstPoliticianCard.paintBar();
 
-    document.getElementById('ist-pc-toggle').addEventListener('click', () => {
+    const meEl = document.getElementById('ist-pc-me');
+    const openMine = () => {
       openProfileOverlay({
         sb: state.sb, I18N, user, profile,
         sozcuCount, kefaletCount, sponsoredList, kefilOfUser,
@@ -713,6 +721,13 @@
           if (av) av.innerHTML = avatarHTML();
         },
       });
+    };
+    meEl.addEventListener('click', openMine);
+    // It is a div wearing role="button" (a real <button> around a portrait
+    // and two lines of type fights the bar's own type rules), so the keys a
+    // button would answer have to be answered by hand.
+    meEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMine(); }
     });
   }
 
