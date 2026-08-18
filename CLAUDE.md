@@ -724,7 +724,11 @@ full-bleed map — and the seat moves into **the left end of the profile bar** i
 "THE TOP BAR" in profile-card.css), with you pushed to the right end. `render()` paints both
 surfaces at once and wires the same detail sheet to each; it is painted in the bar's own classes
 (`.ist-pc-avatar` / `.ist-pc-id` / `.ist-pc-name` / `.ist-pc-meta`), so there is one portrait
-treatment and one type scale on that bar rather than a second set to keep in sync. The whole seated
+treatment and one type scale on that bar rather than a second set to keep in sync — neither end is
+the junior of the pair, and nothing may scale one of them down. Both portraits are stretched to the
+row's full height, their top tips flush with the top of it, which is the highest point on the screen
+anything may be drawn: the bar's `padding-top` is the device's notch inset, and past it a face would
+sit behind the system clock. The whole seated
 layout hangs off one class, `.ist-pc-has-seat`, which the module puts on the row — a page with no
 seat keeps the bar's original single left-aligned block.
 
