@@ -622,9 +622,11 @@ in `ios/App/App/Info.plist` for that same prompt.
 
 A phone shows the city between two fixed charcoal bars: **who is here** at the top (the profile
 bar) and **where you can go** at the bottom (Kütüphane / Hane / Kahvehane). The top bar carries two
-people, facing outward from the middle: **you** on the right (avatar, name, district, the gear that
-opens your profile) and, on the left, **whoever holds power over what the page is showing** — the
-seat card, see its own section below. Both run full-bleed edge to edge, both add the device's own
+people, facing outward from the middle: **you** on the right (avatar, name, district) and, on the
+left, **whoever holds power over what the page is showing** — the seat card, see its own section
+below. Each is pressed as one block: yours opens your profile, theirs opens theirs. There is no
+gear on this bar — pressing a person is already the gesture, and the desktop identity card's own
+`.edit-btn` is a different surface (a card in a page, with nothing else to press). Both run full-bleed edge to edge, both add the device's own
 inset on top of their height (notch at the top, home indicator at the bottom), both print their
 contents on `--screen-inset`, and neither moves while the three pages swipe underneath. The top
 bar stands taller (`--navbar-h-top`) than the bottom one (`--navbar-h`) because it carries a
