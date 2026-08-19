@@ -5510,7 +5510,7 @@ async function checkSozcuTakeoverStatus() {
 
     const { data: words } = await sb
       .from('sozcel_used_answers')
-      .select('used_on, word, definition, syllables')
+      .select('used_on, word, definition, syllables, sozcul_id')
       .in('used_on', assignedDates);
     const wordByDate = new Map((words || []).filter(w => w.word).map(w => [w.used_on, w]));
 
@@ -6054,11 +6054,28 @@ async function submitTakeover(status, sylsEl, submitBtn, statusEl, defsEl, takeo
       return;
     }
 
-    // Correcting a day doesn't take it over: a row that already belongs to
-    // a Sözcü keeps their name on it, so "Günün Sözcüsü" still credits the
-    // person whose day it is. Only a day nobody owns is attributed to the
-    // person writing it.
-    const owner = (guard && guard.sozcul_id) || status.session.user.id;
+    // Correcting a day never takes it over. A row that already belongs to a
+    // Sözcü keeps their name on it, and a row that belongs to *nobody* — an
+    // ordinary day whose word the server picked from the pool — stays
+    // unattributed: opening this form to add the dictionary entry to a word
+    // that has already been played is a correction, not a claim, and it must
+    // not print "Günün Sözcüsü: <you>" on a day you simply edited.
+    // Attribution happens in exactly one case: an assigned Sözcü writing
+    // their own day, which is a day that has no row yet. The admin's day
+    // editor ('admin' mode) never claims — an admin who *is* that day's
+    // Sözcü arrives in 'pending-input' mode instead, and is credited there.
+    let owner;
+    if (guard) {
+      owner = guard.word
+        ? (guard.sozcul_id || null)
+        : (status.mode === 'admin' ? null : status.session.user.id);
+    } else {
+      // Guard read failed: fall back to whatever the form was opened with,
+      // so a hiccup can't silently rewrite the day's owner either way.
+      owner = status.mode === 'admin'
+        ? ((status.existing && status.existing.sozcul_id) || null)
+        : status.session.user.id;
+    }
     const definition = serializeTakeoverDict(takeover);
     const { error } = await withSaveTimeout(sb
       .from('sozcel_used_answers')
