@@ -13,7 +13,7 @@
   <script src="safe-area-ready.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
-  <script src="router.js"></script>
+  <script src="router.js?v=2"></script>
   <script src="i18n.js?v=3"></script>
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
@@ -22,7 +22,7 @@
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
   <script src="tbmm.js" defer></script>
-  <script src="politician-card.js" defer></script>
+  <script src="politician-card.js?v=2" defer></script>
   <script src="profile-card.js?v=4" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
@@ -4987,19 +4987,20 @@ function openPoliticianDetailSheet(html) {
 // from declaring the same global twice in the one document they share (see
 // router.js).
 //
-// A country nobody has been recorded for falls back to the Cumhurbaşkanı
-// rather than printing its name over "Henüz eklenmedi" (db/political_seats
-// _v2_countries.sql): most of the countries drawn on this map will never
-// have a leader entered, and the national seat is this page's resting
-// state anyway. Hane can be stricter because all 26 of its seats exist.
+// A country nobody has been recorded for prints its own name over "Henüz
+// eklenmedi", exactly as an unassigned district does on Hane. It used to
+// fall back to the Cumhurbaşkanı, on the reasoning that most of this map
+// will never have a leader entered — but that made a touch on a country
+// look like a touch that did nothing, which is indistinguishable from the
+// feature being broken. A seat that says it is empty is the honest answer,
+// and the reader can always see their tap landed.
 async function renderSeatFor(seatId, seatLabel) {
   if (!window.IstPoliticianCard) return;
   const byId = await IstPoliticianCard.seats(sb);
-  const seat = byId[seatId];
   IstPoliticianCard.render({
     mountElId: 'politician-card',
-    seat: seat || byId['cumhurbaskani'],
-    seatLabel: seat ? seatLabel : 'Cumhurbaşkanı',
+    seat: byId[seatId],
+    seatLabel,
     openDetail: openPoliticianDetailSheet,
   });
 }

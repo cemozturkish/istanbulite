@@ -758,9 +758,10 @@ takes the second page's whole script with it.
 
 Country seats are keyed by the same id the map's `data-country` carries and are recorded in
 `political_seats.country` (`db/political_seats_v2_countries.sql`; a seat carries a neighborhood
-*or* a country, never both). No row is required: Kütüphane falls back to the Cumhurbaşkanı for a
-country nobody has been recorded for rather than printing its name over "Henüz eklenmedi" — most
-of the countries on that map will never have a leader entered.
+*or* a country, never both). No row is required — a country nobody has been recorded for prints
+its own name over "Henüz eklenmedi", exactly as an unassigned district does on Hane. It must not
+quietly fall back to the Cumhurbaşkanı instead: a touch that leaves the bar unchanged is
+indistinguishable from the feature being broken, which is precisely how it was first reported.
 
 It is **not desktop-only**, and must not be made desktop-only again: the phone is the platform ~90%
 of users are on (see Vision), and hiding it there hid the app's whole political layer from almost
