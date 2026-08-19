@@ -587,7 +587,8 @@ level too high does nothing at all.
 
 The Istanbul map behind Anahane and Kahvehane is the same drawing for everyone *except* the one
 district the member lives in, and that district is picked out **in the artwork**, not by a wash laid
-over it. Each district gets its own hand-painted copy of the map at `assets/map/home/<id>.png` — the
+over it. Each district gets its own hand-painted copy of the map at
+`assets/map/home/istanbul-map-<id>.png` — the
 same 5046×2300 frame as `assets/map/istanbul-map.png`, so every traced hit-region still lands where
 it did — and `home-map.js` puts the copy belonging to the viewer in place of the base map.
 
