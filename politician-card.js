@@ -86,15 +86,18 @@
     `;
   }
 
-  // The seat as an occupant of the profile bar: the bar's own portrait and
-  // type classes rather than the desktop card's, so it is dressed by "THE
-  // TOP BAR" in profile-card.css exactly like the person on the other end
-  // of the row — one portrait treatment, one type scale, no second copy to
-  // keep in sync.
+  // The seat as an occupant of the profile bar: the bar's own type classes
+  // rather than the desktop card's, so it is dressed by "THE TOP BAR" in
+  // profile-card.css exactly like the person on the other end of the row —
+  // one type scale, no second copy to keep in sync.
+  //
+  // No portrait: the bar is two names in type and nothing else, on both
+  // ends (see the same section). The face is what the detail sheet opens
+  // with — a bar that prints it too spends the row's whole width saying
+  // twice what one line of type already says.
   function barHTML(seat, seatLabel) {
     const p = seat?.politicians || null;
     return `
-      <div class="ist-pc-avatar ist-pc-seat-avatar">${avatarHTML(p)}</div>
       <div class="ist-pc-id">
         <div class="ist-pc-name">${esc(p ? `${p.first_name} ${p.last_name}`.trim() : seatLabel)}</div>
         <div class="ist-pc-meta">${esc(seat?.title || 'Henüz eklenmedi')}</div>
@@ -103,7 +106,7 @@
   }
 
   // The seat currently on the bar, kept so paintBar() can put it back after
-  // profile-card.js rebuilds the row (an avatar change, a re-mount) — that
+  // profile-card.js rebuilds the row (a re-mount, a profile refresh) — that
   // rebuild is an innerHTML swap, so it empties the slot without knowing it
   // held anything.
   let barSeat = null;

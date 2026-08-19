@@ -622,15 +622,17 @@ in `ios/App/App/Info.plist` for that same prompt.
 
 A phone shows the city between two fixed charcoal bars: **who is here** at the top (the profile
 bar) and **where you can go** at the bottom (Kütüphane / Hane / Kahvehane). The top bar carries two
-people, facing outward from the middle: **you** on the right (avatar, name, district) and, on the
-left, **whoever holds power over what the page is showing** — the seat card, see its own section
-below. Each is pressed as one block: yours opens your profile, theirs opens theirs. There is no
-gear on this bar — pressing a person is already the gesture, and the desktop identity card's own
-`.edit-btn` is a different surface (a card in a page, with nothing else to press). Both run full-bleed edge to edge, both add the device's own
+people, facing outward from the middle: **you** on the right (your name over your district) and, on
+the left, **whoever holds power over what the page is showing** — the seat card, see its own section
+below. It is **two names in type and no portraits**: a face here would spend most of the row saying
+twice what the line of type already says, and a face is what the sheet each end opens leads with
+anyway. Each name is pressed as one block: yours opens your profile, theirs opens theirs. There is
+no gear on this bar either — pressing a person is already the gesture, and the desktop identity
+card's own `.edit-btn` is a different surface (a card in a page, with nothing else to press). Both run full-bleed edge to edge, both add the device's own
 inset on top of their height (notch at the top, home indicator at the bottom), both print their
 contents on `--screen-inset`, and neither moves while the three pages swipe underneath. The top
-bar stands taller (`--navbar-h-top`) than the bottom one (`--navbar-h`) because it carries a
-portrait and two lines of type against the tab bar's one word. Heights and colors are the
+bar stands taller (`--navbar-h-top`) than the bottom one (`--navbar-h`) because it carries two lines
+of type against the tab bar's one word. Heights and colors are the
 `--navbar-h` / `--navbar-h-top` / `--navbar-ink*` tokens in frames.css — the colors deliberately
 palette-independent, the same in light, mono and dark. The top bar is one
 implementation in profile-card.css ("THE TOP BAR"); the bottom bar's colors live in frames.css
@@ -723,12 +725,9 @@ everyone. On a phone the card as a card *is* hidden — there is no room for a s
 full-bleed map — and the seat moves into **the left end of the profile bar** instead (`#ist-pc-seat`,
 "THE TOP BAR" in profile-card.css), with you pushed to the right end. `render()` paints both
 surfaces at once and wires the same detail sheet to each; it is painted in the bar's own classes
-(`.ist-pc-avatar` / `.ist-pc-id` / `.ist-pc-name` / `.ist-pc-meta`), so there is one portrait
-treatment and one type scale on that bar rather than a second set to keep in sync — neither end is
-the junior of the pair, and nothing may scale one of them down. Both portraits are stretched to the
-row's full height, their top tips flush with the top of it, which is the highest point on the screen
-anything may be drawn: the bar's `padding-top` is the device's notch inset, and past it a face would
-sit behind the system clock. The whole seated
+(`.ist-pc-id` / `.ist-pc-name` / `.ist-pc-meta`), so there is one type
+scale on that bar rather than a second set to keep in sync — neither end is the junior of the pair,
+and nothing may scale one of them down. The whole seated
 layout hangs off one class, `.ist-pc-has-seat`, which the module puts on the row — a page with no
 seat keeps the bar's original single left-aligned block.
 

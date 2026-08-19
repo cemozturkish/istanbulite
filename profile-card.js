@@ -651,19 +651,9 @@
     const lastName = profile?.last_name || '';
     const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
     const yasadigi = profile?.neighborhood || '';
-    let avatarUrl = state.avatarUrl;
-    let avatarHair = state.avatarHair;
-    let avatarHat = state.avatarHat;
-    let avatarAccessory = state.avatarAccessory;
-    let avatarShirt = state.avatarShirt;
-
     const yasadigiDisplay = yasadigi ? (NB_NAMES[yasadigi] || yasadigi) : '—';
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const toggleLabel = t('profile.toggle') || 'Profil';
-
-    function avatarHTML() {
-      return IstAvatar.html(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt);
-    }
 
     container.innerHTML = `
       <div class="ist-pc" id="ist-pc-root">
@@ -681,7 +671,6 @@
                way to do what pressing yourself does. -->
           <div class="ist-pc-me" id="ist-pc-me" role="button" tabindex="0"
                aria-label="${esc(toggleLabel)}" title="${esc(toggleLabel)}">
-            <div class="ist-pc-avatar" id="ist-pc-avatar">${avatarHTML()}</div>
             <div class="ist-pc-id">
               <div class="ist-pc-name">${esc(displayName)}</div>
               <div class="ist-pc-meta">${esc(yasadigiDisplay)}</div>
@@ -708,17 +697,14 @@
         avatarHat: state.avatarHat,
         avatarAccessory: state.avatarAccessory,
         avatarShirt: state.avatarShirt,
+        // The bar prints no portrait (see the row's markup above), so a new
+        // avatar has nothing to repaint here -- it is only recorded, for the
+        // next time this sheet is opened.
         onAvatarChange(hair, hat, accessory, shirt) {
           state.avatarHair = hair;
           state.avatarHat = hat;
           state.avatarAccessory = accessory;
           state.avatarShirt = shirt;
-          avatarHair = hair;
-          avatarHat = hat;
-          avatarAccessory = accessory;
-          avatarShirt = shirt;
-          const av = document.getElementById('ist-pc-avatar');
-          if (av) av.innerHTML = avatarHTML();
         },
       });
     };
