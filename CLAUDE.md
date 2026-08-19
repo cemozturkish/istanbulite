@@ -280,16 +280,30 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
   matching. RLS: a member may SELECT **only their own** row and there is no client
   write policy at all; that a code cannot be looked up is precisely why holding one means it was
   handed to you.
-- `hive_slots`: `(owner_id, slot)` PK with `slot` 0–5, plus `member_id`, `placed_at`, `expires_at`.
+- `hive_slots`: `(owner_id, slot)` PK with `slot` 0–5, plus `member_id` and `placed_at`.
   Unique `(owner_id, member_id)` so one person can't hold two of your six. RLS: SELECT/DELETE your
-  own rows (emptying a slot early is a plain delete); no client INSERT/UPDATE — filling a slot means
-  resolving a code you aren't allowed to read.
+  own rows; no client INSERT/UPDATE — filling a slot means resolving a code you aren't allowed to
+  read, and (since v3) writing a row into somebody else's honeycomb.
+- **Placements are permanent and mutual** (`db/hive_slots_v3_mutual_permanent.sql`). v1 expired a
+  placement after 7 days so the comb emptied itself unless the contact kept happening; that expiry
+  is gone — `expires_at` is dropped and whoever you put in stands there until one of you takes the
+  other out. Resolving a code now places **both** sides: they go in your comb, you go in theirs, in
+  the **mirror slot** (`5 - slot`, the point reflection through the middle cell — your top-right is
+  their bottom-left), so the two combs are one shape seen from either end. The slot numbering that
+  mirror is stated in is `HIVE_ROWS` in profile-card.js; renumbering there silently un-mirrors it.
 - Functions: `hive_my_code()` (SECURITY DEFINER, issues this week's code on first ask),
   `hive_claim_code(code, slot)` (SECURITY DEFINER; returns a *status* — `ok` / `invalid_code` /
-  `self` / `slot_taken` / `already_in_hive` — that the UI words itself, see `profile.hive.err.*` in
-  `i18n.js`; places for 7 days and sweeps the owner's expired rows first), and `hive_my_slots()`
-  (SECURITY INVOKER, the caller's live slots joined to each occupant's public profile fields, with
-  expiry settled by the database rather than the device clock).
+  `self` / `slot_taken` / `already_in_hive` / `their_hive_full` — that the UI words itself, see
+  `profile.hive.err.*` in `i18n.js`), `hive_remove_member(member_id)` (SECURITY DEFINER; Çıkar,
+  which clears **both** directions — a one-sided removal would leave exactly the asymmetric row v3
+  exists to remove), and `hive_my_slots()` (SECURITY INVOKER, the caller's slots joined to each
+  occupant's public profile fields).
+- Two edges the claim decides rather than guessing at: if the mirror slot in their comb is taken it
+  falls back to their lowest free slot (mutual matters more than mirrored), and if their six are
+  **full** the whole claim is refused with `their_hive_full` rather than placing one side — a comb
+  that is mutual only when there happened to be room is a coin toss, not a rule. Rows left over
+  from v1 are not mirrored retroactively; they just stop expiring, and a claim that finds the
+  target already holding you leaves their side arranged as it is.
 
 **Table: `app_settings`** — generic admin-managed key/value feature toggle table (`db/app_settings.sql`).
 - `key text pk`, `value boolean`, `updated_by`, `updated_at`.
@@ -738,12 +752,16 @@ same mask, same drawn ring, same badges — so there is no second frame treatmen
 
 A slot is filled **hand-to-hand, by code** (`db/hive_slots.sql`): every member holds one code per
 Istanbul week, tapping an empty slot asks for someone else's, and whoever it belongs to stands
-there for a week. There is deliberately no member search, no follow button and no request-accept
+there from then on. There is deliberately no member search, no follow button and no request-accept
 flow — to put someone in your honeycomb you have to have been told their code, which means you saw
-them, and since both the code and the placement run out, the honeycomb empties itself unless that
-keeps happening. It is a record of contact, not a follower list, and it is the closest thing to a
-connection the site has (still no DMs — ever). What is *shown* of an occupant beside their frame is
-the undesigned half: name, district, and the week running down, no more.
+them. It is a record of contact, not a follower list, and it is the closest thing to a connection
+the site has (still no DMs — ever).
+
+Handing over a code is an **introduction, not a note one person takes about the other**: the claim
+places both sides at once, mirrored (see the schema section above), and Çıkar clears both. That is
+what keeps it from being a follow — there is no arrangement in which one member is holding the
+other without being held back. What is *shown* of an occupant beside their frame is the undesigned
+half: name and district, no more.
 
 Each slot owns the space on the outer side of its own row, which just prints the occupant — name,
 district, days left — and never changes for a tap. What a tap needs lands in **the dock**, one
