@@ -807,7 +807,9 @@
   function ensureHiveOverlay() {
     if (document.getElementById('hive-overlay')) return;
     const el = document.createElement('div');
-    el.className = 'ist-sheet-overlay ist-sheet-pull hive-overlay';
+    // ist-sheet-dim: the honeycomb is a destination, not something read
+    // beside the map — so it tints what it rose from (see sheet.css).
+    el.className = 'ist-sheet-overlay ist-sheet-pull ist-sheet-dim hive-overlay';
     el.id = 'hive-overlay';
     el.hidden = true;
     el.innerHTML = `
