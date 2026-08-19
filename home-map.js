@@ -29,11 +29,15 @@
   // the moment its file lands — an id listed with no file behind it is
   // not fatal (the load fails and the base map simply stays), but it does
   // cost a wasted request for every member who lives there.
-  const PAINTED = ['bakirkoy', 'besiktas'];
+  const PAINTED = ['bakirkoy'];
 
-  const DIR = 'assets/map/home/';
-  const EXT = '.png';
+  // A painted map is the base map's own filename with the district's id on
+  // the end -- assets/map/home/istanbul-map-bakirkoy.png -- so a folder of
+  // them reads as copies of one drawing rather than 25 unrelated files.
   const BASE = 'assets/map/istanbul-map.png';
+  const DIR = 'assets/map/home/';
+  const STEM = 'istanbul-map-';
+  const EXT = '.png';
 
   // Which district the last resolved profile said the member lives in.
   // Remembered so a reload can put the right map up on the FIRST paint,
@@ -56,7 +60,7 @@
   }
 
   function srcFor(id) {
-    return id && PAINTED.indexOf(id) !== -1 ? DIR + id + EXT : null;
+    return id && PAINTED.indexOf(id) !== -1 ? DIR + STEM + id + EXT : null;
   }
 
   function panels() {
