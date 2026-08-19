@@ -367,7 +367,9 @@ sb.from('articles').delete().eq('id', id)
   for other members around it, each filled by entering that member's weekly code
   (`IstProfileCard.openHiveOverlay`, see Site-wide defaults and `db/hive_slots.sql`).
   Opening your profile card here shows the cover alone — the honeycomb is a destination on the
-  map, not a page of your account
+  map, not a page of your account. On a phone it does not rise from the bottom edge like every
+  other sheet: the PETEK button itself **grows into the page** and the page folds back into the
+  button when it closes
 - Vision: this page is "you + Istanbul" — see Vision & Product Philosophy above
 
 ### `admin.html` — Admin Dashboard
@@ -407,7 +409,7 @@ sb.from('articles').delete().eq('id', id)
   above the map label opens a bottom sheet (`#kahvehane-detail`) listing the cheapest cup of
   coffee per venue, scoped to the selected district or all of Istanbul; on desktop the same list
   also shows permanently in col-right. Opened from the map, it carries `.ist-sheet-pull` like
-  Anahane's news/event sheet and the PETEK sheet do — on a phone it rests half-way under the map
+  Anahane's news/event sheet does — on a phone it rests half-way under the map
   and swipes down to dismiss (`IstSheet.pull`, see sheet.js). **Read-only for everyone** — the
   index is curated from the admin portal only (admin.html's "Kahve" tab), and RLS allows writes
   to the admin alone (`db/coffee_prices_v2_admin_only.sql`)
@@ -552,13 +554,17 @@ geometry and no centred modal anywhere on the site.
   - A sheet opened **from the profile bar** (your profile, a member's) rests under that bar,
     via `--ist-sheet-top` (`IstSheet.position` measures it live).
   - A sheet opened **over the map** — a news item, an event, an article, the meclis, later a
-    country, the PETEK honeycomb, the Kahve Endeksi board — carries `ist-sheet-pull` and is
+    country, the Kahve Endeksi board — carries `ist-sheet-pull` and is
     *dragged*: it comes to rest half-way down, under
     the map, so you still see what you tapped; drag it up and it stops at the profile bar;
     past that the reading continues inside it; drag it back down and it closes. One
     implementation, `IstSheet.pull(overlay, { onDismiss })` — attach it once and
     `IstSheet.open/close` drive it from there. Touch only (`pointer: coarse`); a narrow desktop
     window keeps the ordinary sheet.
+  - The one exception is the PETEK honeycomb, which on a phone does not slide at all: it grows
+    out of the button that opened it (see its own section below). It is still THE sheet — same
+    markup, same `IstSheet.open/close`, same phone geometry — only the way it arrives differs,
+    because it arrives out of a specific object on the screen rather than from off it.
 - **Chrome:** background/border come from `frames.css`'s `.ist-sheet` rule (2px ink border, no
   bottom border, no shadow).
 
@@ -695,17 +701,30 @@ avatar, name, district) shows on all three; the week's game grid is Kahvehane's;
 settings — with the Kişiselleştir and Çıkış Yap buttons that act on them — are Kütüphane's.
 Anahane's is the cover and nothing else.
 
-### The hane honeycomb — the PETEK sheet (`IstProfileCard.openHiveOverlay`)
+### The hane honeycomb — the PETEK page (`IstProfileCard.openHiveOverlay`)
 
 The honeycomb (`hiveHTML`) is your own cover frame as the middle cell of seven, with six slots
 packed around it for other members. It opens from the **PETEK button over Anahane's map**, into
 its own sheet (`#hive-overlay`, built lazily by `ensureHiveOverlay` on first open) rather than the
 shared profile sheet — who you keep close is a destination on the middle page, not a page of your
 account, which is why it is reached from the city rather than from the gear in the profile bar.
-Being reached from the map rather than the profile bar is also what earns it `.ist-sheet-pull`: on
-a phone it rests half-way down under the map and swipes to dismiss, the same gesture a news item or
-the meclis opens with (`IstSheet.pull`, see sheet.js) — the profile sheet, opened from the profile
-bar, keeps the plain rules instead. The honeycomb reuses the cover's own frame for its middle cell —
+Being reached from a button on the map rather than from the profile bar is also what gives it its
+own opening. On a phone it neither slides up from the bottom edge nor rests half-way down the way
+a news item does: the **PETEK button grows into the page**, and the page folds back into the button
+when it closes. The page never moves — it is already at its final size (the phone sheet's own
+geometry: under the profile bar, out to the bottom of the screen). What animates is the window onto
+it, a `clip-path` inset that starts as the button's own box and opens out to the page's four edges,
+with the button hidden for as long as the page is up so the two are never both on the map.
+
+`growHive` in profile-card.js runs it, off two live rectangles, rather than a CSS transition
+between two states: both are measured in the same frame the overlay is unhidden, and a
+custom-property from-state set in that frame is not reliably computed before `.open` lands on the
+next one — the page would simply appear at full size. profile-card.css therefore only takes the
+slide away (`.hive-grow`), and `prefers-reduced-motion: reduce` skips the grow entirely. The
+button is passed in as `origin`; without one (or on desktop, where a button in the corner of a wide
+window has no phone-sized page to become) the honeycomb opens as the ordinary sheet. Since it no
+longer slides, it does not carry `.ist-sheet-pull` either — it is closed with its own × the way a
+game page is, not by swiping it down. The honeycomb reuses the cover's own frame for its middle cell —
 same mask, same drawn ring, same badges — so there is no second frame treatment to keep in sync.
 
 A slot is filled **hand-to-hand, by code** (`db/hive_slots.sql`): every member holds one code per
