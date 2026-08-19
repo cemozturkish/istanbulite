@@ -2644,25 +2644,21 @@ function baseMapLabel() {
 //   public.political_seats — id ('istanbul' or a neighborhood id) ->
 //                            politician_id + title
 // Nothing here is hardcoded, since officeholders change. Fetched once and
-// cached, since there are only ever 26 seats and they rarely change.
-let politicalSeatsById = null;
-
-async function loadPoliticalSeats() {
-  if (politicalSeatsById) return politicalSeatsById;
-  const { data } = await sb.from('political_seats').select('*, politicians(*)');
-  politicalSeatsById = {};
-  (data || []).forEach(s => { politicalSeatsById[s.id] = s; });
-  return politicalSeatsById;
-}
+// cached for the session by the shared module (IstPoliticianCard.seats) --
+// they rarely change, and Kütüphane swaps its own seat off the very same
+// table, so there is one cache rather than one per page. That also matters
+// mechanically: both page scripts end up in the one document router.js
+// keeps, and two top-level `let`s of the same name there is a SyntaxError
+// that takes the second page's whole script with it.
 
 // The card and its detail view are drawn by the shared module
 // (politician-card.js) -- the same markup kahvehane and kütüphane print,
 // so a politician looks the same wherever you meet one. What stays here
-// is the part that is genuinely anahane's: the whole seat table is
-// cached and the card swaps seats as the district selection changes,
-// which the other two pages (one fixed seat each) never do.
+// is the part that is genuinely anahane's: which seat is showing follows
+// the district selection on the map. Kütüphane does the same with the
+// countries on its phone map; Kahvehane has one fixed seat.
 async function renderPoliticianCard(seatId) {
-  const byId = await loadPoliticalSeats();
+  const byId = await IstPoliticianCard.seats(sb);
   const id = seatId || 'istanbul';
   const seat = byId[id];
   const seatLabel = id !== 'istanbul' ? (districtNames[id] || id) : 'İstanbul';

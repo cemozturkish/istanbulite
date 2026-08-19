@@ -4,11 +4,13 @@
 // .politician-card CSS), plus the "who is this" detail view opened when
 // it's clicked.
 //
-// Used by all three carousel pages: kutuphane.html (the fixed
-// Cumhurbaşkanı seat), kahvehane.html (the viewer's own neighborhood's
-// mayor seat) and anahane.html (whichever district is selected on the
-// map — it keeps its own seat cache and calls render()/detailHTML()
-// directly, since mount()'s one-seat fetch can't express that).
+// Used by all three carousel pages: kahvehane.html (one fixed seat, the
+// viewer's own neighborhood's mayor) and anahane.html and kutuphane.html,
+// whose seats follow their maps — the selected district's Belediye
+// Başkanı on Hane, the touched country's leader on Kütüphane, which rests
+// on the Cumhurbaşkanı with nothing selected. The two map-driven pages
+// call render() with a seat out of seats() rather than mount(), which
+// only knows how to show one fixed id.
 //
 // ── On a phone the seat lives in the top bar ──
 // There is no room beside the map for a second card, and the seat is not
@@ -145,17 +147,50 @@
     paintBar();
   }
 
+  // Every seat, fetched once and kept for the session, keyed by id.
+  //
+  // Two of the three pages swap their seat as their map is tapped — Hane
+  // through its districts, Kütüphane through the countries on its phone
+  // map — and there the next seat has to arrive *with* the tap rather than
+  // a request later. All three read the same small table, so they share one
+  // fetch; both pages used to keep a copy of this, which meant two
+  // identically named globals in one document once router.js had injected
+  // both page scripts (see "The three carousel pages share one document" in
+  // CLAUDE.md) — the second `let` to be parsed threw and took its whole page
+  // script with it.
+  //
+  // The promise is what's cached, not the rows, so simultaneous first
+  // callers share the one request. A failed fetch is dropped rather than
+  // cached: it is a network blip, not an empty table, and caching it would
+  // leave every seat blank for the rest of the session.
+  let seatsPromise = null;
+  function seats(sb) {
+    if (!seatsPromise) {
+      seatsPromise = sb.from('political_seats').select('*, politicians(*)').then(({ data, error }) => {
+        if (error) {
+          seatsPromise = null;
+          console.error('[politician-card seats]', error);
+          return {};
+        }
+        const byId = {};
+        (data || []).forEach(s => { byId[s.id] = s; });
+        return byId;
+      });
+    }
+    return seatsPromise;
+  }
+
   // opts: { sb, mountElId, seatId, seatLabel, openDetail(html) }
-  // Fetches the seat once and renders it; if openDetail is given, wires a
-  // click to open the full detail through it. Callable again on a page
-  // revisit (e.g. a virtual navigation) — it always re-fetches, since a
-  // single seat lookup is cheap.
+  // Renders one fixed seat; if openDetail is given, wires a click to open
+  // the full detail through it. Callable again on a page revisit (e.g. a
+  // virtual navigation) — the seats are already in hand by then, so the
+  // repaint costs nothing.
   async function mount(opts) {
     const { sb, mountElId, seatId, seatLabel, openDetail } = opts;
     if (!sb || !seatId) return;
-    const { data: seat } = await sb.from('political_seats').select('*, politicians(*)').eq('id', seatId).maybeSingle();
-    render({ mountElId, seat, seatLabel, openDetail });
+    const byId = await seats(sb);
+    render({ mountElId, seat: byId[seatId], seatLabel, openDetail });
   }
 
-  global.IstPoliticianCard = { mount, render, paintBar, clearSeat, cardHTML, detailHTML, avatarHTML };
+  global.IstPoliticianCard = { mount, render, seats, paintBar, clearSeat, cardHTML, detailHTML, avatarHTML };
 })(window);

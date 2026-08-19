@@ -211,7 +211,9 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > **Note:** the tables documented below are the core set. The complete, current schema lives in
 > `db/*.sql` — later features each have their own migration file there (events + `event_rsvps`,
 > `breaking_news` + polls/series/updates, `library_articles`/shelves/letters/categories,
-> `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians`, TBMM
+> `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians` +
+> `political_seats` (one seat per district, the two fixed national/city ones, and one per country
+> on Kütüphane's map), TBMM
 > seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `coffee_prices`
 > (the Kahve Endeksi — v3 adds the opening-hours and scheduled-discount columns that make it
 > live), `coffee_comments` (what members say about a venue), `countries` + `country_entries`
@@ -446,6 +448,11 @@ sb.from('articles').delete().eq('id', id)
   body — on a desktop, where the world map isn't the drawing on screen, that line is the whole of
   it. Country names come off the map's own `data-name`, not a second fetch, so a story names a
   place with the same word the caption prints when you touch it
+- Touching a country also **swaps the seat** the profile bar names to that country's leader, the
+  same way tapping a district on Anahane swaps it to that district's Belediye Başkanı — see the
+  seat card's own section under Site-wide defaults. Deselecting (tapping the sea, or closing the
+  country's page) puts the Cumhurbaşkanı back; `resetMapLabel()` is the one place that knows what
+  "nothing is selected" means, so nothing else may clear the selection by hand
 - **Touching a country opens that country's page** (`country_entries`), and that page is a
   **news page, not a chapter**: the country's entries are the same `.article.openable` cards
   the Dünya feed prints, and opening one gives the same `.article` a story gives — kicker
@@ -736,10 +743,24 @@ profile popup.
 ### The seat card — `#politician-card` (`politician-card.js` + `.css`)
 
 Each carousel page carries exactly one card naming who holds power over what the page is showing:
-the **Cumhurbaşkanı** on Kütüphane, the viewer's own district's **Belediye Başkanı** on Kahvehane,
-and on Anahane whichever district is selected on the map (it swaps as you tap). All three print the
-same markup and open the same `.politician-detail` view as THE sheet — `politician-card.js` builds
-both, each page only supplies its seat and its own `openDetail`.
+the viewer's own district's **Belediye Başkanı** on Kahvehane (one fixed seat), and on Anahane and
+Kütüphane a seat that **follows the map** — whichever district is selected on Hane, and on
+Kütüphane whichever country is touched on the phone map, resting on the **Cumhurbaşkanı** with
+nothing selected. All three print the same markup and open the same `.politician-detail` view as
+THE sheet — `politician-card.js` builds both, each page only supplies its seat and its own
+`openDetail`.
+
+Every seat comes from one session-long cache, `IstPoliticianCard.seats(sb)` — the two map-driven
+pages need the next seat to arrive *with* the tap, and they read the same table. It lives in the
+shared module rather than in each page for a mechanical reason too: both page scripts end up in the
+one document router.js keeps, and two top-level `let`s of the same name there is a SyntaxError that
+takes the second page's whole script with it.
+
+Country seats are keyed by the same id the map's `data-country` carries and are recorded in
+`political_seats.country` (`db/political_seats_v2_countries.sql`; a seat carries a neighborhood
+*or* a country, never both). No row is required: Kütüphane falls back to the Cumhurbaşkanı for a
+country nobody has been recorded for rather than printing its name over "Henüz eklenmedi" — most
+of the countries on that map will never have a leader entered.
 
 It is **not desktop-only**, and must not be made desktop-only again: the phone is the platform ~90%
 of users are on (see Vision), and hiding it there hid the app's whole political layer from almost
