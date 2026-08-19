@@ -128,6 +128,7 @@ default one.
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
+├── home-map.js           # Swaps in the hand-painted map for the member's own district
 ├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js,
 │   tbmm.js, sozcu-mascot.js, admin-notification.js, loading-screen.js/.css,
 │   safe-area-ready.js, frames.css        # Focused shared modules
@@ -210,7 +211,9 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > **Note:** the tables documented below are the core set. The complete, current schema lives in
 > `db/*.sql` — later features each have their own migration file there (events + `event_rsvps`,
 > `breaking_news` + polls/series/updates, `library_articles`/shelves/letters/categories,
-> `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians`, TBMM
+> `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians` +
+> `political_seats` (one seat per district, the two fixed national/city ones, and one per country
+> on Kütüphane's map), TBMM
 > seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `coffee_prices`
 > (the Kahve Endeksi — v3 adds the opening-hours and scheduled-discount columns that make it
 > live), `coffee_comments` (what members say about a venue), `countries` + `country_entries`
@@ -364,7 +367,9 @@ sb.from('articles').delete().eq('id', id)
   for other members around it, each filled by entering that member's weekly code
   (`IstProfileCard.openHiveOverlay`, see Site-wide defaults and `db/hive_slots.sql`).
   Opening your profile card here shows the cover alone — the honeycomb is a destination on the
-  map, not a page of your account
+  map, not a page of your account. On a phone it does not rise from the bottom edge like every
+  other sheet: the PETEK button itself **grows into the page** and the page folds back into the
+  button when it closes
 - Vision: this page is "you + Istanbul" — see Vision & Product Philosophy above
 
 ### `admin.html` — Admin Dashboard
@@ -404,7 +409,7 @@ sb.from('articles').delete().eq('id', id)
   above the map label opens a bottom sheet (`#kahvehane-detail`) listing the cheapest cup of
   coffee per venue, scoped to the selected district or all of Istanbul; on desktop the same list
   also shows permanently in col-right. Opened from the map, it carries `.ist-sheet-pull` like
-  Anahane's news/event sheet and the PETEK sheet do — on a phone it rests half-way under the map
+  Anahane's news/event sheet does — on a phone it rests half-way under the map
   and swipes down to dismiss (`IstSheet.pull`, see sheet.js). **Read-only for everyone** — the
   index is curated from the admin portal only (admin.html's "Kahve" tab), and RLS allows writes
   to the admin alone (`db/coffee_prices_v2_admin_only.sql`)
@@ -445,6 +450,11 @@ sb.from('articles').delete().eq('id', id)
   body — on a desktop, where the world map isn't the drawing on screen, that line is the whole of
   it. Country names come off the map's own `data-name`, not a second fetch, so a story names a
   place with the same word the caption prints when you touch it
+- Touching a country also **swaps the seat** the profile bar names to that country's leader, the
+  same way tapping a district on Anahane swaps it to that district's Belediye Başkanı — see the
+  seat card's own section under Site-wide defaults. Deselecting (tapping the sea, or closing the
+  country's page) puts the Cumhurbaşkanı back; `resetMapLabel()` is the one place that knows what
+  "nothing is selected" means, so nothing else may clear the selection by hand
 - **Touching a country opens that country's page** (`country_entries`), and that page is a
   **news page, not a chapter**: the country's entries are the same `.article.openable` cards
   the Dünya feed prints, and opening one gives the same `.article` a story gives — kicker
@@ -544,13 +554,17 @@ geometry and no centred modal anywhere on the site.
   - A sheet opened **from the profile bar** (your profile, a member's) rests under that bar,
     via `--ist-sheet-top` (`IstSheet.position` measures it live).
   - A sheet opened **over the map** — a news item, an event, an article, the meclis, later a
-    country, the PETEK honeycomb, the Kahve Endeksi board — carries `ist-sheet-pull` and is
+    country, the Kahve Endeksi board — carries `ist-sheet-pull` and is
     *dragged*: it comes to rest half-way down, under
     the map, so you still see what you tapped; drag it up and it stops at the profile bar;
     past that the reading continues inside it; drag it back down and it closes. One
     implementation, `IstSheet.pull(overlay, { onDismiss })` — attach it once and
     `IstSheet.open/close` drive it from there. Touch only (`pointer: coarse`); a narrow desktop
     window keeps the ordinary sheet.
+  - The one exception is the PETEK honeycomb, which on a phone does not slide at all: it grows
+    out of the button that opened it (see its own section below). It is still THE sheet — same
+    markup, same `IstSheet.open/close`, same phone geometry — only the way it arrives differs,
+    because it arrives out of a specific object on the screen rather than from off it.
 - **Chrome:** background/border come from `frames.css`'s `.ist-sheet` rule (2px ink border, no
   bottom border, no shadow).
 
@@ -581,6 +595,27 @@ push the top of the stack out of the scroller and out of reach. The margin also 
 box that does *not* grow — every wrapper between a column and its feed carries `flex: 1`, and
 flex hands the free space to a growing item before any margin sees it, so an auto margin one
 level too high does nothing at all.
+
+### The member's own district is painted into the map — `home-map.js`
+
+The Istanbul map behind Anahane and Kahvehane is the same drawing for everyone *except* the one
+district the member lives in, and that district is picked out **in the artwork**, not by a wash laid
+over it. Each district gets its own hand-painted copy of the map at
+`assets/map/home/istanbul-map-<id>.png` — the
+same 5046×2300 frame as `assets/map/istanbul-map.png`, so every traced hit-region still lands where
+it did — and `home-map.js` puts the copy belonging to the viewer in place of the base map.
+
+The older treatment (the red `.neighborhood.home` tint through the traced polygon) is the fallback,
+not the plan: a district with no painted file keeps it, so the set can be drawn one district at a
+time. On a district that *is* painted, `.map-panel.ist-home-painted` neutralises that tint and the
+polygon behaves like any other — the drawing alone says "this one is yours".
+
+Three things about it: the swap waits for the painted map to decode (an `<img>` whose `src` changes
+to something unfetched goes blank, which reads as the city flickering out); the district is
+remembered in `localStorage`, so a reload has the right map up before the profiles round-trip
+confirms it; and the swap is aimed at images whose src *is* `istanbul-map.png`, because Kütüphane's
+Turkey map wears the same `.map-photo` class in the same shared document. Adding a district is a
+file drop plus one id in `PAINTED` — see `assets/map/home/README.md`.
 
 ### The map is scenery, and it drifts — `map-parallax.js`
 
@@ -620,13 +655,19 @@ in `ios/App/App/Info.plist` for that same prompt.
 
 ### The phone's two bars — `#ist-pc-mount` (top) and `.section-rule > header` (bottom)
 
-A phone shows the city between two fixed charcoal bars: **who you are** at the top (the profile
-bar — avatar, name, district, the gear that opens your profile) and **where you can go** at the
-bottom (Kütüphane / Hane / Kahvehane). Both run full-bleed edge to edge, both add the device's own
+A phone shows the city between two fixed charcoal bars: **who is here** at the top (the profile
+bar) and **where you can go** at the bottom (Kütüphane / Hane / Kahvehane). The top bar carries two
+people, facing outward from the middle: **you** on the right (your name over your district) and, on
+the left, **whoever holds power over what the page is showing** — the seat card, see its own section
+below. It is **two names in type and no portraits**: a face here would spend most of the row saying
+twice what the line of type already says, and a face is what the sheet each end opens leads with
+anyway. Each name is pressed as one block: yours opens your profile, theirs opens theirs. There is
+no gear on this bar either — pressing a person is already the gesture, and the desktop identity
+card's own `.edit-btn` is a different surface (a card in a page, with nothing else to press). Both run full-bleed edge to edge, both add the device's own
 inset on top of their height (notch at the top, home indicator at the bottom), both print their
 contents on `--screen-inset`, and neither moves while the three pages swipe underneath. The top
-bar stands taller (`--navbar-h-top`) than the bottom one (`--navbar-h`) because it carries a
-portrait and two lines of type against the tab bar's one word. Heights and colors are the
+bar stands taller (`--navbar-h-top`) than the bottom one (`--navbar-h`) because it carries two lines
+of type against the tab bar's one word. Heights and colors are the
 `--navbar-h` / `--navbar-h-top` / `--navbar-ink*` tokens in frames.css — the colors deliberately
 palette-independent, the same in light, mono and dark. The top bar is one
 implementation in profile-card.css ("THE TOP BAR"); the bottom bar's colors live in frames.css
@@ -660,17 +701,39 @@ avatar, name, district) shows on all three; the week's game grid is Kahvehane's;
 settings — with the Kişiselleştir and Çıkış Yap buttons that act on them — are Kütüphane's.
 Anahane's is the cover and nothing else.
 
-### The hane honeycomb — the PETEK sheet (`IstProfileCard.openHiveOverlay`)
+### The hane honeycomb — the PETEK page (`IstProfileCard.openHiveOverlay`)
 
 The honeycomb (`hiveHTML`) is your own cover frame as the middle cell of seven, with six slots
 packed around it for other members. It opens from the **PETEK button over Anahane's map**, into
 its own sheet (`#hive-overlay`, built lazily by `ensureHiveOverlay` on first open) rather than the
 shared profile sheet — who you keep close is a destination on the middle page, not a page of your
 account, which is why it is reached from the city rather than from the gear in the profile bar.
-Being reached from the map rather than the profile bar is also what earns it `.ist-sheet-pull`: on
-a phone it rests half-way down under the map and swipes to dismiss, the same gesture a news item or
-the meclis opens with (`IstSheet.pull`, see sheet.js) — the profile sheet, opened from the profile
-bar, keeps the plain rules instead. The honeycomb reuses the cover's own frame for its middle cell —
+Being reached from a button on the map rather than from the profile bar is also what gives it its
+own opening. On a phone it neither slides up from the bottom edge nor rests half-way down the way
+a news item does: the **PETEK button grows into the page**, and the page folds back into the button
+when it closes. The page never moves — it is already at its final size. What animates is the window
+onto it, a `clip-path` inset that starts as the button's own box and opens out to the page's four
+edges, with the button hidden for as long as the page is up so the two are never both on the map.
+
+**That size is the honeycomb's own, not the screen's.** On a phone this page is the one sheet that
+is not full-bleed: it is cut to what is on it — the honeycomb, and the dock under it — and stands
+in the middle of the city, clear of both bars, so a button grows into a box roughly its own kind of
+size rather than into the whole screen. Its width is the honeycomb's arithmetic (the row of three
+cells plus a readout track either side), which is why the cell/gap/track tokens live on
+`.hive-overlay` rather than on `.ist-hive`: the page and the rows do the same sum, once. It is a
+fixed size and never a shrink-to-fit — the dock swaps its contents on every tap, and a page
+measured off its contents would resize under the reader each time, the very flinch
+`.ist-hive-cell-open` exists to avoid. A readout too long for its track breaks inside it.
+
+`growHive` in profile-card.js runs it, off two live rectangles, rather than a CSS transition
+between two states: both are measured in the same frame the overlay is unhidden, and a
+custom-property from-state set in that frame is not reliably computed before `.open` lands on the
+next one — the page would simply appear at full size. profile-card.css therefore only takes the
+slide away (`.hive-grow`), and `prefers-reduced-motion: reduce` skips the grow entirely. The
+button is passed in as `origin`; without one (or on desktop, where a button in the corner of a wide
+window has no phone-sized page to become) the honeycomb opens as the ordinary sheet. Since it no
+longer slides, it does not carry `.ist-sheet-pull` either — it is closed with its own × the way a
+game page is, not by swiping it down. The honeycomb reuses the cover's own frame for its middle cell —
 same mask, same drawn ring, same badges — so there is no second frame treatment to keep in sync.
 
 A slot is filled **hand-to-hand, by code** (`db/hive_slots.sql`): every member holds one code per
@@ -704,6 +767,48 @@ Clicking any `.author-link` / `.kefil-link` anywhere on the site opens that memb
 profile as the sheet above (cover + weekly grid + member since + kefil chain). One implementation,
 in `profile-card.js`; each page just calls `initMemberSheet` once. Do not write a page-local
 profile popup.
+
+### The seat card — `#politician-card` (`politician-card.js` + `.css`)
+
+Each carousel page carries exactly one card naming who holds power over what the page is showing:
+the viewer's own district's **Belediye Başkanı** on Kahvehane (one fixed seat), and on Anahane and
+Kütüphane a seat that **follows the map** — whichever district is selected on Hane, and on
+Kütüphane whichever country is touched on the phone map, resting on the **Cumhurbaşkanı** with
+nothing selected. All three print the same markup and open the same `.politician-detail` view as
+THE sheet — `politician-card.js` builds both, each page only supplies its seat and its own
+`openDetail`.
+
+Every seat comes from one session-long cache, `IstPoliticianCard.seats(sb)` — the two map-driven
+pages need the next seat to arrive *with* the tap, and they read the same table. It lives in the
+shared module rather than in each page for a mechanical reason too: both page scripts end up in the
+one document router.js keeps, and two top-level `let`s of the same name there is a SyntaxError that
+takes the second page's whole script with it.
+
+Country seats are keyed by the same id the map's `data-country` carries and are recorded in
+`political_seats.country` (`db/political_seats_v2_countries.sql`; a seat carries a neighborhood
+*or* a country, never both). No row is required — a country nobody has been recorded for prints
+its own name over "Henüz eklenmedi", exactly as an unassigned district does on Hane. It must not
+quietly fall back to the Cumhurbaşkanı instead: a touch that leaves the bar unchanged is
+indistinguishable from the feature being broken, which is precisely how it was first reported.
+
+It is **not desktop-only**, and must not be made desktop-only again: the phone is the platform ~90%
+of users are on (see Vision), and hiding it there hid the app's whole political layer from almost
+everyone. On a phone the card as a card *is* hidden — there is no room for a second card beside a
+full-bleed map — and the seat moves into **the left end of the profile bar** instead (`#ist-pc-seat`,
+"THE TOP BAR" in profile-card.css), with you pushed to the right end. `render()` paints both
+surfaces at once and wires the same detail sheet to each; it is painted in the bar's own classes
+(`.ist-pc-id` / `.ist-pc-name` / `.ist-pc-meta`), so there is one type
+scale on that bar rather than a second set to keep in sync — neither end is the junior of the pair,
+and nothing may scale one of them down. The whole seated
+layout hangs off one class, `.ist-pc-has-seat`, which the module puts on the row — a page with no
+seat keeps the bar's original single left-aligned block.
+
+Two things about the bar seat fail silently if forgotten. The bar lives **outside `#ist-content`**,
+so the seat survives a virtual navigation that replaces everything else: `router.js` calls
+`clearSeat()` the moment it swaps the content, or Kahvehane wears the Cumhurbaşkanı until its own
+fetch lands (and a tap in that window opens Kütüphane's sheet). And profile-card.js rebuilds its row
+wholesale whenever the profile re-renders, which empties the slot — it calls `paintBar()` afterwards
+to put the seat back.
 
 ## Coding Conventions
 

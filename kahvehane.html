@@ -13,7 +13,7 @@
   <script src="safe-area-ready.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
-  <script src="router.js"></script>
+  <script src="router.js?v=2"></script>
   <script src="i18n.js?v=3"></script>
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
@@ -21,11 +21,11 @@
   <!-- Live open/closed + scheduled-discount evaluation for the Kahve
        Endeksi board below. Shared with admin.html. -->
   <script src="coffee-index.js"></script>
-  <link rel="stylesheet" href="profile-card.css?v=4">
+  <link rel="stylesheet" href="profile-card.css?v=5">
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
-  <script src="politician-card.js" defer></script>
-  <script src="profile-card.js?v=3" defer></script>
+  <script src="politician-card.js?v=2" defer></script>
+  <script src="profile-card.js?v=5" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
   <link rel="stylesheet" href="mahalle-picker.css">
@@ -34,6 +34,7 @@
   <script src="admin-notification.js" defer></script>
   <script src="map-zoom.js" defer></script>
   <script src="map-parallax.js" defer></script>
+  <script src="home-map.js" defer></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in. Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot, and a one-shot flag so the posts/scoreboard card-entrance animation (see animateFeedSwap) skips its first run here -- the column itself is already sliding in from the same edge, so animating the cards inside it too would look like the content arriving twice.
        ist-entering-* (the manual transform-transition fallback, see .col-right-slide/.game-link-enter below) is only for browsers WITHOUT View Transitions support -- on VT-capable browsers the native cross-document transition already slides the whole column in as a snapshot, so also applying the fallback class made the real DOM run its own second, independent slide underneath once DOMContentLoaded released it mid-transition, producing a visible double entrance. vt-* (which drives the VT pseudo-element keyframes) is unaffected and still always seeded. -->
   <script>
@@ -689,6 +690,27 @@
     }
     .neighborhood.home:hover, .neighborhood.home.hover-active { fill: rgba(130, 55, 48, 0.26); }
     .neighborhood.home.active { fill: rgba(130, 55, 48, 0.38); stroke: var(--brown-4); stroke-dasharray: none; }
+
+    /* A member whose district has a hand-painted map (assets/map/home/,
+       see home-map.js) gets the colour from the artwork itself, so the
+       .home tint above would lay a second red over the first -- and a
+       thicker, polygon-shaped one at that. On those maps the polygon
+       falls back to plain district behaviour: the drawing alone says
+       "this one is yours", and hovering or selecting it looks exactly
+       like hovering or selecting anywhere else. */
+    .map-panel.ist-home-painted .neighborhood.home {
+      fill: transparent;
+      stroke: transparent;
+      stroke-dasharray: none;
+    }
+    .map-panel.ist-home-painted .neighborhood.home:hover,
+    .map-panel.ist-home-painted .neighborhood.home.hover-active {
+      fill: rgba(var(--ink-rgb), 0.18);
+    }
+    .map-panel.ist-home-painted .neighborhood.home.active {
+      fill: rgba(var(--ink-rgb), 0.32);
+      stroke: var(--accent);
+    }
 
     /* Plain text, no frame/shadow — matches the HANE/KÜTÜPHANE/KAHVEHANE
        nav tab style (nav a above), not a floating pill. */
@@ -1605,8 +1627,10 @@
          on mobile — the desktop-only #library-card would just take up
          space above the discussion feed. */
       #library-card { display: none; }
-      /* Politician card is desktop-only, same as #library-card -- nothing
-         replaces it on mobile. */
+      /* The Belediye Başkanı card as a card is desktop-only -- but the
+         seat it names is NOT hidden on a phone any more: it moves into
+         the profile bar's left end (#ist-pc-seat, see "THE TOP BAR" in
+         profile-card.css). politician-card.js paints both. */
       #politician-card { display: none; }
       /* Fills .col-left's height exactly; min-height:0 lets it (and,
          in turn, .discussion-posts below) shrink to fit rather than
@@ -2739,6 +2763,10 @@ async function refreshHomeNeighborhood() {
   if (homeNeighborhood) {
     const nbEl = document.getElementById(homeNeighborhood);
     if (nbEl) nbEl.classList.add('home');
+    // Same reason, for the other half of the highlight: the map image
+    // itself is part of #ist-content and comes back as the base map on
+    // every mount (see home-map.js).
+    if (window.IstHomeMap) window.IstHomeMap.apply(homeNeighborhood);
   }
   let profileNb = null;
   let profileFirst = '';
@@ -2768,6 +2796,9 @@ async function refreshHomeNeighborhood() {
     // default view is Tüm İstanbul, not the user's own neighborhood.
     const nbEl = document.getElementById(homeNeighborhood);
     if (nbEl) nbEl.classList.add('home');
+    // Districts with a hand-painted map get it here in place of the base
+    // one; the rest keep the .home tint the class above applies.
+    if (window.IstHomeMap) window.IstHomeMap.apply(homeNeighborhood);
   } else {
     document.getElementById('home-nb-badge').textContent = 'Semt seçilmedi';
   }

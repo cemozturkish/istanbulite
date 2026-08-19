@@ -13,17 +13,17 @@
   <script src="safe-area-ready.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
-  <script src="router.js"></script>
+  <script src="router.js?v=2"></script>
   <script src="i18n.js?v=3"></script>
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
   <script src="game-locks.js"></script>
-  <link rel="stylesheet" href="profile-card.css?v=4">
+  <link rel="stylesheet" href="profile-card.css?v=5">
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
   <script src="tbmm.js" defer></script>
-  <script src="politician-card.js" defer></script>
-  <script src="profile-card.js?v=3" defer></script>
+  <script src="politician-card.js?v=2" defer></script>
+  <script src="profile-card.js?v=5" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
   <link rel="stylesheet" href="mahalle-picker.css">
@@ -1382,10 +1382,16 @@
     .arrow-title {
       margin: 0;
       text-align: center;
-      font-size: 1.5rem;
+      /* All caps and a size down from a headline: this line names the
+         page (Posta Kutusu, a country, a shelf), it is not the headline
+         of what is on it -- so it reads as a masthead label above the
+         cards rather than competing with their own titles. */
+      font-size: 1.1rem;
       font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
       color: var(--ink);
-      line-height: 1.2;
+      line-height: 1.25;
       /* Both sides, so a long name breaks symmetrically instead of
          drifting off the arrow. */
       padding: 0 38px;
@@ -2557,18 +2563,15 @@
       .col-left .nb-highlight { display: none; }
 
       /* Shelves area — sits below the map now instead of filling the
-         remaining viewport, so it grows with its own content (three per
-         column, more shelves just add columns) instead of scrolling
-         internally. Column flow (not row) so the buttons fill top-to-bottom
-         on the left before starting the right column, matching
-         Hane/Kahvehane's two-column pattern below the map. */
+         remaining viewport, so it grows with its own content instead of
+         scrolling internally. One per row, each spanning the full width
+         of the sheet: a shelf and a letter are list rows, not tiles, and
+         the two-column grid this used to be cut every name in half to
+         make them fit side by side. */
       .shelves {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-auto-flow: column;
-        grid-template-rows: repeat(3, auto);
-        grid-auto-columns: 1fr;
-        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        padding: 0;
         gap: 8px;
         overflow: visible;
       }
@@ -2583,25 +2586,14 @@
         padding: 10px 8px;
         border-bottom-width: 4px;
       }
-      .shelf-title { font-size: 0.78rem; letter-spacing: 1px; line-height: 1.2; }
-      /* Clamped to one line -- a long shelf name/subtitle was stretching
-         that whole grid row (both columns share row height) into a
-         much taller card than the rest, breaking the "fits neatly"
-         look of the 3-left/3-right grid. */
-      .shelf-title,
-      .shelf-subtitle {
-        display: -webkit-box;
-        -webkit-line-clamp: 1;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-      }
+      .shelf-title { font-size: 0.85rem; letter-spacing: 1px; line-height: 1.2; }
       .shelf-subtitle { font-size: 0.68rem; margin-top: 2px; }
       .shelf-progress { font-size: 0.56rem; margin-top: 3px; }
 
       /* Library boxes -- .col-left's own grid column now (see "boxes"
          above), stacked vertically same as Kahvehane's game tiles in its
-         own games column (not a 2-up grid like the shelves grid above --
-         these boxes read as one column of stacked cards). */
+         own games column -- these boxes read as one column of stacked
+         cards, same as the shelves list above). */
       .lib-boxes { gap: 8px; padding: 12px; }
       /* Sized to its own tile, not stretched to the flex column's full
          width -- same clamp() kahvehane's .game-link mobile tiles use, so
@@ -2728,8 +2720,11 @@
       body:not(.ist-viewing-other) #library-card,
       body:not(.ist-viewing-other) .profile-right { display: none !important; }
       body.ist-viewing-other #ist-pc-mount { display: none !important; }
-      /* Politician card (top-right, desktop) is a desktop-only artifact,
-         same as #library-card -- nothing replaces it on mobile. */
+      /* The Cumhurbaşkanı card as a card is desktop-only -- but the seat
+         it names is NOT hidden on a phone any more: it moves into the
+         profile bar's left end (#ist-pc-seat, see "THE TOP BAR" in
+         profile-card.css), which is where there is actually room for it
+         beside a full-bleed map. politician-card.js paints both. */
       #politician-card { display: none !important; }
 
       /* ── Mobile top: compact profile card + countdowns ── */
@@ -4972,6 +4967,36 @@ function openPoliticianDetailSheet(html) {
   _closeReaderOverlay = closeReaderOverlay;
 }
 
+// ── The seat follows the map ──
+// This page's seat is the Cumhurbaşkanı at rest, but the phone map is
+// Türkiye among its neighbours and touching a country opens that
+// country's page -- so the seat follows the tap, naming that country's
+// leader, exactly the way Hane's seat follows its districts.
+//
+// The seats themselves come from the shared cache (IstPoliticianCard.seats)
+// rather than a fetch of this page's own -- Hane swaps its seat off the same
+// table, and one copy of that cache is also what keeps the two page scripts
+// from declaring the same global twice in the one document they share (see
+// router.js).
+//
+// A country nobody has been recorded for prints its own name over "Henüz
+// eklenmedi", exactly as an unassigned district does on Hane. It used to
+// fall back to the Cumhurbaşkanı, on the reasoning that most of this map
+// will never have a leader entered — but that made a touch on a country
+// look like a touch that did nothing, which is indistinguishable from the
+// feature being broken. A seat that says it is empty is the honest answer,
+// and the reader can always see their tap landed.
+async function renderSeatFor(seatId, seatLabel) {
+  if (!window.IstPoliticianCard) return;
+  const byId = await IstPoliticianCard.seats(sb);
+  IstPoliticianCard.render({
+    mountElId: 'politician-card',
+    seat: byId[seatId],
+    seatLabel,
+    openDetail: openPoliticianDetailSheet,
+  });
+}
+
 // The three buttons that open this page's sheets -- Makaleler, Posta
 // Kutusu and TBMM -- all live inside #ist-content, which the router
 // replaces wholesale on every re-entry to this page (see router.js's
@@ -5446,6 +5471,10 @@ const neighborhoodNames = {
     activeRegionName = null;
     _mapSelectionOpenedSheet = false;
     if (mapLabel) mapLabel.textContent = idleMapLabel();
+    // Nothing is selected any more, so the seat goes back to the one this
+    // page rests on. A no-op on the very first run (politician-card.js is
+    // deferred and has not loaded yet); mount()'s own poll paints it then.
+    renderSeatFor('cumhurbaskani', 'Cumhurbaşkanı');
   }
   window.__istResetMapLabel = resetMapLabel;
   resetMapLabel();
@@ -5471,8 +5500,12 @@ const neighborhoodNames = {
       if (nb.classList.contains('country')) {
         // This selection belongs to the sheet about to rise, so closing
         // that sheet takes the tint and the caption with it (see
-        // closeReaderOverlay).
+        // closeReaderOverlay) -- and the seat with it too, since
+        // resetMapLabel is what closing runs.
         _mapSelectionOpenedSheet = true;
+        // The bar's left end follows the map here exactly as it does on
+        // Hane: the country you just touched puts its leader up there.
+        renderSeatFor(nbId, regionName(nb));
         if (nbId === 'ankara') openTBMMSheet();
         else openCountrySheet(nbId, regionName(nb));
       }
@@ -5481,11 +5514,15 @@ const neighborhoodNames = {
     // Snap back to the idle caption only when clicking empty space inside
     // the map panel itself — clicking the shelves, reading area or other UI
     // that floats over the map must not reset it.
+    //
+    // Through resetMapLabel rather than by clearing the same four things
+    // here: that is the one place that knows what "nothing is selected"
+    // means, and it grew a fifth thing (putting the seat back to the
+    // Cumhurbaşkanı) that this copy silently would not have done — tapping
+    // the sea would have deselected the country while leaving its leader
+    // standing on the bar.
     if (!e.target.closest('.map-panel') || e.target.closest('.map-label')) return;
-    getMapRegions().forEach(n => n.classList.remove('active'));
-    if (mapLabel) mapLabel.textContent = idleMapLabel();
-    activeRegionName = null;
-    _mapSelectionOpenedSheet = false;
+    resetMapLabel();
   });
   document.addEventListener('mouseover', (e) => {
     const nb = e.target.closest(MAP_REGION_SEL);
@@ -5878,16 +5915,14 @@ function mount() {
   IstRouter.onTick(tickDunyaNewsAgo);
   loadPersonMentionsRoster();
   // politician-card.js is deferred -- on a fresh real page load this
-  // mount() call runs synchronously during parsing, before any deferred
-  // script has executed, so a plain `if (window.IstPoliticianCard)` check
-  // here would silently miss it. Poll briefly instead (same idiom as
-  // __mountIstPc's tryOnb below).
+  // runs synchronously during parsing, before any deferred script has
+  // executed, so a plain `if (window.IstPoliticianCard)` check here would
+  // silently miss it. Poll briefly instead (same idiom as __mountIstPc's
+  // tryOnb below). This paints the resting seat through the same path a
+  // country tap uses, so there is one way the seat is ever set.
   (function tryPoliticianCard(tries) {
     if (window.IstPoliticianCard) {
-      IstPoliticianCard.mount({
-        sb, mountElId: 'politician-card', seatId: 'cumhurbaskani', seatLabel: 'Cumhurbaşkanı',
-        openDetail: openPoliticianDetailSheet,
-      });
+      renderSeatFor('cumhurbaskani', 'Cumhurbaşkanı');
     } else if (tries > 0) {
       setTimeout(() => tryPoliticianCard(tries - 1), 60);
     }

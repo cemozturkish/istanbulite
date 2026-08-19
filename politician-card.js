@@ -4,11 +4,29 @@
 // .politician-card CSS), plus the "who is this" detail view opened when
 // it's clicked.
 //
-// Used by all three carousel pages: kutuphane.html (the fixed
-// Cumhurbaşkanı seat), kahvehane.html (the viewer's own neighborhood's
-// mayor seat) and anahane.html (whichever district is selected on the
-// map — it keeps its own seat cache and calls cardHTML/detailHTML
-// directly, since mount()'s one-seat fetch can't express that).
+// Used by all three carousel pages: kahvehane.html (one fixed seat, the
+// viewer's own neighborhood's mayor) and anahane.html and kutuphane.html,
+// whose seats follow their maps — the selected district's Belediye
+// Başkanı on Hane, the touched country's leader on Kütüphane, which rests
+// on the Cumhurbaşkanı with nothing selected. The two map-driven pages
+// call render() with a seat out of seats() rather than mount(), which
+// only knows how to show one fixed id.
+//
+// ── On a phone the seat lives in the top bar ──
+// There is no room beside the map for a second card, and the seat is not
+// page furniture anyway: it names who holds power over what you are
+// looking at, which is the same *kind* of fact as who you are. So the
+// profile bar carries both — the seat on the left, you on the right (see
+// "THE TOP BAR" in profile-card.css). render() therefore paints twice:
+// the page's own #politician-card (the desktop card) and #ist-pc-seat,
+// the slot profile-card.js leaves at the left end of the bar's row.
+//
+// The bar outlives a virtual navigation (it sits outside #ist-content,
+// see router.js), so the seat in it has to be told when the page under it
+// changes: router.js calls clearSeat() the moment it swaps the content,
+// and the arriving page's own mount() paints the new seat. Without that,
+// Kahvehane would wear the Cumhurbaşkanı for as long as its seat fetch
+// takes — and a tap in that window would open Kütüphane's sheet.
 //
 // Whoever wires the click must bind it to the card element, never
 // delegate it on document: #politician-card exists on all three pages and
@@ -70,21 +88,109 @@
     `;
   }
 
-  // opts: { sb, mountElId, seatId, seatLabel, openDetail(html) }
-  // Fetches the seat once and renders the compact card; if openDetail is
-  // given, wires a click to open the full detail through it. Callable
-  // again on a page revisit (e.g. a virtual navigation) — it always
-  // re-fetches, since a single seat lookup is cheap.
-  async function mount(opts) {
-    const { sb, mountElId, seatId, seatLabel, openDetail } = opts;
-    const card = document.getElementById(mountElId);
-    if (!card || !sb || !seatId) return;
-    const { data: seat } = await sb.from('political_seats').select('*, politicians(*)').eq('id', seatId).maybeSingle();
-    card.innerHTML = cardHTML(seat, seatLabel);
-    if (openDetail) {
-      card.onclick = () => openDetail(detailHTML(seat, seatLabel));
-    }
+  // The seat as an occupant of the profile bar: the bar's own type classes
+  // rather than the desktop card's, so it is dressed by "THE TOP BAR" in
+  // profile-card.css exactly like the person on the other end of the row —
+  // one type scale, no second copy to keep in sync.
+  //
+  // No portrait: the bar is two names in type and nothing else, on both
+  // ends (see the same section). The face is what the detail sheet opens
+  // with — a bar that prints it too spends the row's whole width saying
+  // twice what one line of type already says.
+  function barHTML(seat, seatLabel) {
+    const p = seat?.politicians || null;
+    return `
+      <div class="ist-pc-id">
+        <div class="ist-pc-name">${esc(p ? `${p.first_name} ${p.last_name}`.trim() : seatLabel)}</div>
+        <div class="ist-pc-meta">${esc(seat?.title || 'Henüz eklenmedi')}</div>
+      </div>
+    `;
   }
 
-  global.IstPoliticianCard = { mount, cardHTML, detailHTML, avatarHTML };
+  // The seat currently on the bar, kept so paintBar() can put it back after
+  // profile-card.js rebuilds the row (a re-mount, a profile refresh) — that
+  // rebuild is an innerHTML swap, so it empties the slot without knowing it
+  // held anything.
+  let barSeat = null;
+
+  function paintBar() {
+    const slot = document.getElementById('ist-pc-seat');
+    if (!slot) return;
+    const row = slot.closest('.ist-pc-row');
+    slot.innerHTML = barSeat ? barSeat.html : '';
+    slot.onclick = barSeat && barSeat.open ? barSeat.open : null;
+    // The row right-aligns the person only once somebody is standing at the
+    // other end; on a page with no seat it keeps its original single-block
+    // layout rather than leaving a hole where the seat would be.
+    if (row) row.classList.toggle('ist-pc-has-seat', !!barSeat);
+  }
+
+  // Paints one seat onto both of its surfaces (the page's desktop card and
+  // the bar) and wires the same detail view to each.
+  // opts: { mountElId, seat, seatLabel, openDetail(html) }
+  function render(opts) {
+    const { mountElId, seat, seatLabel, openDetail } = opts;
+    const open = openDetail ? () => openDetail(detailHTML(seat, seatLabel)) : null;
+    const card = document.getElementById(mountElId || 'politician-card');
+    if (card) {
+      card.innerHTML = cardHTML(seat, seatLabel);
+      card.onclick = open;
+    }
+    barSeat = { html: barHTML(seat, seatLabel), open };
+    paintBar();
+  }
+
+  // Called by router.js the instant a virtual navigation swaps the page
+  // under the bar — see the note at the top of this file.
+  function clearSeat() {
+    barSeat = null;
+    paintBar();
+  }
+
+  // Every seat, fetched once and kept for the session, keyed by id.
+  //
+  // Two of the three pages swap their seat as their map is tapped — Hane
+  // through its districts, Kütüphane through the countries on its phone
+  // map — and there the next seat has to arrive *with* the tap rather than
+  // a request later. All three read the same small table, so they share one
+  // fetch; both pages used to keep a copy of this, which meant two
+  // identically named globals in one document once router.js had injected
+  // both page scripts (see "The three carousel pages share one document" in
+  // CLAUDE.md) — the second `let` to be parsed threw and took its whole page
+  // script with it.
+  //
+  // The promise is what's cached, not the rows, so simultaneous first
+  // callers share the one request. A failed fetch is dropped rather than
+  // cached: it is a network blip, not an empty table, and caching it would
+  // leave every seat blank for the rest of the session.
+  let seatsPromise = null;
+  function seats(sb) {
+    if (!seatsPromise) {
+      seatsPromise = sb.from('political_seats').select('*, politicians(*)').then(({ data, error }) => {
+        if (error) {
+          seatsPromise = null;
+          console.error('[politician-card seats]', error);
+          return {};
+        }
+        const byId = {};
+        (data || []).forEach(s => { byId[s.id] = s; });
+        return byId;
+      });
+    }
+    return seatsPromise;
+  }
+
+  // opts: { sb, mountElId, seatId, seatLabel, openDetail(html) }
+  // Renders one fixed seat; if openDetail is given, wires a click to open
+  // the full detail through it. Callable again on a page revisit (e.g. a
+  // virtual navigation) — the seats are already in hand by then, so the
+  // repaint costs nothing.
+  async function mount(opts) {
+    const { sb, mountElId, seatId, seatLabel, openDetail } = opts;
+    if (!sb || !seatId) return;
+    const byId = await seats(sb);
+    render({ mountElId, seat: byId[seatId], seatLabel, openDetail });
+  }
+
+  global.IstPoliticianCard = { mount, render, seats, paintBar, clearSeat, cardHTML, detailHTML, avatarHTML };
 })(window);

@@ -1884,7 +1884,7 @@
     <div class="panel">
       <div class="panel-title" id="p-form-mode-label">Edit Seat</div>
       <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
-        Shown on Anahane's top-right card: İstanbul Büyükşehir Belediye Başkanı by default, or the clicked district's Belediye Başkanı. One seat per district plus the citywide seat — pick who currently holds it from the Kişiler roster (or leave unassigned).
+        Who the profile bar (and the desktop card) names on each page: İstanbul Büyükşehir Belediye Başkanı or the clicked district's on Anahane, the Cumhurbaşkanı on Kütüphane — or, when a country on Kütüphane's phone map is touched, that country's leader. One seat per district, plus the citywide and national ones, plus one per country on the map. Pick who currently holds it from the Kişiler roster (or leave unassigned). A country left unassigned simply keeps showing the Cumhurbaşkanı.
       </p>
 
       <label>Seat</label>
@@ -5089,10 +5089,19 @@ async function deletePerson(id) {
 // different person from the dropdown and saving.
 let politiciansSeatsLoaded = false;
 let politiciansNeighborhoodNames = {};
+// Kept apart from the districts above, not merged into one label map: the
+// upsert has to know which column a seat id belongs in (political_seats
+// carries a neighborhood OR a country, never both -- see
+// db/political_seats_v2_countries.sql), and which map an id is in is that
+// answer.
+let politiciansCountryNames = {};
 
 async function loadPoliticiansTab() {
   if (!politiciansSeatsLoaded) {
-    const { data, error } = await sb.from('neighborhoods').select('id, name_tr').order('name_tr');
+    const [{ data, error }, { data: countryData }] = await Promise.all([
+      sb.from('neighborhoods').select('id, name_tr').order('name_tr'),
+      sb.from('countries').select('id, name_tr').order('name_tr'),
+    ]);
     if (!error && data) {
       const seatSel = document.getElementById('p-seat');
       const istOpt = document.createElement('option');
@@ -5103,14 +5112,30 @@ async function loadPoliticiansTab() {
       cbOpt.value = 'cumhurbaskani';
       cbOpt.textContent = 'Cumhurbaşkanı';
       seatSel.appendChild(cbOpt);
+      const dGroup = document.createElement('optgroup');
+      dGroup.label = 'İlçeler';
       data.forEach(n => {
         if (n.id === 'istanbul_disi') return;
         politiciansNeighborhoodNames[n.id] = n.name_tr;
         const opt = document.createElement('option');
         opt.value = n.id;
         opt.textContent = n.name_tr;
-        seatSel.appendChild(opt);
+        dGroup.appendChild(opt);
       });
+      seatSel.appendChild(dGroup);
+      // Every country drawn on Kütüphane's phone map, whether or not it
+      // has a leader recorded yet -- the point of the list is to show what
+      // can be filled in.
+      const cGroup = document.createElement('optgroup');
+      cGroup.label = 'Ülkeler';
+      (countryData || []).forEach(c => {
+        politiciansCountryNames[c.id] = c.name_tr;
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name_tr;
+        cGroup.appendChild(opt);
+      });
+      seatSel.appendChild(cGroup);
       politiciansSeatsLoaded = true;
     }
   }
@@ -5133,7 +5158,7 @@ async function populateSeatPersonDropdown() {
 function politicianSeatLabel(seatId) {
   if (seatId === 'istanbul') return 'İstanbul (Büyükşehir)';
   if (seatId === 'cumhurbaskani') return 'Cumhurbaşkanı';
-  return politiciansNeighborhoodNames[seatId] || seatId;
+  return politiciansNeighborhoodNames[seatId] || politiciansCountryNames[seatId] || seatId;
 }
 
 async function loadPoliticiansList() {
@@ -5143,7 +5168,11 @@ async function loadPoliticiansList() {
   if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
   const byId = {};
   (data || []).forEach(s => { byId[s.id] = s; });
-  const seatIds = ['istanbul', 'cumhurbaskani', ...Object.keys(politiciansNeighborhoodNames)];
+  const seatIds = [
+    'istanbul', 'cumhurbaskani',
+    ...Object.keys(politiciansNeighborhoodNames),
+    ...Object.keys(politiciansCountryNames),
+  ];
 
   listEl.innerHTML = seatIds.map(seatId => {
     const seat = byId[seatId];
@@ -5200,9 +5229,15 @@ document.getElementById('p-submit-btn').addEventListener('click', async () => {
   statusEl.textContent = ''; statusEl.className = 'status-msg';
   btn.innerHTML = '<span class="spinner"></span>';
 
+  // A seat carries a neighborhood OR a country, never both -- which of the
+  // two label maps holds the id is what says which (see the maps' own note
+  // above, and the check constraint in db/political_seats_v2_countries.sql).
+  const isCountry = !!politiciansCountryNames[seatId];
+  const isFixed = seatId === 'istanbul' || seatId === 'cumhurbaskani';
   const { error } = await sb.from('political_seats').upsert([{
     id: seatId,
-    neighborhood: (seatId === 'istanbul' || seatId === 'cumhurbaskani') ? null : seatId,
+    neighborhood: (isFixed || isCountry) ? null : seatId,
+    country: isCountry ? seatId : null,
     title, politician_id,
   }]);
 
