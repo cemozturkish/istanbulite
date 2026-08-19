@@ -70,8 +70,6 @@
     'profile.hive.codeprompt':{ default: 'PETEK KODU',          more_english: 'PETEK CODE' },
     'profile.hive.add':     { default: 'Ekle',                  more_english: 'Add' },
     'profile.hive.remove':  { default: 'Çıkar',                 more_english: 'Remove' },
-    'profile.hive.dayleft': { default: 'gün kaldı',             more_english: 'day left' },
-    'profile.hive.daysleft':{ default: 'gün kaldı',             more_english: 'days left' },
     'profile.hive.codelabel':{ default: 'BU HAFTAKİ PETEK KODUN', more_english: 'YOUR PETEK CODE THIS WEEK' },
     'profile.hive.codehint':{ default: 'pazar günü yenilenir',  more_english: 'renews Sunday' },
     'profile.hive.err.short':          { default: 'Kod 6 karakter.',            more_english: 'The code is 6 characters.' },
@@ -79,6 +77,7 @@
     'profile.hive.err.self':           { default: 'Bu senin kendi kodun.',       more_english: "That's your own code." },
     'profile.hive.err.slot_taken':     { default: 'Bu yer dolu.',                more_english: 'That slot is taken.' },
     'profile.hive.err.already_in_hive':{ default: 'Bu üye zaten hanende.',       more_english: 'They are already in your hane.' },
+    'profile.hive.err.their_hive_full':{ default: 'Onun peteği dolu.',           more_english: 'Their petek is full.' },
     'profile.hive.err.failed':         { default: 'Olmadı, tekrar dene.',        more_english: "That didn't work, try again." },
 
     // login / signup (index.html)

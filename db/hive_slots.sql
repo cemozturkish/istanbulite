@@ -26,6 +26,11 @@
 -- string rather than raising — the UI prints its own wording per status
 -- (see i18n.js, profile.hive.*).
 --
+-- SUPERSEDED IN PART by db/hive_slots_v3_mutual_permanent.sql: the
+-- seven-day placement described below is gone (expires_at is dropped),
+-- placing is mutual and mirrored, and removal clears both sides. The
+-- code half — weekly, unreadable to anyone but its owner — is unchanged.
+--
 -- Run in Supabase SQL editor. Idempotent.
 -- =====================================================================
 

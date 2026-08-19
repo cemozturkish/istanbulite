@@ -1200,17 +1200,21 @@
   //
   // A slot is filled hand-to-hand, by code (see db/hive_slots.sql): every
   // member holds one code per Istanbul week, tapping a "+" asks for
-  // someone else's, and whoever it belongs to stands in that slot for a
-  // week. There is no member search and no follow button on purpose —
+  // someone else's, and whoever it belongs to stands in that slot from
+  // then on. There is no member search and no follow button on purpose —
   // to put someone in your honeycomb you have to have been told their
-  // code, which means you saw them, and both the code and the placement
-  // run out, so the honeycomb empties itself unless that keeps
-  // happening. It is a record of contact, not a follower list.
+  // code, which means you saw them. It is a record of contact, not a
+  // follower list.
+  //
+  // Placing is mutual and mirrored (v3): resolving a code puts them in
+  // your honeycomb and you in theirs, in the slot opposite the one you
+  // used — your top-right is their bottom-left — so the two combs are
+  // one shape seen from either side. Çıkar clears both sides for the
+  // same reason.
   //
   // What is *shown* of an occupant beside their frame is still the
-  // undesigned half: name, district and the week running down, no more.
-  // The rest of that readout stays placeholder ruling until there's a
-  // rule for it.
+  // undesigned half: name and district, no more. The rest of that
+  // readout stays placeholder ruling until there's a rule for it.
   // ══════════════════════════════════════════════════════════════
   const HIVE_SLOT_COUNT = 6;
   const HIVE_CODE_LENGTH = 6;
@@ -1218,19 +1222,14 @@
   // How the three rows are laid out, in slot order (0-5, clockwise-ish
   // from the top-left): two slots up top, one either side of the user,
   // two along the bottom. `me` marks where the user's own frame goes.
+  // This numbering is also what the mirror in hive_claim_code is stated
+  // in (5 - slot is the point reflection through the middle cell), so
+  // renumbering the slots here would silently un-mirror the two combs.
   const HIVE_ROWS = [
     { slots: [0, 1] },
     { slots: [2, 3], me: 1 },   // user sits between the two middle slots
     { slots: [4, 5] },
   ];
-
-  // Whole days left on a placement, rounded up, so the last day reads
-  // "1 gün" rather than "0". Plain duration arithmetic on an ISO
-  // timestamp — no date formatting is parsed back (see ist-date.js).
-  function hiveDaysLeft(expiresAt) {
-    const ms = new Date(expiresAt).getTime() - Date.now();
-    return Math.max(0, Math.ceil(ms / 86400000));
-  }
 
   function hiveMemberName(member) {
     return capitalizeName(`${member.first_name || ''} ${member.last_name || ''}`.trim()) || 'İsimsiz Üye';
@@ -1238,8 +1237,8 @@
 
   // ── What stands beside a slot ──
   // Each slot owns the space on the outer side of its own row, printing
-  // the occupant when there is one — name, district, the week running
-  // down, no more. This never changes when a slot is tapped: the frames
+  // the occupant when there is one — name and district, no more. This
+  // never changes when a slot is tapped: the frames
   // are fixed furniture (see .ist-hive-cell in profile-card.css), so
   // what a tap needs — the code form, an occupant's Çıkar — lands in the
   // dock below the honeycomb instead (see hiveDockHTML), not beside the
@@ -1252,14 +1251,11 @@
     const cls = `ist-hive-side ist-hive-side-${side}`;
     if (!member) return `<div class="${cls}"></div>`;
 
-    const days = hiveDaysLeft(member.expires_at);
-    const left = `${days} ${t(days === 1 ? 'profile.hive.dayleft' : 'profile.hive.daysleft')}`;
     const nb = member.neighborhood ? (NB_NAMES[member.neighborhood] || member.neighborhood) : '';
     return `
       <div class="${cls} ist-hive-readout">
         <div class="ist-hive-readout-name">${esc(hiveMemberName(member))}</div>
         ${nb ? `<div class="ist-hive-readout-meta">${esc(nb)}</div>` : ''}
-        <div class="ist-hive-readout-left">${esc(left)}</div>
       </div>
     `;
   }
@@ -1270,12 +1266,10 @@
   // unique because only ever one slot is open at a time.
   function hiveExtensionHTML(member, open, t) {
     if (member) {
-      const days = hiveDaysLeft(member.expires_at);
       const nb = member.neighborhood ? (NB_NAMES[member.neighborhood] || member.neighborhood) : '';
       return `
         <div class="ist-hive-readout-name">${esc(hiveMemberName(member))}</div>
         ${nb ? `<div class="ist-hive-readout-meta">${esc(nb)}</div>` : ''}
-        <div class="ist-hive-readout-left">${esc(`${days} ${t(days === 1 ? 'profile.hive.dayleft' : 'profile.hive.daysleft')}`)}</div>
         <button type="button" class="ist-hive-remove" id="po-hive-remove">${esc(t('profile.hive.remove'))}</button>
         <div class="ist-hive-ext-msg" id="po-hive-msg">${esc(open.error || '')}</div>
       `;
@@ -1535,16 +1529,19 @@
     renderHive(state);
   }
 
+  // Çıkar is mutual, like the placing was: it goes through
+  // hive_remove_member rather than deleting the caller's own row, so the
+  // member's honeycomb stops holding you at the same moment yours stops
+  // holding them (see db/hive_slots_v3_mutual_permanent.sql).
   async function releaseHiveSlot(state) {
     const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
     if (!state.hiveOpen) return;
     const slot = state.hiveOpen.slot;
+    const member = ((state.hive && state.hive.slots) || {})[slot];
+    if (!member) return;
     const btn = document.getElementById('po-hive-remove');
     btn.disabled = true;
-    const { error } = await state.sb
-      .from('hive_slots').delete()
-      .eq('owner_id', state.user.id)
-      .eq('slot', slot);
+    const { error } = await state.sb.rpc('hive_remove_member', { p_member_id: member.member_id });
     if (error) {
       btn.disabled = false;
       const msgEl = document.getElementById('po-hive-msg');
