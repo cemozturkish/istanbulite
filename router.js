@@ -245,6 +245,12 @@
       if (liveContent) {
         liveContent.innerHTML = cached.contentHTML;
       }
+      // The seat card sits in the profile bar on a phone, and the bar is
+      // deliberately outside #ist-content -- so unlike everything the swap
+      // above just replaced, the seat survives it. Drop it here; the
+      // arriving page's mount() paints its own. Leaving it would show (and
+      // on a tap, open) the page you just left. See politician-card.js.
+      if (global.IstPoliticianCard) global.IstPoliticianCard.clearSeat();
       document.title = cached.title || document.title;
       document.body.dataset.page = targetSlug;
       document.body.classList.remove(exitClass);
@@ -336,6 +342,10 @@
       if (pages[targetSlug] && pages[targetSlug].mount) {
         try { pages[targetSlug].mount(); } catch (e) { console.error(e); }
       }
+      // The map image that just arrived is #ist-content's own, so it is
+      // the base map again -- put the member's hand-painted district map
+      // back before anything reads layout below (see home-map.js).
+      if (global.IstHomeMap) global.IstHomeMap.refresh();
       // Deliberately after mount(): initMapZoom's own measure() reads
       // getBoundingClientRect(), which forces a synchronous layout --
       // done before mount() had a chance to run, that forced flush would

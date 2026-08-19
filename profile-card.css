@@ -25,28 +25,9 @@
   padding: 10px 16px;
 }
 
-.ist-pc-avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: var(--paper);
-  border: 2px solid var(--ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--ink);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.ist-pc-avatar img { width: 100%; height: 100%; object-fit: cover; }
-
 /* Layered avatar (bald base + optional transparent hair overlay — see
    avatar.js IstAvatar.html). A plain wrapper span filling whatever circular
-   container it's dropped into (.ist-pc-avatar, .ist-pc-cover-avatar,
+   container it's dropped into (.ist-pc-cover-avatar,
    .library-card .avatar, kütüphane's/game pages' own local .avatar/
    .pp-avatar, a politician/TBMM detail sheet's own avatar box, admin.html's
    avatar-preview thumbnails, ...). Each stacked layer gets its own
@@ -75,27 +56,20 @@
   margin-top: 2px;
 }
 
-/* Icon-only so it stays a small square inline with the avatar/name/district
-   instead of pushing onto its own line below them (its width no longer
-   depends on the current language's label length). */
-.ist-pc-toggle {
-  flex-shrink: 0;
-  width: 30px;
-  height: 30px;
-  padding: 0;
+/* You: your name over your district, and that block is the button that
+   opens your profile. There is no gear beside it: the other end of this bar
+   is a person you press to read about them, so pressing a person is already
+   the gesture, and a gear would be a second way to do what pressing yourself
+   does. (The desktop identity card keeps its own .edit-btn — that card sits
+   in a page, not on a bar, and has nothing else to press.) */
+.ist-pc-me {
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--ink);
-  color: var(--paper);
-  border: none;
+  flex: 1 1 auto;
+  min-width: 0;
   cursor: pointer;
-  transition: background 160ms;
+  -webkit-tap-highlight-color: transparent;
 }
-.ist-pc-toggle svg { width: 16px; height: 16px; }
-
-.ist-pc-toggle:hover { background: var(--accent); }
 
 /* ── THE TOP BAR ──
    On a phone the card above is not a card at all: it is the counterpart of
@@ -141,7 +115,9 @@
   .ist-pc-row {
     height: var(--navbar-h-top, 46px);
     padding: 0 var(--screen-inset, 18px);
-    gap: 10px;
+    /* Wide enough that the two people read as two people even when both
+       names run long enough to close the gap the slack usually leaves. */
+    gap: 14px;
   }
   .ist-pc-loading {
     height: var(--navbar-h-top, 46px);
@@ -151,36 +127,85 @@
     justify-content: center;
     color: var(--navbar-ink-label);
   }
-  /* Only the size changes: the avatar keeps its hexframe (frames.css) with
-     the drawn ring and its own paper fill, so it reads as a small portrait
-     standing on the bar rather than a hole cut in it. */
-  .ist-pc-avatar {
-    height: 42px;
-    font-size: 0.9rem;
-  }
+  /* One size for both ends, and small enough that two full names and two
+     titles fit a 390px phone without either being clipped: at 0.9rem the
+     row was exactly full with nothing between the two people. */
   .ist-pc-name {
-    font-size: 0.9rem;
+    font-size: 0.82rem;
     color: var(--navbar-ink-label-active);
   }
+  /* Both lines of type hold their own line: this row carries two people,
+     and either one's name or title running long must eat its own words
+     rather than the other person's space. */
   .ist-pc-meta {
     margin-top: 0;
+    font-size: 0.56rem;
+    letter-spacing: 0.8px;
     color: var(--navbar-ink-label);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  /* A label in the bar rather than a button on it: the tab bar carries no
-     chrome behind its own labels either, so the gear drops its filled
-     circle and just takes the bar's type colors. */
-  .ist-pc-toggle {
-    width: 30px;
-    height: 30px;
-    border-radius: 0;
-    background: none;
-    color: var(--navbar-ink-label);
+  /* Pressing yourself says so: the bar carries no chrome behind its own
+     labels (neither does the tab bar at the other edge), so the press is
+     acknowledged by the type brightening rather than by a button lighting
+     up under it. */
+  .ist-pc-me:active .ist-pc-meta { color: var(--navbar-ink-label-active); }
+
+  /* ── The other end of the bar: the seat ──
+     The bar names the two people who matter on the page you are looking
+     at: on the right, you — on the left, whoever holds power over what
+     the page is showing (the Cumhurbaşkanı on Kütüphane, a Belediye
+     Başkanı on Kahvehane and Hane). It is the same fact in two
+     directions, so it is one bar rather than a bar and a card: there is
+     no room beside a full-bleed map for a second card anyway, and the
+     political layer of the app was invisible on a phone while there was.
+
+     Neither end prints a portrait. The bar is two names in type and
+     nothing else: a face here would spend most of the row saying twice
+     what the line of type already says, and the face is what the detail
+     sheet each end opens leads with anyway.
+
+     The markup is painted into #ist-pc-seat by politician-card.js, in
+     this bar's own classes (.ist-pc-id / .ist-pc-name / .ist-pc-meta) —
+     so the seat is dressed by every rule above, and there is exactly one
+     type scale on this bar. Only what is specific to standing at the left
+     end is here.
+
+     .ist-pc-has-seat is the single switch: politician-card.js puts it on
+     the row when a seat is painted and takes it off when the seat is
+     dropped (a virtual navigation clears it, see router.js). Everything
+     about the seated layout hangs off it, so a page with no seat — and
+     the moment between leaving one page and the next one's seat
+     arriving — keeps the bar's original left-aligned single block. */
+  .ist-pc-seat { display: none; }
+  .ist-pc-has-seat .ist-pc-seat {
+    display: flex;
+    align-items: center;
+    order: 1;
+    /* The two ends split the row's slack evenly (the person below grows
+       too), so the gap that separates them sits in the middle and each
+       name stays against its own edge of the screen. min-width:0 so that
+       when there is no slack left they both give way — a long name eats
+       its own words rather than the other person's space. */
+    flex: 1 1 auto;
+    min-width: 0;
+    cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
-  .ist-pc-toggle:hover,
-  .ist-pc-toggle:active {
-    background: none;
-    color: var(--navbar-ink-label-active);
+  /* Nothing here sets a size, and nothing here is a second set of rules:
+     the two ends of the bar are the same two lines of type twice over, so
+     the seat takes .ist-pc-name / .ist-pc-meta above exactly as the reader
+     does and neither reads as the junior of the pair. Anything that shrank
+     one of them belongs nowhere. */
+
+  /* The person turns around: their name right-aligned against the far edge
+     — the mirror of the seat at the other end, so the bar reads outward
+     from the middle in both directions. */
+  .ist-pc-has-seat .ist-pc-me {
+    order: 2;
+    flex: 1 1 auto;
+    text-align: right;
   }
 }
 
@@ -234,6 +259,85 @@
      under it. */
   .ist-sheet-body.profile-overlay-body {
     padding-bottom: calc(var(--navbar-h, 38px) + 6px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ── THE PETEK PAGE GROWS OUT OF ITS BUTTON ──
+   On a phone the honeycomb does not arrive as a sheet sliding up from
+   the bottom edge, the way a news item or the meclis does. The PETEK
+   button over the map *becomes* it: the page opens out of the button's
+   own box and folds back into it when closed. The button is where the
+   honeycomb sits on the map, so it is where the page comes from — a
+   sheet rising from the bottom edge would say it came from somewhere
+   else entirely.
+
+   All this block does is take the slide away: the page is already at its
+   final size and position (the phone sheet's own geometry, resting under
+   the profile bar and running to the bottom of the screen) and it never
+   moves. What animates is the window onto it — a clip-path that starts
+   as the button's box and opens out to the page's four edges — and that
+   is run from profile-card.js (see growHive) rather than written here,
+   because it is measured off two live rectangles and a CSS transition
+   between two custom-property states has no reliable from-state to start
+   from in the same frame the page is unhidden.
+
+   The sheet is deliberately left untransformed: a transform would carry
+   the clip along with it and the two boxes would stop lining up. */
+@media (max-width: 768px) {
+  /* ── The page is cut to the honeycomb ──
+     It is not a full sheet with the honeycomb floating in the middle of
+     it: the page is only as big as what is on it — the honeycomb, and
+     the dock under it — and it stands in the middle of the city, clear
+     of both bars. That is what makes it a thing that came out of a
+     button rather than a page that arrived from off-screen: the button
+     grows into a box roughly its own kind of size, not into the whole
+     screen.
+
+     The width is the honeycomb's own arithmetic (the row of three cells
+     plus a readout track either side), so the paper ends where the
+     drawing ends. It is a fixed size, not a shrink-to-fit: the dock
+     below swaps its contents on every tap (your code, a code field, a
+     Çıkar button) and a page measured off its contents would resize
+     under the reader each time — the same flinch .ist-hive-cell-open
+     was written to avoid. Contents that outrun it wrap inside it. */
+  .hive-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Clear of the profile bar above (--ist-sheet-top, measured live by
+       IstSheet.position) and the tab bar below, so the page is centred
+       in the city rather than in the window. */
+    padding:
+      var(--ist-sheet-top, 76px)
+      var(--screen-inset, 18px)
+      calc(var(--navbar-h, 46px) + 10px + env(safe-area-inset-bottom, 0px));
+  }
+  .hive-overlay .ist-sheet {
+    position: relative;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    width: calc(
+      var(--ist-hive-cell-w) * 3 + var(--ist-hive-gap) * 2
+      + (var(--ist-hive-side-w) + var(--ist-hive-row-gap)) * 2
+      + var(--ist-hive-page-pad) * 2);
+    max-width: 100%;
+    height: auto;
+    max-height: 100%;
+    /* It floats now, so it gets its fourth edge back: frames.css drops a
+       sheet's bottom border because a sheet runs off the bottom of the
+       screen, and this one no longer does. */
+    border-bottom-width: 2px !important;
+  }
+  /* The close button keeps its corner, so the page's top edge stays
+     clear for it; everything else is the honeycomb's own margins. */
+  .hive-overlay .ist-sheet-body.profile-overlay-body {
+    padding: 38px var(--ist-hive-page-pad) 16px;
+  }
+  .hive-overlay.hive-grow .ist-sheet,
+  .hive-overlay.hive-grow.open .ist-sheet {
+    transform: none;
   }
 }
 
@@ -516,7 +620,12 @@
    because this page never scrolls (see .profile-overlay-body): three rows
    of a tall hexagon is the whole height budget of the sheet, so on a short
    window the cells give room up rather than pushing the bottom row out. */
-.ist-hive {
+/* The honeycomb's size lives on the PAGE, not on the honeycomb: on a
+   phone the page is cut to the honeycomb (see "THE PETEK PAGE" below),
+   which means the sheet has to do the same arithmetic the rows do. One
+   set of tokens, read by both, rather than the page guessing at a width
+   the honeycomb worked out for itself. */
+.hive-overlay {
   /* Height follows from the drawing's own ratio (frames.css), so the
      width is the only size knob: 3 rows ≈ 3.8 × this tall. */
   --ist-hive-cell-w: min(136px, 16.5vh);
@@ -531,6 +640,16 @@
      at every size the honeycomb is drawn at. */
   --ist-hive-gap: calc(var(--ist-hive-cell-w) * -0.215);
   --ist-hive-row-overlap: calc(var(--ist-hive-cell-w) * -0.20);
+  /* The gutter between a row's cells and the readout beside it, and the
+     room that readout gets. The readout track is only *named* here — off
+     the phone page the row simply spreads to the sheet's width and the
+     tracks take what's left (see .ist-hive-row). */
+  --ist-hive-row-gap: 12px;
+  --ist-hive-side-w: 78px;
+  /* The paper either side of the honeycomb on the phone page. */
+  --ist-hive-page-pad: 16px;
+}
+.ist-hive {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -543,7 +662,7 @@
      line up down the honeycomb. */
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: var(--ist-hive-row-gap);
   width: 100%;
 }
 /* The interlock. Past closing the canvas padding it's kept shallow on
@@ -652,6 +771,9 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
 .ist-hive-side-left { align-items: flex-end; text-align: right; }
 .ist-hive-side-right { align-items: flex-start; text-align: left; }
 .ist-hive-readout-name {
+  /* Breaks inside its own track rather than printing over the edge of
+     the page — see the note on the meta lines below. */
+  overflow-wrap: anywhere;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
   font-size: 0.78rem;
   font-weight: 700;
@@ -662,6 +784,14 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
 }
 .ist-hive-readout-meta,
 .ist-hive-readout-left {
+  /* The page is cut to the honeycomb, so a readout's track is narrow by
+     construction (--ist-hive-side-w, and narrower still where the page
+     hits the screen's own edge): a long district — KÜÇÜKÇEKMECE,
+     GAZİOSMANPAŞA — is one word wider than the track and would otherwise
+     print straight over the page's edge. It breaks inside its track
+     instead; at this size a broken district reads better than one
+     running off the paper. */
+  overflow-wrap: anywhere;
   font-size: 0.6rem;
   font-weight: 600;
   letter-spacing: 1px;
@@ -980,8 +1110,12 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
      side still need room to be legible. Smaller cells, tighter gaps,
      thinner rules — one fixed size, since the dock (not the honeycomb)
      is what makes room for a tap now. */
-  .ist-hive { --ist-hive-cell-w: min(84px, 11vh); }
-  .ist-hive-row { gap: 8px; }
+  .hive-overlay {
+    --ist-hive-cell-w: min(84px, 11vh);
+    --ist-hive-row-gap: 8px;
+    --ist-hive-side-w: 54px;
+    --ist-hive-page-pad: 14px;
+  }
   .ist-hive-readout-name { font-size: 0.62rem; }
   .ist-hive-readout-meta,
   .ist-hive-readout-left { font-size: 0.5rem; letter-spacing: 0.6px; }
