@@ -4975,6 +4975,35 @@ function openPoliticianDetailSheet(html) {
   _closeReaderOverlay = closeReaderOverlay;
 }
 
+// ── The seat follows the map ──
+// This page's seat is the Cumhurbaşkanı at rest, but the phone map is
+// Türkiye among its neighbours and touching a country opens that
+// country's page -- so the seat follows the tap, naming that country's
+// leader, exactly the way Hane's seat follows its districts.
+//
+// The seats themselves come from the shared cache (IstPoliticianCard.seats)
+// rather than a fetch of this page's own -- Hane swaps its seat off the same
+// table, and one copy of that cache is also what keeps the two page scripts
+// from declaring the same global twice in the one document they share (see
+// router.js).
+//
+// A country nobody has been recorded for falls back to the Cumhurbaşkanı
+// rather than printing its name over "Henüz eklenmedi" (db/political_seats
+// _v2_countries.sql): most of the countries drawn on this map will never
+// have a leader entered, and the national seat is this page's resting
+// state anyway. Hane can be stricter because all 26 of its seats exist.
+async function renderSeatFor(seatId, seatLabel) {
+  if (!window.IstPoliticianCard) return;
+  const byId = await IstPoliticianCard.seats(sb);
+  const seat = byId[seatId];
+  IstPoliticianCard.render({
+    mountElId: 'politician-card',
+    seat: seat || byId['cumhurbaskani'],
+    seatLabel: seat ? seatLabel : 'Cumhurbaşkanı',
+    openDetail: openPoliticianDetailSheet,
+  });
+}
+
 // The three buttons that open this page's sheets -- Makaleler, Posta
 // Kutusu and TBMM -- all live inside #ist-content, which the router
 // replaces wholesale on every re-entry to this page (see router.js's
@@ -5449,6 +5478,10 @@ const neighborhoodNames = {
     activeRegionName = null;
     _mapSelectionOpenedSheet = false;
     if (mapLabel) mapLabel.textContent = idleMapLabel();
+    // Nothing is selected any more, so the seat goes back to the one this
+    // page rests on. A no-op on the very first run (politician-card.js is
+    // deferred and has not loaded yet); mount()'s own poll paints it then.
+    renderSeatFor('cumhurbaskani', 'Cumhurbaşkanı');
   }
   window.__istResetMapLabel = resetMapLabel;
   resetMapLabel();
@@ -5474,8 +5507,12 @@ const neighborhoodNames = {
       if (nb.classList.contains('country')) {
         // This selection belongs to the sheet about to rise, so closing
         // that sheet takes the tint and the caption with it (see
-        // closeReaderOverlay).
+        // closeReaderOverlay) -- and the seat with it too, since
+        // resetMapLabel is what closing runs.
         _mapSelectionOpenedSheet = true;
+        // The bar's left end follows the map here exactly as it does on
+        // Hane: the country you just touched puts its leader up there.
+        renderSeatFor(nbId, regionName(nb));
         if (nbId === 'ankara') openTBMMSheet();
         else openCountrySheet(nbId, regionName(nb));
       }
@@ -5484,11 +5521,15 @@ const neighborhoodNames = {
     // Snap back to the idle caption only when clicking empty space inside
     // the map panel itself — clicking the shelves, reading area or other UI
     // that floats over the map must not reset it.
+    //
+    // Through resetMapLabel rather than by clearing the same four things
+    // here: that is the one place that knows what "nothing is selected"
+    // means, and it grew a fifth thing (putting the seat back to the
+    // Cumhurbaşkanı) that this copy silently would not have done — tapping
+    // the sea would have deselected the country while leaving its leader
+    // standing on the bar.
     if (!e.target.closest('.map-panel') || e.target.closest('.map-label')) return;
-    getMapRegions().forEach(n => n.classList.remove('active'));
-    if (mapLabel) mapLabel.textContent = idleMapLabel();
-    activeRegionName = null;
-    _mapSelectionOpenedSheet = false;
+    resetMapLabel();
   });
   document.addEventListener('mouseover', (e) => {
     const nb = e.target.closest(MAP_REGION_SEL);
@@ -5881,16 +5922,14 @@ function mount() {
   IstRouter.onTick(tickDunyaNewsAgo);
   loadPersonMentionsRoster();
   // politician-card.js is deferred -- on a fresh real page load this
-  // mount() call runs synchronously during parsing, before any deferred
-  // script has executed, so a plain `if (window.IstPoliticianCard)` check
-  // here would silently miss it. Poll briefly instead (same idiom as
-  // __mountIstPc's tryOnb below).
+  // runs synchronously during parsing, before any deferred script has
+  // executed, so a plain `if (window.IstPoliticianCard)` check here would
+  // silently miss it. Poll briefly instead (same idiom as __mountIstPc's
+  // tryOnb below). This paints the resting seat through the same path a
+  // country tap uses, so there is one way the seat is ever set.
   (function tryPoliticianCard(tries) {
     if (window.IstPoliticianCard) {
-      IstPoliticianCard.mount({
-        sb, mountElId: 'politician-card', seatId: 'cumhurbaskani', seatLabel: 'Cumhurbaşkanı',
-        openDetail: openPoliticianDetailSheet,
-      });
+      renderSeatFor('cumhurbaskani', 'Cumhurbaşkanı');
     } else if (tries > 0) {
       setTimeout(() => tryPoliticianCard(tries - 1), 60);
     }
