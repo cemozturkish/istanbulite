@@ -711,10 +711,19 @@ account, which is why it is reached from the city rather than from the gear in t
 Being reached from a button on the map rather than from the profile bar is also what gives it its
 own opening. On a phone it neither slides up from the bottom edge nor rests half-way down the way
 a news item does: the **PETEK button grows into the page**, and the page folds back into the button
-when it closes. The page never moves — it is already at its final size (the phone sheet's own
-geometry: under the profile bar, out to the bottom of the screen). What animates is the window onto
-it, a `clip-path` inset that starts as the button's own box and opens out to the page's four edges,
-with the button hidden for as long as the page is up so the two are never both on the map.
+when it closes. The page never moves — it is already at its final size. What animates is the window
+onto it, a `clip-path` inset that starts as the button's own box and opens out to the page's four
+edges, with the button hidden for as long as the page is up so the two are never both on the map.
+
+**That size is the honeycomb's own, not the screen's.** On a phone this page is the one sheet that
+is not full-bleed: it is cut to what is on it — the honeycomb, and the dock under it — and stands
+in the middle of the city, clear of both bars, so a button grows into a box roughly its own kind of
+size rather than into the whole screen. Its width is the honeycomb's arithmetic (the row of three
+cells plus a readout track either side), which is why the cell/gap/track tokens live on
+`.hive-overlay` rather than on `.ist-hive`: the page and the rows do the same sum, once. It is a
+fixed size and never a shrink-to-fit — the dock swaps its contents on every tap, and a page
+measured off its contents would resize under the reader each time, the very flinch
+`.ist-hive-cell-open` exists to avoid. A readout too long for its track breaks inside it.
 
 `growHive` in profile-card.js runs it, off two live rectangles, rather than a CSS transition
 between two states: both are measured in the same frame the overlay is unhidden, and a

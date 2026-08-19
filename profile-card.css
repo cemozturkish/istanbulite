@@ -284,6 +284,57 @@
    The sheet is deliberately left untransformed: a transform would carry
    the clip along with it and the two boxes would stop lining up. */
 @media (max-width: 768px) {
+  /* ── The page is cut to the honeycomb ──
+     It is not a full sheet with the honeycomb floating in the middle of
+     it: the page is only as big as what is on it — the honeycomb, and
+     the dock under it — and it stands in the middle of the city, clear
+     of both bars. That is what makes it a thing that came out of a
+     button rather than a page that arrived from off-screen: the button
+     grows into a box roughly its own kind of size, not into the whole
+     screen.
+
+     The width is the honeycomb's own arithmetic (the row of three cells
+     plus a readout track either side), so the paper ends where the
+     drawing ends. It is a fixed size, not a shrink-to-fit: the dock
+     below swaps its contents on every tap (your code, a code field, a
+     Çıkar button) and a page measured off its contents would resize
+     under the reader each time — the same flinch .ist-hive-cell-open
+     was written to avoid. Contents that outrun it wrap inside it. */
+  .hive-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Clear of the profile bar above (--ist-sheet-top, measured live by
+       IstSheet.position) and the tab bar below, so the page is centred
+       in the city rather than in the window. */
+    padding:
+      var(--ist-sheet-top, 76px)
+      var(--screen-inset, 18px)
+      calc(var(--navbar-h, 46px) + 10px + env(safe-area-inset-bottom, 0px));
+  }
+  .hive-overlay .ist-sheet {
+    position: relative;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    width: calc(
+      var(--ist-hive-cell-w) * 3 + var(--ist-hive-gap) * 2
+      + (var(--ist-hive-side-w) + var(--ist-hive-row-gap)) * 2
+      + var(--ist-hive-page-pad) * 2);
+    max-width: 100%;
+    height: auto;
+    max-height: 100%;
+    /* It floats now, so it gets its fourth edge back: frames.css drops a
+       sheet's bottom border because a sheet runs off the bottom of the
+       screen, and this one no longer does. */
+    border-bottom-width: 2px !important;
+  }
+  /* The close button keeps its corner, so the page's top edge stays
+     clear for it; everything else is the honeycomb's own margins. */
+  .hive-overlay .ist-sheet-body.profile-overlay-body {
+    padding: 38px var(--ist-hive-page-pad) 16px;
+  }
   .hive-overlay.hive-grow .ist-sheet,
   .hive-overlay.hive-grow.open .ist-sheet {
     transform: none;
@@ -559,7 +610,12 @@
    because this page never scrolls (see .profile-overlay-body): three rows
    of a tall hexagon is the whole height budget of the sheet, so on a short
    window the cells give room up rather than pushing the bottom row out. */
-.ist-hive {
+/* The honeycomb's size lives on the PAGE, not on the honeycomb: on a
+   phone the page is cut to the honeycomb (see "THE PETEK PAGE" below),
+   which means the sheet has to do the same arithmetic the rows do. One
+   set of tokens, read by both, rather than the page guessing at a width
+   the honeycomb worked out for itself. */
+.hive-overlay {
   /* Height follows from the drawing's own ratio (frames.css), so the
      width is the only size knob: 3 rows ≈ 3.8 × this tall. */
   --ist-hive-cell-w: min(136px, 16.5vh);
@@ -574,6 +630,16 @@
      at every size the honeycomb is drawn at. */
   --ist-hive-gap: calc(var(--ist-hive-cell-w) * -0.215);
   --ist-hive-row-overlap: calc(var(--ist-hive-cell-w) * -0.20);
+  /* The gutter between a row's cells and the readout beside it, and the
+     room that readout gets. The readout track is only *named* here — off
+     the phone page the row simply spreads to the sheet's width and the
+     tracks take what's left (see .ist-hive-row). */
+  --ist-hive-row-gap: 12px;
+  --ist-hive-side-w: 78px;
+  /* The paper either side of the honeycomb on the phone page. */
+  --ist-hive-page-pad: 16px;
+}
+.ist-hive {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -586,7 +652,7 @@
      line up down the honeycomb. */
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: var(--ist-hive-row-gap);
   width: 100%;
 }
 /* The interlock. Past closing the canvas padding it's kept shallow on
@@ -695,6 +761,9 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
 .ist-hive-side-left { align-items: flex-end; text-align: right; }
 .ist-hive-side-right { align-items: flex-start; text-align: left; }
 .ist-hive-readout-name {
+  /* Breaks inside its own track rather than printing over the edge of
+     the page — see the note on the meta lines below. */
+  overflow-wrap: anywhere;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
   font-size: 0.78rem;
   font-weight: 700;
@@ -705,6 +774,14 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
 }
 .ist-hive-readout-meta,
 .ist-hive-readout-left {
+  /* The page is cut to the honeycomb, so a readout's track is narrow by
+     construction (--ist-hive-side-w, and narrower still where the page
+     hits the screen's own edge): a long district — KÜÇÜKÇEKMECE,
+     GAZİOSMANPAŞA — is one word wider than the track and would otherwise
+     print straight over the page's edge. It breaks inside its track
+     instead; at this size a broken district reads better than one
+     running off the paper. */
+  overflow-wrap: anywhere;
   font-size: 0.6rem;
   font-weight: 600;
   letter-spacing: 1px;
@@ -1023,8 +1100,12 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
      side still need room to be legible. Smaller cells, tighter gaps,
      thinner rules — one fixed size, since the dock (not the honeycomb)
      is what makes room for a tap now. */
-  .ist-hive { --ist-hive-cell-w: min(84px, 11vh); }
-  .ist-hive-row { gap: 8px; }
+  .hive-overlay {
+    --ist-hive-cell-w: min(84px, 11vh);
+    --ist-hive-row-gap: 8px;
+    --ist-hive-side-w: 54px;
+    --ist-hive-page-pad: 14px;
+  }
   .ist-hive-readout-name { font-size: 0.62rem; }
   .ist-hive-readout-meta,
   .ist-hive-readout-left { font-size: 0.5rem; letter-spacing: 0.6px; }
