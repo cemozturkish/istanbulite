@@ -128,6 +128,7 @@ default one.
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
+├── home-map.js           # Swaps in the hand-painted map for the member's own district
 ├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js,
 │   tbmm.js, sozcu-mascot.js, admin-notification.js, loading-screen.js/.css,
 │   safe-area-ready.js, frames.css        # Focused shared modules
@@ -581,6 +582,26 @@ push the top of the stack out of the scroller and out of reach. The margin also 
 box that does *not* grow — every wrapper between a column and its feed carries `flex: 1`, and
 flex hands the free space to a growing item before any margin sees it, so an auto margin one
 level too high does nothing at all.
+
+### The member's own district is painted into the map — `home-map.js`
+
+The Istanbul map behind Anahane and Kahvehane is the same drawing for everyone *except* the one
+district the member lives in, and that district is picked out **in the artwork**, not by a wash laid
+over it. Each district gets its own hand-painted copy of the map at `assets/map/home/<id>.png` — the
+same 5046×2300 frame as `assets/map/istanbul-map.png`, so every traced hit-region still lands where
+it did — and `home-map.js` puts the copy belonging to the viewer in place of the base map.
+
+The older treatment (the red `.neighborhood.home` tint through the traced polygon) is the fallback,
+not the plan: a district with no painted file keeps it, so the set can be drawn one district at a
+time. On a district that *is* painted, `.map-panel.ist-home-painted` neutralises that tint and the
+polygon behaves like any other — the drawing alone says "this one is yours".
+
+Three things about it: the swap waits for the painted map to decode (an `<img>` whose `src` changes
+to something unfetched goes blank, which reads as the city flickering out); the district is
+remembered in `localStorage`, so a reload has the right map up before the profiles round-trip
+confirms it; and the swap is aimed at images whose src *is* `istanbul-map.png`, because Kütüphane's
+Turkey map wears the same `.map-photo` class in the same shared document. Adding a district is a
+file drop plus one id in `PAINTED` — see `assets/map/home/README.md`.
 
 ### The map is scenery, and it drifts — `map-parallax.js`
 

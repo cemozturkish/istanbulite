@@ -342,6 +342,10 @@
       if (pages[targetSlug] && pages[targetSlug].mount) {
         try { pages[targetSlug].mount(); } catch (e) { console.error(e); }
       }
+      // The map image that just arrived is #ist-content's own, so it is
+      // the base map again -- put the member's hand-painted district map
+      // back before anything reads layout below (see home-map.js).
+      if (global.IstHomeMap) global.IstHomeMap.refresh();
       // Deliberately after mount(): initMapZoom's own measure() reads
       // getBoundingClientRect(), which forces a synchronous layout --
       // done before mount() had a chance to run, that forced flush would
