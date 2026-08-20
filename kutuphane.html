@@ -1139,17 +1139,50 @@
       border: 1px solid var(--rule);
       padding: 2px 7px;
     }
+    /* An openable card is a button, and presses like one: it gives under
+       the finger and springs back past its own size when released. Where
+       that release opens a page, the overshoot is the first frame of the
+       card growing into it (see growNewsPage) -- the press and the page
+       are one continuous move. The back-out curve is what puts the spring
+       in; a plain ease would only walk the card back to rest.
+
+       It replaced a sideways nudge on :hover, which a touch screen has no
+       way to take back: the tapped card was left sitting 6px off, in
+       plain view behind the page it had just opened. The press state is
+       therefore a class driven by pointer events (wireCardPress), not
+       :hover or :active -- both of which stick after a tap on iOS. */
     .article.openable {
       cursor: pointer;
       display: flex;
       flex-direction: column;
+      transition: background 0.15s, transform 0.2s ease-out;
     }
     .article.openable h3 { margin-top: auto; }
-    /* In #dunya-news-feed (col-right, the left-hand column) inward is
-       rightward, same convention as .shelf-btn:hover above. Inside a
-       sheet there is no map to slide toward, so .country-entries takes
-       the slide back off below. */
-    .article.openable:hover { background: var(--paper-dark); transform: translateX(6px); }
+    .article.openable.pressing {
+      transform: scale(0.955);
+      transition: transform 0.11s ease-out;
+    }
+    /* The release, and the reason this is a keyframed animation rather
+       than a springy easing back to rest: the whole travel is 4.5% of the
+       card, so a curve that overshoots its own end lands about a pixel
+       past it -- arithmetic, not a tuning problem. The pop has to be
+       stated as its own frame. */
+    @keyframes ist-card-release {
+      0%   { transform: scale(0.955); }
+      52%  { transform: scale(1.022); }
+      100% { transform: scale(1); }
+    }
+    .article.openable.released {
+      animation: ist-card-release 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .article.openable.pressing { transform: none; }
+      .article.openable.released { animation: none; }
+    }
+    /* Only where a pointer can actually leave again. */
+    @media (hover: hover) and (pointer: fine) {
+      .article.openable:hover { background: var(--paper-dark); }
+    }
     /* Multi-paragraph bodies: a news card's body is one paragraph, but a
        country entry's is prose split on blank lines (renderLetterBodyHtml). */
     .article p + p { margin-top: 10px; }
@@ -1560,7 +1593,6 @@
     /* A story's entries are the same cards the Dünya feed prints, so
        tapping one reads exactly like tapping a news item. */
     .country-entries { display: flex; flex-direction: column; gap: 12px; }
-    .country-entries .article.openable:hover { transform: none; }
     .path-list {
       display: flex;
       flex-direction: column;
@@ -2799,9 +2831,6 @@
          than the boxes beside them. */
       #dunya-news-feed { padding: 12px; gap: 8px; flex: none; overflow: visible; min-height: auto; }
       .article { padding: 8px 12px; }
-      /* Inward is leftward here: the Dünya feed is the right-hand column
-         on a phone, the mirror of where it sits on desktop. */
-      .article.openable:hover { transform: translateX(-6px); }
       :is(.article, .news-page-head) .kicker { font-size: 10px; margin-bottom: 2px; letter-spacing: 1px; }
       .article h3 { font-size: 18px; margin-bottom: 3px; line-height: 1.25; }
       .article p { font-size: 12px; line-height: 1.35; }
@@ -4619,6 +4648,7 @@ function renderCountryEntriesList(entries, page) {
   `;
   document.getElementById('country-back').addEventListener('click', closeReaderOverlay);
   area.querySelectorAll('.article.openable').forEach(card => {
+    wireCardPress(card);
     card.addEventListener('click', () => {
       const entry = (entries || []).find(en => en.id === card.dataset.entry);
       if (entry) openCountryEntryReader(entry, entries, page);
@@ -4812,6 +4842,7 @@ function renderDunyaNewsFeed() {
       `;
     }).join('');
     feed.querySelectorAll('.article.openable').forEach(el => {
+      wireCardPress(el);
       const n = rowsById.get(el.dataset.newsId);
       if (!n) return;
       // The card is passed along: on a phone it is what the page grows
@@ -4819,6 +4850,30 @@ function renderDunyaNewsFeed() {
       el.addEventListener('click', () => openDunyaNewsDetail(n, el));
     });
   });
+}
+
+// A card presses like a button (see .article.openable in the stylesheet).
+// Driven from pointer events rather than :hover/:active because a touch
+// screen has no way to take either back: the state stays on the element
+// after the tap, and the card sits pressed -- or, in the sideways nudge
+// this replaced, sits offset -- behind the page it just opened.
+function wireCardPress(card) {
+  card.addEventListener('pointerdown', () => {
+    card.classList.remove('released');
+    card.classList.add('pressing');
+  });
+  // Lifting the finger is the only thing that pops: a press that ended
+  // because the feed started scrolling under it (pointercancel) or because
+  // the pointer left the card was never a press, and springing it open
+  // would announce something the reader didn't do.
+  card.addEventListener('pointerup', () => {
+    if (!card.classList.contains('pressing')) return;
+    card.classList.remove('pressing');
+    card.classList.add('released');
+  });
+  const quiet = () => card.classList.remove('pressing');
+  ['pointercancel', 'pointerleave'].forEach(ev => card.addEventListener(ev, quiet));
+  card.addEventListener('animationend', () => card.classList.remove('released'));
 }
 
 function tickDunyaNewsAgo() {

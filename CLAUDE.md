@@ -500,6 +500,14 @@ sb.from('articles').delete().eq('id', id)
   its edges already on the card's edges; the map above stays live and untouched, and touching a
   country there opens that country over the top (`initNewsPage` watches `#reader-overlay` and folds
   the story away). On desktop there is no band and no map to protect, so it stays THE sheet
+- **A card presses like a button**: it gives under the finger (`.pressing`, scale 0.955) and pops
+  past its own size when released (`.released`, a keyframed 1.022 — the travel is too small for a
+  springy easing to overshoot visibly), which is the first frame of it growing into the page. It
+  replaced a sideways `:hover` nudge, which a touch screen cannot take back: the tapped card was
+  left sitting 6px off in plain view behind the page it had just opened. The press is a class
+  driven by pointer events (`wireCardPress`) for that reason — `:hover` and `:active` both stick
+  after a tap on iOS — and only a real `pointerup` pops, so a flick down the feed doesn't
+  announce a press the reader never made
 - The page is **head / body / foot**, and only the middle moves: what the story is (kicker, age)
   on the top line, the story and its Zaman Akışı scrolling in the middle, and where it is
   happening on the bottom line — the caption to the highlight burning on the map right above it —
