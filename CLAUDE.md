@@ -954,6 +954,16 @@ to — somebody else's neighbour, standing on the same grid — is drawn a shade
 so: they are not yours to detach, and you attach to them the same way you attach to anyone, by
 being handed their code. Hiding them would be a lie about the shape, and the shape is the object.
 
+**A member is named in the paper beside their own hexagon** (`hiveNameHTML`), on whichever side of
+the reader they are standing: everyone to the left of you is named to the left of their frame,
+ranged right against it; everyone to the right is named to the right, ranged left — so the names
+read outward from the middle and the middle of the drawing stays the people. The label is printed
+only where the cell just outside it is empty: it lives in the drawing's own gaps, so a name is
+never laid over somebody's frame, and a member walled in on their outer side is named by the dock
+when they are tapped (which is where their district is anyway). It is absolutely placed and out of
+flow — the packing is arithmetic, and nothing about it may shift because somebody's name is long —
+and `fitHive` measures the names when it fits the grid, since they hang outside the plane's own box.
+
 What a tap needs lands in **the dock**, one fixed spot below the grid (`hiveDockHTML`): your own
 code at rest, or the tapped hexagon's panel while one is open — the code field for a free side; the
 member with their district for a taken one, carrying a Çıkar button where they are yours to detach,

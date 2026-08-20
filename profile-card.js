@@ -1230,6 +1230,8 @@
   // further would make the members unreadable to fit a shape nobody can
   // make out anyway.
   const HIVE_MIN_SCALE = 0.45;
+  // The air left after a name when the grid is fitted (see fitHive).
+  const HIVE_NAME_BREATH = 5;
 
   function hiveMemberName(member) {
     return capitalizeName(`${member.first_name || ''} ${member.last_name || ''}`.trim()) || 'İsimsiz Üye';
@@ -1260,7 +1262,27 @@
     return `<div class="ist-hive-cell${cls ? ' ' + cls : ''}" style="${style}" ${attrs || ''}>${inner}</div>`;
   }
 
-  function hiveMemberCellHTML(member, style, isOpen) {
+  // ── The name beside a hexagon ──
+  // A member is named in the paper *outside* their own frame, on
+  // whichever side of the reader they are standing: everyone to the left
+  // of you is named to the left of their hexagon, ranged right against
+  // it, and everyone to the right is named to the right, ranged left —
+  // so the names read outward from the middle the way the old comb's
+  // readouts did, and the middle of the drawing stays the people.
+  //
+  // The label is only printed when the cell just outside it is empty. It
+  // lives in the drawing's own gaps, so a name can never be laid over
+  // somebody's frame; a member walled in on their outer side is named by
+  // the dock when they are tapped, which is where the district is
+  // anyway. It is absolutely placed and never in flow — a name is a
+  // caption on the drawing, and nothing about the packing may depend on
+  // how long somebody's name happens to be.
+  function hiveNameHTML(member, side) {
+    if (!side) return '';
+    return `<span class="ist-hive-name ist-hive-name-${side}">${esc(hiveMemberName(member))}</span>`;
+  }
+
+  function hiveMemberCellHTML(member, style, isOpen, nameSide) {
     const name = hiveMemberName(member);
     const cls = `ist-hive-filled${member.bonded ? ' ist-hive-bonded' : ''}${isOpen ? ' ist-hive-cell-open' : ''}`;
     return `
@@ -1271,6 +1293,7 @@
           ${coverBadgesHTML(member)}
           <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
         </div>
+        ${hiveNameHTML(member, nameSide)}
       </button>
     `;
   }
@@ -1308,6 +1331,9 @@
     const cells = (opts.hive && opts.hive.cells) || [];
     const open = opts.open || null;
     const taken = new Set(cells.map(c => `${c.q},${c.r}`));
+    // The caller stands at (0,0) too — a name must not be printed over
+    // their frame either.
+    const occupied = new Set(taken); occupied.add('0,0');
 
     const items = [{ q: 0, r: 0, kind: 'me' }];
     cells.forEach(c => items.push({ q: c.q, r: c.r, kind: 'member', member: c }));
@@ -1328,7 +1354,12 @@
       const style = `left: calc(var(--ist-hive-step-x) * ${p.x}); top: calc(var(--ist-hive-step-y) * ${p.y});`;
       if (item.kind === 'me') return hiveMeCellHTML(opts, style);
       if (item.kind === 'member') {
-        return hiveMemberCellHTML(item.member, style, !!open && open.member === item.member.member_id);
+        // Which side of the reader they are standing on — and whether the
+        // cell further out that way is free to print a name into.
+        const side = (item.q + item.r / 2) < 0 ? 'left' : 'right';
+        const outward = side === 'left' ? `${item.q - 1},${item.r}` : `${item.q + 1},${item.r}`;
+        const nameSide = occupied.has(outward) ? null : side;
+        return hiveMemberCellHTML(item.member, style, !!open && open.member === item.member.member_id, nameSide);
       }
       return hiveEmptyCellHTML(item.dir, style, !!open && open.dir === item.dir, t);
     }).join('');
@@ -1454,12 +1485,29 @@
 
     const cx = me.offsetLeft + me.offsetWidth / 2;
     const cy = me.offsetTop + me.offsetHeight / 2;
+    // The names hang outside the plane's own box (see hiveNameHTML), so
+    // the drawing is wider than the cells are: measure what is actually
+    // on the paper rather than what the grid's arithmetic came to, or the
+    // outermost name is the one thing the window clips.
+    let minL = 0, maxR = pw;
+    plane.querySelectorAll('.ist-hive-name').forEach(el => {
+      const left = el.parentElement.offsetLeft + el.offsetLeft;
+      // A capital with letter-spacing after it paints a little past its
+      // own box, so the track is not quite the ink: fit the wider of the
+      // two, and leave a breath after it — a name whose last letter lands
+      // exactly on the window's edge reads as a clipped name, not a
+      // fitted one.
+      const w = Math.max(el.offsetWidth, el.scrollWidth) + HIVE_NAME_BREATH;
+      if (left - HIVE_NAME_BREATH < minL) minL = left - HIVE_NAME_BREATH;
+      if (left + w > maxR) maxR = left + w;
+    });
+
     // What has to fit is not the drawing's own box but the box it needs
     // *around the reader*: they stay in the middle of the window, so a
     // petek that has grown out to one side only is still asking for that
     // much room on both. Fitting the raw box instead leaves the far side
     // clipped by a window the arithmetic had just called roomy.
-    const reqW = 2 * Math.max(cx, pw - cx);
+    const reqW = 2 * Math.max(cx - minL, maxR - cx);
     const reqH = 2 * Math.max(cy, ph - cy);
     const scale = Math.max(HIVE_MIN_SCALE, Math.min(1, vw / reqW, vh / reqH));
 
