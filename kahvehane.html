@@ -14,7 +14,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
   <script src="router.js?v=2"></script>
-  <script src="i18n.js?v=5"></script>
+  <script src="i18n.js?v=6"></script>
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
   <script src="game-locks.js"></script>
@@ -488,6 +488,10 @@
     .detail-overlay-body .cv-comments { overflow: visible; }
     .detail-overlay-body .cv-detail { display: block; max-width: 520px; margin: 0 auto; position: relative; }
 
+    /* The phone's host for the question card (see #q-card-host in the
+       markup). Desktop asks it in the games column instead. */
+    .q-host { display: none; }
+
     /* ── Right column: same reasoning as .col-left above ── */
     .col-right {
       grid-column: 3;
@@ -887,6 +891,102 @@
        white/transparent + dark ink, matching the .post / Anahane
        news+event cards over the map photo, instead of the palette-driven
        --paper-warm/--ink these used to retheme with under earth/mono. */
+    /* ── The question between two games ──
+       The three games are a sequence and this is what stands in each
+       joint of it (see db/daily_questions.sql): play Sözcel, answer this,
+       play Tümcel, answer the next. It is the mall stairway in its
+       smallest form -- the way to the next game runs through it, so a
+       member who came only for the games still says what they think on
+       the way, one question at a time, from inside the app rather than
+       out of a survey nobody opens.
+
+       It stands at the top of the games column, above the tiles, because
+       the tile it unlocks is right below it: what is in the way should
+       be in the way, not somewhere else on the page. Same white/ink card
+       language as .game-link so the column reads as one stack. */
+    .q-card {
+      position: relative;
+      /* Its column is narrow and fixed (260px on desktop, whatever the
+         phone band gives it): the card takes the full width of it and
+         never a pixel more. As a flex item in .game-picker's row-wrap it
+         has to be told to take a whole row, or it sizes to its own text
+         and pushes the tiles off the page. */
+      flex: 0 0 100%;
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
+      border: 2px solid var(--ink);
+      border-bottom-width: 5px;
+      background: var(--paper-card);
+      padding: 12px 14px;
+      touch-action: pan-y;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Follows the finger while it is being thrown, and is let go of on
+       release -- the card leaves in the direction of the answer, which is
+       what makes the direction mean something (the same grammar as
+       Kütüphane's news deck). */
+    .q-card.throwing { transition: transform 0.32s ease, opacity 0.32s ease; }
+    .q-kicker {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.56rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ink-red, var(--accent));
+    }
+    .q-body {
+      margin-top: 5px;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 0.95rem;
+      line-height: 1.3;
+      color: var(--ink);
+    }
+    .q-opts { display: flex; gap: 8px; margin-top: 10px; }
+    .q-opt {
+      flex: 1;
+      min-width: 0;
+      padding: 8px 6px;
+      border: 1px solid var(--ink);
+      background: none;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--ink);
+      cursor: pointer;
+      overflow-wrap: anywhere;
+    }
+    .q-opt:hover { background: var(--ink); color: var(--paper); }
+    .q-hint {
+      margin-top: 7px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.54rem;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: center;
+    }
+    /* What the card says once it has been answered, in the two beats
+       before it leaves: your answer is in, and how many people are
+       standing where you are standing. No names and no percentages of a
+       poll -- just the one number that says you are not alone in it. */
+    .q-done { text-align: center; padding: 4px 0 2px; }
+    .q-done-line {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .q-done-tally {
+      margin-top: 3px;
+      font-size: 0.62rem;
+      color: var(--muted);
+    }
+    .q-err { margin-top: 6px; font-size: 0.62rem; color: var(--accent); text-align: center; }
+    .q-err:empty { display: none; }
+
     .game-link {
       /* Square, and centred on its own content -- the three tiles sit
          side by side in one row (see .game-picker above), so the width
@@ -1338,7 +1438,12 @@
            is exactly the leftover space and no more -- content that
            doesn't fit scrolls inside .discussion-posts instead of
            growing this row or the page. */
-        grid-template-rows: calc(100vw + var(--map-hero-top)) 1fr;
+        /* Three rows on a phone: the map, the question card's own row
+           (auto -- zero when there is no question, which is most days),
+           and the columns. The card is a row rather than something
+           inside a column because it has to be read, and the games
+           column here is a strip. */
+        grid-template-rows: calc(100vw + var(--map-hero-top)) auto 1fr;
         /* align-content other than the default (stretch) makes grid
            track-size its rows by content first and only then position
            the resulting (shorter) track set within the container -- so
@@ -1498,9 +1603,16 @@
          fixed-size column instead of growing the page.
          Explicit z-index so it stays on top of the map even once it's
          zoomed in and spilling past its own little square. */
+      .q-host {
+        display: block;
+        grid-column: 1 / -1;
+        grid-row: 2;
+        padding: 6px var(--screen-inset, 18px) 0;
+        z-index: 2;
+      }
       .col-left {
         grid-column: 1;
-        grid-row: 2;
+        grid-row: 3;
         min-height: 0;
         min-width: 0;
         overflow: visible;
@@ -1649,7 +1761,7 @@
          (non-scrolling-page) height instead of overflowing it. */
       .col-right {
         grid-column: 2;
-        grid-row: 2;
+        grid-row: 3;
         min-height: 0;
         overflow: visible;
         border-left: none;
@@ -2246,6 +2358,14 @@
        stays outside this node. display:contents keeps grid placement identical
        to before this wrapper existed. -->
   <div id="ist-content" style="display:contents">
+  <!-- Where the question card lands on a phone (see loadDailyQuestion):
+       a full-width row across the band, above both columns. On a phone
+       the games column is a narrow strip beside the board -- too narrow
+       to read a question in -- so the question takes the whole width and
+       stands in front of both, which is what a thing in the way should
+       do. Desktop keeps it in the games column, right above the tile it
+       is holding shut; this host is display:none there. -->
+  <div class="q-host" id="q-card-host"></div>
   <aside class="col-left">
     <!-- Profile cards swapped: this neighborhood's Belediye Başkanı now
          sits top-left, #library-card top-right (see .col-right below). -->
@@ -2855,6 +2975,7 @@ async function mount() {
 
   loadPosts();
   markPlayedGames(window.__currentUser.id);
+  loadDailyQuestion(window.__currentUser.id);
   if (typeof applyGameLocks === 'function') applyGameLocks(sb);
   loadScoreboard();
   loadCoffeeIndexPanel();
@@ -2964,6 +3085,179 @@ function getTodaySeed() {
 // gray). A game_results row with attempts >= 1 means the game ended; attempts=0
 // is the in-progress marker written by each game's markAsPlayed(). LocalStorage
 // flags also mark a game as started in case the Supabase write fails.
+// ── The question between two games (see db/daily_questions.sql) ──
+// The games are a sequence with a question in each joint: play Sözcel,
+// answer this, play Tümcel, answer the next, play Bulmaca, answer the
+// last. This is the card that asks it -- it stands at the top of the
+// games column, above the tile it is holding shut (game-locks.js does
+// the holding; this only asks).
+//
+// It appears only once the game before it has actually been played
+// today, so the sequence is play-then-answer and never the other way
+// round. A day with no question in a slot has no card and no gate: an
+// empty table has to leave the site exactly as it was.
+//
+// The answer is written once and never edited (there is no UPDATE policy
+// on question_answers) -- what you thought when you were asked is the
+// record. What comes back is a count and no names.
+const QUESTION_ORDER = ['sozcel', 'tumcel', 'bulmaca'];
+let questionCard = null; // { id, choice } while one is on screen
+
+async function loadDailyQuestion(userId) {
+  const host = document.getElementById('game-picker');
+  const old = document.getElementById('q-card');
+  if (old) old.remove();
+  questionCard = null;
+  if (!host || !userId) return;
+
+  const today = getTodaySeed();
+  let questions = [];
+  try {
+    const { data, error } = await sb
+      .from('daily_questions')
+      .select('id, after_game, body_tr, body_en, option_a_tr, option_a_en, option_b_tr, option_b_en')
+      .eq('question_date', today);
+    if (error || !data || !data.length) return;
+    questions = data;
+  } catch (_) { return; }
+
+  // Which games have actually been played today, and which questions are
+  // already answered -- both are what decides whether anything is due.
+  const played = new Set();
+  try {
+    const { data } = await sb.from('game_results').select('game').eq('user_id', userId).eq('date', today);
+    (data || []).forEach(r => played.add(r.game));
+  } catch (_) {}
+  const answered = new Set();
+  try {
+    const { data } = await sb.from('question_answers')
+      .select('question_id').eq('user_id', userId)
+      .in('question_id', questions.map(q => q.id));
+    (data || []).forEach(r => answered.add(r.question_id));
+  } catch (_) {}
+
+  const byGame = {};
+  questions.forEach(q => { byGame[q.after_game] = q; });
+  const dueGame = QUESTION_ORDER.find(g => byGame[g] && played.has(g) && !answered.has(byGame[g].id));
+  if (!dueGame) return;
+  renderQuestionCard(byGame[dueGame]);
+}
+
+function questionText(q, field) {
+  const en = window.I18N && I18N.isEnglish();
+  return (en && q[field + '_en']) ? q[field + '_en'] : q[field + '_tr'];
+}
+
+// A phone reads the question across the whole band (#q-card-host); a
+// desktop reads it in the games column, directly above the tile it is
+// holding shut. Same card either way.
+function questionHost() {
+  const phone = window.matchMedia('(max-width: 768px)').matches;
+  return document.getElementById(phone ? 'q-card-host' : 'game-picker');
+}
+
+function renderQuestionCard(q) {
+  const host = questionHost();
+  if (!host) return;
+  const card = document.createElement('div');
+  card.className = 'q-card';
+  card.id = 'q-card';
+  card.dataset.questionId = q.id;
+  card.innerHTML = `
+    <div class="q-kicker">${I18N.t('games.q.kicker')}</div>
+    <div class="q-body">${escapeHtml(questionText(q, 'body'))}</div>
+    <div class="q-opts">
+      <button type="button" class="q-opt" data-choice="b">${escapeHtml(questionText(q, 'option_b'))}</button>
+      <button type="button" class="q-opt" data-choice="a">${escapeHtml(questionText(q, 'option_a'))}</button>
+    </div>
+    <div class="q-hint">${I18N.t('games.q.hint')}</div>
+    <div class="q-err" id="q-err"></div>`;
+  // Above the tiles, under the heading: the way to the next game runs
+  // through it.
+  const heading = host.querySelector('h2');
+  if (heading && heading.nextSibling) host.insertBefore(card, heading.nextSibling);
+  else host.insertBefore(card, host.firstChild);
+  questionCard = { id: q.id, choice: null };
+  wireQuestionCard(card);
+}
+
+// Swipe is the same grammar as Kütüphane's news deck: right is option A,
+// left is option B, and the card leaves in the direction of the answer,
+// so nobody answers a question they did not see the sides of. The two
+// buttons say the same thing for a mouse, and for anyone who would
+// rather read than throw.
+function wireQuestionCard(card) {
+  card.querySelectorAll('.q-opt').forEach(btn => {
+    btn.addEventListener('click', () => answerQuestion(btn.dataset.choice, 0));
+  });
+
+  let from = null;
+  card.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.q-opt')) return;
+    from = { x: e.clientX, y: e.clientY };
+    card.setPointerCapture(e.pointerId);
+    card.classList.remove('throwing');
+  });
+  card.addEventListener('pointermove', (e) => {
+    if (!from) return;
+    const dx = e.clientX - from.x;
+    if (Math.abs(dx) < Math.abs(e.clientY - from.y)) return;
+    card.style.transform = `translateX(${dx}px) rotate(${dx / 40}deg)`;
+  });
+  const release = (e) => {
+    if (!from) return;
+    const dx = (e.clientX || 0) - from.x;
+    from = null;
+    card.classList.add('throwing');
+    if (Math.abs(dx) > 60) answerQuestion(dx > 0 ? 'a' : 'b', dx);
+    else card.style.transform = '';
+  };
+  ['pointerup', 'pointercancel'].forEach(ev => card.addEventListener(ev, release));
+}
+
+async function answerQuestion(choice, dx) {
+  const card = document.getElementById('q-card');
+  if (!card || !questionCard || questionCard.choice) return;
+  questionCard.choice = choice;
+  const errEl = document.getElementById('q-err');
+  if (errEl) errEl.textContent = '';
+
+  const { error } = await sb.from('question_answers')
+    .insert([{ question_id: questionCard.id, user_id: window.__currentUser.id, choice }]);
+  if (error) {
+    questionCard.choice = null;
+    card.classList.add('throwing');
+    card.style.transform = '';
+    if (errEl) errEl.textContent = I18N.t('games.q.failed');
+    return;
+  }
+
+  // Answered: the tile below is open from here on, so the locks are
+  // recomputed before the card has even finished leaving.
+  if (typeof applyGameLocks === 'function') applyGameLocks(sb);
+
+  let tally = null;
+  try {
+    const { data } = await sb.rpc('question_tally', { p_question_id: questionCard.id });
+    tally = Array.isArray(data) ? data[0] : data;
+  } catch (_) {}
+
+  const same = tally ? Math.max(0, (choice === 'a' ? tally.a_count : tally.b_count) - 1) : 0;
+  card.classList.add('throwing');
+  card.style.transform = dx ? `translateX(${dx > 0 ? 140 : -140}%) rotate(${dx > 0 ? 12 : -12}deg)` : '';
+  card.style.opacity = '0.15';
+  setTimeout(() => {
+    card.classList.remove('throwing');
+    card.style.transform = '';
+    card.style.opacity = '';
+    card.innerHTML = `<div class="q-done">
+      <div class="q-done-line">${I18N.t('games.q.thanks')}</div>
+      ${same > 0 ? `<div class="q-done-tally">${same} ${escapeHtml(I18N.t('games.q.tallyone'))}</div>` : ''}
+    </div>`;
+    setTimeout(() => { card.remove(); questionCard = null; }, 2600);
+  }, 340);
+}
+
 async function markPlayedGames(userId) {
   const today = getTodaySeed();
   const started = new Set();

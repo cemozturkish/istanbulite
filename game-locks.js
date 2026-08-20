@@ -7,10 +7,19 @@
 // includes this script picks up the new rule automatically.
 //
 // Rules:
+//   - The three games are a sequence with a question in each joint (see
+//     db/daily_questions.sql): Tümcel is locked until the question that
+//     follows Sözcel has been answered, and Bulmaca until the one that
+//     follows Tümcel has. The card that asks it appears in Kahvehane's
+//     games column once the game before it has been played, so the
+//     sequence is: play, answer, play, answer, play, answer.
+//     A day with no question in a slot has no gate there — an empty
+//     table has to behave exactly like the site did before it existed,
+//     or a feature with no content takes the app down with it.
 //   - Bulmaca is locked until the user has won Tümcel at least once.
 //   - Any game the admin has switched off for the current Istanbul day
 //     (via admin.html's Oyunlar tab / the game_day_toggles table) is
-//     locked for everyone, regardless of the rule above.
+//     locked for everyone, regardless of the rules above.
 
 (function () {
   const GAME_LABELS = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Bulmaca' };
@@ -21,13 +30,38 @@
   // everyone — those are the game's own progression, not an admin control.
   const ADMIN_EMAIL = 'cemwozturk@gmail.com';
 
+  // Which game each one follows in the sequence. Also what the question
+  // gate reads: the question in the joint before `game`.
+  const PREV_GAME = { tumcel: 'sozcel', bulmaca: 'tumcel' };
+
+  // A game can carry more than one gate (Bulmaca carries two), so these
+  // are always filtered, never found.
   const GATES = [
+    {
+      game: 'tumcel',
+      requires: (s) => questionCleared(s, 'tumcel'),
+      message: () => "Tümcel'i açmak için önce Sözcel'i oynayıp günün sorusunu cevapla.",
+    },
+    {
+      game: 'bulmaca',
+      requires: (s) => questionCleared(s, 'bulmaca'),
+      message: () => "Bulmaca'yı açmak için önce Tümcel'i oynayıp günün sorusunu cevapla.",
+    },
     {
       game: 'bulmaca',
       requires: (s) => s.tumcelWon,
       message: () => "Bulmaca'yı oynayabilmek için önce Tümcel'i kazanman gerekiyor.",
     },
   ];
+
+  // True when nothing is standing between the reader and `game`: either
+  // there is no question in the joint before it today, or they have
+  // already answered it.
+  function questionCleared(s, game) {
+    const prev = PREV_GAME[game];
+    const qid = prev && s.questions ? s.questions[prev] : null;
+    return !qid || (s.answered && s.answered.has(qid));
+  }
 
   function offMessage(game) {
     return `Bugün ${GAME_LABELS[game] || game} yok!`;
@@ -167,7 +201,29 @@
       }
     }
 
-    const stats = { tumcelWon: false };
+    const stats = { tumcelWon: false, questions: {}, answered: new Set() };
+    // Today's questions, and which of them this member has answered.
+    // Best-effort on purpose: before db/daily_questions.sql has been run
+    // the tables aren't there, and the games must still open.
+    try {
+      const { data, error } = await sb
+        .from('daily_questions')
+        .select('id, after_game')
+        .eq('question_date', istanbulDateISO());
+      if (!error && data) data.forEach(q => { stats.questions[q.after_game] = q.id; });
+    } catch (_) {}
+    const qIds = Object.values(stats.questions);
+    if (userId && qIds.length) {
+      try {
+        const { data, error } = await sb
+          .from('question_answers')
+          .select('question_id')
+          .eq('user_id', userId)
+          .in('question_id', qIds);
+        if (!error && data) data.forEach(r => stats.answered.add(r.question_id));
+      } catch (_) {}
+    }
+
     if (userId) {
       try {
         const { data, error } = await sb
@@ -183,8 +239,8 @@
 
       if (activeLink) {
         const g = activeLink.dataset.game;
-        const gate = GATES.find(x => x.game === g);
-        if (gate && !gate.requires(stats)) {
+        const gate = GATES.filter(x => x.game === g).find(x => !x.requires(stats));
+        if (gate) {
           try { sessionStorage.setItem('game_lock_bounce_msg', gate.message(stats)); } catch (_) {}
           window.location.replace('kahvehane.html');
           return true;
@@ -210,8 +266,8 @@
         return;
       }
       if (isAdmin) link.removeAttribute('title');
-      const gate = GATES.find(x => x.game === g);
-      if (gate && !gate.requires(stats)) {
+      const gate = GATES.filter(x => x.game === g).find(x => !x.requires(stats));
+      if (gate) {
         lockLink(link, gate.message(stats));
       } else {
         unlockLink(link);

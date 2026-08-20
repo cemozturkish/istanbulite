@@ -147,7 +147,7 @@ default one.
 ├── sheet.css/.js         # THE sheet: the one page that rises from the bottom — see "Site-wide defaults"
 ├── profile-card.js/.css  # Profile bar (the phone's top bar), avatar, badges — shared across pages
 ├── onboarding.js/.css    # New-account onboarding flow
-├── game-locks.js         # Per-day game on/off enforcement (game_day_toggles)
+├── game-locks.js         # Per-day game on/off enforcement + the sequence's question gates
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
 ├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it
 ├── i18n.js               # TR/EN language toggle
@@ -288,6 +288,29 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 - Presence of a row = that game is disabled that day; absence = runs normally. Managed from the on/off board in admin.html's Oyunlar tab (toggling on deletes the row, toggling off upserts it).
 - Read by `game-locks.js` on every game page (and Kahvehane) to lock the game's nav card and, if a user hits the game page directly, bounce them to Kahvehane with "Bugün `<Oyun>` yok!".
 - RLS: authenticated users SELECT all; admin-only INSERT/UPDATE/DELETE.
+
+**Tables: `daily_questions` + `question_answers`** — the question between two games
+(`db/daily_questions.sql`).
+- The three games are a **sequence with a question in each joint**: play Sözcel, answer a
+  question, play Tümcel, answer another, play Bulmaca, answer the last. The questions are the
+  point of the sequence rather than a garnish on it — they are how the site learns what its
+  members actually think, from people who are already here rather than from a survey nobody opens.
+- `daily_questions`: `id`, `question_date`, `after_game` (`sozcel`/`tumcel`/`bulmaca` — the game it
+  is asked *after*, which is its position in the sequence), the body and two options in TR and
+  optional EN. Unique `(question_date, after_game)`: three slots a day, one question each.
+- `question_answers`: `(question_id, user_id)` PK, `choice` (`a`/`b`). **Insert-only** — there is
+  deliberately no UPDATE policy: an answer is what you thought when you were asked, and a row that
+  can be rewritten later is not that.
+- RLS: questions readable by everyone signed in, writable by the admin alone. An answer is
+  readable by **its own author and the admin**, and by nobody else; there is no policy that lets
+  one member read another's. The count the card prints back comes from `question_tally(question_id)`
+  (SECURITY DEFINER, two integers, no identities) — Kütüphane's news polls show who voted, these do
+  not, because a poll about a news story is a public opinion and these are closer to the member.
+- **No data, no gate.** Every lock the client applies is conditional on a question existing for that
+  day (`GATES` in `game-locks.js`): a day the admin left empty behaves exactly as the site did
+  before this file existed. A feature that locks the app when its content table is empty is a
+  feature that takes the app down.
+- Curated from admin.html's Oyunlar tab → **Sorular** panel (date × game, both languages).
 
 **Table: `sozcel_used_answers`** — one row per Istanbul day: that day's Sözcel answer (`db/sozcel_used_answers*.sql`).
 - `used_on date pk`, `word` (unique across all days, so an answer never repeats), `definition`, `syllables`, `sozcul_id`, `created_at`.
@@ -467,7 +490,9 @@ sb.from('articles').delete().eq('id', id)
   on/off board (next 7 days × Sözcel/Tümcel/Bulmaca, backed by `game_day_toggles`) at the
   top, then sub-nav pills to switch between each game's own management panel (Sözcel sözcü
   assignments, Tümcel puzzle editor, Bulmaca which has no manual content — puzzles are
-  generated, so its panel is just a pointer back to the on/off board). Toggling a game off
+  generated, so its panel is just a pointer back to the on/off board, and **Sorular**, where
+  the question that follows each game on a given day is written in both languages — see
+  `daily_questions` in the schema above). Toggling a game off
   for a day locks it site-wide for that day (enforced by `game-locks.js`, see Database Schema above and Assets/coding conventions below).
 
 ### `kahvehane.html` — Coffeehouse (RIGHT page, zoom IN — the local, interactive side)
@@ -484,6 +509,16 @@ sb.from('articles').delete().eq('id', id)
   - Tümcel: Turkish quote-fragment Connections (replaced Bağlantılar)
   - Bulmaca: Turkish crossword
 - The games change every day; scores and scoreboards are tracked (`game_results`)
+- **The three games are a sequence, and a question stands in each joint** (`daily_questions`, see
+  the schema above). Once you have played Sözcel, a card appears at the top of the games column
+  asking the day's first question; Tümcel stays locked until it is answered, and Bulmaca until the
+  question after Tümcel is. Swipe it right for the first option, left for the second — the same
+  grammar as Kütüphane's news deck, where the direction *is* the answer — or press one of the two
+  buttons. This is the mall-stairway principle in its smallest form: a member who came only for the
+  games still says what they think on the way to the next one. On a phone the card is a full-width
+  row across the band above both columns (the games column there is a strip); on desktop it sits in
+  the games column, directly above the tile it is holding shut. Answering prints back one number —
+  how many other people answered the same — and no names
 - The **coffee price index** (Kahve Endeksi, `coffee_prices` table) **is the left column**
   (`#coffee-index-panel`), on every screen, beside the map that scopes it: the cheapest cup of
   coffee per venue, in the selected district or all of İstanbul. It used to be a block under the
