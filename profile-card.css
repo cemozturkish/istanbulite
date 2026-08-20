@@ -293,9 +293,8 @@
      grows into a box roughly its own kind of size, not into the whole
      screen.
 
-     The width is the honeycomb's own arithmetic (the row of three cells
-     plus a readout track either side), so the paper ends where the
-     drawing ends. It is a fixed size, not a shrink-to-fit: the dock
+     The width is the window onto the grid (--ist-hive-view-w) plus its
+     margins, so the paper ends where the drawing's room ends. It is a fixed size, not a shrink-to-fit: the dock
      below swaps its contents on every tap (your code, a code field, a
      Çıkar button) and a page measured off its contents would resize
      under the reader each time — the same flinch .ist-hive-cell-open
@@ -318,10 +317,7 @@
     right: auto;
     top: auto;
     bottom: auto;
-    width: calc(
-      var(--ist-hive-cell-w) * 3 + var(--ist-hive-gap) * 2
-      + (var(--ist-hive-side-w) + var(--ist-hive-row-gap)) * 2
-      + var(--ist-hive-page-pad) * 2);
+    width: calc(var(--ist-hive-view-w) + var(--ist-hive-page-pad) * 2);
     max-width: 100%;
     height: auto;
     max-height: 100%;
@@ -602,105 +598,89 @@
    — is mobile-only, where the columns don't apply. */
 .hive-overlay { z-index: 502; }
 
-/* ── The hane honeycomb (the PETEK sheet, opened from Anahane's map) ──
-   Your own frame in the middle, six member slots packed around it (see
-   hiveHTML in profile-card.js). The middle cell is the profile cover's
-   own frame — same mask, same drawn ring, same stickers dropped on it —
-   it just has neighbours here, so there is no second frame treatment to
-   keep in sync.
+/* ── The petek (the PETEK page, opened from Anahane's map) ──
+   One shared grid, drawn from where the reader is standing in it: their
+   own frame in the middle, everybody on their map placed exactly where
+   they are around it, and a "+" on each free side of their own hexagon
+   (see hiveGridHTML in profile-card.js, db/hive_lattice_v4.sql). The
+   middle cell is the profile cover's own frame — same mask, same drawn
+   ring, same stickers dropped on it — it just has neighbours here, so
+   there is no second frame treatment to keep in sync.
 
-   The packing is done by the rows themselves rather than by any per-cell
-   offset: the row of three is the widest, the two rows of two are centred
-   against it, and centring 2 cells over 3 lands each of them exactly over
-   a gap — a half-cell offset, for free, at any cell size. The rows then
-   pull up into each other slightly so the frames interlock instead of
-   reading as a table of avatars.
+   The packing is arithmetic now rather than three centred rows: a cell
+   at axial (q, r) sits --ist-hive-step-x × (q + r/2) across and
+   --ist-hive-step-y × r down, which is what offsets every other row by
+   half a cell and interlocks the hexagons. Both steps are written
+   against the cell width, so the grid holds at any size the cells are
+   drawn at — and the JS only ever emits calc() against them, never a
+   pixel.
 
-   Cell size is capped against the window's height as well as in px,
-   because this page never scrolls (see .profile-overlay-body): three rows
-   of a tall hexagon is the whole height budget of the sheet, so on a short
-   window the cells give room up rather than pushing the bottom row out. */
-/* The honeycomb's size lives on the PAGE, not on the honeycomb: on a
-   phone the page is cut to the honeycomb (see "THE PETEK PAGE" below),
-   which means the sheet has to do the same arithmetic the rows do. One
-   set of tokens, read by both, rather than the page guessing at a width
-   the honeycomb worked out for itself. */
+   The window onto the grid is a fixed box (--ist-hive-view-*): a petek
+   grows and this page does not, so the drawing is scaled down into the
+   box and, once it would have to shrink past legibility, dragged
+   instead (see fitHive). Cell size is capped against the window's height
+   as well as in px, because this page never scrolls (see
+   .profile-overlay-body). */
 .hive-overlay {
   /* Height follows from the drawing's own ratio (frames.css), so the
-     width is the only size knob: 3 rows ≈ 3.8 × this tall. */
+     width is the only size knob. */
   --ist-hive-cell-w: min(136px, 16.5vh);
+  --ist-hive-cell-h: calc(var(--ist-hive-cell-w) * 1.5);
   /* The drawn hexagon doesn't fill its own box — the art is centred in a
      1024×1536 canvas with the silhouette 780×1375 of it (the whole
      hexframe family shares that canvas so the layers stay registered, see
      --hexframe-ratio). That leaves ~11.9% of the width transparent on
-     each side and ~5.2% of the height top and bottom, so packing the
-     cells means pulling them into each other by that padding first: the
-     gaps below are what's left over on top of closing it, which is why
-     they're negative. Written against the cell width so the packing holds
-     at every size the honeycomb is drawn at. */
-  --ist-hive-gap: calc(var(--ist-hive-cell-w) * -0.215);
-  --ist-hive-row-overlap: calc(var(--ist-hive-cell-w) * -0.20);
-  /* The gutter between a row's cells and the readout beside it, and the
-     room that readout gets. The readout track is only *named* here — off
-     the phone page the row simply spreads to the sheet's width and the
-     tracks take what's left (see .ist-hive-row). */
-  --ist-hive-row-gap: 12px;
-  --ist-hive-side-w: 78px;
-  /* The paper either side of the honeycomb on the phone page. */
+     each side and ~5.2% of the height top and bottom, so the step from
+     one cell to the next is less than a cell: what is left after closing
+     that padding. Past closing it the interlock is kept shallow on
+     purpose — these hexagons are elongated, so pulling them a proper
+     honeycomb quarter-height into each other would bury the avatar art
+     standing at each frame's base. */
+  --ist-hive-step-x: calc(var(--ist-hive-cell-w) * 0.785);
+  --ist-hive-step-y: calc(var(--ist-hive-cell-w) * 1.30);
+  /* The window onto the grid: five cells across, three rows down. Not a
+     limit on how big a petek may get — the drawing is scaled into this
+     box — but the room the page gives it, which is fixed so the page
+     never resizes under the reader as the grid changes. */
+  --ist-hive-view-w: calc(var(--ist-hive-step-x) * 4 + var(--ist-hive-cell-w));
+  --ist-hive-view-h: calc(var(--ist-hive-step-y) * 2 + var(--ist-hive-cell-h));
+  /* The paper either side of the grid on the phone page. */
   --ist-hive-page-pad: 16px;
 }
+/* The window. Fixed size, clipped: what is inside it is the whole petek,
+   which may be larger than any page could hold. */
 .ist-hive {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 2px 0;
-}
-.ist-hive-row {
-  display: grid;
-  /* readout · cells · readout — the cells column is the same width in
-     every row (see .ist-hive-cells), so the readouts either side of it
-     line up down the honeycomb. */
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--ist-hive-row-gap);
-  width: 100%;
-}
-/* The interlock. Past closing the canvas padding it's kept shallow on
-   purpose: these hexagons are elongated, so pulling them a proper
-   honeycomb quarter-height into each other would bury the avatar art
-   standing at each frame's base. */
-.ist-hive-row + .ist-hive-row { margin-top: var(--ist-hive-row-overlap); }
-/* Each child is pinned to its own column. The two side tracks stay equal
-   at all times, and neither ever changes size for a tap — what a slot
-   needs when opened lives in the dock below the honeycomb instead (see
-   .ist-hive-dock), so the honeycomb itself is fixed furniture. */
-.ist-hive-side-left  { grid-column: 1; }
-.ist-hive-cells      { grid-column: 2; }
-.ist-hive-side-right { grid-column: 3; }
-/* Every row's cell block is as wide as the widest row (the row of three),
-   so all three rows leave their readouts exactly the same room — and a
-   row of two centred in a box three cells wide still lands each of its
-   cells over a gap in the row of three, which is the offset that packs
-   the honeycomb. Fixed width, no open/closed state: the hexagons are
-   fixed furniture on this page, never resized by what's tapped (see the
-   dock below). */
-.ist-hive-cells {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: var(--ist-hive-gap);
-  width: calc(var(--ist-hive-cell-w) * 3 + var(--ist-hive-gap) * 2);
-}
-/* Every slot is a button (the middle cell, which is you, is not): an
-   empty one opens the code form, a filled one opens its occupant's
-   panel — both land in the dock below, never here (see .ist-hive-cell-
-   open and hiveDockHTML in profile-card.js). Stripped back to the frame
-   itself — the drawn hexagon is the affordance, there is no button
-   chrome around it, and it never changes size for being pressed. */
-.ist-hive-cell {
   position: relative;
+  width: var(--ist-hive-view-w);
+  height: var(--ist-hive-view-h);
+  max-width: 100%;
+  margin: 2px auto;
+  overflow: hidden;
+}
+/* Offered only when the drawing genuinely outruns the window (fitHive
+   sets the class): a grid that fits has nowhere to go, and a page that
+   slides under the finger for no reason reads as broken. */
+.ist-hive-pannable { cursor: grab; touch-action: none; }
+.ist-hive-pannable:active { cursor: grabbing; }
+/* The drawing itself. Hung off the middle of the window by the caller's
+   own cell — fitHive sets the margins, the transform-origin and the
+   scale from that one cell, so the reader stays dead centre at every
+   size and after every merge. */
+.ist-hive-plane {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+}
+/* Every cell is placed on the plane, never in flow: a grid is a set of
+   coordinates, and laying it out with rows would mean re-deriving those
+   coordinates in CSS. Members and free sides are buttons (the middle
+   cell, which is you, is not) and both open their panel in the dock
+   below, never here (see .ist-hive-cell-open and hiveDockHTML) —
+   stripped back to the frame itself, since the drawn hexagon is the
+   affordance and it never changes size for being pressed. */
+.ist-hive-cell {
+  position: absolute;
   width: var(--ist-hive-cell-w);
-  flex: 0 0 auto;
   padding: 0;
   border: none;
   background: none;
@@ -709,7 +689,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 button.ist-hive-cell { cursor: pointer; }
-/* Hover lifts the empty frame out of "muted" and into full ink, which is
+/* Hover lifts an empty side out of "muted" and into full ink, which is
    the whole hint that it is a place something goes. */
 button.ist-hive-cell:hover .ist-hive-slot,
 button.ist-hive-cell:focus-visible .ist-hive-slot {
@@ -718,19 +698,25 @@ button.ist-hive-cell:focus-visible .ist-hive-slot {
 button.ist-hive-cell:hover .ist-hive-plus,
 button.ist-hive-cell:focus-visible .ist-hive-plus { color: var(--ink); }
 button.ist-hive-cell:focus-visible { outline: none; }
-/* The open slot stays inked for as long as its panel is out in the dock,
-   so it's obvious which frame that panel belongs to. It lifts slightly
-   too (transform only — nothing about its box size changes, so neighbour
-   cells never move), since a filled slot is already ink-stroked by
-   default and the ink alone wouldn't read as "selected" against itself. */
+/* The open hexagon stays inked for as long as its panel is out in the
+   dock, so it's obvious which frame that panel belongs to. It lifts
+   slightly too (transform only — nothing about its box changes, so no
+   neighbour ever moves), since a member's frame is already ink-stroked
+   by default and the ink alone wouldn't read as "selected" against
+   itself. */
 button.ist-hive-cell-open .ist-hive-slot { --hexframe-stroke: var(--ink); }
 button.ist-hive-cell-open .ist-hive-plus { color: var(--ink); }
 .ist-hive-frame { transition: opacity 160ms, transform 200ms cubic-bezier(0.22, 1, 0.36, 1); }
 button.ist-hive-cell-open .ist-hive-frame { transform: scale(1.05); }
-button.ist-hive-slot-filled:hover .ist-hive-frame { opacity: 0.82; }
-/* An open occupant is not dimmed: the Çıkar button in the dock is the
-   state, and a faded portrait next to it reads as "leaving". */
-button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
+button.ist-hive-filled:hover .ist-hive-frame { opacity: 0.82; }
+/* A member you are not attached to — somebody else's neighbour, standing
+   on the same petek. They are drawn a shade back from the ones you are
+   holding: the grid is one shape and hiding part of it would be a lie,
+   but which of it is yours has to be legible at a glance. */
+button.ist-hive-filled:not(.ist-hive-bonded) .ist-hive-frame { opacity: 0.78; }
+/* An open member is never dimmed: the panel in the dock is the state,
+   and a faded portrait next to a Çıkar button reads as "leaving". */
+button.ist-hive-cell-open.ist-hive-filled .ist-hive-frame { opacity: 1; }
 /* The frame fills its cell and takes its height from the drawing's ratio
    (frames.css pins width:auto !important on every hexframe, so the cell
    is what carries the width). */
@@ -738,11 +724,10 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
   width: auto;
   height: auto;
 }
-/* An empty slot: the same drawn frame in muted ink, with a "+" where a
-   member will stand. Nothing behind it — no paper fill, so a slot nobody
-   is in reads as an opening in the honeycomb rather than as a filled cell
-   whose member failed to load, and the one frame that IS filled (yours,
-   in the middle) is the only one carrying weight. */
+/* A free side of your own hexagon: the same drawn frame in muted ink,
+   with a "+" where a member will stand. Nothing behind it — no paper
+   fill — so an opening reads as an opening rather than as a member whose
+   avatar failed to load. */
 .ist-hive-slot {
   --hexframe-stroke: var(--muted);
   background: none;
@@ -757,19 +742,6 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
   line-height: 1;
   color: var(--muted);
 }
-/* ── The space beside a slot ──
-   Each slot owns the outer side of its own row, printing the occupant
-   when there is one. Fixed content, fixed width — nothing here reacts
-   to a tap (see the dock below), so the honeycomb never shifts as slots
-   fill or empty either. */
-.ist-hive-side {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.ist-hive-side-left { align-items: flex-end; text-align: right; }
-.ist-hive-side-right { align-items: flex-start; text-align: left; }
 .ist-hive-readout-name {
   /* Breaks inside its own track rather than printing over the edge of
      the page — see the note on the meta lines below. */
@@ -783,13 +755,12 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
   color: var(--ink);
 }
 .ist-hive-readout-meta {
-  /* The page is cut to the honeycomb, so a readout's track is narrow by
-     construction (--ist-hive-side-w, and narrower still where the page
-     hits the screen's own edge): a long district — KÜÇÜKÇEKMECE,
-     GAZİOSMANPAŞA — is one word wider than the track and would otherwise
-     print straight over the page's edge. It breaks inside its track
-     instead; at this size a broken district reads better than one
-     running off the paper. */
+  /* The page is cut to the grid, so the dock is narrow by construction
+     (and narrower still where the page hits the screen's own edge): a
+     long district — KÜÇÜKÇEKMECE, GAZİOSMANPAŞA — can be one word wider
+     than it and would otherwise print straight over the page's edge. It
+     breaks inside the panel instead; at this size a broken district
+     reads better than one running off the paper. */
   overflow-wrap: anywhere;
   font-size: 0.6rem;
   font-weight: 600;
@@ -799,14 +770,14 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
 }
 
 /* ── The dock ──
-   One fixed spot under the honeycomb, always the same width as the rows
+   One fixed spot under the grid, always the same width as the window
    above it. At rest it holds your own code — the other half of the
-   exchange (db/hive_slots.sql: a slot can only be filled by someone who
-   was handed a code, so the code has to be somewhere the owner can read
-   it out). Tapping a hex swaps its content to that slot's panel instead
-   of growing the hex itself (see .ist-hive-cell in profile-card.js's
-   hiveSlotHTML) — the honeycomb never resizes or shifts for a tap, only
-   this one spot's content changes. The border/height live here, on the
+   exchange (db/hive_slots.sql: you can only attach to someone who handed
+   you a code, so the code has to be somewhere its owner can read it
+   out). Tapping a hexagon swaps this content to that hexagon's panel
+   instead of growing the hexagon itself (see .ist-hive-cell and
+   hiveDockHTML in profile-card.js) — the grid never resizes, shifts or
+   pans for a tap, only this one spot's content changes. The border/height live here, on the
    wrapper, rather than on whichever content happens to be inside it, so
    the divider and the room for it never flicker between states. */
 .ist-hive-dock {
@@ -839,12 +810,13 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
 }
 .ist-hive-code-hint { font-size: 0.55rem; letter-spacing: 0.6px; text-transform: none; }
 
-/* ── A slot's panel ──
-   Pressing a hex does not open a page of its own: its panel lands in the
-   dock, which stays on screen exactly where it was — the honeycomb above
-   it doesn't move, so the tapped hex (ringed via .ist-hive-cell-open) is
-   still exactly under the finger that pressed it. The code form for an
-   empty slot, the occupant plus a Çıkar button for a filled one.
+/* ── A hexagon's panel ──
+   Pressing a hexagon does not open a page of its own: its panel lands in
+   the dock, which stays on screen exactly where it was — the grid above
+   it doesn't move, so the tapped hexagon (ringed via
+   .ist-hive-cell-open) is still exactly under the finger that pressed
+   it. The code form for a free side of your own hexagon; the member,
+   with a Çıkar button where they are yours to detach, for a taken one.
    Pressing the same hex again folds it back to the resting code display,
    which is why there is no close button in here. Centred and free to use
    the dock's full width — a real field and a real button, not squeezed
@@ -909,6 +881,18 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
   cursor: pointer;
 }
 .ist-hive-remove:hover { background: var(--hover); }
+/* Where a Çıkar button would be when there is no Çıkar to offer: the
+   bond is still locked for the week it was made in, or this member is
+   somebody else's neighbour and not yours to detach. The rule is printed
+   in the button's own place rather than the button being left out —
+   a missing control reads as a bug, a stated one reads as a rule. */
+.ist-hive-ext-note {
+  margin-top: 2px;
+  font-size: 0.58rem;
+  line-height: 1.3;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
 .ist-hive-ext-msg:empty { display: none; }
 .ist-hive-ext-msg {
   font-size: 0.6rem;
@@ -1104,15 +1088,13 @@ button.ist-hive-cell-open.ist-hive-slot-filled .ist-hive-frame { opacity: 1; }
   .ist-pc-cover-pick-arrow svg { width: 8px; height: 8px; }
   .ist-pc-cover-name { max-width: 180px; margin-top: 6px; font-size: 1.05rem; }
   .ist-pc-cover-meta { margin-top: 1px; font-size: 0.62rem; }
-  /* The honeycomb is width-bound on a phone rather than height-bound: the
-     middle row is three cells plus two gaps wide, and the readouts either
-     side still need room to be legible. Smaller cells, tighter gaps,
-     thinner rules — one fixed size, since the dock (not the honeycomb)
-     is what makes room for a tap now. */
+  /* The grid is width-bound on a phone rather than height-bound: five
+     cells across has to fit between the screen's own edges. Smaller
+     cells, thinner rules — one fixed size, since the drawing scales
+     itself into the window (see fitHive) and the dock, not the grid, is
+     what makes room for a tap. */
   .hive-overlay {
     --ist-hive-cell-w: min(84px, 11vh);
-    --ist-hive-row-gap: 8px;
-    --ist-hive-side-w: 54px;
     --ist-hive-page-pad: 14px;
   }
   .ist-hive-readout-name { font-size: 0.62rem; }

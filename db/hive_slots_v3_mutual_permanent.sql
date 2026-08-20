@@ -34,6 +34,12 @@
 -- made under v1 is not mirrored retroactively. Removing it from either
 -- side still clears both.
 --
+-- SUPERSEDED BY db/hive_lattice_v4.sql: the six numbered slots are gone.
+-- The petek is one shared grid now (hive_cells + hive_bonds) — a member is
+-- one hexagon at real coordinates, attaching makes you neighbours on a grid
+-- everybody stands on, and a bond is locked for the week it was made in.
+-- Only the hive_codes half of this file is still live.
+--
 -- Run in Supabase SQL editor. Idempotent.
 -- =====================================================================
 

@@ -294,40 +294,64 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 - RLS: authenticated users SELECT all; direct INSERT only for an assigned Sözcü's *own* row before its deadline (midnight Istanbul at the start of `used_on`), matching the UPDATE policy; DELETE admin-only.
 - **The admin is never locked out** (`db/sozcel_used_answers_v6_admin_override.sql`): admin INSERT/UPDATE policies sit alongside the Sözcü ones, with no `sozcul_id` match and no deadline, because a word that is wrong *on the day it is being played* is exactly the case that has to be fixable and the one moment every other policy refuses. The admin reaches it through the same Sözcü Görevi form on `sozcel.html` — the button opens a day picker instead of an assignment, and saving preserves whoever the row already belonged to, so correcting a day never takes it over. `game-locks.js` matches: the admin isn't bounced off a game they switched off for the day (they own the switch), though the win-gates still apply to everyone since those are the game's own progression.
 
-**Tables: `hive_codes` + `hive_slots`** — the hane honeycomb on Anahane (`db/hive_slots.sql`).
+**Tables: `hive_codes` + `hive_cells` + `hive_bonds`** — the petek, opened from Anahane's map
+(`db/hive_lattice_v4.sql`, superseding the six-slot `hive_slots` of `db/hive_slots*.sql`).
+- The petek is **one shared grid**, not a comb per member. A member is a single hexagon at axial
+  coordinates on a map; attaching to somebody makes you their neighbour on a grid everybody is
+  standing on, and a third member attaching to either of you arrives into the shape those two have
+  already made. A petek that is redrawn per viewer is not one object, it is a picture of one —
+  which is exactly what the old design was, and why it was replaced.
 - `hive_codes`: `(user_id, week_start)` PK, `code` (6 chars, no I/O/0/1), unique per `(week_start, code)`.
-  One code per member per Istanbul week — `week_start` is the **Sunday** on or before today
-  (`db/hive_slots_v2_sunday_week.sql`), resolved server-side by `public.hive_week_start()`. Note
-  this is the one week on the site that does *not* start Monday like the profile's game grid: the
-  code week is the rhythm of seeing people, and it turns over on Sunday. Only the live week's codes
-  resolve, which is what makes them renew — last week's rows are left alone and simply stop
-  matching. RLS: a member may SELECT **only their own** row and there is no client
-  write policy at all; that a code cannot be looked up is precisely why holding one means it was
-  handed to you.
-- `hive_slots`: `(owner_id, slot)` PK with `slot` 0–5, plus `member_id` and `placed_at`.
-  Unique `(owner_id, member_id)` so one person can't hold two of your six. RLS: SELECT/DELETE your
-  own rows; no client INSERT/UPDATE — filling a slot means resolving a code you aren't allowed to
-  read, and (since v3) writing a row into somebody else's honeycomb.
-- **Placements are permanent and mutual** (`db/hive_slots_v3_mutual_permanent.sql`). v1 expired a
-  placement after 7 days so the comb emptied itself unless the contact kept happening; that expiry
-  is gone — `expires_at` is dropped and whoever you put in stands there until one of you takes the
-  other out. Resolving a code now places **both** sides: they go in your comb, you go in theirs, in
-  the **mirror slot** (`5 - slot`, the point reflection through the middle cell — your top-right is
-  their bottom-left), so the two combs are one shape seen from either end. The slot numbering that
-  mirror is stated in is `HIVE_ROWS` in profile-card.js; renumbering there silently un-mirrors it.
-- Functions: `hive_my_code()` (SECURITY DEFINER, issues this week's code on first ask),
-  `hive_claim_code(code, slot)` (SECURITY DEFINER; returns a *status* — `ok` / `invalid_code` /
-  `self` / `slot_taken` / `already_in_hive` / `their_hive_full` — that the UI words itself, see
-  `profile.hive.err.*` in `i18n.js`), `hive_remove_member(member_id)` (SECURITY DEFINER; Çıkar,
-  which clears **both** directions — a one-sided removal would leave exactly the asymmetric row v3
-  exists to remove), and `hive_my_slots()` (SECURITY INVOKER, the caller's slots joined to each
-  occupant's public profile fields).
-- Two edges the claim decides rather than guessing at: if the mirror slot in their comb is taken it
-  falls back to their lowest free slot (mutual matters more than mirrored), and if their six are
-  **full** the whole claim is refused with `their_hive_full` rather than placing one side — a comb
-  that is mutual only when there happened to be room is a coin toss, not a rule. Rows left over
-  from v1 are not mirrored retroactively; they just stop expiring, and a claim that finds the
-  target already holding you leaves their side arranged as it is.
+  Unchanged, and still the only way in. One code per member per Istanbul week — `week_start` is the
+  **Sunday** on or before today (`db/hive_slots_v2_sunday_week.sql`), resolved server-side by
+  `public.hive_week_start()`. Note this is the one week on the site that does *not* start Monday
+  like the profile's game grid: the code week is the rhythm of seeing people, and it turns over on
+  Sunday. Only the live week's codes resolve, which is what makes them renew — last week's rows are
+  left alone and simply stop matching. RLS: a member may SELECT **only their own** row and there is
+  no client write policy at all; that a code cannot be looked up is precisely why holding one means
+  it was handed to you.
+- `hive_cells`: `user_id` PK, plus `map_id` and `(q, r)`. Unique `(map_id, q, r)` — two members can
+  never stand in the same place — declared **deferrable**, because a merge moves a whole map in one
+  statement and only its end state is meaningful. A `map_id` is not a row in a table of its own: a
+  map is exactly the set of cells sharing an id, so merging two is an update of the losing id. A
+  member who has never attached to anyone **has no cell at all** — they are their own hexagon with
+  six free sides, and they join the grid on their first attachment.
+- `hive_bonds`: `(a, b)` PK with `a < b`, plus `map_id`, `bonded_at` and `locked_until`. Stored once
+  per pair, unordered, because an attachment has no direction: there is no owner of a bond and no
+  follower in one.
+- **A bond is locked for the week it was made in.** `locked_until` is the *next* week's start;
+  `hive_unbond` refuses with `locked` until then. A petek that can be unpicked the moment it is
+  built is a drawing, not a structure.
+- **Merging preserves both formations exactly.** Attaching two members already on different maps
+  carries the smaller map over to the larger one's frame **rigidly** — rotated by a multiple of 60°
+  and shifted, never rearranged — so every existing neighbour stays a neighbour at the same angle.
+  The tapped side is tried first, then the caller's other free sides, each in all six rotations; if
+  nothing lands without a collision the attach is refused (`no_room`) rather than moving anyone.
+  Nobody's formation is ever disturbed to make room for a newcomer.
+- RLS: **no client policies at all** on either table. The grid is read only through `hive_map()`,
+  which hands back the one map the caller is standing on, relative to them — it is not a directory
+  to be enumerated, and every write has to resolve a code the caller is not allowed to read.
+- Functions: `hive_my_code()` (unchanged), `hive_map()` (SECURITY DEFINER; the caller's map with
+  the caller at `(0,0)`, each row carrying `bonded` and `locked` for the caller's own attachments),
+  `hive_bond_code(code, dir)` (SECURITY DEFINER; returns a *status* the UI words itself — `ok` /
+  `invalid_code` / `self` / `already_bonded` / `dir_taken` / `too_far` / `no_room`, see
+  `profile.hive.err.*` in `i18n.js`), `hive_unbond(member_id)` (SECURITY DEFINER; Çıkar, clearing
+  the one bond both ways and releasing the cell of anyone left attached to nothing), plus the
+  helpers `hive_dir(d)` and `hive_rot(q, r, k)`.
+- **Directions are numbered 0-5 the way the drawing reads them** — `0 (0,-1)`, `1 (+1,-1)`,
+  `2 (-1,0)`, `3 (+1,0)`, `4 (-1,+1)`, `5 (0,+1)` — and `HIVE_DIRS` in profile-card.js must match
+  `hive_dir()` exactly: the server decides where a member lands and says so in these terms, so
+  renumbering either side silently mis-aims every tap. (It is also the old slot numbering, which is
+  why the migration reproduces most old combs cell for cell.)
+- Two edges the attach decides rather than guessing at: joining someone else's petek takes the side
+  of them that puts them on the side of you that you tapped, falling back to any free side of theirs
+  (being attached at all matters more than the exact angle); and two members already on the **same**
+  map who are not adjacent are refused with `too_far`, because moving either of them would drag a
+  formation other people are standing in.
+- The old `hive_slots` rows are embedded onto the grid by the migration at the bottom of
+  `db/hive_lattice_v4.sql`: each connected group is walked breadth-first, keeping each pair's old
+  direction where the cell is free. A bond whose two members end up placed but not adjacent is
+  dropped — the shape on screen has to be the truth about who is next to whom.
 
 **Table: `app_settings`** — generic admin-managed key/value feature toggle table (`db/app_settings.sql`).
 - `key text pk`, `value boolean`, `updated_by`, `updated_at`.
@@ -398,13 +422,14 @@ sb.from('articles').delete().eq('id', id)
 - The entry point and anchor of the three-page carousel — the user always starts here
 - Interactive Istanbul district map in the center; clicking a district opens its detail sheet
 - Both side columns are **empty**: the events moved to Kahvehane and every news story to
-  Kütüphane, so what is left on Hane is the map, the seat, the honeycomb and you
+  Kütüphane, so what is left on Hane is the map, the seat, the petek and you
 - The personal layer lives here: the user's own profile, avatar, home identity
 - The **PETEK** button over the map (the counterpart of Kahvehane's Kahve Endeksi pill, sitting
-  just above the map label) opens the **hane honeycomb** — your frame in the middle, six slots
-  for other members around it, each filled by entering that member's weekly code
-  (`IstProfileCard.openHiveOverlay`, see Site-wide defaults and `db/hive_slots.sql`).
-  Opening your profile card here shows the cover alone — the honeycomb is a destination on the
+  just above the map label) opens the **petek** — one shared honeycomb, your frame in the middle
+  and everybody you are standing next to around it, each attachment made by entering that
+  member's weekly code
+  (`IstProfileCard.openHiveOverlay`, see Site-wide defaults and `db/hive_lattice_v4.sql`).
+  Opening your profile card here shows the cover alone — the petek is a destination on the
   map, not a page of your account. On a phone it does not rise from the bottom edge like every
   other sheet: the PETEK button itself **grows into the page** and the page folds back into the
   button when it closes
@@ -717,7 +742,7 @@ geometry and no centred modal anywhere on the site.
     window keeps the ordinary sheet.
   - Two surfaces are exceptions, and both for the same reason: they arrive out of a specific
     object already on the screen rather than from off it, so they **grow out of that object**
-    instead of sliding. The **PETEK honeycomb** grows out of its button (see its own section
+    instead of sliding. The **PETEK page** grows out of its button (see its own section
     below), and **a news story on Kütüphane** grows out of the card it was tapped on, into the
     band that card lies in (see Kütüphane's own section). Both are still THE sheet — same
     markup, same `IstSheet.open/close` — only the way they arrive differs.
@@ -860,13 +885,16 @@ avatar, name, district) shows on all three; the week's game grid is Kahvehane's;
 settings — with the Kişiselleştir and Çıkış Yap buttons that act on them — are Kütüphane's.
 Anahane's is the cover and nothing else.
 
-### The hane honeycomb — the PETEK page (`IstProfileCard.openHiveOverlay`)
+### The petek — the PETEK page (`IstProfileCard.openHiveOverlay`)
 
-The honeycomb (`hiveHTML`) is your own cover frame as the middle cell of seven, with six slots
-packed around it for other members. It opens from the **PETEK button over Anahane's map**, into
-its own sheet (`#hive-overlay`, built lazily by `ensureHiveOverlay` on first open) rather than the
-shared profile sheet — who you keep close is a destination on the middle page, not a page of your
-account, which is why it is reached from the city rather than from the gear in the profile bar.
+The petek (`hiveGridHTML`) is **one shared honeycomb**, drawn from where the reader is standing in
+it: their own cover frame in the middle, everybody else on their map placed exactly where they
+actually are around it, and a "+" on each free side of their own hexagon. It is not six slots of
+your own any more — see the schema section above for what that means and why. It opens from the
+**PETEK button over Anahane's map**, into its own sheet (`#hive-overlay`, built lazily by
+`ensureHiveOverlay` on first open) rather than the shared profile sheet — who you keep close is a
+destination on the middle page, not a page of your account, which is why it is reached from the city
+rather than from the gear in the profile bar.
 Being reached from a button on the map rather than from the profile bar is also what gives it its
 own opening. On a phone it neither slides up from the bottom edge nor rests half-way down the way
 a news item does: the **PETEK button grows into the page**, and the page folds back into the button
@@ -874,53 +902,62 @@ when it closes. The page never moves — it is already at its final size. What a
 onto it, a `clip-path` inset that starts as the button's own box and opens out to the page's four
 edges, with the button hidden for as long as the page is up so the two are never both on the map.
 
-**That size is the honeycomb's own, not the screen's.** On a phone this page is the one sheet that
-is not full-bleed: it is cut to what is on it — the honeycomb, and the dock under it — and stands
-in the middle of the city, clear of both bars, so a button grows into a box roughly its own kind of
-size rather than into the whole screen. Its width is the honeycomb's arithmetic (the row of three
-cells plus a readout track either side), which is why the cell/gap/track tokens live on
-`.hive-overlay` rather than on `.ist-hive`: the page and the rows do the same sum, once. It is a
-fixed size and never a shrink-to-fit — the dock swaps its contents on every tap, and a page
-measured off its contents would resize under the reader each time, the very flinch
-`.ist-hive-cell-open` exists to avoid. A readout too long for its track breaks inside it.
+**The page is a fixed size and the petek is not.** On a phone this page is the one sheet that is
+not full-bleed: it is cut to what is on it — the window onto the grid, and the dock under it — and
+stands in the middle of the city, clear of both bars, so a button grows into a box roughly its own
+kind of size rather than into the whole screen. Its width is `--ist-hive-view-w`, the window's own
+arithmetic, which is why the cell and step tokens live on `.hive-overlay` rather than on
+`.ist-hive`: the page and the grid do the same sum, once. What changes as members are added is the
+*drawing*, never the page — `fitHive` scales the grid down into the window and, once it would have
+to shrink past legibility (`HIVE_MIN_SCALE`), leaves it there and lets it be dragged instead. What
+has to fit is the room the drawing needs **around the reader**, not its own box: the reader stays
+dead centre, so a petek grown out to one side is still asking for that much room on both, and
+fitting the raw box leaves the far side clipped by a window the arithmetic had just called roomy.
 
-`growHive` in profile-card.js runs it, off two live rectangles, rather than a CSS transition
-between two states: both are measured in the same frame the overlay is unhidden, and a
+Every cell is placed on the plane by `calc()` against `--ist-hive-step-x` / `--ist-hive-step-y`, so
+the whole grid is laid out in the drawing's own units at whatever size the cells happen to be — the
+JS emits coordinates, never pixels. `hivePos` and those two tokens are the only places the packing
+is stated.
+
+`growHive` in profile-card.js runs the opening, off two live rectangles, rather than a CSS
+transition between two states: both are measured in the same frame the overlay is unhidden, and a
 custom-property from-state set in that frame is not reliably computed before `.open` lands on the
 next one — the page would simply appear at full size. profile-card.css therefore only takes the
 slide away (`.hive-grow`), and `prefers-reduced-motion: reduce` skips the grow entirely. The
 button is passed in as `origin`; without one (or on desktop, where a button in the corner of a wide
-window has no phone-sized page to become) the honeycomb opens as the ordinary sheet. Since it no
+window has no phone-sized page to become) the petek opens as the ordinary sheet. Since it no
 longer slides, it does not carry `.ist-sheet-pull` either — it is closed with its own × the way a
-game page is, not by swiping it down. The honeycomb reuses the cover's own frame for its middle cell —
+game page is, not by swiping it down. The grid reuses the cover's own frame for every cell —
 same mask, same drawn ring, same badges — so there is no second frame treatment to keep in sync.
 
-A slot is filled **hand-to-hand, by code** (`db/hive_slots.sql`): every member holds one code per
-Istanbul week, tapping an empty slot asks for someone else's, and whoever it belongs to stands
-there from then on. There is deliberately no member search, no follow button and no request-accept
-flow — to put someone in your honeycomb you have to have been told their code, which means you saw
-them. It is a record of contact, not a follower list, and it is the closest thing to a connection
-the site has (still no DMs — ever).
+A side is filled **hand-to-hand, by code** (`db/hive_slots.sql`): every member holds one code per
+Istanbul week, tapping a free side of your own hexagon asks for someone else's, and from then on
+they are standing there. There is deliberately no member search, no follow button and no
+request-accept flow — to attach to someone you have to have been told their code, which means you
+saw them. It is a record of contact, not a follower list, and it is the closest thing to a
+connection the site has (still no DMs — ever).
 
-Handing over a code is an **introduction, not a note one person takes about the other**: the claim
-places both sides at once, mirrored (see the schema section above), and Çıkar clears both. That is
-what keeps it from being a follow — there is no arrangement in which one member is holding the
-other without being held back. What is *shown* of an occupant beside their frame is the undesigned
-half: name and district, no more.
+Handing over a code is an **introduction, not a note one person takes about the other**: attaching
+is mutual by construction (you are neighbours or you are not), and Çıkar clears the bond both ways.
+That is what keeps it from being a follow — there is no arrangement in which one member is holding
+the other without being held back.
 
-Each slot owns the space on the outer side of its own row, which just prints the occupant — name,
-district, days left — and never changes for a tap. What a tap needs lands in **the dock**, one
-fixed spot below the honeycomb (`hiveDockHTML`): your own code at rest, or the tapped slot's panel
-while one is open — the code field for an empty slot, a Çıkar button for a filled one. The
-honeycomb itself is fixed furniture: no cell resizes and no row shifts when a slot opens, on a
-phone or anywhere else — the tapped hex is marked instead (`.ist-hive-cell-open` inks its ring and
-lifts it slightly via `transform`, which never moves a neighbour). This replaced an earlier design
-where the frame itself grew sideways into the row's own gutter — workable on desktop, but the
-gutter was too narrow on a phone to hold a real field without shrinking every hexagon to make room,
-which read as the whole honeycomb flinching at a tap. Pressing the same hex again folds the dock
-back to the resting code display, which is why there is no close button in it.
+**You see the whole petek, including the parts that are not yours.** A member you are not attached
+to — somebody else's neighbour, standing on the same grid — is drawn a shade back and, tapped, says
+so: they are not yours to detach, and you attach to them the same way you attach to anyone, by
+being handed their code. Hiding them would be a lie about the shape, and the shape is the object.
 
-Neither the honeycomb nor any of the three profile sets scrolls: each fits inside the sheet, the
+What a tap needs lands in **the dock**, one fixed spot below the grid (`hiveDockHTML`): your own
+code at rest, or the tapped hexagon's panel while one is open — the code field for a free side; the
+member with their district for a taken one, carrying a Çıkar button where they are yours to detach,
+and where they are not (the bond is still locked for its week, or they are not attached to you) the
+rule printed in the button's own place. A missing control reads as a bug; a stated one reads as a
+rule. The grid itself is fixed furniture: nothing resizes, shifts or pans for a tap, on a phone or
+anywhere else — the tapped hexagon is marked instead (`.ist-hive-cell-open` inks its ring and lifts
+it slightly via `transform`, which never moves a neighbour). Pressing the same hexagon again folds
+the dock back to the resting code display, which is why there is no close button in it.
+
+Neither the petek nor any of the three profile sets scrolls: each fits inside the sheet, the
 way a politician's page does. If a new block stops fitting, drop a block from that page — do not
 turn the page into a scroller.
 

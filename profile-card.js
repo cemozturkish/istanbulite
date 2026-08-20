@@ -37,10 +37,10 @@
   // they act on (the settings sliders and the account), so they live
   // with them on Kütüphane.
   //
-  // The hane honeycomb used to be Anahane's profile page. It is its own
+  // The petek used to be Anahane's profile page. It is its own
   // sheet now (#hive-overlay, see openHiveOverlay below), opened by the
   // PETEK button over Anahane's map rather than through the gear in the
-  // profile bar — the honeycomb is who you keep close, which is a
+  // profile bar — the petek is who you keep close, which is a
   // destination on the middle page, not a page of your account, and
   // being reached from the map rather than the profile bar is also what
   // gives it its own opening: on a phone the PETEK button does not rise
@@ -790,13 +790,13 @@
   }
 
   // ── THE PETEK PAGE ──
-  // The hane honeycomb, opened by the PETEK button over Anahane's map.
-  // Its own overlay (#hive-overlay) rather than the shared profile sheet
-  // above, because it opens differently: on a phone the honeycomb is not
-  // a sheet rising from the bottom edge at all — the PETEK button itself
-  // grows out into the page, and the page shrinks back into the button
-  // when it closes (see growHive below). The button is where the
-  // honeycomb lives on the map, so it is what the page comes out of.
+  // The petek — the shared grid — opened by the PETEK button over
+  // Anahane's map. Its own overlay (#hive-overlay) rather than the shared
+  // profile sheet above, because it opens differently: on a phone the
+  // grid is not a sheet rising from the bottom edge at all — the PETEK
+  // button itself grows out into the page, and the page shrinks back into
+  // the button when it closes (see growHive below). The button is where
+  // the petek lives on the map, so it is what the page comes out of.
   // It reuses hiveHTML/hiveMountHTML/renderHive/loadHive wholesale:
   // those only ever look up #po-hive-mount by id, so they don't care
   // which overlay wraps them.
@@ -957,10 +957,11 @@
     const st = await ensureProfileState(sb, I18N);
     if (!st) return;
     ensureHiveOverlay();
-    // Fresh every open: folded up, never on the slot extension someone
-    // left open last time, and re-fetches so the week left on each
-    // placement is current (see loadHive).
-    _hive = Object.assign({}, st, { sb, I18N, hiveOpen: null, hiveLoaded: false });
+    // Fresh every open: folded up, never on the panel someone left open
+    // last time, undragged, and re-fetched — somebody else's attachment
+    // may have carried this whole petek somewhere since (see loadHive
+    // and hive_bond_code in db/hive_lattice_v4.sql).
+    _hive = Object.assign({}, st, { sb, I18N, hiveOpen: null, hiveLoaded: false, hivePan: { x: 0, y: 0 } });
     renderHiveOverlayBody();
     const overlay = document.getElementById('hive-overlay');
     const body = document.getElementById('hive-overlay-body');
@@ -1180,133 +1181,106 @@
   }
 
   // ══════════════════════════════════════════════════════════════
-  // THE HANE HONEYCOMB (anahane's profile page)
+  // THE PETEK (anahane's map, the PETEK button)
   //
-  // Your own frame in the middle cell, six slots packed around it. A
-  // slot is a place the user puts *another member*, so that opening
-  // their own profile on the middle page is also how they look in on
-  // the handful of people they keep close — the profile stays the
-  // anchor point of the middle page, but it stops being only about the
-  // person holding the phone.
+  // One shared honeycomb, not six slots each. A member is a single
+  // hexagon; attaching to somebody makes you their neighbour on a grid
+  // everybody is standing on, and a third member who attaches to either
+  // of you arrives into the shape the two of you have already made. What
+  // you see here is that grid, drawn from where you happen to be
+  // standing in it — you in the middle (always), everyone else exactly
+  // where they are relative to you.
   //
-  // Reading the honeycomb as three rows of 2 / 3 / 2 cells (the middle
-  // cell of the middle row being the user) is what packs them: the
-  // short rows are centred against the long one, which offsets them by
-  // exactly half a cell, and the rows overlap slightly so the frames
-  // interlock instead of sitting in a table (see .ist-hive in
-  // profile-card.css). Each slot's readout — what that member is up to
-  // — is printed on the outer side of its own row, so the pairs read
-  // outward from the middle rather than into it.
+  // This replaced a design where every member had a comb of their own:
+  // six numbered slots, mirrored pairwise into the other person's six.
+  // Two people who were both in your comb had no relation to each other
+  // in it, so the drawing was a diagram of your contacts rather than a
+  // thing being built — and a petek that is redrawn per viewer is not
+  // one object, it is a picture of one. See db/hive_lattice_v4.sql.
   //
-  // A slot is filled hand-to-hand, by code (see db/hive_slots.sql): every
-  // member holds one code per Istanbul week, tapping a "+" asks for
-  // someone else's, and whoever it belongs to stands in that slot from
-  // then on. There is no member search and no follow button on purpose —
-  // to put someone in your honeycomb you have to have been told their
+  // A cell is filled hand-to-hand, by code (db/hive_slots.sql): every
+  // member holds one code per Istanbul week, tapping a free side of your
+  // own hexagon asks for someone else's, and from then on they are
+  // standing there. There is no member search and no follow button on
+  // purpose — to attach to someone you have to have been told their
   // code, which means you saw them. It is a record of contact, not a
   // follower list.
   //
-  // Placing is mutual and mirrored (v3): resolving a code puts them in
-  // your honeycomb and you in theirs, in the slot opposite the one you
-  // used — your top-right is their bottom-left — so the two combs are
-  // one shape seen from either side. Çıkar clears both sides for the
-  // same reason.
-  //
-  // What is *shown* of an occupant beside their frame is still the
-  // undesigned half: name and district, no more. The rest of that
-  // readout stays placeholder ruling until there's a rule for it.
+  // Attaching is mutual, and locked for the week it was made in: you
+  // cannot unpick it until the week turns over. What is *shown* of a
+  // member is the undesigned half — name and district, no more — and it
+  // lands in the dock below when their hexagon is tapped, never beside
+  // it, so the grid itself never moves for a tap.
   // ══════════════════════════════════════════════════════════════
-  const HIVE_SLOT_COUNT = 6;
   const HIVE_CODE_LENGTH = 6;
 
-  // How the three rows are laid out, in slot order (0-5, clockwise-ish
-  // from the top-left): two slots up top, one either side of the user,
-  // two along the bottom. `me` marks where the user's own frame goes.
-  // This numbering is also what the mirror in hive_claim_code is stated
-  // in (5 - slot is the point reflection through the middle cell), so
-  // renumbering the slots here would silently un-mirror the two combs.
-  const HIVE_ROWS = [
-    { slots: [0, 1] },
-    { slots: [2, 3], me: 1 },   // user sits between the two middle slots
-    { slots: [4, 5] },
-  ];
+  // The six sides of a hexagon in axial coordinates, in the order the
+  // drawing reads them (two above, one either side, two below). This is
+  // the same numbering hive_dir() uses in db/hive_lattice_v4.sql — the
+  // server decides where a member lands, and it says so in these terms,
+  // so renumbering here silently mis-aims every tap.
+  //
+  //     0 (0,-1)   1 (+1,-1)
+  //   2 (-1, 0)  ME  3 (+1, 0)
+  //     4 (-1,+1)  5 ( 0,+1)
+  const HIVE_DIRS = [[0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1]];
+  // How far a cell scales down before the grid is panned instead. A
+  // petek keeps growing and the page it is drawn on does not (see
+  // .hive-overlay in profile-card.css), so past a point shrinking it
+  // further would make the members unreadable to fit a shape nobody can
+  // make out anyway.
+  const HIVE_MIN_SCALE = 0.45;
 
   function hiveMemberName(member) {
     return capitalizeName(`${member.first_name || ''} ${member.last_name || ''}`.trim()) || 'İsimsiz Üye';
   }
 
-  // ── What stands beside a slot ──
-  // Each slot owns the space on the outer side of its own row, printing
-  // the occupant when there is one — name and district, no more. This
-  // never changes when a slot is tapped: the frames
-  // are fixed furniture (see .ist-hive-cell in profile-card.css), so
-  // what a tap needs — the code form, an occupant's Çıkar — lands in the
-  // dock below the honeycomb instead (see hiveDockHTML), not beside the
-  // row.
-  //
-  // An empty slot prints nothing at all. It used to carry placeholder
-  // ruling standing in for a member's stats; that was only ever a note
-  // about where writing would go.
-  function hiveSideHTML(side, member, t) {
-    const cls = `ist-hive-side ist-hive-side-${side}`;
-    if (!member) return `<div class="${cls}"></div>`;
+  function hiveMemberDistrict(member) {
+    return member.neighborhood ? (NB_NAMES[member.neighborhood] || member.neighborhood) : '';
+  }
 
-    const nb = member.neighborhood ? (NB_NAMES[member.neighborhood] || member.neighborhood) : '';
+  // Axial (q, r) → the cell's place on the drawing. Rows step down by
+  // --ist-hive-step-y and each row is offset half a step across, which
+  // is what interlocks the hexagons; both steps are written in CSS
+  // against the cell width, so the whole grid is laid out in calc() and
+  // holds at whatever size the cells are drawn at.
+  function hivePos(q, r, minX, minY) {
+    return {
+      x: (q + r / 2) - minX,
+      y: r - minY,
+    };
+  }
+
+  // ── One cell ──
+  // A member's hexagon, an empty side of your own, or you. All three are
+  // absolutely placed on the plane; the first two are buttons that open
+  // their panel in the dock (see hiveDockHTML) — the frame itself never
+  // resizes for a tap, it is only marked, so no neighbour ever moves.
+  function hiveCellHTML(inner, style, attrs, cls) {
+    return `<div class="ist-hive-cell${cls ? ' ' + cls : ''}" style="${style}" ${attrs || ''}>${inner}</div>`;
+  }
+
+  function hiveMemberCellHTML(member, style, isOpen) {
+    const name = hiveMemberName(member);
+    const cls = `ist-hive-filled${member.bonded ? ' ist-hive-bonded' : ''}${isOpen ? ' ist-hive-cell-open' : ''}`;
     return `
-      <div class="${cls} ist-hive-readout">
-        <div class="ist-hive-readout-name">${esc(hiveMemberName(member))}</div>
-        ${nb ? `<div class="ist-hive-readout-meta">${esc(nb)}</div>` : ''}
-      </div>
+      <button type="button" class="ist-hive-cell ${cls}" style="${style}"
+              data-member="${esc(member.member_id)}" aria-expanded="${isOpen ? 'true' : 'false'}"
+              title="${esc(name)}" aria-label="${esc(name)}">
+        <div class="ist-pc-cover-avatar ist-hive-frame">
+          ${coverBadgesHTML(member)}
+          <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
+        </div>
+      </button>
     `;
   }
 
-  // What the open slot puts in the dock: the code form for an empty
-  // slot, the occupant plus a Çıkar button for a filled one. `open` is
-  // state.hiveOpen — { slot, value, error } — and the ids below are
-  // unique because only ever one slot is open at a time.
-  function hiveExtensionHTML(member, open, t) {
-    if (member) {
-      const nb = member.neighborhood ? (NB_NAMES[member.neighborhood] || member.neighborhood) : '';
-      return `
-        <div class="ist-hive-readout-name">${esc(hiveMemberName(member))}</div>
-        ${nb ? `<div class="ist-hive-readout-meta">${esc(nb)}</div>` : ''}
-        <button type="button" class="ist-hive-remove" id="po-hive-remove">${esc(t('profile.hive.remove'))}</button>
-        <div class="ist-hive-ext-msg" id="po-hive-msg">${esc(open.error || '')}</div>
-      `;
-    }
-    return `
-      <label class="ist-hive-ext-label" for="po-hive-code">${esc(t('profile.hive.codeprompt'))}</label>
-      <input class="ist-pc-input ist-hive-input" id="po-hive-code" type="text"
-             inputmode="latin" autocomplete="off" autocapitalize="characters" spellcheck="false"
-             maxlength="${HIVE_CODE_LENGTH}" placeholder="${'•'.repeat(HIVE_CODE_LENGTH)}"
-             value="${esc(open.value || '')}">
-      <button type="button" class="ist-pc-save ist-hive-submit" id="po-hive-submit">${esc(t('profile.hive.add'))}</button>
-      <div class="ist-hive-ext-msg" id="po-hive-msg">${esc(open.error || '')}</div>
-    `;
-  }
-
-  // One slot cell — a button either way, and pressing it opens (or
-  // closes) that slot's panel in the dock below: the code form when
-  // empty, the occupant with a Çıkar button when filled. The frame
-  // itself never resizes for this — .ist-hive-cell-open just inks its
-  // ring, so the tapped hex stays exactly where it was, only marked.
-  function hiveSlotHTML(slot, member, isOpen, t) {
-    const openCls = isOpen ? ' ist-hive-cell-open' : '';
-    const expanded = isOpen ? 'true' : 'false';
-    if (member) {
-      const name = hiveMemberName(member);
-      return `
-        <button type="button" class="ist-hive-cell ist-hive-slot-filled${openCls}" data-slot="${slot}" aria-expanded="${expanded}" title="${esc(name)}" aria-label="${esc(name)}">
-          <div class="ist-pc-cover-avatar ist-hive-frame">
-            ${coverBadgesHTML(member)}
-            <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
-          </div>
-        </button>
-      `;
-    }
+  function hiveEmptyCellHTML(dir, style, isOpen, t) {
     const label = t('profile.hive.empty');
     return `
-      <button type="button" class="ist-hive-cell${openCls}" data-slot="${slot}" aria-expanded="${expanded}" title="${esc(label)}" aria-label="${esc(label)}">
+      <button type="button" class="ist-hive-cell ist-hive-empty${isOpen ? ' ist-hive-cell-open' : ''}" style="${style}"
+              data-dir="${dir}" aria-expanded="${isOpen ? 'true' : 'false'}"
+              title="${esc(label)}" aria-label="${esc(label)}">
         <div class="hexframe ist-hive-frame ist-hive-slot">
           <span class="ist-hive-plus" aria-hidden="true">+</span>
         </div>
@@ -1314,21 +1288,67 @@
     `;
   }
 
-  function hiveMeHTML(opts) {
+  function hiveMeCellHTML(opts, style) {
     const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName } = opts;
+    return hiveCellHTML(`
+      <div class="ist-pc-cover-avatar ist-hive-frame" title="${esc(displayName)}">
+        ${coverBadgesHTML(profile)}
+        <div class="ist-pc-cover-art">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>
+      </div>
+    `, style, '', 'ist-hive-me');
+  }
+
+  // ── The grid ──
+  // Everyone on the caller's map, plus the free sides of the caller's own
+  // hexagon — those are the only openings shown, because they are the
+  // only ones the caller can attach to. Somebody else's free sides are
+  // theirs to give away, not yours to fill.
+  function hiveGridHTML(opts) {
+    const t = opts.t;
+    const cells = (opts.hive && opts.hive.cells) || [];
+    const open = opts.open || null;
+    const taken = new Set(cells.map(c => `${c.q},${c.r}`));
+
+    const items = [{ q: 0, r: 0, kind: 'me' }];
+    cells.forEach(c => items.push({ q: c.q, r: c.r, kind: 'member', member: c }));
+    HIVE_DIRS.forEach((v, dir) => {
+      if (!taken.has(`${v[0]},${v[1]}`)) items.push({ q: v[0], r: v[1], kind: 'empty', dir });
+    });
+
+    // The plane is sized to what is actually on it, then centred on the
+    // caller's own cell by renderHive — so the reader is in the middle
+    // whatever shape has grown around them.
+    const xs = items.map(i => i.q + i.r / 2);
+    const ys = items.map(i => i.r);
+    const minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+    const minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+
+    const html = items.map(item => {
+      const p = hivePos(item.q, item.r, minX, minY);
+      const style = `left: calc(var(--ist-hive-step-x) * ${p.x}); top: calc(var(--ist-hive-step-y) * ${p.y});`;
+      if (item.kind === 'me') return hiveMeCellHTML(opts, style);
+      if (item.kind === 'member') {
+        return hiveMemberCellHTML(item.member, style, !!open && open.member === item.member.member_id);
+      }
+      return hiveEmptyCellHTML(item.dir, style, !!open && open.dir === item.dir, t);
+    }).join('');
+
+    const w = `calc(var(--ist-hive-step-x) * ${maxX - minX} + var(--ist-hive-cell-w))`;
+    const h = `calc(var(--ist-hive-step-y) * ${maxY - minY} + var(--ist-hive-cell-h))`;
     return `
-      <div class="ist-hive-cell ist-hive-me">
-        <div class="ist-pc-cover-avatar ist-hive-frame" title="${esc(displayName)}">
-          ${coverBadgesHTML(profile)}
-          <div class="ist-pc-cover-art">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>
-        </div>
+      <div class="ist-hive" id="po-hive-view">
+        <div class="ist-hive-plane" id="po-hive-plane" style="width: ${w}; height: ${h};">${html}</div>
       </div>
     `;
   }
 
-  // Your own code for the week — the other half of the exchange, and the
-  // only way anyone can put you in theirs. The dock's resting content:
-  // whatever is showing whenever no slot is open (see hiveDockHTML).
+  // ── The dock ──
+  // One fixed spot under the grid that a tap talks to, so nothing on the
+  // grid itself has to grow, shift or make room. It rests on your own
+  // code when nothing is selected, and swaps to the tapped hexagon's
+  // panel while one is open: the code form for a free side, the member
+  // for a taken one — with Çıkar when you are the one attached to them,
+  // and why not when you are not.
   function hiveCodeHTML(hive, t) {
     if (!hive || !hive.code) return `<div class="ist-hive-code ist-hive-code-empty">&nbsp;</div>`;
     return `
@@ -1341,57 +1361,126 @@
     `;
   }
 
-  // ── The dock ──
-  // One fixed spot under the honeycomb that a tap on a hex talks to,
-  // instead of the hex growing sideways into it (see hiveSlotHTML). It
-  // rests on your own code when nothing is selected, and swaps to the
-  // tapped slot's panel — the code form for an empty one, the occupant
-  // and a Çıkar button for a filled one — while a slot is open. Full
-  // honeycomb width rather than a row's narrow side gutter, so the code
-  // field and buttons land at a real size on a phone instead of the
-  // cramped column the old side-extension had to fit into.
+  function hiveMemberPanelHTML(member, open, t) {
+    const nb = hiveMemberDistrict(member);
+    let action;
+    if (!member.bonded) {
+      // Somebody else's neighbour. You can see them — the petek is one
+      // shape and it would be a lie to hide part of it — but they are
+      // not yours to detach, and you attach to them the same way you
+      // attach to anyone: by being handed their code.
+      action = `<div class="ist-hive-ext-note">${esc(t('profile.hive.notyours'))}</div>`;
+    } else if (member.locked) {
+      action = `<div class="ist-hive-ext-note">${esc(t('profile.hive.lockednote'))}</div>`;
+    } else {
+      action = `<button type="button" class="ist-hive-remove" id="po-hive-remove">${esc(t('profile.hive.remove'))}</button>`;
+    }
+    return `
+      <div class="ist-hive-readout-name">${esc(hiveMemberName(member))}</div>
+      ${nb ? `<div class="ist-hive-readout-meta">${esc(nb)}</div>` : ''}
+      ${action}
+      <div class="ist-hive-ext-msg" id="po-hive-msg">${esc(open.error || '')}</div>
+    `;
+  }
+
+  function hiveFormHTML(open, t) {
+    return `
+      <label class="ist-hive-ext-label" for="po-hive-code">${esc(t('profile.hive.codeprompt'))}</label>
+      <input class="ist-pc-input ist-hive-input" id="po-hive-code" type="text"
+             inputmode="latin" autocomplete="off" autocapitalize="characters" spellcheck="false"
+             maxlength="${HIVE_CODE_LENGTH}" placeholder="${'•'.repeat(HIVE_CODE_LENGTH)}"
+             value="${esc(open.value || '')}">
+      <button type="button" class="ist-pc-save ist-hive-submit" id="po-hive-submit">${esc(t('profile.hive.add'))}</button>
+      <div class="ist-hive-ext-msg" id="po-hive-msg">${esc(open.error || '')}</div>
+    `;
+  }
+
   function hiveDockHTML(opts) {
     const t = opts.t;
     const open = opts.open;
-    if (open) {
-      const members = (opts.hive && opts.hive.slots) || {};
-      return `<div class="ist-hive-dock-panel">${hiveExtensionHTML(members[open.slot] || null, open, t)}</div>`;
+    if (open && open.member) {
+      const member = ((opts.hive && opts.hive.cells) || []).find(c => c.member_id === open.member);
+      if (member) return `<div class="ist-hive-dock-panel">${hiveMemberPanelHTML(member, open, t)}</div>`;
+    }
+    if (open && open.dir != null) {
+      return `<div class="ist-hive-dock-panel">${hiveFormHTML(open, t)}</div>`;
     }
     return hiveCodeHTML(opts.hive, t);
   }
 
   function hiveHTML(opts) {
-    const t = opts.t;
-    const members = (opts.hive && opts.hive.slots) || {};
-    const open = opts.open || null;
-    const rows = HIVE_ROWS.map(row => {
-      const cells = [];
-      row.slots.forEach((slot, i) => {
-        if (row.me === i) cells.push(hiveMeHTML(opts));
-        cells.push(hiveSlotHTML(slot, members[slot] || null, !!open && open.slot === slot, t));
-      });
-      if (row.me === row.slots.length) cells.push(hiveMeHTML(opts));
-      const [leftSlot, rightSlot] = [row.slots[0], row.slots[row.slots.length - 1]];
-      return `
-        <div class="ist-hive-row">
-          ${hiveSideHTML('left', members[leftSlot] || null, t)}
-          <div class="ist-hive-cells">${cells.join('')}</div>
-          ${hiveSideHTML('right', members[rightSlot] || null, t)}
-        </div>
-      `;
-    }).join('');
     return `
-      <div class="ist-hive" data-slots="${HIVE_SLOT_COUNT}">${rows}</div>
+      ${hiveGridHTML(opts)}
       <div class="ist-hive-dock" id="po-hive-dock">${hiveDockHTML(opts)}</div>
     `;
   }
 
-  // ── The honeycomb's own little render/fetch loop ──
+  // ── The petek's own little render/fetch loop ──
   // It re-renders in place (into #po-hive-mount) rather than through
-  // renderOverlayBody, so opening a slot or closing it again doesn't
+  // renderOverlayBody, so opening a hexagon or closing it again doesn't
   // rebuild the rest of the profile page under it.
   function hiveMountHTML() {
     return `<div id="po-hive-mount"></div>`;
+  }
+
+  // ── Fitting the grid into a page that never resizes ──
+  // The page is cut to its own fixed size (see .hive-overlay in
+  // profile-card.css) and the petek grows without asking it. So the
+  // drawing is scaled to fit what room there is, centred on the caller's
+  // own cell — and when it would have to shrink past legibility it is
+  // left at that floor and dragged instead.
+  function fitHive(state) {
+    const view = document.getElementById('po-hive-view');
+    const plane = document.getElementById('po-hive-plane');
+    if (!view || !plane) return;
+    const me = plane.querySelector('.ist-hive-me');
+    if (!me) return;
+
+    const vw = view.clientWidth, vh = view.clientHeight;
+    const pw = plane.offsetWidth, ph = plane.offsetHeight;
+    // The grid is drawn before the page is unhidden (see
+    // renderHiveOverlayBody), so the first measurement is a screenful of
+    // zeroes. Wait for a frame that has real numbers in it rather than
+    // leaving the plane hanging off the middle of a window it was never
+    // measured against — bounded, so a page that is closed again before
+    // it ever laid out doesn't leave a frame loop behind.
+    if (!vw || !vh || !pw || !ph) {
+      const tries = (state.hiveFitTries || 0) + 1;
+      state.hiveFitTries = tries;
+      if (tries < 30) requestAnimationFrame(() => fitHive(state));
+      return;
+    }
+    state.hiveFitTries = 0;
+
+    const cx = me.offsetLeft + me.offsetWidth / 2;
+    const cy = me.offsetTop + me.offsetHeight / 2;
+    // What has to fit is not the drawing's own box but the box it needs
+    // *around the reader*: they stay in the middle of the window, so a
+    // petek that has grown out to one side only is still asking for that
+    // much room on both. Fitting the raw box instead leaves the far side
+    // clipped by a window the arithmetic had just called roomy.
+    const reqW = 2 * Math.max(cx, pw - cx);
+    const reqH = 2 * Math.max(cy, ph - cy);
+    const scale = Math.max(HIVE_MIN_SCALE, Math.min(1, vw / reqW, vh / reqH));
+
+    // Scaling about the caller's own cell and then hanging that point off
+    // the middle of the window keeps them in the middle at any scale —
+    // and the pan, when there is one, is a plain offset from there.
+    const pan = state.hivePan || { x: 0, y: 0 };
+    state.hiveFit = { scale, cx, cy, vw, vh, reqW, reqH };
+    plane.style.transformOrigin = `${cx}px ${cy}px`;
+    plane.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${scale})`;
+    plane.style.marginLeft = `${-cx}px`;
+    plane.style.marginTop = `${-cy}px`;
+    // Panning is only offered when the fit had to give up: a grid that
+    // fits has nowhere to go, and a page that slides under the finger
+    // for no reason reads as broken.
+    const pannable = (reqW * scale > vw + 1) || (reqH * scale > vh + 1);
+    view.classList.toggle('ist-hive-pannable', pannable);
+    if (!pannable && (pan.x || pan.y)) {
+      state.hivePan = { x: 0, y: 0 };
+      plane.style.transform = `scale(${scale})`;
+    }
   }
 
   function renderHive(state) {
@@ -1409,31 +1498,58 @@
       displayName: state.hiveDisplayName || '',
       hive: state.hive, open: state.hiveOpen, t,
     });
+    fitHive(state);
     wireHiveEvents(state);
   }
 
-  // Both calls are best-effort: before db/hive_slots.sql has been run the
-  // RPCs simply aren't there, and the honeycomb should still draw (six
-  // empty frames, no code) rather than the profile page failing to open.
+  // Both calls are best-effort: before db/hive_lattice_v4.sql has been
+  // run the RPCs simply aren't there, and the petek should still draw
+  // (your own hexagon with six free sides, no code) rather than the page
+  // failing to open.
   async function loadHive(state) {
     state.hiveLoaded = true;
     const { sb } = state;
-    const [codeRes, slotsRes] = await Promise.all([
+    const [codeRes, mapRes] = await Promise.all([
       sb.rpc('hive_my_code'),
-      sb.rpc('hive_my_slots'),
+      sb.rpc('hive_map'),
     ]);
     const code = Array.isArray(codeRes.data) ? codeRes.data[0] : codeRes.data;
-    const slots = {};
-    (slotsRes.data || []).forEach(row => { slots[row.slot] = row; });
-    state.hive = { code: code ? code.code : null, slots };
+    state.hive = { code: code ? code.code : null, cells: mapRes.data || [] };
     renderHive(state);
   }
 
-  async function reloadHiveSlots(state) {
-    const { data } = await state.sb.rpc('hive_my_slots');
-    const slots = {};
-    (data || []).forEach(row => { slots[row.slot] = row; });
-    state.hive = Object.assign({}, state.hive, { slots });
+  async function reloadHiveMap(state) {
+    const { data } = await state.sb.rpc('hive_map');
+    state.hive = Object.assign({}, state.hive, { cells: data || [] });
+  }
+
+  // Dragging the grid. Only ever offered when the drawing genuinely
+  // outruns the page (see fitHive); it moves the plane and nothing else,
+  // so the dock below stays exactly where the finger left it.
+  function wireHivePan(state) {
+    const view = document.getElementById('po-hive-view');
+    const plane = document.getElementById('po-hive-plane');
+    if (!view || !plane || !view.classList.contains('ist-hive-pannable')) return;
+    let from = null;
+
+    view.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button')) return;
+      from = { x: e.clientX, y: e.clientY, pan: Object.assign({ x: 0, y: 0 }, state.hivePan) };
+      view.setPointerCapture(e.pointerId);
+    });
+    view.addEventListener('pointermove', (e) => {
+      if (!from) return;
+      const fit = state.hiveFit || { scale: 1, reqW: 0, reqH: 0, vw: 0, vh: 0 };
+      // Clamped to the drawing's own overhang, so the petek can never be
+      // dragged off the page and lost.
+      const slackX = Math.max(0, (fit.reqW * fit.scale - fit.vw) / 2);
+      const slackY = Math.max(0, (fit.reqH * fit.scale - fit.vh) / 2);
+      const x = Math.max(-slackX, Math.min(slackX, from.pan.x + (e.clientX - from.x)));
+      const y = Math.max(-slackY, Math.min(slackY, from.pan.y + (e.clientY - from.y)));
+      state.hivePan = { x, y };
+      plane.style.transform = `translate(${x}px, ${y}px) scale(${fit.scale})`;
+    });
+    ['pointerup', 'pointercancel'].forEach(ev => view.addEventListener(ev, () => { from = null; }));
   }
 
   function wireHiveEvents(state) {
@@ -1444,15 +1560,25 @@
     // Bound to the mount, never to `document`: all three carousel pages
     // share one document (see router.js), so a document-level handler
     // would keep firing after navigating away from Anahane.
-    mount.querySelectorAll('.ist-hive-cell[data-slot]').forEach(cell => {
+    mount.querySelectorAll('.ist-hive-cell[data-dir]').forEach(cell => {
       cell.addEventListener('click', () => {
-        const slot = parseInt(cell.dataset.slot, 10);
-        // Pressing the open slot again folds it back up, so the frame is
-        // its own close button and nothing else has to carry one.
-        state.hiveOpen = (state.hiveOpen && state.hiveOpen.slot === slot)
+        const dir = parseInt(cell.dataset.dir, 10);
+        // Pressing the open hexagon again folds it back up, so the frame
+        // is its own close button and nothing else has to carry one.
+        state.hiveOpen = (state.hiveOpen && state.hiveOpen.dir === dir)
           ? null
-          : { slot, value: '', error: '' };
+          : { dir, value: '', error: '' };
         state.hiveFocusInput = !!state.hiveOpen;
+        renderHive(state);
+      });
+    });
+
+    mount.querySelectorAll('.ist-hive-cell[data-member]').forEach(cell => {
+      cell.addEventListener('click', () => {
+        const id = cell.dataset.member;
+        state.hiveOpen = (state.hiveOpen && state.hiveOpen.member === id)
+          ? null
+          : { member: id, value: '', error: '' };
         renderHive(state);
       });
     });
@@ -1480,8 +1606,8 @@
         if (e.key === 'Enter') submit.click();
         if (e.key === 'Escape') { state.hiveOpen = null; renderHive(state); }
       });
-      submit.addEventListener('click', () => claimHiveSlot(state, input.value));
-      // Focus only when the extension has just been opened, not on every
+      submit.addEventListener('click', () => bindHiveMember(state, input.value));
+      // Focus only when the panel has just been opened, not on every
       // re-render: loadHive landing while a code is half-typed would
       // otherwise yank the caret back to the start of the field.
       if (state.hiveFocusInput) {
@@ -1491,13 +1617,21 @@
     }
 
     const removeBtn = document.getElementById('po-hive-remove');
-    if (removeBtn) removeBtn.addEventListener('click', () => releaseHiveSlot(state));
+    if (removeBtn) removeBtn.addEventListener('click', () => unbindHiveMember(state));
+
+    wireHivePan(state);
   }
 
-  async function claimHiveSlot(state, rawCode) {
+  // Attaching. The direction is the side of your own hexagon you tapped;
+  // where the other member's petek ends up — and whether their whole
+  // formation can be carried over to meet yours at all — is the server's
+  // call (see hive_bond_code in db/hive_lattice_v4.sql), which is why
+  // every outcome here is a status this prints rather than a guess made
+  // before asking.
+  async function bindHiveMember(state, rawCode) {
     const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
     const open = state.hiveOpen;
-    if (!open) return;
+    if (!open || open.dir == null) return;
     const code = String(rawCode || '').trim().toUpperCase();
     const msgEl = document.getElementById('po-hive-msg');
     const btn = document.getElementById('po-hive-submit');
@@ -1510,7 +1644,7 @@
     btn.disabled = true;
     open.error = '';
     if (msgEl) msgEl.textContent = '';
-    const { data, error } = await state.sb.rpc('hive_claim_code', { p_code: code, p_slot: open.slot });
+    const { data, error } = await state.sb.rpc('hive_bond_code', { p_code: code, p_dir: open.dir });
     const row = Array.isArray(data) ? data[0] : data;
     const status = error ? 'failed' : ((row && row.status) || 'failed');
 
@@ -1522,38 +1656,44 @@
       return;
     }
 
-    // Placed: the extension folds back up and the slot it was hanging
-    // off now carries the member it just took.
-    await reloadHiveSlots(state);
+    // Attached: the whole map is re-fetched rather than the one cell
+    // patched in, because this one attachment may have carried an entire
+    // petek over to meet yours — everybody's coordinates can have
+    // changed, including your own.
+    await reloadHiveMap(state);
     state.hiveOpen = null;
+    state.hivePan = { x: 0, y: 0 };
     renderHive(state);
   }
 
-  // Çıkar is mutual, like the placing was: it goes through
-  // hive_remove_member rather than deleting the caller's own row, so the
-  // member's honeycomb stops holding you at the same moment yours stops
-  // holding them (see db/hive_slots_v3_mutual_permanent.sql).
-  async function releaseHiveSlot(state) {
+  // Çıkar is mutual, like the attaching was, and it is refused for the
+  // whole week the bond was made in — the server says so with a status
+  // rather than the button being hidden, because a lock the reader can
+  // see is a rule and a missing button is a bug.
+  async function unbindHiveMember(state) {
     const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
-    if (!state.hiveOpen) return;
-    const slot = state.hiveOpen.slot;
-    const member = ((state.hive && state.hive.slots) || {})[slot];
-    if (!member) return;
+    const open = state.hiveOpen;
+    if (!open || !open.member) return;
     const btn = document.getElementById('po-hive-remove');
-    btn.disabled = true;
-    const { error } = await state.sb.rpc('hive_remove_member', { p_member_id: member.member_id });
-    if (error) {
-      btn.disabled = false;
+    if (btn) btn.disabled = true;
+    const { data, error } = await state.sb.rpc('hive_unbond', { p_member_id: open.member });
+    const row = Array.isArray(data) ? data[0] : data;
+    const status = error ? 'failed' : ((row && row.status) || 'failed');
+
+    if (status !== 'ok') {
+      if (btn) btn.disabled = false;
+      open.error = t(`profile.hive.err.${status}`);
       const msgEl = document.getElementById('po-hive-msg');
-      if (msgEl) msgEl.textContent = t('profile.hive.err.failed');
+      if (msgEl) msgEl.textContent = open.error;
+      if (status === 'locked') await reloadHiveMap(state);
       return;
     }
-    // Emptied: leave the extension open on the now-empty slot, so it is
-    // showing the code form — the natural next move after taking someone
-    // out is putting someone else in.
-    await reloadHiveSlots(state);
-    state.hiveOpen = { slot, value: '', error: '' };
-    state.hiveFocusInput = true;
+
+    // Gone: the dock falls back to your own code, which is the natural
+    // next move after taking someone out — the side they were standing
+    // on is free again and takes a code.
+    await reloadHiveMap(state);
+    state.hiveOpen = null;
     renderHive(state);
   }
 
