@@ -291,7 +291,7 @@
 
     /* ── Coffee venue slide-in panel ──
        Clicking a row on the Kahve Endeksi board (col-right) opens that
-       venue here, over the discussion feed -- the same left-hand slide
+       venue here, over the events column -- the same left-hand slide
        the scoreboard uses when a game opens, so "I tapped something on
        the right, its detail arrived on the left" is one consistent move
        across the page. Carries the venue's live status, its week's
@@ -763,6 +763,187 @@
       .coffee-pill { display: none; }
     }
 
+    /* ── Events (left column) ──
+       Moved here from Hane, card markup and all (see renderEventsNow in
+       the script below), so the styling below is that column's, carried
+       over rather than reinvented. It sits where the neighborhood
+       comments used to: same box, same flex chain. */
+    .events-section {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex: 1;
+      min-height: 0;
+    }
+    #events-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 14px 16px 14px;
+    }
+
+    .event-item {
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      column-gap: 10px;
+      padding: 14px 16px 14px 14px;
+      margin-bottom: 12px;
+      background: var(--paper-card);
+      border: 2px solid var(--card-border-color);
+      border-bottom: 5px solid var(--card-border-color);
+      transition: background 0.15s, transform 0.15s ease;
+    }
+    .event-item:last-child { margin-bottom: 0; }
+    .event-item .ev-date-block {
+      text-align: center;
+      padding-top: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      color: var(--card-fg-heading);
+    }
+    .event-item .ev-day {
+      font-size: 1.7rem;
+      font-weight: 400;
+      line-height: 1;
+    }
+    .event-item .ev-mon {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--card-fg-muted);
+      margin-top: 4px;
+    }
+    .event-item .ev-wd {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.55rem;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--card-fg-muted);
+      margin-top: 2px;
+      opacity: 0.75;
+    }
+    .event-item .ev-body { min-width: 0; }
+    .event-item .ev-kicker {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--ink-red);
+      margin-bottom: 5px;
+    }
+    .event-item .ev-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 600;
+      line-height: 1.22;
+      margin-bottom: 0;
+      color: var(--card-fg-heading);
+    }
+    .event-item .ev-meta {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.78rem;
+      color: var(--card-fg-muted);
+      line-height: 1.35;
+    }
+    .event-item.openable { cursor: pointer; }
+    /* Plain hover: a lighter background plus a small nudge inward toward
+       the map. .is-open (see markOpenEventCard) mirrors the same look
+       while that card's detail sheet is open, so it stays visually
+       "pressed" even after the mouse moves onto the sheet itself.
+       Rightward here, not leftward as on Hane: this column sits to the
+       LEFT of the map on Kahvehane, so inward is the other way. */
+    .event-item.openable:hover,
+    .event-item.openable.is-open {
+      background: #e8e8e8;
+      transform: translateX(6px);
+    }
+    /* Only ever rendered inside the detail sheet (see buildEventDetailHtml)
+       -- the column's preview card doesn't include it. */
+    .event-item .ev-details {
+      grid-column: 1 / -1;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--card-border);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: var(--card-fg);
+    }
+    .event-item .ev-desc { margin-bottom: 10px; }
+    .detail-overlay-body .event-item { max-width: 520px; margin: 0 auto; }
+    /* Nothing to hover in the sheet -- the card there is the destination,
+       not a way into one, so it must not nudge under the reader's cursor. */
+    .detail-overlay-body .event-item.openable:hover { transform: none; }
+    .ev-rsvp-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .ev-rsvp-btn {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 7px 14px;
+      background: transparent;
+      color: var(--ink-red);
+      border: 1px solid var(--ink-red);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .ev-rsvp-btn:hover { background: rgba(185, 54, 49, 0.15); }
+    .ev-rsvp-btn.attending {
+      background: var(--ink-red);
+      color: #1a1a1a;
+    }
+    .ev-rsvp-btn.attending:hover { opacity: 0.85; }
+    .ev-rsvp-btn:disabled { opacity: 0.6; cursor: default; }
+    .ev-rsvp-count {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.7rem;
+      color: var(--card-fg-muted);
+    }
+    .ev-attendees {
+      display: flex;
+      align-items: center;
+    }
+    /* Preview-card attendee stack: shown under the title on every
+       breakpoint, in the space the compact card otherwise leaves empty.
+       The detail sheet's .ev-attendees (inside .ev-rsvp-row) is
+       unaffected since it isn't matched by this class. */
+    .ev-attendees-preview {
+      display: flex;
+      margin-top: 10px;
+    }
+    .ev-attendees-preview:empty { display: none !important; }
+    .ev-attendee-avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--paper-dark);
+      border: 1.5px solid var(--paper-card, #fff);
+      box-shadow: 0 0 0 1px var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--accent);
+      overflow: hidden;
+      margin-left: -8px;
+    }
+    .ev-attendee-avatar:first-child { margin-left: 0; }
+    .ev-attendee-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .ev-attendee-avatar.ev-attendee-more {
+      font-size: 0.56rem;
+      color: var(--card-fg-muted);
+    }
+
     .discussion-section {
       display: flex;
       flex-direction: column;
@@ -770,6 +951,12 @@
       flex: 1;
       min-height: 0;
     }
+    /* The comments are parked while the events hold this column (see
+       COMMENTS_ENABLED in the script). `hidden` alone would not do it:
+       the rule above sets display, and any display beats the UA's
+       [hidden] rule -- so the section has to be hidden louder than it is
+       shown, at both breakpoints. */
+    .discussion-section[hidden] { display: none !important; }
 
     /* Which neighborhood's comments are showing is already visible under
        the map itself (#map-label) -- this used to repeat it here too,
@@ -1585,10 +1772,10 @@
         padding: 4px 10px;
       }
 
-      /* Comments: normal in-flow column below the map, to the left --
-         flex (not block) so .discussion-section below can stretch to
+      /* Events: normal in-flow column below the map, to the left --
+         flex (not block) so .events-section below can stretch to
          exactly fill row 2's height (a plain 1fr, see body above),
-         which is what lets its own .discussion-posts scroll internally
+         which is what lets its own #events-panel scroll internally
          within a fixed-size column instead of growing the page.
          Explicit z-index so it stays on top of the map even once it's
          zoomed in and spilling past its own little square. */
@@ -1635,6 +1822,61 @@
       /* Fills .col-left's height exactly; min-height:0 lets it (and,
          in turn, .discussion-posts below) shrink to fit rather than
          overflowing the fixed column. */
+      /* Events fill .col-left's height exactly, the way the comments
+         used to; min-height:0 lets #events-panel below shrink to fit
+         rather than overflowing the fixed column. */
+      .events-section {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        overflow: visible;
+      }
+      /* The events sit at the BOTTOM of the column -- one event rests
+         just above the tab bar and each further one is laid on top of it,
+         so the stack grows up toward the map instead of hanging off the
+         hero line. Same move as every other feed on the phone (see the
+         site-wide default), and the same mechanism: an auto margin on the
+         first card rather than justify-content:flex-end, so a stack that
+         outgrows the band simply scrolls instead of pushing its top out
+         of a scroller that cannot reach it.
+         8px side padding (on top of #main-site's own 10px frame padding)
+         puts the cards on the shared 18px screen inset -- the same line
+         the comments used to hold and the game tiles still do. */
+      #events-panel {
+        padding: 6px 8px 10px;
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        display: flex;
+        flex-direction: column;
+      }
+      #events-panel > :first-child { margin-top: auto; }
+      /* Fixed-height box laying its cards out as flex items: without this
+         they would be squeezed shorter to fit instead of overflowing into
+         the scroll. */
+      #events-panel > * { flex-shrink: 0; }
+      #events-panel > :last-child { margin-bottom: 0; }
+      .event-item {
+        grid-template-columns: 30px 1fr;
+        column-gap: 8px;
+        padding: 8px 9px;
+        margin-bottom: 6px;
+      }
+      .event-item .ev-date-block { padding-top: 2px; }
+      .event-item .ev-day { font-size: 1.05rem; line-height: 1; }
+      .event-item .ev-mon { font-size: 0.5rem; margin-top: 2px; }
+      .event-item .ev-wd { font-size: 0.46rem; margin-top: 1px; }
+      .event-item .ev-kicker { font-size: 9px; letter-spacing: 1.5px; margin-bottom: 2px; }
+      .event-item .ev-title { font-size: 16px; margin-bottom: 0; line-height: 1.2; }
+      .ev-attendees-preview { margin-top: 6px; }
+      .ev-attendees-preview .ev-attendee-avatar {
+        width: 20px;
+        height: 20px;
+        font-size: 0.5rem;
+        margin-left: -6px;
+      }
       .discussion-section {
         display: flex;
         flex-direction: column;
@@ -2357,7 +2599,15 @@
          sits top-left, #library-card top-right (see .col-right below). -->
     <div class="library-card politician-card" id="politician-card"><div class="card-loading"><span class="spinner"></span></div></div>
     <div class="col-left-slide">
-      <section class="discussion-section">
+      <!-- Events, moved here from Hane: this column is where you find the
+           people, and an event is the app's whole point -- a real reason
+           to be somewhere with them. It takes the space the neighborhood
+           comments used to hold; the comments themselves are parked (see
+           COMMENTS_ENABLED in the script below) until they get a home. -->
+      <section class="events-section">
+        <div id="events-panel"></div>
+      </section>
+      <section class="discussion-section" id="discussion-section" hidden>
         <div class="discussion-label" id="discussion-label" data-i18n="kahvehane.allistanbul">Tüm İstanbul</div>
         <div class="discussion-posts" id="discussion-posts"></div>
         <div class="submit-form" id="submit-form" style="display:none;">
@@ -2373,7 +2623,7 @@
         </div>
       </section>
     </div>
-    <!-- Slides in over the discussion feed above on desktop while a game
+    <!-- Slides in over the events column above on desktop while a game
          is open (see .game-score-slide CSS + initGameOverlay JS). Same
          #scoreboard-* ids loadScoreboard() already targets -- just
          relocated here from col-right, which now shows the coffee index
@@ -2389,7 +2639,7 @@
         </ol>
       </div>
     </div>
-    <!-- Slides in over the discussion feed the same way, when a venue is
+    <!-- Slides in over the events column the same way, when a venue is
          clicked on the Kahve Endeksi board in col-right. Content is
          rendered by renderVenueHTML() (shared with the mobile sheet) --
          see .coffee-venue-slide CSS and openCoffeeVenue() below. -->
@@ -2664,6 +2914,11 @@ function openDetail(html) {
   const overlay = document.getElementById('kahvehane-detail');
   const body = document.getElementById('kahvehane-detail-body');
   if (!overlay || !body) return;
+  // Whatever is about to show is not the previously-marked event card (an
+  // event's own click handler re-marks its card right after calling this)
+  // -- clear so a politician's or a venue's sheet doesn't leave a stale
+  // card looking "hovered" behind it.
+  if (typeof markOpenEventCard === 'function') markOpenEventCard(null);
   body.innerHTML = html;
   if (window.IstPersonMentions) IstPersonMentions.linkify(body, personMentionsRoster);
   body.scrollTop = 0;
@@ -2672,6 +2927,8 @@ function openDetail(html) {
 function closeDetail() {
   const overlay = document.getElementById('kahvehane-detail');
   if (!overlay) return;
+  // The card in the column stops looking pressed when its sheet goes.
+  if (typeof markOpenEventCard === 'function') markOpenEventCard(null);
   // On mobile a coffee venue lives inside this sheet (the board drills
   // into it), so dismissing the sheet dismisses the venue with it.
   if (openVenueId && !isDesktopBoard()) closeCoffeeVenue();
@@ -2808,6 +3065,7 @@ async function refreshHomeNeighborhood() {
 }
 
 let onI18NChangeForCountdown = null;
+let onI18NChangeForEvents = null;
 let discussionTickIntervalId = null;
 
 // This page's repeatable "become the active page" work -- the part that
@@ -2963,6 +3221,7 @@ async function mount() {
   if (window.__istSuppressFirstCardAnim) window.__istSuppressFirstCardAnim.left = false;
 
   loadPosts();
+  loadEvents();
   markPlayedGames(window.__currentUser.id);
   if (typeof applyGameLocks === 'function') applyGameLocks(sb);
   loadScoreboard();
@@ -2971,6 +3230,10 @@ async function mount() {
   IstRouter.onTick(tickScoreboardCountdown);
   onI18NChangeForCountdown = tickScoreboardCountdown;
   I18N.onChange(onI18NChangeForCountdown);
+  // Event cards print weekday/month names and the RSVP labels, all of
+  // which change with the language -- rebuild them in place.
+  onI18NChangeForEvents = () => renderEvents(true);
+  I18N.onChange(onI18NChangeForEvents);
   if (discussionTickIntervalId) clearInterval(discussionTickIntervalId);
   discussionTickIntervalId = setInterval(tickDiscussionPosts, 30000);
   // The coffee board re-ranks itself off the clock (venues opening and
@@ -2994,6 +3257,7 @@ async function mount() {
 function unmount() {
   IstRouter.offTick(tickScoreboardCountdown);
   if (onI18NChangeForCountdown) { I18N.offChange(onI18NChangeForCountdown); onI18NChangeForCountdown = null; }
+  if (onI18NChangeForEvents) { I18N.offChange(onI18NChangeForEvents); onI18NChangeForEvents = null; }
   if (discussionTickIntervalId) { clearInterval(discussionTickIntervalId); discussionTickIntervalId = null; }
   if (coffeeTickIntervalId) { clearInterval(coffeeTickIntervalId); coffeeTickIntervalId = null; }
   I18N.offChange(tickCoffeeIndex);
@@ -3459,7 +3723,7 @@ async function loadScoreboard(neighborhoodFilter = null, instant = false) {
 // into the app in the first place.
 if (!window.__istVirtualNavInjecting) init();
 
-// ── Map Interaction — clicking a neighborhood filters the discussion feed ──
+// ── Map Interaction — clicking a neighborhood filters this page's column ──
 // Delegated on document and re-queried fresh each time rather than bound
 // per-node once -- a virtual navigation (see router.js) replaces
 // #ist-content's whole subtree on every revisit to this page, including
@@ -3494,6 +3758,7 @@ document.addEventListener('click', (e) => {
     // (which also replays the game buttons' own entrance animation even
     // though they never change).
     loadPosts(nbId, true);
+    loadEvents(nbId, true);
     loadScoreboard(nbId, true);
     loadCoffeeIndexPanel(nbId);
     return;
@@ -3514,6 +3779,7 @@ document.addEventListener('click', (e) => {
   selectedNeighborhood = homeNeighborhood;
   updateSubmitFormVisibility();
   loadPosts(null, true);
+  loadEvents(null, true);
   loadScoreboard(null, true);
   loadCoffeeIndexPanel(null);
 });
@@ -3531,13 +3797,275 @@ document.addEventListener('mouseout', (e) => {
   getMapNeighborhoods().forEach(n => n.classList.remove('hover-active'));
 });
 
+// ── Events (left column) ──────────────────
+// Moved here from Hane, whose left column used to carry them. This is the
+// interactive side of the app -- the local layer, where you find the
+// people -- and an event is the one thing on the site that ends with you
+// somewhere else, with them. It follows the map the way the comments did:
+// pick a district and you see that district's events, tap the sea and you
+// see all of İstanbul's.
+const MONTH_ABBR_TR = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
+const MONTH_ABBR_EN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+function eventDateParts(iso) {
+  const d = new Date(iso);
+  const tz = 'Europe/Istanbul';
+  const en = I18N.isEnglish();
+  const locale = en ? 'en-US' : 'tr-TR';
+  const day = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, day: 'numeric' }), 10);
+  const month = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, month: 'numeric' }), 10);
+  const weekday = d.toLocaleDateString(locale, { timeZone: tz, weekday: 'long' });
+  const wd = d.toLocaleDateString(locale, { timeZone: tz, weekday: 'short' }).toLocaleUpperCase(locale);
+  const time = d.toLocaleTimeString(locale, { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: en });
+  const monAbbr = (en ? MONTH_ABBR_EN : MONTH_ABBR_TR)[month - 1] || '';
+  return { day, mon: monAbbr, wd, weekday, time };
+}
+
+let allEvents = [];
+let eventsRequestSeq = 0;
+let rsvpCounts = {};       // event_id -> attendee count
+let myRsvpIds = new Set(); // event_ids the current user has RSVP'd to
+let rsvpAttendees = {};    // event_id -> [profile, ...] (capped)
+let openEventCardId = null; // event whose card stays "hovered" while its sheet is open
+const MAX_ATTENDEE_AVATARS = 6;
+
+async function loadEvents(neighborhoodFilter = null, instant = false) {
+  const reqId = ++eventsRequestSeq;
+  const now = new Date().toISOString();
+  // Scope the query to the selected neighborhood so the 30-row cap
+  // doesn't hide matching rows that sit past the global top-30 window.
+  let query = sb.from('events')
+    .select('*')
+    .gte('event_date', now)
+    .order('event_date', { ascending: true })
+    .limit(30);
+  if (neighborhoodFilter) query = query.eq('neighborhood', neighborhoodFilter);
+  const { data, error } = await query;
+  // Drop responses from superseded requests so a slow older fetch
+  // can't clobber a newer one with stale rows.
+  if (reqId !== eventsRequestSeq) return;
+  if (error) { console.error('[kahvehane events]', error); allEvents = []; }
+  else allEvents = data || [];
+  await loadRsvps();
+  if (reqId !== eventsRequestSeq) return;
+  renderEvents(instant);
+}
+
+async function loadRsvps() {
+  rsvpCounts = {};
+  myRsvpIds = new Set();
+  rsvpAttendees = {};
+  const ids = allEvents.map(ev => ev.id);
+  if (!ids.length) return;
+  const { data, error } = await sb.from('event_rsvps')
+    .select('event_id, user_id, created_at')
+    .in('event_id', ids)
+    .order('created_at', { ascending: true });
+  if (error) { console.error('[kahvehane rsvps]', error); return; }
+  const myId = window.__currentUser && window.__currentUser.id;
+  (data || []).forEach(r => {
+    rsvpCounts[r.event_id] = (rsvpCounts[r.event_id] || 0) + 1;
+    if (myId && r.user_id === myId) myRsvpIds.add(r.event_id);
+  });
+  // Resolve attendee profile pictures in one batched query.
+  const userIds = Array.from(new Set((data || []).map(r => r.user_id)));
+  if (userIds.length) {
+    const { data: profs, error: profErr } = await sb.from('profiles')
+      .select('id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt')
+      .in('id', userIds);
+    if (profErr) { console.error('[kahvehane rsvp attendees]', profErr); return; }
+    const profMap = new Map((profs || []).map(p => [p.id, p]));
+    (data || []).forEach(r => {
+      const p = profMap.get(r.user_id);
+      if (!p) return;
+      (rsvpAttendees[r.event_id] = rsvpAttendees[r.event_id] || []).push(p);
+    });
+  }
+}
+
+function buildAttendeeAvatarsHtml(eventId) {
+  const list = rsvpAttendees[eventId] || [];
+  if (!list.length) return '';
+  const shown = list.slice(0, MAX_ATTENDEE_AVATARS);
+  const extra = list.length - shown.length;
+  const avatarsHtml = shown.map(p => {
+    const name = capitalizeName([p.first_name, p.last_name].filter(Boolean).join(' ')) || 'Üye';
+    const inner = IstAvatar.html(p.avatar_url, p.avatar_hair, p.avatar_hat, p.avatar_accessory, p.avatar_shirt);
+    return `<span class="ev-attendee-avatar" title="${escapeHtml(name)}">${inner}</span>`;
+  }).join('');
+  const moreHtml = extra > 0
+    ? `<span class="ev-attendee-avatar ev-attendee-more" title="+${extra}">+${extra}</span>`
+    : '';
+  return avatarsHtml + moreHtml;
+}
+
+async function toggleRsvp(eventId, btn) {
+  const myId = window.__currentUser && window.__currentUser.id;
+  if (!myId || btn.disabled) return;
+  const attending = myRsvpIds.has(eventId);
+  btn.disabled = true;
+  try {
+    if (attending) {
+      const { error } = await sb.from('event_rsvps').delete().eq('event_id', eventId).eq('user_id', myId);
+      if (error) throw error;
+    } else {
+      const { error } = await sb.from('event_rsvps').insert({ event_id: eventId, user_id: myId });
+      if (error) throw error;
+    }
+  } catch (err) {
+    console.error('[kahvehane rsvp]', err);
+    btn.disabled = false;
+    return;
+  }
+  // Refetch counts + attendee avatars so the stack reflects the change,
+  // then patch just this event's row in place so the card doesn't collapse.
+  await loadRsvps();
+  const nowAttending = myRsvpIds.has(eventId);
+  btn.classList.toggle('attending', nowAttending);
+  btn.textContent = nowAttending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join');
+  const row = btn.closest('.ev-rsvp-row');
+  const countEl = row?.querySelector('.ev-rsvp-count');
+  if (countEl) countEl.textContent = `${rsvpCounts[eventId] || 0} ${I18N.t('home.events.rsvp.count')}`;
+  const avatarsEl = row?.querySelector('.ev-attendees');
+  if (avatarsEl) avatarsEl.innerHTML = buildAttendeeAvatarsHtml(eventId);
+  // Also patch the (separate) preview card in the column behind the sheet,
+  // so its attendee stack matches without waiting for a reload.
+  const previewEl = document.querySelector(`.event-item[data-event-id="${CSS.escape(eventId)}"] .ev-attendees-preview`);
+  if (previewEl) previewEl.innerHTML = buildAttendeeAvatarsHtml(eventId);
+  btn.disabled = false;
+}
+
+// Keeps exactly one #events-panel card looking "hovered" (see the .is-open
+// CSS above) for as long as its detail sheet is open, regardless of where
+// the mouse actually is. Pass null to clear.
+function markOpenEventCard(id) {
+  openEventCardId = id == null ? null : String(id);
+  document.querySelectorAll('#events-panel .event-item.openable.is-open')
+    .forEach(el => el.classList.remove('is-open'));
+  if (openEventCardId == null) return;
+  const el = document.querySelector(`#events-panel [data-event-id="${CSS.escape(openEventCardId)}"]`);
+  if (el) el.classList.add('is-open');
+}
+
+function renderEvents(instant) {
+  const panel = document.getElementById('events-panel');
+  if (!panel) return;
+  // 'left': this column sits to the left of the map, so its cards enter
+  // and leave by the left edge -- the same way the comments did here.
+  animateFeedSwap(panel, 'left', () => renderEventsNow(panel, allEvents), [], instant);
+}
+
+// Full detail markup for an event -- rendered into the detail sheet (see
+// openDetail). Reuses the .event-item card's own styling so it looks like
+// the same card, just full-size, with the RSVP row live.
+function buildEventDetailHtml(ev) {
+  const nbLabel = ev.neighborhood ? (neighborhoodNames[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
+  const parts = eventDateParts(ev.event_date);
+  const dateTime = [parts.weekday, parts.time].filter(Boolean).join(' ');
+  const metaHTML = [dateTime, ev.location].filter(Boolean).map(escapeHtml).join('<br>');
+  const count = rsvpCounts[ev.id] || 0;
+  const attending = myRsvpIds.has(ev.id);
+  return `
+    <div class="event-item">
+      <div class="ev-date-block">
+        <div class="ev-day">${parts.day}</div>
+        <div class="ev-mon">${parts.mon}</div>
+      </div>
+      <div class="ev-body">
+        <div class="ev-kicker">${escapeHtml(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
+        <div class="ev-title">${escapeHtml(ev.title)}</div>
+        ${metaHTML ? `<div class="ev-meta">${metaHTML}</div>` : ''}
+      </div>
+      <div class="ev-details">
+        ${ev.description ? `<div class="ev-desc">${escapeHtml(ev.description)}</div>` : ''}
+        <div class="ev-rsvp-row">
+          <button type="button" class="ev-rsvp-btn${attending ? ' attending' : ''}" data-event-id="${escapeHtml(ev.id)}">${attending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join')}</button>
+          <span class="ev-rsvp-count">${count} ${I18N.t('home.events.rsvp.count')}</span>
+          <span class="ev-attendees">${buildAttendeeAvatarsHtml(ev.id)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderEventsNow(panel, rows) {
+  if (!rows.length) {
+    // Nothing to say when there is no event: an empty column leaves the
+    // map behind it clear, rather than printing a line over the drawing.
+    panel.innerHTML = '';
+    return;
+  }
+  const rowsById = new Map(rows.map(ev => [String(ev.id), ev]));
+  panel.innerHTML = rows.map(ev => {
+    const nbLabel = ev.neighborhood ? (neighborhoodNames[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
+    const parts = eventDateParts(ev.event_date);
+    // Weekday lives in the date block (day / month / weekday); time and
+    // location are both dropped from the preview -- see
+    // buildEventDetailHtml for the full date/time/location, still shown
+    // once you open the card. That frees this card for a bigger title.
+    return `
+      <div class="event-item openable" data-event-id="${escapeHtml(ev.id)}">
+        <div class="ev-date-block">
+          <div class="ev-day">${parts.day}</div>
+          <div class="ev-mon">${parts.mon}</div>
+          <div class="ev-wd">${parts.wd}</div>
+        </div>
+        <div class="ev-body">
+          <div class="ev-kicker">${escapeHtml(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
+          <div class="ev-title">${escapeHtml(ev.title)}</div>
+          <span class="ev-attendees ev-attendees-preview">${buildAttendeeAvatarsHtml(ev.id)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  panel.querySelectorAll('.event-item.openable').forEach(el => {
+    const ev = rowsById.get(el.dataset.eventId);
+    if (!ev) return;
+    el.addEventListener('click', () => {
+      openDetail(buildEventDetailHtml(ev));
+      markOpenEventCard(ev.id);
+    });
+  });
+
+  // Re-render (map click, live refresh) rebuilds every card from scratch,
+  // wiping .is-open along with it -- restore it if the card that was open
+  // is still in this batch.
+  if (openEventCardId != null && rowsById.has(openEventCardId)) markOpenEventCard(openEventCardId);
+}
+
+// The RSVP button lives inside the detail sheet, which is re-rendered on
+// every open -- delegated on the sheet body so it survives that, and bound
+// to the element rather than to document (the sheet's body belongs to this
+// page's markup, but a document listener would outlive a virtual
+// navigation away from it -- see router.js).
+(function initEventRsvpClicks() {
+  const body = document.getElementById('kahvehane-detail-body');
+  if (!body) return;
+  body.addEventListener('click', (e) => {
+    const btn = e.target.closest('.ev-rsvp-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    toggleRsvp(btn.dataset.eventId, btn);
+  });
+})();
+
 // ── Paginated comment feed ──
 // Reads `neighborhood_comments` 20 at a time, with a "Load more" button.
 // Resets when the filter changes (map click / clear).
+//
+// PARKED. The events column above took this column's space, and where the
+// neighborhood comments belong is still an open question -- so the feed,
+// its composer and everything that drives them stay exactly as they are,
+// switched off at one line rather than deleted. `#discussion-section`
+// carries `hidden` in the markup to match; turning both back on is the
+// whole of re-enabling it.
+const COMMENTS_ENABLED = false;
 const PAGE_SIZE = 20;
 let feedState = { filter: null, offset: 0, done: false, currentUserId: null };
 
 async function loadPosts(neighborhoodFilter = null, instant = false) {
+  if (!COMMENTS_ENABLED) return;
   feedState = { filter: neighborhoodFilter, offset: 0, done: false, currentUserId: feedState.currentUserId };
   const postsEl = document.getElementById('discussion-posts');
 
