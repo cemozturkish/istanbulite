@@ -528,6 +528,13 @@ sb.from('articles').delete().eq('id', id)
   its edges already on the card's edges; the map above stays live and untouched, and touching a
   country there opens that country over the top (`initNewsPage` watches `#reader-overlay` and folds
   the story away). On desktop there is no band and no map to protect, so it stays THE sheet
+- **The lit countries breathe while the story is open** (`.country.news-active`, a slow 1.9s
+  pulse in fill and stroke). A static tint says "these are selected"; a pulse says "this is what
+  you are reading about, up there, now" — the one thing the page down in the band cannot say for
+  itself, being nowhere near the drawing. Slow and even rather than a hard blink: the map is
+  hand-drawn scenery, and a flashing shape over it reads as an alarm. Every shape of every country
+  in the story takes the class in the same frame, so the whole story pulses on one beat instead of
+  as a set of places that happen to be lit; `prefers-reduced-motion: reduce` holds it lit
 - **A card presses like a button**: it gives under the finger (`.pressing`, scale 0.955) and pops
   past its own size when released (`.released`, a keyframed 1.022 — the travel is too small for a
   springy easing to overshoot visibly), which is the first frame of it growing into the page. It
