@@ -644,6 +644,11 @@
      never resizes under the reader as the grid changes. */
   --ist-hive-view-w: calc(var(--ist-hive-step-x) * 4 + var(--ist-hive-cell-w));
   --ist-hive-view-h: calc(var(--ist-hive-step-y) * 2 + var(--ist-hive-cell-h));
+  /* The track a name gets beside its hexagon, and the air between the
+     two. Written against the cell so a name stays the same size relative
+     to the face it belongs to at every scale the grid is drawn at. */
+  --ist-hive-name-w: calc(var(--ist-hive-cell-w) * 0.66);
+  --ist-hive-name-gap: calc(var(--ist-hive-cell-w) * 0.02);
   /* The paper either side of the grid on the phone page. */
   --ist-hive-page-pad: 16px;
 }
@@ -742,6 +747,44 @@ button.ist-hive-cell-open.ist-hive-filled .ist-hive-frame { opacity: 1; }
   line-height: 1;
   color: var(--muted);
 }
+
+/* ── The name beside a hexagon ──
+   Everyone to the left of the reader is named to the left of their own
+   frame and ranged right against it; everyone to the right is named to
+   the right and ranged left. So the names read outward from the middle,
+   the drawing keeps the faces, and no line of type ever crosses the
+   grid. Printed only where the cell further out is empty (see
+   hiveNameHTML) — a name lives in the drawing's gaps, never over
+   somebody's frame.
+
+   Absolutely placed, out of flow and out of pointer events: the packing
+   is arithmetic and must not shift by so much as a pixel because
+   somebody's name is long. A name too long for its track breaks inside
+   it rather than running off the page — at this size a broken name reads
+   better than one printed over the paper's edge. */
+.ist-hive-name {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--ist-hive-name-w);
+  pointer-events: none;
+  overflow-wrap: anywhere;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  /* Capped as well as scaled: on a desktop the cells are big enough that
+     a name written purely against them would out-shout the drawing. */
+  font-size: min(0.8rem, calc(var(--ist-hive-cell-w) * 0.105));
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  line-height: 1.15;
+  color: var(--ink);
+}
+.ist-hive-name-left  { right: 100%; margin-right: var(--ist-hive-name-gap); text-align: right; }
+.ist-hive-name-right { left: 100%;  margin-left: var(--ist-hive-name-gap);  text-align: left; }
+/* A member you are not attached to is drawn a shade back (see
+   .ist-hive-bonded above); their name says the same thing, so the two
+   halves of one hexagon never disagree. */
+button.ist-hive-filled:not(.ist-hive-bonded) .ist-hive-name { color: var(--muted); }
 .ist-hive-readout-name {
   /* Breaks inside its own track rather than printing over the edge of
      the page — see the note on the meta lines below. */
