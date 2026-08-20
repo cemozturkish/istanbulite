@@ -493,7 +493,9 @@ sb.from('articles').delete().eq('id', id)
   it, and the depth is `nth-child` and nothing else: every card sits in the same grid cell of
   `#dunya-news-feed`, and the two behind are pushed up and back a step so their edges show.
   Promoting the next story is *removing the front node* (`dealDeckCard`) — the ones behind
-  transition forward on their own instead of being re-rendered there. Past the third card the
+  transition forward on their own instead of being re-rendered there. The order is the deck's own
+  rule, not the query's: `undealtNews()` sorts by `updated_at` itself, so the newest story is on
+  top by construction. Past the third card the
   picture stops changing; the rest stay in the DOM (the desktop column still prints the whole
   list, and the fourth has to be standing ready) but are not drawn. Only the top of the deck takes
   a tap. Desktop keeps the scrolling list
@@ -504,10 +506,17 @@ sb.from('articles').delete().eq('id', id)
   something — the newest `breaking_news_polls` row the reader hasn't answered — the direction is
   the answer (right is `option_a`, left is `option_b`) and that option is stamped on the page as
   it moves, so nobody answers a question they never saw; a story with nothing open to answer
-  swipes away just the same, unstamped. What has been dealt with is kept per member in
-  `localStorage` (`dunya_dealt_<uid>`), pruned to the stories still in the 72h window: a deck that
-  refills itself on every reload is one nobody can reach the bottom of, and reaching the bottom is
-  the point — the empty deck says so and points at the door
+  swipes away just the same, unstamped
+- **A story that has been dealt with comes back only when it has actually moved.** What is kept
+  per member in `localStorage` (`dunya_dealt_<uid>`) is not "this story is done" but the story's
+  own `updated_at` *as thrown* — so a gelişme landing on its timeline (which bumps
+  `breaking_news.updated_at`; a deliberately backdated one does not, see `addNewsUpdate` in
+  admin.html) puts it back in the deck, and back on **top** of it, because the deck is ordered by
+  that same column. A story that has not moved stays gone. The store is pruned to the stories
+  still in the 72h window, and the earlier stampless format (a plain array) is migrated on the
+  next fetch by stamping each entry with the story as it currently stands. A deck that refills
+  itself on every reload is one nobody can reach the bottom of, and reaching the bottom is the
+  point — the empty deck says so and points at the door
 - **A story opens into the band it was lying in, not over the map** (`#news-overlay` /
   `#news-page`). On a phone the tapped card *grows* into the whole strip between the hero line and
   the tab bar — the same move the PETEK button makes on Hane, run by `growNewsPage` off a

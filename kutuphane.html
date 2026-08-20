@@ -4928,11 +4928,7 @@ async function loadDunyaNews() {
     return;
   }
   DUNYA_NEWS_CACHE = data || [];
-  // Forget stories that have fallen out of the window: what is dealt with
-  // is only ever about what is on the table.
-  const live = new Set(DUNYA_NEWS_CACHE.map(n => String(n.id)));
-  const kept = Array.from(_dealtIds).filter(id => live.has(id));
-  if (kept.length !== _dealtIds.size) { _dealtIds = new Set(kept); saveDealtIds(); }
+  reconcileDealt();
   renderDunyaNewsFeed();
 }
 
@@ -4944,8 +4940,17 @@ async function loadDunyaNews() {
 // opposite of what this app is for. Kept per member in localStorage, the
 // same way chapter completion is (see libReadCompletedSet), and pruned to
 // the stories still in the 72h window so it cannot grow without end.
+//
+// What is remembered is not "this story is done" but **the state of it
+// that was done with**: the story's own updated_at at the moment it was
+// thrown. A story the admin has since moved on (a gelişme lands on the
+// timeline and bumps breaking_news.updated_at -- see addNewsUpdate in
+// admin.html, where a backdated one deliberately doesn't) is not the
+// story the reader dealt with, so it comes back, and comes back on top of
+// the deck because the deck is ordered by that same column. A story that
+// has not moved stays gone.
 const DEALT_KEY_PREFIX = 'dunya_dealt_';
-let _dealtIds = new Set();
+let _dealt = new Map();   // story id -> the updated_at that was dealt with
 let _dealtKey = null;
 
 async function ensureDealtLoaded() {
@@ -4953,19 +4958,57 @@ async function ensureDealtLoaded() {
   const uid = await libGetCurrentUserId();
   _dealtKey = DEALT_KEY_PREFIX + (uid || 'anon');
   try {
-    const raw = JSON.parse(localStorage.getItem(_dealtKey) || '[]');
-    if (Array.isArray(raw)) _dealtIds = new Set(raw.map(String));
+    const raw = JSON.parse(localStorage.getItem(_dealtKey) || '{}');
+    // A plain array is the first version of this store, which remembered
+    // only that a story was dealt with. Those come in stampless and are
+    // given the story's current updated_at on the next fetch (see
+    // reconcileDealt) -- "you dealt with it as it stands", which is the
+    // only honest reading of a record that never had a stamp.
+    if (Array.isArray(raw)) raw.forEach(id => _dealt.set(String(id), null));
+    else if (raw && typeof raw === 'object') {
+      Object.keys(raw).forEach(id => _dealt.set(String(id), raw[id] || null));
+    }
   } catch (e) { /* unreadable store: start the deck full */ }
 }
 
 function saveDealtIds() {
   if (!_dealtKey) return;
-  try { localStorage.setItem(_dealtKey, JSON.stringify(Array.from(_dealtIds))); } catch (e) {}
+  const obj = {};
+  _dealt.forEach((stamp, id) => { obj[id] = stamp; });
+  try { localStorage.setItem(_dealtKey, JSON.stringify(obj)); } catch (e) {}
 }
 
-// Stories the reader hasn't dealt with, newest first -- what the deck is.
+// Drops what has fallen out of the 72h window (what is dealt with is only
+// ever about what is on the table) and stamps anything the older store
+// left stampless. Run once per fetch, against the rows just returned.
+function reconcileDealt() {
+  let changed = false;
+  const live = new Map(DUNYA_NEWS_CACHE.map(n => [String(n.id), n.updated_at || n.created_at]));
+  _dealt.forEach((stamp, id) => {
+    if (!live.has(id)) { _dealt.delete(id); changed = true; return; }
+    if (!stamp) { _dealt.set(id, live.get(id)); changed = true; }
+  });
+  if (changed) saveDealtIds();
+}
+
+// True while the story is still the one the reader threw away. Compared as
+// dates rather than as strings: PostgREST is free to hand back the same
+// instant as ...Z or as +00:00, and one of those sorts above the other.
+function newsIsDealt(n) {
+  const stamp = _dealt.get(String(n.id));
+  if (stamp === undefined) return false;
+  if (!stamp) return true;
+  return new Date(n.updated_at || n.created_at) <= new Date(stamp);
+}
+
+// The deck: what the reader hasn't dealt with, newest first. Sorted here
+// rather than left to the query's own order, because "the newest story is
+// the one on top" is the deck's rule and not a side effect of how its
+// rows happened to arrive.
 function undealtNews() {
-  return DUNYA_NEWS_CACHE.filter(n => !_dealtIds.has(String(n.id)));
+  return DUNYA_NEWS_CACHE.filter(n => !newsIsDealt(n))
+    .slice()
+    .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
 }
 
 // Takes the front card out of the deck without re-rendering it. The two
@@ -4973,9 +5016,13 @@ function undealtNews() {
 // node re-runs the nth-child rules and they TRANSITION forward a step --
 // which is the whole reason the deck's depth is expressed as position
 // rather than as a class the JS has to reassign.
-function dealDeckCard(newsId) {
-  const id = String(newsId);
-  if (!_dealtIds.has(id)) { _dealtIds.add(id); saveDealtIds(); }
+function dealDeckCard(story) {
+  const id = String(story.id);
+  // The stamp is the story AS THROWN. The next gelişme moves it past this
+  // and the story comes back -- that is the whole of "a story returns only
+  // when it has actually moved".
+  _dealt.set(id, story.updated_at || story.created_at || new Date().toISOString());
+  saveDealtIds();
   const feed = document.getElementById('dunya-news-feed');
   if (!feed) return;
   const node = feed.querySelector(`.article[data-news-id="${CSS.escape(id)}"]`);
@@ -5345,7 +5392,7 @@ function dealNewsPage(dir) {
   // The deck advances BEHIND the page while it is still on its way out,
   // so the next story is already standing there as the paper clears it
   // -- rather than the band being empty for a beat and then filling.
-  if (story) dealDeckCard(story.id);
+  if (story) dealDeckCard(story);
   const w = window.innerWidth || 400;
   page.style.transition = `transform ${NEWS_SWIPE_FLY_MS}ms ease-in, opacity ${NEWS_SWIPE_FLY_MS}ms ease-in`;
   page.style.transform = `translateX(${dir * (w + 140)}px) rotate(${dir * 7}deg)`;
