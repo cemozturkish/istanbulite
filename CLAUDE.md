@@ -489,6 +489,26 @@ sb.from('articles').delete().eq('id', id)
   for the Dünya feed it grew out of): İstanbul, Türkiye, the districts and the world in one feed,
   each card kickered with its own category. Hane used to carry the first three; there is one place
   on the site where the news is
+- **A story opens into the band it was lying in, not over the map** (`#news-overlay` /
+  `#news-page`). On a phone the tapped card *grows* into the whole strip between the hero line and
+  the tab bar — the same move the PETEK button makes on Hane, run by `growNewsPage` off a
+  `clip-path` measured from the card's own box — and folds back into that card on the way out. It
+  is deliberately not the pulled sheet the rest of this page uses: a story lights the countries it
+  is about (`setNewsCountryHighlight`), and a sheet rising over the map covered the very thing it
+  had just lit, so the reader had to drag the page back down to see it. The page's two sides are
+  measured off the feed's own content box (`measureNewsPageBand`) so it comes out of the card with
+  its edges already on the card's edges; the map above stays live and untouched, and touching a
+  country there opens that country over the top (`initNewsPage` watches `#reader-overlay` and folds
+  the story away). On desktop there is no band and no map to protect, so it stays THE sheet
+- The page is **head / body / foot**, and only the middle moves: what the story is (kicker, age)
+  on the top line, the story and its Zaman Akışı scrolling in the middle, and where it is
+  happening on the bottom line — the caption to the highlight burning on the map right above it —
+  with the sources at the other end of that line, opening as a drawer that slides up to it. The
+  two lines are furniture rather than sections because the band is short and those are exactly the
+  two things that must not scroll away. A story reached by touching the *map* is a different route
+  and keeps its own page in the reader sheet (see `openCountryEntryReader`); the objects printed
+  inside either — sources, the timeline, its polls — are one set of rules
+  (`:is(.article, .news-page)`)
 - **Makaleler and Posta Kutusu are two small buttons in the top-right corner**, under the profile
   bar — Makaleler on the left, Posta Kutusu (with its unread badge) on the right. They used to be
   full-width cards stacked down that column; the column is the news column now, so what is left of
@@ -659,10 +679,12 @@ geometry and no centred modal anywhere on the site.
     implementation, `IstSheet.pull(overlay, { onDismiss })` — attach it once and
     `IstSheet.open/close` drive it from there. Touch only (`pointer: coarse`); a narrow desktop
     window keeps the ordinary sheet.
-  - The one exception is the PETEK honeycomb, which on a phone does not slide at all: it grows
-    out of the button that opened it (see its own section below). It is still THE sheet — same
-    markup, same `IstSheet.open/close`, same phone geometry — only the way it arrives differs,
-    because it arrives out of a specific object on the screen rather than from off it.
+  - Two surfaces are exceptions, and both for the same reason: they arrive out of a specific
+    object already on the screen rather than from off it, so they **grow out of that object**
+    instead of sliding. The **PETEK honeycomb** grows out of its button (see its own section
+    below), and **a news story on Kütüphane** grows out of the card it was tapped on, into the
+    band that card lies in (see Kütüphane's own section). Both are still THE sheet — same
+    markup, same `IstSheet.open/close` — only the way they arrive differs.
 - **Chrome:** background/border come from `frames.css`'s `.ist-sheet` rule (2px ink border, no
   bottom border, no shadow).
 
