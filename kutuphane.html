@@ -1399,8 +1399,20 @@
        stands alone over an .article, exactly the way a Dünya story's
        page does, and the .article's h3 is the headline. */
     .arrow-head.arrow-head-bare { min-height: 26px; }
-    /* A country's entries are the same cards the Dünya feed prints, so
-       tapping one reads exactly like tapping a story. */
+    /* The one line under a story's name: what the reader is looking at
+       before they pick an entry (country_stories.blurb). Set in the
+       page's italic aside voice rather than as body text — it is a
+       caption on the title, not the first paragraph of anything. */
+    .story-blurb {
+      margin: 0 0 16px;
+      font-size: 0.8rem;
+      font-style: italic;
+      line-height: 1.5;
+      color: var(--muted);
+      text-align: center;
+    }
+    /* A story's entries are the same cards the Dünya feed prints, so
+       tapping one reads exactly like tapping a news item. */
     .country-entries { display: flex; flex-direction: column; gap: 12px; }
     .country-entries .article.openable:hover { transform: none; }
     .path-list {
@@ -4147,58 +4159,133 @@ function openLetterReader(letter, letters) {
 }
 
 // ══════════════════════════════════════════
-// Ülkeler — what a country on the map opens.
+// Hikâyeler — what a country on the map opens.
+//
+// A reader does not touch Ukrayna to read about Ukrayna. They touch it
+// because there is a war there, and that war is also Rusya. So the map is
+// grouped into **stories** (db/country_stories.sql): touching any member
+// lights all of them and opens one page carrying every member's entries,
+// each card kickered with the country it is filed under. Five of them --
+// Rusya–Ukrayna, the İsrail cephesi (Filistin, Lübnan, Suriye, İran),
+// Ermenistan–Azerbaycan, Yunanistan–Kıbrıs, and Türkiye with Ankara.
+//
+// A country in no story is unchanged: it lights alone and opens its own
+// entries under its own name. The page is the same page either way --
+// only its title and how many countries feed it differ.
 //
 // Same shape as Posta Kutusu above, and deliberately so: the sheet lists
-// that country's entries, touching one opens it as a single scrollable
-// page, and its back button returns to the list rather than closing.
-// Reads public.country_entries (admin-only writes, see
-// db/country_entries.sql); the map's data-country is the key.
+// the entries, touching one opens it as a single scrollable page, and its
+// back button returns to the list rather than closing.
 // ══════════════════════════════════════════
-// Per country, so a second visit to the same country is instant while a
-// different one still fetches. Not preloaded: most countries are never
-// touched in a session.
+// The groups, as country id -> story. Small and structural (five rows),
+// so it is fetched once on mount rather than when a country is first
+// touched: the tap has to light the whole group in the same frame it
+// tints the shape, and it cannot wait for a round trip to know what the
+// group is. Before it lands -- roughly the first moment of the page -- a
+// tap simply behaves the way it did before stories existed, which is a
+// legible degradation rather than a broken one.
+let COUNTRY_STORIES = null;
+let COUNTRY_STORIES_LOAD = null;
+
+function loadCountryStories() {
+  if (COUNTRY_STORIES) return Promise.resolve(COUNTRY_STORIES);
+  if (!COUNTRY_STORIES_LOAD) {
+    COUNTRY_STORIES_LOAD = sb.from('country_story_countries')
+      .select('country, country_stories(id, name_tr, blurb)')
+      .then(({ data, error }) => {
+        if (error) {
+          // Cleared so the next mount retries rather than inheriting a
+          // failed fetch for the rest of the session.
+          COUNTRY_STORIES_LOAD = null;
+          console.error('[kutuphane country stories]', error);
+          return null;
+        }
+        const byStory = new Map();
+        (data || []).forEach(row => {
+          const s = row.country_stories;
+          if (!s) return;
+          if (!byStory.has(s.id)) {
+            byStory.set(s.id, { id: s.id, name: s.name_tr, blurb: s.blurb, countries: [] });
+          }
+          byStory.get(s.id).countries.push(row.country);
+        });
+        // Every member points at the same story object, so "what lights
+        // with this" and "what feeds this page" are one list read twice.
+        const map = {};
+        byStory.forEach(story => story.countries.forEach(c => { map[c] = story; }));
+        COUNTRY_STORIES = map;
+        return map;
+      });
+  }
+  return COUNTRY_STORIES_LOAD;
+}
+
+function countryStoryOf(countryId) {
+  return (COUNTRY_STORIES && COUNTRY_STORIES[countryId]) || null;
+}
+
+// What lights when this country is touched, and what feeds its page: the
+// whole story, or just the country itself when it is in none.
+function storyCountryIds(countryId) {
+  const story = countryStoryOf(countryId);
+  return story ? story.countries : [countryId];
+}
+
+// Cached per page rather than per country -- the key is the set of
+// countries the page is built from, so Rusya and Ukrayna share one entry
+// and one fetch, which is the point of them being one story. Not
+// preloaded: most of the map is never touched in a session.
 const COUNTRY_ENTRIES_CACHE = {};
 
-async function loadCountryEntries(countryId) {
-  if (COUNTRY_ENTRIES_CACHE[countryId]) return COUNTRY_ENTRIES_CACHE[countryId];
+async function loadCountryEntries(countryIds) {
+  const ids = countryIds.slice().sort();
+  const key = ids.join(',');
+  if (COUNTRY_ENTRIES_CACHE[key]) return COUNTRY_ENTRIES_CACHE[key];
   // The entry's chain rides along with it (db/country_entry_events.sql):
   // a timeline is the point of most of these pages, so fetching it
   // separately when the reader opens one would put a spinner in the
   // middle of a page that is otherwise already here.
   const { data, error } = await sb.from('country_entries')
     .select('*, country_entry_events(*)')
-    .eq('country', countryId)
+    .in('country', ids)
     .order('entry_date', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
   if (error) {
     console.error('[kutuphane country entries]', error);
-    // Not cached: a failed fetch is a network blip, not an empty country,
-    // and caching it would keep the country empty for the whole session.
+    // Not cached: a failed fetch is a network blip, not an empty story,
+    // and caching it would keep the page empty for the whole session.
     return null;
   }
-  COUNTRY_ENTRIES_CACHE[countryId] = data || [];
-  return COUNTRY_ENTRIES_CACHE[countryId];
+  COUNTRY_ENTRIES_CACHE[key] = data || [];
+  return COUNTRY_ENTRIES_CACHE[key];
 }
 
-// countryName comes from the map shape's own data-name, so the sheet is
-// titled with the same word the caption under the map just changed to.
+// countryName comes from the map shape's own data-name, so a country with
+// no story is titled with the same word the caption under the map prints
+// when you touch it. A country in one is titled with the story's name
+// instead -- the war, not the participant.
 async function openCountrySheet(countryId, countryName) {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
   // Touching the map can happen while a Dünya story's sheet is open (it
-  // rests under the map): this country's page replaces that story, so the
-  // story's highlight goes with it -- what is lit stays what is open.
+  // rests under the map): this page replaces that story, so the story's
+  // highlight goes with it -- what is lit stays what is open.
   clearNewsCountryHighlight();
+  const story = countryStoryOf(countryId);
+  const page = {
+    title: story ? story.name : countryName,
+    blurb: story ? story.blurb : '',
+    countries: story ? story.countries : [countryId],
+  };
   area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   IstSheet.open(overlay);
   _closeReaderOverlay = closeReaderOverlay;
-  const entries = await loadCountryEntries(countryId);
+  const entries = await loadCountryEntries(page.countries);
   // The reader may have closed this sheet, or opened another country,
   // while the fetch was in flight -- don't paint over what they did.
   if (!overlay.classList.contains('open')) return;
-  renderCountryEntriesList(entries, countryId, countryName);
+  renderCountryEntriesList(entries, page);
 }
 
 // The head every page inside the reader sheet wears -- a country, a
@@ -4268,26 +4355,33 @@ function countryEntryStamp(entry) {
   return newest ? formatLetterDate(newest.event_date) : '';
 }
 
-function renderCountryEntriesList(entries, countryId, countryName) {
+// Each card is kickered with the country its entry is filed under, not
+// with the page's own title: on a story page that is the whole point --
+// FİLİSTİN, LÜBNAN, SURİYE, İRAN down one page under "İsrail Cephesi" --
+// and on a one-country page it prints exactly what it always did.
+function countryEntryKicker(entry) {
+  return mapCountryName(entry.country).toLocaleUpperCase('tr-TR');
+}
+
+function renderCountryEntriesList(entries, page) {
   const area = document.getElementById('reader-overlay-sheet');
   if (!area) return;
   let listHtml;
   if (entries === null) {
-    listHtml = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">${libEsc(countryName)} yüklenemedi.</div>`;
+    listHtml = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">${libEsc(page.title)} yüklenemedi.</div>`;
   } else if (!entries.length) {
-    listHtml = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">${libEsc(countryName)} için henüz bir şey yok.</div>`;
+    listHtml = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">${libEsc(page.title)} için henüz bir şey yok.</div>`;
   } else {
-    // The same card the Dünya feed prints, so a country's entries are
-    // tapped exactly the way a story is -- kicker, headline, opening
+    // The same card the Dünya feed prints, so a story's entries are
+    // tapped exactly the way a news item is -- kicker, headline, opening
     // paragraph -- rather than as a shelf of chapters.
-    const kicker = countryName.toLocaleUpperCase('tr-TR');
     listHtml = `<div class="country-entries">` + entries.map(en => {
       const lead = (en.body || '').split(/\n{2,}/)[0].trim();
       const stamp = countryEntryStamp(en);
       return `
         <div class="article openable" data-entry="${libEsc(en.id)}">
           <div class="meta-row">
-            <div class="kicker">${libEsc(kicker)}</div>
+            <div class="kicker">${libEsc(countryEntryKicker(en))}</div>
             ${stamp ? `<div class="ago">${libEsc(stamp)}</div>` : ''}
           </div>
           <h3>${libEsc(en.title)}</h3>
@@ -4298,7 +4392,8 @@ function renderCountryEntriesList(entries, countryId, countryName) {
   }
   area.innerHTML = `
     <div class="shelf-path">
-      ${arrowHeadHTML(countryName, 'country-back', 'Kütüphane')}
+      ${arrowHeadHTML(page.title, 'country-back', 'Kütüphane')}
+      ${page.blurb ? `<p class="story-blurb">${libEsc(page.blurb)}</p>` : ''}
       ${listHtml}
     </div>
   `;
@@ -4306,7 +4401,7 @@ function renderCountryEntriesList(entries, countryId, countryName) {
   area.querySelectorAll('.article.openable').forEach(card => {
     card.addEventListener('click', () => {
       const entry = (entries || []).find(en => en.id === card.dataset.entry);
-      if (entry) openCountryEntryReader(entry, entries, countryId, countryName);
+      if (entry) openCountryEntryReader(entry, entries, page);
     });
   });
 }
@@ -4317,17 +4412,17 @@ function renderCountryEntriesList(entries, countryId, countryName) {
 // country page and a news page are one page type, not two that resemble
 // each other. Body paragraphs come off renderLetterBodyHtml: blank lines
 // separate paragraphs, nothing else is interpreted.
-function openCountryEntryReader(entry, entries, countryId, countryName) {
+function openCountryEntryReader(entry, entries, page) {
   const area = document.getElementById('reader-overlay-sheet');
   if (!area) return;
   const url = libSafeUrl(entry.source_url);
   const stamp = countryEntryStamp(entry);
   area.innerHTML = `
     <div class="shelf-path">
-      ${arrowHeadHTML(null, 'country-entry-back', countryName)}
+      ${arrowHeadHTML(null, 'country-entry-back', page.title)}
       <div class="article">
         <div class="meta-row">
-          <div class="kicker">${libEsc(countryName.toLocaleUpperCase('tr-TR'))}</div>
+          <div class="kicker">${libEsc(countryEntryKicker(entry))}</div>
           ${stamp ? `<div class="ago">${libEsc(stamp)}</div>` : ''}
         </div>
         <h3>${libEsc(entry.title)}</h3>
@@ -4338,7 +4433,7 @@ function openCountryEntryReader(entry, entries, countryId, countryName) {
     </div>
   `;
   document.getElementById('country-entry-back').addEventListener('click',
-    () => renderCountryEntriesList(entries, countryId, countryName));
+    () => renderCountryEntriesList(entries, page));
   _closeReaderOverlay = closeReaderOverlay;
   const pathEl = area.querySelector('.shelf-path');
   if (pathEl) pathEl.scrollTop = 0;
@@ -4431,7 +4526,12 @@ function countryShapes(countryId) {
   return document.querySelectorAll(`.country[data-country="${CSS.escape(countryId)}"]`);
 }
 
-function newsCountryName(countryId) {
+// The one place a country id becomes a word: read off the map's own
+// shapes rather than fetched from public.countries, so a story naming
+// Lübnan and the caption printed when you touch Lübnan are the same word
+// by construction. Used by the news feed and by the story pages alike --
+// hence `map`, not `news`.
+function mapCountryName(countryId) {
   const shape = countryShapes(countryId)[0];
   return (shape && shape.getAttribute('data-name')) || countryId;
 }
@@ -4557,7 +4657,7 @@ function buildDunyaNewsDetailHtml(n) {
         // Cased in JS with tr-TR, like the kicker above it: leaving it to
         // CSS turns Sırbistan's dotless ı and dotted i into the wrong
         // letters on any engine that doesn't read the page's lang.
-        `<span>${libEsc(newsCountryName(id).toLocaleUpperCase('tr-TR'))}</span>`).join('')}
+        `<span>${libEsc(mapCountryName(id).toLocaleUpperCase('tr-TR'))}</span>`).join('')}
     </div>
   ` : '';
   return `
@@ -5453,6 +5553,25 @@ const neighborhoodNames = {
   function regionId(el) { return el.dataset.neighborhood || el.dataset.country || el.id; }
   function regionName(el) { return el.getAttribute('data-name') || regionId(el); }
 
+  // What lights when this region is touched or hovered. On the world
+  // overlay that is the region's whole story -- Ukrayna lights Rusya with
+  // it, Filistin lights the three countries the same war is being fought
+  // in (db/country_stories.sql) -- because the page about to open is
+  // about all of them, and the map has to say so before it opens. On the
+  // İstanbul overlay, and for a country in no story, it is the one region.
+  function regionGroupIds(el) {
+    const id = regionId(el);
+    return el.classList.contains('country') ? storyCountryIds(id) : [id];
+  }
+
+  // Paint one class across a group, clearing it everywhere else -- the
+  // only way `active` and `hover-active` are ever set, so neither can end
+  // up lit on half a story.
+  function paintGroup(el, cls) {
+    const group = new Set(el ? regionGroupIds(el) : []);
+    getMapRegions().forEach(n => n.classList.toggle(cls, group.has(regionId(n))));
+  }
+
   // The caption a region puts under the map when it is touched or hovered.
   // On the world overlay that is nothing at all: touching a country opens
   // its page, and that page already carries the country's name on its top
@@ -5507,14 +5626,18 @@ const neighborhoodNames = {
     const nb = e.target.closest(MAP_REGION_SEL);
     if (nb) {
       const nbId = regionId(nb);
-      getMapRegions().forEach(n => n.classList.toggle('active', regionId(n) === nbId));
+      paintGroup(nb, 'active');
       if (mapLabel) mapLabel.textContent = regionLabel(nb);
       activeRegionName = regionLabel(nb);
-      // Every country on the phone map opens: its entries rise in the same
-      // half-page sheet a news item does (see openCountrySheet). Ankara is
+      // Every country on the phone map opens: its story rises in the same
+      // half-page sheet a news item does (see openCountrySheet), carrying
+      // the entries of every country that just lit with it. Ankara is
       // the exception -- the only city drawn, the only thing inked red on
       // the artwork, and what this page holds of Ankara is the meclis, so it
-      // opens the TBMM sheet the button in the boxes column opens.
+      // opens the TBMM sheet the button in the boxes column opens. It still
+      // lights with Türkiye, so the reader sees which country's parliament
+      // they are opening; being in a story is about what lights, and what
+      // a shape opens is decided here.
       //
       // The tint and caption above run first either way, so the map reads as
       // selected behind whichever sheet rises over it. Gated on .country so
@@ -5552,8 +5675,7 @@ const neighborhoodNames = {
     if (!nb) return;
     const mapLabel = document.getElementById('map-label');
     if (mapLabel) mapLabel.textContent = regionLabel(nb);
-    const nbId = regionId(nb);
-    getMapRegions().forEach(n => n.classList.toggle('hover-active', regionId(n) === nbId));
+    paintGroup(nb, 'hover-active');
   });
   document.addEventListener('mouseout', (e) => {
     const nb = e.target.closest(MAP_REGION_SEL);
@@ -5934,6 +6056,11 @@ function mount() {
   // idle text) and the router hands this page a fresh copy of that markup on
   // every re-entry -- see resetMapLabel in initLibraryMap.
   if (window.__istResetMapLabel) window.__istResetMapLabel();
+  // Which countries light together (db/country_stories.sql). Fetched here
+  // rather than on the first tap: the tap has to light the whole story in
+  // the frame it tints the shape it was aimed at. Cached across
+  // re-entries, so this is one request per session, not per mount.
+  loadCountryStories();
   loadDunyaNews();
   IstRouter.onTick(tickDunyaNewsAgo);
   loadPersonMentionsRoster();

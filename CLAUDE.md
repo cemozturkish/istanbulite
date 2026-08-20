@@ -58,6 +58,24 @@ The three pages, and what each direction *means*:
   this page is for reading and observing, not for peer-to-peer interaction at a national level.
   Istanbulite is not a place to argue about Turkey with strangers.
 
+### The map tells stories, not entries
+
+The world map on Kütüphane is not a set of country articles. **A country is not a subject** —
+what happens is never contained by one border, and a page that pretends otherwise has to keep
+retelling the same events from each side. So the map is grouped into **stories**, and touching
+any country in one lights every country in it and opens the story they share: Ukrayna lights
+Rusya, Filistin lights Lübnan and Suriye and İran, Ermenistan lights Azerbaycan, Yunanistan
+lights Kıbrıs, Ankara lights Türkiye. The reader learns the shape of a thing by seeing which
+places light up together — that is the map doing work no paragraph does.
+
+The rule this comes from, and the one to resolve future map questions with: **we show people
+stories, not an information dump about every country.** A page here earns its place by being
+about something that is *happening* — with a beginning, a chain of moments, and a place it
+currently stands. Not a profile, not a fact sheet, not an encyclopaedia entry with a population
+figure at the top. If a country has no story, it opens and says so; that is a better page than a
+manufactured one. And a story is finite: it ends where the reader has enough to go and talk to
+someone about it, which is the whole point of the app being on the other side of the swipe.
+
 The zoom levels tell one story: mahalle → Istanbul → Türkiye, with the user standing in the middle.
 
 ### No DMs — ever
@@ -222,8 +240,9 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `coffee_prices`
 > (the Kahve Endeksi — v3 adds the opening-hours and scheduled-discount columns that make it
 > live), `coffee_comments` (what members say about a venue), `countries` + `country_entries`
-> + `country_entry_events` (what a country on Kütüphane's map opens, and the key-moment
-> timeline an entry can carry) and `breaking_news_countries` (which countries a
+> + `country_entry_events` + `country_stories` + `country_story_countries` (what a country on
+> Kütüphane's map opens, the key-moment timeline an entry can carry, and which countries light
+> and open together as one story) and `breaking_news_countries` (which countries a
 > Dünya story is about, lit on that map when the story opens), and more). When in doubt, read the relevant `db/` file — it is the
 > source of truth.
 
@@ -491,23 +510,66 @@ sb.from('articles').delete().eq('id', id)
   seat card's own section under Site-wide defaults. Deselecting (tapping the sea, or closing the
   country's page) puts the Cumhurbaşkanı back; `resetMapLabel()` is the one place that knows what
   "nothing is selected" means, so nothing else may clear the selection by hand
-- **Touching a country opens that country's page** (`country_entries`), and that page is a
-  **news page, not a chapter**: the country's entries are the same `.article.openable` cards
-  the Dünya feed prints, and opening one gives the same `.article` a story gives — kicker
-  (the country's name), headline, body, its Zaman Akışı, source. There is deliberately no
-  second page type here; a country reads the way a story reads. The one thing that is the
-  country page's own is its head: the hand-drawn arrow (`assets/back.png`, the same one the
-  game pages use) alone in the corner, with the country's name centred on the top line — no
-  worded back button, because the reader arrived by touching the drawing. `countryHeadHTML()`
-  builds it, and an entry's own page passes no title, so the arrow stands alone over the
-  article exactly as it does on a story's page
+- **Touching a country opens a story, not a country** (`country_stories`, see its own section
+  below). Countries that share one are lit together the moment one of them is touched, and open
+  one page carrying all of their entries. What opens is a **news page, not a chapter**: the
+  entries are the same `.article.openable` cards the Dünya feed prints, and opening one gives
+  the same `.article` a story gives — kicker (the country the entry is filed under), headline,
+  body, its Zaman Akışı, source. There is deliberately no second page type here; a story reads
+  the way a news item reads. The one thing that is this page's own is its head: the hand-drawn
+  arrow (`assets/back.png`, the same one the game pages use) alone in the corner, with the
+  story's name centred on the top line and its one-line blurb under it — no worded back button,
+  because the reader arrived by touching the drawing. `arrowHeadHTML()` builds it, and an
+  entry's own page passes no title, so the arrow stands alone over the article exactly as it
+  does on a Dünya story's page
 - An entry can carry a **Zaman Akışı** (`country_entry_events`) — a chain of dated key moments,
   the way a `breaking_news` story grows `breaking_news_updates`, reusing that timeline's own
   `.timeline-*` markup and printed **newest first** just like it. The only difference is the
   stamp: a moment carries its date rather than its age, because these chains reach back to 1917
   and "109 yıl önce" tells a reader nothing. Curated from admin.html's Ülkeler tab;
-  `db/country_entries_seed.sql` holds the starting set (Rusya–Ukrayna, Filistin–İsrail, Suriye,
-  Karabağ, Kıbrıs, Putin Rusyası)
+  `db/country_entries_seed.sql` and `db/country_stories_seed.sql` hold the starting set
+  (Rusya–Ukrayna, Putin Rusyası, Filistin–İsrail, Lübnan, Suriye, İran–İsrail, Karabağ, the
+  closed Türkiye–Ermenistan border, Kıbrıs, the Ege, and Türkiye's own decade)
+
+### The map is grouped into stories — `country_stories`
+
+Nobody touches Ukrayna to read about Ukrayna. They touch it because there is a war there, and
+that war is also Rusya. So the countries on Kütüphane's phone map are grouped into **stories**
+(`db/country_stories.sql`): touching any member lights **all** of them and opens one page
+carrying every member's entries. Five of them, and they are the reason the map is worth
+touching at all:
+
+| Story | Countries |
+|---|---|
+| Rusya–Ukrayna Savaşı | Ukrayna, Rusya |
+| İsrail Cephesi | Filistin, Lübnan, Suriye, İran |
+| Ermenistan–Azerbaycan | Ermenistan, Azerbaycan |
+| Yunanistan ve Kıbrıs | Yunanistan, Kıbrıs |
+| Türkiye | Türkiye, Ankara |
+
+Four things about it:
+
+- **An entry never moves; the reader's route to it does.** There is no content table here — a
+  story's pages are the ordinary `country_entries` of its members, gathered into one list. Each
+  card is kickered with the country it is filed under (FİLİSTİN, LÜBNAN, SURİYE, İRAN down one
+  page under "İsrail Cephesi"), which is what makes the grouping legible rather than a merge.
+- **A country belongs to at most one story**, enforced by `country_story_countries.country`
+  being the primary key: the map must answer "what lights with this?" with one row, not with a
+  set of candidates. A country in no story is unchanged — it lights alone, under its own name.
+- **Being in a story is about what lights, not about what opens.** Ankara still opens the TBMM
+  sheet (it is the only city drawn and the only route to the meclis from the map); Türkiye
+  lights with it so the reader sees whose parliament they are opening. What a shape opens is
+  decided in the map's click handler, and only there.
+- **The groups are fetched on `mount()`, not on the first tap.** A tap has to light the whole
+  story in the same frame it tints the shape it was aimed at, so it cannot wait for a round
+  trip. Before the fetch lands — roughly the first moment of the page — a tap behaves the way it
+  did before stories existed, which degrades legibly. `paintGroup()` in `initLibraryMap` is the
+  only place `active` / `hover-active` are ever set, so neither can end up lit on half a story.
+
+Which countries belong to which is structural and does not change with the news, so the admin
+portal shows it read-only: picking a country in the Ülkeler tab prints the story its entry will
+appear in, and every row in the list carries its story name. Editing the grouping is a
+migration.
 
 ### `tumcel.html` — Tümcel
 - Connections-style game where 16 sentence fragments must be regrouped into 4 quotes
