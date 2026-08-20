@@ -489,6 +489,34 @@ sb.from('articles').delete().eq('id', id)
   for the Dünya feed it grew out of): İstanbul, Türkiye, the districts and the world in one feed,
   each card kickered with its own category. Hane used to carry the first three; there is one place
   on the site where the news is
+- **The feed is a deck on a phone, not a list.** The newest story stands on top, the rest behind
+  it, and the depth is `nth-child` and nothing else: every card sits in the same grid cell of
+  `#dunya-news-feed`, and the two behind are pushed up and back a step so their edges show.
+  Promoting the next story is *removing the front node* (`dealDeckCard`) — the ones behind
+  transition forward on their own instead of being re-rendered there. The order is the deck's own
+  rule, not the query's: `undealtNews()` sorts by `updated_at` itself, so the newest story is on
+  top by construction. Past the third card the
+  picture stops changing; the rest stay in the DOM (the desktop column still prints the whole
+  list, and the fourth has to be standing ready) but are not drawn. Only the top of the deck takes
+  a tap. Desktop keeps the scrolling list
+- **A story leaves the deck by being swiped, not by being opened** (`wireNewsPageSwipe`,
+  `dealNewsPage`). The arrow at the top of the page puts it back on the deck; a throw left or
+  right is done with it, and the deck advances *behind* the page while it is still flying out, so
+  the next story is already standing there as the paper clears. Where the story is asking
+  something — the newest `breaking_news_polls` row the reader hasn't answered — the direction is
+  the answer (right is `option_a`, left is `option_b`) and that option is stamped on the page as
+  it moves, so nobody answers a question they never saw; a story with nothing open to answer
+  swipes away just the same, unstamped
+- **A story that has been dealt with comes back only when it has actually moved.** What is kept
+  per member in `localStorage` (`dunya_dealt_<uid>`) is not "this story is done" but the story's
+  own `updated_at` *as thrown* — so a gelişme landing on its timeline (which bumps
+  `breaking_news.updated_at`; a deliberately backdated one does not, see `addNewsUpdate` in
+  admin.html) puts it back in the deck, and back on **top** of it, because the deck is ordered by
+  that same column. A story that has not moved stays gone. The store is pruned to the stories
+  still in the 72h window, and the earlier stampless format (a plain array) is migrated on the
+  next fetch by stamping each entry with the story as it currently stands. A deck that refills
+  itself on every reload is one nobody can reach the bottom of, and reaching the bottom is the
+  point — the empty deck says so and points at the door
 - **A story opens into the band it was lying in, not over the map** (`#news-overlay` /
   `#news-page`). On a phone the tapped card *grows* into the whole strip between the hero line and
   the tab bar — the same move the PETEK button makes on Hane, run by `growNewsPage` off a
@@ -716,8 +744,11 @@ stack grows upward toward the map instead of downward away from the thumb. It is
 on both pages that carry one — Kahvehane's events, Kütüphane's news feed — and where a page has
 two columns, they end on the same line. (Hane has no feed at all any more; its columns are empty.)
 
-One implementation note, because it fails silently: the space is pushed down with an **auto top
-margin on the innermost box** (the feed itself), never `justify-content: flex-end`. A stack that
+Kütüphane's news is the one stack that is a **deck** rather than a list — same bottom-aligned
+box, but the cards are laid on top of each other instead of above each other (see its own
+section). Where a page's stack is a list, one implementation note, because it fails silently: the
+space is pushed down with an **auto top margin on the innermost box** (the feed itself), never
+`justify-content: flex-end`. A stack that
 outgrows the screen resolves its auto margin to zero and simply scrolls, where flex-end would
 push the top of the stack out of the scroller and out of reach. The margin also has to sit on a
 box that does *not* grow — every wrapper between a column and its feed carries `flex: 1`, and

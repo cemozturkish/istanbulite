@@ -1305,6 +1305,64 @@
     :is(.article, .news-page) .poll-voter-avatar.poll-voter-more { font-size: 0.56rem; color: var(--muted); }
     :is(.article, .news-page) .poll-status.err { color: var(--ink-red); font-size: 0.72rem; margin-top: 6px; }
 
+    /* ── The two answers a swipe is heading toward ──
+       Stamped on the page itself rather than in the band behind it, so
+       they travel with the paper the reader is pushing: the label appears
+       at the edge the page is moving toward, and gets solid as the throw
+       gets committed. Only drawn when the story is actually asking
+       something (see newsOpenPoll) -- a swipe on a story with no open
+       question is just "next", and a stamp there would invent an opinion
+       nobody was asked for. */
+    .news-swipe-cue {
+      position: absolute;
+      top: 50%;
+      z-index: 4;
+      max-width: 46%;
+      padding: 7px 12px;
+      border: 2px solid currentColor;
+      background: var(--frame-bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      line-height: 1.15;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .news-swipe-cue:empty { display: none; }
+    /* Each stamp sits on the edge the page is moving AWAY from, not the
+       one it is heading toward: the leading edge is the half that leaves
+       the screen first, so a stamp there would be the first thing gone
+       exactly as the throw commits. */
+    .news-swipe-cue-a { left: 14px; color: var(--ink-red); transform: translateY(-50%) rotate(-5deg); }
+    .news-swipe-cue-b { right: 14px; color: var(--ink); transform: translateY(-50%) rotate(5deg); }
+
+    /* ── The bottom of the deck ──
+       Printed only when the reader dealt with every story themselves --
+       an empty feed because there is no news stays empty, leaving the map
+       behind it clear (see renderDunyaNewsFeed). Reaching the end of the
+       news here is not a dead end to apologise for; it is the app doing
+       its job, so it says so and points at the door. */
+    .deck-done {
+      padding: 18px 12px;
+      text-align: center;
+      border: 2px dashed var(--rule);
+      background: transparent;
+    }
+    .deck-done-line {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .deck-done-sub {
+      margin-top: 3px;
+      font-size: 0.75rem;
+      font-style: italic;
+      color: var(--muted);
+    }
+
     /* ══════════════════════════════════════════════════════════
        THE NEWS PAGE — what a story from the left-hand feed opens into.
 
@@ -2835,6 +2893,57 @@
       .article h3 { font-size: 18px; margin-bottom: 3px; line-height: 1.25; }
       .article p { font-size: 12px; line-height: 1.35; }
 
+      /* ── THE DECK ──
+         Two stories or ten, on a phone the feed is one stack of paper
+         standing at the bottom of the band: the newest on top, the rest
+         behind it, and the reader deals with them one at a time (swipe
+         the open story away and the next one is already standing there --
+         see dealNewsPage). It replaced a scrolling list, which asked the
+         reader to decide how much of the news to get through; a stack
+         asks them to deal with one thing.
+
+         Every card sits in the same grid cell, so they are exactly on top
+         of each other and exactly the same height, and the two behind are
+         pushed up and back a step each so their top edges show. The depth
+         is nth-child and nothing else: promoting the next story is
+         REMOVING the front node, and the ones behind transition into
+         their new places on their own rather than being re-rendered
+         there.
+
+         Past the third the picture stops changing -- a stack is a stack,
+         and a fourth edge of paper says nothing a third one didn't. Those
+         cards stay in the DOM (the desktop column still prints the whole
+         list, and the fourth has to be standing there ready when the
+         front one leaves); they are simply not drawn. */
+      #dunya-news-feed {
+        display: grid;
+        grid-template-areas: "deck";
+      }
+      #dunya-news-feed > .article {
+        grid-area: deck;
+        transition: background 0.15s, transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      /* The press keeps its own quick curve: the deck's rule above is an
+         id selector and would otherwise win it on specificity, and a card
+         that takes a third of a second to give under the finger doesn't
+         read as a button at all. */
+      #dunya-news-feed > .article.openable.pressing { transition: transform 0.11s ease-out; }
+      /* Content from the top here. A card stretched to the tallest in the
+         deck would otherwise hold its headline down at its own bottom
+         edge with a gap above it. */
+      #dunya-news-feed > .article.openable h3 { margin-top: 0; }
+      #dunya-news-feed > .article:nth-child(1) { z-index: 3; }
+      #dunya-news-feed > .article:nth-child(2) { z-index: 2; transform: translateY(-10px) scale(0.965); }
+      #dunya-news-feed > .article:nth-child(3) { z-index: 1; transform: translateY(-19px) scale(0.93); }
+      #dunya-news-feed > .article:nth-child(n+4) { display: none; }
+      /* Only the top of the deck is a button. The ones behind are edges of
+         paper: a press on the sliver of one would fight its own depth
+         transform and pull it out of the stack. */
+      #dunya-news-feed > .article:not(:nth-child(1)) { pointer-events: none; }
+      @media (prefers-reduced-motion: reduce) {
+        #dunya-news-feed > .article { transition: background 0.15s; }
+      }
+
       /* ── THE NEWS PAGE on a phone (see its block above) ──
          Not a sheet arriving from anywhere: it IS the band the feed lies
          in. Its top edge is the hero line, its bottom edge is where the
@@ -2869,6 +2978,10 @@
         height: auto;
         transform: none;
         transition: none;
+        /* The page owns its horizontal axis (the throw, see
+           wireNewsPageSwipe); the vertical one stays the browser's, so the
+           body inside it scrolls natively. */
+        touch-action: pan-y;
         /* It floats in the band instead of running off the bottom of the
            screen, so it gets the fourth edge frames.css drops. */
         border-bottom-width: 2px !important;
@@ -4802,6 +4915,7 @@ function clearNewsCountryHighlight() { setNewsCountryHighlight([]); }
 async function loadDunyaNews() {
   const feed = document.getElementById('dunya-news-feed');
   if (!feed) return;
+  await ensureDealtLoaded();
   const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
   const { data, error } = await sb.from('breaking_news')
     .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*), breaking_news_series(name), breaking_news_countries(country)')
@@ -4814,21 +4928,131 @@ async function loadDunyaNews() {
     return;
   }
   DUNYA_NEWS_CACHE = data || [];
+  reconcileDealt();
   renderDunyaNewsFeed();
+}
+
+// ── What the reader has already dealt with ──
+// A story leaves the deck when it is swiped away, not when it is opened:
+// the arrow puts it back on top, a swipe is done with it. That has to
+// survive a reload -- a deck that refills itself every time the app is
+// reopened is a deck nobody can ever get to the bottom of, which is the
+// opposite of what this app is for. Kept per member in localStorage, the
+// same way chapter completion is (see libReadCompletedSet), and pruned to
+// the stories still in the 72h window so it cannot grow without end.
+//
+// What is remembered is not "this story is done" but **the state of it
+// that was done with**: the story's own updated_at at the moment it was
+// thrown. A story the admin has since moved on (a gelişme lands on the
+// timeline and bumps breaking_news.updated_at -- see addNewsUpdate in
+// admin.html, where a backdated one deliberately doesn't) is not the
+// story the reader dealt with, so it comes back, and comes back on top of
+// the deck because the deck is ordered by that same column. A story that
+// has not moved stays gone.
+const DEALT_KEY_PREFIX = 'dunya_dealt_';
+let _dealt = new Map();   // story id -> the updated_at that was dealt with
+let _dealtKey = null;
+
+async function ensureDealtLoaded() {
+  if (_dealtKey) return;
+  const uid = await libGetCurrentUserId();
+  _dealtKey = DEALT_KEY_PREFIX + (uid || 'anon');
+  try {
+    const raw = JSON.parse(localStorage.getItem(_dealtKey) || '{}');
+    // A plain array is the first version of this store, which remembered
+    // only that a story was dealt with. Those come in stampless and are
+    // given the story's current updated_at on the next fetch (see
+    // reconcileDealt) -- "you dealt with it as it stands", which is the
+    // only honest reading of a record that never had a stamp.
+    if (Array.isArray(raw)) raw.forEach(id => _dealt.set(String(id), null));
+    else if (raw && typeof raw === 'object') {
+      Object.keys(raw).forEach(id => _dealt.set(String(id), raw[id] || null));
+    }
+  } catch (e) { /* unreadable store: start the deck full */ }
+}
+
+function saveDealtIds() {
+  if (!_dealtKey) return;
+  const obj = {};
+  _dealt.forEach((stamp, id) => { obj[id] = stamp; });
+  try { localStorage.setItem(_dealtKey, JSON.stringify(obj)); } catch (e) {}
+}
+
+// Drops what has fallen out of the 72h window (what is dealt with is only
+// ever about what is on the table) and stamps anything the older store
+// left stampless. Run once per fetch, against the rows just returned.
+function reconcileDealt() {
+  let changed = false;
+  const live = new Map(DUNYA_NEWS_CACHE.map(n => [String(n.id), n.updated_at || n.created_at]));
+  _dealt.forEach((stamp, id) => {
+    if (!live.has(id)) { _dealt.delete(id); changed = true; return; }
+    if (!stamp) { _dealt.set(id, live.get(id)); changed = true; }
+  });
+  if (changed) saveDealtIds();
+}
+
+// True while the story is still the one the reader threw away. Compared as
+// dates rather than as strings: PostgREST is free to hand back the same
+// instant as ...Z or as +00:00, and one of those sorts above the other.
+function newsIsDealt(n) {
+  const stamp = _dealt.get(String(n.id));
+  if (stamp === undefined) return false;
+  if (!stamp) return true;
+  return new Date(n.updated_at || n.created_at) <= new Date(stamp);
+}
+
+// The deck: what the reader hasn't dealt with, newest first. Sorted here
+// rather than left to the query's own order, because "the newest story is
+// the one on top" is the deck's rule and not a side effect of how its
+// rows happened to arrive.
+function undealtNews() {
+  return DUNYA_NEWS_CACHE.filter(n => !newsIsDealt(n))
+    .slice()
+    .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
+}
+
+// Takes the front card out of the deck without re-rendering it. The two
+// behind it are already in the DOM at their own depths, so removing this
+// node re-runs the nth-child rules and they TRANSITION forward a step --
+// which is the whole reason the deck's depth is expressed as position
+// rather than as a class the JS has to reassign.
+function dealDeckCard(story) {
+  const id = String(story.id);
+  // The stamp is the story AS THROWN. The next gelişme moves it past this
+  // and the story comes back -- that is the whole of "a story returns only
+  // when it has actually moved".
+  _dealt.set(id, story.updated_at || story.created_at || new Date().toISOString());
+  saveDealtIds();
+  const feed = document.getElementById('dunya-news-feed');
+  if (!feed) return;
+  const node = feed.querySelector(`.article[data-news-id="${CSS.escape(id)}"]`);
+  if (node) node.remove();
+  if (!feed.querySelector('.article')) feed.innerHTML = deckDoneHTML();
+}
+
+function deckDoneHTML() {
+  return `
+    <div class="deck-done">
+      <div class="deck-done-line">Hepsi bu kadar.</div>
+      <div class="deck-done-sub">Dışarısı seni bekliyor.</div>
+    </div>
+  `;
 }
 
 function renderDunyaNewsFeed() {
   const feed = document.getElementById('dunya-news-feed');
   if (!feed) return;
+  const rows = undealtNews();
   animateFeedSwap(feed, 'right', () => {
-    if (!DUNYA_NEWS_CACHE.length) {
-      // Nothing to say when there is no world story: an empty column leaves
-      // the map behind it clear, rather than printing a line over the drawing.
-      feed.innerHTML = '';
+    if (!rows.length) {
+      // Two different empties, and they are not the same thing: no news at
+      // all leaves the column blank so the map behind it stays clear,
+      // while a deck the reader emptied themselves gets told so.
+      feed.innerHTML = DUNYA_NEWS_CACHE.length ? deckDoneHTML() : '';
       return;
     }
-    const rowsById = new Map(DUNYA_NEWS_CACHE.map(n => [String(n.id), n]));
-    feed.innerHTML = DUNYA_NEWS_CACHE.map(n => {
+    const rowsById = new Map(rows.map(n => [String(n.id), n]));
+    feed.innerHTML = rows.map(n => {
       const lastTouch = n.updated_at || n.created_at;
       return `
         <div class="article openable" data-news-id="${libEsc(n.id)}">
@@ -4997,6 +5221,8 @@ function buildNewsPageHtml(n) {
       ${newsTimelineHTML(n)}
     </div>
     ${footHtml}
+    <div class="news-swipe-cue news-swipe-cue-a" id="news-cue-a"></div>
+    <div class="news-swipe-cue news-swipe-cue-b" id="news-cue-b"></div>
   `;
 }
 
@@ -5089,11 +5315,181 @@ function measureNewsPageBand() {
   overlay.style.setProperty('--news-page-width', width.toFixed(2) + 'px');
 }
 
+// ══════════════════════════════════════════════════════════════════
+// THE SWIPE — how a story leaves the deck
+//
+// The arrow at the top of the page puts a story back on the deck; a
+// swipe is done with it. That is the whole rule, and it is what makes
+// the stack finite: the reader deals with one story, it goes, the next
+// one is already standing there.
+//
+// Where the story is asking something (a poll it has grown, see
+// breaking_news_polls), the direction is the answer -- right is the
+// first option, left is the second -- and the option the throw is
+// heading toward is stamped on the page as it moves, so nobody answers
+// a question they never saw. A story with nothing open to answer swipes
+// away just the same, with no stamp: the gesture is "next" first and an
+// opinion only where one was asked for.
+// ══════════════════════════════════════════════════════════════════
+const NEWS_SWIPE_DEAL_PX = 84;    // throw past this and the story is dealt
+const NEWS_SWIPE_DEAL_VEL = 0.55; // ...or a flick this fast (px/ms)
+const NEWS_SWIPE_FLY_MS = 300;
+let _newsStory = null;            // the story the open page is printing
+let _newsPollMine = new Map();    // poll id -> the reader's own vote, or null
+let _newsDealing = false;
+
+// The newest question on the open story the reader hasn't answered.
+// Newest rather than first: a story's later polls are the ones its
+// timeline has just grown, so that is the question it is currently
+// asking. Only polls whose votes have actually come back are considered
+// -- an unloaded poll is not an unanswered one.
+function newsOpenPoll() {
+  const polls = (_newsStory && _newsStory.breaking_news_polls) || [];
+  return polls.slice()
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .find(p => _newsPollMine.has(String(p.id)) && _newsPollMine.get(String(p.id)) == null) || null;
+}
+
+function paintNewsSwipeCues() {
+  const a = document.getElementById('news-cue-a');
+  const b = document.getElementById('news-cue-b');
+  if (!a || !b) return;
+  const poll = newsOpenPoll();
+  a.textContent = poll ? poll.option_a : '';
+  b.textContent = poll ? poll.option_b : '';
+}
+
+function setNewsSwipeCueOpacity(dx) {
+  const a = document.getElementById('news-cue-a');
+  const b = document.getElementById('news-cue-b');
+  const p = Math.min(1, Math.abs(dx) / NEWS_SWIPE_DEAL_PX);
+  if (a) a.style.opacity = dx > 0 ? p : 0;
+  if (b) b.style.opacity = dx < 0 ? p : 0;
+}
+
+// One vote, cast on the way out. Deliberately not awaited by the deal:
+// the story is gone from the deck either way, and holding the animation
+// on a round trip would make the gesture feel like it needs permission.
+async function castNewsSwipeVote(poll, option) {
+  const uid = await libGetCurrentUserId();
+  if (!uid) return;
+  _newsPollMine.set(String(poll.id), option);
+  const { error } = await sb.from('breaking_news_poll_option_votes')
+    .insert([{ poll_id: poll.id, user_id: uid, option }]);
+  // A duplicate is not a failure here: the reader may have answered the
+  // same poll from its own buttons before swiping.
+  if (error && error.code !== '23505') console.error('[news swipe vote]', error);
+}
+
+// dir: +1 thrown right, -1 thrown left.
+function dealNewsPage(dir) {
+  const page = document.getElementById('news-page');
+  if (!page || _newsDealing) return;
+  _newsDealing = true;
+  const story = _newsStory;
+  const poll = newsOpenPoll();
+  if (poll) castNewsSwipeVote(poll, dir > 0 ? 1 : 2);
+  // The deck advances BEHIND the page while it is still on its way out,
+  // so the next story is already standing there as the paper clears it
+  // -- rather than the band being empty for a beat and then filling.
+  if (story) dealDeckCard(story);
+  const w = window.innerWidth || 400;
+  page.style.transition = `transform ${NEWS_SWIPE_FLY_MS}ms ease-in, opacity ${NEWS_SWIPE_FLY_MS}ms ease-in`;
+  page.style.transform = `translateX(${dir * (w + 140)}px) rotate(${dir * 7}deg)`;
+  page.style.opacity = '0';
+  setTimeout(() => {
+    page.style.transition = '';
+    page.style.transform = '';
+    page.style.opacity = '';
+    // Straight to hidden, never the fold-back: the story did not go back
+    // into the card it came from, it left the deck.
+    snapNewsPageShut();
+    _newsDealing = false;
+  }, NEWS_SWIPE_FLY_MS + 20);
+}
+
+// Touch phones only -- the same condition the pulled sheet uses, and for
+// the same reason: a finger is the only thing that can throw a page.
+function wireNewsPageSwipe() {
+  const page = document.getElementById('news-page');
+  if (!page) return;
+  const mobile = window.matchMedia('(max-width: 768px) and (pointer: coarse)');
+  let sx = 0, sy = 0, dx = 0, lastX = 0, lastT = 0, vel = 0;
+  let dragging = false, axis = null;
+
+  function render() {
+    page.style.transform = `translateX(${dx}px) rotate(${dx * 0.014}deg)`;
+    setNewsSwipeCueOpacity(dx);
+  }
+
+  function springBack() {
+    page.style.transition = 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s';
+    page.style.transform = '';
+    setNewsSwipeCueOpacity(0);
+    setTimeout(() => { if (!_newsDealing) page.style.transition = ''; }, 320);
+  }
+
+  page.addEventListener('touchstart', (e) => {
+    if (!mobile.matches || e.touches.length !== 1 || _newsDealing) return;
+    // The carousel's own swipe listens on the document (router.js, its
+    // touchstart is what arms it): a horizontal drag on an open story is
+    // that story's, not a page change, so it stops here.
+    e.stopPropagation();
+    dragging = true;
+    axis = null;
+    dx = 0;
+    sx = lastX = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+    lastT = e.timeStamp || performance.now();
+    vel = 0;
+    page.style.transition = 'none';
+  }, { passive: true });
+
+  page.addEventListener('touchmove', (e) => {
+    if (!dragging || e.touches.length !== 1) return;
+    const x = e.touches[0].clientX, y = e.touches[0].clientY;
+    // Which gesture this is gets decided once, on the first real movement,
+    // and never revisited: the body scrolls vertically inside this page,
+    // and a drag that kept changing its mind would fight the scroller.
+    if (axis === null) {
+      const adx = Math.abs(x - sx), ady = Math.abs(y - sy);
+      if (adx < 6 && ady < 6) return;
+      axis = adx > ady * 1.2 ? 'x' : 'y';
+      if (axis === 'y') { dragging = false; page.style.transition = ''; return; }
+    }
+    const now = e.timeStamp || performance.now();
+    const dt = now - lastT;
+    // Weighted toward the newest sample so a flick's final speed wins over
+    // the slow start of the same drag.
+    if (dt > 0) vel = 0.7 * ((x - lastX) / dt) + 0.3 * vel;
+    lastX = x;
+    lastT = now;
+    dx = x - sx;
+    render();
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
+
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    const flicked = Math.abs(vel) > NEWS_SWIPE_DEAL_VEL;
+    const thrown = Math.abs(dx) > NEWS_SWIPE_DEAL_PX;
+    if (!flicked && !thrown) { springBack(); return; }
+    // A flick decides its own direction: a finger that started left and
+    // ended up flicking right meant right.
+    dealNewsPage((flicked ? vel : dx) > 0 ? 1 : -1);
+  };
+  page.addEventListener('touchend', end);
+  page.addEventListener('touchcancel', end);
+}
+
 function openDunyaNewsDetail(n, cardEl) {
   const overlay = document.getElementById('news-overlay');
   const inner = document.getElementById('news-page-inner');
   if (!overlay || !inner) return;
   _newsOrigin = cardEl || null;
+  _newsStory = n;
+  _newsPollMine.clear();
   inner.innerHTML = buildNewsPageHtml(n);
   measureNewsPageBand();
   IstSheet.open(overlay);
@@ -5121,6 +5517,7 @@ function closeNewsPage() {
     inner.innerHTML = '';
     cancelNewsAnims();
     _newsOrigin = null;
+    _newsStory = null;
   });
 }
 
@@ -5131,14 +5528,19 @@ function closeNewsPage() {
 // is no longer on the screen.
 function snapNewsPageShut() {
   const overlay = document.getElementById('news-overlay');
+  const page = document.getElementById('news-page');
   const inner = document.getElementById('news-page-inner');
   if (!overlay || !inner || overlay.hidden) return;
   clearNewsCountryHighlight();
   cancelNewsAnims();
+  // Whatever a half-finished throw left on the page (see wireNewsPageSwipe)
+  // -- the next story opens square in the band, never mid-flight.
+  if (page) { page.style.transition = ''; page.style.transform = ''; page.style.opacity = ''; }
   overlay.classList.remove('open');
   overlay.hidden = true;
   inner.innerHTML = '';
   _newsOrigin = null;
+  _newsStory = null;
 }
 
 // Wired once: the page's own chrome, and the two things that can take it
@@ -5149,6 +5551,7 @@ function snapNewsPageShut() {
   if (!overlay || !inner) return;
   const backdrop = document.getElementById('news-overlay-backdrop');
   if (backdrop) backdrop.addEventListener('click', () => closeNewsPage());
+  wireNewsPageSwipe();
   // Bound to the overlay's own contents rather than to the document: this
   // page's markup is rebuilt on every open, and the three carousel pages
   // share one document (see router.js).
@@ -5210,6 +5613,12 @@ async function loadAndRenderDunyaPoll(poll) {
   }
 
   renderDunyaPollInto(container, poll, votersA, votersB, mine, profilesById);
+  // What the swipe on the open story would be answering: the newest
+  // question the reader hasn't answered yet (see newsOpenPoll). Recorded
+  // here rather than fetched a second time -- this is already the query
+  // that knows it.
+  _newsPollMine.set(String(poll.id), mine);
+  paintNewsSwipeCues();
 }
 
 function buildDunyaVoterAvatarsHtml(userIds, profilesById) {
