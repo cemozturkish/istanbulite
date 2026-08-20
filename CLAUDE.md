@@ -218,7 +218,7 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > `breaking_news` + polls/series/updates, `library_articles`/shelves/letters/categories,
 > `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians` +
 > `political_seats` (one seat per district, the two fixed national/city ones, and one per country
-> on Kütüphane's map), TBMM
+> on Kütüphane's map — `db/political_seats_countries_seed.sql` fills that last set), TBMM
 > seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `coffee_prices`
 > (the Kahve Endeksi — v3 adds the opening-hours and scheduled-discount columns that make it
 > live), `coffee_comments` (what members say about a venue), `countries` + `country_entries`
