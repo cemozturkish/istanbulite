@@ -11,18 +11,17 @@
   <script src="safe-area-ready.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
-  <script src="router.js?v=2"></script>
+  <script src="router.js?v=3"></script>
   <script src="i18n.js?v=6"></script>
   <script src="palette.js"></script>
   <script src="loading-screen.js?v=2"></script>
   <link rel="stylesheet" href="palette.css">
   <link rel="stylesheet" href="loading-screen.css?v=2">
   <script src="game-locks.js"></script>
-  <link rel="stylesheet" href="profile-card.css?v=9">
+  <link rel="stylesheet" href="profile-card.css?v=10">
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
-  <script src="politician-card.js?v=2" defer></script>
-  <script src="profile-card.js?v=9" defer></script>
+  <script src="profile-card.js?v=10" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
   <link rel="stylesheet" href="mahalle-picker.css">
@@ -396,29 +395,17 @@
       flex-direction: column;
       overflow-y: auto;
     }
-    /* Wraps everything in .col-right except #politician-card, mirroring
-       .col-left-slide -- keeps the politician card visually still during
-       the slide/view-transition animations below while the news feed
-       slides. */
+    /* Mirrors .col-left-slide -- the column's own sliding contents during
+       the slide/view-transition animations below. */
     .col-right-slide {
       display: flex;
       flex-direction: column;
       flex: 1;
       min-height: 0;
     }
-    /* Mirrors #library-card's layout: DOM order in renderPoliticianCard()
-       puts the avatar last (right side) instead of first, and this
-       right-aligns the name/title text next to it -- a true mirror image
-       of the top-left card rather than just a reused style. */
-    .politician-card .card-id { text-align: right; }
-    /* Clicking the card opens the detail bottom sheet (see the delegated
-       #politician-card click listener) -- unlike #library-card, the whole
-       card is the click target, not just an inner edit button. */
-    .politician-card { cursor: pointer; }
-    /* The two top cards sit on the same 14px line -- the one the feeds
-       that used to stack below them were printed on, kept so the cards
-       still line up with the columns' own inset. */
-    #library-card, #politician-card {
+    /* #library-card sits on the same 14px line the feeds below it are
+       printed on, so it lines up with its column's own inset. */
+    #library-card {
       margin-left: 14px;
       margin-right: 14px;
     }
@@ -428,7 +415,7 @@
        top; buttons will be added inside these later. Sibling of
        .col-left-slide/.col-right-slide (not inside it) so they stay put
        while the news/events feed above scrolls, exactly like
-       #library-card/#politician-card stay put at the top. */
+       #library-card stays put at the top. */
     .corner-card {
       border: 2px solid var(--ink);
       border-bottom: 5px solid var(--ink);
@@ -888,24 +875,17 @@
         z-index: 1;
       }
       .col-left { grid-area: events; }
-      /* Nothing on this page's right column shows on a phone: the seat it
-         carries moved into the profile bar (see #politician-card below)
-         and the rest of it is empty. Hidden outright rather than given a
-         track of its own, so the events get the full width. */
+      /* Nothing on this page's right column shows on a phone -- it is
+         empty (the seat it used to carry is gone from Hane entirely, see
+         the col-right markup). Hidden outright rather than given a track
+         of its own, so the events get the full width. */
       .col-right { display: none; }
       /* #ist-pc-mount (profile-card.js) already covers the identity card
          on mobile — the desktop-only #library-card would otherwise
          duplicate it. */
       #library-card { display: none; }
-      /* The politician card as a card is desktop-only -- but the seat it
-         names is NOT hidden on a phone any more: it moves into the
-         profile bar's left end (#ist-pc-seat, see "THE TOP BAR" in
-         profile-card.css). It still follows the map there, so tapping a
-         district swaps the bar's seat to that district's Belediye
-         Başkanı on a phone too. politician-card.js paints both.
-         Bottom corner cards stay desktop-only -- same reasoning
+      /* Bottom corner cards stay desktop-only -- same reasoning
          #library-card carries above (nothing to show in them yet). */
-      #politician-card { display: none; }
       .corner-card { display: none; }
 
       /* Both sidebars keep their desktop flex column (see the feeds' auto
@@ -1163,9 +1143,8 @@
        white card nested inside it. The #anahane-detail-sheet override
        below gives the SHEET the white chapter-box border/background
        (swapping out frames.css's gray shared fill) plus a drop shadow
-       lifting it off the map, and the card rule further down strips the
-       inner .politician-detail's own border and background so it's just
-       content sitting in the sheet's padding.
+       lifting it off the map, and the event card inside it sits in that
+       box's padding.
 
        On mobile the sheet is dragged rather than scrolled (initDetailPull,
        see the ≤768px block at the end of this stylesheet): native
@@ -1177,68 +1156,20 @@
       border-bottom-width: 0 !important;
       box-shadow: var(--frame-shadow-strong) !important;
     }
-    /* The card's own border/background are dropped inside the detail
-       overlay -- #anahane-detail-sheet now carries that box itself, so
-       the card is just its content sitting in the sheet's padding, not a
-       second bordered box nested inside the first. */
-    .detail-overlay-body .politician-detail {
-      background: none;
-      border: none;
-      padding: 0;
-    }
+    /* There is no .politician-detail on this page any more: Hane names no
+       seat at all (see the col-right markup below), so the only thing this
+       sheet opens is an event. A person mentioned by name inside one still
+       shows their title in the small label below, which is all this page
+       ever needs to say about who somebody is -- the full page belongs to
+       the two sides, where the seat does. */
 
-    /* Politician detail sheet -- opened from #politician-card (built by
-       the shared politician-card.js). The site's usual card treatment
-       (background/border/shadow), in a centered profile layout. */
-    .politician-detail {
-      background: var(--paper-card);
-      border: 2px solid var(--card-border-color);
-      border-bottom: 5px solid var(--card-border-color);
-      padding: 24px;
-      color: var(--card-fg);
-      text-align: center;
-    }
-    .politician-detail-avatar {
-      width: 96px;
-      height: 96px;
-      border-radius: 50%;
-      border: 2px solid var(--card-border-color);
-      background: var(--paper-dark);
-      overflow: hidden;
-      position: relative;
-      margin: 0 auto 14px;
-    }
-    .politician-detail-name {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: var(--card-fg-heading);
-    }
-    .politician-detail-title {
-      font-size: 0.82rem;
-      color: var(--muted);
-      margin-top: 2px;
-      margin-bottom: 16px;
-    }
-    .politician-detail-row {
-      text-align: left;
-      font-size: 0.86rem;
-      padding: 8px 0;
-      border-top: 1px solid var(--rule);
-    }
-    .politician-detail-bio {
-      text-align: left;
-      font-size: 0.88rem;
-      line-height: 1.5;
-      margin-top: 12px;
-      white-space: pre-wrap;
-    }
     /* A person's name mentioned inside news/event body text (see
        person-mentions.js) -- dotted rather than a solid underline so it
        doesn't read as an outbound link. If the person currently holds a
        title (data-tip), hovering/focusing reveals it in a small label
-       above the name -- a quick "who is this" reminder, not the full
-       .politician-detail sheet the seat cards above open. */
+       above the name -- a quick "who is this" reminder. It is the whole
+       of what this page says about who somebody is: the full page belongs
+       to the two sides, where the seat cards are. */
     .person-mention {
       color: var(--accent);
       text-decoration: underline;
@@ -1397,27 +1328,28 @@
   </main>
 
   <aside class="col-right">
-    <!-- Symmetric mirror of #library-card at the top of col-left: same
-         .library-card visual style, but the extra .politician-card class
-         (see its CSS above) flips the avatar to the right side, and
-         renderPoliticianCard() below renders the avatar/name/text in that
-         reversed order to match. İstanbul's Büyükşehir Belediye Başkanı by
-         default, swapped for the clicked district's Belediye Başkanı. -->
-    <div class="library-card politician-card" id="politician-card"><div class="card-loading"><span class="spinner"></span></div></div>
+    <!-- No seat card here. Hane names nobody in power: this page is the
+         self and the people (the petek beside it, the events on the other
+         side) and it has no map for a seat to be true of. Whoever holds
+         power over what you are looking at is a fact of the two sides --
+         the district's Belediye Başkanı on Kahvehane, the country's
+         leader on Kütüphane -- and the profile bar over this page carries
+         you alone, in the middle of it (see setBarLayout in
+         profile-card.js). -->
     <!-- Empty on purpose. Every story is on Kütüphane now -- İstanbul,
          Türkiye, the districts and Dünya in one feed (see its own
          #dunya-news-feed), rather than split across two pages. -->
     <div class="col-right-slide"></div>
-    <!-- Bottom-left corner card (mirrors #politician-card above, pinned to
-         the bottom instead of the top) -- empty for now, buttons TBD. -->
+    <!-- Bottom-left corner card (mirrors #library-card in the other
+         column, pinned to the bottom instead of the top) -- empty for
+         now, buttons TBD. -->
     <div class="corner-card" id="corner-card-left"></div>
   </aside>
   </div>
 </div>
 
-<!-- Detail overlay: the bottom sheet this page opens things full-size in
-     -- a politician's page, or a person mentioned by name. See
-     openDetail/closeDetail further down. -->
+<!-- Detail overlay: the bottom sheet this page opens things full-size
+     in -- an event. See openDetail/closeDetail further down. -->
 <div class="ist-sheet-overlay ist-sheet-pull detail-overlay" id="anahane-detail" hidden>
   <div class="ist-sheet-backdrop" id="anahane-detail-backdrop"></div>
   <div class="ist-sheet detail-overlay-sheet" id="anahane-detail-sheet">
@@ -1470,7 +1402,6 @@ function mount() {
   // showSite() entirely) leaves the nav bar and profile card inheriting
   // pointer-events:none with nothing to unlock it.
   document.getElementById('main-site').classList.add('active');
-  renderPoliticianCard('istanbul');
   loadEvents();
   loadPersonMentionsRoster();
   mountPetek();
@@ -1733,45 +1664,14 @@ document.getElementById('signup-submit-btn').addEventListener('click', async () 
   });
 });
 
-// ── Politician card (top-right, desktop) ───────────────────────
-// Mirrors #library-card at the top-left: the İstanbul Büyükşehir Belediye
-// Başkanı by default, swapped for the clicked district's Belediye Başkanı.
-// Backed by two tables (see db/politicians.sql) so a person's data (name,
-// avatar, bio) is independent of which seat, if any, they currently hold:
-//   public.politicians     — the people roster
-//   public.political_seats — id ('istanbul' or a neighborhood id) ->
-//                            politician_id + title
-// Nothing here is hardcoded, since officeholders change. Fetched once and
-// cached for the session by the shared module (IstPoliticianCard.seats) --
-// they rarely change, and Kütüphane swaps its own seat off the very same
-// table, so there is one cache rather than one per page. That also matters
-// mechanically: both page scripts end up in the one document router.js
-// keeps, and two top-level `let`s of the same name there is a SyntaxError
-// that takes the second page's whole script with it.
-
-// The card and its detail view are drawn by the shared module
-// (politician-card.js) -- the same markup kahvehane and kütüphane print,
-// so a politician looks the same wherever you meet one. What stays here
-// is the part that is genuinely anahane's: the seat it names. Hane's map
-// is gone -- the petek is the page now -- so the seat no longer follows a
-// selection here; it rests on İstanbul's Büyükşehir Belediye Başkanı, the
-// one seat that is true of the whole city the reader is standing in.
-// Kütüphane still swaps its seat with the countries on its phone map;
-// Kahvehane has one fixed seat of its own.
-async function renderPoliticianCard(seatId) {
-  const byId = await IstPoliticianCard.seats(sb);
-  const id = seatId || 'istanbul';
-  const seat = byId[id];
-  const seatLabel = id !== 'istanbul' ? (districtNames[id] || id) : 'İstanbul';
-  // render() paints both of the seat's surfaces -- the desktop card here in
-  // col-right and the phone's slot in the profile bar -- and wires this
-  // page's openDetail to each. The click is bound to those elements, never
-  // delegated on document: #politician-card exists on all three carousel
-  // pages, and a document-level listener would survive a virtual navigation
-  // (see router.js) and keep firing on the other pages' cards, opening
-  // anahane's sheet on top of theirs.
-  IstPoliticianCard.render({ mountElId: 'politician-card', seat, seatLabel, openDetail });
-}
+// ── No seat on Hane ───────────────────────────────────────────
+// This page named a seat once -- İstanbul's Büyükşehir Belediye Başkanı,
+// mirroring #library-card at the top-left. It names none now: Hane is the
+// self and the people, with no map on it for a seat to be true of, and
+// the profile bar over it carries you alone in the middle of the row (see
+// setBarLayout in profile-card.js). Whoever holds power over what you are
+// looking at is a fact of the two sides -- Kahvehane's own district and
+// Kütüphane's countries -- and lives there, in politician-card.js.
 
 // ── Events (left column) ──────────────────
 // Beside the petek: the petek is who you are standing next to, an event
@@ -2032,9 +1932,9 @@ function esc(s) {
   }[c]));
 }
 
-// Detail overlay: a bottom sheet for whatever this page opens full-size --
-// a politician's page (see politician-card.js) or a person mentioned by
-// name. Mirrors Kahvehane's game overlay / Kütüphane's reader overlay.
+// Detail overlay: a bottom sheet for whatever this page opens full-size
+// -- an event. Mirrors Kahvehane's game overlay / Kütüphane's reader
+// overlay.
 // The phone pull handler (IstSheet.pull, assigned below). Opening and
 // closing need nothing from it, since IstSheet drives it itself.
 let detailPull = null;
@@ -2069,8 +1969,8 @@ function closeDetail() {
 })();
 
 // The pull is the shared sheet's (see IstSheet.pull in sheet.js) — the
-// same gesture Kütüphane's reader opens with, so a politician and the
-// meclis behave identically in the hand.
+// same gesture Kütüphane's reader opens with, so an event and a story
+// behave identically in the hand.
 detailPull = IstSheet.pull('anahane-detail', { onDismiss: closeDetail });
 
 // ── Init ──
