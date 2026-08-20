@@ -55,6 +55,67 @@
   };
   const DEFAULT_PAGE = 'anahane';
 
+  // ── Where the two names stand on the top bar, per page ──
+  // The bar over the three carousel pages says where you are standing by
+  // where the names on it are standing: the seat at one edge and you at
+  // the other on the two pages that name a seat, and you alone in the
+  // middle on Hane, which names none (the petek is the people; there is
+  // no map on that page for a seat to be true of). Swiping walks your own
+  // name between those three positions, so the bar makes the same move
+  // the pages under it make.
+  //
+  // See "THE TOP BAR" in profile-card.css for the classes themselves.
+  const BAR_LAYOUT = {
+    kutuphane: 'ist-pc-seat-left',
+    anahane:   'ist-pc-seat-none',
+    kahvehane: 'ist-pc-seat-right',
+  };
+  const BAR_LAYOUT_CLASSES = ['ist-pc-seat-left', 'ist-pc-seat-none', 'ist-pc-seat-right'];
+
+  // Moves the bar into `page`'s layout, sliding whichever names are
+  // already on it into their new positions (a FLIP: measure, re-lay out,
+  // put each block back where it was with a transform, then release it —
+  // there is nothing about a flex row changing ends that CSS can
+  // transition on its own).
+  //
+  // Called by renderPage when the row is first built (nothing to slide
+  // yet), by setPage, and by router.js at the exact moment a virtual
+  // navigation swaps the page under the bar — that timing is the whole
+  // point: the names have to travel *with* the page, not after it.
+  function setBarLayout(page, opts) {
+    const row = document.querySelector('#ist-pc-mount .ist-pc-row');
+    const cls = BAR_LAYOUT[page];
+    if (!row || !cls || row.classList.contains(cls)) return;
+
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const animate = !(opts && opts.animate === false) && !reduced && window.innerWidth <= 768;
+    // Only what carries words moves; an empty seat slot has nothing to
+    // slide (it is emptied on every navigation, see politician-card.js).
+    const movers = animate
+      ? Array.from(row.querySelectorAll('.ist-pc-id')).filter(el => el.textContent.trim())
+      : [];
+    const before = movers.map(el => el.getBoundingClientRect().left);
+
+    BAR_LAYOUT_CLASSES.forEach(c => row.classList.remove(c));
+    row.classList.add(cls);
+
+    movers.forEach((el, i) => {
+      const dx = before[i] - el.getBoundingClientRect().left;
+      if (!dx) return;
+      el.style.transition = 'none';
+      el.style.transform = `translateX(${dx}px)`;
+    });
+    // Force the offset positions above to be committed as the transition's
+    // starting point before it is handed back to the stylesheet's own
+    // transform transition on the next line.
+    void row.offsetWidth;
+    movers.forEach(el => {
+      if (!el.style.transform) return;
+      el.style.transition = '';
+      el.style.transform = '';
+    });
+  }
+
   // Which of the three carousel pages we're on. router.js stamps
   // body.dataset.page on every virtual navigation; on a real page load
   // the filename is the source of truth.
@@ -538,13 +599,18 @@
   let _mounted = false;
   let _state = null;
   let _resizeListener = null;
+  // The page the bar is currently standing over — read when you press
+  // yourself (which blocks your profile shows is the page's call, see
+  // PROFILE_SECTIONS) so the row itself never has to be rebuilt for it.
+  let _page = DEFAULT_PAGE;
 
   async function mount(opts) {
     const sb = opts.sb;
     const I18N = opts.I18N;
-    const page = opts.page || 'anahane'; // 'anahane' | 'kahvehane' | 'kutuphane'
+    const page = opts.page || DEFAULT_PAGE; // 'anahane' | 'kahvehane' | 'kutuphane'
     const container = document.getElementById('ist-pc-mount');
     if (!container || !sb) return;
+    _page = page;
 
     // Already mounted this session (e.g. a router re-invoking mount on a
     // virtual navigation) — just re-render for the new page, no re-fetch.
@@ -573,14 +639,28 @@
       container.innerHTML = `<div class="ist-pc"><div class="ist-pc-loading"><span>Yükleniyor…</span></div></div>`;
       _state = await fetchProfileData(sb, I18N, user);
       _mounted = true;
-      renderPage(container, page, _state);
+      // _page rather than `page`: the reader may have swiped on while this
+      // fetch was in flight, and the row has to arrive standing over the
+      // page that is actually on screen.
+      renderPage(container, _page, _state);
     }
   }
 
+  // A navigation does not rebuild this row. The two lines of type on it —
+  // your name and your district — are the same on all three pages; what
+  // the page decides is which blocks your profile opens with
+  // (PROFILE_SECTIONS, read off _page when it is opened) and where on the
+  // bar the names stand. Rebuilding it would also take the seat's markup
+  // and, mid-navigation, the very transform the layout move is riding on.
   function setPage(page) {
+    // Recorded first, before either guard: a navigation during the bar's
+    // own first fetch has nothing to move yet, but it is still the page
+    // the row about to be built belongs to (see doMount).
+    _page = page;
     const container = document.getElementById('ist-pc-mount');
     if (!container || !_state) return;
-    renderPage(container, page, _state);
+    if (!container.querySelector('.ist-pc-row')) { renderPage(container, page, _state); return; }
+    setBarLayout(page);
   }
 
   function unmount() {
@@ -650,15 +730,17 @@
     const yasadigiDisplay = yasadigi ? (NB_NAMES[yasadigi] || yasadigi) : '—';
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const toggleLabel = t('profile.toggle') || 'Profil';
+    _page = page;
 
     container.innerHTML = `
       <div class="ist-pc" id="ist-pc-root">
         <div class="ist-pc-row">
-          <!-- Left end of the bar: whoever holds power over what this page
-               is showing. Filled by politician-card.js (see its paintBar),
-               never by this module -- the bar only keeps the slot. Empty,
-               and on the two pages that have no seat at all, the row falls
-               back to its original layout (see .ist-pc-has-seat). -->
+          <!-- Whoever holds power over what this page is showing. Filled
+               by politician-card.js (see its paintBar), never by this
+               module -- the bar only keeps the slot. Which end of the row
+               it stands at, and whether the page names a seat at all, is
+               setBarLayout's (Kütüphane left, Kahvehane right, Hane
+               none). -->
           <div class="ist-pc-seat" id="ist-pc-seat"></div>
           <!-- You. The whole block is the button that opens your profile --
                there is no gear beside it any more: on a bar where the other
@@ -679,6 +761,9 @@
     // The row above was just rebuilt from scratch, which empties the seat
     // slot; the seat's own module knows what belonged there.
     if (global.IstPoliticianCard) global.IstPoliticianCard.paintBar();
+    // Where the two names stand is the page's (see setBarLayout). Nothing
+    // to slide on a row that has only just appeared.
+    setBarLayout(page, { animate: false });
 
     const meEl = document.getElementById('ist-pc-me');
     const openMine = () => {
@@ -686,8 +771,11 @@
         sb: state.sb, I18N, user, profile,
         sozcuCount, kefaletCount, sponsoredList, kefilOfUser,
         // Which blocks this profile page shows is the page's call, not
-        // this card's (see PROFILE_SECTIONS).
-        page,
+        // this card's (see PROFILE_SECTIONS). Read live rather than closed
+        // over: the row outlives a navigation now (see setPage), so the
+        // page it was built for is not necessarily the page it is standing
+        // over when it is finally pressed.
+        page: _page,
         avatarUrl: state.avatarUrl,
         avatarHair: state.avatarHair,
         avatarHat: state.avatarHat,
@@ -2211,6 +2299,7 @@
   global.IstProfileCard = {
     mount,
     setPage,
+    setBarLayout,
     unmount,
     mountLibraryCard,
     openProfileOverlay,
