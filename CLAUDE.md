@@ -40,12 +40,14 @@ still in the middle. Not this, not that: **both**.
 
 The three pages, and what each direction *means*:
 
-- **Middle — `anahane.html` (Hane, "home"):** the self and the city, and nothing else. The
-  Istanbul district map, the user's own profile and avatar, the PETEK honeycomb. "No matter where
+- **Middle — `anahane.html` (Hane, "home"):** the self and the people, and nothing else. The
+  page **is the PETEK** — the shared honeycomb, drawn from where you are standing in it — with the
+  **events** beside it and the user's own profile and avatar reached from the bar. "No matter where
   you are in Istanbul, Istanbul is your home first." Personal customization (avatar creation,
-  profile) belongs to the middle — it is the user's anchor point. It deliberately carries **no
-  feed at all**: the events went to the local side and the news to the national one, because a
-  page about you should not also be a page you scroll.
+  profile) belongs to the middle — it is the user's anchor point. The map is not here: the city as
+  a drawing is one swipe away on Kahvehane, where a district is a thing you actually choose. What
+  is here is who you are standing next to and where you can go and meet them; the news is on the
+  national side.
 - **One direction — `kahvehane.html` (zoom IN, the local):** deeper into the neighborhood. The
   district/mahalle-level map, the **coffee price index** and local economy, the daily games, the
   scoreboards (who got what score), and the **events**. This is the *interactive* side of the app
@@ -134,7 +136,7 @@ default one.
 ```
 /home/user/istanbulite/
 ├── index.html            # Login/signup gate ONLY — redirects to anahane.html once authenticated
-├── anahane.html          # MIDDLE page: home — Istanbul map, profile/avatar, the PETEK honeycomb
+├── anahane.html          # MIDDLE page: home — the PETEK honeycomb itself, plus the events
 ├── kutuphane.html        # LEFT page (zoom out): Library — Turkey map, ALL news, articles, letters, TBMM
 ├── kahvehane.html        # RIGHT page (zoom in): Coffeehouse — district map, games hub, scoreboards, events
 ├── sozcel.html           # Turkish Wordle-style daily word game
@@ -294,7 +296,7 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 - RLS: authenticated users SELECT all; direct INSERT only for an assigned Sözcü's *own* row before its deadline (midnight Istanbul at the start of `used_on`), matching the UPDATE policy; DELETE admin-only.
 - **The admin is never locked out** (`db/sozcel_used_answers_v6_admin_override.sql`): admin INSERT/UPDATE policies sit alongside the Sözcü ones, with no `sozcul_id` match and no deadline, because a word that is wrong *on the day it is being played* is exactly the case that has to be fixable and the one moment every other policy refuses. The admin reaches it through the same Sözcü Görevi form on `sozcel.html` — the button opens a day picker instead of an assignment, and saving preserves whoever the row already belonged to, so correcting a day never takes it over. `game-locks.js` matches: the admin isn't bounced off a game they switched off for the day (they own the switch), though the win-gates still apply to everyone since those are the game's own progression.
 
-**Tables: `hive_codes` + `hive_cells` + `hive_bonds`** — the petek, opened from Anahane's map
+**Tables: `hive_codes` + `hive_cells` + `hive_bonds`** — the petek, which is Anahane itself
 (`db/hive_lattice_v4.sql`, superseding the six-slot `hive_slots` of `db/hive_slots*.sql`).
 - The petek is **one shared grid**, not a comb per member. A member is a single hexagon at axial
   coordinates on a map; attaching to somebody makes you their neighbour on a grid everybody is
@@ -420,20 +422,28 @@ sb.from('articles').delete().eq('id', id)
 
 ### `anahane.html` — Hane (MIDDLE page, home)
 - The entry point and anchor of the three-page carousel — the user always starts here
-- Interactive Istanbul district map in the center; clicking a district opens its detail sheet
-- Both side columns are **empty**: the events moved to Kahvehane and every news story to
-  Kütüphane, so what is left on Hane is the map, the seat, the petek and you
-- The personal layer lives here: the user's own profile, avatar, home identity
-- The **PETEK** button over the map (the counterpart of Kahvehane's Kahve Endeksi pill, sitting
-  just above the map label) opens the **petek** — one shared honeycomb, your frame in the middle
-  and everybody you are standing next to around it, each attachment made by entering that
-  member's weekly code
-  (`IstProfileCard.openHiveOverlay`, see Site-wide defaults and `db/hive_lattice_v4.sql`).
-  Opening your profile card here shows the cover alone — the petek is a destination on the
-  map, not a page of your account. On a phone it does not rise from the bottom edge like every
-  other sheet: the PETEK button itself **grows into the page** and the page folds back into the
-  button when it closes
-- Vision: this page is "you + Istanbul" — see Vision & Product Philosophy above
+- **The page is the petek** (`IstProfileCard.mountHivePage`, see Site-wide defaults and
+  `db/hive_lattice_v4.sql`): one shared honeycomb, your own frame in the middle and everybody you
+  are standing next to around it, each attachment made by entering that member's weekly code.
+  It was a sheet opened by a button over a map; it is the middle page itself now. There is nothing
+  to open and nothing to close — you arrive and you are standing in it
+- **There is no map on Hane.** The Istanbul map lives on Kahvehane, which is where a district is a
+  thing you are actually choosing (a mahalle, an event, what a cup costs there). Hane had the same
+  drawing with nothing to pick on it. The seat in the profile bar therefore no longer follows a
+  selection here: it rests on İstanbul's Büyükşehir Belediye Başkanı, the one seat true of the
+  whole city the reader is standing in
+- **The events are the column beside it** (`#events-panel`, `events` / `event_rsvps`), back from
+  Kahvehane. They belong next to the petek: the petek is who you are standing next to, an event is
+  the one thing on the site that ends with you actually standing next to them. Unscoped by
+  construction — there is no map here to filter by, so it is the whole city's list, each card
+  kickered with its own district. Opening a card rises the page's detail sheet with the description
+  and a live RSVP row
+- On a phone the petek stands in the hero square the map used to hold and the events hang from the
+  bottom of the band below it, so the hero line is exactly where it is on the other two pages
+- The personal layer lives here: the user's own profile, avatar, home identity. Opening your
+  profile card on this page shows the cover alone — the petek is the page, not a block inside your
+  account
+- Vision: this page is "you + the people" — see Vision & Product Philosophy above
 
 ### `admin.html` — Admin Dashboard
 - Login restricted to ADMIN_EMAIL
@@ -462,13 +472,11 @@ sb.from('articles').delete().eq('id', id)
 
 ### `kahvehane.html` — Coffeehouse (RIGHT page, zoom IN — the local, interactive side)
 - Istanbul district map with mahalle-level picker
-- **Events live in the left column** (`#events-panel`, `events` / `event_rsvps`), moved here from
-  Hane: pick a district on the map and you see that district's events, tap the sea and you see all
-  of İstanbul's — the same way the comments used to follow the map. Opening a card rises the page's
-  detail sheet with the description and a live RSVP row (attendee avatars and all)
-- The **neighborhood comments are parked**, not deleted: the events took their column and where
-  they belong is still an open question, so the feed, its composer and everything driving them
-  stay exactly as they are behind `const COMMENTS_ENABLED = false` plus `hidden` on
+- **The Kahve Endeksi is the left column** (see below). The events that held it went back to Hane,
+  beside the petek — the people and where they will be are one page now
+- The **neighborhood comments are parked**, not deleted: their column belongs to the index and
+  where the comments belong is still an open question, so the feed, its composer and everything
+  driving them stay exactly as they are behind `const COMMENTS_ENABLED = false` plus `hidden` on
   `#discussion-section`. Turning both back on is the whole of re-enabling it. Comments are still
   posted only to your own neighborhood (RLS enforces it)
 - This is where the NYTimes-like games live, there are three of them:
@@ -476,14 +484,15 @@ sb.from('articles').delete().eq('id', id)
   - Tümcel: Turkish quote-fragment Connections (replaced Bağlantılar)
   - Bulmaca: Turkish crossword
 - The games change every day; scores and scoreboards are tracked (`game_results`)
-- The **coffee price index** (Kahve Endeksi, `coffee_prices` table): the "Kahve Endeksi" pill
-  above the map label opens a bottom sheet (`#kahvehane-detail`) listing the cheapest cup of
-  coffee per venue, scoped to the selected district or all of Istanbul; on desktop the same list
-  also shows permanently in col-right. Opened from the map, it carries `.ist-sheet-pull` like
-  Kütüphane's news sheet does — on a phone it rests half-way under the map
-  and swipes down to dismiss (`IstSheet.pull`, see sheet.js). **Read-only for everyone** — the
-  index is curated from the admin portal only (admin.html's "Kahve" tab), and RLS allows writes
-  to the admin alone (`db/coffee_prices_v2_admin_only.sql`)
+- The **coffee price index** (Kahve Endeksi, `coffee_prices` table) **is the left column**
+  (`#coffee-index-panel`), on every screen, beside the map that scopes it: the cheapest cup of
+  coffee per venue, in the selected district or all of İstanbul. It used to be a block under the
+  game tiles on desktop and a bottom sheet behind a pill on a phone — one list on two surfaces,
+  kept in step by hand, where the pill only ever existed because this column was holding something
+  else. There is one surface now and no button: the board is simply there, which is what a market
+  board is. **Read-only for everyone** — the index is curated from the admin portal only
+  (admin.html's "Kahve" tab), and RLS allows writes to the admin alone
+  (`db/coffee_prices_v2_admin_only.sql`)
 - The index is a **live board, not a printed list** — it is meant to be accurate about the cup
   you could go and buy right now, the way a market board is accurate about a price. A venue
   outside its opening hours drops out of the ranking and sinks to the bottom of the board,
@@ -497,12 +506,10 @@ sb.from('articles').delete().eq('id', id)
   on the map instead (the same `.hover-active` tint the map's own hover uses), which keeps the
   board terse and answers "where is this" with the map rather than more text. Hovering also
   nudges the row toward the map (`translateX(-4px)`), matching `.game-link` and the scoreboard
-- **Clicking a row opens that venue.** On desktop it arrives as a left-hand slide-in panel
-  (`.coffee-venue-slide`) over the discussion feed — deliberately the same move the weekly
-  scoreboard makes when a game opens, so "I tapped something on the right, its detail arrived
-  on the left" reads as one consistent gesture. On mobile the board is itself a bottom sheet,
-  so the sheet drills into the venue with a back link instead. Both surfaces are built by the
-  same `renderVenueHTML()`. The panel carries the venue's live price and status, its week's
+- **Clicking a row drills the column into that venue**, in place, with a back link — the same
+  move on every screen, because the board is the column itself. Nothing slides in over anything
+  and nothing rises from the bottom: you tapped a line in a list and the list became the thing
+  you tapped. Built by `renderVenueHTML()`. The panel carries the venue's live price and status, its week's
   opening hours (today's line inked), and **`coffee_comments`** — the members' half of the
   index. The venue's district stays lit on the map for as long as its panel is open, and the
   panel's live block re-renders on the same 30s tick as the board without disturbing the
@@ -544,7 +551,7 @@ sb.from('articles').delete().eq('id', id)
   point — the empty deck says so and points at the door
 - **A story opens into the band it was lying in, not over the map** (`#news-overlay` /
   `#news-page`). On a phone the tapped card *grows* into the whole strip between the hero line and
-  the tab bar — the same move the PETEK button makes on Hane, run by `growNewsPage` off a
+  the tab bar — run by `growNewsPage` off a
   `clip-path` measured from the card's own box — and folds back into that card on the way out. It
   is deliberately not the pulled sheet the rest of this page uses: a story lights the countries it
   is about (`setNewsCountryHighlight`), and a sheet rising over the map covered the very thing it
@@ -732,8 +739,8 @@ geometry and no centred modal anywhere on the site.
   row is padded to — everything stacked over the same map lines up, always.
   - A sheet opened **from the profile bar** (your profile, a member's) rests under that bar,
     via `--ist-sheet-top` (`IstSheet.position` measures it live).
-  - A sheet opened **over the map** — a news item, an event, an article, the meclis, later a
-    country, the Kahve Endeksi board — carries `ist-sheet-pull` and is
+  - A sheet opened **over a page's hero** — a news item, an event, an article, the meclis,
+    later a country — carries `ist-sheet-pull` and is
     *dragged*: it comes to rest half-way down, under
     the map, so you still see what you tapped; drag it up and it stops at the profile bar;
     past that the reading continues inside it; drag it back down and it closes. One
@@ -742,17 +749,17 @@ geometry and no centred modal anywhere on the site.
     window keeps the ordinary sheet.
   - Two surfaces are exceptions, and both for the same reason: they arrive out of a specific
     object already on the screen rather than from off it, so they **grow out of that object**
-    instead of sliding. The **PETEK page** grows out of its button (see its own section
-    below), and **a news story on Kütüphane** grows out of the card it was tapped on, into the
-    band that card lies in (see Kütüphane's own section). Both are still THE sheet — same
-    markup, same `IstSheet.open/close` — only the way they arrive differs.
+    instead of sliding: **a news story on Kütüphane** grows out of the card it was tapped on,
+    into the band that card lies in (see Kütüphane's own section). It is still THE sheet — same
+    markup, same `IstSheet.open/close` — only the way it arrives differs. (The PETEK page used
+    to be the other one; it is a page of its own now, not a sheet at all.)
 - **Chrome:** background/border come from `frames.css`'s `.ist-sheet` rule (2px ink border, no
   bottom border, no shadow).
 
 ### The phone's hero line — `--map-hero-end`
 
-On a phone all three carousel pages are one screen: a square map at the top, everything else
-below it. **Everything below starts on the same line** — Kahvehane's events and game tiles,
+On a phone all three carousel pages are one screen: a square hero at the top — the map on
+Kahvehane and Kütüphane, the petek on Hane — everything else below it. **Everything below starts on the same line** — Kahvehane's events and game tiles,
 Kütüphane's news column — and each map's caption sits
 just above it. A sheet pulled up over the map comes to rest there too. That line is
 `--map-hero-end` (frames.css: frame ring + `--map-hero-top` + the map's own `100vw` square); what
@@ -766,8 +773,10 @@ The hero line is where each page's columns *begin*; it is not where their cards 
 every stack below the map is **bottom-aligned**: one news item, one event, one comment, one
 library box rests just above the tab bar, and the next one is laid **on top of** it, so the
 stack grows upward toward the map instead of downward away from the thumb. It is the same move
-on both pages that carry one — Kahvehane's events, Kütüphane's news feed — and where a page has
-two columns, they end on the same line. (Hane has no feed at all any more; its columns are empty.)
+on both pages that carry one — Hane's events, Kütüphane's news feed — and where a page has
+two columns, they end on the same line. Kahvehane's own column is the one exception, and
+deliberately: the Kahve Endeksi is a ranking, not a feed, so it reads top-down — the cheapest cup
+belongs at the top of the list, not hanging off the tab bar.
 
 Kütüphane's news is the one stack that is a **deck** rather than a list — same bottom-aligned
 box, but the cards are laid on top of each other instead of above each other (see its own
@@ -782,7 +791,7 @@ level too high does nothing at all.
 
 ### The member's own district is painted into the map — `home-map.js`
 
-The Istanbul map behind Anahane and Kahvehane is the same drawing for everyone *except* the one
+The Istanbul map behind Kahvehane is the same drawing for everyone *except* the one
 district the member lives in, and that district is picked out **in the artwork**, not by a wash laid
 over it. Each district gets its own hand-painted copy of the map at
 `assets/map/home/istanbul-map-<id>.png` — the
@@ -803,12 +812,13 @@ file drop plus one id in `PAINTED` — see `assets/map/home/README.md`.
 
 ### The map is scenery, and it drifts — `map-parallax.js`
 
-The map is the one thing on all three carousel pages that is *scenery* rather than content:
+The map is the one thing on the two pages that carry one that is *scenery* rather than content
+(Hane's hero is the petek, which is the page itself and does not drift):
 everything else — the two bars, the columns, every sheet — is printed **on** the screen, while the
 map is what the screen is a window **onto**. On a phone that is literal: tilt the device and the
 drawing behind the window shifts against you, the way the view through a real window does. Nothing
 else moves — not the profile bar, not the tab bar, not the feeds, not the caption over the map, not
-a sheet resting on the hero line. One implementation for all three pages; each page just loads the
+a sheet resting on the hero line. One implementation for both map pages; each page just loads the
 script, and `router.js` re-aims it after a virtual navigation swaps `#ist-content`.
 
 Three things about it are load-bearing:
@@ -885,50 +895,38 @@ avatar, name, district) shows on all three; the week's game grid is Kahvehane's;
 settings — with the Kişiselleştir and Çıkış Yap buttons that act on them — are Kütüphane's.
 Anahane's is the cover and nothing else.
 
-### The petek — the PETEK page (`IstProfileCard.openHiveOverlay`)
+### The petek — which is Hane itself (`IstProfileCard.mountHivePage`)
 
 The petek (`hiveGridHTML`) is **one shared honeycomb**, drawn from where the reader is standing in
 it: their own cover frame in the middle, everybody else on their map placed exactly where they
 actually are around it, and a "+" on each free side of their own hexagon. It is not six slots of
-your own any more — see the schema section above for what that means and why. It opens from the
-**PETEK button over Anahane's map**, into its own sheet (`#hive-overlay`, built lazily by
-`ensureHiveOverlay` on first open) rather than the shared profile sheet — who you keep close is a
-destination on the middle page, not a page of your account, which is why it is reached from the city
-rather than from the gear in the profile bar.
-Being reached from a button on the map rather than from the profile bar is also what gives it its
-own opening. On a phone it neither slides up from the bottom edge nor rests half-way down the way
-a news item does: the **PETEK button grows into the page**, and the page folds back into the button
-when it closes. The page never moves — it is already at its final size. What animates is the window
-onto it, a `clip-path` inset that starts as the button's own box and opens out to the page's four
-edges, with the button hidden for as long as the page is up so the two are never both on the map.
+your own — see the schema section above for what that means and why.
 
-**The page is a fixed size and the petek is not.** On a phone this page is the one sheet that is
-not full-bleed: it is cut to what is on it — the window onto the grid, and the dock under it — and
-stands in the middle of the city, clear of both bars, so a button grows into a box roughly its own
-kind of size rather than into the whole screen. Its width is `--ist-hive-view-w`, the window's own
-arithmetic, which is why the cell and step tokens live on `.hive-overlay` rather than on
-`.ist-hive`: the page and the grid do the same sum, once. What changes as members are added is the
-*drawing*, never the page — `fitHive` scales the grid down into the window and, once it would have
-to shrink past legibility (`HIVE_MIN_SCALE`), leaves it there and lets it be dragged instead. What
-has to fit is the room the drawing needs **around the reader**, not its own box: the reader stays
-dead centre, so a petek grown out to one side is still asking for that much room on both, and
-fitting the raw box leaves the far side clipped by a window the arithmetic had just called roomy.
+**It is the middle page**, not something opened over one. It was a page of your profile, then a
+sheet grown out of a PETEK button over Hane's map; the map is gone and the honeycomb is simply
+what Hane *is*. Nothing opens and nothing closes: you arrive on the middle page and you are
+standing in the grid, which is the shortest possible distance between a reader and the one object
+this app is about. Anahane mounts it into a node it owns (`#hive-page`) via
+`IstProfileCard.mountHivePage({ sb, I18N, mountId })` on every entry — including a virtual one,
+which swaps `#ist-content` and takes the previous mount with it — and every mount re-fetches
+`hive_map()`, because somebody else's attachment may have carried this whole petek somewhere since
+it was last drawn.
+
+**The window is the room the page has; the petek is not.** `.ist-hive-page` fills Hane's middle
+cell — the hero square on a phone, the middle column on a desktop — with the dock resting at its
+foot. What changes as members are added is the *drawing*, never the page: `fitHive` scales the grid
+into the window and, once it would have to shrink past legibility (`HIVE_MIN_SCALE`), leaves it
+there and lets it be dragged instead. What has to fit is the room the drawing needs **around the
+reader**, not its own box: the reader stays dead centre, so a petek grown out to one side is still
+asking for that much room on both, and fitting the raw box leaves the far side clipped by a window
+the arithmetic had just called roomy. The window is re-fitted on resize, since it is now a page and
+pages change size.
 
 Every cell is placed on the plane by `calc()` against `--ist-hive-step-x` / `--ist-hive-step-y`, so
 the whole grid is laid out in the drawing's own units at whatever size the cells happen to be — the
 JS emits coordinates, never pixels. `hivePos` and those two tokens are the only places the packing
-is stated.
-
-`growHive` in profile-card.js runs the opening, off two live rectangles, rather than a CSS
-transition between two states: both are measured in the same frame the overlay is unhidden, and a
-custom-property from-state set in that frame is not reliably computed before `.open` lands on the
-next one — the page would simply appear at full size. profile-card.css therefore only takes the
-slide away (`.hive-grow`), and `prefers-reduced-motion: reduce` skips the grow entirely. The
-button is passed in as `origin`; without one (or on desktop, where a button in the corner of a wide
-window has no phone-sized page to become) the petek opens as the ordinary sheet. Since it no
-longer slides, it does not carry `.ist-sheet-pull` either — it is closed with its own × the way a
-game page is, not by swiping it down. The grid reuses the cover's own frame for every cell —
-same mask, same drawn ring, same badges — so there is no second frame treatment to keep in sync.
+is stated. The grid reuses the cover's own frame for every cell — same mask, same drawn ring, same
+badges — so there is no second frame treatment to keep in sync.
 
 A side is filled **hand-to-hand, by code** (`db/hive_slots.sql`): every member holds one code per
 Istanbul week, tapping a free side of your own hexagon asks for someone else's, and from then on
@@ -967,9 +965,9 @@ anywhere else — the tapped hexagon is marked instead (`.ist-hive-cell-open` in
 it slightly via `transform`, which never moves a neighbour). Pressing the same hexagon again folds
 the dock back to the resting code display, which is why there is no close button in it.
 
-Neither the petek nor any of the three profile sets scrolls: each fits inside the sheet, the
-way a politician's page does. If a new block stops fitting, drop a block from that page — do not
-turn the page into a scroller.
+Nothing on this page scrolls, and neither does any of the three profile sets: each fits the room it
+is given, the way a politician's page does. If a new block stops fitting, drop a block — do not turn
+the page into a scroller.
 
 ### Another member's profile — `IstProfileCard.initMemberSheet({ sb, I18N })`
 

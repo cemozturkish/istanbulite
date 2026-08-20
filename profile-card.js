@@ -37,16 +37,12 @@
   // they act on (the settings sliders and the account), so they live
   // with them on Kütüphane.
   //
-  // The petek used to be Anahane's profile page. It is its own
-  // sheet now (#hive-overlay, see openHiveOverlay below), opened by the
-  // PETEK button over Anahane's map rather than through the gear in the
-  // profile bar — the petek is who you keep close, which is a
-  // destination on the middle page, not a page of your account, and
-  // being reached from the map rather than the profile bar is also what
-  // gives it its own opening: on a phone the PETEK button does not rise
-  // a sheet from the bottom edge, it *grows into* the page (see
-  // openHiveOverlay below). Anahane's own profile is therefore the cover
-  // alone: who you are, nothing else.
+  // The petek used to be Anahane's profile page, then a sheet opened
+  // from a button over Anahane's map. It is the middle page *itself*
+  // now (see mountHivePage below) — the petek is who you keep close,
+  // which is a destination of its own, not a page of your account.
+  // Anahane's own profile is therefore the cover alone: who you are,
+  // nothing else.
   //
   // Nothing here scrolls: each page's profile fits inside the sheet the
   // way a politician's does (see .profile-overlay-body in
@@ -790,20 +786,19 @@
   }
 
   // ── THE PETEK PAGE ──
-  // The petek — the shared grid — opened by the PETEK button over
-  // Anahane's map. Its own overlay (#hive-overlay) rather than the shared
-  // profile sheet above, because it opens differently: on a phone the
-  // grid is not a sheet rising from the bottom edge at all — the PETEK
-  // button itself grows out into the page, and the page shrinks back into
-  // the button when it closes (see growHive below). The button is where
-  // the petek lives on the map, so it is what the page comes out of.
-  // It reuses hiveHTML/hiveMountHTML/renderHive/loadHive wholesale:
-  // those only ever look up #po-hive-mount by id, so they don't care
-  // which overlay wraps them.
+  // Hane *is* the petek. The middle page is the shared grid itself —
+  // there is no map on it any more and no button to open anything: you
+  // arrive on the page and you are standing in the honeycomb, which is
+  // what the middle page was always about (the self and the city, and
+  // the city's other half — the map — is one swipe away on Kahvehane).
+  //
+  // So this mounts into a node the page owns rather than into an overlay.
+  // Everything below (hiveHTML, renderHive, loadHive) only ever looks up
+  // #po-hive-mount by id, so none of it cares what wraps it.
   //
   // It fetches the profile itself: the compact card doesn't mount on
   // desktop (see mount), so there is no fetched state to borrow there,
-  // and the button has to work either way.
+  // and the page has to draw either way.
   let _sharedState = null;
   let _hive = null; // { sb, I18N, user, profile, ..., hive, hiveOpen, hiveLoaded }
 
@@ -816,170 +811,35 @@
     return _sharedState;
   }
 
-  // The grow: a phone opens the honeycomb by expanding the PETEK button
-  // into the page rather than sliding a sheet up under the map. The page
-  // is already sitting exactly where it will end up — what animates is
-  // the window onto it, a clip-path inset that starts as the button's own
-  // box and opens out to the page's four edges. Measuring that clip
-  // against the real, untransformed sheet is why nothing here moves the
-  // sheet itself: a transform would scale the clip with it and the two
-  // boxes would stop lining up.
-  //
-  // It is animated from here rather than by a CSS transition between two
-  // classes, because the two rectangles are measured in the same frame
-  // the overlay is unhidden: a custom-property from-state set in that
-  // frame is not reliably computed before .open lands on the next one, so
-  // the page would simply appear at full size. An animation started
-  // outright has no from-state to lose.
-  //
-  // Off on desktop, where the button sits in a corner of a wide window
-  // and there is no phone-sized page for it to become: there the
-  // honeycomb stays the ordinary sheet.
-  const HIVE_GROW_MS = 420;
-  const HIVE_GROW_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
-  let _hiveOrigin = null;
-  let _hiveAnims = [];
-
-  function hiveGrows() {
-    return window.matchMedia('(max-width: 768px)').matches;
-  }
-
-  function hiveReducedMotion() {
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  }
-
-  // The button's box, expressed as an inset into the page's own box.
-  // Clamped at zero: a button falling outside the page (a very short
-  // window, say) opens from that edge rather than from a negative inset,
-  // which clip-path reads as an overflow instead.
-  function hiveOriginInset(sheet) {
-    const origin = _hiveOrigin;
-    if (!sheet || !origin || !origin.isConnected) return null;
-    const b = origin.getBoundingClientRect();
-    const s = sheet.getBoundingClientRect();
-    if (!b.width || !b.height || !s.width || !s.height) return null;
-    const px = (v) => Math.max(0, v).toFixed(2) + 'px';
-    return `inset(${px(b.top - s.top)} ${px(s.right - b.right)} ${px(s.bottom - b.bottom)} ${px(b.left - s.left)})`;
-  }
-
-  function cancelHiveAnims() {
-    _hiveAnims.forEach((a) => { try { a.cancel(); } catch (e) {} });
-    _hiveAnims = [];
-  }
-
-  // dir: 'in' when the button becomes the page, 'out' when the page folds
-  // back into it. The contents cross-fade rather than being drawn
-  // squeezed inside a button-sized window: out fast, in once the page
-  // has most of its room.
-  function growHive(dir) {
-    const overlay = document.getElementById('hive-overlay');
-    const sheet = document.getElementById('hive-overlay-sheet');
-    if (!overlay || !sheet || !overlay.classList.contains('hive-grow')) return;
-    cancelHiveAnims();
-    if (hiveReducedMotion() || !sheet.animate) return;
-    const shut = hiveOriginInset(sheet);
-    if (!shut) return;
-    const wide = 'inset(0px)';
-    const opts = { duration: HIVE_GROW_MS, easing: HIVE_GROW_EASE };
-    // 'out' holds the collapsed frame after it finishes: IstSheet.close
-    // re-hides the overlay a little later (0.55s), and without the fill
-    // the page would snap back to full size for those last frames.
-    _hiveAnims.push(sheet.animate(
-      dir === 'in' ? [{ clipPath: shut }, { clipPath: wide }] : [{ clipPath: wide }, { clipPath: shut }],
-      dir === 'in' ? opts : Object.assign({ fill: 'forwards' }, opts)));
-    const fade = dir === 'in'
-      ? [{ opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1 }]
-      : [{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 0 }];
-    ['hive-overlay-close', 'hive-overlay-body'].forEach((id) => {
-      const node = document.getElementById(id);
-      if (node) _hiveAnims.push(node.animate(fade, Object.assign({ fill: 'forwards' }, opts)));
-    });
-  }
-
-  function ensureHiveOverlay() {
-    if (document.getElementById('hive-overlay')) return;
-    const el = document.createElement('div');
-    // ist-sheet-dim: the honeycomb is a destination, not something read
-    // beside the map — so it tints what it rose from (see sheet.css).
-    el.className = 'ist-sheet-overlay ist-sheet-dim hive-overlay';
-    el.id = 'hive-overlay';
-    el.hidden = true;
-    el.innerHTML = `
-      <div class="ist-sheet-backdrop" id="hive-overlay-backdrop"></div>
-      <div class="ist-sheet profile-overlay-sheet" id="hive-overlay-sheet">
-        <button type="button" class="ist-sheet-close" id="hive-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-        <div class="ist-sheet-body profile-overlay-body profile-overlay-centred" id="hive-overlay-body"></div>
-      </div>
-    `;
-    document.body.appendChild(el);
-
-    document.getElementById('hive-overlay-backdrop').addEventListener('click', closeHiveOverlay);
-    document.getElementById('hive-overlay-close').addEventListener('click', closeHiveOverlay);
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && el.classList.contains('open')) closeHiveOverlay();
-    });
-  }
-
-  function closeHiveOverlay() {
-    const overlay = document.getElementById('hive-overlay');
-    const origin = _hiveOrigin;
-    // The page folds into the button first; IstSheet.close takes the
-    // overlay away once that has finished (its own 0.55s covers the
-    // 0.42s fold).
-    growHive('out');
-    IstSheet.close('hive-overlay', () => {
-      cancelHiveAnims();
-      if (overlay) overlay.classList.remove('hive-grow');
-      _hiveOrigin = null;
-    });
-    // The button comes back just as the page finishes folding into it, so
-    // the two are never both on the map, and the button is never missing
-    // from it once the page is gone.
-    if (origin) setTimeout(() => { origin.style.removeProperty('opacity'); }, Math.max(0, HIVE_GROW_MS - 60));
-  }
-
-  function renderHiveOverlayBody() {
-    const body = document.getElementById('hive-overlay-body');
-    if (!body || !_hive) return;
-    body.innerHTML = hiveMountHTML();
-    // Draws immediately from whatever is already cached (empty frames on
-    // the first open) and fills itself in when the fetch lands, same as
-    // the shared sheet's own settings blocks do.
-    _hive.hiveDisplayName = `${_hive.profile?.first_name || ''} ${_hive.profile?.last_name || ''}`.trim() || _hive.user.email;
-    renderHive(_hive);
-    if (!_hive.hiveLoaded) loadHive(_hive);
-  }
-
-  async function openHiveOverlay(opts) {
+  // Called by anahane on every entry — including a virtual one, which
+  // swaps #ist-content and takes the previous mount with it. The map is
+  // re-fetched each time on purpose: somebody else's attachment may have
+  // carried this whole petek somewhere since it was last drawn (see
+  // hive_bond_code in db/hive_lattice_v4.sql).
+  async function mountHivePage(opts) {
     const sb = opts && opts.sb;
     const I18N = opts && opts.I18N;
-    if (!sb) return;
+    const mountId = (opts && opts.mountId) || 'hive-page';
+    const host = document.getElementById(mountId);
+    if (!sb || !host) return;
+    host.innerHTML = `<div class="ist-hive-page">${hiveMountHTML()}</div>`;
     const st = await ensureProfileState(sb, I18N);
-    if (!st) return;
-    ensureHiveOverlay();
-    // Fresh every open: folded up, never on the panel someone left open
-    // last time, undragged, and re-fetched — somebody else's attachment
-    // may have carried this whole petek somewhere since (see loadHive
-    // and hive_bond_code in db/hive_lattice_v4.sql).
+    // The page can be swapped out from under the fetch (a swipe away
+    // while it is in flight), and then there is nothing to draw into.
+    if (!st || !document.getElementById('po-hive-mount')) return;
     _hive = Object.assign({}, st, { sb, I18N, hiveOpen: null, hiveLoaded: false, hivePan: { x: 0, y: 0 } });
-    renderHiveOverlayBody();
-    const overlay = document.getElementById('hive-overlay');
-    const body = document.getElementById('hive-overlay-body');
-    if (body) body.scrollTop = 0;
-    // The grow is armed before the overlay is unhidden — the class is what
-    // puts the page at its final size, and the clip is measured against
-    // that size, not against a sheet still parked off the bottom edge.
-    const origin = opts && opts.origin;
-    _hiveOrigin = (hiveGrows() && origin && origin.getBoundingClientRect) ? origin : null;
-    if (overlay) overlay.classList.toggle('hive-grow', !!_hiveOrigin);
-    IstSheet.open('hive-overlay');
-    if (_hiveOrigin) {
-      // The button is the page now: hidden for as long as the page is up,
-      // so nothing is drawn twice over the map.
-      _hiveOrigin.style.opacity = '0';
-      growHive('in');
-    }
+    _hive.hiveDisplayName = `${_hive.profile?.first_name || ''} ${_hive.profile?.last_name || ''}`.trim() || _hive.user.email;
+    renderHive(_hive);
+    loadHive(_hive);
   }
+
+  // The window onto the grid is the page now, so it changes size with the
+  // window — a phone rotating, a desktop window dragged narrower. The
+  // drawing is re-fitted into it rather than left at the scale it was
+  // measured for (see fitHive).
+  window.addEventListener('resize', () => {
+    if (_hive && document.getElementById('po-hive-view')) fitHive(_hive);
+  });
 
   // ══════════════════════════════════════════════════════════════
   // ANOTHER MEMBER'S PROFILE
@@ -1226,7 +1086,7 @@
   const HIVE_DIRS = [[0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1]];
   // How far a cell scales down before the grid is panned instead. A
   // petek keeps growing and the page it is drawn on does not (see
-  // .hive-overlay in profile-card.css), so past a point shrinking it
+  // .ist-hive-page in profile-card.css), so past a point shrinking it
   // further would make the members unreadable to fit a shape nobody can
   // make out anyway.
   const HIVE_MIN_SCALE = 0.45;
@@ -1455,11 +1315,11 @@
   }
 
   // ── Fitting the grid into a page that never resizes ──
-  // The page is cut to its own fixed size (see .hive-overlay in
+  // The window is whatever room the page has (see .ist-hive-page in
   // profile-card.css) and the petek grows without asking it. So the
-  // drawing is scaled to fit what room there is, centred on the caller's
-  // own cell — and when it would have to shrink past legibility it is
-  // left at that floor and dragged instead.
+  // drawing is scaled to fit that room, centred on the caller's own cell
+  // — and when it would have to shrink past legibility it is left at
+  // that floor and dragged instead.
   function fitHive(state) {
     const view = document.getElementById('po-hive-view');
     const plane = document.getElementById('po-hive-plane');
@@ -1950,9 +1810,9 @@
     wireAccessoryCarousel(state);
     wireShirtCarousel(state);
     // Every block below is optional: which ones exist depends on the page
-    // this was opened from (see PROFILE_SECTIONS). The honeycomb is no
-    // longer one of them — it has its own overlay and its own render
-    // path now (see openHiveOverlay/renderHiveOverlayBody).
+    // this was opened from (see PROFILE_SECTIONS). The petek is no
+    // longer one of them — it is a page of its own now (Hane), with its
+    // own render path (see mountHivePage).
     if (document.getElementById('po-weekgrid-mount')) {
       getWeekGameStatus(sb, user.id).then(status => {
         const m = document.getElementById('po-weekgrid-mount');
@@ -2355,7 +2215,7 @@
     mountLibraryCard,
     openProfileOverlay,
     closeProfileOverlay,
-    openHiveOverlay,
+    mountHivePage,
     initMemberSheet,
     openMemberSheet,
     closeMemberSheet,
