@@ -509,16 +509,26 @@ sb.from('articles').delete().eq('id', id)
   - Tümcel: Turkish quote-fragment Connections (replaced Bağlantılar)
   - Bulmaca: Turkish crossword
 - The games change every day; scores and scoreboards are tracked (`game_results`)
-- **The three games are a sequence, and a question stands in each joint** (`daily_questions`, see
-  the schema above). Once you have played Sözcel, a card appears at the top of the games column
-  asking the day's first question; Tümcel stays locked until it is answered, and Bulmaca until the
-  question after Tümcel is. Swipe it right for the first option, left for the second — the same
-  grammar as Kütüphane's news deck, where the direction *is* the answer — or press one of the two
-  buttons. This is the mall-stairway principle in its smallest form: a member who came only for the
-  games still says what they think on the way to the next one. On a phone the card is a full-width
-  row across the band above both columns (the games column there is a strip); on desktop it sits in
-  the games column, directly above the tile it is holding shut. Answering prints back one number —
-  how many other people answered the same — and no names
+- **The three games are a sequence with a question in each joint, and on a phone that sequence is
+  a DECK** — the same object Kütüphane's news is, in the same terms (`#game-deck`, `buildGameDeck`;
+  `daily_questions`, see the schema above). One card is in front of you at a time: play the game on
+  top, come back, the question that follows it is standing there, throw it left or right and the
+  next game is already behind it. The depth is `nth-child` and nothing else, so dealing the front
+  card is *removing the node* — the ones behind transition forward on their own. A game played
+  today and a question already answered are simply not in the deck; when nothing is left it says
+  "Hepsi bu kadar. / Dışarısı seni bekliyor.", the same bottom Kütüphane's deck has
+- **The direction is the answer**, exactly as on a news story: right is the first option, left the
+  second, and the option is stamped on the card as it goes (`.q-cue`) so nobody answers a question
+  they never saw. The two buttons say the same thing for a mouse. Tümcel stays locked until the
+  question after Sözcel is answered, Bulmaca until the one after Tümcel is (`game-locks.js`) — this
+  is the mall-stairway principle in its smallest form: a member who came only for the games still
+  says what they think on the way to the next one. Answering prints back one number — how many
+  other people answered the same — and no names
+- **Desktop has no deck**, the way the news column there is a list rather than a deck: the three
+  tiles all print, and the question card simply stands above the tile it is holding shut. Because
+  the phone deck's depth is `nth-child`, a card taken out of it is removed from the DOM rather than
+  hidden — a hidden child still counts, and one left in place would push the next card past the
+  rule that stops drawing them
 - The **coffee price index** (Kahve Endeksi, `coffee_prices` table) **is the left column**
   (`#coffee-index-panel`), on every screen, beside the map that scopes it: the cheapest cup of
   coffee per venue, in the selected district or all of İstanbul. It used to be a block under the
