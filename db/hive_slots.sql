@@ -26,6 +26,12 @@
 -- string rather than raising — the UI prints its own wording per status
 -- (see i18n.js, profile.hive.*).
 --
+-- SUPERSEDED BY db/hive_lattice_v4.sql: the six numbered slots are gone.
+-- The petek is one shared grid now (hive_cells + hive_bonds) — a member is
+-- one hexagon at real coordinates, attaching makes you neighbours on a grid
+-- everybody stands on, and a bond is locked for the week it was made in.
+-- Only the hive_codes half of this file is still live.
+--
 -- SUPERSEDED IN PART by db/hive_slots_v3_mutual_permanent.sql: the
 -- seven-day placement described below is gone (expires_at is dropped),
 -- placing is mutual and mirrored, and removal clears both sides. The

@@ -63,9 +63,9 @@
     'profile.email':        { default: 'E-posta',             more_english: 'Email' },
     'profile.thisweek':     { default: 'Bu Hafta',             more_english: 'This Week' },
     'profile.profileinfo':  { default: 'Profil Bilgileri',     more_english: 'Profile Info' },
-    // The hane honeycomb — the PETEK sheet, opened from Anahane's map:
-    // the six slots around your own frame, filled by handing someone your
-    // weekly code (see hiveHTML in profile-card.js and db/hive_slots.sql).
+    // The petek — the shared grid opened from Anahane's map: your own
+    // hexagon, its free sides, and everybody standing around you (see
+    // hiveGridHTML in profile-card.js and db/hive_lattice_v4.sql).
     'profile.hive.empty':   { default: 'Boş yer',               more_english: 'Empty slot' },
     'profile.hive.codeprompt':{ default: 'PETEK KODU',          more_english: 'PETEK CODE' },
     'profile.hive.add':     { default: 'Ekle',                  more_english: 'Add' },
@@ -75,9 +75,17 @@
     'profile.hive.err.short':          { default: 'Kod 6 karakter.',            more_english: 'The code is 6 characters.' },
     'profile.hive.err.invalid_code':   { default: 'Bu hafta böyle bir kod yok.', more_english: 'No such code this week.' },
     'profile.hive.err.self':           { default: 'Bu senin kendi kodun.',       more_english: "That's your own code." },
-    'profile.hive.err.slot_taken':     { default: 'Bu yer dolu.',                more_english: 'That slot is taken.' },
-    'profile.hive.err.already_in_hive':{ default: 'Bu üye zaten hanende.',       more_english: 'They are already in your hane.' },
-    'profile.hive.err.their_hive_full':{ default: 'Onun peteği dolu.',           more_english: 'Their petek is full.' },
+    // A bond is locked for the week it was made in, and a member you are
+    // not attached to is somebody else's neighbour on the same petek —
+    // visible, but not yours to detach.
+    'profile.hive.lockednote':{ default: 'Bu bağ bu hafta kilitli.',   more_english: 'This bond is locked for the week.' },
+    'profile.hive.notyours': { default: 'Petekte, ama sana bağlı değil.', more_english: 'On the petek, but not attached to you.' },
+    'profile.hive.err.dir_taken':      { default: 'Bu yer dolu.',                more_english: 'That side is taken.' },
+    'profile.hive.err.already_bonded': { default: 'Bu üye zaten peteğinde.',     more_english: 'You two are already attached.' },
+    'profile.hive.err.too_far':        { default: 'Aynı petektesiniz ama yan yana değilsiniz.', more_english: "You're on the same petek, but not side by side." },
+    'profile.hive.err.no_room':        { default: 'İki petek buraya sığmıyor.',  more_english: "The two peteks don't fit together there." },
+    'profile.hive.err.locked':         { default: 'Bu bağ bu hafta kilitli.',    more_english: 'This bond is locked for the week.' },
+    'profile.hive.err.not_bonded':     { default: 'Bu üyeye bağlı değilsin.',    more_english: "You're not attached to them." },
     'profile.hive.err.failed':         { default: 'Olmadı, tekrar dene.',        more_english: "That didn't work, try again." },
 
     // login / signup (index.html)
