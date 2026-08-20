@@ -40,15 +40,20 @@ still in the middle. Not this, not that: **both**.
 
 The three pages, and what each direction *means*:
 
-- **Middle — `anahane.html` (Hane, "home"):** the self and the city. The Istanbul district map,
-  the user's own profile and avatar, events, breaking news. "No matter where you are in Istanbul,
-  Istanbul is your home first." Personal customization (avatar creation, profile) belongs to the
-  middle — it is the user's anchor point.
+- **Middle — `anahane.html` (Hane, "home"):** the self and the city, and nothing else. The
+  Istanbul district map, the user's own profile and avatar, the PETEK honeycomb. "No matter where
+  you are in Istanbul, Istanbul is your home first." Personal customization (avatar creation,
+  profile) belongs to the middle — it is the user's anchor point. It deliberately carries **no
+  feed at all**: the events went to the local side and the news to the national one, because a
+  page about you should not also be a page you scroll.
 - **One direction — `kahvehane.html` (zoom IN, the local):** deeper into the neighborhood. The
   district/mahalle-level map, the **coffee price index** and local economy, the daily games, the
-  scoreboards (who got what score), and neighborhood comments. This is the *interactive* side of
-  the app — where you engage with other Istanbulites.
+  scoreboards (who got what score), and the **events**. This is the *interactive* side of the app
+  — where you engage with other Istanbulites, and an event is the one thing on the site that ends
+  with you outside, standing next to one. The neighborhood comments used to live here too; they
+  are parked while the events hold that column (`COMMENTS_ENABLED` in kahvehane.html).
 - **Other direction — `kutuphane.html` (zoom OUT, Turkey):** the national layer. The Turkey map,
+  **all of the news** (İstanbul, Türkiye, the districts and Dünya in one feed, down the left),
   articles, letters, politicians, TBMM. Deliberately **less interactive** than the local side:
   this page is for reading and observing, not for peer-to-peer interaction at a national level.
   Istanbulite is not a place to argue about Turkey with strangers.
@@ -111,9 +116,9 @@ default one.
 ```
 /home/user/istanbulite/
 ├── index.html            # Login/signup gate ONLY — redirects to anahane.html once authenticated
-├── anahane.html          # MIDDLE page: home — Istanbul map, profile/avatar, events, breaking news
-├── kutuphane.html        # LEFT page (zoom out): Library — Turkey map, articles, letters, TBMM/politicians
-├── kahvehane.html        # RIGHT page (zoom in): Coffeehouse — district map, games hub, scoreboards, comments
+├── anahane.html          # MIDDLE page: home — Istanbul map, profile/avatar, the PETEK honeycomb
+├── kutuphane.html        # LEFT page (zoom out): Library — Turkey map, ALL news, articles, letters, TBMM
+├── kahvehane.html        # RIGHT page (zoom in): Coffeehouse — district map, games hub, scoreboards, events
 ├── sozcel.html           # Turkish Wordle-style daily word game
 ├── tumcel.html           # Turkish quote-fragment Connections-style daily game (replaced Bağlantılar)
 ├── bulmaca.html          # Turkish daily mini crossword
@@ -373,8 +378,8 @@ sb.from('articles').delete().eq('id', id)
 ### `anahane.html` — Hane (MIDDLE page, home)
 - The entry point and anchor of the three-page carousel — the user always starts here
 - Interactive Istanbul district map in the center; clicking a district opens its detail sheet
-- Left column: events panel (with RSVPs — `events` / `event_rsvps` tables)
-- Right column: breaking news feed (with polls, series, updates)
+- Both side columns are **empty**: the events moved to Kahvehane and every news story to
+  Kütüphane, so what is left on Hane is the map, the seat, the honeycomb and you
 - The personal layer lives here: the user's own profile, avatar, home identity
 - The **PETEK** button over the map (the counterpart of Kahvehane's Kahve Endeksi pill, sitting
   just above the map label) opens the **hane honeycomb** — your frame in the middle, six slots
@@ -412,8 +417,16 @@ sb.from('articles').delete().eq('id', id)
   for a day locks it site-wide for that day (enforced by `game-locks.js`, see Database Schema above and Assets/coding conventions below).
 
 ### `kahvehane.html` — Coffeehouse (RIGHT page, zoom IN — the local, interactive side)
-- Istanbul district map with mahalle-level picker; community discussion per neighborhood
-- Users can only comment on their own neighborhood, but can view and read all
+- Istanbul district map with mahalle-level picker
+- **Events live in the left column** (`#events-panel`, `events` / `event_rsvps`), moved here from
+  Hane: pick a district on the map and you see that district's events, tap the sea and you see all
+  of İstanbul's — the same way the comments used to follow the map. Opening a card rises the page's
+  detail sheet with the description and a live RSVP row (attendee avatars and all)
+- The **neighborhood comments are parked**, not deleted: the events took their column and where
+  they belong is still an open question, so the feed, its composer and everything driving them
+  stay exactly as they are behind `const COMMENTS_ENABLED = false` plus `hidden` on
+  `#discussion-section`. Turning both back on is the whole of re-enabling it. Comments are still
+  posted only to your own neighborhood (RLS enforces it)
 - This is where the NYTimes-like games live, there are three of them:
   - Sözcel: Turkish Wordle
   - Tümcel: Turkish quote-fragment Connections (replaced Bağlantılar)
@@ -423,7 +436,7 @@ sb.from('articles').delete().eq('id', id)
   above the map label opens a bottom sheet (`#kahvehane-detail`) listing the cheapest cup of
   coffee per venue, scoped to the selected district or all of Istanbul; on desktop the same list
   also shows permanently in col-right. Opened from the map, it carries `.ist-sheet-pull` like
-  Anahane's news/event sheet does — on a phone it rests half-way under the map
+  Kütüphane's news sheet does — on a phone it rests half-way under the map
   and swipes down to dismiss (`IstSheet.pull`, see sheet.js). **Read-only for everyone** — the
   index is curated from the admin portal only (admin.html's "Kahve" tab), and RLS allows writes
   to the admin alone (`db/coffee_prices_v2_admin_only.sql`)
@@ -452,7 +465,16 @@ sb.from('articles').delete().eq('id', id)
   comment list or a half-typed comment
 
 ### `kutuphane.html` — Library (LEFT page, zoom OUT — the Turkey/national side)
-- Turkey map; articles, shelves, letters (Posta Kutusu), politicians, TBMM seat chart
+- Turkey map; **all the news**, articles, shelves, letters (Posta Kutusu), politicians, TBMM chart
+- **Every breaking story is here now**, in the left-hand column (`#dunya-news-feed`, still named
+  for the Dünya feed it grew out of): İstanbul, Türkiye, the districts and the world in one feed,
+  each card kickered with its own category. Hane used to carry the first three; there is one place
+  on the site where the news is
+- **Makaleler and Posta Kutusu are two small buttons in the top-right corner**, under the profile
+  bar — Makaleler on the left, Posta Kutusu (with its unread badge) on the right. They used to be
+  full-width cards stacked down that column; the column is the news column now, so what is left of
+  them is the smallest thing that still reads as a door. On a phone they are pinned there
+  (`position: fixed`) over the map rather than being a grid track of their own
 - Everyone can read, like, and comment on articles
 - Per the vision, this side stays *less* interactive than Kahvehane — reading and observing
   the national level, not peer-to-peer engagement about it
@@ -585,8 +607,8 @@ geometry and no centred modal anywhere on the site.
 ### The phone's hero line — `--map-hero-end`
 
 On a phone all three carousel pages are one screen: a square map at the top, everything else
-below it. **Everything below starts on the same line** — Anahane's news and events, Kahvehane's
-comments and game tiles, Kütüphane's Dünya column and shelf boxes — and each map's caption sits
+below it. **Everything below starts on the same line** — Kahvehane's events and game tiles,
+Kütüphane's news column — and each map's caption sits
 just above it. A sheet pulled up over the map comes to rest there too. That line is
 `--map-hero-end` (frames.css: frame ring + `--map-hero-top` + the map's own `100vw` square); what
 is printed on the two bars sits on `--screen-inset`, and so do the sheets' side gaps. Never
@@ -599,8 +621,8 @@ The hero line is where each page's columns *begin*; it is not where their cards 
 every stack below the map is **bottom-aligned**: one news item, one event, one comment, one
 library box rests just above the tab bar, and the next one is laid **on top of** it, so the
 stack grows upward toward the map instead of downward away from the thumb. It is the same move
-on all three pages — Anahane's news and events, Kahvehane's comments (they rest on the composer),
-Kütüphane's Dünya feed and library boxes — and each pair of columns ends on the same line.
+on both pages that carry one — Kahvehane's events, Kütüphane's news feed — and where a page has
+two columns, they end on the same line. (Hane has no feed at all any more; its columns are empty.)
 
 One implementation note, because it fails silently: the space is pushed down with an **auto top
 margin on the innermost box** (the feed itself), never `justify-content: flex-end`. A stack that

@@ -32,7 +32,7 @@
   <script src="map-zoom.js" defer></script>
   <script src="map-parallax.js" defer></script>
   <script src="home-map.js" defer></script>
-  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in. Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot, and a one-shot flag so the news/events card-entrance animation (see animateFeedSwap) skips its first run here -- the column itself is already sliding in from the same edge, so animating the cards inside it too would look like the content arriving twice.
+  <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in. Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot, and a one-shot flag (read by the other two pages' own card-entrance animations) so a feed's cards don't animate in on their first run here -- the column itself is already sliding in from the same edge, so animating the cards inside it too would look like the content arriving twice.
        ist-entering-* (the manual transform-transition fallback) is only for browsers WITHOUT View Transitions support -- on VT-capable browsers the native cross-document transition already slides the column in as a snapshot, so also applying the fallback class made the real DOM run its own second, independent slide underneath once DOMContentLoaded released it mid-transition, producing a visible double entrance. vt-* (which drives the VT pseudo-element keyframes) is unaffected and still always seeded. -->
   <script>
     (function(){
@@ -101,10 +101,9 @@
       --rule-double: 4px double var(--ink);
     }
 
-    /* News + event cards float over the map photo and keep one fixed
-       look (white, mostly opaque) regardless of the earth/mono
-       palette toggle — same reasoning as the fixed --card-fg text
-       colors on .article/.event-item below. This overrides
+    /* Cards that float over the map photo keep one fixed look (white,
+       mostly opaque) regardless of the earth/mono palette toggle — same
+       reasoning as the fixed --card-fg text colors. This overrides
        palette.css's mono --paper-card just for this page. */
     :root[data-palette="mono"] {
       --paper-card: rgba(255, 255, 255, 0.85);
@@ -429,10 +428,9 @@
        #politician-card click listener) -- unlike #library-card, the whole
        card is the click target, not just an inner edit button. */
     .politician-card { cursor: pointer; }
-    /* Match the top cards' width to the news/event cards below them --
-       .library-card's 12px margin vs. the feeds' 14px padding left them
-       4px narrower than #breaking-news-feed/#events-panel's cards, which
-       read as misaligned edges stacked in the same column. */
+    /* The two top cards sit on the same 14px line -- the one the feeds
+       that used to stack below them were printed on, kept so the cards
+       still line up with the columns' own inset. */
     #library-card, #politician-card {
       margin-left: 14px;
       margin-right: 14px;
@@ -643,337 +641,6 @@
     }
     .petek-pill:hover { background: #1a1a1a; color: #fff; }
 
-    /* ── LEFT SIDEBAR ── */
-    .sidebar-left {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      flex: 1;
-      min-height: 0;
-    }
-
-    /* Shared by whichever feed (news or events) lands in the left column's
-       scroll slot below the pinned library-card -- see the swappable
-       #breaking-news-feed/#events-panel markup in #main-site. */
-    #breaking-news-feed,
-    #events-panel {
-      overflow-y: auto;
-      overflow-x: hidden;
-      flex: 1;
-      min-height: 0;
-    }
-
-    /* Still used by the "Kaynaklar" (sources) sub-heading inside an
-       expanded article -- see renderBreakingNewsFeed(). */
-    .sidebar-label {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--ink-red);
-      margin-bottom: 2px;
-    }
-
-    #breaking-news-feed { padding: 10px 14px 16px 14px; }
-
-    /* Cards are a light grey, translucent square floating over the map
-       photo, so their text uses a fixed dark palette (not the page's
-       --ink tokens, which vary by earth/mono palette) regardless of
-       OS light/dark preference or the active palette. */
-    .article {
-      background: var(--paper-card);
-      border: 2px solid var(--card-border-color);
-      border-bottom: 5px solid var(--card-border-color);
-      padding: 16px 18px;
-      margin-bottom: 12px;
-      color: var(--card-fg);
-      transition: background 0.15s, color 0.15s, transform 0.15s ease;
-    }
-    .article:last-child { margin-bottom: 0; }
-
-    .article .kicker {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.62rem;
-      font-weight: 700;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: var(--ink-red);
-      margin-bottom: 6px;
-      /* Series/category name always stays on one line -- truncates with
-         an ellipsis instead of wrapping onto a second line when the
-         timestamp on the other side of .meta-row squeezes its width. */
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      min-width: 0;
-    }
-
-    .article h3 {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 1.17rem;
-      font-weight: 600;
-      letter-spacing: 0;
-      text-transform: none;
-      line-height: 1.25;
-      margin-bottom: 8px;
-      color: var(--card-fg-heading);
-      /* Sized large enough that wrapped lines naturally reach close to
-         both edges on their own -- no justify/word-spacing stretching,
-         which reads as artificial gaps between words. text-wrap:balance
-         keeps line breaks even so a short trailing word (e.g. "ALINDI")
-         doesn't get stranded alone on its own line. */
-      text-wrap: balance;
-    }
-
-    .article p {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.82rem;
-      line-height: 1.5;
-      color: var(--card-fg);
-    }
-
-    .article.openable {
-      cursor: pointer;
-      /* Feed preview cards: kicker+timestamp stay pinned at the top via
-         .meta-row, and the headline anchors to the bottom of the card
-         whenever there's slack height to push into (e.g. cards
-         stretched to a shared height). No-op when the card is exactly
-         as tall as its content, which is the common case today. */
-      display: flex;
-      flex-direction: column;
-    }
-    .article.openable h3 { margin-top: auto; }
-    /* Plain hover: just a lighter background + a small nudge inward
-       toward the center — text/border stay put. .is-open (see
-       markOpenNewsCard) mirrors the same look while that card's detail
-       sheet is open, so it stays visually "pressed" even after the mouse
-       moves off it (e.g. onto the sheet itself). */
-    .article.openable:hover,
-    .article.openable.is-open {
-      background: #e8e8e8;
-      transform: translateX(6px);
-    }
-    .article .meta-row {
-      display: flex;
-      justify-content: space-between;
-      /* flex-start (not baseline) keeps the kicker pinned to the
-         top-left and the timestamp pinned to the top-right regardless
-         of either one's line-height. */
-      align-items: flex-start;
-      gap: 8px;
-      margin-bottom: 4px;
-    }
-    .article .ago {
-      font-size: 0.65rem;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--card-fg-muted);
-      font-style: italic;
-      /* Stays on one line and never gets squeezed by the kicker --
-         the kicker truncates instead (see .kicker's text-overflow). */
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    /* Only ever rendered inside the detail sheet (see buildNewsDetailHtml)
-       — the sidebar preview card doesn't include it, so no visibility
-       toggle is needed here. */
-    .article .sources {
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px dashed var(--card-border);
-    }
-    .article .sources-toggle {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      width: 100%;
-      background: none;
-      border: none;
-      padding: 0;
-      margin: 0;
-      cursor: pointer;
-      font: inherit;
-      color: inherit;
-      text-align: left;
-    }
-    .article .sources-toggle .sidebar-label { margin: 0; }
-    .article .sources-toggle-icon {
-      font-size: 0.7rem;
-      color: var(--card-fg-muted);
-      transition: transform 0.15s ease;
-      flex-shrink: 0;
-    }
-    .article .sources.open .sources-toggle-icon { transform: rotate(180deg); }
-    .article .sources-body {
-      display: none;
-      margin-top: 8px;
-    }
-    .article .sources.open .sources-body { display: block; }
-    .article .src-item {
-      padding: 6px 0;
-      border-bottom: 1px dotted var(--card-border-soft);
-      font-size: 0.78rem;
-    }
-    .article .src-item:last-child { border-bottom: none; }
-    .article .src-item .src-name {
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      font-size: 0.65rem;
-      display: block;
-      color: var(--card-fg-muted);
-      margin-bottom: 2px;
-    }
-    .article .src-item a {
-      color: var(--card-fg);
-      text-decoration: none;
-      border-bottom: 1px solid currentColor;
-      line-height: 1.4;
-    }
-    .article .src-item a:hover { opacity: 0.7; }
-    .article .sources-empty {
-      font-size: 0.75rem;
-      font-style: italic;
-      color: var(--card-fg-muted);
-    }
-    .article .timeline {
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px dashed var(--card-border);
-    }
-    /* Vertical spine with a horizontal tick branching off to each dated
-       entry (update or poll), newest first. Each item draws its own
-       border-left segment (instead of one pseudo-element spanning a
-       guessed top/bottom offset), so stacking items reproduces one
-       continuous line that starts and ends exactly at the first/last
-       tick — no eyeballed pixel offset to drift out of alignment. The
-       tick sits in a flex row with the .ago date so it's centered on
-       that line exactly too. */
-    .article .timeline-item {
-      border-left: 2px solid var(--ink-red);
-      padding: 10px 0;
-    }
-    .article .timeline-item:first-child { padding-top: 0; }
-    .article .timeline-item:last-child { padding-bottom: 0; }
-    .article .timeline-item-date {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 4px;
-    }
-    .article .timeline-tick {
-      flex: 0 0 12px;
-      height: 2px;
-      background: var(--ink-red);
-    }
-    .article .timeline-item .ago {
-      display: block;
-    }
-    .article .timeline-item strong,
-    .article .timeline-item p,
-    .article .timeline-item .poll-block {
-      display: block;
-      margin-left: 26px;
-    }
-    .article .timeline-item strong {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.85rem;
-      color: var(--card-fg-heading);
-    }
-    .article .timeline-item p {
-      margin-top: 2px;
-      font-size: 0.78rem;
-    }
-    .article .timeline-item .poll-block {
-      margin-top: 6px;
-      padding-top: 0;
-      border-top: none;
-    }
-
-    /* Poll block — only ever rendered inside the detail sheet, filled
-       in async after openDetail() by loadAndRenderPoll(). */
-    .article .poll-block {
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px dashed var(--card-border);
-    }
-    .article .poll-question {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--ink-red);
-      margin-bottom: 8px;
-    }
-    .article .poll-options {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .article .poll-opt-btn {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.82rem;
-      text-align: left;
-      padding: 9px 12px;
-      background: var(--paper-card);
-      border: 1px solid var(--card-border-color);
-      color: var(--card-fg);
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .article .poll-opt-btn:hover:not(:disabled) { background: #e8e8e8; }
-    .article .poll-opt-btn:disabled { cursor: default; opacity: 0.6; }
-    .article .poll-result-labels {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.78rem;
-      color: var(--card-fg);
-      margin-bottom: 6px;
-    }
-    .article .poll-label-a, .article .poll-label-b { min-width: 0; }
-    .article .poll-label-b { text-align: right; }
-    .article .poll-label-mine { font-weight: 700; }
-    .article .poll-bar-track {
-      display: flex;
-      height: 10px;
-      background: var(--card-border-soft);
-      overflow: hidden;
-    }
-    .article .poll-bar-fill-a {
-      height: 100%;
-      background: var(--ink-red);
-      transition: width 0.3s ease;
-    }
-    .article .poll-bar-fill-b {
-      height: 100%;
-      background: var(--card-fg);
-      transition: width 0.3s ease;
-    }
-    .article .poll-voters-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      margin-top: 8px;
-    }
-    .article .poll-voters {
-      display: flex;
-      align-items: center;
-    }
-    .article .poll-status.err { color: var(--ink-red); font-size: 0.72rem; margin-top: 6px; }
-
-    /* ── RIGHT SIDEBAR ── */
-    .sidebar-right {
-      padding: 0;
-      overflow-y: auto;
-      overflow-x: hidden;
-      display: flex;
-      flex-direction: column;
-    }
 
     .sidebar-right-inner {
       padding: 16px;
@@ -1023,63 +690,6 @@
       vertical-align: middle;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Flashing neighborhood with breaking news */
-    @keyframes flash-nb {
-      0%, 100% { fill: rgba(185, 54, 49, 0.1); }
-      50% { fill: rgba(185, 54, 49, 0.6); }
-    }
-    .neighborhood.flashing-news {
-      animation: flash-nb 1.2s ease-in-out infinite;
-      stroke: var(--ink-red);
-      stroke-width: 3;
-    }
-    .neighborhood.flashing-news:hover {
-      animation: none;
-      fill: rgba(185, 54, 49, 0.5);
-    }
-    .neighborhood.flashing-news.active {
-      animation: none;
-      fill: rgba(185, 54, 49, 0.5);
-      stroke: var(--ink-deep);
-      stroke-width: 3;
-    }
-
-    /* Flashing news card in feed when its neighborhood is selected */
-    @keyframes flash-card {
-      0%, 100% { background: var(--paper-card); box-shadow: inset 3px 0 0 transparent; }
-      50% { background: var(--paper-banner); box-shadow: inset 3px 0 0 var(--ink-red); }
-    }
-    .article.flashing-news-card {
-      animation: flash-card 1.2s ease-in-out infinite;
-    }
-
-    /* Hovering a neighborhood-specific news/event card highlights that
-       district on the map (see attachCardMapHover). Listed last among the
-       .neighborhood rules so it reads clearly even over .home/.active/
-       .flashing-news. */
-    .neighborhood.card-hover {
-      animation: none;
-      fill: rgba(var(--ink-rgb), 0.32);
-      stroke: var(--accent);
-      stroke-width: 3;
-    }
-
-    /* Rıhtım Camii series landmark sticker over Kadıköy -- shown/hidden in
-       lockstep with .card-hover by attachCardMapHover's mosqueSticker
-       option (mirrors the .card-hover fade so it can't outlive the
-       highlight it decorates). The image itself (assets/mosque-bw.png) is
-       already baked grayscale -- a CSS grayscale() filter here would be
-       redundant, and doesn't render reliably on SVG <image> in
-       Safari/WebKit anyway. */
-    .map-sticker {
-      opacity: 0;
-      transition: opacity 0.25s ease;
-      pointer-events: none;
-    }
-    .map-sticker.show {
-      opacity: 1;
-    }
 
     /* ── MOBILE RESPONSIVE ──
        Stacked flow instead of desktop's floating-over-fullscreen-map
@@ -1144,9 +754,8 @@
            minmax(auto, 1fr), and that auto minimum is the news/events
            stacks' own height, which is the demand that squeezed row 1 in
            the first place. Zero as the minimum makes row 2 exactly the
-           leftover space and no more; a feed with more cards than that
-           scrolls inside its own sidebar (see .sidebar-left/.sidebar-right
-           below) instead of growing the row. */
+           leftover space and no more; anything taller scrolls inside its
+           own column instead of growing the row. */
         grid-template-rows: calc(100vw + var(--map-hero-top)) minmax(0, 1fr);
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
@@ -1297,42 +906,11 @@
       }
       .col-left { grid-area: events; }
       .col-right { grid-area: news; }
-      /* What actually bottom-aligns each column. The two wrappers between
-         the column and its feed (.col-*-slide, then .sidebar-*) both
-         carry flex:1 and so fill the column's full height -- the auto
-         margin therefore has to go on the feed itself, the innermost box,
-         with flex:none to stop it growing into the space it is supposed
-         to be pushed down through. (An auto margin on a wrapper that
-         grows is silently ignored: flex distributes the free space before
-         margins ever see it.) .sidebar-* go back to flex here for the
-         same reason -- an auto margin does nothing to a block child.
-
-         Deliberately an auto margin rather than justify-content:flex-end:
-         once a stack outgrows the space, an auto margin resolves to zero
-         and the row simply grows, scrolling in #main-site as usual, where
-         flex-end would push the top of the stack out of the grid area and
-         out of reach. */
-      #events-panel, #breaking-news-feed {
-        flex: none;
-        margin-top: auto;
-      }
-      /* The two stacks end on the same line: the feeds' own bottom
-         padding is all that separates the last card from the tab bar
-         (#main-site's padding-bottom), so the trailing card margin --
-         which only ever existed to space one card off the next -- goes.
-         Top alignment used to be the thing worth matching here (see
-         #events-panel's own padding note further down); now it's the
-         bottom. */
-      #breaking-news-feed { padding-bottom: 10px; }
-      #breaking-news-feed > :last-child,
-      #events-panel > :last-child { margin-bottom: 0; }
-      /* Transparent (inherits the desktop rule's background:none) so
-         these read as frameless text floating over the map, same as
-         desktop -- #main-site's own background is the same #f7f7f7, so
-         this looks identical at rest, and once map-zoom.js zooms the
-         map past its little square, it now shows through here instead
-         of being hidden behind a flat color. */
-
+      /* Both columns are empty on this page now -- the events went to
+         Kahvehane and the news to Kütüphane -- so the two tracks below
+         the map carry nothing and the map is all there is to see. The
+         tracks themselves stay: they are what the carousel slides, and
+         they are where whatever comes next to Hane will land. */
       /* #ist-pc-mount (profile-card.js) already covers the identity card
          on mobile — the desktop-only #library-card would otherwise
          duplicate it. */
@@ -1368,42 +946,6 @@
          shorter than the whole stack and the overflow escapes upward
          again, one level at a time. */
       .col-left, .col-right { min-height: 0; }
-      .sidebar-left, .sidebar-right {
-        flex: 1;
-        min-height: 0;
-        overflow-y: auto;
-        overflow-x: hidden;
-        overscroll-behavior: contain;
-        -webkit-overflow-scrolling: touch;
-        /* No scrollbar: these columns are frameless cards floating on the
-           map, so a track drawn down the middle of the artwork would read
-           as a seam in the drawing rather than as chrome. */
-        scrollbar-width: none;
-      }
-      .sidebar-left::-webkit-scrollbar,
-      .sidebar-right::-webkit-scrollbar { display: none; }
-      #breaking-news-feed, #events-panel { overflow: visible; }
-      .sidebar-label {
-        font-size: 9px;
-        letter-spacing: 1.5px;
-      }
-      .article {
-        padding: 8px 12px;
-      }
-      .article .kicker {
-        font-size: 10px;
-        margin-bottom: 2px;
-        letter-spacing: 1px;
-      }
-      .article h3 {
-        font-size: 18px;
-        margin-bottom: 3px;
-        line-height: 1.25;
-      }
-      .article p {
-        font-size: 12px;
-        line-height: 1.35;
-      }
       .sidebar-right-inner {
         padding: 8px 12px;
         gap: 6px;
@@ -1599,229 +1141,12 @@
       }
     }
 
-    /* ── Events (right column) ── */
-    #events-panel { padding: 10px 14px 16px 14px; }
-
-    .event-item {
-      display: grid;
-      grid-template-columns: 38px 1fr;
-      column-gap: 10px;
-      padding: 14px 16px 14px 14px;
-      margin-bottom: 12px;
-      background: var(--paper-card);
-      border: 2px solid var(--card-border-color);
-      border-bottom: 5px solid var(--card-border-color);
-      transition: background 0.15s, transform 0.15s ease;
-    }
-    .event-item:last-child { margin-bottom: 0; }
-    .event-item .ev-date-block {
-      text-align: center;
-      padding-top: 14px;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      color: var(--card-fg-heading);
-    }
-    .event-item .ev-day {
-      font-size: 1.7rem;
-      font-weight: 400;
-      line-height: 1;
-    }
-    .event-item .ev-mon {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.6rem;
-      font-weight: 600;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--card-fg-muted);
-      margin-top: 4px;
-    }
-    .event-item .ev-wd {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.55rem;
-      font-weight: 600;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--card-fg-muted);
-      margin-top: 2px;
-      opacity: 0.75;
-    }
-    .event-item .ev-body { min-width: 0; }
-    .event-item .ev-kicker {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.6rem;
-      font-weight: 700;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: var(--ink-red);
-      margin-bottom: 5px;
-    }
-    .event-item .ev-title {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 1.2rem;
-      font-weight: 600;
-      line-height: 1.22;
-      margin-bottom: 0;
-      color: var(--card-fg-heading);
-    }
-    .event-item .ev-meta {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.78rem;
-      color: var(--card-fg-muted);
-      line-height: 1.35;
-    }
-    .event-item.openable { cursor: pointer; }
-    /* Plain hover: just a lighter background + a small nudge inward
-       toward the center — text/border stay put. .is-open (see
-       markOpenEventCard) mirrors the same look while that card's detail
-       sheet is open, so it stays visually "pressed" even after the mouse
-       moves off it (e.g. onto the sheet itself). */
-    .event-item.openable:hover,
-    .event-item.openable.is-open {
-      background: #e8e8e8;
-      transform: translateX(-6px);
-    }
-    /* Only ever rendered inside the detail sheet (see buildEventDetailHtml)
-       — the sidebar preview card doesn't include it, so no visibility
-       toggle is needed here. */
-    .event-item .ev-details {
-      grid-column: 1 / -1;
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px dashed var(--card-border);
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.82rem;
-      line-height: 1.5;
-      color: var(--card-fg);
-    }
-    .event-item .ev-desc { margin-bottom: 10px; }
-    .ev-rsvp-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .ev-rsvp-btn {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.62rem;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      padding: 7px 14px;
-      background: transparent;
-      color: var(--ink-red);
-      border: 1px solid var(--ink-red);
-      cursor: pointer;
-      transition: background 0.15s, color 0.15s;
-    }
-    .ev-rsvp-btn:hover { background: rgba(185, 54, 49, 0.15); }
-    .ev-rsvp-btn.attending {
-      background: var(--ink-red);
-      color: #1a1a1a;
-    }
-    .ev-rsvp-btn.attending:hover { opacity: 0.85; }
-    .ev-rsvp-btn:disabled { opacity: 0.6; cursor: default; }
-    .ev-rsvp-count {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.7rem;
-      color: var(--card-fg-muted);
-    }
-    .ev-attendees {
-      display: flex;
-      align-items: center;
-    }
-    /* Preview-card attendee stack: shown under the title on every
-       breakpoint, in the space the compact card otherwise leaves empty.
-       The detail overlay's .ev-attendees (inside .ev-rsvp-row) is
-       unaffected since it isn't matched by this class. */
-    .ev-attendees-preview {
-      display: flex;
-      margin-top: 10px;
-    }
-    .ev-attendees-preview:empty { display: none !important; }
-    .ev-attendee-avatar,
-    .poll-voter-avatar {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      background: var(--paper-dark);
-      border: 1.5px solid var(--paper-card, #fff);
-      box-shadow: 0 0 0 1px var(--card-border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.62rem;
-      font-weight: 700;
-      color: var(--accent);
-      overflow: hidden;
-      margin-left: -8px;
-    }
-    .ev-attendee-avatar:first-child,
-    .poll-voter-avatar:first-child { margin-left: 0; }
-    .ev-attendee-avatar img,
-    .poll-voter-avatar img { width: 100%; height: 100%; object-fit: cover; }
-    .ev-attendee-avatar.ev-attendee-more,
-    .poll-voter-avatar.poll-voter-more {
-      font-size: 0.56rem;
-      color: var(--card-fg-muted);
-    }
-
-    /* News (left) and event (right) cards slide in from their own
-       column's outer screen edge on render, and slide back out the
-       same way when the feed is about to be replaced -- see the
-       animateFeedSwap() helper used by renderBreakingNewsFeed() /
-       renderEvents(). Generic so it also covers the "no articles/
-       events" empty-state message. */
-    @keyframes card-slide-in-left {
-      from { transform: translateX(-100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes card-slide-in-right {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-    /* backwards fill-mode holds the keyframe's "from" state during the
-       staggered animation-delay set in JS, so a lower card stays hidden
-       off-screen while it waits its turn instead of flashing visible
-       in place first. */
-    .card-entering-left { animation: card-slide-in-left 0.4s ease-out backwards; }
-    .card-entering-right { animation: card-slide-in-right 0.4s ease-out backwards; }
-    .card-leaving-left,
-    .card-leaving-right {
-      transition: transform 0.3s ease-in, opacity 0.3s ease-in;
-      opacity: 0;
-    }
-    .card-leaving-left { transform: translateX(-100%); }
-    .card-leaving-right { transform: translateX(100%); }
-
     @media (max-width: 768px) {
       @keyframes ist-vt-out-left { from { transform: translateX(0); } to { transform: translateX(-100vw); } }
       @keyframes ist-vt-in-left { from { transform: translateX(100vw); } to { transform: translateX(0); } }
       @keyframes ist-vt-out-right { from { transform: translateX(0); } to { transform: translateX(100vw); } }
       @keyframes ist-vt-in-right { from { transform: translateX(-100vw); } to { transform: translateX(0); } }
 
-      /* Top padding matches #breaking-news-feed's (10px, set once above
-         for all breakpoints) so the news and event cards' top edges
-         align instead of the event column sitting higher. */
-      #events-panel { padding: 10px 8px 10px 8px; }
-      .event-item {
-        grid-template-columns: 30px 1fr;
-        column-gap: 8px;
-        padding: 8px 9px;
-        margin-bottom: 6px;
-      }
-      .event-item .ev-date-block { padding-top: 2px; }
-      .event-item .ev-day { font-size: 1.05rem; line-height: 1; }
-      .event-item .ev-mon { font-size: 0.5rem; margin-top: 2px; }
-      .event-item .ev-wd { font-size: 0.46rem; margin-top: 1px; }
-      .event-item .ev-kicker { font-size: 9px; letter-spacing: 1.5px; margin-bottom: 2px; }
-      .event-item .ev-title { font-size: 16px; margin-bottom: 0; line-height: 1.2; }
-      .ev-attendees-preview { margin-top: 6px; }
-      .ev-attendees-preview .ev-attendee-avatar {
-        width: 20px;
-        height: 20px;
-        font-size: 0.5rem;
-        margin-left: -6px;
-      }
 
       html.vt-forward::view-transition-old(ist-col-left),
       html.vt-forward::view-transition-old(ist-col-right) {
@@ -1857,8 +1182,8 @@
        below gives the SHEET the white chapter-box border/background
        (swapping out frames.css's gray shared fill) plus a drop shadow
        lifting it off the map, and the card rule further down strips the
-       inner .article/.event-item/.politician-detail's own border and
-       background so it's just content sitting in the sheet's padding.
+       inner .politician-detail's own border and background so it's just
+       content sitting in the sheet's padding.
 
        On mobile the sheet is dragged rather than scrolled (initDetailPull,
        see the ≤768px block at the end of this stylesheet): native
@@ -1872,11 +1197,8 @@
     }
     /* The card's own border/background are dropped inside the detail
        overlay -- #anahane-detail-sheet now carries that box itself, so
-       the card is just its content (kicker, headline, timeline) sitting
-       in the sheet's padding, not a second bordered box nested inside
-       the first. */
-    .detail-overlay-body .article,
-    .detail-overlay-body .event-item,
+       the card is just its content sitting in the sheet's padding, not a
+       second bordered box nested inside the first. */
     .detail-overlay-body .politician-detail {
       background: none;
       border: none;
@@ -1884,9 +1206,8 @@
     }
 
     /* Politician detail sheet -- opened from #politician-card (built by
-       the shared politician-card.js). Same card treatment as .article
-       (background/border/shadow), but a centered profile layout instead
-       of an article's kicker+headline. */
+       the shared politician-card.js). The site's usual card treatment
+       (background/border/shadow), in a centered profile layout. */
     .politician-detail {
       background: var(--paper-card);
       border: 2px solid var(--card-border-color);
@@ -2067,11 +1388,11 @@
   <div id="ist-content" style="display:contents">
   <aside class="col-left">
     <div class="library-card" id="library-card"><div class="card-loading"><span class="spinner"></span></div></div>
-    <div class="col-left-slide">
-      <section class="sidebar-left" id="left-sidebar">
-        <div id="events-panel"></div>
-      </section>
-    </div>
+    <!-- Empty on purpose. The events that used to fill this column moved
+         to Kahvehane, where the people are (see its own #events-panel);
+         Hane keeps the map, the seat and you. The column itself stays --
+         it is what holds the corner cards and what the carousel slides. -->
+    <div class="col-left-slide"></div>
     <!-- Bottom-right corner card (mirrors #library-card above, pinned to
          the bottom instead of the top) -- empty for now, buttons TBD. -->
     <div class="corner-card" id="corner-card-right"></div>
@@ -2197,16 +1518,6 @@
         <g id="Layer_24" data-name="Layer 24">
           <polygon id="bahcelievler" class="neighborhood" data-name="Bahçelievler" points="1622.68 1693.32 1637.83 1671.21 1632.58 1649.59 1519.4 1624.55 1328.74 1616.93 1272.58 1737 1359.01 1780.79 1448.51 1767.02 1613.73 1703.92 1622.68 1693.32" fill="none" stroke="#000" stroke-miterlimit="10"/>
         </g>
-        <!-- Rıhtım Camii series landmark sticker, centered over Kadıköy's
-             polygon (see attachCardMapHover's mosqueSticker option) --
-             painted last so it always sits above every neighborhood
-             fill/stroke regardless of layer order above. Baked grayscale
-             (assets/mosque-bw.png) instead of a CSS grayscale() filter on
-             the colour original -- CSS filter on an SVG <image> doesn't
-             render reliably in Safari/WebKit, so it showed full colour on
-             mobile. -->
-        <image id="mosque-sticker" class="map-sticker" href="assets/mosque-bw.png"
-               x="2532" y="1473" width="190" height="190" preserveAspectRatio="xMidYMid meet"/>
       </svg>
       </div>
 
@@ -2225,11 +1536,10 @@
          reversed order to match. İstanbul's Büyükşehir Belediye Başkanı by
          default, swapped for the clicked district's Belediye Başkanı. -->
     <div class="library-card politician-card" id="politician-card"><div class="card-loading"><span class="spinner"></span></div></div>
-    <div class="col-right-slide">
-      <section class="sidebar-right">
-        <div id="breaking-news-feed"></div>
-      </section>
-    </div>
+    <!-- Empty on purpose. Every story is on Kütüphane now -- İstanbul,
+         Türkiye, the districts and Dünya in one feed (see its own
+         #dunya-news-feed), rather than split across two pages. -->
+    <div class="col-right-slide"></div>
     <!-- Bottom-left corner card (mirrors #politician-card above, pinned to
          the bottom instead of the top) -- empty for now, buttons TBD. -->
     <div class="corner-card" id="corner-card-left"></div>
@@ -2237,10 +1547,9 @@
   </div>
 </div>
 
-<!-- Detail overlay: bottom sheet housing a news article or event's full
-     details, opened instead of the old expand-in-place toggle — see
-     openDetail/closeDetail and buildNewsDetailHtml/buildEventDetailHtml
-     further down. -->
+<!-- Detail overlay: the bottom sheet this page opens things full-size in
+     -- a politician's page, or a person mentioned by name. See
+     openDetail/closeDetail further down. -->
 <div class="ist-sheet-overlay ist-sheet-pull detail-overlay" id="anahane-detail" hidden>
   <div class="ist-sheet-backdrop" id="anahane-detail-backdrop"></div>
   <div class="ist-sheet detail-overlay-sheet" id="anahane-detail-sheet">
@@ -2277,18 +1586,6 @@ async function checkSession() {
   authSession = session || null;
   resolveLoading();
 }
-
-// Tick the "X dk önce" labels every minute so they stay current. Named
-// (not inline) so mount()/unmount() can register/unregister the exact
-// same callback with IstRouter's shared clock instead of running its own
-// setInterval, which a revisit via virtual navigation would duplicate.
-function tickNewsAgo() {
-  document.querySelectorAll('#breaking-news-feed .ago[data-iso]').forEach(el => {
-    el.textContent = formatNewsAge(el.dataset.iso);
-  });
-}
-
-let onI18NChangeForNews = null;
 
 // Highlight home neighborhood: try metadata first, then profiles table
 // (admin-created accounts may not have neighborhood in user_metadata --
@@ -2351,11 +1648,6 @@ function mount() {
   // call's forced layout read locks in a frame with no .home class and
   // the class arriving a moment later reads as a visible flash.
   highlightHomeNeighborhood(window.__currentUser);
-  onI18NChangeForNews = () => { renderEvents(); applyNewsFilter(activeNewsFilter || 'all'); };
-  I18N.onChange(onI18NChangeForNews);
-  IstRouter.onTick(tickNewsAgo);
-  loadBreakingNews();
-  loadEvents();
   renderPoliticianCard(activeNeighborhood || 'istanbul');
   loadPersonMentionsRoster();
   wirePetekPill();
@@ -2411,8 +1703,11 @@ function loadPersonMentionsRoster(tries) {
 }
 
 function unmount() {
-  if (onI18NChangeForNews) { I18N.offChange(onI18NChangeForNews); onI18NChangeForNews = null; }
-  IstRouter.offTick(tickNewsAgo);
+  // Nothing of this page's own to unwind any more: the news and the
+  // events -- the only things here that ticked or re-rendered on a
+  // language change -- moved to Kütüphane and Kahvehane respectively.
+  // Kept as a registered hook so router.js has one to call, and so the
+  // next thing that needs unwinding has somewhere to go.
 }
 
 async function showSite(user) {
@@ -2420,7 +1715,6 @@ async function showSite(user) {
   // #main-site's .active toggle now lives in mount() (see its comment) --
   // showSite() calls mount() below regardless, so adding it here too
   // would just be a redundant duplicate.
-  // Capture user id so seenKey() can scope per-user.
   window.__currentUser = user;
   I18N.syncFromSupabase(sb, user.id);
   Palette.syncFromSupabase(sb, user.id);
@@ -2627,8 +1921,8 @@ const svg = document.querySelector('svg');
 // clicks/hover working after any number of navigate-away-and-back trips.
 function getNeighborhoods() { return document.querySelectorAll('.neighborhood'); }
 
-// Currently-selected neighborhood scopes the news feed and events to that
-// district. null means show everything (subject to the news filter tabs).
+// Currently-selected district. null means nothing is selected, and the
+// seat card falls back to İstanbul's Büyükşehir Belediye Başkanı.
 let activeNeighborhood = null;
 
 // Resolve what the map label should currently read when nothing is
@@ -2684,12 +1978,10 @@ function esc(s) {
 
 document.addEventListener('click', (e) => {
   const nb = e.target.closest('.neighborhood');
-  // Only clicks inside the map itself should clear the neighborhood
-  // filter (tapping the sea/background to deselect) -- this used to
-  // match ANY click anywhere on the page that wasn't precisely on a
-  // district shape, so tapping an event card, a news card, or the nav
-  // bar silently cleared the map filter and kicked off a full,
-  // unnecessary events reload in the background.
+  // Only clicks inside the map itself should clear the selection
+  // (tapping the sea/background to deselect) -- this used to match ANY
+  // click anywhere on the page that wasn't precisely on a district
+  // shape, so tapping a card or the nav bar silently cleared it.
   if (!nb) {
     // The PETEK pill sits inside the map panel but is not part of the
     // map: pressing it opens the honeycomb, it doesn't deselect a
@@ -2699,29 +1991,21 @@ document.addEventListener('click', (e) => {
     document.getElementById('map-label').textContent = 'İstanbul';
     if (activeNeighborhood !== null) {
       activeNeighborhood = null;
-      flashingNewsCardId = null;
-      applyNewsFilter(activeNewsFilter, true);
-      loadEvents(true);
       renderPoliticianCard('istanbul');
     }
     return;
   }
   // data-neighborhood covers multi-polygon districts (e.g. Şişli's
   // exclave piece) whose element id must stay unique but which still
-  // count as the same neighborhood for filtering/active-state purposes.
+  // count as the same neighborhood for active-state purposes.
   const nbId = nb.dataset.neighborhood || nb.id;
   getNeighborhoods().forEach(n => n.classList.toggle('active', (n.dataset.neighborhood || n.id) === nbId));
   const name = nb.getAttribute('data-name') || nbId;
   document.getElementById('map-label').textContent = name;
-  const flashedItem = flashingNews[nbId];
-  flashingNewsCardId = flashedItem ? flashedItem.id : null;
-  markNewsSeenForNeighborhood(nbId);
   activeNeighborhood = nbId;
-  // instant: a map click filters the existing feed to this district --
-  // it should update in place, not slide the whole feed out and back
-  // in as if it were leaving and re-entering the screen.
-  applyNewsFilter(activeNewsFilter, true);
-  loadEvents(true);
+  // The selection now drives one thing on this page: which seat the
+  // profile bar names. The news and the events it used to filter live on
+  // Kütüphane and Kahvehane.
   renderPoliticianCard(nbId);
 });
 document.addEventListener('mouseover', (e) => {
@@ -2738,779 +2022,17 @@ document.addEventListener('mouseout', (e) => {
   getNeighborhoods().forEach(n => n.classList.remove('hover-active'));
 });
 
-// ── Breaking News (from public.breaking_news) ──────────────────
-// Rows expire client-side 3 days (72h) after updated_at (falls back to
-// created_at for stories with no timeline updates yet), so a story
-// that keeps getting "gelişme" updates stays in the feed instead of
-// silently vanishing at the 72h mark. The lastTouch age badge (see
-// formatNewsAge) shows an hour count for the first day, then "DÜN" for
-// the second day and "evvelsi gün" for the third, before the row drops
-// out of the feed entirely. The admin can also archive a row early
-// (breaking_news.archived_at) to pull it from this feed before the 72h
-// mark; the query below excludes archived rows outright. A row with a
-// neighborhood pulses
-// that district on the map until the *current user* has clicked it;
-// "seen" state is local to the browser (localStorage key:
-// ist-news-seen-<userId>).
-let flashingNews = {}; // nbId -> { id, title, body, url, created_at }
-let allBreakingNews = []; // cached for client-side filter
-let activeNewsFilter = 'all';
-let flashingNewsCardId = null; // news id whose card should flash while its neighborhood is active
-let openNewsCardId = null; // news id whose card stays visually "hovered" while its detail sheet is open (see markOpenNewsCard)
-let openEventCardId = null; // event id whose card stays visually "hovered" while its detail sheet is open (see markOpenEventCard)
 
-function seenKey() {
-  // Capture current user once available; fallback to anonymous bucket.
-  const uid = (window.__currentUser && window.__currentUser.id) || 'anon';
-  return 'ist-news-seen-' + uid;
-}
-function loadSeenSet() {
-  try { return new Set(JSON.parse(localStorage.getItem(seenKey()) || '[]')); }
-  catch { return new Set(); }
-}
-function persistSeenSet(set) {
-  try { localStorage.setItem(seenKey(), JSON.stringify([...set])); } catch {}
-}
-function markNewsSeenForNeighborhood(nbId) {
-  const item = flashingNews[nbId];
-  if (!item) return;
-  const set = loadSeenSet();
-  set.add(item.id);
-  persistSeenSet(set);
-  const el = document.getElementById(nbId);
-  if (el) el.classList.remove('flashing-news');
-  delete flashingNews[nbId];
-}
-
-function applyFlashingNewsCard() {
-  if (!flashingNewsCardId) return;
-  const card = document.querySelector(`#breaking-news-feed [data-news-id="${CSS.escape(flashingNewsCardId)}"]`);
-  if (card) card.classList.add('flashing-news-card');
-}
-
-function escapeText(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g,
-    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-const NB_NAMES_TR = {
-  bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler',
-  sisli:'Şişli', eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa',
-  esenler:'Esenler', bagcilar:'Bağcılar', basaksehir:'Başakşehir',
-  kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi', uskudar:'Üsküdar',
-  kadikoy:'Kadıköy', maltepe:'Maltepe', umraniye:'Ümraniye',
-  cekmekoy:'Çekmeköy', beykoz:'Beykoz', sariyer:'Sarıyer',
-  besiktas:'Beşiktaş', beyoglu:'Beyoğlu', gungoren:'Güngören',
-  kagithane:'Kağıthane', atasehir:'Ataşehir', zeytinburnu:'Zeytinburnu', fatih:'Fatih'
-};
-
-function categoryLabelTR(n) {
-  const c = n.category || n.neighborhood || 'turkiye';
-  if (c === 'turkiye') return 'TÜRKİYE';
-  if (c === 'istanbul') return 'İSTANBUL';
-  if (c === 'dunya') return 'DÜNYA';
-  return (NB_NAMES_TR[c] || c).toLocaleUpperCase('tr-TR');
-}
-
-// The story's series name (if the admin tagged one grouping several
-// separate posts under the same ongoing event), falling back to the
-// category label when the story isn't part of a series.
-function newsKickerLabel(n) {
-  const seriesName = n.breaking_news_series && n.breaking_news_series.name;
-  return seriesName ? seriesName.toLocaleUpperCase('tr-TR') : categoryLabelTR(n);
-}
-
-// No trailing "ago"/"önce" word -- kept as short as possible so the
-// series name (kicker) gets more of .meta-row's width before truncating.
-function formatAgoTR(iso) {
-  const d = new Date(iso);
-  const secs = Math.floor((Date.now() - d.getTime()) / 1000);
-  const en = I18N.isEnglish();
-  if (secs < 60) return en ? 'now' : 'şimdi';
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return en ? `${mins}m` : `${mins} dk`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return en ? `${hrs}h` : `${hrs} sa`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return en ? `${days}d` : `${days} gün`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return en ? `${months}mo` : `${months} ay`;
-  const years = Math.floor(days / 365);
-  const remMonths = Math.floor((days - years * 365) / 30);
-  if (remMonths <= 0) return en ? `${years}y` : `${years} yıl`;
-  return en ? `${years}y ${remMonths}mo` : `${years} yıl ${remMonths} ay`;
-}
-
-// Age label for a news card/detail's lastTouch badge specifically -- news
-// rows only live 3 days (see loadBreakingNews's cutoff), so once a story
-// crosses the 24h mark this switches from the hour count straight to
-// "DÜN", then "evvelsi gün" for the following day, instead of ever
-// showing "1 gün"/"2 gün". Kept separate from formatAgoTR, which still
-// counts in open-ended days/months/years for the timeline's gelişme
-// entries (those can be backdated years into a story's history).
-function formatNewsAge(iso) {
-  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  const en = I18N.isEnglish();
-  if (secs < 60) return en ? 'now' : 'şimdi';
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return en ? `${mins}m` : `${mins} dk`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return en ? `${hrs}h` : `${hrs} sa`;
-  if (hrs < 48) return en ? 'yesterday' : 'DÜN';
-  return en ? '2 days ago' : 'evvelsi gün';
-}
-
-// Spelled-out "X sa önce" / "Xh ago" form used in the timeline, where the
-// date stands alone as a column of its own (formatAgoTR's terse "X sa" is
-// tuned for the cramped meta-row next to a kicker instead). Gelişme entries
-// can be backdated years into a story's history, hence formatAgoTR's
-// ay/yıl branches above — the timeline stays relative ("11 yıl önce")
-// instead of switching to an absolute date.
-function formatAgoTRLong(iso) {
-  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  const en = I18N.isEnglish();
-  if (secs < 60) return en ? 'now' : 'şimdi';
-  return `${formatAgoTR(iso)} ${en ? 'ago' : 'önce'}`;
-}
-
-function safeUrl(u) {
-  const s = String(u || '').trim();
-  if (/^https?:\/\//i.test(s)) return s;
-  return null;
-}
-
-// Slides a feed panel's current cards out toward their column's outer
-// screen edge, then rebuilds it and slides the fresh cards back in from
-// that same edge. `direction` is 'left' (breaking news, left column) or
-// 'right' (events, right column) -- see the .card-entering-*/.card-leaving-*
-// CSS. Renders immediately (no leave animation) on first paint, when the
-// panel starts out empty. Cards enter with a staggered delay by list
-// position, so the topmost card arrives first and lower ones follow.
-// Used to skip this entrance animation on the first call after arriving
-// via the swipe-pagination nav (window.__istSuppressFirstCardAnim,
-// seeded pre-body), on the theory that the whole column is already
-// sliding in from that same edge so animating the cards too would look
-// like the content arriving twice -- but loadBreakingNews()/loadEvents()
-// always hit Supabase fresh on every mount(), so in practice the data
-// (and this first render) lands well after the ~400ms column-slide has
-// already finished, not alongside it. Suppressing then just made the
-// cards pop in with no animation at all instead of preventing a double
-// animation that wasn't happening anyway -- so this no longer consults
-// that flag and always plays the entrance.
-// `instant`: rebuilds in place with no leave/enter animation at all --
-// used for map neighborhood clicks, where the slide-out/in read as the
-// whole feed leaving and re-entering the screen instead of just updating.
-const CARD_SWAP_MS = 300;
-const CARD_STAGGER_MS = 160;
-function animateFeedSwap(container, direction, buildFn, instant) {
-  if (instant) { buildFn(); return; }
-  const enterClass = direction === 'left' ? 'card-entering-left' : 'card-entering-right';
-  const leaveClass = direction === 'left' ? 'card-leaving-left' : 'card-leaving-right';
-  const playEnter = () => {
-    buildFn();
-    Array.from(container.children).forEach((el, i) => {
-      el.style.animationDelay = `${i * CARD_STAGGER_MS}ms`;
-      el.classList.add(enterClass);
-      el.addEventListener('animationend', () => {
-        el.classList.remove(enterClass);
-        el.style.animationDelay = '';
-      }, { once: true });
-    });
-  };
-  const existing = Array.from(container.children);
-  if (!existing.length) { playEnter(); return; }
-  existing.forEach(el => el.classList.add(leaveClass));
-  setTimeout(playEnter, CARD_SWAP_MS);
-}
-
-function renderBreakingNewsFeed(rows, instant) {
-  const feed = document.getElementById('breaking-news-feed');
-  if (!feed) return;
-  animateFeedSwap(feed, 'left', () => renderBreakingNewsFeedNow(feed, rows), instant);
-}
-
-// Full detail markup for a news article — rendered into the detail
-// overlay's sheet (see openDetail). Reuses the .article card's own
-// styling so it looks like the same card, just full-size.
-function buildNewsDetailHtml(n) {
-  const sources = (n.breaking_news_sources || [])
-    .slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  const sourcesHtml = sources.length
-    ? sources.map(s => {
-        const url = safeUrl(s.url);
-        const inner = `
-          <span class="src-name">${escapeText(s.name)}</span>
-          ${escapeText(s.headline)}
-        `;
-        return `<div class="src-item">${
-          url
-            ? `<a href="${escapeText(url)}" target="_blank" rel="noopener">${inner}</a>`
-            : inner
-        }</div>`;
-      }).join('')
-    : '<div class="sources-empty">Henüz kaynak eklenmedi.</div>';
-  // Updates and polls share one chronological spine (newest first) — a
-  // poll slots in at the point in the story's history it was posted,
-  // rather than living in a separate block.
-  const timelineEvents = (n.breaking_news_updates || []).map(u => ({ type: 'update', created_at: u.created_at, data: u }))
-    .concat((n.breaking_news_polls || []).map(p => ({ type: 'poll', created_at: p.created_at, data: p })))
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  const timelineHtml = timelineEvents.length ? `
-    <div class="timeline">
-      <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Zaman Akışı</div>
-      <div class="timeline-track">
-        ${timelineEvents.map(ev => ev.type === 'poll' ? `
-          <div class="timeline-item timeline-item-poll">
-            <div class="timeline-item-date">
-              <span class="timeline-tick"></span>
-              <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatAgoTRLong(ev.created_at))}</div>
-            </div>
-            <div class="poll-block" id="poll-${escapeText(ev.data.id)}"></div>
-          </div>
-        ` : `
-          <div class="timeline-item">
-            <div class="timeline-item-date">
-              <span class="timeline-tick"></span>
-              <div class="ago" data-iso="${escapeText(ev.created_at)}">${escapeText(formatAgoTRLong(ev.created_at))}</div>
-            </div>
-            <strong>${escapeText(ev.data.title)}</strong>
-            ${ev.data.body ? `<p>${escapeText(ev.data.body)}</p>` : ''}
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  ` : '';
-  const lastTouch = n.updated_at || n.created_at;
-  return `
-    <div class="article">
-      <div class="meta-row">
-        <div class="kicker">${escapeText(newsKickerLabel(n))}</div>
-        <div class="ago" data-iso="${escapeText(lastTouch)}">${escapeText(formatNewsAge(lastTouch))}</div>
-      </div>
-      <h3>${escapeText(n.title)}</h3>
-      ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
-      ${timelineHtml}
-      <div class="sources">
-        <button type="button" class="sources-toggle" aria-expanded="false">
-          <div class="sidebar-label" style="padding:0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">${I18N.t('news.sources')} (${sources.length})</div>
-          <span class="sources-toggle-icon">▾</span>
-        </button>
-        <div class="sources-body">
-          ${sourcesHtml}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// Fetches this news item's poll votes and renders either the voting
-// buttons or the result bars into its #poll-<id> container inside the
-// currently-open detail sheet. Called after openDetail() since the
-// sheet's HTML is built synchronously but the vote/result state isn't
-// known until this query resolves.
-const MAX_POLL_VOTER_AVATARS = 6;
-
-async function loadAndRenderPoll(poll) {
-  const container = document.getElementById('poll-' + poll.id);
-  if (!container) return;
-  const { data, error } = await sb.from('breaking_news_poll_option_votes')
-    .select('user_id, option').eq('poll_id', poll.id);
-  if (error) { console.error('[poll]', error); return; }
-  const uid = window.__currentUser && window.__currentUser.id;
-  const votersA = [], votersB = [];
-  let mine = null;
-  (data || []).forEach(v => {
-    if (v.option === 1) votersA.push(v.user_id);
-    else if (v.option === 2) votersB.push(v.user_id);
-    if (uid && v.user_id === uid) mine = v.option;
-  });
-
-  // Only need profile pictures once the result view (bars + avatars) is
-  // about to be shown -- skip the query while votes are still empty or
-  // the viewer hasn't voted yet (still seeing the plain vote buttons).
-  let profilesById = new Map();
-  const userIds = Array.from(new Set([...votersA, ...votersB]));
-  if (mine != null && userIds.length) {
-    const { data: profs, error: profErr } = await sb.from('profiles')
-      .select('id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt').in('id', userIds);
-    if (profErr) console.error('[poll voter profiles]', profErr);
-    else profilesById = new Map(profs.map(p => [p.id, p]));
-  }
-
-  renderPollInto(container, poll, votersA, votersB, mine, profilesById);
-}
-
-function buildVoterAvatarsHtml(userIds, profilesById) {
-  const list = userIds.map(id => profilesById.get(id)).filter(Boolean);
-  if (!list.length) return '';
-  const shown = list.slice(0, MAX_POLL_VOTER_AVATARS);
-  const extra = list.length - shown.length;
-  const avatarsHtml = shown.map(p => {
-    const name = capitalizeName([p.first_name, p.last_name].filter(Boolean).join(' ')) || 'Üye';
-    const inner = IstAvatar.html(p.avatar_url, p.avatar_hair, p.avatar_hat, p.avatar_accessory, p.avatar_shirt);
-    return `<span class="poll-voter-avatar" title="${escapeText(name)}">${inner}</span>`;
-  }).join('');
-  const moreHtml = extra > 0
-    ? `<span class="poll-voter-avatar poll-voter-more" title="+${extra}">+${extra}</span>`
-    : '';
-  return avatarsHtml + moreHtml;
-}
-
-function renderPollInto(container, poll, votersA, votersB, mine, profilesById) {
-  const countA = votersA.length, countB = votersB.length;
-  const total = countA + countB;
-  if (mine == null) {
-    container.innerHTML = `
-      <div class="poll-question">${escapeText(poll.question)}</div>
-      <div class="poll-options">
-        <button class="poll-opt-btn" type="button" data-option="1">${escapeText(poll.option_a)}</button>
-        <button class="poll-opt-btn" type="button" data-option="2">${escapeText(poll.option_b)}</button>
-      </div>
-      <div class="poll-status"></div>
-    `;
-    container.querySelectorAll('.poll-opt-btn').forEach(btn => {
-      btn.addEventListener('click', () => submitPollVote(poll, parseInt(btn.dataset.option, 10), container));
-    });
-  } else {
-    const pctA = total ? Math.round((countA / total) * 100) : 0;
-    const pctB = total ? 100 - pctA : 0;
-    container.innerHTML = `
-      <div class="poll-question">${escapeText(poll.question)}</div>
-      <div class="poll-result-labels">
-        <span class="poll-label-a${mine === 1 ? ' poll-label-mine' : ''}">${escapeText(poll.option_a)} · ${pctA}%</span>
-        <span class="poll-label-b${mine === 2 ? ' poll-label-mine' : ''}">${pctB}% · ${escapeText(poll.option_b)}</span>
-      </div>
-      <div class="poll-bar-track">
-        <div class="poll-bar-fill-a" style="width:${pctA}%"></div>
-        <div class="poll-bar-fill-b" style="width:${pctB}%"></div>
-      </div>
-      <div class="poll-voters-row">
-        <div class="poll-voters poll-voters-a">${buildVoterAvatarsHtml(votersA, profilesById)}</div>
-        <div class="poll-voters poll-voters-b">${buildVoterAvatarsHtml(votersB, profilesById)}</div>
-      </div>
-    `;
-  }
-}
-
-async function submitPollVote(poll, option, container) {
-  const uid = window.__currentUser && window.__currentUser.id;
-  if (!uid) return;
-  container.querySelectorAll('.poll-opt-btn').forEach(b => b.disabled = true);
-  const { error } = await sb.from('breaking_news_poll_option_votes')
-    .insert([{ poll_id: poll.id, user_id: uid, option }]);
-  if (error) {
-    console.error('[poll vote]', error);
-    const statusEl = container.querySelector('.poll-status');
-    if (statusEl) {
-      statusEl.textContent = 'Oy kaydedilemedi, tekrar deneyin.';
-      statusEl.className = 'poll-status err';
-    }
-    container.querySelectorAll('.poll-opt-btn').forEach(b => b.disabled = false);
-    return;
-  }
-  loadAndRenderPoll(poll);
-}
-
-// News series that gets its own map decoration: hovering/tapping a card
-// from this series also drops a grayscale landmark sticker on its
-// neighborhood (see attachCardMapHover's mosqueSticker option below).
-const MOSQUE_STICKER_SERIES = 'Rıhtım Camii';
-
-// Turkish-aware, whitespace-tolerant name match -- a plain === would miss
-// admin-entered variants that differ only by case, since JS's default
-// toLowerCase() doesn't fold Turkish dotted/dotless I the way 'tr'
-// collation does ("İ"/"i" and "I"/"ı" are matched, but "i"/"ı" stay apart).
-function trNameEquals(a, b) {
-  if (!a || !b) return false;
-  return a.trim().localeCompare(b.trim(), 'tr', { sensitivity: 'base' }) === 0;
-}
-
-// Hovering a news/event card highlights its neighborhood on the map (no-op
-// for city-wide rows with no neighborhood). Shared by both feeds. Pass
-// { mosqueSticker: true } to also toggle #mosque-sticker in lockstep --
-// used for Rıhtım Camii series cards, whose neighborhood is Kadıköy.
-function attachCardMapHover(el, nbId, opts) {
-  if (!nbId) return;
-  const showMosqueSticker = !!(opts && opts.mosqueSticker);
-  el.addEventListener('mouseenter', () => {
-    const nbEl = document.getElementById(nbId);
-    if (nbEl) nbEl.classList.add('card-hover');
-    if (showMosqueSticker) {
-      const sticker = document.getElementById('mosque-sticker');
-      if (sticker) sticker.classList.add('show');
-    }
-  });
-  el.addEventListener('mouseleave', () => {
-    const nbEl = document.getElementById(nbId);
-    if (nbEl) nbEl.classList.remove('card-hover');
-    if (showMosqueSticker) {
-      const sticker = document.getElementById('mosque-sticker');
-      if (sticker) sticker.classList.remove('show');
-    }
-  });
-}
-
-// Keeps exactly one #breaking-news-feed card looking "hovered" (see the
-// .is-open CSS above) for as long as its detail sheet is open, regardless
-// of where the mouse actually is. Pass null to clear (sheet closed, or a
-// non-news detail opened instead).
-function markOpenNewsCard(id) {
-  openNewsCardId = id == null ? null : String(id);
-  document.querySelectorAll('#breaking-news-feed .article.openable.is-open')
-    .forEach(el => el.classList.remove('is-open'));
-  if (openNewsCardId == null) return;
-  const el = document.querySelector(`#breaking-news-feed [data-news-id="${CSS.escape(openNewsCardId)}"]`);
-  if (el) el.classList.add('is-open');
-}
-
-function renderBreakingNewsFeedNow(feed, rows) {
-  if (!rows.length) {
-    feed.innerHTML = '';
-    return;
-  }
-  const rowsById = new Map(rows.map(n => [String(n.id), n]));
-  feed.innerHTML = rows.map(n => {
-    const lastTouch = n.updated_at || n.created_at;
-    return `
-      <div class="article openable" data-news-id="${escapeText(n.id)}">
-        <div class="meta-row">
-          <div class="kicker">${escapeText(newsKickerLabel(n))}</div>
-          <div class="ago" data-iso="${escapeText(lastTouch)}">${escapeText(formatNewsAge(lastTouch))}</div>
-        </div>
-        <h3>${escapeText(n.title)}</h3>
-        ${n.body ? `<p>${escapeText(n.body)}</p>` : ''}
-      </div>
-    `;
-  }).join('');
-
-  feed.querySelectorAll('.article.openable').forEach(el => {
-    const n = rowsById.get(el.dataset.newsId);
-    el.addEventListener('click', () => {
-      if (n) {
-        openDetail(buildNewsDetailHtml(n));
-        markOpenNewsCard(n.id);
-        (n.breaking_news_polls || []).forEach(p => loadAndRenderPoll(p));
-      }
-    });
-    if (n) {
-      attachCardMapHover(el, n.neighborhood, {
-        mosqueSticker: !!(n.breaking_news_series && trNameEquals(n.breaking_news_series.name, MOSQUE_STICKER_SERIES)),
-      });
-    }
-  });
-
-  // Re-render (filter change, map click, live refresh) rebuilds every card
-  // from scratch, wiping .is-open along with it -- restore it if the card
-  // that was open is still in this batch.
-  if (openNewsCardId != null && rowsById.has(openNewsCardId)) markOpenNewsCard(openNewsCardId);
-
-  applyFlashingNewsCard();
-}
-
-function applyNewsFilter(filter, instant) {
-  activeNewsFilter = filter;
-  document.querySelectorAll('.news-filter-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.filter === filter);
-  });
-  let rows = allBreakingNews;
-  if (filter === 'istanbul') rows = allBreakingNews.filter(n => n.category === 'istanbul');
-  else if (filter === 'turkiye') rows = allBreakingNews.filter(n => n.category === 'turkiye');
-  else if (filter === 'dunya') rows = allBreakingNews.filter(n => n.category === 'dunya');
-  else if (filter === 'mahalle') rows = allBreakingNews.filter(n => n.category !== 'istanbul' && n.category !== 'turkiye' && n.category !== 'dunya');
-  // When a district is selected on the map, narrow further to its news.
-  if (activeNeighborhood) rows = rows.filter(n => n.neighborhood === activeNeighborhood);
-  renderBreakingNewsFeed(rows, instant);
-}
-
-document.querySelectorAll('.news-filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => applyNewsFilter(btn.dataset.filter));
-});
-
-async function loadBreakingNews() {
-  const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await sb.from('breaking_news')
-    .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*), breaking_news_series(name)').gte('updated_at', cutoff)
-    .is('archived_at', null)
-    // Dünya (world) news now lives exclusively in Kütüphane's own feed
-    // (see kutuphane.html's loadDunyaNews) -- excluded here so it doesn't
-    // also show up mixed into Hane's İstanbul/Türkiye/mahalle feed.
-    .neq('category', 'dunya')
-    .order('updated_at', { ascending: false });
-  if (error) { console.error('[anahane breaking_news]', error); return; }
-  allBreakingNews = data || [];
-
-  applyNewsFilter(activeNewsFilter);
-
-  // Pulse neighborhoods with unseen news.
-  const seen = loadSeenSet();
-  flashingNews = {};
-  document.querySelectorAll('.neighborhood.flashing-news').forEach(el => el.classList.remove('flashing-news'));
-  allBreakingNews.forEach(n => {
-    if (!n.neighborhood) return;
-    if (seen.has(n.id)) return;
-    if (flashingNews[n.neighborhood]) return;
-    flashingNews[n.neighborhood] = n;
-  });
-  Object.keys(flashingNews).forEach(nbId => {
-    const el = document.getElementById(nbId);
-    if (el) el.classList.add('flashing-news');
-  });
-}
-
-// ── Events (left column) ──────────────────
-const MONTH_ABBR_TR = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
-const MONTH_ABBR_EN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-
-function eventDateParts(iso) {
-  const d = new Date(iso);
-  const tz = 'Europe/Istanbul';
-  const en = I18N.isEnglish();
-  const locale = en ? 'en-US' : 'tr-TR';
-  const day = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, day: 'numeric' }), 10);
-  const month = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, month: 'numeric' }), 10);
-  const weekday = d.toLocaleDateString(locale, { timeZone: tz, weekday: 'long' });
-  const wd = d.toLocaleDateString(locale, { timeZone: tz, weekday: 'short' }).toLocaleUpperCase(locale);
-  const time = d.toLocaleTimeString(locale, { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: en });
-  const monAbbr = (en ? MONTH_ABBR_EN : MONTH_ABBR_TR)[month - 1] || '';
-  return { day, mon: monAbbr, wd, weekday, time };
-}
-
-let allEvents = [];
-let eventsRequestSeq = 0;
-let rsvpCounts = {};   // event_id -> attendee count
-let myRsvpIds = new Set(); // event_ids the current user has RSVP'd to
-let rsvpAttendees = {}; // event_id -> [{ id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt }, ...] (capped)
-const MAX_ATTENDEE_AVATARS = 6;
-
-function capitalizeName(s) {
-  if (!s) return '';
-  return s.trim().split(/\s+/).map(w => w ? w.charAt(0).toLocaleUpperCase('tr-TR') + w.slice(1).toLocaleLowerCase('tr-TR') : '').join(' ');
-}
-
-async function loadEvents(instant) {
-  const reqId = ++eventsRequestSeq;
-  const now = new Date().toISOString();
-  // Scope the query to the selected neighborhood so the 30-row cap
-  // doesn't hide matching rows that sit past the global top-30 window.
-  let query = sb.from('events')
-    .select('*')
-    .gte('event_date', now)
-    .order('event_date', { ascending: true })
-    .limit(30);
-  if (activeNeighborhood) query = query.eq('neighborhood', activeNeighborhood);
-  const { data, error } = await query;
-  // Drop responses from superseded requests so a slow older fetch
-  // can't clobber a newer one with stale rows.
-  if (reqId !== eventsRequestSeq) return;
-  if (error) { console.error('[anahane events]', error); allEvents = []; }
-  else allEvents = data || [];
-  await loadRsvps();
-  if (reqId !== eventsRequestSeq) return;
-  renderEvents(instant);
-}
-
-async function loadRsvps() {
-  rsvpCounts = {};
-  myRsvpIds = new Set();
-  rsvpAttendees = {};
-  const ids = allEvents.map(ev => ev.id);
-  if (!ids.length) return;
-  const { data, error } = await sb.from('event_rsvps')
-    .select('event_id, user_id, created_at')
-    .in('event_id', ids)
-    .order('created_at', { ascending: true });
-  if (error) { console.error('[anahane rsvps]', error); return; }
-  const myId = window.__currentUser && window.__currentUser.id;
-  (data || []).forEach(r => {
-    rsvpCounts[r.event_id] = (rsvpCounts[r.event_id] || 0) + 1;
-    if (myId && r.user_id === myId) myRsvpIds.add(r.event_id);
-  });
-  // Resolve attendee profile pictures in one batched query.
-  const userIds = Array.from(new Set((data || []).map(r => r.user_id)));
-  if (userIds.length) {
-    const { data: profs, error: profErr } = await sb.from('profiles')
-      .select('id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt')
-      .in('id', userIds);
-    if (profErr) { console.error('[anahane rsvp attendees]', profErr); return; }
-    const profMap = new Map((profs || []).map(p => [p.id, p]));
-    (data || []).forEach(r => {
-      const p = profMap.get(r.user_id);
-      if (!p) return;
-      (rsvpAttendees[r.event_id] = rsvpAttendees[r.event_id] || []).push(p);
-    });
-  }
-}
-
-function buildAttendeeAvatarsHtml(eventId) {
-  const list = rsvpAttendees[eventId] || [];
-  if (!list.length) return '';
-  const shown = list.slice(0, MAX_ATTENDEE_AVATARS);
-  const extra = list.length - shown.length;
-  const avatarsHtml = shown.map(p => {
-    const name = capitalizeName([p.first_name, p.last_name].filter(Boolean).join(' ')) || 'Üye';
-    const inner = IstAvatar.html(p.avatar_url, p.avatar_hair, p.avatar_hat, p.avatar_accessory, p.avatar_shirt);
-    return `<span class="ev-attendee-avatar" title="${escapeText(name)}">${inner}</span>`;
-  }).join('');
-  const moreHtml = extra > 0
-    ? `<span class="ev-attendee-avatar ev-attendee-more" title="+${extra}">+${extra}</span>`
-    : '';
-  return avatarsHtml + moreHtml;
-}
-
-async function toggleRsvp(eventId, btn) {
-  const myId = window.__currentUser && window.__currentUser.id;
-  if (!myId || btn.disabled) return;
-  const attending = myRsvpIds.has(eventId);
-  btn.disabled = true;
-  try {
-    if (attending) {
-      const { error } = await sb.from('event_rsvps').delete().eq('event_id', eventId).eq('user_id', myId);
-      if (error) throw error;
-    } else {
-      const { error } = await sb.from('event_rsvps').insert({ event_id: eventId, user_id: myId });
-      if (error) throw error;
-    }
-  } catch (err) {
-    console.error('[anahane rsvp]', err);
-    btn.disabled = false;
-    return;
-  }
-  // Refetch counts + attendee avatars so the stack reflects the change,
-  // then patch just this event's row in place so the card doesn't collapse.
-  await loadRsvps();
-  const nowAttending = myRsvpIds.has(eventId);
-  btn.classList.toggle('attending', nowAttending);
-  btn.textContent = nowAttending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join');
-  const row = btn.closest('.ev-rsvp-row');
-  const countEl = row?.querySelector('.ev-rsvp-count');
-  if (countEl) countEl.textContent = `${rsvpCounts[eventId] || 0} ${I18N.t('home.events.rsvp.count')}`;
-  const avatarsEl = row?.querySelector('.ev-attendees');
-  if (avatarsEl) avatarsEl.innerHTML = buildAttendeeAvatarsHtml(eventId);
-  // Also patch the (separate) preview card in the events list behind the
-  // overlay, so its attendee stack matches without waiting for a reload.
-  const previewEl = document.querySelector(`.event-item[data-event-id="${CSS.escape(eventId)}"] .ev-attendees-preview`);
-  if (previewEl) previewEl.innerHTML = buildAttendeeAvatarsHtml(eventId);
-  btn.disabled = false;
-}
-
-// Keeps exactly one #events-panel card looking "hovered" (see the
-// .is-open CSS above) for as long as its detail sheet is open, regardless
-// of where the mouse actually is. Pass null to clear (sheet closed, or a
-// non-event detail opened instead).
-function markOpenEventCard(id) {
-  openEventCardId = id == null ? null : String(id);
-  document.querySelectorAll('#events-panel .event-item.openable.is-open')
-    .forEach(el => el.classList.remove('is-open'));
-  if (openEventCardId == null) return;
-  const el = document.querySelector(`#events-panel [data-event-id="${CSS.escape(openEventCardId)}"]`);
-  if (el) el.classList.add('is-open');
-}
-
-function renderEvents(instant) {
-  const panel = document.getElementById('events-panel');
-  if (!panel) return;
-  let rows = allEvents;
-  if (activeNeighborhood) rows = rows.filter(ev => ev.neighborhood === activeNeighborhood);
-  animateFeedSwap(panel, 'right', () => renderEventsNow(panel, rows), instant);
-}
-
-// Full detail markup for an event — rendered into the detail overlay's
-// sheet (see openDetail). Reuses the .event-item card's own styling so
-// it looks like the same card, just full-size, with the RSVP row live.
-function buildEventDetailHtml(ev) {
-  const nbLabel = ev.neighborhood ? (NB_NAMES_TR[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
-  const parts = eventDateParts(ev.event_date);
-  const dateTime = [parts.weekday, parts.time].filter(Boolean).join(' ');
-  const metaHTML = [dateTime, ev.location].filter(Boolean).map(escapeText).join('<br>');
-  const count = rsvpCounts[ev.id] || 0;
-  const attending = myRsvpIds.has(ev.id);
-  return `
-    <div class="event-item">
-      <div class="ev-date-block">
-        <div class="ev-day">${parts.day}</div>
-        <div class="ev-mon">${parts.mon}</div>
-      </div>
-      <div class="ev-body">
-        <div class="ev-kicker">${escapeText(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
-        <div class="ev-title">${escapeText(ev.title)}</div>
-        ${metaHTML ? `<div class="ev-meta">${metaHTML}</div>` : ''}
-      </div>
-      <div class="ev-details">
-        ${ev.description ? `<div class="ev-desc">${escapeText(ev.description)}</div>` : ''}
-        <div class="ev-rsvp-row">
-          <button type="button" class="ev-rsvp-btn${attending ? ' attending' : ''}" data-event-id="${ev.id}">${attending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join')}</button>
-          <span class="ev-rsvp-count">${count} ${I18N.t('home.events.rsvp.count')}</span>
-          <span class="ev-attendees">${buildAttendeeAvatarsHtml(ev.id)}</span>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderEventsNow(panel, rows) {
-  if (!rows.length) {
-    panel.innerHTML = '';
-    return;
-  }
-  const rowsById = new Map(rows.map(ev => [String(ev.id), ev]));
-  panel.innerHTML = rows.map(ev => {
-    const nbLabel = ev.neighborhood ? (NB_NAMES_TR[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
-    const parts = eventDateParts(ev.event_date);
-    // Weekday now lives in the date block (day / month / weekday); time
-    // and location are both dropped from the preview -- see
-    // buildEventDetailHtml for the full date/time/location, still shown
-    // once you open the card. That frees this card for a bigger title.
-    return `
-      <div class="event-item openable" data-event-id="${escapeText(ev.id)}">
-        <div class="ev-date-block">
-          <div class="ev-day">${parts.day}</div>
-          <div class="ev-mon">${parts.mon}</div>
-          <div class="ev-wd">${parts.wd}</div>
-        </div>
-        <div class="ev-body">
-          <div class="ev-kicker">${escapeText(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
-          <div class="ev-title">${escapeText(ev.title)}</div>
-          <span class="ev-attendees ev-attendees-preview">${buildAttendeeAvatarsHtml(ev.id)}</span>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  panel.querySelectorAll('.event-item.openable').forEach(el => {
-    const ev = rowsById.get(el.dataset.eventId);
-    el.addEventListener('click', () => {
-      if (ev) {
-        openDetail(buildEventDetailHtml(ev));
-        markOpenEventCard(ev.id);
-      }
-    });
-    if (ev) attachCardMapHover(el, ev.neighborhood);
-  });
-
-  // Re-render (map click, live refresh) rebuilds every card from scratch,
-  // wiping .is-open along with it -- restore it if the card that was open
-  // is still in this batch.
-  if (openEventCardId != null && rowsById.has(openEventCardId)) markOpenEventCard(openEventCardId);
-}
-
-// Detail overlay: a bottom sheet for a news article or event's full
-// details, opened instead of the old expand-in-place toggle — mirrors
-// Kahvehane's game overlay / Kütüphane's reader overlay. Content is
-// built by buildNewsDetailHtml/buildEventDetailHtml above.
-// The phone pull handler (IstSheet.pull, assigned below). Kept so the
-// sources accordion can tell it the sheet's height changed; opening and
+// Detail overlay: a bottom sheet for whatever this page opens full-size --
+// a politician's page (see politician-card.js) or a person mentioned by
+// name. Mirrors Kahvehane's game overlay / Kütüphane's reader overlay.
+// The phone pull handler (IstSheet.pull, assigned below). Opening and
 // closing need nothing from it, since IstSheet drives it itself.
 let detailPull = null;
 function openDetail(html) {
   const overlay = document.getElementById('anahane-detail');
   const body = document.getElementById('anahane-detail-body');
   if (!overlay || !body) return;
-  // Whatever's about to show is not the previously-marked news/event card
-  // (the news/event click handler re-marks its own card right after
-  // calling this) -- clear so a person mention's detail (or the other
-  // feed's card) doesn't leave a stale card looking "hovered".
-  markOpenNewsCard(null);
-  markOpenEventCard(null);
   body.innerHTML = html;
   if (window.IstPersonMentions) IstPersonMentions.linkify(body, personMentionsRoster);
   // The sheet's body is the scroll container on desktop (see sheet.css) --
@@ -3522,8 +2044,6 @@ function openDetail(html) {
 function closeDetail() {
   const overlay = document.getElementById('anahane-detail');
   if (!overlay) return;
-  markOpenNewsCard(null);
-  markOpenEventCard(null);
   IstSheet.close(overlay);
 }
 (function initDetailOverlay() {
@@ -3537,36 +2057,12 @@ function closeDetail() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && overlay.classList.contains('open')) closeDetail();
   });
-  // Delegated so it keeps working across re-renders of the sheet body
-  // (e.g. jumping straight from one event's detail to another's).
-  body.addEventListener('click', (e) => {
-    const toggle = e.target.closest('.sources-toggle');
-    if (toggle) {
-      const wrap = toggle.closest('.sources');
-      if (wrap) {
-        const isOpen = wrap.classList.toggle('open');
-        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-        // The sheet just got taller/shorter -- re-measure how much paper
-        // is left to pull (see IstSheet.pull in sheet.js).
-        if (detailPull) detailPull.measure();
-      }
-      return;
-    }
-    const btn = e.target.closest('.ev-rsvp-btn');
-    if (!btn) return;
-    e.stopPropagation();
-    toggleRsvp(btn.dataset.eventId, btn);
-  });
 })();
 
 // The pull is the shared sheet's (see IstSheet.pull in sheet.js) — the
-// same gesture Kütüphane's reader opens with, so a news item and the
-// meclis behave identically in the hand. Only the dismissal is this
-// page's: closeDetail clears the marked card as well as hiding the sheet.
+// same gesture Kütüphane's reader opens with, so a politician and the
+// meclis behave identically in the hand.
 detailPull = IstSheet.pull('anahane-detail', { onDismiss: closeDetail });
-
-// loadBreakingNews() is called from showSite() once the user is known
-// so the per-user "seen" set is in play immediately.
 
 // ── Init ──
 // Skipped when this script is being injected by a virtual navigation
