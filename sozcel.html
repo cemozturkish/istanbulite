@@ -19,8 +19,8 @@
   <script src="game-locks.js"></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
-  <link rel="stylesheet" href="profile-card.css?v=9">
-  <script src="profile-card.js?v=9" defer></script>
+  <link rel="stylesheet" href="profile-card.css?v=10">
+  <script src="profile-card.js?v=10" defer></script>
   <script src="sheet.js"></script>
   <link rel="stylesheet" href="sheet.css?v=2">
   <style>
@@ -1439,6 +1439,41 @@
     .dict-meaning-attr {
       font-style: normal;
       font-weight: 700;
+      color: var(--accent);
+    }
+    /* The Sözcü's own meaning: what the word means to the person who
+       chose it, printed under the dictionary's meanings and deliberately
+       set apart from them — the dictionary is the language's, this line
+       is one Istanbulite's. */
+    .dict-own {
+      margin-top: 6px;
+      padding-top: 5px;
+      border-top: 1px solid var(--whisper);
+    }
+    .dict-own-label {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ink-red);
+      margin-bottom: 2px;
+    }
+    .dict-own-text {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.75rem;
+      font-style: italic;
+      line-height: 1.4;
+      color: var(--ink);
+    }
+    .dict-own-attr {
+      display: block;
+      margin-top: 2px;
+      font-style: normal;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
       color: var(--accent);
     }
     .result-share-btn {
@@ -5108,6 +5143,16 @@ function renderDictEntry(raw, word) {
     out += `</div>`;
     return out;
   }).join('');
+  // The Sözcü's own meaning, last: the dictionary says what the word means,
+  // this says what it means to the person who picked it. Attributed where
+  // today's Sözcü is known (loadSozcuOfTheDay fills TODAY_SOZCU_LABEL) —
+  // an unsigned line here would read as one more dictionary sense.
+  if (dict.own) {
+    html += `<div class="dict-own">
+      <div class="dict-own-label">Sözcünün Bildiği Anlam</div>
+      <div class="dict-own-text">${esc(dict.own)}${TODAY_SOZCU_LABEL ? `<span class="dict-own-attr">— ${esc(TODAY_SOZCU_LABEL)}</span>` : ''}</div>
+    </div>`;
+  }
   return html;
 }
 
@@ -5388,6 +5433,10 @@ if (window.ResizeObserver) {
 
 // ── Günün Sözcüsü: shows whoever's suggestion the admin picked today,
 // or the admin themselves if nobody suggested it. ──
+
+// Today's Sözcü as printed under the board ("ATAŞEHİR'DEN CEM"). Kept here
+// so the result popup can sign their own meaning of the word with it.
+let TODAY_SOZCU_LABEL = null;
 function turkishLocative(name) {
   if (!name) return '';
   const upper = name.toLocaleUpperCase('tr-TR');
@@ -5436,6 +5485,7 @@ async function loadSozcuOfTheDay() {
     const nbId = prof.neighborhood;
     const nbName = (typeof neighborhoodNames !== 'undefined' && neighborhoodNames[nbId]) || nbId || '';
     const label = nbName ? `${turkishLocative(nbName)} ${firstName}` : firstName;
+    TODAY_SOZCU_LABEL = label;
     el.innerHTML = `<span class="sozcu-tag">Günün Sözcüsü:</span><span class="sozcu-name author-link" data-user-id="${prof.id}">${escapeHtml(label)}</span>`;
     // Now that there is a name in it, size it down to one line if the name
     // is long — see fitSozcuLine().
@@ -5712,7 +5762,8 @@ function renderTakeoverForm(takeover, status) {
       ` : `
       İstediğin uzunlukta bir Türkçe sözcük seç, ama hecelerine kendin ayır —
       en az 2, en fazla 3 hece gir. Oyunda kelime senin ayırdığın hecelerle
-      gösterilecek, her hece bir alt basamakta. Sözlük bilgisini de doldur.
+      gösterilecek, her hece bir alt basamakta. Sözlük bilgisini de doldur —
+      ve istersen kelimenin senin bildiğin anlamını da yaz.
       ${escapeHtml(dateLabel)} günü diğer İstanbullular bu kelimeyi tahmin edecek.
       ${existing ? 'Gece yarısına kadar dilediğin kadar değiştirebilirsin.' : ''}
       `}
@@ -5731,6 +5782,16 @@ function renderTakeoverForm(takeover, status) {
         <label class="stk-label">Sözlük — Anlam(lar)</label>
         <div class="stk-defs" id="stk-defs"></div>
         <button type="button" class="stk-add-def" id="stk-add-def">+ Anlam Ekle</button>
+      </div>
+
+      <div class="stk-section">
+        <label class="stk-label">Senin Bildiğin Anlam (isteğe bağlı)</label>
+        <textarea class="stk-textarea" id="stk-own-input" rows="2"
+                  placeholder="Bu kelime senin için ne demek?">${escapeHtml(dict && dict.own ? dict.own : '')}</textarea>
+        <div class="stk-hint" style="margin-top:4px;">
+          Sözlüğün yazdığı değil, senin bildiğin anlam. Kelimeyi bulan
+          herkes bunu senin adınla okuyacak.
+        </div>
       </div>
 
       <div>
@@ -5944,8 +6005,12 @@ function renumberTakeoverDefs() {
 function serializeTakeoverDict(takeover) {
   const noteEl = takeover.querySelector('#stk-note-input');
   const rootEl = takeover.querySelector('#stk-root-input');
+  const ownEl = takeover.querySelector('#stk-own-input');
   const note = ((noteEl && noteEl.value) || '').trim() || null;
   const root = ((rootEl && rootEl.value) || '').trim() || null;
+  // The Sözcü's own meaning of the word — free text, optional, and kept
+  // apart from `defs` so the result popup can print it as theirs.
+  const own = ((ownEl && ownEl.value) || '').trim() || null;
 
   // Scope to the definitions container, and read each row's fields
   // defensively. This used to collect `.stk-def-row` from the whole panel,
@@ -5964,8 +6029,8 @@ function serializeTakeoverDict(takeover) {
     })
     .filter(d => d && d.text);
 
-  if (!note && !root && !defs.length) return null;
-  return JSON.stringify({ note, root, defs });
+  if (!note && !root && !own && !defs.length) return null;
+  return JSON.stringify({ note, root, own, defs });
 }
 
 async function submitTakeover(status, sylsEl, submitBtn, statusEl, defsEl, takeover) {

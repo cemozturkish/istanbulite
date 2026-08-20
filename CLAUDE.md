@@ -452,9 +452,10 @@ sb.from('articles').delete().eq('id', id)
   to open and nothing to close — you arrive and you are standing in it
 - **There is no map on Hane.** The Istanbul map lives on Kahvehane, which is where a district is a
   thing you are actually choosing (a mahalle, an event, what a cup costs there). Hane had the same
-  drawing with nothing to pick on it. The seat in the profile bar therefore no longer follows a
-  selection here: it rests on İstanbul's Büyükşehir Belediye Başkanı, the one seat true of the
-  whole city the reader is standing in
+  drawing with nothing to pick on it. **Hane names no seat at all** — the profile bar over it
+  carries you alone, centred in the row. A seat names whoever holds power over what the page is
+  showing, and what this page shows is the people; there is no map on it for a seat to be true of,
+  and the two sides are where power is a fact (Kahvehane's district, Kütüphane's countries)
 - **The events are the column beside it** (`#events-panel`, `events` / `event_rsvps`), back from
   Kahvehane. They belong next to the petek: the petek is who you are standing next to, an event is
   the one thing on the site that ends with you actually standing next to them. Unscoped by
@@ -605,6 +606,13 @@ sb.from('articles').delete().eq('id', id)
   its edges already on the card's edges; the map above stays live and untouched, and touching a
   country there opens that country over the top (`initNewsPage` watches `#reader-overlay` and folds
   the story away). On desktop there is no band and no map to protect, so it stays THE sheet
+- **The lit countries breathe while the story is open** (`.country.news-active`, a slow 1.9s
+  pulse in fill and stroke). A static tint says "these are selected"; a pulse says "this is what
+  you are reading about, up there, now" — the one thing the page down in the band cannot say for
+  itself, being nowhere near the drawing. Slow and even rather than a hard blink: the map is
+  hand-drawn scenery, and a flashing shape over it reads as an alarm. Every shape of every country
+  in the story takes the class in the same frame, so the whole story pulses on one beat instead of
+  as a set of places that happen to be lit; `prefers-reduced-motion: reduce` holds it lit
 - **A card presses like a button**: it gives under the finger (`.pressing`, scale 0.955) and pops
   past its own size when released (`.released`, a keyframed 1.022 — the travel is too small for a
   springy easing to overshoot visibly), which is the first frame of it growing into the page. It
@@ -638,9 +646,8 @@ sb.from('articles').delete().eq('id', id)
   body — on a desktop, where the world map isn't the drawing on screen, that line is the whole of
   it. Country names come off the map's own `data-name`, not a second fetch, so a story names a
   place with the same word the caption prints when you touch it
-- Touching a country also **swaps the seat** the profile bar names to that country's leader, the
-  same way tapping a district on Anahane swaps it to that district's Belediye Başkanı — see the
-  seat card's own section under Site-wide defaults. Deselecting (tapping the sea, or closing the
+- Touching a country also **swaps the seat** the profile bar names (at this page's left end) to
+  that country's leader — see the seat card's own section under Site-wide defaults. Deselecting (tapping the sea, or closing the
   country's page) puts the Cumhurbaşkanı back; `resetMapLabel()` is the one place that knows what
   "nothing is selected" means, so nothing else may clear the selection by hand
 - **Touching a country opens a story, not a country** (`country_stories`, see its own section
@@ -896,9 +903,22 @@ in `ios/App/App/Info.plist` for that same prompt.
 
 A phone shows the city between two fixed charcoal bars: **who is here** at the top (the profile
 bar) and **where you can go** at the bottom (Kütüphane / Hane / Kahvehane). The top bar carries two
-people, facing outward from the middle: **you** on the right (your name over your district) and, on
-the left, **whoever holds power over what the page is showing** — the seat card, see its own section
-below. It is **two names in type and no portraits**: a face here would spend most of the row saying
+people, facing outward from the middle: **you** (your name over your district) and **whoever holds
+power over what the page is showing** — the seat card, see its own section below.
+
+**Which end each of them stands at is the page, and it moves with the swipe.** Kütüphane seats the
+politician at the left and you at the right; Hane names no seat at all and stands you alone in the
+middle; Kahvehane mirrors Kütüphane — you at the left, the seat at the right. So swiping from
+Kütüphane to Hane walks your own name from the right edge into the middle, and swiping on to
+Kahvehane walks it out to the left: the bar makes the same move the pages under it make, and the
+middle page is the one where you are alone in the middle of it (see "Always in the middle"). One
+implementation, `IstProfileCard.setBarLayout(page)` — three classes on the row, and the slide is a
+FLIP it runs itself, because a flex row changing ends has nothing CSS can transition. It is applied
+by `router.js` at the exact moment a virtual navigation swaps the content, so the names travel
+*with* the page rather than jumping into place after it settles; that also means the bar's row is
+never rebuilt on a navigation (it would take the transform with it — see `setPage`).
+
+It is **two names in type and no portraits**: a face here would spend most of the row saying
 twice what the line of type already says, and a face is what the sheet each end opens leads with
 anyway. Each name is pressed as one block: yours opens your profile, theirs opens theirs. There is
 no gear on this bar either — pressing a person is already the gesture, and the desktop identity
@@ -1023,16 +1043,16 @@ profile popup.
 
 ### The seat card — `#politician-card` (`politician-card.js` + `.css`)
 
-Each carousel page carries exactly one card naming who holds power over what the page is showing:
-the viewer's own district's **Belediye Başkanı** on Kahvehane (one fixed seat), and on Anahane and
-Kütüphane a seat that **follows the map** — whichever district is selected on Hane, and on
-Kütüphane whichever country is touched on the phone map, resting on the **Cumhurbaşkanı** with
-nothing selected. All three print the same markup and open the same `.politician-detail` view as
-THE sheet — `politician-card.js` builds both, each page only supplies its seat and its own
-`openDetail`.
+Two of the three carousel pages carry one card naming who holds power over what the page is
+showing: the viewer's own district's **Belediye Başkanı** on Kahvehane (one fixed seat), and on
+Kütüphane a seat that **follows the map** — whichever country is touched on the phone map, resting
+on the **Cumhurbaşkanı** with nothing selected. **Hane carries none**: it is the self and the
+people, and it has no map for a seat to be true of (see its own section). Both print the same
+markup and open the same `.politician-detail` view as THE sheet — `politician-card.js` builds both,
+each page only supplies its seat and its own `openDetail`.
 
-Every seat comes from one session-long cache, `IstPoliticianCard.seats(sb)` — the two map-driven
-pages need the next seat to arrive *with* the tap, and they read the same table. It lives in the
+Every seat comes from one session-long cache, `IstPoliticianCard.seats(sb)` — the map-driven page
+needs the next seat to arrive *with* the tap, and both pages read the same table. It lives in the
 shared module rather than in each page for a mechanical reason too: both page scripts end up in the
 one document router.js keeps, and two top-level `let`s of the same name there is a SyntaxError that
 takes the second page's whole script with it.
@@ -1047,21 +1067,23 @@ indistinguishable from the feature being broken, which is precisely how it was f
 It is **not desktop-only**, and must not be made desktop-only again: the phone is the platform ~90%
 of users are on (see Vision), and hiding it there hid the app's whole political layer from almost
 everyone. On a phone the card as a card *is* hidden — there is no room for a second card beside a
-full-bleed map — and the seat moves into **the left end of the profile bar** instead (`#ist-pc-seat`,
-"THE TOP BAR" in profile-card.css), with you pushed to the right end. `render()` paints both
-surfaces at once and wires the same detail sheet to each; it is painted in the bar's own classes
-(`.ist-pc-id` / `.ist-pc-name` / `.ist-pc-meta`), so there is one type
+full-bleed map — and the seat moves into **one end of the profile bar** instead (`#ist-pc-seat`,
+"THE TOP BAR" in profile-card.css), with you at the other: the left end on Kütüphane, the right end
+on Kahvehane (see the bar's own section for why it changes ends, and what moves when it does).
+`render()` paints both surfaces at once and wires the same detail sheet to each; it is painted in
+the bar's own classes (`.ist-pc-id` / `.ist-pc-name` / `.ist-pc-meta`), so there is one type
 scale on that bar rather than a second set to keep in sync — neither end is the junior of the pair,
-and nothing may scale one of them down. The whole seated
-layout hangs off one class, `.ist-pc-has-seat`, which the module puts on the row — a page with no
-seat keeps the bar's original single left-aligned block.
+and nothing may scale one of them down. Which end it stands at is **not** this module's: it is the
+page's, set by `IstProfileCard.setBarLayout`, and `paintBar()` only ever fills the slot.
 
 Two things about the bar seat fail silently if forgotten. The bar lives **outside `#ist-content`**,
 so the seat survives a virtual navigation that replaces everything else: `router.js` calls
 `clearSeat()` the moment it swaps the content, or Kahvehane wears the Cumhurbaşkanı until its own
 fetch lands (and a tap in that window opens Kütüphane's sheet). And profile-card.js rebuilds its row
-wholesale whenever the profile re-renders, which empties the slot — it calls `paintBar()` afterwards
-to put the seat back.
+whenever the profile re-renders, which empties the slot — it calls `paintBar()` afterwards to put
+the seat back. The slot itself keeps its half of the row on the two pages that name a seat whether
+it is painted or not, so the row does not re-flow under the reader when the seat lands a moment
+after the page it belongs to.
 
 ## Coding Conventions
 

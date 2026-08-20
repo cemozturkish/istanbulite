@@ -4,22 +4,24 @@
 // .politician-card CSS), plus the "who is this" detail view opened when
 // it's clicked.
 //
-// Used by all three carousel pages: kahvehane.html (one fixed seat, the
-// viewer's own neighborhood's mayor) and anahane.html and kutuphane.html,
-// whose seats follow their maps — the selected district's Belediye
-// Başkanı on Hane, the touched country's leader on Kütüphane, which rests
-// on the Cumhurbaşkanı with nothing selected. The two map-driven pages
-// call render() with a seat out of seats() rather than mount(), which
-// only knows how to show one fixed id.
+// Used by two of the three carousel pages: kahvehane.html (one fixed
+// seat, the viewer's own neighborhood's mayor) and kutuphane.html, whose
+// seat follows its map — the touched country's leader, resting on the
+// Cumhurbaşkanı with nothing selected. That page calls render() with a
+// seat out of seats() rather than mount(), which only knows how to show
+// one fixed id. Hane names no seat at all: the petek is the people, and
+// there is no map on that page for a seat to be true of.
 //
 // ── On a phone the seat lives in the top bar ──
 // There is no room beside the map for a second card, and the seat is not
 // page furniture anyway: it names who holds power over what you are
 // looking at, which is the same *kind* of fact as who you are. So the
-// profile bar carries both — the seat on the left, you on the right (see
-// "THE TOP BAR" in profile-card.css). render() therefore paints twice:
+// profile bar carries both — at opposite ends of the row, and which end
+// each of them stands at is the page (Kütüphane seats the politician at
+// the left and you at the right; Kahvehane mirrors it), see "THE TOP BAR"
+// in profile-card.css. render() therefore paints twice:
 // the page's own #politician-card (the desktop card) and #ist-pc-seat,
-// the slot profile-card.js leaves at the left end of the bar's row.
+// the slot profile-card.js leaves in the bar's row for it.
 //
 // The bar outlives a virtual navigation (it sits outside #ist-content,
 // see router.js), so the seat in it has to be told when the page under it
@@ -29,10 +31,11 @@
 // takes — and a tap in that window would open Kütüphane's sheet.
 //
 // Whoever wires the click must bind it to the card element, never
-// delegate it on document: #politician-card exists on all three pages and
-// a document-level listener survives a virtual navigation (see router.js),
-// so it would keep firing on the other pages' cards — which is exactly
-// how anahane's sheet used to open on top of kütüphane's.
+// delegate it on document: #politician-card exists on both pages that
+// carry a seat and a document-level listener survives a virtual
+// navigation (see router.js), so it would keep firing on the other page's
+// card — which is exactly how anahane's sheet used to open on top of
+// kütüphane's.
 //
 // Backed by public.political_seats (id -> politician_id + title) joined
 // with public.politicians, the people roster shared with mayors — see
@@ -116,13 +119,15 @@
   function paintBar() {
     const slot = document.getElementById('ist-pc-seat');
     if (!slot) return;
-    const row = slot.closest('.ist-pc-row');
     slot.innerHTML = barSeat ? barSeat.html : '';
     slot.onclick = barSeat && barSeat.open ? barSeat.open : null;
-    // The row right-aligns the person only once somebody is standing at the
-    // other end; on a page with no seat it keeps its original single-block
-    // layout rather than leaving a hole where the seat would be.
-    if (row) row.classList.toggle('ist-pc-has-seat', !!barSeat);
+    // Which end of the bar this slot stands at — and whether the page has
+    // a seat at all — is the *page's*, not this module's: it is one of
+    // three layouts set by IstProfileCard.setBarLayout (see "THE TOP BAR"
+    // in profile-card.css). The slot holds its half of the row on the two
+    // pages that name a seat whether it is painted yet or not, so the row
+    // does not re-flow under the reader when a seat lands a moment after
+    // the page it belongs to.
   }
 
   // Paints one seat onto both of its surfaces (the page's desktop card and
