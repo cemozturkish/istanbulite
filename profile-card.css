@@ -237,16 +237,13 @@
 .ist-sheet-body.profile-overlay-body {
   overflow: auto;
 }
-/* Two of these pages are one fixed shape rather than a column of blocks
-   read top-down: the PETEK sheet (the honeycomb and nothing else, see
-   hiveHTML / openHiveOverlay in profile-card.js) and Anahane's profile
-   (the cover and nothing else). Both are centred in the sheet instead of
-   stacked from the top with the whole void left under them. Centring
-   happens inside the body's padding box, so the close button's 48px of
-   headroom is still clear. The class is set in renderOverlayBody, not
-   keyed to any one block's markup, so a slot's extension — which
-   re-renders inside the honeycomb's mount — stays centred too instead of
-   jumping to the top of the sheet. */
+/* Anahane's profile is one fixed shape rather than a column of blocks
+   read top-down: the cover, and nothing else (the petek that used to
+   stand beside it is the whole of Hane now — see mountHivePage in
+   profile-card.js). It is centred in the sheet instead of stacked from
+   the top with the whole void left under it. Centring happens inside the
+   body's padding box, so the close button's 48px of headroom is still
+   clear. */
 .ist-sheet-body.profile-overlay-body.profile-overlay-centred {
   display: grid;
   align-content: center;
@@ -259,81 +256,6 @@
      under it. */
   .ist-sheet-body.profile-overlay-body {
     padding-bottom: calc(var(--navbar-h, 38px) + 6px + env(safe-area-inset-bottom, 0px));
-  }
-}
-
-/* ── THE PETEK PAGE GROWS OUT OF ITS BUTTON ──
-   On a phone the honeycomb does not arrive as a sheet sliding up from
-   the bottom edge, the way a news item or the meclis does. The PETEK
-   button over the map *becomes* it: the page opens out of the button's
-   own box and folds back into it when closed. The button is where the
-   honeycomb sits on the map, so it is where the page comes from — a
-   sheet rising from the bottom edge would say it came from somewhere
-   else entirely.
-
-   All this block does is take the slide away: the page is already at its
-   final size and position (the phone sheet's own geometry, resting under
-   the profile bar and running to the bottom of the screen) and it never
-   moves. What animates is the window onto it — a clip-path that starts
-   as the button's box and opens out to the page's four edges — and that
-   is run from profile-card.js (see growHive) rather than written here,
-   because it is measured off two live rectangles and a CSS transition
-   between two custom-property states has no reliable from-state to start
-   from in the same frame the page is unhidden.
-
-   The sheet is deliberately left untransformed: a transform would carry
-   the clip along with it and the two boxes would stop lining up. */
-@media (max-width: 768px) {
-  /* ── The page is cut to the honeycomb ──
-     It is not a full sheet with the honeycomb floating in the middle of
-     it: the page is only as big as what is on it — the honeycomb, and
-     the dock under it — and it stands in the middle of the city, clear
-     of both bars. That is what makes it a thing that came out of a
-     button rather than a page that arrived from off-screen: the button
-     grows into a box roughly its own kind of size, not into the whole
-     screen.
-
-     The width is the window onto the grid (--ist-hive-view-w) plus its
-     margins, so the paper ends where the drawing's room ends. It is a fixed size, not a shrink-to-fit: the dock
-     below swaps its contents on every tap (your code, a code field, a
-     Çıkar button) and a page measured off its contents would resize
-     under the reader each time — the same flinch .ist-hive-cell-open
-     was written to avoid. Contents that outrun it wrap inside it. */
-  .hive-overlay {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* Clear of the profile bar above (--ist-sheet-top, measured live by
-       IstSheet.position) and the tab bar below, so the page is centred
-       in the city rather than in the window. */
-    padding:
-      var(--ist-sheet-top, 76px)
-      var(--screen-inset, 18px)
-      calc(var(--navbar-h, 46px) + 10px + env(safe-area-inset-bottom, 0px));
-  }
-  .hive-overlay .ist-sheet {
-    position: relative;
-    left: auto;
-    right: auto;
-    top: auto;
-    bottom: auto;
-    width: calc(var(--ist-hive-view-w) + var(--ist-hive-page-pad) * 2);
-    max-width: 100%;
-    height: auto;
-    max-height: 100%;
-    /* It floats now, so it gets its fourth edge back: frames.css drops a
-       sheet's bottom border because a sheet runs off the bottom of the
-       screen, and this one no longer does. */
-    border-bottom-width: 2px !important;
-  }
-  /* The close button keeps its corner, so the page's top edge stays
-     clear for it; everything else is the honeycomb's own margins. */
-  .hive-overlay .ist-sheet-body.profile-overlay-body {
-    padding: 38px var(--ist-hive-page-pad) 16px;
-  }
-  .hive-overlay.hive-grow .ist-sheet,
-  .hive-overlay.hive-grow.open .ist-sheet {
-    transform: none;
   }
 }
 
@@ -588,15 +510,6 @@
   color: var(--muted);
 }
 
-/* The honeycomb's tint is the shared .ist-sheet-dim (sheet.css); what is
-   its own is sitting above the side columns, which lift themselves to 501
-   over an ordinary sheet's backdrop (frames.css) so a game blurb or
-   chapter nav swapped into them stays lit while the sheet is open.
-   Nothing is swapped into them for the honeycomb, so leaving them above
-   the tint would dim the map alone and read as a bug rather than a dim.
-   The Kahve Endeksi board needs no such lift: its pill — and so its sheet
-   — is mobile-only, where the columns don't apply. */
-.hive-overlay { z-index: 502; }
 
 /* ── The petek (the PETEK page, opened from Anahane's map) ──
    One shared grid, drawn from where the reader is standing in it: their
@@ -615,16 +528,17 @@
    drawn at — and the JS only ever emits calc() against them, never a
    pixel.
 
-   The window onto the grid is a fixed box (--ist-hive-view-*): a petek
-   grows and this page does not, so the drawing is scaled down into the
-   box and, once it would have to shrink past legibility, dragged
-   instead (see fitHive). Cell size is capped against the window's height
-   as well as in px, because this page never scrolls (see
-   .profile-overlay-body). */
-.hive-overlay {
+   The petek IS Hane (see mountHivePage in profile-card.js), so the window
+   onto the grid is simply the room the page has — between the two bars on
+   a phone, the middle column on a desktop. A petek grows and that room
+   does not, so the drawing is scaled down into it and, once it would have
+   to shrink past legibility, dragged instead (see fitHive). Cell size is
+   capped against the viewport height as well as in px: nothing here
+   scrolls, ever. */
+.ist-hive-page {
   /* Height follows from the drawing's own ratio (frames.css), so the
      width is the only size knob. */
-  --ist-hive-cell-w: min(136px, 16.5vh);
+  --ist-hive-cell-w: min(150px, 17vh);
   --ist-hive-cell-h: calc(var(--ist-hive-cell-w) * 1.5);
   /* The drawn hexagon doesn't fill its own box — the art is centred in a
      1024×1536 canvas with the silhouette 780×1375 of it (the whole
@@ -638,28 +552,46 @@
      standing at each frame's base. */
   --ist-hive-step-x: calc(var(--ist-hive-cell-w) * 0.785);
   --ist-hive-step-y: calc(var(--ist-hive-cell-w) * 1.30);
-  /* The window onto the grid: five cells across, three rows down. Not a
-     limit on how big a petek may get — the drawing is scaled into this
-     box — but the room the page gives it, which is fixed so the page
-     never resizes under the reader as the grid changes. */
-  --ist-hive-view-w: calc(var(--ist-hive-step-x) * 4 + var(--ist-hive-cell-w));
-  --ist-hive-view-h: calc(var(--ist-hive-step-y) * 2 + var(--ist-hive-cell-h));
   /* The track a name gets beside its hexagon, and the air between the
      two. Written against the cell so a name stays the same size relative
      to the face it belongs to at every scale the grid is drawn at. */
   --ist-hive-name-w: calc(var(--ist-hive-cell-w) * 0.66);
   --ist-hive-name-gap: calc(var(--ist-hive-cell-w) * 0.02);
-  /* The paper either side of the grid on the phone page. */
+  /* The paper either side of the grid. */
   --ist-hive-page-pad: 16px;
+  /* The page is the petek (see mountHivePage): it fills whatever Hane's
+     main area gives it, between the two bars on a phone and inside the
+     middle column on a desktop, with the dock resting at its foot. */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 0 var(--ist-hive-page-pad) 4px;
+  box-sizing: border-box;
 }
-/* The window. Fixed size, clipped: what is inside it is the whole petek,
-   which may be larger than any page could hold. */
+/* The mount the page hands the petek (see mountHivePage) sits between the
+   page and the grid, so it has to pass the page's height through rather
+   than shrink to its contents: without this the window below resolves to
+   zero and the whole drawing is clipped to nothing, with only the dock
+   left standing under the profile bar. */
+.ist-hive-page > #po-hive-mount {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+/* The window onto the grid: everything the page has left after the dock.
+   Clipped, because what is inside it is the whole petek and that may be
+   larger than any page could hold — fitHive scales the drawing into
+   whatever this measures, so the window is stated once, here, and the JS
+   never guesses at a size. */
 .ist-hive {
   position: relative;
-  width: var(--ist-hive-view-w);
-  height: var(--ist-hive-view-h);
-  max-width: 100%;
-  margin: 2px auto;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
   overflow: hidden;
 }
 /* Offered only when the drawing genuinely outruns the window (fitHive
@@ -1131,14 +1063,14 @@ button.ist-hive-filled:not(.ist-hive-bonded) .ist-hive-name { color: var(--muted
   .ist-pc-cover-pick-arrow svg { width: 8px; height: 8px; }
   .ist-pc-cover-name { max-width: 180px; margin-top: 6px; font-size: 1.05rem; }
   .ist-pc-cover-meta { margin-top: 1px; font-size: 0.62rem; }
-  /* The grid is width-bound on a phone rather than height-bound: five
-     cells across has to fit between the screen's own edges. Smaller
-     cells, thinner rules — one fixed size, since the drawing scales
-     itself into the window (see fitHive) and the dock, not the grid, is
-     what makes room for a tap. */
-  .hive-overlay {
-    --ist-hive-cell-w: min(84px, 11vh);
-    --ist-hive-page-pad: 14px;
+  /* The grid is width-bound on a phone rather than height-bound: a few
+     cells across have to fit between the screen's own edges. Smaller
+     cells, thinner rules — the drawing scales itself into whatever room
+     the page has (see fitHive), and the dock, not the grid, is what makes
+     room for a tap. */
+  .ist-hive-page {
+    --ist-hive-cell-w: min(104px, 13vh);
+    --ist-hive-page-pad: var(--screen-inset, 14px);
   }
   .ist-hive-readout-name { font-size: 0.62rem; }
   .ist-hive-readout-meta { font-size: 0.5rem; letter-spacing: 0.6px; }

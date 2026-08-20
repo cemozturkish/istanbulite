@@ -18,20 +18,17 @@
   <link rel="stylesheet" href="palette.css">
   <link rel="stylesheet" href="loading-screen.css?v=2">
   <script src="game-locks.js"></script>
-  <link rel="stylesheet" href="profile-card.css?v=8">
+  <link rel="stylesheet" href="profile-card.css?v=9">
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
   <script src="politician-card.js?v=2" defer></script>
-  <script src="profile-card.js?v=8" defer></script>
+  <script src="profile-card.js?v=9" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
   <link rel="stylesheet" href="mahalle-picker.css">
   <script src="mahalle-picker.js" defer></script>
   <script src="sozcu-mascot.js" defer></script>
   <script src="admin-notification.js" defer></script>
-  <script src="map-zoom.js" defer></script>
-  <script src="map-parallax.js" defer></script>
-  <script src="home-map.js" defer></script>
   <!-- Swipe pagination: pre-body, set initial offscreen state so columns don't flash at origin before sliding in. Also seeds the VT direction class so the cross-document transition knows which way to slide before it captures the snapshot, and a one-shot flag (read by the other two pages' own card-entrance animations) so a feed's cards don't animate in on their first run here -- the column itself is already sliding in from the same edge, so animating the cards inside it too would look like the content arriving twice.
        ist-entering-* (the manual transform-transition fallback) is only for browsers WITHOUT View Transitions support -- on VT-capable browsers the native cross-document transition already slides the column in as a snapshot, so also applying the fallback class made the real DOM run its own second, independent slide underneath once DOMContentLoaded released it mid-transition, producing a visible double entrance. vt-* (which drives the VT pseudo-element keyframes) is unaffected and still always seeded. -->
   <script>
@@ -308,13 +305,11 @@
     }
 
     /* Top nav, both side columns, and main are frameless -- just typography
-       (or the full-bleed map) floating directly on the map photo. frames.css
-       still targets these classes/tag with !important (including `main`,
-       shared with kahvehane/kutuphane where it IS a card), so beat it with
-       an #main-site-qualified override (higher specificity, wins regardless
-       of stylesheet order). Without `main` here, frames.css's opaque
-       --frame-bg background paints solid over main's grid cell, hiding the
-       fixed/z-index:-1 .map-panel behind it. */
+       on the page's own paper. frames.css still targets these classes/tag
+       with !important (including `main`, shared with kahvehane/kutuphane
+       where it IS a card), so beat it with an #main-site-qualified
+       override (higher specificity, wins regardless of stylesheet
+       order). */
     #main-site .section-rule,
     #main-site .col-left,
     #main-site .col-right,
@@ -331,15 +326,7 @@
       justify-content: center;
       align-items: center;
       padding: 14px 28px 10px 28px;
-      /* main now carries z-index:0 (see main{} below) to keep its fixed
-         .map-panel child contained in its own stacking context instead of
-         escaping to the root -- but that also makes main's whole subtree,
-         including the full-bleed map, paint above any *non*-stacking-context
-         sibling. .col-left/.col-right already get z-index:501 from
-         frames.css (for the bottom-sheet layering, desktop-only), so they
-         were unaffected; .section-rule had no z-index of its own and ended
-         up buried under the map. A plain positive z-index (any value above
-         main's 0) is enough to put it back on top. */
+      /* Above main, whatever main happens to carry. */
       z-index: 1;
     }
 
@@ -457,190 +444,29 @@
       grid-row: 2;
       display: block;
       overflow: hidden;
-      /* z-index (any explicit value, grid items don't need `position` for
-         this) gives main its own stacking context, so its fixed/negative
-         z-index child .map-panel stays contained within main's local
-         paint order instead of escaping all the way to the root stacking
-         context. Without this, .map-panel ends up stacked below
-         #main-site's own box -- and #main-site.active has
-         pointer-events:auto (see above) covering the full viewport, so it
-         silently intercepted every hover/click meant for the map's SVG
-         hit-regions before they ever reached them. Nothing else lives in
-         main, so letting clicks pass straight through main's own box is
-         safe; .map-panel re-enables pointer-events for itself and its
-         children below. */
-      z-index: 0;
-      pointer-events: none;
+      /* The petek stands in this cell and fills it. Nothing here is a
+         window onto a fixed backdrop any more, so main is a plain grid
+         item again: the stacking context and the pointer-events:none
+         that used to be here existed only to keep the full-bleed map
+         layer behind everything and still clickable. */
+      min-height: 0;
     }
 
-    /* ── MAP PANEL: fixed full-bleed background (matches kahvehane/kutuphane) ──
-       position:fixed escapes the grid entirely, so this covers the whole
-       viewport regardless of which grid cell it's a DOM child of. */
-    .map-panel {
-      position: fixed;
-      inset: 0;
-      pointer-events: auto;
-      z-index: -1;
-      padding: 0;
+    /* ── THE PETEK PAGE ──
+       Hane is the petek: the grid fills the middle cell, and the dock
+       (your own code for the week, or whatever hexagon is open) rests at
+       its foot. Everything about how it is drawn — the cell size, the
+       packing, the window it is scaled into — belongs to .ist-hive-page
+       in profile-card.css, which is one implementation rather than a
+       geometry this page restates. All that is this page's own is the
+       cell it stands in. */
+    .petek-page {
+      height: 100%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
       overflow: hidden;
-      /* Matches the map artwork's own sea/background gray (#f7f7f7); the
-         svg uses preserveAspectRatio="slice" so this only shows briefly
-         during image load, not as a letterbox gap. */
-      background: #f7f7f7;
-      /* Pinch-to-zoom is disabled for now (see map-zoom.js's
-         ZOOM_ENABLED) -- touch-action stays at the browser default so a
-         touch that starts on the map still scrolls the page normally. */
-      touch-action: auto;
     }
-
-    /* Wraps the photo + hit-region overlay so map-zoom.js can scale/pan
-       them together as one unit with a single transform -- map-label
-       stays outside it, un-zoomed. */
-    .map-zoom-layer {
-      position: absolute;
-      inset: 0;
-      transform-origin: 0 0;
-    }
-
-    .map-panel img.map-photo {
-      width: 100%;
-      height: 100%;
-      display: block;
-      object-fit: cover;
-      object-position: center;
-    }
-
-    /* Mobile-only draft map image -- hidden on desktop, shown instead of
-       the svg inside the mobile media query below. */
-    .map-mobile-draft { display: none; }
-
-    /* Traced hit-region overlay, aligned to map-photo via the matching
-       5046x2300 viewBox + slice (see mobile media query for the
-       mobile-draft swap, which hides this since it has no mobile trace
-       yet). */
-    .map-panel svg.map-svg {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
-
-    .neighborhood {
-      cursor: pointer;
-      fill: transparent;
-      stroke: transparent;
-      stroke-width: 3;
-      transition: fill 0.2s, stroke 0.2s;
-      pointer-events: all;
-      /* Mobile browsers draw the default tap-highlight using the
-         element's bounding *box*, not its actual (irregular polygon)
-         shape -- on a district like this, that showed up as a gray
-         rectangle flashing over the tapped area for a moment. */
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    /* Real districts outside this app's 25 (Avcılar, Arnavutköy, Kartal,
-       Sultanbeyli, Sancaktepe, Pendik, Tuzla, Şile), plus the Kocaeli-side
-       landmass ("istanbul_disi") — not interactive, and no longer given a
-       distinguishing tint; they just blend into the base map artwork. */
-    .map-unaccommodated,
-    .map-istanbul-disi {
-      fill: transparent;
-      stroke: transparent;
-      pointer-events: none;
-    }
-
-    /* Hover: dim the artwork under the cursor. .hover-active is toggled
-       via JS on every polygon sharing the same data-neighborhood (see
-       the mouseover/mouseout listeners below), so multi-polygon
-       districts like Şişli light up as one unit instead of just the
-       piece under the cursor; :hover stays as a no-JS fallback for the
-       single polygon actually being pointed at. */
-    .neighborhood:hover, .neighborhood.hover-active { fill: rgba(var(--ink-rgb), 0.18); }
-    /* Clicked/active: darker tint + outline */
-    .neighborhood.active {
-      fill: rgba(var(--ink-rgb), 0.32);
-      stroke: var(--accent);
-    }
-    /* Home neighborhood: always darker than the rest, even at rest,
-       plus a dashed outline so it reads as "yours" over the art. Uses
-       --ink-red (the same red as SON DAKİKA/breaking news) instead of
-       the neutral ink tint the other states use -- it's identical in
-       both earth and mono palettes, so no separate mono override needed. */
-    .neighborhood.home {
-      fill: rgba(130, 55, 48, 0.16);
-      stroke: var(--brown-4);
-      stroke-width: 4;
-      stroke-dasharray: 10 6;
-    }
-    .neighborhood.home:hover, .neighborhood.home.hover-active { fill: rgba(130, 55, 48, 0.26); }
-    .neighborhood.home.active { fill: rgba(130, 55, 48, 0.38); stroke: var(--brown-4); stroke-dasharray: none; }
-
-    /* A member whose district has a hand-painted map (assets/map/home/,
-       see home-map.js) gets the colour from the artwork itself, so the
-       .home tint above would lay a second red over the first -- and a
-       thicker, polygon-shaped one at that. On those maps the polygon
-       falls back to plain district behaviour: the drawing alone says
-       "this one is yours", and hovering or selecting it looks exactly
-       like hovering or selecting anywhere else. */
-    .map-panel.ist-home-painted .neighborhood.home {
-      fill: transparent;
-      stroke: transparent;
-      stroke-dasharray: none;
-    }
-    .map-panel.ist-home-painted .neighborhood.home:hover,
-    .map-panel.ist-home-painted .neighborhood.home.hover-active {
-      fill: rgba(var(--ink-rgb), 0.18);
-    }
-    .map-panel.ist-home-painted .neighborhood.home.active {
-      fill: rgba(var(--ink-rgb), 0.32);
-      stroke: var(--accent);
-    }
-
-    /* Plain text, no frame/shadow — matches the HANE/KÜTÜPHANE/KAHVEHANE
-       nav tab style (nav a above), not a floating pill. */
-    .map-label {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 6;
-      text-align: center;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      color: var(--accent);
-    }
-
-    /* ── PETEK pill — opens the hane honeycomb ──
-       Sits right above the map label, the same white/ink frame Kahvehane's
-       Kahve Endeksi pill wears over its own map, so the one button each
-       page carries over the city reads as the same kind of button. Unlike
-       that one it stays on desktop too: the honeycomb has no persistent
-       column of its own to be redundant with. */
-    .petek-pill {
-      position: fixed;
-      bottom: 52px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 6;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.62rem;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      border: 2px solid #1a1a1a;
-      background: rgba(255, 255, 255, 0.85);
-      color: #1a1a1a;
-      padding: 6px 14px;
-      cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease;
-    }
-    .petek-pill:hover { background: #1a1a1a; color: #fff; }
-
 
     .sidebar-right-inner {
       padding: 16px;
@@ -691,6 +517,188 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── Events (left column) ──
+       The column beside the petek (see renderEventsNow in the script
+       below). It spent a while on Kahvehane, in the space the
+       neighborhood comments used to hold, and came back with that
+       column's styling -- same box, same flex chain -- when the Kahve
+       Endeksi took the column there. */
+    .events-section {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex: 1;
+      min-height: 0;
+    }
+    #events-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 14px 16px 14px;
+    }
+
+    .event-item {
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      column-gap: 10px;
+      padding: 14px 16px 14px 14px;
+      margin-bottom: 12px;
+      background: var(--paper-card);
+      border: 2px solid var(--card-border-color);
+      border-bottom: 5px solid var(--card-border-color);
+      transition: background 0.15s, transform 0.15s ease;
+    }
+    .event-item:last-child { margin-bottom: 0; }
+    .event-item .ev-date-block {
+      text-align: center;
+      padding-top: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      color: var(--card-fg-heading);
+    }
+    .event-item .ev-day {
+      font-size: 1.7rem;
+      font-weight: 400;
+      line-height: 1;
+    }
+    .event-item .ev-mon {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--card-fg-muted);
+      margin-top: 4px;
+    }
+    .event-item .ev-wd {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.55rem;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--card-fg-muted);
+      margin-top: 2px;
+      opacity: 0.75;
+    }
+    .event-item .ev-body { min-width: 0; }
+    .event-item .ev-kicker {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--ink-red);
+      margin-bottom: 5px;
+    }
+    .event-item .ev-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 600;
+      line-height: 1.22;
+      margin-bottom: 0;
+      color: var(--card-fg-heading);
+    }
+    .event-item .ev-meta {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.78rem;
+      color: var(--card-fg-muted);
+      line-height: 1.35;
+    }
+    .event-item.openable { cursor: pointer; }
+    /* Plain hover: a lighter background plus a small nudge inward toward
+       the map. .is-open (see markOpenEventCard) mirrors the same look
+       while that card's detail sheet is open, so it stays visually
+       "pressed" even after the mouse moves onto the sheet itself.
+       Rightward here, not leftward as on Hane: this column sits to the
+       LEFT of the map on Kahvehane, so inward is the other way. */
+    .event-item.openable:hover,
+    .event-item.openable.is-open {
+      background: #e8e8e8;
+      transform: translateX(6px);
+    }
+    /* Only ever rendered inside the detail sheet (see buildEventDetailHtml)
+       -- the column's preview card doesn't include it. */
+    .event-item .ev-details {
+      grid-column: 1 / -1;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--card-border);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: var(--card-fg);
+    }
+    .event-item .ev-desc { margin-bottom: 10px; }
+    .detail-overlay-body .event-item { max-width: 520px; margin: 0 auto; }
+    /* Nothing to hover in the sheet -- the card there is the destination,
+       not a way into one, so it must not nudge under the reader's cursor. */
+    .detail-overlay-body .event-item.openable:hover { transform: none; }
+    .ev-rsvp-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .ev-rsvp-btn {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 7px 14px;
+      background: transparent;
+      color: var(--ink-red);
+      border: 1px solid var(--ink-red);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .ev-rsvp-btn:hover { background: rgba(185, 54, 49, 0.15); }
+    .ev-rsvp-btn.attending {
+      background: var(--ink-red);
+      color: #1a1a1a;
+    }
+    .ev-rsvp-btn.attending:hover { opacity: 0.85; }
+    .ev-rsvp-btn:disabled { opacity: 0.6; cursor: default; }
+    .ev-rsvp-count {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.7rem;
+      color: var(--card-fg-muted);
+    }
+    .ev-attendees {
+      display: flex;
+      align-items: center;
+    }
+    /* Preview-card attendee stack: shown under the title on every
+       breakpoint, in the space the compact card otherwise leaves empty.
+       The detail sheet's .ev-attendees (inside .ev-rsvp-row) is
+       unaffected since it isn't matched by this class. */
+    .ev-attendees-preview {
+      display: flex;
+      margin-top: 10px;
+    }
+    .ev-attendees-preview:empty { display: none !important; }
+    .ev-attendee-avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--paper-dark);
+      border: 1.5px solid var(--paper-card, #fff);
+      box-shadow: 0 0 0 1px var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--accent);
+      overflow: hidden;
+      margin-left: -8px;
+    }
+    .ev-attendee-avatar:first-child { margin-left: 0; }
+    .ev-attendee-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .ev-attendee-avatar.ev-attendee-more {
+      font-size: 0.56rem;
+      color: var(--card-fg-muted);
+    }
+
     /* ── MOBILE RESPONSIVE ──
        Stacked flow instead of desktop's floating-over-fullscreen-map
        layout: the map sits at the very top like a hero banner with the
@@ -722,40 +730,15 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
-          "map map"
-          "news events";
-        /* Row 2 takes everything the map leaves, so the two card columns
-           have a full-height box to sit at the BOTTOM of (see the feeds'
-           auto margin below) instead of hanging off the map's lower edge.
-           Left as the default
-           align-content (stretch, not the `start` this used to pin): with
-           anything else, grid track-sizes the rows by their content first
-           and only then positions the shorter track set in the container,
-           so row 2 sizes to one short card stack and never claims the
-           leftover space -- the same trap kahvehane.html hit (see its own
-           grid-template-rows comment).
-
-           Both tracks are stated, neither is left to content, and that is
-           the whole point -- kahvehane.html's row 1 already reads exactly
-           like this, and this is the page catching up to it:
-
-           Row 1 is the map's square written out (main bleeds to the true
-           screen edges, so its rendered width is always 100vw, and the
-           extra term matches main's own margin-top below). Left as `auto`,
-           the track's base size was main's MIN-content height, which for
-           an aspect-ratio panel is next to nothing -- so as soon as row 2
-           wanted more than the leftover space, the grid paid it out of the
-           map: with three days of news the square collapsed from 393px to
-           250px on a phone, taking the shared hero line down with it and
-           sliding Hane's cards up out of line with Kütüphane's and
-           Kahvehane's.
-
-           Row 2 is minmax(0, 1fr), not a bare `1fr` -- a bare one is
-           minmax(auto, 1fr), and that auto minimum is the news/events
-           stacks' own height, which is the demand that squeezed row 1 in
-           the first place. Zero as the minimum makes row 2 exactly the
-           leftover space and no more; anything taller scrolls inside its
-           own column instead of growing the row. */
+          "hero hero"
+          "events events";
+        /* Row 1 is the petek, standing exactly where the map used to and
+           in exactly its box: the same square every other page's hero
+           occupies, starting on the same line under the profile bar, so
+           swiping between the three pages never shifts what is under it.
+           Row 2 is the events, running the full width -- the news column
+           that used to share this row is on Kütüphane now, and a single
+           feed reads better across the screen than pinned to half of it. */
         grid-template-rows: calc(100vw + var(--map-hero-top)) minmax(0, 1fr);
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
@@ -765,88 +748,38 @@
            the content below it; the column gap (between events/news)
            is kept, just halved below. */
         row-gap: 0 !important;
-        /* Halve frames.css's column-gap (--frame-gap, 10px) between the
-           events and news columns -- the full gap read as too much
-           breathing room between the two card stacks on mobile. */
+        /* Halved for the same reason it is on the other two pages -- the
+           full gap reads as too much breathing room between columns.
+           Nothing sits beside the events here, but the track is what the
+           carousel slides, so the geometry stays theirs. */
         column-gap: calc(var(--frame-gap) / 2) !important;
-        /* #main-site always fills the full viewport height (height:100%
-           above), but its content (map + one short row of cards) often
-           doesn't -- and the columns are transparent by design (see
-           .col-left/.col-right below), so the run of empty page above the
-           bottom-aligned cards would show the raw page canvas instead of
-           the map/card #f7f7f7. Coloring the container itself means any
-           such gap matches by default instead of needing a fix per
-           element. */
-        background: #f7f7f7;
         /* Clears the fixed bottom tab bar so the last row of cards isn't
            hidden behind it. */
         padding-bottom: calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom) + 16px);
       }
 
-      /* Map: same real desktop artwork + traced SVG hit-regions (no more
-         placeholder draft image), now a normal in-flow square block
-         instead of a fixed full-bleed background layer. Bleeds past
-         #main-site's own left/right frame padding (frames.css) so it
-         reaches the true screen edges instead of sitting in a gutter,
-         and drops frames.css's card shadow (only meant for panels that
-         look like discrete floating cards, not this edge-to-edge hero). */
+      /* The petek fills everything between the two bars. It bleeds past
+         #main-site's own left/right frame padding (frames.css) so the
+         grid has the true screen width to be drawn in, and starts on the
+         same line every other page's content does (--map-hero-top, the
+         room under the profile bar) so swiping between the three pages
+         doesn't shift what is under the bar. */
       main {
-        grid-area: map;
+        grid-area: hero;
         position: static;
-        height: auto;
-        overflow: visible;
+        min-height: 0;
+        overflow: hidden;
         margin-left: calc(-1 * var(--frame-pad, 10px));
         margin-right: calc(-1 * var(--frame-pad, 10px));
-        /* Room under the profile bar (offset by the same safe-area
-           amount so the gap stays constant across notch sizes), so the
-           bar overlaps only the map's empty "sea" band and never the
-           districts themselves. Trimmed the old 40px extra down to 16px
-           to reclaim the leftover dead space above the map and pull the
-           whole map (and the events/news below it) further up. */
-        margin-top: var(--map-hero-top);
+        /* The map used to start on --map-hero-top and run *under* the
+           profile bar: it is scenery, and a bar floating over scenery is
+           the point. The petek is not scenery -- it is the page -- so it
+           starts below the bar instead. The row it stands in keeps the
+           hero square's own height either way, so the events below still
+           begin on exactly the line Kahvehane's and Kütüphane's columns
+           do and swiping between the three shifts nothing. */
+        margin-top: calc(var(--navbar-h-top, 56px) + env(safe-area-inset-top) + 6px);
         box-shadow: none !important;
-      }
-      .map-panel {
-        position: relative;
-        width: 100%;
-        aspect-ratio: 1 / 1;
-        overflow: hidden;
-      }
-      /* Neither this page nor kahvehane's is meant to scroll -- so once
-         map-zoom.js zooms past 1x, it switches the panel to a fixed
-         position pinned at its own current on-screen rect (computed in
-         JS, not CSS) with overflow allowed to escape that little square.
-         That's the same "position:fixed escapes the grid" trick the
-         desktop full-bleed map already relies on (see main's z-index:0
-         above, which keeps it correctly layered instead of jumping to
-         the root stacking context), so the larger zoomed map can spill
-         into the rest of the screen without ever growing #main-site's
-         own scrollable content size. */
-      .map-panel.ist-zoomed {
-        position: fixed;
-        overflow: visible;
-      }
-      .map-panel img.map-photo { display: block; }
-      .map-panel svg.map-svg { display: block; }
-      .map-mobile-draft { display: none; }
-      .map-label {
-        position: absolute;
-        bottom: 8px;
-        left: 50%;
-        right: auto;
-        transform: translateX(-50%);
-        font-size: 11px;
-        letter-spacing: 1px;
-      }
-      /* Mobile: .map-panel is position:relative here (not the fixed
-         full-viewport backdrop), so the pill anchors inside the map's
-         own square, just above the label — same as Kahvehane's. */
-      .petek-pill {
-        position: absolute;
-        bottom: 28px;
-        font-size: 9px;
-        letter-spacing: 1.2px;
-        padding: 4px 10px;
       }
 
       /* The profile bar (#ist-pc-mount) is the fixed top bar — the
@@ -885,15 +818,65 @@
         overflow: visible;
       }
 
-      /* Events (left) + news (right): normal in-flow columns below the
-         map, each stacking its cards from the BOTTOM of the screen up --
-         one news item rests just above the tab bar, and a second one is
-         laid on top of it rather than the stack hanging off the map's
-         lower edge. Flex columns (not blocks) so the auto margin below
-         can do that. Explicit z-index (above main's own 0, see main{}
-         above) so they stay on top of the map even once it's zoomed in
-         and spilling past its own little square -- otherwise DOM order
-         alone would leave one of the two columns stacked below it. */
+      /* Events fill .col-left's height exactly; min-height:0 lets
+         #events-panel below shrink to fit rather than overflowing the
+         fixed column. */
+      .events-section {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        overflow: visible;
+      }
+      /* The events sit at the BOTTOM of the column -- one event rests
+         just above the tab bar and each further one is laid on top of it,
+         so the stack grows up toward the map instead of hanging off the
+         hero line. Same move as every other feed on the phone (see the
+         site-wide default), and the same mechanism: an auto margin on the
+         first card rather than justify-content:flex-end, so a stack that
+         outgrows the band simply scrolls instead of pushing its top out
+         of a scroller that cannot reach it.
+         8px side padding (on top of #main-site's own 10px frame padding)
+         puts the cards on the shared 18px screen inset -- the same line
+         the comments used to hold and the game tiles still do. */
+      #events-panel {
+        padding: 6px 8px 10px;
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        display: flex;
+        flex-direction: column;
+      }
+      #events-panel > :first-child { margin-top: auto; }
+      /* Fixed-height box laying its cards out as flex items: without this
+         they would be squeezed shorter to fit instead of overflowing into
+         the scroll. */
+      #events-panel > * { flex-shrink: 0; }
+      #events-panel > :last-child { margin-bottom: 0; }
+      .event-item {
+        grid-template-columns: 30px 1fr;
+        column-gap: 8px;
+        padding: 8px 9px;
+        margin-bottom: 6px;
+      }
+      .event-item .ev-date-block { padding-top: 2px; }
+      .event-item .ev-day { font-size: 1.05rem; line-height: 1; }
+      .event-item .ev-mon { font-size: 0.5rem; margin-top: 2px; }
+      .event-item .ev-wd { font-size: 0.46rem; margin-top: 1px; }
+      .event-item .ev-kicker { font-size: 9px; letter-spacing: 1.5px; margin-bottom: 2px; }
+      .event-item .ev-title { font-size: 16px; margin-bottom: 0; line-height: 1.2; }
+      .ev-attendees-preview { margin-top: 6px; }
+      .ev-attendees-preview .ev-attendee-avatar {
+        width: 20px;
+        height: 20px;
+        font-size: 0.5rem;
+        margin-left: -6px;
+      }
+
+      /* The card columns keep their shape (flex columns, bottom-up
+         stacks): the events are in the left one, and whatever lands in
+         the right behaves the way Kahvehane's and Kütüphane's do. */
       .col-left, .col-right {
         position: static;
         top: auto; bottom: auto; left: auto; right: auto;
@@ -905,12 +888,11 @@
         z-index: 1;
       }
       .col-left { grid-area: events; }
-      .col-right { grid-area: news; }
-      /* Both columns are empty on this page now -- the events went to
-         Kahvehane and the news to Kütüphane -- so the two tracks below
-         the map carry nothing and the map is all there is to see. The
-         tracks themselves stay: they are what the carousel slides, and
-         they are where whatever comes next to Hane will land. */
+      /* Nothing on this page's right column shows on a phone: the seat it
+         carries moved into the profile bar (see #politician-card below)
+         and the rest of it is empty. Hidden outright rather than given a
+         track of its own, so the events get the full width. */
+      .col-right { display: none; }
       /* #ist-pc-mount (profile-card.js) already covers the identity card
          on mobile — the desktop-only #library-card would otherwise
          duplicate it. */
@@ -1388,144 +1370,30 @@
   <div id="ist-content" style="display:contents">
   <aside class="col-left">
     <div class="library-card" id="library-card"><div class="card-loading"><span class="spinner"></span></div></div>
-    <!-- Empty on purpose. The events that used to fill this column moved
-         to Kahvehane, where the people are (see its own #events-panel);
-         Hane keeps the map, the seat and you. The column itself stays --
-         it is what holds the corner cards and what the carousel slides. -->
-    <div class="col-left-slide"></div>
+    <!-- The events, back where they started. They belong beside the petek:
+         the petek is who you are standing next to, and an event is the
+         one thing on the site that ends with you actually standing next
+         to them. Kahvehane holds the map and what a cup costs on it;
+         Hane holds the people and where they will be. Unscoped by
+         construction -- there is no map on this page to filter by, so
+         this is the whole city's list (each card kickered with its own
+         district), and choosing a district is Kahvehane's job. -->
+    <div class="col-left-slide">
+      <section class="events-section">
+        <div id="events-panel"></div>
+      </section>
+    </div>
     <!-- Bottom-right corner card (mirrors #library-card above, pinned to
          the bottom instead of the top) -- empty for now, buttons TBD. -->
     <div class="corner-card" id="corner-card-right"></div>
   </aside>
 
   <main>
-    <section class="map-panel">
-      <!-- Scaled/panned as one unit by map-zoom.js (pinch to zoom, drag
-           to pan once zoomed) -- map-label below stays outside it. -->
-      <div class="map-zoom-layer">
-      <img class="map-photo" src="assets/map/istanbul-map.png" alt="">
-
-        <!-- Mobile portrait map: draft/placeholder art only, no hit-regions
-             traced yet -- layout planning, real SVG comes later. Desktop
-             svg above is hidden on mobile and vice versa (see mobile
-             media query). -->
-        <img class="map-mobile-draft" src="assets/map/istanbul-map-mobile.png" alt="">
-
-      <!-- Hit-region overlay traced against map-photo (same 5046x2300
-           source image) — see assets/map/istanbul-map.svg for the source of
-           truth; keep this copy and kahvehane.html's in sync. -->
-      <svg class="map-svg" viewBox="0 0 5046 2300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-        <g id="Layer_2" data-name="Layer 2">
-          <polygon id="sariyer" class="neighborhood" data-name="Sarıyer" points="2561.99 471.95 2579.25 560.82 2503.32 625.54 2504.18 641.07 2480.88 655.74 2482.61 685.08 2454.13 699.75 2454.13 720.46 2362.67 782.58 2412.71 820.55 2456.72 849.89 2541.28 885.27 2542.15 916.33 2471.39 952.57 2506.77 984.5 2473.12 1034.54 2504.18 1061.29 2471.39 1085.45 2434.95 1076.45 2400.36 1099.72 2266.89 1049.21 2313.48 1004.34 2281.56 886.13 2270.34 883.54 2058.69 919.14 2034.76 874.77 1978.93 870.28 1984.91 785.03 1920.6 760.6 1915.61 749.13 1944.03 664.88 1870.24 607.05 1866.25 591.09 1949.51 455.99 2054.62 477.99 2177.15 481.44 2233.23 417.58 2461.04 445.2 2561.99 471.95" fill="none"/>
-        </g>
-        <g id="Layer_3" data-name="Layer 3">
-          <polygon id="sultangazi" class="neighborhood" data-name="Sultangazi" points="1791.89 1108.49 1797.09 1245.59 1771.69 1241.83 1701.67 1254.01 1620.23 1293.58 1615.01 1293.42 1599.64 1302.84 1502.1 1249.72 1502.65 1225.9 1391.25 1144.31 1495.72 1024.03 1510.75 1021.72 1730.28 1085.06 1788.22 1096.88 1791.89 1108.49" fill="none"/>
-        </g>
-        <g id="Layer_4" data-name="Layer 4">
-          <polygon id="beykoz" class="neighborhood" data-name="Beykoz" points="2553.65 745.72 2594.92 713.18 2589.37 683.01 2710.81 630.62 2710.02 580.62 2745.74 565.54 2737.8 535.37 2840.99 484.57 3094.99 464.73 3133.09 418.69 3466.47 449.65 3514.1 440.92 3564.9 447.27 3552.2 557.6 3741.91 756.04 3726.83 761.6 3404.56 792.55 3286.29 917.17 3191.04 923.52 3168.81 963.21 3150.56 1135.46 2979.1 1176.73 2947.35 1228.33 2933.86 1239.44 2889.41 1237.85 2847.34 1175.15 2806.06 1183.88 2751.29 1152.92 2709.06 1157.21 2654.31 1110.95 2612.77 1110.95 2593.34 1085.45 2607.62 1055.29 2583.81 1012.42 2713.99 896.54 2686.21 845.73 2571.11 825.89 2586.19 778.26 2553.65 745.72" fill="none"/>
-        </g>
-        <g id="Layer_5" data-name="Layer 5">
-          <polygon id="gop" class="neighborhood" data-name="Gaziosmanpaşa" points="1793.76 1241.83 1771.69 1241.83 1701.67 1254.01 1620.23 1293.58 1657.17 1340.04 1732.11 1369.69 1780.82 1392.52 1812.02 1416.12 1890.18 1389.77 1894.98 1343.81 1892.7 1300.43 1888.17 1289.43 1799.52 1300.73 1793.76 1241.83" fill="none"/>
-        </g>
-        <g id="Layer_6" data-name="Layer 6">
-          <polygon id="maltepe" class="neighborhood" data-name="Maltepe" points="2745.47 1728.35 2705.63 1700.46 2825.7 1625.92 2874.07 1563.32 2952.03 1555.92 2981.05 1513.81 3056.74 1513.81 3162.58 1474.55 3217.21 1569.58 3180.22 1705.58 3000.4 1803.46 2946.34 1759.64 2904.23 1763.63 2876.92 1741.43 2840.5 1748.26 2800.1 1718.67 2745.47 1728.35" fill="none"/>
-        </g>
-        <g id="Layer_8" data-name="Layer 8">
-          <polygon id="sisli-2" class="neighborhood" data-neighborhood="sisli" data-name="Şişli" points="2172.76 1341.22 2178.51 1343.69 2220.5 1234.93 2269.55 1216.69 2275.84 1160.72 2225.09 1139.48 2188.66 1156.8 2167.77 1211.13 2081.19 1236.21 2052.53 1282.19 2172.76 1341.22" fill="none" stroke="#000" stroke-miterlimit="10"/>
-          <polygon id="sisli" class="neighborhood" data-neighborhood="sisli" data-name="Şişli" points="2229.82 1088.81 2217.92 1097.09 2125.5 1095.98 2083.3 1089.61 2008.34 1107.24 1989.4 1022.34 2058.69 919.14 2275.22 884.95 2283.98 889.73 2313.48 1004.34 2229.82 1088.81" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_9" data-name="Layer 9">
-          <polygon id="kadikoy" class="neighborhood" data-name="Kadıköy" points="2444.44 1521.78 2462.65 1486.5 2537.19 1401.14 2553.13 1401.14 2652.14 1453.49 2834.24 1608.84 2823.43 1629.9 2705.63 1700.46 2693.11 1695.91 2624.26 1724.36 2583.86 1710.14 2603.2 1667.46 2578.74 1646.4 2520.69 1657.78 2472.32 1614.54 2518.42 1588.36 2516.71 1559.91 2444.44 1521.78" fill="none"/>
-        </g>
-        <g id="Layer_10" data-name="Layer 10">
-          <polygon id="uskudar" class="neighborhood" data-name="Üsküdar" points="2407.93 1447.02 2588.23 1248.78 2567.46 1198.75 2592.95 1170.43 2582.57 1137.39 2612.77 1110.95 2654.31 1110.95 2709.06 1157.21 2706.23 1187.42 2713.78 1236.51 2687.35 1292.2 2710.76 1360.74 2699.94 1379.52 2673.2 1389.19 2663.52 1428.46 2647.59 1453.49 2549.71 1402.28 2537.19 1401.14 2462.08 1489.34 2407.93 1447.02" fill="none"/>
-        </g>
-        <g id="Layer_11" data-name="Layer 11">
-          <polygon id="besiktas" class="neighborhood" data-name="Beşiktaş" points="2429.29 1277.69 2258.86 1390.89 2178.51 1343.69 2220.5 1234.93 2269.55 1216.69 2275.84 1160.72 2225.09 1139.48 2217.92 1097.09 2271.44 1049.41 2400.36 1099.72 2434.95 1076.45 2467.03 1085.88 2475.2 1112.3 2442.5 1151.29 2467.65 1175.19 2426.15 1218.58 2429.29 1277.69" fill="none"/>
-        </g>
-        <g id="Layer_12" data-name="Layer 12">
-          <polygon id="fatih" class="neighborhood" data-name="Fatih" points="2282.76 1548.41 2050.31 1619.15 1981.25 1619.99 1926.5 1690.74 1840.6 1707.58 1836.88 1551.2 1978.43 1414.2 1983.77 1408.6 2075.57 1447.34 2125.26 1481.03 2174.11 1486.08 2272.65 1472.61 2282.76 1548.41" fill="none"/>
-        </g>
-        <g id="Layer_13" data-name="Layer 13">
-          <polygon id="kartal" class="map-unaccommodated" data-name="Kartal" points="3247.42 2015.56 3389.53 1763.49 3378.49 1708.3 3413.3 1660.75 3353.02 1518.95 3213.77 1568.2 3180.22 1705.58 3000.4 1803.46 3247.42 2015.56" fill="none"/>
-        </g>
-        <g id="Layer_35" data-name="Layer 35">
-          <polygon id="sancaktepe" class="map-unaccommodated" data-name="Sancaktepe" points="3667.27 1211.31 3690.8 1111.55 3673.06 1104.05 3429.51 1131.11 3388.83 1227.27 3108.24 1331.77 3092.24 1341.18 3217.21 1569.58 3353.02 1518.95 3374.88 1336.22 3466.81 1298.53 3491.64 1303.12 3527.98 1232.95 3667.27 1211.31" fill="none"/>
-        </g>
-        <g id="Layer_36" data-name="Layer 36">
-          <polygon id="sultanbeyli" class="map-unaccommodated" data-name="Sultanbeyli" points="3607.48 1598.24 3634.14 1534.8 3601.96 1462.17 3548.64 1464.93 3525.65 1451.14 3491.64 1303.12 3466.81 1298.53 3374.88 1336.22 3353.02 1518.95 3413.3 1660.75 3607.48 1598.24" fill="none"/>
-        </g>
-        <g id="Layer_33" data-name="Layer 33">
-          <polygon id="cekmekoy" class="neighborhood" data-name="Çekmeköy" points="3853.46 874.93 3823.7 1138.32 3772.28 1167.19 3752.44 1167.19 3726.28 1120.28 3691.1 1119.38 3687.49 1106.75 3673.06 1104.05 3429.51 1131.11 3388.83 1227.27 3113.84 1330.77 3107.1 1317.91 2947.35 1228.33 2979.1 1176.73 3150.56 1135.46 3168.81 963.21 3191.04 923.52 3286.29 917.17 3404.56 792.55 3723.23 762.11 3737.93 755.37 3853.46 874.93" fill="none"/>
-        </g>
-        <g id="Layer_34" data-name="Layer 34">
-          <polygon id="pendik" class="map-unaccommodated" data-name="Pendik" points="3537.01 2081.56 3366.94 2010.15 3272.98 2035.52 3249.5 2010.15 3389.53 1763.49 3378.49 1708.3 3413.3 1660.75 3607.48 1598.24 3634.14 1534.8 3598.08 1461.43 3548.64 1464.93 3525.65 1451.14 3491.64 1303.12 3527.98 1232.95 3667.27 1211.31 3691.1 1119.38 3726.28 1120.28 3752.44 1167.19 3772.28 1167.19 3823.7 1138.32 3824.52 1146.67 4053.78 1193.65 4128.01 1269.76 4127.07 1354.32 4046.27 1364.66 3841.44 1572.31 3769.09 1578.88 3662.91 1919.01 3595.26 1956.6 3537.01 2081.56" fill="none"/>
-        </g>
-        <g id="Layer_29" data-name="Layer 29">
-          <polygon id="tuzla" class="map-unaccommodated" data-name="Tuzla" points="3584.68 2071.02 3548.81 2089.6 3540.48 2081.27 3595.26 1956.6 3662.91 1919.01 3769.09 1578.88 3841.44 1572.31 4046.27 1364.66 4127.07 1354.32 4129.23 1743.69 3958.5 1872.81 3951.48 2016.8 3803.68 2120.78 3712.33 2084.39 3663.31 2095.53 3584.68 2071.02" fill="none"/>
-        </g>
-        <g id="Layer_30" data-name="Layer 30">
-          <polygon id="sile" class="map-unaccommodated" data-name="Şile" points="4135.36 439.71 3686.7 406.62 3657.28 434.81 3564.9 447.27 3552.2 557.6 3853.46 874.93 3824.52 1146.67 4053.78 1193.65 4128.01 1269.76 4135.36 439.71" fill="none"/>
-        </g>
-        <g id="Layer_31" data-name="Layer 31">
-          <polygon id="istanbul_disi" class="map-istanbul-disi" data-name="İstanbul Dışı" points="4137.82 1736.89 3958.5 1872.81 3951.48 2016.8 3803.68 2120.78 3846.33 2137.37 3846.33 2148.77 3870.41 2157.64 3907.17 2128.5 4096 2194.4 4094.73 2218.48 4112.48 2229.88 4132.75 2226.08 4137.82 1736.89" fill="none"/>
-        </g>
-        <g id="Layer_32" data-name="Layer 32">
-          <polygon id="kucukcekmece" class="neighborhood" data-name="Küçükçekmece" points="1086.01 1885.98 1113.35 1863.43 1221.33 1824.47 1257.55 1738.36 1272.58 1737 1329.31 1620.14 1326.5 1492.34 1138.64 1525.14 1014.63 1559.92 1014.94 1603.05 993.55 1730.39 1021.66 1755.28 1050.58 1870.94 1086.01 1885.98" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_25" data-name="Layer 25">
-          <polygon id="avcilar" class="map-unaccommodated" data-name="Avcılar" points="921.68 1945.03 1050.58 1870.94 1021.66 1755.28 993.55 1730.39 1014.43 1599.46 1014.63 1559.92 917.14 1492.89 921.68 1945.03" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_26" data-name="Layer 26">
-          <polygon id="esenler" class="neighborhood" data-name="Esenler" points="1599.64 1302.84 1615.01 1293.42 1623.94 1296.4 1657.17 1340.04 1654.69 1349.96 1659.65 1387.15 1685.44 1422.86 1678 1466.01 1682.46 1473.45 1738.01 1505.19 1746.94 1518.08 1743.34 1574.97 1727.24 1588.77 1721.64 1583.05 1684.45 1578.09 1679.98 1570.66 1676.22 1532.73 1662.17 1530.22 1615.51 1537.43 1608.74 1515.6 1535.66 1477.91 1548.56 1434.77 1553.52 1401.54 1524.85 1397.39 1486.17 1441.52 1472.68 1448.16 1419.61 1422.37 1419.56 1376.01 1477.14 1262.67 1502.1 1249.72 1599.64 1302.84" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_27" data-name="Layer 27">
-          <polygon id="bayrampasa" class="neighborhood" data-name="Bayrampaşa" points="1806.58 1499.23 1807.17 1413.63 1787.1 1396.51 1713.89 1362.86 1654.26 1339.83 1659.65 1387.15 1685.44 1422.86 1677.29 1462.63 1682.46 1473.45 1733.96 1503.37 1749.9 1523.44 1801.27 1505.73 1806.58 1499.23" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_28" data-name="Layer 28">
-          <polygon id="bagcilar" class="neighborhood" data-name="Bağcılar" points="1524.85 1397.39 1486.17 1441.52 1475.28 1448.6 1425.7 1425.72 1328.71 1457.44 1328.74 1616.93 1519.4 1624.55 1545.55 1630.55 1549.91 1570.62 1618.55 1538.48 1608.74 1515.6 1534.65 1475.83 1551 1428.44 1551 1400.66 1524.85 1397.39" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_14" data-name="Layer 14">
-          <polygon id="atasehir" class="neighborhood" data-name="Ataşehir" points="2866.97 1570.93 2834.58 1612.84 2647.59 1453.49 2660.56 1430.01 2765.8 1418.42 2869.18 1430.93 2999.39 1421.36 3126.93 1404.05 3162.58 1474.55 3056.74 1513.81 2981.05 1513.81 2952.03 1555.92 2874.07 1563.32 2866.97 1570.93" fill="none"/>
-        </g>
-        <g id="Layer_15" data-name="Layer 15">
-          <polygon id="umraniye" class="neighborhood" data-name="Ümraniye" points="2675.86 1428.62 2660.56 1430.01 2673.2 1389.19 2699.94 1379.52 2710.76 1360.74 2687.35 1292.2 2713.78 1236.51 2705.07 1190.79 2709.06 1157.21 2753.28 1153.71 2806.06 1183.88 2847.34 1175.15 2889.41 1237.85 2933.86 1239.44 2947.35 1228.33 3107.1 1317.91 3110.71 1330.8 3092.24 1341.18 3126.93 1404.05 2985.07 1423.05 2869.18 1430.93 2816.33 1424.91 2765.8 1418.42 2675.86 1428.62" fill="none"/>
-        </g>
-        <g id="Layer_16" data-name="Layer 16">
-          <path id="arnavutkoy" class="map-unaccommodated" data-name="Arnavutköy" d="M1129.94,275.77c2.24,2.82,4.47,5.65,6.66,8.51,9.31,12.15,17.8,24.92,25.41,38.2,1.49,2.6.94,5.63,1.84,8.49,3.73,11.9,7.46,23.8,11.18,35.7,2.03,6.47.37,13.86-1.15,20.47-1.23,5.35-3.66,10.35-5.39,15.56-3.78,11.42-4.1,23.96-.92,35.56,1.42,5.16,2.24,10.59,3.92,15.67,4.33,13.12,5.62,27.01,6.88,40.77-16.5,17.13-33.51,34.62-51.19,50.53-4.77,4.29-10.02,9.63-9.21,15.99.73,5.78,2.58,11.42,4.53,16.92.65,1.84,1.39,3.71,2.72,5.13,1.27,1.36,2.99,2.21,4.66,3.03,7.31,3.57,14.62,7.14,21.93,10.72,13.21,6.45,22.8,18.06,35.64,25.22,5.17,2.88,10.71,5.77,13.86,10.78-.51,6.58,2.04,12.36,3.79,18.73,1.93,7.03,3.07,14.26,4.2,21.46.9,5.76,1.81,11.52,2.71,17.28,27.5,19.23,55.77,37.88,83.27,57.11,19.19,13.41,38.76,26.3,57.16,40.78-1.35,12.18,5.55,23.17,7.95,35.18,1.96,9.81,1.25,20.22,4.98,29.5,1.04,2.58.34,6.7.89,9.42,2.54,12.79,5.08,25.57,7.63,38.36,1.86,9.36,4.44,18.85,6.44,28.19.71,3.3,1.05,6.67,1.4,10.04.36,3.55.72,7.19-.17,10.64-.83,3.22-2.69,6.05-4.52,8.82-3.04,4.6-6.12,9.25-10.17,12.99-.5,6.15-5.87,9.58-8.76,15.04-3.73,7.05-2.68,15.58-1.39,23.45,1.77,10.79,3.82,21.54,6.01,32.25,3.11,15.2,10.01,29.2,9.78,44.72-.06,4.04,1.5,7.67,2.5,11.59,2.43,9.56,3.44,19.48,3,29.33-.11,2.48-.44,5.23-2.31,6.88-1.37,1.21-3.28,1.55-5.09,1.84-6.78,1.09-13.57,2.18-20.35,3.27-6.12.98-12.18,3.79-18.16,5.42-5.49,1.5-11,2.88-16.52,4.26-12.56,3.15-25.12,6.3-37.68,9.44-7,1.75-14.08,3.52-21.29,3.61-7.21.09-14.69-1.66-20.26-6.24-4.61-.3-8.98-.83-13.29-2.52-17.31-6.77-34.62-13.53-51.92-20.3-3.82.4-7.22,2.48-10.35,4.71-12.03,8.53-24.07,17.05-36.1,25.58-16.88,11.96-36.24,21.26-52.53,34.01-18.09,18.09-45.82,28.02-66.78,42.4-24.35,16.7-48.69,33.41-73.04,50.11-5.48,3.76-13.31,12.56-18.56,6.76-3.85-4.25-4.13-20.68-5.33-26.51-3.67-17.8-7.45-35.58-10.82-53.45-7.64-40.46-11.95-81.47-16.25-122.43-6.5-61.92-13.02-124.16-9.64-186.33,1.8-33.16,6.42-66.26,5.2-99.44-4.32-117.56-.75-236.17-.41-353.8.14-50.83-1.71-101.65-1.72-152.48,0-7.57.21-15.77,4.91-21.7,3.37-4.24,8.51-6.6,13.37-8.99,19.15-9.41,36.85-21.57,55.9-31.18,19.05-9.61,40.15-16.73,61.41-14.93,14.04,1.19,27.44,6.19,40.63,11.15,14.62,5.49,29.25,10.99,43.39,17.62,7.99,3.75,16.19,8.19,20.9,15.66,6.49-1.65,10.49.24,14.65,5.49Z" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_17" data-name="Layer 17">
-          <polygon id="bakirkoy" class="neighborhood" data-name="Bakırköy" points="1329.75 2006.83 1086.01 1885.98 1113.35 1863.43 1221.33 1824.47 1257.55 1738.36 1272.58 1737 1359.01 1780.79 1448.51 1767.02 1613.73 1703.92 1637.83 1671.21 1703.8 1675.8 1701.51 1787.67 1710.69 1798 1686.02 1855.94 1630.37 1867.99 1605.7 1848.49 1547.76 1862.83 1520.79 1928.8 1498.99 1940.28 1486.95 1966.67 1329.75 2006.83" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_18" data-name="Layer 18">
-          <polygon id="basaksehir" class="neighborhood" data-name="Başakşehir" points="1320.41 1494.56 1143.15 1524.47 1014.63 1559.92 917.14 1492.89 918.25 1295.14 1168.63 1136.72 1257.81 1164.97 1375.24 1137.27 1502.65 1225.9 1502.1 1249.72 1476.61 1264.67 1419.56 1376.01 1421.78 1430.85 1328.71 1457.44 1326.5 1492.34 1320.41 1494.56" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_19" data-name="Layer 19">
-          <polygon id="eyupsultan" class="neighborhood" data-name="Eyüpsultan" points="1179.5 491.54 1118.51 556.48 1121.9 581.32 1201.31 633 1212.01 690.47 1352.44 788.36 1382.22 947.24 1355.68 992.98 1381.09 1138.66 1391.25 1144.31 1495.72 1024.03 1503.62 1020.08 1788.22 1096.88 1791.61 1101.39 1799.52 1300.73 1805.73 1303.55 1888.17 1289.43 1893.67 1304.02 1890.18 1389.77 1808.42 1417.19 1806.98 1503.67 1860.65 1526.67 1978.43 1414.2 1981.92 1403.73 1962.97 1373.81 1979.42 1340.91 1997.87 1328.94 1995.8 1276.22 2022.07 1229.05 2022.07 1163.36 2006.84 1120.05 2008.34 1107.24 1989.4 1022.34 2058.69 919.14 2034.76 874.77 1978.93 870.28 1984.91 785.03 1920.6 760.6 1915.61 749.13 1944.03 664.88 1870.24 607.05 1866.25 591.09 1949.51 455.99 1703.09 429.14 1500.15 437.18 1385.87 447.34 1172.78 448.83 1179.5 491.54" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_20" data-name="Layer 20">
-          <polygon id="kagithane" class="neighborhood" data-name="Kağıthane" points="1995.8 1276.22 2022.07 1229.05 2022.07 1163.36 2007.15 1117.39 2008.34 1107.24 2078.8 1089.92 2132.54 1096.49 2217.92 1097.09 2225.09 1139.48 2188.66 1156.8 2167.77 1211.13 2081.19 1236.21 2050.14 1283.38 1995.21 1280.99 1995.8 1276.22" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_21" data-name="Layer 21">
-          <polygon id="beyoglu" class="neighborhood" data-name="Beyoğlu" points="1995.21 1280.99 1995.8 1329.95 1987.44 1337.72 1988.04 1347.27 2122.98 1416.53 2172.54 1461.32 2255.54 1392.65 2178.51 1343.69 2052.53 1282.19 1995.21 1280.99" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_22" data-name="Layer 22">
-          <polygon id="zeytinburnu" class="neighborhood" data-name="Zeytinburnu" points="1701.17 1793.49 1807.74 1772.02 1841.48 1716.82 1836.88 1551.2 1860.65 1526.67 1806.98 1503.67 1745.64 1525.13 1743.34 1574.97 1727.24 1588.77 1706.81 1676.18 1701.17 1793.49" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_23" data-name="Layer 23">
-          <polygon id="gungoren" class="neighborhood" data-name="Güngören" points="1676.22 1532.73 1679.73 1573.36 1684.74 1575.87 1724.87 1584.89 1706.81 1676.18 1637.6 1674.67 1632.58 1649.59 1545.55 1630.55 1549.91 1570.62 1627.06 1536.74 1662.17 1530.22 1676.22 1532.73" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-        <g id="Layer_24" data-name="Layer 24">
-          <polygon id="bahcelievler" class="neighborhood" data-name="Bahçelievler" points="1622.68 1693.32 1637.83 1671.21 1632.58 1649.59 1519.4 1624.55 1328.74 1616.93 1272.58 1737 1359.01 1780.79 1448.51 1767.02 1613.73 1703.92 1622.68 1693.32" fill="none" stroke="#000" stroke-miterlimit="10"/>
-        </g>
-      </svg>
-      </div>
-
-      <div class="map-label" id="map-label">İstanbul</div>
-      <!-- Opens the petek — the one shared grid, drawn from where you are
-           standing in it (see openHiveOverlay in profile-card.js). -->
-      <button type="button" class="petek-pill" id="petek-pill" data-i18n="hane.petek">Petek</button>
-    </section>
+    <!-- Hane IS the petek: the shared honeycomb is the page, not a sheet
+         opened over a map (see mountHivePage in profile-card.js). The
+         Istanbul map that used to be here is one swipe away on Kahvehane,
+         where the district is the thing you are actually choosing. -->
+    <section class="petek-page" id="hive-page"></section>
   </main>
 
   <aside class="col-right">
@@ -1587,45 +1455,6 @@ async function checkSession() {
   resolveLoading();
 }
 
-// Highlight home neighborhood: try metadata first, then profiles table
-// (admin-created accounts may not have neighborhood in user_metadata --
-// that fallback path is a real network round-trip).
-let cachedHomeNeighborhood = null;
-// home-map.js is deferred and this can run before it, so it is read
-// through a getter rather than captured.
-function homeMapModule() { return window.IstHomeMap || null; }
-async function highlightHomeNeighborhood(user) {
-  // Re-apply the last known highlight immediately (synchronously, before
-  // any profiles-table fetch below) -- #ist-content's map is rebuilt
-  // fresh on every mount and starts with no .home class, so without this
-  // a revisit shows the map for a beat with no highlight, then fades it
-  // in once the fetch resolves. That read as a visible flash; this makes
-  // a revisit correct on the very first paint.
-  if (cachedHomeNeighborhood) {
-    const nbEl = document.getElementById(cachedHomeNeighborhood);
-    if (nbEl) nbEl.classList.add('home');
-    // Same reason, for the other half of the highlight: the map image
-    // itself is part of #ist-content and comes back as the base map on
-    // every mount (see home-map.js).
-    if (homeMapModule()) homeMapModule().apply(cachedHomeNeighborhood);
-  }
-  let homeNb = user?.user_metadata?.yasadigi_ilce || user?.user_metadata?.neighborhood;
-  if (!homeNb && user?.id) {
-    const { data: profile } = await sb.from('profiles').select('neighborhood').eq('id', user.id).single();
-    homeNb = profile?.neighborhood;
-  }
-  if (homeNb) {
-    cachedHomeNeighborhood = homeNb;
-    const nbEl = document.getElementById(homeNb);
-    if (nbEl) nbEl.classList.add('home');
-    // Districts with a hand-painted map get it here in place of the base
-    // one; the rest keep the .home tint the class above applies.
-    if (homeMapModule()) homeMapModule().apply(homeNb);
-    const subEl = document.getElementById('user-nb-sublabel');
-    if (subEl) subEl.textContent = districtNames[homeNb] || homeNb;
-  }
-}
-
 // This page's repeatable "become the active page" work -- the part that
 // re-runs on every virtual re-entry into anahane, not just the first real
 // load (see showSite() below for the one-time login-gateway part: hiding
@@ -1633,9 +1462,7 @@ async function highlightHomeNeighborhood(user) {
 // picker/admin-notification nudges).
 function mount() {
   // #main-site's pointer-events lock (see its CSS) is only unlocked by
-  // the .active class -- kutuphane/kahvehane don't need this (their
-  // #main-site has no pointer-events:none to begin with), but anahane's
-  // full-bleed map layer does. #main-site is one shared, persistent node
+  // the .active class. #main-site is one shared, persistent node
   // across virtual navigations, and its *live* CSS rules are whichever
   // page's stylesheet setActiveStylesheet last enabled -- so this has to
   // be reasserted on every entry into anahane, not just showSite()'s
@@ -1643,14 +1470,10 @@ function mount() {
   // showSite() entirely) leaves the nav bar and profile card inheriting
   // pointer-events:none with nothing to unlock it.
   document.getElementById('main-site').classList.add('active');
-  // First: its cached-value pre-apply (see highlightHomeNeighborhood) has
-  // to land before router.js's post-mount MapZoom.init runs, or that
-  // call's forced layout read locks in a frame with no .home class and
-  // the class arriving a moment later reads as a visible flash.
-  highlightHomeNeighborhood(window.__currentUser);
-  renderPoliticianCard(activeNeighborhood || 'istanbul');
+  renderPoliticianCard('istanbul');
+  loadEvents();
   loadPersonMentionsRoster();
-  wirePetekPill();
+  mountPetek();
   // #library-card lives inside #ist-content, so a virtual re-entry into
   // this page (router.js's navigateTo) resets it back to its spinner
   // placeholder along with the rest of the swapped HTML -- unlike
@@ -1673,21 +1496,21 @@ function mountLibraryCardWhenReady(tries) {
   }
 }
 
-// The PETEK button over the map opens the hane honeycomb (see
-// openHiveOverlay in profile-card.js). Bound to the button itself, not to
-// `document` -- the three carousel pages share one document (router.js),
-// and the button lives inside #ist-content, so the binding leaves with the
-// page and is made again on every re-entry (mount).
+// Hane IS the petek (see mountHivePage in profile-card.js): there is no
+// button and no sheet any more, the grid is simply the page. Mounted on
+// every entry, including a virtual one -- #ist-content is swapped whole
+// on a swipe back to this page, so the previous mount leaves with it.
 //
-// The button is handed over as the page's `origin`: on a phone the
-// honeycomb grows out of this very button rather than rising as a sheet
-// from the bottom edge, so the page needs the box it comes out of.
-function wirePetekPill() {
-  const pill = document.getElementById('petek-pill');
-  if (!pill) return;
-  pill.addEventListener('click', () => {
-    if (window.IstProfileCard) IstProfileCard.openHiveOverlay({ sb, I18N, origin: pill });
-  });
+// profile-card.js is deferred, so on a real page load a fast
+// checkSession() can reach mount() before it has executed -- poll
+// briefly, the same way the library card and the mentions roster do,
+// rather than silently leaving the page empty until the next re-entry.
+function mountPetek(tries) {
+  if (window.IstProfileCard) {
+    IstProfileCard.mountHivePage({ sb, I18N, mountId: 'hive-page' });
+  } else if ((tries === undefined ? 40 : tries) > 0) {
+    setTimeout(() => mountPetek((tries === undefined ? 40 : tries) - 1), 60);
+  }
 }
 
 // person-mentions.js is deferred -- poll briefly the same way tryOnb/
@@ -1910,29 +1733,6 @@ document.getElementById('signup-submit-btn').addEventListener('click', async () 
   });
 });
 
-// ── Map Interactions ──
-const svg = document.querySelector('svg');
-
-// A virtual navigation (see router.js) replaces #ist-content's whole
-// subtree on every revisit to this page, including the map's SVG
-// -- so the actual .neighborhood elements are different DOM nodes each
-// time. Delegating on `document` (never itself replaced) and re-querying
-// fresh each time, instead of binding per-node listeners once, keeps map
-// clicks/hover working after any number of navigate-away-and-back trips.
-function getNeighborhoods() { return document.querySelectorAll('.neighborhood'); }
-
-// Currently-selected district. null means nothing is selected, and the
-// seat card falls back to İstanbul's Büyükşehir Belediye Başkanı.
-let activeNeighborhood = null;
-
-// Resolve what the map label should currently read when nothing is
-// being hovered: the active neighborhood's name, or 'İstanbul'.
-function baseMapLabel() {
-  if (!activeNeighborhood) return 'İstanbul';
-  const active = document.getElementById(activeNeighborhood);
-  return (active && active.getAttribute('data-name')) || activeNeighborhood;
-}
-
 // ── Politician card (top-right, desktop) ───────────────────────
 // Mirrors #library-card at the top-left: the İstanbul Büyükşehir Belediye
 // Başkanı by default, swapped for the clicked district's Belediye Başkanı.
@@ -1952,9 +1752,12 @@ function baseMapLabel() {
 // The card and its detail view are drawn by the shared module
 // (politician-card.js) -- the same markup kahvehane and kütüphane print,
 // so a politician looks the same wherever you meet one. What stays here
-// is the part that is genuinely anahane's: which seat is showing follows
-// the district selection on the map. Kütüphane does the same with the
-// countries on its phone map; Kahvehane has one fixed seat.
+// is the part that is genuinely anahane's: the seat it names. Hane's map
+// is gone -- the petek is the page now -- so the seat no longer follows a
+// selection here; it rests on İstanbul's Büyükşehir Belediye Başkanı, the
+// one seat that is true of the whole city the reader is standing in.
+// Kütüphane still swaps its seat with the countries on its phone map;
+// Kahvehane has one fixed seat of its own.
 async function renderPoliticianCard(seatId) {
   const byId = await IstPoliticianCard.seats(sb);
   const id = seatId || 'istanbul';
@@ -1970,58 +1773,264 @@ async function renderPoliticianCard(seatId) {
   IstPoliticianCard.render({ mountElId: 'politician-card', seat, seatLabel, openDetail });
 }
 
+// ── Events (left column) ──────────────────
+// Beside the petek: the petek is who you are standing next to, an event
+// is where you can go and actually stand next to them. This page has no
+// map, so the list is the whole city's -- every district, each card
+// kickered with its own -- and picking a district is Kahvehane's job.
+// The filter argument survives for whoever wants to scope it later; the
+// page never passes one.
+const MONTH_ABBR_TR = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
+const MONTH_ABBR_EN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+function eventDateParts(iso) {
+  const d = new Date(iso);
+  const tz = 'Europe/Istanbul';
+  const en = I18N.isEnglish();
+  const locale = en ? 'en-US' : 'tr-TR';
+  const day = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, day: 'numeric' }), 10);
+  const month = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, month: 'numeric' }), 10);
+  const weekday = d.toLocaleDateString(locale, { timeZone: tz, weekday: 'long' });
+  const wd = d.toLocaleDateString(locale, { timeZone: tz, weekday: 'short' }).toLocaleUpperCase(locale);
+  const time = d.toLocaleTimeString(locale, { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: en });
+  const monAbbr = (en ? MONTH_ABBR_EN : MONTH_ABBR_TR)[month - 1] || '';
+  return { day, mon: monAbbr, wd, weekday, time };
+}
+
+let allEvents = [];
+let eventsRequestSeq = 0;
+let rsvpCounts = {};       // event_id -> attendee count
+let myRsvpIds = new Set(); // event_ids the current user has RSVP'd to
+let rsvpAttendees = {};    // event_id -> [profile, ...] (capped)
+let openEventCardId = null; // event whose card stays "hovered" while its sheet is open
+const MAX_ATTENDEE_AVATARS = 6;
+
+async function loadEvents(neighborhoodFilter = null, instant = false) {
+  const reqId = ++eventsRequestSeq;
+  const now = new Date().toISOString();
+  // Scope the query to the selected neighborhood so the 30-row cap
+  // doesn't hide matching rows that sit past the global top-30 window.
+  let query = sb.from('events')
+    .select('*')
+    .gte('event_date', now)
+    .order('event_date', { ascending: true })
+    .limit(30);
+  if (neighborhoodFilter) query = query.eq('neighborhood', neighborhoodFilter);
+  const { data, error } = await query;
+  // Drop responses from superseded requests so a slow older fetch
+  // can't clobber a newer one with stale rows.
+  if (reqId !== eventsRequestSeq) return;
+  if (error) { console.error('[kahvehane events]', error); allEvents = []; }
+  else allEvents = data || [];
+  await loadRsvps();
+  if (reqId !== eventsRequestSeq) return;
+  renderEvents(instant);
+}
+
+async function loadRsvps() {
+  rsvpCounts = {};
+  myRsvpIds = new Set();
+  rsvpAttendees = {};
+  const ids = allEvents.map(ev => ev.id);
+  if (!ids.length) return;
+  const { data, error } = await sb.from('event_rsvps')
+    .select('event_id, user_id, created_at')
+    .in('event_id', ids)
+    .order('created_at', { ascending: true });
+  if (error) { console.error('[kahvehane rsvps]', error); return; }
+  const myId = window.__currentUser && window.__currentUser.id;
+  (data || []).forEach(r => {
+    rsvpCounts[r.event_id] = (rsvpCounts[r.event_id] || 0) + 1;
+    if (myId && r.user_id === myId) myRsvpIds.add(r.event_id);
+  });
+  // Resolve attendee profile pictures in one batched query.
+  const userIds = Array.from(new Set((data || []).map(r => r.user_id)));
+  if (userIds.length) {
+    const { data: profs, error: profErr } = await sb.from('profiles')
+      .select('id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt')
+      .in('id', userIds);
+    if (profErr) { console.error('[kahvehane rsvp attendees]', profErr); return; }
+    const profMap = new Map((profs || []).map(p => [p.id, p]));
+    (data || []).forEach(r => {
+      const p = profMap.get(r.user_id);
+      if (!p) return;
+      (rsvpAttendees[r.event_id] = rsvpAttendees[r.event_id] || []).push(p);
+    });
+  }
+}
+
+function buildAttendeeAvatarsHtml(eventId) {
+  const list = rsvpAttendees[eventId] || [];
+  if (!list.length) return '';
+  const shown = list.slice(0, MAX_ATTENDEE_AVATARS);
+  const extra = list.length - shown.length;
+  const avatarsHtml = shown.map(p => {
+    const name = capitalizeName([p.first_name, p.last_name].filter(Boolean).join(' ')) || 'Üye';
+    const inner = IstAvatar.html(p.avatar_url, p.avatar_hair, p.avatar_hat, p.avatar_accessory, p.avatar_shirt);
+    return `<span class="ev-attendee-avatar" title="${esc(name)}">${inner}</span>`;
+  }).join('');
+  const moreHtml = extra > 0
+    ? `<span class="ev-attendee-avatar ev-attendee-more" title="+${extra}">+${extra}</span>`
+    : '';
+  return avatarsHtml + moreHtml;
+}
+
+async function toggleRsvp(eventId, btn) {
+  const myId = window.__currentUser && window.__currentUser.id;
+  if (!myId || btn.disabled) return;
+  const attending = myRsvpIds.has(eventId);
+  btn.disabled = true;
+  try {
+    if (attending) {
+      const { error } = await sb.from('event_rsvps').delete().eq('event_id', eventId).eq('user_id', myId);
+      if (error) throw error;
+    } else {
+      const { error } = await sb.from('event_rsvps').insert({ event_id: eventId, user_id: myId });
+      if (error) throw error;
+    }
+  } catch (err) {
+    console.error('[kahvehane rsvp]', err);
+    btn.disabled = false;
+    return;
+  }
+  // Refetch counts + attendee avatars so the stack reflects the change,
+  // then patch just this event's row in place so the card doesn't collapse.
+  await loadRsvps();
+  const nowAttending = myRsvpIds.has(eventId);
+  btn.classList.toggle('attending', nowAttending);
+  btn.textContent = nowAttending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join');
+  const row = btn.closest('.ev-rsvp-row');
+  const countEl = row?.querySelector('.ev-rsvp-count');
+  if (countEl) countEl.textContent = `${rsvpCounts[eventId] || 0} ${I18N.t('home.events.rsvp.count')}`;
+  const avatarsEl = row?.querySelector('.ev-attendees');
+  if (avatarsEl) avatarsEl.innerHTML = buildAttendeeAvatarsHtml(eventId);
+  // Also patch the (separate) preview card in the column behind the sheet,
+  // so its attendee stack matches without waiting for a reload.
+  const previewEl = document.querySelector(`.event-item[data-event-id="${CSS.escape(eventId)}"] .ev-attendees-preview`);
+  if (previewEl) previewEl.innerHTML = buildAttendeeAvatarsHtml(eventId);
+  btn.disabled = false;
+}
+
+// Keeps exactly one #events-panel card looking "hovered" (see the .is-open
+// CSS above) for as long as its detail sheet is open, regardless of where
+// the mouse actually is. Pass null to clear.
+function markOpenEventCard(id) {
+  openEventCardId = id == null ? null : String(id);
+  document.querySelectorAll('#events-panel .event-item.openable.is-open')
+    .forEach(el => el.classList.remove('is-open'));
+  if (openEventCardId == null) return;
+  const el = document.querySelector(`#events-panel [data-event-id="${CSS.escape(openEventCardId)}"]`);
+  if (el) el.classList.add('is-open');
+}
+
+function renderEvents(instant) {
+  const panel = document.getElementById('events-panel');
+  if (!panel) return;
+  // 'left': this column sits to the left of the map, so its cards enter
+  // and leave by the left edge -- the same way the comments did here.
+  renderEventsNow(panel, allEvents);
+}
+
+// Full detail markup for an event -- rendered into the detail sheet (see
+// openDetail). Reuses the .event-item card's own styling so it looks like
+// the same card, just full-size, with the RSVP row live.
+function buildEventDetailHtml(ev) {
+  const nbLabel = ev.neighborhood ? (districtNames[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
+  const parts = eventDateParts(ev.event_date);
+  const dateTime = [parts.weekday, parts.time].filter(Boolean).join(' ');
+  const metaHTML = [dateTime, ev.location].filter(Boolean).map(escapeHtml).join('<br>');
+  const count = rsvpCounts[ev.id] || 0;
+  const attending = myRsvpIds.has(ev.id);
+  return `
+    <div class="event-item">
+      <div class="ev-date-block">
+        <div class="ev-day">${parts.day}</div>
+        <div class="ev-mon">${parts.mon}</div>
+      </div>
+      <div class="ev-body">
+        <div class="ev-kicker">${esc(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
+        <div class="ev-title">${esc(ev.title)}</div>
+        ${metaHTML ? `<div class="ev-meta">${metaHTML}</div>` : ''}
+      </div>
+      <div class="ev-details">
+        ${ev.description ? `<div class="ev-desc">${esc(ev.description)}</div>` : ''}
+        <div class="ev-rsvp-row">
+          <button type="button" class="ev-rsvp-btn${attending ? ' attending' : ''}" data-event-id="${esc(ev.id)}">${attending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join')}</button>
+          <span class="ev-rsvp-count">${count} ${I18N.t('home.events.rsvp.count')}</span>
+          <span class="ev-attendees">${buildAttendeeAvatarsHtml(ev.id)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderEventsNow(panel, rows) {
+  if (!rows.length) {
+    // Nothing to say when there is no event: an empty column leaves the
+    // map behind it clear, rather than printing a line over the drawing.
+    panel.innerHTML = '';
+    return;
+  }
+  const rowsById = new Map(rows.map(ev => [String(ev.id), ev]));
+  panel.innerHTML = rows.map(ev => {
+    const nbLabel = ev.neighborhood ? (districtNames[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
+    const parts = eventDateParts(ev.event_date);
+    // Weekday lives in the date block (day / month / weekday); time and
+    // location are both dropped from the preview -- see
+    // buildEventDetailHtml for the full date/time/location, still shown
+    // once you open the card. That frees this card for a bigger title.
+    return `
+      <div class="event-item openable" data-event-id="${esc(ev.id)}">
+        <div class="ev-date-block">
+          <div class="ev-day">${parts.day}</div>
+          <div class="ev-mon">${parts.mon}</div>
+          <div class="ev-wd">${parts.wd}</div>
+        </div>
+        <div class="ev-body">
+          <div class="ev-kicker">${esc(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
+          <div class="ev-title">${esc(ev.title)}</div>
+          <span class="ev-attendees ev-attendees-preview">${buildAttendeeAvatarsHtml(ev.id)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  panel.querySelectorAll('.event-item.openable').forEach(el => {
+    const ev = rowsById.get(el.dataset.eventId);
+    if (!ev) return;
+    el.addEventListener('click', () => {
+      openDetail(buildEventDetailHtml(ev));
+      markOpenEventCard(ev.id);
+    });
+  });
+
+  // Re-render (map click, live refresh) rebuilds every card from scratch,
+  // wiping .is-open along with it -- restore it if the card that was open
+  // is still in this batch.
+  if (openEventCardId != null && rowsById.has(openEventCardId)) markOpenEventCard(openEventCardId);
+}
+
+// The RSVP button lives inside the detail sheet, which is re-rendered on
+// every open -- delegated on the sheet body so it survives that, and bound
+// to the element rather than to document (the sheet's body belongs to this
+// page's markup, but a document listener would outlive a virtual
+// navigation away from it -- see router.js).
+(function initEventRsvpClicks() {
+  const body = document.getElementById('anahane-detail-body');
+  if (!body) return;
+  body.addEventListener('click', (e) => {
+    const btn = e.target.closest('.ev-rsvp-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    toggleRsvp(btn.dataset.eventId, btn);
+  });
+})();
+
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
 }
-
-document.addEventListener('click', (e) => {
-  const nb = e.target.closest('.neighborhood');
-  // Only clicks inside the map itself should clear the selection
-  // (tapping the sea/background to deselect) -- this used to match ANY
-  // click anywhere on the page that wasn't precisely on a district
-  // shape, so tapping a card or the nav bar silently cleared it.
-  if (!nb) {
-    // The PETEK pill sits inside the map panel but is not part of the
-    // map: pressing it opens the honeycomb, it doesn't deselect a
-    // district (same guard Kahvehane gives its Kahve Endeksi pill).
-    if (!e.target.closest('.map-panel') || e.target.closest('.petek-pill')) return;
-    getNeighborhoods().forEach(n => n.classList.remove('active'));
-    document.getElementById('map-label').textContent = 'İstanbul';
-    if (activeNeighborhood !== null) {
-      activeNeighborhood = null;
-      renderPoliticianCard('istanbul');
-    }
-    return;
-  }
-  // data-neighborhood covers multi-polygon districts (e.g. Şişli's
-  // exclave piece) whose element id must stay unique but which still
-  // count as the same neighborhood for active-state purposes.
-  const nbId = nb.dataset.neighborhood || nb.id;
-  getNeighborhoods().forEach(n => n.classList.toggle('active', (n.dataset.neighborhood || n.id) === nbId));
-  const name = nb.getAttribute('data-name') || nbId;
-  document.getElementById('map-label').textContent = name;
-  activeNeighborhood = nbId;
-  // The selection now drives one thing on this page: which seat the
-  // profile bar names. The news and the events it used to filter live on
-  // Kütüphane and Kahvehane.
-  renderPoliticianCard(nbId);
-});
-document.addEventListener('mouseover', (e) => {
-  const nb = e.target.closest('.neighborhood');
-  if (!nb) return;
-  document.getElementById('map-label').textContent = nb.getAttribute('data-name') || nb.id;
-  const nbId = nb.dataset.neighborhood || nb.id;
-  getNeighborhoods().forEach(n => n.classList.toggle('hover-active', (n.dataset.neighborhood || n.id) === nbId));
-});
-document.addEventListener('mouseout', (e) => {
-  const nb = e.target.closest('.neighborhood');
-  if (!nb || nb.contains(e.relatedTarget)) return;
-  document.getElementById('map-label').textContent = baseMapLabel();
-  getNeighborhoods().forEach(n => n.classList.remove('hover-active'));
-});
-
 
 // Detail overlay: a bottom sheet for whatever this page opens full-size --
 // a politician's page (see politician-card.js) or a person mentioned by
