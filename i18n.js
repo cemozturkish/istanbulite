@@ -173,6 +173,8 @@
     'games.q.thanks':   { default: 'Cevabın alındı.',         more_english: 'Your answer is in.' },
     'games.q.tallyone': { default: 'kişi seninle aynı fikirde', more_english: 'others answered the same' },
     'games.q.failed':   { default: 'Olmadı, tekrar dene.',    more_english: "That didn't work, try again." },
+    'games.q.deckdone':    { default: 'Hepsi bu kadar.',       more_english: "That's all of it." },
+    'games.q.deckdonesub': { default: 'Dışarısı seni bekliyor.', more_english: 'Outside is waiting.' },
     'games.todayneighborhoods': { default: 'Günün Mahalleleri',   more_english: "Today's Neighborhoods" },
     'games.congrats': { default: 'Tebrikler!', more_english: 'Congratulations!' },
     'games.share':     { default: 'Paylaş',     more_english: 'Share' },
