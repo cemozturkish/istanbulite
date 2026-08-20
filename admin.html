@@ -1506,6 +1506,7 @@
         <button class="games-subtab active" data-subtab="sozcel">Sözcel</button>
         <button class="games-subtab" data-subtab="tumcel">Tümcel</button>
         <button class="games-subtab" data-subtab="bulmaca">Bulmaca</button>
+        <button class="games-subtab" data-subtab="sorular">Sorular</button>
       </div>
 
       <!-- SÖZCEL -->
@@ -1672,6 +1673,59 @@
           Bulmaca'nın günlük bilmeceleri otomatik üretilir — buradan manuel içerik girişi yapılmaz.
           Oyunu belirli bir gün için açıp kapatmak için yukarıdaki Oyun Takvimi'ni kullanın.
         </p>
+      </div>
+
+      <!-- SORULAR — the question between two games (db/daily_questions.sql) -->
+      <div class="games-subpanel" id="games-sorular-panel" style="display:none;">
+        <div class="panel-title">Günün Soruları</div>
+        <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
+          Oyunlar bir sıra: Sözcel → soru → Tümcel → soru → Bulmaca → soru. Buraya girdiğiniz soru,
+          seçtiğiniz oyunun <em>ardından</em> sorulur ve sıradaki oyun o soru cevaplanana kadar kilitli
+          kalır. Boş bıraktığınız bir gün/oyun için kilit de yoktur — o gün oyunlar normal açılır.
+          Cevaplar üyelerin kendilerinden başka kimseye görünmez; site yalnızca sayıyı gösterir.
+        </p>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;">
+          <div style="flex:1;min-width:150px;">
+            <label>Tarih</label>
+            <input type="date" id="dq-date">
+          </div>
+          <div style="flex:1;min-width:150px;">
+            <label>Şu oyundan sonra</label>
+            <select id="dq-after-game">
+              <option value="sozcel">Sözcel</option>
+              <option value="tumcel">Tümcel</option>
+              <option value="bulmaca">Bulmaca</option>
+            </select>
+          </div>
+        </div>
+
+        <label>Soru (Türkçe)</label>
+        <textarea id="dq-body-tr" rows="2" placeholder="Ör: Mahallende en çok neyin eksikliğini hissediyorsun?"></textarea>
+        <label>Soru (English)</label>
+        <textarea id="dq-body-en" rows="2" placeholder="Optional"></textarea>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:180px;">
+            <label>A şıkkı (sağa kaydırma)</label>
+            <input type="text" id="dq-a-tr" placeholder="Ör: Yeşil alan">
+            <input type="text" id="dq-a-en" placeholder="Option A (English)">
+          </div>
+          <div style="flex:1;min-width:180px;">
+            <label>B şıkkı (sola kaydırma)</label>
+            <input type="text" id="dq-b-tr" placeholder="Ör: Buluşacak yer">
+            <input type="text" id="dq-b-en" placeholder="Option B (English)">
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button id="dq-save">Kaydet</button>
+          <button id="dq-clear" class="btn-secondary" style="display:none;">Yeni Soru</button>
+        </div>
+        <div id="dq-status" class="status-msg"></div>
+
+        <div class="panel-title" style="margin-top:22px;">Girilmiş Sorular</div>
+        <div class="articles-list" id="dq-list"><div class="empty-state"><span class="spinner"></span></div></div>
       </div>
 
     </div>
@@ -2168,6 +2222,8 @@ document.querySelectorAll('.games-subtab').forEach(btn => {
     document.getElementById('games-sozcel-panel').style.display = (sub === 'sozcel') ? '' : 'none';
     document.getElementById('games-tumcel-panel').style.display = (sub === 'tumcel') ? '' : 'none';
     document.getElementById('games-bulmaca-panel').style.display = (sub === 'bulmaca') ? '' : 'none';
+    document.getElementById('games-sorular-panel').style.display = (sub === 'sorular') ? '' : 'none';
+    if (sub === 'sorular') loadDailyQuestions();
   });
 });
 
@@ -5553,6 +5609,134 @@ document.getElementById('tb-parties-apply-btn').addEventListener('click', async 
   await refreshTBMMChart();
   setTimeout(() => { statusEl.textContent = ''; }, 3000);
 });
+
+// ── Oyunlar: Günün Soruları (daily_questions) ──
+// The question that stands between two games. One per (date, game); the
+// site asks it after that game is played and holds the next game shut
+// until it is answered (see game-locks.js and db/daily_questions.sql).
+// A slot left empty is not a broken day -- it simply has no question and
+// no gate, which is what keeps this a piece of content rather than a
+// switch that can take the games down.
+let dqEditingId = null;
+
+function dqSetStatus(msg, kind) {
+  const el = document.getElementById('dq-status');
+  el.textContent = msg || '';
+  el.className = 'status-msg' + (kind ? ' ' + kind : '');
+}
+
+function dqClearForm() {
+  dqEditingId = null;
+  ['dq-body-tr', 'dq-body-en', 'dq-a-tr', 'dq-a-en', 'dq-b-tr', 'dq-b-en'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('dq-clear').style.display = 'none';
+  document.getElementById('dq-save').textContent = 'Kaydet';
+  dqSetStatus('');
+}
+
+async function loadDailyQuestions() {
+  const list = document.getElementById('dq-list');
+  if (!list) return;
+  const dateEl = document.getElementById('dq-date');
+  if (dateEl && !dateEl.value) dateEl.value = sozcelIstanbulDateISO(0);
+
+  const { data, error } = await sb
+    .from('daily_questions')
+    .select('*')
+    .order('question_date', { ascending: false })
+    .limit(60);
+
+  if (error) {
+    list.innerHTML = `<div class="empty-state">Yüklenemedi: ${escapeHtml(error.message)}<br><small>db/daily_questions.sql çalıştırıldı mı?</small></div>`;
+    return;
+  }
+  if (!data || !data.length) {
+    list.innerHTML = '<div class="empty-state">Henüz soru yok.</div>';
+    return;
+  }
+  const labels = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Bulmaca' };
+  list.innerHTML = data.map(q => `
+    <div class="article-card" data-id="${q.id}">
+      <p>${escapeHtml(q.body_tr)}</p>
+      <div class="a-neighborhood">
+        ${escapeHtml(q.question_date)} · ${escapeHtml(labels[q.after_game] || q.after_game)} sonrası
+        · A: ${escapeHtml(q.option_a_tr)} / B: ${escapeHtml(q.option_b_tr)}
+      </div>
+      <div class="card-actions">
+        <button class="btn-edit" data-dq-edit="${q.id}">Düzenle</button>
+        <button class="btn-del" data-dq-del="${q.id}">Sil</button>
+      </div>
+    </div>`).join('');
+
+  list.querySelectorAll('[data-dq-edit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const q = data.find(x => x.id === btn.getAttribute('data-dq-edit'));
+      if (!q) return;
+      dqEditingId = q.id;
+      document.getElementById('dq-date').value = q.question_date;
+      document.getElementById('dq-after-game').value = q.after_game;
+      document.getElementById('dq-body-tr').value = q.body_tr || '';
+      document.getElementById('dq-body-en').value = q.body_en || '';
+      document.getElementById('dq-a-tr').value = q.option_a_tr || '';
+      document.getElementById('dq-a-en').value = q.option_a_en || '';
+      document.getElementById('dq-b-tr').value = q.option_b_tr || '';
+      document.getElementById('dq-b-en').value = q.option_b_en || '';
+      document.getElementById('dq-clear').style.display = '';
+      document.getElementById('dq-save').textContent = 'Güncelle';
+      dqSetStatus('Düzenleniyor.', '');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+  list.querySelectorAll('[data-dq-del]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Soru silinsin mi? Verilen cevaplar da silinir.')) return;
+      const { error: delErr } = await sb.from('daily_questions').delete().eq('id', btn.getAttribute('data-dq-del'));
+      if (delErr) { dqSetStatus('Silinemedi: ' + delErr.message, 'error'); return; }
+      if (dqEditingId === btn.getAttribute('data-dq-del')) dqClearForm();
+      loadDailyQuestions();
+    });
+  });
+}
+
+(function initDailyQuestionForm() {
+  const save = document.getElementById('dq-save');
+  if (!save) return;
+  document.getElementById('dq-clear').addEventListener('click', dqClearForm);
+  save.addEventListener('click', async () => {
+    const row = {
+      question_date: document.getElementById('dq-date').value,
+      after_game: document.getElementById('dq-after-game').value,
+      body_tr: document.getElementById('dq-body-tr').value.trim(),
+      body_en: document.getElementById('dq-body-en').value.trim() || null,
+      option_a_tr: document.getElementById('dq-a-tr').value.trim(),
+      option_a_en: document.getElementById('dq-a-en').value.trim() || null,
+      option_b_tr: document.getElementById('dq-b-tr').value.trim(),
+      option_b_en: document.getElementById('dq-b-en').value.trim() || null,
+    };
+    if (!row.question_date || !row.body_tr || !row.option_a_tr || !row.option_b_tr) {
+      dqSetStatus('Tarih, soru ve iki şık zorunlu.', 'err');
+      return;
+    }
+    save.disabled = true;
+    const { data: { session } } = await sb.auth.getSession();
+    const createdBy = session && session.user ? session.user.id : null;
+    const { error } = dqEditingId
+      ? await sb.from('daily_questions').update(row).eq('id', dqEditingId)
+      : await sb.from('daily_questions').insert([{ ...row, created_by: createdBy }]);
+    save.disabled = false;
+    if (error) {
+      // The one collision worth wording: a slot already taken.
+      dqSetStatus(/duplicate|unique/i.test(error.message)
+        ? 'O gün o oyunun sorusu zaten var — listeden düzenleyin.'
+        : 'Kaydedilemedi: ' + error.message, 'err');
+      return;
+    }
+    dqSetStatus(dqEditingId ? 'Güncellendi.' : 'Eklendi.', 'ok');
+    dqClearForm();
+    loadDailyQuestions();
+  });
+})();
 
 // ── Oyunlar: per-day on/off board (game_day_toggles) ──
 const GAME_STATUS_GAMES = [

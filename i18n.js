@@ -166,6 +166,13 @@
     // games — shared right column (Günün Oyunları / scoreboard / neighborhood stats)
     'games.today':            { default: 'Günün Oyunları',        more_english: "Today's Games" },
     'games.weeklyscoreboard': { default: 'Haftanın Skor Tahtası', more_english: 'Weekly Scoreboard' },
+    // The question standing between two games (see db/daily_questions.sql
+    // and the question card in kahvehane.html).
+    'games.q.kicker':   { default: 'GÜNÜN SORUSU',            more_english: "TODAY'S QUESTION" },
+    'games.q.hint':     { default: 'Kaydır ya da seç',        more_english: 'Swipe or pick' },
+    'games.q.thanks':   { default: 'Cevabın alındı.',         more_english: 'Your answer is in.' },
+    'games.q.tallyone': { default: 'kişi seninle aynı fikirde', more_english: 'others answered the same' },
+    'games.q.failed':   { default: 'Olmadı, tekrar dene.',    more_english: "That didn't work, try again." },
     'games.todayneighborhoods': { default: 'Günün Mahalleleri',   more_english: "Today's Neighborhoods" },
     'games.congrats': { default: 'Tebrikler!', more_english: 'Congratulations!' },
     'games.share':     { default: 'Paylaş',     more_english: 'Share' },
