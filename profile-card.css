@@ -598,6 +598,29 @@
      standing at each frame's base. */
   --ist-hive-step-x: calc(var(--ist-hive-cell-w) * 0.785);
   --ist-hive-step-y: calc(var(--ist-hive-cell-w) * 1.30);
+  /* ── The five tones of the drawing ──
+     Distance from the reader, in ink. The petek is one shape with the
+     reader at its centre, and how far into it something is should be
+     legible before a single word is read:
+
+       1. you                      — the darkest thing on the page
+       2. the members you hold     — a step back
+       3. members on the same petek you are not attached to
+       4. the free sides you can offer ("+")
+       5. the field of places nobody stands in yet
+
+     Every one of them is the ring of the same drawn hexagon
+     (--hexframe-stroke, see frames.css), so this is a tone ladder and
+     not five different treatments. Level 2 is mixed rather than picked
+     from the palette because nothing between --ink and --muted exists
+     there; the flat value above it is the fallback for a browser without
+     color-mix, and it keeps the ladder monotonic either way. */
+  --ist-hive-ring-me: var(--ink);
+  --ist-hive-ring-bonded: #5a5a5a;
+  --ist-hive-ring-bonded: color-mix(in srgb, var(--ink) 62%, var(--paper));
+  --ist-hive-ring-other: var(--muted);
+  --ist-hive-ring-open: var(--hairline);
+  --ist-hive-ring-ghost: var(--rule);
   /* The track a name gets beside its hexagon, and the air between the
      two. Written against the cell so a name stays the same size relative
      to the face it belongs to at every scale the grid is drawn at. */
@@ -687,11 +710,15 @@ button.ist-hive-cell:focus-visible /* The transparent field around the petek: fr
    drawn so the honeycomb reads as something that continues. Faint, and
    deliberately not a button — the only openings that DO anything are the
    six sides of the reader's own hexagon (see hiveGhostCellHTML). */
+/* 5. The field of places nobody stands in yet: the lightest tone there
+   is. It used to be held back with opacity, which is a different thing
+   from being further away — the ladder is ink now, so the drawing reads
+   as one honeycomb at five depths rather than as a grid with some of it
+   faded out. */
 .ist-hive-ghost {
   pointer-events: none;
-  opacity: 0.34;
 }
-.ist-hive-ghost .ist-hive-slot { --hexframe-stroke: var(--rule); }
+.ist-hive-ghost .ist-hive-slot { --hexframe-stroke: var(--ist-hive-ring-ghost); }
 
 .ist-hive-plus { color: var(--ink); }
 button.ist-hive-cell:focus-visible { outline: none; }
@@ -705,12 +732,21 @@ button.ist-hive-cell-open .ist-hive-slot { --hexframe-stroke: var(--ink); }
 button.ist-hive-cell-open .ist-hive-plus { color: var(--ink); }
 .ist-hive-frame { transition: opacity 160ms, transform 200ms cubic-bezier(0.22, 1, 0.36, 1); }
 button.ist-hive-cell-open .ist-hive-frame { transform: scale(1.05); }
+/* 1. You. Nothing else on the page is this dark. */
+.ist-hive-me .ist-hive-frame { --hexframe-stroke: var(--ist-hive-ring-me); }
+/* 2. The members you are attached to: one step back from you, and still
+   clearly in the foreground — these are the six that are yours. */
+.ist-hive-filled.ist-hive-bonded .ist-hive-frame { --hexframe-stroke: var(--ist-hive-ring-bonded); }
 button.ist-hive-filled:hover .ist-hive-frame { opacity: 0.82; }
-/* A member you are not attached to — somebody else's neighbour, standing
-   on the same petek. They are drawn a shade back from the ones you are
-   holding: the grid is one shape and hiding part of it would be a lie,
-   but which of it is yours has to be legible at a glance. */
-button.ist-hive-filled:not(.ist-hive-bonded) .ist-hive-frame { opacity: 0.78; }
+/* 3. A member you are not attached to — somebody else's neighbour,
+   standing on the same petek. Another step back: the grid is one shape
+   and hiding part of it would be a lie, but which of it is yours has to
+   be legible at a glance. The tone carries that; the opacity only takes
+   the edge off the portrait so the two agree. */
+.ist-hive-filled:not(.ist-hive-bonded) .ist-hive-frame {
+  --hexframe-stroke: var(--ist-hive-ring-other);
+  opacity: 0.88;
+}
 /* An open member is never dimmed: the panel in the dock is the state,
    and a faded portrait next to a Çıkar button reads as "leaving". */
 button.ist-hive-cell-open.ist-hive-filled .ist-hive-frame { opacity: 1; }
@@ -725,8 +761,11 @@ button.ist-hive-cell-open.ist-hive-filled .ist-hive-frame { opacity: 1; }
    with a "+" where a member will stand. Nothing behind it — no paper
    fill — so an opening reads as an opening rather than as a member whose
    avatar failed to load. */
+/* 4. A free side of your own hexagon: a place, not a person. */
+.ist-hive-empty .ist-hive-slot { --hexframe-stroke: var(--ist-hive-ring-open); }
+.ist-hive-empty .ist-hive-plus { color: var(--ist-hive-ring-open); }
 .ist-hive-slot {
-  --hexframe-stroke: var(--muted);
+  --hexframe-stroke: var(--ist-hive-ring-open);
   background: none;
   display: flex;
   align-items: center;
