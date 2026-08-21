@@ -60,8 +60,16 @@ with checks(sira, dosya, aranan, var) as (
     -- ── Ağustos 11–13 ──
     (11, 'db/coffee_comments.sql',                    'coffee_comments tablosu',
          to_regclass('public.coffee_comments') is not null),
-    (12, 'db/coffee_prices_v3_live.sql',              'coffee_prices.hours + discount kolonları',
-         pg_temp.has_col('coffee_prices', 'hours') and pg_temp.has_col('coffee_prices', 'discount')),
+    -- v3'ün eklediği kolonlar: hours + happy_* beşlisi. (Burada bir ara
+    -- 'discount' aranıyordu; öyle bir kolon hiç olmadı, dolayısıyla bu
+    -- satır migration çalıştırılmış olsa bile EKSİK diyordu.)
+    (12, 'db/coffee_prices_v3_live.sql',              'coffee_prices.hours + happy_* kolonları',
+         pg_temp.has_col('coffee_prices', 'hours')
+         and pg_temp.has_col('coffee_prices', 'happy_price')
+         and pg_temp.has_col('coffee_prices', 'happy_days')
+         and pg_temp.has_col('coffee_prices', 'happy_start')
+         and pg_temp.has_col('coffee_prices', 'happy_end')
+         and pg_temp.has_col('coffee_prices', 'happy_label')),
     (13, 'db/sozcel_used_answers_v5_server_pick.sql', 'sozcel_daily_word() fonksiyonu',
          pg_temp.has_fn('sozcel_daily_word')),
     (14, 'db/game_day_toggles.sql',                   'game_day_toggles tablosu',
