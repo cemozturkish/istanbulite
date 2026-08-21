@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="palette.css">
   <link rel="stylesheet" href="loading-screen.css?v=2">
   <script src="game-locks.js"></script>
-  <link rel="stylesheet" href="profile-card.css?v=10">
+  <link rel="stylesheet" href="profile-card.css?v=11">
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
   <script src="profile-card.js?v=10" defer></script>
@@ -719,14 +719,20 @@
         grid-template-areas:
           "hero hero"
           "events events";
-        /* Row 1 is the petek, standing exactly where the map used to and
-           in exactly its box: the same square every other page's hero
-           occupies, starting on the same line under the profile bar, so
-           swiping between the three pages never shifts what is under it.
-           Row 2 is the events, running the full width -- the news column
-           that used to share this row is on Kütüphane now, and a single
-           feed reads better across the screen than pinned to half of it. */
-        grid-template-rows: calc(100vw + var(--map-hero-top)) minmax(0, 1fr);
+        /* Row 1 is the petek and it takes everything that is left; row 2
+           is the events and takes only what its own cards need.
+           The other two pages' hero is a map -- a square drawing, so it
+           gets a square. This page's hero is the petek, which is not a
+           picture of a fixed size but a shape that grows, and the reader
+           stands at the middle of it: pinning it to the map's square left
+           the middle of the drawing at the middle of a box in the top
+           third of the screen, with dead paper under it whenever there
+           were no events on. So the petek is measured from what is left
+           after the events rather than from the map's geometry, and with
+           nothing on tonight it is the whole band between the two bars —
+           which is where the reader's own avatar then sits, dead centre
+           of the screen. */
+        grid-template-rows: minmax(0, 1fr) auto;
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
            the map -- a different color from the map's own #f7f7f7,
@@ -874,7 +880,14 @@
         overflow: visible;
         z-index: 1;
       }
-      .col-left { grid-area: events; }
+      .col-left {
+        grid-area: events;
+        /* Their share of the band, and no more. A night with a lot on
+           must not push the petek — and the reader standing in the
+           middle of it — up off the screen; past this the list scrolls
+           inside its own column, the way every other phone feed does. */
+        max-height: 46vh;
+      }
       /* Nothing on this page's right column shows on a phone -- it is
          empty (the seat it used to carry is gone from Hane entirely, see
          the col-right markup). Hidden outright rather than given a track

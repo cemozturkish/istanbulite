@@ -1005,6 +1005,23 @@ which swaps `#ist-content` and takes the previous mount with it — and every mo
 `hive_map()`, because somebody else's attachment may have carried this whole petek somewhere since
 it was last drawn.
 
+**The petek takes the band, and the events take what is left.** On a phone Hane's hero is not the
+map's square: the other two pages' hero is a drawing of a fixed size and gets a square, while this
+one is a shape that grows with the reader standing in the middle of it. Pinned to the map's square,
+the middle of the drawing sat in the middle of a box in the top third of the screen with dead paper
+under it on any night with nothing on. So row 1 is `minmax(0, 1fr)` — whatever the events leave —
+and the events' column is capped (`max-height: 46vh`) so a busy night scrolls inside its own box
+instead of pushing the reader off the middle of the screen.
+
+**The frames are a five-step tone ladder, and the step is distance from the reader**
+(`--ist-hive-ring-*` on `.ist-hive-page`): you are the darkest thing on the page, then the members
+you hold, then members on the same petek you are not attached to, then the free sides you can offer,
+then the field of places nobody stands in yet. All five are the ring of the same drawn hexagon
+(`--hexframe-stroke`, frames.css), so it is one ladder rather than five treatments — and how deep
+into the petek something is stays legible before a word is read. Level 2 is `color-mix`ed because
+the palette has nothing between `--ink` and `--muted`; the flat value declared above it is the
+fallback, and the ladder stays monotonic either way.
+
 **The reader's own avatar is the page's exact centre, on every device.** The window fills the whole
 of `.ist-hive-page` — Hane's middle cell, the hero square on a phone and the middle column on a
 desktop — and the dock is laid *over* its foot rather than taking height from it: a dock that took
