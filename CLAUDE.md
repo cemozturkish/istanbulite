@@ -531,9 +531,13 @@ sb.from('articles').delete().eq('id', id)
 - **And a game card is a news card**, printed on the same paper in the same band: a kicker saying
   where in the day's sequence it stands (1./2./3. OYUN, `games.step1-3`), the game's name as the
   headline, what it is under that — the type sizes are `.article`'s own. Three squares side by
-  side said nothing about order; a stack of cards in order says it without a word. The deck hangs
-  off the bottom of the band like every other stack on a phone (`margin-top: auto`), and a game
-  already played today is inked over the way a story you have dealt with is gone. Sözcel's
+  side said nothing about order; a stack of cards in order says it without a word. The deck sits
+  in the band's **bottom-right corner** — down against the tab bar like every other phone stack
+  (`margin-top: auto`), and over on the thumb side (`align-self: flex-end`, because `.game-picker`
+  packs its cross axis to `flex-start` for the desktop row's sake). It keeps the cards' own width
+  rather than filling the band: a deck is a hand of cards, not a panel, and it reads as one by not
+  spanning everything. A game already played today is inked over the way a story you have dealt
+  with is gone. Sözcel's
   wordmark is a tile's way of saying its name — in the deck it says it in the headline like every
   other card. The desktop three-square tiles are untouched
 - **The direction is the answer**, exactly as on a news story: right is the first option, left the
