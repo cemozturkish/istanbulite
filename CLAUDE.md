@@ -1053,17 +1053,26 @@ when they are tapped (which is where their district is anyway). It is absolutely
 flow — the packing is arithmetic, and nothing about it may shift because somebody's name is long —
 and `fitHive` measures the names when it fits the grid, since they hang outside the plane's own box.
 
-What a tap needs lands in **the dock**, one fixed spot resting on the page's foot (`hiveDockHTML`),
-and its two states are the two halves of the exchange: at rest it is the field where you **take** a
-seat somebody just offered you (taking one is not about a slot of your own, which is why it lives
-at rest rather than behind a hexagon), and a tapped free side **gives** one away — that seat's
-freshly minted code, with the minutes it has left ticking in place. A tapped member shows who they
-are, with a Çıkar button where they are yours to detach, and where they are not (the bond is still
-locked for its week, or they are not attached to you) the rule printed in the button's own place. A missing control reads as a bug; a stated one reads as a
-rule. The grid itself is fixed furniture: nothing resizes, shifts or pans for a tap, on a phone or
-anywhere else — the tapped hexagon is marked instead (`.ist-hive-cell-open` inks its ring and lifts
-it slightly via `transform`, which never moves a neighbour). Pressing the same hexagon again folds
-the dock back to the resting code display, which is why there is no close button in it.
+**Both halves of the exchange are printed inside the hexagon they belong to.** There used to be a
+dock along the foot of the page carrying whatever was tapped; there is no bar on this page at all
+now. Pressing a free side of your own hexagon mints that seat's code and prints it **in the seat**,
+with the minutes it has left ticking under it — the code *is* that empty place
+(`db/hive_slot_codes_v5.sql`), so it belongs in it. Pressing **yourself** opens the field that takes
+a code somebody gave you, inside your own frame, because you are the one who moves; six characters
+is the whole code, so it goes the moment it is complete and there is no button to press. Every
+hexagon is its own close button — pressing the open one again folds it back — which is why nothing
+here carries one.
+
+Nothing about a cell's box changes for a press: the frame is the same size open or shut, so no
+neighbour ever moves — what changes happens *inside* the drawing (`.ist-hive-cell-open` inks the
+ring and lifts it slightly via `transform`).
+
+**Pressing a member does nothing, for now.** Their name is beside them and their tone says how far
+into the petek they are, so the panel that used to open had only one thing in it that acted: Çıkar.
+Detaching is parked — `hive_unbond()` is untouched in the database and still refuses a bond inside
+the week it was made in, but nothing calls it, and where a detach belongs on a page that is only
+the drawing is an open question. Member hexagons are therefore not buttons at all rather than
+buttons that open nothing.
 
 Nothing on this page scrolls, and neither does any of the three profile sets: each fits the room it
 is given, the way a politician's page does. If a new block stops fitting, drop a block — do not turn

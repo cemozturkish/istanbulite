@@ -1202,13 +1202,11 @@
   }
 
   // ── One cell ──
-  // A member's hexagon, an empty side of your own, or you. All three are
-  // absolutely placed on the plane; the first two are buttons that open
-  // their panel in the dock (see hiveDockHTML) — the frame itself never
-  // resizes for a tap, it is only marked, so no neighbour ever moves.
-  function hiveCellHTML(inner, style, attrs, cls) {
-    return `<div class="ist-hive-cell${cls ? ' ' + cls : ''}" style="${style}" ${attrs || ''}>${inner}</div>`;
-  }
+  // A member's hexagon, a free side of your own, you, or an empty place
+  // in the field. Every one of them is absolutely placed on the plane and
+  // none of them resizes for a press — what a press changes happens
+  // *inside* the frame (the seat's code, your own code field), so no
+  // neighbour ever moves.
 
   // ── The name beside a hexagon ──
   // A member is named in the paper *outside* their own frame, on
@@ -1230,34 +1228,53 @@
     return `<span class="ist-hive-name ist-hive-name-${side}">${esc(hiveMemberName(member))}</span>`;
   }
 
-  function hiveMemberCellHTML(member, style, isOpen, nameSide) {
+  // A member on the grid. Not a button: pressing one used to open their
+  // panel, and the only thing in that panel that did anything was Çıkar,
+  // which is gone for now. Their name is beside them and their tone says
+  // how far into the petek they are — there is nothing left for a press
+  // to reveal, so it does not offer one.
+  function hiveMemberCellHTML(member, style, nameSide) {
     const name = hiveMemberName(member);
-    const cls = `ist-hive-filled${member.bonded ? ' ist-hive-bonded' : ''}${isOpen ? ' ist-hive-cell-open' : ''}`;
+    const cls = `ist-hive-filled${member.bonded ? ' ist-hive-bonded' : ''}`;
     return `
-      <button type="button" class="ist-hive-cell ${cls}" style="${style}"
-              data-member="${esc(member.member_id)}" aria-expanded="${isOpen ? 'true' : 'false'}"
-              title="${esc(name)}" aria-label="${esc(name)}">
+      <div class="ist-hive-cell ${cls}" style="${style}" title="${esc(name)}">
         <div class="ist-pc-cover-avatar ist-hive-frame">
           ${coverBadgesHTML(member)}
           <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
         </div>
         ${hiveNameHTML(member, nameSide)}
-      </button>
+      </div>
     `;
   }
 
   // A free side of your own hexagon: the one thing on the grid you can
-  // hand out. Pressing it mints a code for that seat and nothing else —
-  // see offerHiveSlot.
-  function hiveEmptyCellHTML(dir, style, isOpen, t) {
+  // hand out. Pressing it mints a code for that seat, and the code is
+  // printed **in the seat itself** — the code IS that empty place (see
+  // db/hive_slot_codes_v5.sql), so it belongs inside its own hexagon and
+  // not in a panel somewhere else on the page. There is no copy button
+  // and nothing to dismiss: it is six characters you read out to whoever
+  // is standing in front of you, and it dies on its own.
+  function hiveEmptyCellHTML(dir, style, open, t) {
     const label = t('profile.hive.empty');
+    const isOpen = !!open;
+    let inner = `<span class="ist-hive-plus" aria-hidden="true">+</span>`;
+    if (isOpen) {
+      if (open.error) {
+        inner = `<span class="ist-hive-cell-msg">${esc(open.error)}</span>`;
+      } else if (open.offer) {
+        inner = `
+          <span class="ist-hive-cell-code">${esc(open.offer.code)}</span>
+          <span class="ist-hive-cell-left" id="po-hive-left">${esc(hiveOfferLeft(open.offer))}</span>
+        `;
+      } else {
+        inner = `<span class="ist-hive-cell-code ist-hive-cell-waiting">••••••</span>`;
+      }
+    }
     return `
       <button type="button" class="ist-hive-cell ist-hive-empty${isOpen ? ' ist-hive-cell-open' : ''}" style="${style}"
               data-dir="${dir}" aria-expanded="${isOpen ? 'true' : 'false'}"
               title="${esc(label)}" aria-label="${esc(label)}">
-        <div class="hexframe ist-hive-frame ist-hive-slot">
-          <span class="ist-hive-plus" aria-hidden="true">+</span>
-        </div>
+        <div class="hexframe ist-hive-frame ist-hive-slot">${inner}</div>
       </button>
     `;
   }
@@ -1277,14 +1294,35 @@
     `;
   }
 
-  function hiveMeCellHTML(opts, style) {
+  // You, in the middle. Pressing yourself is how you TAKE a seat somebody
+  // just offered you: the field opens inside your own hexagon, because
+  // you are the one who moves. It is the mirror of the seat's own code
+  // above — what you give is printed in the place you give, what you take
+  // is typed into you — and it is why neither of them needs a bar at the
+  // foot of the page any more.
+  function hiveMeCellHTML(opts, style, open, t) {
     const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName } = opts;
-    return hiveCellHTML(`
-      <div class="ist-pc-cover-avatar ist-hive-frame" title="${esc(displayName)}">
-        ${coverBadgesHTML(profile)}
-        <div class="ist-pc-cover-art">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>
-      </div>
-    `, style, '', 'ist-hive-me');
+    const isOpen = !!(open && open.claim);
+    const claim = isOpen ? `
+      <div class="ist-hive-claim-in">
+        <input class="ist-hive-claim-input" id="po-hive-code" type="text"
+               inputmode="latin" autocomplete="off" autocapitalize="characters" spellcheck="false"
+               enterkeyhint="go" maxlength="${HIVE_CODE_LENGTH}"
+               placeholder="${'•'.repeat(HIVE_CODE_LENGTH)}"
+               aria-label="${esc(t('profile.hive.claimprompt'))}"
+               value="${esc(open.value || '')}">
+        <span class="ist-hive-cell-msg" id="po-hive-msg">${esc(open.error || '')}</span>
+      </div>` : '';
+    return `
+      <button type="button" class="ist-hive-cell ist-hive-me${isOpen ? ' ist-hive-cell-open' : ''}" style="${style}"
+              data-me="1" aria-expanded="${isOpen ? 'true' : 'false'}" title="${esc(displayName)}">
+        <div class="ist-pc-cover-avatar ist-hive-frame">
+          ${coverBadgesHTML(profile)}
+          <div class="ist-pc-cover-art">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>
+          ${claim}
+        </div>
+      </button>
+    `;
   }
 
   // ── The grid ──
@@ -1349,17 +1387,17 @@
     const html = items.map(item => {
       const p = hivePos(item.q, item.r, minX, minY);
       const style = `left: calc(var(--ist-hive-step-x) * ${p.x}); top: calc(var(--ist-hive-step-y) * ${p.y});`;
-      if (item.kind === 'me') return hiveMeCellHTML(opts, style);
+      if (item.kind === 'me') return hiveMeCellHTML(opts, style, open, t);
       if (item.kind === 'member') {
         // Which side of the reader they are standing on — and whether the
         // cell further out that way is free to print a name into.
         const side = (item.q + item.r / 2) < 0 ? 'left' : 'right';
         const outward = side === 'left' ? `${item.q - 1},${item.r}` : `${item.q + 1},${item.r}`;
         const nameSide = occupied.has(outward) ? null : side;
-        return hiveMemberCellHTML(item.member, style, !!open && open.member === item.member.member_id, nameSide);
+        return hiveMemberCellHTML(item.member, style, nameSide);
       }
       if (item.kind === 'ghost') return hiveGhostCellHTML(style);
-      return hiveEmptyCellHTML(item.dir, style, !!open && open.dir === item.dir, t);
+      return hiveEmptyCellHTML(item.dir, style, (open && open.dir === item.dir) ? open : null, t);
     }).join('');
 
     const w = `calc(var(--ist-hive-step-x) * ${maxX - minX} + var(--ist-hive-cell-w))`;
@@ -1371,53 +1409,9 @@
     `;
   }
 
-  // ── The dock ──
-  // One fixed spot under the grid that a tap talks to, so nothing on the
-  // grid itself has to grow, shift or make room.
-  //
-  // The two halves of the exchange are the two states it rests in:
-  //   - Nothing selected: the field where you TAKE a seat somebody just
-  //     offered you. Taking one is not about a slot of your own, which is
-  //     why it lives at rest rather than behind a hexagon.
-  //   - A free side of your own hexagon: the code that GIVES that seat
-  //     away, minted on the spot and dead in a few minutes (see
-  //     db/hive_slot_codes_v5.sql). No member carries a code around any
-  //     more; a seat does, and only while somebody is standing in front
-  //     of you waiting to hear it.
-  //   - A member: who they are, and Çıkar where they are yours to detach.
-
-  // The code for the tapped seat, with the time it has left. `offer` is
-  // state.hiveOpen.offer — null while the mint is still in flight.
-  function hiveOfferHTML(open, t) {
-    const offer = open.offer;
-    if (open.error) {
-      return `
-        <div class="ist-hive-ext-label">${esc(t('profile.hive.offerlabel'))}</div>
-        <div class="ist-hive-ext-msg" id="po-hive-msg">${esc(open.error)}</div>
-      `;
-    }
-    if (!offer) {
-      return `
-        <div class="ist-hive-ext-label">${esc(t('profile.hive.offerlabel'))}</div>
-        <div class="ist-hive-code-value ist-hive-code-waiting">••••••</div>
-      `;
-    }
-    return `
-      <div class="ist-hive-ext-label">${esc(t('profile.hive.offerlabel'))}</div>
-      <div class="ist-hive-offer">
-        <span class="ist-hive-code-value">${esc(offer.code)}</span>
-        <button type="button" class="ist-pc-copy" id="po-hive-copy">${esc(t('profile.copy'))}</button>
-      </div>
-      <div class="ist-hive-code-hint">
-        <span id="po-hive-left">${esc(hiveOfferLeft(offer))}</span> ${esc(t('profile.hive.offerhint'))}
-      </div>
-      <div class="ist-hive-ext-msg" id="po-hive-msg"></div>
-    `;
-  }
-
-  // What is left of an offer, as m:ss. A seat that has run out says so
-  // rather than sitting there looking live — the whole point of the code
-  // is that it dies.
+  // What is left of an offer, as m:ss, printed under the code inside the
+  // seat itself. A seat that has run out says so rather than sitting
+  // there looking live — the whole point of the code is that it dies.
   function hiveOfferLeft(offer) {
     const ms = new Date(offer.expires_at).getTime() - Date.now();
     if (!(ms > 0)) return '0:00';
@@ -1425,63 +1419,13 @@
     return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
   }
 
-  function hiveMemberPanelHTML(member, open, t) {
-    const nb = hiveMemberDistrict(member);
-    let action;
-    if (!member.bonded) {
-      // Somebody else's neighbour. You can see them — the petek is one
-      // shape and it would be a lie to hide part of it — but they are
-      // not yours to detach, and you reach them the same way you reach
-      // anyone: by being handed a seat.
-      action = `<div class="ist-hive-ext-note">${esc(t('profile.hive.notyours'))}</div>`;
-    } else if (member.locked) {
-      action = `<div class="ist-hive-ext-note">${esc(t('profile.hive.lockednote'))}</div>`;
-    } else {
-      action = `<button type="button" class="ist-hive-remove" id="po-hive-remove">${esc(t('profile.hive.remove'))}</button>`;
-    }
-    return `
-      <div class="ist-hive-readout-name">${esc(hiveMemberName(member))}</div>
-      ${nb ? `<div class="ist-hive-readout-meta">${esc(nb)}</div>` : ''}
-      ${action}
-      <div class="ist-hive-ext-msg" id="po-hive-msg">${esc(open.error || '')}</div>
-    `;
-  }
-
-  // The resting state: take a seat you were just given.
-  function hiveClaimHTML(hive, t) {
-    return `
-      <div class="ist-hive-claim">
-        <label class="ist-hive-ext-label" for="po-hive-code">${esc(t('profile.hive.claimprompt'))}</label>
-        <div class="ist-hive-claim-row">
-          <input class="ist-pc-input ist-hive-input" id="po-hive-code" type="text"
-                 inputmode="latin" autocomplete="off" autocapitalize="characters" spellcheck="false"
-                 maxlength="${HIVE_CODE_LENGTH}" placeholder="${'•'.repeat(HIVE_CODE_LENGTH)}"
-                 value="${esc((hive && hive.claimValue) || '')}">
-          <button type="button" class="ist-pc-save ist-hive-submit" id="po-hive-submit">${esc(t('profile.hive.add'))}</button>
-        </div>
-        <div class="ist-hive-ext-msg" id="po-hive-msg">${esc((hive && hive.claimError) || '')}</div>
-      </div>
-    `;
-  }
-
-  function hiveDockHTML(opts) {
-    const t = opts.t;
-    const open = opts.open;
-    if (open && open.member) {
-      const member = ((opts.hive && opts.hive.cells) || []).find(c => c.member_id === open.member);
-      if (member) return `<div class="ist-hive-dock-panel">${hiveMemberPanelHTML(member, open, t)}</div>`;
-    }
-    if (open && open.dir != null) {
-      return `<div class="ist-hive-dock-panel">${hiveOfferHTML(open, t)}</div>`;
-    }
-    return hiveClaimHTML(opts.hive, t);
-  }
-
+  // The page is the drawing, and nothing else. There was a dock along the
+  // foot carrying whatever was tapped; both halves of the exchange live
+  // inside the hexagons they belong to now (the seat's code in the seat,
+  // the field that takes a code in you), so the bar had nothing left to
+  // hold and the petek gets the whole page back.
   function hiveHTML(opts) {
-    return `
-      ${hiveGridHTML(opts)}
-      <div class="ist-hive-dock" id="po-hive-dock">${hiveDockHTML(opts)}</div>
-    `;
+    return hiveGridHTML(opts);
   }
 
   // ── The petek's own little render/fetch loop ──
@@ -1595,7 +1539,7 @@
   async function loadHive(state) {
     state.hiveLoaded = true;
     const { data } = await state.sb.rpc('hive_map');
-    state.hive = Object.assign({ claimValue: '', claimError: '' }, state.hive, { cells: data || [] });
+    state.hive = Object.assign({}, state.hive, { cells: data || [] });
     renderHive(state);
   }
 
@@ -1657,59 +1601,56 @@
       });
     });
 
-    mount.querySelectorAll('.ist-hive-cell[data-member]').forEach(cell => {
-      cell.addEventListener('click', () => {
-        const id = cell.dataset.member;
-        state.hiveOpen = (state.hiveOpen && state.hiveOpen.member === id)
-          ? null
-          : { member: id, value: '', error: '' };
-        renderHive(state);
-      });
-    });
-
-    const copyBtn = document.getElementById('po-hive-copy');
-    if (copyBtn) copyBtn.addEventListener('click', () => {
-      const offer = state.hiveOpen && state.hiveOpen.offer;
-      navigator.clipboard.writeText((offer && offer.code) || '');
-      const orig = copyBtn.textContent;
-      copyBtn.textContent = t('profile.copied');
-      setTimeout(() => { copyBtn.textContent = orig; }, 1500);
+    // Pressing yourself opens the field that takes a code somebody gave
+    // you, inside your own hexagon. Pressing yourself again folds it back
+    // to your avatar — every hexagon on this page is its own close
+    // button, which is why nothing here carries one.
+    const meCell = mount.querySelector('.ist-hive-cell[data-me]');
+    if (meCell) meCell.addEventListener('click', () => {
+      if (state.hiveOpen && state.hiveOpen.claim) { state.hiveOpen = null; renderHive(state); return; }
+      state.hiveOpen = { claim: true, value: '', error: '' };
+      state.hiveFocusInput = true;
+      renderHive(state);
     });
 
     const input = document.getElementById('po-hive-code');
-    const submit = document.getElementById('po-hive-submit');
-    if (input && submit) {
+    if (input) {
+      // A press inside the field must not reach the hexagon behind it, or
+      // opening the field would immediately fold it away again.
+      ['click', 'pointerdown'].forEach(ev => input.addEventListener(ev, (e) => e.stopPropagation()));
       input.addEventListener('input', () => {
         // The codes are read off somebody else's screen, so type them in
         // whatever case and drop anything outside the alphabet (see
         // db/hive_slot_codes_v5.sql).
         const cleaned = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, HIVE_CODE_LENGTH);
         if (cleaned !== input.value) input.value = cleaned;
-        state.hive = Object.assign({}, state.hive, { claimValue: cleaned });
+        if (state.hiveOpen) state.hiveOpen.value = cleaned;
+        // Six characters is the whole code, so there is nothing left to
+        // confirm: it goes the moment it is complete. That is what lets
+        // the field be a field and not a field plus a button in a
+        // hexagon this size.
+        if (cleaned.length === HIVE_CODE_LENGTH) claimHiveSlot(state, cleaned);
       });
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') submit.click();
+        if (e.key === 'Enter') claimHiveSlot(state, input.value);
+        if (e.key === 'Escape') { state.hiveOpen = null; renderHive(state); }
       });
-      submit.addEventListener('click', () => claimHiveSlot(state, input.value));
-      // Focus only when the panel has just been opened, not on every
-      // re-render: loadHive landing while a code is half-typed would
-      // otherwise yank the caret back to the start of the field.
+      // Focus only when the field has just been opened, not on every
+      // re-render: a fetch landing while a code is half-typed would
+      // otherwise yank the caret back to the start of it.
       if (state.hiveFocusInput) {
         state.hiveFocusInput = false;
         input.focus();
       }
     }
 
-    const removeBtn = document.getElementById('po-hive-remove');
-    if (removeBtn) removeBtn.addEventListener('click', () => unbindHiveMember(state));
-
     wireHiveOfferClock(state);
     wireHivePan(state);
   }
 
-  // The seat's own clock. It ticks in place — the dock is not re-rendered
-  // for it, because a panel that rebuilds every second is a panel nobody
-  // can copy a code out of.
+  // The seat's own clock. It ticks in place — the seat is not re-rendered
+  // for it, because a hexagon that rebuilds every second is one nobody
+  // can read a code out of.
   function wireHiveOfferClock(state) {
     clearInterval(state.hiveOfferTimer);
     const offer = state.hiveOpen && state.hiveOpen.offer;
@@ -1761,15 +1702,19 @@
     const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
     const code = String(rawCode || '').trim().toUpperCase();
     const msgEl = document.getElementById('po-hive-msg');
-    const btn = document.getElementById('po-hive-submit');
+    const open = state.hiveOpen;
+    if (!open || !open.claim || state.hiveClaiming) return;
     const fail = (key) => {
-      state.hive = Object.assign({}, state.hive, { claimValue: code, claimError: t(key) });
-      if (msgEl) msgEl.textContent = state.hive.claimError;
-      if (btn) btn.disabled = false;
+      state.hiveClaiming = false;
+      open.value = code;
+      open.error = t(key);
+      if (msgEl) msgEl.textContent = open.error;
     };
     if (code.length !== HIVE_CODE_LENGTH) { fail('profile.hive.err.short'); return; }
 
-    if (btn) btn.disabled = true;
+    // The field fires itself at six characters, so a second keystroke
+    // mid-flight would send the same code twice.
+    state.hiveClaiming = true;
     if (msgEl) msgEl.textContent = '';
     const { data, error } = await state.sb.rpc('hive_claim_slot', { p_code: code });
     const row = Array.isArray(data) ? data[0] : data;
@@ -1780,43 +1725,19 @@
     // because taking this seat may have carried an entire petek over to
     // meet another — everybody's coordinates can have changed, including
     // the reader's own.
-    state.hive = Object.assign({}, state.hive, { claimValue: '', claimError: '' });
+    state.hiveClaiming = false;
     await reloadHiveMap(state);
     state.hiveOpen = null;
     state.hivePan = { x: 0, y: 0 };
     renderHive(state);
   }
 
-  // Çıkar is mutual, like the attaching was, and it is refused for the
-  // whole week the bond was made in — the server says so with a status
-  // rather than the button being hidden, because a lock the reader can
-  // see is a rule and a missing button is a bug.
-  async function unbindHiveMember(state) {
-    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
-    const open = state.hiveOpen;
-    if (!open || !open.member) return;
-    const btn = document.getElementById('po-hive-remove');
-    if (btn) btn.disabled = true;
-    const { data, error } = await state.sb.rpc('hive_unbond', { p_member_id: open.member });
-    const row = Array.isArray(data) ? data[0] : data;
-    const status = error ? 'failed' : ((row && row.status) || 'failed');
-
-    if (status !== 'ok') {
-      if (btn) btn.disabled = false;
-      open.error = t(`profile.hive.err.${status}`);
-      const msgEl = document.getElementById('po-hive-msg');
-      if (msgEl) msgEl.textContent = open.error;
-      if (status === 'locked') await reloadHiveMap(state);
-      return;
-    }
-
-    // Gone: the dock falls back to your own code, which is the natural
-    // next move after taking someone out — the side they were standing
-    // on is free again and takes a code.
-    await reloadHiveMap(state);
-    state.hiveOpen = null;
-    renderHive(state);
-  }
+  // Çıkar — detaching from a member — is parked, not deleted: the panel
+  // it lived in is gone (a member's hexagon opens nothing now), and where
+  // a detach belongs on a page that is only the drawing is an open
+  // question. hive_unbond() is untouched in the database and still
+  // refuses a bond inside the week it was made in (see
+  // db/hive_lattice_v4.sql); nothing calls it from here for the moment.
 
   // Drag-and-drop repositioning of cover badges (Profil tab only — the
   // read-only popup never passes editable: true to coverHTML, so it has no
