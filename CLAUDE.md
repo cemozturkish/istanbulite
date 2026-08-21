@@ -160,7 +160,7 @@ default one.
 ├── capacitor.config.json # iOS app config (Capacitor wraps the same site — see README.md)
 ├── ios/                  # Generated Capacitor Xcode project (committed, minus Pods/build output)
 ├── scripts/sync-web.js   # Copies site files into www/ for the Capacitor build
-├── db/                   # SQL migration files — SOURCE OF TRUTH for the full Supabase schema
+├── db/                   # SQL migrations (see db/README.md); db/seed/ holds one-off data imports
 ├── CNAME                 # GitHub Pages custom domain config: istanbulite.net
 └── assets/               # map/, avatar/, mascot/, loading/ subfolders + one-off images
 ```
@@ -233,20 +233,25 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 
 ## Database Schema
 
-> **Note:** the tables documented below are the core set. The complete, current schema lives in
-> `db/*.sql` — later features each have their own migration file there (events + `event_rsvps`,
-> `breaking_news` + polls/series/updates, `library_articles`/shelves/letters/categories,
-> `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians` +
-> `political_seats` (one seat per district, the two fixed national/city ones, and one per country
-> on Kütüphane's map — `db/political_seats_countries_seed.sql` fills that last set), TBMM
-> seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `coffee_prices`
-> (the Kahve Endeksi — v3 adds the opening-hours and scheduled-discount columns that make it
-> live), `coffee_comments` (what members say about a venue), `countries` + `country_entries`
-> + `country_entry_events` + `country_stories` + `country_story_countries` (what a country on
-> Kütüphane's map opens, the key-moment timeline an entry can carry, and which countries light
-> and open together as one story) and `breaking_news_countries` (which countries a
-> Dünya story is about, lit on that map when the story opens), and more). When in doubt, read the relevant `db/` file — it is the
-> source of truth.
+> **Note:** the tables documented below are the core set — and this document is the only place
+> they are written down. `profiles`, `neighborhoods`, `articles`, the two comment tables and the
+> core functions (`is_admin()`, `handle_new_user()`, `verify_kefil_code()`) exist **only in
+> Supabase**; no file in `db/` creates them, so the folder cannot rebuild a database from nothing.
+>
+> What `db/` holds is everything that came after: one migration per feature, in families that have
+> to be run in order — events + `event_rsvps`, `breaking_news` + polls/series/updates,
+> `library_articles`/shelves/letters/categories, `game_results`, avatar item columns,
+> `profile_badges`, `politicians` + `political_seats` (one seat per district, the two fixed
+> national/city ones, and one per country on Kütüphane's map), TBMM seats/parties, `mahalles`,
+> `admin_notifications`, Sözcel sözcü assignments, `coffee_prices` (the Kahve Endeksi),
+> `coffee_comments`, `country_entries` + `country_entry_events` + `country_stories` +
+> `country_story_countries`, `breaking_news_countries`, `daily_questions` + `question_answers`,
+> and the petek's `hive_cells` + `hive_bonds` + `hive_slot_offers`.
+>
+> `db/README.md` maps every family and its order; one-off data imports live in `db/seed/`; and
+> `db/check_migrations.sql` — which changes nothing — reports file by file which of them a given
+> database has actually had run. When in doubt, read the relevant `db/` file: for everything built
+> on top of the core above, it is the source of truth.
 
 **Table: `neighborhoods`** — lookup of valid neighborhood IDs.
 - `id text pk` (kebab-case slug), `name_tr text` (Turkish display name).
@@ -697,7 +702,7 @@ sb.from('articles').delete().eq('id', id)
   `.timeline-*` markup and printed **newest first** just like it. The only difference is the
   stamp: a moment carries its date rather than its age, because these chains reach back to 1917
   and "109 yıl önce" tells a reader nothing. Curated from admin.html's Ülkeler tab;
-  `db/country_entries_seed.sql` and `db/country_stories_seed.sql` hold the starting set
+  `db/seed/country_entries_seed.sql` and `db/seed/country_stories_seed.sql` hold the starting set
   (Rusya–Ukrayna, Putin Rusyası, Filistin–İsrail, Lübnan, Suriye, İran–İsrail, Karabağ, the
   closed Türkiye–Ermenistan border, Kıbrıs, the Ege, and Türkiye's own decade)
 
