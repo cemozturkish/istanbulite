@@ -607,12 +607,18 @@
   --ist-hive-page-pad: 16px;
   /* The page is the petek (see mountHivePage): it fills whatever Hane's
      main area gives it, between the two bars on a phone and inside the
-     middle column on a desktop, with the dock resting at its foot. */
-  display: flex;
-  flex-direction: column;
+     middle column on a desktop.
+     The window below takes ALL of it and the dock floats over its foot,
+     rather than the two sharing the height as a flex column. That is
+     what puts the reader's own avatar at the exact centre of the page on
+     every device, horizontally and vertically: a dock that takes room
+     from the window moves the middle of the window off the middle of the
+     page, and the one fixed point of this whole drawing is the person
+     holding the phone. */
+  position: relative;
   height: 100%;
   min-height: 0;
-  padding: 0 var(--ist-hive-page-pad) 4px;
+  padding: 0 var(--ist-hive-page-pad);
   box-sizing: border-box;
 }
 /* The mount the page hands the petek (see mountHivePage) sits between the
@@ -634,10 +640,8 @@
    whatever this measures, so the window is stated once, here, and the JS
    never guesses at a size. */
 .ist-hive {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  width: 100%;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
 }
 /* Offered only when the drawing genuinely outruns the window (fitHive
@@ -679,7 +683,17 @@ button.ist-hive-cell:focus-visible .ist-hive-slot {
   --hexframe-stroke: var(--ink);
 }
 button.ist-hive-cell:hover .ist-hive-plus,
-button.ist-hive-cell:focus-visible .ist-hive-plus { color: var(--ink); }
+button.ist-hive-cell:focus-visible /* The transparent field around the petek: free cells nobody can act on,
+   drawn so the honeycomb reads as something that continues. Faint, and
+   deliberately not a button — the only openings that DO anything are the
+   six sides of the reader's own hexagon (see hiveGhostCellHTML). */
+.ist-hive-ghost {
+  pointer-events: none;
+  opacity: 0.34;
+}
+.ist-hive-ghost .ist-hive-slot { --hexframe-stroke: var(--rule); }
+
+.ist-hive-plus { color: var(--ink); }
 button.ist-hive-cell:focus-visible { outline: none; }
 /* The open hexagon stays inked for as long as its panel is out in the
    dock, so it's obvious which frame that panel belongs to. It lifts
@@ -801,10 +815,20 @@ button.ist-hive-filled:not(.ist-hive-bonded) .ist-hive-name { color: var(--muted
    pans for a tap, only this one spot's content changes. The border/height live here, on the
    wrapper, rather than on whichever content happens to be inside it, so
    the divider and the room for it never flicker between states. */
+/* Resting on the page's foot rather than standing under the grid: the
+   grid is the whole page now (see .ist-hive above), so the dock is laid
+   over it. It carries its own ground so the drawing behind it doesn't
+   read through the type, and it never moves — the tapped hexagon's panel
+   lands here, at the same size, wherever the hexagon was. */
 .ist-hive-dock {
-  margin-top: 14px;
-  padding-top: 10px;
+  position: absolute;
+  left: var(--ist-hive-page-pad);
+  right: var(--ist-hive-page-pad);
+  bottom: 6px;
+  z-index: 2;
+  padding-top: 8px;
   border-top: 1px solid var(--hairline);
+  background: var(--paper);
   min-height: 34px;
   display: flex;
   align-items: center;
@@ -830,6 +854,25 @@ button.ist-hive-filled:not(.ist-hive-bonded) .ist-hive-name { color: var(--muted
   color: var(--ink);
 }
 .ist-hive-code-hint { font-size: 0.55rem; letter-spacing: 0.6px; text-transform: none; }
+
+/* ── The seat's code, and the way in ──
+   Two halves of one exchange, in the one spot: the code a free side
+   mints (given away, and dead in minutes) and the field where a code
+   somebody read out to you is taken. */
+.ist-hive-offer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+/* The moment between the tap and the mint landing. Same size and place
+   as the code itself, so nothing jumps when it arrives. */
+.ist-hive-code-waiting { color: var(--muted); letter-spacing: 3px; }
+.ist-hive-claim { width: min(240px, 100%); text-align: center; }
+.ist-hive-claim-row { display: flex; gap: 6px; margin-top: 4px; }
+.ist-hive-claim-row .ist-hive-input { flex: 1; min-width: 0; }
+.ist-hive-claim-row .ist-hive-submit { width: auto; flex: 0 0 auto; padding-left: 12px; padding-right: 12px; }
 
 /* ── A hexagon's panel ──
    Pressing a hexagon does not open a page of its own: its panel lands in

@@ -67,20 +67,25 @@
     // hexagon, its free sides, and everybody standing around you (see
     // hiveGridHTML in profile-card.js and db/hive_lattice_v4.sql).
     'profile.hive.empty':   { default: 'Boş yer',               more_english: 'Empty slot' },
-    'profile.hive.codeprompt':{ default: 'PETEK KODU',          more_english: 'PETEK CODE' },
-    'profile.hive.add':     { default: 'Ekle',                  more_english: 'Add' },
+    'profile.hive.add':     { default: 'Gir',                   more_english: 'Enter' },
     'profile.hive.remove':  { default: 'Çıkar',                 more_english: 'Remove' },
-    'profile.hive.codelabel':{ default: 'BU HAFTAKİ PETEK KODUN', more_english: 'YOUR PETEK CODE THIS WEEK' },
-    'profile.hive.codehint':{ default: 'pazar günü yenilenir',  more_english: 'renews Sunday' },
+    // The code belongs to the empty seat, not to the member, and it dies
+    // in minutes (see db/hive_slot_codes_v5.sql): one half of the dock
+    // gives a seat away, the other half takes one.
+    'profile.hive.offerlabel':{ default: 'BU YER İÇİN KOD',      more_english: 'CODE FOR THIS SEAT' },
+    'profile.hive.offerhint': { default: 'sonra bu kod ölür',    more_english: 'left on this code' },
+    'profile.hive.claimprompt':{ default: 'SANA VERİLEN KOD',    more_english: 'A CODE YOU WERE GIVEN' },
     'profile.hive.err.short':          { default: 'Kod 6 karakter.',            more_english: 'The code is 6 characters.' },
-    'profile.hive.err.invalid_code':   { default: 'Bu hafta böyle bir kod yok.', more_english: 'No such code this week.' },
-    'profile.hive.err.self':           { default: 'Bu senin kendi kodun.',       more_english: "That's your own code." },
+    'profile.hive.err.invalid_code':   { default: 'Böyle bir kod yok.',         more_english: 'No such code.' },
+    'profile.hive.err.expired':        { default: 'Bu kodun süresi doldu.',      more_english: 'That code has run out.' },
+    'profile.hive.err.spent':          { default: 'Bu yeri başkası aldı.',       more_english: 'Somebody already took that seat.' },
+    'profile.hive.err.self':           { default: 'Bu senin kendi yerin.',       more_english: "That's your own seat." },
     // A bond is locked for the week it was made in, and a member you are
     // not attached to is somebody else's neighbour on the same petek —
     // visible, but not yours to detach.
     'profile.hive.lockednote':{ default: 'Bu bağ bu hafta kilitli.',   more_english: 'This bond is locked for the week.' },
     'profile.hive.notyours': { default: 'Petekte, ama sana bağlı değil.', more_english: 'On the petek, but not attached to you.' },
-    'profile.hive.err.dir_taken':      { default: 'Bu yer dolu.',                more_english: 'That side is taken.' },
+    'profile.hive.err.dir_taken':      { default: 'O yere başkası geçmiş.',      more_english: 'Somebody moved into that place first.' },
     'profile.hive.err.already_bonded': { default: 'Bu üye zaten peteğinde.',     more_english: 'You two are already attached.' },
     'profile.hive.err.too_far':        { default: 'Aynı petektesiniz ama yan yana değilsiniz.', more_english: "You're on the same petek, but not side by side." },
     'profile.hive.err.no_room':        { default: 'İki petek buraya sığmıyor.',  more_english: "The two peteks don't fit together there." },
