@@ -248,6 +248,9 @@
       }
     }
 
+    // From here on the real answer is known, whatever the DOM does next:
+    // see the pre-lock at the bottom of this file, which must not undo it.
+    _locksResolved = true;
     ALL_GAMES.forEach(g => {
       const link = document.querySelector(`.game-link[data-game="${g}"]`);
       if (!link) return;
@@ -288,6 +291,10 @@
     } catch (_) {}
   }
 
+  // True once applyGameLocks has actually decided each link's state, so
+  // the pre-lock below knows there is nothing left to guard.
+  let _locksResolved = false;
+
   window.applyGameLocks = applyGameLocks;
   document.addEventListener('DOMContentLoaded', consumeBounceMessage);
 
@@ -299,9 +306,16 @@
   // the gate entirely. All three games can end up locked now (admin
   // off-switch applies to any of them, not just the win-gated ones), so all
   // are pre-locked, not just the ones in GATES.
+  // ...unless the round trip already came back. A page whose session
+  // restores from cache can finish applyGameLocks *before* this event
+  // fires -- the answer is in, and pre-locking on top of it would leave
+  // all three games locked on "Yükleniyor…" with nothing left to come and
+  // unlock them. Guarding the window is only worth anything while the
+  // window is still open.
   document.addEventListener('DOMContentLoaded', () => {
     injectStyles();
     wireClicks();
+    if (_locksResolved) return;
     ALL_GAMES.forEach(g => {
       const link = document.querySelector(`.game-link[data-game="${g}"]`);
       if (!link || link.classList.contains('active')) return;

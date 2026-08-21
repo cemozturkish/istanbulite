@@ -505,8 +505,11 @@ sb.from('articles').delete().eq('id', id)
 
 ### `kahvehane.html` — Coffeehouse (RIGHT page, zoom IN — the local, interactive side)
 - Istanbul district map with mahalle-level picker
-- **The Kahve Endeksi is the left column** (see below). The events that held it went back to Hane,
-  beside the petek — the people and where they will be are one page now
+- **The Kahve Endeksi is a button in the top-right corner** (see below), the same door
+  Kütüphane's Makaleler/Posta Kutusu boxes are. The events that held the other column went back
+  to Hane, beside the petek — the people and where they will be are one page now. The band under
+  the map is the day's games alone: on a phone `#main-site` is one column, and `.col-left` (the
+  mayor's card, the parked comments) is `display: none` there
 - The **neighborhood comments are parked**, not deleted: their column belongs to the index and
   where the comments belong is still an open question, so the feed, its composer and everything
   driving them stay exactly as they are behind `const COMMENTS_ENABLED = false` plus `hidden` on
@@ -525,6 +528,20 @@ sb.from('articles').delete().eq('id', id)
   card is *removing the node* — the ones behind transition forward on their own. A game played
   today and a question already answered are simply not in the deck; when nothing is left it says
   "Hepsi bu kadar. / Dışarısı seni bekliyor.", the same bottom Kütüphane's deck has
+- **And a game card is a news card**, printed on the same paper in the same band: a kicker saying
+  where in the day's sequence it stands (1./2./3. OYUN, `games.step1-3`), the game's name as the
+  headline, what it is under that — the type sizes are `.article`'s own. Three squares side by
+  side said nothing about order; a stack of cards in order says it without a word. The deck sits
+  in the band's **bottom-right corner** — down against the tab bar like every other phone stack
+  (`margin-top: auto`), and over on the thumb side (`align-self: flex-end`, because `.game-picker`
+  packs its cross axis to `flex-start` for the desktop row's sake). It keeps the cards' own width
+  rather than filling the band: a deck is a hand of cards, not a panel, and it reads as one by not
+  spanning everything. A game already played today is inked over the way a story you have dealt
+  with is gone — *played* meaning finished (`attempts >= 1`), never merely opened: a game left
+  half-done stays on top of the deck, marked, because it is exactly what the reader still has in
+  front of them. Sözcel's
+  wordmark is a tile's way of saying its name — in the deck it says it in the headline like every
+  other card. The desktop three-square tiles are untouched
 - **The direction is the answer**, exactly as on a news story: right is the first option, left the
   second, and the option is stamped on the card as it goes (`.q-cue`) so nobody answers a question
   they never saw. The two buttons say the same thing for a mouse. Tümcel stays locked until the
@@ -537,13 +554,17 @@ sb.from('articles').delete().eq('id', id)
   the phone deck's depth is `nth-child`, a card taken out of it is removed from the DOM rather than
   hidden — a hidden child still counts, and one left in place would push the next card past the
   rule that stops drawing them
-- The **coffee price index** (Kahve Endeksi, `coffee_prices` table) **is the left column**
-  (`#coffee-index-panel`), on every screen, beside the map that scopes it: the cheapest cup of
-  coffee per venue, in the selected district or all of İstanbul. It used to be a block under the
-  game tiles on desktop and a bottom sheet behind a pill on a phone — one list on two surfaces,
-  kept in step by hand, where the pill only ever existed because this column was holding something
-  else. There is one surface now and no button: the board is simply there, which is what a market
-  board is. **Read-only for everyone** — the index is curated from the admin portal only
+- The **coffee price index** (Kahve Endeksi, `coffee_prices` table) opens from **one button in
+  the top-right corner** (`.corner-boxes` > `#coffee-box`) as THE sheet (`#coffee-overlay`), which
+  is where `#coffee-index-panel` itself now lives: the cheapest cup of coffee per venue, in the
+  district the map is scoped to or all of İstanbul. It stood open as the left column for a while;
+  it is a destination again, because what the band under the map is *for* is the day's games — a
+  member who came for the games walks past the whole city on the way, which is the point, and the
+  board is one tap off that path rather than half of it. Still **one** surface, not two: the same
+  panel node, the same ids, the same board, wherever it is standing. It keeps its own overlay
+  rather than sharing `#kahvehane-detail`, whose body `openDetail` paints over wholesale for the
+  politician card. Scoping still follows the map even while the sheet is shut, so opening it never
+  shows the wrong district. **Read-only for everyone** — the index is curated from the admin portal only
   (admin.html's "Kahve" tab), and RLS allows writes to the admin alone
   (`db/coffee_prices_v2_admin_only.sql`)
 - The index is a **live board, not a printed list** — it is meant to be accurate about the cup
@@ -559,10 +580,9 @@ sb.from('articles').delete().eq('id', id)
   on the map instead (the same `.hover-active` tint the map's own hover uses), which keeps the
   board terse and answers "where is this" with the map rather than more text. Hovering also
   nudges the row toward the map (`translateX(-4px)`), matching `.game-link` and the scoreboard
-- **Clicking a row drills the column into that venue**, in place, with a back link — the same
-  move on every screen, because the board is the column itself. Nothing slides in over anything
-  and nothing rises from the bottom: you tapped a line in a list and the list became the thing
-  you tapped. Built by `renderVenueHTML()`. The panel carries the venue's live price and status, its week's
+- **Clicking a row drills the board into that venue**, in place, with a back link — the same
+  move on every screen. Nothing slides in over anything and nothing rises on top of it: you tapped
+  a line in a list and the list became the thing you tapped. Built by `renderVenueHTML()`. The panel carries the venue's live price and status, its week's
   opening hours (today's line inked), and **`coffee_comments`** — the members' half of the
   index. The venue's district stays lit on the map for as long as its panel is open, and the
   panel's live block re-renders on the same 30s tick as the board without disturbing the
@@ -637,11 +657,14 @@ sb.from('articles').delete().eq('id', id)
   and keeps its own page in the reader sheet (see `openCountryEntryReader`); the objects printed
   inside either — sources, the timeline, its polls — are one set of rules
   (`:is(.article, .news-page)`)
-- **Makaleler and Posta Kutusu are two small buttons in the top-right corner**, under the profile
-  bar — Makaleler on the left, Posta Kutusu (with its unread badge) on the right. They used to be
-  full-width cards stacked down that column; the column is the news column now, so what is left of
-  them is the smallest thing that still reads as a door. On a phone they are pinned there
-  (`position: fixed`) over the map rather than being a grid track of their own
+- **Makaleler and Posta Kutusu are two small buttons in the two top corners**, under the profile
+  bar — Makaleler in the left one, Posta Kutusu (with its unread badge) in the right. They used to
+  be full-width cards stacked down that column; the column is the news column now, so what is left
+  of them is the smallest thing that still reads as a door. On a phone they are pinned there
+  (`position: fixed`) over the map rather than being a grid track of their own, one at each end of
+  the line — a corner each, because the two doors lead to different rooms. The strip between them
+  is map, so it takes no taps (`pointer-events: none` on the column, `auto` on the buttons) or it
+  would swallow every touch on the districts under it
 - Everyone can read, like, and comment on articles
 - Per the vision, this side stays *less* interactive than Kahvehane — reading and observing
   the national level, not peer-to-peer engagement about it
@@ -832,12 +855,12 @@ The hero line is where each page's columns *begin*; it is not where their cards 
 every stack below the map is **bottom-aligned**: one news item, one event, one comment, one
 library box rests just above the tab bar, and the next one is laid **on top of** it, so the
 stack grows upward toward the map instead of downward away from the thumb. It is the same move
-on both pages that carry one — Hane's events, Kütüphane's news feed — and where a page has
-two columns, they end on the same line. Kahvehane's own column is the one exception, and
-deliberately: the Kahve Endeksi is a ranking, not a feed, so it reads top-down — the cheapest cup
-belongs at the top of the list, not hanging off the tab bar.
+on all three pages that carry one — Hane's events, Kütüphane's news feed, Kahvehane's deck of
+the day's games — and where a page has two columns, they end on the same line. The Kahve Endeksi
+is the one exception, and deliberately: it is a ranking, not a feed, so it reads top-down inside
+its sheet — the cheapest cup belongs at the top of the list.
 
-Kütüphane's news is the one stack that is a **deck** rather than a list — same bottom-aligned
+Kütüphane's news and Kahvehane's games are the stacks that are a **deck** rather than a list — same bottom-aligned
 box, but the cards are laid on top of each other instead of above each other (see its own
 section). Where a page's stack is a list, one implementation note, because it fails silently: the
 space is pushed down with an **auto top margin on the innermost box** (the feed itself), never
