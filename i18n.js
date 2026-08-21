@@ -67,6 +67,13 @@
     // hexagon, its free sides, and everybody standing around you (see
     // hiveGridHTML in profile-card.js and db/hive_lattice_v4.sql).
     'profile.hive.empty':   { default: 'Boş yer',               more_english: 'Empty slot' },
+    // The petek's three depths, named on the rail down its edge (see
+    // HIVE_LEVELS in profile-card.js). They read as distances rather than
+    // as page names, because that is what they are: you, then the people
+    // beside you, then the whole shape.
+    'profile.hive.level.self': { default: 'Sen',           more_english: 'You' },
+    'profile.hive.level.near': { default: 'Yanındakiler',  more_english: 'Beside you' },
+    'profile.hive.level.all':  { default: 'Petek',         more_english: 'The petek' },
     // The code belongs to the empty seat, not to the member, and it dies
     // in minutes (see db/hive_slot_codes_v5.sql). Both halves of the
     // exchange are printed inside the hexagon they belong to now — the

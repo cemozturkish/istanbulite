@@ -471,9 +471,13 @@ sb.from('articles').delete().eq('id', id)
   and a live RSVP row
 - On a phone the petek stands in the hero square the map used to hold and the events hang from the
   bottom of the band below it, so the hero line is exactly where it is on the other two pages
+- **The petek has three depths and the reader pulls up and down through them** — you alone at the
+  innermost, the six places touching you in the middle, the whole shape at the outermost, where the
+  seats can actually be handed out. One drawing zoomed, not three pages; see the petek's own section
+  under Site-wide defaults
 - The personal layer lives here: the user's own profile, avatar, home identity. Opening your
   profile card on this page shows the cover alone — the petek is the page, not a block inside your
-  account
+  account, and what is yours to change is printed on the petek's innermost depth
 - Vision: this page is "you + the people" — see Vision & Product Philosophy above
 
 ### `admin.html` — Admin Dashboard
@@ -994,8 +998,8 @@ Anahane's is the cover and nothing else.
 
 The petek (`hiveGridHTML`) is **one shared honeycomb**, drawn from where the reader is standing in
 it: their own cover frame in the middle, everybody else on their map placed exactly where they
-actually are around it, and a "+" on each free side of their own hexagon. It is not six slots of
-your own — see the schema section above for what that means and why.
+actually are around it, and — at its outermost depth — a "+" on each free side of their own
+hexagon. It is not six slots of your own — see the schema section above for what that means and why.
 
 **It is the middle page**, not something opened over one. It was a page of your profile, then a
 sheet grown out of a PETEK button over Hane's map; the map is gone and the honeycomb is simply
@@ -1006,6 +1010,51 @@ this app is about. Anahane mounts it into a node it owns (`#hive-page`) via
 which swaps `#ist-content` and takes the previous mount with it — and every mount re-fetches
 `hive_map()`, because somebody else's attachment may have carried this whole petek somewhere since
 it was last drawn.
+
+**The petek has three depths, and the reader pulls up and down through them**
+(`HIVE_LEVELS` in profile-card.js). It is one drawing zoomed, not three pages: what changes is how
+far out the reader is standing in the same honeycomb, which is the whole difference between a level
+and a tab. A level is simply the **ring** — hex distance from the reader — a cell is allowed to
+stand at, so changing level is one comparison per cell and never a re-render: the cells further out
+fade, the plane rescales about the reader, and both transitions are the stylesheet's.
+
+| Level | What is drawn | Names | The seats |
+|---|---|---|---|
+| 0 — Sen | your own hexagon alone, large, with what is yours to change under it | — | inert |
+| 1 — Yanındakiler | you and the six places touching you; an empty one stays empty | printed | inert |
+| 2 — Petek | all of it: their neighbours, the field around it, everything | none | live |
+
+Four things about it:
+
+- **The exchange belongs to the outermost level alone.** Offering a seat and taking one are how the
+  petek is *built*, and building it is a thing you do to the whole shape — so the "+" appears, and
+  the hexagons answer a press, only where the whole shape is on screen. Below that level the seats
+  are drawing: the cells are `disabled`, not merely stripped of their "+", because a hexagon that
+  answers a press by doing nothing is worse than one that plainly does not answer. Stepping away
+  from that level folds any open seat back rather than leaving a live code burning on a hexagon
+  nobody can see.
+- **Names are the middle level's, and only ring 1 is ever named.** Level 0 has nobody else on it
+  and level 2 hides names outright (at the size the whole shape is drawn at, the names would be the
+  only thing on the page, and the shape is what that level is for) — so the middle level is the only
+  depth that prints one, and at that depth everything past the first ring is not drawn. A neighbour
+  can therefore never go unnamed because of somebody the reader cannot currently see, which is
+  exactly what the old "is the cell outside them free?" rule did once levels existed.
+- **The reader arrives at the middle depth, every time**, including after a swipe away and back —
+  the same rule the three carousel pages follow (see "Always in the middle").
+- **The pull is the gesture; the rail is how anyone finds out.** Drag and level-change are one
+  handler: the drawing follows the finger while there is drawing left to reach, and once the finger
+  runs *past* the end of it — or there was never anywhere to go, which is every level but the
+  outermost — the same pull changes the level. A pull up is a scroll down, and down the levels is
+  outward. Three marks down the outer edge say how many depths there are and which one you are
+  standing at, and each takes a press. Horizontal pulls are left to the carousel underneath
+  (`router.js` already ignores anything vertical-dominant).
+
+Level 0 is also the one place on this page that carries **words about the reader** — name, district,
+member-since, and the way into their own personalization, which opens the profile sheet's settings
+blocks via the `sections` override on `openProfileOverlay` (personalization belongs to the middle
+page per the Vision section, and this is the middle page's innermost depth). The block is laid
+*over* the foot of the window rather than taking room from it, so the window never changes size
+between depths; `fitHive` reserves the height it measures and centres the reader in what is left.
 
 **The petek takes the band, and the events take what is left.** On a phone Hane's hero is not the
 map's square: the other two pages' hero is a drawing of a fixed size and gets a square, while this
