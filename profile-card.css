@@ -705,29 +705,27 @@ button.ist-hive-cell:hover .ist-hive-slot,
 button.ist-hive-cell:focus-visible .ist-hive-slot {
   --hexframe-stroke: var(--ink);
 }
+/* Hover lifts a free side out of its own tone and into full ink, which
+   is the whole hint that it is a place something goes. */
 button.ist-hive-cell:hover .ist-hive-plus,
-button.ist-hive-cell:focus-visible /* The transparent field around the petek: free cells nobody can act on,
-   drawn so the honeycomb reads as something that continues. Faint, and
-   deliberately not a button — the only openings that DO anything are the
-   six sides of the reader's own hexagon (see hiveGhostCellHTML). */
-/* 5. The field of places nobody stands in yet: the lightest tone there
-   is. It used to be held back with opacity, which is a different thing
+button.ist-hive-cell:focus-visible .ist-hive-plus { color: var(--ink); }
+
+/* 5. The field of places nobody stands in yet: the lightest tone on the
+   page. It used to be held back with opacity, which is a different thing
    from being further away — the ladder is ink now, so the drawing reads
    as one honeycomb at five depths rather than as a grid with some of it
-   faded out. */
+   faded out. Not a control: these places are not yours to give away, and
+   only the six sides of your own hexagon are (see hiveGhostCellHTML). */
 .ist-hive-ghost {
   pointer-events: none;
 }
 .ist-hive-ghost .ist-hive-slot { --hexframe-stroke: var(--ist-hive-ring-ghost); }
 
-.ist-hive-plus { color: var(--ink); }
 button.ist-hive-cell:focus-visible { outline: none; }
-/* The open hexagon stays inked for as long as its panel is out in the
-   dock, so it's obvious which frame that panel belongs to. It lifts
-   slightly too (transform only — nothing about its box changes, so no
-   neighbour ever moves), since a member's frame is already ink-stroked
-   by default and the ink alone wouldn't read as "selected" against
-   itself. */
+/* An open hexagon — a seat showing its code, or you showing the field
+   that takes one — stays inked while it is open, and lifts slightly
+   (transform only: nothing about its box changes, so no neighbour ever
+   moves). */
 button.ist-hive-cell-open .ist-hive-slot { --hexframe-stroke: var(--ink); }
 button.ist-hive-cell-open .ist-hive-plus { color: var(--ink); }
 .ist-hive-frame { transition: opacity 160ms, transform 200ms cubic-bezier(0.22, 1, 0.36, 1); }
@@ -737,7 +735,6 @@ button.ist-hive-cell-open .ist-hive-frame { transform: scale(1.05); }
 /* 2. The members you are attached to: one step back from you, and still
    clearly in the foreground — these are the six that are yours. */
 .ist-hive-filled.ist-hive-bonded .ist-hive-frame { --hexframe-stroke: var(--ist-hive-ring-bonded); }
-button.ist-hive-filled:hover .ist-hive-frame { opacity: 0.82; }
 /* 3. A member you are not attached to — somebody else's neighbour,
    standing on the same petek. Another step back: the grid is one shape
    and hiding part of it would be a lie, but which of it is yours has to
@@ -747,9 +744,6 @@ button.ist-hive-filled:hover .ist-hive-frame { opacity: 0.82; }
   --hexframe-stroke: var(--ist-hive-ring-other);
   opacity: 0.88;
 }
-/* An open member is never dimmed: the panel in the dock is the state,
-   and a faded portrait next to a Çıkar button reads as "leaving". */
-button.ist-hive-cell-open.ist-hive-filled .ist-hive-frame { opacity: 1; }
 /* The frame fills its cell and takes its height from the drawing's ratio
    (frames.css pins width:auto !important on every hexframe, so the cell
    is what carries the width). */
@@ -767,9 +761,17 @@ button.ist-hive-cell-open.ist-hive-filled .ist-hive-frame { opacity: 1; }
 .ist-hive-slot {
   --hexframe-stroke: var(--ist-hive-ring-open);
   background: none;
+  /* A column, not a row: what stands in here is either the "+" alone or
+     a code with its countdown under it, and the drawn hexagon is at its
+     widest across the middle — six characters and a clock side by side
+     would run straight out through its slanted sides. */
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 0 9%;
+  box-sizing: border-box;
+  text-align: center;
 }
 .ist-hive-plus {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
@@ -815,193 +817,84 @@ button.ist-hive-cell-open.ist-hive-filled .ist-hive-frame { opacity: 1; }
 /* A member you are not attached to is drawn a shade back (see
    .ist-hive-bonded above); their name says the same thing, so the two
    halves of one hexagon never disagree. */
-button.ist-hive-filled:not(.ist-hive-bonded) .ist-hive-name { color: var(--muted); }
-.ist-hive-readout-name {
-  /* Breaks inside its own track rather than printing over the edge of
-     the page — see the note on the meta lines below. */
-  overflow-wrap: anywhere;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  line-height: 1.15;
-  color: var(--ink);
-}
-.ist-hive-readout-meta {
-  /* The page is cut to the grid, so the dock is narrow by construction
-     (and narrower still where the page hits the screen's own edge): a
-     long district — KÜÇÜKÇEKMECE, GAZİOSMANPAŞA — can be one word wider
-     than it and would otherwise print straight over the page's edge. It
-     breaks inside the panel instead; at this size a broken district
-     reads better than one running off the paper. */
-  overflow-wrap: anywhere;
-  font-size: 0.6rem;
-  font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
+.ist-hive-filled:not(.ist-hive-bonded) .ist-hive-name { color: var(--muted); }
+/* ── What a press puts inside a hexagon ──
+   There was a bar along the foot of the page carrying whatever was
+   tapped. Both halves of the exchange belong to a hexagon rather than to
+   a panel — the code for a seat IS that seat, and the field that takes a
+   code is you — so they are printed inside the frames themselves and the
+   bar is gone. The page is the drawing again.
 
-/* ── The dock ──
-   One fixed spot under the grid, always the same width as the window
-   above it. At rest it holds your own code — the other half of the
-   exchange (db/hive_slots.sql: you can only attach to someone who handed
-   you a code, so the code has to be somewhere its owner can read it
-   out). Tapping a hexagon swaps this content to that hexagon's panel
-   instead of growing the hexagon itself (see .ist-hive-cell and
-   hiveDockHTML in profile-card.js) — the grid never resizes, shifts or
-   pans for a tap, only this one spot's content changes. The border/height live here, on the
-   wrapper, rather than on whichever content happens to be inside it, so
-   the divider and the room for it never flicker between states. */
-/* Resting on the page's foot rather than standing under the grid: the
-   grid is the whole page now (see .ist-hive above), so the dock is laid
-   over it. It carries its own ground so the drawing behind it doesn't
-   read through the type, and it never moves — the tapped hexagon's panel
-   lands here, at the same size, wherever the hexagon was. */
-.ist-hive-dock {
-  position: absolute;
-  left: var(--ist-hive-page-pad);
-  right: var(--ist-hive-page-pad);
-  bottom: 6px;
-  z-index: 2;
-  padding-top: 8px;
-  border-top: 1px solid var(--hairline);
-  background: var(--paper);
-  min-height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.ist-hive-code {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: center;
-  gap: 4px 8px;
-  font-size: 0.6rem;
-  font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.ist-hive-code-value {
+   Nothing here changes a cell's box: the frame is the same size open or
+   shut, so no neighbour ever moves for a press. */
+.ist-hive-cell-code {
   font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
-  font-size: 0.95rem;
+  font-size: calc(var(--ist-hive-cell-w) * 0.135);
   font-weight: 700;
-  letter-spacing: 3px;
+  letter-spacing: 1px;
   color: var(--ink);
+  line-height: 1;
 }
-.ist-hive-code-hint { font-size: 0.55rem; letter-spacing: 0.6px; text-transform: none; }
-
-/* ── The seat's code, and the way in ──
-   Two halves of one exchange, in the one spot: the code a free side
-   mints (given away, and dead in minutes) and the field where a code
-   somebody read out to you is taken. */
-.ist-hive-offer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 2px;
+.ist-hive-cell-waiting { color: var(--muted); }
+/* The minutes the seat has left, under its code. */
+.ist-hive-cell-left {
+  margin-top: 3px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: calc(var(--ist-hive-cell-w) * 0.095);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  line-height: 1;
 }
-/* The moment between the tap and the mint landing. Same size and place
-   as the code itself, so nothing jumps when it arrives. */
-.ist-hive-code-waiting { color: var(--muted); letter-spacing: 3px; }
-.ist-hive-claim { width: min(240px, 100%); text-align: center; }
-.ist-hive-claim-row { display: flex; gap: 6px; margin-top: 4px; }
-.ist-hive-claim-row .ist-hive-input { flex: 1; min-width: 0; }
-.ist-hive-claim-row .ist-hive-submit { width: auto; flex: 0 0 auto; padding-left: 12px; padding-right: 12px; }
+/* Whatever went wrong, said in the frame it went wrong in. */
+.ist-hive-cell-msg {
+  padding: 0 6%;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: calc(var(--ist-hive-cell-w) * 0.085);
+  line-height: 1.2;
+  text-align: center;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+.ist-hive-cell-msg:empty { display: none; }
 
-/* ── A hexagon's panel ──
-   Pressing a hexagon does not open a page of its own: its panel lands in
-   the dock, which stays on screen exactly where it was — the grid above
-   it doesn't move, so the tapped hexagon (ringed via
-   .ist-hive-cell-open) is still exactly under the finger that pressed
-   it. The code form for a free side of your own hexagon; the member,
-   with a Çıkar button where they are yours to detach, for a taken one.
-   Pressing the same hex again folds it back to the resting code display,
-   which is why there is no close button in here. Centred and free to use
-   the dock's full width — a real field and a real button, not squeezed
-   into a row's narrow side gutter the way the old inline extension was. */
-.ist-hive-dock-panel {
+/* The field that takes a code somebody gave you, inside your own
+   hexagon. It sits over the middle of the frame — the widest part of the
+   drawn shape, so six characters fit between its two slanted sides — on
+   its own ground, since typing over your own portrait is not reading.
+   16px is not a taste: anything smaller and iOS zooms the whole page in
+   on focus, which would throw the reader off the middle of their own
+   petek. */
+.ist-hive-claim-in {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 12;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  width: min(220px, 100%);
-  text-align: center;
+  gap: 3px;
 }
-/* Whatever just landed in the dock — the resting code or a slot's panel
-   — fades and lifts gently into place instead of snapping in, since both
-   are a full replace of the dock's content on every render. */
-.ist-hive-dock > * {
-  animation: ist-hive-dock-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-@keyframes ist-hive-dock-in {
-  from { opacity: 0; transform: translateY(5px); }
-  to   { opacity: 1; transform: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ist-hive-dock > * { animation: none; }
-  .ist-hive-frame { transition: opacity 160ms; }
-}
-.ist-hive-ext-label {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 0.56rem;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-/* The code is typed off a screen someone else is holding up, so it is
-   set monospaced and spaced out — a mistyped character has to be
-   visible at a glance. Doubled class so the width beats .ist-pc-input's
-   own width:100%. */
-.ist-pc-input.ist-hive-input {
+.ist-hive-claim-input {
   width: 100%;
   box-sizing: border-box;
-  padding: 6px 5px;
-  text-align: center;
+  padding: 5px 2px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
   font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
-  font-size: 16px; /* prevent iOS zoom */
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-}
-.ist-hive-submit { width: 100%; }
-.ist-hive-remove {
-  margin-top: 2px;
-  padding: 5px 14px;
-  border: 1px solid var(--rule);
-  background: none;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 1.2px;
+  letter-spacing: 1px;
+  text-align: center;
   text-transform: uppercase;
   color: var(--ink);
-  cursor: pointer;
 }
-.ist-hive-remove:hover { background: var(--hover); }
-/* Where a Çıkar button would be when there is no Çıkar to offer: the
-   bond is still locked for the week it was made in, or this member is
-   somebody else's neighbour and not yours to detach. The rule is printed
-   in the button's own place rather than the button being left out —
-   a missing control reads as a bug, a stated one reads as a rule. */
-.ist-hive-ext-note {
-  margin-top: 2px;
-  font-size: 0.58rem;
-  line-height: 1.3;
-  letter-spacing: 0.4px;
-  color: var(--muted);
-}
-.ist-hive-ext-msg:empty { display: none; }
-.ist-hive-ext-msg {
-  font-size: 0.6rem;
-  line-height: 1.25;
-  color: var(--accent);
-}
+.ist-hive-claim-input:focus { outline: none; border-color: var(--accent); }
+/* An open frame's message needs a ground of its own here: it is printed
+   over the drawing rather than on paper. */
+.ist-hive-claim-in .ist-hive-cell-msg { background: var(--paper); }
 
 /* ── Weekly game grid ── 3 rows (Sözcel/Tümcel/Bulmaca) × 7 days
    (Monday…Sunday, Istanbul time). See GAME_SCHEDULE / weekGridHTML in
@@ -1194,17 +1087,12 @@ button.ist-hive-filled:not(.ist-hive-bonded) .ist-hive-name { color: var(--muted
   /* The grid is width-bound on a phone rather than height-bound: a few
      cells across have to fit between the screen's own edges. Smaller
      cells, thinner rules — the drawing scales itself into whatever room
-     the page has (see fitHive), and the dock, not the grid, is what makes
-     room for a tap. */
+     the page has (see fitHive), and a press changes what is inside a
+     frame rather than asking the grid for room. */
   .ist-hive-page {
     --ist-hive-cell-w: min(104px, 13vh);
     --ist-hive-page-pad: var(--screen-inset, 14px);
   }
-  .ist-hive-readout-name { font-size: 0.62rem; }
-  .ist-hive-readout-meta { font-size: 0.5rem; letter-spacing: 0.6px; }
-  .ist-hive-dock { margin-top: 10px; padding-top: 8px; }
-  .ist-hive-code { gap: 3px 6px; }
-  .ist-hive-ext-label { font-size: 0.5rem; letter-spacing: 0.6px; }
   .ist-pc-weekgrid { margin-bottom: 0; }
   .ist-pc-daycell { max-width: 16px; }
   .ist-pc-weekgrid-row { margin-bottom: 1px; gap: 3px; }
