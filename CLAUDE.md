@@ -537,7 +537,9 @@ sb.from('articles').delete().eq('id', id)
   packs its cross axis to `flex-start` for the desktop row's sake). It keeps the cards' own width
   rather than filling the band: a deck is a hand of cards, not a panel, and it reads as one by not
   spanning everything. A game already played today is inked over the way a story you have dealt
-  with is gone. Sözcel's
+  with is gone — *played* meaning finished (`attempts >= 1`), never merely opened: a game left
+  half-done stays on top of the deck, marked, because it is exactly what the reader still has in
+  front of them. Sözcel's
   wordmark is a tile's way of saying its name — in the deck it says it in the headline like every
   other card. The desktop three-square tiles are untouched
 - **The direction is the answer**, exactly as on a news story: right is the first option, left the
