@@ -14,7 +14,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
   <script src="router.js?v=3"></script>
-  <script src="i18n.js?v=7"></script>
+  <script src="i18n.js?v=8"></script>
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
   <script src="game-locks.js"></script>
@@ -487,6 +487,12 @@
        scrolling -- no internal scroller, no absolute close button. */
     .detail-overlay-body .cv-comments { overflow: visible; }
     .detail-overlay-body .cv-detail { display: block; max-width: 520px; margin: 0 auto; position: relative; }
+    /* Same for the board itself: the sheet's own padding is the panel's
+       margin now, and the sheet's body is what scrolls -- the column-era
+       padding and internal scroller would only be a second frame inside
+       the first one. */
+    .detail-overlay-body .coffee-index-panel { padding: 0; }
+    .detail-overlay-body .coffee-rows { overflow: visible; }
 
     /* Desktop keeps the three tiles exactly as they were: the deck
        wrapper is not a box there at all, so every rule below still sees
@@ -1084,10 +1090,12 @@
       font-weight: 700;
     }
 
-    /* Kept in the markup (JS toggles .started/.completed color on it
-       elsewhere) but no longer shown -- the name alone is enough now
-       that each tile has room to just center it. */
-    .game-link-subtitle {
+    /* Both kept in the markup and shown on a phone, where the game is a
+       news card with room for a kicker and a standfirst (see .game-deck
+       in the mobile block); on the desktop square the name alone is all
+       there is room to centre. */
+    .game-link-subtitle,
+    .game-link-kicker {
       display: none;
     }
 
@@ -1476,12 +1484,12 @@
 
       #main-site {
         display: grid;
-        /* An even split. The games column used to be `auto` -- as wide as
-           three narrow tiles happened to be -- but it is a deck now (see
-           .game-deck below): one card at a time, carrying a question that
-           has to be read, so it takes half the band and the board takes
-           the other half. */
-        grid-template-columns: 1fr 1fr;
+        /* One column, and it is the games. The Kahve Endeksi held the
+           other half until it went back behind a button in the corner
+           (see .corner-boxes), and what is left is a deck of cards the
+           reader is meant to actually read -- the same full-width band
+           Kütüphane gives its news deck, on the same line. */
+        grid-template-columns: 1fr;
         /* Row 1 (the map) gets an explicit, definite track size instead
            of "auto": with one auto-width column (games) and one 1fr
            column (comments) below it, plain "auto auto" rows didn't
@@ -1644,33 +1652,17 @@
         font-size: 11px;
         letter-spacing: 1px;
       }
-      /* The board on a phone: a plain in-flow column below the map,
-         where the events used to be. It reads top-down (a ranking is a
-         list, not a feed -- the cheapest cup belongs at the top, not
-         hanging off the tab bar) and scrolls inside its own fixed-height
-         column rather than growing the page. */
+      /* The board inside its sheet (see .corner-boxes / #coffee-overlay):
+         it reads top-down the way a ranking does -- the cheapest cup at
+         the top -- and the sheet's own body is what scrolls it. */
       .coffee-index-panel {
         padding: 8px 8px 10px;
       }
-      /* The board's column: normal in-flow column below the map, to the
-         left -- flex (not block) so .coffee-index-panel below can stretch
-         to exactly fill row 2's height (a plain 1fr, see body above),
-         which is what lets the board scroll internally within a
-         fixed-size column instead of growing the page.
-         Explicit z-index so it stays on top of the map even once it's
-         zoomed in and spilling past its own little square. */
-      .col-left {
-        grid-column: 1;
-        grid-row: 2;
-        min-height: 0;
-        min-width: 0;
-        overflow: visible;
-        border-right: 1px solid var(--rule);
-        border-top: 1px solid var(--rule);
-        display: flex;
-        flex-direction: column;
-        z-index: 1;
-      }
+      /* Nothing left in this column on a phone: the mayor's card and the
+         identity card are the profile bar's now, the comments are parked,
+         and the board went behind the corner button. An empty column
+         would still claim its half of the band. */
+      .col-left { display: none; }
       /* Transparent (inherits the desktop rule's background:none) so
          these read as frameless text floating over the map, same as
          desktop -- body's own background is the same #f7f7f7, so this
@@ -1806,12 +1798,29 @@
         height: 14px;
       }
 
+      /* Pinned into the top-right corner under the profile bar, over the
+         map, on the same line as Kütüphane's corner boxes -- .col-right
+         itself is the games column below the map, so it is the button
+         that is fixed here rather than its column. */
+      .corner-boxes {
+        position: fixed;
+        top: calc(env(safe-area-inset-top) + var(--navbar-h-top, 56px) + 8px);
+        right: var(--screen-inset, 18px);
+        padding: 0;
+        z-index: 6;
+      }
+      .corner-box { padding: 5px 8px; border-bottom-width: 3px; }
+      .corner-box-title { font-size: 0.58rem; letter-spacing: 1px; }
+      /* No hover nudge on a phone -- it sits over the map and a :hover
+         left latched after a tap would leave it sitting offset. */
+      .corner-box:hover { transform: none; }
+
       /* Games: normal in-flow column below the map, to the right --
          short rectangular tiles stacked with a gap. flex (not block)
          so .games-section below sizes within the column's fixed
          (non-scrolling-page) height instead of overflowing it. */
       .col-right {
-        grid-column: 2;
+        grid-column: 1;
         grid-row: 2;
         min-height: 0;
         overflow: visible;
@@ -1832,7 +1841,7 @@
       /* Scrolls internally (rather than growing the page) on the rare
          screen too short for even the 3 short tiles to fit. */
       .games-section-inner {
-        padding: 8px;
+        padding: 12px;
         gap: 8px;
         display: flex;
         flex-direction: column;
@@ -1873,13 +1882,18 @@
       .game-deck {
         display: grid;
         grid-template-areas: "deck";
-        /* Sized by its own tallest card, and no taller: the deck sits at
-           the top of the column rather than being stretched down it (a
-           card stretched to fill a column reads as a panel, not paper).
-           Every card takes that same height -- which is what lets the
-           front one cover the ones behind instead of leaving their
-           bottom edges showing under it. */
+        /* Sized by its own tallest card, and no taller: a card stretched
+           to fill a column reads as a panel, not paper. Every card takes
+           that same height -- which is what lets the front one cover the
+           ones behind instead of leaving their bottom edges showing
+           under it. */
         flex: 0 0 auto;
+        /* And it rests on the bottom of the band, one card above the tab
+           bar, exactly as Kütüphane's news deck does -- an auto margin
+           rather than justify-content:flex-end, so a deck that outgrows
+           the band still scrolls in .games-section-inner instead of
+           pushing its top card out of reach. */
+        margin-top: auto;
       }
       /* Opaque in the deck. A tile's own 0.85 white reads fine floating
          over the map, but in a stack it lets the card *behind* show
@@ -1890,9 +1904,36 @@
         flex: 1;
         aspect-ratio: auto;
         background: var(--paper-card, #fff);
+        /* Same frame the news wears (.article in kutuphane.html): 2px
+           ink with a heavy bottom rule. The deck is one object across the
+           two pages, so a card in it is one object too. */
+        border: 2px solid var(--ink);
+        border-bottom: 5px solid var(--ink);
+        color: var(--ink);
       }
+      /* Played today: the card is inked over, the way a story you have
+         dealt with is gone from the news deck -- it is still there, and
+         it is visibly behind you. Everything printed on it flips to
+         paper, kicker included, or the card would go dark under text
+         that stayed dark with it. */
       .game-deck > .game-link-enter > .game-link.started,
-      .game-deck > .game-link-enter > .game-link.completed { background: var(--ink); }
+      .game-deck > .game-link-enter > .game-link.completed {
+        background: var(--ink);
+        color: var(--paper-card, #fff);
+      }
+      .game-deck > .game-link-enter > .game-link.started .game-link-kicker,
+      .game-deck > .game-link-enter > .game-link.completed .game-link-kicker,
+      .game-deck > .game-link-enter > .game-link.started .game-link-subtitle,
+      .game-deck > .game-link-enter > .game-link.completed .game-link-subtitle {
+        color: rgba(255, 255, 255, 0.72);
+      }
+      /* A card is pressed, not hovered: on a touch screen :hover latches
+         onto whatever was tapped last and leaves the top of the deck
+         sitting 4px off (the same reason Kütüphane's cards press rather
+         than nudge). */
+      .game-deck .game-link:hover { transform: none; background: var(--paper-card, #fff); }
+      .game-deck .game-link.started:hover,
+      .game-deck .game-link.completed:hover { background: var(--ink); }
       .game-deck > * {
         grid-area: deck;
         transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
@@ -1929,59 +1970,77 @@
         min-height: 0;
         display: flex;
       }
-      /* The column is half the band here, so the two options read better
-         stacked than side by side -- the same call Kütüphane's poll makes
-         in its own narrow column. Which is which is carried by the stamps
-         on the throw, not by their left/right order. */
-      .q-opts { flex-direction: column; }
+      /* Side by side again: the deck is the whole band now (the board
+         gave its half back, see .corner-boxes), and two options across a
+         full-width card read the way the news page's poll does. Which is
+         which is still carried by the stamps on the throw, not by their
+         left/right order. */
+      .q-opts { flex-direction: row; }
       .game-link {
-        padding: 0;
-        /* Square tiles. The height is untouched -- it's still the
-           column's own height split three ways by .game-link-enter's
-           flex:1 above -- and --game-tile-size mirrors that measured
-           height back into the width, so squaring these only ever moves
-           the width. syncGameTileSize() sets it, and sets it before the
-           first paint (see the call at the very end of this page's
-           script), so the clamp below is a never-seen last resort rather
-           than the shape the tiles open in.
-           Deliberately NOT `width: auto` + aspect-ratio, which is the
-           tidier way to say "as wide as you are tall" and does resolve
-           in Chromium: on WebKit the ratio fought the flex stretch and
-           the tiles came out the wrong height, so the measured width is
-           the one that renders right on the phones this is built for.
-           The desktop rule's ratio is dropped for the same reason. */
-        width: var(--game-tile-size, clamp(96px, 26vw, 128px));
+        /* ── The day's game, as a news card ──
+           Not a tile any more: the same paper Kütüphane's stories are
+           printed on, in the same band, read the same way -- a kicker
+           saying where in the day's sequence this is, the game's name as
+           the headline, and what it is under that. The three of them are
+           a sequence, and a sequence is legible as a stack of cards in
+           order; three squares side by side said nothing about order at
+           all. Type sizes are the phone news card's own (see .article in
+           kutuphane.html's mobile block). */
+        padding: 8px 12px;
+        width: auto;
+        align-items: stretch;
+        justify-content: flex-start;
+        text-align: left;
+        /* A card is as wide as the band and as tall as its own text --
+           the square the desktop tile still is has no meaning in a deck,
+           where every card has to be the same height as every other one
+           anyway (the deck's grid cell decides that, see .game-deck). */
         aspect-ratio: auto;
-        /* No explicit height/flex here -- .game-link-enter (its parent,
-           a row-direction flex container) stretches it to fill that
-           wrapper's height by default (align-items:stretch), which is
-           what actually grows the tile now that .game-link-enter itself
-           has flex:1. flex:1 directly on .game-link would set
-           flex-basis:0%, overriding the width above instead of just
-           adding height. */
+        /* No explicit height here -- .game-link-enter (its parent, a
+           row-direction flex container) stretches it to fill that
+           wrapper's height by default, and the wrapper is a grid item in
+           the deck, so every card comes out the height of the tallest
+           one in the stack. */
         display: flex;
         flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
         position: relative;
       }
-      .game-link-title {
-        /* Tracks the tile, capped at the old 15px: square tiles are only
-           as wide as the column is tall, so on a short screen (an SE in
-           particular) they get narrow enough that a fixed 15px "Bulmaca"
-           no longer fits on one line. */
-        font-size: min(15px, calc(var(--game-tile-size, 96px) * 0.16));
+      /* Where in the day's sequence this card is -- the news card's
+         kicker, in its own type and its own red. */
+      .game-link-kicker {
+        display: block;
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+        font-size: 10px;
         font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: var(--ink-red);
+        margin-bottom: 2px;
       }
+      /* The headline. margin-top:auto sits it at the foot of the card
+         with the kicker at its head, which is how an .article.openable
+         lays its own two lines out. */
+      .game-link-title {
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1.25;
+        margin-top: auto;
+        margin-bottom: 3px;
+      }
+      /* And the standfirst -- shown again here (the desktop tile hides
+         it: a square with the name centred in it has no room for a second
+         line, a card does). */
       .game-link-subtitle {
-        font-size: 9px;
-        padding: 0 4px;
-        line-height: 1.15;
+        display: block;
+        font-size: 12px;
+        line-height: 1.35;
+        font-style: normal;
         overflow-wrap: break-word;
-        word-break: break-word;
-        max-width: 100%;
       }
+      /* The wordmark is the square tile's way of saying "Sözcel"; a card
+         says it in the headline like every other card in the stack. */
+      .game-deck .game-link-logo { display: none; }
+      .game-deck .game-link[data-game="sozcel"] .game-link-title { display: block; }
 
       /* Bottom tab bar — fixed at bottom. Thinned from the top; labels sit
          flush against the bottom edge (the safe-area padding below is what
@@ -2049,28 +2108,36 @@
         margin-right: -0.5px;
       }
 
-      /* ── Mobile swipe pagination: full page (map + datetime + columns) slides; fixed bottom nav stays ── */
-      .col-left, .col-right {
+      /* ── Mobile swipe pagination: full page (map + datetime + columns) slides; fixed bottom nav stays ──
+         What slides is .col-right-slide and the corner button, not
+         .col-right itself: the button is position:fixed (see
+         .corner-boxes above), and a transform on an ancestor would make
+         that ancestor its containing block -- the button would spend the
+         whole 0.32s measured from the top of the games column, halfway
+         down the screen, and then jump into the corner. Transforming the
+         fixed element itself just moves it, which is exactly what
+         Kütüphane's own corner pair does. */
+      .col-right-slide, .corner-boxes {
         transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: transform;
         backface-visibility: hidden;
       }
-      html.ist-entering-forward .col-left,
-      html.ist-entering-forward .col-right {
+      html.ist-entering-forward .col-right-slide,
+      html.ist-entering-forward .corner-boxes {
         transform: translateX(100vw);
         transition: none;
       }
-      html.ist-entering-backward .col-left,
-      html.ist-entering-backward .col-right {
+      html.ist-entering-backward .col-right-slide,
+      html.ist-entering-backward .corner-boxes {
         transform: translateX(-100vw);
         transition: none;
       }
-      body.ist-exiting-forward .col-left,
-      body.ist-exiting-forward .col-right {
+      body.ist-exiting-forward .col-right-slide,
+      body.ist-exiting-forward .corner-boxes {
         transform: translateX(-100vw);
       }
-      body.ist-exiting-backward .col-left,
-      body.ist-exiting-backward .col-right {
+      body.ist-exiting-backward .col-right-slide,
+      body.ist-exiting-backward .corner-boxes {
         transform: translateX(100vw);
       }
     }
@@ -2343,6 +2410,46 @@
       overflow-y: auto;
     }
 
+    /* ── The corner button ──
+       The one door into the Kahve Endeksi, and deliberately the same
+       object Kütüphane's Makaleler/Posta Kutusu boxes are: the smallest
+       thing that still reads as a door, standing in the top-right corner
+       under the profile bar. Both map pages now open their side matter
+       from the same corner, so the gesture carries across the swipe. */
+    .corner-boxes {
+      display: flex;
+      flex-direction: row;
+      justify-content: flex-end;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px 12px 0;
+      flex-shrink: 0;
+    }
+    .corner-box {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--paper-warm);
+      border: 2px solid var(--ink);
+      border-bottom: 3px solid var(--ink);
+      padding: 6px 10px;
+      color: var(--ink);
+      transition: background 0.2s, transform 0.2s;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+    }
+    /* Nudges toward the map, the same feedback .game-link and the board's
+       own rows give (this column's inward is leftward). */
+    .corner-box:hover { background: var(--paper-dark); transform: translateX(-4px); }
+    .corner-box-title {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
     /* Politician detail sheet -- opened from #politician-card. Same card
        treatment as the rest of the page (background/border/shadow via
        frames.css's shared flat-card rule), centered profile layout. */
@@ -2471,24 +2578,6 @@
          sits top-left, #library-card top-right (see .col-right below). -->
     <div class="library-card politician-card" id="politician-card"><div class="card-loading"><span class="spinner"></span></div></div>
     <div class="col-left-slide">
-      <!-- The Kahve Endeksi, in the column itself rather than behind a
-           button. This is the local economy, and it is the one thing on
-           this page you read rather than press: it belongs beside the map
-           it is scoped by, at all times and on every screen, not one tap
-           away behind a pill that only existed because there was no room
-           for it here. Content is rendered entirely by JS via
-           renderCoffeeBoardHTML -- see loadCoffeeIndexPanel below, and
-           .coffee-index-panel in the stylesheet. Clicking a row drills
-           this same panel into that venue (openCoffeeVenue).
-           The events that used to hold this column went back to Hane,
-           where the petek is: the people and what they are doing are one
-           page now. -->
-      <div class="coffee-index-panel" id="coffee-index-panel">
-        <div class="coffee-detail" id="coffee-index-content">
-          <h2 data-i18n="kahve.index">Kahve Endeksi</h2>
-          <div class="coffee-empty" data-i18n="kahve.loading">Yükleniyor...</div>
-        </div>
-      </div>
       <section class="discussion-section" id="discussion-section" hidden>
         <div class="discussion-label" id="discussion-label" data-i18n="kahvehane.allistanbul">Tüm İstanbul</div>
         <div class="discussion-posts" id="discussion-posts"></div>
@@ -2650,6 +2739,19 @@
     <!-- Profile cards swapped: #library-card now sits top-right, the
          Belediye Başkanı card top-left (see .col-left above). -->
     <div class="library-card" id="library-card"><div class="card-loading"><span class="spinner"></span></div></div>
+    <!-- The Kahve Endeksi, back behind a button and standing in the top
+         right corner under the profile bar -- the same door Kütüphane's
+         Makaleler/Posta Kutusu boxes are, in the same corner, so the two
+         map pages open their side matter the same way. The column it used
+         to fill is the day's games now (see .game-deck), which is what the
+         reader came here to be walked past. Opens the board as THE sheet
+         (openCoffeeSheet below); the board itself is unchanged -- clicking
+         a row still drills it into that venue in place. -->
+    <div class="corner-boxes">
+      <button type="button" class="corner-box" id="coffee-box" title="Kahve Endeksi">
+        <span class="corner-box-title" data-i18n="kahve.index">Kahve Endeksi</span>
+      </button>
+    </div>
     <div class="col-right-slide">
     <section class="games-section">
       <div class="games-section-inner">
@@ -2671,6 +2773,7 @@
           <div class="game-deck" id="game-deck">
           <div class="game-link-enter">
           <a href="sozcel.html" class="game-link" data-game="sozcel">
+            <div class="game-link-kicker" data-i18n="games.step1">1. OYUN</div>
             <img class="game-link-logo" src="assets/sozcel-logo.png" alt="Sözcel" width="512" height="512" decoding="async">
             <div class="game-link-title">Sözcel</div>
             <div class="game-link-subtitle">Türkçe Wordle</div>
@@ -2679,6 +2782,7 @@
 
           <div class="game-link-enter">
           <a href="tumcel.html" class="game-link" data-game="tumcel">
+            <div class="game-link-kicker" data-i18n="games.step2">2. OYUN</div>
             <div class="game-link-title">Tümcel</div>
             <div class="game-link-subtitle">Türkçe Alıntı Bulmacası</div>
           </a>
@@ -2686,6 +2790,7 @@
 
           <div class="game-link-enter">
           <a href="bulmaca.html" class="game-link" data-game="bulmaca">
+            <div class="game-link-kicker" data-i18n="games.step3">3. OYUN</div>
             <div class="game-link-title">Bulmaca</div>
             <div class="game-link-subtitle">Mini Çapraz Bulmaca</div>
           </a>
@@ -2711,11 +2816,31 @@
     </div>
   </div>
 
-  <!-- Detail overlay: bottom sheet for the Kahve Endeksi board and a
-       drilled-into venue (see openDetail/initDetailOverlay further down).
-       Opened from the coffee pill over the map, so it carries
-       .ist-sheet-pull like anahane-detail and kutuphane's reader-overlay
-       do — swipes to dismiss the same way. -->
+  <!-- The Kahve Endeksi, as THE sheet: the board and, once a row is
+       tapped, the venue it drills into (the panel node lives here, so
+       every id the board's script already targets is exactly where it
+       was). It keeps its own overlay rather than sharing
+       #kahvehane-detail's body, which openDetail paints over wholesale
+       for the politician card. .ist-sheet-pull, like every sheet opened
+       over a page's hero: it comes to rest under the map, so the district
+       a row lights is still visible above it. -->
+  <div class="ist-sheet-overlay ist-sheet-pull ist-sheet-dim detail-overlay" id="coffee-overlay" hidden>
+    <div class="ist-sheet-backdrop" id="coffee-overlay-backdrop"></div>
+    <div class="ist-sheet detail-overlay-sheet" id="coffee-overlay-sheet">
+      <button type="button" class="ist-sheet-close" id="coffee-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
+      <div class="ist-sheet-body detail-overlay-body" id="coffee-overlay-body">
+        <div class="coffee-index-panel" id="coffee-index-panel">
+          <div class="coffee-detail" id="coffee-index-content">
+            <h2 data-i18n="kahve.index">Kahve Endeksi</h2>
+            <div class="coffee-empty" data-i18n="kahve.loading">Yükleniyor...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail overlay: bottom sheet for #politician-card's full info (see
+       openDetail/initDetailOverlay further down). -->
   <div class="ist-sheet-overlay ist-sheet-pull ist-sheet-dim detail-overlay" id="kahvehane-detail" hidden>
     <div class="ist-sheet-backdrop" id="kahvehane-detail-backdrop"></div>
     <div class="ist-sheet detail-overlay-sheet" id="kahvehane-detail-sheet">
@@ -2820,6 +2945,47 @@ function closeDetail() {
 // hand. Only the dismissal is this page's: closeDetail also closes a
 // drilled-into venue, if one is open.
 IstSheet.pull('kahvehane-detail', { onDismiss: closeDetail });
+
+// ── The Kahve Endeksi's own sheet ──
+// The board is a destination again, reached from the corner button
+// (#coffee-box) rather than standing open in a column: the column belongs
+// to the day's games now. It is THE sheet, pulled like every other one
+// opened over this page's map -- the board's own panel is the sheet's
+// body, so nothing about how the board or a venue is rendered changes.
+function openCoffeeSheet() {
+  const overlay = document.getElementById('coffee-overlay');
+  if (!overlay) return;
+  // Always open on the board itself, scoped to whatever the map is
+  // currently showing -- a venue left drilled into from last time is not
+  // what "open the index" means.
+  refreshCoffeeIndexPanel();
+  IstSheet.open(overlay);
+}
+function closeCoffeeSheet() {
+  const overlay = document.getElementById('coffee-overlay');
+  if (!overlay) return;
+  // A venue's district stays lit on the map while its panel is open --
+  // closing the sheet is what puts the map back.
+  if (openVenueId) closeCoffeeVenue();
+  IstSheet.close(overlay);
+}
+(function initCoffeeOverlay() {
+  const overlay = document.getElementById('coffee-overlay');
+  const backdrop = document.getElementById('coffee-overlay-backdrop');
+  const closeBtn = document.getElementById('coffee-overlay-close');
+  if (!overlay || !backdrop || !closeBtn) return;
+  backdrop.addEventListener('click', closeCoffeeSheet);
+  closeBtn.addEventListener('click', closeCoffeeSheet);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeCoffeeSheet();
+  });
+})();
+IstSheet.pull('coffee-overlay', { onDismiss: closeCoffeeSheet });
+// Delegated: the button lives inside #ist-content, which a virtual
+// navigation rebuilds wholesale. #coffee-box is this page's alone.
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#coffee-box')) openCoffeeSheet();
+});
 
 // Tick every 60s via the shared clock (see router.js) instead of running
 // its own setInterval, which a revisit via virtual navigation would
@@ -2953,70 +3119,26 @@ let discussionTickIntervalId = null;
 // position, so its own rect is a reliable, already-safe-area-aware
 // reference point.
 function syncColumnHeights() {
-  const colLeft = document.querySelector('.col-left');
   const colRight = document.querySelector('.col-right');
   const headerEl = document.querySelector('header');
-  if (!colLeft || !colRight || !headerEl) return;
+  if (!colRight || !headerEl) return;
   if (window.innerWidth > 768) {
-    colLeft.style.height = '';
     colRight.style.height = '';
-    syncGameTileSize();
     return;
   }
   const frameGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-gap')) || 10;
   const navTop = headerEl.getBoundingClientRect().top;
-  const colTop = colLeft.getBoundingClientRect().top;
+  // Measured off the games column itself, and only it: .col-left is
+  // display:none on a phone now (the board went behind the corner
+  // button, see .corner-boxes), and a hidden element's rect is all
+  // zeroes -- which would have handed the band the whole screen's
+  // height instead of the strip under the map.
+  const colTop = colRight.getBoundingClientRect().top;
   const height = Math.max(0, navTop - colTop - frameGap);
-  colLeft.style.height = height + 'px';
   colRight.style.height = height + 'px';
-  syncGameTileSize();
 }
 window.addEventListener('resize', syncColumnHeights);
 
-// Mobile only: keeps the game tiles square. Their height is decided by
-// the column above (see .game-link in the mobile media query) and the
-// width has to follow it, so measure the wrapper -- .game-link-enter,
-// whose height is a third of the games column and, unlike the tile's own
-// box, doesn't move when we change the tile's width -- and hand that
-// number back to CSS. Nothing here touches height; only --game-tile-size.
-// The column's height keeps moving after mount()'s own passes -- the
-// profile card above the tiles finishes its async mount, the safe-area
-// insets settle a beat into a fresh WKWebView paint -- so the wrapper is
-// also watched, not just re-measured on resize. Widening a tile takes
-// width from the comments column, never from the map (main spans both
-// grid columns at a viewport-based height), so this can't feed back into
-// the height it just measured.
-//
-// The value lands on the root element, not on #game-picker: router.js's
-// virtual navigation replaces #ist-content (and with it the picker) on
-// every entry into this page, and the swapped-in markup can paint before
-// mount() gets to re-measure. On the root it outlives the swap, so a
-// re-entry starts from the last known size instead of an unset var.
-const gameTileObserver = window.ResizeObserver
-  ? new ResizeObserver(() => syncGameTileSize())
-  : null;
-let observedGameTile = null;
-
-function syncGameTileSize() {
-  const picker = document.getElementById('game-picker');
-  const wrapper = picker && picker.querySelector('.game-link-enter');
-  if (!wrapper) return;
-  // Re-attached rather than set up once: router.js's virtual navigation
-  // swaps #ist-content wholesale, so a re-entry into this page hands us a
-  // brand new wrapper element each time.
-  if (gameTileObserver && wrapper !== observedGameTile) {
-    gameTileObserver.disconnect();
-    gameTileObserver.observe(wrapper);
-    observedGameTile = wrapper;
-  }
-  const root = document.documentElement;
-  if (window.innerWidth > 768) {
-    root.style.removeProperty('--game-tile-size');
-    return;
-  }
-  const size = Math.round(wrapper.getBoundingClientRect().height);
-  if (size > 0) root.style.setProperty('--game-tile-size', size + 'px');
-}
 
 // person-mentions.js is deferred -- poll briefly (same idiom as
 // IstPoliticianCard elsewhere) so a fast mount() on a slow connection
@@ -3123,10 +3245,10 @@ function unmount() {
   if (discussionTickIntervalId) { clearInterval(discussionTickIntervalId); discussionTickIntervalId = null; }
   if (coffeeTickIntervalId) { clearInterval(coffeeTickIntervalId); coffeeTickIntervalId = null; }
   I18N.offChange(tickCoffeeIndex);
-  // A virtual navigation rebuilds #ist-content, so the venue panel's DOM
-  // goes with it — drop the selection too, or coming back would light a
-  // district on the map for a panel that no longer exists.
-  closeCoffeeVenue();
+  // A virtual navigation rebuilds #ist-content, but the board's sheet is
+  // body-level and outlives it — close it (and any venue drilled into it)
+  // on the way out, or it would still be standing over the next page.
+  closeCoffeeSheet();
 }
 
 async function init() {

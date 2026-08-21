@@ -173,6 +173,11 @@
     'games.weeklyscoreboard': { default: 'Haftanın Skor Tahtası', more_english: 'Weekly Scoreboard' },
     // The question standing between two games (see db/daily_questions.sql
     // and the question card in kahvehane.html).
+    // Where in the day's sequence a game card stands -- its kicker in the
+    // deck, the way a news card is kickered with its category.
+    'games.step1':      { default: '1. OYUN',                 more_english: 'GAME 1' },
+    'games.step2':      { default: '2. OYUN',                 more_english: 'GAME 2' },
+    'games.step3':      { default: '3. OYUN',                 more_english: 'GAME 3' },
     'games.q.kicker':   { default: 'GÜNÜN SORUSU',            more_english: "TODAY'S QUESTION" },
     'games.q.hint':     { default: 'Kaydır ya da seç',        more_english: 'Swipe or pick' },
     'games.q.thanks':   { default: 'Cevabın alındı.',         more_english: 'Your answer is in.' },
