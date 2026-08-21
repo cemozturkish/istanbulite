@@ -319,22 +319,25 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 - RLS: authenticated users SELECT all; direct INSERT only for an assigned Sözcü's *own* row before its deadline (midnight Istanbul at the start of `used_on`), matching the UPDATE policy; DELETE admin-only.
 - **The admin is never locked out** (`db/sozcel_used_answers_v6_admin_override.sql`): admin INSERT/UPDATE policies sit alongside the Sözcü ones, with no `sozcul_id` match and no deadline, because a word that is wrong *on the day it is being played* is exactly the case that has to be fixable and the one moment every other policy refuses. The admin reaches it through the same Sözcü Görevi form on `sozcel.html` — the button opens a day picker instead of an assignment, and saving preserves whoever the row already belonged to, so correcting a day never takes it over. `game-locks.js` matches: the admin isn't bounced off a game they switched off for the day (they own the switch), though the win-gates still apply to everyone since those are the game's own progression.
 
-**Tables: `hive_codes` + `hive_cells` + `hive_bonds`** — the petek, which is Anahane itself
-(`db/hive_lattice_v4.sql`, superseding the six-slot `hive_slots` of `db/hive_slots*.sql`).
+**Tables: `hive_slot_offers` + `hive_cells` + `hive_bonds`** — the petek, which is Anahane itself
+(`db/hive_lattice_v4.sql` for the grid, `db/hive_slot_codes_v5.sql` for the codes; together they
+supersede the six-slot `hive_slots` and the weekly `hive_codes` of `db/hive_slots*.sql`).
 - The petek is **one shared grid**, not a comb per member. A member is a single hexagon at axial
   coordinates on a map; attaching to somebody makes you their neighbour on a grid everybody is
   standing on, and a third member attaching to either of you arrives into the shape those two have
   already made. A petek that is redrawn per viewer is not one object, it is a picture of one —
   which is exactly what the old design was, and why it was replaced.
-- `hive_codes`: `(user_id, week_start)` PK, `code` (6 chars, no I/O/0/1), unique per `(week_start, code)`.
-  Unchanged, and still the only way in. One code per member per Istanbul week — `week_start` is the
-  **Sunday** on or before today (`db/hive_slots_v2_sunday_week.sql`), resolved server-side by
-  `public.hive_week_start()`. Note this is the one week on the site that does *not* start Monday
-  like the profile's game grid: the code week is the rhythm of seeing people, and it turns over on
-  Sunday. Only the live week's codes resolve, which is what makes them renew — last week's rows are
-  left alone and simply stop matching. RLS: a member may SELECT **only their own** row and there is
-  no client write policy at all; that a code cannot be looked up is precisely why holding one means
-  it was handed to you.
+- `hive_slot_offers`: **the code belongs to the empty seat, not to the member**
+  (`db/hive_slot_codes_v5.sql`). `code` PK (6 chars, no I/O/0/1), `owner_id`, `dir` (which side of
+  the owner's own hexagon the seat is on), `expires_at` (ten minutes), `claimed_by`/`claimed_at`.
+  Tapping a free side mints one on the spot; you read it out to the member in front of you, they
+  type it in and land in that exact place, and it is spent. Nobody carries a code around any more —
+  there is nothing to pass on afterwards and nothing to look up, which is the hand-to-hand rule
+  made literal. It replaces `hive_codes` (one code per member per week, from `db/hive_slots.sql`):
+  a code that identifies a *person* for a week is a small permanent handle on them, and it left the
+  newcomer, not the owner, deciding where on the grid they would stand. RLS: **no client policies
+  at all** — a member mints through `hive_offer_slot(dir)` and spends through `hive_claim_slot(code)`,
+  and claiming has to resolve a row the caller was never allowed to see.
 - `hive_cells`: `user_id` PK, plus `map_id` and `(q, r)`. Unique `(map_id, q, r)` — two members can
   never stand in the same place — declared **deferrable**, because a merge moves a whole map in one
   statement and only its end state is meaningful. A `map_id` is not a row in a table of its own: a
@@ -356,13 +359,17 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 - RLS: **no client policies at all** on either table. The grid is read only through `hive_map()`,
   which hands back the one map the caller is standing on, relative to them — it is not a directory
   to be enumerated, and every write has to resolve a code the caller is not allowed to read.
-- Functions: `hive_my_code()` (unchanged), `hive_map()` (SECURITY DEFINER; the caller's map with
-  the caller at `(0,0)`, each row carrying `bonded` and `locked` for the caller's own attachments),
-  `hive_bond_code(code, dir)` (SECURITY DEFINER; returns a *status* the UI words itself — `ok` /
-  `invalid_code` / `self` / `already_bonded` / `dir_taken` / `too_far` / `no_room`, see
-  `profile.hive.err.*` in `i18n.js`), `hive_unbond(member_id)` (SECURITY DEFINER; Çıkar, clearing
-  the one bond both ways and releasing the cell of anyone left attached to nothing), plus the
-  helpers `hive_dir(d)` and `hive_rot(q, r, k)`.
+- Functions: `hive_map()` (SECURITY DEFINER; the caller's map with the caller at `(0,0)`, each row
+  carrying `bonded` and `locked` for the caller's own attachments), `hive_offer_slot(dir)`
+  (SECURITY DEFINER; mints that seat's code and returns it with its expiry — one live offer per
+  side, and tapping the same side again replaces it rather than leaving two doors into one seat),
+  `hive_claim_slot(code)` (SECURITY DEFINER; returns a *status* the UI words itself — `ok` /
+  `invalid_code` / `expired` / `spent` / `self` / `already_bonded` / `dir_taken` / `too_far` /
+  `no_room`, see `profile.hive.err.*` in `i18n.js`), `hive_unbond(member_id)` (SECURITY DEFINER;
+  Çıkar, clearing the one bond both ways and releasing the cell of anyone left attached to
+  nothing), plus the helpers `hive_dir(d)` and `hive_rot(q, r, k)`. **The direction is the offer's,
+  not the claimer's**: whoever opened the seat decided where it is, which is the whole point of the
+  code being the seat rather than the person.
 - **Directions are numbered 0-5 the way the drawing reads them** — `0 (0,-1)`, `1 (+1,-1)`,
   `2 (-1,0)`, `3 (+1,0)`, `4 (-1,+1)`, `5 (0,+1)` — and `HIVE_DIRS` in profile-card.js must match
   `hive_dir()` exactly: the server decides where a member lands and says so in these terms, so
@@ -957,9 +964,16 @@ which swaps `#ist-content` and takes the previous mount with it — and every mo
 `hive_map()`, because somebody else's attachment may have carried this whole petek somewhere since
 it was last drawn.
 
-**The window is the room the page has; the petek is not.** `.ist-hive-page` fills Hane's middle
-cell — the hero square on a phone, the middle column on a desktop — with the dock resting at its
-foot. What changes as members are added is the *drawing*, never the page: `fitHive` scales the grid
+**The reader's own avatar is the page's exact centre, on every device.** The window fills the whole
+of `.ist-hive-page` — Hane's middle cell, the hero square on a phone and the middle column on a
+desktop — and the dock is laid *over* its foot rather than taking height from it: a dock that took
+room would move the middle of the window off the middle of the page, and the one fixed point of
+this drawing is the person holding the phone. Around them the grid draws a **transparent field of
+further empty cells** (`hiveGhostCellHTML`) so the honeycomb reads as something that continues;
+those are drawing, not interface — the only openings that do anything are the six sides of the
+reader's own hexagon, because those are the only seats that are theirs to give.
+
+**The window is the room the page has; the petek is not.** What changes as members are added is the *drawing*, never the page: `fitHive` scales the grid
 into the window and, once it would have to shrink past legibility (`HIVE_MIN_SCALE`), leaves it
 there and lets it be dragged instead. What has to fit is the room the drawing needs **around the
 reader**, not its own box: the reader stays dead centre, so a petek grown out to one side is still
@@ -973,12 +987,14 @@ JS emits coordinates, never pixels. `hivePos` and those two tokens are the only 
 is stated. The grid reuses the cover's own frame for every cell — same mask, same drawn ring, same
 badges — so there is no second frame treatment to keep in sync.
 
-A side is filled **hand-to-hand, by code** (`db/hive_slots.sql`): every member holds one code per
-Istanbul week, tapping a free side of your own hexagon asks for someone else's, and from then on
-they are standing there. There is deliberately no member search, no follow button and no
-request-accept flow — to attach to someone you have to have been told their code, which means you
-saw them. It is a record of contact, not a follower list, and it is the closest thing to a
-connection the site has (still no DMs — ever).
+A side is filled **hand-to-hand, by code** (`db/hive_slot_codes_v5.sql`) — and the code is the
+**empty seat itself**, not the member. Tapping a free side of your own hexagon mints a code for
+exactly that place, good for ten minutes and for one person; you read it out to whoever is standing
+in front of you, they type it into the dock's resting field, and they land there. Then it is spent.
+There is deliberately no member search, no follow button and no request-accept flow — and now
+nothing to carry around either: a code that outlives the meeting is a handle on a person, and this
+one dies with the meeting. It is a record of contact, not a follower list, and it is the closest
+thing to a connection the site has (still no DMs — ever).
 
 Handing over a code is an **introduction, not a note one person takes about the other**: attaching
 is mutual by construction (you are neighbours or you are not), and Çıkar clears the bond both ways.
@@ -1000,11 +1016,13 @@ when they are tapped (which is where their district is anyway). It is absolutely
 flow — the packing is arithmetic, and nothing about it may shift because somebody's name is long —
 and `fitHive` measures the names when it fits the grid, since they hang outside the plane's own box.
 
-What a tap needs lands in **the dock**, one fixed spot below the grid (`hiveDockHTML`): your own
-code at rest, or the tapped hexagon's panel while one is open — the code field for a free side; the
-member with their district for a taken one, carrying a Çıkar button where they are yours to detach,
-and where they are not (the bond is still locked for its week, or they are not attached to you) the
-rule printed in the button's own place. A missing control reads as a bug; a stated one reads as a
+What a tap needs lands in **the dock**, one fixed spot resting on the page's foot (`hiveDockHTML`),
+and its two states are the two halves of the exchange: at rest it is the field where you **take** a
+seat somebody just offered you (taking one is not about a slot of your own, which is why it lives
+at rest rather than behind a hexagon), and a tapped free side **gives** one away — that seat's
+freshly minted code, with the minutes it has left ticking in place. A tapped member shows who they
+are, with a Çıkar button where they are yours to detach, and where they are not (the bond is still
+locked for its week, or they are not attached to you) the rule printed in the button's own place. A missing control reads as a bug; a stated one reads as a
 rule. The grid itself is fixed furniture: nothing resizes, shifts or pans for a tap, on a phone or
 anywhere else — the tapped hexagon is marked instead (`.ist-hive-cell-open` inks its ring and lifts
 it slightly via `transform`, which never moves a neighbour). Pressing the same hexagon again folds
