@@ -683,11 +683,11 @@
 }
 /* Every cell is placed on the plane, never in flow: a grid is a set of
    coordinates, and laying it out with rows would mean re-deriving those
-   coordinates in CSS. Members and free sides are buttons (the middle
-   cell, which is you, is not) and both open their panel in the dock
-   below, never here (see .ist-hive-cell-open and hiveDockHTML) —
-   stripped back to the frame itself, since the drawn hexagon is the
-   affordance and it never changes size for being pressed. */
+   coordinates in CSS. A free side and the reader's own cell are buttons
+   at the outermost level, where the exchange lives (see applyHiveLevel);
+   both print what a press opens *inside* their own frame and never
+   beside it. Stripped back to the frame itself, since the drawn hexagon
+   is the affordance and it never changes size for being pressed. */
 .ist-hive-cell {
   position: absolute;
   width: var(--ist-hive-cell-w);
@@ -896,6 +896,138 @@ button.ist-hive-cell-open .ist-hive-frame { transform: scale(1.05); }
    over the drawing rather than on paper. */
 .ist-hive-claim-in .ist-hive-cell-msg { background: var(--paper); }
 
+/* ══════════════════════════════════════════════════════════════
+   THE PETEK'S THREE DEPTHS
+   One drawing, three levels, and the reader pulls up and down through
+   them (see HIVE_LEVELS in profile-card.js). Nothing is rebuilt for a
+   level change and nothing moves: the cells that are further out than
+   the level fade, the plane rescales about the reader, and everything
+   here is the transition on one of those two.
+
+     0 — SEN          you alone, drawn large, with what is yours to
+                      change under you.
+     1 — YANINDAKİLER you and the six places touching you, whoever
+                      stands in them named. An empty place stays empty:
+                      no "+", because a seat is handed out to the petek
+                      and this level is about who is already beside you.
+     2 — PETEK        all of it, no names, and the seats live.
+   ══════════════════════════════════════════════════════════════ */
+/* A vertical pull is the page's own gesture; a horizontal one still
+   belongs to the carousel underneath (see router.js). */
+.ist-hive-page { touch-action: pan-x; }
+/* The plane carries the zoom between depths. The drag turns this off in
+   JS so the drawing keeps up with the finger, and fitHive puts it back
+   — one property, set in one place each way. */
+.ist-hive-plane { transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1); }
+/* A cell further out than the level the reader is standing at. Not
+   display:none — the packing is arithmetic off cells that are all still
+   there, and a cell taken out of the box would move the ones left in it.
+   fitHive skips these when it measures what has to fit. */
+.ist-hive-cell { transition: opacity 320ms ease; }
+.ist-hive-away { opacity: 0; pointer-events: none; }
+.ist-hive-name, .ist-hive-plus { transition: opacity 260ms ease; }
+/* Names belong to the depths where a person is a person. At the
+   outermost one the whole shape is on the page and a name beside every
+   hexagon would be the only thing on it — there the drawing says it. */
+.ist-hive-level-2 .ist-hive-name { opacity: 0; }
+/* And the "+" belongs to the level where a seat can actually be handed
+   out. Below it the openings are drawing (the cells are disabled too,
+   see applyHiveLevel) — an empty place is left empty and says nothing. */
+.ist-hive-page:not(.ist-hive-level-2) .ist-hive-plus { opacity: 0; }
+
+/* ── Level 0: what is yours to change ──
+   Laid over the foot of the window rather than taking room from it, so
+   the window itself never changes size between depths; fitHive reserves
+   the height it measures here and centres the reader in what is left. */
+.ist-hive-self {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-bottom: 4px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 260ms ease;
+}
+.ist-hive-level-0 .ist-hive-self { opacity: 1; pointer-events: auto; }
+.ist-hive-self-name {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.15;
+}
+.ist-hive-self-meta,
+.ist-hive-self-since {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.2;
+}
+.ist-hive-self-btn {
+  margin-top: 8px;
+  padding: 7px 18px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ist-hive-self-btn:hover { background: var(--ink); color: var(--paper); }
+
+/* ── The rail ──
+   Three marks down the outer edge: how many depths there are, and which
+   one you are standing at. The swipe is the gesture — this is how anyone
+   finds out there is one, and it takes a press too, because a control
+   that only announces is a decoration. */
+.ist-hive-rail {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 4px;
+}
+.ist-hive-rail-dot {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 220ms ease, border-color 220ms ease, transform 220ms ease;
+}
+.ist-hive-rail-dot:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
+.ist-hive-rail-on {
+  border-color: var(--ink);
+  background: var(--ink);
+  transform: scale(1.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ist-hive-plane, .ist-hive-cell, .ist-hive-name,
+  .ist-hive-plus, .ist-hive-self, .ist-hive-rail-dot { transition: none; }
+}
+
 /* ── Weekly game grid ── 3 rows (Sözcel/Tümcel/Bulmaca) × 7 days
    (Monday…Sunday, Istanbul time). See GAME_SCHEDULE / weekGridHTML in
    profile-card.js for which weekdays each game runs on and how a cell's
@@ -1093,6 +1225,12 @@ button.ist-hive-cell-open .ist-hive-frame { transform: scale(1.05); }
     --ist-hive-cell-w: min(104px, 13vh);
     --ist-hive-page-pad: var(--screen-inset, 14px);
   }
+  /* Level 0's block and the rail on a phone: the same objects, sized for
+     the band the petek is drawn in. */
+  .ist-hive-self-name { font-size: 1rem; }
+  .ist-hive-self-meta, .ist-hive-self-since { font-size: 0.64rem; }
+  .ist-hive-self-btn { margin-top: 6px; padding: 6px 14px; font-size: 0.66rem; }
+  .ist-hive-rail { right: 0; gap: 8px; }
   .ist-pc-weekgrid { margin-bottom: 0; }
   .ist-pc-daycell { max-width: 16px; }
   .ist-pc-weekgrid-row { margin-bottom: 1px; gap: 3px; }
