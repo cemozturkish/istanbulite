@@ -1920,28 +1920,34 @@
         border-bottom: 5px solid var(--ink);
         color: var(--ink);
       }
-      /* Played today: the card is inked over, the way a story you have
-         dealt with is gone from the news deck -- it is still there, and
-         it is visibly behind you. Everything printed on it flips to
-         paper, kicker included, or the card would go dark under text
-         that stayed dark with it. */
-      .game-deck > .game-link-enter > .game-link.started,
+      /* Finished today: the card is inked over, the way a story you have
+         dealt with is gone from the news deck. Everything printed on it
+         flips to paper, kicker included, or the card would go dark under
+         text that stayed dark with it. (A finished game leaves the deck
+         anyway -- this is what the desktop tiles and the moment before
+         the next mount look like.) */
       .game-deck > .game-link-enter > .game-link.completed {
         background: var(--ink);
         color: var(--paper-card, #fff);
       }
-      .game-deck > .game-link-enter > .game-link.started .game-link-kicker,
       .game-deck > .game-link-enter > .game-link.completed .game-link-kicker,
-      .game-deck > .game-link-enter > .game-link.started .game-link-subtitle,
       .game-deck > .game-link-enter > .game-link.completed .game-link-subtitle {
         color: rgba(255, 255, 255, 0.72);
+      }
+      /* Started but not finished is the opposite of done: the card stays
+         on top of the deck waiting to be gone back to, so it must not be
+         inked like a card that has been dealt with. It is marked instead,
+         with the same "this is the one you are on" bar the coffee board
+         puts on an open venue. */
+      .game-deck > .game-link-enter > .game-link.started {
+        background: var(--paper-card, #fff);
+        box-shadow: inset 4px 0 0 var(--ink);
       }
       /* A card is pressed, not hovered: on a touch screen :hover latches
          onto whatever was tapped last and leaves the top of the deck
          sitting 4px off (the same reason Kütüphane's cards press rather
          than nudge). */
       .game-deck .game-link:hover { transform: none; background: var(--paper-card, #fff); }
-      .game-deck .game-link.started:hover,
       .game-deck .game-link.completed:hover { background: var(--ink); }
       .game-deck > * {
         grid-area: deck;
@@ -2893,6 +2899,19 @@
   }
   function closeGame() {
     IstSheet.close(overlay, () => { frame.src = 'about:blank'; });
+    // Coming back out of a game is the other half of the deck's own
+    // sentence: play the one on top, come back, the question that follows
+    // it is standing there. The sheet never left this page, so nothing
+    // re-mounts on its own -- without this the deck stayed exactly as it
+    // was until the reader swiped away and back. It re-reads what has
+    // been finished rather than assuming the game just played was: a game
+    // opened and closed mid-way is still on top of the deck (see
+    // buildGameDeck's own note on that).
+    const uid = window.__currentUser && window.__currentUser.id;
+    if (!uid) return;
+    markPlayedGames(uid);
+    buildGameDeck(uid);
+    if (typeof applyGameLocks === 'function') applyGameLocks(sb);
   }
 
   // Delegated on document (not bound per-node) -- a virtual navigation
@@ -3378,10 +3397,18 @@ async function buildGameDeck(userId) {
     if (!error && data) questions = data;
   } catch (_) { /* table not there yet: no questions, no gates */ }
 
+  // Played means FINISHED, not opened. Every game writes an in-progress
+  // row on the reader's first interaction (attempts: 0 -- see each game's
+  // markAsPlayed), which is what marks the tile as "started"; reading a
+  // row's mere existence as played dealt the card out from under a game
+  // still being played, and a dealt card is gone for the day -- somebody
+  // on their second guess came back to find Sözcel out of the deck and no
+  // way to reach it. `attempts >= 1` is the same rule markPlayedGames
+  // uses for its started/completed colouring; the two must agree.
   const played = new Set();
   try {
-    const { data } = await sb.from('game_results').select('game').eq('user_id', userId).eq('date', today);
-    (data || []).forEach(r => played.add(r.game));
+    const { data } = await sb.from('game_results').select('game, attempts').eq('user_id', userId).eq('date', today);
+    (data || []).forEach(r => { if ((r.attempts || 0) >= 1) played.add(r.game); });
   } catch (_) {}
   const answered = new Set();
   if (questions.length) {
@@ -3395,8 +3422,9 @@ async function buildGameDeck(userId) {
   questions.forEach(q => { if (!answered.has(q.id)) deckQuestions[q.after_game] = q; });
 
   // The deck is the sequence with everything already done taken out of
-  // it: a game played today is dealt with, and so is a question already
-  // answered. What is left, in order, is what the reader still has in
+  // it: a game *finished* today is dealt with, and so is a question
+  // already answered. A game merely started is not done with -- it stays
+  // on top of the deck, marked, waiting to be gone back to. What is left, in order, is what the reader still has in
   // front of them -- and the first of those is the top of the deck.
   const phone = isPhoneDeck();
   QUESTION_ORDER.forEach(game => {
