@@ -251,6 +251,13 @@
       // arriving page's mount() paints its own. Leaving it would show (and
       // on a tap, open) the page you just left. See politician-card.js.
       if (global.IstPoliticianCard) global.IstPoliticianCard.clearSeat();
+      // The bar's other occupant -- you -- does not leave with the page,
+      // it walks to where it stands on the next one: right on Kütüphane,
+      // the middle on Hane, left on Kahvehane (see setBarLayout in
+      // profile-card.js). Done here, at the exact moment the content is
+      // swapped, so the name travels *with* the page sliding in rather
+      // than jumping into place after it has settled.
+      if (global.IstProfileCard) global.IstProfileCard.setBarLayout(targetSlug);
       document.title = cached.title || document.title;
       document.body.dataset.page = targetSlug;
       document.body.classList.remove(exitClass);

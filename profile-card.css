@@ -172,17 +172,44 @@
      type scale on this bar. Only what is specific to standing at the left
      end is here.
 
-     .ist-pc-has-seat is the single switch: politician-card.js puts it on
-     the row when a seat is painted and takes it off when the seat is
-     dropped (a virtual navigation clears it, see router.js). Everything
-     about the seated layout hangs off it, so a page with no seat — and
-     the moment between leaving one page and the next one's seat
-     arriving — keeps the bar's original left-aligned single block. */
+     ── Which end each person stands at is the *page*, and it moves ──
+     The three carousel pages are one screen swiped left and right, and
+     the bar over them says where you are standing by where the two names
+     are standing:
+
+       Kütüphane  seat left   · you right   (.ist-pc-seat-left)
+       Hane       no seat     · you centred (.ist-pc-seat-none)
+       Kahvehane  you left    · seat right  (.ist-pc-seat-right)
+
+     So swiping from Kütüphane to Hane walks your own name from the right
+     edge into the middle, and swiping on to Kahvehane walks it out to the
+     left — the bar makes the same move the pages under it make, and the
+     middle page is the one where you are alone in the middle of it (see
+     "Always in the middle" in CLAUDE.md). Hane names no seat at all: the
+     petek is the people, and there is no map on it for a seat to be true
+     of.
+
+     IstProfileCard.setBarLayout(page) is the single switch — one of the
+     three classes above on the row, put there by the page's own render
+     and by router.js the instant a virtual navigation swaps the content
+     under the bar (so the names travel *with* the page rather than after
+     it). It also animates the move; nothing here does, because the two
+     blocks change ends rather than sliding, and a flex layout has nothing
+     to transition between. What is transitioned is each name's own
+     transform, off the FLIP setBarLayout runs — hence the rule on
+     .ist-pc-id below. A page with none of the three classes (nothing has
+     set a layout yet) keeps the bar's original left-aligned single block.
+
+     The seat's slot holds its half of the row on the two pages that have
+     one, painted or not: it is emptied on every navigation and filled
+     again a moment later when the seat resolves (see politician-card.js),
+     and a row that re-flowed on that would jump under the reader's eye
+     just as the page settled. */
   .ist-pc-seat { display: none; }
-  .ist-pc-has-seat .ist-pc-seat {
+  .ist-pc-seat-left .ist-pc-seat,
+  .ist-pc-seat-right .ist-pc-seat {
     display: flex;
     align-items: center;
-    order: 1;
     /* The two ends split the row's slack evenly (the person below grows
        too), so the gap that separates them sits in the middle and each
        name stays against its own edge of the screen. min-width:0 so that
@@ -199,14 +226,33 @@
      does and neither reads as the junior of the pair. Anything that shrank
      one of them belongs nowhere. */
 
-  /* The person turns around: their name right-aligned against the far edge
-     — the mirror of the seat at the other end, so the bar reads outward
-     from the middle in both directions. */
-  .ist-pc-has-seat .ist-pc-me {
-    order: 2;
-    flex: 1 1 auto;
-    text-align: right;
+  /* Each name shrink-wraps its own type rather than filling its half of
+     the row, and is pushed to its end by the flex box around it. That is
+     what makes the move measurable: the block that carries the words is
+     the block that travels, so the FLIP in setBarLayout only has to
+     translate it — with a full-width block and text-align doing the
+     aligning, the words would jump while the box stayed still. */
+  .ist-pc-row .ist-pc-id {
+    flex: 0 1 auto;
+    min-width: 0;
+    transition: transform 400ms cubic-bezier(0.4, 0, 0.2, 1);
   }
+  @media (prefers-reduced-motion: reduce) {
+    .ist-pc-row .ist-pc-id { transition: none; }
+  }
+
+  /* Kütüphane: the seat at the left edge, you turned around at the right
+     — the bar reading outward from the middle in both directions. */
+  .ist-pc-seat-left .ist-pc-seat { order: 1; justify-content: flex-start; text-align: left; }
+  .ist-pc-seat-left .ist-pc-me { order: 2; flex: 1 1 auto; justify-content: flex-end; text-align: right; }
+
+  /* Kahvehane: the same bar mirrored — you at the left edge, the seat at
+     the right. */
+  .ist-pc-seat-right .ist-pc-me { order: 1; flex: 1 1 auto; justify-content: flex-start; text-align: left; }
+  .ist-pc-seat-right .ist-pc-seat { order: 2; justify-content: flex-end; text-align: right; }
+
+  /* Hane: you alone, in the middle of the bar over the middle page. */
+  .ist-pc-seat-none .ist-pc-me { flex: 1 1 auto; justify-content: center; text-align: center; }
 }
 
 /* ── Profile sheet ──
