@@ -544,6 +544,11 @@ sb.from('articles').delete().eq('id', id)
   with is gone — *played* meaning finished (`attempts >= 1`), never merely opened: a game left
   half-done stays on top of the deck, marked, because it is exactly what the reader still has in
   front of them. Sözcel's
+  A game the admin has switched **off** for the day (`game_day_toggles`) is not in the deck at
+  all — it is not a step the reader has left to take, and a card that can never be dealt is a deck
+  that can never be emptied. So a day whose only game is Sözcel ends on "Hepsi bu kadar." the
+  moment Sözcel is done, exactly as Kütüphane's news deck does. The admin keeps theirs, the same
+  way their nav link stays open (`IstGameLocks.offGamesToday`, game-locks.js). Sözcel's
   wordmark is a tile's way of saying its name — in the deck it says it in the headline like every
   other card. The desktop three-square tiles are untouched
 - **The direction is the answer**, exactly as on a news story: right is the first option, left the
