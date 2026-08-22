@@ -1989,10 +1989,29 @@
     const offsetY = -reserve / 2;
     state.hiveFit = { scale, cx, cy, vw, vh, reqW, reqH, offsetY };
     plane.style.transformOrigin = `${cx}px ${cy}px`;
+    // ── A fresh plane is placed, not animated into place ──
+    // The plane carries the zoom between depths (a 520ms transform
+    // transition, see profile-card.css), and that is right when the
+    // drawing that is already on screen is being re-fitted: a level
+    // change, a drag settling, the window resizing.
+    //
+    // But renderHive rebuilds the mount's markup, so after every
+    // re-render this is a **brand-new node** whose transform is still
+    // `none` — and the measurements above have already resolved its
+    // style, so the transition has a start value and animates the whole
+    // petek from full size down to its fitted scale. Every press of a
+    // hexagon re-renders, so every press made the entire drawing zoom:
+    // one hexagon was pressed and all of them appeared to answer.
+    //
+    // A node this has never fitted has nothing to animate *from* — not
+    // even on a level change, where the old scale belonged to a node
+    // that no longer exists — so it is placed outright.
+    const fresh = state.hiveFitNode !== plane;
+    state.hiveFitNode = plane;
     // Cleared here rather than never set: the drag below turns the
     // transition off so the plane keeps up with the finger, and this is
     // the one place that knows the drag is over.
-    plane.style.transition = '';
+    plane.style.transition = fresh ? 'none' : '';
     plane.style.transform = `translate(${pan.x}px, ${pan.y + offsetY}px) scale(${scale})`;
     plane.style.marginLeft = `${-cx}px`;
     plane.style.marginTop = `${-cy}px`;
@@ -2004,6 +2023,13 @@
     if (!pannable && (pan.x || pan.y)) {
       state.hivePan = { x: 0, y: 0 };
       plane.style.transform = `translate(0px, ${offsetY}px) scale(${scale})`;
+    }
+    // Commit the placement above as this node's starting point before
+    // handing the transition back to the stylesheet, so the next fit of
+    // this same plane — a level change, a drag — does animate.
+    if (fresh) {
+      void plane.offsetWidth;
+      plane.style.transition = '';
     }
   }
 
