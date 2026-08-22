@@ -509,8 +509,9 @@ sb.from('articles').delete().eq('id', id)
 
 ### `kahvehane.html` — Coffeehouse (RIGHT page, zoom IN — the local, interactive side)
 - Istanbul district map with mahalle-level picker
-- **The Kahve Endeksi is a button in the top-right corner** (see below), the same door
-  Kütüphane's Makaleler/Posta Kutusu boxes are. The events that held the other column went back
+- **Two buttons stand in the two top corners** (`.corner-boxes`), the same pair Kütüphane's
+  Makaleler/Posta Kutusu boxes are: the **Kahve Endeksi** on the left (`#coffee-box`, see below)
+  and the week's **Skor Tahtası** on the right (`#scoreboard-box`). The events that held the other column went back
   to Hane, beside the petek — the people and where they will be are one page now. The band under
   the map is the day's games alone: on a phone `#main-site` is one column, and `.col-left` (the
   mayor's card, the parked comments) is `display: none` there
@@ -563,8 +564,8 @@ sb.from('articles').delete().eq('id', id)
   the phone deck's depth is `nth-child`, a card taken out of it is removed from the DOM rather than
   hidden — a hidden child still counts, and one left in place would push the next card past the
   rule that stops drawing them
-- The **coffee price index** (Kahve Endeksi, `coffee_prices` table) opens from **one button in
-  the top-right corner** (`.corner-boxes` > `#coffee-box`) as THE sheet (`#coffee-overlay`), which
+- The **coffee price index** (Kahve Endeksi, `coffee_prices` table) opens from **the top-LEFT
+  corner button** (`.corner-boxes` > `#coffee-box`) as THE sheet (`#coffee-overlay`), which
   is where `#coffee-index-panel` itself now lives: the cheapest cup of coffee per venue, in the
   district the map is scoped to or all of İstanbul. It stood open as the left column for a while;
   it is a destination again, because what the band under the map is *for* is the day's games — a
@@ -576,6 +577,17 @@ sb.from('articles').delete().eq('id', id)
   shows the wrong district. **Read-only for everyone** — the index is curated from the admin portal only
   (admin.html's "Kahve" tab), and RLS allows writes to the admin alone
   (`db/coffee_prices_v2_admin_only.sql`)
+- The **weekly scoreboard opens from the other corner** (`#scoreboard-box` → `#scoreboard-overlay`,
+  THE sheet). It needed a door of its own because the games are **fleeting**: a game card is dealt,
+  played and inked over, and the board only ever surfaced as the desktop panel that slides in over
+  the discussion feed *while a game is open* (`.game-score-slide`, >1240px) — so on a phone the
+  score a member had just earned was nowhere to be seen the moment they finished. There is still
+  **one** board and not two: the single `#scoreboard-board` node is moved into the sheet on opening
+  and put back into `.game-score-slide` after it closes, so every `#scoreboard-*` id
+  `loadScoreboard()` targets stays exactly one element wherever the board is standing. It re-reads
+  on each opening (a week rolls over while a page stays open) and follows the map's scope, the same
+  rule the index follows
+
 - The index is a **live board, not a printed list** — it is meant to be accurate about the cup
   you could go and buy right now, the way a market board is accurate about a price. A venue
   outside its opening hours drops out of the ranking and sinks to the bottom of the board,

@@ -14,7 +14,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
   <script src="router.js?v=3"></script>
-  <script src="i18n.js?v=11"></script>
+  <script src="i18n.js?v=12"></script>
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
   <script src="game-locks.js?v=2"></script>
@@ -893,6 +893,15 @@
     .game-score-slide .scoreboard-item,
     .game-score-slide .week-day:first-child { border-left-width: 0; }
 
+    /* The board standing in its own sheet (#scoreboard-overlay, opened
+       from the right-hand corner button): the sheet's body is its box, so
+       the margin that separated it from the game tiles in the column has
+       nothing above it to clear, and the sheet's own body is what
+       scrolls -- the list must not keep a second scroller inside one. */
+    #scoreboard-overlay-body { padding: 10px 12px 14px; }
+    #scoreboard-overlay-body .scoreboard { margin-top: 0; }
+    #scoreboard-overlay-body .scoreboard-list { overflow-y: visible; }
+
     /* Chapter-box style, matching the Kütüphane reading-path nodes
        (.path-node): thick ink border with a heavier bottom edge. Fixed
        white/transparent + dark ink, matching the .post / Anahane
@@ -1478,7 +1487,11 @@
     .corner-boxes {
       display: flex;
       flex-direction: row;
-      justify-content: flex-end;
+      /* One button at each end of the line rather than a huddled pair:
+         the Kahve Endeksi and the Skor Tahtası are different rooms, and
+         a corner each says so where a pair does not (the same treatment
+         Kütüphane's Makaleler/Posta Kutusu take). */
+      justify-content: space-between;
       align-items: flex-start;
       gap: 8px;
       padding: 10px 12px 0;
@@ -1852,9 +1865,16 @@
         position: fixed;
         top: calc(env(safe-area-inset-top) + var(--navbar-h-top, 56px) + 8px);
         right: var(--screen-inset, 18px);
+        /* Spanning the whole line, a corner each -- Kahve Endeksi on the
+           left, Skor Tahtası on the right. The band between them is map,
+           so the strip itself takes no taps (only the buttons do), or it
+           would swallow every touch on the districts underneath it. */
+        left: var(--screen-inset, 18px);
+        pointer-events: none;
         padding: 0;
         z-index: 6;
       }
+      .corner-box { pointer-events: auto; }
       .corner-box { padding: 5px 8px; border-bottom-width: 3px; }
       .corner-box-title { font-size: 0.58rem; letter-spacing: 1px; }
       /* No hover nudge on a phone -- it sits over the map and a :hover
@@ -2621,7 +2641,7 @@
          relocated here from col-right, which now shows the coffee index
          instead (see .coffee-index-panel below). -->
     <div class="game-score-slide" id="game-score-slide">
-      <div class="scoreboard">
+      <div class="scoreboard" id="scoreboard-board">
         <!-- Week strip sits above the heading and spans its exact width —
              see .week-progress in the stylesheet. -->
         <div class="scoreboard-countdown" id="scoreboard-countdown"></div>
@@ -2768,9 +2788,20 @@
          reader came here to be walked past. Opens the board as THE sheet
          (openCoffeeSheet below); the board itself is unchanged -- clicking
          a row still drills it into that venue in place. -->
+    <!-- Two doors, one in each top corner, the same pair Kütüphane prints
+         under its own profile bar: the Kahve Endeksi on the left, the
+         week's Skor Tahtası on the right. The board needs a door of its
+         own because the games are fleeting -- on a phone the scoreboard
+         only ever existed as the desktop panel that slides in WHILE a
+         game is open (.game-score-slide), so the moment the reader
+         finished playing there was nothing left to see their score in.
+         Both open THE sheet. -->
     <div class="corner-boxes">
       <button type="button" class="corner-box" id="coffee-box" title="Kahve Endeksi">
         <span class="corner-box-title" data-i18n="kahve.index">Kahve Endeksi</span>
+      </button>
+      <button type="button" class="corner-box" id="scoreboard-box" title="Skor Tahtası">
+        <span class="corner-box-title" data-i18n="games.scoreboardbox">Skor Tahtası</span>
       </button>
     </div>
     <div class="col-right-slide">
@@ -2857,6 +2888,21 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- The week's Skor Tahtası, as THE sheet, opened from the right-hand
+       corner button. There is no second board: the one #scoreboard-board
+       node is MOVED in here while the sheet is open and put back into
+       .game-score-slide (its desktop home, where it slides in over the
+       discussion feed while a game is open) on the way out -- so every
+       #scoreboard-* id loadScoreboard() targets stays exactly one
+       element, wherever the board happens to be standing. -->
+  <div class="ist-sheet-overlay ist-sheet-pull ist-sheet-dim detail-overlay" id="scoreboard-overlay" hidden>
+    <div class="ist-sheet-backdrop" id="scoreboard-overlay-backdrop"></div>
+    <div class="ist-sheet detail-overlay-sheet" id="scoreboard-overlay-sheet">
+      <button type="button" class="ist-sheet-close" id="scoreboard-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
+      <div class="ist-sheet-body detail-overlay-body" id="scoreboard-overlay-body"></div>
     </div>
   </div>
 
@@ -3015,10 +3061,54 @@ function closeCoffeeSheet() {
   });
 })();
 IstSheet.pull('coffee-overlay', { onDismiss: closeCoffeeSheet });
-// Delegated: the button lives inside #ist-content, which a virtual
-// navigation rebuilds wholesale. #coffee-box is this page's alone.
+// ── The week's Skor Tahtası, from the other corner ──
+// The games are fleeting -- a card is dealt, played and inked over -- so
+// the score a reader just earned had nowhere to be looked at on a phone:
+// the board only ever slid in over the discussion feed on a wide desktop
+// while a game was still open. It is a destination of its own now, the
+// mirror of the Kahve Endeksi's corner. The board itself is unchanged and
+// unduplicated: the one node is carried into the sheet and back out.
+function openScoreboardSheet() {
+  const overlay = document.getElementById('scoreboard-overlay');
+  const body = document.getElementById('scoreboard-overlay-body');
+  const board = document.getElementById('scoreboard-board');
+  if (!overlay || !body || !board) return;
+  if (board.parentElement !== body) body.appendChild(board);
+  // Whatever the map is scoped to is what the board answers for, the same
+  // rule the coffee index follows -- and a week rolls over while a page
+  // stays open, so it is re-read on every opening rather than trusted.
+  loadScoreboard(activeMapNeighborhood || null, true);
+  IstSheet.open(overlay);
+}
+function closeScoreboardSheet() {
+  const overlay = document.getElementById('scoreboard-overlay');
+  if (!overlay) return;
+  IstSheet.close(overlay, () => {
+    // Back to its desktop home once the sheet has finished leaving --
+    // moving it mid-slide would empty the sheet in plain view.
+    const home = document.getElementById('game-score-slide');
+    const board = document.getElementById('scoreboard-board');
+    if (home && board && board.parentElement !== home) home.appendChild(board);
+  });
+}
+(function initScoreboardOverlay() {
+  const overlay = document.getElementById('scoreboard-overlay');
+  const backdrop = document.getElementById('scoreboard-overlay-backdrop');
+  const closeBtn = document.getElementById('scoreboard-overlay-close');
+  if (!overlay || !backdrop || !closeBtn) return;
+  backdrop.addEventListener('click', closeScoreboardSheet);
+  closeBtn.addEventListener('click', closeScoreboardSheet);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeScoreboardSheet();
+  });
+})();
+IstSheet.pull('scoreboard-overlay', { onDismiss: closeScoreboardSheet });
+
+// Delegated: the buttons live inside #ist-content, which a virtual
+// navigation rebuilds wholesale. Both ids are this page's alone.
 document.addEventListener('click', (e) => {
   if (e.target.closest('#coffee-box')) openCoffeeSheet();
+  if (e.target.closest('#scoreboard-box')) openScoreboardSheet();
 });
 
 // Tick every 60s via the shared clock (see router.js) instead of running
