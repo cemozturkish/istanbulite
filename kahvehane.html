@@ -486,13 +486,26 @@
        content lays out as a plain column with the sheet doing the
        scrolling -- no internal scroller, no absolute close button. */
     .detail-overlay-body .cv-comments { overflow: visible; }
-    .detail-overlay-body .cv-detail { display: block; max-width: 520px; margin: 0 auto; position: relative; }
-    /* Same for the board itself: the sheet's own padding is the panel's
-       margin now, and the sheet's body is what scrolls -- the column-era
-       padding and internal scroller would only be a second frame inside
-       the first one. */
-    .detail-overlay-body .coffee-index-panel { padding: 0; }
-    .detail-overlay-body .coffee-rows { overflow: visible; }
+    .detail-overlay-body .cv-detail { display: block; max-width: none; position: relative; }
+    /* Same for the board itself, and it fits its sheet exactly the way
+       the Skor Tahtasi fits its own (see #scoreboard-overlay-body): the
+       sheet's own padding is the board's margin, the sheet's body is
+       what scrolls, and the board runs the full width of it. The board
+       is only ever the sheet's body now -- the column-era padding, flex
+       sizing, internal scroller and 520px cap are all leftovers of the
+       page column it used to be, and every one of them read as a second
+       frame drawn inside the first. */
+    #coffee-overlay-body { padding: 10px 12px 14px; }
+    .detail-overlay-body .coffee-index-panel {
+      display: block;
+      flex: none;
+      min-height: 0;
+      padding: 0;
+    }
+    .detail-overlay-body .coffee-detail { max-width: none; margin: 0; }
+    /* Same 4px step under the heading the scoreboard's list takes, so the
+       two boards read as one object seen twice. */
+    .detail-overlay-body .coffee-rows { overflow: visible; flex: none; margin-top: 4px; }
 
     /* Desktop keeps the three tiles exactly as they were: the deck
        wrapper is not a box there at all, so every rule below still sees
@@ -901,6 +914,19 @@
     #scoreboard-overlay-body { padding: 10px 12px 14px; }
     #scoreboard-overlay-body .scoreboard { margin-top: 0; }
     #scoreboard-overlay-body .scoreboard-list { overflow-y: visible; }
+
+    /* Both corner sheets, on a phone: the tab bar is fixed over the
+       sheet's lower edge, so a board long enough to be scrolled to its
+       end needs that much room under its last row or the cheapest cup in
+       the next district is read through the tab bar. It is padding on a
+       sheet that is taller than its content anyway, so nothing moves on
+       a short board. */
+    @media (max-width: 768px) {
+      #coffee-overlay-body,
+      #scoreboard-overlay-body {
+        padding-bottom: calc(var(--navbar-h, 52px) + 24px + env(safe-area-inset-bottom, 0px));
+      }
+    }
 
     /* Chapter-box style, matching the Kütüphane reading-path nodes
        (.path-node): thick ink border with a heavier bottom edge. Fixed
@@ -1711,12 +1737,6 @@
         font-size: 11px;
         letter-spacing: 1px;
       }
-      /* The board inside its sheet (see .corner-boxes / #coffee-overlay):
-         it reads top-down the way a ranking does -- the cheapest cup at
-         the top -- and the sheet's own body is what scrolls it. */
-      .coffee-index-panel {
-        padding: 8px 8px 10px;
-      }
       /* Nothing left in this column on a phone: the mayor's card and the
          identity card are the profile bar's now, the comments are parked,
          and the board went behind the corner button. An empty column
@@ -2462,34 +2482,22 @@
       text-align: center; padding: 14px 4px;
     }
 
-    /* ── Coffee index panel (left column) ──
-       The board itself: the whole of this column, on every screen. It
-       used to be a block under the game tiles in col-right on desktop
-       and a sheet behind a pill on a phone -- two surfaces of one list,
-       kept in step by hand. There is one now, and it is where the reader
-       is already looking: beside the map that scopes it. Clicking a row
-       drills this same panel into that venue and back (openCoffeeVenue),
-       so the column never hands its content to another surface. */
+    /* ── Coffee index panel ──
+       The board itself, and it is the sheet's body and nothing else now
+       (#coffee-overlay, opened from the left-hand corner button). It
+       used to be the left column, and the column-era rules here -- a
+       flex:1 panel with min-height:0 and .coffee-rows keeping its own
+       overflow-y:auto -- outranked the sheet's own by coming later in
+       the file, so the board was still sizing itself to a column that
+       is not there and scrolling inside a body that was already
+       scrolling. One box, laid out by the sheet: see
+       #coffee-overlay-body above. Clicking a row drills this same panel
+       into that venue and back (openCoffeeVenue), so the sheet never
+       hands its content to another surface. */
     .coffee-index-panel {
       position: relative;
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      padding: 10px 14px 16px;
     }
-    .coffee-index-panel .coffee-detail {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      min-height: 0;
-      max-width: none;
-    }
-    .coffee-index-panel .coffee-rows {
-      flex: 1;
-      min-height: 0;
-      overflow-y: auto;
-    }
+    .coffee-index-panel .coffee-detail { max-width: none; }
 
     /* Politician detail sheet -- opened from #politician-card. Same card
        treatment as the rest of the page (background/border/shadow via
