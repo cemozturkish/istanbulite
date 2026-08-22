@@ -251,6 +251,11 @@
       // arriving page's mount() paints its own. Leaving it would show (and
       // on a tap, open) the page you just left. See politician-card.js.
       if (global.IstPoliticianCard) global.IstPoliticianCard.clearSeat();
+      // Same reasoning for a member the petek had named there: it is a
+      // caption on a hexagon on Hane, and Hane is what is leaving. Put
+      // your own name back before the row is laid out for the next page
+      // (see setBarMember in profile-card.js).
+      if (global.IstProfileCard && global.IstProfileCard.clearBarMember) global.IstProfileCard.clearBarMember();
       // The bar's other occupant -- you -- does not leave with the page,
       // it walks to where it stands on the next one: right on Kütüphane,
       // the middle on Hane, left on Kahvehane (see setBarLayout in

@@ -253,6 +253,29 @@
 
   /* Hane: you alone, in the middle of the bar over the middle page. */
   .ist-pc-seat-none .ist-pc-me { flex: 1 1 auto; justify-content: center; text-align: center; }
+
+  /* ── When the bar is naming somebody else ──
+     Pressing a member on the petek puts their name here, in the place
+     your own name stands, and pressing it opens them (see setBarMember
+     in profile-card.js). The block is otherwise unchanged: it is the
+     same two lines, the same type, and the same gesture — a person on
+     this bar is a person you press to read about, which is exactly what
+     they now are.
+
+     The one mark is a short red rule under the name, and it is red for
+     one reason: the hexagon they were pressed on is red, at the other
+     end of the screen (see .ist-hive-picked). Nothing else on the page
+     is, so the two are unmistakably about each other — which is the
+     whole of what tells the reader whose name this is and where it came
+     from. Drawn as a border on the name's own box rather than as a
+     colour on the type, which would have to fight the bar's charcoal
+     ground for contrast. */
+  .ist-pc-me-other .ist-pc-name {
+    display: inline-block;
+    max-width: 100%;
+    padding-bottom: 2px;
+    border-bottom: 2px solid var(--ink-red, #B93631);
+  }
 }
 
 /* ── Profile sheet ──
@@ -744,6 +767,20 @@ button.ist-hive-cell-open .ist-hive-slot { --hexframe-stroke: var(--ink); }
 button.ist-hive-cell-open .ist-hive-plus { color: var(--ink); }
 .ist-hive-frame { transition: opacity 160ms, transform 200ms cubic-bezier(0.22, 1, 0.36, 1); }
 button.ist-hive-cell-open .ist-hive-frame { transform: scale(1.05); }
+/* Held: the hexagon gives way under the finger, and springs back to its
+   own size the moment it is let go — the drawing answering the press
+   rather than a highlight laid over it. Last of the three transform
+   rules on purpose: a hexagon that is open AND being pressed is being
+   pressed. The class is driven by pointer events in wireHiveGestures,
+   never :active, which sticks after a tap on iOS. */
+button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.94); }
+/* A cell the level has closed answers nothing — and must not swallow the
+   pull either: a disabled button is not dispatched pointer events at
+   all, so without this a drag or a level-swipe that happened to start on
+   one of them died where it began. Taken out of the hit-testing instead,
+   the gesture reaches the page underneath, which is what it was always
+   aimed at. */
+.ist-hive-cell:disabled { pointer-events: none; }
 /* 1. You. Nothing else on the page is this dark. */
 .ist-hive-me .ist-hive-frame { --hexframe-stroke: var(--ist-hive-ring-me); }
 /* 2. The members you are attached to: one step back from you, and still
@@ -757,6 +794,20 @@ button.ist-hive-cell-open .ist-hive-frame { transform: scale(1.05); }
 .ist-hive-filled:not(.ist-hive-bonded) .ist-hive-frame {
   --hexframe-stroke: var(--ist-hive-ring-other);
   opacity: 0.88;
+}
+/* ── The one who is named on the bar ──
+   Red, which is nowhere on the five-tone ring ladder above and is the
+   point: the ladder says how far into the petek somebody is, and this
+   says the reader is asking about them right now. It is the whole of
+   what a press changes on the drawing — nothing rises over the petek and
+   nothing on it moves — so it carries the link between the hexagon down
+   here and the name that has just appeared at the top of the screen, and
+   it has to be the one thing on the page that cannot be mistaken for a
+   depth. Full ink either way: whether they are yours is not what is
+   being said any more. */
+.ist-hive-cell.ist-hive-picked .ist-hive-frame {
+  --hexframe-stroke: var(--ink-red, #B93631);
+  opacity: 1;
 }
 /* The frame fills its cell and takes its height from the drawing's ratio
    (frames.css pins width:auto !important on every hexframe, so the cell
