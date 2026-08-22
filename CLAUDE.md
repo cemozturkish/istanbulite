@@ -462,7 +462,9 @@ sb.from('articles').delete().eq('id', id)
   drawing with nothing to pick on it. **Hane names no seat at all** — the profile bar over it
   carries you alone, centred in the row. A seat names whoever holds power over what the page is
   showing, and what this page shows is the people; there is no map on it for a seat to be true of,
-  and the two sides are where power is a fact (Kahvehane's district, Kütüphane's countries)
+  and the two sides are where power is a fact (Kahvehane's district, Kütüphane's countries). The
+  one thing that ever stands in your place there is **another member**, put there by pressing their
+  hexagon on the petek — which is the people again, not a seat (see the petek's own section)
 - **The events are the column beside it** (`#events-panel`, `events` / `event_rsvps`), back from
   Kahvehane. They belong next to the petek: the petek is who you are standing next to, an event is
   the one thing on the site that ends with you actually standing next to them. Unscoped by
@@ -959,7 +961,9 @@ power over what the page is showing** — the seat card, see its own section bel
 
 **Which end each of them stands at is the page, and it moves with the swipe.** Kütüphane seats the
 politician at the left and you at the right; Hane names no seat at all and stands you alone in the
-middle; Kahvehane mirrors Kütüphane — you at the left, the seat at the right. So swiping from
+middle — until you press somebody on the petek, which is the one thing that puts another name in
+your place there (see the petek's own section); Kahvehane mirrors Kütüphane — you at the left, the
+seat at the right. So swiping from
 Kütüphane to Hane walks your own name from the right edge into the middle, and swiping on to
 Kahvehane walks it out to the left: the bar makes the same move the pages under it make, and the
 middle page is the one where you are alone in the middle of it (see "Always in the middle"). One
@@ -1189,12 +1193,37 @@ Nothing about a cell's box changes for a press: the frame is the same size open 
 neighbour ever moves — what changes happens *inside* the drawing (`.ist-hive-cell-open` inks the
 ring and lifts it slightly via `transform`).
 
-**Pressing a member does nothing, for now.** Their name is beside them and their tone says how far
-into the petek they are, so the panel that used to open had only one thing in it that acted: Çıkar.
-Detaching is parked — `hive_unbond()` is untouched in the database and still refuses a bond inside
-the week it was made in, but nothing calls it, and where a detach belongs on a page that is only
-the drawing is an open question. Member hexagons are therefore not buttons at all rather than
-buttons that open nothing.
+**Pressing a member names them on the bar, and pressing the bar opens them** (`pickHiveMember`,
+`setBarMember`). At the outermost depth — the only one where the seats are live and the only one
+that prints no names — a press turns that hexagon **red** and puts the member's name at the top of
+the screen, in the place the reader's own name stands; pressing that name opens their profile, the
+same member sheet every `.author-link` on the site opens. Pressing the hexagon again puts your own
+name back, the way every other hexagon on this page is its own close button.
+
+Two steps rather than one, and nothing rises over the petek in between. The drawing stays the page:
+the whole of what a press changes on it is the one ring going red, which is the only red on the
+page and is therefore unmistakably about the name that has just appeared at the other end of the
+screen (a short red rule under that name says so from its end). The bar needed no new gesture for
+the second step — *press a person, read about them* is what that bar has always done; it is simply
+aimed at somebody else. And it is why the intermediate step is skipped on **desktop**, where there
+is no bar at all (see `mount`): the press opens the profile straight away rather than turning a
+hexagon red and leading nowhere.
+
+The name is cleared by anything that means the reader has left them: another depth (`setHiveLevel`),
+another page (`router.js` calls `clearBarMember` beside `clearSeat`), a fresh mount of Hane.
+
+Detaching is still parked — `hive_unbond()` is untouched in the database and still refuses a bond
+inside the week it was made in, but nothing calls it, and where a detach belongs on a page that is
+only the drawing is an open question.
+
+Two mechanical notes, both of which fail silently. A member cell is a `<button>` now, so
+`applyHiveLevel` disables it below the outermost level like every other cell — and a disabled
+button is dispatched **no pointer events at all**, which would kill a drag or a level-swipe that
+happened to start on one. `.ist-hive-cell:disabled` is therefore `pointer-events: none`, so the
+gesture falls through to the page it was always aimed at. And the press effect (the hexagon gives
+way under the finger and springs back when released, `.ist-hive-cell-pressing`) is driven by
+pointer events rather than `:active`, which sticks after a tap on iOS — the same reason Kütüphane's
+cards press the way they do.
 
 Nothing on this page scrolls, and neither does any of the three profile sets: each fits the room it
 is given, the way a politician's page does. If a new block stops fitting, drop a block — do not turn

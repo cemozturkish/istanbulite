@@ -116,6 +116,60 @@
     });
   }
 
+  // ── Somebody else's name, where your own name stands ──
+  // Hane names no seat (see BAR_LAYOUT): the bar over the petek carries
+  // you alone, in the middle. Pressing a member on the petek puts *them*
+  // there instead — the one place on the screen that is already a name
+  // with a district under it, and already a thing you press to read
+  // about somebody. So the petek says who, the bar says their name, and
+  // the bar's own gesture — press a person, open their profile — is what
+  // opens them. Nothing new had to be invented for the second step: it
+  // is the gesture the bar has always had, aimed at somebody else.
+  //
+  // Kept at module scope rather than on the row, because the row is
+  // rebuilt (renderPage) and swapped between layouts (setBarLayout)
+  // under it, and a name that survived neither would be lost to a
+  // re-render nobody asked for. It IS cleared by anything that means the
+  // reader has left them behind: another depth of the petek, another
+  // page (router.js), a fresh mount of the page itself.
+  let _barMember = null;   // { id, name, meta }
+
+  function setBarMember(member) {
+    _barMember = member ? {
+      id: String(member.member_id),
+      name: hiveMemberName(member),
+      meta: hiveMemberDistrict(member) || '—',
+    } : null;
+    paintBarMe();
+  }
+
+  function clearBarMember() {
+    if (!_barMember) return;
+    setBarMember(null);
+  }
+
+  function barMemberId() {
+    return _barMember ? _barMember.id : null;
+  }
+
+  // Paints whichever of the two the bar is currently carrying into the
+  // one block. Your own name is kept on the element rather than read
+  // back out of the module's state, so this stays true after a
+  // renderPage that this module did not drive.
+  function paintBarMe() {
+    const me = document.getElementById('ist-pc-me');
+    if (!me) return;
+    const nameEl = me.querySelector('.ist-pc-name');
+    const metaEl = me.querySelector('.ist-pc-meta');
+    if (!nameEl || !metaEl) return;
+    nameEl.textContent = _barMember ? _barMember.name : (me.dataset.selfName || '');
+    metaEl.textContent = _barMember ? _barMember.meta : (me.dataset.selfMeta || '');
+    me.classList.toggle('ist-pc-me-other', !!_barMember);
+    const label = _barMember ? _barMember.name : (me.dataset.selfLabel || '');
+    me.setAttribute('aria-label', label);
+    me.setAttribute('title', label);
+  }
+
   // Which of the three carousel pages we're on. router.js stamps
   // body.dataset.page on every virtual navigation; on a real page load
   // the filename is the source of truth.
@@ -748,6 +802,8 @@
                person is already the gesture, and a gear would be a second
                way to do what pressing yourself does. -->
           <div class="ist-pc-me" id="ist-pc-me" role="button" tabindex="0"
+               data-self-name="${esc(displayName)}" data-self-meta="${esc(yasadigiDisplay)}"
+               data-self-label="${esc(toggleLabel)}"
                aria-label="${esc(toggleLabel)}" title="${esc(toggleLabel)}">
             <div class="ist-pc-id">
               <div class="ist-pc-name">${esc(displayName)}</div>
@@ -764,9 +820,17 @@
     // Where the two names stand is the page's (see setBarLayout). Nothing
     // to slide on a row that has only just appeared.
     setBarLayout(page, { animate: false });
+    // The row above was built with your own name in it; if the petek had
+    // put somebody else's there, it goes back.
+    paintBarMe();
 
     const meEl = document.getElementById('ist-pc-me');
     const openMine = () => {
+      // Whoever the bar is naming is who it opens. Read live: the petek
+      // can have swapped the name under this handler at any point since
+      // the row was built (see setBarMember).
+      const other = barMemberId();
+      if (other) { openMemberSheet(other); return; }
       openProfileOverlay({
         sb: state.sb, I18N, user, profile,
         sozcuCount, kefaletCount, sponsoredList, kefilOfUser,
@@ -919,9 +983,14 @@
     // a swipe away and back — the same rule the three carousel pages
     // follow (see "Always in the middle" in CLAUDE.md).
     _hive = Object.assign({}, st, {
-      sb, I18N, hiveOpen: null, hiveLoaded: false,
+      sb, I18N, hiveOpen: null, hiveLoaded: false, hiveSelected: null,
       hivePan: { x: 0, y: 0 }, hiveLevel: HIVE_LEVEL_DEFAULT,
     });
+    // Arriving at the middle depth means arriving with nobody picked, so
+    // the bar carries you again — a name left on it from the last time
+    // this page was standing would be naming a hexagon that is no longer
+    // even drawn.
+    clearBarMember();
     _hive.hiveDisplayName = `${_hive.profile?.first_name || ''} ${_hive.profile?.last_name || ''}`.trim() || _hive.user.email;
     // Level 0's block and the rail are the page's furniture rather than
     // the drawing's: they are built once, here, so a re-render of the
@@ -1342,22 +1411,31 @@
     return `<span class="ist-hive-stats">${rows.join('')}</span>`;
   }
 
-  // A member on the grid. Not a button: pressing one used to open their
-  // panel, and the only thing in that panel that did anything was Çıkar,
-  // which is gone for now. Their name is beside them and their tone says
-  // how far into the petek they are — there is nothing left for a press
-  // to reveal, so it does not offer one.
-  function hiveMemberCellHTML(member, meta, nameSide, status, t) {
+  // A member on the grid. Pressing one **names them on the bar** — their
+  // name takes the place your own name holds at the top of the screen —
+  // and pressing that name opens their profile (see setBarMember). The
+  // petek itself stays the drawing: nothing rises over it, nothing on it
+  // moves, and the whole of what a press changes here is the one hexagon
+  // going red. Two steps rather than one because the petek at its
+  // outermost depth prints no names at all — the shape is what that
+  // level is for — so a press has to be able to say *who* before it can
+  // offer to say anything more about them.
+  //
+  // Pressing them again puts your own name back: every hexagon on this
+  // page is its own close button (see hiveEmptyCellHTML, hiveMeCellHTML).
+  function hiveMemberCellHTML(member, meta, nameSide, status, t, picked) {
     const name = hiveMemberName(member);
-    const cls = `ist-hive-filled${member.bonded ? ' ist-hive-bonded' : ''}`;
+    const cls = `ist-hive-filled${member.bonded ? ' ist-hive-bonded' : ''}${picked ? ' ist-hive-picked' : ''}`;
     return `
-      <div class="ist-hive-cell ${cls}" ${meta} title="${esc(name)}">
+      <button type="button" class="ist-hive-cell ${cls}" ${meta}
+              data-member-id="${esc(member.member_id)}" aria-pressed="${picked ? 'true' : 'false'}"
+              title="${esc(name)}" aria-label="${esc(name)}">
         <div class="ist-pc-cover-avatar ist-hive-frame">
           ${coverBadgesHTML(member)}
           <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
         </div>
         ${hiveNameHTML(member, nameSide, status, t)}
-      </div>
+      </button>
     `;
   }
 
@@ -1560,7 +1638,8 @@
         // grid is simply re-rendered — the label is out of flow, so
         // nothing on the plane moves when it arrives.
         const status = status_.get(String(item.member.member_id)) || null;
-        return hiveMemberCellHTML(item.member, meta, nameSide, status, t);
+        const picked = opts.selected && opts.selected === String(item.member.member_id);
+        return hiveMemberCellHTML(item.member, meta, nameSide, status, t, picked);
       }
       if (item.kind === 'ghost') return hiveGhostCellHTML(meta);
       return hiveEmptyCellHTML(item.dir, meta, (open && open.dir === item.dir) ? open : null, t);
@@ -1752,14 +1831,43 @@
     state.hivePan = { x: 0, y: 0 };
     // A code on offer belongs to the level the seats are on: stepping
     // away from that level folds the seat back rather than leaving a live
-    // code burning on a hexagon nobody can see any more.
-    if (level !== HIVE_LEVEL_ALL && state.hiveOpen) {
+    // code burning on a hexagon nobody can see any more. A member picked
+    // out of the petek is the same: their name is on the bar because the
+    // reader is standing in front of their hexagon, and at another depth
+    // they are not.
+    const dropped = level !== HIVE_LEVEL_ALL && (state.hiveOpen || state.hiveSelected);
+    if (dropped) {
       state.hiveOpen = null;
+      state.hiveSelected = null;
+      clearBarMember();
       renderHive(state);
       return;
     }
     applyHiveLevel(state);
     fitHive(state);
+  }
+
+  // ── Pressing a member ──
+  // One member is named on the bar at a time, and pressing the one that
+  // is already named puts your own name back — the same toggle every
+  // other hexagon on this page answers a press with. The name is read
+  // off the map row rather than the DOM: the caption beside a hexagon is
+  // only printed at the middle depth, and this is the outermost.
+  function pickHiveMember(state, id) {
+    const cells = (state.hive && state.hive.cells) || [];
+    const member = cells.find(c => String(c.member_id) === id) || null;
+    // Desktop has no top bar at all (see mount) — there is nowhere to put
+    // their name, so the press does the second step's work straight away
+    // rather than turning a hexagon red and leading nowhere. One press
+    // instead of two, because the step in between has no home here.
+    if (!document.getElementById('ist-pc-me')) {
+      if (member) openMemberSheet(id);
+      return;
+    }
+    const next = state.hiveSelected === id ? null : id;
+    state.hiveSelected = next;
+    setBarMember(next ? member : null);
+    renderHive(state);
   }
 
   // The page is the drawing, and nothing else. There was a dock along the
@@ -1912,7 +2020,7 @@
       avatarUrl: state.avatarUrl, avatarHair: state.avatarHair, avatarHat: state.avatarHat,
       avatarAccessory: state.avatarAccessory, avatarShirt: state.avatarShirt,
       displayName: state.hiveDisplayName || '',
-      hive: state.hive, open: state.hiveOpen, t,
+      hive: state.hive, open: state.hiveOpen, selected: state.hiveSelected || null, t,
     });
     applyHiveLevel(state);
     fitHive(state);
@@ -2010,7 +2118,18 @@
         id: e.pointerId, x: e.clientX, y: e.clientY,
         pan: Object.assign({ x: 0, y: 0 }, state.hivePan),
         axis: null, over: 0,
+        // The hexagon under the finger gives way while it is held (see
+        // .ist-hive-cell-pressing). Driven by pointer events rather than
+        // :active because :active sticks after a tap on iOS, and a
+        // hexagon left shrunken behind whatever the press opened is
+        // exactly the kind of thing nobody can take back.
+        //
+        // Only what can be pressed presses: a cell the level has closed
+        // is `disabled` and a ghost is not a control, and both are
+        // pointer-events: none, so neither is ever the target here.
+        pressed: e.target.closest('.ist-hive-cell'),
       };
+      if (g.pressed) g.pressed.classList.add('ist-hive-cell-pressing');
     });
 
     page.addEventListener('pointermove', (e) => {
@@ -2023,6 +2142,8 @@
         // page only ever claims the pointer for its own axis.
         g.axis = Math.abs(dy) > Math.abs(dx) * 1.2 ? 'y' : 'x';
         state.hiveSwiped = true;
+        // It turned out to be a pull, so it was never a press.
+        if (g.pressed) { g.pressed.classList.remove('ist-hive-cell-pressing'); g.pressed = null; }
         if (g.axis === 'y') { try { page.setPointerCapture(e.pointerId); } catch (err) {} }
       }
       const sl = slack();
@@ -2047,6 +2168,9 @@
       if (!g) return;
       const gesture = g;
       g = null;
+      // Released: the hexagon springs back to its own size, on the
+      // frame's own transition.
+      if (gesture.pressed) gesture.pressed.classList.remove('ist-hive-cell-pressing');
       if (gesture.axis === 'y' && Math.abs(gesture.over) > HIVE_LEVEL_SWIPE) {
         setHiveLevel(state, hiveLevel(state) + (gesture.over < 0 ? 1 : -1));
         return;
@@ -2109,6 +2233,16 @@
         renderHive(state);
         offerHiveSlot(state, dir);
       });
+    });
+
+    // ── Pressing somebody ──
+    // Their name goes up onto the bar, in the place your own name holds,
+    // and the hexagon goes red so the drawing says which of them the bar
+    // is talking about. Pressing them again puts your own name back.
+    // Nothing opens here: the profile is one more press, on the name
+    // itself (see setBarMember).
+    mount.querySelectorAll('.ist-hive-cell[data-member-id]').forEach(cell => {
+      cell.addEventListener('click', () => pickHiveMember(state, cell.dataset.memberId));
     });
 
     // Pressing yourself opens the field that takes a code somebody gave
@@ -2864,6 +2998,7 @@
     mount,
     setPage,
     setBarLayout,
+    clearBarMember,
     unmount,
     mountLibraryCard,
     openProfileOverlay,
