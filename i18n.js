@@ -175,6 +175,9 @@
     // games — shared right column (Günün Oyunları / scoreboard / neighborhood stats)
     'games.today':            { default: 'Günün Oyunları',        more_english: "Today's Games" },
     'games.weeklyscoreboard': { default: 'Haftanın Skor Tahtası', more_english: 'Weekly Scoreboard' },
+    // Short form for the corner button on Kahvehane -- the heading inside
+    // the sheet still prints the full 'Haftanın Skor Tahtası'.
+    'games.scoreboardbox': { default: 'Skor Tahtası', more_english: 'Scoreboard' },
     // The question standing between two games (see db/daily_questions.sql
     // and the question card in kahvehane.html).
     // Where in the day's sequence a game card stands -- its kicker in the
