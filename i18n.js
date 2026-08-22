@@ -74,6 +74,12 @@
     'profile.hive.level.self': { default: 'Sen',           more_english: 'You' },
     'profile.hive.level.near': { default: 'Yanındakiler',  more_english: 'Beside you' },
     'profile.hive.level.all':  { default: 'Petek',         more_english: 'The petek' },
+    // Under a neighbour's name at the middle depth: how much of the day
+    // they still have in front of them (see hiveStatHTML in
+    // profile-card.js). Both are nouns following a number — "3+ HABER",
+    // "1/3 OYUN" — so they stay in the singular in both languages.
+    'profile.hive.stat.news':  { default: 'haber',         more_english: 'news' },
+    'profile.hive.stat.games': { default: 'oyun',          more_english: 'games' },
     // The code belongs to the empty seat, not to the member, and it dies
     // in minutes (see db/hive_slot_codes_v5.sql). Both halves of the
     // exchange are printed inside the hexagon they belong to now — the
