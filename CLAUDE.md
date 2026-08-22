@@ -1049,12 +1049,20 @@ Four things about it:
   standing at, and each takes a press. Horizontal pulls are left to the carousel underneath
   (`router.js` already ignores anything vertical-dominant).
 
-Level 0 is also the one place on this page that carries **words about the reader** — name, district,
-member-since, and the way into their own personalization, which opens the profile sheet's settings
-blocks via the `sections` override on `openProfileOverlay` (personalization belongs to the middle
-page per the Vision section, and this is the middle page's innermost depth). The block is laid
-*over* the foot of the window rather than taking room from it, so the window never changes size
-between depths; `fitHive` reserves the height it measures and centres the reader in what is left.
+**Level 0 is where the reader is personalized, and it carries the controls rather than a way to
+reach them.** There is no Kişiselleştir button and nothing rises over the page: the avatar arrows
+stand on the reader's own hexagon (`hiveAvatarPickerHTML` — the profile sheet's own markup, ids and
+four `wire*Carousel` functions, reused unchanged), and their name, district, member-since and three
+preferences (dil, renk, görünüm) are printed under it. **Every control commits itself**, the way the
+avatar arrows already did — so there is no Kaydet here either, and nothing to confirm. What is *not*
+here is the account (email, kefil, referral code, Çıkış Yap): that is not personalization, and it
+stays on Kütüphane's profile page. Two mechanical notes: the arrow block is a node of its own
+standing on the me cell's coordinates, because the me cell is a `<button>` and a button inside a
+button is not something the parser keeps; and it is `display: none` away from level 0 rather than
+faded, both to keep the arrows out of the tab order and so `fitHive` can tell they are not on the
+paper. The whole block is laid *over* the foot of the window rather than taking room from it, so the
+window never changes size between depths; `fitHive` reserves the height it measures and centres the
+reader in what is left.
 
 **The petek takes the band, and the events take what is left.** On a phone Hane's hero is not the
 map's square: the other two pages' hero is a drawing of a fixed size and gets a square, while this

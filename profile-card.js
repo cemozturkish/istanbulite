@@ -126,12 +126,8 @@
     return PROFILE_SECTIONS[file] ? file : DEFAULT_PAGE;
   }
 
-  // Which blocks a profile page shows. Normally the page decides (see
-  // PROFILE_SECTIONS); a caller may hand its own set instead, which is
-  // how Hane's innermost petek level opens the personalization the page
-  // it stands on doesn't otherwise carry.
-  function sectionsFor(page, override) {
-    return override || PROFILE_SECTIONS[page] || PROFILE_SECTIONS[DEFAULT_PAGE];
+  function sectionsFor(page) {
+    return PROFILE_SECTIONS[page] || PROFILE_SECTIONS[DEFAULT_PAGE];
   }
 
   // Two-option toggles. Legacy `more_turkish` and `system` values are
@@ -872,7 +868,7 @@
     // in the sheet instead of stacked against its top edge with the
     // whole void left under it. See .profile-overlay-centred in
     // profile-card.css.
-    const show = sectionsFor(_ov.page, _ov.sections);
+    const show = sectionsFor(_ov.page);
     body.classList.toggle('profile-overlay-centred', !show.week && !show.account && !show.settings);
     wireSettingsEvents(_ov);
   }
@@ -934,6 +930,7 @@
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const page = document.getElementById('po-hive-page');
     page.insertAdjacentHTML('beforeend', hiveSelfHTML(_hive) + hiveRailHTML(t));
+    wireHiveSelf(_hive);
     renderHive(_hive);
     wireHiveGestures(_hive);
     loadHive(_hive);
@@ -1234,7 +1231,10 @@
   const HIVE_LEVEL_DEFAULT = 1;
   // How far each level lets the drawing grow. fitHive still shrinks below
   // these to fit the window — this is a ceiling, not a size.
-  const HIVE_LEVEL_ZOOM = [2.6, 1.5, 1];
+  // Level 0 shares its window with the avatar arrows beside the hexagon
+  // and the three preferences under it, so it is drawn a step smaller
+  // than a hexagon alone would allow.
+  const HIVE_LEVEL_ZOOM = [2.2, 1.5, 1];
   // How far a finger has to travel *past the end of the drawing* before
   // the level changes under it, and how far it has to travel at all
   // before the gesture is one rather than a tap.
@@ -1391,11 +1391,45 @@
               data-me="1" aria-expanded="${isOpen ? 'true' : 'false'}" title="${esc(displayName)}">
         <div class="ist-pc-cover-avatar ist-hive-frame">
           ${coverBadgesHTML(profile)}
-          <div class="ist-pc-cover-art">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>
+          <!-- The art is its own layer inside the frame because the avatar
+               carousels replace its whole innerHTML on every arrow press
+               (see wireHairCarousel and friends, which this page reuses
+               unchanged at level 0) — sharing a parent with the badges
+               would wipe them. -->
+          <div class="ist-pc-cover-art" id="po-avatar-preview">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>
           ${claim}
         </div>
       </button>
     `;
+  }
+
+  // ── Changing your own avatar, at the depth that is about you ──
+  // Two columns of four arrows flanking your own hexagon — hat, hair,
+  // accessory, shirt, top to bottom, all the same size so no category
+  // reads as more primary than another. It is the same markup, the same
+  // ids and the same four `wire*Carousel` functions the profile sheet's
+  // customizing mode uses: one implementation of picking an avatar, in
+  // two places that show it.
+  //
+  // A separate node standing on the me cell's own coordinates rather than
+  // markup inside it, because the me cell is a <button> and a button
+  // inside a button is not a thing the parser will keep. It carries the
+  // cell's height so `top: 50%` centres the columns on the frame, and it
+  // is drawn only at level 0 (see profile-card.css) — a press changes
+  // your avatar there and then, and saves itself, so there is nothing to
+  // open and nothing to confirm.
+  function hiveAvatarPickerHTML(meta) {
+    const row = (id, dir, label) =>
+      `<button type="button" class="ist-pc-cover-pick-arrow" id="po-${id}-${dir}" aria-label="${esc(label)}">`
+      + `${dir === 'prev' ? ARROW_ICON_LEFT : ARROW_ICON_RIGHT}</button>`;
+    const col = (dir) => `
+      <div class="ist-pc-cover-pick-col ist-hive-pick-col ist-pc-cover-pick-${dir === 'prev' ? 'prev' : 'next'}">
+        ${row('hat', dir, dir === 'prev' ? 'Önceki şapka' : 'Sonraki şapka')}
+        ${row('hair', dir, dir === 'prev' ? 'Önceki saç' : 'Sonraki saç')}
+        ${row('accessory', dir, dir === 'prev' ? 'Önceki aksesuar' : 'Sonraki aksesuar')}
+        ${row('shirt', dir, dir === 'prev' ? 'Önceki tişört' : 'Sonraki tişört')}
+      </div>`;
+    return `<div class="ist-hive-picker" ${meta}>${col('prev')}${col('next')}</div>`;
   }
 
   // ── The grid ──
@@ -1473,7 +1507,7 @@
       // the DOM never carried.
       const meta = `style="left: calc(var(--ist-hive-step-x) * ${p.x}); top: calc(var(--ist-hive-step-y) * ${p.y});" `
         + `data-ring="${hiveRing(item.q, item.r)}"`;
-      if (item.kind === 'me') return hiveMeCellHTML(opts, meta, open, t);
+      if (item.kind === 'me') return hiveMeCellHTML(opts, meta, open, t) + hiveAvatarPickerHTML(meta);
       if (item.kind === 'member') {
         // Which side of the reader they are standing on. Named only if
         // they are touching the reader — see nameCells above.
@@ -1524,24 +1558,109 @@
   // ── Level 0: you, and what is yours to change ──
   // The innermost depth is the one place on this page that is about the
   // reader rather than about the shape they are standing in, so it is the
-  // one place that carries words about them: their name, their district,
-  // how long they have been here, and the way into their own
-  // personalization. Everything on it is already known by the time the
-  // page draws — there is no second fetch behind this level.
+  // one place that carries words about them — and it carries the controls
+  // themselves, not a way to reach them. There is no Kişiselleştir button
+  // and nothing rises over the page: the arrows are on your hexagon (see
+  // hiveAvatarPickerHTML) and your three preferences are printed under
+  // your name, each one committing itself the moment it is pressed, the
+  // way the avatar arrows already did. Nothing here opens and nothing
+  // closes, which is the whole rule this page is built on.
+  //
+  // What is *not* here is the account — email, kefil, referral code,
+  // signing out. Those are not personalization; they stay on Kütüphane's
+  // profile page, where the account block lives (see PROFILE_SECTIONS).
+  //
+  // Everything printed is already known by the time the page draws —
+  // there is no second fetch behind this level.
+  const HIVE_PREFS = [
+    { key: 'lang', column: 'language_pref', label: 'profile.langpref',
+      options: [{ value: 'default', label: 'Daha Türkçe' }, { value: 'more_english', label: 'Daha İngilizce' }] },
+    { key: 'palette', column: 'palette_pref', label: 'profile.colortheme',
+      options: [{ value: 'mono', label: 'Siyah-Beyaz' }, { value: 'earth', label: 'Kahverengi' }] },
+    { key: 'theme', column: 'theme_pref', label: 'profile.appearance',
+      options: [{ value: 'light', label: 'Açık' }, { value: 'dark', label: 'Koyu' }] },
+  ];
+
+  function hivePrefValue(state, pref) {
+    const raw = state.profile ? state.profile[pref.column] : null;
+    if (pref.key === 'lang') return normalizeLang(raw);
+    if (pref.key === 'palette') return normalizePalette(raw);
+    return normalizeTheme(raw);
+  }
+
   function hiveSelfHTML(state) {
     const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
     const district = state.profile && state.profile.neighborhood
       ? (NB_NAMES[state.profile.neighborhood] || state.profile.neighborhood) : '';
     const since = (state.I18N && state.I18N.formatMemberSince && state.profile && state.profile.joined_at)
       ? state.I18N.formatMemberSince(state.profile.joined_at) : '';
+    const prefs = HIVE_PREFS.map(pref => {
+      const current = hivePrefValue(state, pref);
+      const options = pref.options.map(o => `
+        <button type="button" class="ist-hive-pref-opt${o.value === current ? ' ist-hive-pref-on' : ''}"
+                data-pref="${pref.key}" data-value="${o.value}"
+                aria-pressed="${o.value === current ? 'true' : 'false'}">${esc(o.label)}</button>`).join('');
+      return `
+        <div class="ist-hive-pref">
+          <span class="ist-hive-pref-label">${esc(t(pref.label))}</span>
+          <span class="ist-hive-pref-seg" role="group" aria-label="${esc(t(pref.label))}">${options}</span>
+        </div>`;
+    }).join('');
     return `
       <div class="ist-hive-self" id="po-hive-self">
         <div class="ist-hive-self-name">${esc(capitalizeName(state.hiveDisplayName || ''))}</div>
         <div class="ist-hive-self-meta">${esc(district)}</div>
         ${since ? `<div class="ist-hive-self-since">${esc(since)}</div>` : ''}
-        <button type="button" class="ist-hive-self-btn" id="po-hive-customize">${esc(t('profile.customize'))}</button>
+        <div class="ist-hive-prefs">${prefs}</div>
+        <div class="ist-hive-self-msg" id="po-hive-self-msg" role="status" aria-live="polite"></div>
       </div>
     `;
+  }
+
+  // A preference commits itself. There is no Kaydet on this page for the
+  // same reason there is no Kişiselleştir: what a press does, it does —
+  // exactly like the avatar arrows beside the hexagon above it. Whatever
+  // can be applied without a reload is applied here and now (the palette
+  // repaints, the language re-labels the site); the appearance is stored
+  // the same way the profile sheet stores it.
+  async function pickHivePref(state, key, value) {
+    const pref = HIVE_PREFS.find(p => p.key === key);
+    if (!pref || hivePrefValue(state, pref) === value) return;
+    const msg = document.getElementById('po-hive-self-msg');
+    const { data, error } = await state.sb.from('profiles')
+      .update({ [pref.column]: value }).eq('id', state.user.id).select('id');
+    if (error || !data || data.length === 0) {
+      if (msg) msg.textContent = (error && error.message) || 'Kaydedilemedi.';
+      return;
+    }
+    if (msg) msg.textContent = '';
+    state.profile = Object.assign({}, state.profile, { [pref.column]: value });
+    if (key === 'palette' && global.Palette) global.Palette.setPalette(value);
+    if (key === 'lang' && state.I18N && state.I18N.setLang) state.I18N.setLang(value);
+    // The block is rebuilt rather than patched: a language change rewrites
+    // every label on it, and the marks have to agree with what was just
+    // saved either way.
+    renderHiveSelf(state);
+  }
+
+  function wireHiveSelf(state) {
+    document.querySelectorAll('#po-hive-self .ist-hive-pref-opt').forEach(btn => {
+      btn.addEventListener('click', () => pickHivePref(state, btn.dataset.pref, btn.dataset.value));
+    });
+  }
+
+  // Level 0's block, re-rendered in place. It is the page's furniture
+  // rather than the drawing's, so it never goes through renderHive — and
+  // it is wired here rather than at mount, since a re-render replaces
+  // every control on it.
+  function renderHiveSelf(state) {
+    const host = document.getElementById('po-hive-self');
+    if (!host) return;
+    host.outerHTML = hiveSelfHTML(state);
+    wireHiveSelf(state);
+    // Its height is what fitHive leaves the drawing at level 0, and a
+    // language change can move it by a line.
+    fitHive(state);
   }
 
   // Puts the page into the level it is at: which cells are drawn (a cell
@@ -1663,24 +1782,37 @@
     // what a window fitted to the cells alone would clip.
     const named = level < HIVE_LEVEL_ALL;
     let minL = cx, maxR = cx, minT = cy, maxB = cy;
-    plane.querySelectorAll('.ist-hive-cell').forEach(cell => {
+    // Whatever hangs outside a cell's own box on this level and still has
+    // to be on the paper: a member's name at the depths that print one,
+    // and the avatar arrows at the depth that shows them. A capital with
+    // letter-spacing after it paints a little past its own box, so the
+    // track is not quite the ink: fit the wider of the two, and leave a
+    // breath after it — anything whose far edge lands exactly on the
+    // window's edge reads as clipped rather than fitted.
+    const outriders = (cell) => {
+      const found = [];
+      if (named) found.push(...cell.querySelectorAll('.ist-hive-name'));
+      if (level === 0) found.push(...cell.querySelectorAll('.ist-hive-pick-col'));
+      return found;
+    };
+    plane.querySelectorAll('.ist-hive-cell, .ist-hive-picker').forEach(cell => {
       if (cell.classList.contains('ist-hive-away')) return;
+      // The arrow block is display:none away from level 0, and a box with
+      // no size reports its offsets as zero — measured, it would drag the
+      // required box out to the plane's own origin and shrink the drawing
+      // to fit something nobody can see.
+      if (!cell.offsetWidth) return;
       const l = cell.offsetLeft, t = cell.offsetTop;
       if (l < minL) minL = l;
       if (l + cell.offsetWidth > maxR) maxR = l + cell.offsetWidth;
       if (t < minT) minT = t;
       if (t + cell.offsetHeight > maxB) maxB = t + cell.offsetHeight;
-      const nameEl = named ? cell.querySelector('.ist-hive-name') : null;
-      if (!nameEl) return;
-      const left = l + nameEl.offsetLeft;
-      // A capital with letter-spacing after it paints a little past its
-      // own box, so the track is not quite the ink: fit the wider of the
-      // two, and leave a breath after it — a name whose last letter lands
-      // exactly on the window's edge reads as a clipped name, not a
-      // fitted one.
-      const w = Math.max(nameEl.offsetWidth, nameEl.scrollWidth) + HIVE_NAME_BREATH;
-      if (left - HIVE_NAME_BREATH < minL) minL = left - HIVE_NAME_BREATH;
-      if (left + w > maxR) maxR = left + w;
+      outriders(cell).forEach(el => {
+        const left = l + el.offsetLeft;
+        const w = Math.max(el.offsetWidth, el.scrollWidth) + HIVE_NAME_BREATH;
+        if (left - HIVE_NAME_BREATH < minL) minL = left - HIVE_NAME_BREATH;
+        if (left + w > maxR) maxR = left + w;
+      });
     });
 
     // And what has to fit is not that box either, but the box it needs
@@ -1871,27 +2003,6 @@
       dot.addEventListener('click', () => setHiveLevel(state, parseInt(dot.dataset.level, 10)));
     });
 
-    // Level 0's one control: the way into everything about the reader
-    // that they can change. It is the settings page of the profile sheet
-    // — the personalization belongs to the middle page (see the Vision
-    // section in CLAUDE.md), and this is the middle page's innermost
-    // depth, which is the closest the site gets to the reader themselves.
-    const customize = document.getElementById('po-hive-customize');
-    if (customize) customize.addEventListener('click', () => {
-      openProfileOverlay({
-        sb: state.sb, I18N: state.I18N, user: state.user, profile: state.profile,
-        sozcuCount: state.sozcuCount, kefaletCount: state.kefaletCount,
-        sponsoredList: state.sponsoredList, kefilOfUser: state.kefilOfUser,
-        sections: { hive: false, week: false, account: true, settings: true },
-        avatarUrl: state.avatarUrl, avatarHair: state.avatarHair, avatarHat: state.avatarHat,
-        avatarAccessory: state.avatarAccessory, avatarShirt: state.avatarShirt,
-        onAvatarChange(hair, hat, accessory, shirt) {
-          state.avatarHair = hair; state.avatarHat = hat;
-          state.avatarAccessory = accessory; state.avatarShirt = shirt;
-          renderHive(state);
-        },
-      });
-    });
   }
 
   function wireHiveEvents(state) {
@@ -1960,6 +2071,15 @@
         input.focus();
       }
     }
+
+    // The arrows flanking your own hexagon at level 0 (see
+    // hiveAvatarPickerHTML). These are the profile sheet's own carousels,
+    // reused unchanged — each press commits the pick on its own, so this
+    // page needs no Kaydet of its own either.
+    wireHairCarousel(state);
+    wireHatCarousel(state);
+    wireAccessoryCarousel(state);
+    wireShirtCarousel(state);
 
     wireHiveOfferClock(state);
   }
@@ -2117,7 +2237,7 @@
   // badges still render via coverHTML.
   function settingsPageHTML(state) {
     const { I18N, user, profile, sozcuCount, sponsoredList, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
-    const show = sectionsFor(state.page, state.sections);
+    const show = sectionsFor(state.page);
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
