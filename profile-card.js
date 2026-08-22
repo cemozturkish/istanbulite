@@ -1296,9 +1296,50 @@
   // anyway. It is absolutely placed and never in flow — a name is a
   // caption on the drawing, and nothing about the packing may depend on
   // how long somebody's name happens to be.
-  function hiveNameHTML(member, side) {
+  //
+  // Under the name, where the member stands in their own day: how much
+  // of the news is still stacked in their Kütüphane, and how far into
+  // the day's games they have got. This is the app's own formula
+  // (people → their ideas → our opinions on those ideas) written on the
+  // drawing itself — a name says somebody is beside you, these two lines
+  // say they are in the middle of the same day you are, which is the
+  // thing actually worth walking up to them about. It is deliberately
+  // two numbers and no titles: what they are reading is theirs, that
+  // they have three left to read is the city's.
+  function hiveNameHTML(member, side, status, t) {
     if (!side) return '';
-    return `<span class="ist-hive-name ist-hive-name-${side}">${esc(hiveMemberName(member))}</span>`;
+    return `
+      <span class="ist-hive-name ist-hive-name-${side}">
+        <span class="ist-hive-name-label">${esc(hiveMemberName(member))}</span>
+        ${hiveStatHTML(status, t)}
+      </span>`;
+  }
+
+  // Above this the count stops being a number and becomes "a stack" —
+  // the deck itself only ever draws three cards, so there is nothing
+  // past the third for the count to be true of anyway.
+  const HIVE_NEWS_MAX = 3;
+
+  function hiveStatHTML(status, t) {
+    if (!status) return '';
+    const rows = [];
+    const news = Math.max(0, status.news_stacked | 0);
+    // Nothing left to read is not a score of zero, it is an empty deck —
+    // and an empty deck says so on its own page ("Hepsi bu kadar"). On
+    // somebody else's hexagon it is simply not a line.
+    if (news > 0) {
+      const n = news > HIVE_NEWS_MAX ? `${HIVE_NEWS_MAX}+` : String(news);
+      rows.push(`<span class="ist-hive-stat">${n} ${esc(t('profile.hive.stat.news'))}</span>`);
+    }
+    // The fraction is printed whether or not they have started: 0/3 is
+    // the whole point of it — a day with three games in front of it —
+    // and it disappears only on a day the admin left with no games at
+    // all, where there is no sequence for anybody to be inside.
+    if ((status.games_total | 0) > 0) {
+      rows.push(`<span class="ist-hive-stat">${status.games_played | 0}/${status.games_total | 0} ${esc(t('profile.hive.stat.games'))}</span>`);
+    }
+    if (!rows.length) return '';
+    return `<span class="ist-hive-stats">${rows.join('')}</span>`;
   }
 
   // A member on the grid. Not a button: pressing one used to open their
@@ -1306,7 +1347,7 @@
   // which is gone for now. Their name is beside them and their tone says
   // how far into the petek they are — there is nothing left for a press
   // to reveal, so it does not offer one.
-  function hiveMemberCellHTML(member, meta, nameSide) {
+  function hiveMemberCellHTML(member, meta, nameSide, status, t) {
     const name = hiveMemberName(member);
     const cls = `ist-hive-filled${member.bonded ? ' ist-hive-bonded' : ''}`;
     return `
@@ -1315,7 +1356,7 @@
           ${coverBadgesHTML(member)}
           <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
         </div>
-        ${hiveNameHTML(member, nameSide)}
+        ${hiveNameHTML(member, nameSide, status, t)}
       </div>
     `;
   }
@@ -1442,6 +1483,7 @@
     const t = opts.t;
     const cells = (opts.hive && opts.hive.cells) || [];
     const open = opts.open || null;
+    const status_ = (opts.hive && opts.hive.status) || new Map();
     const taken = new Set(cells.map(c => `${c.q},${c.r}`));
     // The caller stands at (0,0) too — a name must not be printed over
     // their frame either.
@@ -1513,7 +1555,12 @@
         // they are touching the reader — see nameCells above.
         const side = (item.q + item.r / 2) < 0 ? 'left' : 'right';
         const nameSide = hiveRing(item.q, item.r) === 1 ? side : null;
-        return hiveMemberCellHTML(item.member, meta, nameSide);
+        // Where they stand in their own day, printed under the name. It
+        // lands a moment after the map does (see loadHiveStatus) and the
+        // grid is simply re-rendered — the label is out of flow, so
+        // nothing on the plane moves when it arrives.
+        const status = status_.get(String(item.member.member_id)) || null;
+        return hiveMemberCellHTML(item.member, meta, nameSide, status, t);
       }
       if (item.kind === 'ghost') return hiveGhostCellHTML(meta);
       return hiveEmptyCellHTML(item.dir, meta, (open && open.dir === item.dir) ? open : null, t);
@@ -1881,11 +1928,46 @@
     const { data } = await state.sb.rpc('hive_map');
     state.hive = Object.assign({}, state.hive, { cells: data || [] });
     renderHive(state);
+    // The drawing does not wait for it: the grid is the page, and where
+    // everybody stands in their day is a caption on it. It lands on its
+    // own and re-renders (see loadHiveStatus).
+    loadHiveStatus(state);
   }
 
   async function reloadHiveMap(state) {
     const { data } = await state.sb.rpc('hive_map');
     state.hive = Object.assign({}, state.hive, { cells: data || [] });
+    loadHiveStatus(state);
+  }
+
+  // ── Where everybody on the petek stands in their own day ──
+  // One call, for the whole map at once: how much of the news is still
+  // stacked in each member's Kütüphane and how far into the day's games
+  // they have got (db/hive_member_status.sql). The two Istanbul dates
+  // are the client's, because the Istanbul day is (coding convention
+  // 10) — the RPC keys game_day_toggles by the first and matches
+  // game_results.date, which has always been unpadded, with the second.
+  //
+  // Best-effort like every other call on this page: before the migration
+  // has been run the function isn't there, and the petek must still draw
+  // — a member simply goes uncaptioned, which is exactly how the page
+  // read before this existed.
+  async function loadHiveStatus(state) {
+    try {
+      const iso = IstDate.iso();
+      const [y, m, d] = iso.split('-').map(Number);
+      const { data, error } = await state.sb.rpc('hive_member_status', {
+        p_game_date: iso,
+        p_game_key: `${y}-${m}-${d}`,
+      });
+      if (error || !data) return;
+      const status = new Map(data.map(r => [String(r.member_id), r]));
+      state.hive = Object.assign({}, state.hive, { status });
+      // Only if the page is still the one this was fetched for: a swipe
+      // away and back mounts a fresh state, and painting into the old
+      // one would draw nothing anyway.
+      if (state === _hive && document.getElementById('po-hive-mount')) renderHive(state);
+    } catch (e) { /* no captions this time; the drawing is unchanged */ }
   }
 
   // ── Dragging the grid, and swiping between its depths ──

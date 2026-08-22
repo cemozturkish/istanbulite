@@ -1138,6 +1138,31 @@ when they are tapped (which is where their district is anyway). It is absolutely
 flow — the packing is arithmetic, and nothing about it may shift because somebody's name is long —
 and `fitHive` measures the names when it fits the grid, since they hang outside the plane's own box.
 
+**Under the name is where that member stands in their own day** (`hiveStatHTML`,
+`db/hive_member_status.sql`): how much of the news is still stacked in their Kütüphane
+(`3+ HABER` / `2 HABER` / `1 HABER`, nothing at all when their deck is empty) and how far into the
+day's games they have got (`0/3 OYUN` on a day with three, `0/1` on a day with one). It is the
+app's own formula written on the drawing — a name says somebody is beside you, these two lines say
+they are in the middle of the same day you are, which is the thing worth walking up to them about.
+Deliberately two numbers and no titles: *what* they are reading is theirs, *that* they have three
+left to read is the city's. The fraction prints whether or not they have started (`0/3` is the
+point of it) and disappears only on a day with no games at all; a game the admin switched off is
+on neither side of it, because it is not a step anybody has left to take.
+
+Both come from one RPC per map, `hive_member_status(p_game_date, p_game_key)` — it takes no member
+list and answers only for the caller's own map, so it is a caption on the petek and not a directory
+anyone can sweep. It lands after `hive_map()` and simply re-renders; the labels are out of flow, so
+nothing on the plane moves when they arrive, and a missing migration leaves members uncaptioned
+rather than breaking the page. The games half is arithmetic over `game_results` and
+`game_day_toggles`, which were already there. The news half needed **`news_dealt`** — until now
+what a member had dealt with lived only in their own `localStorage` (`dunya_dealt_<uid>`), so
+nothing outside that one browser could say how deep their deck was. It mirrors that store exactly,
+stamp semantics included (what is kept is the story's `updated_at` **as thrown**, so a gelişme puts
+it back in their deck and back into their count), and the deck itself is still driven by
+`localStorage` — the server copy is written fire-and-forget beside it and merged back in on load,
+later stamp winning. RLS lets a member read only their own rows: the petek says somebody has three
+stories left, never which three.
+
 **Both halves of the exchange are printed inside the hexagon they belong to.** There used to be a
 dock along the foot of the page carrying whatever was tapped; there is no bar on this page at all
 now. Pressing a free side of your own hexagon mints that seat's code and prints it **in the seat**,

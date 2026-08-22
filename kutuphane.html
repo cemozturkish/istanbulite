@@ -14,16 +14,16 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
   <script src="router.js?v=3"></script>
-  <script src="i18n.js?v=10"></script>
+  <script src="i18n.js?v=11"></script>
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
   <script src="game-locks.js?v=2"></script>
-  <link rel="stylesheet" href="profile-card.css?v=13">
+  <link rel="stylesheet" href="profile-card.css?v=15">
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
   <script src="tbmm.js" defer></script>
   <script src="politician-card.js?v=3" defer></script>
-  <script src="profile-card.js?v=13" defer></script>
+  <script src="profile-card.js?v=14" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
   <link rel="stylesheet" href="mahalle-picker.css">
@@ -4938,13 +4938,16 @@ function clearNewsCountryHighlight() { setNewsCountryHighlight([]); }
 async function loadDunyaNews() {
   const feed = document.getElementById('dunya-news-feed');
   if (!feed) return;
-  await ensureDealtLoaded();
+  // Both at once: what the reader has dealt with (localStorage, plus the
+  // server mirror it is merged with) and what there is to deal with. The
+  // store's round trip must not stand between the reader and the deck.
   const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
-  const { data, error } = await sb.from('breaking_news')
+  const query = sb.from('breaking_news')
     .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*), breaking_news_series(name), breaking_news_countries(country)')
     .gte('updated_at', cutoff)
     .is('archived_at', null)
     .order('updated_at', { ascending: false });
+  const [, { data, error }] = await Promise.all([ensureDealtLoaded(), query]);
   if (error) {
     console.error('[kutuphane news]', error);
     feed.innerHTML = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Haberler yüklenemedi.</div>`;
@@ -4975,10 +4978,12 @@ async function loadDunyaNews() {
 const DEALT_KEY_PREFIX = 'dunya_dealt_';
 let _dealt = new Map();   // story id -> the updated_at that was dealt with
 let _dealtKey = null;
+let _dealtUid = null;
 
 async function ensureDealtLoaded() {
   if (_dealtKey) return;
   const uid = await libGetCurrentUserId();
+  _dealtUid = uid || null;
   _dealtKey = DEALT_KEY_PREFIX + (uid || 'anon');
   try {
     const raw = JSON.parse(localStorage.getItem(_dealtKey) || '{}');
@@ -4992,6 +4997,52 @@ async function ensureDealtLoaded() {
       Object.keys(raw).forEach(id => _dealt.set(String(id), raw[id] || null));
     }
   } catch (e) { /* unreadable store: start the deck full */ }
+  await mergeServerDealt();
+}
+
+// ── The same store, kept server-side too (db/hive_member_status.sql) ──
+// The deck is still driven by localStorage: it is read on every render,
+// it works offline, and it must not wait for a round trip to know what is
+// on the table. What the server copy is for is somebody ELSE's petek --
+// how deep this member's deck still is, printed beside their name at the
+// middle depth of the honeycomb (see hiveNameHTML in profile-card.js).
+// A second device the member reads on is the same store from the site's
+// point of view, so merging the two costs nothing and answers it: the
+// later stamp wins, because a story dealt with in its newer state has
+// been dealt with in its older one too.
+async function mergeServerDealt() {
+  if (!_dealtUid) return;
+  try {
+    const { data, error } = await sb.from('news_dealt')
+      .select('news_id, dealt_stamp')
+      .eq('user_id', _dealtUid);
+    if (error || !data) return;
+    let changed = false;
+    data.forEach(r => {
+      const id = String(r.news_id);
+      const mine = _dealt.get(id);
+      // A stampless local entry (the first version of the store) is left
+      // alone: it already means "dealt with, whatever state it was in".
+      if (mine === null) return;
+      if (mine === undefined || new Date(r.dealt_stamp) > new Date(mine)) {
+        _dealt.set(id, r.dealt_stamp);
+        changed = true;
+      }
+    });
+    if (changed) saveDealtIds();
+  } catch (e) { /* the deck is local first; the mirror is best-effort */ }
+}
+
+// Fire-and-forget: the card has already left the deck by the time this
+// is called, and nothing on this page reads the answer back.
+function recordDealtOnServer(id, stamp) {
+  if (!_dealtUid || !stamp) return;
+  try {
+    sb.from('news_dealt')
+      .upsert({ user_id: _dealtUid, news_id: id, dealt_stamp: stamp, dealt_at: new Date().toISOString() },
+              { onConflict: 'user_id,news_id' })
+      .then(() => {}, () => {});
+  } catch (e) {}
 }
 
 function saveDealtIds() {
@@ -5009,7 +5060,7 @@ function reconcileDealt() {
   const live = new Map(DUNYA_NEWS_CACHE.map(n => [String(n.id), n.updated_at || n.created_at]));
   _dealt.forEach((stamp, id) => {
     if (!live.has(id)) { _dealt.delete(id); changed = true; return; }
-    if (!stamp) { _dealt.set(id, live.get(id)); changed = true; }
+    if (!stamp) { _dealt.set(id, live.get(id)); recordDealtOnServer(id, live.get(id)); changed = true; }
   });
   if (changed) saveDealtIds();
 }
@@ -5044,8 +5095,12 @@ function dealDeckCard(story) {
   // The stamp is the story AS THROWN. The next gelişme moves it past this
   // and the story comes back -- that is the whole of "a story returns only
   // when it has actually moved".
-  _dealt.set(id, story.updated_at || story.created_at || new Date().toISOString());
+  const stamp = story.updated_at || story.created_at || new Date().toISOString();
+  _dealt.set(id, stamp);
   saveDealtIds();
+  // And on the server, so the people standing beside this member on the
+  // petek can see how much of the day they still have in front of them.
+  recordDealtOnServer(id, stamp);
   const feed = document.getElementById('dunya-news-feed');
   if (!feed) return;
   const node = feed.querySelector(`.article[data-news-id="${CSS.escape(id)}"]`);
