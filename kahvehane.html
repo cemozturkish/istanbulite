@@ -17,7 +17,7 @@
   <script src="i18n.js?v=10"></script>
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
-  <script src="game-locks.js"></script>
+  <script src="game-locks.js?v=2"></script>
   <!-- Live open/closed + scheduled-discount evaluation for the Kahve
        Endeksi board below. Shared with admin.html. -->
   <script src="coffee-index.js"></script>
@@ -3416,6 +3416,20 @@ async function buildGameDeck(userId) {
     const { data } = await sb.from('game_results').select('game, attempts').eq('user_id', userId).eq('date', today);
     (data || []).forEach(r => { if ((r.attempts || 0) >= 1) played.add(r.game); });
   } catch (_) {}
+  // A game the admin has switched off for today is not a step the reader
+  // has left to take -- it is not part of the day's sequence at all. So it
+  // leaves the deck exactly the way a finished game does, rather than
+  // standing in it locked: a card that can never be dealt is a deck that
+  // can never be emptied, and reaching the bottom is the whole point (a
+  // day whose only game is Sözcel ends on "Hepsi bu kadar." the moment
+  // Sözcel is done, the same as Kütüphane's news deck). The admin keeps
+  // theirs -- they own the switch, and their nav link stays open too (see
+  // game-locks.js).
+  let offGames = new Set();
+  if (!isAdmin && window.IstGameLocks) {
+    try { offGames = await IstGameLocks.offGamesToday(sb); } catch (_) {}
+  }
+
   const answered = new Set();
   if (questions.length) {
     try {
@@ -3444,7 +3458,7 @@ async function buildGameDeck(userId) {
     // one left in place would push the fourth card into the rule that
     // stops drawing them. (The tiles come back with the page: router.js
     // swaps #ist-content whole on every entry.)
-    if (tile && phone && played.has(game)) tile.remove();
+    if (tile && phone && (played.has(game) || offGames.has(game))) tile.remove();
     const q = deckQuestions[game];
     if (!q) return;
     const card = questionCardHTML(q);
