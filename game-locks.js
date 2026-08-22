@@ -153,6 +153,15 @@
     return off;
   }
 
+  // The same answer, for anyone who needs it outside the nav: Kahvehane's
+  // deck asks so it can leave an off game out of the day's sequence
+  // altogether (see buildGameDeck there). Not cached -- the admin can flip
+  // a switch while a member is standing on the page, and this is one small
+  // query per call, exactly as applyGameLocks already does it.
+  function offGamesToday(sb) {
+    return fetchOffGamesToday(sb);
+  }
+
   function lockLink(link, msg) {
     link.classList.add('locked');
     link.dataset.lockMsg = msg;
@@ -296,6 +305,7 @@
   let _locksResolved = false;
 
   window.applyGameLocks = applyGameLocks;
+  window.IstGameLocks = { offGamesToday };
   document.addEventListener('DOMContentLoaded', consumeBounceMessage);
 
   // Pre-lock every game-link as soon as the DOM is ready, regardless of user
