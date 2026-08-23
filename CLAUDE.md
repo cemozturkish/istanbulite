@@ -782,13 +782,14 @@ developing thing stays traceable through its earlier posts; an **OLAY** is the t
 are about. Rusya–Ukrayna Savaşı. Gazze. İran ve ABD. It is there on a day nobody posted, it
 reaches back to 2014 when the newest story is from this morning, and a reader opens it to find out
 what this whole thing *is* rather than what happened since Tuesday. Opened from the **middle box**
-under the profile bar.
+under the profile bar — which is a **switch**, not a door: it inks itself and stays inked, and
+pressing it again puts Kütüphane back.
 
 **It is a PINBOARD, and that is the one place on this page that is not printed paper.** Everything
 else in Kütüphane is a newspaper — kicker, headline, column, rule — and that is right for the news,
 which is a thing you *read*. An olay is a thing you *work out*: who is in it, what it touches,
-which other olay keeps naming the same country. So it is cork with four things pinned to it and
-string run between them, and the reader's eye does the joining. Concretely:
+which other olay keeps naming the same country. So it is four things pinned up with string run
+between them, and the reader's eye does the joining. Concretely:
 
 - **Four pins, and nothing scrolls** (`OLAY_BOARD_MAX`). A board you can scroll is a board you are
   not standing in front of. The fifth olay is not behind a page — it is simply not on the board,
@@ -809,14 +810,34 @@ string run between them, and the reader's eye does the joining. Concretely:
   filename, with nothing to enter anywhere; `world_events.image_url` is only for a copy kept
   elsewhere. No drawing yet = the card is its name alone, which is what every olay looks like on
   the day it is created — a placeholder that reads as a decision, not a broken frame.
-- **Its own overlay, and deliberately not `ist-sheet-pull`** (`#olaylar-overlay`). A pulled sheet
-  rests half-way down so the map it was opened over is still visible, which is right for a news
-  item *read beside* the city. A board is not read beside anything — you stand in front of it — so
-  it takes the full phone sheet under the profile bar and dims what is behind it, the way the PETEK
-  and the Kahve Endeksi do. Still THE sheet: same markup, same `IstSheet.open/close`.
+- **The map IS the board, and this is not a sheet at all** (`#olaylar-layer`). Nothing rises from
+  the bottom and nothing is opened: pressing the box **inks it** (`.lib-box-on` — it stays held
+  down because it is the way back out), everything else on the page goes — the news column, the
+  reading area, the other two library doors — and the four olaylar are pinned **over the drawing
+  of the world they happen in**, with the string run between them across it. It is the one
+  background this page already had and the only one that means anything; the cork it was first
+  drawn on said nothing. The exception to THE sheet is the same argument the news page makes: a
+  sheet would cover the very thing this content is about.
+  - The layer sits at z-index 5 — above the columns and the map overlay, below the profile bar and
+    the tab bar, so the two bars stay in charge and the Olaylar box stays pressable.
+  - A wash quiets the map (`.olay-scrim`) and its z-index is the whole trick: **1**, which is over
+    the map photo (`.map-panel`, −1) and *under* the traced country shapes (`.map-svg-world`, 2).
+    So the drawing is quieted while **a lit country burns through it at full strength**.
+  - Which is what reaching for a pin does: it lights that olay's countries on the map underneath —
+    the same breathing highlight a Dünya story lights — and an open dossier holds them lit. The
+    shapes are drawn but take no taps while the board is up (`body.olaylar-on .country`).
+  - It lives **inside `#ist-content`**, so a swipe to another page takes it away rather than
+    leaving it hanging over Hane; the `body.olaylar-on` rules live in this page's own stylesheet,
+    which the router disables on the way out, and `mount()` clears the class on the way back in.
+  - A pin that is not on the pulled thread recedes by going **quiet in the ink**, never by going
+    translucent: a half-transparent card over a map is mush rather than a card in the background.
+  - Its desktop centring is `align-items: center`, never a `translateX(-50%)`: the layer's
+    entrance animates `transform`, and a transform used for centring is thrown away the frame that
+    keyframe starts — which put the whole board off the right of the screen.
 
-One olay opens as the **dossier taken off the board**, in the same overlay, and keeps the board's
-language rather than reverting to the newspaper column: the drawing at full width, a stamp saying
+One olay opens as the **dossier taken off the board** — the layer's content swaps in place, still
+no second surface — and keeps the board's language rather than reverting to the newspaper column:
+paper lying on the map, the drawing at full width, a stamp saying
 whether this is still going, the parties pinned along one line (the same words the threads are
 labelled with, met again), and its **Zaman Akışı** (`world_event_moments`) run down a piece of
 string — newest first, and dated rather than aged, like every timeline on the site, because these
