@@ -2973,6 +2973,13 @@
          paper: a press on the sliver of one would fight its own depth
          transform and pull it out of the stack. */
       #dunya-news-feed > .article:not(:nth-child(1)) { pointer-events: none; }
+      /* The card an open story grew out of is not on the paper any more --
+         it BECAME the page. Left drawn, it stood behind the page as a
+         second copy of the same story, and a throw slid the page off it to
+         reveal the very card it had just left. Hidden rather than removed
+         so the deck behind it does not shift and the fold-back still has
+         the box to collapse into (see growNewsPage). */
+      #dunya-news-feed > .article.news-open { visibility: hidden; }
       @media (prefers-reduced-motion: reduce) {
         #dunya-news-feed > .article { transition: background 0.15s; }
       }
@@ -5130,6 +5137,11 @@ function renderDunyaNewsFeed() {
       return;
     }
     const rowsById = new Map(rows.map(n => [String(n.id), n]));
+    // A shut card is its headline and nothing else: the body is what
+    // OPENING the story is for, and printing it twice -- once squeezed
+    // into the card, once again on the page that grows out of it -- made
+    // the two read as the same paper duplicated rather than as one story
+    // opening.
     feed.innerHTML = rows.map(n => {
       const lastTouch = n.updated_at || n.created_at;
       return `
@@ -5139,7 +5151,6 @@ function renderDunyaNewsFeed() {
             <div class="ago" data-iso="${libEsc(lastTouch)}">${libEsc(libFormatNewsAge(lastTouch))}</div>
           </div>
           <h3>${libEsc(n.title)}</h3>
-          ${n.body ? `<p>${libEsc(n.body)}</p>` : ''}
         </div>
       `;
     }).join('');
@@ -5336,6 +5347,15 @@ function newsOriginInset(page) {
   if (!b.width || !b.height || !s.width || !s.height) return null;
   const px = (v) => Math.max(0, v).toFixed(2) + 'px';
   return `inset(${px(b.top - s.top)} ${px(s.right - b.right)} ${px(s.bottom - b.bottom)} ${px(b.left - s.left)})`;
+}
+
+// Puts the card back on the deck. Called before the fold-back rather
+// than after it: the shrinking page always covers the box it is
+// collapsing into, so the card reappears under it unseen -- and a card
+// left invisible by a close that never got to its callback would be a
+// hole in the deck nobody could open.
+function showNewsOrigin() {
+  if (_newsOrigin) _newsOrigin.classList.remove('news-open');
 }
 
 function cancelNewsAnims() {
@@ -5566,6 +5586,11 @@ function openDunyaNewsDetail(n, cardEl) {
   const inner = document.getElementById('news-page-inner');
   if (!overlay || !inner) return;
   _newsOrigin = cardEl || null;
+  // The card is the page now, so it stops being drawn behind it. Only
+  // where the page actually grows out of it: on desktop the story opens
+  // as THE sheet beside a printed column, and a gap in that column would
+  // just read as a missing story.
+  if (_newsOrigin && newsPageGrows()) _newsOrigin.classList.add('news-open');
   _newsStory = n;
   _newsPollMine.clear();
   inner.innerHTML = buildNewsPageHtml(n);
@@ -5590,6 +5615,7 @@ function closeNewsPage() {
   // opening something else), so the story's highlight goes out here
   // rather than at each of them.
   clearNewsCountryHighlight();
+  showNewsOrigin();
   growNewsPage('out');
   IstSheet.close(overlay, () => {
     inner.innerHTML = '';
@@ -5610,6 +5636,7 @@ function snapNewsPageShut() {
   const inner = document.getElementById('news-page-inner');
   if (!overlay || !inner || overlay.hidden) return;
   clearNewsCountryHighlight();
+  showNewsOrigin();
   cancelNewsAnims();
   // Whatever a half-finished throw left on the page (see wireNewsPageSwipe)
   // -- the next story opens square in the band, never mid-flight.
