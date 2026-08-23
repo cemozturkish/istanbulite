@@ -28,6 +28,30 @@
   // never has to remember to reset/measure/release around its own opens.
   const pulls = new WeakMap();
 
+  // overlay element -> the pending re-hide from its last close().
+  //
+  // Closing cannot hide the sheet immediately: it has to stay on screen
+  // for the 0.55s it spends sliding back down. But a reader who shuts a
+  // sheet and opens it again inside that window used to get the old
+  // close's timer landing on the NEW opening -- it set hidden = true on a
+  // sheet that had just been unhidden and ran the caller's teardown on
+  // content that had just been rendered.
+  //
+  // On a phone that took the whole page with it: sheet.css hides the two
+  // columns while `.ist-sheet-overlay.open` exists anywhere in the body,
+  // and the sheet was left carrying .open while hidden -- so the sheet
+  // was invisible AND everything behind it stayed hidden. Nothing was
+  // broken, nothing threw; the page had simply been emptied by a timer
+  // belonging to a close that was over.
+  const hides = new WeakMap();
+
+  function cancelPendingHide(overlay) {
+    const t = hides.get(overlay);
+    if (t == null) return;
+    clearTimeout(t);
+    hides.delete(overlay);
+  }
+
   // Sets --ist-sheet-top, which sheet.css's phone rules read.
   function position(target) {
     const overlay = el(target);
@@ -45,6 +69,9 @@
   function open(target) {
     const overlay = el(target);
     if (!overlay) return;
+    // Whatever the last close still had scheduled is not about this
+    // opening -- see `hides` above.
+    cancelPendingHide(overlay);
     position(overlay);
     const p = pulls.get(overlay);
     // A fresh open starts flat, whatever the last gesture left behind.
@@ -69,10 +96,16 @@
     const p = pulls.get(overlay);
     if (p) p.release();
     overlay.classList.remove('open');
-    setTimeout(() => {
+    cancelPendingHide(overlay);
+    hides.set(overlay, setTimeout(() => {
+      hides.delete(overlay);
+      // Belt and braces: open() cancels this timer, so reaching here with
+      // the sheet open again should be impossible -- but hiding a live
+      // sheet is the one failure this can cause, and it is silent.
+      if (overlay.classList.contains('open')) return;
       overlay.hidden = true;
       if (after) after();
-    }, SLIDE_MS);
+    }, SLIDE_MS));
   }
 
   function isOpen(target) {
