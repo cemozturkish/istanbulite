@@ -927,6 +927,14 @@ geometry and no centred modal anywhere on the site.
   content styling (`class="ist-sheet detail-overlay-sheet"`), never for size or position.
 - **Behaviour:** `IstSheet.open(overlay)` / `IstSheet.close(overlay, after)` — do not hand-roll
   the unhide → rAF → `.open` dance or the 550ms hide timeout.
+- **Closing and reopening inside the 0.55s slide is one object's problem, not each page's.**
+  `IstSheet.close` cannot hide the sheet at once — it has to stay on screen while it slides down —
+  so it schedules the hide. `IstSheet.open` cancels whatever the last close still had pending;
+  without that, the old timer landed on the *new* opening and set `hidden` on a sheet that had just
+  been unhidden, while `.open` stayed on it. On a phone that emptied the whole page: sheet.css
+  hides both columns while `.ist-sheet-overlay.open` exists anywhere in the body, so the sheet was
+  invisible *and* everything behind it stayed hidden. Nothing threw. Never re-add a bare
+  `setTimeout` re-hide in a page's own close.
 - **A sheet that fetches its content must not ask `.open` whether the reader is still there.**
   `IstSheet.open` adds that class on the *next animation frame*, while a fetch answered from cache
   resolves on the microtask before that frame runs — so the guard runs while the class is still
@@ -1409,8 +1417,8 @@ after the page it belongs to.
     learned a new `data-i18n` key prints the key itself (`HANE.PETEK`) because the cached `i18n.js`
     has never heard of it, and a button wired to a brand-new function silently throws. The shared
     files carry a version query (`i18n.js?v=2`, `profile-card.js?v=2`, `profile-card.css?v=2`,
-    `loading-screen.js?v=2`); changing one of them means bumping its number **in every page at
-    once**. All pages must spell the URL identically — `router.js`'s `loadScriptOnce` matches on
+    `loading-screen.js?v=2`, `sheet.js?v=2`); changing one of them means bumping its number **in
+    every page at once**. All pages must spell the URL identically — `router.js`'s `loadScriptOnce` matches on
     the exact `src` string, so one page left on `i18n.js` while another says `i18n.js?v=3` makes a
     swipe load and re-execute the module a second time.
 
