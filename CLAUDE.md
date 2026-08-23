@@ -782,43 +782,74 @@ developing thing stays traceable through its earlier posts; an **OLAY** is the t
 are about. Rusya–Ukrayna Savaşı. Gazze. İran ve ABD. It is there on a day nobody posted, it
 reaches back to 2014 when the newest story is from this morning, and a reader opens it to find out
 what this whole thing *is* rather than what happened since Tuesday. Opened from the **middle box**
-under the profile bar; it is the same reader sheet a country's page rises in, and it prints the
-same `.article` cards, because a story reads the way a story reads wherever the reader came in
-from.
+under the profile bar.
 
-An olay is mostly its **Zaman Akışı** (`world_event_moments`) — dated key moments, newest first, in
-the same ticked track a country entry's chain and a news story's gelişmeler are printed in. Dated
-rather than aged, for the same reason those are: these reach back decades and "12 yıl önce" tells a
-reader nothing. Around it: the name, one line under it, who is in it, and an optional standing
-account of a few paragraphs.
+**It is a PINBOARD, and that is the one place on this page that is not printed paper.** Everything
+else in Kütüphane is a newspaper — kicker, headline, column, rule — and that is right for the news,
+which is a thing you *read*. An olay is a thing you *work out*: who is in it, what it touches,
+which other olay keeps naming the same country. So it is cork with four things pinned to it and
+string run between them, and the reader's eye does the joining. Concretely:
 
-Four things about it:
+- **Four pins, and nothing scrolls** (`OLAY_BOARD_MAX`). A board you can scroll is a board you are
+  not standing in front of. The fifth olay is not behind a page — it is simply not on the board,
+  and admin.html's list says `PANODA` / `PANODA DEĞİL` on every row so that is never a surprise.
+  Same rule the petek's levels follow: if a block stops fitting, drop a block.
+- **The string is the point, and it is drawn while the reader watches.** Two olaylar are strung
+  together when they share a party, and the string carries that party's name (İSRAİL between Gazze
+  and İran ve ABD; RUSYA and İRAN out of Suriye). The board's top line counts them — "4 olay · 3
+  iplik" — so there is something to find before a word is read. `worldEventThreads` computes the
+  pairs; `drawOlayThreads` measures the real pin heads after layout and hangs a sagging quadratic
+  between them, dash-offset animated so each one is *tied* rather than faded in. A straight line
+  is a flowchart; a line that sags is string somebody ran.
+- **Pulling a thread.** Reaching for a pin (hover, or the press on a phone) burns every string tied
+  to it and drops the rest of the board back — the same move the map makes when a country is
+  touched and its whole story lights. What is connected says so before anything is opened.
+- **What is pinned is a drawing** (`assets/olaylar/<id>.png`, see that folder's README): the
+  countries of that olay and the lines between them, in the site's own hand. Dropped in by
+  filename, with nothing to enter anywhere; `world_events.image_url` is only for a copy kept
+  elsewhere. No drawing yet = the card is its name alone, which is what every olay looks like on
+  the day it is created — a placeholder that reads as a decision, not a broken frame.
+- **Its own overlay, and deliberately not `ist-sheet-pull`** (`#olaylar-overlay`). A pulled sheet
+  rests half-way down so the map it was opened over is still visible, which is right for a news
+  item *read beside* the city. A board is not read beside anything — you stand in front of it — so
+  it takes the full phone sheet under the profile bar and dims what is behind it, the way the PETEK
+  and the Kahve Endeksi do. Still THE sheet: same markup, same `IstSheet.open/close`.
+
+One olay opens as the **dossier taken off the board**, in the same overlay, and keeps the board's
+language rather than reverting to the newspaper column: the drawing at full width, a stamp saying
+whether this is still going, the parties pinned along one line (the same words the threads are
+labelled with, met again), and its **Zaman Akışı** (`world_event_moments`) run down a piece of
+string — newest first, and dated rather than aged, like every timeline on the site, because these
+reach back decades and "12 yıl önce" tells a reader nothing. This page is the one thing here that
+scrolls: a chain of a dozen moments has to.
+
+Four things about the data:
 
 - **It is not `country_stories`, and must not be folded into it.** That grouping belongs to the
   *map*: one story per country (the primary key on `country_story_countries` enforces it) and only
   for the 28 shapes that were drawn, because its whole job is answering "what lights when this is
   touched?" with exactly one row. An olay is not bound to the map — ABD is a party to one and is
   nowhere on the artwork, and İran is in more than one at once.
-- **Who is in it is plain text** (`parties`, printed as the card's kicker), *not* derived from the
-  countries ticked. A kicker that can only name drawn shapes would be lying by omission the moment
-  ABD or Hamas is a party. The ticked countries (`world_event_countries`, a composite key, so a
-  country may be in several olaylar) are for one thing only: **the map lights them while the olay's
-  page is open**, the same breathing `.country.news-active` highlight a Dünya story lights. That is
-  worth doing precisely because this sheet is `ist-sheet-pull` and rests *under* the map on a
-  phone — the drawing is where "nerede" gets answered. `closeReaderOverlay` already drops the
-  highlight on every way out; going back to the list drops it too.
+- **Who is in it is plain text** (`parties`), *not* derived from the countries ticked — a field
+  that can only name drawn shapes would be lying by omission the moment ABD or Hamas is a party.
+  It does double duty: it is what the board's **strings** are computed from and what they are
+  labelled with, so writing it well is writing the board. The ticked countries
+  (`world_event_countries`, a composite key, so a country may be in several olaylar) are folded in
+  behind it, which is what keeps an olay whose parties line was left blank strung up anyway.
 - **Whether it is still going is the one fact the list carries that a news list does not**
   (`status`, printed where a card prints its age: "2014 — sürüyor", "2003–2011"). An `ended_on` is
   cleared server-side of the form when the status is `ongoing`, so the list can never print
   "2014–2022 · sürüyor".
 - **Ongoing olaylar are ordered by `sort_order`, not by what moved last.** A war does not stop
-  being the biggest thing on the page because something smaller had a development this morning.
+  being the biggest thing on the page because something smaller had a development this morning —
+  and with only four places on the cork, that order decides what exists.
 
 Curated from admin.html's **Olaylar** tab (form on the left, the list with each card's own timeline
 editor on the right — the same shape the Ülkeler tab has, because it is the same kind of object: a
 page whose value is that somebody maintains its chain). `db/world_events_seed.sql` holds a starting
 set — Rusya–Ukrayna, Gazze, İran ve ABD, Suriye — deliberately thin, only the dates nobody argues
-about, to be verified and extended from the portal.
+about, to be verified and extended from the portal. `db/world_events_v2_board.sql` adds the
+`image_url` override the pinned drawings can use.
 
 ### `tumcel.html` — Tümcel
 - Connections-style game where 16 sentence fragments must be regrouped into 4 quotes

@@ -30,7 +30,7 @@ insert into public.world_events
 
   ('suriye', 'Suriye''de Rejimin Düşüşü',
    'On üç yıllık savaşın on bir günde biten son perdesi — ve Türkiye''nin sınırındaki her şeyin yeniden kurulması.',
-   'Suriye · Türkiye', 'ongoing', '2024-11-27', 70)
+   'Suriye · Türkiye · Rusya · İran', 'ongoing', '2024-11-27', 70)
 on conflict (id) do update set
   name_tr = excluded.name_tr,
   blurb = excluded.blurb,
@@ -40,6 +40,13 @@ on conflict (id) do update set
   sort_order = excluded.sort_order;
 
 
+-- The `parties` above are also what strings the pinboard together: two
+-- olaylar sharing a party are tied by a labelled thread (see
+-- worldEventThreads in kutuphane.html). These four give three threads --
+-- İSRAİL between Gazze and İran ve ABD, RUSYA and İRAN out of Suriye --
+-- which is the board saying, before a word is read, that the same few
+-- countries keep turning up in different wars.
+--
 -- What the map lights behind an open olay. Only the drawn countries can
 -- be here -- ABD is a party to one of these and is nowhere on the
 -- artwork, which is exactly why `parties` above is plain text.
