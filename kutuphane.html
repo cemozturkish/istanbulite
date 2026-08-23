@@ -3687,6 +3687,16 @@
         <button type="button" class="lib-box" id="lib-box-makaleler" title="Makaleler">
           <span class="lib-box-title">Makaleler</span>
         </button>
+        <!-- OLAYLAR takes the MIDDLE of the line rather than a corner, and
+             for the same reason the other two take corners: what is behind
+             it is the map. Makaleler and Posta Kutusu are two rooms of the
+             library, one at each end; an olay is not a room, it is what the
+             drawing between them is about -- so its door stands over the
+             middle of the drawing. (space-between across three buttons is
+             the whole of that geometry; see the mobile .col-left rule.) -->
+        <button type="button" class="lib-box" id="lib-box-olaylar" title="Olaylar">
+          <span class="lib-box-title">Olaylar</span>
+        </button>
         <button type="button" class="lib-box" id="lib-box-mektuplar" title="Posta Kutusu">
           <span class="lib-box-title">Posta Kutusu</span>
         </button>
@@ -4832,6 +4842,220 @@ function openCountryEntryReader(entry, entries, page) {
   _closeReaderOverlay = closeReaderOverlay;
   const pathEl = area.querySelector('.shelf-path');
   if (pathEl) pathEl.scrollTop = 0;
+}
+
+// ══════════════════════════════════════════
+// OLAYLAR — the world events themselves (db/world_events.sql), opened
+// from the middle box under the profile bar.
+//
+// The object the news is about, standing on its own. A story in the feed
+// below is 72 hours old and gone; a seri gathers such stories under one
+// label so their updates stay traceable; an OLAY is the thing all of
+// them are about -- it is there on a day nobody posted, it reaches back
+// to 2014 when the newest story is from this morning, and a reader opens
+// it to find out what this whole thing IS rather than what happened
+// since Tuesday.
+//
+// Same shape as Posta Kutusu and a country's page, deliberately: the
+// sheet lists the olaylar, touching one opens it as a single page, and
+// its back button returns to the list rather than closing. What is this
+// page's own is the Zaman Akışı it is mostly made of, and the map behind
+// it -- an open olay lights the countries it touches, the same breathing
+// highlight a Dünya story lights, because the sheet rests under the map
+// on a phone and the drawing is where "nerede" gets answered.
+// ══════════════════════════════════════════
+let WORLD_EVENTS_CACHE = null; // null = not fetched yet this session
+
+async function loadWorldEvents() {
+  if (WORLD_EVENTS_CACHE) return WORLD_EVENTS_CACHE;
+  // The moments ride along with their olay: the timeline is most of what
+  // a page like this is, so fetching it when the reader opens one would
+  // put a spinner in the middle of a page that is otherwise already here.
+  // (Same call the country entries make for their own chains.)
+  const { data, error } = await sb.from('world_events')
+    .select('*, world_event_moments(*), world_event_countries(country)')
+    .order('sort_order', { ascending: false })
+    .order('started_on', { ascending: false, nullsFirst: false });
+  if (error) {
+    console.error('[kutuphane olaylar]', error);
+    // Not cached: a failed fetch is a network blip, not an empty page.
+    return null;
+  }
+  WORLD_EVENTS_CACHE = data || [];
+  return WORLD_EVENTS_CACHE;
+}
+
+// Newest first, exactly as a country entry's chain and a news story's
+// gelişmeler are printed. Sorted here rather than in the query because
+// the moments arrive embedded in their olay, and an embedded select
+// carries no order of its own.
+function worldEventMoments(ev) {
+  return (ev.world_event_moments || []).slice()
+    .sort((a, b) => (a.moment_date < b.moment_date ? 1 : a.moment_date > b.moment_date ? -1 : 0));
+}
+
+function worldEventCountryIds(ev) {
+  return (ev.world_event_countries || []).map(r => r.country).filter(Boolean);
+}
+
+// An olay is listed by who is in it, not by where it is filed -- which is
+// the one line a reader needs to know whether this is the thing they were
+// thinking of. `parties` is plain text on purpose (db/world_events.sql):
+// ABD is a party to one of these and is not a shape on the map. Falls
+// back to the drawn countries, and then to nothing rather than to a word
+// invented to fill the slot.
+function worldEventKicker(ev) {
+  const parties = (ev.parties || '').trim();
+  if (parties) return parties.toLocaleUpperCase('tr-TR');
+  const ids = worldEventCountryIds(ev);
+  if (ids.length) return ids.map(id => mapCountryName(id).toLocaleUpperCase('tr-TR')).join(' · ');
+  return '';
+}
+
+// Where a news card prints its age, an olay prints whether it is still
+// the world the reader is living in -- and how long it has been going.
+// The one fact a list of olaylar carries that a list of stories does not.
+function worldEventStamp(ev) {
+  const en = I18N.isEnglish();
+  const startYear = ev.started_on ? String(ev.started_on).slice(0, 4) : '';
+  if (ev.status === 'ended') {
+    const endYear = ev.ended_on ? String(ev.ended_on).slice(0, 4) : '';
+    if (startYear && endYear) return `${startYear}–${endYear}`;
+    if (endYear) return endYear;
+    return en ? 'ended' : 'SONA ERDİ';
+  }
+  return startYear
+    ? `${startYear} — ${en ? 'ongoing' : 'sürüyor'}`
+    : (en ? 'ongoing' : 'sürüyor');
+}
+
+// The chain, in the same ticked track a country entry's Zaman Akışı and a
+// news story's gelişmeler are printed in -- and dated rather than aged,
+// for the same reason those are: these reach back decades, and "12 yıl
+// önce" tells a reader nothing.
+function worldEventTimelineHTML(ev) {
+  const moments = worldEventMoments(ev);
+  if (!moments.length) return '';
+  return `
+    <div class="timeline">
+      <div class="sidebar-label" style="padding:0 0 6px 0;background:none;border:none;font-size:0.6rem;letter-spacing:2px;">Zaman Akışı</div>
+      <div class="timeline-track">
+        ${moments.map(m => {
+          const url = libSafeUrl(m.source_url);
+          return `
+          <div class="timeline-item">
+            <div class="timeline-item-date">
+              <span class="timeline-tick"></span>
+              <div class="ago">${libEsc(formatLetterDate(m.moment_date))}</div>
+            </div>
+            <strong>${libEsc(m.title)}</strong>
+            ${m.body ? `<p>${libEsc(m.body)}</p>` : ''}
+            ${url ? `<p><a href="${libEsc(url)}" target="_blank" rel="noopener noreferrer">Kaynak</a></p>` : ''}
+          </div>
+        `; }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderWorldEventsList(events) {
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!area) return;
+  // Back at the list, nothing in particular is being looked at -- so the
+  // map goes back to saying nothing rather than staying lit on whichever
+  // olay was open last.
+  clearNewsCountryHighlight();
+  let listHtml;
+  if (events === null) {
+    listHtml = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Olaylar yüklenemedi.</div>`;
+  } else if (!events.length) {
+    listHtml = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Henüz olay yok.</div>`;
+  } else {
+    // The same card the Dünya feed prints, so an olay is tapped exactly
+    // the way a news item is. It is the same reading, one zoom out.
+    listHtml = `<div class="country-entries">` + events.map(ev => {
+      const kicker = worldEventKicker(ev);
+      const blurb = (ev.blurb || '').trim();
+      return `
+        <div class="article openable" data-event="${libEsc(ev.id)}">
+          <div class="meta-row">
+            ${kicker ? `<div class="kicker">${libEsc(kicker)}</div>` : '<div class="kicker"></div>'}
+            <div class="ago">${libEsc(worldEventStamp(ev))}</div>
+          </div>
+          <h3>${libEsc(ev.name_tr)}</h3>
+          ${blurb ? `<p>${libEsc(blurb)}</p>` : ''}
+        </div>
+      `;
+    }).join('') + `</div>`;
+  }
+  area.innerHTML = `
+    <div class="shelf-path">
+      ${arrowHeadHTML('Olaylar', 'olaylar-back', 'Kütüphane')}
+      ${listHtml}
+    </div>
+  `;
+  document.getElementById('olaylar-back').addEventListener('click', closeReaderOverlay);
+  area.querySelectorAll('.article.openable').forEach(card => {
+    wireCardPress(card);
+    card.addEventListener('click', () => {
+      const ev = (events || []).find(x => x.id === card.dataset.event);
+      if (ev) openWorldEventReader(ev, events);
+    });
+  });
+}
+
+// One olay: the arrow alone over one .article -- who is in it, its name,
+// how long it has been going, the standing account, and the chain that is
+// most of the page. Same objects a country entry's page is made of (see
+// the :is(.article, .news-page) rules in the stylesheet), because a story
+// reads the way a story reads wherever the reader came in from.
+function openWorldEventReader(ev, events) {
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!area) return;
+  const kicker = worldEventKicker(ev);
+  const countries = worldEventCountryIds(ev);
+  area.innerHTML = `
+    <div class="shelf-path">
+      ${arrowHeadHTML(null, 'olay-back', 'Olaylar')}
+      <div class="article">
+        <div class="meta-row">
+          ${kicker ? `<div class="kicker">${libEsc(kicker)}</div>` : '<div class="kicker"></div>'}
+          <div class="ago">${libEsc(worldEventStamp(ev))}</div>
+        </div>
+        <h3>${libEsc(ev.name_tr)}</h3>
+        ${ev.blurb ? `<p class="story-blurb">${libEsc(ev.blurb)}</p>` : ''}
+        ${ev.body ? renderLetterBodyHtml(ev.body) : ''}
+        ${worldEventTimelineHTML(ev)}
+        ${newsCountriesHTML(countries)}
+      </div>
+    </div>
+  `;
+  // The map answers "nerede" while the page is open -- the same breathing
+  // highlight a Dünya story lights, and the reason it is worth lighting
+  // at all is that this sheet rests under the map on a phone. Dropped by
+  // closeReaderOverlay on every way out, and by the list on the way back.
+  setNewsCountryHighlight(countries);
+  document.getElementById('olay-back').addEventListener('click',
+    () => renderWorldEventsList(events));
+  _closeReaderOverlay = closeReaderOverlay;
+  const pathEl = area.querySelector('.shelf-path');
+  if (pathEl) pathEl.scrollTop = 0;
+}
+
+// Entry point for the "Olaylar" box -- rises the reader overlay straight
+// into the list, fetching it the first time it is opened this session.
+async function openWorldEventsSheet() {
+  const overlay = document.getElementById('reader-overlay');
+  const area = document.getElementById('reader-overlay-sheet');
+  if (!overlay || !area) return;
+  area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  IstSheet.open(overlay);
+  _closeReaderOverlay = closeReaderOverlay;
+  const events = await loadWorldEvents();
+  // The reader may have closed the sheet, or opened something else, while
+  // the fetch was in flight -- don't paint over what they did.
+  if (!overlay.classList.contains('open')) return;
+  renderWorldEventsList(events);
 }
 
 // ══════════════════════════════════════════
@@ -6121,7 +6345,7 @@ async function renderSeatFor(seatId, seatLabel) {
   });
 }
 
-// The three buttons that open this page's sheets -- Makaleler, Posta
+// The buttons that open this page's sheets -- Makaleler, Olaylar, Posta
 // Kutusu and TBMM -- all live inside #ist-content, which the router
 // replaces wholesale on every re-entry to this page (see router.js's
 // navigateTo). Bound once at script-parse time they went dead the first
@@ -6133,6 +6357,7 @@ async function renderSeatFor(seatId, seatLabel) {
 // handler would keep firing after navigating away (see CLAUDE.md).
 function wireLibraryEntryPoints() {
   document.getElementById('lib-box-makaleler')?.addEventListener('click', openLibraryShelvesSheet);
+  document.getElementById('lib-box-olaylar')?.addEventListener('click', openWorldEventsSheet);
   document.getElementById('lib-box-mektuplar')?.addEventListener('click', openMektuplarSheet);
   initLetterBadge();
   document.getElementById('tbmm-open-btn')?.addEventListener('click', openTBMMSheet);
