@@ -609,6 +609,9 @@
     }
     /* .lib-boxes only ever renders in .col-left (right-hand column) on
        desktop -- inward is leftward, mirrors .info-card:hover above. */
+    /* A parked box (Makaleler) carries `hidden`, and the author rule
+       above would otherwise beat the UA stylesheet's display:none. */
+    .lib-box[hidden] { display: none; }
     .lib-box:hover { background: var(--paper-dark); transform: translateX(-4px); }
     .lib-box-title {
       font-size: 0.62rem;
@@ -3408,15 +3411,14 @@
        bar (20) and the tab bar (100): the two bars stay in charge, and
        the Olaylar box (in .col-left, z-index 6) stays over it so it can
        be pressed again to come back out. */
+    /* The layer is the whole frame, because the board inside it is the
+       map and the map is the whole frame. What sits in the band between
+       the library boxes and the tab bar is the dossier, not the board --
+       see .olay-page. */
     .olay-layer {
       position: fixed;
-      left: var(--screen-inset, 18px);
-      right: var(--screen-inset, 18px);
-      top: var(--olay-layer-top, 120px);
-      bottom: calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom, 0px) + 12px);
+      inset: 0;
       z-index: 5;
-      display: flex;
-      flex-direction: column;
       animation: olay-board-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
     .olay-layer[hidden] { display: none; }
@@ -3453,7 +3455,6 @@
        follow you onto Hane. */
     body.olaylar-on .col-right,
     body.olaylar-on main,
-    body.olaylar-on #lib-box-makaleler,
     body.olaylar-on #lib-box-mektuplar { display: none; }
     /* Pressed, and staying pressed: it is the way back out, so it has to
        look like the thing currently being held down. */
@@ -3464,260 +3465,77 @@
     }
     .lib-box.lib-box-on:hover { background: var(--ink); transform: none; }
 
-    .olay-board {
-      --thread: #c8322b;
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      box-sizing: border-box;
-    }
-    @keyframes olay-board-in {
-      from { opacity: 0; transform: scale(0.985); }
-      to   { opacity: 1; transform: scale(1); }
-    }
-
-    /* The board's own top line: what this is, and how many threads the
-       reader is looking at. The count is the whole gamified promise --
-       it says there is something to find here before a word is read. */
-    .olay-board-head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 2px 2px 12px;
-      flex-shrink: 0;
-    }
-    .olay-board-title {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.66rem;
-      font-weight: 700;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--ink);
-    }
-    .olay-board-count {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.6rem;
-      font-weight: 700;
-      letter-spacing: 1.4px;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-    .olay-board-count b { color: var(--thread); font-weight: 700; }
-
-    /* The board proper: the grid of pins with the string layer laid over
-       it. Positioned, because the threads are absolutely placed against
-       this box and measured in its coordinates. */
-    .olay-board-stage {
-      position: relative;
-      flex: 1;
-      min-height: 0;
-    }
-    .olay-pins {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      grid-auto-rows: 1fr;
-      /* Generous, and deliberately: the cork between the cards is where
-         the string is seen, and a board whose cards touch is a grid of
-         tiles. Four SMALL things pinned up with room around them. */
-      gap: 30px 26px;
-      padding: 4px 10px 16px;
-      box-sizing: border-box;
-      z-index: 1;
-    }
-    /* One, two or three pins do not make a 2x2: the board fills the room
-       it has rather than leaving a hole where the fourth would be. */
-    .olay-pins[data-count="1"] { grid-template-columns: 1fr; }
-    .olay-pins[data-count="2"] { grid-template-columns: 1fr; }
-    .olay-pins[data-count="3"] .olay-pin:first-child { grid-column: 1 / -1; }
-
-    /* The string runs OVER the cards, the way it does on a real board:
-       it is pinned to the top of each and crosses whatever is between
-       them. Under them it was invisible -- four cards on a phone leave
-       almost no cork to see it in, which is exactly the mistake a
-       connector diagram makes. */
-    .olay-threads {
+    /* ── The board IS the map ──
+       Every olay's drawing is made in the map's own frame -- 1080x1920,
+       the same grid the phone map and its traced country shapes are in --
+       so laying it back over the map at the same preserveAspectRatio puts
+       every stroke exactly on the coastline it was drawn against. That
+       pairing (xMidYMin meet against object-fit: contain /
+       object-position: center top) is the registration: change one and
+       every drawing slides off the map. */
+    .olay-board-map {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
-      pointer-events: none;
       overflow: visible;
-      z-index: 2;
+      /* The same top clip the traced overlay takes, so a drawing that
+         reaches Rusya doesn't run up under the profile bar. */
+      clip-path: inset(calc(var(--navbar-h, 38px) + env(safe-area-inset-top)) 0 0 0);
     }
-    .olay-thread {
-      fill: none;
-      stroke: var(--thread);
-      stroke-width: 2;
-      stroke-linecap: round;
-      opacity: 0.8;
-      transition: opacity 0.25s, stroke-width 0.25s;
-    }
-    /* Drawn, not faded in: the string is run between two pins while the
-       reader watches, which is the whole of the animation this page is
-       for. The dash values are set per-path in JS off its own length. */
-    .olay-thread.drawing { animation: olay-thread-draw 0.5s cubic-bezier(0.4, 0, 0.2, 1) both; }
-    @keyframes olay-thread-draw { to { stroke-dashoffset: 0; } }
-    .olay-thread-label {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 9.5px;
-      font-weight: 700;
-      letter-spacing: 1.2px;
-      fill: var(--thread);
-      /* Knocked out of whatever it crosses -- the string, a card, the
-         cork -- so the word is legible without a box drawn around it.
-         Never rotated along the line: half these strings run nearly
-         vertical between the two rows, and a word turned on its side is
-         a word nobody reads. */
-      stroke: var(--paper);
-      stroke-width: 3.5px;
-      paint-order: stroke;
+    /* This page's own map is İstanbul's on a desktop, not the world's, so
+       there the board carries the drawing its olaylar were made on. On a
+       phone the page's map is already the right one and shows through. */
+    .olay-basemap { display: none; }
+
+    /* One drawing. It arrives by being WIPED across the map rather than
+       fading up out of it: these are strings, and a string is run. The
+       clip rect carries its full width as an attribute as well, so a
+       browser that will not animate SVG geometry from CSS simply shows
+       the finished drawing. */
+    .olay-draw {
       opacity: 0;
-      transition: opacity 0.3s;
+      animation: olay-draw-in 0.5s ease-out both;
+      transition: opacity 0.25s;
     }
-    .olay-thread-label.shown { opacity: 1; }
+    @keyframes olay-draw-in { to { opacity: 1; } }
+    .olay-wipe { animation: olay-wipe-in 0.75s cubic-bezier(0.4, 0, 0.2, 1) both; }
+    @keyframes olay-wipe-in { from { width: 0; } to { width: 1080px; } }
+    /* Reaching for one name drops every other drawing back -- what is
+       connected says so before anything is opened. */
+    .olay-board-map.pulling .olay-draw { opacity: 0.22; }
+    .olay-board-map.pulling .olay-draw.lit { opacity: 1; }
 
-    /* A thread the reader is pulling: the one they touched burns, every
-       other one drops back. Same idea as the map lighting a whole story
-       when one of its countries is touched -- what is connected says so
-       the moment you reach for it. */
-    .olay-board.pulling .olay-thread { opacity: 0.12; }
-    .olay-board.pulling .olay-thread.lit { opacity: 1; stroke-width: 2.4; }
-    .olay-board.pulling .olay-thread-label { opacity: 0; }
-    .olay-board.pulling .olay-thread-label.lit { opacity: 1; }
-
-    /* ── A pin: one olay, pinned crooked ── */
-    .olay-pin {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-      min-height: 0;
-      padding: 14px 12px 10px;
-      box-sizing: border-box;
-      text-align: left;
-      background: var(--paper);
-      border: 2px solid var(--ink);
-      border-bottom: 3px solid var(--ink);
-      color: var(--ink);
-      cursor: pointer;
-      font-family: inherit;
-      overflow: hidden;
-      /* Each is set its own resting tilt inline (--tilt), so the board
-         reads as things somebody pinned up rather than as a grid of
-         tiles. Kept small: past ~3deg the cards start colliding at the
-         corners on a narrow phone. */
-      transform: rotate(var(--tilt, 0deg));
-      box-shadow: 3px 4px 0 color-mix(in srgb, var(--ink) 16%, transparent);
-      transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s, opacity 0.25s;
-      animation: olay-pin-drop 0.42s cubic-bezier(0.34, 1.4, 0.5, 1) both;
-      animation-delay: var(--drop-delay, 0ms);
-    }
-    @keyframes olay-pin-drop {
-      from { opacity: 0; transform: translateY(-16px) rotate(0deg) scale(0.94); }
-      to   { opacity: 1; transform: translateY(0) rotate(var(--tilt, 0deg)) scale(1); }
-    }
-    /* The pin head itself -- the thing the string is tied to. Its centre
-         is what the threads are measured to (see threadAnchor). */
-    .olay-pin-head {
-      position: absolute;
-      top: 5px;
-      left: 50%;
-      width: 9px;
-      height: 9px;
-      margin-left: -4.5px;
-      border-radius: 50%;
-      background: var(--thread);
-      box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 45%, transparent);
-    }
-    .olay-pin:hover { transform: rotate(var(--tilt, 0deg)) translateY(-3px) scale(1.02); }
-    /* Presses like the news cards do, and for the same reason: :hover and
-       :active both stick after a tap on iOS. */
-    .olay-pin.pressing { transform: rotate(var(--tilt, 0deg)) scale(0.965); }
-    /* A pin that is not on the pulled thread recedes by going quiet in
-       the ink, not by going translucent: this board is standing on a
-       drawing, and a half-transparent card over a map is mush rather
-       than a card in the background. */
-    .olay-board.pulling .olay-pin {
-      color: var(--muted);
-      border-color: var(--muted);
-      box-shadow: none;
-    }
-    .olay-board.pulling .olay-pin.lit {
-      color: var(--ink);
-      border-color: var(--ink);
-      box-shadow: 3px 4px 0 color-mix(in srgb, var(--ink) 16%, transparent);
-    }
-    .olay-board.pulling .olay-pin.linked {
-      color: var(--ink);
-      border-color: var(--thread);
-      box-shadow: 3px 4px 0 color-mix(in srgb, var(--thread) 22%, transparent);
-    }
-
-    /* The drawing the admin pinned up (assets/olaylar/<id>.png): the
-       countries of this olay and the lines between them, in the site's
-       own hand. It is the card when it is there -- the type sits under
-       it on a taped strip -- and the card is type alone when it is not,
-       which is what every olay looks like on the day it is created. */
-    .olay-pin-photo {
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 4px 0 8px;
-      overflow: hidden;
-    }
-    .olay-pin-photo img {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-      display: block;
-    }
-    .olay-pin.no-photo .olay-pin-photo { display: none; }
-    .olay-pin-name {
-      font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
-      font-size: 0.92rem;
-      font-weight: 700;
-      line-height: 1.15;
-      margin: 0;
-      overflow: hidden;
-    }
-    /* With no drawing on it the card is the name, standing in the middle
-       of its own paper -- a placeholder that reads as a decision. */
-    .olay-pin.no-photo .olay-pin-name {
-      margin-top: auto;
-      margin-bottom: auto;
-      font-size: 1.02rem;
-    }
-    .olay-pin-meta {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 8px;
-      margin-top: 6px;
+    /* An olay's name, hung under its own strokes -- a caption on the
+       drawing rather than a label over it. Placed from the drawing's own
+       ink (see measureOlayInk), so nothing is entered anywhere for it. */
+    .olay-tag { cursor: pointer; animation: olay-draw-in 0.4s ease-out both; }
+    .olay-tag-hit { fill: transparent; }
+    .olay-tag-name {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.55rem;
+      font-size: 30px;
       font-weight: 700;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      color: var(--muted);
-      white-space: nowrap;
+      letter-spacing: 2px;
+      fill: var(--ink);
+      /* Knocked out of whatever it crosses -- a stroke, a coastline, the
+         sea -- so the word is legible without a box drawn around it. */
+      stroke: var(--paper);
+      stroke-width: 9px;
+      paint-order: stroke;
+      transition: fill 0.2s;
     }
-    .olay-pin-meta .live { color: var(--thread); }
-    /* How many moments are on its chain -- the board's own score line.
-       A reader learns which olay is the deep one before opening any. */
-    .olay-pin-count { flex-shrink: 0; }
+    .olay-board-map.pulling .olay-tag-name { fill: var(--muted); }
+    .olay-board-map.pulling .olay-tag.lit .olay-tag-name { fill: #c8322b; }
+
+    @keyframes olay-board-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
 
     .olay-board-empty {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      position: absolute;
+      left: 0; right: 0;
+      top: 40%;
       text-align: center;
       font-style: italic;
       color: var(--muted);
@@ -3726,16 +3544,17 @@
     }
 
     /* ── One olay: the dossier taken off the board ──
-       The page keeps the board's language (the drawing at the top, the
-       string running down its timeline) rather than reverting to the
-       newspaper column the rest of this page is set in. */
-    /* Paper lying on the cork: the dossier has been taken off the board,
-       not opened somewhere else. --thread is redeclared here because the
-       page is a sibling of .olay-board, not a child of it. */
+       Paper lying on the map: the drawing has been picked up and the
+       account of it is on top of where it happened. --thread is
+       redeclared here because this page is a sibling of the board's SVG,
+       not a child of it. */
     .olay-page {
       --thread: #c8322b;
-      flex: 1;
-      min-height: 0;
+      position: absolute;
+      left: var(--screen-inset, 18px);
+      right: var(--screen-inset, 18px);
+      top: var(--olay-layer-top, 120px);
+      bottom: calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom, 0px) + 12px);
       overflow-y: auto;
       box-sizing: border-box;
       padding: 20px 24px;
@@ -3820,40 +3639,28 @@
     .olay-moment p { font-size: 0.85rem; line-height: 1.5; color: var(--muted); margin: 4px 0 0; }
     .olay-moment a { font-size: 0.75rem; }
 
-    /* Desktop gets a 680px sheet rather than a phone screen, so the same
-       board is drawn half again as large -- the type on it grows with the
-       cards instead of sitting in the middle of a big empty rectangle.
-       (The string's own label is SVG text in the stage's pixel units, so
-       it has to be told too.) */
+    /* On a desktop the map behind this page is İstanbul's, not the
+       world's -- so the board brings its own copy of the drawing its
+       olaylar were made on, in a portrait box of its own. Everything
+       inside it is already in that drawing's units, so nothing else has
+       to be told about the change of size. */
     @media (min-width: 769px) {
-      /* No profile bar and no tab bar here, and the box that opens this
-         sits in the right-hand column rather than on a line of its own --
-         so the board is simply a column of its own over the map. */
-      /* Centred by the flex box rather than by a transform: the layer's
-         own entrance animation animates `transform`, and a translateX
-         used for centring would be thrown away the moment that keyframe
-         ran -- which is exactly what pushed the board off the right of
-         the screen. */
-      .olay-layer {
-        left: 0;
-        right: 0;
-        top: 96px;
-        bottom: 36px;
-        align-items: center;
+      .olay-layer { top: 90px; bottom: 34px; left: 0; right: 0; }
+      .olay-basemap { display: block; opacity: 0.5; }
+      .olay-board-map { clip-path: none; }
+      .olay-page {
+        position: absolute;
+        left: 50%;
+        margin-left: min(-360px, -31vw);
+        width: min(720px, 62vw);
+        top: 0;
+        bottom: 0;
       }
-      .olay-board, .olay-page, .olay-board-empty { width: min(720px, 62vw); }
-      .olay-pin-name { font-size: 1.12rem; }
-      .olay-pin.no-photo .olay-pin-name { font-size: 1.25rem; }
-      .olay-pin-meta { font-size: 0.62rem; }
-      .olay-board-title, .olay-board-count { font-size: 0.7rem; }
-      .olay-thread-label { font-size: 12px; stroke-width: 4px; }
-      .olay-thread { stroke-width: 2.4; }
-      .olay-pins { gap: 34px 30px; padding: 6px 12px 18px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .olay-board, .olay-pin { animation: none; }
-      .olay-thread.drawing { animation: none; stroke-dashoffset: 0 !important; }
+      .olay-layer, .olay-scrim, .olay-draw, .olay-tag { animation: none; opacity: 1; }
+      .olay-wipe { animation: none; }
     }
 
     .kefil-link {
@@ -4165,18 +3972,22 @@
            now (see .col-right), so what is left of them is the smallest
            thing that still reads as a door. -->
       <div class="lib-boxes" id="lib-boxes">
-        <button type="button" class="lib-box" id="lib-box-makaleler" title="Makaleler">
-          <span class="lib-box-title">Makaleler</span>
-        </button>
-        <!-- OLAYLAR takes the MIDDLE of the line rather than a corner, and
-             for the same reason the other two take corners: what is behind
-             it is the map. Makaleler and Posta Kutusu are two rooms of the
-             library, one at each end; an olay is not a room, it is what the
-             drawing between them is about -- so its door stands over the
-             middle of the drawing. (space-between across three buttons is
-             the whole of that geometry; see the mobile .col-left rule.) -->
+        <!-- OLAYLAR stands in the LEFT corner, which is the corner the
+             reader's eye starts in: pressing it turns the map into the
+             board, and the map is what this whole page is drawn around.
+             Posta Kutusu keeps the right corner (space-between across the
+             line is the whole of that geometry; see the mobile .col-left
+             rule).
+             MAKALELER is parked, not deleted -- the shelves, their reader
+             and openLibraryShelvesSheet are all untouched behind this one
+             attribute, exactly the way Kahvehane's comments are parked
+             behind COMMENTS_ENABLED. Removing `hidden` is the whole of
+             bringing it back. -->
         <button type="button" class="lib-box" id="lib-box-olaylar" title="Olaylar">
           <span class="lib-box-title">Olaylar</span>
+        </button>
+        <button type="button" class="lib-box" id="lib-box-makaleler" title="Makaleler" hidden>
+          <span class="lib-box-title">Makaleler</span>
         </button>
         <button type="button" class="lib-box" id="lib-box-mektuplar" title="Posta Kutusu">
           <span class="lib-box-title">Posta Kutusu</span>
@@ -5390,19 +5201,17 @@ function openCountryEntryReader(entry, entries, page) {
 // ══════════════════════════════════════════
 let WORLD_EVENTS_CACHE = null; // null = not fetched yet this session
 
-// The board holds four. Not a paging limit with a fifth page behind it:
-// the fifth olay is simply not on the board, and the admin portal says
-// so where the order is set. A pinboard is a fixed amount of cork.
-const OLAY_BOARD_MAX = 4;
+// How many drawings go on the map at once. Not a paging limit with a
+// seventh page behind it: the seventh olay is simply not on the board,
+// and the admin portal says so on every row where the order is set. The
+// real limit is the map -- a world with a dozen strings across it is a
+// mess rather than a board -- so this is a number to lower when it starts
+// looking like one, never a scroller to add.
+const OLAY_BOARD_MAX = 6;
 
-// Where each pin rests. Fixed rather than random, so the board is the
-// same board every time it is opened -- a wall that rearranges itself
-// behind your back is not a place you learn.
-const OLAY_TILTS = ['-2.1deg', '1.6deg', '1.9deg', '-1.4deg'];
-
-// What is on the board right now, in pin order -- the pull handler is
-// given indices, and lighting a pin's countries on the map underneath
-// means going from an index back to its olay.
+// What is on the board right now, in drawing order -- the tag handlers
+// are given indices, and lighting an olay's countries on the map
+// underneath means going from an index back to its olay.
 let BOARD_EVENTS = [];
 
 async function loadWorldEvents() {
@@ -5455,30 +5264,6 @@ function worldEventParties(ev) {
   });
 }
 
-// ── What the string is FOR ──
-// Two olaylar are strung together when they have a party in common, and
-// the string is labelled with that party's name: Gazze and İran ve ABD
-// are tied by İSRAİL, Suriye and Rusya–Ukrayna by RUSYA. That is the
-// whole intellectual payoff of drawing this as a board rather than as a
-// list -- the reader sees that the same countries keep turning up in
-// different wars, which is a thing no paragraph says as fast.
-//
-// One string per pair, labelled with the first shared name, so two
-// olaylar that share three parties are still one string: a board with
-// three parallel lines between the same two cards reads as a mistake.
-function worldEventThreads(events) {
-  const partiesOf = events.map(worldEventParties);
-  const threads = [];
-  for (let a = 0; a < events.length; a++) {
-    for (let b = a + 1; b < events.length; b++) {
-      const set = new Set(partiesOf[b].map(n => n.toLocaleLowerCase('tr-TR')));
-      const shared = partiesOf[a].find(n => set.has(n.toLocaleLowerCase('tr-TR')));
-      if (shared) threads.push({ a, b, label: shared.toLocaleUpperCase('tr-TR') });
-    }
-  }
-  return threads;
-}
-
 // Where a news card prints its age, an olay prints whether it is still
 // the world the reader is living in -- and how long it has been going.
 // The one fact a list of olaylar carries that a list of stories does not.
@@ -5496,22 +5281,9 @@ function worldEventStamp(ev) {
     : (en ? 'ongoing' : 'sürüyor');
 }
 
-// The card's own version: a year and an arrow rather than a sentence.
-// The board is four small things and the word "sürüyor" spelled out ran
-// the line onto a second row on every one of them; the full stamp still
-// prints on the olay's own page, where there is a line to print it on.
-function worldEventStampShort(ev) {
-  const startYear = ev.started_on ? String(ev.started_on).slice(0, 4) : '';
-  if (ev.status === 'ended') {
-    const endYear = ev.ended_on ? String(ev.ended_on).slice(0, 4) : '';
-    if (startYear && endYear) return `${startYear}–${endYear}`;
-    return endYear || startYear || '—';
-  }
-  return startYear ? `${startYear} →` : '→';
-}
-
-// The drawing pinned to the card: the countries of this olay and the
-// lines between them, in the site's own hand. By convention it is simply
+// The drawing: the countries of this olay and the lines between them, in
+// the site's own hand, made in the map's own 1080x1920 frame so it lands
+// back on the coastlines it was drawn against. By convention it is simply
 // dropped in at assets/olaylar/<id>.png and nothing has to be entered
 // anywhere -- image_url is only there for the odd one kept elsewhere.
 // Deliberately not libSafeUrl, which allows http(s) alone: the whole
@@ -5523,200 +5295,255 @@ function olayImageSrc(ev) {
   return `assets/olaylar/${encodeURIComponent(ev.id)}.png`;
 }
 
+// ── The board, which is the map ──
+// Nothing is drawn ON something here: each olay is a line drawing made
+// in the map's own frame -- 1080x1920, the same grid the phone map and
+// its traced country shapes are in (see assets/olaylar/README.md) -- and
+// the board is those drawings laid back over the map they were drawn on.
+// The string between two countries is not computed and not a card
+// connector; it is a stroke somebody drew across the Mediterranean, and
+// it lands exactly where they put it.
+const OLAY_MAP_W = 1080;
+const OLAY_MAP_H = 1920;
+
+// Where an olay's name goes on the map. Nothing is entered anywhere for
+// this: the drawing is read for it -- the ink's own bounding box, found
+// by putting the PNG on a canvas and looking for the first and last
+// pixel that is not transparent -- so a drawing dropped into
+// assets/olaylar/ arrives already knowing where on the world it is.
+// Cached per olay: the read is one decode and one pass over a 1/8-scale
+// copy, but the board is opened and closed all day.
+const OLAY_INK = {};
+
+function measureOlayInk(ev) {
+  const key = ev.id;
+  if (OLAY_INK[key] !== undefined) return Promise.resolve(OLAY_INK[key]);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      let box = null;
+      try {
+        // An eighth of each side: the box only has to be good enough to
+        // hang a word off, and this is 64x less work than the full frame.
+        const w = Math.max(1, Math.round(img.naturalWidth / 8));
+        const h = Math.max(1, Math.round(img.naturalHeight / 8));
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, w, h);
+        const px = ctx.getImageData(0, 0, w, h).data;
+        let x0 = w, y0 = h, x1 = -1, y1 = -1;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (px[(y * w + x) * 4 + 3] > 24) {
+              if (x < x0) x0 = x;
+              if (x > x1) x1 = x;
+              if (y < y0) y0 = y;
+              if (y > y1) y1 = y;
+            }
+          }
+        }
+        if (x1 >= x0 && y1 >= y0) {
+          // Back into the map's own 1080x1920 units, which is what every
+          // coordinate on this board is in.
+          const sx = OLAY_MAP_W / w, sy = OLAY_MAP_H / h;
+          box = { x: x0 * sx, y: y0 * sy, w: (x1 - x0 + 1) * sx, h: (y1 - y0 + 1) * sy };
+        }
+      } catch (e) {
+        // A tainted canvas (the page served from file://, say) is not an
+        // error worth showing anyone: the tag falls back to the olay's
+        // countries below.
+        box = null;
+      }
+      OLAY_INK[key] = box;
+      resolve(box);
+    };
+    img.onerror = () => { OLAY_INK[key] = null; resolve(null); };
+    img.src = olayImageSrc(ev);
+  });
+}
+
+// The fallback, and a good one: the map already knows where Rusya is.
+// The traced shapes are in the same 1080x1920 viewBox as the drawings,
+// so their boxes need no conversion at all.
+function olayCountryAnchor(ev) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  worldEventCountryIds(ev).forEach(id => {
+    countryShapes(id).forEach(el => {
+      let b;
+      try { b = el.getBBox(); } catch (e) { return; }
+      if (!b || !b.width) return;
+      x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y);
+      x1 = Math.max(x1, b.x + b.width); y1 = Math.max(y1, b.y + b.height);
+    });
+  });
+  if (!isFinite(x0)) return null;
+  return { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
+}
+
+// The name hangs under the drawing rather than on it -- a caption on the
+// strokes, not a label over them.
+function olayTagPoint(ev, box) {
+  if (box) return { x: box.x + box.w / 2, y: box.y + box.h + 46 };
+  const c = olayCountryAnchor(ev);
+  return c ? { x: c.x, y: c.y + 40 } : null;
+}
+
 function olaylarBody() { return document.getElementById('olaylar-layer'); }
 
-// ── The board ──
+const OLAY_NS = 'http://www.w3.org/2000/svg';
+
 function renderOlayBoard(events) {
   const body = olaylarBody();
   if (!body) return;
+  // Back at the board, nothing in particular is being looked at -- so the
+  // map goes quiet again rather than staying lit on whichever dossier was
+  // open last.
+  clearNewsCountryHighlight();
   if (events === null) {
-    body.innerHTML = `<div class="olay-board"><div class="olay-board-empty">Olaylar yüklenemedi.</div></div>`;
+    body.innerHTML = `<div class="olay-board-empty">Olaylar yüklenemedi.</div>`;
     return;
   }
   const pinned = events.slice(0, OLAY_BOARD_MAX);
   BOARD_EVENTS = pinned;
   if (!pinned.length) {
-    body.innerHTML = `<div class="olay-board"><div class="olay-board-empty">Panoda henüz bir şey yok.</div></div>`;
+    body.innerHTML = `<div class="olay-board-empty">Panoda henüz bir şey yok.</div>`;
     return;
   }
-  const threads = worldEventThreads(pinned);
-  const en = I18N.isEnglish();
-  // Back at the board, nothing in particular is being looked at -- so the
-  // map goes quiet again rather than staying lit on whichever dossier was
-  // open last.
-  clearNewsCountryHighlight();
 
+  // One SVG in the map's own frame, laid over the map with the same
+  // preserveAspectRatio the traced overlay uses (xMidYMin meet, which is
+  // the SVG spelling of the object-fit: contain / object-position: center
+  // top the map image is drawn with). That pairing is the whole of the
+  // registration: change one and the drawings slide off the coastlines.
+  //
+  // The wipe is a clip rect per drawing, animated from no width to the
+  // full frame, so each string is run across the map rather than fading
+  // up out of it. The rect carries its full width as an attribute too, so
+  // a browser that will not animate SVG geometry from CSS simply shows
+  // the finished drawing.
   body.innerHTML = `
-    <div class="olay-board" id="olay-board">
-      <div class="olay-board-head">
-        <span class="olay-board-title">${en ? 'The Board' : 'Pano'}</span>
-        <span class="olay-board-count">${pinned.length} ${en ? 'events' : 'olay'} · <b>${threads.length}</b> ${en ? 'threads' : 'iplik'}</span>
-      </div>
-      <div class="olay-board-stage" id="olay-board-stage">
-        <svg class="olay-threads" id="olay-threads" aria-hidden="true"></svg>
-        <div class="olay-pins" id="olay-pins" data-count="${pinned.length}">
-          ${pinned.map((ev, i) => {
-            const moments = worldEventMoments(ev);
-            const live = ev.status !== 'ended';
-            return `
-            <button type="button" class="olay-pin" data-idx="${i}" data-event="${libEsc(ev.id)}"
-                    style="--tilt:${OLAY_TILTS[i % OLAY_TILTS.length]};--drop-delay:${240 + i * 90}ms">
-              <span class="olay-pin-head"></span>
-              <span class="olay-pin-photo"><img src="${libEsc(olayImageSrc(ev))}" alt="" loading="lazy"></span>
-              <span class="olay-pin-name">${libEsc(ev.name_tr)}</span>
-              <span class="olay-pin-meta">
-                <span class="${live ? 'live' : ''}">${libEsc(worldEventStampShort(ev))}</span>
-                ${moments.length ? `<span class="olay-pin-count">${moments.length} ${en ? 'moments' : 'an'}</span>` : ''}
-              </span>
-            </button>
-          `; }).join('')}
-        </div>
-      </div>
-    </div>
+    <svg class="olay-board-map" id="olay-board-map"
+         viewBox="0 0 ${OLAY_MAP_W} ${OLAY_MAP_H}" preserveAspectRatio="xMidYMin meet">
+      <defs>
+        ${pinned.map((ev, i) => `
+          <clipPath id="olay-wipe-${i}">
+            <rect class="olay-wipe" x="0" y="0" width="${OLAY_MAP_W}" height="${OLAY_MAP_H}"
+                  style="animation-delay:${180 + i * 260}ms"/>
+          </clipPath>
+        `).join('')}
+      </defs>
+      <!-- Desktop only: this page's own map is İstanbul's there, not the
+           world's, so the board carries the drawing it was made on. On a
+           phone it is hidden and the page's map shows through. -->
+      <image class="olay-basemap" href="assets/map/kutuphane-map-mobile.png"
+             x="0" y="0" width="${OLAY_MAP_W}" height="${OLAY_MAP_H}"
+             preserveAspectRatio="xMidYMin meet"/>
+      ${pinned.map((ev, i) => `
+        <g class="olay-draw" data-idx="${i}" clip-path="url(#olay-wipe-${i})"
+           style="animation-delay:${180 + i * 260}ms">
+          <image href="${libEsc(olayImageSrc(ev))}" x="0" y="0"
+                 width="${OLAY_MAP_W}" height="${OLAY_MAP_H}"
+                 preserveAspectRatio="xMidYMin meet"/>
+        </g>
+      `).join('')}
+      <g class="olay-tags" id="olay-tags"></g>
+    </svg>
   `;
-
-  // A card with no drawing yet is type alone rather than a broken image
-  // frame -- which is what every olay looks like on the day it is made.
-  body.querySelectorAll('.olay-pin-photo img').forEach(img => {
-    const fail = () => img.closest('.olay-pin')?.classList.add('no-photo');
-    img.addEventListener('error', fail);
-    if (img.complete && img.naturalWidth === 0) fail();
+  // A drawing that isn't there yet leaves the map as it was -- the olay
+  // is still on the board, named off its countries instead.
+  body.querySelectorAll('.olay-draw image').forEach(im => {
+    im.addEventListener('error', () => im.closest('.olay-draw')?.remove());
   });
-
-  const pins = Array.from(body.querySelectorAll('.olay-pin'));
-  pins.forEach(pin => {
-    wireCardPress(pin);
-    pin.addEventListener('click', () => {
-      const ev = pinned.find(x => x.id === pin.dataset.event);
-      if (ev) openWorldEventReader(ev, events);
-    });
-  });
-  wireThreadPulling(pins, threads);
-  // Measured after layout, in the frame the pins have real boxes: the
-  // string is run between the pin HEADS, so it has to be drawn from where
-  // they actually landed rather than from where the grid says they are.
-  requestAnimationFrame(() => requestAnimationFrame(() => drawOlayThreads(threads)));
+  paintOlayTags(pinned, events);
 }
 
-// The string, run between two pin heads and left to hang. A straight
-// line between two boxes is a connector diagram; a line that sags is a
-// piece of string somebody tied, and that is the whole difference
-// between this reading as an investigation board and as a flowchart.
-// `animate` is false on a re-measure (a rotation, a resize): the string
-// is already tied, and re-running the draw would have it re-tie itself
-// every time the phone is turned.
-function drawOlayThreads(threads, animate = true) {
-  const stage = document.getElementById('olay-board-stage');
-  const svg = document.getElementById('olay-threads');
-  if (!stage || !svg) return;
-  const box = stage.getBoundingClientRect();
-  svg.setAttribute('viewBox', `0 0 ${Math.round(box.width)} ${Math.round(box.height)}`);
-  const anchor = (idx) => {
-    const head = stage.querySelector(`.olay-pin[data-idx="${idx}"] .olay-pin-head`);
-    if (!head) return null;
-    const r = head.getBoundingClientRect();
-    return { x: r.left + r.width / 2 - box.left, y: r.top + r.height / 2 - box.top };
-  };
-  const NS = 'http://www.w3.org/2000/svg';
-  svg.innerHTML = '';
-  // Starts once the last pin has landed: string is tied to pins that are
-  // already on the wall.
-  const startAt = 240 + OLAY_BOARD_MAX * 90 + 220;
-  threads.forEach((t, i) => {
-    const p1 = anchor(t.a), p2 = anchor(t.b);
-    if (!p1 || !p2) return;
-    const dx = p2.x - p1.x, dy = p2.y - p1.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const sag = Math.min(38, Math.max(12, len * 0.17));
-    const cx = (p1.x + p2.x) / 2, cy = (p1.y + p2.y) / 2 + sag;
-    const path = document.createElementNS(NS, 'path');
-    path.setAttribute('d', `M ${p1.x} ${p1.y} Q ${cx} ${cy} ${p2.x} ${p2.y}`);
-    path.setAttribute('class', 'olay-thread');
-    path.dataset.a = t.a; path.dataset.b = t.b;
-    svg.appendChild(path);
-    const total = path.getTotalLength();
-    path.style.strokeDasharray = `${total}`;
-    path.style.strokeDashoffset = `${total}`;
-    if (animate) {
-      path.style.animationDelay = `${startAt + i * 150}ms`;
-      path.classList.add('drawing');
-    } else {
-      path.style.strokeDashoffset = '0';
+// The names, placed once each drawing has been read. Painted after the
+// board rather than with it: the read is a decode plus a pass over the
+// pixels, and the strings should already be running across the map by
+// the time the first name lands on it.
+async function paintOlayTags(pinned, events) {
+  const layer = document.getElementById('olay-tags');
+  if (!layer) return;
+  const boxes = await Promise.all(pinned.map(measureOlayInk));
+  // The board may have been closed, or a dossier opened, while the
+  // drawings were being read.
+  if (!document.getElementById('olay-tags')) return;
+  // The boxes already spoken for, so a second name never lands on a
+  // first one (see the slide below).
+  const taken = [];
+  pinned.forEach((ev, i) => {
+    const at = olayTagPoint(ev, boxes[i]);
+    if (!at) return;
+    const g = document.createElementNS(OLAY_NS, 'g');
+    g.setAttribute('class', 'olay-tag');
+    g.dataset.idx = i;
+    g.dataset.event = ev.id;
+    g.style.animationDelay = `${900 + i * 160}ms`;
+    const text = document.createElementNS(OLAY_NS, 'text');
+    text.setAttribute('class', 'olay-tag-name');
+    text.setAttribute('x', at.x);
+    text.setAttribute('y', at.y);
+    text.setAttribute('text-anchor', 'middle');
+    text.textContent = ev.name_tr.toLocaleUpperCase('tr-TR');
+    g.appendChild(text);
+    layer.appendChild(g);
+    // Measured only once it is in the document, which is the only point
+    // getBBox means anything.
+    let b;
+    try { b = text.getBBox(); } catch (e) { b = null; }
+    if (b) {
+      // Two olaylar in the same corner of the world would otherwise be
+      // named on top of each other -- Gazze and Doğu Akdeniz share a
+      // coastline. The name slides DOWN off its drawing until it is
+      // clear, which keeps it under the strokes it belongs to and out of
+      // everyone else's; clamped so it can never end up under the profile
+      // bar or off the bottom of the drawing.
+      let dy = 0;
+      for (let guard = 0; guard < 24; guard++) {
+        const box = { x: b.x, y: b.y + dy, w: b.width, h: b.height };
+        const clash = taken.find(t => box.x < t.x + t.w + 10 && t.x < box.x + box.w + 10 &&
+                                      box.y < t.y + t.h + 10 && t.y < box.y + box.h + 10);
+        if (!clash) break;
+        dy = clash.y + clash.h + 14 - b.y;
+      }
+      const y = Math.min(Math.max(at.y + dy, 240), OLAY_MAP_H - 90);
+      dy = y - at.y;
+      text.setAttribute('y', y);
+      taken.push({ x: b.x, y: b.y + dy, w: b.width, h: b.height });
+      // The hit area is the word's own box, opened out to something a
+      // thumb can actually find.
+      const pad = 26;
+      const hit = document.createElementNS(OLAY_NS, 'rect');
+      hit.setAttribute('class', 'olay-tag-hit');
+      hit.setAttribute('x', b.x - pad);
+      hit.setAttribute('y', b.y + dy - pad);
+      hit.setAttribute('width', b.width + pad * 2);
+      hit.setAttribute('height', b.height + pad * 2);
+      g.insertBefore(hit, text);
     }
-
-    // The label rides its own string, always level: half these strings
-    // run nearly vertical between the two rows, and a word turned on its
-    // side is a word nobody reads. Its own stroke knocks it out of the
-    // string underneath.
-    //
-    // Kept near the middle, where the strings run through the gap
-    // between the cards -- further along and the word lands on top of a
-    // card's own headline. But not AT the middle: on a 2x2 the two
-    // diagonals cross exactly there. So each label is stepped a little
-    // along its string and nudged off it sideways, in alternating
-    // directions -- which separates two crossing strings by the one
-    // measurement that is guaranteed not to be shared, their own
-    // perpendicular.
-    const at = 0.42 + (i % 3) * 0.08;
-    const qpt = (u, a, c, b) => (1 - u) * (1 - u) * a + 2 * (1 - u) * u * c + u * u * b;
-    const side = (i % 2 ? 1 : -1) * 11;
-    const nx = -dy / len, ny = dx / len;
-    const mx = qpt(at, p1.x, cx, p2.x) + nx * side;
-    const my = qpt(at, p1.y, cy, p2.y) + ny * side;
-    const label = document.createElementNS(NS, 'text');
-    label.setAttribute('class', 'olay-thread-label');
-    label.setAttribute('x', mx);
-    label.setAttribute('y', my + 3.5);
-    label.setAttribute('text-anchor', 'middle');
-    label.dataset.a = t.a; label.dataset.b = t.b;
-    label.textContent = t.label;
-    svg.appendChild(label);
-    // Named once its own string is tied, not before.
-    if (animate) setTimeout(() => label.classList.add('shown'), startAt + i * 150 + 420);
-    else label.classList.add('shown');
-  });
-}
-
-// Pulling a thread: reaching for one pin burns every string tied to it
-// and drops the rest of the board back. It is the same move the map
-// makes when a country is touched and its whole story lights -- what is
-// connected says so the moment you reach for it, before you have opened
-// anything.
-function wireThreadPulling(pins, threads) {
-  const board = document.getElementById('olay-board');
-  const svg = document.getElementById('olay-threads');
-  if (!board || !svg) return;
-  const clear = () => {
-    board.classList.remove('pulling');
-    svg.querySelectorAll('.lit').forEach(el => el.classList.remove('lit'));
-    pins.forEach(p => p.classList.remove('lit', 'linked'));
-    // The board is standing on the map, so letting go of a pin puts the
-    // map back too.
-    clearNewsCountryHighlight();
-  };
-  pins.forEach(pin => {
-    const idx = Number(pin.dataset.idx);
+    g.addEventListener('click', () => openWorldEventReader(ev, events));
+    // Reaching for a name lights its own strokes and its countries under
+    // them, and drops every other drawing back -- the same move the map
+    // already makes when a country is touched and its whole story lights.
     const pull = () => {
-      clear();
-      // Now that the board is laid over the drawing, reaching for a pin
-      // lights that olay's countries on it -- the same breathing
-      // highlight a Dünya story lights. This is the whole reason the
-      // board belongs over the map rather than on cork: "nerede" is
-      // answered by the thing it is pinned to.
-      setNewsCountryHighlight(worldEventCountryIds(BOARD_EVENTS[idx] || {}));
-      const touching = threads.filter(t => t.a === idx || t.b === idx);
-      if (!touching.length) return;
-      board.classList.add('pulling');
-      pin.classList.add('lit');
-      touching.forEach(t => {
-        const other = t.a === idx ? t.b : t.a;
-        pins[other]?.classList.add('linked');
-        svg.querySelectorAll(`[data-a="${t.a}"][data-b="${t.b}"]`)
-          .forEach(el => el.classList.add('lit'));
-      });
+      const svg = document.getElementById('olay-board-map');
+      if (!svg) return;
+      svg.classList.add('pulling');
+      svg.querySelectorAll('.lit').forEach(el => el.classList.remove('lit'));
+      svg.querySelector(`.olay-draw[data-idx="${i}"]`)?.classList.add('lit');
+      g.classList.add('lit');
+      setNewsCountryHighlight(worldEventCountryIds(ev));
     };
-    ['pointerenter', 'pointerdown'].forEach(e => pin.addEventListener(e, pull));
-    ['pointerleave', 'pointerup', 'pointercancel'].forEach(e => pin.addEventListener(e, clear));
+    const drop = () => {
+      const svg = document.getElementById('olay-board-map');
+      if (!svg) return;
+      svg.classList.remove('pulling');
+      svg.querySelectorAll('.lit').forEach(el => el.classList.remove('lit'));
+      clearNewsCountryHighlight();
+    };
+    ['pointerenter', 'pointerdown'].forEach(e => g.addEventListener(e, pull));
+    ['pointerleave', 'pointerup', 'pointercancel'].forEach(e => g.addEventListener(e, drop));
   });
 }
 
@@ -5852,12 +5679,10 @@ function toggleOlaylar() {
 (function initOlaylarLayer() {
   window.addEventListener('resize', () => {
     if (!olaylarIsOpen()) return;
+    // Nothing on the board is measured in screen pixels any more -- every
+    // drawing and every name is placed in the map's own units and the SVG
+    // re-fits itself -- so a rotation only has to move the dossier.
     positionOlayLayer();
-    // The board is measured, so it has to be re-measured: a rotation puts
-    // every pin somewhere else and the string would be left hanging in
-    // the air between where they used to be.
-    if (!document.querySelector('.olay-pin')) return;
-    drawOlayThreads(worldEventThreads(BOARD_EVENTS), false);
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && olaylarIsOpen()) closeOlaylar();

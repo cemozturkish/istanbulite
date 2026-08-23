@@ -30,7 +30,14 @@ insert into public.world_events
 
   ('suriye', 'Suriye''de Rejimin Düşüşü',
    'On üç yıllık savaşın on bir günde biten son perdesi — ve Türkiye''nin sınırındaki her şeyin yeniden kurulması.',
-   'Suriye · Türkiye · Rusya · İran', 'ongoing', '2024-11-27', 70)
+   'Suriye · Türkiye · Rusya · İran', 'ongoing', '2024-11-27', 70),
+
+  -- The one with a drawing already made for it
+  -- (assets/olaylar/dogu-akdeniz.png): Yunanistan, Kıbrıs ve İsrail, and
+  -- the line run between them across the map.
+  ('dogu-akdeniz', 'Doğu Akdeniz',
+   'Bir denizin altındaki gaz, üstündeki sınırlar ve Türkiye''nin batısındaki en yeni hat.',
+   'Yunanistan · Kıbrıs · İsrail · Türkiye · Mısır', 'ongoing', '2010-12-30', 60)
 on conflict (id) do update set
   name_tr = excluded.name_tr,
   blurb = excluded.blurb,
@@ -56,7 +63,11 @@ insert into public.world_event_countries (event_id, country) values
   ('gazze', 'palestine'),
   ('iran-abd', 'iran'),
   ('suriye', 'syria'),
-  ('suriye', 'turkiye')
+  ('suriye', 'turkiye'),
+  -- İsrail is a party to this one and is not a shape on the map, which is
+  -- exactly why `parties` above is plain text.
+  ('dogu-akdeniz', 'greece'),
+  ('dogu-akdeniz', 'cyprus')
 on conflict (event_id, country) do nothing;
 
 
@@ -97,7 +108,13 @@ from (values
   ('suriye', date '2011-03-15', 'Suriye''de ayaklanma başladı', null),
   ('suriye', date '2024-11-27', 'Halep''e doğru harekât başladı', null),
   ('suriye', date '2024-12-08', 'Şam düştü, Esad ülkeden ayrıldı',
-   'On üç yıllık savaş, on bir gün süren bir harekâtın sonunda rejimin çöküşüyle bitti.')
+   'On üç yıllık savaş, on bir gün süren bir harekâtın sonunda rejimin çöküşüyle bitti.'),
+
+  ('dogu-akdeniz', date '2010-12-30', 'Leviathan sahası bulundu',
+   'İsrail açıklarındaki büyük doğal gaz keşfi, Doğu Akdeniz''i bir enerji dosyası hâline getirdi.'),
+  ('dogu-akdeniz', date '2019-11-27', 'Türkiye–Libya deniz yetki anlaşması imzalandı', null),
+  ('dogu-akdeniz', date '2020-01-02', 'EastMed boru hattı anlaşması Atina''da imzalandı',
+   'Yunanistan, Kıbrıs ve İsrail arasındaki anlaşma, üç ülkeyi tek bir hat olarak tarif etti.')
 ) as v(event_id, moment_date, title, body)
 where not exists (
   select 1 from public.world_event_moments m

@@ -686,18 +686,19 @@ sb.from('articles').delete().eq('id', id)
   and keeps its own page in the reader sheet (see `openCountryEntryReader`); the objects printed
   inside either — sources, the timeline, its polls — are one set of rules
   (`:is(.article, .news-page)`)
-- **Makaleler, Olaylar and Posta Kutusu are three small buttons on the line under the profile
-  bar** — Makaleler in the left corner, Posta Kutusu (with its unread badge) in the right, and
-  **Olaylar in the middle**. The first two used to
+- **Two small buttons on the line under the profile bar**: **Olaylar** in the left corner and
+  **Posta Kutusu** (with its unread badge) in the right. They used to
   be full-width cards stacked down that column; the column is the news column now, so what is left
   of them is the smallest thing that still reads as a door. On a phone they are pinned there
   (`position: fixed`) over the map rather than being a grid track of their own
-  (`justify-content: space-between` is the whole of the geometry) — a corner each for the two
-  library rooms, because those doors lead to different rooms, and the **middle** for Olaylar,
-  because what is behind that button is the map and an olay is what the drawing is *about*. The
-  strip between them
+  (`justify-content: space-between` across the line is the whole of the geometry). The strip
+  between them
   is map, so it takes no taps (`pointer-events: none` on the column, `auto` on the buttons) or it
-  would swallow every touch on the districts under it
+  would swallow every touch on the districts under it. **Makaleler is parked**, not deleted: the
+  shelves, their reader and `openLibraryShelvesSheet` are untouched behind a `hidden` on its box,
+  the way Kahvehane's comments are parked behind `COMMENTS_ENABLED` — removing the attribute is
+  the whole of bringing it back (`.lib-box[hidden]` exists because the author `display: flex`
+  would otherwise beat the UA stylesheet)
 - Everyone can read, like, and comment on articles
 - Per the vision, this side stays *less* interactive than Kahvehane — reading and observing
   the national level, not peer-to-peer engagement about it
@@ -791,25 +792,37 @@ which is a thing you *read*. An olay is a thing you *work out*: who is in it, wh
 which other olay keeps naming the same country. So it is four things pinned up with string run
 between them, and the reader's eye does the joining. Concretely:
 
-- **Four pins, and nothing scrolls** (`OLAY_BOARD_MAX`). A board you can scroll is a board you are
-  not standing in front of. The fifth olay is not behind a page — it is simply not on the board,
-  and admin.html's list says `PANODA` / `PANODA DEĞİL` on every row so that is never a surprise.
-  Same rule the petek's levels follow: if a block stops fitting, drop a block.
-- **The string is the point, and it is drawn while the reader watches.** Two olaylar are strung
-  together when they share a party, and the string carries that party's name (İSRAİL between Gazze
-  and İran ve ABD; RUSYA and İRAN out of Suriye). The board's top line counts them — "4 olay · 3
-  iplik" — so there is something to find before a word is read. `worldEventThreads` computes the
-  pairs; `drawOlayThreads` measures the real pin heads after layout and hangs a sagging quadratic
-  between them, dash-offset animated so each one is *tied* rather than faded in. A straight line
-  is a flowchart; a line that sags is string somebody ran.
-- **Pulling a thread.** Reaching for a pin (hover, or the press on a phone) burns every string tied
-  to it and drops the rest of the board back — the same move the map makes when a country is
-  touched and its whole story lights. What is connected says so before anything is opened.
-- **What is pinned is a drawing** (`assets/olaylar/<id>.png`, see that folder's README): the
-  countries of that olay and the lines between them, in the site's own hand. Dropped in by
-  filename, with nothing to enter anywhere; `world_events.image_url` is only for a copy kept
-  elsewhere. No drawing yet = the card is its name alone, which is what every olay looks like on
-  the day it is created — a placeholder that reads as a decision, not a broken frame.
+- **The drawing is made in the map's own frame, and that is the whole trick.** An olay's PNG
+  (`assets/olaylar/<id>.png`, see that folder's README) is **1080×1920 and transparent** — the size
+  of `assets/map/kutuphane-map-mobile.png` and the viewBox of the traced country overlay — so the
+  board can lay it straight back over the map at the same `preserveAspectRatio="xMidYMin meet"`
+  and every stroke lands on the coastline it was drawn against. It is not a picture on a card; it
+  is a sheet of tracing paper over the world. Change the size on either side and every drawing
+  slides off. Dropped in by filename, with nothing to enter anywhere; `world_events.image_url` is
+  only for a copy kept elsewhere.
+- **The string is a stroke somebody drew, not a line the page computed.** An earlier version tied
+  cards together by shared party and drew a sagging quadratic between them; the map made that
+  redundant and worse — a hand-drawn line from Yunanistan through Kıbrıs to İsrail says the thing
+  the computed one was only gesturing at. Each drawing arrives by being **wiped** across the map
+  (a clip rect animated from no width), because a string is run rather than faded up. The rect
+  carries its full width as an attribute too, so a browser that will not animate SVG geometry from
+  CSS simply shows the finished drawing.
+- **Nothing is written down about where the name goes.** `measureOlayInk` puts the PNG on a canvas
+  at 1/8 scale, finds the first and last pixel that is not transparent, and hangs the olay's name
+  under the middle of that box — so a drawing dropped into the folder arrives already knowing where
+  on the world it is. An olay with **no** drawing is still on the board: its name is placed over
+  its ticked countries instead, off the map's own traced shapes (`olayCountryAnchor`). Two names
+  that would land on each other slide down until clear, clamped so neither ends up under the
+  profile bar. A tainted canvas (a page opened from `file://`) falls back to the countries rather
+  than throwing.
+- **Pulling a thread.** Reaching for a name (hover, or the press on a phone) lights its drawing and
+  its countries on the map and drops every other drawing back — the same move the map makes when a
+  country is touched and its whole story lights.
+- **Six drawings, and nothing scrolls** (`OLAY_BOARD_MAX`). The seventh olay is not behind a page —
+  it is simply not on the board, and admin.html's list says `PANODA` / `PANODA DEĞİL` on every row
+  so that is never a surprise. The real limit is the map: a world with a dozen strings across it is
+  a mess rather than a board, so this is a number to lower when it starts looking like one, never a
+  scroller to add.
 - **The map IS the board, and this is not a sheet at all** (`#olaylar-layer`). Nothing rises from
   the bottom and nothing is opened: pressing the box **inks it** (`.lib-box-on` — it stays held
   down because it is the way back out), everything else on the page goes — the news column, the
@@ -829,11 +842,9 @@ between them, and the reader's eye does the joining. Concretely:
   - It lives **inside `#ist-content`**, so a swipe to another page takes it away rather than
     leaving it hanging over Hane; the `body.olaylar-on` rules live in this page's own stylesheet,
     which the router disables on the way out, and `mount()` clears the class on the way back in.
-  - A pin that is not on the pulled thread recedes by going **quiet in the ink**, never by going
-    translucent: a half-transparent card over a map is mush rather than a card in the background.
-  - Its desktop centring is `align-items: center`, never a `translateX(-50%)`: the layer's
-    entrance animates `transform`, and a transform used for centring is thrown away the frame that
-    keyframe starts — which put the whole board off the right of the screen.
+  - **Desktop carries its own copy of the world map** inside the board (`.olay-basemap`), because
+    the map behind this page is İstanbul's there, not the world's. On a phone it is hidden and the
+    page's own map shows through.
 
 One olay opens as the **dossier taken off the board** — the layer's content swaps in place, still
 no second surface — and keeps the board's language rather than reverting to the newspaper column:
@@ -863,13 +874,15 @@ Four things about the data:
   "2014–2022 · sürüyor".
 - **Ongoing olaylar are ordered by `sort_order`, not by what moved last.** A war does not stop
   being the biggest thing on the page because something smaller had a development this morning —
-  and with only four places on the cork, that order decides what exists.
+  and with only six places on the board, that order decides what exists.
 
 Curated from admin.html's **Olaylar** tab (form on the left, the list with each card's own timeline
 editor on the right — the same shape the Ülkeler tab has, because it is the same kind of object: a
 page whose value is that somebody maintains its chain). `db/world_events_seed.sql` holds a starting
-set — Rusya–Ukrayna, Gazze, İran ve ABD, Suriye — deliberately thin, only the dates nobody argues
-about, to be verified and extended from the portal. `db/world_events_v2_board.sql` adds the
+set — Rusya–Ukrayna, Gazze, İran ve ABD, Suriye, Doğu Akdeniz — deliberately thin, only the dates
+nobody argues about, to be verified and extended from the portal. Doğu Akdeniz is the one with a
+drawing already made for it (`assets/olaylar/dogu-akdeniz.png`: Yunanistan, Kıbrıs and İsrail, and
+the line run between them). `db/world_events_v2_board.sql` adds the
 `image_url` override the pinned drawings can use.
 
 ### `tumcel.html` — Tümcel
