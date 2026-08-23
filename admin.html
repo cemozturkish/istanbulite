@@ -614,6 +614,8 @@
        row reads date-first, which is the order the moment is written in. */
     .upd-form input.upd-date { width: 150px; }
     .upd-form.ce-ev-form { grid-template-columns: auto 1fr 1fr auto; }
+    /* An olay's moment is written date-first too (db/world_events.sql). */
+    .upd-form.we-m-form { grid-template-columns: auto 1fr 1fr auto; }
     .upd-form button { white-space: nowrap; padding: 6px 10px; font-size: 0.75rem; }
     .upd-status { grid-column: 1 / -1; margin: 0; font-size: 0.75rem; }
     @media (max-width: 600px) {
@@ -1103,6 +1105,7 @@
     <button class="admin-tab active" data-tab="kutuphane">Kütüphane</button>
     <button class="admin-tab" data-tab="mektuplar">Posta Kutusu</button>
     <button class="admin-tab" data-tab="countries">Ülkeler</button>
+    <button class="admin-tab" data-tab="worldevents">Olaylar</button>
     <button class="admin-tab" data-tab="news">Breaking News</button>
     <button class="admin-tab" data-tab="events">Events</button>
     <button class="admin-tab" data-tab="games">Oyunlar</button>
@@ -1352,6 +1355,94 @@
       <label>Filter by country</label>
       <select id="ce-filter"><option value="">— All countries —</option></select>
       <div class="articles-list" id="country-entries-list" style="margin-top:14px;">
+        <div class="empty-state"><span class="spinner"></span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- OLAYLAR — the world events themselves (db/world_events.sql), opened
+       from the middle box under Kütüphane's profile bar. Not a seri (a
+       label over news rows so their updates stay traceable) and not a
+       country hikâye (the map's grouping, one per country): the event
+       itself, standing whether or not there was news today. -->
+  <div class="admin-body" id="worldevents-tab" style="display:none;">
+
+    <!-- LEFT: Add / Edit Olay -->
+    <div class="panel">
+      <div class="panel-title" id="we-form-mode-label">Add New Olay</div>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        Bir olay, haberin hakkında olduğu şeydir: Rusya–Ukrayna Savaşı, Gazze, İran ve ABD.
+        Kütüphane'de profil çubuğunun altındaki ortadaki kutudan açılır. Haber akışındaki bir
+        hikâye 72 saat sonra gider; olay, bugün hiç haber çıkmasa da orada durur.
+      </p>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        Sayfanın çoğu <strong>Zaman Akışı</strong>'dır — tarihli kilit anlar, en yenisi üstte.
+        Önce olayı ekleyin, sonra sağdaki kartından anları işleyin.
+      </p>
+
+      <label>Ad</label>
+      <input type="text" id="we-name" placeholder="Rusya–Ukrayna Savaşı"/>
+
+      <label>ID (boş bırakılırsa addan üretilir)</label>
+      <input type="text" id="we-id" placeholder="rusya-ukrayna-savasi"/>
+
+      <label>Tek satır (blurb)</label>
+      <input type="text" id="we-blurb" placeholder="Listede ve sayfanın başında görünen tek cümle..."/>
+
+      <label>Taraflar</label>
+      <p style="margin-top:-4px;margin-bottom:6px;font-size:0.7rem;color:var(--muted);font-style:italic;">
+        Kartın üst satırı. Düz metin — çünkü taraflar çoğu zaman haritada çizili değildir (ABD, Hamas, BM).
+        Ayırıcı olarak · kullanın.
+      </p>
+      <input type="text" id="we-parties" placeholder="Rusya · Ukrayna"/>
+
+      <label>Durum</label>
+      <select id="we-status">
+        <option value="ongoing">Sürüyor</option>
+        <option value="ended">Sona erdi</option>
+      </select>
+
+      <label>Başlangıç (opsiyonel)</label>
+      <input type="date" id="we-started"/>
+
+      <label>Bitiş (opsiyonel — yalnızca sona erdiyse)</label>
+      <input type="date" id="we-ended"/>
+
+      <label>Metin (opsiyonel)</label>
+      <textarea id="we-body" rows="8" placeholder="Bu şeyin ne olduğunu anlatan birkaç paragraf. Boş satır paragrafları ayırır. Zaman akışı her şeyi söylüyorsa boş bırakın."></textarea>
+
+      <div class="country-picker-block on">
+        <label>Ülkeler (opsiyonel)</label>
+        <p style="margin-top:-4px;margin-bottom:6px;font-size:0.7rem;color:var(--muted);font-style:italic;">
+          Olay açıkken haritada yanacak ülkeler. Bir ülke birden çok olayda olabilir —
+          haritanın hikâyelerinden farkı bu.
+        </p>
+        <div class="country-picker" id="we-countries"></div>
+      </div>
+
+      <label>Seri (opsiyonel)</label>
+      <p style="margin-top:-4px;margin-bottom:6px;font-size:0.7rem;color:var(--muted);font-style:italic;">
+        Bu olayın haber izi. Yalnızca kayıt için — okuyucuya şimdilik gösterilmiyor.
+      </p>
+      <select id="we-series"><option value="">— Seri yok —</option></select>
+
+      <label>Sıra (büyük olan üstte)</label>
+      <input type="number" id="we-sort" value="0"/>
+
+      <input type="hidden" id="we-editing-id"/>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="we-submit-btn">Add Olay</button>
+        <button class="btn btn-secondary" id="we-cancel-btn" style="display:none;">Cancel Edit</button>
+      </div>
+      <div class="status-msg" id="we-form-status"></div>
+    </div>
+
+    <!-- RIGHT: Olaylar List -->
+    <div class="panel">
+      <div class="panel-title">Olaylar</div>
+      <div class="articles-list" id="world-events-list">
         <div class="empty-state"><span class="spinner"></span></div>
       </div>
     </div>
@@ -2188,6 +2279,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('kutuphane-tab').style.display = (tab === 'kutuphane') ? '' : 'none';
     document.getElementById('mektuplar-tab').style.display = (tab === 'mektuplar') ? '' : 'none';
     document.getElementById('countries-tab').style.display = (tab === 'countries') ? '' : 'none';
+    document.getElementById('worldevents-tab').style.display = (tab === 'worldevents') ? '' : 'none';
     document.getElementById('news-tab').style.display = (tab === 'news') ? '' : 'none';
     document.getElementById('events-tab').style.display = (tab === 'events') ? '' : 'none';
     document.getElementById('games-tab').style.display = (tab === 'games') ? 'grid' : 'none';
@@ -2201,6 +2293,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'kutuphane') showKutuphaneIndex();
     if (tab === 'mektuplar') loadLettersList();
     if (tab === 'countries') loadCountriesTab();
+    if (tab === 'worldevents') loadWorldEventsTab();
     if (tab === 'news') { loadSeries(); loadBreakingNews(); }
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
     if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); }
@@ -4498,6 +4591,339 @@ async function deleteCountryEntry(id) {
   const { error } = await sb.from('country_entries').delete().eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   loadCountryEntriesList();
+}
+
+// ── Olaylar: the world events themselves (db/world_events.sql) ──
+// The object the news is about. Same editing shape as the Ülkeler tab --
+// a form on the left, a list on the right whose cards carry their own
+// Zaman Akışı editor -- because it is the same kind of thing being kept:
+// a curated page whose value is that somebody maintains its chain.
+let WORLD_EVENTS_ADMIN = [];
+
+// Turkish-aware, because the ids are read by people: "Rusya–Ukrayna
+// Savaşı" has to come out rusya-ukrayna-savasi and not rusya-ukrayna-savasi
+// with a stray ş in it. Only ever used to fill an empty ID field -- the
+// admin can always type their own.
+function slugifyTr(text) {
+  const map = { 'ı': 'i', 'İ': 'i', 'ş': 's', 'Ş': 's', 'ğ': 'g', 'Ğ': 'g',
+                'ü': 'u', 'Ü': 'u', 'ö': 'o', 'Ö': 'o', 'ç': 'c', 'Ç': 'c' };
+  return String(text || '')
+    .replace(/[ıİşŞğĞüÜöÖçÇ]/g, ch => map[ch])
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+
+async function loadWorldEventsTab() {
+  // The country picker and the series select are both filled from tables
+  // this tab does not own; either can be opened before the tab that does.
+  try { await ensureCountriesLoaded(); } catch (e) { /* picker says so itself */ }
+  const picker = document.getElementById('we-countries');
+  if (picker && !picker.children.length) picker.innerHTML = countryPickerHTML([]);
+  const sel = document.getElementById('we-series');
+  if (sel && sel.options.length <= 1) {
+    const { data } = await sb.from('breaking_news_series').select('id, name').order('name');
+    sel.innerHTML = '<option value="">— Seri yok —</option>' + (data || []).map(sr =>
+      `<option value="${escapeHtml(sr.id)}">${escapeHtml(sr.name)}</option>`).join('');
+  }
+  loadWorldEventsList();
+}
+
+// Newest first, exactly as Kütüphane prints it, so what the admin is
+// arranging here is the order the reader will read.
+function worldEventMomentsSorted(ev) {
+  return (ev.world_event_moments || []).slice()
+    .sort((a, b) => (a.moment_date < b.moment_date ? 1 : a.moment_date > b.moment_date ? -1 : 0));
+}
+
+async function loadWorldEventsList() {
+  const listEl = document.getElementById('world-events-list');
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const { data, error } = await sb.from('world_events')
+    .select('*, world_event_moments(*), world_event_countries(country)')
+    .order('sort_order', { ascending: false })
+    .order('started_on', { ascending: false, nullsFirst: false });
+  if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
+  WORLD_EVENTS_ADMIN = data || [];
+  if (!WORLD_EVENTS_ADMIN.length) { listEl.innerHTML = '<div class="empty-state">No olaylar yet.</div>'; return; }
+
+  listEl.innerHTML = WORLD_EVENTS_ADMIN.map(ev => {
+    const moments = worldEventMomentsSorted(ev);
+    const momentsHtml = moments.length ? moments.map(m => `
+      <div class="upd-row" data-m-id="${m.id}">
+        <div class="upd-info">
+          <span class="upd-time">${escapeHtml(m.moment_date)}</span>
+          <strong>${escapeHtml(m.title)}</strong>
+          ${m.body ? `<span class="upd-body-text">${escapeHtml(m.body)}</span>` : ''}
+        </div>
+        <button class="btn-edit" data-act="we-m-edit" data-id="${m.id}">Düzenle</button>
+        <button class="btn-del"  data-act="we-m-del"  data-id="${m.id}">×</button>
+      </div>
+      <div class="upd-edit-form" data-m-edit-id="${m.id}">
+        <input type="date" class="wem-date" value="${escapeHtml(m.moment_date || '')}"/>
+        <input type="text" class="wem-title" value="${escapeHtml(m.title)}"/>
+        <textarea class="wem-body" rows="2">${escapeHtml(m.body || '')}</textarea>
+        <input type="text" class="wem-source" value="${escapeHtml(m.source_url || '')}" placeholder="Kaynak (opsiyonel)"/>
+        <div class="btn-row">
+          <button class="btn btn-primary"   data-act="we-m-save"   data-id="${m.id}">Kaydet</button>
+          <button class="btn btn-secondary" data-act="we-m-cancel" data-id="${m.id}">İptal</button>
+        </div>
+        <div class="ue-status status-msg"></div>
+      </div>
+    `).join('') : '<div style="color:var(--muted);font-size:0.8rem;">Henüz kilit an eklenmedi.</div>';
+    const countries = (ev.world_event_countries || []).map(r => countryNameTr(r.country)).join(', ');
+    return `
+    <div class="article-card" data-id="${escapeHtml(ev.id)}">
+      <div class="a-neighborhood">${ev.status === 'ended' ? 'SONA ERDİ' : 'SÜRÜYOR'}${
+        ev.started_on ? ' · ' + escapeHtml(ev.started_on) : ''
+      }${ev.ended_on ? ' → ' + escapeHtml(ev.ended_on) : ''} · ${escapeHtml(ev.id)}</div>
+      <h4>${escapeHtml(ev.name_tr)}</h4>
+      ${ev.parties ? `<p>${escapeHtml(ev.parties)}</p>` : ''}
+      ${countries ? `<p style="color:var(--muted);">Haritada: ${escapeHtml(countries)}</p>` : ''}
+      <div class="sources-block">
+        <div class="sources-label">Zaman Akışı (${moments.length})</div>
+        ${momentsHtml}
+        <div class="we-m-form upd-form">
+          <input type="date" class="upd-date wem-new-date" title="Tarih"/>
+          <input type="text" class="wem-new-title" placeholder="Kilit an (başlık)"/>
+          <input type="text" class="wem-new-body" placeholder="Ek detay (opsiyonel)"/>
+          <button class="btn btn-secondary" data-act="we-m-add" data-event-id="${escapeHtml(ev.id)}">+ An Ekle</button>
+          <div class="upd-status status-msg"></div>
+        </div>
+      </div>
+      <div class="card-actions">
+        <button class="btn-edit" data-act="we-edit" data-id="${escapeHtml(ev.id)}">Edit</button>
+        <button class="btn-del"  data-act="we-del"  data-id="${escapeHtml(ev.id)}">Delete</button>
+      </div>
+    </div>
+  `;
+  }).join('');
+
+  listEl.querySelectorAll('button[data-act]').forEach(btn => {
+    const act = btn.dataset.act;
+    if (act === 'we-m-add') { btn.addEventListener('click', () => addWorldEventMoment(btn)); return; }
+    if (act === 'we-m-del') { btn.addEventListener('click', () => deleteWorldEventMoment(btn.dataset.id)); return; }
+    if (act === 'we-m-edit' || act === 'we-m-cancel') {
+      btn.addEventListener('click', () => {
+        const form = listEl.querySelector(`.upd-edit-form[data-m-edit-id="${btn.dataset.id}"]`);
+        if (form) form.classList.toggle('open', act === 'we-m-edit');
+      });
+      return;
+    }
+    if (act === 'we-m-save') { btn.addEventListener('click', () => saveWorldEventMoment(btn)); return; }
+    const ev = WORLD_EVENTS_ADMIN.find(x => x.id === btn.dataset.id);
+    if (!ev) return;
+    if (act === 'we-edit') btn.addEventListener('click', () => editWorldEvent(ev));
+    if (act === 'we-del') btn.addEventListener('click', () => deleteWorldEvent(ev.id));
+  });
+}
+
+async function addWorldEventMoment(btn) {
+  const form = btn.closest('.we-m-form');
+  const statusEl = form.querySelector('.upd-status');
+  const dateEl = form.querySelector('.wem-new-date');
+  const titleEl = form.querySelector('.wem-new-title');
+  const bodyEl = form.querySelector('.wem-new-body');
+  const moment_date = dateEl.value;
+  const title = titleEl.value.trim();
+
+  if (!moment_date || !title) {
+    statusEl.textContent = 'Tarih ve başlık zorunlu.';
+    statusEl.className = 'upd-status status-msg err';
+    return;
+  }
+
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  statusEl.textContent = ''; statusEl.className = 'upd-status status-msg';
+
+  const { error } = await sb.from('world_event_moments').insert([{
+    event_id: btn.dataset.eventId,
+    moment_date,
+    title,
+    body: bodyEl.value.trim() || null,
+  }]);
+
+  btn.disabled = false;
+  btn.textContent = origText;
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'upd-status status-msg err';
+    return;
+  }
+  dateEl.value = ''; titleEl.value = ''; bodyEl.value = '';
+  loadWorldEventsList();
+}
+
+async function saveWorldEventMoment(btn) {
+  const form = btn.closest('.upd-edit-form');
+  const statusEl = form.querySelector('.ue-status');
+  const moment_date = form.querySelector('.wem-date').value;
+  const title = form.querySelector('.wem-title').value.trim();
+
+  if (!moment_date || !title) {
+    statusEl.textContent = 'Tarih ve başlık zorunlu.';
+    statusEl.className = 'ue-status status-msg err';
+    return;
+  }
+
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  statusEl.textContent = ''; statusEl.className = 'ue-status status-msg';
+
+  const { error } = await sb.from('world_event_moments').update({
+    moment_date,
+    title,
+    body: form.querySelector('.wem-body').value.trim() || null,
+    source_url: form.querySelector('.wem-source').value.trim() || null,
+  }).eq('id', btn.dataset.id);
+
+  btn.disabled = false;
+  btn.textContent = origText;
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'ue-status status-msg err';
+    return;
+  }
+  loadWorldEventsList();
+}
+
+async function deleteWorldEventMoment(id) {
+  if (!confirm('Bu kilit anı sil?')) return;
+  const { error } = await sb.from('world_event_moments').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadWorldEventsList();
+}
+
+function editWorldEvent(ev) {
+  document.getElementById('we-editing-id').value = ev.id;
+  document.getElementById('we-id').value = ev.id;
+  // The id is the row's key and is what a seed file names it by, so it is
+  // not something to change by accident while fixing a typo in the title.
+  document.getElementById('we-id').disabled = true;
+  document.getElementById('we-name').value = ev.name_tr || '';
+  document.getElementById('we-blurb').value = ev.blurb || '';
+  document.getElementById('we-parties').value = ev.parties || '';
+  document.getElementById('we-status').value = ev.status || 'ongoing';
+  document.getElementById('we-started').value = ev.started_on || '';
+  document.getElementById('we-ended').value = ev.ended_on || '';
+  document.getElementById('we-body').value = ev.body || '';
+  document.getElementById('we-series').value = ev.series_id || '';
+  document.getElementById('we-sort').value = ev.sort_order ?? 0;
+  document.getElementById('we-countries').innerHTML =
+    countryPickerHTML((ev.world_event_countries || []).map(r => r.country));
+  document.getElementById('we-submit-btn').textContent = 'Update Olay';
+  document.getElementById('we-form-mode-label').textContent = 'Editing Olay';
+  document.getElementById('we-cancel-btn').style.display = 'inline-block';
+  document.querySelector('#worldevents-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetWorldEventForm() {
+  document.getElementById('we-editing-id').value = '';
+  document.getElementById('we-id').value = '';
+  document.getElementById('we-id').disabled = false;
+  document.getElementById('we-name').value = '';
+  document.getElementById('we-blurb').value = '';
+  document.getElementById('we-parties').value = '';
+  document.getElementById('we-status').value = 'ongoing';
+  document.getElementById('we-started').value = '';
+  document.getElementById('we-ended').value = '';
+  document.getElementById('we-body').value = '';
+  document.getElementById('we-series').value = '';
+  document.getElementById('we-sort').value = '0';
+  document.getElementById('we-countries').innerHTML = countryPickerHTML([]);
+  document.getElementById('we-submit-btn').textContent = 'Add Olay';
+  document.getElementById('we-form-mode-label').textContent = 'Add New Olay';
+  document.getElementById('we-cancel-btn').style.display = 'none';
+}
+
+document.getElementById('we-cancel-btn').addEventListener('click', resetWorldEventForm);
+
+// Replace an olay's countries with what is ticked now -- the rows carry no
+// state beyond existing, so delete-then-insert is the whole update (same
+// as saveNewsCountries above).
+async function saveWorldEventCountries(eventId, countries) {
+  const { error: delErr } = await sb.from('world_event_countries')
+    .delete().eq('event_id', eventId);
+  if (delErr) return delErr;
+  if (!countries.length) return null;
+  const { error } = await sb.from('world_event_countries')
+    .insert(countries.map(country => ({ event_id: eventId, country })));
+  return error || null;
+}
+
+document.getElementById('we-submit-btn').addEventListener('click', async () => {
+  const editingId = document.getElementById('we-editing-id').value;
+  const name_tr = document.getElementById('we-name').value.trim();
+  const typedId = document.getElementById('we-id').value.trim();
+  const statusEl = document.getElementById('we-form-status');
+  const btn = document.getElementById('we-submit-btn');
+
+  if (!name_tr) {
+    statusEl.textContent = 'Ad zorunlu.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  const id = editingId || slugifyTr(typedId || name_tr);
+  if (!id) {
+    statusEl.textContent = 'ID üretilemedi — elle bir ID yazın.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  const status = document.getElementById('we-status').value;
+  const row = {
+    id,
+    name_tr,
+    blurb: document.getElementById('we-blurb').value.trim() || null,
+    parties: document.getElementById('we-parties').value.trim() || null,
+    status,
+    started_on: document.getElementById('we-started').value || null,
+    // A date on an olay that is still going is a contradiction the list
+    // would then print ("2014–2022 · sürüyor"), so it is dropped here
+    // rather than trusted to be left blank.
+    ended_on: status === 'ended' ? (document.getElementById('we-ended').value || null) : null,
+    body: document.getElementById('we-body').value.trim() || null,
+    series_id: document.getElementById('we-series').value || null,
+    sort_order: Number(document.getElementById('we-sort').value) || 0,
+  };
+
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const result = editingId
+    ? await sb.from('world_events').update(row).eq('id', editingId)
+    : await sb.from('world_events').insert([row]);
+
+  btn.textContent = editingId ? 'Update Olay' : 'Add Olay';
+
+  if (result.error) {
+    statusEl.textContent = result.error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  const cErr = await saveWorldEventCountries(id, pickedCountries(document.getElementById('we-countries')));
+  if (cErr) {
+    statusEl.textContent = 'Olay kaydedildi ama ülkeler kaydedilemedi: ' + cErr.message;
+    statusEl.className = 'status-msg err';
+    loadWorldEventsList();
+    return;
+  }
+  statusEl.textContent = editingId ? 'Olay güncellendi!' : 'Olay eklendi!';
+  statusEl.className = 'status-msg ok';
+  resetWorldEventForm();
+  loadWorldEventsList();
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+async function deleteWorldEvent(id) {
+  if (!confirm('Bu olayı ve zaman akışını sil? Geri alınamaz.')) return;
+  const { error } = await sb.from('world_events').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadWorldEventsList();
 }
 
 // ── Quotes: general-purpose quote bank ──

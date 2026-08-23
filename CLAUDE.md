@@ -244,7 +244,9 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > live), `coffee_comments` (what members say about a venue), `countries` + `country_entries`
 > + `country_entry_events` + `country_stories` + `country_story_countries` (what a country on
 > Kütüphane's map opens, the key-moment timeline an entry can carry, and which countries light
-> and open together as one story) and `breaking_news_countries` (which countries a
+> and open together as one story), `world_events` + `world_event_moments` +
+> `world_event_countries` (the OLAYLAR — the world events themselves, with their dated
+> timelines and the countries an open one lights) and `breaking_news_countries` (which countries a
 > Dünya story is about, lit on that map when the story opens), and more). When in doubt, read the relevant `db/` file — it is the
 > source of truth.
 
@@ -500,6 +502,10 @@ sb.from('articles').delete().eq('id', id)
   recorded", which keeps the venue listed around the clock — the behaviour of every row
   entered before this existed. A live preview under the form shows what the venue being
   edited is doing at this exact minute, and each row in the list carries the same read-out
+- **Olaylar tab** curates the world events (`world_events`) Kütüphane's middle box opens —
+  the olay itself on the left, and on the right a list whose every card carries its own
+  Zaman Akışı editor. See "OLAYLAR — the world events themselves" below for what an olay is
+  and how it differs from a seri and from a country hikâye
 - **Oyunlar tab** combines all three games' admin panels in one place: a shared per-day
   on/off board (next 7 days × Sözcel/Tümcel/Bulmaca, backed by `game_day_toggles`) at the
   top, then sub-nav pills to switch between each game's own management panel (Sözcel sözcü
@@ -680,12 +686,16 @@ sb.from('articles').delete().eq('id', id)
   and keeps its own page in the reader sheet (see `openCountryEntryReader`); the objects printed
   inside either — sources, the timeline, its polls — are one set of rules
   (`:is(.article, .news-page)`)
-- **Makaleler and Posta Kutusu are two small buttons in the two top corners**, under the profile
-  bar — Makaleler in the left one, Posta Kutusu (with its unread badge) in the right. They used to
+- **Makaleler, Olaylar and Posta Kutusu are three small buttons on the line under the profile
+  bar** — Makaleler in the left corner, Posta Kutusu (with its unread badge) in the right, and
+  **Olaylar in the middle**. The first two used to
   be full-width cards stacked down that column; the column is the news column now, so what is left
   of them is the smallest thing that still reads as a door. On a phone they are pinned there
-  (`position: fixed`) over the map rather than being a grid track of their own, one at each end of
-  the line — a corner each, because the two doors lead to different rooms. The strip between them
+  (`position: fixed`) over the map rather than being a grid track of their own
+  (`justify-content: space-between` is the whole of the geometry) — a corner each for the two
+  library rooms, because those doors lead to different rooms, and the **middle** for Olaylar,
+  because what is behind that button is the map and an olay is what the drawing is *about*. The
+  strip between them
   is map, so it takes no taps (`pointer-events: none` on the column, `auto` on the buttons) or it
   would swallow every touch on the districts under it
 - Everyone can read, like, and comment on articles
@@ -763,6 +773,52 @@ Which countries belong to which is structural and does not change with the news,
 portal shows it read-only: picking a country in the Ülkeler tab prints the story its entry will
 appear in, and every row in the list carries its story name. Editing the grouping is a
 migration.
+
+### OLAYLAR — the world events themselves (`world_events`)
+
+The three things Kütüphane keeps about the world are easy to confuse, so: a **story in the feed**
+is what happened (72 hours, then gone); a **seri** is a label laid over several such stories so a
+developing thing stays traceable through its earlier posts; an **OLAY** is the thing all of them
+are about. Rusya–Ukrayna Savaşı. Gazze. İran ve ABD. It is there on a day nobody posted, it
+reaches back to 2014 when the newest story is from this morning, and a reader opens it to find out
+what this whole thing *is* rather than what happened since Tuesday. Opened from the **middle box**
+under the profile bar; it is the same reader sheet a country's page rises in, and it prints the
+same `.article` cards, because a story reads the way a story reads wherever the reader came in
+from.
+
+An olay is mostly its **Zaman Akışı** (`world_event_moments`) — dated key moments, newest first, in
+the same ticked track a country entry's chain and a news story's gelişmeler are printed in. Dated
+rather than aged, for the same reason those are: these reach back decades and "12 yıl önce" tells a
+reader nothing. Around it: the name, one line under it, who is in it, and an optional standing
+account of a few paragraphs.
+
+Four things about it:
+
+- **It is not `country_stories`, and must not be folded into it.** That grouping belongs to the
+  *map*: one story per country (the primary key on `country_story_countries` enforces it) and only
+  for the 28 shapes that were drawn, because its whole job is answering "what lights when this is
+  touched?" with exactly one row. An olay is not bound to the map — ABD is a party to one and is
+  nowhere on the artwork, and İran is in more than one at once.
+- **Who is in it is plain text** (`parties`, printed as the card's kicker), *not* derived from the
+  countries ticked. A kicker that can only name drawn shapes would be lying by omission the moment
+  ABD or Hamas is a party. The ticked countries (`world_event_countries`, a composite key, so a
+  country may be in several olaylar) are for one thing only: **the map lights them while the olay's
+  page is open**, the same breathing `.country.news-active` highlight a Dünya story lights. That is
+  worth doing precisely because this sheet is `ist-sheet-pull` and rests *under* the map on a
+  phone — the drawing is where "nerede" gets answered. `closeReaderOverlay` already drops the
+  highlight on every way out; going back to the list drops it too.
+- **Whether it is still going is the one fact the list carries that a news list does not**
+  (`status`, printed where a card prints its age: "2014 — sürüyor", "2003–2011"). An `ended_on` is
+  cleared server-side of the form when the status is `ongoing`, so the list can never print
+  "2014–2022 · sürüyor".
+- **Ongoing olaylar are ordered by `sort_order`, not by what moved last.** A war does not stop
+  being the biggest thing on the page because something smaller had a development this morning.
+
+Curated from admin.html's **Olaylar** tab (form on the left, the list with each card's own timeline
+editor on the right — the same shape the Ülkeler tab has, because it is the same kind of object: a
+page whose value is that somebody maintains its chain). `db/world_events_seed.sql` holds a starting
+set — Rusya–Ukrayna, Gazze, İran ve ABD, Suriye — deliberately thin, only the dates nobody argues
+about, to be verified and extended from the portal.
 
 ### `tumcel.html` — Tümcel
 - Connections-style game where 16 sentence fragments must be regrouped into 4 quotes
