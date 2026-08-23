@@ -927,6 +927,14 @@ geometry and no centred modal anywhere on the site.
   content styling (`class="ist-sheet detail-overlay-sheet"`), never for size or position.
 - **Behaviour:** `IstSheet.open(overlay)` / `IstSheet.close(overlay, after)` — do not hand-roll
   the unhide → rAF → `.open` dance or the 550ms hide timeout.
+- **A sheet that fetches its content must not ask `.open` whether the reader is still there.**
+  `IstSheet.open` adds that class on the *next animation frame*, while a fetch answered from cache
+  resolves on the microtask before that frame runs — so the guard runs while the class is still
+  absent, the render is skipped, and the sheet sits on its spinner for good. It only ever bites the
+  **second** opening of anything cached: the first really did go to the network and landed long
+  after the class. Take a token instead (`sheetOpenToken` / `sheetOpenIsCurrent` in kutuphane.html):
+  opening takes one, closing and the next opening burn it, so the question asked is "is this still
+  the open I started" rather than "is something open".
 - **Phones:** the sheet's side gaps are the same `--screen-inset` (frames.css) the profile bar's
   row is padded to — everything stacked over the same map lines up, always.
   - A sheet opened **from the profile bar** (your profile, a member's) rests under that bar,
