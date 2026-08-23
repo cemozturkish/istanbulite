@@ -5217,7 +5217,18 @@ function tickDunyaNewsAgo() {
 // containers keep their #dunya-poll-<id> ids so loadAndRenderDunyaPoll
 // finds them wherever the timeline is printed.
 function newsTimelineHTML(n) {
-  const timelineEvents = (n.breaking_news_updates || []).map(u => ({ type: 'update', created_at: u.created_at, data: u }))
+  // The newest gelişme IS the story's headline: adding one copies its
+  // title and body onto breaking_news itself (see addNewsUpdate in
+  // admin.html), so printing it again at the top of the Zaman Akışı is
+  // the same paragraph twice on one page. Matched on what it says rather
+  // than simply taken off the top, because a backdated gelişme is never
+  // promoted -- the chain's newest entry and the one the page is already
+  // printing are not always the same row.
+  const updates = (n.breaking_news_updates || []).slice()
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const same = (a, b) => (a || '').trim() === (b || '').trim();
+  if (updates.length && same(updates[0].title, n.title) && same(updates[0].body, n.body)) updates.shift();
+  const timelineEvents = updates.map(u => ({ type: 'update', created_at: u.created_at, data: u }))
     .concat((n.breaking_news_polls || []).map(p => ({ type: 'poll', created_at: p.created_at, data: p })))
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   if (!timelineEvents.length) return '';
