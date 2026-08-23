@@ -5074,6 +5074,31 @@ async function loadCountryEntries(countryIds) {
   return COUNTRY_ENTRIES_CACHE[key];
 }
 
+// ── Which open of a sheet is the current one ──
+// A sheet that fetches its content has to know, when the fetch lands,
+// whether the reader is still looking at it. Testing for the `.open`
+// class does NOT answer that: IstSheet.open adds it on the next
+// animation frame, while a fetch answered from cache resolves on the
+// microtask before that frame runs -- so the check ran while the class
+// was still absent and the page bailed out, leaving its spinner up for
+// good. That is exactly what the SECOND opening of anything cached did:
+// the first open really did fetch, took a network round trip, and got
+// there long after the class landed.
+//
+// So the question is not "is this sheet open" but "is this still the
+// open I started". Each opening takes a token; closing burns it, and so
+// does the next opening.
+const SHEET_OPEN_SEQ = new Map();
+function sheetOpenToken(overlayId) {
+  const n = (SHEET_OPEN_SEQ.get(overlayId) || 0) + 1;
+  SHEET_OPEN_SEQ.set(overlayId, n);
+  return n;
+}
+function sheetOpenIsCurrent(overlayId, token) {
+  const overlay = document.getElementById(overlayId);
+  return !!overlay && !overlay.hidden && SHEET_OPEN_SEQ.get(overlayId) === token;
+}
+
 // countryName comes from the map shape's own data-name, so a country with
 // no story is titled with the same word the caption under the map prints
 // when you touch it. A country in one is titled with the story's name
@@ -5094,13 +5119,14 @@ async function openCountrySheet(countryId, countryName) {
     blurb: story ? story.blurb : '',
     countries: story ? story.countries : [countryId],
   };
+  const token = sheetOpenToken('reader-overlay');
   area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   IstSheet.open(overlay);
   _closeReaderOverlay = closeReaderOverlay;
   const entries = await loadCountryEntries(page.countries);
   // The reader may have closed this sheet, or opened another country,
   // while the fetch was in flight -- don't paint over what they did.
-  if (!overlay.classList.contains('open')) return;
+  if (!sheetOpenIsCurrent('reader-overlay', token)) return;
   renderCountryEntriesList(entries, page);
 }
 
@@ -5651,18 +5677,24 @@ async function openWorldEventsSheet() {
   const overlay = document.getElementById('olaylar-overlay');
   const body = olaylarBody();
   if (!overlay || !body) return;
+  const token = sheetOpenToken('olaylar-overlay');
   body.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   IstSheet.open(overlay);
   const events = await loadWorldEvents();
   // The reader may have closed the board while the fetch was in flight --
-  // don't paint over what they did.
-  if (!overlay.classList.contains('open')) return;
+  // don't paint over what they did. Through the token and not the .open
+  // class: see sheetOpenToken for why the class is the wrong question,
+  // and for the spinner that answered it wrongly on every reopening.
+  if (!sheetOpenIsCurrent('olaylar-overlay', token)) return;
   renderOlayBoard(events);
 }
 
 function closeOlaylarSheet() {
   const overlay = document.getElementById('olaylar-overlay');
   if (!overlay) return;
+  // Burns the current open's token, so a fetch still in the air lands on
+  // a board nobody is looking at and paints nothing.
+  sheetOpenToken('olaylar-overlay');
   IstSheet.close(overlay, () => { const b = olaylarBody(); if (b) b.innerHTML = ''; });
 }
 
@@ -6805,6 +6837,7 @@ function closeReaderOverlay() {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
+  sheetOpenToken('reader-overlay');
   // Every way out of the sheet lands here (back button, backdrop, Escape,
   // dragging it down), so the highlight a country page lit is dropped
   // here rather than at each of them.
