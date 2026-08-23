@@ -1380,6 +1380,16 @@
         Sayfanın çoğu <strong>Zaman Akışı</strong>'dır — tarihli kilit anlar, en yenisi üstte.
         Önce olayı ekleyin, sonra sağdaki kartından anları işleyin.
       </p>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        Okuyucu bunları bir <strong>pano</strong> olarak görüyor: mantara iğnelenmiş kartlar ve
+        ortak tarafı olan ikisinin arasına gerilmiş, o tarafın adıyla etiketli bir ip. Pano
+        <strong>4 olay</strong> alır ve kaydırılmaz — sıraya göre ilk dörtten sonrası panoda
+        <em>hiç</em> görünmez. Beşinciyi göstermek istiyorsanız birini indirin.
+      </p>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        Karta iğnelenen çizim <code>assets/olaylar/&lt;id&gt;.png</code> dosyasıdır — dosyayı o adla
+        koyun, burada bir şey girmenize gerek yok. Çizimi olmayan olay adıyla tek başına durur.
+      </p>
 
       <label>Ad</label>
       <input type="text" id="we-name" placeholder="Rusya–Ukrayna Savaşı"/>
@@ -1392,8 +1402,9 @@
 
       <label>Taraflar</label>
       <p style="margin-top:-4px;margin-bottom:6px;font-size:0.7rem;color:var(--muted);font-style:italic;">
-        Kartın üst satırı. Düz metin — çünkü taraflar çoğu zaman haritada çizili değildir (ABD, Hamas, BM).
-        Ayırıcı olarak · kullanın.
+        Düz metin — çünkü taraflar çoğu zaman haritada çizili değildir (ABD, Hamas, BM).
+        Ayırıcı olarak · kullanın. <strong>Panodaki ipleri bu alan kurar:</strong> ortak tarafı
+        olan iki olay birbirine bağlanır ve ip o tarafın adıyla etiketlenir.
       </p>
       <input type="text" id="we-parties" placeholder="Rusya · Ukrayna"/>
 
@@ -1412,11 +1423,18 @@
       <label>Metin (opsiyonel)</label>
       <textarea id="we-body" rows="8" placeholder="Bu şeyin ne olduğunu anlatan birkaç paragraf. Boş satır paragrafları ayırır. Zaman akışı her şeyi söylüyorsa boş bırakın."></textarea>
 
+      <label>Çizim adresi (opsiyonel)</label>
+      <p style="margin-top:-4px;margin-bottom:6px;font-size:0.7rem;color:var(--muted);font-style:italic;">
+        Boş bırakın — pano <code>assets/olaylar/&lt;id&gt;.png</code> dosyasını kendisi arar.
+        Yalnızca çizim başka bir yerde duruyorsa doldurun.
+      </p>
+      <input type="text" id="we-image" placeholder="assets/olaylar/... veya https://..."/>
+
       <div class="country-picker-block on">
         <label>Ülkeler (opsiyonel)</label>
         <p style="margin-top:-4px;margin-bottom:6px;font-size:0.7rem;color:var(--muted);font-style:italic;">
-          Olay açıkken haritada yanacak ülkeler. Bir ülke birden çok olayda olabilir —
-          haritanın hikâyelerinden farkı bu.
+          Olayın haritada çizili ülkeleri. Taraflar alanı boşsa panodaki ipler bunlardan kurulur,
+          ve bir ülke birden çok olayda olabilir — haritanın hikâyelerinden farkı bu.
         </p>
         <div class="country-picker" id="we-countries"></div>
       </div>
@@ -4648,8 +4666,11 @@ async function loadWorldEventsList() {
   WORLD_EVENTS_ADMIN = data || [];
   if (!WORLD_EVENTS_ADMIN.length) { listEl.innerHTML = '<div class="empty-state">No olaylar yet.</div>'; return; }
 
-  listEl.innerHTML = WORLD_EVENTS_ADMIN.map(ev => {
+  listEl.innerHTML = WORLD_EVENTS_ADMIN.map((ev, i) => {
     const moments = worldEventMomentsSorted(ev);
+    // The board holds four and does not scroll, so the list has to say
+    // out loud which ones a reader can actually reach.
+    const onBoard = i < 4;
     const momentsHtml = moments.length ? moments.map(m => `
       <div class="upd-row" data-m-id="${m.id}">
         <div class="upd-info">
@@ -4677,7 +4698,9 @@ async function loadWorldEventsList() {
     <div class="article-card" data-id="${escapeHtml(ev.id)}">
       <div class="a-neighborhood">${ev.status === 'ended' ? 'SONA ERDİ' : 'SÜRÜYOR'}${
         ev.started_on ? ' · ' + escapeHtml(ev.started_on) : ''
-      }${ev.ended_on ? ' → ' + escapeHtml(ev.ended_on) : ''} · ${escapeHtml(ev.id)}</div>
+      }${ev.ended_on ? ' → ' + escapeHtml(ev.ended_on) : ''} · ${escapeHtml(ev.id)}${
+        onBoard ? ' · PANODA' : ' · PANODA DEĞİL'
+      }</div>
       <h4>${escapeHtml(ev.name_tr)}</h4>
       ${ev.parties ? `<p>${escapeHtml(ev.parties)}</p>` : ''}
       ${countries ? `<p style="color:var(--muted);">Haritada: ${escapeHtml(countries)}</p>` : ''}
@@ -4811,6 +4834,7 @@ function editWorldEvent(ev) {
   document.getElementById('we-started').value = ev.started_on || '';
   document.getElementById('we-ended').value = ev.ended_on || '';
   document.getElementById('we-body').value = ev.body || '';
+  document.getElementById('we-image').value = ev.image_url || '';
   document.getElementById('we-series').value = ev.series_id || '';
   document.getElementById('we-sort').value = ev.sort_order ?? 0;
   document.getElementById('we-countries').innerHTML =
@@ -4832,6 +4856,7 @@ function resetWorldEventForm() {
   document.getElementById('we-started').value = '';
   document.getElementById('we-ended').value = '';
   document.getElementById('we-body').value = '';
+  document.getElementById('we-image').value = '';
   document.getElementById('we-series').value = '';
   document.getElementById('we-sort').value = '0';
   document.getElementById('we-countries').innerHTML = countryPickerHTML([]);
@@ -4887,6 +4912,7 @@ document.getElementById('we-submit-btn').addEventListener('click', async () => {
     // rather than trusted to be left blank.
     ended_on: status === 'ended' ? (document.getElementById('we-ended').value || null) : null,
     body: document.getElementById('we-body').value.trim() || null,
+    image_url: document.getElementById('we-image').value.trim() || null,
     series_id: document.getElementById('we-series').value || null,
     sort_order: Number(document.getElementById('we-sort').value) || 0,
   };
