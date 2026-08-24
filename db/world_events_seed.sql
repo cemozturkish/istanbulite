@@ -19,8 +19,14 @@
 -- ones with a drawing carry it: the rest have no line running to
 -- anywhere yet, so their paper falls back to hanging over their
 -- countries until somebody picks a spot in the portal.
+--
+-- color (db/world_events_v4_color.sql) is sampled straight off each
+-- drawing's own ink, so the paper's pin matches the string that was
+-- actually drawn instead of defaulting every olay to the same red. The
+-- two without a drawing yet carry null -- the site's red until somebody
+-- draws them and picks a colour to match.
 insert into public.world_events
-  (id, name_tr, blurb, parties, status, started_on, sort_order, paper_x, paper_y) values
+  (id, name_tr, blurb, parties, status, started_on, sort_order, paper_x, paper_y, color) values
   ('rusya-ukrayna-savasi', 'Rusya–Ukrayna Savaşı',
    'Avrupa''nın İkinci Dünya Savaşı''ndan bu yana gördüğü en büyük savaş — ve İstanbul''un iki kez masayı kurduğu yer.',
    'Rusya · Ukrayna', 'ongoing', '2014-02-20', 100,
@@ -29,19 +35,21 @@ insert into public.world_events
    -- Suriye. The paper hangs at the Ukrayna end of that fan, so the
    -- string runs out of the note and into Rusya rather than the note
    -- sitting off on its own.
-   478, 155),
+   478, 155,
+   -- Sampled off the drawing's own ink.
+   '#557c94'),
 
   ('gazze', 'Gazze',
    'Bir yılı aşan bombardıman, bir açlık ve bir soykırım davası. Bölgedeki her dosyanın üstünden geçtiği yer.',
-   'İsrail · Filistin', 'ongoing', '2023-10-07', 90, null, null),
+   'İsrail · Filistin', 'ongoing', '2023-10-07', 90, null, null, null),
 
   ('iran-abd', 'İran ve ABD',
    'Kırk yıllık husumetin nükleer bir dosyaya, oradan da doğrudan vuruşlara dönüşmesi.',
-   'İran · ABD · İsrail', 'ongoing', '2015-07-14', 80, null, null),
+   'İran · ABD · İsrail', 'ongoing', '2015-07-14', 80, null, null, null),
 
   ('suriye', 'Suriye''de Rejimin Düşüşü',
    'On üç yıllık savaşın on bir günde biten son perdesi — ve Türkiye''nin sınırındaki her şeyin yeniden kurulması.',
-   'Suriye · Türkiye · Rusya · İran', 'ongoing', '2024-11-27', 70, null, null),
+   'Suriye · Türkiye · Rusya · İran', 'ongoing', '2024-11-27', 70, null, null, null),
 
   -- The one with a drawing already made for it
   -- (assets/olaylar/dogu-akdeniz.png): Yunanistan, Kıbrıs ve İsrail, and
@@ -52,7 +60,9 @@ insert into public.world_events
    -- Pinned on the Mediterranean just under Türkiye's southern coast, so
    -- the string runs up to it from Kıbrıs and İsrail rather than the note
    -- sitting down in the empty bottom of the map.
-   250, 850)
+   250, 850,
+   -- Sampled off the drawing's own ink.
+   '#9f2e2b')
 on conflict (id) do update set
   name_tr = excluded.name_tr,
   blurb = excluded.blurb,
@@ -61,7 +71,8 @@ on conflict (id) do update set
   started_on = excluded.started_on,
   sort_order = excluded.sort_order,
   paper_x = excluded.paper_x,
-  paper_y = excluded.paper_y;
+  paper_y = excluded.paper_y,
+  color = excluded.color;
 
 
 -- The `parties` above are also what strings the pinboard together: two
@@ -105,6 +116,18 @@ from (values
    'Türkiye ve BM''nin arabuluculuğuyla Karadeniz''den tahıl sevkiyatının önü açıldı; koordinasyon merkezi İstanbul''da kuruldu.'),
   ('rusya-ukrayna-savasi', date '2023-07-17', 'Rusya tahıl anlaşmasından çekildi', null),
 
+  -- Gazze's chapters reach back before the war the feed is reporting on:
+  -- 2023 is not where this began, it is where the current chapter began,
+  -- and a reader who only sees the last two years is missing the ones
+  -- before it that explain them.
+  ('gazze', date '1948-05-15', 'Nekbe: 700 binden fazla Filistinli yerinden edildi',
+   'İsrail''in kuruluşuyla birlikte Filistinlilerin çoğu kendi topraklarından sürüldü ya da kaçtı; Gazze Şeridi''nin nüfusu büyük ölçüde bu mültecilerden oluştu.'),
+  ('gazze', date '1967-06-10', 'Altı Gün Savaşı sonunda Gazze işgal edildi',
+   'İsrail, Altı Gün Savaşı''nda Gazze Şeridi''ni, Batı Şeria''yı ve Sina''yı ele geçirdi. Gazze''nin İsrail işgali böyle başladı.'),
+  ('gazze', date '2005-09-12', 'İsrail yerleşimcilerini ve askerini Gazze''den çekti',
+   'Tek taraflı "ayrılma planı" Gazze''deki yerleşimleri boşalttı, ama hava, deniz ve sınır kontrolü İsrail''de kaldı.'),
+  ('gazze', date '2007-06-14', 'Hamas Gazze''nin kontrolünü ele geçirdi, ablukası başladı',
+   'Hamas''ın Fetih''i Gazze''den çıkarmasının ardından İsrail ve Mısır bölgeyi kara, deniz ve havadan abluka altına aldı — abluka bugün hâlâ sürüyor.'),
   ('gazze', date '2023-10-07', 'Hamas İsrail''e saldırdı',
    'Gazze''den başlatılan saldırıda 1.200''den fazla kişi öldürüldü, yüzlerce kişi rehin alındı.'),
   ('gazze', date '2023-10-27', 'İsrail kara harekâtını başlattı', null),

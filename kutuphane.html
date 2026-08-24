@@ -3556,6 +3556,12 @@
     .olay-paper.pressing { transform: translate(-50%, 0) rotate(var(--tilt, 0deg)) scale(0.96); }
     /* The pin it hangs from: the one red thing on the paper, and the same
        red the drawn strings are in. */
+    /* --thread is set inline per paper (worldEventColor), so the pin,
+       the "live" word and the lit-state ring below all take whatever
+       colour that olay was given -- the site's red only by default. */
+    .olay-paper {
+      --thread: #c8322b;
+    }
     .olay-paper-pin {
       position: absolute;
       top: -5px;
@@ -3564,7 +3570,7 @@
       height: 9px;
       margin-left: -4.5px;
       border-radius: 50%;
-      background: #c8322b;
+      background: var(--thread);
       box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 45%, transparent);
     }
     .olay-paper-name {
@@ -3575,7 +3581,9 @@
       line-height: 1.15;
     }
     .olay-paper-meta {
-      display: block;
+      display: flex;
+      align-items: center;
+      gap: 6px;
       margin-top: 4px;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.52rem;
@@ -3585,7 +3593,16 @@
       color: var(--muted);
       white-space: nowrap;
     }
-    .olay-paper-meta .live { color: #c8322b; }
+    .olay-paper-meta .live { color: var(--thread); }
+    /* "3/8" -- how far the reader already got into this olay, so the
+       board itself remembers on their behalf before the paper is even
+       pressed. Printed in the ink, not the thread colour: it is a fact
+       about the reader, not about the olay. */
+    .olay-paper-progress {
+      padding: 1px 5px;
+      border: 1px solid var(--muted);
+      color: var(--muted);
+    }
     /* Reaching for one paper drops the rest of the board back -- the
          drawings fade and the other papers go quiet in the ink, never
          translucent (a see-through card over a map is mush). */
@@ -3593,10 +3610,10 @@
     .olay-layer.pulling .olay-paper .olay-paper-pin { background: var(--muted); }
     .olay-layer.pulling .olay-paper.lit {
       color: var(--ink);
-      border-color: #c8322b;
-      box-shadow: 3px 4px 0 color-mix(in srgb, #c8322b 22%, transparent);
+      border-color: var(--thread);
+      box-shadow: 3px 4px 0 color-mix(in srgb, var(--thread) 22%, transparent);
     }
-    .olay-layer.pulling .olay-paper.lit .olay-paper-pin { background: #c8322b; }
+    .olay-layer.pulling .olay-paper.lit .olay-paper-pin { background: var(--thread); }
 
     @keyframes olay-board-in {
       from { opacity: 0; }
@@ -3678,37 +3695,139 @@
     }
     .olay-stamp.ended { border-color: var(--muted); color: var(--muted); transform: rotate(1.5deg); }
 
-    /* The chain, run down a string instead of the newspaper's ticked
-       rule -- same object as a Zaman Akışı everywhere else on the site,
-       said in this page's own hand. Newest first, dated not aged. */
-    .olay-timeline { margin-top: 18px; }
-    .olay-timeline-label {
+    /* ── The chapters ──
+       An olay is a story with a shape, not a feed of updates -- so unlike
+       every OTHER Zaman Akışı on the site (a country entry's, a news
+       story's gelişmeler), this one runs OLDEST FIRST. Scrolling down
+       moves toward the present, the way turning a page does in an
+       actual book of chapters -- which is deliberately the same object
+       Makaleler's shelves are built from (title, dated, a photo, body
+       text with further [[img::URL]] images inline). Gazze is one
+       chapter of "İsrail Cephesi"; the decades before it are the
+       chapters that explain why it is not the whole story. */
+    .olay-chapters { margin-top: 22px; }
+    .olay-chapters-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .olay-chapters-label {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.6rem; font-weight: 700; letter-spacing: 2px;
-      text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+      text-transform: uppercase; color: var(--muted);
     }
-    .olay-moment {
+    /* Live count of where the reader is -- "3 / 8" -- the same fact the
+       rail is drawing, said in words for anyone glancing at the top
+       rather than at the string down the side. */
+    .olay-chapters-progress {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.62rem; font-weight: 700; letter-spacing: 1px;
+      color: var(--thread);
+    }
+    /* The rail: a pale string running the full height of the chapter
+       list, with a coloured fill grown from the top as the reader
+       scrolls past each chapter -- literally a piece of string with a
+       bead sliding down it, which is the board's own language carried
+       into the page that came off the board. The fill is a sibling
+       element rather than a per-chapter border, so its height can be
+       set once from JS instead of toggled on N different chapters. */
+    .olay-chapters-list {
       position: relative;
-      padding: 0 0 16px 20px;
-      border-left: 1.5px solid var(--thread);
+      padding-left: 20px;
     }
-    .olay-moment:last-child { border-left-color: transparent; padding-bottom: 0; }
-    .olay-moment::before {
+    .olay-chapters-track {
+      position: absolute;
+      left: 0; top: 4px; bottom: 4px;
+      width: 1.5px;
+      background: var(--rule);
+    }
+    .olay-chapters-fill {
+      position: absolute;
+      left: 0; top: 4px;
+      width: 1.5px;
+      height: 0;
+      background: var(--thread);
+      transition: height 0.15s linear;
+    }
+    .olay-chapter {
+      position: relative;
+      padding-bottom: 26px;
+    }
+    .olay-chapter:last-child { padding-bottom: 0; }
+    /* The node on the string: hollow and pale until the reader has
+       scrolled past it, then filled in the olay's own colour -- read,
+       the way a chapter you have finished looks different from one you
+       have not. */
+    .olay-chapter::before {
       content: '';
       position: absolute;
-      left: -5px; top: 3px;
-      width: 8px; height: 8px;
+      left: -24px; top: 3px;
+      width: 9px; height: 9px;
       border-radius: 50%;
-      background: var(--thread);
+      background: var(--paper);
+      border: 1.5px solid var(--muted);
+      transition: background 0.2s, border-color 0.2s;
     }
-    .olay-moment-date {
+    .olay-chapter.read::before { background: var(--thread); border-color: var(--thread); }
+    .olay-chapter-date {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
       font-size: 0.58rem; font-weight: 700; letter-spacing: 1.4px;
-      text-transform: uppercase; color: var(--muted); margin-bottom: 2px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 4px;
     }
-    .olay-moment strong { display: block; font-size: 0.92rem; line-height: 1.35; }
-    .olay-moment p { font-size: 0.85rem; line-height: 1.5; color: var(--muted); margin: 4px 0 0; }
-    .olay-moment a { font-size: 0.75rem; }
+    .olay-chapter h4 {
+      font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+      font-size: 1.02rem;
+      font-weight: 700;
+      line-height: 1.25;
+      margin: 0 0 8px;
+    }
+    /* The chapter's own photo -- pinned above its text like a note on
+       the board this page came off of, rather than run full-width the
+       way an inline [[img::URL]] does. A small tilt, a pin dot, a white
+       border: the same pinboard hand the board itself is drawn in. */
+    .olay-chapter-photo {
+      position: relative;
+      display: inline-block;
+      max-width: min(220px, 70%);
+      margin: 12px 14px 10px 0;
+      float: left;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      padding: 6px 6px 22px;
+      box-shadow: 3px 4px 0 color-mix(in srgb, var(--ink) 16%, transparent);
+      transform: rotate(var(--photo-tilt, -1.4deg));
+    }
+    /* The pin it hangs from -- the same red dot every paper on the board
+       carries, so a chapter's own photo reads as pinned rather than
+       merely framed. */
+    .olay-chapter-photo::before {
+      content: '';
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      width: 9px;
+      height: 9px;
+      margin-left: -4.5px;
+      border-radius: 50%;
+      background: var(--thread);
+      box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 45%, transparent);
+    }
+    .olay-chapter-photo img {
+      display: block;
+      width: 100%;
+      height: auto;
+      object-fit: cover;
+    }
+    .olay-chapter-body p { font-size: 0.88rem; line-height: 1.6; color: var(--ink); margin: 0 0 10px; }
+    .olay-chapter-body p:last-child { margin-bottom: 0; }
+    .olay-chapter-body::after { content: ''; display: block; clear: both; }
+    .olay-chapter-body a { font-size: 0.8rem; }
+    /* Inline images inside a chapter's own body text (further
+       [[img::URL]] tokens, same convention Makaleler uses) reuse
+       .body-img as-is, full width, no pinning -- the ONE pinned photo
+       per chapter is its lead image above.*/
 
     /* On a desktop the map behind this page is İstanbul's, not the
        world's -- so the board brings its own copy of the drawing its
@@ -5304,13 +5423,27 @@ async function loadWorldEvents() {
   return WORLD_EVENTS_CACHE;
 }
 
-// Newest first, exactly as a country entry's chain and a news story's
-// gelişmeler are printed. Sorted here rather than in the query because
-// the moments arrive embedded in their olay, and an embedded select
-// carries no order of its own.
-function worldEventMoments(ev) {
+// OLDEST first -- the opposite of a country entry's chain and a news
+// story's gelişmeler, and deliberately so: those are feeds, where the
+// newest thing is the point; an olay is a story with a shape, and a
+// story is read from its beginning. Scrolling its dossier moves toward
+// the present. Sorted here rather than in the query because the moments
+// arrive embedded in their olay, and an embedded select carries no order
+// of its own.
+function worldEventChapters(ev) {
   return (ev.world_event_moments || []).slice()
-    .sort((a, b) => (a.moment_date < b.moment_date ? 1 : a.moment_date > b.moment_date ? -1 : 0));
+    .sort((a, b) => (a.moment_date < b.moment_date ? -1 : a.moment_date > b.moment_date ? 1 : 0));
+}
+
+// The colour this olay's UI chrome takes -- the paper's pin, its stamp,
+// the chapter rail. Four to six olaylar can be pinned to the board at
+// once, and their strings have to stay tellable apart, so the board is
+// the one surface on the site where the single house red gives way to
+// several (db/world_events_v4_color.sql). Null (nobody has picked one,
+// or the olay predates the column) falls back to that same red.
+function worldEventColor(ev) {
+  const c = String((ev && ev.color) || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(c) ? c : '#c8322b';
 }
 
 function worldEventCountryIds(ev) {
@@ -5490,6 +5623,27 @@ function olaylarBody() { return document.getElementById('olaylar-layer'); }
 
 const OLAY_NS = 'http://www.w3.org/2000/svg';
 
+// ── How far the reader has gotten into an olay's chapters ──
+// Stored per member, monotonic (never regresses if they scroll back up
+// to reread something) -- same shape as libReadCompletedSet's storage,
+// keyed to one olay rather than a shelf's whole set of chapters.
+function olayProgressKey(uid, eventId) {
+  return `olay_progress_${uid}_${eventId}`;
+}
+function olayReadProgress(uid, eventId) {
+  if (!uid) return -1;
+  try {
+    const raw = localStorage.getItem(olayProgressKey(uid, eventId));
+    const n = raw == null ? -1 : parseInt(raw, 10);
+    return Number.isFinite(n) ? n : -1;
+  } catch (e) { return -1; }
+}
+function olayWriteProgress(uid, eventId, idx) {
+  if (!uid || idx < 0) return;
+  if (idx <= olayReadProgress(uid, eventId)) return;
+  try { localStorage.setItem(olayProgressKey(uid, eventId), String(idx)); } catch (e) {}
+}
+
 function renderOlayBoard(events) {
   const body = olaylarBody();
   if (!body) return;
@@ -5560,7 +5714,10 @@ function renderOlayBoard(events) {
 // pixels, and the strings should already be running across the map by
 // the time the first paper lands on it.
 async function paintOlayPapers(pinned, events) {
-  const boxes = await Promise.all(pinned.map(measureOlayInk));
+  const [boxes, uid] = await Promise.all([
+    Promise.all(pinned.map(measureOlayInk)),
+    libGetCurrentUserId(),
+  ]);
   // The board may have been closed, or a dossier opened, while the
   // drawings were being read.
   const host = document.getElementById('olay-papers');
@@ -5572,6 +5729,13 @@ async function paintOlayPapers(pinned, events) {
     const at = olayPaperPoint(ev, boxes[i]);
     if (!at) return;
     const live = ev.status !== 'ended';
+    // How far the reader already got into this olay's chapters, printed
+    // back the same way a shelf's own progress badge is -- so the board
+    // itself says "you were here" before the paper is even pressed.
+    const total = worldEventChapters(ev).length;
+    const readIdx = olayReadProgress(uid, ev.id);
+    const progressLabel = total && readIdx >= 0
+      ? `${Math.min(readIdx + 1, total)}/${total}` : '';
     const paper = document.createElement('button');
     paper.type = 'button';
     paper.className = 'olay-paper';
@@ -5579,11 +5743,15 @@ async function paintOlayPapers(pinned, events) {
     paper.dataset.mapX = at.x;
     paper.dataset.mapY = at.y;
     paper.style.setProperty('--tilt', OLAY_PAPER_TILTS[i % OLAY_PAPER_TILTS.length]);
+    paper.style.setProperty('--thread', worldEventColor(ev));
     paper.style.animationDelay = `${700 + i * 160}ms`;
     paper.innerHTML = `
       <span class="olay-paper-pin"></span>
       <span class="olay-paper-name">${libEsc(ev.name_tr)}</span>
-      <span class="olay-paper-meta"><span class="${live ? 'live' : ''}">${libEsc(worldEventStamp(ev))}</span></span>
+      <span class="olay-paper-meta">
+        <span class="${live ? 'live' : ''}">${libEsc(worldEventStamp(ev))}</span>
+        ${progressLabel ? `<span class="olay-paper-progress">${libEsc(progressLabel)}</span>` : ''}
+      </span>
     `;
     host.appendChild(paper);
 
@@ -5665,18 +5833,171 @@ function placeOlayPapers() {
   });
 }
 
+// A chapter's own body: paragraphs, and any further [[img::URL]] tokens
+// inline -- the same convention Makaleler's own chapters use (see
+// db/library_articles_v7_inline_images.sql), because that is exactly
+// what these are meant to read like. Lighter than the shelf reader's
+// own renderInlineBody: no vote widgets, no [[word::def]] vocab terms --
+// an olay's chapter is prose about something that already happened, not
+// a pedagogical exercise.
+function renderChapterBody(text) {
+  const imgLineRe = /^\s*\[\[img::(\S+?)\]\]\s*$/;
+  const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+  const parts = [];
+  let buf = [];
+  const flush = () => {
+    if (!buf.length) return;
+    const joined = libEsc(buf.join('\n'));
+    parts.push(joined.split(/\n{2,}/).map(p =>
+      p.trim() ? `<p>${p.replace(/\n/g, '<br>')}</p>` : '').join(''));
+    buf = [];
+  };
+  for (const line of lines) {
+    const m = line.match(imgLineRe);
+    if (m) { flush(); parts.push(`<img class="body-img" src="${libEsc(m[1])}" alt="" loading="lazy">`); }
+    else buf.push(line);
+  }
+  flush();
+  return parts.join('');
+}
+
+// ── The chapters, oldest first ──
+// Fixed tilts for the pinned lead photos, same idea as the board's own
+// paper tilts: pinned by hand, not laid out, but the same board every
+// time it is opened.
+const OLAY_CHAPTER_PHOTO_TILTS = ['-1.6deg', '1.3deg', '-1.1deg', '1.8deg'];
+
+function olayChaptersHTML(ev) {
+  const chapters = worldEventChapters(ev);
+  if (!chapters.length) return '';
+  return `
+    <div class="olay-chapters" id="olay-chapters">
+      <div class="olay-chapters-head">
+        <span class="olay-chapters-label">Bölümler</span>
+        <span class="olay-chapters-progress" id="olay-chapters-progress">1 / ${chapters.length}</span>
+      </div>
+      <div class="olay-chapters-list" id="olay-chapters-list">
+        <div class="olay-chapters-track"></div>
+        <div class="olay-chapters-fill" id="olay-chapters-fill"></div>
+        ${chapters.map((ch, i) => {
+          const url = libSafeUrl(ch.source_url);
+          return `
+          <article class="olay-chapter" id="olay-chapter-${i}" data-idx="${i}">
+            <div class="olay-chapter-date">${libEsc(formatLetterDate(ch.moment_date))}</div>
+            <h4>${libEsc(ch.title)}</h4>
+            ${ch.image_url ? `
+              <div class="olay-chapter-photo" style="--photo-tilt:${OLAY_CHAPTER_PHOTO_TILTS[i % OLAY_CHAPTER_PHOTO_TILTS.length]}">
+                <img src="${libEsc(ch.image_url)}" alt="" loading="lazy">
+              </div>` : ''}
+            <div class="olay-chapter-body">
+              ${renderChapterBody(ch.body)}
+              ${url ? `<p><a href="${libEsc(url)}" target="_blank" rel="noopener noreferrer">Kaynak</a></p>` : ''}
+            </div>
+          </article>
+        `; }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// Which chapter counts as "current": the last one whose top has crossed
+// a reading line a little way down from the top of the scroller, rather
+// than the literal first pixel still on screen -- so the chapter you are
+// actually reading (not the sliver of the next one peeking up) is the
+// one the rail and the counter agree on.
+const OLAY_READ_LINE = 90;
+
+// Wires the scroll-driven rail, counter and "read" marks for one open
+// dossier, and loads/writes the member's furthest position. `page` is
+// the scrolling container (.olay-page itself -- see its own CSS).
+function wireOlayChapters(ev, page) {
+  const list = document.getElementById('olay-chapters-list');
+  const fill = document.getElementById('olay-chapters-fill');
+  const counter = document.getElementById('olay-chapters-progress');
+  if (!list || !fill || !counter) return;
+  const chapters = Array.from(list.querySelectorAll('.olay-chapter'));
+  if (!chapters.length) return;
+  const total = chapters.length;
+  let ticking = false;
+  let currentIdx = -1;
+
+  // A chapter's distance from the top of .olay-page's own scrollable
+  // content -- NOT offsetTop, which is relative to the nearest POSITIONED
+  // ancestor (.olay-chapters-list, itself position:relative so the rail
+  // has something to sit inside) and so is only ever a chapter's distance
+  // from the *list*, not from the page. getBoundingClientRect is relative
+  // to the viewport instead, which combined with the page's own scrollTop
+  // gives a figure that stays correct at any scroll position.
+  function distanceFromPageTop(el) {
+    const pageTop = page.getBoundingClientRect().top;
+    return el.getBoundingClientRect().top - pageTop + page.scrollTop;
+  }
+
+  function update() {
+    ticking = false;
+    const listTop = distanceFromPageTop(list);
+    const listHeight = list.offsetHeight || 1;
+    const readAt = page.scrollTop + OLAY_READ_LINE;
+    // At the very bottom of the scroller the last chapter is sitting
+    // fully in view even though the reading line -- a fixed distance
+    // from the top of the viewport -- may never physically reach it, if
+    // there simply is not enough page below it left to scroll through.
+    // Treat "cannot scroll any further" as "has seen the rest", the same
+    // way reaching the end of anything else on the site counts as done.
+    const atBottom = page.scrollTop >= page.scrollHeight - page.clientHeight - 2;
+    // The fill's own height is the raw scroll fraction through the list --
+    // continuous, so the string looks like it is actually being read down
+    // rather than jumping chapter to chapter.
+    const frac = atBottom ? 1 : Math.min(Math.max((readAt - listTop) / listHeight, 0), 1);
+    fill.style.height = `${Math.round(frac * listHeight)}px`;
+    // The COUNTER and the "read" marks move chapter to chapter, since
+    // "3 / 8" has to name one whole chapter, not 43% of one.
+    let idx = atBottom ? total - 1 : 0;
+    if (!atBottom) {
+      chapters.forEach((ch, i) => {
+        if (distanceFromPageTop(ch) <= readAt) idx = i;
+      });
+    }
+    if (idx !== currentIdx) {
+      currentIdx = idx;
+      counter.textContent = `${idx + 1} / ${total}`;
+      chapters.forEach((ch, i) => ch.classList.toggle('read', i <= idx));
+      libGetCurrentUserId().then(uid => olayWriteProgress(uid, ev.id, idx));
+    }
+  }
+  page.addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(update);
+  }, { passive: true });
+  update();
+
+  // Resume where the reader left off -- but only if they have actually
+  // been further than the first chapter before, and only once, on this
+  // opening: nothing here should fight a reader who then scrolls back up
+  // to reread the beginning.
+  libGetCurrentUserId().then(uid => {
+    const saved = olayReadProgress(uid, ev.id);
+    if (saved <= 0) return;
+    const target = chapters[Math.min(saved, total - 1)];
+    if (!target || !document.body.contains(target)) return;
+    page.scrollTop = distanceFromPageTop(target) - OLAY_READ_LINE + 4;
+    update();
+  });
+}
+
 // ── One olay: the dossier taken off the board ──
 // It keeps the board's language rather than reverting to the newspaper
 // column the rest of this page is set in: the drawing at the top, the
 // parties pinned along one line, a stamp saying whether this is still
-// going, and the chain run down a piece of string. Newest first and
-// dated rather than aged, like every Zaman Akışı on the site -- these
-// reach back decades, and "12 yıl önce" tells a reader nothing.
+// going, and its chapters -- oldest first, read down like a book rather
+// than a feed, because an olay is a story with a shape and not a list of
+// updates (see worldEventChapters). --thread takes the olay's own colour
+// (worldEventColor), which the paper's pin already carried on the board.
 function openWorldEventReader(ev, events) {
   const body = olaylarBody();
   if (!body) return;
   const en = I18N.isEnglish();
-  const moments = worldEventMoments(ev);
   // Held for as long as the dossier is up, not just while a finger is on
   // a pin: the page is lying on the map, and what it is about stays lit
   // underneath it. Dropped by renderOlayBoard on the way back and by
@@ -5685,7 +6006,7 @@ function openWorldEventReader(ev, events) {
   const parties = worldEventParties(ev);
   const live = ev.status !== 'ended';
   body.innerHTML = `
-    <div class="olay-page" id="olay-page">
+    <div class="olay-page" id="olay-page" style="--thread:${worldEventColor(ev)}">
       ${arrowHeadHTML(null, 'olay-back', en ? 'The Board' : 'Pano')}
       <div class="olay-page-photo" id="olay-page-photo"></div>
       <span class="olay-stamp${live ? '' : ' ended'}">${libEsc(worldEventStamp(ev))}</span>
@@ -5694,26 +6015,16 @@ function openWorldEventReader(ev, events) {
       ${parties.length ? `<div class="olay-parties">${parties.map(n =>
         `<span>${libEsc(n.toLocaleUpperCase('tr-TR'))}</span>`).join('')}</div>` : ''}
       ${ev.body ? `<div class="olay-page-body">${renderLetterBodyHtml(ev.body)}</div>` : ''}
-      ${moments.length ? `
-        <div class="olay-timeline">
-          <div class="olay-timeline-label">Zaman Akışı</div>
-          ${moments.map(m => {
-            const url = libSafeUrl(m.source_url);
-            return `
-            <div class="olay-moment">
-              <div class="olay-moment-date">${libEsc(formatLetterDate(m.moment_date))}</div>
-              <strong>${libEsc(m.title)}</strong>
-              ${m.body ? `<p>${libEsc(m.body)}</p>` : ''}
-              ${url ? `<p><a href="${libEsc(url)}" target="_blank" rel="noopener noreferrer">Kaynak</a></p>` : ''}
-            </div>
-          `; }).join('')}
-        </div>` : ''}
+      ${olayChaptersHTML(ev)}
     </div>
   `;
   paintOlayPageMap(ev);
+  const page = document.getElementById('olay-page');
+  if (page) wireOlayChapters(ev, page);
   document.getElementById('olay-back')?.addEventListener('click',
     () => renderOlayBoard(events));
 }
+
 
 // The strip at the top of a dossier: the piece of map this olay is
 // drawn on, cropped to its own strokes. The drawing itself is a
