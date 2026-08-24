@@ -14,37 +14,48 @@
 -- Requires db/world_events.sql. Run in Supabase SQL editor. Idempotent.
 -- =====================================================================
 
+-- paper_x / paper_y (db/world_events_v3_paper.sql) is where the olay's
+-- paper hangs on the board, in the map's own 1080x1920 frame. Only the
+-- one with a drawing carries it: the others have no line running to
+-- anywhere yet, so their paper falls back to hanging over their
+-- countries until somebody picks a spot in the portal.
 insert into public.world_events
-  (id, name_tr, blurb, parties, status, started_on, sort_order) values
+  (id, name_tr, blurb, parties, status, started_on, sort_order, paper_x, paper_y) values
   ('rusya-ukrayna-savasi', 'Rusya–Ukrayna Savaşı',
    'Avrupa''nın İkinci Dünya Savaşı''ndan bu yana gördüğü en büyük savaş — ve İstanbul''un iki kez masayı kurduğu yer.',
-   'Rusya · Ukrayna', 'ongoing', '2014-02-20', 100),
+   'Rusya · Ukrayna', 'ongoing', '2014-02-20', 100, null, null),
 
   ('gazze', 'Gazze',
    'Bir yılı aşan bombardıman, bir açlık ve bir soykırım davası. Bölgedeki her dosyanın üstünden geçtiği yer.',
-   'İsrail · Filistin', 'ongoing', '2023-10-07', 90),
+   'İsrail · Filistin', 'ongoing', '2023-10-07', 90, null, null),
 
   ('iran-abd', 'İran ve ABD',
    'Kırk yıllık husumetin nükleer bir dosyaya, oradan da doğrudan vuruşlara dönüşmesi.',
-   'İran · ABD · İsrail', 'ongoing', '2015-07-14', 80),
+   'İran · ABD · İsrail', 'ongoing', '2015-07-14', 80, null, null),
 
   ('suriye', 'Suriye''de Rejimin Düşüşü',
    'On üç yıllık savaşın on bir günde biten son perdesi — ve Türkiye''nin sınırındaki her şeyin yeniden kurulması.',
-   'Suriye · Türkiye · Rusya · İran', 'ongoing', '2024-11-27', 70),
+   'Suriye · Türkiye · Rusya · İran', 'ongoing', '2024-11-27', 70, null, null),
 
   -- The one with a drawing already made for it
   -- (assets/olaylar/dogu-akdeniz.png): Yunanistan, Kıbrıs ve İsrail, and
   -- the line run between them across the map.
   ('dogu-akdeniz', 'Doğu Akdeniz',
    'Bir denizin altındaki gaz, üstündeki sınırlar ve Türkiye''nin batısındaki en yeni hat.',
-   'Yunanistan · Kıbrıs · İsrail · Türkiye · Mısır', 'ongoing', '2010-12-30', 60)
+   'Yunanistan · Kıbrıs · İsrail · Türkiye · Mısır', 'ongoing', '2010-12-30', 60,
+   -- Pinned on the Mediterranean just under Türkiye's southern coast, so
+   -- the string runs up to it from Kıbrıs and İsrail rather than the note
+   -- sitting down in the empty bottom of the map.
+   250, 850)
 on conflict (id) do update set
   name_tr = excluded.name_tr,
   blurb = excluded.blurb,
   parties = excluded.parties,
   status = excluded.status,
   started_on = excluded.started_on,
-  sort_order = excluded.sort_order;
+  sort_order = excluded.sort_order,
+  paper_x = excluded.paper_x,
+  paper_y = excluded.paper_y;
 
 
 -- The `parties` above are also what strings the pinboard together: two
