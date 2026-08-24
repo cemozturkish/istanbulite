@@ -148,6 +148,7 @@ default one.
 ├── profile-card.js/.css  # Profile bar (the phone's top bar), avatar, badges — shared across pages
 ├── onboarding.js/.css    # New-account onboarding flow
 ├── game-locks.js         # Per-day game on/off enforcement + the sequence's question gates
+├── event-interest.js     # "İlgimi çekti": the verdict Kahvehane's event deck records, Hane reads
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
 ├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it
 ├── i18n.js               # TR/EN language toggle
@@ -468,12 +469,19 @@ sb.from('articles').delete().eq('id', id)
   and the two sides are where power is a fact (Kahvehane's district, Kütüphane's countries). The
   one thing that ever stands in your place there is **another member**, put there by pressing their
   hexagon on the petek — which is the people again, not a seat (see the petek's own section)
-- **The events are the column beside it** (`#events-panel`, `events` / `event_rsvps`), back from
-  Kahvehane. They belong next to the petek: the petek is who you are standing next to, an event is
-  the one thing on the site that ends with you actually standing next to them. Unscoped by
-  construction — there is no map here to filter by, so it is the whole city's list, each card
-  kickered with its own district. Opening a card rises the page's detail sheet with the description
-  and a live RSVP row
+- **The events are the column beside it** (`#events-panel`, `events` / `event_rsvps`). They belong
+  next to the petek: the petek is who you are standing next to, an event is the one thing on the
+  site that ends with you actually standing next to them. Opening a card rises the page's detail
+  sheet with the description and a live RSVP row
+- **And it is what the member KEPT, not the city's whole calendar** (`keptEvents`,
+  `event-interest.js`). The calendar is dealt with one card at a time on Kahvehane — thrown right
+  is "ilgimi çekti", thrown left is gone (see that page's own section) — and this column is the
+  other end of that gesture: the evenings that were actually theirs, standing beside the people
+  they would be standing next to. A list of everything on in İstanbul is a listings page; this is a
+  plan. Two empties, and they are not the same thing: a city with nothing on prints nothing, while
+  a city with events on and none of them kept prints one line pointing at the deck
+  (`.events-empty`). If the store is missing entirely the column degrades to the whole city's list
+  rather than to an empty page — that is the failure a reader can make sense of
 - On a phone the petek stands in the hero square the map used to hold and the events hang from the
   bottom of the band below it, so the hero line is exactly where it is on the other two pages
 - **The petek has three depths and the reader pulls up and down through them** — you alone at the
@@ -521,10 +529,12 @@ sb.from('articles').delete().eq('id', id)
 - Istanbul district map with mahalle-level picker
 - **Two buttons stand in the two top corners** (`.corner-boxes`), the same pair Kütüphane's
   Makaleler/Posta Kutusu boxes are: the **Kahve Endeksi** on the left (`#coffee-box`, see below)
-  and the week's **Skor Tahtası** on the right (`#scoreboard-box`). The events that held the other column went back
-  to Hane, beside the petek — the people and where they will be are one page now. The band under
-  the map is the day's games alone: on a phone `#main-site` is one column, and `.col-left` (the
-  mayor's card, the parked comments) is `display: none` there
+  and the week's **Skor Tahtası** on the right (`#scoreboard-box`)
+- **The band under the map is TWO decks**: the city's events in its bottom-left corner
+  (`#events-deck`), the day's games in its bottom-right one (`#game-deck`). On a phone `#main-site`
+  is two equal columns in row 2 — `.col-left` holds the events (the mayor's card and the parked
+  comments inside it stay hidden), `.col-right` the games — and each deck sits against its own
+  outer edge, so the two read as the two ends of one band rather than as a column of boxes
 - The **neighborhood comments are parked**, not deleted: their column belongs to the index and
   where the comments belong is still an open question, so the feed, its composer and everything
   driving them stay exactly as they are behind `const COMMENTS_ENABLED = false` plus `hidden` on
@@ -558,10 +568,41 @@ sb.from('articles').delete().eq('id', id)
   A game the admin has switched **off** for the day (`game_day_toggles`) is not in the deck at
   all — it is not a step the reader has left to take, and a card that can never be dealt is a deck
   that can never be emptied. So a day whose only game is Sözcel ends on "Hepsi bu kadar." the
-  moment Sözcel is done, exactly as Kütüphane's news deck does. The admin keeps theirs, the same
+  moment Sözcel is done, exactly as Kütüphane's news deck does. **An emptied deck's dashed frame
+  takes the band's own width** rather than its text's: a box whose width is decided by a line of
+  type lands on a fractional pixel, and WebKit drops the LEFT edge of a dashed border sitting on
+  one — the frame printed with three sides and no visible reason for the fourth to be missing.
+  Stretching it (`:has(> .deck-done:only-child)`) puts both edges back on whole pixels, and is the
+  right picture anyway, since that is the width the same frame has always had on Kütüphane. The admin keeps theirs, the same
   way their nav link stays open (`IstGameLocks.offGamesToday`, game-locks.js). Sözcel's
   wordmark is a tile's way of saying its name — in the deck it says it in the headline like every
   other card. The desktop three-square tiles are untouched
+- **The events are a deck in the other corner** (`#events-deck`, `loadKahveEvents`,
+  `event-interest.js`) — the same object as the games beside it and as Kütüphane's news, in the
+  same terms: cards laid on top of each other, only the front one live, the depth `nth-child` and
+  nothing else, dealt by being *thrown* rather than by being opened. An event card is a news card
+  too: kicker (the district — this page has a map, so the word has something to point at), the
+  event as the headline, when it is under that. The deck is the **whole city's**, never the
+  district the map is scoped to: an event is a reason to cross town, and a list that quietly shrank
+  to the district under the reader's thumb would be the app talking them out of exactly that
+- **What the throw means here is a verdict, not "next"**: right is **İlgimi çekti**, left **İlgimi
+  çekmedi**, stamped on the paper as it goes (`.ev-swipe-cue`) so nobody gives a verdict they never
+  saw, with the same two words as buttons in the page's foot for a mouse. What is thrown right is
+  what Hane prints beside the petek — so the two pages are one move: you sort the city's calendar
+  on the local side, and what you kept is waiting for you in the middle. That is the mall stairway
+  in its smallest form: the member who came for the games walks the whole city's calendar on the
+  way, and leaves with the two or three evenings that were actually theirs. The verdict is kept per
+  member in `localStorage` (`ev_interest_<uid>`), the same store the news deck's dealt list is and
+  for the same reason — a verdict is the reader's own working state, not something anybody else is
+  entitled to read. `event-interest.js` is its own file because both pages need it and the two
+  share one document under router.js, where a copy in each page's script is a copy that drifts
+- **A card opens into the band, not over the map** (`#event-overlay`, `openEventPage`,
+  `growEventPage`) — the same object, and the same argument, as Kütüphane's news page: the page
+  lights the event's district on the map above (`lightMapDistrict`), and a sheet rising over that
+  map would cover the very thing it had just lit. So on a phone the tapped card *grows* into the
+  whole band — both halves, its own and the games' — off a `clip-path` measured from the card's own
+  box, and folds back into it on the way out. Head / body / foot, only the middle scrolling. On
+  desktop there is no band and no map to protect, so it stays THE sheet
 - **The direction is the answer**, exactly as on a news story: right is the first option, left the
   second, and the option is stamped on the card as it goes (`.q-cue`) so nobody answers a question
   they never saw. The two buttons say the same thing for a mouse. Tümcel stays locked until the
