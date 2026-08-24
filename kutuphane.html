@@ -5627,6 +5627,14 @@ function placeOlayPapers() {
   const papers = Array.from(host.querySelectorAll('.olay-paper'));
   if (!papers.length) return;
   const bounds = host.getBoundingClientRect();
+  // The board runs to the top of the screen but the profile bar is drawn
+  // over it, so a paper pinned high on the map -- a stroke ending in the
+  // Ukrayna or Rusya -- would hang behind the bar and be unreachable.
+  // Measured off the bar itself rather than written down as a number, the
+  // way sheet.js measures the same edge for the same reason.
+  const bar = document.getElementById('ist-pc-mount');
+  const barBottom = bar ? bar.getBoundingClientRect().bottom - bounds.top : 0;
+  const ceiling = Math.max(4, barBottom + 6);
   const taken = [];
   papers.forEach(paper => {
     const at = olayMapToScreen(svg, Number(paper.dataset.mapX), Number(paper.dataset.mapY));
@@ -5650,7 +5658,7 @@ function placeOlayPapers() {
       y = clash.y + clash.h + 12;
     }
     x = Math.min(Math.max(x, w / 2 + 4), bounds.width - w / 2 - 4);
-    y = Math.min(Math.max(y, 4), Math.max(4, bounds.height - h - 4));
+    y = Math.min(Math.max(y, ceiling), Math.max(ceiling, bounds.height - h - 4));
     paper.style.left = `${x}px`;
     paper.style.top = `${y}px`;
     taken.push({ x, y, w, h });

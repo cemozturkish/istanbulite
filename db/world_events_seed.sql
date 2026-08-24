@@ -16,14 +16,20 @@
 
 -- paper_x / paper_y (db/world_events_v3_paper.sql) is where the olay's
 -- paper hangs on the board, in the map's own 1080x1920 frame. Only the
--- one with a drawing carries it: the others have no line running to
+-- ones with a drawing carry it: the rest have no line running to
 -- anywhere yet, so their paper falls back to hanging over their
 -- countries until somebody picks a spot in the portal.
 insert into public.world_events
   (id, name_tr, blurb, parties, status, started_on, sort_order, paper_x, paper_y) values
   ('rusya-ukrayna-savasi', 'Rusya–Ukrayna Savaşı',
    'Avrupa''nın İkinci Dünya Savaşı''ndan bu yana gördüğü en büyük savaş — ve İstanbul''un iki kez masayı kurduğu yer.',
-   'Rusya · Ukrayna', 'ongoing', '2014-02-20', 100, null, null),
+   'Rusya · Ukrayna', 'ongoing', '2014-02-20', 100,
+   -- assets/olaylar/rusya-ukrayna-savasi.png: four strokes fanning out of
+   -- Rusya -- to Ukrayna, to the Kafkasya, to the Hazar, and down to
+   -- Suriye. The paper hangs at the Ukrayna end of that fan, so the
+   -- string runs out of the note and into Rusya rather than the note
+   -- sitting off on its own.
+   478, 155),
 
   ('gazze', 'Gazze',
    'Bir yılı aşan bombardıman, bir açlık ve bir soykırım davası. Bölgedeki her dosyanın üstünden geçtiği yer.',
