@@ -3503,29 +3503,100 @@
     @keyframes olay-wipe-in { from { width: 0; } to { width: 1080px; } }
     /* Reaching for one name drops every other drawing back -- what is
        connected says so before anything is opened. */
-    .olay-board-map.pulling .olay-draw { opacity: 0.22; }
-    .olay-board-map.pulling .olay-draw.lit { opacity: 1; }
+    .olay-layer.pulling .olay-draw { opacity: 0.22; }
+    .olay-layer.pulling .olay-draw.lit { opacity: 1; }
 
     /* An olay's name, hung under its own strokes -- a caption on the
        drawing rather than a label over it. Placed from the drawing's own
        ink (see measureOlayInk), so nothing is entered anywhere for it. */
-    .olay-tag { cursor: pointer; animation: olay-draw-in 0.4s ease-out both; }
-    .olay-tag-hit { fill: transparent; }
-    .olay-tag-name {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 30px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      fill: var(--ink);
-      /* Knocked out of whatever it crosses -- a stroke, a coastline, the
-         sea -- so the word is legible without a box drawn around it. */
-      stroke: var(--paper);
-      stroke-width: 9px;
-      paint-order: stroke;
-      transition: fill 0.2s;
+    /* ── The papers pinned to the map ──
+       An olay is a piece of paper hanging on the board with the drawn
+       line running from it to the place it is about. It is the only thing
+       on this board that takes a press -- the drawing is drawing, the
+       paper is the door.
+       HTML rather than SVG text: it holds two lines of type at a size
+       that does not change with the screen, where anything inside the
+       map's own 1080-wide frame would be scaled down with the map. Placed
+       by JS through the SVG's own screen matrix, so a coordinate on the
+       drawing and a coordinate on the paper mean the same thing. */
+    .olay-papers {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
     }
-    .olay-board-map.pulling .olay-tag-name { fill: var(--muted); }
-    .olay-board-map.pulling .olay-tag.lit .olay-tag-name { fill: #c8322b; }
+    .olay-paper {
+      position: absolute;
+      display: block;
+      width: 132px;
+      box-sizing: border-box;
+      padding: 11px 10px 8px;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      border-bottom: 3px solid var(--ink);
+      box-shadow: 3px 4px 0 color-mix(in srgb, var(--ink) 16%, transparent);
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+      pointer-events: auto;
+      font-family: inherit;
+      /* Its point is its PIN -- top centre, where the drawn line ends.
+         The paper hangs off that point rather than being centred on it,
+         which is what makes a coordinate picked at the end of a stroke
+         mean "the string is tied here". Each hangs at its own small
+         angle: pinned by hand, not laid out. */
+      transform-origin: 50% 0;
+      transform: translate(-50%, 0) rotate(var(--tilt, 0deg));
+      transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s, opacity 0.2s;
+      animation: olay-draw-in 0.4s ease-out both;
+    }
+    .olay-paper:hover { transform: translate(-50%, 0) rotate(var(--tilt, 0deg)) scale(1.04); }
+    /* Pointer-driven rather than :active, which sticks after a tap on iOS
+       -- the same reason the news cards press the way they do. */
+    .olay-paper.pressing { transform: translate(-50%, 0) rotate(var(--tilt, 0deg)) scale(0.96); }
+    /* The pin it hangs from: the one red thing on the paper, and the same
+       red the drawn strings are in. */
+    .olay-paper-pin {
+      position: absolute;
+      top: -5px;
+      left: 50%;
+      width: 9px;
+      height: 9px;
+      margin-left: -4.5px;
+      border-radius: 50%;
+      background: #c8322b;
+      box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 45%, transparent);
+    }
+    .olay-paper-name {
+      display: block;
+      font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+    .olay-paper-meta {
+      display: block;
+      margin-top: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.52rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .olay-paper-meta .live { color: #c8322b; }
+    /* Reaching for one paper drops the rest of the board back -- the
+         drawings fade and the other papers go quiet in the ink, never
+         translucent (a see-through card over a map is mush). */
+    .olay-layer.pulling .olay-paper { color: var(--muted); border-color: var(--muted); box-shadow: none; }
+    .olay-layer.pulling .olay-paper .olay-paper-pin { background: var(--muted); }
+    .olay-layer.pulling .olay-paper.lit {
+      color: var(--ink);
+      border-color: #c8322b;
+      box-shadow: 3px 4px 0 color-mix(in srgb, #c8322b 22%, transparent);
+    }
+    .olay-layer.pulling .olay-paper.lit .olay-paper-pin { background: #c8322b; }
 
     @keyframes olay-board-in {
       from { opacity: 0; }
@@ -3569,7 +3640,7 @@
       background: var(--paper);
       padding: 8px;
     }
-    .olay-page-photo img { width: 100%; display: block; }
+    .olay-page-photo svg { width: 100%; height: auto; display: block; }
     .olay-page h3 {
       font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
       font-size: 1.5rem;
@@ -3659,7 +3730,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .olay-layer, .olay-scrim, .olay-draw, .olay-tag { animation: none; opacity: 1; }
+      .olay-layer, .olay-scrim, .olay-draw, .olay-paper { animation: none; opacity: 1; }
       .olay-wipe { animation: none; }
     }
 
@@ -5381,12 +5452,38 @@ function olayCountryAnchor(ev) {
   return { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
 }
 
-// The name hangs under the drawing rather than on it -- a caption on the
-// strokes, not a label over them.
-function olayTagPoint(ev, box) {
-  if (box) return { x: box.x + box.w / 2, y: box.y + box.h + 46 };
+// Where the paper hangs, in the map's own frame. The author's own
+// coordinates first (db/world_events_v3_paper.sql): the drawn line ends
+// somewhere specific and nothing in the picture can say where, because a
+// stroke ending in empty sea looks like a stroke ending anywhere else.
+// Failing that the paper hangs under the drawing's ink, and failing that
+// over the countries -- both of which are a guess, and both of which are
+// better than an olay nobody can press.
+function olayPaperPoint(ev, box) {
+  const x = Number(ev.paper_x), y = Number(ev.paper_y);
+  if (Number.isFinite(x) && Number.isFinite(y) && (x || y)) return { x, y };
+  if (box) return { x: box.x + box.w / 2, y: box.y + box.h + 60 };
   const c = olayCountryAnchor(ev);
   return c ? { x: c.x, y: c.y + 40 } : null;
+}
+
+// Each paper hangs at its own small angle -- pinned by hand, not laid
+// out. Fixed rather than random so the board is the same board every
+// time it is opened.
+const OLAY_PAPER_TILTS = ['-1.8deg', '1.5deg', '-1.2deg', '2deg', '-2.2deg', '1.1deg'];
+
+// A point in the map's own 1080x1920 frame, in screen pixels. Taken off
+// the SVG's own screen matrix rather than worked out from the box and
+// preserveAspectRatio by hand: the browser already knows exactly where it
+// put the drawing, and a second copy of that arithmetic is a second
+// chance to disagree with it.
+function olayMapToScreen(svg, x, y) {
+  const m = svg.getScreenCTM && svg.getScreenCTM();
+  if (!m) return null;
+  const pt = svg.createSVGPoint();
+  pt.x = x; pt.y = y;
+  const q = pt.matrixTransform(m);
+  return { x: q.x, y: q.y };
 }
 
 function olaylarBody() { return document.getElementById('olaylar-layer'); }
@@ -5447,103 +5544,116 @@ function renderOlayBoard(events) {
                  preserveAspectRatio="xMidYMin meet"/>
         </g>
       `).join('')}
-      <g class="olay-tags" id="olay-tags"></g>
     </svg>
+    <div class="olay-papers" id="olay-papers"></div>
   `;
   // A drawing that isn't there yet leaves the map as it was -- the olay
   // is still on the board, named off its countries instead.
   body.querySelectorAll('.olay-draw image').forEach(im => {
     im.addEventListener('error', () => im.closest('.olay-draw')?.remove());
   });
-  paintOlayTags(pinned, events);
+  paintOlayPapers(pinned, events);
 }
 
-// The names, placed once each drawing has been read. Painted after the
+// The papers, hung once each drawing has been read. Painted after the
 // board rather than with it: the read is a decode plus a pass over the
 // pixels, and the strings should already be running across the map by
-// the time the first name lands on it.
-async function paintOlayTags(pinned, events) {
-  const layer = document.getElementById('olay-tags');
-  if (!layer) return;
+// the time the first paper lands on it.
+async function paintOlayPapers(pinned, events) {
   const boxes = await Promise.all(pinned.map(measureOlayInk));
   // The board may have been closed, or a dossier opened, while the
   // drawings were being read.
-  if (!document.getElementById('olay-tags')) return;
-  // The boxes already spoken for, so a second name never lands on a
-  // first one (see the slide below).
-  const taken = [];
+  const host = document.getElementById('olay-papers');
+  const svg = document.getElementById('olay-board-map');
+  if (!host || !svg) return;
+  host.innerHTML = '';
+  const en = I18N.isEnglish();
   pinned.forEach((ev, i) => {
-    const at = olayTagPoint(ev, boxes[i]);
+    const at = olayPaperPoint(ev, boxes[i]);
     if (!at) return;
-    const g = document.createElementNS(OLAY_NS, 'g');
-    g.setAttribute('class', 'olay-tag');
-    g.dataset.idx = i;
-    g.dataset.event = ev.id;
-    g.style.animationDelay = `${900 + i * 160}ms`;
-    const text = document.createElementNS(OLAY_NS, 'text');
-    text.setAttribute('class', 'olay-tag-name');
-    text.setAttribute('x', at.x);
-    text.setAttribute('y', at.y);
-    text.setAttribute('text-anchor', 'middle');
-    text.textContent = ev.name_tr.toLocaleUpperCase('tr-TR');
-    g.appendChild(text);
-    layer.appendChild(g);
-    // Measured only once it is in the document, which is the only point
-    // getBBox means anything.
-    let b;
-    try { b = text.getBBox(); } catch (e) { b = null; }
-    if (b) {
-      // Two olaylar in the same corner of the world would otherwise be
-      // named on top of each other -- Gazze and Doğu Akdeniz share a
-      // coastline. The name slides DOWN off its drawing until it is
-      // clear, which keeps it under the strokes it belongs to and out of
-      // everyone else's; clamped so it can never end up under the profile
-      // bar or off the bottom of the drawing.
-      let dy = 0;
-      for (let guard = 0; guard < 24; guard++) {
-        const box = { x: b.x, y: b.y + dy, w: b.width, h: b.height };
-        const clash = taken.find(t => box.x < t.x + t.w + 10 && t.x < box.x + box.w + 10 &&
-                                      box.y < t.y + t.h + 10 && t.y < box.y + box.h + 10);
-        if (!clash) break;
-        dy = clash.y + clash.h + 14 - b.y;
-      }
-      const y = Math.min(Math.max(at.y + dy, 240), OLAY_MAP_H - 90);
-      dy = y - at.y;
-      text.setAttribute('y', y);
-      taken.push({ x: b.x, y: b.y + dy, w: b.width, h: b.height });
-      // The hit area is the word's own box, opened out to something a
-      // thumb can actually find.
-      const pad = 26;
-      const hit = document.createElementNS(OLAY_NS, 'rect');
-      hit.setAttribute('class', 'olay-tag-hit');
-      hit.setAttribute('x', b.x - pad);
-      hit.setAttribute('y', b.y + dy - pad);
-      hit.setAttribute('width', b.width + pad * 2);
-      hit.setAttribute('height', b.height + pad * 2);
-      g.insertBefore(hit, text);
-    }
-    g.addEventListener('click', () => openWorldEventReader(ev, events));
-    // Reaching for a name lights its own strokes and its countries under
+    const live = ev.status !== 'ended';
+    const paper = document.createElement('button');
+    paper.type = 'button';
+    paper.className = 'olay-paper';
+    paper.dataset.idx = i;
+    paper.dataset.mapX = at.x;
+    paper.dataset.mapY = at.y;
+    paper.style.setProperty('--tilt', OLAY_PAPER_TILTS[i % OLAY_PAPER_TILTS.length]);
+    paper.style.animationDelay = `${700 + i * 160}ms`;
+    paper.innerHTML = `
+      <span class="olay-paper-pin"></span>
+      <span class="olay-paper-name">${libEsc(ev.name_tr)}</span>
+      <span class="olay-paper-meta"><span class="${live ? 'live' : ''}">${libEsc(worldEventStamp(ev))}</span></span>
+    `;
+    host.appendChild(paper);
+
+    paper.addEventListener('click', () => openWorldEventReader(ev, events));
+    // Reaching for a paper lights its own strokes and the countries under
     // them, and drops every other drawing back -- the same move the map
     // already makes when a country is touched and its whole story lights.
+    const layer = document.getElementById('olaylar-layer');
     const pull = () => {
-      const svg = document.getElementById('olay-board-map');
-      if (!svg) return;
-      svg.classList.add('pulling');
-      svg.querySelectorAll('.lit').forEach(el => el.classList.remove('lit'));
+      paper.classList.add('pressing');
+      if (!layer) return;
+      layer.classList.add('pulling');
+      layer.querySelectorAll('.lit').forEach(el => el.classList.remove('lit'));
       svg.querySelector(`.olay-draw[data-idx="${i}"]`)?.classList.add('lit');
-      g.classList.add('lit');
+      paper.classList.add('lit');
       setNewsCountryHighlight(worldEventCountryIds(ev));
     };
     const drop = () => {
-      const svg = document.getElementById('olay-board-map');
-      if (!svg) return;
-      svg.classList.remove('pulling');
-      svg.querySelectorAll('.lit').forEach(el => el.classList.remove('lit'));
+      paper.classList.remove('pressing');
+      if (!layer) return;
+      layer.classList.remove('pulling');
+      layer.querySelectorAll('.lit').forEach(el => el.classList.remove('lit'));
       clearNewsCountryHighlight();
     };
-    ['pointerenter', 'pointerdown'].forEach(e => g.addEventListener(e, pull));
-    ['pointerleave', 'pointerup', 'pointercancel'].forEach(e => g.addEventListener(e, drop));
+    ['pointerenter', 'pointerdown'].forEach(e => paper.addEventListener(e, pull));
+    ['pointerleave', 'pointerup', 'pointercancel'].forEach(e => paper.addEventListener(e, drop));
+  });
+  placeOlayPapers();
+}
+
+// Puts every paper where its map coordinate actually landed on screen,
+// then slides any two that would overlap apart. Runs after the papers
+// are in the document (their size is what the type came out as) and
+// again on every resize -- the papers are HTML at a fixed size over a
+// drawing that is not, so their spacing changes with the screen even
+// though their coordinates do not.
+function placeOlayPapers() {
+  const host = document.getElementById('olay-papers');
+  const svg = document.getElementById('olay-board-map');
+  if (!host || !svg) return;
+  const papers = Array.from(host.querySelectorAll('.olay-paper'));
+  if (!papers.length) return;
+  const bounds = host.getBoundingClientRect();
+  const taken = [];
+  papers.forEach(paper => {
+    const at = olayMapToScreen(svg, Number(paper.dataset.mapX), Number(paper.dataset.mapY));
+    if (!at) return;
+    // Placed first, measured second: the paper's height depends on how
+    // many lines its name came out as, which nothing knows in advance.
+    paper.style.left = `${at.x - bounds.left}px`;
+    paper.style.top = `${at.y - bounds.top}px`;
+    const w = paper.offsetWidth, h = paper.offsetHeight;
+    let x = at.x - bounds.left, y = at.y - bounds.top;
+    // Two olaylar about the same corner of the world would otherwise be
+    // pinned on top of each other. The later paper slides DOWN until it
+    // is clear -- which keeps it near the line it belongs to -- then is
+    // pulled back inside the board if that pushed it off the bottom.
+    // x is the pin's own column, y is the top of the paper hanging from
+    // it (see the transform in the stylesheet).
+    for (let guard = 0; guard < 24; guard++) {
+      const clash = taken.find(t => Math.abs(t.x - x) < (t.w + w) / 2 + 10 &&
+                                    y < t.y + t.h + 10 && t.y < y + h + 10);
+      if (!clash) break;
+      y = clash.y + clash.h + 12;
+    }
+    x = Math.min(Math.max(x, w / 2 + 4), bounds.width - w / 2 - 4);
+    y = Math.min(Math.max(y, 4), Math.max(4, bounds.height - h - 4));
+    paper.style.left = `${x}px`;
+    paper.style.top = `${y}px`;
+    taken.push({ x, y, w, h });
   });
 }
 
@@ -5569,9 +5679,7 @@ function openWorldEventReader(ev, events) {
   body.innerHTML = `
     <div class="olay-page" id="olay-page">
       ${arrowHeadHTML(null, 'olay-back', en ? 'The Board' : 'Pano')}
-      <div class="olay-page-photo" id="olay-page-photo">
-        <img src="${libEsc(olayImageSrc(ev))}" alt="">
-      </div>
+      <div class="olay-page-photo" id="olay-page-photo"></div>
       <span class="olay-stamp${live ? '' : ' ended'}">${libEsc(worldEventStamp(ev))}</span>
       <h3>${libEsc(ev.name_tr)}</h3>
       ${ev.blurb ? `<p class="olay-page-blurb">${libEsc(ev.blurb)}</p>` : ''}
@@ -5594,15 +5702,46 @@ function openWorldEventReader(ev, events) {
         </div>` : ''}
     </div>
   `;
-  const photo = document.getElementById('olay-page-photo');
-  const img = photo?.querySelector('img');
-  if (img) {
-    const fail = () => photo.remove();
-    img.addEventListener('error', fail);
-    if (img.complete && img.naturalWidth === 0) fail();
-  }
+  paintOlayPageMap(ev);
   document.getElementById('olay-back')?.addEventListener('click',
     () => renderOlayBoard(events));
+}
+
+// The strip at the top of a dossier: the piece of map this olay is
+// drawn on, cropped to its own strokes. The drawing itself is a
+// 1080x1920 overlay that is mostly empty -- printed whole it is a tall
+// blank rectangle with a few marks in it, which is what it looked like
+// before this existed. Cropping to the ink and putting the map back
+// under it says "here it is, on the world" in the space of a photograph.
+async function paintOlayPageMap(ev) {
+  const host = document.getElementById('olay-page-photo');
+  if (!host) return;
+  const box = await measureOlayInk(ev);
+  // The reader may have gone back to the board while this was measured.
+  if (!document.getElementById('olay-page-photo')) return;
+  if (!box) { host.remove(); return; }
+  // Air around the strokes, and never a sliver: a crop much taller than
+  // it is wide reads as a mistake, so the short side is opened out to at
+  // least 3:4 before it is clamped back inside the map.
+  const pad = Math.max(70, Math.max(box.w, box.h) * 0.14);
+  let x0 = box.x - pad, y0 = box.y - pad;
+  let w = box.w + pad * 2, h = box.h + pad * 2;
+  const minW = h * 0.75;
+  if (w < minW) { x0 -= (minW - w) / 2; w = minW; }
+  const minH = w * 0.5;
+  if (h < minH) { y0 -= (minH - h) / 2; h = minH; }
+  x0 = Math.min(Math.max(x0, 0), Math.max(0, OLAY_MAP_W - w));
+  y0 = Math.min(Math.max(y0, 0), Math.max(0, OLAY_MAP_H - h));
+  w = Math.min(w, OLAY_MAP_W); h = Math.min(h, OLAY_MAP_H);
+  host.innerHTML = `
+    <svg viewBox="${x0.toFixed(1)} ${y0.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}"
+         preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <image href="assets/map/kutuphane-map-mobile.png" x="0" y="0"
+             width="${OLAY_MAP_W}" height="${OLAY_MAP_H}" preserveAspectRatio="xMidYMin meet"/>
+      <image href="${libEsc(olayImageSrc(ev))}" x="0" y="0"
+             width="${OLAY_MAP_W}" height="${OLAY_MAP_H}" preserveAspectRatio="xMidYMin meet"/>
+    </svg>
+  `;
 }
 
 // ── Entering and leaving the mode ──
@@ -5679,10 +5818,11 @@ function toggleOlaylar() {
 (function initOlaylarLayer() {
   window.addEventListener('resize', () => {
     if (!olaylarIsOpen()) return;
-    // Nothing on the board is measured in screen pixels any more -- every
-    // drawing and every name is placed in the map's own units and the SVG
-    // re-fits itself -- so a rotation only has to move the dossier.
     positionOlayLayer();
+    // The drawings re-fit themselves (they are in the map's own units),
+    // but the papers are HTML at a fixed size hung off those units, so
+    // a rotation moves every one of them.
+    placeOlayPapers();
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && olaylarIsOpen()) closeOlaylar();

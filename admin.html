@@ -613,6 +613,43 @@
        db/country_entry_events.sql), so its field is narrower — and its
        row reads date-first, which is the order the moment is written in. */
     .upd-form input.upd-date { width: 150px; }
+    /* Where the olay's paper hangs on the board. The picker is the mobile
+       map at the exact aspect ratio of its own 1080x1920 frame, so a click
+       is a coordinate in that frame with no arithmetic beyond a ratio --
+       and the olay's own drawing is laid over it at the same registration
+       the board uses, so the admin is aiming at the end of the line they
+       actually drew. */
+    .olay-map-pick {
+      position: relative;
+      width: 230px;
+      aspect-ratio: 1080 / 1920;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      cursor: crosshair;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+    .olay-map-pick img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      display: block;
+      pointer-events: none;
+    }
+    .olay-map-pick .olay-map-draw { opacity: 0.9; }
+    .olay-map-pick .olay-map-dot {
+      position: absolute;
+      width: 11px;
+      height: 11px;
+      margin: -5.5px 0 0 -5.5px;
+      border-radius: 50%;
+      background: #c8322b;
+      box-shadow: 0 0 0 2px #fff;
+      pointer-events: none;
+    }
+    .olay-map-pick .olay-map-dot[hidden] { display: none; }
     .upd-form.ce-ev-form { grid-template-columns: auto 1fr 1fr auto; }
     /* An olay's moment is written date-first too (db/world_events.sql). */
     .upd-form.we-m-form { grid-template-columns: auto 1fr 1fr auto; }
@@ -1431,6 +1468,24 @@
         Yalnızca çizim başka bir yerde duruyorsa doldurun (yine 1080×1920 saydam olmalı).
       </p>
       <input type="text" id="we-image" placeholder="assets/olaylar/... veya https://..."/>
+
+      <label>Panodaki kâğıdın yeri</label>
+      <p style="margin-top:-4px;margin-bottom:6px;font-size:0.7rem;color:var(--muted);font-style:italic;">
+        Haritaya tıklayın: olayın kâğıdı panoda oraya asılır. Çizdiğiniz ipin <strong>bittiği
+        yeri</strong> seçin — ip kâğıda gider. Boş bırakılırsa kâğıt çizimin altına asılır, çizim de
+        yoksa işaretli ülkelerin üstüne.
+      </p>
+      <div class="olay-map-pick" id="we-map-pick" title="Kâğıdın yerini seçmek için tıklayın">
+        <img src="assets/map/kutuphane-map-mobile.png" alt=""/>
+        <img class="olay-map-draw" id="we-map-draw" alt="" hidden/>
+        <span class="olay-map-dot" id="we-map-dot" hidden></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:6px;">
+        <span id="we-map-coords" style="font-size:0.72rem;color:var(--muted);">Seçilmedi</span>
+        <button type="button" class="btn btn-secondary" id="we-map-clear" style="padding:4px 9px;font-size:0.72rem;">Temizle</button>
+      </div>
+      <input type="hidden" id="we-paper-x"/>
+      <input type="hidden" id="we-paper-y"/>
 
       <div class="country-picker-block on">
         <label>Ülkeler (opsiyonel)</label>
@@ -4707,6 +4762,11 @@ async function loadWorldEventsList() {
       <h4>${escapeHtml(ev.name_tr)}</h4>
       ${ev.parties ? `<p>${escapeHtml(ev.parties)}</p>` : ''}
       ${countries ? `<p style="color:var(--muted);">Haritada: ${escapeHtml(countries)}</p>` : ''}
+      <p style="color:var(--muted);">Kâğıt: ${
+        ev.paper_x == null || ev.paper_y == null
+          ? 'yeri seçilmedi — çizimin altına asılır'
+          : escapeHtml(`x ${ev.paper_x} · y ${ev.paper_y}`)
+      }</p>
       <div class="sources-block">
         <div class="sources-label">Zaman Akışı (${moments.length})</div>
         ${momentsHtml}
@@ -4838,6 +4898,10 @@ function editWorldEvent(ev) {
   document.getElementById('we-ended').value = ev.ended_on || '';
   document.getElementById('we-body').value = ev.body || '';
   document.getElementById('we-image').value = ev.image_url || '';
+  document.getElementById('we-paper-x').value = ev.paper_x == null ? '' : ev.paper_x;
+  document.getElementById('we-paper-y').value = ev.paper_y == null ? '' : ev.paper_y;
+  paintOlayPaperPick();
+  paintOlayPickDrawing(ev);
   document.getElementById('we-series').value = ev.series_id || '';
   document.getElementById('we-sort').value = ev.sort_order ?? 0;
   document.getElementById('we-countries').innerHTML =
@@ -4860,6 +4924,10 @@ function resetWorldEventForm() {
   document.getElementById('we-ended').value = '';
   document.getElementById('we-body').value = '';
   document.getElementById('we-image').value = '';
+  document.getElementById('we-paper-x').value = '';
+  document.getElementById('we-paper-y').value = '';
+  paintOlayPaperPick();
+  paintOlayPickDrawing(null);
   document.getElementById('we-series').value = '';
   document.getElementById('we-sort').value = '0';
   document.getElementById('we-countries').innerHTML = countryPickerHTML([]);
@@ -4867,6 +4935,65 @@ function resetWorldEventForm() {
   document.getElementById('we-form-mode-label').textContent = 'Add New Olay';
   document.getElementById('we-cancel-btn').style.display = 'none';
 }
+
+// ── The paper's place on the board ──
+// The picker is the mobile map at its own aspect ratio, so a click is a
+// coordinate in the map's 1080x1920 frame and nothing but a ratio stands
+// between the two. Kept in two hidden fields rather than in a variable,
+// so the form is read the same way every other field on it is.
+const OLAY_PICK_W = 1080, OLAY_PICK_H = 1920;
+
+function paintOlayPaperPick() {
+  const dot = document.getElementById('we-map-dot');
+  const out = document.getElementById('we-map-coords');
+  const x = document.getElementById('we-paper-x').value;
+  const y = document.getElementById('we-paper-y').value;
+  if (x === '' || y === '') {
+    dot.hidden = true;
+    out.textContent = 'Seçilmedi';
+    return;
+  }
+  dot.hidden = false;
+  dot.style.left = (Number(x) / OLAY_PICK_W * 100) + '%';
+  dot.style.top = (Number(y) / OLAY_PICK_H * 100) + '%';
+  out.textContent = `x: ${x} · y: ${y}`;
+}
+
+// The olay's own drawing over the picker, at the same registration the
+// board uses -- so the admin is aiming at the end of the line they drew
+// rather than at a blank map. Falls back to nothing when the file isn't
+// there yet, which is every olay on the day it is created.
+function paintOlayPickDrawing(ev) {
+  const img = document.getElementById('we-map-draw');
+  if (!img) return;
+  const custom = String((ev && ev.image_url) || '').trim();
+  const id = (ev && ev.id) || document.getElementById('we-id').value.trim();
+  const src = /^(https?:\/\/|assets\/)/i.test(custom) ? custom
+    : (id ? `assets/olaylar/${encodeURIComponent(id)}.png` : '');
+  if (!src) { img.hidden = true; img.removeAttribute('src'); return; }
+  img.hidden = false;
+  img.onerror = () => { img.hidden = true; };
+  img.src = src;
+}
+
+document.getElementById('we-map-pick').addEventListener('click', (e) => {
+  const box = e.currentTarget.getBoundingClientRect();
+  const x = Math.round((e.clientX - box.left) / box.width * OLAY_PICK_W);
+  const y = Math.round((e.clientY - box.top) / box.height * OLAY_PICK_H);
+  document.getElementById('we-paper-x').value = Math.min(Math.max(x, 0), OLAY_PICK_W);
+  document.getElementById('we-paper-y').value = Math.min(Math.max(y, 0), OLAY_PICK_H);
+  paintOlayPaperPick();
+});
+
+// Typing an id for a new olay brings its drawing up on the picker, so
+// the paper can be placed the moment the file is in the folder.
+document.getElementById('we-id').addEventListener('input', () => paintOlayPickDrawing(null));
+
+document.getElementById('we-map-clear').addEventListener('click', () => {
+  document.getElementById('we-paper-x').value = '';
+  document.getElementById('we-paper-y').value = '';
+  paintOlayPaperPick();
+});
 
 document.getElementById('we-cancel-btn').addEventListener('click', resetWorldEventForm);
 
@@ -4916,6 +5043,10 @@ document.getElementById('we-submit-btn').addEventListener('click', async () => {
     ended_on: status === 'ended' ? (document.getElementById('we-ended').value || null) : null,
     body: document.getElementById('we-body').value.trim() || null,
     image_url: document.getElementById('we-image').value.trim() || null,
+    paper_x: document.getElementById('we-paper-x').value === '' ? null
+      : Number(document.getElementById('we-paper-x').value),
+    paper_y: document.getElementById('we-paper-y').value === '' ? null
+      : Number(document.getElementById('we-paper-y').value),
     series_id: document.getElementById('we-series').value || null,
     sort_order: Number(document.getElementById('we-sort').value) || 0,
   };
