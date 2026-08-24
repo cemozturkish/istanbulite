@@ -246,7 +246,7 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > Kütüphane's map opens, the key-moment timeline an entry can carry, and which countries light
 > and open together as one story), `world_events` + `world_event_moments` +
 > `world_event_countries` (the OLAYLAR — the world events themselves, with their dated
-> timelines and the countries an open one lights) and `breaking_news_countries` (which countries a
+> timelines, where their paper hangs on the map, and the countries an open one lights) and `breaking_news_countries` (which countries a
 > Dünya story is about, lit on that map when the story opens), and more). When in doubt, read the relevant `db/` file — it is the
 > source of truth.
 
@@ -789,8 +789,9 @@ pressing it again puts Kütüphane back.
 **It is a PINBOARD, and that is the one place on this page that is not printed paper.** Everything
 else in Kütüphane is a newspaper — kicker, headline, column, rule — and that is right for the news,
 which is a thing you *read*. An olay is a thing you *work out*: who is in it, what it touches,
-which other olay keeps naming the same country. So it is four things pinned up with string run
-between them, and the reader's eye does the joining. Concretely:
+which other olay keeps naming the same country. So each olay is **a piece of paper pinned to the
+map**, with a hand-drawn line running from the paper to the place it is about, and the reader's eye
+does the joining. Concretely:
 
 - **The drawing is made in the map's own frame, and that is the whole trick.** An olay's PNG
   (`assets/olaylar/<id>.png`, see that folder's README) is **1080×1920 and transparent** — the size
@@ -807,17 +808,26 @@ between them, and the reader's eye does the joining. Concretely:
   (a clip rect animated from no width), because a string is run rather than faded up. The rect
   carries its full width as an attribute too, so a browser that will not animate SVG geometry from
   CSS simply shows the finished drawing.
-- **Nothing is written down about where the name goes.** `measureOlayInk` puts the PNG on a canvas
-  at 1/8 scale, finds the first and last pixel that is not transparent, and hangs the olay's name
-  under the middle of that box — so a drawing dropped into the folder arrives already knowing where
-  on the world it is. An olay with **no** drawing is still on the board: its name is placed over
-  its ticked countries instead, off the map's own traced shapes (`olayCountryAnchor`). Two names
-  that would land on each other slide down until clear, clamped so neither ends up under the
-  profile bar. A tainted canvas (a page opened from `file://`) falls back to the countries rather
-  than throwing.
-- **Pulling a thread.** Reaching for a name (hover, or the press on a phone) lights its drawing and
-  its countries on the map and drops every other drawing back — the same move the map makes when a
-  country is touched and its whole story lights.
+- **The paper is the only thing that takes a press**, and where it hangs is the author's own
+  decision (`paper_x` / `paper_y`, `db/world_events_v3_paper.sql`), picked by clicking a mini map in
+  the admin portal with the olay's own drawing laid over it. It has to be said rather than worked
+  out: the line ends where the paper goes, and a stroke ending in empty sea looks exactly like a
+  stroke ending anywhere else. The coordinate marks the **pin** — the paper hangs down from it
+  (`transform-origin: 50% 0`), so a point picked at the end of a stroke means "the string is tied
+  here". Two fallbacks, both a guess and both better than an olay nobody can press: under the
+  drawing's own ink (`measureOlayInk` puts the PNG on a canvas at 1/8 scale and finds the first and
+  last non-transparent pixel), and failing that over the ticked countries, off the map's own traced
+  shapes (`olayCountryAnchor`). A tainted canvas (a page opened from `file://`) falls back the same
+  way rather than throwing.
+- **The papers are HTML, not SVG**, and placed through the board SVG's own `getScreenCTM()`. They
+  hold two lines of type at a size that does not change with the screen, where anything inside the
+  map's 1080-wide frame would be scaled down with the map — and taking the matrix off the browser
+  beats a second copy of the `preserveAspectRatio` arithmetic that could disagree with it. They are
+  re-placed on resize (`placeOlayPapers`), and two that would overlap slide apart.
+- **Pulling a thread.** Reaching for a paper (hover, or the press on a phone) lights its drawing and
+  its countries on the map, and drops every other drawing and paper back — the same move the map
+  makes when a country is touched and its whole story lights. A quiet paper goes muted in the ink,
+  never translucent: a see-through card over a map is mush.
 - **Six drawings, and nothing scrolls** (`OLAY_BOARD_MAX`). The seventh olay is not behind a page —
   it is simply not on the board, and admin.html's list says `PANODA` / `PANODA DEĞİL` on every row
   so that is never a surprise. The real limit is the map: a world with a dozen strings across it is
@@ -848,7 +858,9 @@ between them, and the reader's eye does the joining. Concretely:
 
 One olay opens as the **dossier taken off the board** — the layer's content swaps in place, still
 no second surface — and keeps the board's language rather than reverting to the newspaper column:
-paper lying on the map, the drawing at full width, a stamp saying
+paper lying on the map, led by a **crop of the map around its own strokes** (the drawing is a
+mostly-empty 9:16 overlay; printed whole it is a tall blank rectangle, so `paintOlayPageMap` crops
+to the ink and puts the map back underneath), a stamp saying
 whether this is still going, the parties pinned along one line (the same words the threads are
 labelled with, met again), and its **Zaman Akışı** (`world_event_moments`) run down a piece of
 string — newest first, and dated rather than aged, like every timeline on the site, because these
@@ -883,7 +895,8 @@ set — Rusya–Ukrayna, Gazze, İran ve ABD, Suriye, Doğu Akdeniz — delibera
 nobody argues about, to be verified and extended from the portal. Doğu Akdeniz is the one with a
 drawing already made for it (`assets/olaylar/dogu-akdeniz.png`: Yunanistan, Kıbrıs and İsrail, and
 the line run between them). `db/world_events_v2_board.sql` adds the
-`image_url` override the pinned drawings can use.
+`image_url` override the pinned drawings can use, and `db/world_events_v3_paper.sql` the two
+coordinates that say where each paper hangs.
 
 ### `tumcel.html` — Tümcel
 - Connections-style game where 16 sentence fragments must be regrouped into 4 quotes
