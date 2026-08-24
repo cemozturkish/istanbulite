@@ -1176,7 +1176,9 @@ contents on `--screen-inset`, and neither moves while the three pages swipe unde
 bar stands taller (`--navbar-h-top`) than the bottom one (`--navbar-h`) because it carries two lines
 of type against the tab bar's one word. Heights and colors are the
 `--navbar-h` / `--navbar-h-top` / `--navbar-ink*` tokens in frames.css — the colors deliberately
-palette-independent, the same in light, mono and dark. The top bar is one
+palette-independent between light and dark, with one exception: the earth (kahverengi) palette
+overrides `--navbar-ink` to its own dark brown `--ink` instead of charcoal, via
+`:root[data-palette="earth"]`, mirroring the same specificity trick the mono block uses. The top bar is one
 implementation in profile-card.css ("THE TOP BAR"); the bottom bar's colors live in frames.css
 ("MOBILE FIXED BOTTOM NAV") while each page still positions its own `<header>`. Never write
 either bar's height as a number — the same value also reserves the space each page leaves at the
