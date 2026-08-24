@@ -37,8 +37,10 @@ card in admin.html's **Olaylar** tab, and the field there is only for a drawing 
 
 ## Drawing them
 
-- **Ink and the one red.** The site is grayscale plus a single red (`#c8322b`), and on this board
-  the red is the string. `assets/olaylar/dogu-akdeniz.png` is the reference.
+- **A colour per olay.** The site is grayscale plus one red, but the board is the exception: each
+  olay's strings get their own muted colour, so four of them over one map stay tellable apart.
+  `dogu-akdeniz.png` (red) and `rusya-ukrayna-savasi.png` (blue) are the reference. Keep them
+  desaturated — the map underneath is a drawing too, and a saturated line over it shouts.
 - **Strokes, not fills.** The map underneath is already a drawing; a filled shape over it reads as
   a hole. Lines between places, in the site's own hand.
 - **Leave the rest transparent.** Several of these are on the map at once, so any background at all
