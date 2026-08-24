@@ -584,7 +584,13 @@ sb.from('articles').delete().eq('id', id)
   too: kicker (the district — this page has a map, so the word has something to point at), the
   event as the headline, when it is under that. The deck is the **whole city's**, never the
   district the map is scoped to: an event is a reason to cross town, and a list that quietly shrank
-  to the district under the reader's thumb would be the app talking them out of exactly that
+  to the district under the reader's thumb would be the app talking them out of exactly that. **The
+  corner is never blank**: the two empties still say different things — a deck the reader emptied
+  themselves is told so and pointed at the door, a city with nothing on says exactly that
+  (`events.none`) — but both say it inside the same dashed frame (`deckFrameHTML`), because a
+  corner with nothing in it at all reads as the deck being broken rather than as there being
+  nothing on. Kütüphane's news column still goes blank when there is no news: that is a whole
+  column over a map, and an apology printed across it is a bigger object than this one
 - **What the throw means here is a verdict, not "next"**: right is **İlgimi çekti**, left **İlgimi
   çekmedi**, stamped on the paper as it goes (`.ev-swipe-cue`) so nobody gives a verdict they never
   saw, with the same two words as buttons in the page's foot for a mouse. What is thrown right is

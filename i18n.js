@@ -24,6 +24,9 @@
     'home.events.rsvp.count':{ default: 'kişi katılıyor',    more_english: 'attending' },
     // The verdict a thrown event card records on Kahvehane -- the words
     // the stamps carry and the two buttons say (see event-interest.js).
+    // A city with nothing on: the events deck's other bottom.
+    'events.none':         { default: 'Şimdilik etkinlik yok.', more_english: 'Nothing on just yet.' },
+    'events.nonesub':      { default: 'Dışarısı yine de seni bekliyor.', more_english: 'Outside is waiting anyway.' },
     'events.verdict.yes':  { default: 'İlgimi çekti',        more_english: 'Interested' },
     'events.verdict.no':   { default: 'İlgimi çekmedi',      more_english: 'Not for me' },
     'home.events.kept':    { default: 'İlgini çekenler',     more_english: 'What caught your eye' },
