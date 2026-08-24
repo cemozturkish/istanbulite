@@ -12,7 +12,7 @@
   <title>Sözcel — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
-  <script src="i18n.js?v=12"></script>
+  <script src="i18n.js?v=13"></script>
   <script src="palette.js"></script>
   <script src="avatar.js"></script>
   <link rel="stylesheet" href="palette.css">
@@ -1008,6 +1008,30 @@
       flex-shrink: 0;
     }
 
+    /* Progressive Sözcü hints: unlocked one at a time as wrong guesses pile
+       up (2nd, 4th, 5th). Grows the .game-status block, which is watched by
+       the same ResizeObserver that already re-fits the board when the
+       end-of-game countdown joins the message line — see layoutBoard(). */
+    .sozcel-hints {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-top: 4px;
+      flex-shrink: 0;
+    }
+    .sozcel-hints:empty { display: none; }
+    .sozcel-hint {
+      text-align: center;
+      font-size: 0.68rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .sozcel-hint .sozcel-hint-label {
+      color: var(--ink);
+      font-weight: 700;
+      margin-right: 4px;
+    }
+
     .dist-bar-wrap {
       display: flex;
       align-items: center;
@@ -1722,6 +1746,7 @@
       .word-grid { max-width: 100%; }
       .game-message { font-size: 15px; min-height: 18px; }
       .reset-info { font-size: 12px; }
+      .sozcel-hint { font-size: 12px; }
 
     }
 
@@ -1814,6 +1839,7 @@
         <div class="game-status">
           <div class="game-message" id="game-message"></div>
           <div class="reset-info" id="reset-info"></div>
+          <div class="sozcel-hints" id="sozcel-hints"></div>
         </div>
       </div>
       <div class="keyboard" id="keyboard"></div>
@@ -1867,6 +1893,7 @@
       <div class="result-title" style="margin-bottom:14px;" data-i18n="games.howto">Nasıl Oynanır</div>
       <div class="help-body">
         <p data-i18n="sozcel.help.intro">Gizli Türkçe sözcüğü <strong>altı denemede</strong> bulun. Sözcük, hecelerine ayrılmış petek düzeninde gösterilir — her hece bir alt basamakta başlar. Doğru yerde bulduğun bir harf kutusuna kilitlenir ve sonraki denemelerde öyle kalır; sen sadece kalan harfleri girersin.</p>
+        <p data-i18n="sozcel.help.hints">Zorlanırsan yalnız değilsin: 2. yanlış tahminden sonra kelimenin kökeninin dili, 4. yanlıştan sonra sözcük türü (isim, sıfat…), 5. yanlıştan sonra da o günün Sözcüsünün kelimeye verdiği anlam ipucu olarak gösterilir.</p>
         <p data-i18n="sozcel.help.colors">Her tahminin ardından kutular renklenir:</p>
         <p>
           <span class="swatch correct"></span> <span data-i18n="sozcel.help.green2">Harf doğru ve doğru yerde.</span><br>
@@ -4642,9 +4669,44 @@ function submitGuess(fullGuess) {
       setTimeout(() => showResultPopup(false), 1500);
     } else {
       updateDisplay(); // shows the newly-locked letters, clears the rest for the next attempt
+      renderHints();
       saveState();
     }
   }, revealMs);
+}
+
+// ── Progressive Sözcü hints ──
+// Three hints unlock as wrong guesses pile up, drawn from the same
+// dictionary JSON the Sözcü filled in (see serializeTakeoverDict): the
+// root language after the 2nd wrong guess, the word's grammatical class
+// after the 4th, and the Sözcü's own meaning before the 6th (last) attempt.
+// Driven purely by how many guesses have been submitted so far, so a
+// resumed game (restoreState) picks up exactly where it left off, and a
+// day whose Sözcü left a field blank simply shows one hint fewer.
+function renderHints() {
+  const el = document.getElementById('sozcel-hints');
+  if (!el) return;
+  let dict = null;
+  if (TODAY_DEFINITION) {
+    try { dict = JSON.parse(TODAY_DEFINITION); } catch (_) { dict = null; }
+  }
+  if (!dict) { el.innerHTML = ''; return; }
+
+  const esc = s => String(s == null ? '' : s)
+    .replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const n = submittedGuesses.length;
+  const parts = [];
+  if (n >= 2 && dict.rootLang) {
+    parts.push(`<div class="sozcel-hint"><span class="sozcel-hint-label">İpucu — Kökeni:</span>${esc(dict.rootLang)}</div>`);
+  }
+  const firstCls = dict.defs && dict.defs[0] && dict.defs[0].cls;
+  if (n >= 4 && firstCls) {
+    parts.push(`<div class="sozcel-hint"><span class="sozcel-hint-label">İpucu — Sözcük Türü:</span>${esc(firstCls)}</div>`);
+  }
+  if (n >= 5 && dict.own) {
+    parts.push(`<div class="sozcel-hint"><span class="sozcel-hint-label">İpucu — Sözcünün Bildiği Anlam:</span>${esc(dict.own)}</div>`);
+  }
+  el.innerHTML = parts.join('');
 }
 
 function checkWord(guess) {
@@ -5414,6 +5476,7 @@ if (window.ResizeObserver) {
     VALID_WORDS = WORD_LENGTH === 6 ? VALID_WORDS_6 : (WORD_LENGTH === 5 ? VALID_WORDS_5 : null);
     initWordGrid();
     await restoreState();
+    renderHints();
   }
   if (lockOwnWordToday && !gameOver) {
     // Today's word is this user's own Sözcü pick — leave the grid visible
@@ -5518,6 +5581,10 @@ function formatISOTurkish(iso) {
 
 // ── Sözcü takeover form (rendered inside the Sözcü Görevi popup) ──
 const SOZCU_WORD_CLASSES = ['isim', 'fiil', 'sıfat', 'zarf', 'bağlaç', 'edat', 'zamir', 'ünlem'];
+// The root-language hint (2nd wrong guess) needs just the language, kept
+// apart from the free-text "Köken" field — that one is a full etymology
+// ("Arapça niyyet") and showing it as a hint would give the answer away.
+const SOZCU_ROOT_LANGS = ['Türkçe', 'Arapça', 'Farsça', 'Fransızca', 'İngilizce', 'İtalyanca', 'Yunanca', 'Latince', 'İbranice', 'Ermenice', 'Diğer'];
 let _takeoverCountdownInterval = null;
 
 // Resolves what (if anything) should be shown in the Sözcü takeover.
@@ -5805,6 +5872,18 @@ function renderTakeoverForm(takeover, status) {
       </div>
 
       <div>
+        <label class="stk-label">Köken Dili (isteğe bağlı)</label>
+        <select class="stk-text-input" id="stk-root-lang-input">
+          <option value=""${!(dict && dict.rootLang) ? ' selected' : ''}>— Seç —</option>
+          ${SOZCU_ROOT_LANGS.map(l => `<option value="${l}"${dict && dict.rootLang === l ? ' selected' : ''}>${l}</option>`).join('')}
+        </select>
+        <div class="stk-hint" style="margin-top:4px;">
+          Sadece dil — oyunda 2. yanlış tahminden sonra ipucu olarak gösterilir,
+          "Köken"deki tam bilgi değil.
+        </div>
+      </div>
+
+      <div>
         <label class="stk-label">Günün Notu (isteğe bağlı)</label>
         <input type="text" class="stk-text-input" id="stk-note-input"
                placeholder="örn. Bugün Cumhuriyet Bayramı"
@@ -6008,9 +6087,11 @@ function renumberTakeoverDefs() {
 function serializeTakeoverDict(takeover) {
   const noteEl = takeover.querySelector('#stk-note-input');
   const rootEl = takeover.querySelector('#stk-root-input');
+  const rootLangEl = takeover.querySelector('#stk-root-lang-input');
   const ownEl = takeover.querySelector('#stk-own-input');
   const note = ((noteEl && noteEl.value) || '').trim() || null;
   const root = ((rootEl && rootEl.value) || '').trim() || null;
+  const rootLang = ((rootLangEl && rootLangEl.value) || '').trim() || null;
   // The Sözcü's own meaning of the word — free text, optional, and kept
   // apart from `defs` so the result popup can print it as theirs.
   const own = ((ownEl && ownEl.value) || '').trim() || null;
@@ -6032,8 +6113,8 @@ function serializeTakeoverDict(takeover) {
     })
     .filter(d => d && d.text);
 
-  if (!note && !root && !own && !defs.length) return null;
-  return JSON.stringify({ note, root, own, defs });
+  if (!note && !root && !rootLang && !own && !defs.length) return null;
+  return JSON.stringify({ note, root, rootLang, own, defs });
 }
 
 async function submitTakeover(status, sylsEl, submitBtn, statusEl, defsEl, takeover) {

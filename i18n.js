@@ -126,6 +126,10 @@
       default: 'Gizli Türkçe sözcüğü <strong>altı denemede</strong> bulun. Sözcük, hecelerine ayrılmış petek düzeninde gösterilir — her hece bir alt basamakta başlar. Doğru yerde bulduğun bir harf kutusuna kilitlenir ve sonraki denemelerde öyle kalır; sen sadece kalan harfleri girersin.',
       more_english: 'Guess the hidden Turkish word in <strong>six tries</strong>. The word is laid out by its syllables in a honeycomb staircase — each syllable starts one step lower. A letter you land in the right spot locks into its box and stays there for your next tries — you only type the remaining letters.',
     },
+    'sozcel.help.hints':   {
+      default: 'Zorlanırsan yalnız değilsin: 2. yanlış tahminden sonra kelimenin kökeninin dili, 4. yanlıştan sonra sözcük türü (isim, sıfat…), 5. yanlıştan sonra da o günün Sözcüsünün kelimeye verdiği anlam ipucu olarak gösterilir.',
+      more_english: 'Stuck? You are not alone: after your 2nd wrong guess a hint shows the word\'s root language, after the 4th its grammatical class (noun, adjective…), and after the 5th the meaning that day\'s Sözcü gave the word.',
+    },
     'sozcel.help.green':   { default: 'Doğru harf, doğru yer',     more_english: 'Right letter, right spot' },
     'sozcel.help.yellow':  { default: 'Doğru harf, yanlış yer',    more_english: 'Right letter, wrong spot' },
     'sozcel.help.gray':    { default: 'Harf sözcükte yok',         more_english: 'Letter not in the word' },
