@@ -14,7 +14,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
   <script src="router.js?v=4"></script>
-  <script src="i18n.js?v=14"></script>
+  <script src="i18n.js?v=15"></script>
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
   <script src="game-locks.js?v=2"></script>
@@ -5607,13 +5607,19 @@ async function loadKahveEvents() {
   renderEventsDeck();
 }
 
-function eventDeckDoneHTML() {
+// The dashed frame both bottoms are printed in -- the deck's own end and
+// a city with nothing on. One box, two things it can say.
+function deckFrameHTML(line, sub) {
   return `
     <div class="deck-done">
-      <div class="deck-done-line">${escapeHtml(I18N.t('games.q.deckdone'))}</div>
-      <div class="deck-done-sub">${escapeHtml(I18N.t('games.q.deckdonesub'))}</div>
+      <div class="deck-done-line">${escapeHtml(line)}</div>
+      <div class="deck-done-sub">${escapeHtml(sub)}</div>
     </div>
   `;
+}
+
+function eventDeckDoneHTML() {
+  return deckFrameHTML(I18N.t('games.q.deckdone'), I18N.t('games.q.deckdonesub'));
 }
 
 function renderEventsDeck() {
@@ -5621,11 +5627,17 @@ function renderEventsDeck() {
   if (!deck) return;
   const rows = undealtEvents();
   if (!rows.length) {
-    // Two different empties, and they are not the same thing: a city with
-    // nothing on leaves the corner blank rather than announcing it, while
-    // a deck the reader emptied themselves gets told so and pointed at
-    // the door.
-    deck.innerHTML = kahveEvents.length ? eventDeckDoneHTML() : '';
+    // The corner is never blank. The two empties still say different
+    // things -- a deck the reader emptied themselves is told so and
+    // pointed at the door, a city with nothing on says exactly that --
+    // but both say it inside the same frame, because a corner with
+    // nothing in it at all reads as the deck being broken rather than as
+    // there being nothing on. (Kütüphane's news column DOES go blank when
+    // there is no news: it is the whole left-hand column over a map, and
+    // an apology printed across that is a bigger object than this.)
+    deck.innerHTML = kahveEvents.length
+      ? eventDeckDoneHTML()
+      : deckFrameHTML(I18N.t('events.none'), I18N.t('events.nonesub'));
     return;
   }
   const byId = new Map(rows.map(ev => [String(ev.id), ev]));
