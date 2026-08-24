@@ -14,10 +14,13 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
   <script src="router.js?v=4"></script>
-  <script src="i18n.js?v=13"></script>
+  <script src="i18n.js?v=14"></script>
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
   <script src="game-locks.js?v=2"></script>
+  <!-- "İlgimi çekti": the verdict a thrown event card records here and
+       Hane reads back beside the petek. Shared with anahane.html. -->
+  <script src="event-interest.js"></script>
   <!-- Live open/closed + scheduled-discount evaluation for the Kahve
        Endeksi board below. Shared with admin.html. -->
   <script src="coffee-index.js"></script>
@@ -1070,6 +1073,10 @@
       text-align: center;
       border: 2px dashed var(--rule);
       background: transparent;
+      /* Its width is the band's, never its own text's -- see the mobile
+         rule on the two decks below, where that matters for more than
+         looks. */
+      box-sizing: border-box;
     }
     .deck-done-line {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
@@ -1083,6 +1090,243 @@
       font-style: italic;
       color: var(--muted);
     }
+
+    /* ══════════════════════════════════════════════════════════
+       THE EVENTS DECK — the other half of the band
+
+       The day's games are a deck in the band's right-hand corner; the
+       city's events are the same deck in its left-hand one. Both are the
+       object Kütüphane's news is: cards laid on top of each other, one
+       in front of the reader at a time, dealt by being thrown rather
+       than by being opened.
+
+       What an event asks is not "next" but a verdict -- right is "ilgimi
+       çekti", left "ilgimi çekmedi" -- and what the reader keeps is
+       waiting for them beside the petek on Hane (see event-interest.js).
+       That is the mall stairway in its smallest form again: the member
+       who came for the games walks the whole city's calendar on the way,
+       and leaves with the two or three evenings that were actually
+       theirs.
+
+       An event card is a news card, printed on the same paper as a game
+       card next to it: kicker (the district -- this page has a map, so
+       the word has something to point at), the event as the headline,
+       and when it is under that. ══════════════════════════════════════ */
+    .events-section {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    .events-deck {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px;
+      min-height: 0;
+      /* Desktop: a plain column of cards, scrolling inside the column
+         rather than being clipped by .col-left's own overflow:hidden. On
+         a phone this is a deck instead, and its scroller is the band (see
+         the mobile rules). */
+      overflow-y: auto;
+    }
+    .ev-card {
+      display: flex;
+      flex-direction: column;
+      padding: 8px 12px;
+      background: var(--paper-card, #fff);
+      border: 2px solid var(--ink);
+      border-bottom: 5px solid var(--ink);
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.2s ease-out;
+    }
+    .ev-card-kicker {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--ink-red);
+      margin-bottom: 2px;
+    }
+    .ev-card-title {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-top: auto;
+      margin-bottom: 3px;
+    }
+    .ev-card-meta {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+    }
+    /* The card presses like a button and springs past its own size when
+       released -- the first frame of it growing into the page (see
+       growEventPage). Driven by pointer events rather than :hover or
+       :active, both of which stick after a tap on iOS and would leave the
+       card sitting pressed behind the page it just opened. Same object,
+       same reasoning, as Kütüphane's .article.openable. */
+    .ev-card.pressing {
+      transform: scale(0.955);
+      transition: transform 0.11s ease-out;
+    }
+    @keyframes ist-ev-card-release {
+      0%   { transform: scale(0.955); }
+      52%  { transform: scale(1.022); }
+      100% { transform: scale(1); }
+    }
+    .ev-card.released { animation: ist-ev-card-release 0.34s cubic-bezier(0.22, 1, 0.36, 1); }
+    @media (prefers-reduced-motion: reduce) {
+      .ev-card.pressing { transform: none; }
+      .ev-card.released { animation: none; }
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .ev-card:hover { background: var(--paper-dark); }
+    }
+    /* The card is the page now, so it stops being drawn behind it --
+       only where the page actually grows out of it (a phone). */
+    .ev-card.ev-open { visibility: hidden; }
+
+    /* ══════════════════════════════════════════════════════════
+       THE EVENT PAGE — what a card opens into.
+
+       Kütüphane's news page, in every respect that matters: on a phone
+       it grows out of the tapped card into the band that card lies in,
+       and folds back into it, because a sheet rising over the map would
+       cover the very district the page has just lit (lightMapDistrict) --
+       and where the thing is happening is half of what an event IS.
+
+       Head / body / foot, and only the middle scrolls: what this is on
+       the top line, the event itself in the middle, the verdict on the
+       bottom line -- the same two words the throw stamps, for a mouse.
+       On desktop there is no band and no map to protect, so it stays THE
+       sheet (sheet.css), exactly as everything else here does.
+       ══════════════════════════════════════════════════════════ */
+    .event-overlay .event-page { display: flex; flex-direction: column; overflow: hidden; }
+    .event-page-inner {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .event-page-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: none;
+      padding: 12px 16px 10px;
+      border-bottom: 1px solid var(--rule);
+    }
+    /* The same hand-drawn arrow every reader on the site wears: the
+       reader arrived by touching a card, so the way back out is the
+       drawing, not a word. */
+    .event-page-back {
+      flex: none;
+      width: 26px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .event-page-back:hover { opacity: 0.6; }
+    .event-page-back img { width: 24px; height: 24px; display: block; }
+    .event-page-head .ev-card-kicker { flex: 1; min-width: 0; margin-bottom: 0; }
+    .event-page-head .ev-page-when { flex: none; font-size: 11px; color: var(--muted); }
+    .event-page-body {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      padding: 14px 16px 16px;
+    }
+    .event-page-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--ink);
+      text-wrap: balance;
+      margin: 0 0 8px 0;
+    }
+    .event-page-meta {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.78rem;
+      line-height: 1.5;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .event-page-body > p {
+      font-size: 0.88rem;
+      line-height: 1.55;
+      color: var(--ink);
+    }
+    .event-page-body > p + p { margin-top: 10px; }
+    /* The bottom line: the two answers, for whoever has no finger to
+       throw with. Same words the stamps carry, so the gesture and the
+       buttons are visibly one question. */
+    .event-page-foot {
+      flex: none;
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      padding: 8px 16px;
+      border-top: 1px solid var(--rule);
+      background: var(--frame-bg);
+    }
+    .ev-verdict-btn {
+      flex: 1;
+      min-width: 0;
+      padding: 8px 6px;
+      background: none;
+      border: 2px solid var(--ink);
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--ink);
+      transition: background 0.15s, color 0.15s;
+    }
+    .ev-verdict-btn.yes { border-color: var(--ink-red); color: var(--ink-red); }
+    .ev-verdict-btn:hover { background: var(--ink); color: var(--paper-card, #fff); }
+    .ev-verdict-btn.yes:hover { background: var(--ink-red); color: var(--paper-card, #fff); }
+    /* ── The stamp the throw puts on the paper ──
+       Each stamp sits on the edge the page is moving AWAY from: the
+       leading edge is the half that leaves the screen first, so a stamp
+       there would be gone exactly as the throw commits. It gets solid as
+       the throw does, so nobody ever gives a verdict they didn't see. */
+    .ev-swipe-cue {
+      position: absolute;
+      top: 50%;
+      z-index: 4;
+      max-width: 46%;
+      padding: 7px 12px;
+      border: 2px solid currentColor;
+      background: var(--frame-bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      line-height: 1.15;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .ev-swipe-cue-yes { left: 14px; color: var(--ink-red); transform: translateY(-50%) rotate(-5deg); }
+    .ev-swipe-cue-no { right: 14px; color: var(--ink); transform: translateY(-50%) rotate(5deg); }
 
     .game-link {
       /* Square, and centred on its own content -- the three tiles sit
@@ -1569,12 +1813,14 @@
 
       #main-site {
         display: grid;
-        /* One column, and it is the games. The Kahve Endeksi held the
-           other half until it went back behind a button in the corner
-           (see .corner-boxes), and what is left is a deck of cards the
-           reader is meant to actually read -- the same full-width band
-           Kütüphane gives its news deck, on the same line. */
-        grid-template-columns: 1fr;
+        /* Two columns, and both of them are decks: the city's events on
+           the left, the day's games on the right (see .events-deck).
+           The Kahve Endeksi held the left half until it went behind the
+           corner button, and the band was the games alone for a while --
+           but an event is the one thing on the site that ends with the
+           reader outside standing next to somebody, so it belongs in the
+           band the reader is actually walking past, not one tap off it. */
+        grid-template-columns: 1fr 1fr;
         /* Row 1 (the map) gets an explicit, definite track size instead
            of "auto": with one auto-width column (games) and one 1fr
            column (comments) below it, plain "auto auto" rows didn't
@@ -1737,11 +1983,22 @@
         font-size: 11px;
         letter-spacing: 1px;
       }
-      /* Nothing left in this column on a phone: the mayor's card and the
-         identity card are the profile bar's now, the comments are parked,
-         and the board went behind the corner button. An empty column
-         would still claim its half of the band. */
-      .col-left { display: none; }
+      /* The events column. Everything this column used to carry on a
+         phone is gone -- the mayor's card and the identity card are the
+         profile bar's now, the comments are parked, the board went behind
+         the corner button -- and it was hidden outright for as long as
+         that left it empty. It holds the events deck now, which is
+         exactly the half of the band Kütüphane fills with its news. */
+      .col-left {
+        display: flex;
+        flex-direction: column;
+        grid-column: 1;
+        grid-row: 2;
+        min-height: 0;
+        overflow: visible;
+        border-top: 1px solid var(--rule);
+        z-index: 1;
+      }
       /* Transparent (inherits the desktop rule's background:none) so
          these read as frameless text floating over the map, same as
          desktop -- body's own background is the same #f7f7f7, so this
@@ -1906,7 +2163,7 @@
          so .games-section below sizes within the column's fixed
          (non-scrolling-page) height instead of overflowing it. */
       .col-right {
-        grid-column: 1;
+        grid-column: 2;
         grid-row: 2;
         min-height: 0;
         overflow: visible;
@@ -1965,7 +2222,7 @@
          changing; the rest stay in the DOM (the next one has to be
          standing ready) but are not drawn. Only the top takes a press or
          a throw: the ones behind are edges of paper. */
-      .game-deck {
+      .game-deck, .events-deck {
         display: grid;
         grid-template-areas: "deck";
         /* Sized by its own tallest card, and no taller: a card stretched
@@ -2035,26 +2292,124 @@
          than nudge). */
       .game-deck .game-link:hover { transform: none; background: var(--paper-card, #fff); }
       .game-deck .game-link.completed:hover { background: var(--ink); }
-      .game-deck > * {
+      :is(.game-deck, .events-deck) > * {
         grid-area: deck;
         transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
       }
-      .game-deck > :nth-child(1) { z-index: 3; }
+      :is(.game-deck, .events-deck) > :nth-child(1) { z-index: 3; }
       /* The two behind are pushed up and back a step each. The scale is
          kept shallow on purpose: it pulls a card's top edge back down
          again, so a deeper scale with the same offset would show LESS of
          the card behind, not more. */
-      .game-deck > :nth-child(2) { z-index: 2; transform: translateY(-12px) scale(0.97); }
-      .game-deck > :nth-child(3) { z-index: 1; transform: translateY(-23px) scale(0.94); }
-      .game-deck > :nth-child(n+4) { display: none; }
-      .game-deck > :not(:nth-child(1)) { pointer-events: none; }
+      :is(.game-deck, .events-deck) > :nth-child(2) { z-index: 2; transform: translateY(-12px) scale(0.97); }
+      :is(.game-deck, .events-deck) > :nth-child(3) { z-index: 1; transform: translateY(-23px) scale(0.94); }
+      :is(.game-deck, .events-deck) > :nth-child(n+4) { display: none; }
+      :is(.game-deck, .events-deck) > :not(:nth-child(1)) { pointer-events: none; }
       /* A card being thrown follows the finger with no transition of its
          own (the JS sets transform directly); the flight out and the
          spring back set their own. */
       .game-deck > .q-card.throwing { transition: transform 0.3s ease-in, opacity 0.3s ease-in; }
       @media (prefers-reduced-motion: reduce) {
-        .game-deck > * { transition: none; }
+        :is(.game-deck, .events-deck) > * { transition: none; }
       }
+      /* ── The empty frame takes the whole band ──
+         Alone in a deck, .deck-done was the only thing deciding the
+         deck's width, and the width it decided was its own text's --
+         which lands on a fractional pixel. WebKit then drops the LEFT
+         edge of a dashed border sitting on one, so the frame printed
+         with three sides and no obvious reason for the fourth to be
+         missing. Stretching it to the band puts both its edges back on
+         whole pixels, and it is the right picture anyway: this is the
+         same object Kütüphane's news deck ends with, and there it has
+         always been the column's own width. */
+      :is(.game-deck, .events-deck):has(> .deck-done:only-child) { align-self: stretch; }
+      /* The events deck rests in the band's bottom-LEFT corner, the
+         mirror of the games' bottom-right one: both hang from the bottom
+         (an auto top margin rather than justify-content, so a deck that
+         outgrows the band still scrolls instead of pushing its top card
+         out of reach), and each sits against its own outer edge, so the
+         two decks read as the two ends of one band rather than as a
+         column of boxes. */
+      .events-deck {
+        margin-top: auto;
+        align-self: flex-start;
+        max-width: 100%;
+        padding: 0;
+        /* The cards behind the front one stand a step up and back, past
+           this box's own top edge -- the band below is what scrolls. */
+        overflow: visible;
+      }
+      .events-section-inner {
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+      }
+      /* Opaque in a deck, the same reason a game card is: a card behind
+         showing through the one in front is exactly the illusion a deck
+         is made of. */
+      .events-deck > .ev-card {
+        background: var(--paper-card, #fff);
+      }
+      .events-deck > .ev-card:hover { background: var(--paper-card, #fff); }
+      .ev-card-title { font-size: 16px; }
+      /* A card being thrown follows the finger with no transition of its
+         own (the page's own throw sets the transform directly). */
+      .event-page.throwing { transition: transform 0.3s ease-in, opacity 0.3s ease-in; }
+
+      /* ── THE EVENT PAGE on a phone (see its block above) ──
+         Not a sheet arriving from anywhere: it IS the band the deck lies
+         in. Its top edge is the hero line, its bottom edge is where the
+         bottom card was already resting above the tab bar, and its two
+         sides are the deck's own -- so the card the reader pressed grows
+         into a box that was already drawn around it. The grow is a
+         clip-path animated in JS (growEventPage), which is why every
+         transform and transition the sheet would otherwise carry comes
+         off here: a transform would move the page out from under the clip
+         measured against it.
+
+         --event-page-left/--event-page-width are measured off the deck's
+         own content box when the page opens (and again on resize) rather
+         than restated as the sum of the frame pad and the deck's padding
+         -- one number written in two places is how a page ends up two
+         pixels off the card it came out of. */
+      .event-overlay {
+        /* The map above stays live while an event is open: the page takes
+           its own taps and nothing else takes any. */
+        pointer-events: none;
+      }
+      .event-overlay .ist-sheet-backdrop { display: none; }
+      .event-overlay .event-page {
+        pointer-events: auto;
+        left: var(--event-page-left, calc(var(--frame-pad, 10px) + 12px));
+        right: auto;
+        width: var(--event-page-width, calc(100vw - (var(--frame-pad, 10px) + 12px) * 2));
+        top: var(--map-hero-end);
+        bottom: calc(var(--navbar-h, 46px) + env(safe-area-inset-bottom, 0px) + var(--frame-gap, 10px));
+        height: auto;
+        transform: none;
+        transition: none;
+        /* The page owns its horizontal axis (the throw); the vertical one
+           stays the browser's, so the body inside it scrolls natively. */
+        touch-action: pan-y;
+        /* It floats in the band instead of running off the bottom of the
+           screen, so it gets the fourth edge frames.css drops. */
+        border-bottom-width: 2px !important;
+      }
+      .event-overlay.open .event-page { transform: none; }
+      .event-page-head { padding: 9px 12px 8px; }
+      .event-page-body { padding: 11px 12px 14px; }
+      .event-page-title { font-size: 19px; margin-bottom: 6px; }
+      .event-page-body > p { font-size: 13px; line-height: 1.5; }
+      .event-page-foot { padding: 7px 12px; }
+      /* sheet.css hides the side columns under any open sheet, because a
+         sheet rises OVER them. This page doesn't rise over anything: it
+         grows inside the band, and the cards it is expanding past are
+         half the reason the move reads at all. */
+      body:has(#event-overlay.open) .col-left,
+      body:has(#event-overlay.open) .col-right { visibility: visible; }
 
       /* Each tile grows to fill the column's own height (see
          syncColumnHeights() in the script below, which is what gives
@@ -2218,25 +2573,29 @@
          down the screen, and then jump into the corner. Transforming the
          fixed element itself just moves it, which is exactly what
          Kütüphane's own corner pair does. */
-      .col-right-slide, .corner-boxes {
+      .col-left-slide, .col-right-slide, .corner-boxes {
         transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: transform;
         backface-visibility: hidden;
       }
+      html.ist-entering-forward .col-left-slide,
       html.ist-entering-forward .col-right-slide,
       html.ist-entering-forward .corner-boxes {
         transform: translateX(100vw);
         transition: none;
       }
+      html.ist-entering-backward .col-left-slide,
       html.ist-entering-backward .col-right-slide,
       html.ist-entering-backward .corner-boxes {
         transform: translateX(-100vw);
         transition: none;
       }
+      body.ist-exiting-forward .col-left-slide,
       body.ist-exiting-forward .col-right-slide,
       body.ist-exiting-forward .corner-boxes {
         transform: translateX(-100vw);
       }
+      body.ist-exiting-backward .col-left-slide,
       body.ist-exiting-backward .col-right-slide,
       body.ist-exiting-backward .corner-boxes {
         transform: translateX(100vw);
@@ -2627,6 +2986,19 @@
          sits top-left, #library-card top-right (see .col-right below). -->
     <div class="library-card politician-card" id="politician-card"><div class="card-loading"><span class="spinner"></span></div></div>
     <div class="col-left-slide">
+      <!-- ── The city's events, as a deck ──
+           The band's left-hand corner, mirroring the day's games in its
+           right-hand one (see .events-deck in the stylesheet). A card is
+           dealt by being thrown: right is "ilgimi çekti" and the event
+           goes to Hane, beside the petek; left is "ilgimi çekmedi" and it
+           is gone. Unscoped by construction -- the whole city's list,
+           each card kickered with its own district, which the map above
+           lights the moment the card is opened. -->
+      <section class="events-section" id="events-section">
+        <div class="events-section-inner">
+          <div class="events-deck" id="events-deck"></div>
+        </div>
+      </section>
       <section class="discussion-section" id="discussion-section" hidden>
         <div class="discussion-label" id="discussion-label" data-i18n="kahvehane.allistanbul">Tüm İstanbul</div>
         <div class="discussion-posts" id="discussion-posts"></div>
@@ -2911,6 +3283,20 @@
     <div class="ist-sheet detail-overlay-sheet" id="scoreboard-overlay-sheet">
       <button type="button" class="ist-sheet-close" id="scoreboard-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
       <div class="ist-sheet-body detail-overlay-body" id="scoreboard-overlay-body"></div>
+    </div>
+  </div>
+
+  <!-- ── The event page ──
+       Deliberately NOT a pulled sheet: on a phone this grows out of the
+       card it was tapped on into the band that card lies in, and folds
+       back into it, so the district it lights on the map above stays in
+       full view for as long as the event is open. The same object, and
+       the same argument, as Kütüphane's news page. See "THE EVENT PAGE"
+       in the stylesheet and openEventPage below. -->
+  <div class="ist-sheet-overlay event-overlay" id="event-overlay" hidden>
+    <div class="ist-sheet-backdrop" id="event-overlay-backdrop"></div>
+    <div class="ist-sheet event-page" id="event-page">
+      <div class="event-page-inner" id="event-page-inner"></div>
     </div>
   </div>
 
@@ -3252,10 +3638,12 @@ let discussionTickIntervalId = null;
 // reference point.
 function syncColumnHeights() {
   const colRight = document.querySelector('.col-right');
+  const colLeft = document.querySelector('.col-left');
   const headerEl = document.querySelector('header');
   if (!colRight || !headerEl) return;
   if (window.innerWidth > 768) {
     colRight.style.height = '';
+    if (colLeft) colLeft.style.height = '';
     return;
   }
   const frameGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-gap')) || 10;
@@ -3268,6 +3656,11 @@ function syncColumnHeights() {
   const colTop = colRight.getBoundingClientRect().top;
   const height = Math.max(0, navTop - colTop - frameGap);
   colRight.style.height = height + 'px';
+  // Both halves of the band, and both off the games column's own top:
+  // the two decks hang from the same bottom line and have to start from
+  // the same top one, or the events would sit a few pixels off the games
+  // beside them.
+  if (colLeft) colLeft.style.height = height + 'px';
 }
 window.addEventListener('resize', syncColumnHeights);
 
@@ -3347,6 +3740,14 @@ async function mount() {
   if (typeof applyGameLocks === 'function') applyGameLocks(sb);
   loadScoreboard();
   loadCoffeeIndexPanel();
+  loadKahveEvents();
+  // The cards print a date and a district in the reader's own language,
+  // so they are rebuilt when it changes -- registered here and dropped in
+  // unmount(), the same way the countdown's own listener is, so a page
+  // entered twice doesn't end up with two.
+  if (onI18NChangeForEvents) I18N.offChange(onI18NChangeForEvents);
+  onI18NChangeForEvents = () => renderEventsDeck();
+  I18N.onChange(onI18NChangeForEvents);
 
   IstRouter.onTick(tickScoreboardCountdown);
   onI18NChangeForCountdown = tickScoreboardCountdown;
@@ -3374,6 +3775,7 @@ async function mount() {
 function unmount() {
   IstRouter.offTick(tickScoreboardCountdown);
   if (onI18NChangeForCountdown) { I18N.offChange(onI18NChangeForCountdown); onI18NChangeForCountdown = null; }
+  if (onI18NChangeForEvents) { I18N.offChange(onI18NChangeForEvents); onI18NChangeForEvents = null; }
   if (discussionTickIntervalId) { clearInterval(discussionTickIntervalId); discussionTickIntervalId = null; }
   if (coffeeTickIntervalId) { clearInterval(coffeeTickIntervalId); coffeeTickIntervalId = null; }
   I18N.offChange(tickCoffeeIndex);
@@ -3381,6 +3783,10 @@ function unmount() {
   // body-level and outlives it — close it (and any venue drilled into it)
   // on the way out, or it would still be standing over the next page.
   closeCoffeeSheet();
+  // Same reasoning, and the event page is the more urgent of the two: it
+  // is not a sheet but the band itself, so one left open would sit over
+  // the next page's own band.
+  snapEventPageShut();
 }
 
 async function init() {
@@ -5076,7 +5482,13 @@ document.addEventListener('keydown', (e) => {
 // Light one district (or none) and name it on the map label. Shared by
 // the row hover and by the open venue panel, which keeps its district
 // lit for as long as it is open.
-function applyCoffeeHighlight(nbId) {
+function applyCoffeeHighlight(nbId) { lightMapDistrict(nbId); }
+
+// Light one district (or none) and name it on the map label. One
+// implementation for everything on this page that answers "where is
+// this?" with the drawing rather than with more text -- a coffee row
+// hovered, a venue panel left open, an event card opened into its page.
+function lightMapDistrict(nbId) {
   getMapNeighborhoods().forEach(n =>
     n.classList.toggle('hover-active', !!nbId && (n.dataset.neighborhood || n.id) === nbId));
   const label = document.getElementById('map-label');
@@ -5112,6 +5524,471 @@ document.addEventListener('mouseout', (e) => {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
   else wire();
 })();
+
+
+// ══════════════════════════════════════════════════════════════════
+// THE EVENTS DECK — the city's calendar, one card at a time
+//
+// The mirror of the game deck in the other corner of the band, and the
+// same object Kütüphane's news deck is: cards laid on top of each other,
+// only the front one live, dealt by being thrown rather than by being
+// opened. What the throw means here is a verdict -- right "ilgimi
+// çekti", left "ilgimi çekmedi" -- and what the reader keeps is printed
+// beside the petek on Hane (see event-interest.js, which both pages
+// read).
+//
+// The deck is the whole city's, never the selected district's: an event
+// is a reason to cross town, and a list that quietly shrank to the
+// district the map happens to be scoped to would be the app talking the
+// reader out of exactly that. The district is on the card instead, and
+// the map lights it the moment the card is opened.
+// ══════════════════════════════════════════════════════════════════
+const EVENTS_LIMIT = 30;
+const MONTH_ABBR_TR = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
+const MONTH_ABBR_EN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+let kahveEvents = [];
+let eventsRequestSeq = 0;
+let onI18NChangeForEvents = null;
+
+function myUid() {
+  return (window.__currentUser && window.__currentUser.id) || null;
+}
+
+// Istanbul's clock, like everything dated on this site (see ist-date.js
+// and convention 10): never a formatted date parsed back into a Date.
+function eventWhenParts(iso) {
+  const d = new Date(iso);
+  const tz = 'Europe/Istanbul';
+  const en = I18N.isEnglish();
+  const locale = en ? 'en-US' : 'tr-TR';
+  const day = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, day: 'numeric' }), 10);
+  const month = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, month: 'numeric' }), 10);
+  const wd = d.toLocaleDateString(locale, { timeZone: tz, weekday: 'short' }).toLocaleUpperCase(locale);
+  const weekday = d.toLocaleDateString(locale, { timeZone: tz, weekday: 'long' });
+  const time = d.toLocaleTimeString(locale, { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: en });
+  return { day, mon: (en ? MONTH_ABBR_EN : MONTH_ABBR_TR)[month - 1] || '', wd, weekday, time };
+}
+
+function eventShortWhen(iso) {
+  const p = eventWhenParts(iso);
+  return `${p.day} ${p.mon} ${p.wd} · ${p.time}`;
+}
+
+// What the reader hasn't ruled on yet, soonest first. Sorted here rather
+// than left to the query's order, because "the next evening in the city
+// is the one on top" is the deck's own rule.
+function undealtEvents() {
+  const uid = myUid();
+  return kahveEvents
+    .filter(ev => !IstEventInterest.judged(uid, ev.id))
+    .slice()
+    .sort((a, b) => new Date(a.event_date) - new Date(b.event_date));
+}
+
+async function loadKahveEvents() {
+  const reqId = ++eventsRequestSeq;
+  const { data, error } = await sb.from('events')
+    .select('*')
+    .gte('event_date', new Date().toISOString())
+    .order('event_date', { ascending: true })
+    .limit(EVENTS_LIMIT);
+  // Drop a superseded response so a slow older fetch can't clobber a
+  // newer one with stale rows.
+  if (reqId !== eventsRequestSeq) return;
+  if (error) { console.error('[kahvehane events]', error); kahveEvents = []; }
+  else kahveEvents = data || [];
+  // Verdicts on events that have already happened are dead weight -- but
+  // only prune when this fetch actually saw the whole calendar. A short
+  // page of a capped query is not evidence that the rows it didn't
+  // return are gone.
+  if (kahveEvents.length < EVENTS_LIMIT) {
+    IstEventInterest.prune(myUid(), kahveEvents.map(ev => String(ev.id)));
+  }
+  renderEventsDeck();
+}
+
+function eventDeckDoneHTML() {
+  return `
+    <div class="deck-done">
+      <div class="deck-done-line">${escapeHtml(I18N.t('games.q.deckdone'))}</div>
+      <div class="deck-done-sub">${escapeHtml(I18N.t('games.q.deckdonesub'))}</div>
+    </div>
+  `;
+}
+
+function renderEventsDeck() {
+  const deck = document.getElementById('events-deck');
+  if (!deck) return;
+  const rows = undealtEvents();
+  if (!rows.length) {
+    // Two different empties, and they are not the same thing: a city with
+    // nothing on leaves the corner blank rather than announcing it, while
+    // a deck the reader emptied themselves gets told so and pointed at
+    // the door.
+    deck.innerHTML = kahveEvents.length ? eventDeckDoneHTML() : '';
+    return;
+  }
+  const byId = new Map(rows.map(ev => [String(ev.id), ev]));
+  deck.innerHTML = rows.map(ev => {
+    const nb = ev.neighborhood ? (neighborhoodNames[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
+    return `
+      <div class="ev-card" data-event-id="${escapeHtml(ev.id)}">
+        <div class="ev-card-kicker">${escapeHtml(nb.toLocaleUpperCase('tr-TR'))}</div>
+        <div class="ev-card-title">${escapeHtml(ev.title)}</div>
+        <div class="ev-card-meta">${escapeHtml(eventShortWhen(ev.event_date))}</div>
+      </div>
+    `;
+  }).join('');
+  deck.querySelectorAll('.ev-card').forEach(el => {
+    wireEvCardPress(el);
+    const ev = byId.get(el.dataset.eventId);
+    if (!ev) return;
+    // The card is passed along: on a phone it is what the page grows out
+    // of (see growEventPage).
+    el.addEventListener('click', () => openEventPage(ev, el));
+  });
+}
+
+// A card presses like a button. Pointer events rather than :hover /
+// :active, both of which stick after a tap on iOS and would leave the
+// card sitting pressed behind the page it just opened.
+function wireEvCardPress(card) {
+  card.addEventListener('pointerdown', () => {
+    card.classList.remove('released');
+    card.classList.add('pressing');
+  });
+  card.addEventListener('pointerup', () => {
+    if (!card.classList.contains('pressing')) return;
+    card.classList.remove('pressing');
+    card.classList.add('released');
+  });
+  const quiet = () => card.classList.remove('pressing');
+  ['pointercancel', 'pointerleave'].forEach(e => card.addEventListener(e, quiet));
+  card.addEventListener('animationend', () => card.classList.remove('released'));
+}
+
+// Takes the front card out of the deck without re-rendering it: the ones
+// behind are already in the DOM at their own depths, so removing this
+// node re-runs the nth-child rules and they TRANSITION forward a step --
+// which is the whole reason a deck's depth is position and not a class.
+function dealEventCard(ev, verdict) {
+  IstEventInterest.set(myUid(), ev.id, verdict);
+  const deck = document.getElementById('events-deck');
+  if (!deck) return;
+  const node = deck.querySelector(`.ev-card[data-event-id="${CSS.escape(String(ev.id))}"]`);
+  if (node) node.remove();
+  if (!deck.querySelector('.ev-card')) deck.innerHTML = eventDeckDoneHTML();
+}
+
+// ── The page an event opens into ──
+const EV_GROW_MS = 380;
+const EV_GROW_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const EV_SWIPE_DEAL_PX = 84;    // throw past this and the event is dealt
+const EV_SWIPE_DEAL_VEL = 0.55; // ...or a flick this fast (px/ms)
+const EV_SWIPE_FLY_MS = 300;
+let _evOrigin = null;   // the deck card this page grew out of
+let _evAnims = [];
+let _evOpen = null;     // the event the open page is printing
+let _evDealing = false;
+
+function evPageGrows() {
+  return window.matchMedia('(max-width: 768px)').matches
+    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function evOriginInset(page) {
+  if (!page || !_evOrigin || !_evOrigin.isConnected) return null;
+  const b = _evOrigin.getBoundingClientRect();
+  const s = page.getBoundingClientRect();
+  if (!b.width || !b.height || !s.width || !s.height) return null;
+  const px = (v) => Math.max(0, v).toFixed(2) + 'px';
+  return `inset(${px(b.top - s.top)} ${px(s.right - b.right)} ${px(s.bottom - b.bottom)} ${px(b.left - s.left)})`;
+}
+
+function showEvOrigin() {
+  if (_evOrigin) _evOrigin.classList.remove('ev-open');
+}
+
+function cancelEvAnims() {
+  _evAnims.forEach(a => { try { a.cancel(); } catch (e) {} });
+  _evAnims = [];
+}
+
+// dir: 'in' when the card becomes the page, 'out' when the page folds
+// back into it. What animates is the WINDOW onto the page -- a clip-path
+// inset that starts as the tapped card's own box and opens to the page's
+// four edges -- rather than the page itself, which is already sitting
+// exactly where it will end up.
+function growEventPage(dir) {
+  const page = document.getElementById('event-page');
+  const inner = document.getElementById('event-page-inner');
+  cancelEvAnims();
+  if (!page || !inner || !evPageGrows() || !page.animate) return;
+  const shut = evOriginInset(page);
+  if (!shut) return;
+  const wide = 'inset(0px)';
+  const opts = { duration: EV_GROW_MS, easing: EV_GROW_EASE };
+  // 'out' holds the collapsed frame after it finishes: IstSheet.close
+  // re-hides the overlay later (0.55s), and without the fill the page
+  // would snap back to full size for those last frames.
+  _evAnims.push(page.animate(
+    dir === 'in' ? [{ clipPath: shut }, { clipPath: wide }] : [{ clipPath: wide }, { clipPath: shut }],
+    dir === 'in' ? opts : Object.assign({ fill: 'forwards' }, opts)));
+  _evAnims.push(inner.animate(
+    dir === 'in'
+      ? [{ opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1 }]
+      : [{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 0 }],
+    Object.assign({ fill: 'forwards' }, opts)));
+}
+
+// Where the page's two sides fall, measured off the deck's own content
+// box rather than restated as the sum of the frame pad and its padding:
+// the page has to come out of the card with its sides already on the
+// card's sides. Cleared on desktop, where the page is THE sheet and
+// sheet.css owns its geometry.
+function measureEventPageBand() {
+  const overlay = document.getElementById('event-overlay');
+  if (!overlay) return;
+  const deck = document.getElementById('events-deck');
+  if (!window.matchMedia('(max-width: 768px)').matches || !deck) {
+    overlay.style.removeProperty('--event-page-left');
+    overlay.style.removeProperty('--event-page-width');
+    return;
+  }
+  // The whole band, not the deck's own box and not even its own column:
+  // the deck is a hand of cards in one corner, and an event opened into
+  // that corner would be a page 170px wide. It grows across both halves
+  // -- its own side and the games' -- which is the same box Kütüphane's
+  // news page fills, measured the same way (off the two columns' own
+  // content boxes, never restated as a sum of paddings).
+  const inner = deck.closest('.events-section-inner') || deck;
+  const games = document.querySelector('.games-section-inner');
+  const r = inner.getBoundingClientRect();
+  const cs = getComputedStyle(inner);
+  const left = r.left + parseFloat(cs.paddingLeft || 0);
+  let right = r.right - parseFloat(cs.paddingRight || 0);
+  if (games) {
+    const gr = games.getBoundingClientRect();
+    const gcs = getComputedStyle(games);
+    right = Math.max(right, gr.right - parseFloat(gcs.paddingRight || 0));
+  }
+  const width = right - left;
+  if (!(width > 0)) return;
+  overlay.style.setProperty('--event-page-left', left.toFixed(2) + 'px');
+  overlay.style.setProperty('--event-page-width', width.toFixed(2) + 'px');
+}
+
+function buildEventPageHtml(ev) {
+  const nb = ev.neighborhood ? (neighborhoodNames[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
+  const p = eventWhenParts(ev.event_date);
+  const meta = [`${p.day} ${p.mon} · ${p.weekday} · ${p.time}`, ev.location].filter(Boolean)
+    .map(escapeHtml).join('<br>');
+  return `
+    <div class="event-page-head">
+      <button class="event-page-back" type="button" id="event-page-back"
+              aria-label="Kahvehane" title="Kahvehane"><img src="assets/back.png" alt=""/></button>
+      <div class="ev-card-kicker">${escapeHtml(nb.toLocaleUpperCase('tr-TR'))}</div>
+      <div class="ev-page-when">${escapeHtml(`${p.day} ${p.mon}`)}</div>
+    </div>
+    <div class="event-page-body">
+      <h2 class="event-page-title">${escapeHtml(ev.title)}</h2>
+      <div class="event-page-meta">${meta}</div>
+      ${ev.description ? `<p>${escapeHtml(ev.description)}</p>` : ''}
+    </div>
+    <div class="event-page-foot">
+      <button type="button" class="ev-verdict-btn no" data-verdict="no">${escapeHtml(I18N.t('events.verdict.no'))}</button>
+      <button type="button" class="ev-verdict-btn yes" data-verdict="yes">${escapeHtml(I18N.t('events.verdict.yes'))}</button>
+    </div>
+    <div class="ev-swipe-cue ev-swipe-cue-yes" id="ev-cue-yes">${escapeHtml(I18N.t('events.verdict.yes'))}</div>
+    <div class="ev-swipe-cue ev-swipe-cue-no" id="ev-cue-no">${escapeHtml(I18N.t('events.verdict.no'))}</div>
+  `;
+}
+
+function openEventPage(ev, cardEl) {
+  const overlay = document.getElementById('event-overlay');
+  const inner = document.getElementById('event-page-inner');
+  if (!overlay || !inner) return;
+  _evOrigin = cardEl || null;
+  // The card is the page now, so it stops being drawn behind it -- only
+  // where the page actually grows out of it. On desktop the page is THE
+  // sheet beside a printed column, and a gap in that column would just
+  // read as a missing event.
+  if (_evOrigin && evPageGrows()) _evOrigin.classList.add('ev-open');
+  _evOpen = ev;
+  inner.innerHTML = buildEventPageHtml(ev);
+  measureEventPageBand();
+  IstSheet.open(overlay);
+  growEventPage('in');
+  const back = document.getElementById('event-page-back');
+  if (back) back.addEventListener('click', () => closeEventPage());
+  inner.querySelectorAll('.ev-verdict-btn').forEach(btn => {
+    btn.addEventListener('click', () => dealEventPage(btn.dataset.verdict === 'yes' ? 1 : -1));
+  });
+  // Light the district on the map. The page sits in the band BELOW the
+  // map rather than over it, so the drawing stays uncovered: the reader
+  // sees where the event is for as long as they are reading about it.
+  lightMapDistrict(ev.neighborhood || null);
+}
+
+function closeEventPage() {
+  const overlay = document.getElementById('event-overlay');
+  const inner = document.getElementById('event-page-inner');
+  if (!overlay || !inner || overlay.hidden) return;
+  // Every way out lands here, so the highlight goes out here rather than
+  // at each of them -- and it goes back to whatever the board was
+  // holding lit, if a venue panel is open behind all this.
+  lightMapDistrict(restingCoffeeHighlight());
+  showEvOrigin();
+  growEventPage('out');
+  IstSheet.close(overlay, () => {
+    inner.innerHTML = '';
+    cancelEvAnims();
+    _evOrigin = null;
+    _evOpen = null;
+  });
+}
+
+// Gone this frame, with no fold-back: for a throw, and for a swipe to
+// another carousel page. The overlay is body-level and outlives the
+// content swap (see router.js), so an event left open would stand over
+// Hane's petek for the half-second the ordinary close takes -- and fold
+// back into a card that is no longer on the screen.
+function snapEventPageShut() {
+  const overlay = document.getElementById('event-overlay');
+  const page = document.getElementById('event-page');
+  const inner = document.getElementById('event-page-inner');
+  if (!overlay || !inner || overlay.hidden) return;
+  lightMapDistrict(restingCoffeeHighlight());
+  showEvOrigin();
+  cancelEvAnims();
+  if (page) { page.style.transition = ''; page.style.transform = ''; page.style.opacity = ''; }
+  overlay.classList.remove('open');
+  overlay.hidden = true;
+  inner.innerHTML = '';
+  _evOrigin = null;
+  _evOpen = null;
+}
+
+function setEvCueOpacity(dx) {
+  const yes = document.getElementById('ev-cue-yes');
+  const no = document.getElementById('ev-cue-no');
+  const p = Math.min(1, Math.abs(dx) / EV_SWIPE_DEAL_PX);
+  if (yes) yes.style.opacity = dx > 0 ? p : 0;
+  if (no) no.style.opacity = dx < 0 ? p : 0;
+}
+
+// dir: +1 thrown right (ilgimi çekti), -1 thrown left (ilgimi çekmedi).
+function dealEventPage(dir) {
+  const page = document.getElementById('event-page');
+  if (!page || _evDealing || !_evOpen) return;
+  _evDealing = true;
+  const ev = _evOpen;
+  // The deck advances BEHIND the page while it is still on its way out,
+  // so the next event is already standing there as the paper clears it.
+  dealEventCard(ev, dir > 0 ? 'yes' : 'no');
+  const w = window.innerWidth || 400;
+  page.style.transition = `transform ${EV_SWIPE_FLY_MS}ms ease-in, opacity ${EV_SWIPE_FLY_MS}ms ease-in`;
+  page.style.transform = `translateX(${dir * (w + 140)}px) rotate(${dir * 7}deg)`;
+  page.style.opacity = '0';
+  setTimeout(() => {
+    page.style.transition = '';
+    page.style.transform = '';
+    page.style.opacity = '';
+    // Straight to hidden, never the fold-back: the event did not go back
+    // into the card it came from, it left the deck.
+    snapEventPageShut();
+    _evDealing = false;
+  }, EV_SWIPE_FLY_MS + 20);
+}
+
+// Touch phones only -- the same condition the pulled sheet uses, and for
+// the same reason: a finger is the only thing that can throw a page.
+function wireEventPageSwipe() {
+  const page = document.getElementById('event-page');
+  if (!page) return;
+  const mobile = window.matchMedia('(max-width: 768px) and (pointer: coarse)');
+  let sx = 0, sy = 0, dx = 0, lastX = 0, lastT = 0, vel = 0;
+  let dragging = false, axis = null;
+
+  function render() {
+    page.style.transform = `translateX(${dx}px) rotate(${dx * 0.014}deg)`;
+    setEvCueOpacity(dx);
+  }
+
+  function springBack() {
+    page.style.transition = 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s';
+    page.style.transform = '';
+    setEvCueOpacity(0);
+    setTimeout(() => { if (!_evDealing) page.style.transition = ''; }, 320);
+  }
+
+  page.addEventListener('touchstart', (e) => {
+    if (!mobile.matches || e.touches.length !== 1 || _evDealing) return;
+    // The carousel's own swipe listens on the document (router.js): a
+    // horizontal drag on an open event is that event's, not a page
+    // change, so it stops here.
+    e.stopPropagation();
+    dragging = true;
+    axis = null;
+    dx = 0;
+    sx = lastX = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+    lastT = e.timeStamp || performance.now();
+    vel = 0;
+    page.style.transition = 'none';
+  }, { passive: true });
+
+  page.addEventListener('touchmove', (e) => {
+    if (!dragging || e.touches.length !== 1) return;
+    const x = e.touches[0].clientX, y = e.touches[0].clientY;
+    // Which gesture this is gets decided once, on the first real
+    // movement, and never revisited: the body scrolls vertically inside
+    // this page, and a drag that kept changing its mind would fight the
+    // scroller.
+    if (axis === null) {
+      const adx = Math.abs(x - sx), ady = Math.abs(y - sy);
+      if (adx < 6 && ady < 6) return;
+      axis = adx > ady * 1.2 ? 'x' : 'y';
+      if (axis === 'y') { dragging = false; page.style.transition = ''; return; }
+    }
+    const now = e.timeStamp || performance.now();
+    const dt = now - lastT;
+    // Weighted toward the newest sample so a flick's final speed wins
+    // over the slow start of the same drag.
+    if (dt > 0) vel = 0.7 * ((x - lastX) / dt) + 0.3 * vel;
+    lastX = x;
+    lastT = now;
+    dx = x - sx;
+    render();
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
+
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    const flicked = Math.abs(vel) > EV_SWIPE_DEAL_VEL;
+    const thrown = Math.abs(dx) > EV_SWIPE_DEAL_PX;
+    if (!flicked && !thrown) { springBack(); return; }
+    // A flick decides its own direction: a finger that started left and
+    // ended up flicking right meant right.
+    dealEventPage((flicked ? vel : dx) > 0 ? 1 : -1);
+  };
+  page.addEventListener('touchend', end);
+  page.addEventListener('touchcancel', end);
+}
+
+(function initEventPage() {
+  const overlay = document.getElementById('event-overlay');
+  const backdrop = document.getElementById('event-overlay-backdrop');
+  if (!overlay || !backdrop) return;
+  backdrop.addEventListener('click', () => closeEventPage());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeEventPage();
+  });
+  window.addEventListener('resize', measureEventPageBand);
+  wireEventPageSwipe();
+})();
+
 
 IstRouter.registerPage('kahvehane', { mount, unmount });
 
