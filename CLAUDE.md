@@ -245,9 +245,10 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > + `country_entry_events` + `country_stories` + `country_story_countries` (what a country on
 > Kütüphane's map opens, the key-moment timeline an entry can carry, and which countries light
 > and open together as one story), `world_events` + `world_event_moments` +
-> `world_event_countries` (the OLAYLAR — the world events themselves, with their dated
-> timelines, where their paper hangs on the map, and the countries an open one lights) and `breaking_news_countries` (which countries a
-> Dünya story is about, lit on that map when the story opens), and more). When in doubt, read the relevant `db/` file — it is the
+> `world_event_countries` (the OLAYLAR — the world events themselves, with their per-olay colour,
+> where their paper hangs on the map, the countries an open one lights, and their chapters —
+> oldest first, each optionally carrying its own photo) and `breaking_news_countries` (which
+> countries a Dünya story is about, lit on that map when the story opens), and more). When in doubt, read the relevant `db/` file — it is the
 > source of truth.
 
 **Table: `neighborhoods`** — lookup of valid neighborhood IDs.
@@ -503,9 +504,10 @@ sb.from('articles').delete().eq('id', id)
   entered before this existed. A live preview under the form shows what the venue being
   edited is doing at this exact minute, and each row in the list carries the same read-out
 - **Olaylar tab** curates the world events (`world_events`) Kütüphane's middle box opens —
-  the olay itself on the left, and on the right a list whose every card carries its own
-  Zaman Akışı editor. See "OLAYLAR — the world events themselves" below for what an olay is
-  and how it differs from a seri and from a country hikâye
+  the olay itself (including its own colour and where its paper hangs) on the left, and on the
+  right a list whose every card carries its own chapter editor, oldest chapter first, each with
+  a room for its own lead photo. See "OLAYLAR — the world events themselves" below for what an
+  olay is and how it differs from a seri and from a country hikâye
 - **Oyunlar tab** combines all three games' admin panels in one place: a shared per-day
   on/off board (next 7 days × Sözcel/Tümcel/Bulmaca, backed by `game_day_toggles`) at the
   top, then sub-nav pills to switch between each game's own management panel (Sözcel sözcü
@@ -836,7 +838,7 @@ does the joining. Concretely:
 - **The map IS the board, and this is not a sheet at all** (`#olaylar-layer`). Nothing rises from
   the bottom and nothing is opened: pressing the box **inks it** (`.lib-box-on` — it stays held
   down because it is the way back out), everything else on the page goes — the news column, the
-  reading area, the other two library doors — and the four olaylar are pinned **over the drawing
+  reading area, the other two library doors — and up to six olaylar are pinned **over the drawing
   of the world they happen in**, with the string run between them across it. It is the one
   background this page already had and the only one that means anything; the cork it was first
   drawn on said nothing. The exception to THE sheet is the same argument the news page makes: a
@@ -862,10 +864,44 @@ paper lying on the map, led by a **crop of the map around its own strokes** (the
 mostly-empty 9:16 overlay; printed whole it is a tall blank rectangle, so `paintOlayPageMap` crops
 to the ink and puts the map back underneath), a stamp saying
 whether this is still going, the parties pinned along one line (the same words the threads are
-labelled with, met again), and its **Zaman Akışı** (`world_event_moments`) run down a piece of
-string — newest first, and dated rather than aged, like every timeline on the site, because these
-reach back decades and "12 yıl önce" tells a reader nothing. This page is the one thing here that
-scrolls: a chain of a dozen moments has to.
+labelled with, met again), and its **chapters** run down a piece of string. This page is the one
+thing here that scrolls: a chain of chapters has to.
+
+**The chapters (`world_event_moments`) read OLDEST FIRST, and that is a deliberate reversal of
+every other Zaman Akışı on the site.** A country entry's chain and a news story's gelişmeler are
+feeds — the newest thing is the point, so they print newest first. An olay is not a feed, it is a
+**story with a shape**: Gazze's 2023 is not where the thing began, it is the newest chapter of
+something that reaches back through 1948, 1967 and 2007 — and a reader who only sees the last two
+years is missing the chapters that explain them. So scrolling an olay's chapters moves toward the
+present, the way turning pages does in an actual book (`worldEventChapters` sorts ascending; every
+other Zaman Akışı on the site still sorts descending — do not "fix" this to match them). Each
+chapter is dated, titled, can carry its own lead photo pinned above its text
+(`world_event_moments.image_url`, `db/world_events_v5_chapters.sql` — styled like a note pinned to
+the board itself, tilt and a red pin dot included) and its body can carry further `[[img::URL]]`
+images inline, the same convention `library_articles` chapters use
+(`db/library_articles_v7_inline_images.sql`) — deliberately the same object Makaleler's own
+chapters are, because that is exactly what these are meant to read like.
+
+**A rail runs down the chapters, and it is read literally as a piece of string with a bead sliding
+down it** (`.olay-chapters-fill`, `wireOlayChapters`) — the board's own language, carried into the
+page that came off the board. A pale track runs the full list; a coloured fill (the olay's own
+colour, see below) grows from the top as the reader scrolls, continuously, so it reads as being
+read rather than jumping. The **counter** ("3 / 8") and each chapter's node move chapter-to-chapter
+instead, off a reading line a little way down from the top of the scroller
+(`OLAY_READ_LINE`) — continuous position for the string, one whole chapter at a time for the
+count. Reaching the physical bottom of the scroller counts every remaining chapter as reached even
+if the reading line never physically crosses their headings, the same way finishing anything else
+on the site by reaching its end counts as done.
+
+**The app remembers where the reader got to, monotonically, per member** (`olayReadProgress` /
+`olayWriteProgress`, `localStorage` keyed `olay_progress_<uid>_<eventId>` — same shape as
+`lib_chapter_completed_<uid>` for Makaleler). Scrolling back up to reread the beginning never
+erases it: only a chapter further than the one already stored is written. Reopening the dossier
+later scrolls straight to the furthest chapter reached (only when that is past the first chapter,
+so a first-ever open is never yanked anywhere), and the **board itself says so before the paper is
+even pressed** — a paper whose olay has been started shows "3/8" beside its stamp
+(`paintOlayPapers`), the same idea as the petek's `hive_member_status` printing how many stories or
+games a neighbour has left: a fact about the reader, printed where they will see it before they ask.
 
 Four things about the data:
 
@@ -887,6 +923,13 @@ Four things about the data:
 - **Ongoing olaylar are ordered by `sort_order`, not by what moved last.** A war does not stop
   being the biggest thing on the page because something smaller had a development this morning —
   and with only six places on the board, that order decides what exists.
+- **Each olay carries its own colour** (`color`, `db/world_events_v4_color.sql`, a hex string,
+  admin-editable with a plain `<input type="color">`). The board is the one surface on the site
+  where the single house red gives way to several — four to six olaylar can be pinned to the same
+  map at once, and their papers, pins and chapter rails have to stay tellable apart. Null (the
+  common case until an admin picks one) falls back to that same red (`worldEventColor`). Pick it to
+  match the drawing's own ink — `rusya-ukrayna-savasi`'s is the blue actually drawn in
+  `assets/olaylar/rusya-ukrayna-savasi.png`, not an arbitrary blue.
 
 Curated from admin.html's **Olaylar** tab (form on the left, the list with each card's own timeline
 editor on the right — the same shape the Ülkeler tab has, because it is the same kind of object: a

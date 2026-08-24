@@ -71,3 +71,19 @@ with neither is what every olay looks like on the day it is created — not a br
 
 Opening an olay leads with a **crop of the map** around its strokes — the same drawing, cropped to
 its own ink with the map put back underneath. Nothing to prepare: it comes from the same file.
+
+## Its colour
+
+An olay can carry its own colour (the admin portal's Olaylar tab, a plain colour picker) — the
+paper's pin, its stamp and its dossier's chapter rail all take it. Pick it to match the ink you
+actually drew the strokes in, not an arbitrary colour: `rusya-ukrayna-savasi`'s is sampled straight
+off `rusya-ukrayna-savasi.png` itself. Left unset, an olay is the site's own red, same as before
+this existed. Several olaylar can be pinned to the board at once, which is the whole reason this
+is here — it is the one surface on the site where the single house red gives way to several.
+
+## Its chapters are a separate thing from this folder
+
+The dated story an olay tells — its chapters, oldest first, each with an optional lead photo — is
+curated in the admin portal, not dropped in as a file. See the OLAYLAR section of `CLAUDE.md` for
+how a chapter differs from every other Zaman Akışı on the site (it reads oldest to newest, not
+newest first) and how a chapter's photo is meant to look.

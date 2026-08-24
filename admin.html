@@ -651,8 +651,10 @@
     }
     .olay-map-pick .olay-map-dot[hidden] { display: none; }
     .upd-form.ce-ev-form { grid-template-columns: auto 1fr 1fr auto; }
-    /* An olay's moment is written date-first too (db/world_events.sql). */
-    .upd-form.we-m-form { grid-template-columns: auto 1fr 1fr auto; }
+    /* A chapter carries a textarea and a photo field, which do not belong
+       crammed into the shared 4-column row -- stacked, full width. */
+    .upd-form.we-m-form { grid-template-columns: 1fr; }
+    .upd-form.we-m-form .wem-new-date { width: 150px; }
     .upd-form button { white-space: nowrap; padding: 6px 10px; font-size: 0.75rem; }
     .upd-status { grid-column: 1 / -1; margin: 0; font-size: 0.75rem; }
     @media (max-width: 600px) {
@@ -1414,8 +1416,11 @@
         hikâye 72 saat sonra gider; olay, bugün hiç haber çıkmasa da orada durur.
       </p>
       <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
-        Sayfanın çoğu <strong>Zaman Akışı</strong>'dır — tarihli kilit anlar, en yenisi üstte.
-        Önce olayı ekleyin, sonra sağdaki kartından anları işleyin.
+        Sayfanın çoğu <strong>Bölümler</strong>'dir — tarihli, isteğe bağlı bir kapak fotoğrafı
+        taşıyabilen bölümler, <strong>en eskisi üstte</strong>. Okuyucu aşağı indikçe günümüze
+        yaklaşır — bir haberin akışının tersi, çünkü bir olay bir gelişme akışı değil, baştan
+        sonu olan bir hikâye. Gazze'nin 2023'ü tek bölüm değil: soykırımdan önceki on yılların her
+        biri kendi bölümü olabilir. Önce olayı ekleyin, sonra sağdaki kartından bölümleri işleyin.
       </p>
       <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
         Okuyucuda Olaylar kutusuna basılınca <strong>haritanın kendisi pano oluyor</strong>: her
@@ -1460,7 +1465,15 @@
       <input type="date" id="we-ended"/>
 
       <label>Metin (opsiyonel)</label>
-      <textarea id="we-body" rows="8" placeholder="Bu şeyin ne olduğunu anlatan birkaç paragraf. Boş satır paragrafları ayırır. Zaman akışı her şeyi söylüyorsa boş bırakın."></textarea>
+      <textarea id="we-body" rows="8" placeholder="Bu şeyin ne olduğunu anlatan birkaç paragraf. Boş satır paragrafları ayırır. Bölümler her şeyi söylüyorsa boş bırakın."></textarea>
+
+      <label>Renk</label>
+      <p style="margin-top:-4px;margin-bottom:6px;font-size:0.7rem;color:var(--muted);font-style:italic;">
+        Panoda bu olayın kâğıdı, iğnesi ve dosyasının bölüm ipi bu renkte olur. Sitenin tek kırmızısı
+        panoda çoğalır çünkü aynı haritada dört-altı olay birden asılı durabiliyor — birbirinden
+        ayırt edilebilmeleri lazım. Çizdiğiniz çizginin rengiyle aynı yapın, mesela Rusya'nınkini mavi.
+      </p>
+      <input type="color" id="we-color" value="#c8322b"/>
 
       <label>Çizim adresi (opsiyonel)</label>
       <p style="margin-top:-4px;margin-bottom:6px;font-size:0.7rem;color:var(--muted);font-style:italic;">
@@ -4672,8 +4685,8 @@ async function deleteCountryEntry(id) {
 // ── Olaylar: the world events themselves (db/world_events.sql) ──
 // The object the news is about. Same editing shape as the Ülkeler tab --
 // a form on the left, a list on the right whose cards carry their own
-// Zaman Akışı editor -- because it is the same kind of thing being kept:
-// a curated page whose value is that somebody maintains its chain.
+// chapter editor -- because it is the same kind of thing being kept:
+// a curated page whose value is that somebody maintains its chapters.
 let WORLD_EVENTS_ADMIN = [];
 
 // Turkish-aware, because the ids are read by people: "Rusya–Ukrayna
@@ -4706,11 +4719,12 @@ async function loadWorldEventsTab() {
   loadWorldEventsList();
 }
 
-// Newest first, exactly as Kütüphane prints it, so what the admin is
-// arranging here is the order the reader will read.
+// OLDEST first, exactly as Kütüphane's dossier prints it -- an olay is a
+// story read from its beginning, not a feed -- so what the admin sees
+// stacked here top to bottom is the order the reader will actually read.
 function worldEventMomentsSorted(ev) {
   return (ev.world_event_moments || []).slice()
-    .sort((a, b) => (a.moment_date < b.moment_date ? 1 : a.moment_date > b.moment_date ? -1 : 0));
+    .sort((a, b) => (a.moment_date < b.moment_date ? -1 : a.moment_date > b.moment_date ? 1 : 0));
 }
 
 async function loadWorldEventsList() {
@@ -4734,6 +4748,7 @@ async function loadWorldEventsList() {
         <div class="upd-info">
           <span class="upd-time">${escapeHtml(m.moment_date)}</span>
           <strong>${escapeHtml(m.title)}</strong>
+          ${m.image_url ? `<span class="upd-body-text">📷 ${escapeHtml(m.image_url)}</span>` : ''}
           ${m.body ? `<span class="upd-body-text">${escapeHtml(m.body)}</span>` : ''}
         </div>
         <button class="btn-edit" data-act="we-m-edit" data-id="${m.id}">Düzenle</button>
@@ -4741,8 +4756,9 @@ async function loadWorldEventsList() {
       </div>
       <div class="upd-edit-form" data-m-edit-id="${m.id}">
         <input type="date" class="wem-date" value="${escapeHtml(m.moment_date || '')}"/>
-        <input type="text" class="wem-title" value="${escapeHtml(m.title)}"/>
-        <textarea class="wem-body" rows="2">${escapeHtml(m.body || '')}</textarea>
+        <input type="text" class="wem-title" value="${escapeHtml(m.title)}" placeholder="Bölüm başlığı"/>
+        <textarea class="wem-body" rows="4">${escapeHtml(m.body || '')}</textarea>
+        <input type="text" class="wem-image" value="${escapeHtml(m.image_url || '')}" placeholder="Fotoğraf (opsiyonel, https://... veya assets/...)"/>
         <input type="text" class="wem-source" value="${escapeHtml(m.source_url || '')}" placeholder="Kaynak (opsiyonel)"/>
         <div class="btn-row">
           <button class="btn btn-primary"   data-act="we-m-save"   data-id="${m.id}">Kaydet</button>
@@ -4750,11 +4766,13 @@ async function loadWorldEventsList() {
         </div>
         <div class="ue-status status-msg"></div>
       </div>
-    `).join('') : '<div style="color:var(--muted);font-size:0.8rem;">Henüz kilit an eklenmedi.</div>';
+    `).join('') : '<div style="color:var(--muted);font-size:0.8rem;">Henüz bölüm eklenmedi.</div>';
     const countries = (ev.world_event_countries || []).map(r => countryNameTr(r.country)).join(', ');
+    const swatch = /^#[0-9a-fA-F]{6}$/.test(ev.color || '') ? ev.color : '#c8322b';
     return `
     <div class="article-card" data-id="${escapeHtml(ev.id)}">
-      <div class="a-neighborhood">${ev.status === 'ended' ? 'SONA ERDİ' : 'SÜRÜYOR'}${
+      <div class="a-neighborhood">
+        <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${swatch};margin-right:4px;vertical-align:middle;"></span>${ev.status === 'ended' ? 'SONA ERDİ' : 'SÜRÜYOR'}${
         ev.started_on ? ' · ' + escapeHtml(ev.started_on) : ''
       }${ev.ended_on ? ' → ' + escapeHtml(ev.ended_on) : ''} · ${escapeHtml(ev.id)}${
         onBoard ? ' · PANODA' : ' · PANODA DEĞİL'
@@ -4768,13 +4786,14 @@ async function loadWorldEventsList() {
           : escapeHtml(`x ${ev.paper_x} · y ${ev.paper_y}`)
       }</p>
       <div class="sources-block">
-        <div class="sources-label">Zaman Akışı (${moments.length})</div>
+        <div class="sources-label">Bölümler (${moments.length})</div>
         ${momentsHtml}
         <div class="we-m-form upd-form">
           <input type="date" class="upd-date wem-new-date" title="Tarih"/>
-          <input type="text" class="wem-new-title" placeholder="Kilit an (başlık)"/>
-          <input type="text" class="wem-new-body" placeholder="Ek detay (opsiyonel)"/>
-          <button class="btn btn-secondary" data-act="we-m-add" data-event-id="${escapeHtml(ev.id)}">+ An Ekle</button>
+          <input type="text" class="wem-new-title" placeholder="Bölüm başlığı"/>
+          <textarea class="wem-new-body" rows="3" placeholder="Bölümün metni (opsiyonel). Boş satır paragraf ayırır; kendi [[img::URL]] satırı ek fotoğraf ekler."></textarea>
+          <input type="text" class="wem-new-image" placeholder="Kapak fotoğrafı (opsiyonel, https://... veya assets/...)"/>
+          <button class="btn btn-secondary" data-act="we-m-add" data-event-id="${escapeHtml(ev.id)}">+ Bölüm Ekle</button>
           <div class="upd-status status-msg"></div>
         </div>
       </div>
@@ -4811,6 +4830,7 @@ async function addWorldEventMoment(btn) {
   const dateEl = form.querySelector('.wem-new-date');
   const titleEl = form.querySelector('.wem-new-title');
   const bodyEl = form.querySelector('.wem-new-body');
+  const imageEl = form.querySelector('.wem-new-image');
   const moment_date = dateEl.value;
   const title = titleEl.value.trim();
 
@@ -4830,6 +4850,7 @@ async function addWorldEventMoment(btn) {
     moment_date,
     title,
     body: bodyEl.value.trim() || null,
+    image_url: imageEl.value.trim() || null,
   }]);
 
   btn.disabled = false;
@@ -4839,7 +4860,7 @@ async function addWorldEventMoment(btn) {
     statusEl.className = 'upd-status status-msg err';
     return;
   }
-  dateEl.value = ''; titleEl.value = ''; bodyEl.value = '';
+  dateEl.value = ''; titleEl.value = ''; bodyEl.value = ''; imageEl.value = '';
   loadWorldEventsList();
 }
 
@@ -4864,6 +4885,7 @@ async function saveWorldEventMoment(btn) {
     moment_date,
     title,
     body: form.querySelector('.wem-body').value.trim() || null,
+    image_url: form.querySelector('.wem-image').value.trim() || null,
     source_url: form.querySelector('.wem-source').value.trim() || null,
   }).eq('id', btn.dataset.id);
 
@@ -4878,7 +4900,7 @@ async function saveWorldEventMoment(btn) {
 }
 
 async function deleteWorldEventMoment(id) {
-  if (!confirm('Bu kilit anı sil?')) return;
+  if (!confirm('Bu bölümü sil?')) return;
   const { error } = await sb.from('world_event_moments').delete().eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   loadWorldEventsList();
@@ -4897,6 +4919,7 @@ function editWorldEvent(ev) {
   document.getElementById('we-started').value = ev.started_on || '';
   document.getElementById('we-ended').value = ev.ended_on || '';
   document.getElementById('we-body').value = ev.body || '';
+  document.getElementById('we-color').value = /^#[0-9a-fA-F]{6}$/.test(ev.color || '') ? ev.color : '#c8322b';
   document.getElementById('we-image').value = ev.image_url || '';
   document.getElementById('we-paper-x').value = ev.paper_x == null ? '' : ev.paper_x;
   document.getElementById('we-paper-y').value = ev.paper_y == null ? '' : ev.paper_y;
@@ -4923,6 +4946,7 @@ function resetWorldEventForm() {
   document.getElementById('we-started').value = '';
   document.getElementById('we-ended').value = '';
   document.getElementById('we-body').value = '';
+  document.getElementById('we-color').value = '#c8322b';
   document.getElementById('we-image').value = '';
   document.getElementById('we-paper-x').value = '';
   document.getElementById('we-paper-y').value = '';
@@ -5042,6 +5066,7 @@ document.getElementById('we-submit-btn').addEventListener('click', async () => {
     // rather than trusted to be left blank.
     ended_on: status === 'ended' ? (document.getElementById('we-ended').value || null) : null,
     body: document.getElementById('we-body').value.trim() || null,
+    color: document.getElementById('we-color').value || null,
     image_url: document.getElementById('we-image').value.trim() || null,
     paper_x: document.getElementById('we-paper-x').value === '' ? null
       : Number(document.getElementById('we-paper-x').value),
