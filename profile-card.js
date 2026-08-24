@@ -753,11 +753,15 @@
     }
 
     const palettePref = normalizePalette(profile?.palette_pref);
+    const themePrefForApply = normalizeTheme(profile?.theme_pref);
     // Apply the freshly-fetched DB value now, synchronously, so the
     // avatar (and everything else gated on Palette.current) renders in
     // the right colors immediately instead of racing the slower
     // Palette.syncFromSupabase call some pages also make on load.
-    if (global.Palette) global.Palette.setPalette(palettePref);
+    if (global.Palette) {
+      global.Palette.setPalette(palettePref);
+      global.Palette.setTheme(themePrefForApply);
+    }
 
     return {
       sb, I18N, user, profile, kefaletCount, sponsoredList, sozcuCount, kefilOfUser,
@@ -1762,6 +1766,7 @@
     if (msg) msg.textContent = '';
     state.profile = Object.assign({}, state.profile, { [pref.column]: value });
     if (key === 'palette' && global.Palette) global.Palette.setPalette(value);
+    if (key === 'theme' && global.Palette) global.Palette.setTheme(value);
     if (key === 'lang' && state.I18N && state.I18N.setLang) state.I18N.setLang(value);
     // The block is rebuilt rather than patched: a language change rewrites
     // every label on it, and the marks have to agree with what was just
@@ -2694,9 +2699,12 @@
       const { data, error } = await sb.from('profiles').update(payload).eq('id', user.id).select('id');
       if (error) throw error;
       if (!data || data.length === 0) throw new Error('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
-      // Cache the new palette locally so the reload starts in the right
-      // colors instead of flashing the old palette.
-      if (global.Palette) global.Palette.setPalette(newPalette);
+      // Cache the new palette/theme locally so the reload starts in the
+      // right colors instead of flashing the old ones.
+      if (global.Palette) {
+        global.Palette.setPalette(newPalette);
+        global.Palette.setTheme(newTheme);
+      }
       setTimeout(() => window.location.reload(), 400);
     } catch (err) {
       btn.textContent = t('profile.save');

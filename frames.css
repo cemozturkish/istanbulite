@@ -106,7 +106,15 @@
 }
 
 /* Dark mode — flip the base palette so frames stay readable, and
-   make the canvas the darkest tone with a stronger shadow. */
+   make the canvas the darkest tone with a stronger shadow. This is the
+   OS-driven default: it fires purely off prefers-color-scheme, same as
+   always, for a first paint before palette.js has set data-theme (or if
+   it never runs) and for anyone who has never touched Görünüm. The
+   second selector below — same media query, one specificity notch
+   higher — is the escape hatch: a member who explicitly picked "Açık"
+   in the profile sheet still gets dark mode's colors here unless that
+   block cancels them back to light, because this rule doesn't know
+   about data-theme at all. */
 @media (prefers-color-scheme: dark) {
   :root {
     --ink:          #f1e6d9;
@@ -145,6 +153,102 @@
       0 6px 14px rgba(0, 0, 0, 0.65),
       0 1px 2px rgba(0, 0, 0, 0.40);
   }
+
+  /* Explicit "Açık" (light) under earth, cancelling the block above —
+     the GÖRÜNÜM slider in the profile sheet used to write theme_pref to
+     the DB and never do anything else with it, so "Açık" still showed
+     this file's dark colors under system dark mode (palette-card white
+     showing black, etc). palette.js now mirrors theme_pref onto
+     data-theme (like it already does for data-palette), and this
+     compound selector — :root[data-palette="earth"][data-theme="light"],
+     specificity (0,3,0) — beats the plain :root two rules up regardless
+     of source order. Deliberately scoped inside this same media query:
+     outside it, it would win unconditionally and flatten every page's
+     own light-mode tuning (anahane's translucent white --paper-card,
+     kahvehane's darker one, …) even in the ordinary case of a light OS,
+     which is the one case that must be left completely alone. Values
+     mirror kahvehane.html's inline :root — the shared ones every earth
+     page but anahane already agrees on. */
+  :root[data-palette="earth"][data-theme="light"] {
+    --ink:          #4C382A;
+    --ink-deep:     #4C382A;
+    --paper:        #eddbd0;
+    --paper-warm:   #eddbd0;
+    --paper-card:   #b8947a;
+    --paper-banner: #c9ae9a;
+    --paper-navbar: #b89b7f;
+    --paper-dark:   #d8c0b1;
+    --hover:        #d8c0b1;
+    --field-bg:     #e8d3c8;
+    --accent:       #4C3B31;
+    --accent-2:     #775E4C;
+    --muted:        #867264;
+    --rule:         #b8a08a;
+    --hairline:     #c5ad9a;
+    --whisper:      #d4bbad;
+    --ink-red:      #B93631;
+    --brown-1:      #b8947a;
+    --brown-2:      #866955;
+    --brown-3:      #775742;
+    --brown-4:      #4C3B31;
+
+    --page-bg: #f1dfc6;
+    --frame-bg: #e3cdbe;
+    --frame-shadow:
+      0 12px 28px -6px rgba(76, 56, 42, 0.42),
+      0 4px 10px -2px rgba(76, 56, 42, 0.28),
+      0 1px 2px rgba(76, 56, 42, 0.18);
+    --frame-shadow-strong:
+      0 18px 38px -8px rgba(76, 56, 42, 0.50),
+      0 6px 14px -2px rgba(76, 56, 42, 0.34),
+      0 1px 2px rgba(76, 56, 42, 0.20);
+  }
+}
+
+/* Explicit "Koyu" (dark) under earth, forced even when the OS is light —
+   the one direction the media query above can never reach on its own,
+   since it only ever fires off prefers-color-scheme. Unconditional (no
+   media query), so :root[data-palette="earth"][data-theme="dark"]'s
+   (0,3,0) beats every page's own inline :root (0,1,0) outright. This is
+   new reach, not a cancellation, so unlike the light block above it is
+   deliberately NOT scoped to stay out of the ordinary case — choosing
+   Koyu is the ordinary case it exists for. Same homogenizing effect
+   system dark mode already has on every earth page (this block's values
+   are that same dark set); mono still ignores it entirely, same as
+   always. */
+:root[data-palette="earth"][data-theme="dark"] {
+  --ink:          #f1e6d9;
+  --ink-deep:     #f7eee2;
+  --paper:        #2a1f17;
+  --paper-warm:   #2a1f17;
+  --paper-card:   #3a2c20;
+  --paper-banner: #4a382a;
+  --paper-navbar: #1c130b;
+  --paper-dark:   #251910;
+  --hover:        #3a2c20;
+  --field-bg:     #251a13;
+  --accent:       #d6bda3;
+  --accent-2:     #b8997f;
+  --muted:        #9c8268;
+  --rule:         #4a382a;
+  --hairline:     #3a2c20;
+  --whisper:      #2f2218;
+  --ink-red:      #E58D88;
+  --brown-1:      #a88a72;
+  --brown-2:      #b89580;
+  --brown-3:      #c9aa90;
+  --brown-4:      #d4bba0;
+
+  --page-bg: #040200;
+  --frame-bg: #352720;
+  --frame-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.72),
+    0 4px 10px rgba(0, 0, 0, 0.55),
+    0 1px 2px rgba(0, 0, 0, 0.40);
+  --frame-shadow-strong:
+    0 20px 44px rgba(0, 0, 0, 0.80),
+    0 6px 14px rgba(0, 0, 0, 0.65),
+    0 1px 2px rgba(0, 0, 0, 0.40);
 }
 
 /* ── PAGE CANVAS ─────────────────────────────────────────────── */
