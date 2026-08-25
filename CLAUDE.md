@@ -1104,13 +1104,17 @@ geometry and no centred modal anywhere on the site.
   country they are about stays visible, and a wash laid over it takes back exactly what the resting
   position had just given. But the drawing must not stay at full strength either, or the page never
   reads as having gone quiet — so **the tint over the map is painted by the traced overlay itself**
-  (`IstSheet.lightTheMap`): one rect inside `svg.map-svg`, masked by the district shapes cloned into
-  a `<mask>`. Inside that svg it is registered with the drawing by construction — same viewBox, same
-  parallax drift, same pinch-zoom — which is the whole reason it is built in there rather than
-  layered over the top. Three details that fail silently: the shapes are **cloned, not `<use>`d**
-  (a use-instance keeps the original's styles, and `.neighborhood` is `fill: transparent`, so every
-  hole came out invisible); the clones are stripped of `id` and `class` (a second element answering
-  to `sariyer` breaks `getElementById`); and what is punched out is the **whole city**
+  (`IstSheet.lightTheMap`): one path inside `svg.map-svg`. Inside that svg it is registered with the
+  drawing by construction — same viewBox, same parallax drift, same pinch-zoom — which is the whole
+  reason it is built in there rather than layered over the top. **One `fill-rule: evenodd` path, not
+  a masked rect**: the obvious spelling is a `<rect>` with the districts in a `<mask>`, and it is the
+  expensive one — a mask makes the engine allocate and rasterise a second surface the size of the
+  masked box, and on a phone that arrived a beat after the backdrop it was supposed to be moving
+  with, so the map was visibly the last thing to go quiet. An outer rectangle with every district as
+  a subpath inside it draws the same picture as one ordinary fill. Two more details that fail
+  silently: the subpaths are **built from the shapes' own geometry**, never `<use>`d (a use-instance
+  keeps the original's styles, and `.neighborhood` is `fill: transparent`, so every hole came out
+  invisible); and what is punched out is the **whole city**
   (`.neighborhood, .country, .map-unaccommodated`) — the districts this app doesn't serve are still
   İstanbul, and leaving them dark read as half the city being broken. What stays quiet is the sea
   and `.map-istanbul-disi`, the land beyond the city. The rect's resting state (`fill`, `opacity: 0`)
@@ -1122,7 +1126,13 @@ geometry and no centred modal anywhere on the site.
   resolved opacity is already 1, nothing is left for a transition to interpolate, and the map snaps
   to dark while the band below it fades over the full 0.55s. Two tints, one instant and one
   gradual, is exactly the desync that read is there to stop. It is also built eagerly on load, so
-  the common case is that a sheet opening finds it long settled. Hane is unaffected
+  the common case is that a sheet opening finds it long settled. And **which of the two tints is on
+  is decided in one place** — `IstSheet.syncDim` toggles `html.ist-dim-on` in the same frame the
+  backdrop's own class lands. It was `body:has(.ist-sheet-dim.open)`, and a `:has()` spanning the
+  whole body is re-evaluated on the engine's own schedule: when it landed a frame or two late, the
+  map lagged the band. Two tints meant to read as one movement cannot be driven by two different
+  mechanisms. Anything that drops `.open` by hand instead of through `IstSheet.close` calls
+  `syncDim()` itself (see `snapEventPageShut`). Hane is unaffected
   — its hero is the petek, which is the page itself rather than scenery behind one.
 - **Phones:** the sheet's side gaps are the same `--screen-inset` (frames.css) the profile bar's
   row is padded to — everything stacked over the same map lines up, always.
