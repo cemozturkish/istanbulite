@@ -11,17 +11,21 @@
   <script src="safe-area-ready.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
-  <script src="router.js?v=3"></script>
-  <script src="i18n.js?v=9"></script>
+  <script src="router.js?v=4"></script>
+  <script src="i18n.js?v=15"></script>
   <script src="palette.js"></script>
   <script src="loading-screen.js?v=2"></script>
   <link rel="stylesheet" href="palette.css">
   <link rel="stylesheet" href="loading-screen.css?v=2">
-  <script src="game-locks.js"></script>
-  <link rel="stylesheet" href="profile-card.css?v=12">
+  <script src="game-locks.js?v=2"></script>
+  <!-- "İlgimi çekti": what the reader kept out of Kahvehane's event deck.
+       This column is the other end of that gesture. Shared with
+       kahvehane.html. -->
+  <script src="event-interest.js"></script>
+  <link rel="stylesheet" href="profile-card.css?v=16">
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
-  <script src="profile-card.js?v=11" defer></script>
+  <script src="profile-card.js?v=15" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
   <link rel="stylesheet" href="mahalle-picker.css">
@@ -43,8 +47,8 @@
       } catch(e) {}
     })();
   </script>
-  <script src="sheet.js"></script>
-  <link rel="stylesheet" href="sheet.css?v=2">
+  <script src="sheet.js?v=5"></script>
+  <link rel="stylesheet" href="sheet.css?v=6">
   <style data-page="anahane">
     :root {
       /* Core ink & paper — cool cream newspaper palette */
@@ -440,13 +444,13 @@
     }
 
     /* ── THE PETEK PAGE ──
-       Hane is the petek: the grid fills the middle cell, and the dock
-       (your own code for the week, or whatever hexagon is open) rests at
-       its foot. Everything about how it is drawn — the cell size, the
-       packing, the window it is scaled into — belongs to .ist-hive-page
-       in profile-card.css, which is one implementation rather than a
-       geometry this page restates. All that is this page's own is the
-       cell it stands in. */
+       Hane is the petek: the grid fills the middle cell, and the reader
+       pulls up and down through its three depths inside it (see
+       HIVE_LEVELS in profile-card.js). Everything about how it is drawn
+       — the cell size, the packing, the window it is scaled into, the
+       levels — belongs to .ist-hive-page in profile-card.css, which is
+       one implementation rather than a geometry this page restates. All
+       that is this page's own is the cell it stands in. */
     .petek-page {
       height: 100%;
       min-height: 0;
@@ -535,6 +539,29 @@
       transition: background 0.15s, transform 0.15s ease;
     }
     .event-item:last-child { margin-bottom: 0; }
+    /* The reader has a city with things on in it and has kept none of
+       them yet -- the same dashed frame the decks on the other two pages
+       end with, saying where the deck is rather than apologising for an
+       empty column. */
+    .events-empty {
+      padding: 16px 12px;
+      text-align: center;
+      border: 2px dashed var(--rule);
+      background: transparent;
+      box-sizing: border-box;
+    }
+    .events-empty-line {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .events-empty-sub {
+      margin-top: 3px;
+      font-size: 0.72rem;
+      font-style: italic;
+      color: var(--muted);
+    }
     .event-item .ev-date-block {
       text-align: center;
       padding-top: 14px;
@@ -1836,12 +1863,27 @@ function markOpenEventCard(id) {
   if (el) el.classList.add('is-open');
 }
 
+// What the member kept. The city's whole calendar is dealt with one card
+// at a time on Kahvehane -- thrown right is "ilgimi çekti", thrown left
+// is gone (see event-interest.js) -- and this column is the other end of
+// that gesture: the evenings that were actually theirs, standing beside
+// the people they would be standing next to. A list of everything on in
+// İstanbul is a listings page; this is a plan.
+function keptEvents() {
+  // No store, no filter: the column degrades to the whole city's list
+  // rather than to an empty page, which is the failure a reader can
+  // actually make sense of.
+  if (!window.IstEventInterest) return allEvents;
+  const kept = IstEventInterest.interestedIds(window.__currentUser && window.__currentUser.id);
+  return allEvents.filter(ev => kept.has(String(ev.id)));
+}
+
 function renderEvents(instant) {
   const panel = document.getElementById('events-panel');
   if (!panel) return;
   // 'left': this column sits to the left of the map, so its cards enter
   // and leave by the left edge -- the same way the comments did here.
-  renderEventsNow(panel, allEvents);
+  renderEventsNow(panel, keptEvents());
 }
 
 // Full detail markup for an event -- rendered into the detail sheet (see
@@ -1879,9 +1921,17 @@ function buildEventDetailHtml(ev) {
 
 function renderEventsNow(panel, rows) {
   if (!rows.length) {
-    // Nothing to say when there is no event: an empty column leaves the
-    // map behind it clear, rather than printing a line over the drawing.
-    panel.innerHTML = '';
+    // Two different empties, and they are not the same thing. A city with
+    // nothing on says nothing at all -- an empty column is quieter than a
+    // line apologising for itself. But a city with events on and none of
+    // them kept is a reader who hasn't been through the deck yet, and
+    // that is worth one line pointing at where it is.
+    panel.innerHTML = allEvents.length ? `
+      <div class="events-empty">
+        <div class="events-empty-line">${esc(I18N.t('home.events.kept'))}</div>
+        <div class="events-empty-sub">${esc(I18N.t('home.events.emptysub'))}</div>
+      </div>
+    ` : '';
     return;
   }
   const rowsById = new Map(rows.map(ev => [String(ev.id), ev]));

@@ -148,6 +148,7 @@ default one.
 ├── profile-card.js/.css  # Profile bar (the phone's top bar), avatar, badges — shared across pages
 ├── onboarding.js/.css    # New-account onboarding flow
 ├── game-locks.js         # Per-day game on/off enforcement + the sequence's question gates
+├── event-interest.js     # "İlgimi çekti": the verdict Kahvehane's event deck records, Hane reads
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
 ├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it
 ├── i18n.js               # TR/EN language toggle
@@ -233,25 +234,23 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 
 ## Database Schema
 
-> **Note:** the tables documented below are the core set — and this document is the only place
-> they are written down. `profiles`, `neighborhoods`, `articles`, the two comment tables and the
-> core functions (`is_admin()`, `handle_new_user()`, `verify_kefil_code()`) exist **only in
-> Supabase**; no file in `db/` creates them, so the folder cannot rebuild a database from nothing.
->
-> What `db/` holds is everything that came after: one migration per feature, in families that have
-> to be run in order — events + `event_rsvps`, `breaking_news` + polls/series/updates,
-> `library_articles`/shelves/letters/categories, `game_results`, avatar item columns,
-> `profile_badges`, `politicians` + `political_seats` (one seat per district, the two fixed
-> national/city ones, and one per country on Kütüphane's map), TBMM seats/parties, `mahalles`,
-> `admin_notifications`, Sözcel sözcü assignments, `coffee_prices` (the Kahve Endeksi),
-> `coffee_comments`, `country_entries` + `country_entry_events` + `country_stories` +
-> `country_story_countries`, `breaking_news_countries`, `daily_questions` + `question_answers`,
-> and the petek's `hive_cells` + `hive_bonds` + `hive_slot_offers`.
->
-> `db/README.md` maps every family and its order; one-off data imports live in `db/seed/`; and
-> `db/check_migrations.sql` — which changes nothing — reports file by file which of them a given
-> database has actually had run. When in doubt, read the relevant `db/` file: for everything built
-> on top of the core above, it is the source of truth.
+> **Note:** the tables documented below are the core set. The complete, current schema lives in
+> `db/*.sql` — later features each have their own migration file there (events + `event_rsvps`,
+> `breaking_news` + polls/series/updates, `library_articles`/shelves/letters/categories,
+> `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians` +
+> `political_seats` (one seat per district, the two fixed national/city ones, and one per country
+> on Kütüphane's map — `db/political_seats_countries_seed.sql` fills that last set), TBMM
+> seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `coffee_prices`
+> (the Kahve Endeksi — v3 adds the opening-hours and scheduled-discount columns that make it
+> live), `coffee_comments` (what members say about a venue), `countries` + `country_entries`
+> + `country_entry_events` + `country_stories` + `country_story_countries` (what a country on
+> Kütüphane's map opens, the key-moment timeline an entry can carry, and which countries light
+> and open together as one story), `world_events` + `world_event_moments` +
+> `world_event_countries` (the OLAYLAR — the world events themselves, with their per-olay colour,
+> where their paper hangs on the map, the countries an open one lights, and their chapters —
+> oldest first, each optionally carrying its own photo) and `breaking_news_countries` (which
+> countries a Dünya story is about, lit on that map when the story opens), and more). When in doubt, read the relevant `db/` file — it is the
+> source of truth.
 
 **Table: `neighborhoods`** — lookup of valid neighborhood IDs.
 - `id text pk` (kebab-case slug), `name_tr text` (Turkish display name).
@@ -467,18 +466,31 @@ sb.from('articles').delete().eq('id', id)
   drawing with nothing to pick on it. **Hane names no seat at all** — the profile bar over it
   carries you alone, centred in the row. A seat names whoever holds power over what the page is
   showing, and what this page shows is the people; there is no map on it for a seat to be true of,
-  and the two sides are where power is a fact (Kahvehane's district, Kütüphane's countries)
-- **The events are the column beside it** (`#events-panel`, `events` / `event_rsvps`), back from
-  Kahvehane. They belong next to the petek: the petek is who you are standing next to, an event is
-  the one thing on the site that ends with you actually standing next to them. Unscoped by
-  construction — there is no map here to filter by, so it is the whole city's list, each card
-  kickered with its own district. Opening a card rises the page's detail sheet with the description
-  and a live RSVP row
+  and the two sides are where power is a fact (Kahvehane's district, Kütüphane's countries). The
+  one thing that ever stands in your place there is **another member**, put there by pressing their
+  hexagon on the petek — which is the people again, not a seat (see the petek's own section)
+- **The events are the column beside it** (`#events-panel`, `events` / `event_rsvps`). They belong
+  next to the petek: the petek is who you are standing next to, an event is the one thing on the
+  site that ends with you actually standing next to them. Opening a card rises the page's detail
+  sheet with the description and a live RSVP row
+- **And it is what the member KEPT, not the city's whole calendar** (`keptEvents`,
+  `event-interest.js`). The calendar is dealt with one card at a time on Kahvehane — thrown right
+  is "ilgimi çekti", thrown left is gone (see that page's own section) — and this column is the
+  other end of that gesture: the evenings that were actually theirs, standing beside the people
+  they would be standing next to. A list of everything on in İstanbul is a listings page; this is a
+  plan. Two empties, and they are not the same thing: a city with nothing on prints nothing, while
+  a city with events on and none of them kept prints one line pointing at the deck
+  (`.events-empty`). If the store is missing entirely the column degrades to the whole city's list
+  rather than to an empty page — that is the failure a reader can make sense of
 - On a phone the petek stands in the hero square the map used to hold and the events hang from the
   bottom of the band below it, so the hero line is exactly where it is on the other two pages
+- **The petek has three depths and the reader pulls up and down through them** — you alone at the
+  innermost, the six places touching you in the middle, the whole shape at the outermost, where the
+  seats can actually be handed out. One drawing zoomed, not three pages; see the petek's own section
+  under Site-wide defaults
 - The personal layer lives here: the user's own profile, avatar, home identity. Opening your
   profile card on this page shows the cover alone — the petek is the page, not a block inside your
-  account
+  account, and what is yours to change is printed on the petek's innermost depth
 - Vision: this page is "you + the people" — see Vision & Product Philosophy above
 
 ### `admin.html` — Admin Dashboard
@@ -499,6 +511,11 @@ sb.from('articles').delete().eq('id', id)
   recorded", which keeps the venue listed around the clock — the behaviour of every row
   entered before this existed. A live preview under the form shows what the venue being
   edited is doing at this exact minute, and each row in the list carries the same read-out
+- **Olaylar tab** curates the world events (`world_events`) Kütüphane's middle box opens —
+  the olay itself (including its own colour and where its paper hangs) on the left, and on the
+  right a list whose every card carries its own chapter editor, oldest chapter first, each with
+  a room for its own lead photo. See "OLAYLAR — the world events themselves" below for what an
+  olay is and how it differs from a seri and from a country hikâye
 - **Oyunlar tab** combines all three games' admin panels in one place: a shared per-day
   on/off board (next 7 days × Sözcel/Tümcel/Bulmaca, backed by `game_day_toggles`) at the
   top, then sub-nav pills to switch between each game's own management panel (Sözcel sözcü
@@ -510,11 +527,18 @@ sb.from('articles').delete().eq('id', id)
 
 ### `kahvehane.html` — Coffeehouse (RIGHT page, zoom IN — the local, interactive side)
 - Istanbul district map with mahalle-level picker
-- **The Kahve Endeksi is a button in the top-right corner** (see below), the same door
-  Kütüphane's Makaleler/Posta Kutusu boxes are. The events that held the other column went back
-  to Hane, beside the petek — the people and where they will be are one page now. The band under
-  the map is the day's games alone: on a phone `#main-site` is one column, and `.col-left` (the
-  mayor's card, the parked comments) is `display: none` there
+- **Two buttons stand in the two top corners** (`.corner-boxes`), the same pair Kütüphane's
+  Makaleler/Posta Kutusu boxes are: the **Kahve Endeksi** on the left (`#coffee-box`, see below)
+  and the week's **Skor Tahtası** on the right (`#scoreboard-box`)
+- **The band under the map is TWO decks**: the city's events in its bottom-left corner
+  (`#events-deck`), the day's games in its bottom-right one (`#game-deck`). On a phone `#main-site`
+  is two equal columns in row 2 — `.col-left` holds the events (the mayor's card and the parked
+  comments inside it stay hidden), `.col-right` the games — and each deck fills its own half, so
+  the channel between them is exactly the distance each keeps from its own outer screen edge
+  (`--deck-inset` / `--deck-channel-pad`, stated once on `#main-site` because the two halves have
+  to agree or the channel is off-centre). That is why the decks stretch rather than sizing to their
+  own cards, as the games deck did while it *was* the whole band: two content-width decks leave a
+  gap whose width is decided by whichever card carries the longest word
 - The **neighborhood comments are parked**, not deleted: their column belongs to the index and
   where the comments belong is still an open question, so the feed, its composer and everything
   driving them stay exactly as they are behind `const COMMENTS_ENABLED = false` plus `hidden` on
@@ -538,15 +562,65 @@ sb.from('articles').delete().eq('id', id)
   headline, what it is under that — the type sizes are `.article`'s own. Three squares side by
   side said nothing about order; a stack of cards in order says it without a word. The deck sits
   in the band's **bottom-right corner** — down against the tab bar like every other phone stack
-  (`margin-top: auto`), and over on the thumb side (`align-self: flex-end`, because `.game-picker`
-  packs its cross axis to `flex-start` for the desktop row's sake). It keeps the cards' own width
-  rather than filling the band: a deck is a hand of cards, not a panel, and it reads as one by not
-  spanning everything. A game already played today is inked over the way a story you have dealt
+  (`margin-top: auto`), and filling its own half of the band (`align-self: stretch`; see the two
+  decks' channel above for why it no longer keeps the cards' own width). A game already played today is inked over the way a story you have dealt
   with is gone — *played* meaning finished (`attempts >= 1`), never merely opened: a game left
   half-done stays on top of the deck, marked, because it is exactly what the reader still has in
   front of them. Sözcel's
+  A game the admin has switched **off** for the day (`game_day_toggles`) is not in the deck at
+  all — it is not a step the reader has left to take, and a card that can never be dealt is a deck
+  that can never be emptied. So a day whose only game is Sözcel ends on "Hepsi bu kadar." the
+  moment Sözcel is done, exactly as Kütüphane's news deck does. **An emptied deck's dashed frame
+  takes the band's own width** rather than its text's: a box whose width is decided by a line of
+  type lands on a fractional pixel, and WebKit drops the LEFT edge of a dashed border sitting on
+  one — the frame printed with three sides and no visible reason for the fourth to be missing.
+  Stretching it (`:has(> .deck-done:only-child)`) puts both edges back on whole pixels, and is the
+  right picture anyway, since that is the width the same frame has always had on Kütüphane. The admin keeps theirs, the same
+  way their nav link stays open (`IstGameLocks.offGamesToday`, game-locks.js). Sözcel's
   wordmark is a tile's way of saying its name — in the deck it says it in the headline like every
   other card. The desktop three-square tiles are untouched
+- **The events are a deck in the other corner** (`#events-deck`, `loadKahveEvents`,
+  `event-interest.js`) — the same object as the games beside it and as Kütüphane's news, in the
+  same terms: cards laid on top of each other, only the front one live, the depth `nth-child` and
+  nothing else, dealt by being *thrown* rather than by being opened. An event card is a news card
+  too: kicker (the district — this page has a map, so the word has something to point at), the
+  event as the headline, when it is under that. The deck is the **whole city's**, never the
+  district the map is scoped to: an event is a reason to cross town, and a list that quietly shrank
+  to the district under the reader's thumb would be the app talking them out of exactly that. **The
+  corner is never blank**: the two empties still say different things — a deck the reader emptied
+  themselves is told so and pointed at the door, a city with nothing on says exactly that
+  (`events.none`) — but both say it inside the same dashed frame (`deckFrameHTML`), because a
+  corner with nothing in it at all reads as the deck being broken rather than as there being
+  nothing on. Kütüphane's news column still goes blank when there is no news: that is a whole
+  column over a map, and an apology printed across it is a bigger object than this one
+- **What the throw means here is a verdict, not "next"**: right is **İlgimi çekti**, left **İlgimi
+  çekmedi**, stamped on the paper as it goes (`.ev-swipe-cue`) so nobody gives a verdict they never
+  saw. **And the throw is the only way to give one** — there is deliberately no row of buttons on
+  the page: it is the one thing this page asks of the reader, and a page carrying both says the
+  gesture is the shortcut and the buttons are the real way, which is the wrong way round. It is
+  also the gesture the news deck and the question cards have already taught. A desktop reader has
+  no finger, so there the mouse drags the page itself (`wireEventPageSwipe` binds both, one set of
+  three steps behind them). What is thrown right is
+  what Hane prints beside the petek — so the two pages are one move: you sort the city's calendar
+  on the local side, and what you kept is waiting for you in the middle. That is the mall stairway
+  in its smallest form: the member who came for the games walks the whole city's calendar on the
+  way, and leaves with the two or three evenings that were actually theirs. The verdict is kept per
+  member in `localStorage` (`ev_interest_<uid>`), the same store the news deck's dealt list is and
+  for the same reason — a verdict is the reader's own working state, not something anybody else is
+  entitled to read. `event-interest.js` is its own file because both pages need it and the two
+  share one document under router.js, where a copy in each page's script is a copy that drifts
+- **A card opens into the band, not over the map** (`#event-overlay`, `openEventPage`,
+  `growEventPage`) — the same object, and the same argument, as Kütüphane's news page: the page
+  lights the event's district on the map above (`lightMapDistrict`), and a sheet rising over that
+  map would cover the very thing it had just lit. So on a phone the tapped card *grows* into the
+  whole band — both halves, its own and the games' — off a `clip-path` measured from the card's own
+  box, and folds back into it on the way out. Head / body / foot, only the middle scrolling. On
+  desktop there is no band and no map to protect, so it stays THE sheet
+- **The band under it goes quiet, and so does everything but the city** — the same tint the Kahve
+  Endeksi and the Skor Tahtası rise with (`.ist-sheet-dim`), which stops at the hero line and is
+  then painted over the map by the map's own traced overlay, with the districts punched out of it
+  (see THE sheet's own section). Here the tint takes no taps at all: the whole band is
+  the page, so there is no backdrop left to press, and the map above has to stay live
 - **The direction is the answer**, exactly as on a news story: right is the first option, left the
   second, and the option is stamped on the card as it goes (`.q-cue`) so nobody answers a question
   they never saw. The two buttons say the same thing for a mouse. Tümcel stays locked until the
@@ -559,8 +633,8 @@ sb.from('articles').delete().eq('id', id)
   the phone deck's depth is `nth-child`, a card taken out of it is removed from the DOM rather than
   hidden — a hidden child still counts, and one left in place would push the next card past the
   rule that stops drawing them
-- The **coffee price index** (Kahve Endeksi, `coffee_prices` table) opens from **one button in
-  the top-right corner** (`.corner-boxes` > `#coffee-box`) as THE sheet (`#coffee-overlay`), which
+- The **coffee price index** (Kahve Endeksi, `coffee_prices` table) opens from **the top-LEFT
+  corner button** (`.corner-boxes` > `#coffee-box`) as THE sheet (`#coffee-overlay`), which
   is where `#coffee-index-panel` itself now lives: the cheapest cup of coffee per venue, in the
   district the map is scoped to or all of İstanbul. It stood open as the left column for a while;
   it is a destination again, because what the band under the map is *for* is the day's games — a
@@ -572,6 +646,17 @@ sb.from('articles').delete().eq('id', id)
   shows the wrong district. **Read-only for everyone** — the index is curated from the admin portal only
   (admin.html's "Kahve" tab), and RLS allows writes to the admin alone
   (`db/coffee_prices_v2_admin_only.sql`)
+- The **weekly scoreboard opens from the other corner** (`#scoreboard-box` → `#scoreboard-overlay`,
+  THE sheet). It needed a door of its own because the games are **fleeting**: a game card is dealt,
+  played and inked over, and the board only ever surfaced as the desktop panel that slides in over
+  the discussion feed *while a game is open* (`.game-score-slide`, >1240px) — so on a phone the
+  score a member had just earned was nowhere to be seen the moment they finished. There is still
+  **one** board and not two: the single `#scoreboard-board` node is moved into the sheet on opening
+  and put back into `.game-score-slide` after it closes, so every `#scoreboard-*` id
+  `loadScoreboard()` targets stays exactly one element wherever the board is standing. It re-reads
+  on each opening (a week rolls over while a page stays open) and follows the map's scope, the same
+  rule the index follows
+
 - The index is a **live board, not a printed list** — it is meant to be accurate about the cup
   you could go and buy right now, the way a market board is accurate about a price. A venue
   outside its opening hours drops out of the ranking and sinks to the bottom of the board,
@@ -662,14 +747,19 @@ sb.from('articles').delete().eq('id', id)
   and keeps its own page in the reader sheet (see `openCountryEntryReader`); the objects printed
   inside either — sources, the timeline, its polls — are one set of rules
   (`:is(.article, .news-page)`)
-- **Makaleler and Posta Kutusu are two small buttons in the two top corners**, under the profile
-  bar — Makaleler in the left one, Posta Kutusu (with its unread badge) in the right. They used to
+- **Two small buttons on the line under the profile bar**: **Olaylar** in the left corner and
+  **Posta Kutusu** (with its unread badge) in the right. They used to
   be full-width cards stacked down that column; the column is the news column now, so what is left
   of them is the smallest thing that still reads as a door. On a phone they are pinned there
-  (`position: fixed`) over the map rather than being a grid track of their own, one at each end of
-  the line — a corner each, because the two doors lead to different rooms. The strip between them
+  (`position: fixed`) over the map rather than being a grid track of their own
+  (`justify-content: space-between` across the line is the whole of the geometry). The strip
+  between them
   is map, so it takes no taps (`pointer-events: none` on the column, `auto` on the buttons) or it
-  would swallow every touch on the districts under it
+  would swallow every touch on the districts under it. **Makaleler is parked**, not deleted: the
+  shelves, their reader and `openLibraryShelvesSheet` are untouched behind a `hidden` on its box,
+  the way Kahvehane's comments are parked behind `COMMENTS_ENABLED` — removing the attribute is
+  the whole of bringing it back (`.lib-box[hidden]` exists because the author `display: flex`
+  would otherwise beat the UA stylesheet)
 - Everyone can read, like, and comment on articles
 - Per the vision, this side stays *less* interactive than Kahvehane — reading and observing
   the national level, not peer-to-peer engagement about it
@@ -745,6 +835,175 @@ Which countries belong to which is structural and does not change with the news,
 portal shows it read-only: picking a country in the Ülkeler tab prints the story its entry will
 appear in, and every row in the list carries its story name. Editing the grouping is a
 migration.
+
+### OLAYLAR — the world events themselves (`world_events`)
+
+The three things Kütüphane keeps about the world are easy to confuse, so: a **story in the feed**
+is what happened (72 hours, then gone); a **seri** is a label laid over several such stories so a
+developing thing stays traceable through its earlier posts; an **OLAY** is the thing all of them
+are about. Rusya–Ukrayna Savaşı. Gazze. İran ve ABD. It is there on a day nobody posted, it
+reaches back to 2014 when the newest story is from this morning, and a reader opens it to find out
+what this whole thing *is* rather than what happened since Tuesday. Opened from the **middle box**
+under the profile bar — which is a **switch**, not a door: it inks itself and stays inked, and
+pressing it again puts Kütüphane back.
+
+**It is a PINBOARD, and that is the one place on this page that is not printed paper.** Everything
+else in Kütüphane is a newspaper — kicker, headline, column, rule — and that is right for the news,
+which is a thing you *read*. An olay is a thing you *work out*: who is in it, what it touches,
+which other olay keeps naming the same country. So each olay is **a piece of paper pinned to the
+map**, with a hand-drawn line running from the paper to the place it is about, and the reader's eye
+does the joining. Concretely:
+
+- **The drawing is made in the map's own frame, and that is the whole trick.** An olay's PNG
+  (`assets/olaylar/<id>.png`, see that folder's README) is **1080×1920 and transparent** — the size
+  of `assets/map/kutuphane-map-mobile.png` and the viewBox of the traced country overlay — so the
+  board can lay it straight back over the map at the same `preserveAspectRatio="xMidYMin meet"`
+  and every stroke lands on the coastline it was drawn against. It is not a picture on a card; it
+  is a sheet of tracing paper over the world. Change the size on either side and every drawing
+  slides off. Dropped in by filename, with nothing to enter anywhere; `world_events.image_url` is
+  only for a copy kept elsewhere.
+- **The string is a stroke somebody drew, not a line the page computed.** An earlier version tied
+  cards together by shared party and drew a sagging quadratic between them; the map made that
+  redundant and worse — a hand-drawn line from Yunanistan through Kıbrıs to İsrail says the thing
+  the computed one was only gesturing at. Each drawing arrives by being **wiped** across the map
+  (a clip rect animated from no width), because a string is run rather than faded up. The rect
+  carries its full width as an attribute too, so a browser that will not animate SVG geometry from
+  CSS simply shows the finished drawing.
+- **The paper is the only thing that takes a press**, and where it hangs is the author's own
+  decision (`paper_x` / `paper_y`, `db/world_events_v3_paper.sql`), picked by clicking a mini map in
+  the admin portal with the olay's own drawing laid over it. It has to be said rather than worked
+  out: the line ends where the paper goes, and a stroke ending in empty sea looks exactly like a
+  stroke ending anywhere else. The coordinate marks the **pin** — the paper hangs down from it
+  (`transform-origin: 50% 0`), so a point picked at the end of a stroke means "the string is tied
+  here". Two fallbacks, both a guess and both better than an olay nobody can press: under the
+  drawing's own ink (`measureOlayInk` puts the PNG on a canvas at 1/8 scale and finds the first and
+  last non-transparent pixel), and failing that over the ticked countries, off the map's own traced
+  shapes (`olayCountryAnchor`). A tainted canvas (a page opened from `file://`) falls back the same
+  way rather than throwing.
+- **The papers are HTML, not SVG**, and placed through the board SVG's own `getScreenCTM()`. They
+  hold two lines of type at a size that does not change with the screen, where anything inside the
+  map's 1080-wide frame would be scaled down with the map — and taking the matrix off the browser
+  beats a second copy of the `preserveAspectRatio` arithmetic that could disagree with it. They are
+  re-placed on resize (`placeOlayPapers`), and two that would overlap slide apart.
+- **Pulling a thread.** Reaching for a paper (hover, or the press on a phone) lights its drawing and
+  its countries on the map, and drops every other drawing and paper back — the same move the map
+  makes when a country is touched and its whole story lights. A quiet paper goes muted in the ink,
+  never translucent: a see-through card over a map is mush.
+- **Six drawings, and nothing scrolls** (`OLAY_BOARD_MAX`). The seventh olay is not behind a page —
+  it is simply not on the board, and admin.html's list says `PANODA` / `PANODA DEĞİL` on every row
+  so that is never a surprise. The real limit is the map: a world with a dozen strings across it is
+  a mess rather than a board, so this is a number to lower when it starts looking like one, never a
+  scroller to add.
+- **The map IS the board, and this is not a sheet at all** (`#olaylar-layer`). Nothing rises from
+  the bottom and nothing is opened: pressing the box **inks it** (`.lib-box-on` — it stays held
+  down because it is the way back out), everything else on the page goes — the news column, the
+  reading area, the other two library doors — and up to six olaylar are pinned **over the drawing
+  of the world they happen in**, with the string run between them across it. It is the one
+  background this page already had and the only one that means anything; the cork it was first
+  drawn on said nothing. The exception to THE sheet is the same argument the news page makes: a
+  sheet would cover the very thing this content is about.
+  - The layer sits at z-index 5 — above the columns and the map overlay, below the profile bar and
+    the tab bar, so the two bars stay in charge and the Olaylar box stays pressable.
+  - A wash quiets the map (`.olay-scrim`) and its z-index is the whole trick: **1**, which is over
+    the map photo (`.map-panel`, −1) and *under* the traced country shapes (`.map-svg-world`, 2).
+    So the drawing is quieted while **a lit country burns through it at full strength**.
+  - Which is what reaching for a pin does: it lights that olay's countries on the map underneath —
+    the same breathing highlight a Dünya story lights — and an open dossier holds them lit. The
+    shapes are drawn but take no taps while the board is up (`body.olaylar-on .country`).
+  - It lives **inside `#ist-content`**, so a swipe to another page takes it away rather than
+    leaving it hanging over Hane; the `body.olaylar-on` rules live in this page's own stylesheet,
+    which the router disables on the way out, and `mount()` clears the class on the way back in.
+  - **Desktop carries its own copy of the world map** inside the board (`.olay-basemap`), because
+    the map behind this page is İstanbul's there, not the world's. On a phone it is hidden and the
+    page's own map shows through.
+
+One olay opens as the **dossier taken off the board** — the layer's content swaps in place, still
+no second surface — and keeps the board's language rather than reverting to the newspaper column:
+paper lying on the map, led by a **crop of the map around its own strokes** (the drawing is a
+mostly-empty 9:16 overlay; printed whole it is a tall blank rectangle, so `paintOlayPageMap` crops
+to the ink and puts the map back underneath), a stamp saying
+whether this is still going, the parties pinned along one line (the same words the threads are
+labelled with, met again), and its **chapters** run down a piece of string. This page is the one
+thing here that scrolls: a chain of chapters has to.
+
+**The chapters (`world_event_moments`) read OLDEST FIRST, and that is a deliberate reversal of
+every other Zaman Akışı on the site.** A country entry's chain and a news story's gelişmeler are
+feeds — the newest thing is the point, so they print newest first. An olay is not a feed, it is a
+**story with a shape**: Gazze's 2023 is not where the thing began, it is the newest chapter of
+something that reaches back through 1948, 1967 and 2007 — and a reader who only sees the last two
+years is missing the chapters that explain them. So scrolling an olay's chapters moves toward the
+present, the way turning pages does in an actual book (`worldEventChapters` sorts ascending; every
+other Zaman Akışı on the site still sorts descending — do not "fix" this to match them). Each
+chapter is dated, titled, can carry its own lead photo pinned above its text
+(`world_event_moments.image_url`, `db/world_events_v5_chapters.sql` — styled like a note pinned to
+the board itself, tilt and a red pin dot included) and its body can carry further `[[img::URL]]`
+images inline, the same convention `library_articles` chapters use
+(`db/library_articles_v7_inline_images.sql`) — deliberately the same object Makaleler's own
+chapters are, because that is exactly what these are meant to read like.
+
+**A rail runs down the chapters, and it is read literally as a piece of string with a bead sliding
+down it** (`.olay-chapters-fill`, `wireOlayChapters`) — the board's own language, carried into the
+page that came off the board. A pale track runs the full list; a coloured fill (the olay's own
+colour, see below) grows from the top as the reader scrolls, continuously, so it reads as being
+read rather than jumping. The **counter** ("3 / 8") and each chapter's node move chapter-to-chapter
+instead, off a reading line a little way down from the top of the scroller
+(`OLAY_READ_LINE`) — continuous position for the string, one whole chapter at a time for the
+count. Reaching the physical bottom of the scroller counts every remaining chapter as reached even
+if the reading line never physically crosses their headings, the same way finishing anything else
+on the site by reaching its end counts as done.
+
+**The app remembers where the reader got to, monotonically, per member** (`olayReadProgress` /
+`olayWriteProgress`, `localStorage` keyed `olay_progress_<uid>_<eventId>` — same shape as
+`lib_chapter_completed_<uid>` for Makaleler). Scrolling back up to reread the beginning never
+erases it: only a chapter further than the one already stored is written. Reopening the dossier
+later scrolls straight to the furthest chapter reached (only when that is past the first chapter,
+so a first-ever open is never yanked anywhere), and the **board itself says so before the paper is
+even pressed** — a paper whose olay has been started shows "3/8" beside its stamp
+(`paintOlayPapers`), the same idea as the petek's `hive_member_status` printing how many stories or
+games a neighbour has left: a fact about the reader, printed where they will see it before they ask.
+
+Four things about the data:
+
+- **It is not `country_stories`, and must not be folded into it.** That grouping belongs to the
+  *map*: one story per country (the primary key on `country_story_countries` enforces it) and only
+  for the 28 shapes that were drawn, because its whole job is answering "what lights when this is
+  touched?" with exactly one row. An olay is not bound to the map — ABD is a party to one and is
+  nowhere on the artwork, and İran is in more than one at once.
+- **Who is in it is plain text** (`parties`), *not* derived from the countries ticked — a field
+  that can only name drawn shapes would be lying by omission the moment ABD or Hamas is a party.
+  It does double duty: it is what the board's **strings** are computed from and what they are
+  labelled with, so writing it well is writing the board. The ticked countries
+  (`world_event_countries`, a composite key, so a country may be in several olaylar) are folded in
+  behind it, which is what keeps an olay whose parties line was left blank strung up anyway.
+- **Whether it is still going is the one fact the list carries that a news list does not**
+  (`status`, printed where a card prints its age: "2014 — sürüyor", "2003–2011"). An `ended_on` is
+  cleared server-side of the form when the status is `ongoing`, so the list can never print
+  "2014–2022 · sürüyor".
+- **Ongoing olaylar are ordered by `sort_order`, not by what moved last.** A war does not stop
+  being the biggest thing on the page because something smaller had a development this morning —
+  and with only six places on the board, that order decides what exists.
+- **Each olay carries its own colour** (`color`, `db/world_events_v4_color.sql`, a hex string,
+  admin-editable with a plain `<input type="color">`). The board is the one surface on the site
+  where the single house red gives way to several — four to six olaylar can be pinned to the same
+  map at once, and their papers, pins and chapter rails have to stay tellable apart. Null (the
+  common case until an admin picks one) falls back to that same red (`worldEventColor`). Pick it to
+  match the drawing's own ink — `rusya-ukrayna-savasi`'s is the blue actually drawn in
+  `assets/olaylar/rusya-ukrayna-savasi.png`, not an arbitrary blue.
+
+Curated from admin.html's **Olaylar** tab (form on the left, the list with each card's own timeline
+editor on the right — the same shape the Ülkeler tab has, because it is the same kind of object: a
+page whose value is that somebody maintains its chain). `db/world_events_seed.sql` holds a starting
+set — Rusya–Ukrayna, Gazze, İran ve ABD, Suriye, Doğu Akdeniz — deliberately thin, only the dates
+nobody argues about, to be verified and extended from the portal. Four of the five have a drawing
+on the board: `dogu-akdeniz.png` (Yunanistan, Kıbrıs and İsrail, and the line run between them),
+`rusya-ukrayna-savasi.png`, `gazze.png` (one stroke out of Gazze south-west across Sina, its paper
+pinned at the far end in the empty desert) and `iran-abd.png` (six strokes fanning between İran and
+İsrail, its paper at the İran end of the fan). Suriye is the one still without one — its paper
+hangs over its ticked countries in the site's own red until somebody draws it.
+`db/world_events_gazze_iran_papers.sql` sets those last two papers and colours on a database the
+seed has already been run against, without rewriting anything else. `db/world_events_v2_board.sql` adds the
+`image_url` override the pinned drawings can use, and `db/world_events_v3_paper.sql` the two
+coordinates that say where each paper hangs.
 
 ### `tumcel.html` — Tümcel
 - Connections-style game where 16 sentence fragments must be regrouped into 4 quotes
@@ -822,6 +1081,59 @@ geometry and no centred modal anywhere on the site.
   content styling (`class="ist-sheet detail-overlay-sheet"`), never for size or position.
 - **Behaviour:** `IstSheet.open(overlay)` / `IstSheet.close(overlay, after)` — do not hand-roll
   the unhide → rAF → `.open` dance or the 550ms hide timeout.
+- **Closing and reopening inside the 0.55s slide is one object's problem, not each page's.**
+  `IstSheet.close` cannot hide the sheet at once — it has to stay on screen while it slides down —
+  so it schedules the hide. `IstSheet.open` cancels whatever the last close still had pending;
+  without that, the old timer landed on the *new* opening and set `hidden` on a sheet that had just
+  been unhidden, while `.open` stayed on it. On a phone that emptied the whole page: sheet.css
+  hides both columns while `.ist-sheet-overlay.open` exists anywhere in the body, so the sheet was
+  invisible *and* everything behind it stayed hidden. Nothing threw. Never re-add a bare
+  `setTimeout` re-hide in a page's own close.
+- **A sheet that fetches its content must not ask `.open` whether the reader is still there.**
+  `IstSheet.open` adds that class on the *next animation frame*, while a fetch answered from cache
+  resolves on the microtask before that frame runs — so the guard runs while the class is still
+  absent, the render is skipped, and the sheet sits on its spinner for good. It only ever bites the
+  **second** opening of anything cached: the first really did go to the network and landed long
+  after the class. Take a token instead (`sheetOpenToken` / `sheetOpenIsCurrent` in kutuphane.html):
+  opening takes one, closing and the next opening burn it, so the question asked is "is this still
+  the open I started" rather than "is something open".
+- **The tint quiets everything but the city.** A sheet that is a destination rather than something
+  read beside the page opts into a dim backdrop (`.ist-sheet-dim` — the Kahve Endeksi, the Skor
+  Tahtası, an event's page). On a phone that wash stops at `--map-hero-end` on any page with a map
+  (`body:has(.map-panel)`): these sheets come to rest *under* the map precisely so the district or
+  country they are about stays visible, and a wash laid over it takes back exactly what the resting
+  position had just given. But the drawing must not stay at full strength either, or the page never
+  reads as having gone quiet — so **the tint over the map is painted by the traced overlay itself**
+  (`IstSheet.lightTheMap`): one path inside `svg.map-svg`. Inside that svg it is registered with the
+  drawing by construction — same viewBox, same parallax drift, same pinch-zoom — which is the whole
+  reason it is built in there rather than layered over the top. **One `fill-rule: evenodd` path, not
+  a masked rect**: the obvious spelling is a `<rect>` with the districts in a `<mask>`, and it is the
+  expensive one — a mask makes the engine allocate and rasterise a second surface the size of the
+  masked box, and on a phone that arrived a beat after the backdrop it was supposed to be moving
+  with, so the map was visibly the last thing to go quiet. An outer rectangle with every district as
+  a subpath inside it draws the same picture as one ordinary fill. Two more details that fail
+  silently: the subpaths are **built from the shapes' own geometry**, never `<use>`d (a use-instance
+  keeps the original's styles, and `.neighborhood` is `fill: transparent`, so every hole came out
+  invisible); and what is punched out is the **whole city**
+  (`.neighborhood, .country, .map-unaccommodated`) — the districts this app doesn't serve are still
+  İstanbul, and leaving them dark read as half the city being broken. What stays quiet is the sea
+  and `.map-istanbul-disi`, the land beyond the city. The rect's resting state (`fill`, `opacity: 0`)
+  is declared outside the phone media query, since a rect with no fill of its own paints solid black
+  and it is built on any screen; only the switch that turns it on is phone-only. And its resting
+  opacity is **committed with a forced style read the moment it is built** — a freshly-inserted
+  element has no computed style until the next style pass, and `.open` is added inside a
+  `requestAnimationFrame`, which runs *before* that pass: without the read the rect's first
+  resolved opacity is already 1, nothing is left for a transition to interpolate, and the map snaps
+  to dark while the band below it fades over the full 0.55s. Two tints, one instant and one
+  gradual, is exactly the desync that read is there to stop. It is also built eagerly on load, so
+  the common case is that a sheet opening finds it long settled. And **which of the two tints is on
+  is decided in one place** — `IstSheet.syncDim` toggles `html.ist-dim-on` in the same frame the
+  backdrop's own class lands. It was `body:has(.ist-sheet-dim.open)`, and a `:has()` spanning the
+  whole body is re-evaluated on the engine's own schedule: when it landed a frame or two late, the
+  map lagged the band. Two tints meant to read as one movement cannot be driven by two different
+  mechanisms. Anything that drops `.open` by hand instead of through `IstSheet.close` calls
+  `syncDim()` itself (see `snapEventPageShut`). Hane is unaffected
+  — its hero is the petek, which is the page itself rather than scenery behind one.
 - **Phones:** the sheet's side gaps are the same `--screen-inset` (frames.css) the profile bar's
   row is padded to — everything stacked over the same map lines up, always.
   - A sheet opened **from the profile bar** (your profile, a member's) rests under that bar,
@@ -837,9 +1149,21 @@ geometry and no centred modal anywhere on the site.
   - Two surfaces are exceptions, and both for the same reason: they arrive out of a specific
     object already on the screen rather than from off it, so they **grow out of that object**
     instead of sliding: **a news story on Kütüphane** grows out of the card it was tapped on,
-    into the band that card lies in (see Kütüphane's own section). It is still THE sheet — same
-    markup, same `IstSheet.open/close` — only the way it arrives differs. (The PETEK page used
-    to be the other one; it is a page of its own now, not a sheet at all.)
+    into the band that card lies in (see Kütüphane's own section), and **an event on Kahvehane**
+    does the same. They are still THE sheet — same markup, same `IstSheet.open/close` — only the
+    way they arrive differs, and that arrival is one implementation as well:
+    `IstSheet.grow({ page, inner, origin, dir })`. (The PETEK page used to be a third; it is a
+    page of its own now, not a sheet at all.)
+  - **The grow draws its own frame, and that is the whole reason it is shared.** The move is one
+    `clip-path` inset animated from the card's box out to the page's four edges — the page is
+    already sitting where it will end up, and what opens is the *window* onto it. But a clip-path
+    clips the element's **border** along with everything else, so for the whole of the animation
+    the page was bordered on whichever sides the clip happened to rest on and a raw cut edge on
+    the other three. So the frame is drawn by a box of its own, animated over the same rect on the
+    same curve, wearing the border width and colour it reads off the page — and it is a **sibling**
+    of the page, never a child, since a child would be clipped by the very clip-path it is there to
+    dress. It is dropped the moment the page stands at full size, where the page's own border takes
+    over in exactly the place it left off.
 - **Chrome:** background/border come from `frames.css`'s `.ist-sheet` rule (2px ink border, no
   bottom border, no shadow).
 
@@ -943,7 +1267,9 @@ power over what the page is showing** — the seat card, see its own section bel
 
 **Which end each of them stands at is the page, and it moves with the swipe.** Kütüphane seats the
 politician at the left and you at the right; Hane names no seat at all and stands you alone in the
-middle; Kahvehane mirrors Kütüphane — you at the left, the seat at the right. So swiping from
+middle — until you press somebody on the petek, which is the one thing that puts another name in
+your place there (see the petek's own section); Kahvehane mirrors Kütüphane — you at the left, the
+seat at the right. So swiping from
 Kütüphane to Hane walks your own name from the right edge into the middle, and swiping on to
 Kahvehane walks it out to the left: the bar makes the same move the pages under it make, and the
 middle page is the one where you are alone in the middle of it (see "Always in the middle"). One
@@ -963,7 +1289,9 @@ contents on `--screen-inset`, and neither moves while the three pages swipe unde
 bar stands taller (`--navbar-h-top`) than the bottom one (`--navbar-h`) because it carries two lines
 of type against the tab bar's one word. Heights and colors are the
 `--navbar-h` / `--navbar-h-top` / `--navbar-ink*` tokens in frames.css — the colors deliberately
-palette-independent, the same in light, mono and dark. The top bar is one
+palette-independent between light and dark, with one exception: the earth (kahverengi) palette
+overrides `--navbar-ink` to its own dark brown `--ink` instead of charcoal, via
+`:root[data-palette="earth"]`, mirroring the same specificity trick the mono block uses. The top bar is one
 implementation in profile-card.css ("THE TOP BAR"); the bottom bar's colors live in frames.css
 ("MOBILE FIXED BOTTOM NAV") while each page still positions its own `<header>`. Never write
 either bar's height as a number — the same value also reserves the space each page leaves at the
@@ -999,8 +1327,8 @@ Anahane's is the cover and nothing else.
 
 The petek (`hiveGridHTML`) is **one shared honeycomb**, drawn from where the reader is standing in
 it: their own cover frame in the middle, everybody else on their map placed exactly where they
-actually are around it, and a "+" on each free side of their own hexagon. It is not six slots of
-your own — see the schema section above for what that means and why.
+actually are around it, and — at its outermost depth — a "+" on each free side of their own
+hexagon. It is not six slots of your own — see the schema section above for what that means and why.
 
 **It is the middle page**, not something opened over one. It was a page of your profile, then a
 sheet grown out of a PETEK button over Hane's map; the map is gone and the honeycomb is simply
@@ -1011,6 +1339,59 @@ this app is about. Anahane mounts it into a node it owns (`#hive-page`) via
 which swaps `#ist-content` and takes the previous mount with it — and every mount re-fetches
 `hive_map()`, because somebody else's attachment may have carried this whole petek somewhere since
 it was last drawn.
+
+**The petek has three depths, and the reader pulls up and down through them**
+(`HIVE_LEVELS` in profile-card.js). It is one drawing zoomed, not three pages: what changes is how
+far out the reader is standing in the same honeycomb, which is the whole difference between a level
+and a tab. A level is simply the **ring** — hex distance from the reader — a cell is allowed to
+stand at, so changing level is one comparison per cell and never a re-render: the cells further out
+fade, the plane rescales about the reader, and both transitions are the stylesheet's.
+
+| Level | What is drawn | Names | The seats |
+|---|---|---|---|
+| 0 — Sen | your own hexagon alone, large, with what is yours to change under it | — | inert |
+| 1 — Yanındakiler | you and the six places touching you; an empty one stays empty | printed | inert |
+| 2 — Petek | all of it: their neighbours, the field around it, everything | none | live |
+
+Four things about it:
+
+- **The exchange belongs to the outermost level alone.** Offering a seat and taking one are how the
+  petek is *built*, and building it is a thing you do to the whole shape — so the "+" appears, and
+  the hexagons answer a press, only where the whole shape is on screen. Below that level the seats
+  are drawing: the cells are `disabled`, not merely stripped of their "+", because a hexagon that
+  answers a press by doing nothing is worse than one that plainly does not answer. Stepping away
+  from that level folds any open seat back rather than leaving a live code burning on a hexagon
+  nobody can see.
+- **Names are the middle level's, and only ring 1 is ever named.** Level 0 has nobody else on it
+  and level 2 hides names outright (at the size the whole shape is drawn at, the names would be the
+  only thing on the page, and the shape is what that level is for) — so the middle level is the only
+  depth that prints one, and at that depth everything past the first ring is not drawn. A neighbour
+  can therefore never go unnamed because of somebody the reader cannot currently see, which is
+  exactly what the old "is the cell outside them free?" rule did once levels existed.
+- **The reader arrives at the middle depth, every time**, including after a swipe away and back —
+  the same rule the three carousel pages follow (see "Always in the middle").
+- **The pull is the gesture; the rail is how anyone finds out.** Drag and level-change are one
+  handler: the drawing follows the finger while there is drawing left to reach, and once the finger
+  runs *past* the end of it — or there was never anywhere to go, which is every level but the
+  outermost — the same pull changes the level. A pull up is a scroll down, and down the levels is
+  outward. Three marks down the outer edge say how many depths there are and which one you are
+  standing at, and each takes a press. Horizontal pulls are left to the carousel underneath
+  (`router.js` already ignores anything vertical-dominant).
+
+**Level 0 is where the reader is personalized, and it carries the controls rather than a way to
+reach them.** There is no Kişiselleştir button and nothing rises over the page: the avatar arrows
+stand on the reader's own hexagon (`hiveAvatarPickerHTML` — the profile sheet's own markup, ids and
+four `wire*Carousel` functions, reused unchanged), and their name, district, member-since and three
+preferences (dil, renk, görünüm) are printed under it. **Every control commits itself**, the way the
+avatar arrows already did — so there is no Kaydet here either, and nothing to confirm. What is *not*
+here is the account (email, kefil, referral code, Çıkış Yap): that is not personalization, and it
+stays on Kütüphane's profile page. Two mechanical notes: the arrow block is a node of its own
+standing on the me cell's coordinates, because the me cell is a `<button>` and a button inside a
+button is not something the parser keeps; and it is `display: none` away from level 0 rather than
+faded, both to keep the arrows out of the tab order and so `fitHive` can tell they are not on the
+paper. The whole block is laid *over* the foot of the window rather than taking room from it, so the
+window never changes size between depths; `fitHive` reserves the height it measures and centres the
+reader in what is left.
 
 **The petek takes the band, and the events take what is left.** On a phone Hane's hero is not the
 map's square: the other two pages' hero is a drawing of a fixed size and gets a square, while this
@@ -1081,6 +1462,31 @@ when they are tapped (which is where their district is anyway). It is absolutely
 flow — the packing is arithmetic, and nothing about it may shift because somebody's name is long —
 and `fitHive` measures the names when it fits the grid, since they hang outside the plane's own box.
 
+**Under the name is where that member stands in their own day** (`hiveStatHTML`,
+`db/hive_member_status.sql`): how much of the news is still stacked in their Kütüphane
+(`3+ HABER` / `2 HABER` / `1 HABER`, nothing at all when their deck is empty) and how far into the
+day's games they have got (`0/3 OYUN` on a day with three, `0/1` on a day with one). It is the
+app's own formula written on the drawing — a name says somebody is beside you, these two lines say
+they are in the middle of the same day you are, which is the thing worth walking up to them about.
+Deliberately two numbers and no titles: *what* they are reading is theirs, *that* they have three
+left to read is the city's. The fraction prints whether or not they have started (`0/3` is the
+point of it) and disappears only on a day with no games at all; a game the admin switched off is
+on neither side of it, because it is not a step anybody has left to take.
+
+Both come from one RPC per map, `hive_member_status(p_game_date, p_game_key)` — it takes no member
+list and answers only for the caller's own map, so it is a caption on the petek and not a directory
+anyone can sweep. It lands after `hive_map()` and simply re-renders; the labels are out of flow, so
+nothing on the plane moves when they arrive, and a missing migration leaves members uncaptioned
+rather than breaking the page. The games half is arithmetic over `game_results` and
+`game_day_toggles`, which were already there. The news half needed **`news_dealt`** — until now
+what a member had dealt with lived only in their own `localStorage` (`dunya_dealt_<uid>`), so
+nothing outside that one browser could say how deep their deck was. It mirrors that store exactly,
+stamp semantics included (what is kept is the story's `updated_at` **as thrown**, so a gelişme puts
+it back in their deck and back into their count), and the deck itself is still driven by
+`localStorage` — the server copy is written fire-and-forget beside it and merged back in on load,
+later stamp winning. RLS lets a member read only their own rows: the petek says somebody has three
+stories left, never which three.
+
 **Both halves of the exchange are printed inside the hexagon they belong to.** There used to be a
 dock along the foot of the page carrying whatever was tapped; there is no bar on this page at all
 now. Pressing a free side of your own hexagon mints that seat's code and prints it **in the seat**,
@@ -1095,12 +1501,37 @@ Nothing about a cell's box changes for a press: the frame is the same size open 
 neighbour ever moves — what changes happens *inside* the drawing (`.ist-hive-cell-open` inks the
 ring and lifts it slightly via `transform`).
 
-**Pressing a member does nothing, for now.** Their name is beside them and their tone says how far
-into the petek they are, so the panel that used to open had only one thing in it that acted: Çıkar.
-Detaching is parked — `hive_unbond()` is untouched in the database and still refuses a bond inside
-the week it was made in, but nothing calls it, and where a detach belongs on a page that is only
-the drawing is an open question. Member hexagons are therefore not buttons at all rather than
-buttons that open nothing.
+**Pressing a member names them on the bar, and pressing the bar opens them** (`pickHiveMember`,
+`setBarMember`). At the outermost depth — the only one where the seats are live and the only one
+that prints no names — a press turns that hexagon **red** and puts the member's name at the top of
+the screen, in the place the reader's own name stands; pressing that name opens their profile, the
+same member sheet every `.author-link` on the site opens. Pressing the hexagon again puts your own
+name back, the way every other hexagon on this page is its own close button.
+
+Two steps rather than one, and nothing rises over the petek in between. The drawing stays the page:
+the whole of what a press changes on it is the one ring going red, which is the only red on the
+page and is therefore unmistakably about the name that has just appeared at the other end of the
+screen (a short red rule under that name says so from its end). The bar needed no new gesture for
+the second step — *press a person, read about them* is what that bar has always done; it is simply
+aimed at somebody else. And it is why the intermediate step is skipped on **desktop**, where there
+is no bar at all (see `mount`): the press opens the profile straight away rather than turning a
+hexagon red and leading nowhere.
+
+The name is cleared by anything that means the reader has left them: another depth (`setHiveLevel`),
+another page (`router.js` calls `clearBarMember` beside `clearSeat`), a fresh mount of Hane.
+
+Detaching is still parked — `hive_unbond()` is untouched in the database and still refuses a bond
+inside the week it was made in, but nothing calls it, and where a detach belongs on a page that is
+only the drawing is an open question.
+
+Two mechanical notes, both of which fail silently. A member cell is a `<button>` now, so
+`applyHiveLevel` disables it below the outermost level like every other cell — and a disabled
+button is dispatched **no pointer events at all**, which would kill a drag or a level-swipe that
+happened to start on one. `.ist-hive-cell:disabled` is therefore `pointer-events: none`, so the
+gesture falls through to the page it was always aimed at. And the press effect (the hexagon gives
+way under the finger and springs back when released, `.ist-hive-cell-pressing`) is driven by
+pointer events rather than `:active`, which sticks after a tap on iOS — the same reason Kütüphane's
+cards press the way they do.
 
 Nothing on this page scrolls, and neither does any of the three profile sets: each fits the room it
 is given, the way a politician's page does. If a new block stops fitting, drop a block — do not turn
@@ -1191,8 +1622,8 @@ after the page it belongs to.
     learned a new `data-i18n` key prints the key itself (`HANE.PETEK`) because the cached `i18n.js`
     has never heard of it, and a button wired to a brand-new function silently throws. The shared
     files carry a version query (`i18n.js?v=2`, `profile-card.js?v=2`, `profile-card.css?v=2`,
-    `loading-screen.js?v=2`); changing one of them means bumping its number **in every page at
-    once**. All pages must spell the URL identically — `router.js`'s `loadScriptOnce` matches on
+    `loading-screen.js?v=2`, `sheet.js?v=2`); changing one of them means bumping its number **in
+    every page at once**. All pages must spell the URL identically — `router.js`'s `loadScriptOnce` matches on
     the exact `src` string, so one page left on `i18n.js` while another says `i18n.js?v=3` makes a
     swipe load and re-execute the module a second time.
 

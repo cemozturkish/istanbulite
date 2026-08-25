@@ -22,6 +22,15 @@
     'home.events.rsvp.join': { default: 'Katılıyorum',       more_english: 'RSVP' },
     'home.events.rsvp.going':{ default: 'Katılıyorsun ✓',    more_english: 'Going ✓' },
     'home.events.rsvp.count':{ default: 'kişi katılıyor',    more_english: 'attending' },
+    // The verdict a thrown event card records on Kahvehane -- the words
+    // the stamps carry and the two buttons say (see event-interest.js).
+    // A city with nothing on: the events deck's other bottom.
+    'events.none':         { default: 'Şimdilik etkinlik yok.', more_english: 'Nothing on just yet.' },
+    'events.nonesub':      { default: 'Dışarısı yine de seni bekliyor.', more_english: 'Outside is waiting anyway.' },
+    'events.verdict.yes':  { default: 'İlgimi çekti',        more_english: 'Interested' },
+    'events.verdict.no':   { default: 'İlgimi çekmedi',      more_english: 'Not for me' },
+    'home.events.kept':    { default: 'İlgini çekenler',     more_english: 'What caught your eye' },
+    'home.events.emptysub':{ default: 'Kahvehane\'de etkinlik destesine göz at.', more_english: 'Flip through the event deck on Kahvehane.' },
 
     // profile / settings card
     'profile.edit':        { default: 'Düzenle',             more_english: 'Edit' },
@@ -67,6 +76,19 @@
     // hexagon, its free sides, and everybody standing around you (see
     // hiveGridHTML in profile-card.js and db/hive_lattice_v4.sql).
     'profile.hive.empty':   { default: 'Boş yer',               more_english: 'Empty slot' },
+    // The petek's three depths, named on the rail down its edge (see
+    // HIVE_LEVELS in profile-card.js). They read as distances rather than
+    // as page names, because that is what they are: you, then the people
+    // beside you, then the whole shape.
+    'profile.hive.level.self': { default: 'Sen',           more_english: 'You' },
+    'profile.hive.level.near': { default: 'Yanındakiler',  more_english: 'Beside you' },
+    'profile.hive.level.all':  { default: 'Petek',         more_english: 'The petek' },
+    // Under a neighbour's name at the middle depth: how much of the day
+    // they still have in front of them (see hiveStatHTML in
+    // profile-card.js). Both are nouns following a number — "3+ HABER",
+    // "1/3 OYUN" — so they stay in the singular in both languages.
+    'profile.hive.stat.news':  { default: 'haber',         more_english: 'news' },
+    'profile.hive.stat.games': { default: 'oyun',          more_english: 'games' },
     // The code belongs to the empty seat, not to the member, and it dies
     // in minutes (see db/hive_slot_codes_v5.sql). Both halves of the
     // exchange are printed inside the hexagon they belong to now — the
@@ -112,6 +134,10 @@
     'sozcel.help.intro':   {
       default: 'Gizli Türkçe sözcüğü <strong>altı denemede</strong> bulun. Sözcük, hecelerine ayrılmış petek düzeninde gösterilir — her hece bir alt basamakta başlar. Doğru yerde bulduğun bir harf kutusuna kilitlenir ve sonraki denemelerde öyle kalır; sen sadece kalan harfleri girersin.',
       more_english: 'Guess the hidden Turkish word in <strong>six tries</strong>. The word is laid out by its syllables in a honeycomb staircase — each syllable starts one step lower. A letter you land in the right spot locks into its box and stays there for your next tries — you only type the remaining letters.',
+    },
+    'sozcel.help.hints':   {
+      default: 'Zorlanırsan yalnız değilsin: 2. yanlış tahminden sonra kelimenin kökeninin dili, 4. yanlıştan sonra sözcük türü (isim, sıfat…), 5. yanlıştan sonra da o günün Sözcüsünün kelimeye verdiği anlam ipucu olarak gösterilir.',
+      more_english: 'Stuck? You are not alone: after your 2nd wrong guess a hint shows the word\'s root language, after the 4th its grammatical class (noun, adjective…), and after the 5th the meaning that day\'s Sözcü gave the word.',
     },
     'sozcel.help.green':   { default: 'Doğru harf, doğru yer',     more_english: 'Right letter, right spot' },
     'sozcel.help.yellow':  { default: 'Doğru harf, yanlış yer',    more_english: 'Right letter, wrong spot' },
@@ -162,6 +188,9 @@
     // games — shared right column (Günün Oyunları / scoreboard / neighborhood stats)
     'games.today':            { default: 'Günün Oyunları',        more_english: "Today's Games" },
     'games.weeklyscoreboard': { default: 'Haftanın Skor Tahtası', more_english: 'Weekly Scoreboard' },
+    // Short form for the corner button on Kahvehane -- the heading inside
+    // the sheet still prints the full 'Haftanın Skor Tahtası'.
+    'games.scoreboardbox': { default: 'Skor Tahtası', more_english: 'Scoreboard' },
     // The question standing between two games (see db/daily_questions.sql
     // and the question card in kahvehane.html).
     // Where in the day's sequence a game card stands -- its kicker in the

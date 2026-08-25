@@ -1,14 +1,24 @@
 // Shared palette helper for Istanbulite.
 // Reads `profiles.palette_pref` (cached in localStorage for instant first paint),
 // sets data-palette on <html>, and exposes a setter the AYARLAR panel calls.
+// Does the same for `profiles.theme_pref` (Görünüm, Açık/Koyu) as data-theme.
 //
 // Values: 'mono' (default — siyah-beyaz) | 'earth' (warm cream / brown).
 // Pages declare warm/earth tokens inline; palette.css overrides them when
 // data-palette="mono". See palette.css for the override block.
+//
+// theme_pref: 'light' (default) | 'dark'. Mono has no dark variant, so
+// data-theme only ever changes anything under data-palette="earth" — see
+// the `:root[data-palette="earth"][data-theme="…"]` blocks in frames.css.
+// Without it, earth's appearance just followed the OS's prefers-color-scheme
+// with no way to override it, so a member's own Açık/Koyu pick in the
+// profile sheet was stored but never actually applied.
 
 (function (global) {
   const STORAGE_KEY = 'istanbulite_palette_pref';
   const VALID = new Set(['mono', 'earth']);
+  const THEME_STORAGE_KEY = 'istanbulite_theme_pref';
+  const VALID_THEME = new Set(['light', 'dark']);
 
   function readCached() {
     try {
@@ -19,11 +29,22 @@
   function writeCached(v) {
     try { localStorage.setItem(STORAGE_KEY, v); } catch (e) { /* ignore */ }
   }
+  function readCachedTheme() {
+    try {
+      const v = localStorage.getItem(THEME_STORAGE_KEY);
+      return VALID_THEME.has(v) ? v : 'light';
+    } catch (e) { return 'light'; }
+  }
+  function writeCachedTheme(v) {
+    try { localStorage.setItem(THEME_STORAGE_KEY, v); } catch (e) { /* ignore */ }
+  }
 
   let current = readCached();
+  let currentTheme = readCachedTheme();
 
   function apply() {
     document.documentElement.setAttribute('data-palette', current);
+    document.documentElement.setAttribute('data-theme', currentTheme);
     syncThemeColor();
   }
 
@@ -31,6 +52,13 @@
     if (!VALID.has(v)) v = 'mono';
     current = v;
     writeCached(v);
+    apply();
+  }
+
+  function setTheme(v) {
+    if (!VALID_THEME.has(v)) v = 'light';
+    currentTheme = v;
+    writeCachedTheme(v);
     apply();
   }
 
@@ -72,11 +100,15 @@
     if (!sb || !userId) return;
     try {
       const { data } = await sb.from('profiles')
-        .select('palette_pref').eq('id', userId).maybeSingle();
+        .select('palette_pref, theme_pref').eq('id', userId).maybeSingle();
       // If DB has a known value, adopt it. If null/unset, KEEP the cached
       // choice — otherwise a freshly saved 'mono' on one page would flip
       // back to 'earth' on the next page before its update propagates.
       if (data && VALID.has(data.palette_pref)) setPalette(data.palette_pref);
+      // Same race as palette_pref above: only adopt a known DB value,
+      // otherwise keep the cached choice (which already defaults to
+      // 'light', matching how profile-card.js normalizes a null column).
+      if (data && VALID_THEME.has(data.theme_pref)) setTheme(data.theme_pref);
     } catch (e) { /* keep cached value */ }
   }
 
@@ -85,8 +117,10 @@
 
   global.Palette = {
     setPalette,
+    setTheme,
     syncFromSupabase,
     avatarSrc,
     get current() { return current; },
+    get currentTheme() { return currentTheme; },
   };
 })(window);

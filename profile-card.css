@@ -253,6 +253,26 @@
 
   /* Hane: you alone, in the middle of the bar over the middle page. */
   .ist-pc-seat-none .ist-pc-me { flex: 1 1 auto; justify-content: center; text-align: center; }
+
+  /* ── When the bar is naming somebody else ──
+     Pressing a member on the petek puts their name here, in the place
+     your own name stands, and pressing it opens them (see setBarMember
+     in profile-card.js). The block is otherwise unchanged: it is the
+     same two lines, the same type, and the same gesture — a person on
+     this bar is a person you press to read about, which is exactly what
+     they now are.
+
+     Set in full caps, which is how this site writes a member's name
+     everywhere it is a label rather than prose — beside their own
+     hexagon on the petek (.ist-hive-name), on the district line under
+     it. A name arriving here from the petek should be the same name it
+     was down there, in the same letters.
+
+     Nothing else marks it. The link between the two ends of the screen
+     is the red hexagon at the bottom — the only red on the page, and it
+     appears in the same instant this name does; a rule under the name
+     was a second thing saying what the first already said. */
+  .ist-pc-me-other .ist-pc-name { text-transform: uppercase; }
 }
 
 /* ── Profile sheet ──
@@ -587,17 +607,31 @@
   --ist-hive-cell-w: min(150px, 17vh);
   --ist-hive-cell-h: calc(var(--ist-hive-cell-w) * 1.5);
   /* The drawn hexagon doesn't fill its own box — the art is centred in a
-     1024×1536 canvas with the silhouette 780×1375 of it (the whole
+     1024×1536 canvas with the silhouette 780×1266 of it (the whole
      hexframe family shares that canvas so the layers stay registered, see
      --hexframe-ratio). That leaves ~11.9% of the width transparent on
-     each side and ~5.2% of the height top and bottom, so the step from
+     each side and ~8.8% of the height top and bottom, so the step from
      one cell to the next is less than a cell: what is left after closing
-     that padding. Past closing it the interlock is kept shallow on
-     purpose — these hexagons are elongated, so pulling them a proper
-     honeycomb quarter-height into each other would bury the avatar art
+     that padding.
+
+     What the two steps are FOR is one number: the paper left between two
+     neighbouring hexagons, and it is the same in every direction. A comb
+     is a comb because every cell is the same distance from every cell it
+     touches; steps picked one axis at a time are not that, and the last
+     pair were not — 0.024 of a cell across against 0.158 down, so the
+     rows read as separate lines of hexagons rather than as one shape.
+
+     So both are solved from that one gap instead: 0.0488 of a cell width
+     of clear paper between the drawn silhouettes, measured off
+     frame-fill.png itself, side to side and corner to corner alike. That
+     is what fixes step-x at 0.810 (the drawn width, 0.7617, plus the
+     gap) and step-y at 1.065 — and it is what has to be re-solved if the
+     frame is ever redrawn again, since both numbers are the drawing's
+     and neither is the box's. The hexagons never come closer than that
+     gap in any direction, so nothing is ever laid over the avatar art
      standing at each frame's base. */
-  --ist-hive-step-x: calc(var(--ist-hive-cell-w) * 0.785);
-  --ist-hive-step-y: calc(var(--ist-hive-cell-w) * 1.30);
+  --ist-hive-step-x: calc(var(--ist-hive-cell-w) * 0.810);
+  --ist-hive-step-y: calc(var(--ist-hive-cell-w) * 1.065);
   /* ── The five tones of the drawing ──
      Distance from the reader, in ink. The petek is one shape with the
      reader at its centre, and how far into it something is should be
@@ -683,11 +717,11 @@
 }
 /* Every cell is placed on the plane, never in flow: a grid is a set of
    coordinates, and laying it out with rows would mean re-deriving those
-   coordinates in CSS. Members and free sides are buttons (the middle
-   cell, which is you, is not) and both open their panel in the dock
-   below, never here (see .ist-hive-cell-open and hiveDockHTML) —
-   stripped back to the frame itself, since the drawn hexagon is the
-   affordance and it never changes size for being pressed. */
+   coordinates in CSS. A free side and the reader's own cell are buttons
+   at the outermost level, where the exchange lives (see applyHiveLevel);
+   both print what a press opens *inside* their own frame and never
+   beside it. Stripped back to the frame itself, since the drawn hexagon
+   is the affordance and it never changes size for being pressed. */
 .ist-hive-cell {
   position: absolute;
   width: var(--ist-hive-cell-w);
@@ -730,6 +764,20 @@ button.ist-hive-cell-open .ist-hive-slot { --hexframe-stroke: var(--ink); }
 button.ist-hive-cell-open .ist-hive-plus { color: var(--ink); }
 .ist-hive-frame { transition: opacity 160ms, transform 200ms cubic-bezier(0.22, 1, 0.36, 1); }
 button.ist-hive-cell-open .ist-hive-frame { transform: scale(1.05); }
+/* Held: the hexagon gives way under the finger, and springs back to its
+   own size the moment it is let go — the drawing answering the press
+   rather than a highlight laid over it. Last of the three transform
+   rules on purpose: a hexagon that is open AND being pressed is being
+   pressed. The class is driven by pointer events in wireHiveGestures,
+   never :active, which sticks after a tap on iOS. */
+button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.94); }
+/* A cell the level has closed answers nothing — and must not swallow the
+   pull either: a disabled button is not dispatched pointer events at
+   all, so without this a drag or a level-swipe that happened to start on
+   one of them died where it began. Taken out of the hit-testing instead,
+   the gesture reaches the page underneath, which is what it was always
+   aimed at. */
+.ist-hive-cell:disabled { pointer-events: none; }
 /* 1. You. Nothing else on the page is this dark. */
 .ist-hive-me .ist-hive-frame { --hexframe-stroke: var(--ist-hive-ring-me); }
 /* 2. The members you are attached to: one step back from you, and still
@@ -743,6 +791,20 @@ button.ist-hive-cell-open .ist-hive-frame { transform: scale(1.05); }
 .ist-hive-filled:not(.ist-hive-bonded) .ist-hive-frame {
   --hexframe-stroke: var(--ist-hive-ring-other);
   opacity: 0.88;
+}
+/* ── The one who is named on the bar ──
+   Red, which is nowhere on the five-tone ring ladder above and is the
+   point: the ladder says how far into the petek somebody is, and this
+   says the reader is asking about them right now. It is the whole of
+   what a press changes on the drawing — nothing rises over the petek and
+   nothing on it moves — so it carries the link between the hexagon down
+   here and the name that has just appeared at the top of the screen, and
+   it has to be the one thing on the page that cannot be mistaken for a
+   depth. Full ink either way: whether they are yours is not what is
+   being said any more. */
+.ist-hive-cell.ist-hive-picked .ist-hive-frame {
+  --hexframe-stroke: var(--ink-red, #B93631);
+  opacity: 1;
 }
 /* The frame fills its cell and takes its height from the drawing's ratio
    (frames.css pins width:auto !important on every hexframe, so the cell
@@ -818,6 +880,35 @@ button.ist-hive-cell-open .ist-hive-frame { transform: scale(1.05); }
    .ist-hive-bonded above); their name says the same thing, so the two
    halves of one hexagon never disagree. */
 .ist-hive-filled:not(.ist-hive-bonded) .ist-hive-name { color: var(--muted); }
+/* ── Where they stand in their own day ──
+   Under the name: how much of the news is still stacked in their
+   Kütüphane, and how far into the day's games they have got (see
+   hiveStatHTML in profile-card.js). Printed as two short lines in the
+   same track as the name and ranged the same way, so the caption reads
+   as one block hanging off the hexagon rather than as a second label
+   somebody added later.
+
+   Everything here is still out of flow and still pointer-events: none —
+   the packing is arithmetic, and a member with three lines beside them
+   must occupy exactly as much of the plane as one with none. */
+.ist-hive-name-label { display: block; }
+.ist-hive-stats {
+  display: block;
+  margin-top: calc(var(--ist-hive-cell-w) * 0.03);
+  /* A step down from the name, and a step back in weight: the name is
+     who they are, this is what they are in the middle of. */
+  font-size: min(0.66rem, calc(var(--ist-hive-cell-w) * 0.085));
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  line-height: 1.25;
+  color: var(--muted);
+}
+.ist-hive-stat { display: block; white-space: nowrap; }
+/* The lines belong to the member they hang off, so an unattached
+   member's caption sits back with their name rather than out-inking it. */
+.ist-hive-filled:not(.ist-hive-bonded) .ist-hive-stats {
+  color: color-mix(in srgb, var(--muted) 62%, var(--paper));
+}
 /* ── What a press puts inside a hexagon ──
    There was a bar along the foot of the page carrying whatever was
    tapped. Both halves of the exchange belong to a hexagon rather than to
@@ -895,6 +986,209 @@ button.ist-hive-cell-open .ist-hive-frame { transform: scale(1.05); }
 /* An open frame's message needs a ground of its own here: it is printed
    over the drawing rather than on paper. */
 .ist-hive-claim-in .ist-hive-cell-msg { background: var(--paper); }
+
+/* ══════════════════════════════════════════════════════════════
+   THE PETEK'S THREE DEPTHS
+   One drawing, three levels, and the reader pulls up and down through
+   them (see HIVE_LEVELS in profile-card.js). Nothing is rebuilt for a
+   level change and nothing moves: the cells that are further out than
+   the level fade, the plane rescales about the reader, and everything
+   here is the transition on one of those two.
+
+     0 — SEN          you alone, drawn large, with what is yours to
+                      change under you.
+     1 — YANINDAKİLER you and the six places touching you, whoever
+                      stands in them named. An empty place stays empty:
+                      no "+", because a seat is handed out to the petek
+                      and this level is about who is already beside you.
+     2 — PETEK        all of it, no names, and the seats live.
+   ══════════════════════════════════════════════════════════════ */
+/* A vertical pull is the page's own gesture; a horizontal one still
+   belongs to the carousel underneath (see router.js). */
+.ist-hive-page { touch-action: pan-x; }
+/* The plane carries the zoom between depths. The drag turns this off in
+   JS so the drawing keeps up with the finger, and fitHive puts it back
+   — one property, set in one place each way. */
+.ist-hive-plane { transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1); }
+/* A cell further out than the level the reader is standing at. Not
+   display:none — the packing is arithmetic off cells that are all still
+   there, and a cell taken out of the box would move the ones left in it.
+   fitHive skips these when it measures what has to fit. */
+.ist-hive-cell { transition: opacity 320ms ease; }
+.ist-hive-away { opacity: 0; pointer-events: none; }
+.ist-hive-name, .ist-hive-plus { transition: opacity 260ms ease; }
+/* Names belong to the depths where a person is a person. At the
+   outermost one the whole shape is on the page and a name beside every
+   hexagon would be the only thing on it — there the drawing says it. */
+.ist-hive-level-2 .ist-hive-name { opacity: 0; }
+/* And the "+" belongs to the level where a seat can actually be handed
+   out. Below it the openings are drawing (the cells are disabled too,
+   see applyHiveLevel) — an empty place is left empty and says nothing. */
+.ist-hive-page:not(.ist-hive-level-2) .ist-hive-plus { opacity: 0; }
+
+/* The avatar arrows standing on your own hexagon's coordinates (see
+   hiveAvatarPickerHTML). display:none away from level 0 rather than
+   faded, so the arrows are out of the tab order at the depths that don't
+   offer them — and so fitHive can tell they are not on the paper. */
+.ist-hive-picker {
+  position: absolute;
+  width: var(--ist-hive-cell-w);
+  /* The frame's own height, so `top: 50%` on the columns centres them on
+     the hexagon rather than on a box collapsed to its contents. */
+  height: var(--ist-hive-cell-h);
+  pointer-events: none;
+}
+.ist-hive-page:not(.ist-hive-level-0) .ist-hive-picker { display: none; }
+.ist-hive-pick-col {
+  pointer-events: auto;
+  gap: 6px;
+}
+/* Drawn small because the plane they stand on is scaled up at this level
+   (see HIVE_LEVEL_ZOOM): at the sheet's own 18px they would come out as
+   the biggest thing on the page and out-shout the hexagon they belong
+   to. */
+.ist-hive-pick-col .ist-pc-cover-pick-arrow { width: 12px; height: 12px; }
+.ist-hive-pick-col .ist-pc-cover-pick-arrow svg { width: 7px; height: 7px; }
+.ist-pc-cover-pick-prev.ist-hive-pick-col { margin-right: 7px; }
+.ist-pc-cover-pick-next.ist-hive-pick-col { margin-left: 7px; }
+
+/* ── Level 0: what is yours to change ──
+   Laid over the foot of the window rather than taking room from it, so
+   the window itself never changes size between depths; fitHive reserves
+   the height it measures here and centres the reader in what is left. */
+.ist-hive-self {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-bottom: 4px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 260ms ease;
+}
+.ist-hive-level-0 .ist-hive-self { opacity: 1; pointer-events: auto; }
+.ist-hive-self-name {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.15;
+}
+.ist-hive-self-meta,
+.ist-hive-self-since {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.2;
+}
+/* ── Your three preferences, printed rather than opened ──
+   A label and its two options, and pressing an option IS the change: it
+   saves itself, the way the avatar arrows above already did. There is no
+   Kaydet on this page and nothing rises over it. */
+.ist-hive-prefs {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  max-width: 280px;
+}
+.ist-hive-pref {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ist-hive-pref-label {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* One box split in two, not two buttons: which of the pair you are on is
+   the whole information, and a gap between them would say they are
+   separate choices. */
+.ist-hive-pref-seg {
+  display: flex;
+  border: 1px solid var(--hairline);
+}
+.ist-hive-pref-opt {
+  padding: 4px 9px;
+  border: none;
+  background: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 180ms ease, color 180ms ease;
+}
+.ist-hive-pref-opt + .ist-hive-pref-opt { border-left: 1px solid var(--hairline); }
+.ist-hive-pref-opt:hover { color: var(--ink); }
+.ist-hive-pref-on { background: var(--ink); color: var(--paper); }
+.ist-hive-pref-on:hover { color: var(--paper); }
+/* Only ever carries what went wrong; empty the rest of the time. */
+.ist-hive-self-msg {
+  margin-top: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 0.62rem;
+  color: var(--accent);
+}
+.ist-hive-self-msg:empty { display: none; }
+
+/* ── The rail ──
+   Three marks down the outer edge: how many depths there are, and which
+   one you are standing at. The swipe is the gesture — this is how anyone
+   finds out there is one, and it takes a press too, because a control
+   that only announces is a decoration. */
+.ist-hive-rail {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 4px;
+}
+.ist-hive-rail-dot {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 220ms ease, border-color 220ms ease, transform 220ms ease;
+}
+.ist-hive-rail-dot:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
+.ist-hive-rail-on {
+  border-color: var(--ink);
+  background: var(--ink);
+  transform: scale(1.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ist-hive-plane, .ist-hive-cell, .ist-hive-name,
+  .ist-hive-plus, .ist-hive-self, .ist-hive-rail-dot { transition: none; }
+}
 
 /* ── Weekly game grid ── 3 rows (Sözcel/Tümcel/Bulmaca) × 7 days
    (Monday…Sunday, Istanbul time). See GAME_SCHEDULE / weekGridHTML in
@@ -1093,6 +1387,13 @@ button.ist-hive-cell-open .ist-hive-frame { transform: scale(1.05); }
     --ist-hive-cell-w: min(104px, 13vh);
     --ist-hive-page-pad: var(--screen-inset, 14px);
   }
+  /* Level 0's block and the rail on a phone: the same objects, sized for
+     the band the petek is drawn in. */
+  .ist-hive-self-name { font-size: 1rem; }
+  .ist-hive-self-meta, .ist-hive-self-since { font-size: 0.64rem; }
+  .ist-hive-prefs { margin-top: 7px; gap: 4px; }
+  .ist-hive-pref-opt { padding: 3px 7px; font-size: 0.58rem; }
+  .ist-hive-rail { right: 0; gap: 8px; }
   .ist-pc-weekgrid { margin-bottom: 0; }
   .ist-pc-daycell { max-width: 16px; }
   .ist-pc-weekgrid-row { margin-bottom: 1px; gap: 3px; }

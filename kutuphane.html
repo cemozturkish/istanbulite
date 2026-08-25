@@ -13,17 +13,17 @@
   <script src="safe-area-ready.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
-  <script src="router.js?v=3"></script>
-  <script src="i18n.js?v=9"></script>
+  <script src="router.js?v=4"></script>
+  <script src="i18n.js?v=15"></script>
   <script src="palette.js"></script>
   <link rel="stylesheet" href="palette.css">
-  <script src="game-locks.js"></script>
-  <link rel="stylesheet" href="profile-card.css?v=12">
+  <script src="game-locks.js?v=2"></script>
+  <link rel="stylesheet" href="profile-card.css?v=16">
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
   <script src="tbmm.js" defer></script>
   <script src="politician-card.js?v=3" defer></script>
-  <script src="profile-card.js?v=11" defer></script>
+  <script src="profile-card.js?v=15" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
   <link rel="stylesheet" href="mahalle-picker.css">
@@ -46,8 +46,8 @@
       } catch(e) {}
     })();
   </script>
-  <script src="sheet.js"></script>
-  <link rel="stylesheet" href="sheet.css?v=2">
+  <script src="sheet.js?v=5"></script>
+  <link rel="stylesheet" href="sheet.css?v=6">
   <style data-page="kutuphane">
     :root {
       /* Core ink & paper — warm cream newspaper palette */
@@ -609,6 +609,9 @@
     }
     /* .lib-boxes only ever renders in .col-left (right-hand column) on
        desktop -- inward is leftward, mirrors .info-card:hover above. */
+    /* A parked box (Makaleler) carries `hidden`, and the author rule
+       above would otherwise beat the UA stylesheet's display:none. */
+    .lib-box[hidden] { display: none; }
     .lib-box:hover { background: var(--paper-dark); transform: translateX(-4px); }
     .lib-box-title {
       font-size: 0.62rem;
@@ -2973,6 +2976,13 @@
          paper: a press on the sliver of one would fight its own depth
          transform and pull it out of the stack. */
       #dunya-news-feed > .article:not(:nth-child(1)) { pointer-events: none; }
+      /* The card an open story grew out of is not on the paper any more --
+         it BECAME the page. Left drawn, it stood behind the page as a
+         second copy of the same story, and a throw slid the page off it to
+         reveal the very card it had just left. Hidden rather than removed
+         so the deck behind it does not shift and the fold-back still has
+         the box to collapse into (see growNewsPage). */
+      #dunya-news-feed > .article.news-open { visibility: hidden; }
       @media (prefers-reduced-motion: reduce) {
         #dunya-news-feed > .article { transition: background 0.15s; }
       }
@@ -3368,6 +3378,471 @@
         animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-right;
       }
     }
+    /* ══════════════════════════════════════════════════════════════
+       OLAYLAR — THE PINBOARD.
+
+       The one surface on this page that is deliberately not printed
+       paper. Everything else in Kütüphane is a newspaper -- kicker,
+       headline, column, rule -- and that is right for the news, which is
+       a thing you read. An olay is a thing you WORK OUT: who is in it,
+       what it touches, which other olay it shares a country with. So it
+       is a board with things pinned to it and string run between them,
+       and the reader's eye does the joining.
+
+       Nothing here scrolls. Four pins, the whole thing in one glance --
+       a board you can scroll is a board you are not standing in front
+       of. What does not fit is not on the board (see BOARD_MAX).
+
+       The string is the one red thing on this page, and it is an
+       explicit red rather than var(--accent): the palette flattens to
+       charcoal in mono, and a string that isn't red isn't a string --
+       the same exception the unread badge takes.
+       ══════════════════════════════════════════════════════════════ */
+    /* ── The layer the board is drawn on ──
+       There is no cork, and that is the point: **the map is the board**.
+       These four things are pinned over the drawing of the world they
+       happen in, with the string run between them across it -- which is
+       the one background this page already had and the only one that
+       means anything. It is a mode the page enters, not a panel that
+       opens: nothing rises, nothing is dismissed, the Olaylar box inks
+       itself and everything else on the page goes.
+
+       Above the columns (3) and the map overlay (2), below the profile
+       bar (20) and the tab bar (100): the two bars stay in charge, and
+       the Olaylar box (in .col-left, z-index 6) stays over it so it can
+       be pressed again to come back out. */
+    /* The layer is the whole frame, because the board inside it is the
+       map and the map is the whole frame. What sits in the band between
+       the library boxes and the tab bar is the dossier, not the board --
+       see .olay-page. */
+    .olay-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      animation: olay-board-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .olay-layer[hidden] { display: none; }
+    /* A wash over the map so ink on paper still reads against a drawing,
+       and so entering the mode is visible on the very first frame. Light
+       on purpose -- this quiets the map, it does not put it away. Built
+       from --paper, so it is a pale wash in the light palette and a dark
+       one in dark, without a second rule.
+       Its own element at z-index 1, and that placement is the whole
+       point: it goes over the map PHOTO (.map-panel, z-index -1) but
+       UNDER the traced country shapes (.map-svg-world, z-index 2). So the
+       drawing is quieted while a lit country still burns through it at
+       full strength -- which is the one thing the board is standing on
+       the map for. */
+    .olay-scrim {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      background: color-mix(in srgb, var(--paper) 62%, transparent);
+      pointer-events: none;
+      animation: olay-board-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .olay-scrim[hidden] { display: none; }
+    /* The shapes are drawn while the board is up, but they are not a
+       target: a tap that opened a country's page behind the board would
+       be a page nobody asked for, under one they are reading. */
+    body.olaylar-on .country { pointer-events: none; }
+
+    /* While the board is up, Kütüphane is the board: the news column,
+       the reading area and the other two library doors are not dimmed,
+       they are gone. Only the map, the two bars and the box that got you
+       here are left. These rules live in this page's own stylesheet, which
+       the router disables the moment you swipe away -- so the class cannot
+       follow you onto Hane. */
+    body.olaylar-on .col-right,
+    body.olaylar-on main,
+    body.olaylar-on #lib-box-mektuplar { display: none; }
+    /* Pressed, and staying pressed: it is the way back out, so it has to
+       look like the thing currently being held down. */
+    .lib-box.lib-box-on {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: var(--paper);
+    }
+    .lib-box.lib-box-on:hover { background: var(--ink); transform: none; }
+
+    /* ── The board IS the map ──
+       Every olay's drawing is made in the map's own frame -- 1080x1920,
+       the same grid the phone map and its traced country shapes are in --
+       so laying it back over the map at the same preserveAspectRatio puts
+       every stroke exactly on the coastline it was drawn against. That
+       pairing (xMidYMin meet against object-fit: contain /
+       object-position: center top) is the registration: change one and
+       every drawing slides off the map. */
+    .olay-board-map {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      /* The same top clip the traced overlay takes, so a drawing that
+         reaches Rusya doesn't run up under the profile bar. */
+      clip-path: inset(calc(var(--navbar-h, 38px) + env(safe-area-inset-top)) 0 0 0);
+    }
+    /* This page's own map is İstanbul's on a desktop, not the world's, so
+       there the board carries the drawing its olaylar were made on. On a
+       phone the page's map is already the right one and shows through. */
+    .olay-basemap { display: none; }
+
+    /* One drawing. It arrives by being WIPED across the map rather than
+       fading up out of it: these are strings, and a string is run. The
+       clip rect carries its full width as an attribute as well, so a
+       browser that will not animate SVG geometry from CSS simply shows
+       the finished drawing. */
+    .olay-draw {
+      opacity: 0;
+      animation: olay-draw-in 0.5s ease-out both;
+      transition: opacity 0.25s;
+    }
+    @keyframes olay-draw-in { to { opacity: 1; } }
+    .olay-wipe { animation: olay-wipe-in 0.75s cubic-bezier(0.4, 0, 0.2, 1) both; }
+    @keyframes olay-wipe-in { from { width: 0; } to { width: 1080px; } }
+    /* Reaching for one name drops every other drawing back -- what is
+       connected says so before anything is opened. */
+    .olay-layer.pulling .olay-draw { opacity: 0.22; }
+    .olay-layer.pulling .olay-draw.lit { opacity: 1; }
+
+    /* An olay's name, hung under its own strokes -- a caption on the
+       drawing rather than a label over it. Placed from the drawing's own
+       ink (see measureOlayInk), so nothing is entered anywhere for it. */
+    /* ── The papers pinned to the map ──
+       An olay is a piece of paper hanging on the board with the drawn
+       line running from it to the place it is about. It is the only thing
+       on this board that takes a press -- the drawing is drawing, the
+       paper is the door.
+       HTML rather than SVG text: it holds two lines of type at a size
+       that does not change with the screen, where anything inside the
+       map's own 1080-wide frame would be scaled down with the map. Placed
+       by JS through the SVG's own screen matrix, so a coordinate on the
+       drawing and a coordinate on the paper mean the same thing. */
+    .olay-papers {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .olay-paper {
+      position: absolute;
+      display: block;
+      width: 132px;
+      box-sizing: border-box;
+      padding: 11px 10px 8px;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      border-bottom: 3px solid var(--ink);
+      box-shadow: 3px 4px 0 color-mix(in srgb, var(--ink) 16%, transparent);
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+      pointer-events: auto;
+      font-family: inherit;
+      /* Its point is its PIN -- top centre, where the drawn line ends.
+         The paper hangs off that point rather than being centred on it,
+         which is what makes a coordinate picked at the end of a stroke
+         mean "the string is tied here". Each hangs at its own small
+         angle: pinned by hand, not laid out. */
+      transform-origin: 50% 0;
+      transform: translate(-50%, 0) rotate(var(--tilt, 0deg));
+      transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s, opacity 0.2s;
+      animation: olay-draw-in 0.4s ease-out both;
+    }
+    .olay-paper:hover { transform: translate(-50%, 0) rotate(var(--tilt, 0deg)) scale(1.04); }
+    /* Pointer-driven rather than :active, which sticks after a tap on iOS
+       -- the same reason the news cards press the way they do. */
+    .olay-paper.pressing { transform: translate(-50%, 0) rotate(var(--tilt, 0deg)) scale(0.96); }
+    /* The pin it hangs from: the one red thing on the paper, and the same
+       red the drawn strings are in. */
+    /* --thread is set inline per paper (worldEventColor), so the pin,
+       the "live" word and the lit-state ring below all take whatever
+       colour that olay was given -- the site's red only by default. */
+    .olay-paper {
+      --thread: #c8322b;
+    }
+    .olay-paper-pin {
+      position: absolute;
+      top: -5px;
+      left: 50%;
+      width: 9px;
+      height: 9px;
+      margin-left: -4.5px;
+      border-radius: 50%;
+      background: var(--thread);
+      box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 45%, transparent);
+    }
+    .olay-paper-name {
+      display: block;
+      font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+    .olay-paper-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 3px 6px;
+      margin-top: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.52rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    /* Each piece stays whole -- it is the ROW that wraps, when the status
+       word and the "3/8" badge together don't fit the paper's fixed
+       width, not a single word breaking mid-character past the border. */
+    .olay-paper-meta > span { white-space: nowrap; }
+    .olay-paper-meta .live { color: var(--thread); }
+    /* "3/8" -- how far the reader already got into this olay, so the
+       board itself remembers on their behalf before the paper is even
+       pressed. Printed in the ink, not the thread colour: it is a fact
+       about the reader, not about the olay. */
+    .olay-paper-progress {
+      padding: 1px 5px;
+      border: 1px solid var(--muted);
+      color: var(--muted);
+    }
+    /* Reaching for one paper drops the rest of the board back -- the
+         drawings fade and the other papers go quiet in the ink, never
+         translucent (a see-through card over a map is mush). */
+    .olay-layer.pulling .olay-paper { color: var(--muted); border-color: var(--muted); box-shadow: none; }
+    .olay-layer.pulling .olay-paper .olay-paper-pin { background: var(--muted); }
+    .olay-layer.pulling .olay-paper.lit {
+      color: var(--ink);
+      border-color: var(--thread);
+      box-shadow: 3px 4px 0 color-mix(in srgb, var(--thread) 22%, transparent);
+    }
+    .olay-layer.pulling .olay-paper.lit .olay-paper-pin { background: var(--thread); }
+
+    @keyframes olay-board-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    .olay-board-empty {
+      position: absolute;
+      left: 0; right: 0;
+      top: 40%;
+      text-align: center;
+      font-style: italic;
+      color: var(--muted);
+      font-size: 0.8rem;
+      padding: 20px;
+    }
+
+    /* ── One olay: the dossier taken off the board ──
+       Paper lying on the map: the drawing has been picked up and the
+       account of it is on top of where it happened. --thread is
+       redeclared here because this page is a sibling of the board's SVG,
+       not a child of it. */
+    .olay-page {
+      --thread: #c8322b;
+      position: absolute;
+      left: var(--screen-inset, 18px);
+      right: var(--screen-inset, 18px);
+      top: var(--olay-layer-top, 120px);
+      bottom: calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom, 0px) + 12px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-sizing: border-box;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      box-shadow: 3px 4px 0 color-mix(in srgb, var(--ink) 16%, transparent);
+    }
+    /* ── The dossier's own navbar ──
+       Flex furniture rather than position:sticky, the same shell
+       Makaleler's own reader is built from (.reader-top / .reader-scroll
+       / .reader-actions): the way out stays exactly where the reader last
+       saw it -- top-left -- even scrolled to the bottom of a long
+       chapter, because it was never part of what scrolls. */
+    .olay-page-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      padding: 14px 20px 12px;
+      border-bottom: 1px solid var(--rule);
+      box-sizing: border-box;
+    }
+    /* The same hand-drawn arrow every reader page wears, 50% larger here
+       -- a dossier is read for longer than a shelf card or a letter, so
+       the one way out earns a bigger target. */
+    .olay-page-back {
+      flex-shrink: 0;
+      width: 45px;
+      height: 45px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .olay-page-back:hover { opacity: 0.6; }
+    .olay-page-back img { width: 39px; height: 39px; display: block; }
+    .olay-page-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 16px 24px 20px;
+      box-sizing: border-box;
+    }
+    .olay-page-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-shrink: 0;
+      padding: 12px 20px 16px;
+      border-top: 1px solid var(--rule);
+      box-sizing: border-box;
+    }
+    @media (max-width: 768px) {
+      .olay-page-top { padding: 12px 16px 10px; }
+      .olay-page-scroll { padding: 12px 20px 16px; }
+      .olay-page-actions { padding: 10px 16px 14px; }
+    }
+    .olay-page-photo {
+      margin: 4px 0 14px;
+      border: 2px solid var(--ink);
+      background: var(--paper);
+      padding: 8px;
+    }
+    .olay-page-photo svg { width: 100%; height: auto; display: block; }
+    .olay-page h3 {
+      font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+      font-size: 1.5rem;
+      line-height: 1.15;
+      margin: 0 0 8px;
+    }
+    .olay-page-blurb { font-size: 0.9rem; line-height: 1.5; color: var(--muted); margin: 0 0 14px; }
+    .olay-page-body p { font-size: 0.92rem; line-height: 1.6; margin: 0 0 12px; }
+    /* Who is in it, as tags pinned along one line -- the same words the
+       threads on the board are labelled with, so a reader who pulled a
+       thread meets it again here. */
+    .olay-parties { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+    .olay-parties span {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      color: var(--ink);
+      border: 1px solid var(--ink);
+      padding: 3px 8px;
+    }
+    .olay-stamp {
+      display: inline-block;
+      margin: 0 0 12px;
+      padding: 3px 9px;
+      border: 2px solid var(--thread);
+      color: var(--thread);
+      transform: rotate(-2deg);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .olay-stamp.ended { border-color: var(--muted); color: var(--muted); transform: rotate(1.5deg); }
+
+    /* ── The chapters, read one at a time ──
+       An olay is a story with a shape, not a feed of updates -- so unlike
+       every OTHER Zaman Akışı on the site (a country entry's, a news
+       story's gelişmeler), this one runs OLDEST FIRST and is read
+       Duolingo-style, exactly the way Makaleler's own shelves are: one
+       chapter fills the page, Geri/İleri (in .olay-page-actions) turns
+       it. Gazze is one chapter of "İsrail Cephesi"; the decades before it
+       are the chapters that explain why it is not the whole story. */
+    .olay-chapter-date {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.58rem; font-weight: 700; letter-spacing: 1.4px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 4px;
+    }
+    .olay-chapter h4 {
+      font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+      font-size: 1.02rem;
+      font-weight: 700;
+      line-height: 1.25;
+      margin: 0 0 8px;
+    }
+    /* The chapter's own photo -- pinned above its text like a note on
+       the board this page came off of, rather than run full-width the
+       way an inline [[img::URL]] does. A small tilt, a pin dot, a white
+       border: the same pinboard hand the board itself is drawn in. */
+    .olay-chapter-photo {
+      position: relative;
+      display: inline-block;
+      max-width: min(220px, 70%);
+      margin: 12px 14px 10px 0;
+      float: left;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      padding: 6px 6px 22px;
+      box-shadow: 3px 4px 0 color-mix(in srgb, var(--ink) 16%, transparent);
+      transform: rotate(var(--photo-tilt, -1.4deg));
+    }
+    /* The pin it hangs from -- the same red dot every paper on the board
+       carries, so a chapter's own photo reads as pinned rather than
+       merely framed. */
+    .olay-chapter-photo::before {
+      content: '';
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      width: 9px;
+      height: 9px;
+      margin-left: -4.5px;
+      border-radius: 50%;
+      background: var(--thread);
+      box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 45%, transparent);
+    }
+    .olay-chapter-photo img {
+      display: block;
+      width: 100%;
+      height: auto;
+      object-fit: cover;
+    }
+    .olay-chapter-body p { font-size: 0.88rem; line-height: 1.6; color: var(--ink); margin: 0 0 10px; }
+    .olay-chapter-body p:last-child { margin-bottom: 0; }
+    .olay-chapter-body::after { content: ''; display: block; clear: both; }
+    .olay-chapter-body a { font-size: 0.8rem; }
+    /* Inline images inside a chapter's own body text (further
+       [[img::URL]] tokens, same convention Makaleler uses) reuse
+       .body-img as-is, full width, no pinning -- the ONE pinned photo
+       per chapter is its lead image above.*/
+
+    /* On a desktop the map behind this page is İstanbul's, not the
+       world's -- so the board brings its own copy of the drawing its
+       olaylar were made on, in a portrait box of its own. Everything
+       inside it is already in that drawing's units, so nothing else has
+       to be told about the change of size. */
+    @media (min-width: 769px) {
+      .olay-layer { top: 90px; bottom: 34px; left: 0; right: 0; }
+      .olay-basemap { display: block; opacity: 0.5; }
+      .olay-board-map { clip-path: none; }
+      .olay-page {
+        position: absolute;
+        left: 50%;
+        margin-left: min(-360px, -31vw);
+        width: min(720px, 62vw);
+        top: 0;
+        bottom: 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .olay-layer, .olay-scrim, .olay-draw, .olay-paper { animation: none; opacity: 1; }
+      .olay-wipe { animation: none; }
+    }
+
     .kefil-link {
       background: none; border: none; cursor: pointer;
       font-family: inherit; font-size: inherit; color: inherit;
@@ -3677,7 +4152,21 @@
            now (see .col-right), so what is left of them is the smallest
            thing that still reads as a door. -->
       <div class="lib-boxes" id="lib-boxes">
-        <button type="button" class="lib-box" id="lib-box-makaleler" title="Makaleler">
+        <!-- OLAYLAR stands in the LEFT corner, which is the corner the
+             reader's eye starts in: pressing it turns the map into the
+             board, and the map is what this whole page is drawn around.
+             Posta Kutusu keeps the right corner (space-between across the
+             line is the whole of that geometry; see the mobile .col-left
+             rule).
+             MAKALELER is parked, not deleted -- the shelves, their reader
+             and openLibraryShelvesSheet are all untouched behind this one
+             attribute, exactly the way Kahvehane's comments are parked
+             behind COMMENTS_ENABLED. Removing `hidden` is the whole of
+             bringing it back. -->
+        <button type="button" class="lib-box" id="lib-box-olaylar" title="Olaylar">
+          <span class="lib-box-title">Olaylar</span>
+        </button>
+        <button type="button" class="lib-box" id="lib-box-makaleler" title="Makaleler" hidden>
           <span class="lib-box-title">Makaleler</span>
         </button>
         <button type="button" class="lib-box" id="lib-box-mektuplar" title="Posta Kutusu">
@@ -3710,6 +4199,16 @@
       </div>
     </div>
   </aside>
+
+  <!-- OLAYLAR — the board, laid over the map. Deliberately NOT a sheet:
+       nothing rises from the bottom and nothing new is opened. Pressing
+       the box inks it, everything else on the page goes, and the four
+       olaylar are pinned over the drawing itself -- the map IS the
+       pinboard, which is what these things are pinned to anyway.
+       Inside #ist-content, so a swipe to another page takes it away with
+       the rest of Kütüphane rather than leaving it hanging over Hane. -->
+  <div class="olay-scrim" id="olay-scrim" hidden></div>
+  <div class="olay-layer" id="olaylar-layer" hidden></div>
   </div>
 
 </div><!-- /#main-site -->
@@ -3721,6 +4220,7 @@
     <div class="ist-sheet-backdrop" id="reader-overlay-backdrop"></div>
     <div class="ist-sheet reader-overlay-sheet" id="reader-overlay-sheet"></div>
   </div>
+
 
   <!-- THE NEWS PAGE. A story from the left-hand feed does not rise from
        the bottom of the screen like every other page here: on a phone the
@@ -4643,6 +5143,31 @@ async function loadCountryEntries(countryIds) {
   return COUNTRY_ENTRIES_CACHE[key];
 }
 
+// ── Which open of a sheet is the current one ──
+// A sheet that fetches its content has to know, when the fetch lands,
+// whether the reader is still looking at it. Testing for the `.open`
+// class does NOT answer that: IstSheet.open adds it on the next
+// animation frame, while a fetch answered from cache resolves on the
+// microtask before that frame runs -- so the check ran while the class
+// was still absent and the page bailed out, leaving its spinner up for
+// good. That is exactly what the SECOND opening of anything cached did:
+// the first open really did fetch, took a network round trip, and got
+// there long after the class landed.
+//
+// So the question is not "is this sheet open" but "is this still the
+// open I started". Each opening takes a token; closing burns it, and so
+// does the next opening.
+const SHEET_OPEN_SEQ = new Map();
+function sheetOpenToken(overlayId) {
+  const n = (SHEET_OPEN_SEQ.get(overlayId) || 0) + 1;
+  SHEET_OPEN_SEQ.set(overlayId, n);
+  return n;
+}
+function sheetOpenIsCurrent(overlayId, token) {
+  const overlay = document.getElementById(overlayId);
+  return !!overlay && !overlay.hidden && SHEET_OPEN_SEQ.get(overlayId) === token;
+}
+
 // countryName comes from the map shape's own data-name, so a country with
 // no story is titled with the same word the caption under the map prints
 // when you touch it. A country in one is titled with the story's name
@@ -4663,13 +5188,14 @@ async function openCountrySheet(countryId, countryName) {
     blurb: story ? story.blurb : '',
     countries: story ? story.countries : [countryId],
   };
+  const token = sheetOpenToken('reader-overlay');
   area.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   IstSheet.open(overlay);
   _closeReaderOverlay = closeReaderOverlay;
   const entries = await loadCountryEntries(page.countries);
   // The reader may have closed this sheet, or opened another country,
   // while the fetch was in flight -- don't paint over what they did.
-  if (!overlay.classList.contains('open')) return;
+  if (!sheetOpenIsCurrent('reader-overlay', token)) return;
   renderCountryEntriesList(entries, page);
 }
 
@@ -4828,6 +5354,769 @@ function openCountryEntryReader(entry, entries, page) {
 }
 
 // ══════════════════════════════════════════
+// OLAYLAR — the world events themselves (db/world_events.sql), opened
+// from the middle box under the profile bar.
+//
+// The object the news is about, standing on its own. A story in the feed
+// below is 72 hours old and gone; a seri gathers such stories under one
+// label so their updates stay traceable; an OLAY is the thing all of
+// them are about -- it is there on a day nobody posted, it reaches back
+// to 2014 when the newest story is from this morning, and a reader opens
+// it to find out what this whole thing IS rather than what happened
+// since Tuesday.
+//
+// It is presented as a PINBOARD and not as a column of newspaper cards,
+// which is the one place on this page that departs from the paper. The
+// news is a thing you read; an olay is a thing you work out -- who is in
+// it, what it touches, which other olay shares a country with it -- and
+// a board with string run between its pins is what that looks like. The
+// string is drawn while the reader watches, because the drawing of it is
+// the point: it says these things are connected before a word is read.
+//
+// Nothing on the board scrolls. Four pins and the whole thing in one
+// glance; a board you scroll is a board you are not standing in front
+// of. What does not fit is not on the board (BOARD_MAX below), the same
+// rule the petek's levels follow -- if a block stops fitting, drop a
+// block rather than turning the page into a scroller.
+// ══════════════════════════════════════════
+let WORLD_EVENTS_CACHE = null; // null = not fetched yet this session
+
+// How many drawings go on the map at once. Not a paging limit with a
+// seventh page behind it: the seventh olay is simply not on the board,
+// and the admin portal says so on every row where the order is set. The
+// real limit is the map -- a world with a dozen strings across it is a
+// mess rather than a board -- so this is a number to lower when it starts
+// looking like one, never a scroller to add.
+const OLAY_BOARD_MAX = 6;
+
+// What is on the board right now, in drawing order -- the tag handlers
+// are given indices, and lighting an olay's countries on the map
+// underneath means going from an index back to its olay.
+let BOARD_EVENTS = [];
+
+async function loadWorldEvents() {
+  if (WORLD_EVENTS_CACHE) return WORLD_EVENTS_CACHE;
+  // The moments ride along with their olay: the timeline is most of what
+  // a page like this is, so fetching it when the reader opens one would
+  // put a spinner in the middle of a page that is otherwise already here.
+  // (Same call the country entries make for their own chains.)
+  const { data, error } = await sb.from('world_events')
+    .select('*, world_event_moments(*), world_event_countries(country)')
+    .order('sort_order', { ascending: false })
+    .order('started_on', { ascending: false, nullsFirst: false });
+  if (error) {
+    console.error('[kutuphane olaylar]', error);
+    // Not cached: a failed fetch is a network blip, not an empty board.
+    return null;
+  }
+  WORLD_EVENTS_CACHE = data || [];
+  return WORLD_EVENTS_CACHE;
+}
+
+// OLDEST first -- the opposite of a country entry's chain and a news
+// story's gelişmeler, and deliberately so: those are feeds, where the
+// newest thing is the point; an olay is a story with a shape, and a
+// story is read from its beginning. Scrolling its dossier moves toward
+// the present. Sorted here rather than in the query because the moments
+// arrive embedded in their olay, and an embedded select carries no order
+// of its own.
+function worldEventChapters(ev) {
+  return (ev.world_event_moments || []).slice()
+    .sort((a, b) => (a.moment_date < b.moment_date ? -1 : a.moment_date > b.moment_date ? 1 : 0));
+}
+
+// The colour this olay's UI chrome takes -- the paper's pin, its stamp,
+// the chapter rail. Four to six olaylar can be pinned to the board at
+// once, and their strings have to stay tellable apart, so the board is
+// the one surface on the site where the single house red gives way to
+// several (db/world_events_v4_color.sql). Null (nobody has picked one,
+// or the olay predates the column) falls back to that same red.
+function worldEventColor(ev) {
+  const c = String((ev && ev.color) || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(c) ? c : '#c8322b';
+}
+
+function worldEventCountryIds(ev) {
+  return (ev.world_event_countries || []).map(r => r.country).filter(Boolean);
+}
+
+// Who is in it, as a list. `parties` is plain text on purpose
+// (db/world_events.sql) because the parties to an olay are routinely not
+// all on the map -- ABD is in one of these and is nowhere on the
+// artwork. The ticked countries are folded in after it so an olay whose
+// parties line was left blank still has something to be strung up by.
+function worldEventParties(ev) {
+  const typed = String(ev.parties || '')
+    .split(/[·|,;]/).map(x => x.trim()).filter(Boolean);
+  const drawn = worldEventCountryIds(ev).map(id => mapCountryName(id));
+  const seen = new Set();
+  return typed.concat(drawn).filter(name => {
+    const key = name.toLocaleLowerCase('tr-TR');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+// Where a news card prints its age, an olay prints whether it is still
+// the world the reader is living in -- and how long it has been going.
+// The one fact a list of olaylar carries that a list of stories does not.
+function worldEventStamp(ev) {
+  const en = I18N.isEnglish();
+  const startYear = ev.started_on ? String(ev.started_on).slice(0, 4) : '';
+  if (ev.status === 'ended') {
+    const endYear = ev.ended_on ? String(ev.ended_on).slice(0, 4) : '';
+    if (startYear && endYear) return `${startYear}–${endYear}`;
+    if (endYear) return endYear;
+    return en ? 'ended' : 'sona erdi';
+  }
+  return startYear
+    ? `${startYear} — ${en ? 'ongoing' : 'sürüyor'}`
+    : (en ? 'ongoing' : 'sürüyor');
+}
+
+// The drawing: the countries of this olay and the lines between them, in
+// the site's own hand, made in the map's own 1080x1920 frame so it lands
+// back on the coastlines it was drawn against. By convention it is simply
+// dropped in at assets/olaylar/<id>.png and nothing has to be entered
+// anywhere -- image_url is only there for the odd one kept elsewhere.
+// Deliberately not libSafeUrl, which allows http(s) alone: the whole
+// point of the convention is a repo-relative path.
+function olayImageSrc(ev) {
+  const custom = String(ev.image_url || '').trim();
+  if (/^https?:\/\//i.test(custom)) return custom;
+  if (/^assets\/[A-Za-z0-9._\/-]+$/.test(custom)) return custom;
+  return `assets/olaylar/${encodeURIComponent(ev.id)}.png`;
+}
+
+// ── The board, which is the map ──
+// Nothing is drawn ON something here: each olay is a line drawing made
+// in the map's own frame -- 1080x1920, the same grid the phone map and
+// its traced country shapes are in (see assets/olaylar/README.md) -- and
+// the board is those drawings laid back over the map they were drawn on.
+// The string between two countries is not computed and not a card
+// connector; it is a stroke somebody drew across the Mediterranean, and
+// it lands exactly where they put it.
+const OLAY_MAP_W = 1080;
+const OLAY_MAP_H = 1920;
+
+// Where an olay's name goes on the map. Nothing is entered anywhere for
+// this: the drawing is read for it -- the ink's own bounding box, found
+// by putting the PNG on a canvas and looking for the first and last
+// pixel that is not transparent -- so a drawing dropped into
+// assets/olaylar/ arrives already knowing where on the world it is.
+// Cached per olay: the read is one decode and one pass over a 1/8-scale
+// copy, but the board is opened and closed all day.
+const OLAY_INK = {};
+
+function measureOlayInk(ev) {
+  const key = ev.id;
+  if (OLAY_INK[key] !== undefined) return Promise.resolve(OLAY_INK[key]);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      let box = null;
+      try {
+        // An eighth of each side: the box only has to be good enough to
+        // hang a word off, and this is 64x less work than the full frame.
+        const w = Math.max(1, Math.round(img.naturalWidth / 8));
+        const h = Math.max(1, Math.round(img.naturalHeight / 8));
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, w, h);
+        const px = ctx.getImageData(0, 0, w, h).data;
+        let x0 = w, y0 = h, x1 = -1, y1 = -1;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (px[(y * w + x) * 4 + 3] > 24) {
+              if (x < x0) x0 = x;
+              if (x > x1) x1 = x;
+              if (y < y0) y0 = y;
+              if (y > y1) y1 = y;
+            }
+          }
+        }
+        if (x1 >= x0 && y1 >= y0) {
+          // Back into the map's own 1080x1920 units, which is what every
+          // coordinate on this board is in.
+          const sx = OLAY_MAP_W / w, sy = OLAY_MAP_H / h;
+          box = { x: x0 * sx, y: y0 * sy, w: (x1 - x0 + 1) * sx, h: (y1 - y0 + 1) * sy };
+        }
+      } catch (e) {
+        // A tainted canvas (the page served from file://, say) is not an
+        // error worth showing anyone: the tag falls back to the olay's
+        // countries below.
+        box = null;
+      }
+      OLAY_INK[key] = box;
+      resolve(box);
+    };
+    img.onerror = () => { OLAY_INK[key] = null; resolve(null); };
+    img.src = olayImageSrc(ev);
+  });
+}
+
+// The fallback, and a good one: the map already knows where Rusya is.
+// The traced shapes are in the same 1080x1920 viewBox as the drawings,
+// so their boxes need no conversion at all.
+function olayCountryAnchor(ev) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  worldEventCountryIds(ev).forEach(id => {
+    countryShapes(id).forEach(el => {
+      let b;
+      try { b = el.getBBox(); } catch (e) { return; }
+      if (!b || !b.width) return;
+      x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y);
+      x1 = Math.max(x1, b.x + b.width); y1 = Math.max(y1, b.y + b.height);
+    });
+  });
+  if (!isFinite(x0)) return null;
+  return { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
+}
+
+// Where the paper hangs, in the map's own frame. The author's own
+// coordinates first (db/world_events_v3_paper.sql): the drawn line ends
+// somewhere specific and nothing in the picture can say where, because a
+// stroke ending in empty sea looks like a stroke ending anywhere else.
+// Failing that the paper hangs under the drawing's ink, and failing that
+// over the countries -- both of which are a guess, and both of which are
+// better than an olay nobody can press.
+function olayPaperPoint(ev, box) {
+  const x = Number(ev.paper_x), y = Number(ev.paper_y);
+  if (Number.isFinite(x) && Number.isFinite(y) && (x || y)) return { x, y };
+  if (box) return { x: box.x + box.w / 2, y: box.y + box.h + 60 };
+  const c = olayCountryAnchor(ev);
+  return c ? { x: c.x, y: c.y + 40 } : null;
+}
+
+// Each paper hangs at its own small angle -- pinned by hand, not laid
+// out. Fixed rather than random so the board is the same board every
+// time it is opened.
+const OLAY_PAPER_TILTS = ['-1.8deg', '1.5deg', '-1.2deg', '2deg', '-2.2deg', '1.1deg'];
+
+// A point in the map's own 1080x1920 frame, in screen pixels. Taken off
+// the SVG's own screen matrix rather than worked out from the box and
+// preserveAspectRatio by hand: the browser already knows exactly where it
+// put the drawing, and a second copy of that arithmetic is a second
+// chance to disagree with it.
+function olayMapToScreen(svg, x, y) {
+  const m = svg.getScreenCTM && svg.getScreenCTM();
+  if (!m) return null;
+  const pt = svg.createSVGPoint();
+  pt.x = x; pt.y = y;
+  const q = pt.matrixTransform(m);
+  return { x: q.x, y: q.y };
+}
+
+function olaylarBody() { return document.getElementById('olaylar-layer'); }
+
+const OLAY_NS = 'http://www.w3.org/2000/svg';
+
+// ── How far the reader has gotten into an olay's chapters ──
+// Stored per member, monotonic (never regresses if they scroll back up
+// to reread something) -- same shape as libReadCompletedSet's storage,
+// keyed to one olay rather than a shelf's whole set of chapters.
+function olayProgressKey(uid, eventId) {
+  return `olay_progress_${uid}_${eventId}`;
+}
+function olayReadProgress(uid, eventId) {
+  if (!uid) return -1;
+  try {
+    const raw = localStorage.getItem(olayProgressKey(uid, eventId));
+    const n = raw == null ? -1 : parseInt(raw, 10);
+    return Number.isFinite(n) ? n : -1;
+  } catch (e) { return -1; }
+}
+function olayWriteProgress(uid, eventId, idx) {
+  if (!uid || idx < 0) return;
+  if (idx <= olayReadProgress(uid, eventId)) return;
+  try { localStorage.setItem(olayProgressKey(uid, eventId), String(idx)); } catch (e) {}
+}
+
+function renderOlayBoard(events) {
+  const body = olaylarBody();
+  if (!body) return;
+  // Back at the board, nothing in particular is being looked at -- so the
+  // map goes quiet again rather than staying lit on whichever dossier was
+  // open last.
+  clearNewsCountryHighlight();
+  if (events === null) {
+    body.innerHTML = `<div class="olay-board-empty">Olaylar yüklenemedi.</div>`;
+    return;
+  }
+  const pinned = events.slice(0, OLAY_BOARD_MAX);
+  BOARD_EVENTS = pinned;
+  if (!pinned.length) {
+    body.innerHTML = `<div class="olay-board-empty">Panoda henüz bir şey yok.</div>`;
+    return;
+  }
+
+  // One SVG in the map's own frame, laid over the map with the same
+  // preserveAspectRatio the traced overlay uses (xMidYMin meet, which is
+  // the SVG spelling of the object-fit: contain / object-position: center
+  // top the map image is drawn with). That pairing is the whole of the
+  // registration: change one and the drawings slide off the coastlines.
+  //
+  // The wipe is a clip rect per drawing, animated from no width to the
+  // full frame, so each string is run across the map rather than fading
+  // up out of it. The rect carries its full width as an attribute too, so
+  // a browser that will not animate SVG geometry from CSS simply shows
+  // the finished drawing.
+  body.innerHTML = `
+    <svg class="olay-board-map" id="olay-board-map"
+         viewBox="0 0 ${OLAY_MAP_W} ${OLAY_MAP_H}" preserveAspectRatio="xMidYMin meet">
+      <defs>
+        ${pinned.map((ev, i) => `
+          <clipPath id="olay-wipe-${i}">
+            <rect class="olay-wipe" x="0" y="0" width="${OLAY_MAP_W}" height="${OLAY_MAP_H}"
+                  style="animation-delay:${180 + i * 260}ms"/>
+          </clipPath>
+        `).join('')}
+      </defs>
+      <!-- Desktop only: this page's own map is İstanbul's there, not the
+           world's, so the board carries the drawing it was made on. On a
+           phone it is hidden and the page's map shows through. -->
+      <image class="olay-basemap" href="assets/map/kutuphane-map-mobile.png"
+             x="0" y="0" width="${OLAY_MAP_W}" height="${OLAY_MAP_H}"
+             preserveAspectRatio="xMidYMin meet"/>
+      ${pinned.map((ev, i) => `
+        <g class="olay-draw" data-idx="${i}" clip-path="url(#olay-wipe-${i})"
+           style="animation-delay:${180 + i * 260}ms">
+          <image href="${libEsc(olayImageSrc(ev))}" x="0" y="0"
+                 width="${OLAY_MAP_W}" height="${OLAY_MAP_H}"
+                 preserveAspectRatio="xMidYMin meet"/>
+        </g>
+      `).join('')}
+    </svg>
+    <div class="olay-papers" id="olay-papers"></div>
+  `;
+  // A drawing that isn't there yet leaves the map as it was -- the olay
+  // is still on the board, named off its countries instead.
+  body.querySelectorAll('.olay-draw image').forEach(im => {
+    im.addEventListener('error', () => im.closest('.olay-draw')?.remove());
+  });
+  paintOlayPapers(pinned, events);
+}
+
+// The papers, hung once each drawing has been read. Painted after the
+// board rather than with it: the read is a decode plus a pass over the
+// pixels, and the strings should already be running across the map by
+// the time the first paper lands on it.
+async function paintOlayPapers(pinned, events) {
+  const [boxes, uid] = await Promise.all([
+    Promise.all(pinned.map(measureOlayInk)),
+    libGetCurrentUserId(),
+  ]);
+  // The board may have been closed, or a dossier opened, while the
+  // drawings were being read.
+  const host = document.getElementById('olay-papers');
+  const svg = document.getElementById('olay-board-map');
+  if (!host || !svg) return;
+  host.innerHTML = '';
+  const en = I18N.isEnglish();
+  pinned.forEach((ev, i) => {
+    const at = olayPaperPoint(ev, boxes[i]);
+    if (!at) return;
+    const live = ev.status !== 'ended';
+    // How far the reader already got into this olay's chapters, printed
+    // back the same way a shelf's own progress badge is -- so the board
+    // itself says "you were here" before the paper is even pressed.
+    const total = worldEventChapters(ev).length;
+    const readIdx = olayReadProgress(uid, ev.id);
+    const progressLabel = total && readIdx >= 0
+      ? `${Math.min(readIdx + 1, total)}/${total}` : '';
+    const paper = document.createElement('button');
+    paper.type = 'button';
+    paper.className = 'olay-paper';
+    paper.dataset.idx = i;
+    paper.dataset.mapX = at.x;
+    paper.dataset.mapY = at.y;
+    paper.style.setProperty('--tilt', OLAY_PAPER_TILTS[i % OLAY_PAPER_TILTS.length]);
+    paper.style.setProperty('--thread', worldEventColor(ev));
+    paper.style.animationDelay = `${700 + i * 160}ms`;
+    paper.innerHTML = `
+      <span class="olay-paper-pin"></span>
+      <span class="olay-paper-name">${libEsc(ev.name_tr)}</span>
+      <span class="olay-paper-meta">
+        <span class="${live ? 'live' : ''}">${libEsc(worldEventStamp(ev))}</span>
+        ${progressLabel ? `<span class="olay-paper-progress">${libEsc(progressLabel)}</span>` : ''}
+      </span>
+    `;
+    host.appendChild(paper);
+
+    paper.addEventListener('click', () => openWorldEventReader(ev, events));
+    // Reaching for a paper lights its own strokes and the countries under
+    // them, and drops every other drawing back -- the same move the map
+    // already makes when a country is touched and its whole story lights.
+    const layer = document.getElementById('olaylar-layer');
+    const pull = () => {
+      paper.classList.add('pressing');
+      if (!layer) return;
+      layer.classList.add('pulling');
+      layer.querySelectorAll('.lit').forEach(el => el.classList.remove('lit'));
+      svg.querySelector(`.olay-draw[data-idx="${i}"]`)?.classList.add('lit');
+      paper.classList.add('lit');
+      setNewsCountryHighlight(worldEventCountryIds(ev));
+    };
+    const drop = () => {
+      paper.classList.remove('pressing');
+      if (!layer) return;
+      layer.classList.remove('pulling');
+      layer.querySelectorAll('.lit').forEach(el => el.classList.remove('lit'));
+      clearNewsCountryHighlight();
+    };
+    ['pointerenter', 'pointerdown'].forEach(e => paper.addEventListener(e, pull));
+    ['pointerleave', 'pointerup', 'pointercancel'].forEach(e => paper.addEventListener(e, drop));
+  });
+  placeOlayPapers();
+}
+
+// Puts every paper where its map coordinate actually landed on screen,
+// then slides any two that would overlap apart. Runs after the papers
+// are in the document (their size is what the type came out as) and
+// again on every resize -- the papers are HTML at a fixed size over a
+// drawing that is not, so their spacing changes with the screen even
+// though their coordinates do not.
+function placeOlayPapers() {
+  const host = document.getElementById('olay-papers');
+  const svg = document.getElementById('olay-board-map');
+  if (!host || !svg) return;
+  const papers = Array.from(host.querySelectorAll('.olay-paper'));
+  if (!papers.length) return;
+  const bounds = host.getBoundingClientRect();
+  // The board runs to the top of the screen but the profile bar is drawn
+  // over it, so a paper pinned high on the map -- a stroke ending in the
+  // Ukrayna or Rusya -- would hang behind the bar and be unreachable.
+  // Measured off the bar itself rather than written down as a number, the
+  // way sheet.js measures the same edge for the same reason.
+  const bar = document.getElementById('ist-pc-mount');
+  const barBottom = bar ? bar.getBoundingClientRect().bottom - bounds.top : 0;
+  const ceiling = Math.max(4, barBottom + 6);
+  const taken = [];
+  papers.forEach(paper => {
+    const at = olayMapToScreen(svg, Number(paper.dataset.mapX), Number(paper.dataset.mapY));
+    if (!at) return;
+    // Placed first, measured second: the paper's height depends on how
+    // many lines its name came out as, which nothing knows in advance.
+    paper.style.left = `${at.x - bounds.left}px`;
+    paper.style.top = `${at.y - bounds.top}px`;
+    const w = paper.offsetWidth, h = paper.offsetHeight;
+    let x = at.x - bounds.left, y = at.y - bounds.top;
+    // Two olaylar about the same corner of the world would otherwise be
+    // pinned on top of each other. The later paper slides DOWN until it
+    // is clear -- which keeps it near the line it belongs to -- then is
+    // pulled back inside the board if that pushed it off the bottom.
+    // x is the pin's own column, y is the top of the paper hanging from
+    // it (see the transform in the stylesheet).
+    for (let guard = 0; guard < 24; guard++) {
+      const clash = taken.find(t => Math.abs(t.x - x) < (t.w + w) / 2 + 10 &&
+                                    y < t.y + t.h + 10 && t.y < y + h + 10);
+      if (!clash) break;
+      y = clash.y + clash.h + 12;
+    }
+    x = Math.min(Math.max(x, w / 2 + 4), bounds.width - w / 2 - 4);
+    y = Math.min(Math.max(y, ceiling), Math.max(ceiling, bounds.height - h - 4));
+    paper.style.left = `${x}px`;
+    paper.style.top = `${y}px`;
+    taken.push({ x, y, w, h });
+  });
+}
+
+// A chapter's own body: paragraphs, and any further [[img::URL]] tokens
+// inline -- the same convention Makaleler's own chapters use (see
+// db/library_articles_v7_inline_images.sql), because that is exactly
+// what these are meant to read like. Lighter than the shelf reader's
+// own renderInlineBody: no vote widgets, no [[word::def]] vocab terms --
+// an olay's chapter is prose about something that already happened, not
+// a pedagogical exercise.
+function renderChapterBody(text) {
+  const imgLineRe = /^\s*\[\[img::(\S+?)\]\]\s*$/;
+  const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+  const parts = [];
+  let buf = [];
+  const flush = () => {
+    if (!buf.length) return;
+    const joined = libEsc(buf.join('\n'));
+    parts.push(joined.split(/\n{2,}/).map(p =>
+      p.trim() ? `<p>${p.replace(/\n/g, '<br>')}</p>` : '').join(''));
+    buf = [];
+  };
+  for (const line of lines) {
+    const m = line.match(imgLineRe);
+    if (m) { flush(); parts.push(`<img class="body-img" src="${libEsc(m[1])}" alt="" loading="lazy">`); }
+    else buf.push(line);
+  }
+  flush();
+  return parts.join('');
+}
+
+// ── The chapters, oldest first ──
+// Fixed tilts for the pinned lead photos, same idea as the board's own
+// paper tilts: pinned by hand, not laid out, but the same board every
+// time it is opened.
+const OLAY_CHAPTER_PHOTO_TILTS = ['-1.6deg', '1.3deg', '-1.1deg', '1.8deg'];
+
+// One chapter's own markup -- reused for whichever chapter is currently
+// on screen (see openWorldEventReader's renderStep). `idx` only picks its
+// photo's fixed tilt, so the same chapter looks the same pinned however
+// the reader got back to it.
+function olayChapterHTML(ch, idx) {
+  const url = libSafeUrl(ch.source_url);
+  return `
+    <article class="olay-chapter">
+      <div class="olay-chapter-date">${libEsc(formatLetterDate(ch.moment_date))}</div>
+      <h4>${libEsc(ch.title)}</h4>
+      ${ch.image_url ? `
+        <div class="olay-chapter-photo" style="--photo-tilt:${OLAY_CHAPTER_PHOTO_TILTS[idx % OLAY_CHAPTER_PHOTO_TILTS.length]}">
+          <img src="${libEsc(ch.image_url)}" alt="" loading="lazy">
+        </div>` : ''}
+      <div class="olay-chapter-body">
+        ${renderChapterBody(ch.body)}
+        ${url ? `<p><a href="${libEsc(url)}" target="_blank" rel="noopener noreferrer">Kaynak</a></p>` : ''}
+      </div>
+    </article>
+  `;
+}
+
+// ── One olay: the dossier taken off the board ──
+// It keeps the board's language rather than reverting to the newspaper
+// column the rest of this page is set in: the drawing up top, the
+// parties pinned along one line, a stamp saying whether this is still
+// going -- then its chapters, oldest first, turned one at a time exactly
+// the way Makaleler's own reader turns a shelf's (openArticleReader): a
+// navbar that never scrolls (.olay-page-top, the way out fixed top-left),
+// a step count, and Geri/İleri in a footer that never scrolls either.
+// Step 0 is the cover above; steps 1..N are the chapters. --thread takes
+// the olay's own colour (worldEventColor), which the paper's pin already
+// carried on the board.
+function openWorldEventReader(ev, events) {
+  const body = olaylarBody();
+  if (!body) return;
+  const en = I18N.isEnglish();
+  // Held for as long as the dossier is up, not just while a finger is on
+  // a pin: the page is lying on the map, and what it is about stays lit
+  // underneath it. Dropped by renderOlayBoard on the way back and by
+  // closeOlaylar on the way out.
+  setNewsCountryHighlight(worldEventCountryIds(ev));
+  const parties = worldEventParties(ev);
+  const live = ev.status !== 'ended';
+  const chapters = worldEventChapters(ev);
+  const hasChapters = chapters.length > 0;
+  const totalSteps = 1 + chapters.length;
+  let step = 0;
+
+  body.innerHTML = `
+    <div class="olay-page" id="olay-page" style="--thread:${worldEventColor(ev)}">
+      <div class="olay-page-top">
+        <button class="olay-page-back" type="button" id="olay-back"
+                aria-label="${libEsc(en ? 'The Board' : 'Pano')}" title="${libEsc(en ? 'The Board' : 'Pano')}">
+          <img src="assets/back.png" alt=""/>
+        </button>
+        ${hasChapters ? `
+          <div class="reader-progress"><div class="reader-progress-fill" id="olay-page-progress-fill"></div></div>
+          <div class="reader-step-count" id="olay-page-step-count"></div>
+        ` : ''}
+      </div>
+      <div class="olay-page-scroll" id="olay-page-scroll"></div>
+      ${hasChapters ? `
+        <div class="olay-page-actions">
+          <button class="reader-btn secondary" type="button" id="olay-page-prev">← Geri</button>
+          <button class="reader-btn" type="button" id="olay-page-next">${en ? 'Next →' : 'İleri →'}</button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+  document.getElementById('olay-back')?.addEventListener('click', () => renderOlayBoard(events));
+
+  function renderStep() {
+    const scroll = document.getElementById('olay-page-scroll');
+    if (!scroll) return;
+    if (hasChapters) {
+      const pct = Math.round(((step + 1) / totalSteps) * 100);
+      const fill = document.getElementById('olay-page-progress-fill');
+      if (fill) fill.style.width = `${100 - pct}%`;
+      const stepEl = document.getElementById('olay-page-step-count');
+      if (stepEl) stepEl.textContent = step === 0
+        ? (en ? 'Overview' : 'Genel Bakış')
+        : `${en ? 'Chapter' : 'Bölüm'} ${step} / ${chapters.length}`;
+    }
+    if (step === 0) {
+      scroll.innerHTML = `
+        <div class="olay-page-photo" id="olay-page-photo"></div>
+        <span class="olay-stamp${live ? '' : ' ended'}">${libEsc(worldEventStamp(ev))}</span>
+        <h3>${libEsc(ev.name_tr)}</h3>
+        ${ev.blurb ? `<p class="olay-page-blurb">${libEsc(ev.blurb)}</p>` : ''}
+        ${parties.length ? `<div class="olay-parties">${parties.map(n =>
+          `<span>${libEsc(n.toLocaleUpperCase('tr-TR'))}</span>`).join('')}</div>` : ''}
+        ${ev.body ? `<div class="olay-page-body">${renderLetterBodyHtml(ev.body)}</div>` : ''}
+      `;
+      paintOlayPageMap(ev);
+    } else {
+      scroll.innerHTML = olayChapterHTML(chapters[step - 1], step - 1);
+      libGetCurrentUserId().then(uid => olayWriteProgress(uid, ev.id, step - 1));
+    }
+    scroll.scrollTop = 0;
+
+    if (hasChapters) {
+      const prevBtn = document.getElementById('olay-page-prev');
+      const nextBtn = document.getElementById('olay-page-next');
+      if (prevBtn) prevBtn.disabled = step === 0;
+      if (nextBtn) {
+        nextBtn.disabled = step >= totalSteps - 1;
+        nextBtn.textContent = step >= totalSteps - 1 ? (en ? 'Done' : 'Bitti') : (en ? 'Next →' : 'İleri →');
+      }
+    }
+  }
+
+  document.getElementById('olay-page-prev')?.addEventListener('click', () => {
+    if (step > 0) { step--; renderStep(); }
+  });
+  document.getElementById('olay-page-next')?.addEventListener('click', () => {
+    if (step < totalSteps - 1) { step++; renderStep(); }
+  });
+
+  renderStep();
+
+  // Resume where the reader left off -- but only if they have actually
+  // been further than the cover before, and only once, on this opening:
+  // nothing here should fight a reader who then pages back to reread the
+  // beginning.
+  if (hasChapters) {
+    libGetCurrentUserId().then(uid => {
+      if (!document.getElementById('olay-page')) return;
+      const saved = olayReadProgress(uid, ev.id);
+      if (saved < 0) return;
+      const target = Math.min(saved + 1, totalSteps - 1);
+      if (target > step) { step = target; renderStep(); }
+    });
+  }
+}
+
+
+// The strip at the top of a dossier: the piece of map this olay is
+// drawn on, cropped to its own strokes. The drawing itself is a
+// 1080x1920 overlay that is mostly empty -- printed whole it is a tall
+// blank rectangle with a few marks in it, which is what it looked like
+// before this existed. Cropping to the ink and putting the map back
+// under it says "here it is, on the world" in the space of a photograph.
+async function paintOlayPageMap(ev) {
+  const host = document.getElementById('olay-page-photo');
+  if (!host) return;
+  const box = await measureOlayInk(ev);
+  // The reader may have gone back to the board while this was measured.
+  if (!document.getElementById('olay-page-photo')) return;
+  if (!box) { host.remove(); return; }
+  // Air around the strokes, and never a sliver: a crop much taller than
+  // it is wide reads as a mistake, so the short side is opened out to at
+  // least 3:4 before it is clamped back inside the map.
+  const pad = Math.max(70, Math.max(box.w, box.h) * 0.14);
+  let x0 = box.x - pad, y0 = box.y - pad;
+  let w = box.w + pad * 2, h = box.h + pad * 2;
+  const minW = h * 0.75;
+  if (w < minW) { x0 -= (minW - w) / 2; w = minW; }
+  const minH = w * 0.5;
+  if (h < minH) { y0 -= (minH - h) / 2; h = minH; }
+  x0 = Math.min(Math.max(x0, 0), Math.max(0, OLAY_MAP_W - w));
+  y0 = Math.min(Math.max(y0, 0), Math.max(0, OLAY_MAP_H - h));
+  w = Math.min(w, OLAY_MAP_W); h = Math.min(h, OLAY_MAP_H);
+  host.innerHTML = `
+    <svg viewBox="${x0.toFixed(1)} ${y0.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}"
+         preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <image href="assets/map/kutuphane-map-mobile.png" x="0" y="0"
+             width="${OLAY_MAP_W}" height="${OLAY_MAP_H}" preserveAspectRatio="xMidYMin meet"/>
+      <image href="${libEsc(olayImageSrc(ev))}" x="0" y="0"
+             width="${OLAY_MAP_W}" height="${OLAY_MAP_H}" preserveAspectRatio="xMidYMin meet"/>
+    </svg>
+  `;
+}
+
+// ── Entering and leaving the mode ──
+// The box is a switch, not a door: pressing it inks it and empties the
+// page around the board, pressing it again puts Kütüphane back. There is
+// nothing to dismiss and nothing rises from anywhere, so there is no
+// backdrop, no close button and no Escape-as-the-only-way-out.
+
+// The board hangs from the line the library boxes stand on, measured
+// rather than written down: that line is the profile bar's own height
+// plus the box, and the bar's height depends on the member's name (see
+// IstSheet.position, which measures the same way for the same reason).
+function positionOlayLayer() {
+  const layer = document.getElementById('olaylar-layer');
+  if (!layer) return;
+  if (!window.matchMedia('(max-width: 768px)').matches) {
+    layer.style.removeProperty('--olay-layer-top');
+    return;
+  }
+  const boxes = document.getElementById('lib-boxes');
+  const bottom = boxes ? boxes.getBoundingClientRect().bottom : 0;
+  layer.style.setProperty('--olay-layer-top', `${Math.max(bottom, 0) + 12}px`);
+}
+
+function olaylarIsOpen() {
+  const layer = document.getElementById('olaylar-layer');
+  return !!layer && !layer.hidden;
+}
+
+async function openOlaylar() {
+  const layer = document.getElementById('olaylar-layer');
+  if (!layer) return;
+  const token = sheetOpenToken('olaylar-layer');
+  document.body.classList.add('olaylar-on');
+  document.getElementById('lib-box-olaylar')?.classList.add('lib-box-on');
+  layer.innerHTML = '<div class="olay-board-empty"><span class="spinner"></span></div>';
+  layer.hidden = false;
+  const scrim = document.getElementById('olay-scrim');
+  if (scrim) scrim.hidden = false;
+  positionOlayLayer();
+  const events = await loadWorldEvents();
+  // Through the token and not "is the layer showing": see sheetOpenToken.
+  if (!sheetOpenIsCurrent('olaylar-layer', token)) return;
+  renderOlayBoard(events);
+}
+
+function closeOlaylar() {
+  const layer = document.getElementById('olaylar-layer');
+  document.body.classList.remove('olaylar-on');
+  document.getElementById('lib-box-olaylar')?.classList.remove('lib-box-on');
+  // Whatever the board had lit on the map goes out with it.
+  clearNewsCountryHighlight();
+  BOARD_EVENTS = [];
+  const scrim = document.getElementById('olay-scrim');
+  if (scrim) scrim.hidden = true;
+  if (!layer) return;
+  // Burns the current token, so a fetch still in the air lands on a board
+  // nobody is looking at and paints nothing.
+  sheetOpenToken('olaylar-layer');
+  layer.hidden = true;
+  layer.innerHTML = '';
+}
+
+function toggleOlaylar() {
+  if (olaylarIsOpen()) closeOlaylar();
+  else openOlaylar();
+}
+
+// Bound once at parse time. The layer itself lives inside #ist-content
+// and leaves with the page, but these two listeners are on window and
+// document, which do not -- so they must not be re-bound on every mount
+// (see CLAUDE.md on the shared document), and each checks that the board
+// is actually up before doing anything.
+(function initOlaylarLayer() {
+  window.addEventListener('resize', () => {
+    if (!olaylarIsOpen()) return;
+    positionOlayLayer();
+    // The drawings re-fit themselves (they are in the map's own units),
+    // but the papers are HTML at a fixed size hung off those units, so
+    // a rotation moves every one of them.
+    placeOlayPapers();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && olaylarIsOpen()) closeOlaylar();
+  });
+})();
+
+// ══════════════════════════════════════════
 // The news feed — left column (col-right). Reads public.breaking_news,
 // and reads ALL of it: İstanbul, Türkiye, the districts and Dünya alike.
 // Hane used to carry the first three in its own right-hand column; every
@@ -4938,13 +6227,16 @@ function clearNewsCountryHighlight() { setNewsCountryHighlight([]); }
 async function loadDunyaNews() {
   const feed = document.getElementById('dunya-news-feed');
   if (!feed) return;
-  await ensureDealtLoaded();
+  // Both at once: what the reader has dealt with (localStorage, plus the
+  // server mirror it is merged with) and what there is to deal with. The
+  // store's round trip must not stand between the reader and the deck.
   const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
-  const { data, error } = await sb.from('breaking_news')
+  const query = sb.from('breaking_news')
     .select('*, breaking_news_sources(*), breaking_news_updates(*), breaking_news_polls(*), breaking_news_series(name), breaking_news_countries(country)')
     .gte('updated_at', cutoff)
     .is('archived_at', null)
     .order('updated_at', { ascending: false });
+  const [, { data, error }] = await Promise.all([ensureDealtLoaded(), query]);
   if (error) {
     console.error('[kutuphane news]', error);
     feed.innerHTML = `<div class="empty-state" style="padding:20px;font-size:0.78rem;">Haberler yüklenemedi.</div>`;
@@ -4975,10 +6267,12 @@ async function loadDunyaNews() {
 const DEALT_KEY_PREFIX = 'dunya_dealt_';
 let _dealt = new Map();   // story id -> the updated_at that was dealt with
 let _dealtKey = null;
+let _dealtUid = null;
 
 async function ensureDealtLoaded() {
   if (_dealtKey) return;
   const uid = await libGetCurrentUserId();
+  _dealtUid = uid || null;
   _dealtKey = DEALT_KEY_PREFIX + (uid || 'anon');
   try {
     const raw = JSON.parse(localStorage.getItem(_dealtKey) || '{}');
@@ -4992,6 +6286,52 @@ async function ensureDealtLoaded() {
       Object.keys(raw).forEach(id => _dealt.set(String(id), raw[id] || null));
     }
   } catch (e) { /* unreadable store: start the deck full */ }
+  await mergeServerDealt();
+}
+
+// ── The same store, kept server-side too (db/hive_member_status.sql) ──
+// The deck is still driven by localStorage: it is read on every render,
+// it works offline, and it must not wait for a round trip to know what is
+// on the table. What the server copy is for is somebody ELSE's petek --
+// how deep this member's deck still is, printed beside their name at the
+// middle depth of the honeycomb (see hiveNameHTML in profile-card.js).
+// A second device the member reads on is the same store from the site's
+// point of view, so merging the two costs nothing and answers it: the
+// later stamp wins, because a story dealt with in its newer state has
+// been dealt with in its older one too.
+async function mergeServerDealt() {
+  if (!_dealtUid) return;
+  try {
+    const { data, error } = await sb.from('news_dealt')
+      .select('news_id, dealt_stamp')
+      .eq('user_id', _dealtUid);
+    if (error || !data) return;
+    let changed = false;
+    data.forEach(r => {
+      const id = String(r.news_id);
+      const mine = _dealt.get(id);
+      // A stampless local entry (the first version of the store) is left
+      // alone: it already means "dealt with, whatever state it was in".
+      if (mine === null) return;
+      if (mine === undefined || new Date(r.dealt_stamp) > new Date(mine)) {
+        _dealt.set(id, r.dealt_stamp);
+        changed = true;
+      }
+    });
+    if (changed) saveDealtIds();
+  } catch (e) { /* the deck is local first; the mirror is best-effort */ }
+}
+
+// Fire-and-forget: the card has already left the deck by the time this
+// is called, and nothing on this page reads the answer back.
+function recordDealtOnServer(id, stamp) {
+  if (!_dealtUid || !stamp) return;
+  try {
+    sb.from('news_dealt')
+      .upsert({ user_id: _dealtUid, news_id: id, dealt_stamp: stamp, dealt_at: new Date().toISOString() },
+              { onConflict: 'user_id,news_id' })
+      .then(() => {}, () => {});
+  } catch (e) {}
 }
 
 function saveDealtIds() {
@@ -5009,7 +6349,7 @@ function reconcileDealt() {
   const live = new Map(DUNYA_NEWS_CACHE.map(n => [String(n.id), n.updated_at || n.created_at]));
   _dealt.forEach((stamp, id) => {
     if (!live.has(id)) { _dealt.delete(id); changed = true; return; }
-    if (!stamp) { _dealt.set(id, live.get(id)); changed = true; }
+    if (!stamp) { _dealt.set(id, live.get(id)); recordDealtOnServer(id, live.get(id)); changed = true; }
   });
   if (changed) saveDealtIds();
 }
@@ -5044,8 +6384,12 @@ function dealDeckCard(story) {
   // The stamp is the story AS THROWN. The next gelişme moves it past this
   // and the story comes back -- that is the whole of "a story returns only
   // when it has actually moved".
-  _dealt.set(id, story.updated_at || story.created_at || new Date().toISOString());
+  const stamp = story.updated_at || story.created_at || new Date().toISOString();
+  _dealt.set(id, stamp);
   saveDealtIds();
+  // And on the server, so the people standing beside this member on the
+  // petek can see how much of the day they still have in front of them.
+  recordDealtOnServer(id, stamp);
   const feed = document.getElementById('dunya-news-feed');
   if (!feed) return;
   const node = feed.querySelector(`.article[data-news-id="${CSS.escape(id)}"]`);
@@ -5075,6 +6419,11 @@ function renderDunyaNewsFeed() {
       return;
     }
     const rowsById = new Map(rows.map(n => [String(n.id), n]));
+    // A shut card is its headline and nothing else: the body is what
+    // OPENING the story is for, and printing it twice -- once squeezed
+    // into the card, once again on the page that grows out of it -- made
+    // the two read as the same paper duplicated rather than as one story
+    // opening.
     feed.innerHTML = rows.map(n => {
       const lastTouch = n.updated_at || n.created_at;
       return `
@@ -5084,7 +6433,6 @@ function renderDunyaNewsFeed() {
             <div class="ago" data-iso="${libEsc(lastTouch)}">${libEsc(libFormatNewsAge(lastTouch))}</div>
           </div>
           <h3>${libEsc(n.title)}</h3>
-          ${n.body ? `<p>${libEsc(n.body)}</p>` : ''}
         </div>
       `;
     }).join('');
@@ -5151,7 +6499,18 @@ function tickDunyaNewsAgo() {
 // containers keep their #dunya-poll-<id> ids so loadAndRenderDunyaPoll
 // finds them wherever the timeline is printed.
 function newsTimelineHTML(n) {
-  const timelineEvents = (n.breaking_news_updates || []).map(u => ({ type: 'update', created_at: u.created_at, data: u }))
+  // The newest gelişme IS the story's headline: adding one copies its
+  // title and body onto breaking_news itself (see addNewsUpdate in
+  // admin.html), so printing it again at the top of the Zaman Akışı is
+  // the same paragraph twice on one page. Matched on what it says rather
+  // than simply taken off the top, because a backdated gelişme is never
+  // promoted -- the chain's newest entry and the one the page is already
+  // printing are not always the same row.
+  const updates = (n.breaking_news_updates || []).slice()
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const same = (a, b) => (a || '').trim() === (b || '').trim();
+  if (updates.length && same(updates[0].title, n.title) && same(updates[0].body, n.body)) updates.shift();
+  const timelineEvents = updates.map(u => ({ type: 'update', created_at: u.created_at, data: u }))
     .concat((n.breaking_news_polls || []).map(p => ({ type: 'poll', created_at: p.created_at, data: p })))
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   if (!timelineEvents.length) return '';
@@ -5260,58 +6619,36 @@ function buildNewsPageHtml(n) {
 //
 // Off on desktop, where there is no band and the page is THE sheet
 // rising from the bottom as usual.
-const NEWS_GROW_MS = 380;
-const NEWS_GROW_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 let _newsOrigin = null;   // the feed card this page grew out of
-let _newsAnims = [];
 
 function newsPageGrows() {
   return window.matchMedia('(max-width: 768px)').matches
     && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-// The card's box, expressed as an inset into the page's own box. Clamped
-// at zero: a card scrolled part-way out of the band opens from that edge
-// rather than from a negative inset, which clip-path reads as an
-// overflow instead.
-function newsOriginInset(page) {
-  if (!page || !_newsOrigin || !_newsOrigin.isConnected) return null;
-  const b = _newsOrigin.getBoundingClientRect();
-  const s = page.getBoundingClientRect();
-  if (!b.width || !b.height || !s.width || !s.height) return null;
-  const px = (v) => Math.max(0, v).toFixed(2) + 'px';
-  return `inset(${px(b.top - s.top)} ${px(s.right - b.right)} ${px(s.bottom - b.bottom)} ${px(b.left - s.left)})`;
+// Puts the card back on the deck. Called before the fold-back rather
+// than after it: the shrinking page always covers the box it is
+// collapsing into, so the card reappears under it unseen -- and a card
+// left invisible by a close that never got to its callback would be a
+// hole in the deck nobody could open.
+function showNewsOrigin() {
+  if (_newsOrigin) _newsOrigin.classList.remove('news-open');
 }
 
 function cancelNewsAnims() {
-  _newsAnims.forEach(a => { try { a.cancel(); } catch (e) {} });
-  _newsAnims = [];
+  IstSheet.cancelGrow(document.getElementById('news-page'));
 }
 
 // dir: 'in' when the card becomes the page, 'out' when the page folds
-// back into it. The contents cross-fade rather than being drawn squeezed
-// inside a card-sized window: out fast, in once the page has most of its
-// room.
+// back into it. One implementation for this and Kahvehane's event page
+// (IstSheet.grow): the clip that opens the window also clips the page's
+// own border, so the frame is drawn by a box of its own beside it -- see
+// THE GROW in sheet.js.
 function growNewsPage(dir) {
   const page = document.getElementById('news-page');
   const inner = document.getElementById('news-page-inner');
-  cancelNewsAnims();
-  if (!page || !inner || !newsPageGrows() || !page.animate) return;
-  const shut = newsOriginInset(page);
-  if (!shut) return;
-  const wide = 'inset(0px)';
-  const opts = { duration: NEWS_GROW_MS, easing: NEWS_GROW_EASE };
-  // 'out' holds the collapsed frame after it finishes: IstSheet.close
-  // re-hides the overlay a little later (0.55s), and without the fill the
-  // page would snap back to full size for those last frames.
-  _newsAnims.push(page.animate(
-    dir === 'in' ? [{ clipPath: shut }, { clipPath: wide }] : [{ clipPath: wide }, { clipPath: shut }],
-    dir === 'in' ? opts : Object.assign({ fill: 'forwards' }, opts)));
-  _newsAnims.push(inner.animate(
-    dir === 'in'
-      ? [{ opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1 }]
-      : [{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 0 }],
-    Object.assign({ fill: 'forwards' }, opts)));
+  if (!newsPageGrows()) { IstSheet.cancelGrow(page); return; }
+  IstSheet.grow({ page, inner, origin: _newsOrigin, dir });
 }
 
 // Where the page's two sides fall, measured off the feed's own content
@@ -5511,6 +6848,11 @@ function openDunyaNewsDetail(n, cardEl) {
   const inner = document.getElementById('news-page-inner');
   if (!overlay || !inner) return;
   _newsOrigin = cardEl || null;
+  // The card is the page now, so it stops being drawn behind it. Only
+  // where the page actually grows out of it: on desktop the story opens
+  // as THE sheet beside a printed column, and a gap in that column would
+  // just read as a missing story.
+  if (_newsOrigin && newsPageGrows()) _newsOrigin.classList.add('news-open');
   _newsStory = n;
   _newsPollMine.clear();
   inner.innerHTML = buildNewsPageHtml(n);
@@ -5535,6 +6877,7 @@ function closeNewsPage() {
   // opening something else), so the story's highlight goes out here
   // rather than at each of them.
   clearNewsCountryHighlight();
+  showNewsOrigin();
   growNewsPage('out');
   IstSheet.close(overlay, () => {
     inner.innerHTML = '';
@@ -5555,11 +6898,16 @@ function snapNewsPageShut() {
   const inner = document.getElementById('news-page-inner');
   if (!overlay || !inner || overlay.hidden) return;
   clearNewsCountryHighlight();
+  showNewsOrigin();
   cancelNewsAnims();
   // Whatever a half-finished throw left on the page (see wireNewsPageSwipe)
   // -- the next story opens square in the band, never mid-flight.
   if (page) { page.style.transition = ''; page.style.transform = ''; page.style.opacity = ''; }
   overlay.classList.remove('open');
+  // Dropping .open by hand rather than through IstSheet.close, so the
+  // tint's own switch is told (this page's page isn't a dim one, but the
+  // invariant is that nothing removes that class quietly).
+  IstSheet.syncDim();
   overlay.hidden = true;
   inner.innerHTML = '';
   _newsOrigin = null;
@@ -5857,6 +7205,7 @@ function closeReaderOverlay() {
   const overlay = document.getElementById('reader-overlay');
   const area = document.getElementById('reader-overlay-sheet');
   if (!overlay || !area) return;
+  sheetOpenToken('reader-overlay');
   // Every way out of the sheet lands here (back button, backdrop, Escape,
   // dragging it down), so the highlight a country page lit is dropped
   // here rather than at each of them.
@@ -6028,7 +7377,7 @@ async function renderSeatFor(seatId, seatLabel) {
   });
 }
 
-// The three buttons that open this page's sheets -- Makaleler, Posta
+// The buttons that open this page's sheets -- Makaleler, Olaylar, Posta
 // Kutusu and TBMM -- all live inside #ist-content, which the router
 // replaces wholesale on every re-entry to this page (see router.js's
 // navigateTo). Bound once at script-parse time they went dead the first
@@ -6040,6 +7389,7 @@ async function renderSeatFor(seatId, seatLabel) {
 // handler would keep firing after navigating away (see CLAUDE.md).
 function wireLibraryEntryPoints() {
   document.getElementById('lib-box-makaleler')?.addEventListener('click', openLibraryShelvesSheet);
+  document.getElementById('lib-box-olaylar')?.addEventListener('click', toggleOlaylar);
   document.getElementById('lib-box-mektuplar')?.addEventListener('click', openMektuplarSheet);
   initLetterBadge();
   document.getElementById('tbmm-open-btn')?.addEventListener('click', openTBMMSheet);
@@ -6829,6 +8179,7 @@ const palettePref = normalizePalette(profile?.palette_pref);
 I18N.setLang(languagePref);
 // Apply the saved palette too (palette.js already booted from the cached value).
 Palette.setPalette(palettePref);
+Palette.setTheme(themePref);
 
   function avatarDisplayHTML() {
     return IstAvatar.html(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt);
@@ -6946,9 +8297,13 @@ function mount() {
   clearMapLoading();
   loadProfile();
   bootstrapLibraryNav();
-  // Re-attach the Makaleler / Posta Kutusu / TBMM click handlers to this
-  // re-entry's fresh markup (see wireLibraryEntryPoints).
+  // Re-attach the Makaleler / Olaylar / Posta Kutusu / TBMM click handlers
+  // to this re-entry's fresh markup (see wireLibraryEntryPoints).
   wireLibraryEntryPoints();
+  // The board's own markup left with the last copy of this page, but the
+  // body class did not -- and the box would come back inked with nothing
+  // behind it. Kütüphane is always entered with the board down.
+  closeOlaylar();
   // The map caption ships in the markup as "İstanbul" (the desktop map's
   // idle text) and the router hands this page a fresh copy of that markup on
   // every re-entry -- see resetMapLabel in initLibraryMap.
