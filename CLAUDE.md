@@ -533,8 +533,12 @@ sb.from('articles').delete().eq('id', id)
 - **The band under the map is TWO decks**: the city's events in its bottom-left corner
   (`#events-deck`), the day's games in its bottom-right one (`#game-deck`). On a phone `#main-site`
   is two equal columns in row 2 — `.col-left` holds the events (the mayor's card and the parked
-  comments inside it stay hidden), `.col-right` the games — and each deck sits against its own
-  outer edge, so the two read as the two ends of one band rather than as a column of boxes
+  comments inside it stay hidden), `.col-right` the games — and each deck fills its own half, so
+  the channel between them is exactly the distance each keeps from its own outer screen edge
+  (`--deck-inset` / `--deck-channel-pad`, stated once on `#main-site` because the two halves have
+  to agree or the channel is off-centre). That is why the decks stretch rather than sizing to their
+  own cards, as the games deck did while it *was* the whole band: two content-width decks leave a
+  gap whose width is decided by whichever card carries the longest word
 - The **neighborhood comments are parked**, not deleted: their column belongs to the index and
   where the comments belong is still an open question, so the feed, its composer and everything
   driving them stay exactly as they are behind `const COMMENTS_ENABLED = false` plus `hidden` on
@@ -558,10 +562,8 @@ sb.from('articles').delete().eq('id', id)
   headline, what it is under that — the type sizes are `.article`'s own. Three squares side by
   side said nothing about order; a stack of cards in order says it without a word. The deck sits
   in the band's **bottom-right corner** — down against the tab bar like every other phone stack
-  (`margin-top: auto`), and over on the thumb side (`align-self: flex-end`, because `.game-picker`
-  packs its cross axis to `flex-start` for the desktop row's sake). It keeps the cards' own width
-  rather than filling the band: a deck is a hand of cards, not a panel, and it reads as one by not
-  spanning everything. A game already played today is inked over the way a story you have dealt
+  (`margin-top: auto`), and filling its own half of the band (`align-self: stretch`; see the two
+  decks' channel above for why it no longer keeps the cards' own width). A game already played today is inked over the way a story you have dealt
   with is gone — *played* meaning finished (`attempts >= 1`), never merely opened: a game left
   half-done stays on top of the deck, marked, because it is exactly what the reader still has in
   front of them. Sözcel's
@@ -593,7 +595,12 @@ sb.from('articles').delete().eq('id', id)
   column over a map, and an apology printed across it is a bigger object than this one
 - **What the throw means here is a verdict, not "next"**: right is **İlgimi çekti**, left **İlgimi
   çekmedi**, stamped on the paper as it goes (`.ev-swipe-cue`) so nobody gives a verdict they never
-  saw, with the same two words as buttons in the page's foot for a mouse. What is thrown right is
+  saw. **And the throw is the only way to give one** — there is deliberately no row of buttons on
+  the page: it is the one thing this page asks of the reader, and a page carrying both says the
+  gesture is the shortcut and the buttons are the real way, which is the wrong way round. It is
+  also the gesture the news deck and the question cards have already taught. A desktop reader has
+  no finger, so there the mouse drags the page itself (`wireEventPageSwipe` binds both, one set of
+  three steps behind them). What is thrown right is
   what Hane prints beside the petek — so the two pages are one move: you sort the city's calendar
   on the local side, and what you kept is waiting for you in the middle. That is the mall stairway
   in its smallest form: the member who came for the games walks the whole city's calendar on the
@@ -609,6 +616,10 @@ sb.from('articles').delete().eq('id', id)
   whole band — both halves, its own and the games' — off a `clip-path` measured from the card's own
   box, and folds back into it on the way out. Head / body / foot, only the middle scrolling. On
   desktop there is no band and no map to protect, so it stays THE sheet
+- **The band under it goes quiet, the map does not** — the same tint the Kahve Endeksi and the
+  Skor Tahtası rise with (`.ist-sheet-dim`), which now stops at the hero line on every page that
+  has a map (see THE sheet's own section). Here the tint takes no taps at all: the whole band is
+  the page, so there is no backdrop left to press, and the map above has to stay live
 - **The direction is the answer**, exactly as on a news story: right is the first option, left the
   second, and the option is stamped on the card as it goes (`.q-cue`) so nobody answers a question
   they never saw. The two buttons say the same thing for a mouse. Tümcel stays locked until the
@@ -1080,6 +1091,13 @@ geometry and no centred modal anywhere on the site.
   after the class. Take a token instead (`sheetOpenToken` / `sheetOpenIsCurrent` in kutuphane.html):
   opening takes one, closing and the next opening burn it, so the question asked is "is this still
   the open I started" rather than "is something open".
+- **The tint stops at the map.** A sheet that is a destination rather than something read beside
+  the page opts into a dim backdrop (`.ist-sheet-dim` — the Kahve Endeksi, the Skor Tahtası, an
+  event's page). On a phone that wash starts at `--map-hero-end` on any page that has a map
+  (`body:has(.map-panel)`), so the drawing keeps its own light: these sheets come to rest *under*
+  the map precisely so the district or country they are about stays visible, and a wash laid over
+  it takes back exactly what the resting position had just given. Hane is unaffected — its hero is
+  the petek, which is the page itself rather than scenery behind one.
 - **Phones:** the sheet's side gaps are the same `--screen-inset` (frames.css) the profile bar's
   row is padded to — everything stacked over the same map lines up, always.
   - A sheet opened **from the profile bar** (your profile, a member's) rests under that bar,

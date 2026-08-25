@@ -54,7 +54,7 @@
     })();
   </script>
   <script src="sheet.js?v=2"></script>
-  <link rel="stylesheet" href="sheet.css?v=2">
+  <link rel="stylesheet" href="sheet.css?v=3">
   <style data-page="kahvehane">
     :root {
       /* Core ink & paper — warm cream newspaper palette */
@@ -1273,36 +1273,21 @@
       color: var(--ink);
     }
     .event-page-body > p + p { margin-top: 10px; }
-    /* The bottom line: the two answers, for whoever has no finger to
-       throw with. Same words the stamps carry, so the gesture and the
-       buttons are visibly one question. */
-    .event-page-foot {
-      flex: none;
-      display: flex;
-      align-items: stretch;
-      gap: 8px;
-      padding: 8px 16px;
-      border-top: 1px solid var(--rule);
-      background: var(--frame-bg);
+    /* There is no row of buttons on the foot of this page, and that is
+       the point: the verdict is the THROW, the same gesture the news
+       deck and the question cards already taught -- and a page carrying
+       both says the gesture is the shortcut and the buttons are the real
+       way, which is the wrong way round here. It is the one thing this
+       page asks of the reader, so it asks it in one language. (Desktop
+       has no finger, so a mouse drags the page instead -- see
+       wireEventPageSwipe.) */
+    /* The page is a thing you push. On desktop that has to be said, since
+       a mouse has no way to discover it -- and while a drag is running,
+       the text under the cursor must not start highlighting instead. */
+    @media (hover: hover) and (pointer: fine) {
+      .event-page { cursor: grab; }
+      .event-page.ev-dragging { cursor: grabbing; user-select: none; }
     }
-    .ev-verdict-btn {
-      flex: 1;
-      min-width: 0;
-      padding: 8px 6px;
-      background: none;
-      border: 2px solid var(--ink);
-      cursor: pointer;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.62rem;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--ink);
-      transition: background 0.15s, color 0.15s;
-    }
-    .ev-verdict-btn.yes { border-color: var(--ink-red); color: var(--ink-red); }
-    .ev-verdict-btn:hover { background: var(--ink); color: var(--paper-card, #fff); }
-    .ev-verdict-btn.yes:hover { background: var(--ink-red); color: var(--paper-card, #fff); }
     /* ── The stamp the throw puts on the paper ──
        Each stamp sits on the edge the page is moving AWAY from: the
        leading edge is the half that leaves the screen first, so a stamp
@@ -1821,6 +1806,17 @@
            reader outside standing next to somebody, so it belongs in the
            band the reader is actually walking past, not one tap off it. */
         grid-template-columns: 1fr 1fr;
+        /* ── The channel between the two decks ──
+           Each deck stands --deck-inset in from its own outer screen
+           edge (on top of the frame's own padding), and the gap between
+           them is exactly that same distance -- so the band reads as two
+           cards spaced evenly across it rather than as two boxes that
+           happen to have drifted apart. The grid's own column gap
+           already contributes --frame-gap of it, so each facing side
+           pads by half of what is left. Stated once, here, because the
+           two halves have to agree or the channel is off-centre. */
+        --deck-inset: 12px;
+        --deck-channel-pad: calc((var(--frame-pad, 10px) + var(--deck-inset) - var(--frame-gap, 10px)) / 2);
         /* Row 1 (the map) gets an explicit, definite track size instead
            of "auto": with one auto-width column (games) and one 1fr
            column (comments) below it, plain "auto auto" rows didn't
@@ -2184,7 +2180,7 @@
       /* Scrolls internally (rather than growing the page) on the rare
          screen too short for even the 3 short tiles to fit. */
       .games-section-inner {
-        padding: 12px;
+        padding: var(--deck-inset) var(--deck-inset) var(--deck-inset) var(--deck-channel-pad);
         gap: 8px;
         display: flex;
         flex-direction: column;
@@ -2231,20 +2227,24 @@
            ones behind instead of leaving their bottom edges showing
            under it. */
         flex: 0 0 auto;
-        /* And it rests in the bottom-RIGHT corner of the band: down
-           against the tab bar the way Kütüphane's news deck does, and
-           over on the reader's thumb side, which is the corner this page
-           swipes in from. Vertically an auto margin rather than
-           justify-content:flex-end, so a deck that outgrows the band
-           still scrolls in .games-section-inner instead of pushing its
-           top card out of reach; horizontally align-self, because
-           .game-picker packs its cross axis to flex-start (the desktop
-           row's tiles decide their own height there) and the deck would
-           otherwise sit content-width against the left edge.
-           Width is the cards' own -- a deck is a hand of cards, not a
-           panel, and it is legible as one by not filling the band. */
+        /* Down against the tab bar the way Kütüphane's news deck is --
+           an auto top margin rather than justify-content:flex-end, so a
+           deck that outgrows the band still scrolls in
+           .games-section-inner instead of pushing its top card out of
+           reach.
+
+           And it fills its half of the band rather than sizing to its
+           own cards. It kept the cards' width while it WAS the whole
+           band -- a deck is a hand of cards, not a panel, and not
+           spanning everything is how it read as one. With a second deck
+           beside it that is no longer free: two content-width decks
+           leave a channel between them whose width is decided by
+           whichever card happens to carry the longest word, which is
+           nothing at all to look at. The even channel is the thing worth
+           having now (see --deck-channel-pad), and it needs both halves
+           to have a definite edge. */
         margin-top: auto;
-        align-self: flex-end;
+        align-self: stretch;
         max-width: 100%;
       }
       /* Opaque in the deck. A tile's own 0.85 white reads fine floating
@@ -2332,7 +2332,7 @@
          column of boxes. */
       .events-deck {
         margin-top: auto;
-        align-self: flex-start;
+        align-self: stretch;
         max-width: 100%;
         padding: 0;
         /* The cards behind the front one stand a step up and back, past
@@ -2340,7 +2340,7 @@
         overflow: visible;
       }
       .events-section-inner {
-        padding: 12px;
+        padding: var(--deck-inset) var(--deck-channel-pad) var(--deck-inset) var(--deck-inset);
         display: flex;
         flex-direction: column;
         flex: 1;
@@ -2380,7 +2380,15 @@
            its own taps and nothing else takes any. */
         pointer-events: none;
       }
-      .event-overlay .ist-sheet-backdrop { display: none; }
+      /* The tint is the same one the board and the scoreboard rise with
+         (.ist-sheet-dim in sheet.css), and it stops at the hero line
+         there too, so the map -- with this event's own district burning
+         on it -- keeps its light. It takes no taps: the whole band below
+         is the page, so there is no backdrop left to press, and the map
+         above has to stay live. What the tint is actually FOR here is the
+         grow: the card opens into a band that has already gone quiet
+         behind it. */
+      .event-overlay .ist-sheet-backdrop { pointer-events: none; }
       .event-overlay .event-page {
         pointer-events: auto;
         left: var(--event-page-left, calc(var(--frame-pad, 10px) + 12px));
@@ -2403,7 +2411,6 @@
       .event-page-body { padding: 11px 12px 14px; }
       .event-page-title { font-size: 19px; margin-bottom: 6px; }
       .event-page-body > p { font-size: 13px; line-height: 1.5; }
-      .event-page-foot { padding: 7px 12px; }
       /* sheet.css hides the side columns under any open sheet, because a
          sheet rises OVER them. This page doesn't rise over anything: it
          grows inside the band, and the cards it is expanding past are
@@ -3293,7 +3300,7 @@
        full view for as long as the event is open. The same object, and
        the same argument, as Kütüphane's news page. See "THE EVENT PAGE"
        in the stylesheet and openEventPage below. -->
-  <div class="ist-sheet-overlay event-overlay" id="event-overlay" hidden>
+  <div class="ist-sheet-overlay ist-sheet-dim event-overlay" id="event-overlay" hidden>
     <div class="ist-sheet-backdrop" id="event-overlay-backdrop"></div>
     <div class="ist-sheet event-page" id="event-page">
       <div class="event-page-inner" id="event-page-inner"></div>
@@ -5807,10 +5814,6 @@ function buildEventPageHtml(ev) {
       <div class="event-page-meta">${meta}</div>
       ${ev.description ? `<p>${escapeHtml(ev.description)}</p>` : ''}
     </div>
-    <div class="event-page-foot">
-      <button type="button" class="ev-verdict-btn no" data-verdict="no">${escapeHtml(I18N.t('events.verdict.no'))}</button>
-      <button type="button" class="ev-verdict-btn yes" data-verdict="yes">${escapeHtml(I18N.t('events.verdict.yes'))}</button>
-    </div>
     <div class="ev-swipe-cue ev-swipe-cue-yes" id="ev-cue-yes">${escapeHtml(I18N.t('events.verdict.yes'))}</div>
     <div class="ev-swipe-cue ev-swipe-cue-no" id="ev-cue-no">${escapeHtml(I18N.t('events.verdict.no'))}</div>
   `;
@@ -5833,9 +5836,6 @@ function openEventPage(ev, cardEl) {
   growEventPage('in');
   const back = document.getElementById('event-page-back');
   if (back) back.addEventListener('click', () => closeEventPage());
-  inner.querySelectorAll('.ev-verdict-btn').forEach(btn => {
-    btn.addEventListener('click', () => dealEventPage(btn.dataset.verdict === 'yes' ? 1 : -1));
-  });
   // Light the district on the map. The page sits in the band BELOW the
   // map rather than over it, so the drawing stays uncovered: the reader
   // sees where the event is for as long as they are reading about it.
@@ -5913,12 +5913,21 @@ function dealEventPage(dir) {
   }, EV_SWIPE_FLY_MS + 20);
 }
 
-// Touch phones only -- the same condition the pulled sheet uses, and for
-// the same reason: a finger is the only thing that can throw a page.
+// ── The throw ──
+// The only thing this page asks for, so it is the only thing it offers:
+// no buttons, just the gesture the news deck and the question cards
+// already taught. A finger throws the paper on a phone; on desktop the
+// mouse drags it, because a reader with no touch screen still has to be
+// able to say what they thought -- and a page with a row of buttons on it
+// would make the throw look like the shortcut rather than the move.
+//
+// Both inputs run the same three steps; only how a drag starts and where
+// the moves are listened for differ (a mouse leaves the element the
+// moment it is thrown, so its move/up live on the window).
 function wireEventPageSwipe() {
   const page = document.getElementById('event-page');
   if (!page) return;
-  const mobile = window.matchMedia('(max-width: 768px) and (pointer: coarse)');
+  const touch = window.matchMedia('(max-width: 768px) and (pointer: coarse)');
   let sx = 0, sy = 0, dx = 0, lastX = 0, lastT = 0, vel = 0;
   let dragging = false, axis = null;
 
@@ -5934,59 +5943,88 @@ function wireEventPageSwipe() {
     setTimeout(() => { if (!_evDealing) page.style.transition = ''; }, 320);
   }
 
-  page.addEventListener('touchstart', (e) => {
-    if (!mobile.matches || e.touches.length !== 1 || _evDealing) return;
-    // The carousel's own swipe listens on the document (router.js): a
-    // horizontal drag on an open event is that event's, not a page
-    // change, so it stops here.
-    e.stopPropagation();
+  function begin(x, y, t) {
     dragging = true;
     axis = null;
     dx = 0;
-    sx = lastX = e.touches[0].clientX;
-    sy = e.touches[0].clientY;
-    lastT = e.timeStamp || performance.now();
+    sx = lastX = x;
+    sy = y;
+    lastT = t;
     vel = 0;
     page.style.transition = 'none';
-  }, { passive: true });
+  }
 
-  page.addEventListener('touchmove', (e) => {
-    if (!dragging || e.touches.length !== 1) return;
-    const x = e.touches[0].clientX, y = e.touches[0].clientY;
+  // Returns true once the drag has committed to the horizontal axis --
+  // the caller then knows to keep the browser out of it.
+  function move(x, y, t) {
+    if (!dragging) return false;
     // Which gesture this is gets decided once, on the first real
     // movement, and never revisited: the body scrolls vertically inside
     // this page, and a drag that kept changing its mind would fight the
     // scroller.
     if (axis === null) {
       const adx = Math.abs(x - sx), ady = Math.abs(y - sy);
-      if (adx < 6 && ady < 6) return;
+      if (adx < 6 && ady < 6) return false;
       axis = adx > ady * 1.2 ? 'x' : 'y';
-      if (axis === 'y') { dragging = false; page.style.transition = ''; return; }
+      if (axis === 'y') { dragging = false; page.style.transition = ''; return false; }
+      page.classList.add('ev-dragging');
     }
-    const now = e.timeStamp || performance.now();
-    const dt = now - lastT;
+    const dt = t - lastT;
     // Weighted toward the newest sample so a flick's final speed wins
     // over the slow start of the same drag.
     if (dt > 0) vel = 0.7 * ((x - lastX) / dt) + 0.3 * vel;
     lastX = x;
-    lastT = now;
+    lastT = t;
     dx = x - sx;
     render();
-    if (e.cancelable) e.preventDefault();
-  }, { passive: false });
+    return true;
+  }
 
-  const end = () => {
+  function end() {
     if (!dragging) return;
     dragging = false;
+    page.classList.remove('ev-dragging');
     const flicked = Math.abs(vel) > EV_SWIPE_DEAL_VEL;
     const thrown = Math.abs(dx) > EV_SWIPE_DEAL_PX;
     if (!flicked && !thrown) { springBack(); return; }
     // A flick decides its own direction: a finger that started left and
     // ended up flicking right meant right.
     dealEventPage((flicked ? vel : dx) > 0 ? 1 : -1);
-  };
+  }
+
+  page.addEventListener('touchstart', (e) => {
+    if (!touch.matches || e.touches.length !== 1 || _evDealing) return;
+    // The carousel's own swipe listens on the document (router.js): a
+    // horizontal drag on an open event is that event's, not a page
+    // change, so it stops here.
+    e.stopPropagation();
+    begin(e.touches[0].clientX, e.touches[0].clientY, e.timeStamp || performance.now());
+  }, { passive: true });
+
+  page.addEventListener('touchmove', (e) => {
+    if (e.touches.length !== 1) return;
+    if (move(e.touches[0].clientX, e.touches[0].clientY, e.timeStamp || performance.now())
+        && e.cancelable) e.preventDefault();
+  }, { passive: false });
+
   page.addEventListener('touchend', end);
   page.addEventListener('touchcancel', end);
+
+  // The mouse. Only the primary button, and never a drag begun on
+  // something the reader is plainly using for something else (the arrow,
+  // a link, a selection of the body's own text is still theirs to make
+  // -- the axis test below leaves a vertical or tiny movement alone).
+  page.addEventListener('mousedown', (e) => {
+    if (touch.matches || e.button !== 0 || _evDealing) return;
+    if (e.target.closest('button, a, input, textarea')) return;
+    begin(e.clientX, e.clientY, e.timeStamp || performance.now());
+  });
+  window.addEventListener('mousemove', (e) => {
+    // Text selection is what a horizontal mouse drag would otherwise do,
+    // and it would leave the page smeared with highlight as it flew out.
+    if (move(e.clientX, e.clientY, e.timeStamp || performance.now())) e.preventDefault();
+  });
+  window.addEventListener('mouseup', end);
 }
 
 (function initEventPage() {
