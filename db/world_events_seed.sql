@@ -23,8 +23,8 @@
 -- color (db/world_events_v4_color.sql) is sampled straight off each
 -- drawing's own ink, so the paper's pin matches the string that was
 -- actually drawn instead of defaulting every olay to the same red. The
--- two without a drawing yet carry null -- the site's red until somebody
--- draws them and picks a colour to match.
+-- one without a drawing yet carries null -- the site's red until
+-- somebody draws it and picks a colour to match.
 insert into public.world_events
   (id, name_tr, blurb, parties, status, started_on, sort_order, paper_x, paper_y, color) values
   ('rusya-ukrayna-savasi', 'Rusya–Ukrayna Savaşı',
@@ -39,13 +39,24 @@ insert into public.world_events
    -- Sampled off the drawing's own ink.
    '#557c94'),
 
+  -- assets/olaylar/gazze.png: one stroke off the Gazze coast, run
+  -- south-west across Sina into the empty desert. The paper hangs at that
+  -- far end, so the string runs out of the note and back up into Gazze.
   ('gazze', 'Gazze',
    'Bir yılı aşan bombardıman, bir açlık ve bir soykırım davası. Bölgedeki her dosyanın üstünden geçtiği yer.',
-   'İsrail · Filistin', 'ongoing', '2023-10-07', 90, null, null, null),
+   'İsrail · Filistin', 'ongoing', '2023-10-07', 90, 406, 1412,
+   -- Sampled off the drawing's own ink.
+   '#4c8059'),
 
+  -- assets/olaylar/iran-abd.png: six strokes fanning between İran and
+  -- İsrail across the Levant. The paper hangs at the İran end of that
+  -- fan -- the open end, out over the Körfez -- so the strings run out
+  -- of the note and west into İsrail rather than piling on the coast.
   ('iran-abd', 'İran ve ABD',
    'Kırk yıllık husumetin nükleer bir dosyaya, oradan da doğrudan vuruşlara dönüşmesi.',
-   'İran · ABD · İsrail', 'ongoing', '2015-07-14', 80, null, null, null),
+   'İran · ABD · İsrail', 'ongoing', '2015-07-14', 80, 1010, 950,
+   -- Sampled off the drawing's own ink.
+   '#7c7c7c'),
 
   ('suriye', 'Suriye''de Rejimin Düşüşü',
    'On üç yıllık savaşın on bir günde biten son perdesi — ve Türkiye''nin sınırındaki her şeyin yeniden kurulması.',
