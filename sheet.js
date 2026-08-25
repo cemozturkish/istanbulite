@@ -66,9 +66,91 @@
     overlay.style.setProperty('--ist-sheet-top', `${Math.max(cardBottom, 0) + framePad}px`);
   }
 
+  // ── Keeping the map lit under a dim sheet ──
+  //
+  // A sheet that is a destination tints what it rose from (.ist-sheet-dim
+  // in sheet.css). On a phone that wash was laid over the map too, which
+  // took back the one thing the resting position had just given: these
+  // sheets stop UNDER the map precisely so the district or country they
+  // are about stays visible. Stopping the backdrop at the hero line fixed
+  // that, but it left the whole drawing at full strength -- the sea, the
+  // land around the city, everything -- so the page did not read as
+  // having gone quiet at all.
+  //
+  // What is wanted is narrower: **the city stays lit and everything else
+  // goes quiet**, the map photo included. So the tint over the map is
+  // painted by the traced overlay itself -- the same SVG that carries the
+  // hit-regions -- as one rect masked by the district shapes. Inside that
+  // svg it is registered with the drawing by construction: same viewBox,
+  // same preserveAspectRatio, same parallax drift, same pinch-zoom. There
+  // is nothing to align and nothing to keep aligned, which is the whole
+  // reason it is built in here rather than as a layer of its own over the
+  // top.
+  //
+  // The shapes are CLONED into the mask rather than <use>d: a use-instance
+  // keeps the styles of the element it points at, and .neighborhood is
+  // `fill: transparent` -- every hole would have come out invisible.
+  let dimMaskSeq = 0;
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function lightTheMap() {
+    document.querySelectorAll('svg.map-svg').forEach((src) => {
+      // Already carries its own tint, and it is the same drawing it was.
+      if (src.querySelector(':scope > .ist-map-dim')) return;
+      // The CITY, not just the app's own 25 districts: .map-unaccommodated
+      // is the İstanbul districts this app doesn't serve, and they are
+      // still İstanbul -- leaving them dark would have read as half the
+      // city being broken rather than as a picture of anything. What
+      // stays quiet is the sea and .map-istanbul-disi, the Kocaeli-side
+      // land beyond the city, which is exactly the right sentence: the
+      // city is lit, everything else has gone quiet.
+      const shapes = src.querySelectorAll('.neighborhood, .country, .map-unaccommodated');
+      if (!shapes.length) return;
+      const vb = (src.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
+      if (vb.length !== 4 || vb.some(n => !isFinite(n))) return;
+      const [vx, vy, vw, vh] = vb;
+      // The mask's own region has to be stated (the default is a box
+      // around the masked element's bounds, which crops it), and it has to
+      // be roomy: with preserveAspectRatio="slice" the visible area runs
+      // past the viewBox on one axis, and the parallax scales the whole
+      // drawing a few percent past its window on top of that.
+      const box = { x: vx - vw, y: vy - vh, width: vw * 3, height: vh * 3 };
+      const attrs = (el, o) => { Object.keys(o).forEach(k => el.setAttribute(k, o[k])); return el; };
+
+      const mask = attrs(document.createElementNS(SVG_NS, 'mask'), Object.assign({
+        id: 'ist-map-lit-' + (++dimMaskSeq),
+        maskUnits: 'userSpaceOnUse',
+      }, box));
+      // White is where the tint prints; the city is punched out of it.
+      mask.appendChild(attrs(document.createElementNS(SVG_NS, 'rect'),
+        Object.assign({ fill: '#fff' }, box)));
+      shapes.forEach((shape) => {
+        const cut = shape.cloneNode(false);
+        // Nothing of the original comes with it: an id would be a second
+        // element answering to a name the page looks up by
+        // (getElementById(activeMapNeighborhood)), and the class carries
+        // the very fill that would have made the hole invisible.
+        ['id', 'class', 'data-name', 'data-neighborhood', 'data-country'].forEach(a => cut.removeAttribute(a));
+        cut.setAttribute('fill', '#000');
+        cut.setAttribute('stroke', 'none');
+        mask.appendChild(cut);
+      });
+      src.appendChild(mask);
+      src.appendChild(attrs(document.createElementNS(SVG_NS, 'rect'), Object.assign({
+        class: 'ist-map-dim',
+        mask: 'url(#' + mask.id + ')',
+      }, box)));
+    });
+  }
+
   function open(target) {
     const overlay = el(target);
     if (!overlay) return;
+    // Only a tinting sheet needs it, and it is built on the first one
+    // rather than at load: a virtual navigation (router.js) swaps the map
+    // out with the rest of #ist-content, so the drawing this hangs on is
+    // whichever one is currently on the page.
+    if (overlay.classList.contains('ist-sheet-dim')) lightTheMap();
     // Whatever the last close still had scheduled is not about this
     // opening -- see `hides` above.
     cancelPendingHide(overlay);
@@ -406,5 +488,5 @@
     return controller;
   }
 
-  global.IstSheet = { open, close, position, isOpen, pull, SLIDE_MS };
+  global.IstSheet = { open, close, position, isOpen, pull, lightTheMap, SLIDE_MS };
 }(window));

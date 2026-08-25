@@ -616,9 +616,10 @@ sb.from('articles').delete().eq('id', id)
   whole band — both halves, its own and the games' — off a `clip-path` measured from the card's own
   box, and folds back into it on the way out. Head / body / foot, only the middle scrolling. On
   desktop there is no band and no map to protect, so it stays THE sheet
-- **The band under it goes quiet, the map does not** — the same tint the Kahve Endeksi and the
-  Skor Tahtası rise with (`.ist-sheet-dim`), which now stops at the hero line on every page that
-  has a map (see THE sheet's own section). Here the tint takes no taps at all: the whole band is
+- **The band under it goes quiet, and so does everything but the city** — the same tint the Kahve
+  Endeksi and the Skor Tahtası rise with (`.ist-sheet-dim`), which stops at the hero line and is
+  then painted over the map by the map's own traced overlay, with the districts punched out of it
+  (see THE sheet's own section). Here the tint takes no taps at all: the whole band is
   the page, so there is no backdrop left to press, and the map above has to stay live
 - **The direction is the answer**, exactly as on a news story: right is the first option, left the
   second, and the option is stamped on the card as it goes (`.q-cue`) so nobody answers a question
@@ -1091,13 +1092,26 @@ geometry and no centred modal anywhere on the site.
   after the class. Take a token instead (`sheetOpenToken` / `sheetOpenIsCurrent` in kutuphane.html):
   opening takes one, closing and the next opening burn it, so the question asked is "is this still
   the open I started" rather than "is something open".
-- **The tint stops at the map.** A sheet that is a destination rather than something read beside
-  the page opts into a dim backdrop (`.ist-sheet-dim` — the Kahve Endeksi, the Skor Tahtası, an
-  event's page). On a phone that wash starts at `--map-hero-end` on any page that has a map
-  (`body:has(.map-panel)`), so the drawing keeps its own light: these sheets come to rest *under*
-  the map precisely so the district or country they are about stays visible, and a wash laid over
-  it takes back exactly what the resting position had just given. Hane is unaffected — its hero is
-  the petek, which is the page itself rather than scenery behind one.
+- **The tint quiets everything but the city.** A sheet that is a destination rather than something
+  read beside the page opts into a dim backdrop (`.ist-sheet-dim` — the Kahve Endeksi, the Skor
+  Tahtası, an event's page). On a phone that wash stops at `--map-hero-end` on any page with a map
+  (`body:has(.map-panel)`): these sheets come to rest *under* the map precisely so the district or
+  country they are about stays visible, and a wash laid over it takes back exactly what the resting
+  position had just given. But the drawing must not stay at full strength either, or the page never
+  reads as having gone quiet — so **the tint over the map is painted by the traced overlay itself**
+  (`IstSheet.lightTheMap`): one rect inside `svg.map-svg`, masked by the district shapes cloned into
+  a `<mask>`. Inside that svg it is registered with the drawing by construction — same viewBox, same
+  parallax drift, same pinch-zoom — which is the whole reason it is built in there rather than
+  layered over the top. Three details that fail silently: the shapes are **cloned, not `<use>`d**
+  (a use-instance keeps the original's styles, and `.neighborhood` is `fill: transparent`, so every
+  hole came out invisible); the clones are stripped of `id` and `class` (a second element answering
+  to `sariyer` breaks `getElementById`); and what is punched out is the **whole city**
+  (`.neighborhood, .country, .map-unaccommodated`) — the districts this app doesn't serve are still
+  İstanbul, and leaving them dark read as half the city being broken. What stays quiet is the sea
+  and `.map-istanbul-disi`, the land beyond the city. The rect's resting state (`fill`, `opacity: 0`)
+  is declared outside the phone media query, since a rect with no fill of its own paints solid black
+  and it is built on any screen; only the switch that turns it on is phone-only. Hane is unaffected
+  — its hero is the petek, which is the page itself rather than scenery behind one.
 - **Phones:** the sheet's side gaps are the same `--screen-inset` (frames.css) the profile bar's
   row is padded to — everything stacked over the same map lines up, always.
   - A sheet opened **from the profile bar** (your profile, a member's) rests under that bar,
