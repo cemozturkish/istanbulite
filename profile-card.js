@@ -231,7 +231,13 @@
   // before profiles.avatar_hat existed — see db/avatar_hat.sql).
   const AVATAR_HAT_OPTIONS = [
     { value: null,    label: 'Yok' },
-    { value: 'crown', label: 'Sözcü Tacı', requiresSozcuCount: IstAvatar.SOZCU_REQUIRED_COUNT },
+    // 'crown' is parked, not deleted: assets/avatar-hat-crown.png was
+    // never actually drawn, so offering it let a member "unlock" a hat
+    // that then rendered as nothing (avatar.js's hat ? <img> : '' quietly
+    // skips a hat with no URL). Re-add the option once the art exists —
+    // avatar.js's HAT_URLS/hatUrl() and the reward count below are
+    // untouched, so that's the whole of turning it back on.
+    // { value: 'crown', label: 'Sözcü Tacı', requiresSozcuCount: IstAvatar.SOZCU_REQUIRED_COUNT },
   ];
 
   // Accessory overlays — a third independent layer, stacked above hat (see
@@ -369,7 +375,7 @@
           ${unlocked ? '' : 'aria-disabled="true"'}
           title="${esc(title)}"
           aria-label="${esc(b.label)}">
-          <img src="${b.src}" alt="${esc(b.label)}">
+          <img src="${b.src}" alt="${esc(b.label)}" decoding="async">
           ${unlocked ? '' : AVATAR_LOCK_SVG}
           <span class="ist-pc-badge-label">${esc(b.label)}</span>
         </button>
@@ -1162,7 +1168,7 @@
     return normalizedCoverBadges(profile).map(p => {
       const badge = BADGES.find(b => b.id === p.id);
       if (!badge) return '';
-      return `<img class="ist-pc-cover-badge" data-id="${badge.id}" draggable="false" style="left:${p.x}%; top:${p.y}%;" src="${badge.src}" alt="${esc(badge.label)}" title="${esc(badge.label)}">`;
+      return `<img class="ist-pc-cover-badge" data-id="${badge.id}" draggable="false" decoding="async" style="left:${p.x}%; top:${p.y}%;" src="${badge.src}" alt="${esc(badge.label)}" title="${esc(badge.label)}">`;
     }).join('');
   }
 
@@ -2609,6 +2615,7 @@
       </div>
 
       ${show.account ? `<button type="button" class="ist-pc-signout" id="po-signout">${esc(t('profile.signout'))}</button>` : ''}
+      ${show.account ? `<button type="button" class="ist-pc-delete-account" id="po-delete-account">${esc(t('profile.deleteaccount'))}</button>` : ''}
     `;
   }
 
@@ -2661,6 +2668,34 @@
     if (signoutBtn) signoutBtn.addEventListener('click', async () => {
       await sb.auth.signOut();
       window.location.href = 'index.html';
+    });
+    const deleteBtn = document.getElementById('po-delete-account');
+    if (deleteBtn) deleteBtn.addEventListener('click', async () => {
+      if (!confirm(t('profile.deleteaccount.confirm'))) return;
+      deleteBtn.disabled = true;
+      const orig = deleteBtn.textContent;
+      deleteBtn.textContent = t('profile.deleteaccount.deleting');
+      // Deleting the auth.users row (and, by cascade, profiles and
+      // everything FK'd to it) needs the service role key, which never
+      // belongs in client code -- so this calls the same kind of Edge
+      // Function admin.html's account creation already does, just
+      // scoped to the caller's OWN row (see supabase/functions/
+      // delete-own-account, deployed outside this repo).
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { window.location.href = 'index.html'; return; }
+      try {
+        const { data, error } = await sb.functions.invoke('delete-own-account', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (error || (data && data.error)) throw error || new Error(data.error);
+        await sb.auth.signOut();
+        window.location.href = 'index.html';
+      } catch (e) {
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = orig;
+        const msgEl = document.getElementById('po-save-msg');
+        if (msgEl) msgEl.textContent = t('profile.deleteaccount.error');
+      }
     });
   }
 

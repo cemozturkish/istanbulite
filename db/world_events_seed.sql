@@ -15,7 +15,7 @@
 -- =====================================================================
 
 -- paper_x / paper_y (db/world_events_v3_paper.sql) is where the olay's
--- paper hangs on the board, in the map's own 1080x1920 frame. Only the
+-- paper hangs on the board, in the map's own 1080x2420 frame. Only the
 -- ones with a drawing carry it: the rest have no line running to
 -- anywhere yet, so their paper falls back to hanging over their
 -- countries until somebody picks a spot in the portal.

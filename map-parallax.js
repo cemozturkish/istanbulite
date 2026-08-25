@@ -39,8 +39,9 @@
   // The artwork is drawn this much larger than the window that shows it.
   // Half the surplus sits on each side, and that half IS the maximum
   // drift (see measure()) — which is what makes exposing an edge
-  // impossible rather than merely unlikely.
-  const OVERSCAN = 1.045;
+  // impossible rather than merely unlikely. Trimmed from 1.045 -- the
+  // drift read as too much movement on Kütüphane.
+  const OVERSCAN = 1.03;
 
   // Per-frame low-pass on the drift. The raw sensor is jittery enough that
   // following it directly reads as a vibrating map rather than a moving one.
@@ -103,10 +104,24 @@
   function anchorOf(el) {
     if (el.tagName === 'IMG') {
       const pos = (getComputedStyle(el).objectPosition || '').trim();
-      return /(^|\s)(0%|0px|top)$/.test(pos) ? 'top' : 'center';
+      if (/(^|\s)(0%|0px|top)$/.test(pos)) return 'top';
+      if (/(^|\s)(100%|bottom)$/.test(pos)) return 'bottom';
+      return 'center';
     }
     const par = el.getAttribute('preserveAspectRatio') || '';
-    return /YMin/.test(par) ? 'top' : 'center';
+    if (/YMin/.test(par)) return 'top';
+    if (/YMax/.test(par)) return 'bottom';
+    return 'center';
+  }
+
+  // 'top'/'bottom'/'center' -> the matching CSS transform-origin, so the
+  // overscan's scale-up grows away from the edge the layer is actually
+  // pinned to instead of from the box's centre -- a mismatch here is what
+  // would let the drift expose the drawing's real edge. Kütüphane's world
+  // map is bottom-anchored (object-position/preserveAspectRatio: see its
+  // own comment); every other map-panel on the site is still top-anchored.
+  function originOf(anchor) {
+    return anchor === 'top' ? '50% 0%' : anchor === 'bottom' ? '50% 100%' : '50% 50%';
   }
 
   function collect() {
@@ -136,18 +151,42 @@
   // always the untouched one. Every layer covers exactly this box (the
   // in-panel ones by inset:0, Kütüphane's sibling overlay by being fixed to
   // the same full-screen rect), so one measurement serves all of them.
+  //
+  // X is always centred (every object-position / preserveAspectRatio on the
+  // site is horizontally "center"/"xMid"), so its surplus really is split
+  // evenly, half on each side, and +-maxX is correct as a symmetric range.
+  //
+  // Y is not, whenever the group's own anchor is an edge (top or bottom)
+  // rather than centre. Scaling a layer FROM an edge keeps that edge
+  // pinned exactly on the window's edge -- zero slack on that side -- and
+  // puts the entire surplus on the far side instead. A symmetric +-maxY
+  // range assumes slack on both sides; given to an edge anchor, half of
+  // that range pulls the pinned edge straight off the window, exposing
+  // the panel's own background right where the drawing should be. So an
+  // edge anchor gets a one-sided range instead — all the way to the far
+  // edge's full surplus, none at all back past the pinned edge — and a
+  // centre anchor keeps the original symmetric one.
   function measure() {
     for (const g of groups) {
       const r = g.panel.getBoundingClientRect();
-      g.maxX = r.width * (OVERSCAN - 1) / 2;
-      g.maxY = r.height * (OVERSCAN - 1) / 2;
+      const surplusX = r.width * (OVERSCAN - 1);
+      const surplusY = r.height * (OVERSCAN - 1);
+      g.maxX = surplusX / 2;
+      const yAnchor = g.layers.length ? g.layers[0].anchor : 'center';
+      if (yAnchor === 'top') {
+        g.minY = -surplusY; g.maxY = 0;
+      } else if (yAnchor === 'bottom') {
+        g.minY = 0; g.maxY = surplusY;
+      } else {
+        g.minY = -surplusY / 2; g.maxY = surplusY / 2;
+      }
     }
   }
 
   function apply() {
     for (const g of groups) {
       const x = curX * g.maxX;
-      const y = curY * g.maxY;
+      const y = g.minY + (curY + 1) / 2 * (g.maxY - g.minY);
       if (Math.abs(x - g.lastX) < MIN_STEP && Math.abs(y - g.lastY) < MIN_STEP) continue;
       g.lastX = x; g.lastY = y;
       for (const layer of g.layers) {
@@ -232,7 +271,7 @@
     live = true;
     for (const g of groups) {
       for (const layer of g.layers) {
-        layer.el.style.transformOrigin = layer.anchor === 'top' ? '50% 0%' : '50% 50%';
+        layer.el.style.transformOrigin = originOf(layer.anchor);
         layer.el.style.willChange = 'transform';
         layer.el.style.transition = 'transform 480ms cubic-bezier(0.22, 0.61, 0.36, 1)';
       }
@@ -318,7 +357,7 @@
     if (!live) return;
     for (const g of groups) {
       for (const layer of g.layers) {
-        layer.el.style.transformOrigin = layer.anchor === 'top' ? '50% 0%' : '50% 50%';
+        layer.el.style.transformOrigin = originOf(layer.anchor);
         layer.el.style.willChange = 'transform';
       }
     }

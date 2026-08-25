@@ -614,7 +614,7 @@
        row reads date-first, which is the order the moment is written in. */
     .upd-form input.upd-date { width: 150px; }
     /* Where the olay's paper hangs on the board. The picker is the mobile
-       map at the exact aspect ratio of its own 1080x1920 frame, so a click
+       map at the exact aspect ratio of its own 1080x2420 frame, so a click
        is a coordinate in that frame with no arithmetic beyond a ratio --
        and the olay's own drawing is laid over it at the same registration
        the board uses, so the admin is aiming at the end of the line they
@@ -622,7 +622,7 @@
     .olay-map-pick {
       position: relative;
       width: 230px;
-      aspect-ratio: 1080 / 1920;
+      aspect-ratio: 1080 / 2420;
       border: 1px solid var(--rule);
       background: var(--field-bg);
       cursor: crosshair;
@@ -1430,7 +1430,7 @@
       </p>
       <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
         Çizim <code>assets/olaylar/&lt;id&gt;.png</code> dosyasıdır — dosyayı o adla koyun, burada
-        bir şey girmenize gerek yok. <strong>1080×1920, saydam PNG</strong>: bu, mobil haritanın
+        bir şey girmenize gerek yok. <strong>1080×2420, saydam PNG</strong>: bu, mobil haritanın
         kendi ölçüsü, o yüzden çizim tam çizildiği kıyıların üstüne oturuyor
         (<code>assets/olaylar/README.md</code>). Çizimi olmayan olay yine panoda durur — adı bu kez
         işaretli ülkelerinin üstüne konur.
@@ -1478,7 +1478,7 @@
       <label>Çizim adresi (opsiyonel)</label>
       <p style="margin-top:-4px;margin-bottom:6px;font-size:0.7rem;color:var(--muted);font-style:italic;">
         Boş bırakın — pano <code>assets/olaylar/&lt;id&gt;.png</code> dosyasını kendisi arar.
-        Yalnızca çizim başka bir yerde duruyorsa doldurun (yine 1080×1920 saydam olmalı).
+        Yalnızca çizim başka bir yerde duruyorsa doldurun (yine 1080×2420 saydam olmalı).
       </p>
       <input type="text" id="we-image" placeholder="assets/olaylar/... veya https://..."/>
 
@@ -4962,10 +4962,10 @@ function resetWorldEventForm() {
 
 // ── The paper's place on the board ──
 // The picker is the mobile map at its own aspect ratio, so a click is a
-// coordinate in the map's 1080x1920 frame and nothing but a ratio stands
+// coordinate in the map's 1080x2420 frame and nothing but a ratio stands
 // between the two. Kept in two hidden fields rather than in a variable,
 // so the form is read the same way every other field on it is.
-const OLAY_PICK_W = 1080, OLAY_PICK_H = 1920;
+const OLAY_PICK_W = 1080, OLAY_PICK_H = 2420;
 
 function paintOlayPaperPick() {
   const dot = document.getElementById('we-map-dot');
@@ -5621,7 +5621,10 @@ const PP_AVATAR_HAIR_OPTIONS = [
 ];
 const PP_AVATAR_HAT_OPTIONS = [
   { value: '', label: 'Yok' },
-  { value: 'crown', label: 'Taç' },
+  // 'crown' parked: assets/avatar-hat-crown.png doesn't exist yet -- see
+  // profile-card.js's AVATAR_HAT_OPTIONS for the member-facing side of
+  // the same gap.
+  // { value: 'crown', label: 'Taç' },
 ];
 const PP_AVATAR_ACCESSORY_OPTIONS = [
   { value: '', label: 'Yok' },
@@ -6158,7 +6161,13 @@ document.getElementById('tb-parties-apply-btn').addEventListener('click', async 
   btn.innerHTML = '<span class="spinner"></span>';
 
   if (tbPartiesDeletedIds.length) {
-    await sb.from('tbmm_parties').delete().in('id', tbPartiesDeletedIds);
+    const { error: deleteError } = await sb.from('tbmm_parties').delete().in('id', tbPartiesDeletedIds);
+    if (deleteError) {
+      statusEl.textContent = deleteError.message;
+      statusEl.className = 'status-msg err';
+      btn.textContent = 'Kaydet ve Uygula';
+      return;
+    }
     tbPartiesDeletedIds = [];
   }
 

@@ -3,12 +3,12 @@
 --
 -- The board is the map, and an olay is a piece of paper pinned to it
 -- with a hand-drawn line running from the paper to the place. The line
--- is in the olay's own drawing (assets/olaylar/<id>.png, 1080x1920, the
+-- is in the olay's own drawing (assets/olaylar/<id>.png, 1080x2420, the
 -- map's own frame). Where the LINE ENDS is where the paper has to be --
 -- and nothing in the drawing can tell the app that, because a stroke
 -- ending in empty sea looks exactly like a stroke ending anywhere else.
 --
--- So the author says it: two coordinates in that same 1080x1920 frame,
+-- So the author says it: two coordinates in that same 1080x2420 frame,
 -- picked by clicking the map in the admin portal's Olaylar tab. They are
 -- optional -- an olay with none falls back to hanging its paper under
 -- its drawing's ink, and with no drawing either, over its countries --

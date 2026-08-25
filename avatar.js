@@ -26,7 +26,12 @@
   const BASE_URL = 'assets/avatar-base.png';
   const SHIRT_URLS = { black: 'assets/avatar-shirt-black.png' };
   const HAIR_URLS = { buzz: 'assets/avatar-hair-buzz.png', short: 'assets/avatar-hair-short.png', long: 'assets/avatar-hair-long.png' };
-  const HAT_URLS = { crown: 'assets/avatar-hat-crown.png' };
+  // 'crown' (the locked Sözcü reward hat) is parked here too -- see
+  // AVATAR_HAT_OPTIONS in profile-card.js for why. Leaving it out of this
+  // map means hatUrl('crown') falls through to null (below) and the hat
+  // layer is skipped entirely for any row that already has avatar_hat =
+  // 'crown' set, rather than rendering a 404'd <img>.
+  const HAT_URLS = {};
   const ACCESSORY_URLS = { glasses: 'assets/avatar-accessory-glasses.png' };
   // Not a pickable option -- admin-only, set per-politician (public.
   // politicians.in_jail) from admin.html's Kişiler tab, never something a
