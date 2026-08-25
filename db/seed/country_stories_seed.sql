@@ -1,7 +1,7 @@
 -- =====================================================================
 -- Kütüphane — Hikâyelerin eksik yarısı (seed).
 --
--- db/country_entries_seed.sql gave six countries a page each. Grouping
+-- db/seed/country_entries_seed.sql gave six countries a page each. Grouping
 -- them into stories (db/country_stories.sql) exposed the gaps: the
 -- İsrail cephesi had Filistin and Suriye but not Lübnan or İran, the
 -- Karabağ hikâyesi was written entirely from Bakü's side, Yunanistan had

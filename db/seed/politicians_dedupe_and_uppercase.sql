@@ -5,8 +5,8 @@
 -- which keeps future inserts/updates uppercase automatically) and merge
 -- any duplicate people this uncovers.
 --
--- The bulk imports (db/tbmm_28_donem_import.sql,
--- db/istanbul_mayors_import.sql) deduped by exact (first_name, last_name)
+-- The bulk imports (db/seed/tbmm_28_donem_import.sql,
+-- db/seed/istanbul_mayors_import.sql) deduped by exact (first_name, last_name)
 -- match, which missed people already in the table under different casing
 -- -- e.g. an admin-entered "SİNEM DEDETAŞ" sitting next to the mayors
 -- import's "Sinem Dedetaş" as two separate rows. Uppercasing first makes

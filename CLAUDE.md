@@ -161,7 +161,7 @@ default one.
 ├── capacitor.config.json # iOS app config (Capacitor wraps the same site — see README.md)
 ├── ios/                  # Generated Capacitor Xcode project (committed, minus Pods/build output)
 ├── scripts/sync-web.js   # Copies site files into www/ for the Capacitor build
-├── db/                   # SQL migration files — SOURCE OF TRUTH for the full Supabase schema
+├── db/                   # SQL migrations (see db/README.md); db/seed/ holds one-off data imports
 ├── CNAME                 # GitHub Pages custom domain config: istanbulite.net
 └── assets/               # map/, avatar/, mascot/, loading/ subfolders + one-off images
 ```
@@ -792,7 +792,7 @@ sb.from('articles').delete().eq('id', id)
   `.timeline-*` markup and printed **newest first** just like it. The only difference is the
   stamp: a moment carries its date rather than its age, because these chains reach back to 1917
   and "109 yıl önce" tells a reader nothing. Curated from admin.html's Ülkeler tab;
-  `db/country_entries_seed.sql` and `db/country_stories_seed.sql` hold the starting set
+  `db/seed/country_entries_seed.sql` and `db/seed/country_stories_seed.sql` hold the starting set
   (Rusya–Ukrayna, Putin Rusyası, Filistin–İsrail, Lübnan, Suriye, İran–İsrail, Karabağ, the
   closed Türkiye–Ermenistan border, Kıbrıs, the Ege, and Türkiye's own decade)
 

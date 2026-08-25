@@ -1,6 +1,6 @@
 -- =====================================================================
 -- Data import: birth date/place for Istanbul's 37 belediye başkanı
--- (imported by db/istanbul_mayors_import.sql) and Cumhurbaşkanı Recep
+-- (imported by db/seed/istanbul_mayors_import.sql) and Cumhurbaşkanı Recep
 -- Tayyip Erdoğan (whose politicians/political_seats rows were entered
 -- by hand via admin.html's Kişiler/Koltuklar tabs, not by a migration
 -- file -- see db/politicians.sql's 'cumhurbaskani' seat comment).
@@ -36,7 +36,7 @@
 -- to run more than once.
 --
 -- Run in the Supabase SQL editor after db/politicians.sql and
--- db/istanbul_mayors_import.sql have already run.
+-- db/seed/istanbul_mayors_import.sql have already run.
 -- =====================================================================
 
 -- Tier 1: confirmed full date + place.
