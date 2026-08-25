@@ -994,9 +994,14 @@ Curated from admin.html's **Olaylar** tab (form on the left, the list with each 
 editor on the right — the same shape the Ülkeler tab has, because it is the same kind of object: a
 page whose value is that somebody maintains its chain). `db/world_events_seed.sql` holds a starting
 set — Rusya–Ukrayna, Gazze, İran ve ABD, Suriye, Doğu Akdeniz — deliberately thin, only the dates
-nobody argues about, to be verified and extended from the portal. Doğu Akdeniz is the one with a
-drawing already made for it (`assets/olaylar/dogu-akdeniz.png`: Yunanistan, Kıbrıs and İsrail, and
-the line run between them). `db/world_events_v2_board.sql` adds the
+nobody argues about, to be verified and extended from the portal. Four of the five have a drawing
+on the board: `dogu-akdeniz.png` (Yunanistan, Kıbrıs and İsrail, and the line run between them),
+`rusya-ukrayna-savasi.png`, `gazze.png` (one stroke out of Gazze south-west across Sina, its paper
+pinned at the far end in the empty desert) and `iran-abd.png` (six strokes fanning between İran and
+İsrail, its paper at the İran end of the fan). Suriye is the one still without one — its paper
+hangs over its ticked countries in the site's own red until somebody draws it.
+`db/world_events_gazze_iran_papers.sql` sets those last two papers and colours on a database the
+seed has already been run against, without rewriting anything else. `db/world_events_v2_board.sql` adds the
 `image_url` override the pinned drawings can use, and `db/world_events_v3_paper.sql` the two
 coordinates that say where each paper hangs.
 
