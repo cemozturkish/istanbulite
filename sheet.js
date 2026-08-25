@@ -93,6 +93,31 @@
   let dimMaskSeq = 0;
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
+  // One path, not a mask. The tint started life as a <rect> masked by the
+  // district shapes, which is the obvious spelling and the expensive one:
+  // a mask makes the browser allocate and rasterise a second surface the
+  // size of the masked box, and on a phone that arrived a beat after the
+  // backdrop it was supposed to be moving with -- the band went quiet and
+  // the map followed, visibly late. What is drawn instead is a single
+  // filled path with `fill-rule: evenodd`: an outer rectangle, then every
+  // district as a subpath inside it, which evenodd reads as holes. Same
+  // picture, one ordinary fill, nothing to compose.
+  function shapeSubpath(shape) {
+    const tag = shape.tagName.toLowerCase();
+    if (tag === 'path') {
+      const d = shape.getAttribute('d');
+      return d ? ' ' + d + ' Z' : '';
+    }
+    if (tag === 'polygon' || tag === 'polyline') {
+      const pts = (shape.getAttribute('points') || '').trim().split(/[\s,]+/).map(Number);
+      if (pts.length < 6) return '';
+      let d = ' M' + pts[0] + ',' + pts[1];
+      for (let i = 2; i + 1 < pts.length; i += 2) d += 'L' + pts[i] + ',' + pts[i + 1];
+      return d + 'Z';
+    }
+    return '';
+  }
+
   function lightTheMap() {
     document.querySelectorAll('svg.map-svg').forEach((src) => {
       // Already carries its own tint, and it is the same drawing it was.
@@ -109,49 +134,43 @@
       const vb = (src.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
       if (vb.length !== 4 || vb.some(n => !isFinite(n))) return;
       const [vx, vy, vw, vh] = vb;
-      // The mask's own region has to be stated (the default is a box
-      // around the masked element's bounds, which crops it), and it has to
-      // be roomy: with preserveAspectRatio="slice" the visible area runs
-      // past the viewBox on one axis, and the parallax scales the whole
-      // drawing a few percent past its window on top of that.
-      const box = { x: vx - vw, y: vy - vh, width: vw * 3, height: vh * 3 };
-      const attrs = (el, o) => { Object.keys(o).forEach(k => el.setAttribute(k, o[k])); return el; };
+      // A margin around the viewBox rather than a multiple of it. With
+      // preserveAspectRatio="slice" the visible area sits INSIDE the
+      // viewBox, so all this has to cover is the few percent the parallax
+      // scales the drawing past its own window -- and every extra
+      // thousand units here is surface the phone has to fill.
+      const m = 0.12;
+      const box = { x: vx - vw * m, y: vy - vh * m, width: vw * (1 + m * 2), height: vh * (1 + m * 2) };
+      let d = 'M' + box.x + ',' + box.y + 'H' + (box.x + box.width) +
+              'V' + (box.y + box.height) + 'H' + box.x + 'Z';
+      shapes.forEach((shape) => { d += shapeSubpath(shape); });
 
-      const mask = attrs(document.createElementNS(SVG_NS, 'mask'), Object.assign({
-        id: 'ist-map-lit-' + (++dimMaskSeq),
-        maskUnits: 'userSpaceOnUse',
-      }, box));
-      // White is where the tint prints; the city is punched out of it.
-      mask.appendChild(attrs(document.createElementNS(SVG_NS, 'rect'),
-        Object.assign({ fill: '#fff' }, box)));
-      shapes.forEach((shape) => {
-        const cut = shape.cloneNode(false);
-        // Nothing of the original comes with it: an id would be a second
-        // element answering to a name the page looks up by
-        // (getElementById(activeMapNeighborhood)), and the class carries
-        // the very fill that would have made the hole invisible.
-        ['id', 'class', 'data-name', 'data-neighborhood', 'data-country'].forEach(a => cut.removeAttribute(a));
-        cut.setAttribute('fill', '#000');
-        cut.setAttribute('stroke', 'none');
-        mask.appendChild(cut);
-      });
-      src.appendChild(mask);
-      const tint = attrs(document.createElementNS(SVG_NS, 'rect'), Object.assign({
-        class: 'ist-map-dim',
-        mask: 'url(#' + mask.id + ')',
-      }, box));
+      const tint = document.createElementNS(SVG_NS, 'path');
+      tint.setAttribute('class', 'ist-map-dim');
+      tint.setAttribute('d', d);
+      tint.setAttribute('fill-rule', 'evenodd');
       src.appendChild(tint);
       // Commit its resting opacity NOW, before anything can add the class
       // that raises it. A freshly-inserted element has no computed style
       // until the next style pass, and .open is added inside a
       // requestAnimationFrame -- which runs BEFORE that pass. Without this
-      // read the rect's first resolved opacity is already 1, there is no
+      // read the tint's first resolved opacity is already 1, there is no
       // change for a transition to interpolate, and the map snaps to dark
-      // while the band below it fades over the full 0.55s. Two tints, one
-      // instant and one gradual, is exactly the desync this is here to
-      // stop.
+      // while the band below it fades over the full 0.55s.
       getComputedStyle(tint).opacity; // eslint-disable-line no-unused-expressions
     });
+  }
+
+  // Which of the two tints is on is decided HERE, in one place, and said
+  // with a class on the root element -- not with `body:has(.ist-sheet-dim
+  // .open)`. A :has() spanning the whole body is re-evaluated by the
+  // engine on its own schedule, and when it lands a frame or two after
+  // the class that drives the backdrop, the map is visibly the last thing
+  // to go quiet. Two tints that are meant to be one movement cannot be
+  // driven by two different mechanisms.
+  function syncDim() {
+    document.documentElement.classList.toggle(
+      'ist-dim-on', !!document.querySelector('.ist-sheet-dim.open'));
   }
 
   // ── THE GROW ──
@@ -287,6 +306,9 @@
     overlay.hidden = false;
     requestAnimationFrame(() => {
       overlay.classList.add('open');
+      // In the same frame the backdrop's own tint starts, so the two
+      // halves of one wash move together.
+      syncDim();
       // Measured now that the content is laid out and the sheet's real
       // height is resolvable.
       if (p) p.measure();
@@ -304,6 +326,7 @@
     const p = pulls.get(overlay);
     if (p) p.release();
     overlay.classList.remove('open');
+    syncDim();
     cancelPendingHide(overlay);
     hides.set(overlay, setTimeout(() => {
       hides.delete(overlay);
@@ -623,5 +646,5 @@
     return controller;
   }
 
-  global.IstSheet = { open, close, position, isOpen, pull, grow, cancelGrow, lightTheMap, GROW_MS, SLIDE_MS };
+  global.IstSheet = { open, close, position, isOpen, pull, grow, cancelGrow, lightTheMap, syncDim, GROW_MS, SLIDE_MS };
 }(window));
