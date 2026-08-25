@@ -1110,7 +1110,14 @@ geometry and no centred modal anywhere on the site.
   İstanbul, and leaving them dark read as half the city being broken. What stays quiet is the sea
   and `.map-istanbul-disi`, the land beyond the city. The rect's resting state (`fill`, `opacity: 0`)
   is declared outside the phone media query, since a rect with no fill of its own paints solid black
-  and it is built on any screen; only the switch that turns it on is phone-only. Hane is unaffected
+  and it is built on any screen; only the switch that turns it on is phone-only. And its resting
+  opacity is **committed with a forced style read the moment it is built** — a freshly-inserted
+  element has no computed style until the next style pass, and `.open` is added inside a
+  `requestAnimationFrame`, which runs *before* that pass: without the read the rect's first
+  resolved opacity is already 1, nothing is left for a transition to interpolate, and the map snaps
+  to dark while the band below it fades over the full 0.55s. Two tints, one instant and one
+  gradual, is exactly the desync that read is there to stop. It is also built eagerly on load, so
+  the common case is that a sheet opening finds it long settled. Hane is unaffected
   — its hero is the petek, which is the page itself rather than scenery behind one.
 - **Phones:** the sheet's side gaps are the same `--screen-inset` (frames.css) the profile bar's
   row is padded to — everything stacked over the same map lines up, always.
@@ -1127,9 +1134,21 @@ geometry and no centred modal anywhere on the site.
   - Two surfaces are exceptions, and both for the same reason: they arrive out of a specific
     object already on the screen rather than from off it, so they **grow out of that object**
     instead of sliding: **a news story on Kütüphane** grows out of the card it was tapped on,
-    into the band that card lies in (see Kütüphane's own section). It is still THE sheet — same
-    markup, same `IstSheet.open/close` — only the way it arrives differs. (The PETEK page used
-    to be the other one; it is a page of its own now, not a sheet at all.)
+    into the band that card lies in (see Kütüphane's own section), and **an event on Kahvehane**
+    does the same. They are still THE sheet — same markup, same `IstSheet.open/close` — only the
+    way they arrive differs, and that arrival is one implementation as well:
+    `IstSheet.grow({ page, inner, origin, dir })`. (The PETEK page used to be a third; it is a
+    page of its own now, not a sheet at all.)
+  - **The grow draws its own frame, and that is the whole reason it is shared.** The move is one
+    `clip-path` inset animated from the card's box out to the page's four edges — the page is
+    already sitting where it will end up, and what opens is the *window* onto it. But a clip-path
+    clips the element's **border** along with everything else, so for the whole of the animation
+    the page was bordered on whichever sides the clip happened to rest on and a raw cut edge on
+    the other three. So the frame is drawn by a box of its own, animated over the same rect on the
+    same curve, wearing the border width and colour it reads off the page — and it is a **sibling**
+    of the page, never a child, since a child would be clipped by the very clip-path it is there to
+    dress. It is dropped the moment the page stands at full size, where the page's own border takes
+    over in exactly the place it left off.
 - **Chrome:** background/border come from `frames.css`'s `.ist-sheet` rule (2px ink border, no
   bottom border, no shadow).
 

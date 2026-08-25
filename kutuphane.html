@@ -46,8 +46,8 @@
       } catch(e) {}
     })();
   </script>
-  <script src="sheet.js?v=3"></script>
-  <link rel="stylesheet" href="sheet.css?v=4">
+  <script src="sheet.js?v=4"></script>
+  <link rel="stylesheet" href="sheet.css?v=5">
   <style data-page="kutuphane">
     :root {
       /* Core ink & paper — warm cream newspaper palette */
@@ -6619,27 +6619,11 @@ function buildNewsPageHtml(n) {
 //
 // Off on desktop, where there is no band and the page is THE sheet
 // rising from the bottom as usual.
-const NEWS_GROW_MS = 380;
-const NEWS_GROW_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 let _newsOrigin = null;   // the feed card this page grew out of
-let _newsAnims = [];
 
 function newsPageGrows() {
   return window.matchMedia('(max-width: 768px)').matches
     && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-// The card's box, expressed as an inset into the page's own box. Clamped
-// at zero: a card scrolled part-way out of the band opens from that edge
-// rather than from a negative inset, which clip-path reads as an
-// overflow instead.
-function newsOriginInset(page) {
-  if (!page || !_newsOrigin || !_newsOrigin.isConnected) return null;
-  const b = _newsOrigin.getBoundingClientRect();
-  const s = page.getBoundingClientRect();
-  if (!b.width || !b.height || !s.width || !s.height) return null;
-  const px = (v) => Math.max(0, v).toFixed(2) + 'px';
-  return `inset(${px(b.top - s.top)} ${px(s.right - b.right)} ${px(s.bottom - b.bottom)} ${px(b.left - s.left)})`;
 }
 
 // Puts the card back on the deck. Called before the fold-back rather
@@ -6652,34 +6636,19 @@ function showNewsOrigin() {
 }
 
 function cancelNewsAnims() {
-  _newsAnims.forEach(a => { try { a.cancel(); } catch (e) {} });
-  _newsAnims = [];
+  IstSheet.cancelGrow(document.getElementById('news-page'));
 }
 
 // dir: 'in' when the card becomes the page, 'out' when the page folds
-// back into it. The contents cross-fade rather than being drawn squeezed
-// inside a card-sized window: out fast, in once the page has most of its
-// room.
+// back into it. One implementation for this and Kahvehane's event page
+// (IstSheet.grow): the clip that opens the window also clips the page's
+// own border, so the frame is drawn by a box of its own beside it -- see
+// THE GROW in sheet.js.
 function growNewsPage(dir) {
   const page = document.getElementById('news-page');
   const inner = document.getElementById('news-page-inner');
-  cancelNewsAnims();
-  if (!page || !inner || !newsPageGrows() || !page.animate) return;
-  const shut = newsOriginInset(page);
-  if (!shut) return;
-  const wide = 'inset(0px)';
-  const opts = { duration: NEWS_GROW_MS, easing: NEWS_GROW_EASE };
-  // 'out' holds the collapsed frame after it finishes: IstSheet.close
-  // re-hides the overlay a little later (0.55s), and without the fill the
-  // page would snap back to full size for those last frames.
-  _newsAnims.push(page.animate(
-    dir === 'in' ? [{ clipPath: shut }, { clipPath: wide }] : [{ clipPath: wide }, { clipPath: shut }],
-    dir === 'in' ? opts : Object.assign({ fill: 'forwards' }, opts)));
-  _newsAnims.push(inner.animate(
-    dir === 'in'
-      ? [{ opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1 }]
-      : [{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 0 }],
-    Object.assign({ fill: 'forwards' }, opts)));
+  if (!newsPageGrows()) { IstSheet.cancelGrow(page); return; }
+  IstSheet.grow({ page, inner, origin: _newsOrigin, dir });
 }
 
 // Where the page's two sides fall, measured off the feed's own content
