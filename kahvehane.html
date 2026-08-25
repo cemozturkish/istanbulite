@@ -53,8 +53,8 @@
       } catch(e) {}
     })();
   </script>
-  <script src="sheet.js?v=3"></script>
-  <link rel="stylesheet" href="sheet.css?v=4">
+  <script src="sheet.js?v=4"></script>
+  <link rel="stylesheet" href="sheet.css?v=5">
   <style data-page="kahvehane">
     :root {
       /* Core ink & paper — warm cream newspaper palette */
@@ -5700,13 +5700,10 @@ function dealEventCard(ev, verdict) {
 }
 
 // ── The page an event opens into ──
-const EV_GROW_MS = 380;
-const EV_GROW_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const EV_SWIPE_DEAL_PX = 84;    // throw past this and the event is dealt
 const EV_SWIPE_DEAL_VEL = 0.55; // ...or a flick this fast (px/ms)
 const EV_SWIPE_FLY_MS = 300;
 let _evOrigin = null;   // the deck card this page grew out of
-let _evAnims = [];
 let _evOpen = null;     // the event the open page is printing
 let _evDealing = false;
 
@@ -5715,49 +5712,24 @@ function evPageGrows() {
     && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-function evOriginInset(page) {
-  if (!page || !_evOrigin || !_evOrigin.isConnected) return null;
-  const b = _evOrigin.getBoundingClientRect();
-  const s = page.getBoundingClientRect();
-  if (!b.width || !b.height || !s.width || !s.height) return null;
-  const px = (v) => Math.max(0, v).toFixed(2) + 'px';
-  return `inset(${px(b.top - s.top)} ${px(s.right - b.right)} ${px(s.bottom - b.bottom)} ${px(b.left - s.left)})`;
-}
-
 function showEvOrigin() {
   if (_evOrigin) _evOrigin.classList.remove('ev-open');
 }
 
 function cancelEvAnims() {
-  _evAnims.forEach(a => { try { a.cancel(); } catch (e) {} });
-  _evAnims = [];
+  IstSheet.cancelGrow(document.getElementById('event-page'));
 }
 
 // dir: 'in' when the card becomes the page, 'out' when the page folds
-// back into it. What animates is the WINDOW onto the page -- a clip-path
-// inset that starts as the tapped card's own box and opens to the page's
-// four edges -- rather than the page itself, which is already sitting
-// exactly where it will end up.
+// back into it. One implementation for this and Kütüphane's news story
+// (IstSheet.grow) -- the same move, and the frame it draws around itself
+// while it grows is the whole reason it is shared rather than typed
+// twice.
 function growEventPage(dir) {
   const page = document.getElementById('event-page');
   const inner = document.getElementById('event-page-inner');
-  cancelEvAnims();
-  if (!page || !inner || !evPageGrows() || !page.animate) return;
-  const shut = evOriginInset(page);
-  if (!shut) return;
-  const wide = 'inset(0px)';
-  const opts = { duration: EV_GROW_MS, easing: EV_GROW_EASE };
-  // 'out' holds the collapsed frame after it finishes: IstSheet.close
-  // re-hides the overlay later (0.55s), and without the fill the page
-  // would snap back to full size for those last frames.
-  _evAnims.push(page.animate(
-    dir === 'in' ? [{ clipPath: shut }, { clipPath: wide }] : [{ clipPath: wide }, { clipPath: shut }],
-    dir === 'in' ? opts : Object.assign({ fill: 'forwards' }, opts)));
-  _evAnims.push(inner.animate(
-    dir === 'in'
-      ? [{ opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1 }]
-      : [{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 0 }],
-    Object.assign({ fill: 'forwards' }, opts)));
+  if (!evPageGrows()) { IstSheet.cancelGrow(page); return; }
+  IstSheet.grow({ page, inner, origin: _evOrigin, dir });
 }
 
 // Where the page's two sides fall, measured off the deck's own content
