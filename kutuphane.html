@@ -10,7 +10,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f0f0f0">
   <title>Kütüphane — istanbulite.net</title>
-  <script src="safe-area-ready.js"></script>
+  <script src="safe-area-ready.js?v=2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
   <script src="router.js?v=4"></script>
@@ -2794,6 +2794,30 @@
       .map-panel img.map-photo {
         object-fit: cover;
         object-position: center bottom;
+      }
+
+      /* ── The website's window is not the app's ──
+         The rule above is composed for the app, whose WKWebView owns the
+         whole screen: there the surplus `cover` has to crop is ~30px, it
+         comes off the top padding, and the northern countries still clear
+         the profile bar. Mobile Safari's viewport is that same screen
+         minus its own URL bar -- ~100px shorter -- so the surplus is four
+         times as deep, and taken off the top it eats the whole of the
+         padding that clearance was drawn into: the map rides up and Rusya
+         and Ukrayna end up under the bar.
+
+         So on the web the drawing hangs from the TOP, exactly as it is
+         composed, and the browser's surplus is cropped off the BOTTOM
+         instead -- the deliberately sparse lower half the news column is
+         drawn over anyway. The app never sees this rule (html.ist-native /
+         html.ist-web, stamped in safe-area-ready.js), so its own framing
+         above is untouched.
+
+         The traced overlay is re-anchored to match by syncWorldOverlayAnchor
+         rather than by a second rule here: preserveAspectRatio is an
+         attribute, and a stylesheet cannot reach it. */
+      html.ist-web .map-panel img.map-photo {
+        object-position: center top;
       }
 
       /* Swap the overlays: the İstanbul trace is drawn against the desktop
@@ -8301,8 +8325,47 @@ function clearMapLoading() {
   img.addEventListener('error', done, { once: true });
 }
 
+// ── The traced overlay follows the photo, it does not restate it ──
+// The shapes only land on the coastlines while the trace is fitted to the
+// panel exactly the way the artwork is, and the app and the web now fit it
+// differently (see the html.ist-web .map-photo rule). preserveAspectRatio is
+// an attribute, so the stylesheet cannot make that swap -- and a second
+// hardcoded copy of the anchor is a second chance for the two to disagree.
+// So read the answer off the image itself and say the same thing in SVG.
+// Runs on every mount: the router hands this page a fresh copy of both
+// drawings, with the markup's own attribute back on the trace.
+function syncWorldOverlayAnchor() {
+  const svg = document.querySelector('svg.map-svg-world');
+  const img = document.getElementById('map-photo-img');
+  if (!svg || !img) return;
+  // Desktop hides this trace and draws the İstanbul one over a different
+  // artwork with its own anchor, so there is nothing to follow there.
+  if (getComputedStyle(svg).display === 'none') return;
+  const cs = getComputedStyle(img);
+  const pos = (cs.objectPosition || '').trim();
+  const align = /(^|\s)(0%|0px|top)$/.test(pos) ? 'xMidYMin'
+    : /(^|\s)(100%|bottom)$/.test(pos) ? 'xMidYMax'
+    : 'xMidYMid';
+  // `slice` is the SVG spelling of object-fit: cover, `meet` of contain.
+  const fit = cs.objectFit === 'contain' ? 'meet' : 'slice';
+  svg.setAttribute('preserveAspectRatio', `${align} ${fit}`);
+}
+
+// The anchor is a media-query answer, so it can change without a mount:
+// the window crosses the 768px breakpoint, or the phone is rotated. Bound
+// once per document rather than per mount -- the router re-executes this
+// page's whole script on every re-entry, so an unguarded listener here
+// would stack up a fresh copy each time (CLAUDE.md's shared-document
+// rules). The handler is a no-op wherever this trace isn't on screen, so
+// it stays quiet on the other two pages.
+if (!window.__istWorldAnchorBound) {
+  window.__istWorldAnchorBound = true;
+  window.addEventListener('resize', syncWorldOverlayAnchor);
+}
+
 function mount() {
   clearMapLoading();
+  syncWorldOverlayAnchor();
   loadProfile();
   bootstrapLibraryNav();
   // Re-attach the Makaleler / Olaylar / Posta Kutusu / TBMM click handlers
