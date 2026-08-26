@@ -1008,10 +1008,8 @@
     // stay bound to nodes that are still there.
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const page = document.getElementById('po-hive-page');
-    page.insertAdjacentHTML('beforeend', hiveSelfHTML(_hive) + hiveRailHTML(t) + hiveKeptFurnitureHTML());
+    page.insertAdjacentHTML('beforeend', hiveSelfHTML(_hive) + hiveRailHTML(t));
     wireHiveSelf(_hive);
-    document.getElementById('po-hive-dim').addEventListener('click', () => closeHiveEventCard(_hive));
-    document.getElementById('po-hive-event-page-close').addEventListener('click', () => closeHiveEventCard(_hive));
     renderHive(_hive);
     wireHiveGestures(_hive);
     loadHive(_hive);
@@ -1311,11 +1309,14 @@
   // middle page (see "Always in the middle" in CLAUDE.md).
   const HIVE_LEVEL_DEFAULT = 1;
   // How far each level lets the drawing grow. fitHive still shrinks below
-  // these to fit the window — this is a ceiling, not a size.
+  // these to fit the window for levels 0/1 — this is a ceiling, not a
+  // size. Level 2 is fixed at it instead (see fitHive): the outermost
+  // level draws every hexagon at the SAME size the middle depth does,
+  // rather than shrinking the whole shape down to show all of it.
   // Level 0 shares its window with the avatar arrows beside the hexagon
   // and the three preferences under it, so it is drawn a step smaller
   // than a hexagon alone would allow.
-  const HIVE_LEVEL_ZOOM = [2.2, 1.5, 1];
+  const HIVE_LEVEL_ZOOM = [2.2, 1.5, 1.5];
   // How far a finger has to travel *past the end of the drawing* before
   // the level changes under it, and how far it has to travel at all
   // before the gesture is one rather than a tap.
@@ -1337,15 +1338,22 @@
   const HIVE_LEVEL2_MAX_FILL_RINGS = 16;
 
   // How many ghost rings past the occupied shape it takes for level 2's
-  // field to outrun the screen at its 1x zoom ceiling (HIVE_LEVEL_ZOOM).
-  // --ist-hive-step-x/-y are custom properties built from calc()/min(),
-  // which getComputedStyle hands back as that unresolved expression, not
-  // a px number -- only an actual layout property gets a resolved used
-  // value -- so this sizes a throwaway probe with them and measures IT
-  // instead of trying to parse the custom property directly.
-  // screen.width/height rather than window.innerWidth/height: a rotation
-  // swaps them without the field ever needing to be rebuilt (it's only
-  // ever built once, at mount — see renderHive).
+  // field to outrun the screen. level 2 draws at whatever size the
+  // middle depth actually resolves to on this window (see fitHive's
+  // ringCeiling), which fitHive itself can't know yet the first time
+  // this runs (it runs during renderHive, before fitHive's own pass) and
+  // is routinely well under the 1.5x ceiling once six names are in the
+  // fit -- so this assumes the SMALLEST it could possibly be
+  // (HIVE_MIN_SCALE) rather than the ceiling, on purpose: too many rings
+  // is a few extra hidden cells, too few is bare paper at the edge. The
+  // reach needed is measured off the page's own box (what .ist-hive-view
+  // will fill exactly, see .ist-hive in profile-card.css) rather than
+  // window.screen, which can read taller or shorter than the box this is
+  // actually drawn into once the surrounding chrome (top bar, tab bar)
+  // takes its share -- and a 20% margin on top of that measurement,
+  // since this runs before fitHive has ever centred anything and "me"
+  // landing slightly off the eventual centre is exactly the kind of
+  // thing that turns "just enough" into "short by one ring at an edge".
   function hiveFillRings() {
     const page = document.getElementById('po-hive-page');
     if (!page) return 3;
@@ -1353,11 +1361,13 @@
     probe.style.cssText = 'position:absolute; visibility:hidden; width:var(--ist-hive-step-x); height:var(--ist-hive-step-y);';
     page.appendChild(probe);
     const rect = probe.getBoundingClientRect();
-    const stepX = rect.width, stepY = rect.height;
+    const stepX = rect.width * HIVE_MIN_SCALE;
+    const stepY = rect.height * HIVE_MIN_SCALE;
     probe.remove();
     if (!(stepX > 0) || !(stepY > 0)) return 3; // before the page has ever laid out
-    const span = Math.max(window.screen.width || 0, window.screen.height || 0, 1200);
-    const rings = Math.ceil((span / 2) / Math.min(stepX, stepY)) + 1;
+    const span = Math.max(page.clientWidth || 0, page.clientHeight || 0,
+      window.screen.width || 0, window.screen.height || 0, 1200);
+    const rings = Math.ceil((span / 2) * 1.2 / Math.min(stepX, stepY)) + 1;
     return Math.min(HIVE_LEVEL2_MAX_FILL_RINGS, Math.max(2, rings));
   }
 
@@ -1861,6 +1871,14 @@
     if (page) {
       for (let i = 0; i < HIVE_LEVELS; i++) page.classList.toggle(`ist-hive-level-${i}`, i === level);
     }
+    // The kept-events column beside the petek (anahane.html's own
+    // #events-panel, not this file's concern) only belongs to the middle
+    // depth -- the reader's six neighbours are the ones a kept event's
+    // verdict is even about. A class on <html> rather than a DOM
+    // reference across the script boundary: the petek page never needs
+    // to know the column exists, and anahane's CSS is what actually
+    // reacts to it.
+    document.documentElement.classList.toggle('ist-hive-mid', level === HIVE_LEVEL_DEFAULT);
     const mount = document.getElementById('po-hive-mount');
     if (mount) mount.querySelectorAll('.ist-hive-cell').forEach(cell => {
       const ring = parseInt(cell.dataset.ring, 10) || 0;
@@ -1887,10 +1905,6 @@
   function setHiveLevel(state, next) {
     const level = Math.max(0, Math.min(HIVE_LEVELS - 1, next));
     if (level === hiveLevel(state)) return;
-    // A kept event's card belongs to the six hexagons standing on the
-    // middle depth — leaving that depth for any other closes it, the
-    // same way a code on offer or a picked member gets dropped below.
-    if (level !== HIVE_LEVEL_DEFAULT && state.hiveEventOrigin) closeHiveEventCard(state);
     state.hiveLevel = level;
     state.hivePan = { x: 0, y: 0 };
     // A code on offer belongs to the level the seats are on: stepping
@@ -1971,23 +1985,6 @@
     return `<div id="po-hive-mount"></div>`;
   }
 
-  // Built once per mount, like the rail and level-0's block: a re-render
-  // of the grid (renderHive) must never touch these, or a card mid-grow
-  // (see openHiveEventCard) would be torn out of the DOM under its own
-  // animation. The dim sits between the plain page background and the
-  // drawing in z-index (see profile-card.css) so it covers everything
-  // except the honeycomb itself.
-  function hiveKeptFurnitureHTML() {
-    return `
-      <div class="ist-hive-kept" id="po-hive-kept"></div>
-      <div class="ist-hive-dim" id="po-hive-dim"></div>
-      <div class="ist-hive-event-page" id="po-hive-event-page" hidden>
-        <button type="button" class="ist-hive-event-page-close" id="po-hive-event-page-close" aria-label="Kapat">×</button>
-        <div class="ist-hive-event-page-inner" id="po-hive-event-page-inner"></div>
-      </div>
-    `;
-  }
-
   // ── Fitting the grid into a page that never resizes ──
   // The window is whatever room the page has (see .ist-hive-page in
   // profile-card.css) and the petek grows without asking it. So the
@@ -2036,27 +2033,38 @@
     // measured, and the names with them where they are printed — a name
     // hangs outside the plane's box, and the outermost one is exactly
     // what a window fitted to the cells alone would clip.
-    const named = level < HIVE_LEVEL_ALL;
+    //
+    // The outermost level measures the MIDDLE depth's own box instead of
+    // its own: ringCeiling is HIVE_LEVEL_DEFAULT whenever level is the
+    // outermost, not the level itself. Filtered by each cell's own
+    // data-ring rather than .ist-hive-away, because .ist-hive-away is
+    // never set on anything at the outermost level (see applyHiveLevel) —
+    // it can't tell "the six touching the reader" apart from the whole
+    // filled field the way a plain ring comparison can.
+    const ringCeiling = level === HIVE_LEVEL_ALL ? HIVE_LEVEL_DEFAULT : level;
     let minL = cx, maxR = cx, minT = cy, maxB = cy;
     // Whatever hangs outside a cell's own box on this level and still has
-    // to be on the paper: a member's name at the depths that print one,
-    // and the avatar arrows at the depth that shows them. A capital with
-    // letter-spacing after it paints a little past its own box, so the
-    // track is not quite the ink: fit the wider of the two, and leave a
-    // breath after it — anything whose far edge lands exactly on the
-    // window's edge reads as clipped rather than fitted.
+    // to be on the paper: a member's name, and the avatar arrows at the
+    // depth that shows them. A capital with letter-spacing after it
+    // paints a little past its own box, so the track is not quite the
+    // ink: fit the wider of the two, and leave a breath after it —
+    // anything whose far edge lands exactly on the window's edge reads
+    // as clipped rather than fitted.
     const outriders = (cell) => {
-      const found = [];
-      if (named) found.push(...cell.querySelectorAll('.ist-hive-name'));
+      const found = [...cell.querySelectorAll('.ist-hive-name')];
       if (level === 0) found.push(...cell.querySelectorAll('.ist-hive-pick-col'));
       return found;
     };
+    // ringCeiling caps this at 7 cells even at the outermost level (the
+    // ghost field's hundreds of cells all sit well past it), so this
+    // never becomes the offsetLeft/offsetTop reflow storm a real
+    // "measure the whole filled field" pass would be.
     plane.querySelectorAll('.ist-hive-cell, .ist-hive-picker').forEach(cell => {
-      if (cell.classList.contains('ist-hive-away')) return;
-      // The arrow block is display:none away from level 0, and a box with
-      // no size reports its offsets as zero — measured, it would drag the
-      // required box out to the plane's own origin and shrink the drawing
-      // to fit something nobody can see.
+      const ring = parseInt(cell.dataset.ring, 10) || 0;
+      if (ring > ringCeiling) return;
+      // A box with no size reports its offsets as zero — measured, it
+      // would drag the required box out to the plane's own origin and
+      // shrink the drawing to fit something nobody can see.
       if (!cell.offsetWidth) return;
       const l = cell.offsetLeft, t = cell.offsetTop;
       if (l < minL) minL = l;
@@ -2080,8 +2088,14 @@
     const reqH = 2 * Math.max(cy - minT, maxB - cy);
     // Each level has a ceiling of its own: the drawing grows as the
     // reader comes in toward themselves, which is what makes the three
-    // depths read as one zoom rather than as three filters.
-    const scale = Math.max(HIVE_MIN_SCALE, Math.min(HIVE_LEVEL_ZOOM[level] || 1, vw / reqW, vh / reqH));
+    // depths read as one zoom rather than as three filters. The
+    // outermost level shares the middle depth's ceiling AND its box
+    // (ringCeiling above), so it always resolves to the exact number the
+    // middle depth is actually drawn at on this window — not the ceiling
+    // itself, which the middle depth often can't reach at all (six
+    // names routinely leave a phone clamped well under 1.5x) and the
+    // outermost level has to match rather than re-decide on its own.
+    const scale = Math.max(HIVE_MIN_SCALE, Math.min(HIVE_LEVEL_ZOOM[ringCeiling] || 1, vw / reqW, vh / reqH));
 
     // Scaling about the caller's own cell and then hanging that point off
     // the middle of the window keeps them in the middle at any scale —
@@ -2118,8 +2132,11 @@
     plane.style.marginTop = `${-cy}px`;
     // Panning is only offered when the fit had to give up: a grid that
     // fits has nowhere to go, and a page that slides under the finger
-    // for no reason reads as broken.
-    const pannable = (reqW * scale > vw + 1) || (reqH * scale > vh + 1);
+    // for no reason reads as broken. The outermost level never offers
+    // it even though it always overflows by design (see the scale
+    // comment above) — it is meant to be looked at, filled edge to edge
+    // and cut off at them, not dragged around inside.
+    const pannable = level !== HIVE_LEVEL_ALL && ((reqW * scale > vw + 1) || (reqH * scale > vh + 1));
     view.classList.toggle('ist-hive-pannable', pannable);
     if (!pannable && (pan.x || pan.y)) {
       state.hivePan = { x: 0, y: 0 };
@@ -2163,12 +2180,10 @@
     const { data } = await state.sb.rpc('hive_map');
     state.hive = Object.assign({}, state.hive, { cells: data || [] });
     renderHive(state);
-    // The drawing does not wait for either: the grid is the page, and
-    // both where everybody stands in their day and what the reader kept
-    // are captions on it. They land on their own and re-render (see
-    // loadHiveStatus, loadHiveKept).
+    // The drawing does not wait for it: the grid is the page, and where
+    // everybody stands in their day is a caption on it. It lands on its
+    // own and re-renders (see loadHiveStatus).
     loadHiveStatus(state);
-    loadHiveKept(state);
   }
 
   async function reloadHiveMap(state) {
@@ -2207,49 +2222,6 @@
     } catch (e) { /* no captions this time; the drawing is unchanged */ }
   }
 
-  // ── The kept-events stack, standing inside the petek itself ──
-  // Same object as Anahane's own #events-panel column
-  // (event-interest-cards.js) -- what the reader threw right on
-  // Kahvehane -- printed here too, at the depth that already shows
-  // exactly the six people a verdict on one of these might be about (see
-  // openHiveEventCard). Fetched independently of Anahane's own column: a
-  // second small query against a public table is cheaper than reaching
-  // into Anahane's own IIFE-private state across a script boundary it
-  // was built to keep private (see event-interest-cards.js).
-  async function loadHiveKept(state) {
-    try {
-      const uid = state.user && state.user.id;
-      if (!uid || !window.IstEventInterest) return;
-      const keptIds = [...IstEventInterest.interestedIds(uid)];
-      if (!keptIds.length) { state.hiveKept = []; renderHiveKept(state); return; }
-      const { data, error } = await state.sb.from('events').select('*')
-        .in('id', keptIds)
-        .gte('event_date', new Date().toISOString())
-        .order('event_date', { ascending: true });
-      if (error) return;
-      state.hiveKept = data || [];
-      if (state === _hive && document.getElementById('po-hive-mount')) renderHiveKept(state);
-    } catch (e) { /* the stack still draws without its own copy this time */ }
-  }
-
-  function renderHiveKept(state) {
-    const host = document.getElementById('po-hive-kept');
-    if (!host) return;
-    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
-    const rows = state.hiveKept || [];
-    if (!rows.length || !window.IstEventCards) { host.innerHTML = ''; return; }
-    const isEn = state.I18N && state.I18N.isEnglish && state.I18N.isEnglish();
-    host.innerHTML = `
-      <div class="ist-hive-kept-label">${esc(t('home.events.kept'))}</div>
-      ${rows.map(ev => IstEventCards.previewHTML(ev, IstEventCards.dateParts(ev.event_date, isEn),
-        { districtLabel: (id) => NB_NAMES[id] || id })).join('')}
-    `;
-    host.querySelectorAll('.event-item.openable').forEach(el => {
-      const ev = rows.find(r => String(r.id) === el.dataset.eventId);
-      if (ev) el.addEventListener('click', () => openHiveEventCard(state, ev, el));
-    });
-  }
-
   // ── Dragging the grid, and swiping between its depths ──
   // Both are the same gesture until it has an axis, so they are one
   // handler: the drawing follows the finger while there is drawing left
@@ -2273,6 +2245,12 @@
     const plane = () => document.getElementById('po-hive-plane');
     const slack = () => {
       const fit = state.hiveFit || { scale: 1, reqW: 0, reqH: 0, vw: 0, vh: 0 };
+      // The outermost level never has room to give (see fitHive's
+      // pannable comment) -- a drag there is either a level-swipe or
+      // nothing, never a pan.
+      if (hiveLevel(state) === HIVE_LEVEL_ALL) {
+        return { x: 0, y: 0, offsetY: fit.offsetY || 0, scale: fit.scale };
+      }
       return {
         x: Math.max(0, (fit.reqW * fit.scale - fit.vw) / 2),
         y: Math.max(0, (fit.reqH * fit.scale - fit.vh) / 2),
@@ -2282,10 +2260,9 @@
     };
 
     page.addEventListener('pointerdown', (e) => {
-      // The rail, the block under level 0, and the kept-events stack are
-      // controls of their own; a press on any of them is not a pull on
-      // the drawing.
-      if (e.target.closest('.ist-hive-rail') || e.target.closest('.ist-hive-self') || e.target.closest('.ist-hive-kept')) return;
+      // The rail and the block under level 0 are controls of their own;
+      // a press on either is not a pull on the drawing.
+      if (e.target.closest('.ist-hive-rail') || e.target.closest('.ist-hive-self')) return;
       state.hiveSwiped = false;
       g = {
         id: e.pointerId, x: e.clientX, y: e.clientY,
@@ -2384,64 +2361,25 @@
 
   }
 
-  // ── A kept event's card, and what the petek's own six say about it ──
-  // Grows in place over the drawing (IstSheet.grow -- the same primitive
-  // Kütüphane's news cards and Kahvehane's own event page already use,
-  // unchanged) rather than rising a sheet or darkening/shifting the card
-  // the way Anahane's own sidebar copy still does. Unlike those two
-  // callers this one DOES add its own dim (.ist-hive-dimmed): they grow
-  // into a live band and stay uncovered on purpose, but there is nothing
-  // here for a dim to hide -- the whole point is that the ring-1
-  // hexagons stay lit while everything else steps back, so the yes/no
-  // mark just fetched for them (see loadHiveEventVerdicts) reads clearly
-  // against the rest of the page.
-  function openHiveEventCard(state, ev, cardEl) {
-    const page = document.getElementById('po-hive-event-page');
-    const inner = document.getElementById('po-hive-event-page-inner');
-    const host = document.getElementById('po-hive-page');
-    if (!page || !inner || !host || !window.IstEventCards || !window.IstSheet) return;
-    closeHiveEventCard(state); // only one open at a time
-    state.hiveEventOrigin = cardEl;
-    cardEl.classList.add('ist-hive-event-open');
-    const isEn = state.I18N && state.I18N.isEnglish && state.I18N.isEnglish();
-    const parts = IstEventCards.dateParts(ev.event_date, isEn);
-    inner.innerHTML = IstEventCards.detailHTML(ev, parts, { districtLabel: (id) => NB_NAMES[id] || id });
-    page.hidden = false;
-    IstSheet.grow({ page, inner, origin: cardEl, dir: 'in' });
-    host.classList.add('ist-hive-dimmed');
-    loadHiveEventVerdicts(state, ev.id);
-  }
-
-  function closeHiveEventCard(state) {
-    const page = document.getElementById('po-hive-event-page');
-    const inner = document.getElementById('po-hive-event-page-inner');
-    const host = document.getElementById('po-hive-page');
-    if (!page || page.hidden || !window.IstSheet) return;
-    host.classList.remove('ist-hive-dimmed');
-    clearHiveEventVerdicts();
-    IstSheet.grow({ page, inner, origin: state.hiveEventOrigin, dir: 'out' });
-    const origin = state.hiveEventOrigin;
-    state.hiveEventOrigin = null;
-    setTimeout(() => {
-      page.hidden = true;
-      inner.innerHTML = '';
-      if (origin) origin.classList.remove('ist-hive-event-open');
-    }, IstSheet.GROW_MS);
-  }
-
-  // Verdicts, painted straight onto the six ring-1 hexagons for the one
-  // event currently standing open -- not a list of names, since the
-  // hexagon already printing that person's name says whose answer it
-  // is. Best-effort, same convention as loadHiveStatus: before the
-  // migration has been run the RPC isn't there, and the card still
-  // opens with no marks rather than failing to open.
-  async function loadHiveEventVerdicts(state, eventId) {
+  // ── What the petek's own six say about a kept event ──
+  // Anahane's own #events-panel column owns the card and its grow
+  // animation (event-interest-cards.js, IstSheet.grow -- same primitive
+  // Kahvehane's own event page and Kütüphane's news cards already use);
+  // this file only owns the honeycomb, so it exposes just the two calls
+  // that touch it (IstProfileCard.paintHiveEventVerdicts/
+  // clearHiveEventVerdicts) rather than reaching into anahane's DOM to
+  // wire the card itself.
+  //
+  // Verdicts are painted straight onto the six ring-1 hexagons for the
+  // one event standing open -- not a list of names, since the hexagon
+  // already printing that person's name says whose answer it is.
+  // Best-effort, same convention as loadHiveStatus: before the migration
+  // has been run the RPC isn't there, and the card still opens with no
+  // marks rather than failing to open.
+  async function paintHiveEventVerdicts(sb, eventId) {
     try {
-      const { data, error } = await state.sb.rpc('hive_event_interest_status', { p_event_ids: [eventId] });
+      const { data, error } = await sb.rpc('hive_event_interest_status', { p_event_ids: [eventId] });
       if (error || !data) return;
-      // May have closed (or opened a different card) while this was in
-      // flight -- only paint if it's still the one standing open.
-      if (!state.hiveEventOrigin || state.hiveEventOrigin.dataset.eventId !== String(eventId)) return;
       data.forEach(row => {
         const cell = document.querySelector(
           `#po-hive-mount .ist-hive-cell[data-member-id="${CSS.escape(String(row.member_id))}"]`);
@@ -3275,6 +3213,8 @@
     openProfileOverlay,
     closeProfileOverlay,
     mountHivePage,
+    paintHiveEventVerdicts,
+    clearHiveEventVerdicts,
     initMemberSheet,
     openMemberSheet,
     closeMemberSheet,
