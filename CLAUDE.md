@@ -478,13 +478,13 @@ sb.from('articles').delete().eq('id', id)
   sides. And it is the same three-part page a story opens as over there: what it is and the way
   back out (the hand-drawn arrow) on the top line, the event scrolling in the middle, the **RSVP
   row** standing on the bottom line where it cannot scroll away
-- **The petek above it does not move, and that is what the reserved band is for.** Row 1 of the
-  phone grid is `minmax(0, 1fr)` — everything the events take comes out of the petek's own box, so
-  a card that grew the events row visibly slid the reader up the screen as it expanded. The band is
-  therefore reserved the moment the column **has** a card in it (`reserveEventsBand`,
-  `EVENTS_BAND_MIN`), not the moment one is opened: nothing about the layout changes on a press,
-  only what is drawn inside a box that was already that size. An empty night reserves nothing and
-  the petek is the whole band between the two bars, exactly as before
+- **The petek above it does not move, and that is what the column's fixed height is for.** Row 1 of
+  the phone grid is `minmax(0, 1fr)` — everything the events take comes out of the petek's own box,
+  so anything that changed this column's height visibly slid the reader up or down the screen. So
+  the column is a **fixed box** (`--hane-events-h`, see the petek's own section): the same size on
+  a night with three things on, a night with none, and while a card stands grown open in it.
+  Nothing about the layout changes on a press or on a render — only what is drawn inside a box that
+  was already that size
 - **There is no throw on this page.** A kept event has already had its verdict given on Kahvehane's
   deck — that is what put it here — so the one thing this page asks is whether you are **going**,
   and it asks it with a button rather than a gesture. The deck's left/right verdict belongs to the
@@ -505,10 +505,13 @@ sb.from('articles').delete().eq('id', id)
   is "ilgimi çekti", thrown left is gone (see that page's own section) — and this column is the
   other end of that gesture: the evenings that were actually theirs, standing beside the people
   they would be standing next to. A list of everything on in İstanbul is a listings page; this is a
-  plan. Two empties, and they are not the same thing: a city with nothing on prints nothing, while
-  a city with events on and none of them kept prints one line pointing at the deck
-  (`.events-empty`). If the store is missing entirely the column degrades to the whole city's list
-  rather than to an empty page — that is the failure a reader can make sense of
+  plan. Two empties, and they still say different things — a city with nothing on says exactly that
+  (`events.none`), while a city with events on and none of them kept says one line pointing at the
+  deck — but **both say it inside the same dashed frame** (`.events-empty`), the rule Kahvehane's
+  own decks already follow: a column with nothing in it at all reads as the page being broken
+  rather than as there being nothing on, and this column stands directly under the petek, where its
+  absence moved the drawing itself. If the store is missing entirely the column degrades to the
+  whole city's list rather than to an empty page — that is the failure a reader can make sense of
 - On a phone the petek stands in the hero square the map used to hold and the events hang from the
   bottom of the band below it, so the hero line is exactly where it is on the other two pages
 - **The petek has three depths and the reader pulls up and down through them** — you alone at the
@@ -1424,9 +1427,18 @@ reader in what is left.
 map's square: the other two pages' hero is a drawing of a fixed size and gets a square, while this
 one is a shape that grows with the reader standing in the middle of it. Pinned to the map's square,
 the middle of the drawing sat in the middle of a box in the top third of the screen with dead paper
-under it on any night with nothing on. So row 1 is `minmax(0, 1fr)` — whatever the events leave —
-and the events' column is capped (`max-height: 46vh`) so a busy night scrolls inside its own box
-instead of pushing the reader off the middle of the screen.
+under it on any night with nothing on. So row 1 is `minmax(0, 1fr)` — whatever the events leave.
+
+**And what the events leave is the same every night** (`--hane-events-h` on `#main-site`, a fixed
+`height` on `.col-left`). The column used to be an auto row under a `46vh` ceiling, which made the
+reader's own position a function of how many things were on: three kept cards stood the drawing
+higher than none, and an empty column left it hanging over a band of bare paper. A fixed box ends
+that — a busy night scrolls inside it, an empty one prints the dashed frame across it, and a card
+grown open (`.event-grow-page`) simply fills the room the column always has, so nothing has to be
+forced open while it is standing and nothing has to be cleared afterwards. That last part was not
+theoretical: the room used to be an inline `min-height` set for as long as a card was open, and one
+missed cleanup left a third of the screen reserved with nothing drawn in it, pushing the petek off
+centre with no visible cause.
 
 **The frames are a five-step tone ladder, and the step is distance from the reader**
 (`--ist-hive-ring-*` on `.ist-hive-page`): you are the darkest thing on the page, then the members

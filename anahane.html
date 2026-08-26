@@ -525,31 +525,20 @@
       min-height: 0;
       /* .event-grow-page is positioned against this box, not the
          viewport -- it fills exactly the events column's own space,
-         below the petek, never over it. On the phone .col-left sits in
-         an auto-sized grid row (grid-area: events) with only a
-         max-height ceiling, no minimum -- with one small preview card in
-         it that row (and this box) stays tiny, which is nowhere near
-         room enough to grow a card into.
+         below the petek, never over it. On the phone that box is a
+         fixed height (--hane-events-h on .col-left), so the room a card
+         grows into is simply the room the column always has: nothing is
+         forced open while a card is standing and nothing has to be
+         cleared afterwards. It used to be an inline min-height set for
+         as long as a card was open -- and a single missed cleanup left
+         the column holding a third of the screen with nothing drawn in
+         it, which pushed the petek off centre with no visible cause.
 
-         So the band is reserved the moment the column HAS a card in it
-         (renderEventsNow sets this element's own inline min-height), not
-         the moment one is opened. That is the whole of why the petek
-         stands still: opening a card used to grow this row, and row 1 is
-         minmax(0,1fr) -- everything the events take comes out of the
-         petek's own box, so the reader at the middle of it visibly slid
-         up the screen as the card expanded. Nothing about the layout
-         changes on a press now; only what is drawn inside a box that was
-         already this size. An empty night reserves nothing and the petek
-         still gets the whole band.
-
-         Set directly on the element rather than through a custom
-         property some stylesheet rule reads -- this box sits three flex
-         containers deep inside an auto-sized grid track (.col-left >
-         .col-left-slide > .events-section), and after this went through
-         two rounds where a var()-based min-height silently failed to
-         reach the phone at all, an inline style is the one thing here
-         with no cascade, no specificity, and no property indirection
-         left to get wrong. */
+         It replaces reserving the band the moment the column has a card
+         in it: that kept a press from moving the petek, but left the
+         reader's own position a function of how many things were on. A
+         box that is the same size on every night is the same fix,
+         extended to the nights themselves. */
       position: relative;
     }
     #events-panel {
@@ -690,6 +679,15 @@
       border: 2px dashed var(--rule);
       background: transparent;
       box-sizing: border-box;
+      /* It fills the column rather than sitting in it: the column is a
+         fixed box on the phone (see .col-left below), and a frame that
+         only wrapped its own two lines would leave bare paper between
+         itself and the petek -- which is the very thing the frame is
+         there to stop. */
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
     .events-empty-line {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
@@ -892,6 +890,10 @@
            which is where the reader's own avatar then sits, dead centre
            of the screen. */
         grid-template-rows: minmax(0, 1fr) auto;
+        /* The events' fixed share of the band (see .col-left below).
+           Big enough for one preview card to rest in with air around it,
+           and for a card grown open to be read in. */
+        --hane-events-h: min(28vh, 230px);
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
            the map -- a different color from the map's own #f7f7f7,
@@ -984,10 +986,7 @@
 
       /* Events fill .col-left's height exactly; min-height:0 lets
          #events-panel below shrink to fit rather than overflowing the
-         fixed column. While a card is grown open, openEventGrowPage sets
-         this element's own inline min-height directly, which overrides
-         the 0 here regardless -- inline beats any stylesheet rule, so
-         this plain 0 is safe to leave as the normal-state default. */
+         fixed column. */
       .events-section {
         display: flex;
         flex-direction: column;
@@ -1056,11 +1055,22 @@
       }
       .col-left {
         grid-area: events;
-        /* Their share of the band, and no more. A night with a lot on
-           must not push the petek — and the reader standing in the
-           middle of it — up off the screen; past this the list scrolls
-           inside its own column, the way every other phone feed does. */
-        max-height: 46vh;
+        /* ── Their share of the band, and always exactly that share ──
+           A fixed box, not a row that grows with what is in it. The
+           petek is centred in whatever is left above this (see fitHive),
+           so every pixel this row gains or loses moves the reader
+           himself: a night with three things on used to stand the
+           drawing higher than a night with none, and an empty column
+           left it hanging above a band of bare paper. So the column is
+           the same height whatever it holds -- a night with a lot on
+           scrolls inside it, and a night with nothing on prints the
+           dashed frame across it (see .events-empty), the way the decks
+           on the other two pages always keep their own corner.
+           It is also the room a card grows into (.event-grow-page fills
+           this box exactly), which is why it is stated once here rather
+           than forced open for as long as a card is standing. */
+        height: var(--hane-events-h);
+        max-height: none;
       }
       /* Nothing on this page's right column shows on a phone -- it is
          empty (the seat it used to carry is gone from Hane entirely, see
@@ -2133,37 +2143,32 @@ function buildEventPageHtml(ev) {
   });
 }
 
-// The band the column reserves for itself the moment it has a card in
-// it -- deliberately well under .col-left's own 46vh ceiling: that
-// ceiling is the most a whole NIGHT of cards is allowed to push the
-// petek down by, and one card's title/date/description/RSVP row needs
-// nowhere near that much. Reserved on render rather than on open so
-// that pressing a card changes nothing about the layout (see
-// .events-section's own comment) -- and cleared on an empty night, when
-// the petek is the whole band between the two bars.
-const EVENTS_BAND_MIN = 'min(26vh, 230px)';
-
-function reserveEventsBand(hasCards) {
-  const section = document.querySelector('.events-section');
-  if (!section) return;
-  if (hasCards) section.style.minHeight = EVENTS_BAND_MIN;
-  else section.style.removeProperty('min-height');
-}
-
+// The column reserves nothing on render and nothing on open: it is a
+// fixed box (--hane-events-h, see .col-left), the same size on a night
+// with three things on, a night with none, and while a card is standing
+// grown open in it. Which is the whole of why the petek above holds
+// still -- row 1 is minmax(0,1fr), so every pixel this column gains or
+// loses comes out of the drawing the reader is standing in the middle
+// of.
 function renderEventsNow(panel, rows) {
-  reserveEventsBand(rows.length > 0);
   if (!rows.length) {
-    // Two different empties, and they are not the same thing. A city with
-    // nothing on says nothing at all -- an empty column is quieter than a
-    // line apologising for itself. But a city with events on and none of
-    // them kept is a reader who hasn't been through the deck yet, and
-    // that is worth one line pointing at where it is.
-    panel.innerHTML = allEvents.length ? `
+    // Two different empties, and they still say different things -- a
+    // city with nothing on says exactly that, while a city with events
+    // on and none of them kept is a reader who hasn't been through the
+    // deck yet, and that is worth one line pointing at where it is. But
+    // both say it inside the SAME dashed frame, which is the rule the
+    // decks on the other two pages already follow (see Kahvehane's own
+    // deckFrameHTML): a column with nothing in it at all reads as the
+    // page being broken rather than as there being nothing on, and this
+    // one is standing under the petek where its absence moved the
+    // drawing itself.
+    const city = allEvents.length > 0;
+    panel.innerHTML = `
       <div class="events-empty">
-        <div class="events-empty-line">${esc(I18N.t('home.events.kept'))}</div>
-        <div class="events-empty-sub">${esc(I18N.t('home.events.emptysub'))}</div>
+        <div class="events-empty-line">${esc(I18N.t(city ? 'home.events.kept' : 'events.none'))}</div>
+        <div class="events-empty-sub">${esc(I18N.t(city ? 'home.events.emptysub' : 'events.nonesub'))}</div>
       </div>
-    ` : '';
+    `;
     return;
   }
   const rowsById = new Map(rows.map(ev => [String(ev.id), ev]));
