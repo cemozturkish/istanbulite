@@ -2798,26 +2798,76 @@
 
       /* ── The website's window is not the app's ──
          The rule above is composed for the app, whose WKWebView owns the
-         whole screen: there the surplus `cover` has to crop is ~30px, it
-         comes off the top padding, and the northern countries still clear
-         the profile bar. Mobile Safari's viewport is that same screen
-         minus its own URL bar -- ~100px shorter -- so the surplus is four
-         times as deep, and taken off the top it eats the whole of the
-         padding that clearance was drawn into: the map rides up and Rusya
-         and Ukrayna end up under the bar.
+         whole screen and hands this fixed panel every pixel of it. Mobile
+         Safari does neither: its window is that screen minus its own URL
+         bar, and the panel's box starts at the notch rather than at the
+         top of the screen -- measured off a real device, the artwork was
+         drawn 59px down, exactly env(safe-area-inset-top), with the
+         profile bar still painting from 0.
 
-         So on the web the drawing hangs from the TOP, exactly as it is
-         composed, and the browser's surplus is cropped off the BOTTOM
-         instead -- the deliberately sparse lower half the news column is
-         drawn over anyway. The app never sees this rule (html.ist-native /
-         html.ist-web, stamped in safe-area-ready.js), so its own framing
-         above is untouched.
+         Bottom-anchored (the rule above) that box is ~130px short, so the
+         crop came out of the artwork's own top margin -- the 300px of
+         white it is drawn with so the northern countries clear the bar --
+         and Rusya and Ukrayna ended up under it. Simply anchoring to the
+         top instead trades one for the other: the margin survives, but it
+         starts below the notch, and 60-odd px of it stands in the open as
+         a white band between the bar and the map.
 
-         The traced overlay is re-anchored to match by syncWorldOverlayAnchor
-         rather than by a second rule here: preserveAspectRatio is an
-         attribute, and a stylesheet cannot reach it. */
+         So on the web the whole map layer is lifted by the difference:
+         the artwork hangs from the top, and it is raised until the point
+         where its ink begins lands exactly on the bottom edge of the
+         profile bar. Nothing is left over on either side of that line.
+         The lift is stated once, below, and the browser's surplus is
+         cropped off the BOTTOM of the drawing -- the deliberately sparse
+         half the news column is drawn over anyway.
+
+         The app never sees any of it (html.ist-native / html.ist-web,
+         stamped in safe-area-ready.js), so its framing above is untouched. */
+      html.ist-web {
+        /* The artwork's white top margin, in screen pixels: 300 of its own
+           1080-wide grid, and `cover` here is always width-driven (the art
+           is relatively taller than any phone), so one is 100vw/1080 of the
+           other. Minus the bar that margin exists to clear -- what is left
+           is what has to go. max() rather than a bare subtraction: on a
+           screen narrow enough for the bar to be taller than the margin
+           there is nothing to lift, and a negative lift would push the
+           drawing down into the gap it is here to close. */
+        --map-web-lift: max(0px, calc(27.7778vw - var(--navbar-h-top, 56px)));
+      }
+
+      /* The panel and the traced overlay are two boxes holding one
+         drawing, so they are lifted as one: same top, same bottom, same
+         width, and each fits its own layer into it the same way (cover /
+         xMidYMin slice -- see syncWorldOverlayAnchor). Move one of them
+         alone and every country steps off its coastline. `bottom: 0` and
+         `height: auto` keep both boxes reaching the foot of the window as
+         they did, so the lift only ever moves their top edge. */
+      html.ist-web .map-panel,
+      html.ist-web svg.map-svg-world {
+        top: calc(-1 * var(--map-web-lift));
+        /* Stated as a height rather than left to `bottom: 0`: an <svg> is
+           a replaced element, so `height: auto` there is its own intrinsic
+           height (the viewBox's aspect ratio against the width), not the
+           stretch between top and bottom -- and the two boxes would come
+           out different sizes. 100% is the window; the lift is what the
+           top edge just gained. */
+        height: calc(100% + var(--map-web-lift));
+      }
+
       html.ist-web .map-panel img.map-photo {
         object-position: center top;
+      }
+
+      /* Both of these are measured from the top of a box that has just
+         moved, so they take the lift back: the countries' top clip (which
+         is what stops a shape under the profile bar swallowing taps meant
+         for it) and the caption, which belongs on the page's shared hero
+         line and not on the map's own edge. */
+      html.ist-web svg.map-svg-world {
+        clip-path: inset(calc(var(--navbar-h, 38px) + env(safe-area-inset-top) + var(--map-web-lift)) 0 0 0);
+      }
+      html.ist-web .map-label {
+        top: calc(var(--map-hero-end) - 20px + var(--map-web-lift));
       }
 
       /* Swap the overlays: the İstanbul trace is drawn against the desktop
