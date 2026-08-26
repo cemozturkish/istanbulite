@@ -73,6 +73,42 @@
       save(uid);
       recordServer(uid, eventId, v);
     },
+    // ── The verdicts this browser doesn't have yet ──
+    // localStorage is where a verdict lives (see recordServer above for
+    // why the server copy exists at all), and that is right: it is the
+    // reader's own working state, not something anybody else is entitled
+    // to read. But a browser is not a member -- a cleared cache, a second
+    // device, the app beside mobile Safari -- and an evening somebody
+    // kept should be waiting for them beside the petek wherever they
+    // open it. So their own rows are read back and merged in, and only
+    // for keys this browser has never had a verdict for: what the reader
+    // did on THIS device always wins.
+    //
+    // Best-effort in every direction. A database without
+    // db/hive_event_interest.sql answers with an error and nothing
+    // happens; that is exactly the state every install was in before it
+    // was written, and the deck still works there.
+    async hydrate(uid, sb) {
+      if (!uid || !sb) return false;
+      let rows = null;
+      try {
+        const { data, error } = await sb.from('event_interest')
+          .select('event_id, verdict').eq('user_id', uid);
+        if (error) return false;
+        rows = data;
+      } catch (e) { return false; }
+      const map = load(uid);
+      let added = false;
+      (rows || []).forEach(r => {
+        const key = String(r.event_id);
+        if (map[key]) return;
+        if (r.verdict !== 'yes' && r.verdict !== 'no') return;
+        map[key] = r.verdict;
+        added = true;
+      });
+      if (added) save(uid);
+      return added;
+    },
     // Everything the member kept -- Hane's whole question.
     interestedIds(uid) {
       const map = load(uid);

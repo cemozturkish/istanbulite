@@ -20,7 +20,7 @@
   <script src="game-locks.js?v=2"></script>
   <!-- "İlgimi çekti": the verdict a thrown event card records here and
        Hane reads back beside the petek. Shared with anahane.html. -->
-  <script src="event-interest.js"></script>
+  <script src="event-interest.js?v=2"></script>
   <!-- Live open/closed + scheduled-discount evaluation for the Kahve
        Endeksi board below. Shared with admin.html. -->
   <script src="coffee-index.js"></script>
@@ -5625,7 +5625,14 @@ async function loadKahveEvents() {
   // only prune when this fetch actually saw the whole calendar. A short
   // page of a capped query is not evidence that the rows it didn't
   // return are gone.
-  if (kahveEvents.length < EVENTS_LIMIT) {
+  // ...and never on an empty answer. A fetch that came back with no rows
+  // at all cannot tell "the city has nothing on" apart from "this request
+  // saw nothing" (a request that went out before the session did returns
+  // an empty list, not an error, under RLS) -- and pruning against it
+  // wipes every verdict the member has, permanently, with the events
+  // they kept vanishing from Hane. Keeping a stale verdict costs nothing:
+  // both pages filter against the calendar they actually fetched.
+  if (kahveEvents.length && kahveEvents.length < EVENTS_LIMIT) {
     IstEventInterest.prune(myUid(), kahveEvents.map(ev => String(ev.id)));
   }
   renderEventsDeck();

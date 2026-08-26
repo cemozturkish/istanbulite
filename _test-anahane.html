@@ -9,7 +9,53 @@
   <meta name="theme-color" content="#f0f0f0">
   <title>istanbulite.net</title>
   <script src="safe-area-ready.js?v=2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+// TEST STUB — fake Supabase
+(function(){
+  const P = new URLSearchParams(location.search);
+  const nEvents = parseInt(P.get('events')||'0',10);
+  const evs = [];
+  for (let i=0;i<nEvents;i++) evs.push({ id:'e'+i, title:'Kadıköy Sahaf Buluşması '+(i+1), neighborhood:'kadikoy',
+    event_date:new Date(Date.now()+86400000*(i+2)).toISOString(), description:'Sahaflar arasında yürüyüş ve sohbet. Herkes davetli.', location:'Moda Sahili' });
+  const rows = { hive_map: [
+    {member_id:'m1',q:-1,r:0,first_name:'Aysegul',last_name:'Kurtulus',neighborhood:'kadikoy',bonded:true,locked:false},
+    {member_id:'m2',q:1,r:-1,first_name:'Susun',last_name:'Asici',neighborhood:'sisli',bonded:false,locked:false},
+    {member_id:'m3',q:-1,r:1,first_name:'Deniz',last_name:'Yildirim',neighborhood:'besiktas',bonded:true,locked:false},
+    {member_id:'m4',q:0,r:1,first_name:'Bihter',last_name:'Baskin',neighborhood:'fatih',bonded:false,locked:false},
+    {member_id:'m5',q:1,r:0,first_name:'Ege',last_name:'Ak',neighborhood:'uskudar',bonded:true,locked:false}
+  ]};
+  const user = { id:'me', email:'test@example.com' };
+  function result(table){
+    if (table==='profiles') return { data:[{id:'me',first_name:'Cem',last_name:'Ozturk',neighborhood:'bakirkoy',joined_at:'2024-01-01'}], error:null };
+    if (table==='events') return { data: evs, error:null };
+    return { data: [], error:null };
+  }
+  function qb(table){
+    const res = result(table);
+    const p = new Proxy(function(){}, {
+      get(t,k){
+        if(k==='then') return (f,r)=>Promise.resolve(table==='profiles'?{data:res.data[0],error:null}:res).then(f,r);
+        return ()=>p;
+      },
+      apply(){ return p; }
+    });
+    return p;
+  }
+  window.supabase = { createClient: () => ({
+    auth: {
+      getSession: async () => ({ data: { session: { user } } }),
+      getUser: async () => ({ data: { user } }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe(){} } } }),
+      signOut: async () => ({})
+    },
+    from: (t) => qb(t),
+    rpc: async (name) => ({ data: rows[name] || [], error: null }),
+    channel: () => ({ on(){return this;}, subscribe(){return this;} }),
+    removeChannel(){}
+  })};
+})();
+</script>
+
   <script src="ist-date.js"></script>
   <script src="router.js?v=4"></script>
   <script src="i18n.js?v=16"></script>
