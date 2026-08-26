@@ -2387,36 +2387,72 @@
 
   }
 
-  // ── What the petek's own six say about a kept event ──
+  // ── Where the petek stands on a kept event ──
   // Anahane's own #events-panel column owns the card and its grow
   // animation (event-interest-cards.js, IstSheet.grow -- same primitive
   // Kahvehane's own event page and Kütüphane's news cards already use);
   // this file only owns the honeycomb, so it exposes just the two calls
-  // that touch it (IstProfileCard.paintHiveEventVerdicts/
-  // clearHiveEventVerdicts) rather than reaching into anahane's DOM to
-  // wire the card itself.
+  // that touch it (IstProfileCard.paintHiveEventMarks/
+  // clearHiveEventMarks) rather than reaching into anahane's DOM to wire
+  // the card itself.
   //
-  // Verdicts are painted straight onto the six ring-1 hexagons for the
-  // one event standing open -- not a list of names, since the hexagon
-  // already printing that person's name says whose answer it is.
+  // Two different facts, and the drawing keeps them apart. The VERDICT
+  // is what somebody said about the event on Kahvehane's deck -- ilgimi
+  // çekti or çekmedi, a dot in the hexagon's corner. The RSVP is whether
+  // they are actually going, which is the one thing the open page asks,
+  // so it is the louder mark: the hexagon's own ring goes red and it
+  // carries a tick. An interested member who has not said yes yet and a
+  // member who has are the difference between "there is somebody to go
+  // with" and "somebody is going" -- the page is worth nothing if it
+  // prints those as the same thing.
+  //
+  // Painted straight onto the hexagons rather than listed as names,
+  // since the hexagon already printing that person's name says whose
+  // answer it is. The reader's own hexagon is painted from what the
+  // calling page already knows (opts.mine) -- both RPCs deliberately
+  // answer only for everybody else.
+  //
   // Best-effort, same convention as loadHiveStatus: before the migration
   // has been run the RPC isn't there, and the card still opens with no
   // marks rather than failing to open.
-  async function paintHiveEventVerdicts(sb, eventId) {
-    try {
-      const { data, error } = await sb.rpc('hive_event_interest_status', { p_event_ids: [eventId] });
-      if (error || !data) return;
-      data.forEach(row => {
-        const cell = document.querySelector(
-          `#po-hive-mount .ist-hive-cell[data-member-id="${CSS.escape(String(row.member_id))}"]`);
-        if (cell) cell.classList.add(row.verdict === 'yes' ? 'ist-hive-cell-verdict-yes' : 'ist-hive-cell-verdict-no');
-      });
-    } catch (e) { /* no marks this time; the drawing is unchanged */ }
+  function hiveCellFor(memberId) {
+    return document.querySelector(
+      `#po-hive-mount .ist-hive-cell[data-member-id="${CSS.escape(String(memberId))}"]`);
   }
 
-  function clearHiveEventVerdicts() {
-    document.querySelectorAll('#po-hive-mount .ist-hive-cell-verdict-yes, #po-hive-mount .ist-hive-cell-verdict-no')
-      .forEach(cell => cell.classList.remove('ist-hive-cell-verdict-yes', 'ist-hive-cell-verdict-no'));
+  async function paintHiveEventMarks(sb, eventId, opts) {
+    clearHiveEventMarks();
+    const mine = !!(opts && opts.mine);
+    const meCell = document.querySelector('#po-hive-mount .ist-hive-cell[data-me]');
+    if (meCell) meCell.classList.toggle('ist-hive-cell-rsvp', mine);
+    // Both questions in flight at once: they paint different marks on
+    // the same drawing, and asking them one after the other would show
+    // the verdict dots land a beat before the ring turns.
+    const ask = (fn) => sb.rpc(fn, { p_event_ids: [eventId] })
+      .then(r => (r && !r.error && r.data) ? r.data : [])
+      .catch(() => []);
+    let verdicts = [], going = [];
+    try {
+      [verdicts, going] = await Promise.all([
+        ask('hive_event_interest_status'),
+        ask('hive_event_rsvp_status'),
+      ]);
+    } catch (e) { return; /* no marks this time; the drawing is unchanged */ }
+    verdicts.forEach(row => {
+      const cell = hiveCellFor(row.member_id);
+      if (cell) cell.classList.add(row.verdict === 'yes' ? 'ist-hive-cell-verdict-yes' : 'ist-hive-cell-verdict-no');
+    });
+    going.forEach(row => {
+      const cell = hiveCellFor(row.member_id);
+      if (cell) cell.classList.add('ist-hive-cell-rsvp');
+    });
+  }
+
+  function clearHiveEventMarks() {
+    document.querySelectorAll(
+      '#po-hive-mount .ist-hive-cell-verdict-yes, #po-hive-mount .ist-hive-cell-verdict-no, #po-hive-mount .ist-hive-cell-rsvp'
+    ).forEach(cell => cell.classList.remove(
+      'ist-hive-cell-verdict-yes', 'ist-hive-cell-verdict-no', 'ist-hive-cell-rsvp'));
   }
 
   function wireHiveEvents(state) {
@@ -3239,8 +3275,8 @@
     openProfileOverlay,
     closeProfileOverlay,
     mountHivePage,
-    paintHiveEventVerdicts,
-    clearHiveEventVerdicts,
+    paintHiveEventMarks,
+    clearHiveEventMarks,
     initMemberSheet,
     openMemberSheet,
     closeMemberSheet,

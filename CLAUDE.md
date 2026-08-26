@@ -471,8 +471,35 @@ sb.from('articles').delete().eq('id', id)
   hexagon on the petek — which is the people again, not a seat (see the petek's own section)
 - **The events are the column beside it** (`#events-panel`, `events` / `event_rsvps`). They belong
   next to the petek: the petek is who you are standing next to, an event is the one thing on the
-  site that ends with you actually standing next to them. Opening a card rises the page's detail
-  sheet with the description and a live RSVP row
+  site that ends with you actually standing next to them. Opening a card **grows it into the
+  column's own band**, in place — the same primitive Kütüphane's news page and Kahvehane's event
+  page use (`IstSheet.grow`, `openEventGrowPage`), measured onto the cards' own content box
+  (`measureEventGrowBand`) so the page comes out of the card with its sides already on the card's
+  sides. And it is the same three-part page a story opens as over there: what it is and the way
+  back out (the hand-drawn arrow) on the top line, the event scrolling in the middle, the **RSVP
+  row** standing on the bottom line where it cannot scroll away
+- **The petek above it does not move, and that is what the reserved band is for.** Row 1 of the
+  phone grid is `minmax(0, 1fr)` — everything the events take comes out of the petek's own box, so
+  a card that grew the events row visibly slid the reader up the screen as it expanded. The band is
+  therefore reserved the moment the column **has** a card in it (`reserveEventsBand`,
+  `EVENTS_BAND_MIN`), not the moment one is opened: nothing about the layout changes on a press,
+  only what is drawn inside a box that was already that size. An empty night reserves nothing and
+  the petek is the whole band between the two bars, exactly as before
+- **There is no throw on this page.** A kept event has already had its verdict given on Kahvehane's
+  deck — that is what put it here — so the one thing this page asks is whether you are **going**,
+  and it asks it with a button rather than a gesture. The deck's left/right verdict belongs to the
+  page where the whole city's calendar is being sorted; a second, different meaning for the same
+  throw on the page holding what survived it would make both unreadable
+- **And the petek answers it.** With a card open, the reader's own honeycomb is marked
+  (`IstProfileCard.paintHiveEventMarks` / `clearHiveEventMarks`): the ink/paper corner dot is the
+  **verdict** a member gave the event on the deck (`hive_event_interest_status`), and a red disc in
+  the opposite corner is that they are actually **going** (`hive_event_rsvp_status`,
+  `db/hive_event_rsvp.sql`). Two facts, kept apart on purpose — "there is somebody to go with" and
+  "somebody is going" are not the same thing. The reader's own hexagon is painted from what the
+  page already knows (`myRsvpIds`), which is also what lets the mark land the instant the button is
+  pressed; both RPCs answer only for the caller's own map and only for the events it names, the
+  same fence `hive_member_status` stands behind. The ring is deliberately left alone: red on a
+  hexagon's ring already means "this is the one named on the bar"
 - **And it is what the member KEPT, not the city's whole calendar** (`keptEvents`,
   `event-interest.js`). The calendar is dealt with one card at a time on Kahvehane — thrown right
   is "ilgimi çekti", thrown left is gone (see that page's own section) — and this column is the
