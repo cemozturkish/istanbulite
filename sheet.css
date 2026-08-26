@@ -185,8 +185,18 @@
    to clear the 260px side columns — the columns step aside instead of
    the sheet cramping into the same space. */
 @media (max-width: 1240px) {
-  body:has(.ist-sheet-overlay.open) .col-left,
-  body:has(.ist-sheet-overlay.open) .col-right {
+  /* `:not([hidden])` is load-bearing, not belt and braces. This rule can
+     empty a whole page from three DOM nodes away, and it fires on the
+     presence of a CLASS -- so an overlay that is already hidden but was
+     left carrying .open (a close that dropped the attribute without the
+     class, a teardown that ran in the wrong order, an older cached
+     sheet.js racing its own re-hide timer) takes both columns down with
+     it, silently, for the rest of the session. Nothing throws and
+     nothing looks broken: the page simply has nothing in it. A sheet
+     that is not on the screen has no claim on the room the columns
+     stand in. */
+  body:has(.ist-sheet-overlay.open:not([hidden])) .col-left,
+  body:has(.ist-sheet-overlay.open:not([hidden])) .col-right {
     visibility: hidden;
   }
 }

@@ -28,7 +28,7 @@
   <link rel="stylesheet" href="profile-card.css?v=20">
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
-  <script src="profile-card.js?v=19" defer></script>
+  <script src="profile-card.js?v=20" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
   <link rel="stylesheet" href="mahalle-picker.css">
@@ -51,7 +51,7 @@
     })();
   </script>
   <script src="sheet.js?v=5"></script>
-  <link rel="stylesheet" href="sheet.css?v=6">
+  <link rel="stylesheet" href="sheet.css?v=7">
   <style data-page="anahane">
     :root {
       /* Core ink & paper — cool cream newspaper palette */
@@ -549,7 +549,14 @@
     /* Only the middle depth of the petek is about who is standing beside
        the reader, which is the whole reason a kept event's verdict is
        worth showing at all (see paintHiveEventMarks) -- at the other
-       two depths the column has nothing to say. visibility:hidden, not
+       two depths the column has nothing to say. Keyed on the OFF class
+       (applyHiveLevel sets ist-hive-offmid at levels 0 and 2), never on
+       :not(.ist-hive-mid): the default with no class at all has to be
+       VISIBLE. A column hidden because a class never landed is
+       indistinguishable from a column with nothing in it -- which is
+       exactly how it read on a phone: a reserved band of bare paper
+       under the petek, with the frame and the cards standing in it
+       unseen. visibility:hidden, not
        display:none: .col-left sits in an auto-sized grid row on the
        phone (grid-area: events), so display:none would collapse that
        row's height and hand the freed space to the petek's own row
@@ -559,7 +566,7 @@
        still while only what's around it changes. visibility:hidden
        keeps the row's height (and the petek's) constant across every
        level. */
-    html:not(.ist-hive-mid) .events-section { visibility: hidden; }
+    html.ist-hive-offmid .events-section { visibility: hidden; }
     /* The page a kept card grows into. Its box is measured onto the
        cards' own content box when it opens (measureEventGrowBand), the
        same way Kütüphane's news page is measured onto its feed's --
@@ -1905,21 +1912,34 @@ let _eventGrowOrigin = null;
 async function loadEvents(neighborhoodFilter = null, instant = false) {
   const reqId = ++eventsRequestSeq;
   const now = new Date().toISOString();
-  // Scope the query to the selected neighborhood so the 30-row cap
-  // doesn't hide matching rows that sit past the global top-30 window.
-  let query = sb.from('events')
-    .select('*')
-    .gte('event_date', now)
-    .order('event_date', { ascending: true })
-    .limit(30);
-  if (neighborhoodFilter) query = query.eq('neighborhood', neighborhoodFilter);
-  const { data, error } = await query;
-  // Drop responses from superseded requests so a slow older fetch
-  // can't clobber a newer one with stale rows.
-  if (reqId !== eventsRequestSeq) return;
-  if (error) { console.error('[kahvehane events]', error); allEvents = []; }
-  else allEvents = data || [];
-  await loadRsvps();
+  // The column says something from the first frame. It is a fixed box
+  // under the petek (see .col-left), so while this was awaiting its two
+  // round trips that box stood there as bare paper -- and a request that
+  // never came back, or threw on the way, left it that way for good.
+  // Drawing what is known right now (nothing yet, and the frame that
+  // says so) costs nothing and means the band is never empty.
+  renderEvents(true);
+  try {
+    // Scope the query to the selected neighborhood so the 30-row cap
+    // doesn't hide matching rows that sit past the global top-30 window.
+    let query = sb.from('events')
+      .select('*')
+      .gte('event_date', now)
+      .order('event_date', { ascending: true })
+      .limit(30);
+    if (neighborhoodFilter) query = query.eq('neighborhood', neighborhoodFilter);
+    const { data, error } = await query;
+    // Drop responses from superseded requests so a slow older fetch
+    // can't clobber a newer one with stale rows.
+    if (reqId !== eventsRequestSeq) return;
+    if (error) { console.error('[kahvehane events]', error); allEvents = []; }
+    else allEvents = data || [];
+    await loadRsvps();
+  } catch (e) {
+    // A rejected fetch (offline, a blocked request) used to take the
+    // render with it, since it sat after the awaits.
+    console.error('[kahvehane events]', e);
+  }
   if (reqId !== eventsRequestSeq) return;
   renderEvents(instant);
 }
@@ -2192,7 +2212,17 @@ function renderEventsNow(panel, rows) {
   // same way the original was (see openEventGrowPage); otherwise the
   // card it grew out of is simply gone, so fold the page back.
   if (_eventGrowId != null) {
-    if (rowsById.has(_eventGrowId)) {
+    // Only while a page is genuinely standing open. The mark this puts
+    // on a card is `visibility: hidden` (see .event-grow-open), so a
+    // stale id -- a close that took the early return, a virtual
+    // navigation that swapped the markup out from under this module's
+    // own state -- would hide the card on every render from then on,
+    // with nothing on screen to say why.
+    const page = document.getElementById('event-grow-page');
+    if (!page || page.hidden) {
+      _eventGrowId = null;
+      _eventGrowOrigin = null;
+    } else if (rowsById.has(_eventGrowId)) {
       const el = panel.querySelector(`[data-event-id="${CSS.escape(_eventGrowId)}"]`);
       if (el) { el.classList.add('event-grow-open'); _eventGrowOrigin = el; }
     } else {

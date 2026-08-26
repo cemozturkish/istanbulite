@@ -1892,7 +1892,16 @@
     // reference across the script boundary: the petek page never needs
     // to know the column exists, and anahane's CSS is what actually
     // reacts to it.
-    document.documentElement.classList.toggle('ist-hive-mid', level === HIVE_LEVEL_DEFAULT);
+    // Two classes rather than one, and the rule that quiets the column
+    // is written on the OFF state (see anahane.html): a class that never
+    // lands -- profile-card.js still loading, a page entered by a route
+    // that never mounted the petek, an exception in the middle of a
+    // render -- must leave the column READABLE, not blank. `:not(mid)`
+    // failed the other way round, and a column that has quietly gone
+    // invisible looks exactly like one with nothing in it.
+    const mid = level === HIVE_LEVEL_DEFAULT;
+    document.documentElement.classList.toggle('ist-hive-mid', mid);
+    document.documentElement.classList.toggle('ist-hive-offmid', !mid);
     // And the outermost depth, for the same reason the other way round:
     // that depth is the whole shape, so the drawing is let out of its
     // window there and runs off every edge of the screen -- under the
