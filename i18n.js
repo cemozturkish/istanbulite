@@ -125,6 +125,8 @@
     'auth.livedistrict':   { default: 'Yaşadığın Mahalle',   more_english: 'Where You Live' },
     'auth.birthdistrict':  { default: 'Doğduğun Mahalle',    more_english: 'Where You Were Born' },
     'auth.kefilnote':      { default: 'Kayıt için kefil kodu', more_english: 'Sponsor code required to sign up' },
+    'auth.privacypolicy':  { default: 'Gizlilik Politikası',  more_english: 'Privacy Policy' },
+    'auth.privacyagree':   { default: '<a href="gizlilik.html" target="_blank">Gizlilik Politikası</a>nı okudum ve kabul ediyorum.', more_english: 'I have read and accept the <a href="gizlilik.html" target="_blank">Privacy Policy</a>.' },
 
     // games (shared bits)
     'games.howto':         { default: 'Nasıl Oynanır',       more_english: 'How to Play' },

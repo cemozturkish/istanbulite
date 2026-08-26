@@ -2676,26 +2676,21 @@
       const orig = deleteBtn.textContent;
       deleteBtn.textContent = t('profile.deleteaccount.deleting');
       // Deleting the auth.users row (and, by cascade, profiles and
-      // everything FK'd to it) needs the service role key, which never
-      // belongs in client code -- so this calls the same kind of Edge
-      // Function admin.html's account creation already does, just
-      // scoped to the caller's OWN row (see supabase/functions/
-      // delete-own-account, deployed outside this repo).
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session) { window.location.href = 'index.html'; return; }
-      try {
-        const { data, error } = await sb.functions.invoke('delete-own-account', {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        if (error || (data && data.error)) throw error || new Error(data.error);
-        await sb.auth.signOut();
-        window.location.href = 'index.html';
-      } catch (e) {
+      // everything FK'd to it) runs entirely inside Postgres via the
+      // public.delete_own_account() SECURITY DEFINER function (see
+      // db/delete_own_account.sql) -- it executes with the function
+      // owner's privileges, so no service role key ever needs to reach
+      // client code or a separately-deployed Edge Function.
+      const { error } = await sb.rpc('delete_own_account');
+      if (error) {
         deleteBtn.disabled = false;
         deleteBtn.textContent = orig;
         const msgEl = document.getElementById('po-save-msg');
         if (msgEl) msgEl.textContent = t('profile.deleteaccount.error');
+        return;
       }
+      await sb.auth.signOut();
+      window.location.href = 'index.html';
     });
   }
 
