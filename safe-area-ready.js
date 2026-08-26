@@ -13,6 +13,17 @@
 // class the moment the real value is confirmed -- or after a timeout, so
 // devices with a genuinely-zero inset (no notch) aren't stuck waiting.
 (function () {
+  // -- The app's window and the website's window are not the same window --
+  // Same document, but the app's WKWebView owns the whole screen while
+  // mobile Safari's viewport is that screen minus its own URL bar. Any
+  // artwork sized to the window rather than to a box (Kutuphane's phone
+  // map) has to be composed differently under each, so stamp which runtime
+  // this is on <html> the moment the page starts executing -- a stylesheet
+  // can then say `html.ist-web ...` instead of guessing from a viewport
+  // unit. Set here, before the Capacitor early-out below, because both
+  // runtimes need the class.
+  document.documentElement.classList.add(window.Capacitor ? 'ist-native' : 'ist-web');
+
   // Only the native app's WKWebView has shown this delay -- skip the
   // wait entirely on the plain website so mobile Safari visitors never
   // see the extra (unneeded) hidden window.
