@@ -2,14 +2,13 @@
 // EVENT CARDS — the one ".event-item" template, in two sizes
 //
 // Pure markup, nothing else: no fetch, no click-wiring, no DOM writes.
-// Anahane's own script builds it for its sidebar column and
-// profile-card.js's hive code (which only ever runs inside Anahane's own
-// document -- see mountHivePage) builds it again for the copy standing
-// inside the petek's level 1 -- two callers, each wiring its own press
-// behaviour around the same paper (the sidebar rises THE sheet, the
-// petek's copy grows in place). A copy of this template in each script
-// is a copy that drifts, the same reason event-interest.js is its own
-// file.
+// The small card in the stack and the page it grows into are the same
+// paper in two sizes, and they live here rather than in the page that
+// prints them so that changing one is changing both. Anahane's own
+// script is the caller (it wires the press, the grow and the RSVP
+// button around this markup); it is a file of its own for the same
+// reason event-interest.js is -- a template copied into a page script
+// is a template that drifts.
 //
 // Every function takes what it needs as an argument rather than reaching
 // for a global: districtLabel and attendeesHTML are passed in because
@@ -65,11 +64,19 @@
     `;
   }
 
-  // The full card. opts.rsvp = { count, attending, joinLabel, goingLabel,
-  // countLabel } is optional -- omit it and the RSVP row is left out
-  // entirely (the petek's own grown copy does exactly that: it's about
-  // the verdict, not attendance).
-  function detailHTML(ev, parts, opts) {
+  // ── THE EVENT PAGE ──
+  // What a kept card grows into: head / body / foot, the same three-part
+  // page a story opens as on Kütüphane (.news-page there). What it is,
+  // and the way back out, on the top line; the event itself scrolling in
+  // the middle; the RSVP row standing on the bottom line, where it
+  // cannot scroll away from the reader. There is no throw here and no
+  // cue stamped on the paper -- a kept event has already had its verdict
+  // given on Kahvehane's deck, and the one thing this page asks is
+  // whether you are going.
+  //
+  // opts.rsvp = { count, attending, joinLabel, goingLabel, countLabel }
+  // is optional -- omit it and the foot is left out entirely.
+  function pageHTML(ev, parts, opts) {
     opts = opts || {};
     const nbLabel = ev.neighborhood
       ? ((opts.districtLabel && opts.districtLabel(ev.neighborhood)) || ev.neighborhood)
@@ -77,30 +84,28 @@
     const dateTime = [parts.weekday, parts.time].filter(Boolean).join(' ');
     const metaHTML = [dateTime, ev.location].filter(Boolean).map(esc).join('<br>');
     const rsvp = opts.rsvp;
-    const rsvpRow = rsvp ? `
-        <div class="ev-rsvp-row">
-          <button type="button" class="ev-rsvp-btn${rsvp.attending ? ' attending' : ''}" data-event-id="${esc(ev.id)}">${esc(rsvp.attending ? rsvp.goingLabel : rsvp.joinLabel)}</button>
-          <span class="ev-rsvp-count">${rsvp.count} ${esc(rsvp.countLabel)}</span>
-          <span class="ev-attendees">${opts.attendeesHTML ? opts.attendeesHTML(ev.id) : ''}</span>
-        </div>` : '';
+    const back = opts.backLabel || 'Geri';
     return `
-      <div class="event-item">
-        <div class="ev-date-block">
-          <div class="ev-day">${parts.day}</div>
-          <div class="ev-mon">${parts.mon}</div>
-        </div>
-        <div class="ev-body">
-          <div class="ev-kicker">${esc(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
-          <div class="ev-title">${esc(ev.title)}</div>
-          ${metaHTML ? `<div class="ev-meta">${metaHTML}</div>` : ''}
-        </div>
-        <div class="ev-details">
-          ${ev.description ? `<div class="ev-desc">${esc(ev.description)}</div>` : ''}
-          ${rsvpRow}
-        </div>
+      <div class="ev-page-head">
+        <button type="button" class="ev-page-back" aria-label="${esc(back)}" title="${esc(back)}"><img src="assets/back.png" alt=""></button>
+        <div class="ev-kicker">${esc(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
+        <div class="ev-page-when">${parts.day} ${esc(parts.mon)}</div>
       </div>
+      <div class="ev-page-body">
+        <h2 class="ev-page-title">${esc(ev.title)}</h2>
+        ${metaHTML ? `<div class="ev-meta">${metaHTML}</div>` : ''}
+        ${ev.description ? `<p class="ev-desc">${esc(ev.description)}</p>` : ''}
+      </div>
+      ${rsvp ? `
+        <div class="ev-page-foot">
+          <div class="ev-rsvp-row">
+            <button type="button" class="ev-rsvp-btn${rsvp.attending ? ' attending' : ''}" data-event-id="${esc(ev.id)}">${esc(rsvp.attending ? rsvp.goingLabel : rsvp.joinLabel)}</button>
+            <span class="ev-rsvp-count">${rsvp.count} ${esc(rsvp.countLabel)}</span>
+            <span class="ev-attendees">${opts.attendeesHTML ? opts.attendeesHTML(ev.id) : ''}</span>
+          </div>
+        </div>` : ''}
     `;
   }
 
-  window.IstEventCards = { dateParts, previewHTML, detailHTML };
+  window.IstEventCards = { dateParts, previewHTML, pageHTML };
 })();
