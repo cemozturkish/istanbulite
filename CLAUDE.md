@@ -512,6 +512,17 @@ sb.from('articles').delete().eq('id', id)
   rather than as there being nothing on, and this column stands directly under the petek, where its
   absence moved the drawing itself. If the store is missing entirely the column degrades to the
   whole city's list rather than to an empty page — that is the failure a reader can make sense of
+- **A verdict lives in the reader's own browser, but a browser is not a member**
+  (`IstEventInterest.hydrate`). What was thrown right on Kahvehane's deck is kept in `localStorage`,
+  which is right — it is the reader's working state, not something anybody else may read — but a
+  cleared cache, a second device or the app beside mobile Safari left the evenings they kept
+  nowhere. Their own rows of the deck's server mirror (`event_interest`,
+  `db/hive_event_interest.sql`) are read back on load and merged in for keys this browser has never
+  had a verdict for, so what the reader did on THIS device always wins. Best-effort in every
+  direction: a database without the migration answers nothing and the column behaves exactly as it
+  did before. And Kahvehane never prunes the store against an **empty** fetch — a request that
+  returned no rows cannot tell "the city has nothing on" apart from "this request saw nothing", and
+  pruning against it wiped every verdict the member had
 - On a phone the petek stands in the hero square the map used to hold and the events hang from the
   bottom of the band below it, so the hero line is exactly where it is on the other two pages
 - **The petek has three depths and the reader pulls up and down through them** — you alone at the
@@ -1429,16 +1440,20 @@ one is a shape that grows with the reader standing in the middle of it. Pinned t
 the middle of the drawing sat in the middle of a box in the top third of the screen with dead paper
 under it on any night with nothing on. So row 1 is `minmax(0, 1fr)` — whatever the events leave.
 
-**And what the events leave is the same every night** (`--hane-events-h` on `#main-site`, a fixed
-`height` on `.col-left`). The column used to be an auto row under a `46vh` ceiling, which made the
-reader's own position a function of how many things were on: three kept cards stood the drawing
-higher than none, and an empty column left it hanging over a band of bare paper. A fixed box ends
-that — a busy night scrolls inside it, an empty one prints the dashed frame across it, and a card
-grown open (`.event-grow-page`) simply fills the room the column always has, so nothing has to be
-forced open while it is standing and nothing has to be cleared afterwards. That last part was not
-theoretical: the room used to be an inline `min-height` set for as long as a card was open, and one
-missed cleanup left a third of the screen reserved with nothing drawn in it, pushing the petek off
-centre with no visible cause.
+**And the events do not take room from it at all: they are laid OVER its foot** (`--hane-events-h`
+on `#main-site`, `grid-area: hero` + `align-self: end` on `.col-left`). The petek gets the whole
+band between the two bars, so the reader's own avatar is dead centre of the screen — the same move
+level 0's own block makes inside the drawing. A column with a grid row of its own made the reader's
+position a function of how tall it was: it stood the drawing above the middle of the screen by half
+the strip, and every kept card, every empty night, every card opened moved them again.
+
+**The strip is one card tall, and opening a card grows it upward** (`.col-left.events-open`,
+`--hane-events-open-h`). Because it is laid over the window rather than standing in a row, that
+growth changes nothing about the layout: the card rises over the foot of the drawing and folds back
+down, and the reader does not move a pixel. Two things this makes load-bearing — the cards and the
+grown page must be **opaque** (`--paper-card` is deliberately translucent on this page, from the
+days these floated over a map photo, so both composite it onto `--paper`), and a busy night scrolls
+inside the strip rather than growing it.
 
 **The frames are a five-step tone ladder, and the step is distance from the reader**
 (`--ist-hive-ring-*` on `.ist-hive-page`): you are the darkest thing on the page, then the members
