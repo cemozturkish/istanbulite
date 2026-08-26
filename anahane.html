@@ -22,10 +22,13 @@
        This column is the other end of that gesture. Shared with
        kahvehane.html. -->
   <script src="event-interest.js"></script>
-  <link rel="stylesheet" href="profile-card.css?v=17">
+  <!-- The .event-item template, shared with the copy of this same stack
+       standing inside the petek's level 1 (profile-card.js). -->
+  <script src="event-interest-cards.js"></script>
+  <link rel="stylesheet" href="profile-card.css?v=18">
   <script src="avatar.js" defer></script>
   <script src="person-mentions.js" defer></script>
-  <script src="profile-card.js?v=16" defer></script>
+  <script src="profile-card.js?v=17" defer></script>
   <link rel="stylesheet" href="onboarding.css">
   <script src="onboarding.js" defer></script>
   <link rel="stylesheet" href="mahalle-picker.css">
@@ -1720,21 +1723,11 @@ document.getElementById('signup-submit-btn').addEventListener('click', async () 
 // kickered with its own -- and picking a district is Kahvehane's job.
 // The filter argument survives for whoever wants to scope it later; the
 // page never passes one.
-const MONTH_ABBR_TR = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
-const MONTH_ABBR_EN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-
+// Date formatting and the .event-item template itself now live in
+// event-interest-cards.js, shared with the copy of this stack standing
+// inside the petek's level 1 (profile-card.js).
 function eventDateParts(iso) {
-  const d = new Date(iso);
-  const tz = 'Europe/Istanbul';
-  const en = I18N.isEnglish();
-  const locale = en ? 'en-US' : 'tr-TR';
-  const day = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, day: 'numeric' }), 10);
-  const month = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, month: 'numeric' }), 10);
-  const weekday = d.toLocaleDateString(locale, { timeZone: tz, weekday: 'long' });
-  const wd = d.toLocaleDateString(locale, { timeZone: tz, weekday: 'short' }).toLocaleUpperCase(locale);
-  const time = d.toLocaleTimeString(locale, { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: en });
-  const monAbbr = (en ? MONTH_ABBR_EN : MONTH_ABBR_TR)[month - 1] || '';
-  return { day, mon: monAbbr, wd, weekday, time };
+  return IstEventCards.dateParts(iso, I18N.isEnglish());
 }
 
 let allEvents = [];
@@ -1890,33 +1883,18 @@ function renderEvents(instant) {
 // openDetail). Reuses the .event-item card's own styling so it looks like
 // the same card, just full-size, with the RSVP row live.
 function buildEventDetailHtml(ev) {
-  const nbLabel = ev.neighborhood ? (districtNames[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
   const parts = eventDateParts(ev.event_date);
-  const dateTime = [parts.weekday, parts.time].filter(Boolean).join(' ');
-  const metaHTML = [dateTime, ev.location].filter(Boolean).map(escapeHtml).join('<br>');
-  const count = rsvpCounts[ev.id] || 0;
-  const attending = myRsvpIds.has(ev.id);
-  return `
-    <div class="event-item">
-      <div class="ev-date-block">
-        <div class="ev-day">${parts.day}</div>
-        <div class="ev-mon">${parts.mon}</div>
-      </div>
-      <div class="ev-body">
-        <div class="ev-kicker">${esc(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
-        <div class="ev-title">${esc(ev.title)}</div>
-        ${metaHTML ? `<div class="ev-meta">${metaHTML}</div>` : ''}
-      </div>
-      <div class="ev-details">
-        ${ev.description ? `<div class="ev-desc">${esc(ev.description)}</div>` : ''}
-        <div class="ev-rsvp-row">
-          <button type="button" class="ev-rsvp-btn${attending ? ' attending' : ''}" data-event-id="${esc(ev.id)}">${attending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join')}</button>
-          <span class="ev-rsvp-count">${count} ${I18N.t('home.events.rsvp.count')}</span>
-          <span class="ev-attendees">${buildAttendeeAvatarsHtml(ev.id)}</span>
-        </div>
-      </div>
-    </div>
-  `;
+  return IstEventCards.detailHTML(ev, parts, {
+    districtLabel: (id) => districtNames[id] || id,
+    attendeesHTML: buildAttendeeAvatarsHtml,
+    rsvp: {
+      count: rsvpCounts[ev.id] || 0,
+      attending: myRsvpIds.has(ev.id),
+      joinLabel: I18N.t('home.events.rsvp.join'),
+      goingLabel: I18N.t('home.events.rsvp.going'),
+      countLabel: I18N.t('home.events.rsvp.count'),
+    },
+  });
 }
 
 function renderEventsNow(panel, rows) {
@@ -1935,28 +1913,14 @@ function renderEventsNow(panel, rows) {
     return;
   }
   const rowsById = new Map(rows.map(ev => [String(ev.id), ev]));
-  panel.innerHTML = rows.map(ev => {
-    const nbLabel = ev.neighborhood ? (districtNames[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
-    const parts = eventDateParts(ev.event_date);
-    // Weekday lives in the date block (day / month / weekday); time and
-    // location are both dropped from the preview -- see
-    // buildEventDetailHtml for the full date/time/location, still shown
-    // once you open the card. That frees this card for a bigger title.
-    return `
-      <div class="event-item openable" data-event-id="${esc(ev.id)}">
-        <div class="ev-date-block">
-          <div class="ev-day">${parts.day}</div>
-          <div class="ev-mon">${parts.mon}</div>
-          <div class="ev-wd">${parts.wd}</div>
-        </div>
-        <div class="ev-body">
-          <div class="ev-kicker">${esc(nbLabel.toLocaleUpperCase('tr-TR'))}</div>
-          <div class="ev-title">${esc(ev.title)}</div>
-          <span class="ev-attendees ev-attendees-preview">${buildAttendeeAvatarsHtml(ev.id)}</span>
-        </div>
-      </div>
-    `;
-  }).join('');
+  // Weekday lives in the date block (day / month / weekday); time and
+  // location are both dropped from the preview -- see buildEventDetailHtml
+  // for the full date/time/location, still shown once you open the card.
+  // That frees this card for a bigger title.
+  panel.innerHTML = rows.map(ev => IstEventCards.previewHTML(ev, eventDateParts(ev.event_date), {
+    districtLabel: (id) => districtNames[id] || id,
+    attendeesHTML: buildAttendeeAvatarsHtml,
+  })).join('');
 
   panel.querySelectorAll('.event-item.openable').forEach(el => {
     const ev = rowsById.get(el.dataset.eventId);

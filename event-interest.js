@@ -42,6 +42,22 @@
     catch (e) { /* full or blocked: the deck still behaves for this session */ }
   }
 
+  // Fire-and-forget, mirroring recordDealtOnServer in kutuphane.html: the
+  // card has already left the deck by the time this runs and nothing
+  // here reads the answer back. localStorage stays the source of truth
+  // for the reader's OWN verdict -- this exists purely so somebody
+  // ELSE'S hive query (hive_event_interest_status) can see it.
+  function recordServer(uid, eventId, verdict) {
+    const sb = window.IstRouter && window.IstRouter.sb;
+    if (!sb) return;
+    try {
+      sb.from('event_interest')
+        .upsert({ user_id: uid, event_id: eventId, verdict, verdict_at: new Date().toISOString() },
+                { onConflict: 'user_id,event_id' })
+        .then(() => {}, () => {});
+    } catch (e) {}
+  }
+
   const API = {
     // 'yes' | 'no' | null (never asked)
     verdict(uid, eventId) {
@@ -52,8 +68,10 @@
     interested(uid, eventId) { return API.verdict(uid, eventId) === 'yes'; },
     set(uid, eventId, verdict) {
       if (!uid) return;
-      load(uid)[String(eventId)] = verdict === 'yes' ? 'yes' : 'no';
+      const v = verdict === 'yes' ? 'yes' : 'no';
+      load(uid)[String(eventId)] = v;
       save(uid);
+      recordServer(uid, eventId, v);
     },
     // Everything the member kept -- Hane's whole question.
     interestedIds(uid) {

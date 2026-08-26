@@ -700,6 +700,12 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
+  /* .ist-hive-plane (inside) always carries a live inline transform, so
+     it and every cell in it form their own stacking context -- sitting
+     above .ist-hive-dim here is what keeps the honeycomb lit while a
+     kept event's card dims the rest of the page (see .ist-hive-dimmed
+     below), with no per-cell exemption needed. */
+  z-index: 2;
 }
 /* Offered only when the drawing genuinely outruns the window (fitHive
    sets the class): a grid that fits has nowhere to go, and a page that
@@ -1026,6 +1032,119 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.94); }
    see applyHiveLevel) — an empty place is left empty and says nothing. */
 .ist-hive-page:not(.ist-hive-level-2) .ist-hive-plus { opacity: 0; }
 
+/* Ring-1 is "the people around the petek": leaving level 1 for level 0
+   they don't just fade like everything further out does — they slide
+   toward the side they are actually standing on, left or right of the
+   reader (data-side, set alongside data-ring in hiveGridHTML), and slide
+   back in from there returning to level 1. Combined with the opacity
+   fade above, never instead of it. Scoped to ring 1 only — .ist-hive-away
+   never lands on a ring-1 cell at any other level change (see
+   applyHiveLevel), and ghosts/deeper rings never carry data-side at all. */
+.ist-hive-cell[data-ring="1"] { transition: opacity 320ms ease, transform 320ms ease; }
+.ist-hive-cell[data-ring="1"][data-side="left"].ist-hive-away  { transform: translateX(calc(var(--ist-hive-cell-w) * -0.45)); }
+.ist-hive-cell[data-ring="1"][data-side="right"].ist-hive-away { transform: translateX(calc(var(--ist-hive-cell-w) * 0.45)); }
+
+/* Entering the outermost depth specifically staggers each cell's own
+   fade-in by its ring (--ring, set alongside data-ring in hiveGridHTML)
+   so the shape draws itself outward from the reader instead of arriving
+   all at once (see hiveWaveIn). Any other transition — 0<->1, or leaving
+   level 2 — keeps the plain fade every level change has always had;
+   this class is only ever on for the run of one transition. */
+.ist-hive-page.ist-hive-wave-in .ist-hive-cell { transition-delay: calc(var(--ring, 0) * 45ms); }
+
+/* ── The kept-events stack, inside the petek itself ──
+   Same list Anahane's own column beside the petek prints (see
+   event-interest-cards.js) — standing here too, at the depth that
+   already shows exactly the six people a verdict on one of these might
+   be about (see the dim + verdict marks below). Laid over the top of
+   the window rather than taking room from it, the same way level 0's
+   block is laid over the foot — fitHive never has to know it exists. */
+.ist-hive-kept {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  max-height: 34%;
+  overflow-y: auto;
+  z-index: 4;
+  padding: 4px var(--ist-hive-page-pad) 0;
+  box-sizing: border-box;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 260ms ease;
+}
+.ist-hive-level-1 .ist-hive-kept { opacity: 1; pointer-events: auto; }
+.ist-hive-kept:empty { display: none; }
+.ist-hive-kept-label {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+/* The dim: everything on the page steps back except the honeycomb
+   itself (.ist-hive sits above this in z-index, see there) while a kept
+   event's card stands open, so the yes/no just painted onto each
+   neighbour's own hexagon (see loadHiveEventVerdicts) reads clearly. */
+.ist-hive-dim {
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 320ms ease;
+}
+.ist-hive-page.ist-hive-dimmed .ist-hive-dim { opacity: 0.5; pointer-events: auto; }
+
+/* The card itself, grown in place over the drawing (IstSheet.grow, same
+   primitive Kütüphane's news cards and Kahvehane's own event page use). */
+.ist-hive-event-page {
+  position: absolute;
+  inset: 8% 6%;
+  z-index: 6;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.ist-hive-event-page[hidden] { display: none; }
+.ist-hive-event-page-inner { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; box-sizing: border-box; }
+.ist-hive-event-page-close {
+  position: absolute; top: 6px; right: 6px; z-index: 1;
+  width: 24px; height: 24px; border: none; background: none;
+  font-size: 18px; line-height: 1; color: var(--muted); cursor: pointer;
+}
+/* The mini card behind the grown one, gone from the drawing while it is
+   standing in for it — same move Kütüphane's own .news-open makes. */
+.ist-hive-event-open { visibility: hidden; }
+
+/* ── The verdict, on the hexagon it belongs to ──
+   Yes/no from the reader's own neighbours, for exactly the event card
+   standing open (see loadHiveEventVerdicts). No new markup — a ::after
+   badge toggled by class, tucked in the same corner coverBadgesHTML's
+   own badges keep clear of, so it never sits over the avatar art. */
+.ist-hive-cell-verdict-yes::after,
+.ist-hive-cell-verdict-no::after {
+  content: '';
+  position: absolute;
+  right: 8%;
+  bottom: 4%;
+  width: calc(var(--ist-hive-cell-w) * 0.16);
+  height: calc(var(--ist-hive-cell-w) * 0.16);
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1.5px solid var(--paper);
+  z-index: 1;
+}
+.ist-hive-cell-verdict-yes::after { background: var(--ink); }
+.ist-hive-cell-verdict-no::after  { background: var(--paper); border-color: var(--muted); }
+
 /* The avatar arrows standing on your own hexagon's coordinates (see
    hiveAvatarPickerHTML). display:none away from level 0 rather than
    faded, so the arrows are out of the tab order at the depths that don't
@@ -1187,7 +1306,9 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.94); }
 
 @media (prefers-reduced-motion: reduce) {
   .ist-hive-plane, .ist-hive-cell, .ist-hive-name,
-  .ist-hive-plus, .ist-hive-self, .ist-hive-rail-dot { transition: none; }
+  .ist-hive-plus, .ist-hive-self, .ist-hive-rail-dot,
+  .ist-hive-dim, .ist-hive-kept { transition: none; }
+  .ist-hive-page.ist-hive-wave-in .ist-hive-cell { transition-delay: 0s; }
 }
 
 /* ── Weekly game grid ── 3 rows (Sözcel/Tümcel/Bulmaca) × 7 days
