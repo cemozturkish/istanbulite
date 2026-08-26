@@ -1332,43 +1332,59 @@
     return (Math.abs(q) + Math.abs(r) + Math.abs(q + r)) / 2;
   }
 
-  // A sanity cap on level-2's extra fill rings: each ring adds ~6×ring
-  // ghost cells, and nothing sane needs more than this many to outrun a
-  // screen.
-  const HIVE_LEVEL2_MAX_FILL_RINGS = 16;
+  // A sanity cap on the field's reach, in cells either side of the
+  // reader. Nothing sane needs more than this many to outrun a screen,
+  // and a miscomputed step must not be allowed to ask for thousands of
+  // hexagons.
+  const HIVE_FIELD_MAX = 24;
 
-  // How many ghost rings past the occupied shape it takes for level 2's
-  // field to outrun the screen. level 2 draws at whatever size the
-  // middle depth actually resolves to on this window (see fitHive's
-  // ringCeiling), which fitHive itself can't know yet the first time
-  // this runs (it runs during renderHive, before fitHive's own pass) and
-  // is routinely well under the 1.5x ceiling once six names are in the
-  // fit -- so this assumes the SMALLEST it could possibly be
-  // (HIVE_MIN_SCALE) rather than the ceiling, on purpose: too many rings
-  // is a few extra hidden cells, too few is bare paper at the edge. The
-  // reach needed is measured off the page's own box (what .ist-hive-view
-  // will fill exactly, see .ist-hive in profile-card.css) rather than
-  // window.screen, which can read taller or shorter than the box this is
-  // actually drawn into once the surrounding chrome (top bar, tab bar)
-  // takes its share -- and a 20% margin on top of that measurement,
-  // since this runs before fitHive has ever centred anything and "me"
-  // landing slightly off the eventual centre is exactly the kind of
-  // thing that turns "just enough" into "short by one ring at an edge".
-  function hiveFillRings() {
+  // How far the field has to reach, in cells, for the honeycomb to run
+  // off every edge of the screen rather than stopping in mid-air with
+  // bare paper past it. Two things about the measurement:
+  //
+  // The steps are measured off a real .ist-hive-page box, and one is
+  // built for the measurement when the page is not on screen yet — this
+  // runs while the page's own markup is still being *built* (renderHive
+  // calls hiveGridHTML before anything is in the document), so looking
+  // the page up and giving up when it isn't there is how the field ended
+  // up three rings wide on a first paint and stayed that way.
+  //
+  // And what has to be covered is the SCREEN, not the box the page
+  // happens to occupy: the outermost depth lets the drawing run under
+  // the events column and past the tab bar (see .ist-hive's overflow at
+  // that level), so a field cut to the page's own row is cut exactly
+  // where the reader can still see it. The scale is assumed to be the
+  // smallest a cell is ever drawn at (HIVE_MIN_SCALE) rather than the
+  // one fitHive will land on, on purpose: too far is a few extra hidden
+  // outlines, too short is bare paper at an edge.
+  function hiveFieldReach() {
     const page = document.getElementById('po-hive-page');
-    if (!page) return 3;
+    const host = page || document.createElement('div');
+    if (!page) {
+      host.className = 'ist-hive-page';
+      host.style.cssText = 'position:absolute; left:-9999px; top:0; visibility:hidden;';
+      document.body.appendChild(host);
+    }
     const probe = document.createElement('div');
     probe.style.cssText = 'position:absolute; visibility:hidden; width:var(--ist-hive-step-x); height:var(--ist-hive-step-y);';
-    page.appendChild(probe);
+    host.appendChild(probe);
     const rect = probe.getBoundingClientRect();
+    probe.remove();
+    if (!page) host.remove();
     const stepX = rect.width * HIVE_MIN_SCALE;
     const stepY = rect.height * HIVE_MIN_SCALE;
-    probe.remove();
-    if (!(stepX > 0) || !(stepY > 0)) return 3; // before the page has ever laid out
-    const span = Math.max(page.clientWidth || 0, page.clientHeight || 0,
-      window.screen.width || 0, window.screen.height || 0, 1200);
-    const rings = Math.ceil((span / 2) * 1.2 / Math.min(stepX, stepY)) + 1;
-    return Math.min(HIVE_LEVEL2_MAX_FILL_RINGS, Math.max(2, rings));
+    if (!(stepX > 0) || !(stepY > 0)) return { cols: 4, rows: 4 }; // before anything has ever laid out
+    // On a phone the clip is lifted at the outermost depth, so what has
+    // to be covered is the screen itself; on a desktop the drawing is
+    // still clipped to the middle column, and reaching past it would be
+    // a few hundred outlines nobody can ever see.
+    const phone = !!(window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
+    const boxW = (page && page.clientWidth) || 0;
+    const boxH = (page && page.clientHeight) || 0;
+    const halfW = (phone || !boxW ? Math.max(window.innerWidth || 0, boxW, 360) : boxW) / 2;
+    const halfH = (phone || !boxH ? Math.max(window.innerHeight || 0, boxH, 640) : boxH) / 2;
+    const clamp = (n) => Math.min(HIVE_FIELD_MAX, Math.max(2, Math.ceil(n) + 1));
+    return { cols: clamp(halfW / stepX), rows: clamp(halfH / stepY) };
   }
 
   function hiveLevel(state) {
@@ -1630,48 +1646,46 @@
         mine.add(`${v[0]},${v[1]}`);
       }
     });
-    // Where a member's name will be printed: the cell just outside them,
-    // on the side of the reader they are standing (see hiveNameHTML). The
-    // ghost field below leaves those cells empty — a name laid over an
-    // outline reads as a name over somebody's hexagon, and the drawing
-    // has to be honest about which places are places.
+    // The transparent field around it: a honeycomb is a shape that
+    // continues, so it is drawn as one — every free cell touching
+    // anybody on the map, and past them a field reaching far enough to
+    // run off all four edges of the screen (see hiveFieldReach). It is
+    // laid out as the rectangle the screen actually is rather than as
+    // hexagonal rings around the reader: rings that reach the top of a
+    // phone reach only half as far across it at that height, so the
+    // corners came out bare, and rings wide enough to cover them draw
+    // hundreds of hexagons nobody can see.
     //
-    // Only the six touching the reader are named, because the middle
-    // level is the only depth that prints names at all (level 0 has
-    // nobody else on it and level 2 hides them, see the level rules in
-    // profile-card.css) — and at that depth everything past the first
-    // ring is not drawn, so their outward cell is free by construction
-    // and a neighbour can never go unnamed because of somebody the reader
-    // cannot currently see.
-    const nameCells = new Set();
-    cells.forEach(c => {
-      if (hiveRing(c.q, c.r) !== 1) return;
-      const side = (c.q + c.r / 2) < 0 ? -1 : 1;
-      nameCells.add(`${c.q + side},${c.r}`);
-    });
-
-    // The transparent field around it: every free cell touching anybody
-    // on the map, plus as many further rings as it takes to outrun the
-    // level-2 window at 1x zoom (see hiveFillRings), so a small petek
-    // doesn't leave paper bare around it at the outermost depth. Their
-    // ring lands past every level's own ceiling by construction, so the
-    // existing away/level-2 rule (applyHiveLevel) already hides them at
-    // levels 0/1 and shows them at 2 with no change there.
+    // Nothing here is skipped for a name. A member's name is printed in
+    // the cell just outside them (see hiveNameHTML) and that cell is
+    // always at ring 2, which the middle depth — the only one that
+    // prints names at all — does not draw; leaving it out of the field
+    // punched a hole in the honeycomb beside every neighbour at the
+    // outermost depth, which is the one depth the shape itself is for.
+    //
+    // Every cell here stands past every level's own ceiling by
+    // construction, so the existing away rule (applyHiveLevel) hides
+    // them at levels 0/1 and shows them at 2 with no change there.
     const ghosts = new Set();
-    let frontier = [{ q: 0, r: 0 }].concat(cells.map(c => ({ q: c.q, r: c.r })), [...mine].map(k => {
-      const [q, r] = k.split(',').map(Number); return { q, r };
-    }));
-    for (let ring = 0, rings = hiveFillRings(); ring < rings && frontier.length; ring++) {
-      const next = [];
-      frontier.forEach(c => HIVE_DIRS.forEach(v => {
-        const q = c.q + v[0], r = c.r + v[1], key = `${q},${r}`;
-        if (occupied.has(key) || mine.has(key) || ghosts.has(key) || nameCells.has(key)) return;
-        ghosts.add(key);
-        items.push({ q, r, kind: 'ghost' });
-        next.push({ q, r });
-      }));
-      frontier = next;
+    const addGhost = (q, r) => {
+      const key = `${q},${r}`;
+      if (occupied.has(key) || mine.has(key) || ghosts.has(key)) return;
+      ghosts.add(key);
+      items.push({ q, r, kind: 'ghost' });
+    };
+    const reach = hiveFieldReach();
+    for (let r = -reach.rows; r <= reach.rows; r++) {
+      // x = q + r/2 (see hivePos), so each row's own q range is shifted
+      // half a step against the one above it — which is what interlocks
+      // the rows into a comb rather than a grid of columns.
+      const off = r / 2;
+      for (let q = Math.ceil(-reach.cols - off); q <= Math.floor(reach.cols - off); q++) addGhost(q, r);
     }
+    // And a ring of paper around anybody standing outside that
+    // rectangle: a petek that has grown further than the screen is wide
+    // still has to read as continuing, not as ending at whoever is
+    // furthest out.
+    cells.forEach(c => HIVE_DIRS.forEach(v => addGhost(c.q + v[0], c.r + v[1])));
 
     // The plane is sized to what is actually on it, then centred on the
     // caller's own cell by renderHive — so the reader is in the middle
@@ -1879,6 +1893,15 @@
     // to know the column exists, and anahane's CSS is what actually
     // reacts to it.
     document.documentElement.classList.toggle('ist-hive-mid', level === HIVE_LEVEL_DEFAULT);
+    // And the outermost depth, for the same reason the other way round:
+    // that depth is the whole shape, so the drawing is let out of its
+    // window there and runs off every edge of the screen -- under the
+    // events column, past the tab bar -- instead of stopping in mid-air
+    // with bare paper past it (see .ist-hive's overflow in
+    // profile-card.css and anahane.html's own main). The window itself is
+    // unchanged, so what the drawing is scaled to and where the reader
+    // stands in it are exactly what they were: only the clip is lifted.
+    document.documentElement.classList.toggle('ist-hive-all', level === HIVE_LEVEL_ALL);
     const mount = document.getElementById('po-hive-mount');
     if (mount) mount.querySelectorAll('.ist-hive-cell').forEach(cell => {
       const ring = parseInt(cell.dataset.ring, 10) || 0;
@@ -1941,8 +1964,11 @@
     if (!page) return;
     page.classList.add('ist-hive-wave-in');
     clearTimeout(state.hiveWaveTimer);
-    state.hiveWaveTimer = setTimeout(() => page.classList.remove('ist-hive-wave-in'),
-      HIVE_LEVEL2_MAX_FILL_RINGS * 45 + 400);
+    // The stagger is capped in the stylesheet (the field now reaches
+    // past the screen, and a delay that grew with it would leave the
+    // outer paper still arriving long after the shape had), so the class
+    // comes off after that cap plus the transition itself.
+    state.hiveWaveTimer = setTimeout(() => page.classList.remove('ist-hive-wave-in'), 1600);
   }
 
   // ── Pressing a member ──

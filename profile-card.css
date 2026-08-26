@@ -1044,7 +1044,13 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.94); }
    all at once (see hiveWaveIn). Any other transition — 0<->1, or leaving
    level 2 — keeps the plain fade every level change has always had;
    this class is only ever on for the run of one transition. */
-.ist-hive-page.ist-hive-wave-in .ist-hive-cell { transition-delay: calc(var(--ring, 0) * 45ms); }
+.ist-hive-page.ist-hive-wave-in .ist-hive-cell {
+  /* Capped: the field reaches past the edges of the screen now, so an
+     uncapped stagger would still be drawing paper nobody is looking at
+     half a second after the shape itself had arrived. */
+  transition-delay: calc(var(--ring, 0) * 45ms); /* fallback: no min() on times */
+  transition-delay: min(calc(var(--ring, 0) * 45ms), 620ms);
+}
 
 /* ── The verdict, on the hexagon it belongs to ──
    Yes/no from the reader's own neighbours, for exactly the kept event
@@ -1431,6 +1437,19 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.94); }
     --ist-hive-cell-w: min(104px, 13vh);
     --ist-hive-page-pad: var(--screen-inset, 14px);
   }
+  /* ── The outermost depth runs off the screen ──
+     Every other depth is drawn *into* the window the page has (see
+     fitHive): the reader's six neighbours fit it, and clipping what
+     doesn't is right. The outermost depth is the whole shape and the
+     field around it, which by definition does not fit — and a honeycomb
+     that stops in mid-air with bare paper past it reads as the end of
+     the world rather than as the middle of one. So at that depth alone
+     the clip is lifted and the drawing runs to all four edges of the
+     screen, under the events column and past the tab bar. Nothing about
+     the fit changes: the window is still exactly what it was, so the
+     drawing is scaled the same and the reader stays dead centre of it.
+     #main-site's own overflow is what stops it at the screen's edge. */
+  html.ist-hive-all .ist-hive { overflow: visible; }
   /* Level 0's block and the rail on a phone: the same objects, sized for
      the band the petek is drawn in. */
   .ist-hive-self-name { font-size: 1rem; }

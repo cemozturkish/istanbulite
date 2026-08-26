@@ -1419,6 +1419,21 @@ further empty cells** (`hiveGhostCellHTML`) so the honeycomb reads as something 
 those are drawing, not interface — the only openings that do anything are the six sides of the
 reader's own hexagon, because those are the only seats that are theirs to give.
 
+**And at the outermost depth that field runs off every edge of the screen.** A honeycomb is a shape
+that continues, so a comb that stops in mid-air with bare paper past it reads as the end of the
+world rather than as the middle of one. Two things make it reach: the field is laid out as the
+**rectangle the screen actually is** (`hiveFieldReach`) rather than as rings around the reader —
+rings that reach the top of a phone reach only half as far across it at that height, so the corners
+came out bare — and at that depth alone the **clip is lifted** (`html.ist-hive-all`, set by
+`applyHiveLevel`; `.ist-hive` in profile-card.css and `main` / `.petek-page` in anahane.html), so
+the drawing runs under the events column and past the tab bar to the screen's own edges. Nothing
+about the fit changes with it: the window fitHive measures is exactly what it was, so the drawing
+is scaled the same and the reader stays dead centre — only the clip is different. Nothing is left
+out of the field for a name, either: a name is printed in the cell just outside its member, which
+is always at ring 2 and therefore never drawn at the middle depth (the only depth that prints
+names), so skipping it punched a hole in the comb beside every neighbour at exactly the depth the
+shape itself is for.
+
 **The window is the room the page has; the petek is not.** What changes as members are added is the *drawing*, never the page: `fitHive` scales the grid
 into the window and, once it would have to shrink past legibility (`HIVE_MIN_SCALE`), leaves it
 there and lets it be dragged instead. What has to fit is the room the drawing needs **around the
