@@ -2870,6 +2870,22 @@
         top: calc(var(--map-hero-end) - 20px + var(--map-web-lift));
       }
 
+      /* The Olaylar board is a third box holding the same one drawing:
+         every olay's strokes are made in the map's own 1080x2420 frame,
+         so they land on the coastlines only while the board is fitted to
+         the panel exactly the way the artwork is. Its layer is the plain
+         window, so on the web it has to take the same lift the panel and
+         the trace take -- same top, same height, same clip -- or every
+         string hangs a bar's height below the coast it was drawn against.
+         The fit itself (meet/slice, and which edge it hangs from) is
+         copied off the trace in syncOlayBoardAnchor, for the same reason
+         syncWorldOverlayAnchor reads it off the photo. */
+      html.ist-web .olay-board-map {
+        top: calc(-1 * var(--map-web-lift));
+        height: calc(100% + var(--map-web-lift));
+        clip-path: inset(calc(var(--navbar-h, 38px) + env(safe-area-inset-top) + var(--map-web-lift)) 0 0 0);
+      }
+
       /* Swap the overlays: the İstanbul trace is drawn against the desktop
          artwork and lines up with nothing on this drawing, so it steps aside
          for the country trace that *was* drawn on this one. The phone map is
@@ -3547,11 +3563,14 @@
     /* ── The board IS the map ──
        Every olay's drawing is made in the map's own frame -- 1080x2420,
        the same grid the phone map and its traced country shapes are in --
-       so laying it back over the map at the same preserveAspectRatio puts
-       every stroke exactly on the coastline it was drawn against. That
-       pairing (xMidYMin meet against object-fit: contain /
-       object-position: center top) is the registration: change one and
-       every drawing slides off the map. */
+       so laying it back over the map in the same BOX at the same
+       preserveAspectRatio puts every stroke exactly on the coastline it
+       was drawn against. Both halves of that pairing are the
+       registration, and neither is written down twice: the box is the
+       map panel's own (html.ist-web .olay-board-map takes the web lift,
+       above) and the fit is copied off the traced overlay
+       (syncOlayBoardAnchor). Move one of the three and every drawing
+       slides off the map. */
     .olay-board-map {
       position: absolute;
       inset: 0;
@@ -5734,10 +5753,12 @@ function renderOlayBoard(events) {
   }
 
   // One SVG in the map's own frame, laid over the map with the same
-  // preserveAspectRatio the traced overlay uses (xMidYMin meet, which is
-  // the SVG spelling of the object-fit: contain / object-position: center
-  // top the map image is drawn with). That pairing is the whole of the
-  // registration: change one and the drawings slide off the coastlines.
+  // preserveAspectRatio the traced overlay is wearing. That pairing is
+  // the whole of the registration: change one and the drawings slide off
+  // the coastlines. The attribute written here is the DESKTOP answer,
+  // where the board carries its own copy of the artwork in a box of its
+  // own; on a phone the board is laid over the page's own map and
+  // syncOlayBoardAnchor below copies the trace's answer onto it.
   //
   // The wipe is a clip rect per drawing, animated from no width to the
   // full frame, so each string is run across the map rather than fading
@@ -5772,6 +5793,7 @@ function renderOlayBoard(events) {
     </svg>
     <div class="olay-papers" id="olay-papers"></div>
   `;
+  syncOlayBoardAnchor();
   // A drawing that isn't there yet leaves the map as it was -- the olay
   // is still on the board, named off its countries instead.
   body.querySelectorAll('.olay-draw image').forEach(im => {
@@ -6188,8 +6210,10 @@ function toggleOlaylar() {
     if (!olaylarIsOpen()) return;
     positionOlayLayer();
     // The drawings re-fit themselves (they are in the map's own units),
-    // but the papers are HTML at a fixed size hung off those units, so
-    // a rotation moves every one of them.
+    // but which way they are fitted is a media-query answer -- a rotation
+    // can cross the breakpoint -- and the papers are HTML at a fixed size
+    // hung off those units, so a rotation moves every one of them.
+    syncOlayBoardAnchor();
     placeOlayPapers();
   });
   document.addEventListener('keydown', (e) => {
@@ -8399,6 +8423,33 @@ function syncWorldOverlayAnchor() {
   // `slice` is the SVG spelling of object-fit: cover, `meet` of contain.
   const fit = cs.objectFit === 'contain' ? 'meet' : 'slice';
   svg.setAttribute('preserveAspectRatio', `${align} ${fit}`);
+}
+
+// ── The board is fitted the way the map is, never the other way round ──
+// Every olay's drawing is made in the map's own 1080x2420 frame, so a
+// stroke lands on the coastline it was drawn against only while the board
+// is fitted exactly as the artwork is. The board's own layer is the plain
+// window; on the web the map has been lifted out of it (--map-web-lift,
+// taken back in CSS above) and in the app the artwork hangs from the
+// bottom rather than the top -- so the fit itself is read off the trace
+// that IS on this drawing rather than written down a second time here.
+// Desktop is the exception: there the board carries its own copy of the
+// artwork inside itself, so the markup's own xMidYMin meet is already the
+// right answer and there is nothing to follow.
+function syncOlayBoardAnchor() {
+  const board = document.getElementById('olay-board-map');
+  const world = document.querySelector('svg.map-svg-world');
+  if (!board || !world) return;
+  if (getComputedStyle(world).display === 'none') {
+    board.setAttribute('preserveAspectRatio', 'xMidYMin meet');
+    return;
+  }
+  // The trace may not have been told yet on this screen (a rotation, a
+  // board opened before the mount's own sync) -- ask it to catch up
+  // first, then say the same thing.
+  syncWorldOverlayAnchor();
+  board.setAttribute('preserveAspectRatio',
+    world.getAttribute('preserveAspectRatio') || 'xMidYMin meet');
 }
 
 // The anchor is a media-query answer, so it can change without a mount:
