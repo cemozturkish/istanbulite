@@ -1014,14 +1014,15 @@
         min-height: 0;
         overflow: visible;
       }
-      /* The events sit at the BOTTOM of the column -- one event rests
-         just above the tab bar and each further one is laid on top of it,
-         so the stack grows up toward the map instead of hanging off the
-         hero line. Same move as every other feed on the phone (see the
-         site-wide default), and the same mechanism: an auto margin on the
-         first card rather than justify-content:flex-end, so a stack that
-         outgrows the band simply scrolls instead of pushing its top out
-         of a scroller that cannot reach it.
+      /* ── One evening at a time, and you slide between them ──
+         The strip is one card tall (see .col-left), so a stack in it
+         could only ever be a scroller with a card and a half showing --
+         a list you read half of. It is a row instead: one whole card
+         fills the strip, and the next one is a swipe to the side, the
+         way every other stack of cards on this app is dealt. Native
+         scroll-snap does it, so the gesture is the platform's own --
+         momentum, rubber-band, the lot -- and there is no drag handler
+         here to fight the carousel's.
          8px side padding (on top of #main-site's own 10px frame padding)
          puts the cards on the shared 18px screen inset -- the same line
          the comments used to hold and the game tiles still do. */
@@ -1029,22 +1030,47 @@
         padding: 6px 8px 10px;
         flex: 1;
         min-height: 0;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
+        align-items: stretch;
+        gap: 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x mandatory;
+        /* The page carousel is one swipe away in the same direction
+           (router.js listens on the document), so a slide that runs off
+           the end of this strip must not become a page change. The
+           listener is stopped in JS as well -- see wireEventStripSwipe;
+           this is the scroll half of the same rule. */
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
       }
-      #events-panel > :first-child { margin-top: auto; }
-      /* Fixed-height box laying its cards out as flex items: without this
-         they would be squeezed shorter to fit instead of overflowing into
-         the scroll. */
-      #events-panel > * { flex-shrink: 0; }
-      #events-panel > :last-child { margin-bottom: 0; }
+      #events-panel::-webkit-scrollbar { display: none; }
+      /* Each card is the strip: a whole one, never a peek at the next.
+         flex-basis 100% against a row that may hold ten of them, so they
+         must not shrink either. */
+      #events-panel > * {
+        flex: 0 0 100%;
+        min-width: 0;
+        margin: 0;
+        scroll-snap-align: center;
+        overflow: hidden;
+      }
+      /* With more than one kept evening the cards give up a strip of
+         their width so the next one shows at the edge. Nothing else on
+         this page says there is another card to the side -- the strip is
+         one card tall and there is no room in it for dots -- and a
+         carousel nobody knows is a carousel is a list with one item in
+         it. A single card (or the frame on an empty night) keeps the
+         full width: there is nothing to peek at, and 26px of bare paper
+         beside it would just read as a mistake. */
+      #events-panel:has(> :nth-child(2)) > * { flex-basis: calc(100% - 26px); }
       .event-item {
         grid-template-columns: 30px 1fr;
         column-gap: 8px;
         padding: 8px 9px;
-        margin-bottom: 6px;
+        align-content: center;
       }
       .event-item .ev-date-block { padding-top: 2px; }
       .event-item .ev-day { font-size: 1.05rem; line-height: 1; }
@@ -1648,6 +1674,7 @@ function mount() {
   // pointer-events:none with nothing to unlock it.
   document.getElementById('main-site').classList.add('active');
   loadEvents();
+  wireEventStripSwipe();
   loadPersonMentionsRoster();
   mountPetek();
   // #library-card lives inside #ist-content, so a virtual re-entry into
@@ -2172,6 +2199,30 @@ window.addEventListener('resize', () => {
   const page = document.getElementById('event-grow-page');
   if (page && !page.hidden) measureEventGrowBand();
 });
+
+// ── The strip's own sideways slide ──
+// One kept evening fills the strip and the next is a swipe to the side
+// (see #events-panel's phone CSS, which does the sliding natively). The
+// three-page carousel listens for exactly that gesture on the document
+// (router.js), so a slide here has to stop at the strip or it deals the
+// reader to Kütüphane instead of to their next evening -- the same
+// stopPropagation Kahvehane's open event page makes for its own throw.
+//
+// Only while there is genuinely something to slide to, though: with one
+// card in it (or the frame that says there are none) the strip is not a
+// carousel, and swallowing the swipe there would leave a dead 90px band
+// across the bottom of the screen that the page carousel cannot be
+// reached from.
+function wireEventStripSwipe() {
+  const panel = document.getElementById('events-panel');
+  if (!panel || panel.dataset.swipeWired) return;
+  panel.dataset.swipeWired = '1';
+  panel.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    if (panel.scrollWidth <= panel.clientWidth + 1) return;
+    e.stopPropagation();
+  }, { passive: true });
+}
 
 // What the member kept. The city's whole calendar is dealt with one card
 // at a time on Kahvehane -- thrown right is "ilgimi çekti", thrown left

@@ -1442,10 +1442,24 @@ under it on any night with nothing on. So row 1 is `minmax(0, 1fr)` — whatever
 
 **And the events do not take room from it at all: they are laid OVER its foot** (`--hane-events-h`
 on `#main-site`, `grid-area: hero` + `align-self: end` on `.col-left`). The petek gets the whole
-band between the two bars, so the reader's own avatar is dead centre of the screen — the same move
-level 0's own block makes inside the drawing. A column with a grid row of its own made the reader's
+band between the two bars, so the reader's own avatar is dead centre of the screen — a hair above
+it, in fact (`--ist-hive-lift`, read by `fitHive`): the foot of that band carries the events strip,
+so the middle of the box sits a shade low of the middle of what can actually be seen. A hair, not
+half the strip — half is what a grid row of its own used to take, and that read as the petek hanging
+over a band of bare paper. It is the same move level 0's own block makes inside the drawing. A column with a grid row of its own made the reader's
 position a function of how tall it was: it stood the drawing above the middle of the screen by half
 the strip, and every kept card, every empty night, every card opened moved them again.
+
+**One evening fills the strip, and the next is a slide to the side** (`#events-panel`,
+`wireEventStripSwipe`). The strip is one card tall, so a stack in it could only ever be a scroller
+showing a card and a half — a list you read half of. It is a row of whole cards instead, snapped by
+the platform's own scroll-snap rather than a drag handler of this page's, and with more than one in
+it each card gives up a strip of its width so the next one shows at the edge (there is no room in a
+90px band for dots, and a carousel nobody knows is a carousel is a list with one item in it). The
+one thing it needs from JS is a `stopPropagation`: the three-page carousel listens for exactly this
+gesture on the document, so a slide here would otherwise deal the reader to Kütüphane instead of to
+their next evening — and only while there is genuinely something to slide to, or a single card would
+leave a dead band across the bottom of the screen that the page carousel can't be reached from.
 
 **The strip is one card tall, and opening a card grows it upward** (`.col-left.events-open`,
 `--hane-events-open-h`). Because it is laid over the window rather than standing in a row, that

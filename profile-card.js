@@ -2136,7 +2136,19 @@
     // the middle of the window keeps them in the middle at any scale —
     // and the pan, when there is one, is a plain offset from there.
     const pan = state.hivePan || { x: 0, y: 0 };
-    const offsetY = -reserve / 2;
+    // ── And a hair above it ──
+    // The window is the whole band between the two bars, but the bottom
+    // of that band is not empty paper: the events strip is laid over its
+    // foot (see .col-left in anahane.html). Dead centre of the box is
+    // therefore a shade low of dead centre of what the reader can see,
+    // so the drawing is lifted by --ist-hive-lift. Deliberately far less
+    // than half the strip -- half is what standing the column in a grid
+    // row of its own used to do, and that read as the petek hanging over
+    // a band of bare paper. Declared in the stylesheet so it belongs to
+    // the phone, where the strip is.
+    const liftHost = document.getElementById('po-hive-page') || document.documentElement;
+    const lift = parseFloat(getComputedStyle(liftHost).getPropertyValue('--ist-hive-lift')) || 0;
+    const offsetY = -reserve / 2 - lift;
     state.hiveFit = { scale, cx, cy, vw, vh, reqW, reqH, offsetY };
     plane.style.transformOrigin = `${cx}px ${cy}px`;
     // ── A fresh plane is placed, not animated into place ──
