@@ -12,7 +12,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js"></script>
   <script src="router.js?v=4"></script>
-  <script src="i18n.js?v=16"></script>
+  <script src="i18n.js?v=17"></script>
   <script src="palette.js"></script>
   <script src="loading-screen.js?v=2"></script>
   <link rel="stylesheet" href="palette.css">
@@ -1987,6 +1987,12 @@ function eventDateParts(iso) {
 }
 
 let allEvents = [];
+// Whether the last attempt to fetch the city's calendar failed, as
+// against coming back with nothing in it. The column says different
+// things about the two (see renderEventsNow): a city with nothing on
+// tonight is a fact about İstanbul, and printing it because this phone
+// could not ask is the app lying about the city on its behalf.
+let eventsFailed = false;
 let eventsRequestSeq = 0;
 let rsvpCounts = {};       // event_id -> attendee count
 let myRsvpIds = new Set(); // event_ids the current user has RSVP'd to
@@ -2020,8 +2026,8 @@ async function loadEvents(neighborhoodFilter = null, instant = false) {
     // Drop responses from superseded requests so a slow older fetch
     // can't clobber a newer one with stale rows.
     if (reqId !== eventsRequestSeq) return;
-    if (error) { console.error('[kahvehane events]', error); allEvents = []; }
-    else allEvents = data || [];
+    if (error) { console.error('[kahvehane events]', error); allEvents = []; eventsFailed = true; }
+    else { allEvents = data || []; eventsFailed = false; }
     // What the reader threw right on Kahvehane's deck is kept in their
     // own browser (event-interest.js), which is the right home for a
     // verdict -- but a browser is not a member. A cleared cache, a
@@ -2039,6 +2045,7 @@ async function loadEvents(neighborhoodFilter = null, instant = false) {
     // A rejected fetch (offline, a blocked request) used to take the
     // render with it, since it sat after the awaits.
     console.error('[kahvehane events]', e);
+    eventsFailed = true;
   }
   if (reqId !== eventsRequestSeq) return;
   renderEvents(instant);
@@ -2328,10 +2335,12 @@ function renderEventsNow(panel, rows) {
     // one is standing under the petek where its absence moved the
     // drawing itself.
     const city = allEvents.length > 0;
+    const line = city ? 'home.events.kept' : (eventsFailed ? 'events.failed' : 'events.none');
+    const sub = city ? 'home.events.emptysub' : (eventsFailed ? 'events.failedsub' : 'events.nonesub');
     panel.innerHTML = `
       <div class="events-empty">
-        <div class="events-empty-line">${esc(I18N.t(city ? 'home.events.kept' : 'events.none'))}</div>
-        <div class="events-empty-sub">${esc(I18N.t(city ? 'home.events.emptysub' : 'events.nonesub'))}</div>
+        <div class="events-empty-line">${esc(I18N.t(line))}</div>
+        <div class="events-empty-sub">${esc(I18N.t(sub))}</div>
       </div>
     `;
     return;
