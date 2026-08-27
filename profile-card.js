@@ -995,6 +995,17 @@
     _hive = Object.assign({}, st, {
       sb, I18N, hiveOpen: null, hiveLoaded: false, hiveSelected: null,
       hivePan: { x: 0, y: 0 }, hiveLevel: HIVE_LEVEL_DEFAULT,
+      // ── The map this page was standing on last time ──
+      // Every entry re-fetches it (somebody else's attachment may have
+      // carried the whole petek somewhere), but the fetch takes a beat
+      // and the grid is drawn before it lands. Drawn from nothing, that
+      // first frame is the reader alone in six empty sides -- a shape
+      // three times the size of the real one, since fitHive quite
+      // correctly fills the window with what it was given -- and the
+      // page visibly collapses into itself when the map arrives. So a
+      // re-entry starts from what was on the screen when it left, and
+      // the fetch only ever moves it.
+      hive: _hiveMap,
     });
     // Arriving at the middle depth means arriving with nobody picked, so
     // the bar carries you again — a name left on it from the last time
@@ -1010,6 +1021,12 @@
     const page = document.getElementById('po-hive-page');
     page.insertAdjacentHTML('beforeend', hiveSelfHTML(_hive) + hiveRailHTML(t));
     wireHiveSelf(_hive);
+    // A first load has no last time to start from: rather than draw the
+    // wrong shape and correct it, the drawing is held back until the map
+    // lands (a beat, and blank paper is not a lie). Cleared by loadHive
+    // whatever the answer -- including no answer at all, since a member
+    // standing alone on their own petek is a real state and must draw.
+    if (!(_hiveMap && _hiveMap.cells)) page.classList.add('ist-hive-waiting');
     renderHive(_hive);
     wireHiveGestures(_hive);
     loadHive(_hive);
@@ -1324,6 +1341,9 @@
   const HIVE_GESTURE_SLOP = 8;
   // The air between the drawing and the block under it on level 0.
   const HIVE_SELF_GAP = 14;
+  // The paper left between the foot of the drawing and a card standing
+  // open in the strip below it (see fitHive's offsetY).
+  const HIVE_CARD_GAP = 10;
 
   // How far from the reader a cell is standing, in hexagons. This is the
   // level filter, and also what the level-2 wave-in stagger and the
@@ -1392,11 +1412,11 @@
   // profile-card.css) because it is the phone's number, and MEASURED
   // rather than read: the value is a min() of a viewport unit and a cap,
   // which getPropertyValue hands back as its own unresolved text.
-  function hiveBandReserve() {
+  function hiveBandReserve(varName) {
     const page = document.getElementById('po-hive-page');
     if (!page) return 0;
     const probe = document.createElement('div');
-    probe.style.cssText = 'position:absolute; visibility:hidden; width:0; height:var(--ist-hive-reserve, 0px);';
+    probe.style.cssText = `position:absolute; visibility:hidden; width:0; height:var(${varName}, 0px);`;
     page.appendChild(probe);
     const h = probe.getBoundingClientRect().height;
     probe.remove();
@@ -2068,8 +2088,19 @@
     // this screen. It replaces a flat lift, which was a guess at one
     // screen's fit and stopped clearing the card the moment the drawing
     // resolved a little larger than the screen it was guessed on.
-    const reserve = Math.max(selfReserve, hiveBandReserve());
-    const vh = view.clientHeight - reserve;
+    // Two numbers, and they do different jobs. The OPEN one is what the
+    // drawing has to be small enough to clear -- a card grows upward out
+    // of the strip and must never come up over the people. The RESTING
+    // one is where the drawing actually stands the rest of the time,
+    // which is nearly always: centred in the band the strip leaves when
+    // it is shut. Fitting to the first and centring on the second is
+    // what keeps the petek low on the page without ever letting an open
+    // card reach it (see the clamp under `scale`).
+    const openReserve = hiveBandReserve('--ist-hive-reserve');
+    const restReserve = hiveBandReserve('--ist-hive-reserve-rest');
+    const reserve = Math.max(selfReserve, openReserve);
+    const vhFull = view.clientHeight;
+    const vh = vhFull - reserve;
     // The grid is drawn before the page is unhidden, so the first
     // measurement is a screenful of zeroes. Wait for a frame that has
     // real numbers in it rather than leaving the plane hanging off the
@@ -2163,7 +2194,15 @@
     // the middle of the window keeps them in the middle at any scale —
     // and the pan, when there is one, is a plain offset from there.
     const pan = state.hivePan || { x: 0, y: 0 };
-    const offsetY = -reserve / 2;
+    // Where the reader stands in the window: centred in what the strip
+    // leaves when it is shut -- and no lower than the point at which the
+    // foot of the drawing would meet a card standing open (the strip's
+    // opened height, plus a little paper). The first is where the petek
+    // wants to be; the second is the promise that nothing lands on it.
+    const restY = -Math.max(selfReserve, restReserve) / 2;
+    const belowMe = (maxB - cy) * scale;
+    const clearY = (vhFull - reserve - HIVE_CARD_GAP) - vhFull / 2 - belowMe;
+    const offsetY = Math.min(restY, clearY);
     state.hiveFit = { scale, cx, cy, vw, vh, reqW, reqH, offsetY };
     plane.style.transformOrigin = `${cx}px ${cy}px`;
     // ── A fresh plane is placed, not animated into place ──
@@ -2237,11 +2276,23 @@
   // run the RPCs simply aren't there, and the petek should still draw
   // (your own hexagon with six free sides, no code) rather than the page
   // failing to open.
+  // The last map any mount of this page fetched, kept across virtual
+  // navigations (mountHivePage seeds the next mount from it).
+  let _hiveMap = null;
+
   async function loadHive(state) {
     state.hiveLoaded = true;
     const { data } = await state.sb.rpc('hive_map');
     state.hive = Object.assign({}, state.hive, { cells: data || [] });
+    // Kept for the next mount of this page, so a swipe back to Hane
+    // draws the petek it left rather than the reader alone for a beat.
+    _hiveMap = state.hive;
     renderHive(state);
+    // Whatever came back -- rows, an empty map, or nothing at all
+    // because the migration hasn't been run -- the drawing is what the
+    // reader is here for, so it is shown now.
+    const page = document.getElementById('po-hive-page');
+    if (page) page.classList.remove('ist-hive-waiting');
     // The drawing does not wait for it: the grid is the page, and where
     // everybody stands in their day is a caption on it. It lands on its
     // own and re-renders (see loadHiveStatus).
