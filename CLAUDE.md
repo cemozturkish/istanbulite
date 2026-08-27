@@ -1382,7 +1382,13 @@ hexagon. It is not six slots of your own — see the schema section above for wh
 
 **It is the middle page**, not something opened over one. It was a page of your profile, then a
 sheet grown out of a PETEK button over Hane's map; the map is gone and the honeycomb is simply
-what Hane *is*. Nothing opens and nothing closes: you arrive on the middle page and you are
+what Hane *is*. **A mount starts from the map the last one ended with** (`_hiveMap`): every entry
+re-fetches it, but the fetch takes a beat, and a grid drawn from nothing in the meantime is the
+reader alone in six empty sides — a shape several times the size of the real one, since the fit
+quite correctly fills the window with whatever it was handed — which then visibly collapses into
+itself when the map lands. A first load has no last time to start from, so there the drawing is
+held back until the map arrives (`.ist-hive-waiting`): blank paper for a beat is not a lie, a wrong
+drawing is. Nothing opens and nothing closes: you arrive on the middle page and you are
 standing in the grid, which is the shortest possible distance between a reader and the one object
 this app is about. Anahane mounts it into a node it owns (`#hive-page`) via
 `IstProfileCard.mountHivePage({ sb, I18N, mountId })` on every entry — including a virtual one,
@@ -1451,12 +1457,14 @@ under it on any night with nothing on. So row 1 is `minmax(0, 1fr)` — whatever
 
 **And the events do not take room from it at all: they are laid OVER its foot** (`--hane-events-h`
 on `#main-site`, `grid-area: hero` + `align-self: end` on `.col-left`). The petek gets the whole
-band between the two bars — and the drawing is fitted and centred in what is left **above the
-strip's opened height** (`--ist-hive-reserve`, handed to `fitHive` as Hane's own
-`--hane-events-open-h`, so there is one number and not two that can drift). Reserving that room
-rather than lifting the drawing by a guessed number is what makes it hold at any size the fit
-resolves to: **a card opening can never come up over the people**, on any screen. It is the same
-move level 0's own block makes inside the drawing. A column with a grid row of its own made the reader's
+band between the two bars — and the drawing is **fitted** to clear the strip's *opened* height and
+**stands** centred in what its *resting* height leaves (`--ist-hive-reserve` /
+`--ist-hive-reserve-rest`, handed to `fitHive` as Hane's own two strip heights, so there is one set
+of numbers and not two that can drift). Two different jobs: the fit is the promise that **a card
+opening can never come up over the people**, on any screen; the resting centre is where the petek
+actually stands, which is nearly all the time. Where centring it that low would put its foot under
+an open card, `fitHive` lifts it exactly that far and no further. It is the same move level 0's own
+block makes inside the drawing. A column with a grid row of its own made the reader's
 position a function of how tall it was: it stood the drawing above the middle of the screen by half
 the strip, and every kept card, every empty night, every card opened moved them again.
 
