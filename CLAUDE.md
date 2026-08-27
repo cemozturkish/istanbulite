@@ -514,9 +514,11 @@ sb.from('articles').delete().eq('id', id)
   is "ilgimi çekti", thrown left is gone (see that page's own section) — and this column is the
   other end of that gesture: the evenings that were actually theirs, standing beside the people
   they would be standing next to. A list of everything on in İstanbul is a listings page; this is a
-  plan. Two empties, and they still say different things — a city with nothing on says exactly that
-  (`events.none`), while a city with events on and none of them kept says one line pointing at the
-  deck — but **both say it inside the same dashed frame** (`.events-empty`), the rule Kahvehane's
+  plan. Three empties, and they say different things — a city with nothing on says exactly that
+  (`events.none`), a city with events on and none of them kept says one line pointing at the deck,
+  and a fetch that *failed* says so (`events.failed`, `eventsFailed`) rather than reporting an empty
+  calendar the phone never actually saw — but **all of them say it inside the same dashed frame**
+  (`.events-empty`), the rule Kahvehane's
   own decks already follow: a column with nothing in it at all reads as the page being broken
   rather than as there being nothing on, and this column stands directly under the petek, where its
   absence moved the drawing itself. If the store is missing entirely the column degrades to the

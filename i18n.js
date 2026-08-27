@@ -27,6 +27,12 @@
     // A city with nothing on: the events deck's other bottom.
     'events.none':         { default: 'Şimdilik etkinlik yok.', more_english: 'Nothing on just yet.' },
     'events.nonesub':      { default: 'Dışarısı yine de seni bekliyor.', more_english: 'Outside is waiting anyway.' },
+    // The fetch itself failed -- offline, or a request that never came
+    // back. Deliberately not events.none: "there is nothing on tonight"
+    // is a fact about the city, and printing it when the truth is "this
+    // phone couldn't ask" is the app lying about the city on its behalf.
+    'events.failed':       { default: 'Etkinlikler yüklenemedi.', more_english: "Couldn't load events." },
+    'events.failedsub':    { default: 'Bağlantını kontrol edip tekrar dene.', more_english: 'Check your connection and try again.' },
     'events.verdict.yes':  { default: 'İlgimi çekti',        more_english: 'Interested' },
     'events.verdict.no':   { default: 'İlgimi çekmedi',      more_english: 'Not for me' },
     'home.events.kept':    { default: 'İlgini çekenler',     more_english: 'What caught your eye' },
