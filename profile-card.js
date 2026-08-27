@@ -1387,6 +1387,22 @@
     return { cols: clamp(halfW / stepX), rows: clamp(halfH / stepY) };
   }
 
+  // How much of the window's foot belongs to the page rather than to the
+  // drawing, in px. Written in the stylesheet (--ist-hive-reserve, see
+  // profile-card.css) because it is the phone's number, and MEASURED
+  // rather than read: the value is a min() of a viewport unit and a cap,
+  // which getPropertyValue hands back as its own unresolved text.
+  function hiveBandReserve() {
+    const page = document.getElementById('po-hive-page');
+    if (!page) return 0;
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute; visibility:hidden; width:0; height:var(--ist-hive-reserve, 0px);';
+    page.appendChild(probe);
+    const h = probe.getBoundingClientRect().height;
+    probe.remove();
+    return h > 0 ? h : 0;
+  }
+
   function hiveLevel(state) {
     const lvl = state && state.hiveLevel;
     return (typeof lvl === 'number') ? lvl : HIVE_LEVEL_DEFAULT;
@@ -2041,7 +2057,18 @@
     // may use is what is left above it, and the reader's own frame is
     // centred in that rather than behind the words.
     const selfEl = document.getElementById('po-hive-self');
-    const reserve = (level === 0 && selfEl) ? selfEl.offsetHeight + HIVE_SELF_GAP : 0;
+    const selfReserve = (level === 0 && selfEl) ? selfEl.offsetHeight + HIVE_SELF_GAP : 0;
+    // ── And the room the page keeps at the foot of the window ──
+    // On a phone the foot of this band carries Hane's events strip, laid
+    // over the drawing rather than standing in a row of its own (see
+    // .col-left in anahane.html), and a card opened in it grows upward.
+    // That room is reserved here, so the drawing is fitted AND centred
+    // in what is left above it: an open card can then never come up over
+    // the people, whatever size the honeycomb happens to be drawn at on
+    // this screen. It replaces a flat lift, which was a guess at one
+    // screen's fit and stopped clearing the card the moment the drawing
+    // resolved a little larger than the screen it was guessed on.
+    const reserve = Math.max(selfReserve, hiveBandReserve());
     const vh = view.clientHeight - reserve;
     // The grid is drawn before the page is unhidden, so the first
     // measurement is a screenful of zeroes. Wait for a frame that has
@@ -2136,19 +2163,7 @@
     // the middle of the window keeps them in the middle at any scale —
     // and the pan, when there is one, is a plain offset from there.
     const pan = state.hivePan || { x: 0, y: 0 };
-    // ── And a hair above it ──
-    // The window is the whole band between the two bars, but the bottom
-    // of that band is not empty paper: the events strip is laid over its
-    // foot (see .col-left in anahane.html). Dead centre of the box is
-    // therefore a shade low of dead centre of what the reader can see,
-    // so the drawing is lifted by --ist-hive-lift. Deliberately far less
-    // than half the strip -- half is what standing the column in a grid
-    // row of its own used to do, and that read as the petek hanging over
-    // a band of bare paper. Declared in the stylesheet so it belongs to
-    // the phone, where the strip is.
-    const liftHost = document.getElementById('po-hive-page') || document.documentElement;
-    const lift = parseFloat(getComputedStyle(liftHost).getPropertyValue('--ist-hive-lift')) || 0;
-    const offsetY = -reserve / 2 - lift;
+    const offsetY = -reserve / 2;
     state.hiveFit = { scale, cx, cy, vw, vh, reqW, reqH, offsetY };
     plane.style.transformOrigin = `${cx}px ${cy}px`;
     // ── A fresh plane is placed, not animated into place ──

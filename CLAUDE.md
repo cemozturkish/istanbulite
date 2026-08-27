@@ -489,7 +489,11 @@ sb.from('articles').delete().eq('id', id)
   and it asks it with a button rather than a gesture. The deck's left/right verdict belongs to the
   page where the whole city's calendar is being sorted; a second, different meaning for the same
   throw on the page holding what survived it would make both unreadable
-- **And the petek answers it.** With a card open, the reader's own honeycomb is marked
+- **And the petek answers it** — this is the page's whole point, so both marks stand **inside** the
+  drawn hexagon, either side of its foot, never in a corner of the cell's box: the box is not the
+  drawing (the silhouette is inset, and its bottom is a point), so a badge in a corner lands in the
+  paper between hexagons, belonging to nobody, and two neighbours' badges meet in the same gap. With
+  a card open, the reader's own honeycomb is marked
   (`IstProfileCard.paintHiveEventMarks` / `clearHiveEventMarks`): the ink/paper corner dot is the
   **verdict** a member gave the event on the deck (`hive_event_interest_status`), and a red disc in
   the opposite corner is that they are actually **going** (`hive_event_rsvp_status`,
@@ -499,6 +503,12 @@ sb.from('articles').delete().eq('id', id)
   pressed; both RPCs answer only for the caller's own map and only for the events it names, the
   same fence `hive_member_status` stands behind. The ring is deliberately left alone: red on a
   hexagon's ring already means "this is the one named on the bar"
+- **Set like Kahvehane's own event cards** — the kicker, the title, the meta and the page's whole
+  type scale are that page's numbers (`.ev-card` / `.event-page-*` in kahvehane.html), not a second
+  set: it is the same object on both pages, and what the reader threw right over there is what
+  stands here. The ink is `--ink`/`--muted` with it, so the cards follow the palette instead of the
+  fixed dark they carried from the days they floated over a map photo — which on the dark theme was
+  dark text on a dark card
 - **And it is what the member KEPT, not the city's whole calendar** (`keptEvents`,
   `event-interest.js`). The calendar is dealt with one card at a time on Kahvehane — thrown right
   is "ilgimi çekti", thrown left is gone (see that page's own section) — and this column is the
@@ -1441,11 +1451,12 @@ under it on any night with nothing on. So row 1 is `minmax(0, 1fr)` — whatever
 
 **And the events do not take room from it at all: they are laid OVER its foot** (`--hane-events-h`
 on `#main-site`, `grid-area: hero` + `align-self: end` on `.col-left`). The petek gets the whole
-band between the two bars, so the reader's own avatar is dead centre of the screen — a hair above
-it, in fact (`--ist-hive-lift`, read by `fitHive`): the foot of that band carries the events strip,
-so the middle of the box sits a shade low of the middle of what can actually be seen. A hair, not
-half the strip — half is what a grid row of its own used to take, and that read as the petek hanging
-over a band of bare paper. It is the same move level 0's own block makes inside the drawing. A column with a grid row of its own made the reader's
+band between the two bars — and the drawing is fitted and centred in what is left **above the
+strip's opened height** (`--ist-hive-reserve`, handed to `fitHive` as Hane's own
+`--hane-events-open-h`, so there is one number and not two that can drift). Reserving that room
+rather than lifting the drawing by a guessed number is what makes it hold at any size the fit
+resolves to: **a card opening can never come up over the people**, on any screen. It is the same
+move level 0's own block makes inside the drawing. A column with a grid row of its own made the reader's
 position a function of how tall it was: it stood the drawing above the middle of the screen by half
 the strip, and every kept card, every empty night, every card opened moved them again.
 
