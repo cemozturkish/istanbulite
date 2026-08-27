@@ -778,7 +778,13 @@
        Tapping the card grows it in place instead (see
        openEventGrowPage/.event-grow-page), so there is no lingering
        "pressed" look to hold once the tap has already answered. */
-    .event-item.openable:hover { background: #e8e8e8; }
+    /* A mouse only. `:hover` sticks after a tap on iOS, so on a phone
+       this left the card the reader had just opened and closed sitting
+       grey in the strip with no way to clear it -- the same reason
+       Kütüphane's cards press with pointer events rather than :hover. */
+    @media (hover: hover) and (pointer: fine) {
+      .event-item.openable:hover { background: #e8e8e8; }
+    }
     /* Only ever rendered inside the detail sheet (see buildEventDetailHtml)
        -- the column's preview card doesn't include it. */
     .event-item .ev-details {
@@ -911,9 +917,13 @@
         /* The strip the events stand in, resting and opened (see
            .col-left below). Resting it is one preview card with a little
            air around it; opened it is what one card's date, title,
-           description and RSVP row need to be read in. */
+           description and RSVP row need to be read in -- and no more
+           than that, because it opens UPWARD over the petek's own
+           window: the drawing is lifted clear of it (--ist-hive-lift in
+           profile-card.css), and every pixel this number grows is a
+           pixel the reader has to be lifted by. */
         --hane-events-h: 90px;
-        --hane-events-open-h: min(34vh, 270px);
+        --hane-events-open-h: min(24vh, 195px);
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
            the map -- a different color from the map's own #f7f7f7,
@@ -2111,14 +2121,18 @@ async function toggleRsvp(eventId, btn) {
 // rising over it, and it stays inside .events-section, below the petek,
 // never over it (see .event-grow-page in the head <style>).
 
-// Where the page's four sides fall: on the cards' own content box,
-// measured off #events-panel rather than restated as the sum of the
-// column's padding -- the page has to come out of the card with its
-// sides already on the card's sides, and one number written in two
-// places is how those end up a couple of pixels apart. Same measurement
-// Kütüphane's news page makes against its own feed (measureNewsPageBand
-// there). Absolute inside .events-section, so everything is in that
-// box's own coordinates.
+// Where the page's four sides fall: on the strip's own box, measured off
+// #events-panel rather than restated as the sum of the column's padding
+// -- one number written in two places is how those end up a couple of
+// pixels apart. Same measurement Kütüphane's news page makes against its
+// own feed (measureNewsPageBand there). Absolute inside .events-section,
+// so everything is in that box's own coordinates.
+//
+// The panel's PADDING box, not its content box: the strip is a sideways
+// scroller (see #events-panel's phone CSS), and a scroller draws its
+// content right out to the padding edge -- so a page inset by the
+// padding left an 8px sliver of the next card showing down the side of
+// the event just opened.
 function measureEventGrowBand() {
   const page = document.getElementById('event-grow-page');
   const panel = document.getElementById('events-panel');
@@ -2127,12 +2141,11 @@ function measureEventGrowBand() {
   const pr = panel.getBoundingClientRect();
   const sr = section.getBoundingClientRect();
   if (!(pr.width > 0) || !(sr.width > 0)) return;
-  const cs = getComputedStyle(panel);
   const px = (v) => Math.max(0, v).toFixed(2) + 'px';
-  page.style.top = px(pr.top - sr.top + parseFloat(cs.paddingTop || 0));
-  page.style.left = px(pr.left - sr.left + parseFloat(cs.paddingLeft || 0));
-  page.style.right = px(sr.right - pr.right + parseFloat(cs.paddingRight || 0));
-  page.style.bottom = px(sr.bottom - pr.bottom + parseFloat(cs.paddingBottom || 0));
+  page.style.top = px(pr.top - sr.top);
+  page.style.left = px(pr.left - sr.left);
+  page.style.right = px(sr.right - pr.right);
+  page.style.bottom = px(sr.bottom - pr.bottom);
 }
 
 function openEventGrowPage(ev, cardEl) {
@@ -2180,6 +2193,16 @@ function closeEventGrowPage() {
     // Back to the resting strip -- one card's worth, above the tab bar.
     const col = document.querySelector('.col-left');
     if (col) col.classList.remove('events-open');
+    // And the frame the grow drew around the page (see IstSheet.grow):
+    // it is deliberately left standing after an 'out', holding the
+    // collapsed card's outline until the sheet it belongs to hides. On
+    // the other two pages that is the overlay, so it goes with it -- but
+    // this page's grow lives inside the events strip itself, which is
+    // never hidden, so nothing was taking it away. It stayed on the
+    // screen at the *opened* geometry: two black rules running out of
+    // the strip and down over the tab bar, with no way to get rid of
+    // them short of a reload.
+    IstSheet.cancelGrow(page);
   }, IstSheet.GROW_MS);
 }
 

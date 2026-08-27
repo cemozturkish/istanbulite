@@ -473,9 +473,8 @@ sb.from('articles').delete().eq('id', id)
   next to the petek: the petek is who you are standing next to, an event is the one thing on the
   site that ends with you actually standing next to them. Opening a card **grows it into the
   column's own band**, in place — the same primitive Kütüphane's news page and Kahvehane's event
-  page use (`IstSheet.grow`, `openEventGrowPage`), measured onto the cards' own content box
-  (`measureEventGrowBand`) so the page comes out of the card with its sides already on the card's
-  sides. And it is the same three-part page a story opens as over there: what it is and the way
+  page use (`IstSheet.grow`, `openEventGrowPage`), measured onto the strip's own box
+  (`measureEventGrowBand`). And it is the same three-part page a story opens as over there: what it is and the way
   back out (the hand-drawn arrow) on the top line, the event scrolling in the middle, the **RSVP
   row** standing on the bottom line where it cannot scroll away
 - **The petek above it does not move, and that is what the column's fixed height is for.** Row 1 of
