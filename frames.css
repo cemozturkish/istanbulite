@@ -609,3 +609,46 @@ body.ist-dragging .col-left-slide,
 body.ist-dragging .col-right-slide {
   transition: none !important;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   THE ZOOM — Türkiye ↔ İstanbul ↔ mahalle
+   ──────────────────────────────────────────────────────────────
+   Three of the four pages are not pages beside each other but the same
+   city at three distances (see router.js's ZOOM stack), so moving
+   between them is not a slide: the drawing comes toward the reader or
+   falls away from them. Going IN, what is leaving grows past the screen
+   and the arriving level opens out of the middle of it; going OUT, the
+   reverse.
+
+   What moves is every child of #ist-content, not the two columns the
+   horizontal slide moves — the map IS the zoom, and it is a sibling of
+   the columns rather than inside them. #ist-content is `display:contents`
+   and so has no box of its own to transform; its children are the page's
+   real grid items, and moving all of them together is the same picture.
+
+   Stated once here rather than in each level's own <style data-page>,
+   so a fourth level cannot arrive carrying a fifth version of it. The
+   duration is a custom property because router.js reads it back to know
+   how long to wait — the wait and the animation are one number.
+   ══════════════════════════════════════════════════════════════ */
+:root { --ist-zoom-dur: 380ms; }
+
+body.ist-zoom #ist-content > * {
+  transform-origin: 50% 45%;
+  transition: transform var(--ist-zoom-dur) ease, opacity var(--ist-zoom-dur) ease;
+  will-change: transform, opacity;
+}
+body.ist-zoom.ist-zooming-in  #ist-content > * { transform: scale(1.35); opacity: 0; }
+body.ist-zoom.ist-zooming-out #ist-content > * { transform: scale(0.72); opacity: 0; }
+/* The arriving level's starting pose. `transition: none` so the pose is
+   adopted rather than animated to; router.js drops the class on the
+   second frame and the rule above carries it home. */
+html.ist-arriving-in  body.ist-zoom #ist-content > * { transform: scale(0.72); opacity: 0; transition: none; }
+html.ist-arriving-out body.ist-zoom #ist-content > * { transform: scale(1.35); opacity: 0; transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Zero here is read by router.js as "do not wait", so the swap happens
+     at once rather than after a transition nobody can see. */
+  :root { --ist-zoom-dur: 0ms; }
+  body.ist-zoom #ist-content > * { transition: none; }
+}

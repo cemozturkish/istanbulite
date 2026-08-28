@@ -136,14 +136,15 @@ default one.
 ```
 /home/user/istanbulite/
 ├── index.html            # Login/signup gate ONLY — redirects to anahane.html once authenticated
-├── anahane.html          # MIDDLE page: home — the PETEK honeycomb itself, plus the events
-├── kutuphane.html        # LEFT page (zoom out): Library — Turkey map, ALL news, articles, letters, TBMM
-├── kahvehane.html        # RIGHT page (zoom in): Coffeehouse — district map, games hub, scoreboards, events
+├── anahane.html          # HANE tab: home — the PETEK honeycomb itself, plus the events
+├── kutuphane.html        # İSTANBULITE tab, OUTERMOST zoom: Türkiye — Turkey map, ALL news, articles, letters, TBMM
+├── kahvehane.html        # İSTANBULITE tab, MIDDLE zoom: İstanbul — district map, games hub, scoreboards, events
+├── mahalle.html          # İSTANBULITE tab, INNERMOST zoom: the reader's own ilçe and its mahalles
 ├── sozcel.html           # Turkish Wordle-style daily word game
 ├── tumcel.html           # Turkish quote-fragment Connections-style daily game (replaced Bağlantılar)
 ├── bulmaca.html          # Turkish daily mini crossword
 ├── admin.html            # Admin dashboard (admin-only)
-├── router.js             # Shared shell: single Supabase client, swipe carousel, virtual navigation, clock
+├── router.js             # Shared shell: single Supabase client, the two tabs + the zoom stack, virtual navigation, clock
 ├── sheet.css/.js         # THE sheet: the one page that rises from the bottom — see "Site-wide defaults"
 ├── profile-card.js/.css  # Profile bar (the phone's top bar), avatar, badges — shared across pages
 ├── onboarding.js/.css    # New-account onboarding flow
@@ -1349,6 +1350,59 @@ implementation in profile-card.css ("THE TOP BAR"); the bottom bar's colors live
 either bar's height as a number — the same value also reserves the space each page leaves at the
 bottom so its last row of cards clears the tab bar, and one copy left behind is how the two bars
 end up different heights. The game pages hide the bottom bar outright for their fullscreen board.
+
+### Two tabs, and a zoom stack inside one of them — `router.js`
+
+The bottom bar carries **two** tabs: **İstanbulite** and **Hane**. İstanbulite is not one page
+but three, stacked by **zoom** rather than laid side by side — the same city at three distances:
+
+| Slug | What it is | Where in the stack |
+|---|---|---|
+| `kutuphane` | Türkiye — the national layer | furthest out |
+| `kahvehane` | İstanbul — the district map, the games, the events | where the reader lands |
+| `mahalle`   | the reader's own ilçe and its mahalles | furthest in |
+
+**The grammar is: horizontal picks the tab, vertical picks the depth.** A swipe left from any
+İstanbulite level reaches Hane and a swipe right comes back; a swipe **down** or a **pinch out**
+goes *in* (toward the mahalle), a swipe **up** or a **pinch in** goes *out* (toward Türkiye).
+Down-is-in is the petek's own convention — "a pull up is a scroll down, and down the levels is
+outward" — so one gesture means one thing everywhere in the app.
+
+Five things about it:
+
+- **Coming back to a tab returns you to your own distance.** `lastZoom` in router.js remembers
+  which level the reader was standing on, and both the swipe back from Hane and the İstanbulite
+  tab itself aim at that rather than dropping everyone at İstanbul. The tab's `href` is
+  re-pointed to match (`paintNav`), so the link and the gesture can never disagree.
+- **The zoom is not a slide, and it moves everything.** The horizontal transition moves the two
+  columns and deliberately leaves the map still; a zoom moves **every child of `#ist-content`**,
+  the map included, because the map *is* the zoom. `#ist-content` is `display: contents` and so
+  has no box of its own to transform — its children are the page's real grid items, and moving
+  all of them together is the same picture. Going in, what is leaving grows past the screen and
+  the arriving level opens out of the middle of it; going out, the reverse.
+- **It is stated once, in frames.css** (`ist-zooming-in` / `ist-zooming-out` on the body,
+  `ist-arriving-in` / `ist-arriving-out` on the root), never in a level's own
+  `<style data-page>` — a fourth level must not be able to arrive carrying a fifth version of the
+  transition. The duration is `--ist-zoom-dur`, and `router.js` reads it back to know how long to
+  wait, so the wait and the animation are one number. `prefers-reduced-motion` sets it to `0ms`,
+  which the router reads as "swap at once".
+- **The drag follows the finger, and the release carries on from where it left off.** A vertical
+  drag scales `#ist-content`'s children live (`paintZoom`); on release it either continues to
+  exactly the pose the exit class would have set (`flingZoom`, so nothing jumps at the handover)
+  or springs back. The inline styles die with the nodes when the content is swapped.
+- **A drag that begins over something which can genuinely scroll belongs to that thing**
+  (`overScroller` walks up looking for a real scroller). Mahalle's own list scrolls; Kütüphane's
+  news deck and Kahvehane's two decks do not, so a vertical swipe over them zooms. Hane is not in
+  the stack at all, so its vertical pull still belongs to the petek.
+
+### `mahalle.html` — the innermost level
+
+The reader's own ilçe, and the mahalles inside it, with theirs picked out. Deliberately the
+smallest true thing: **there is no mahalle map**, because there is no mahalle geometry —
+`public.mahalles` carries `id`, `ilce_id` and `name_tr` and no polygon (`db/mahalles.sql`), so a
+drawing of this level would have to be invented rather than traced. Everything else this level
+should eventually hold hangs off that decision, so it waits for it. The page does not scroll; one
+list scrolls inside it, bottom-aligned like every other stack on a phone.
 
 ### The three carousel pages share one document
 

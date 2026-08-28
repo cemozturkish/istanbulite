@@ -19,12 +19,80 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  const PAGES = ['kutuphane', 'anahane', 'kahvehane'];
+  // ══════════════════════════════════════════════════════════════
+  // TWO TABS, AND A ZOOM STACK INSIDE ONE OF THEM
+  // ──────────────────────────────────────────────────────────────
+  // The bottom bar carries two tabs now: İstanbulite and Hane.
+  //
+  // İstanbulite is not one page but three, stacked by ZOOM rather than
+  // laid side by side -- the same city at three distances:
+  //
+  //     kutuphane   Türkiye      (furthest out)
+  //     kahvehane   İstanbul     (where the reader lands)
+  //     mahalle     the ilçe     (furthest in)
+  //
+  // The reader moves between them by pinching, or by swiping vertically:
+  // pinch OUT or swipe DOWN goes IN (toward the mahalle), pinch IN or
+  // swipe UP goes OUT (toward Türkiye). That is the petek's own
+  // convention -- "a pull up is a scroll down, and down the levels is
+  // outward" -- so one gesture means one thing everywhere in the app.
+  //
+  // Hane is the other tab and is untouched, reached horizontally.
+  //
+  // So the grammar is: HORIZONTAL picks the tab, VERTICAL picks the depth.
+  const ZOOM = ['kutuphane', 'kahvehane', 'mahalle']; // out -> in
+  const ZOOM_DEFAULT = 'kahvehane';
+  const HANE = 'anahane';
+  const PAGES = ZOOM.concat([HANE]);
+
+  // Which zoom level the reader was last standing on, so that leaving for
+  // Hane and coming back returns them to the distance they were at rather
+  // than to İstanbul every time.
+  let lastZoom = ZOOM_DEFAULT;
+  // Seeded below from whichever page really loaded, so a reader who opens
+  // mahalle.html directly and swipes to Hane comes back to the mahalle.
+
+  // Horizontal moves slide; vertical moves ZOOM, because that is what they
+  // are -- the same city at another distance, not another page beside this
+  // one. The four classes are defined once in frames.css rather than in
+  // each page's own stylesheet, so a fourth level cannot arrive carrying a
+  // fifth version of the transition.
+  const EXIT_CLASS = {
+    forward:  'ist-exiting-forward',
+    backward: 'ist-exiting-backward',
+    in:       'ist-zooming-in',
+    out:      'ist-zooming-out',
+  };
+  const ENTER_CLASS = {
+    forward:  'ist-entering-forward',
+    backward: 'ist-entering-backward',
+    in:       'ist-arriving-in',
+    out:      'ist-arriving-out',
+  };
+
+  function isZoom(slug) { return ZOOM.indexOf(slug) !== -1; }
+  function zoomIndex(slug) { return ZOOM.indexOf(slug); }
+  function tabOf(slug) { return slug === HANE ? 'hane' : 'istanbulite'; }
+
+  // Two tabs, three of the four pages behind one of them. The İstanbulite
+  // link also re-points at whichever level was last stood on, so tapping
+  // it from Hane returns the reader to their own distance rather than
+  // dropping them back at İstanbul every time.
+  function paintNav(slug) {
+    const tab = tabOf(slug);
+    document.querySelectorAll('nav a').forEach(a => {
+      const t = a.dataset.tab || (a.getAttribute('href') === 'anahane.html' ? 'hane' : 'istanbulite');
+      a.classList.toggle('active', t === tab);
+      if (t === 'istanbulite') a.setAttribute('href', lastZoom + '.html');
+    });
+  }
 
   function currentPage() {
     const path = (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
-    return PAGES.includes(path) ? path : PAGES[0];
+    return PAGES.includes(path) ? path : ZOOM_DEFAULT;
   }
+
+  if (isZoom(currentPage())) lastZoom = currentPage();
 
   // Marks the body-level overlay nodes this document really loaded with as
   // belonging to the page that loaded them — navigateTo stamps the ones it
@@ -270,15 +338,43 @@
     });
   }
 
+  // ── How long a zoom takes ──
+  // Declared once in frames.css as --ist-zoom-dur and read back here, so
+  // the wait and the animation are the same number by construction. A
+  // reader on `prefers-reduced-motion` gets 0 there and the wait is
+  // skipped outright.
+  function zoomDurationMs() {
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--ist-zoom-dur').trim();
+    // Absent means an old cached frames.css that has never heard of the
+    // zoom -- fall back rather than snapping. Zero means the stylesheet
+    // deliberately said so (prefers-reduced-motion), and is honoured.
+    if (!v) return 380;
+    const n = parseFloat(v) || 0;
+    return /ms$/.test(v) ? n : n * 1000;
+  }
+  function awaitZoom() {
+    const ms = zoomDurationMs();
+    if (!ms) return Promise.resolve();
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   // ── Prefetch the two pages a swipe can reach ──
   // ensurePageLoaded fetches the target and DOMParses it -- and these are
   // 6,000-8,500 line documents. Done inside a navigation that is the
   // reader waiting; done at idle beforehand it costs them nothing, and
   // the first swipe to a page becomes as quick as the second.
   function prefetchNeighbours(slug) {
-    const i = PAGES.indexOf(slug);
-    if (i === -1) return;
-    const want = [PAGES[i - 1], PAGES[i + 1]].filter(Boolean);
+    if (!PAGES.includes(slug)) return;
+    // What one gesture can reach from here: the level above and the level
+    // below (vertically), and the other tab (horizontally).
+    let want;
+    if (slug === HANE) {
+      want = [lastZoom];
+    } else {
+      const i = zoomIndex(slug);
+      want = [ZOOM[i - 1], ZOOM[i + 1], HANE];
+    }
+    want = want.filter(Boolean);
     const run = () => want.forEach(s => {
       if (!pageCache[s]) ensurePageLoaded(s).catch(() => {});
     });
@@ -305,7 +401,13 @@
     if (targetSlug === currentSlug) return;
     virtualNavInFlight = true;
 
-    const exitClass = dir === 'forward' ? 'ist-exiting-forward' : 'ist-exiting-backward';
+    const exitClass = EXIT_CLASS[dir] || EXIT_CLASS.forward;
+    const zooming = dir === 'in' || dir === 'out';
+    // A zoom moves everything inside #ist-content at once rather than the
+    // two columns alone, so there is no column transitionend to wait on --
+    // the duration is the one frames.css declares, read from the same
+    // custom property so the two can never drift.
+    if (zooming) document.body.classList.add('ist-zoom');
     try {
       // Started BEFORE the slide, so the fetch and the DOMParse happen
       // while the columns are still moving rather than after they have
@@ -323,7 +425,7 @@
 
       let cached;
       try {
-        cached = (await Promise.all([loading, awaitExitSlide()]))[0];
+        cached = (await Promise.all([loading, zooming ? awaitZoom() : awaitExitSlide()]))[0];
       } catch (e) {
         // The target could not be loaded at all -- offline, a 404 from a
         // half-deployed Pages build. The columns are sitting off-screen
@@ -332,6 +434,7 @@
         // which can at least show its own error.
         console.error(e);
         document.body.classList.remove(exitClass);
+        document.body.classList.remove('ist-zoom');
         if (!fromPopstate) window.location.href = targetSlug + '.html';
         return;
       }
@@ -445,18 +548,25 @@
       // triggers the same render path.
       global.__istSuppressFirstCardAnim = { left: true, right: true };
 
-      const enterClass = dir === 'forward' ? 'ist-entering-forward' : 'ist-entering-backward';
+      const enterClass = ENTER_CLASS[dir] || ENTER_CLASS.forward;
       const root = document.documentElement;
       root.classList.add(enterClass);
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => { root.classList.remove(enterClass); });
+        requestAnimationFrame(() => {
+          root.classList.remove(enterClass);
+          // Held for the length of the arrival, because on a zoom it is
+          // `ist-zoom` that declares the transition the release animates
+          // along -- dropped in the same frame, the page would snap.
+          if (zooming) setTimeout(() => document.body.classList.remove('ist-zoom'), zoomDurationMs() + 60);
+        });
       });
 
-      document.querySelectorAll('nav a').forEach(a => {
-        a.classList.toggle('active', a.getAttribute('href') === targetSlug + '.html');
-      });
+      // Two tabs, and three pages share one of them -- so the active tab is
+      // decided by which tab the page belongs to, not by its filename.
+      paintNav(targetSlug);
 
       activeSlug = targetSlug;
+      if (isZoom(targetSlug)) lastZoom = targetSlug;
 
       if (pages[targetSlug] && pages[targetSlug].mount) {
         try { pages[targetSlug].mount(); } catch (e) { console.error(e); }
@@ -522,7 +632,6 @@
   // fire three redundant, racing navigations after visiting all three pages.
   // ══════════════════════════════════════════
   function initSwipePagination() {
-    const NAV_PAGES = ['kutuphane.html', 'anahane.html', 'kahvehane.html'];
     const MIN_DX = 50;
     const MAX_TIME = 700;
     // navigate()'s own tab-bar/swipe navigation always uses navigateTo's
@@ -537,10 +646,44 @@
     const supportsVT = 'startViewTransition' in document && !global.Capacitor;
 
     function isMobile() { return window.innerWidth <= 768; }
-    function currentIdx() {
-      const path = (location.pathname.split('/').pop() || 'index.html');
-      const idx = NAV_PAGES.indexOf(path);
-      return idx === -1 ? 0 : idx;
+
+    // ── Where a gesture from here goes ──
+    // Horizontal picks the tab: from any İstanbulite level a leftward
+    // swipe reaches Hane, and from Hane a rightward one comes back to the
+    // level the reader left. Vertical picks the depth, and only inside
+    // İstanbulite -- Hane is not in the stack, and its own vertical pull
+    // belongs to the petek.
+    function horizontalTarget(dx) {
+      const here = activeSlug;
+      if (here === HANE) return dx > 0 ? { slug: lastZoom, dir: 'backward' } : null;
+      return dx < 0 ? { slug: HANE, dir: 'forward' } : null;
+    }
+    function verticalTarget(dy) {
+      const i = zoomIndex(activeSlug);
+      if (i === -1) return null;
+      // Down goes IN (toward the mahalle), up goes OUT (toward Türkiye) --
+      // the petek's own convention, so one gesture means one thing.
+      const next = dy > 0 ? i + 1 : i - 1;
+      if (next < 0 || next >= ZOOM.length) return null;
+      return { slug: ZOOM[next], dir: dy > 0 ? 'in' : 'out' };
+    }
+    // A pinch is the same move as the vertical swipe: spreading fingers
+    // goes in, closing them goes out.
+    function pinchTarget(spread) { return verticalTarget(spread > 0 ? 1 : -1); }
+
+    // A vertical drag that begins over something which can actually
+    // scroll belongs to that thing, not to the zoom -- Kütüphane's news
+    // column and Kahvehane's board both scroll on a phone.
+    function overScroller(node) {
+      let el = node;
+      while (el && el !== document.body) {
+        if (el.scrollHeight - el.clientHeight > 4) {
+          const oy = getComputedStyle(el).overflowY;
+          if (oy === 'auto' || oy === 'scroll') return true;
+        }
+        el = el.parentElement;
+      }
+      return false;
     }
     function recordDir(dir) {
       // Seed the direction for the incoming page. The pre-body script
@@ -590,13 +733,14 @@
     }
 
     let navigating = false;
-    function navigate(targetIdx, dir) {
+    function navigate(targetSlug, dir) {
       if (navigating) return;
-      if (targetIdx < 0 || targetIdx >= NAV_PAGES.length) return;
-      const curr = currentIdx();
-      if (targetIdx === curr) return;
+      if (!PAGES.includes(targetSlug) || targetSlug === activeSlug) return;
       navigating = true;
-      recordDir(dir);
+      // Only a horizontal move has a cross-document fallback worth
+      // tagging: a zoom is always the virtual path (the two levels share
+      // this document), and `ist-entering-in` has no stylesheet behind it.
+      if (dir === 'forward' || dir === 'backward') recordDir(dir);
       // Virtual (client-side) navigation -- no reload, no flash, shared
       // chrome (profile card, nav bar) never leaves the DOM. See
       // navigateTo above. Used everywhere now, not just inside Capacitor:
@@ -606,7 +750,7 @@
       // avoids entirely by never leaving the document. Any distance
       // (including a 2-hop Kütüphane<->Kahvehane jump) goes straight to
       // the target in one hop instead of flashing through the middle tab.
-      navigateTo(PAGES[targetIdx], dir).finally(() => { navigating = false; });
+      navigateTo(targetSlug, dir).finally(() => { navigating = false; });
     }
 
     // Intercept tab-bar clicks -- always goes through navigate()'s virtual
@@ -614,13 +758,14 @@
     document.addEventListener('click', (e) => {
       const link = e.target.closest('nav a');
       if (!link) return;
-      const href = link.getAttribute('href');
-      const targetIdx = NAV_PAGES.indexOf(href);
-      const curr = currentIdx();
-      if (targetIdx === -1 || targetIdx === curr) return;
-      const dir = targetIdx > curr ? 'forward' : 'backward';
+      const tab = link.dataset.tab || (link.getAttribute('href') === 'anahane.html' ? 'hane' : 'istanbulite');
+      if (tab === tabOf(activeSlug)) { e.preventDefault(); return; }
+      // The İstanbulite tab is three pages; tapping it returns the reader
+      // to the distance they were last standing at, not to İstanbul.
+      const target = tab === 'hane' ? HANE : lastZoom;
+      const dir = tab === 'hane' ? 'forward' : 'backward';
       e.preventDefault();
-      navigate(targetIdx, dir);
+      navigate(target, dir);
     }, true);
 
     // ══════════════════════════════════════════
@@ -656,6 +801,7 @@
     const FLICK_SPEED = 0.55;
     const EDGE_PULL = 0.32;        // how much of the drag the ends give back
     let g = null;
+    let pinch = null;
 
     function columns() {
       return Array.prototype.slice.call(document.querySelectorAll('.col-left, .col-right'));
@@ -673,57 +819,186 @@
       for (let i = 0; i < cols.length; i++) { cols[i].style.transform = ''; cols[i].style.transition = ''; }
       document.body.classList.remove('ist-dragging');
     }
-    global.__istReleaseColumns = releaseColumns;
+
+    // ── What a zoom moves ──
+    // Not the two columns: the whole of what the page draws, map included,
+    // because the map IS the zoom. #ist-content is display:contents and
+    // therefore has no box of its own to transform -- its children are the
+    // page's real grid items, and moving all of them together is the same
+    // picture (see frames.css's own zoom block, which uses this selector).
+    function contentNodes() {
+      const c = document.getElementById('ist-content');
+      return c ? Array.prototype.slice.call(c.children) : [];
+    }
+    // How far in and out the drawing travels. Matched to frames.css --
+    // the release animates from wherever the finger left off to exactly
+    // the value the exit class would have set, so nothing jumps at the
+    // handover.
+    const ZOOM_IN_SCALE = 1.35;
+    const ZOOM_OUT_SCALE = 0.72;
+    // The travel is judged against a third of the screen, the same order
+    // as the horizontal COMMIT_FRACTION.
+    function zoomProgress(dy) {
+      return Math.min(1, Math.abs(dy) / (window.innerHeight * 0.34));
+    }
+    function paintZoom(dy) {
+      const p = zoomProgress(dy);
+      const to = dy > 0 ? ZOOM_IN_SCALE : ZOOM_OUT_SCALE;
+      const scale = 1 + (to - 1) * p;
+      const nodes = contentNodes();
+      for (let i = 0; i < nodes.length; i++) {
+        nodes[i].style.transformOrigin = '50% 45%';
+        nodes[i].style.transition = '';
+        nodes[i].style.transform = 'scale(' + scale + ')';
+        nodes[i].style.opacity = String(1 - p * 0.9);
+      }
+    }
+    function releaseZoom() {
+      const nodes = contentNodes();
+      for (let i = 0; i < nodes.length; i++) {
+        nodes[i].style.transform = '';
+        nodes[i].style.opacity = '';
+        nodes[i].style.transition = '';
+        nodes[i].style.transformOrigin = '';
+      }
+      document.body.classList.remove('ist-dragging');
+    }
+    // Carry the drawing on from where the finger left off, to the exact
+    // place the exit class puts it, then hand over to navigate(). The
+    // inline styles die with the nodes when #ist-content is swapped, so
+    // there is nothing to clean up on the happy path.
+    function flingZoom(dir) {
+      const to = dir === 'in' ? ZOOM_IN_SCALE : ZOOM_OUT_SCALE;
+      const ms = zoomDurationMs();
+      const nodes = contentNodes();
+      for (let i = 0; i < nodes.length; i++) {
+        nodes[i].style.transformOrigin = '50% 45%';
+        nodes[i].style.transition = ms ? ('transform ' + ms + 'ms ease, opacity ' + ms + 'ms ease') : 'none';
+        nodes[i].style.transform = 'scale(' + to + ')';
+        nodes[i].style.opacity = '0';
+      }
+      document.body.classList.remove('ist-dragging');
+    }
+    function springZoom() {
+      const snap = !zoomDurationMs();
+      if (snap) { releaseZoom(); return; }
+      const nodes = contentNodes();
+      for (let i = 0; i < nodes.length; i++) {
+        nodes[i].style.transition = 'transform 0.26s ease, opacity 0.26s ease';
+        nodes[i].style.transform = 'scale(1)';
+        nodes[i].style.opacity = '1';
+      }
+      document.body.classList.remove('ist-dragging');
+      setTimeout(releaseZoom, 280);
+    }
+    function releaseAll() { releaseColumns(); releaseZoom(); }
+    global.__istReleaseColumns = releaseAll;
 
     document.addEventListener('touchstart', (e) => {
-      if (!isMobile() || e.touches.length !== 1) return;
+      if (!isMobile()) return;
       if (virtualNavInFlight || navigating) return;
+      if (e.touches.length === 2) {
+        // A pinch is the same move as the vertical swipe, and it is the
+        // one gesture that says "zoom" without having to be learnt.
+        const [a, b] = e.touches;
+        pinch = { d0: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), fired: false };
+        g = null;
+        return;
+      }
+      if (e.touches.length !== 1) return;
       if (e.target.closest && e.target.closest('nav')) return; // let nav-bar taps through
       const t = e.touches[0];
-      const curr = currentIdx();
       g = {
         x: t.clientX, y: t.clientY, t: Date.now(),
-        lastX: t.clientX, lastT: Date.now(), speed: 0,
-        axis: null, curr,
+        lastX: t.clientX, lastY: t.clientY, lastT: Date.now(), speed: 0,
+        axis: null,
         // Whether there is anywhere to go each way, so the ends can pull
         // back instead of sliding off into nothing.
-        canFwd: curr + 1 < NAV_PAGES.length,
-        canBack: curr - 1 >= 0,
+        canFwd: !!horizontalTarget(-1),
+        canBack: !!horizontalTarget(1),
+        // A vertical drag that starts over something which can genuinely
+        // scroll belongs to that thing, not to the zoom.
+        noZoom: overScroller(e.target),
       };
     }, { passive: true });
 
-    // passive: false, because a horizontal drag has to stop the page
-    // scrolling underneath it once it has claimed the axis.
+    // passive: false, because a drag has to stop the page scrolling
+    // underneath it once it has claimed an axis.
     document.addEventListener('touchmove', (e) => {
+      if (pinch && e.touches.length === 2) {
+        if (pinch.fired) return;
+        const [a, b] = e.touches;
+        const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+        const spread = d - pinch.d0;
+        if (Math.abs(spread) < 40) return;
+        const target = pinchTarget(spread);
+        pinch.fired = true;
+        if (!target) return;
+        if (e.cancelable) e.preventDefault();
+        flingZoom(target.dir);
+        navigate(target.slug, target.dir);
+        return;
+      }
       if (!g || e.touches.length !== 1) return;
       const t = e.touches[0];
       const dx = t.clientX - g.x, dy = t.clientY - g.y;
       if (!g.axis) {
         if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return;
-        // Vertical-dominant belongs to whatever is underneath -- a feed
-        // scrolling, the petek changing depth.
         g.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
-        if (g.axis === 'y') { g = null; return; }
+        if (g.axis === 'y') {
+          // Nothing to zoom into this way, or the finger is on a
+          // scroller: hand the gesture back to whatever is underneath.
+          g.zoom = g.noZoom ? null : verticalTarget(dy);
+          if (!g.zoom) { g = null; return; }
+        }
         document.body.classList.add('ist-dragging');
       }
-      if (g.axis !== 'x') return;
       const now = Date.now();
       const dt = now - g.lastT;
-      if (dt > 0) g.speed = (t.clientX - g.lastX) / dt;
-      g.lastX = t.clientX; g.lastT = now;
-      // The ends are not a wall: they give, a little, so it is obvious
-      // that the pull was heard and that there is nothing past it.
-      const blocked = (dx < 0 && !g.canFwd) || (dx > 0 && !g.canBack);
-      g.dx = blocked ? dx * EDGE_PULL : dx;
+      if (g.axis === 'x') {
+        if (dt > 0) g.speed = (t.clientX - g.lastX) / dt;
+        g.lastX = t.clientX; g.lastT = now;
+        // The ends are not a wall: they give, a little, so it is obvious
+        // that the pull was heard and that there is nothing past it.
+        const blocked = (dx < 0 && !g.canFwd) || (dx > 0 && !g.canBack);
+        g.dx = blocked ? dx * EDGE_PULL : dx;
+        if (e.cancelable) e.preventDefault();
+        paint(g.dx);
+        return;
+      }
+      // Vertical: the zoom follows the finger. A direction reversal mid
+      // drag means the reader changed their mind -- re-aim rather than
+      // carrying on toward a level they are no longer heading for.
+      if (dt > 0) g.speed = (t.clientY - g.lastY) / dt;
+      g.lastY = t.clientY; g.lastT = now;
+      const aimed = verticalTarget(dy);
+      if (!aimed) { g.dy = dy * EDGE_PULL; if (e.cancelable) e.preventDefault(); paintZoom(g.dy); return; }
+      g.zoom = aimed;
+      g.dy = dy;
       if (e.cancelable) e.preventDefault();
-      paint(g.dx);
+      paintZoom(dy);
     }, { passive: false });
 
-    document.addEventListener('touchend', () => {
+    document.addEventListener('touchend', (e) => {
+      if (pinch && e.touches.length < 2) { pinch = null; return; }
       if (!g) return;
       const gesture = g;
       g = null;
-      if (gesture.axis !== 'x') { releaseColumns(); return; }
+      if (gesture.axis === 'y') {
+        const dy = gesture.dy || 0;
+        const target = verticalTarget(dy);
+        const far = zoomProgress(dy) > 0.55;
+        const flicked = Math.abs(gesture.speed) > FLICK_SPEED &&
+                        Math.sign(gesture.speed) === Math.sign(dy) && Math.abs(dy) > SLOP * 2;
+        if (target && (far || flicked)) {
+          flingZoom(target.dir);
+          navigate(target.slug, target.dir);
+          return;
+        }
+        springZoom();
+        return;
+      }
+      if (gesture.axis !== 'x') { releaseAll(); return; }
       const dx = gesture.dx || 0;
       const blocked = (dx < 0 && !gesture.canFwd) || (dx > 0 && !gesture.canBack);
       const far = Math.abs(dx) > window.innerWidth * COMMIT_FRACTION;
@@ -737,17 +1012,18 @@
         const to = dx < 0 ? -window.innerWidth : window.innerWidth;
         const cols = columns();
         for (let i = 0; i < cols.length; i++) {
-          cols[i].style.transition = 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)';
+          cols[i].style.transition = 'transform 0.32s ease';
           cols[i].style.transform = 'translateX(' + to + 'px)';
         }
         document.body.classList.remove('ist-dragging');
-        navigate(gesture.curr + (dx < 0 ? 1 : -1), dx < 0 ? 'forward' : 'backward');
+        const target = horizontalTarget(dx);
+        if (target) navigate(target.slug, target.dir);
         return;
       }
       // Not far enough, or there was nowhere to go: spring back.
       const cols = columns();
       for (let i = 0; i < cols.length; i++) {
-        cols[i].style.transition = 'transform 0.26s cubic-bezier(0.22, 1, 0.36, 1)';
+        cols[i].style.transition = 'transform 0.26s ease';
         cols[i].style.transform = 'translateX(0px)';
       }
       document.body.classList.remove('ist-dragging');
@@ -755,9 +1031,11 @@
     }, { passive: true });
 
     document.addEventListener('touchcancel', () => {
+      pinch = null;
       if (!g) return;
+      const wasY = g.axis === 'y';
       g = null;
-      releaseColumns();
+      if (wasY) springZoom(); else releaseColumns();
     }, { passive: true });
 
     if (document.readyState === 'loading') {
