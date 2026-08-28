@@ -1623,6 +1623,23 @@ hexagon red and leading nowhere.
 The name is cleared by anything that means the reader has left them: another depth (`setHiveLevel`),
 another page (`router.js` calls `clearBarMember` beside `clearSeat`), a fresh mount of Hane.
 
+**What this page leaves behind it is unwound on the way out** (`IstProfileCard.unmountHivePage`,
+called from anahane's own `unmount`). Two things about the petek outlive the swapped `#ist-content`,
+and both of them showed up as the same bug — swipe away, swipe back, and the kept-events column and
+the captions under everybody's names were gone. The **depth classes are on `<html>`**
+(`ist-hive-mid` / `ist-hive-offmid` / `ist-hive-all`, `paintHiveDepthClasses`), which is deliberate —
+anahane's CSS is what hides the events column away from the middle depth — but left behind at level 0
+or 2 they hide that column on the way back in, for the length of the next mount's round trip and for
+good if that mount takes an early return; so the unmount clears them and the mount asserts the middle
+depth **before** its first `await`, not after. And **every in-flight fetch checks itself against
+`_hive`** before drawing (`loadHive`, `reloadHiveMap`, `loadHiveStatus`, `offerHiveSlot`,
+`claimHiveSlot`, plus a `_hiveMountSeq` on the mount itself): they all draw by id into whatever
+`#po-hive-mount` currently is, so a call started on the last visit and answered on this one painted
+its own captionless, differently-levelled petek over the live one — and, having lost the race, was
+never corrected. For the same reason `_hiveMap` is re-kept when the **status** lands and not only
+when the cells do: it is what the next mount starts from, and a remembered map with its captions
+dropped is a petek whose neighbours go blank under their names until (or unless) the next RPC lands.
+
 Detaching is still parked — `hive_unbond()` is untouched in the database and still refuses a bond
 inside the week it was made in, but nothing calls it, and where a detach belongs on a page that is
 only the drawing is an open question.
