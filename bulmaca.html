@@ -12,39 +12,12 @@
   <style>
     :root {
       /* Core ink & paper — warm cream newspaper palette */
-      --ink: #4C382A;
-      --ink-deep: #4C382A;
-      --paper: #eddbd0;
-      --paper-warm: #eddbd0;
       --paper-card: #ddc4b5;
-      --paper-banner: #c9ae9a;
-      --paper-navbar: #b89b7f;
-      --paper-dark: #d8c0b1;
-      --hover: #d8c0b1;
-      --field-bg: #e8d3c8;
       /* Warm neutrals */
-      --accent: #4C3B31;
-      --accent-2: #775E4C;
-      --muted: #867264;
-      --rule: #b8a08a;
-      --hairline: #c5ad9a;
-      --whisper: #d4bbad;
       /* Newspaper accents */
-      --ink-red: #B93631;
-      --brown-1: #b8947a;
-      --brown-2: #866955;
-      --brown-3: #775742;
-      --brown-4: #4C3B31;
       /* Semantic aliases */
-      --border: var(--rule);
       --success: var(--accent-2);
-      --danger: var(--ink-red);
       /* Border shortcuts */
-      --col-border: 1px solid var(--rule);
-      --row-border: 1px solid var(--hairline);
-      --hairline-border: 1px solid var(--whisper);
-      --rule-strong: 1px solid var(--ink);
-      --rule-double: 4px double var(--ink);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -795,11 +768,11 @@
   </style>
   <link rel="stylesheet" href="frames.css?v=1">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="ist-date.js?v=1"></script>
-  <script src="i18n.js?v=17"></script>
+  <script src="ist-date.js?v=2"></script>
+  <script src="i18n.js?v=18"></script>
   <script src="palette.js?v=1"></script>
   <script src="avatar.js?v=1"></script>
-  <link rel="stylesheet" href="palette.css?v=2">
+  <link rel="stylesheet" href="palette.css?v=3">
   <script src="game-locks.js?v=2" defer></script>
   <link rel="stylesheet" href="profile-card.css?v=22">
   <script src="profile-card.js?v=24" defer></script>
@@ -980,17 +953,11 @@ setInterval(updateDateTime, 60000);
 I18N.onChange(updateDateTime);
 
 // Daily seed for puzzle rotation
-function getDailySeed() {
-  return IstDate.daySeed();
-}
+// Was a one-line wrapper in three pages; it still is, but over one seed.
+function getDailySeed() { return IstDate.daySeed(); }
 
-function getTimeUntilMidnight() {
-  const ist = IstDate.now();
-  const diff = IstDate.nextMidnight() - ist;
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  return I18N.formatCountdown(hours, minutes, { prefixTr: 'Yeni bulmaca', prefixEn: 'New puzzle in' });
-}
+// The countdown to the Istanbul day rolling over, in ist-date.js.
+function getTimeUntilMidnight() { return IstDate.untilMidnight({ prefixTr: 'Yeni bulmaca', prefixEn: 'New puzzle in' }); }
 
 // Multiple puzzles for daily rotation
 const PUZZLES = [
@@ -1495,17 +1462,11 @@ async function renderStats() {
 }
 
 // ── Weekly scoreboard (mirrors Kahvehane) ──
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => (
-    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
-  ));
-}
-function parseGameDate(s) {
-  if (!s || typeof s !== 'string') return null;
-  const parts = s.split('-').map(Number);
-  if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
-  return new Date(parts[0], parts[1] - 1, parts[2]);
-}
+// One implementation, in i18n.js -- and the null-safe one: three of the
+// four copies rendered the literal text "null" for a null argument.
+function escapeHtml(s) { return I18N.escapeHtml(s); }
+// A 'YYYY-MM-DD' key as a Date. One implementation, in ist-date.js.
+function parseGameDate(s) { return IstDate.parseYMD(s); }
 async function loadScoreboard() {
   const listEl = document.getElementById('scoreboard-list');
   if (!listEl) return;
@@ -1574,23 +1535,8 @@ async function loadScoreboard() {
 }
 
 // Turkish ablative suffix (vowel harmony + voiceless-consonant rule).
-function getAblativeSuffix(name) {
-  if (!name) return "'den";
-  const lastChar = name.charAt(name.length - 1).toLowerCase();
-  const voiceless = 'pçtkfhsş';
-  const backVowels = 'aıou';
-  let lastVowel = '';
-  for (let i = name.length - 1; i >= 0; i--) {
-    const c = name.charAt(i).toLowerCase();
-    if ('aeıioöuü'.includes(c)) { lastVowel = c; break; }
-  }
-  const isBack = backVowels.includes(lastVowel);
-  const isVoiceless = voiceless.includes(lastChar);
-  if (isVoiceless && isBack) return "'tan";
-  if (isVoiceless) return "'ten";
-  if (isBack) return "'dan";
-  return "'den";
-}
+// Turkish vowel harmony, in i18n.js where localisation lives.
+function getAblativeSuffix(name) { return I18N.ablative(name); }
 
 // Mark games as started (light gray) or completed (dark gray) in side nav
 async function markPlayedGames() {

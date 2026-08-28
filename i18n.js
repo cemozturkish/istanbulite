@@ -362,12 +362,51 @@
   if (document.readyState !== 'loading') applyToDOM();
   else document.addEventListener('DOMContentLoaded', () => applyToDOM());
 
+  // ── Turkish ablative, and HTML escaping ──
+  // Both were declared in four page scripts apiece. The suffix is
+  // localisation by any reading -- Turkish vowel harmony decides between
+  // -dan/-den/-tan/-ten -- and escapeHtml is here for want of a better
+  // shared home: it is needed on every page that builds markup from
+  // strings, and a file of its own would be a tenth render-blocking
+  // request for four lines.
+  //
+  // The four copies of escapeHtml had already drifted: three coerced with
+  // String(s), so escapeHtml(null) rendered the literal text "null" and
+  // escapeHtml(undefined) rendered "undefined". Tumcel's copy had been
+  // fixed. This is that fixed one, which is why unifying them is a fix
+  // rather than only a tidy-up.
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g,
+      c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // "Kadıköy" -> "'den", "Bakırköy" -> "'den", "Fatih" -> "'ten".
+  // Voicelessness decides d/t, the last vowel decides a/e.
+  function ablative(name) {
+    if (!name) return "'den";
+    const lastChar = name.charAt(name.length - 1).toLowerCase();
+    const voiceless = 'pçtkfhsş';
+    const backVowels = 'aıou';
+    let lastVowel = '';
+    for (let i = name.length - 1; i >= 0; i--) {
+      const c = name.charAt(i).toLowerCase();
+      if ('aeıioöuü'.includes(c)) { lastVowel = c; break; }
+    }
+    const isBack = backVowels.includes(lastVowel);
+    const isVoiceless = voiceless.includes(lastChar);
+    if (isVoiceless && isBack) return "'tan";
+    if (isVoiceless) return "'ten";
+    if (isBack) return "'dan";
+    return "'den";
+  }
+
   global.I18N = {
     t, setLang, applyToDOM, isEnglish, onChange, offChange,
     formatDate, formatTime, formatWeekday, formatCountdown, formatMinutes, formatMemberSince,
     formatNeighborhoodBest,
     formatFoundInGuesses, formatFoundInGuessesFirst, formatTodaysWordPoints, sozcelResultTitle,
     syncFromSupabase,
+    escapeHtml, ablative,
     get lang() { return currentLang; },
   };
 })(window);

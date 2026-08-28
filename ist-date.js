@@ -84,5 +84,32 @@
     return t;
   }
 
-  global.IstDate = { parts, now, iso, daySeed, nextMidnight, TZ };
+
+  // ── Two helpers the game-bearing pages each carried their own copy of ──
+  // Both are about the Istanbul day, which is this file's whole subject,
+  // so they belong here rather than four times over in four <script>
+  // blocks (see CLAUDE.md convention 10).
+
+  // A 'YYYY-MM-DD' key -- the shape used_on, game_date and every daily
+  // key on the site are written in -- as a local Date. Returns null
+  // rather than an Invalid Date for anything that is not that shape, so
+  // a caller can tell "no date" from "a date that failed to parse".
+  function parseYMD(s) {
+    if (!s || typeof s !== 'string') return null;
+    const parts = s.split('-').map(Number);
+    if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+
+  // How long until the Istanbul day rolls over, already worded. opts is
+  // passed straight through to I18N.formatCountdown, which is what lets
+  // Bulmaca say "Yeni bulmaca" where the others use the default.
+  function untilMidnight(opts) {
+    const diff = nextMidnight() - now();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return global.I18N ? global.I18N.formatCountdown(hours, minutes, opts) : '';
+  }
+
+  global.IstDate = { parts, now, iso, daySeed, nextMidnight, parseYMD, untilMidnight, TZ };
 })(window);
