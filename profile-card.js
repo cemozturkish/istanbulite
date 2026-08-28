@@ -963,6 +963,7 @@
   // and the page has to draw either way.
   let _sharedState = null;
   let _hive = null; // { sb, I18N, user, profile, ..., hive, hiveOpen, hiveLoaded }
+  let _hiveMountSeq = 0; // bumped by every mountHivePage; see there
 
   async function ensureProfileState(sb, I18N) {
     if (_state) return _state;
@@ -990,11 +991,24 @@
     // longer exists.
     if (_hive && _hive.hiveBoxObserver) { _hive.hiveBoxObserver.disconnect(); _hive.hiveBoxObserver = null; }
     bustHiveMeasureCache();
+    // Every mount supersedes the one before it: a swipe away and back
+    // starts a second one while the first is still inside its await, and
+    // the loser must not carry on drawing into the winner's page.
+    const seq = ++_hiveMountSeq;
     host.innerHTML = `<div class="ist-hive-page ist-hive-level-${HIVE_LEVEL_DEFAULT}" id="po-hive-page">${hiveMountHTML()}</div>`;
+    // The reader arrives at the middle depth, so the classes that say so
+    // are set now rather than after the await below. They live on <html>
+    // and outlive this page (anahane.html's events column is hidden by
+    // ist-hive-offmid): left over from the depth the reader was standing
+    // at when they swiped away, they hide that column for the whole of
+    // the round trip -- and for good if this mount takes an early return.
+    paintHiveDepthClasses(HIVE_LEVEL_DEFAULT);
     const st = await ensureProfileState(sb, I18N);
     // The page can be swapped out from under the fetch (a swipe away
-    // while it is in flight), and then there is nothing to draw into.
-    if (!st || !document.getElementById('po-hive-mount')) return;
+    // while it is in flight), and then there is nothing to draw into --
+    // or a newer mount has already drawn into it, which is the same
+    // thing seen from the other side.
+    if (!st || seq !== _hiveMountSeq || !document.getElementById('po-hive-mount')) return;
     // The reader arrives at the middle depth every time, including after
     // a swipe away and back — the same rule the three carousel pages
     // follow (see "Always in the middle" in CLAUDE.md).
@@ -1036,6 +1050,24 @@
     renderHive(_hive);
     wireHiveGestures(_hive);
     loadHive(_hive);
+  }
+
+  // Called by anahane.html's own unmount() when the router swaps this
+  // page out. Two things have to be unwound, and both of them because
+  // they live OUTSIDE the swapped content and would otherwise be the
+  // last word on a page that is no longer there:
+  //
+  //  - the depth classes on <html>, which quiet the events column at
+  //    every depth but the middle one. Left behind at level 0 or 2 they
+  //    hide that column on the way back in, before the next mount has
+  //    reached its own applyHiveLevel -- and for good if that mount
+  //    takes an early return.
+  //  - _hive itself, which is what every in-flight fetch checks itself
+  //    against before drawing.
+  function unmountHivePage() {
+    if (_hive && _hive.hiveBoxObserver) { _hive.hiveBoxObserver.disconnect(); _hive.hiveBoxObserver = null; }
+    _hive = null;
+    paintHiveDepthClasses(null);
   }
 
   // The window onto the grid is the page now, so it changes size with the
@@ -2038,38 +2070,52 @@
   // on the rail is lit. It never rebuilds anything — the drawing is one
   // set of nodes at every depth, so a level change is a fade and a
   // rescale rather than a re-render.
+  // ── What the current depth says on <html> ──
+  // Three classes, written on the root rather than on the page, because
+  // what reacts to them is not this file's: the kept-events column
+  // beside the petek (anahane.html's own #events-panel) only belongs to
+  // the middle depth -- the reader's six neighbours are the ones a kept
+  // event's verdict is even about. A class rather than a DOM reference
+  // across the script boundary: the petek page never needs to know the
+  // column exists.
+  //
+  // Two classes for that one fact rather than one, and the rule that
+  // quiets the column is written on the OFF state (see anahane.html): a
+  // class that never lands -- profile-card.js still loading, a page
+  // entered by a route that never mounted the petek, an exception in the
+  // middle of a render -- must leave the column READABLE, not blank.
+  // `:not(mid)` failed the other way round, and a column that has
+  // quietly gone invisible looks exactly like one with nothing in it.
+  // Passing a null level here is that state said out loud: neither class
+  // on, column readable (see unmountHivePage).
+  //
+  // And the outermost depth, for the same reason the other way round:
+  // that depth is the whole shape, so the drawing is let out of its
+  // window there and runs off every edge of the screen -- under the
+  // events column, past the tab bar -- instead of stopping in mid-air
+  // with bare paper past it (see .ist-hive's overflow in
+  // profile-card.css and anahane.html's own main). The window itself is
+  // unchanged, so what the drawing is scaled to and where the reader
+  // stands in it are exactly what they were: only the clip is lifted.
+  //
+  // They outlive the page they were set on -- <html> is not swapped by a
+  // virtual navigation -- so the mount sets them up front and the
+  // unmount clears them, neither of which has a state to read a level
+  // off. That is why this is a function of a level and not of a state.
+  function paintHiveDepthClasses(level) {
+    const root = document.documentElement;
+    root.classList.toggle('ist-hive-mid', level === HIVE_LEVEL_DEFAULT);
+    root.classList.toggle('ist-hive-offmid', level != null && level !== HIVE_LEVEL_DEFAULT);
+    root.classList.toggle('ist-hive-all', level === HIVE_LEVEL_ALL);
+  }
+
   function applyHiveLevel(state) {
     const level = hiveLevel(state);
     const page = document.getElementById('po-hive-page');
     if (page) {
       for (let i = 0; i < HIVE_LEVELS; i++) page.classList.toggle(`ist-hive-level-${i}`, i === level);
     }
-    // The kept-events column beside the petek (anahane.html's own
-    // #events-panel, not this file's concern) only belongs to the middle
-    // depth -- the reader's six neighbours are the ones a kept event's
-    // verdict is even about. A class on <html> rather than a DOM
-    // reference across the script boundary: the petek page never needs
-    // to know the column exists, and anahane's CSS is what actually
-    // reacts to it.
-    // Two classes rather than one, and the rule that quiets the column
-    // is written on the OFF state (see anahane.html): a class that never
-    // lands -- profile-card.js still loading, a page entered by a route
-    // that never mounted the petek, an exception in the middle of a
-    // render -- must leave the column READABLE, not blank. `:not(mid)`
-    // failed the other way round, and a column that has quietly gone
-    // invisible looks exactly like one with nothing in it.
-    const mid = level === HIVE_LEVEL_DEFAULT;
-    document.documentElement.classList.toggle('ist-hive-mid', mid);
-    document.documentElement.classList.toggle('ist-hive-offmid', !mid);
-    // And the outermost depth, for the same reason the other way round:
-    // that depth is the whole shape, so the drawing is let out of its
-    // window there and runs off every edge of the screen -- under the
-    // events column, past the tab bar -- instead of stopping in mid-air
-    // with bare paper past it (see .ist-hive's overflow in
-    // profile-card.css and anahane.html's own main). The window itself is
-    // unchanged, so what the drawing is scaled to and where the reader
-    // stands in it are exactly what they were: only the clip is lifted.
-    document.documentElement.classList.toggle('ist-hive-all', level === HIVE_LEVEL_ALL);
+    paintHiveDepthClasses(level);
     const mount = document.getElementById('po-hive-mount');
     if (mount) mount.querySelectorAll('.ist-hive-cell').forEach(cell => {
       const ring = parseInt(cell.dataset.ring, 10) || 0;
@@ -2463,6 +2509,14 @@
   async function loadHive(state) {
     state.hiveLoaded = true;
     const { data } = await state.sb.rpc('hive_map');
+    // Not this page any more: a swipe away and back mounts a fresh state
+    // while this call is still in flight, and the loser must not paint
+    // its own (captionless, differently-levelled) petek into the winner's
+    // page -- which is what left neighbours uncaptioned and, where the
+    // reader had left this page at another depth, the events column
+    // hidden with it. renderHive draws by id, so nothing about the swap
+    // stops it.
+    if (state !== _hive) return;
     state.hive = Object.assign({}, state.hive, { cells: data || [] });
     // Kept for the next mount of this page, so a swipe back to Hane
     // draws the petek it left rather than the reader alone for a beat.
@@ -2481,7 +2535,9 @@
 
   async function reloadHiveMap(state) {
     const { data } = await state.sb.rpc('hive_map');
+    if (state !== _hive) return;
     state.hive = Object.assign({}, state.hive, { cells: data || [] });
+    _hiveMap = state.hive;
     loadHiveStatus(state);
   }
 
@@ -2506,12 +2562,18 @@
         p_game_key: `${y}-${m}-${d}`,
       });
       if (error || !data) return;
+      if (state !== _hive) return;
       const status = new Map(data.map(r => [String(r.member_id), r]));
       state.hive = Object.assign({}, state.hive, { status });
-      // Only if the page is still the one this was fetched for: a swipe
-      // away and back mounts a fresh state, and painting into the old
-      // one would draw nothing anyway.
-      if (state === _hive && document.getElementById('po-hive-mount')) renderHive(state);
+      // Kept for the next mount of this page along with the cells, and
+      // for the same reason: a re-entry starts from the petek it left,
+      // and a petek whose captions have been dropped on the way is one
+      // whose neighbours go blank under their names for the length of a
+      // round trip -- or for good, if that round trip fails.
+      _hiveMap = state.hive;
+      // Only while there is something to draw into: painting a page a
+      // swipe has already taken away draws nothing anyway.
+      if (document.getElementById('po-hive-mount')) renderHive(state);
     } catch (e) { /* no captions this time; the drawing is unchanged */ }
   }
 
@@ -2946,9 +3008,10 @@
   async function offerHiveSlot(state, dir) {
     const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
     const { data, error } = await state.sb.rpc('hive_offer_slot', { p_dir: dir });
-    // The reader may have folded the panel or tapped another side while
-    // the mint was out; the answer belongs to the side that asked for it.
-    if (!state.hiveOpen || state.hiveOpen.dir !== dir) return;
+    // The reader may have folded the panel, tapped another side, or
+    // swiped off the page entirely while the mint was out; the answer
+    // belongs to the side that asked for it, on the page that asked.
+    if (state !== _hive || !state.hiveOpen || state.hiveOpen.dir !== dir) return;
     const row = Array.isArray(data) ? data[0] : data;
     if (error || !row || !row.code) {
       state.hiveOpen.error = t('profile.hive.err.failed');
@@ -2998,6 +3061,12 @@
     // the reader's own.
     state.hiveClaiming = false;
     await reloadHiveMap(state);
+    // The claim can outlive the page it was typed on (a swipe away while
+    // it was in flight): the bond is made either way, and the next mount
+    // fetches the map that now holds it — but this page is gone, and
+    // drawing a state nothing else references any more into whatever
+    // stands there now is how a petek ends up captionless.
+    if (state !== _hive) return;
     state.hiveOpen = null;
     state.hivePan = { x: 0, y: 0 };
     renderHive(state);
@@ -3650,6 +3719,7 @@
     openProfileOverlay,
     closeProfileOverlay,
     mountHivePage,
+    unmountHivePage,
     paintHiveEventMarks,
     clearHiveEventMarks,
     initMemberSheet,
