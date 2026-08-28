@@ -1358,6 +1358,25 @@
   // hexagons.
   const HIVE_FIELD_MAX = 24;
 
+  // The drawn hexagon, as geometry rather than as a picture.
+  // Traced from assets/frame-ring.png -- a 1024x1536 canvas carrying a
+  // 779x1266 silhouette, which is why the <svg> using it carries that
+  // viewBox. Two contours, outer then inner, filled evenodd: the ring
+  // itself as a shape, not a line down the middle of it.
+  //
+  // It is a fill and not a stroke because the drawn ring is not a
+  // constant width -- it runs about 49 units at the top and 56 lower
+  // down. A single stroked centreline reproduced it to only ~87% of its
+  // pixels however the tracing was tuned (the parameters barely moved
+  // the number, which is what showed the model itself was wrong); the
+  // two contours land at 97.6%, the rest being antialiasing. A fill is
+  // also the cheaper of the two to rasterise.
+  //
+  // Re-trace this if frame-ring.png is ever redrawn. Like
+  // --ist-hive-step-x/y in profile-card.css, it is the drawing's number
+  // and not the box's.
+  const HIVE_HEX_PATH = 'M 509 135 L 321 243 L 138 344 L 133 347 L 129 353 L 126 513 L 126 636 L 124 748 L 125 844 L 123 892 L 124 906 L 122 1173 L 129 1180 L 307 1281 L 510 1400 L 513 1400 L 723 1277 L 894 1180 L 901 1173 L 897 528 L 895 390 L 893 351 L 888 346 L 734 261 L 514 135 Z M 506 187 L 494 190 L 484 195 L 377 263 L 218 368 L 205 377 L 193 388 L 180 409 L 175 428 L 174 572 L 174 825 L 176 903 L 177 1102 L 182 1120 L 194 1140 L 210 1154 L 487 1353 L 498 1359 L 506 1361 L 515 1361 L 525 1359 L 543 1348 L 718 1223 L 817 1151 L 827 1142 L 838 1127 L 843 1115 L 846 1100 L 847 886 L 849 794 L 848 428 L 844 412 L 839 401 L 828 386 L 819 378 L 731 319 L 539 195 L 529 190 L 517 187 Z';
+
   // How far the field has to reach, in cells, for the honeycomb to run
   // off every edge of the screen rather than stopping in mid-air with
   // bare paper past it. Two things about the measurement:
@@ -1583,12 +1602,41 @@
   // is the drawing: a honeycomb is a shape that continues, and a member
   // standing in the middle of six openings with white paper past them
   // reads as the end of the world rather than as the middle of one.
+  // ── The empty field is drawn, not masked ──
+  // Every other cell on the plane is a .hexframe: two PNG-masked layers
+  // (frame-fill.png through -webkit-mask, then frame-ring.png again on
+  // ::after, see frames.css). That is the right primitive for a cell that
+  // holds avatar art -- the mask is what the art is cut out by.
+  //
+  // A ghost holds nothing. It is one hexagon outline, and it was paying
+  // for two image masks anyway. On a phone the field runs off all four
+  // edges of the screen at the outermost depth (hiveFieldReach), which is
+  // ~190 of these, so the drawing nobody interacts with was costing
+  // ~380 masked compositing surfaces -- inside a plane that is being
+  // scaled by fitHive and dragged by the reader's own finger. Image
+  // masks are the most expensive thing a mobile compositor is asked to
+  // do here, and this was the one place asking for hundreds of them to
+  // draw nothing at all.
+  //
+  // So a ghost's frame is an <svg> filling HIVE_HEX_PATH instead: no
+  // mask, no ::after. The path is traced from frame-ring.png itself (see
+  // HIVE_HEX_PATH), so the empty places are the same drawn hexagon as the
+  // occupied ones rather than a geometric stand-in -- the frame is
+  // hand-drawn, and a machine-perfect polygon beside it reads as a
+  // different object on a page whose whole subject is one drawing.
+  //
+  // The wrapping <div> stays, and deliberately. Making the cell itself
+  // the <svg> looks like it should save an element, but it does not --
+  // the <use> is an element too, so the count is identical -- and an
+  // <svg> root carrying a viewBox has an intrinsic ratio with no
+  // intrinsic size, so .ist-hive-cell's own `width` does not resolve on
+  // it the way it does on the <div>/<button> every other cell is. Keeping
+  // the div means the box, data-ring, --ring and every rule that reads
+  // them behave exactly as they did before this change; only what is
+  // drawn inside the box is different.
   function hiveGhostCellHTML(meta) {
-    return `
-      <div class="ist-hive-cell ist-hive-ghost" ${meta} aria-hidden="true">
-        <div class="hexframe ist-hive-frame ist-hive-slot"></div>
-      </div>
-    `;
+    return `<div class="ist-hive-cell ist-hive-ghost" ${meta} aria-hidden="true">`
+      + `<svg class="ist-hive-frame ist-hive-ghost-ink" viewBox="0 0 1024 1536"><use href="#ist-hive-hex"/></svg></div>`;
   }
 
   // You, in the middle. Pressing yourself is how you TAKE a seat somebody
@@ -1766,9 +1814,16 @@
 
     const w = `calc(var(--ist-hive-step-x) * ${maxX - minX} + var(--ist-hive-cell-w))`;
     const h = `calc(var(--ist-hive-step-y) * ${maxY - minY} + var(--ist-hive-cell-h))`;
+    // One copy of the drawn hexagon for the whole plane; every ghost is a
+    // <use> of it (see hiveGhostCellHTML). Inside the plane rather than
+    // the document so it leaves with the mount -- Hane is re-mounted on
+    // every entry, and a <defs> left behind in the body would be a second
+    // element claiming the same id.
+    const defs = `<svg class="ist-hive-defs" width="0" height="0" aria-hidden="true" focusable="false">`
+      + `<defs><path id="ist-hive-hex" d="${HIVE_HEX_PATH}" fill-rule="evenodd"/></defs></svg>`;
     return `
       <div class="ist-hive" id="po-hive-view">
-        <div class="ist-hive-plane" id="po-hive-plane" style="width: ${w}; height: ${h};">${html}</div>
+        <div class="ist-hive-plane" id="po-hive-plane" style="width: ${w}; height: ${h};">${defs}${html}</div>
       </div>
     `;
   }

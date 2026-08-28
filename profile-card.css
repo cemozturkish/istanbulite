@@ -761,8 +761,44 @@ button.ist-hive-cell:focus-visible .ist-hive-plus { color: var(--ink); }
    only the six sides of your own hexagon are (see hiveGhostCellHTML). */
 .ist-hive-ghost {
   pointer-events: none;
+  /* The cell keeps the drawing's proportions the way .hexframe used to
+     give them to it -- the frame inside is an <svg> now, and an <svg>
+     root with a viewBox has an intrinsic ratio but no intrinsic size, so
+     it cannot size the box for it. Sized by the div, filled by the svg:
+     the div means the box behaves exactly as it always did. */
+  aspect-ratio: var(--hexframe-ratio);
 }
-.ist-hive-ghost .ist-hive-slot { --hexframe-stroke: var(--ist-hive-ring-ghost); }
+/* The drawn ring, filling the cell the div gives it. */
+.ist-hive-ghost-ink {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* The tone is set here rather than through --hexframe-stroke: there is
+   no masked ::after left to paint, only the ring's own shape to fill.
+   Same value as before -- the fifth and palest rung of the ladder above. */
+.ist-hive-ghost-ink use {
+  /* The fallback is load-bearing, not decoration. `fill` is an inherited
+     property, so a var() that resolves to nothing is invalid at computed
+     value time and falls back to inheriting -- which, under an HTML
+     ancestor, means black. The masked .hexframe this replaced degraded
+     through frames.css's own var(--hexframe-stroke, var(--ink)); this has
+     to do the same or a page that reaches the petek without --rule (a
+     stale cached stylesheet, which is exactly what CLAUDE.md convention
+     13 exists for) paints the whole field solid ink. */
+  fill: var(--ist-hive-ring-ghost, var(--muted, #8b7565));
+  /* The ring is two contours, outer then inner, and only evenodd makes
+     the inner one a hole. The <path> in <defs> carries fill-rule as a
+     presentation attribute, which is the lowest-priority declaration
+     there is -- so on the <use> INSTANCE the inherited nonzero wins and
+     every ghost paints as a solid hexagon. It fails as a filled shape,
+     not as a missing one, so it does not look like an error: the field
+     just quietly becomes a wall. Set it here, where it inherits into the
+     instance. */
+  fill-rule: evenodd;
+}
+/* A <defs> carrier takes no room and is never drawn. */
+.ist-hive-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 
 button.ist-hive-cell:focus-visible { outline: none; }
 /* An open hexagon — a seat showing its code, or you showing the field
