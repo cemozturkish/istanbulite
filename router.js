@@ -648,7 +648,12 @@
     // a much larger change than this one.
     const SLOP = 8;            // px before the gesture claims an axis
     const COMMIT_FRACTION = 0.22;  // of the screen -- past this, release navigates
-    const FLICK_SPEED = 0.45;      // px/ms -- a fast flick commits at any distance
+    // px/ms. 0.55 is the app's own throw constant -- NEWS_SWIPE_DEAL_VEL,
+    // Q_SWIPE_DEAL_VEL and EV_SWIPE_DEAL_VEL are all 0.55 -- so a flick
+    // that changes the page asks exactly as much of the thumb as a flick
+    // that throws a card away. This was 0.45, which made a page change the
+    // easiest flick on the phone; a page is the bigger move of the two.
+    const FLICK_SPEED = 0.55;
     const EDGE_PULL = 0.32;        // how much of the drag the ends give back
     let g = null;
 
