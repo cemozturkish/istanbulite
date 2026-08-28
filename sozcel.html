@@ -10,6 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=2"></script>
   <script src="i18n.js?v=18"></script>
+  <script src="scoreboard.js?v=1"></script>
   <script src="palette.js?v=1"></script>
   <script src="avatar.js?v=1"></script>
   <link rel="stylesheet" href="palette.css?v=3">
@@ -4785,23 +4786,14 @@ function escapeHtml(s) { return I18N.escapeHtml(s); }
 function parseGameDate(s) { return IstDate.parseYMD(s); }
 
 // Points awarded per game: 20/12/8/6/4/2 for win in 1–6 guesses; 1 for playing without winning.
-function gamePoints(attempts, won) {
-  if (won) {
-    const pts = [20, 12, 8, 6, 4, 2];
-    return pts[attempts - 1] ?? 2;
-  }
-  return attempts >= 1 ? 1 : 0;
-}
 
 // First-solver bonuses: Istanbul's first solver of the day (10) also counts
 // as their district's first solver, so the separate district bonus (5) only
 // ever goes to someone who is first within their district but not first
 // in all of Istanbul.
-const ISTANBUL_FIRST_BONUS = 10;
-const NEIGHBORHOOD_FIRST_BONUS = 5;
-function firstSolverBonus(tier) {
-  return tier === 'istanbul' ? ISTANBUL_FIRST_BONUS : tier === 'neighborhood' ? NEIGHBORHOOD_FIRST_BONUS : 0;
-}
+// Both now live in scoreboard.js with the model that uses them.
+const ISTANBUL_FIRST_BONUS = IstScoreboard.ISTANBUL_FIRST_BONUS;
+const NEIGHBORHOOD_FIRST_BONUS = IstScoreboard.NEIGHBORHOOD_FIRST_BONUS;
 
 // Seven-square week tracker (Monday first, matching the scoring week):
 // days already passed are dark, today is double-bordered, days to come are plain.
@@ -4826,161 +4818,29 @@ function setWeekProgress(el) {
   el.innerHTML = renderWeekProgress();
   el.dataset.mode = 'week';
 }
+// The numbers come from IstScoreboard (scoreboard.js). This page's own
+// part is that it writes the same board into two lists -- the desktop
+// column and the mobile one.
+// The points model lives in scoreboard.js so every page scores a week the
+// same way. These stay as one-line declarations rather than renaming the
+// call sites: they are used in this page's own result screen and share
+// panel too, and a top-level `const` would be a SyntaxError the moment two
+// carousel pages ran in one document (see CLAUDE.md on `sb`).
+function gamePoints(attempts, won) { return IstScoreboard.gamePoints(attempts, won); }
+function firstSolverBonus(tier) { return IstScoreboard.firstSolverBonus(tier); }
+function sozcuPoints(attempts, won) { return IstScoreboard.sozcuPoints(attempts, won); }
 
 async function loadScoreboard() {
   const listEl = document.getElementById('scoreboard-list');
   const listElMobile = document.getElementById('scoreboard-list-mobile');
+  if (!listEl && !listElMobile) return;
   function setListHTML(html) {
     if (listEl) listEl.innerHTML = html;
     if (listElMobile) listElMobile.innerHTML = html;
   }
-  if (!listEl && !listElMobile) return;
-  let results = null;
-  try {
-    const { data, error } = await sb.from('game_results')
-      .select('user_id, neighborhood, date, won, attempts, created_at')
-      .eq('game', 'sozcel')
-      .gte('attempts', 1);
-    if (error) throw error;
-    results = data;
-  } catch (e) {
-    setListHTML('<li class="scoreboard-empty">Skorlar yüklenemedi</li>');
-    return;
-  }
-  if (!results || results.length === 0) {
-    setListHTML('');
-    return;
-  }
-  // Weekly cutoff: Monday 00:00 of the current Istanbul week.
-  const nowIst = IstDate.now();
-  const dow = nowIst.getDay(); // 0=Sun … 6=Sat
-  const daysFromMonday = dow === 0 ? 6 : dow - 1;
-  const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - daysFromMonday);
-  const weekly = results.filter(r => { const d = parseGameDate(r.date); return d && d >= cutoff; });
-  if (weekly.length === 0) {
-    setListHTML('');
-    return;
-  }
-  // Find the first winner per date, both Istanbul-wide and per-district
-  // (earliest created_at among won=true rows). Istanbul's first solver is
-  // necessarily also their district's first solver, so the district bonus
-  // only ever applies to someone who isn't the Istanbul winner.
-  const istanbulFirstByDate = new Map();
-  const districtFirstByDate = new Map(); // date -> Map(neighborhood -> { user_id, created_at })
-  weekly.filter(r => r.won).forEach(r => {
-    const existing = istanbulFirstByDate.get(r.date);
-    if (!existing || r.created_at < existing.created_at) {
-      istanbulFirstByDate.set(r.date, { user_id: r.user_id, created_at: r.created_at });
-    }
-    if (r.neighborhood) {
-      if (!districtFirstByDate.has(r.date)) districtFirstByDate.set(r.date, new Map());
-      const nbMap = districtFirstByDate.get(r.date);
-      const nbExisting = nbMap.get(r.neighborhood);
-      if (!nbExisting || r.created_at < nbExisting.created_at) {
-        nbMap.set(r.neighborhood, { user_id: r.user_id, created_at: r.created_at });
-      }
-    }
-  });
-  function firstTierFor(r) {
-    if (istanbulFirstByDate.get(r.date)?.user_id === r.user_id) return 'istanbul';
-    const nbMap = districtFirstByDate.get(r.date);
-    if (r.neighborhood && nbMap?.get(r.neighborhood)?.user_id === r.user_id) return 'neighborhood';
-    return null;
-  }
-
-  // Deduplicate per (user, date): keep the best (highest-scoring) result per day.
-  const byUserDate = new Map();
-  weekly.forEach(r => {
-    if (!r.user_id) return;
-    const key = r.user_id + '|' + r.date;
-    const pts = gamePoints(r.attempts, r.won) + firstSolverBonus(firstTierFor(r));
-    const existing = byUserDate.get(key);
-    if (!existing || pts > existing.pts) {
-      byUserDate.set(key, { user_id: r.user_id, neighborhood: r.neighborhood, date: r.date, pts });
-    }
-  });
-  const scores = new Map();
-  byUserDate.forEach(entry => {
-    const prev = scores.get(entry.user_id) || { score: 0, neighborhood: null, lastDate: null };
-    prev.score += entry.pts;
-    const d = parseGameDate(entry.date);
-    if (entry.neighborhood && (!prev.lastDate || (d && d >= prev.lastDate))) {
-      prev.neighborhood = entry.neighborhood;
-      prev.lastDate = d;
-    }
-    scores.set(entry.user_id, prev);
-  });
-
-  // Sözcü bonus: credit each day's word-setter with the points every
-  // solver earned off their word (sozcuPoints), so picking a word people
-  // enjoy pays off on the same weekly board as playing does.
-  try {
-    const cutoffISO = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
-    const { data: sozcuRows } = await sb
-      .from('sozcel_used_answers')
-      .select('used_on, sozcul_id')
-      .gte('used_on', cutoffISO);
-    const sozcuByDay = new Map();
-    (sozcuRows || []).forEach(r => {
-      const d = parseGameDate(r.used_on);
-      if (d && r.sozcul_id) sozcuByDay.set(d.getTime(), r.sozcul_id);
-    });
-    if (sozcuByDay.size > 0) {
-      const creditedPlayerDay = new Set();
-      weekly.forEach(r => {
-        if (!r.user_id) return;
-        const d = parseGameDate(r.date);
-        if (!d) return;
-        const sozcuId = sozcuByDay.get(d.getTime());
-        if (!sozcuId || sozcuId === r.user_id) return;
-        const dedupKey = r.user_id + '|' + d.getTime();
-        if (creditedPlayerDay.has(dedupKey)) return;
-        creditedPlayerDay.add(dedupKey);
-        const bonus = sozcuPoints(r.attempts, r.won);
-        if (bonus <= 0) return;
-        const prev = scores.get(sozcuId) || { score: 0, neighborhood: null, lastDate: null };
-        prev.score += bonus;
-        scores.set(sozcuId, prev);
-      });
-    }
-  } catch (e) { /* Sözcü bonus is best-effort */ }
-
-  const userIds = Array.from(scores.keys());
-  const nameMap = new Map();
-  const nbFallbackMap = new Map();
-  try {
-    if (userIds.length > 0) {
-      const { data: profs } = await sb.from('profiles').select('id, first_name, neighborhood').in('id', userIds);
-      (profs || []).forEach(p => {
-        if (p.first_name) nameMap.set(p.id, p.first_name.toLocaleUpperCase('tr-TR'));
-        if (p.neighborhood) nbFallbackMap.set(p.id, p.neighborhood);
-      });
-    }
-  } catch (e) {}
-  const top = Array.from(scores.entries())
-    .map(([uid, v]) => ({ uid, score: v.score, neighborhood: v.neighborhood || nbFallbackMap.get(uid) || null, name: nameMap.get(uid) || 'Anonim' }))
-    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'tr'))
-    .slice(0, 5);
-  const listHtml = top.map((p, i) => {
-    const nbName = (neighborhoodNames[p.neighborhood] || p.neighborhood || '').toLocaleUpperCase('tr-TR');
-    const rankClass = ' r' + (i + 1);
-    let playerLabel = escapeHtml(p.name);
-    if (nbName) {
-      playerLabel = I18N.isEnglish()
-        ? `${escapeHtml(p.name)} FROM ${nbName}`
-        : `${nbName}${getAblativeSuffix(nbName).toLocaleUpperCase('tr-TR')} ${escapeHtml(p.name)}`;
-    }
-    return `<li class="scoreboard-item${rankClass} author-link" data-user-id="${p.uid}">` +
-      `<span class="scoreboard-rank">${i + 1}.</span>` +
-      `<span class="scoreboard-player">` +
-        `<span class="scoreboard-name">${playerLabel}</span>` +
-      `</span>` +
-      `<span class="scoreboard-score">${p.score}</span>` +
-    `</li>`;
-  }).join('');
-  setListHTML(listHtml);
-  setWeekProgress(document.getElementById('scoreboard-countdown'));
-  setWeekProgress(document.getElementById('scoreboard-countdown-mobile'));
+  const { rows, error } = await IstScoreboard.weekly(sb);
+  if (error) { setListHTML('<li class="scoreboard-empty">Skorlar yüklenemedi</li>'); return; }
+  setListHTML(rows.length ? IstScoreboard.rowsHTML(rows, { districtNames: neighborhoodNames }) : '');
 }
 
 // ── Today's Sözcel results (shown to the Sözcü, who can't play today's
@@ -5701,11 +5561,6 @@ function sozcuTakeoverScoreboardHTML() {
 
 // Points the Sözcü earns from each solver's result on their word: 5/1/2/3/2/1
 // for a win found on the 1st–6th guess; 0 if the solver didn't find it.
-function sozcuPoints(attempts, won) {
-  if (!won) return 0;
-  const pts = [5, 1, 2, 3, 2, 1];
-  return pts[attempts - 1] ?? 0;
-}
 
 function renderTakeoverDone(takeover, date) {
   if (_takeoverCountdownInterval) { clearInterval(_takeoverCountdownInterval); _takeoverCountdownInterval = null; }

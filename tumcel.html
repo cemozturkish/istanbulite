@@ -10,6 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=2"></script>
   <script src="i18n.js?v=18"></script>
+  <script src="scoreboard.js?v=1"></script>
   <script src="palette.js?v=1"></script>
   <script src="avatar.js?v=1"></script>
   <link rel="stylesheet" href="palette.css?v=3">
@@ -1661,72 +1662,16 @@ async function renderStats() {
 // ── Weekly scoreboard ──
 // A 'YYYY-MM-DD' key as a Date. One implementation, in ist-date.js.
 function parseGameDate(s) { return IstDate.parseYMD(s); }
-
+// The numbers come from IstScoreboard (scoreboard.js) -- the same weekly
+// board Kahvehane and Sözcel show. This page used to count one point per
+// win over a rolling seven days, so it showed different totals for the
+// same members under the same title.
 async function loadScoreboard() {
   const listEl = document.getElementById('scoreboard-list');
   if (!listEl) return;
-  let results = null;
-  try {
-    const { data, error } = await sb.from('game_results')
-      .select('user_id, neighborhood, date, won').eq('won', true);
-    if (error) throw error;
-    results = data;
-  } catch (e) {
-    listEl.innerHTML = '<li class="scoreboard-empty">Skorlar yüklenemedi</li>';
-    return;
-  }
-  if (!results || results.length === 0) {
-    listEl.innerHTML = '';
-    return;
-  }
-  const nowIst = IstDate.now();
-  const cutoff = new Date(nowIst.getFullYear(), nowIst.getMonth(), nowIst.getDate() - 6);
-  const weekly = results.filter(r => { const d = parseGameDate(r.date); return d && d >= cutoff; });
-  if (weekly.length === 0) {
-    listEl.innerHTML = '';
-    return;
-  }
-  const scores = new Map();
-  weekly.forEach(r => {
-    if (!r.user_id) return;
-    const prev = scores.get(r.user_id) || { score: 0, neighborhood: null, lastDate: null };
-    prev.score += 1;
-    const d = parseGameDate(r.date);
-    if (r.neighborhood && (!prev.lastDate || (d && d >= prev.lastDate))) {
-      prev.neighborhood = r.neighborhood;
-      prev.lastDate = d;
-    }
-    scores.set(r.user_id, prev);
-  });
-  const userIds = Array.from(scores.keys());
-  const nameMap = new Map();
-  try {
-    if (userIds.length > 0) {
-      const { data: profs } = await sb.from('profiles').select('id, first_name').in('id', userIds);
-      (profs || []).forEach(p => { if (p.first_name) nameMap.set(p.id, p.first_name.toLocaleUpperCase('tr-TR')); });
-    }
-  } catch (e) {}
-  const top = Array.from(scores.entries())
-    .map(([uid, v]) => ({ uid, score: v.score, neighborhood: v.neighborhood, name: nameMap.get(uid) || 'Anonim' }))
-    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'tr'))
-    .slice(0, 5);
-  listEl.innerHTML = top.map((p, i) => {
-    const nbName = (neighborhoodNames[p.neighborhood] || p.neighborhood || '').toLocaleUpperCase('tr-TR');
-    const rankClass = ' r' + (i + 1);
-    let playerLabel = escapeHtml(p.name);
-    if (nbName) {
-      playerLabel = I18N.isEnglish()
-        ? `${escapeHtml(p.name)} FROM ${nbName}`
-        : `${nbName}${getAblativeSuffix(nbName).toLocaleUpperCase('tr-TR')} ${escapeHtml(p.name)}`;
-    }
-    return `<li class="scoreboard-item${rankClass} author-link" data-user-id="${p.uid}">` +
-      `<span class="scoreboard-rank">${i + 1}.</span>` +
-      `<span class="scoreboard-player">` +
-        `<span class="scoreboard-name">${playerLabel}</span>` +
-      `</span>` +
-      `<span class="scoreboard-score">${p.score}</span>` +
-    `</li>`;
-  }).join('');
+  const { rows, error } = await IstScoreboard.weekly(sb);
+  if (error) { listEl.innerHTML = '<li class="scoreboard-empty">Skorlar yüklenemedi</li>'; return; }
+  listEl.innerHTML = rows.length ? IstScoreboard.rowsHTML(rows, { districtNames: neighborhoodNames }) : '';
 }
 
 // Turkish ablative suffix (vowel harmony + voiceless-consonant rule).
