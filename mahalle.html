@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="tr" class="ist-safe-area-pending">
+<head>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/favicon.png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f0f0f0">
+  <title>Mahalle — istanbulite.net</title>
+  <script src="safe-area-ready.js?v=2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="ist-date.js?v=2"></script>
+  <script src="router.js?v=8"></script>
+  <script src="i18n.js?v=18"></script>
+  <script src="palette.js?v=1"></script>
+  <link rel="stylesheet" href="palette.css?v=3">
+  <link rel="stylesheet" href="profile-card.css?v=22">
+  <script src="avatar.js?v=1" defer></script>
+  <script src="person-mentions.js?v=1" defer></script>
+  <script src="profile-card.js?v=25" defer></script>
+  <link rel="stylesheet" href="onboarding.css?v=1">
+  <script src="onboarding.js?v=1" defer></script>
+  <link rel="stylesheet" href="mahalle-picker.css?v=1">
+  <script src="mahalle-picker.js?v=1" defer></script>
+  <script src="sozcu-mascot.js?v=1" defer></script>
+  <script src="admin-notification.js?v=1" defer></script>
+  <script>
+    (function(){
+      try {
+        var _d = sessionStorage.getItem('ist-page-enter-dir');
+        if (_d) {
+          var _vt = ('startViewTransition' in document) && !window.Capacitor;
+          if (!_vt) document.documentElement.classList.add('ist-entering-' + _d);
+          document.documentElement.classList.add('vt-' + _d);
+          window.__istSuppressFirstCardAnim = { left: true, right: true };
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <script src="sheet.js?v=5"></script>
+  <link rel="stylesheet" href="sheet.css?v=7">
+  <link rel="stylesheet" href="frames.css?v=3">
+
+  <style data-page="mahalle">
+    :root {
+      --paper-card: #ddc4b5;
+      --success: var(--accent-2);
+      --frame-bg: #e3cdbe;
+      --page-bg: #f1dfc6;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* The same grid the other three levels use, so the two fixed bars and
+       the hero line land in exactly the same place as the reader zooms
+       between them (see "The phone's hero line" in CLAUDE.md). */
+    #main-site {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
+      min-height: 100dvh;
+    }
+
+    .section-rule {
+      grid-column: 1 / -1;
+      grid-row: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 14px 28px 10px 28px;
+    }
+
+    main {
+      grid-column: 1;
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .mah-wrap {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      padding: 0 var(--screen-inset, 16px);
+      padding-bottom: calc(var(--navbar-h, 56px) + env(safe-area-inset-bottom) + 12px);
+      padding-top: var(--map-hero-top, 12px);
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    /* ── The level's own name, on the hero line ── */
+    .mah-head { flex-shrink: 0; text-align: center; padding-top: 6px; }
+    .mah-kicker {
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 4px;
+    }
+    .mah-ilce {
+      font-size: 1.65rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0;
+      line-height: 1.05;
+    }
+    .mah-mine {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin: 6px 0 0;
+    }
+    .mah-mine b { color: var(--ink); font-weight: 700; }
+
+    /* ── The mahalle list ──
+       Bottom-aligned like every other stack on a phone (CLAUDE.md: "The
+       phone's feeds hang from the bottom, not the top"), so the last row
+       rests just above the tab bar and the list grows upward. The auto
+       margin sits on the list itself, which does not grow -- a margin one
+       level up would be eaten by the flex parent. */
+    .mah-list-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .mah-list {
+      list-style: none;
+      margin: auto 0 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      /* Without min-height:0 a flex item never shrinks below its own
+         content, so a long ilçe simply overflowed the wrap and was
+         clipped by it -- the list reported nothing to scroll and the
+         rows past the fold were unreachable. */
+      min-height: 0;
+    }
+    .mah-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 7px 10px;
+      background: var(--paper-card);
+      border: 1px solid var(--hairline);
+      font-size: 0.82rem;
+      color: var(--ink);
+    }
+    .mah-row .n {
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      font-size: 0.68rem;
+      min-width: 1.6em;
+    }
+    .mah-row.is-mine {
+      background: var(--brown-1);
+      border-color: var(--brown-2);
+      font-weight: 700;
+    }
+    .mah-row.is-mine .n { color: var(--ink); }
+
+    .mah-empty {
+      border: 1px dashed var(--rule);
+      padding: 18px 14px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin: auto 0 0;
+    }
+    .mah-empty b { display: block; color: var(--ink); font-size: 0.9rem; margin-bottom: 4px; }
+
+    /* ── The phone's bottom tab bar ──
+       Same object as the other three levels': the <header> is pulled out
+       of the grid and pinned to the viewport's bottom edge, so the two
+       fixed bars stay in exactly the same place as the reader zooms
+       between the levels (see "The phone's two bars" in CLAUDE.md).
+       .section-rule is left in flow with no size of its own -- it only
+       ever carried the nav, which is now fixed. */
+    @media (max-width: 768px) {
+      .section-rule {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 0;
+        height: 0;
+        padding: 0;
+        overflow: visible;
+      }
+      header {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom));
+        padding: 0 0 env(safe-area-inset-bottom);
+        margin: 0;
+        border-top: 1px solid var(--rule);
+        border-bottom: none;
+        background: var(--paper-navbar);
+        z-index: 100;
+        display: flex;
+        align-items: stretch;
+      }
+      nav {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        gap: 0;
+        padding: 0 18px;
+        flex-wrap: nowrap;
+        justify-content: stretch;
+      }
+      nav a {
+        flex: 1;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding-bottom: 6px;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: var(--muted);
+        border: none;
+        text-decoration: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      nav a.active { color: var(--ink); font-weight: 700; }
+      nav a:first-child { justify-content: flex-start; }
+      nav a:last-child { justify-content: flex-end; margin-right: -0.5px; }
+
+      /* This level does not scroll as a page: it is a fixed screen with
+         one list scrolling inside it, like every other level. So the
+         grid is given the viewport's height outright -- `min-height`
+         alone lets a long ilçe push the row past the screen, and then
+         nothing below is ever bounded, the list reports nothing to
+         scroll, and its overflowing rows are simply clipped and
+         unreachable. */
+      html, body { height: 100dvh; overflow: hidden; }
+      #main-site {
+        /* frames.css pins this to `height: 100% !important`, so the
+           viewport height has to be given to body for it to resolve to
+           anything but auto. */
+        grid-template-rows: 1fr;
+        overflow: hidden;
+      }
+      main { grid-row: 1 / -1; min-height: 0; }
+    }
+
+    /* Desktop: the same content, centred, with room to breathe. */
+    @media (min-width: 769px) {
+      .mah-wrap { max-width: 620px; margin: 0 auto; padding-top: 28px; padding-bottom: 40px; }
+      .mah-list { margin-top: 0; }
+      .mah-ilce { font-size: 2.4rem; }
+    }
+  </style>
+</head>
+<body data-page="mahalle">
+
+<div id="main-site">
+
+  <!-- Mobile-only compact profile card (mounted by profile-card.js) -->
+  <div id="ist-pc-mount"></div>
+
+  <div class="section-rule">
+    <header>
+      <nav>
+        <a href="kahvehane.html" class="active" data-tab="istanbulite">İstanbulite</a>
+        <a href="anahane.html" data-tab="hane">Hane</a>
+      </nav>
+    </header>
+  </div>
+
+  <div id="ist-content" style="display:contents">
+    <main>
+      <div class="mah-wrap">
+        <div class="mah-head">
+          <p class="mah-kicker" id="mah-kicker">Mahalle</p>
+          <h1 class="mah-ilce" id="mah-ilce">—</h1>
+          <p class="mah-mine" id="mah-mine"></p>
+        </div>
+        <div class="mah-list-wrap">
+          <ul class="mah-list" id="mah-list"></ul>
+        </div>
+      </div>
+    </main>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// MAHALLE — the innermost of the three İstanbulite levels
+//
+// Türkiye (kutuphane) -> İstanbul (kahvehane) -> Mahalle (here). The
+// reader arrives by zooming in: a downward swipe or a pinch out, from the
+// İstanbul level (see router.js's zoom stack).
+//
+// What is here is deliberately the smallest true thing: the reader's own
+// ilçe, and the mahalles inside it, with theirs picked out. There is no
+// mahalle MAP because there is no mahalle geometry -- public.mahalles
+// carries id, ilce_id and name_tr and no polygon (db/mahalles.sql), so a
+// drawing of this level would have to be invented rather than traced.
+// Everything else this level should eventually hold hangs off that
+// decision, so it waits for it.
+// ══════════════════════════════════════════════════════════════
+const sb = IstRouter.sb;
+
+// The 25 districts, by id -- same list every page carries.
+const NB_NAMES = {
+  bakirkoy: 'Bakırköy', bayrampasa: 'Bayrampaşa', bahcelievler: 'Bahçelievler',
+  sisli: 'Şişli', eyupsultan: 'Eyüpsultan', gop: 'Gaziosmanpaşa', esenler: 'Esenler',
+  bagcilar: 'Bağcılar', basaksehir: 'Başakşehir', kucukcekmece: 'Küçükçekmece',
+  sultangazi: 'Sultangazi', uskudar: 'Üsküdar', kadikoy: 'Kadıköy', maltepe: 'Maltepe',
+  umraniye: 'Ümraniye', cekmekoy: 'Çekmeköy', beykoz: 'Beykoz', sariyer: 'Sarıyer',
+  besiktas: 'Beşiktaş', beyoglu: 'Beyoğlu', gungoren: 'Güngören', kagithane: 'Kağıthane',
+  atasehir: 'Ataşehir', zeytinburnu: 'Zeytinburnu', fatih: 'Fatih',
+  istanbul_disi: 'İstanbul Dışı',
+};
+
+let _profile = null;
+
+async function loadMahalle() {
+  const ilceEl = document.getElementById('mah-ilce');
+  const mineEl = document.getElementById('mah-mine');
+  const listEl = document.getElementById('mah-list');
+  if (!ilceEl || !listEl) return;
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+
+  const { data: profile } = await sb.from('profiles')
+    .select('neighborhood, mahalle')
+    .eq('id', session.user.id)
+    .maybeSingle();
+  _profile = profile || null;
+
+  const ilce = profile && profile.neighborhood;
+  ilceEl.textContent = ilce ? (NB_NAMES[ilce] || ilce) : '—';
+
+  if (!ilce) {
+    listEl.outerHTML = '<div class="mah-empty" id="mah-list"><b>Mahalle bilinmiyor</b>Profilinde ilçen kayıtlı değil.</div>';
+    return;
+  }
+
+  const { data: rows, error } = await sb.from('mahalles')
+    .select('id, name_tr')
+    .eq('ilce_id', ilce)
+    .order('name_tr');
+
+  const mine = profile.mahalle || null;
+  const mineRow = (rows || []).find(r => r.id === mine);
+  mineEl.innerHTML = mineRow
+    ? `Senin mahallen: <b>${I18N.escapeHtml(mineRow.name_tr)}</b>`
+    : '';
+
+  if (error) {
+    listEl.outerHTML = '<div class="mah-empty" id="mah-list"><b>Mahalleler yüklenemedi</b>Bağlantını kontrol edip tekrar dene.</div>';
+    return;
+  }
+  if (!rows || !rows.length) {
+    // An ilçe whose mahalles nobody has entered yet is a real state, and
+    // saying so is better than an empty column that reads as broken.
+    listEl.outerHTML = `<div class="mah-empty" id="mah-list"><b>Henüz mahalle yok</b>${I18N.escapeHtml(NB_NAMES[ilce] || ilce)} için mahalleler henüz girilmedi.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = rows.map((r, i) => {
+    const isMine = mine && r.id === mine;
+    return `<li class="mah-row${isMine ? ' is-mine' : ''}">` +
+      `<span class="n">${i + 1}</span>` +
+      `<span>${I18N.escapeHtml(r.name_tr)}</span>` +
+    `</li>`;
+  }).join('');
+}
+
+// ── The page lifecycle router.js drives ──
+function mount() {
+  document.getElementById('main-site').classList.add('active');
+  loadMahalle();
+  if (window.IstProfileCard) IstProfileCard.setPage('mahalle');
+}
+function unmount() { /* nothing of this page's own ticks yet */ }
+IstRouter.registerPage('mahalle', { mount, unmount });
+
+// Skipped when router.js is injecting this script during a virtual
+// navigation -- that path calls the registered mount() itself.
+if (!window.__istVirtualNavInjecting) {
+  mount();
+  window.addEventListener('DOMContentLoaded', () => {
+    if (window.IstProfileCard) IstProfileCard.mount({ sb, I18N, page: 'mahalle' });
+  });
+}
+</script>
+</body>
+</html>
