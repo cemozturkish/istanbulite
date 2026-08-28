@@ -121,10 +121,26 @@
   // three ~1500-line stylesheets.
   const pageCache = {}; // slug -> { styleCSS, contentHTML, overlayHTML, scriptText, title }
 
-  async function ensurePageLoaded(slug) {
-    if (pageCache[slug]) return pageCache[slug];
+  // Keyed on the PROMISE rather than the result, so a prefetch already in
+  // flight and a navigation that wants the same page share one fetch
+  // instead of racing two. A rejection drops the entry again, or one
+  // failed request would be cached as a permanent refusal to load that
+  // page for the rest of the session.
+  const pageLoads = {};
+  function ensurePageLoaded(slug) {
+    if (pageCache[slug]) return Promise.resolve(pageCache[slug]);
+    if (pageLoads[slug]) return pageLoads[slug];
+    const p = loadPage(slug);
+    pageLoads[slug] = p;
+    p.catch(() => { delete pageLoads[slug]; });
+    return p;
+  }
+
+  async function loadPage(slug) {
     const file = slug + '.html';
-    const html = await fetch(file).then(r => r.text());
+    const res = await fetch(file);
+    if (!res.ok) throw new Error(`[router] ${file} -> ${res.status}`);
+    const html = await res.text();
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const styleEl = doc.querySelector('style[data-page="' + slug + '"]');
     const contentEl = doc.getElementById('ist-content');
@@ -203,6 +219,73 @@
     }
   }
 
+  // ── Waiting for the exit slide, rather than for a number ──
+  // The columns' own transition is 0.32s on a phone and 0.4s on desktop
+  // (see each page's two media queries). This used to be a flat 370ms
+  // wait, which matches neither: on the phone -- the platform ~90% of
+  // users are on -- it sat idle for ~50ms after the slide had already
+  // finished, and every one of those milliseconds is in front of the
+  // reader between two pages.
+  //
+  // So the duration is read off the elements that actually carry the
+  // transition, all four of them, since which pair is live depends on the
+  // media query. A screen where none of them animates (reduced motion, a
+  // column display:none) reports 0 and the wait is skipped outright.
+  function exitDurationMs() {
+    let ms = 0;
+    document.querySelectorAll('.col-left, .col-right, .col-left-slide, .col-right-slide').forEach(el => {
+      const cs = getComputedStyle(el);
+      const d = (parseFloat(cs.transitionDuration) || 0) + (parseFloat(cs.transitionDelay) || 0);
+      if (d * 1000 > ms) ms = d * 1000;
+    });
+    return ms;
+  }
+
+  // Resolves when the slide ends, or when it should have. transitionend is
+  // the real signal -- it accounts for when the transition actually began
+  // -- but it never fires if the element is off-screen or the transition
+  // is interrupted, so the measured duration is the backstop rather than
+  // the primary. Whichever comes first.
+  function awaitExitSlide() {
+    const ms = exitDurationMs();
+    if (!ms) return Promise.resolve();
+    return new Promise(resolve => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        document.removeEventListener('transitionend', onEnd, true);
+        resolve();
+      };
+      const onEnd = (e) => {
+        if (e.propertyName !== 'transform') return;
+        const cl = e.target && e.target.classList;
+        if (!cl) return;
+        if (cl.contains('col-left') || cl.contains('col-right') ||
+            cl.contains('col-left-slide') || cl.contains('col-right-slide')) finish();
+      };
+      const timer = setTimeout(finish, ms + 60);
+      document.addEventListener('transitionend', onEnd, true);
+    });
+  }
+
+  // ── Prefetch the two pages a swipe can reach ──
+  // ensurePageLoaded fetches the target and DOMParses it -- and these are
+  // 6,000-8,500 line documents. Done inside a navigation that is the
+  // reader waiting; done at idle beforehand it costs them nothing, and
+  // the first swipe to a page becomes as quick as the second.
+  function prefetchNeighbours(slug) {
+    const i = PAGES.indexOf(slug);
+    if (i === -1) return;
+    const want = [PAGES[i - 1], PAGES[i + 1]].filter(Boolean);
+    const run = () => want.forEach(s => {
+      if (!pageCache[s]) ensurePageLoaded(s).catch(() => {});
+    });
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 4000 });
+    else setTimeout(run, 1500);
+  }
+
   let virtualNavInFlight = false;
   // The currently-displayed page, tracked independently of location.pathname
   // -- once pushState/popstate are in play, the URL can change (e.g. a
@@ -222,16 +305,40 @@
     if (targetSlug === currentSlug) return;
     virtualNavInFlight = true;
 
+    const exitClass = dir === 'forward' ? 'ist-exiting-forward' : 'ist-exiting-backward';
     try {
-      const exitClass = dir === 'forward' ? 'ist-exiting-forward' : 'ist-exiting-backward';
+      // Started BEFORE the slide, so the fetch and the DOMParse happen
+      // while the columns are still moving rather than after they have
+      // stopped. With the prefetch above this is normally already
+      // resolved and the await below costs nothing; on a cold first swipe
+      // it is the difference between the work being hidden by the
+      // animation and the reader watching it.
+      const loading = ensurePageLoaded(targetSlug);
+      // Same reasoning one level down: whichever <script src> the target
+      // declares and this document doesn't have yet can be fetched during
+      // the slide too. Awaited at its old place further down.
+      const scripts = loading.then(loadMissingScripts).catch(() => {});
+
       document.body.classList.add(exitClass);
-      await new Promise(resolve => setTimeout(resolve, 370)); // matches the swipe-pagination transition's 400ms minus a 30ms head start
+
+      let cached;
+      try {
+        cached = (await Promise.all([loading, awaitExitSlide()]))[0];
+      } catch (e) {
+        // The target could not be loaded at all -- offline, a 404 from a
+        // half-deployed Pages build. The columns are sitting off-screen
+        // by now, so doing nothing would leave the reader on a blank
+        // page. Put them back and hand the navigation to the browser,
+        // which can at least show its own error.
+        console.error(e);
+        document.body.classList.remove(exitClass);
+        if (!fromPopstate) window.location.href = targetSlug + '.html';
+        return;
+      }
 
       if (pages[currentSlug] && pages[currentSlug].unmount) {
         try { pages[currentSlug].unmount(); } catch (e) { console.error(e); }
       }
-
-      const cached = await ensurePageLoaded(targetSlug);
 
       if (!document.querySelector('style[data-page="' + targetSlug + '"]')) {
         const styleEl = document.createElement('style');
@@ -306,7 +413,7 @@
       // document doesn't already have (see loadMissingScripts above) --
       // must finish before the page's own script/mount runs below, since
       // that's what actually reads window.IstPoliticianCard and friends.
-      await loadMissingScripts(cached);
+      await scripts;
 
       // First visit to this page this session -- execute its script once
       // to register mount/unmount (see registerPage above). Guarded so a
@@ -375,6 +482,8 @@
       // has to be pointed at it (see map-parallax.js).
       if (global.IstMapParallax) global.IstMapParallax.refresh();
       if (global.IstProfileCard) global.IstProfileCard.setPage(targetSlug);
+      // Whichever two pages the reader can now reach in one swipe.
+      prefetchNeighbours(targetSlug);
     } finally {
       virtualNavInFlight = false;
     }
@@ -542,6 +651,13 @@
     }
   }
   initSwipePagination();
+
+  // The two pages either side of whichever one really loaded. Deliberately
+  // at idle and after load rather than on DOMContentLoaded: this page's
+  // own scripts, fonts and map art come first, and a prefetch that
+  // competes with them has made the app slower, not faster.
+  if (document.readyState === 'complete') prefetchNeighbours(currentPage());
+  else window.addEventListener('load', () => prefetchNeighbours(currentPage()));
 
   global.IstRouter = {
     sb,
