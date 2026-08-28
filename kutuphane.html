@@ -4835,11 +4835,26 @@ function shelfProgress(shelfId) {
 // as Hane's news/events and Kahvehane's discussion feed/scoreboard.
 const CARD_SWAP_MS = 300;
 const CARD_STAGGER_MS = 160;
+// ── The first render after a navigation does not animate its cards ──
+// router.js seeds window.__istSuppressFirstCardAnim on every virtual
+// navigation, and Kahvehane has honoured it since it was added. This page
+// never did: it rendered the news feed with a hardcoded 'right' entrance
+// on arrival, so every card slid in FROM THE RIGHT on top of a column that
+// was already sliding in -- and when the reader had swiped right to get
+// here, the column arrived from the left while the news inside it arrived
+// from the right. Two things moving opposite ways in the same instant.
+//
+// Suppressed, the cards are simply there when the column lands. The
+// entrance is still used for what it was for: an in-page re-render, such
+// as the deck advancing after a story is thrown away.
 function animateFeedSwap(container, direction, buildFn) {
+  const suppress = window.__istSuppressFirstCardAnim && window.__istSuppressFirstCardAnim[direction];
+  if (suppress) window.__istSuppressFirstCardAnim[direction] = false;
   const enterClass = direction === 'left' ? 'card-entering-left' : 'card-entering-right';
   const leaveClass = direction === 'left' ? 'card-leaving-left' : 'card-leaving-right';
   const playEnter = () => {
     buildFn();
+    if (suppress) return;
     staggerEntrance(Array.from(container.children), direction);
   };
   const existing = Array.from(container.children);
