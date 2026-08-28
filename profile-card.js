@@ -1420,8 +1420,34 @@
     const phone = !!(window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
     const boxW = (page && page.clientWidth) || 0;
     const boxH = (page && page.clientHeight) || 0;
-    const halfW = (phone || !boxW ? Math.max(window.innerWidth || 0, boxW, 360) : boxW) / 2;
-    const halfH = (phone || !boxH ? Math.max(window.innerHeight || 0, boxH, 640) : boxH) / 2;
+    // ── The screen, not the page's own box ──
+    // On a phone the clip is lifted at the outermost depth, so
+    // #po-hive-page's box is free to grow with the plane inside it -- and
+    // the plane's size is decided by how many cells this function asks
+    // for. Feeding that box back in here closed the loop: a re-render at
+    // that depth measured a page the previous field had already enlarged
+    // and asked for a bigger field again. Measured on a 390x844 phone,
+    // one press at the outermost depth took the field from 306 cells to
+    // 1692 and the next to 2182, all of the growth off-screen where
+    // nobody could see any of it.
+    //
+    // What the field has to cover is the SCREEN, which is a fixed thing,
+    // so that is what is measured. The desktop branch still measures the
+    // page: the drawing is clipped to the middle column there, and
+    // reaching past it would be a few hundred outlines nobody can see.
+    //
+    // And the screen is read off documentElement, never window.innerWidth
+    // -- innerWidth is the other half of the same loop. With the clip
+    // lifted the field overflows horizontally, and a mobile viewport set
+    // to width=device-width answers that by shrinking to fit, so
+    // innerWidth ITSELF doubles (390x844 -> 782x1693 on the phone this
+    // was measured on) while documentElement.clientWidth and
+    // visualViewport both stay put. Feeding innerWidth back in asked for
+    // a field twice as wide as the screen, which overflowed further.
+    const vpW = document.documentElement.clientWidth || window.innerWidth || 0;
+    const vpH = document.documentElement.clientHeight || window.innerHeight || 0;
+    const halfW = (phone || !boxW ? Math.max(vpW, 360) : boxW) / 2;
+    const halfH = (phone || !boxH ? Math.max(vpH, 640) : boxH) / 2;
     const clamp = (n) => Math.min(HIVE_FIELD_MAX, Math.max(2, Math.ceil(n) + 1));
     return { cols: clamp(halfW / stepX), rows: clamp(halfH / stepY) };
   }
@@ -2038,10 +2064,19 @@
     // they are not.
     const dropped = level !== HIVE_LEVEL_ALL && (state.hiveOpen || state.hiveSelected);
     if (dropped) {
-      state.hiveOpen = null;
+      const mount = document.getElementById('po-hive-mount');
+      const openCell = mount ? mount.querySelector('.ist-hive-cell-open') : null;
       state.hiveSelected = null;
       clearBarMember();
-      renderHive(state);
+      // At most one hexagon was open and at most one was red, so those
+      // are the only two things on the plane that have to be redrawn --
+      // the level's own work (applyHiveLevel/fitHive) happens below
+      // exactly as it does when nothing was dropped. hiveWaveIn is still
+      // deliberately skipped on this path, as it always was.
+      setHiveOpen(state, null, openCell);
+      paintHivePicked(state);
+      applyHiveLevel(state);
+      fitHive(state);
       return;
     }
     applyHiveLevel(state);
@@ -2091,7 +2126,7 @@
     const next = state.hiveSelected === id ? null : id;
     state.hiveSelected = next;
     setBarMember(next ? member : null);
-    renderHive(state);
+    paintHivePicked(state);
   }
 
   // The page is the drawing, and nothing else. There was a dock along the
@@ -2597,52 +2632,150 @@
       'ist-hive-cell-verdict-yes', 'ist-hive-cell-verdict-no', 'ist-hive-cell-rsvp'));
   }
 
-  function wireHiveEvents(state) {
+  // ── One cell, repainted where it stands ──
+  // Opening a seat or the claim field changes what is drawn INSIDE one
+  // hexagon and nothing else: CLAUDE.md's rule for this page is that a
+  // cell's box never changes for a press, precisely so no neighbour ever
+  // moves. So the press does not have to go through renderHive, which
+  // rebuilds every cell on the plane -- ~300 of them at the outermost
+  // depth -- re-runs applyHiveLevel over all of them and re-fits the
+  // whole drawing, to change two.
+  //
+  // The meta is read back off the live node rather than recomputed: it is
+  // exactly what hiveGridHTML wrote there (the calc()-ed left/top and
+  // --ring in the style attribute, data-ring, and data-side on ring 1),
+  // and reading it means the packing arithmetic stays stated in one place.
+  function hiveCellMeta(el) {
+    let meta = `style="${esc(el.getAttribute('style') || '')}" data-ring="${esc(el.dataset.ring || '0')}"`;
+    if (el.dataset.side) meta += ` data-side="${esc(el.dataset.side)}"`;
+    return meta;
+  }
+
+  // Rebuilds one cell in place and rewires just that one. Returns the new
+  // node, or null if this is not a cell that a press can change.
+  function repaintHiveCell(state, el) {
+    if (!el || !el.isConnected) return null;
     const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
+    const meta = hiveCellMeta(el);
+    const open = state.hiveOpen;
+    let html = null;
+    if (el.dataset.me) {
+      html = hiveMeCellHTML({
+        profile: state.profile,
+        avatarUrl: state.avatarUrl, avatarHair: state.avatarHair, avatarHat: state.avatarHat,
+        avatarAccessory: state.avatarAccessory, avatarShirt: state.avatarShirt,
+        displayName: state.hiveDisplayName || '',
+      }, meta, open, t);
+    } else if (el.dataset.dir != null) {
+      const dir = parseInt(el.dataset.dir, 10);
+      html = hiveEmptyCellHTML(dir, meta, (open && open.dir === dir) ? open : null, t);
+    }
+    if (!html) return null;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = html.trim();
+    const next = wrap.firstElementChild;
+    if (!next) return null;
+    // applyHiveLevel's own marks are the level's, not the press's -- a
+    // freshly built cell has never been through it, so they are carried
+    // over rather than left for the next level change to restore.
+    if (el.classList.contains('ist-hive-away')) next.classList.add('ist-hive-away');
+    if (el.disabled) next.disabled = true;
+    el.replaceWith(next);
+    wireHiveCell(state, next);
+    return next;
+  }
+
+  // Opening one hexagon closes whichever was open, and those are the only
+  // two cells on the plane that can have changed.
+  function setHiveOpen(state, next, target) {
+    const mount = document.getElementById('po-hive-mount');
+    const prev = mount ? mount.querySelector('.ist-hive-cell-open') : null;
+    state.hiveOpen = next;
+    if (prev && prev !== target) repaintHiveCell(state, prev);
+    const painted = target ? repaintHiveCell(state, target) : null;
+    // The seat's clock belongs to whatever is open now (or to nothing).
+    wireHiveOfferClock(state);
+    return painted;
+  }
+
+  // Which member is named on the bar is a class and an aria state, and
+  // nothing else in the markup (see hiveMemberCellHTML) -- so it is
+  // painted onto the cells that are already there rather than rebuilt.
+  function paintHivePicked(state) {
     const mount = document.getElementById('po-hive-mount');
     if (!mount) return;
+    const id = state.hiveSelected || null;
+    mount.querySelectorAll('.ist-hive-cell[data-member-id]').forEach(cell => {
+      const on = id != null && cell.dataset.memberId === id;
+      cell.classList.toggle('ist-hive-picked', on);
+      cell.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
 
-    // Bound to the mount, never to `document`: all three carousel pages
-    // share one document (see router.js), so a document-level handler
-    // would keep firing after navigating away from Anahane.
-    mount.querySelectorAll('.ist-hive-cell[data-dir]').forEach(cell => {
+  // The listeners one cell needs, so a repainted cell can be rewired on
+  // its own without touching the other ~300.
+  function wireHiveCell(state, cell) {
+    if (cell.dataset.dir != null) {
       cell.addEventListener('click', () => {
         const dir = parseInt(cell.dataset.dir, 10);
         // Pressing the open hexagon again folds it back up, so the frame
         // is its own close button and nothing else has to carry one.
-        if (state.hiveOpen && state.hiveOpen.dir === dir) {
-          state.hiveOpen = null;
-          renderHive(state);
-          return;
-        }
-        state.hiveOpen = { dir, offer: null, error: '' };
-        renderHive(state);
+        if (state.hiveOpen && state.hiveOpen.dir === dir) { setHiveOpen(state, null, cell); return; }
+        setHiveOpen(state, { dir, offer: null, error: '' }, cell);
         offerHiveSlot(state, dir);
       });
-    });
-
-    // ── Pressing somebody ──
-    // Their name goes up onto the bar, in the place your own name holds,
-    // and the hexagon goes red so the drawing says which of them the bar
-    // is talking about. Pressing them again puts your own name back.
-    // Nothing opens here: the profile is one more press, on the name
-    // itself (see setBarMember).
-    mount.querySelectorAll('.ist-hive-cell[data-member-id]').forEach(cell => {
+      return;
+    }
+    if (cell.dataset.memberId != null) {
+      // ── Pressing somebody ──
+      // Their name goes up onto the bar, in the place your own name
+      // holds, and the hexagon goes red so the drawing says which of them
+      // the bar is talking about. Pressing them again puts your own name
+      // back. Nothing opens here: the profile is one more press, on the
+      // name itself (see setBarMember).
       cell.addEventListener('click', () => pickHiveMember(state, cell.dataset.memberId));
-    });
+      return;
+    }
+    if (cell.dataset.me) {
+      // Pressing yourself opens the field that takes a code somebody gave
+      // you, inside your own hexagon. Pressing yourself again folds it
+      // back to your avatar — every hexagon on this page is its own close
+      // button, which is why nothing here carries one.
+      cell.addEventListener('click', () => {
+        if (state.hiveOpen && state.hiveOpen.claim) { setHiveOpen(state, null, cell); return; }
+        state.hiveFocusInput = true;
+        setHiveOpen(state, { claim: true, value: '', error: '' }, cell);
+      });
+      wireHiveClaimInput(state);
+    }
+  }
 
-    // Pressing yourself opens the field that takes a code somebody gave
-    // you, inside your own hexagon. Pressing yourself again folds it back
-    // to your avatar — every hexagon on this page is its own close
-    // button, which is why nothing here carries one.
-    const meCell = mount.querySelector('.ist-hive-cell[data-me]');
-    if (meCell) meCell.addEventListener('click', () => {
-      if (state.hiveOpen && state.hiveOpen.claim) { state.hiveOpen = null; renderHive(state); return; }
-      state.hiveOpen = { claim: true, value: '', error: '' };
-      state.hiveFocusInput = true;
-      renderHive(state);
-    });
+  function wireHiveEvents(state) {
+    const mount = document.getElementById('po-hive-mount');
+    if (!mount) return;
 
+    // Bound to each cell, never to `document`: all three carousel pages
+    // share one document (see router.js), so a document-level handler
+    // would keep firing after navigating away from Anahane.
+    // Only the cells that answer a press. The ghost field is the bulk of
+    // what is on the plane at the outermost depth and none of it is a
+    // control, so it is never walked here.
+    mount.querySelectorAll('.ist-hive-cell[data-dir], .ist-hive-cell[data-member-id], .ist-hive-cell[data-me]')
+      .forEach(cell => wireHiveCell(state, cell));
+
+    // The arrows flanking your own hexagon at level 0 (see
+    // hiveAvatarPickerHTML). These are the profile sheet's own carousels,
+    // reused unchanged — each press commits the pick on its own, so this
+    // page needs no Kaydet of its own either.
+    wireHairCarousel(state);
+    wireHatCarousel(state);
+    wireAccessoryCarousel(state);
+    wireShirtCarousel(state);
+
+    wireHiveOfferClock(state);
+  }
+
+  function wireHiveClaimInput(state) {
     const input = document.getElementById('po-hive-code');
     if (input) {
       // A press inside the field must not reach the hexagon behind it, or
@@ -2663,7 +2796,10 @@
       });
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') claimHiveSlot(state, input.value);
-        if (e.key === 'Escape') { state.hiveOpen = null; renderHive(state); }
+        if (e.key === 'Escape') {
+          const me = document.querySelector('#po-hive-mount .ist-hive-cell[data-me]');
+          setHiveOpen(state, null, me);
+        }
       });
       // Focus only when the field has just been opened, not on every
       // re-render: a fetch landing while a code is half-typed would
@@ -2673,17 +2809,6 @@
         input.focus();
       }
     }
-
-    // The arrows flanking your own hexagon at level 0 (see
-    // hiveAvatarPickerHTML). These are the profile sheet's own carousels,
-    // reused unchanged — each press commits the pick on its own, so this
-    // page needs no Kaydet of its own either.
-    wireHairCarousel(state);
-    wireHatCarousel(state);
-    wireAccessoryCarousel(state);
-    wireShirtCarousel(state);
-
-    wireHiveOfferClock(state);
   }
 
   // The seat's own clock. It ticks in place — the seat is not re-rendered
@@ -2704,8 +2829,8 @@
       // back to the way in rather than leaving a dead code on screen.
       if (new Date(offer.expires_at).getTime() <= Date.now()) {
         clearInterval(state.hiveOfferTimer);
-        state.hiveOpen = null;
-        renderHive(state);
+        const mount = document.getElementById('po-hive-mount');
+        setHiveOpen(state, null, mount && mount.querySelector('.ist-hive-cell-open'));
       }
     }, 1000);
   }
@@ -2728,7 +2853,12 @@
       state.hiveOpen.offer = row;
       state.hiveOpen.error = '';
     }
-    renderHive(state);
+    // Still the one seat that asked: the guard above already established
+    // that the answer belongs to the side still open.
+    const mount = document.getElementById('po-hive-mount');
+    const cell = mount && mount.querySelector(`.ist-hive-cell[data-dir="${dir}"]`);
+    if (cell) { repaintHiveCell(state, cell); wireHiveOfferClock(state); }
+    else renderHive(state);
   }
 
   // Taking a seat somebody just offered you. The direction is the
