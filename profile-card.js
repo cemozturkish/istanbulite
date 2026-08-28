@@ -984,6 +984,12 @@
     const mountId = (opts && opts.mountId) || 'hive-page';
     const host = document.getElementById(mountId);
     if (!sb || !host) return;
+    // A fresh mount replaces every node this page had, so the previous
+    // mount's observer is watching elements that are about to be
+    // detached, and the cached probes were taken inside a page that no
+    // longer exists.
+    if (_hive && _hive.hiveBoxObserver) { _hive.hiveBoxObserver.disconnect(); _hive.hiveBoxObserver = null; }
+    bustHiveMeasureCache();
     host.innerHTML = `<div class="ist-hive-page ist-hive-level-${HIVE_LEVEL_DEFAULT}" id="po-hive-page">${hiveMountHTML()}</div>`;
     const st = await ensureProfileState(sb, I18N);
     // The page can be swapped out from under the fetch (a swipe away
@@ -1037,6 +1043,9 @@
   // drawing is re-fitted into it rather than left at the scale it was
   // measured for (see fitHive).
   window.addEventListener('resize', () => {
+    // The two cached probes are functions of the viewport, so this is the
+    // one thing that can invalidate them (see bustHiveMeasureCache).
+    bustHiveMeasureCache();
     if (_hive && document.getElementById('po-hive-view')) fitHive(_hive);
   });
 
@@ -1396,7 +1405,31 @@
   // smallest a cell is ever drawn at (HIVE_MIN_SCALE) rather than the
   // one fitHive will land on, on purpose: too far is a few extra hidden
   // outlines, too short is bare paper at an edge.
+  // ── Two probes that were being taken on every render ──
+  // hiveFieldReach and hiveBandReserve each insert an element, read
+  // getBoundingClientRect off it -- a forced synchronous layout -- and
+  // remove it again. Neither answer can change between two presses: both
+  // are functions of the viewport and of CSS values that only move when
+  // the window does. So they are taken once and kept until something
+  // that could actually change them happens.
+  //
+  // Cleared on resize and on every mount of the page (see mountHivePage);
+  // a stale value here would size the ghost field or the reserved band
+  // for a screen the reader is no longer holding.
+  let _hiveMeasure = {};
+  function bustHiveMeasureCache() { _hiveMeasure = {}; }
+
   function hiveFieldReach() {
+    if (_hiveMeasure.reach) return _hiveMeasure.reach;
+    const r = measureHiveFieldReach();
+    // Only cache a real answer: before anything has laid out this returns
+    // the 4x4 floor, and caching that would freeze the field at the size
+    // it had before the page existed.
+    if (r.measured) _hiveMeasure.reach = r;
+    return r;
+  }
+
+  function measureHiveFieldReach() {
     const page = document.getElementById('po-hive-page');
     const host = page || document.createElement('div');
     if (!page) {
@@ -1412,7 +1445,7 @@
     if (!page) host.remove();
     const stepX = rect.width * HIVE_MIN_SCALE;
     const stepY = rect.height * HIVE_MIN_SCALE;
-    if (!(stepX > 0) || !(stepY > 0)) return { cols: 4, rows: 4 }; // before anything has ever laid out
+    if (!(stepX > 0) || !(stepY > 0)) return { cols: 4, rows: 4, measured: false }; // before anything has ever laid out
     // On a phone the clip is lifted at the outermost depth, so what has
     // to be covered is the screen itself; on a desktop the drawing is
     // still clipped to the middle column, and reaching past it would be
@@ -1449,7 +1482,7 @@
     const halfW = (phone || !boxW ? Math.max(vpW, 360) : boxW) / 2;
     const halfH = (phone || !boxH ? Math.max(vpH, 640) : boxH) / 2;
     const clamp = (n) => Math.min(HIVE_FIELD_MAX, Math.max(2, Math.ceil(n) + 1));
-    return { cols: clamp(halfW / stepX), rows: clamp(halfH / stepY) };
+    return { cols: clamp(halfW / stepX), rows: clamp(halfH / stepY), measured: true };
   }
 
   // How much of the window's foot belongs to the page rather than to the
@@ -1458,6 +1491,15 @@
   // rather than read: the value is a min() of a viewport unit and a cap,
   // which getPropertyValue hands back as its own unresolved text.
   function hiveBandReserve(varName) {
+    if (_hiveMeasure[varName] != null) return _hiveMeasure[varName];
+    const h = measureHiveBandReserve(varName);
+    // 0 is both "this page reserves nothing" and "there is no page yet",
+    // and only the first is worth keeping.
+    if (h > 0) _hiveMeasure[varName] = h;
+    return h;
+  }
+
+  function measureHiveBandReserve(varName) {
     const page = document.getElementById('po-hive-page');
     if (!page) return 0;
     const probe = document.createElement('div');
@@ -2198,12 +2240,15 @@
     // page swiped away before it ever laid out doesn't leave a frame loop
     // behind.
     if (!vw || !vh || !plane.offsetWidth || !plane.offsetHeight) {
-      const tries = (state.hiveFitTries || 0) + 1;
-      state.hiveFitTries = tries;
-      if (tries < 30) requestAnimationFrame(() => fitHive(state));
+      // Nothing has laid out yet. This used to re-ask on the next frame,
+      // up to 30 times -- half a second of blank paper on the app's
+      // landing page, and on a slow first load it could run out of tries
+      // and simply give up. The observer below is told when the boxes
+      // become real, so there is nothing to poll for: return, and be
+      // called back.
+      watchHiveBox(state);
       return;
     }
-    state.hiveFitTries = 0;
 
     const cx = me.offsetLeft + me.offsetWidth / 2;
     const cy = me.offsetTop + me.offsetHeight / 2;
@@ -2293,7 +2338,7 @@
     const belowMe = (maxB - cy) * scale;
     const clearY = (vhFull - reserve - HIVE_CARD_GAP) - vhFull / 2 - belowMe;
     const offsetY = Math.min(restY, clearY);
-    state.hiveFit = { scale, cx, cy, vw, vh, reqW, reqH, offsetY };
+    state.hiveFit = { scale, cx, cy, vw, vh, reqW, reqH, offsetY, vwFull: view.clientWidth, vhFull: view.clientHeight };
     plane.style.transformOrigin = `${cx}px ${cy}px`;
     // ── A fresh plane is placed, not animated into place ──
     // The plane carries the zoom between depths (a 520ms transform
@@ -2340,6 +2385,51 @@
       void plane.offsetWidth;
       plane.style.transition = '';
     }
+    watchHiveBox(state);
+  }
+
+  // ── Being told the window has a size, instead of asking every frame ──
+  // One observer for the life of a mount, watching both boxes fitHive
+  // measures. It covers three things that used to need three mechanisms:
+  // the first layout arriving (the retry loop above), the window changing
+  // size, and the page's own box changing for reasons the window knows
+  // nothing about -- Hane's events strip opening, the level clip lifting.
+  //
+  // Guarded against re-fitting for a size it has already fitted, because
+  // fitHive writes to the plane and an observer that reacted to its own
+  // output would spin.
+  function watchHiveBox(state) {
+    if (typeof ResizeObserver !== 'function') {
+      // No observer to lean on: fall back to the old frame poll, bounded
+      // exactly as it was.
+      const tries = (state.hiveFitTries || 0) + 1;
+      state.hiveFitTries = tries;
+      if (tries < 30) requestAnimationFrame(() => fitHive(state));
+      return;
+    }
+    const view = document.getElementById('po-hive-view');
+    const plane = document.getElementById('po-hive-plane');
+    if (!view || !plane) return;
+    // renderHive replaces the mount's markup, so these are NEW nodes every
+    // time it runs and whatever was being watched before is detached --
+    // and a detached node never resizes again. A plain "am I already
+    // observing?" guard therefore leaves the observer watching a node
+    // nobody can see, which is silent: nothing throws, the petek simply
+    // never fits. So the nodes are compared, not the observer's existence.
+    if (state.hiveBoxObserver && state.hiveBoxNode === view) return;
+    if (state.hiveBoxObserver) state.hiveBoxObserver.disconnect();
+    const ro = new ResizeObserver(() => {
+      if (state !== _hive) { ro.disconnect(); return; }
+      const v = document.getElementById('po-hive-view');
+      if (!v) { ro.disconnect(); state.hiveBoxObserver = null; return; }
+      const fit = state.hiveFit;
+      if (fit && fit.vwFull === v.clientWidth && fit.vhFull === v.clientHeight) return;
+      fitHive(state);
+    });
+    ro.observe(view);
+    ro.observe(plane);
+    state.hiveBoxObserver = ro;
+    state.hiveBoxNode = view;
   }
 
   function renderHive(state) {
@@ -2510,16 +2600,29 @@
       // is already overshoot.
       if (g.axis === 'y') g.over = wantY - y;
       state.hivePan = { x, y };
-      const el = plane();
-      if (el) {
+      // ── One write per frame, not one per event ──
+      // iOS delivers pointermove faster than it paints, so several of
+      // these landed inside a single frame: every one of them invalidated
+      // the plane and all but the last was thrown away. The position is
+      // recorded here and written inside a rAF, so the drawing keeps up
+      // with the finger on exactly the frames that are drawn.
+      g.want = { x, y, offsetY: sl.offsetY, scale: sl.scale };
+      if (!g.raf) g.raf = requestAnimationFrame(() => {
+        if (!g) return;
+        g.raf = 0;
+        const el = plane();
+        if (!el) return;
         el.style.transition = 'none';
-        el.style.transform = `translate(${x}px, ${y + sl.offsetY}px) scale(${sl.scale})`;
-      }
+        el.style.transform = `translate(${g.want.x}px, ${g.want.y + g.want.offsetY}px) scale(${g.want.scale})`;
+      });
     });
 
     const settle = () => {
       if (!g) return;
       const gesture = g;
+      // A frame still queued would run after this and re-apply the drag's
+      // last position, undoing whatever settles below.
+      if (gesture.raf) cancelAnimationFrame(gesture.raf);
       g = null;
       // Released: the hexagon springs back to its own size, on the
       // frame's own transition.
