@@ -486,6 +486,11 @@
       prefetchNeighbours(targetSlug);
     } finally {
       virtualNavInFlight = false;
+      // In the happy path the columns were destroyed by the content swap
+      // and carry no inline transform, so this is a no-op. It matters on
+      // the failure path above, where the columns are still the ones the
+      // finger was dragging and would otherwise stay where it left them.
+      if (global.__istReleaseColumns) global.__istReleaseColumns();
     }
   }
 
@@ -618,30 +623,136 @@
       navigate(targetIdx, dir);
     }, true);
 
-    // ── Mobile: horizontal touch-swipe anywhere on main-site (except the nav bar) ──
-    let sx = 0, sy = 0, st = 0, active = false;
+    // ══════════════════════════════════════════
+    // The swipe follows the finger
+    // ──────────────────────────────────────────
+    // This used to be bound to touchend alone: the drag was ignored
+    // entirely and the whole gesture was a button that happened to be
+    // pressed by sliding. Nothing moved under the finger, a swipe could
+    // not be abandoned once begun, and the ends of the carousel gave no
+    // sign that there was nothing past them.
+    //
+    // What moves is the two columns, which is exactly what the exit
+    // animation moves -- the map, the profile bar and the tab bar stay
+    // put, so the middle of the screen is stable while the page slides
+    // (see this section's own comment above). That is also why the map
+    // does not need lifting out of #ist-content for this: it never moves.
+    //
+    // What this deliberately is NOT is a true two-page pager, where the
+    // incoming page is live beside the outgoing one and the finger drags
+    // the seam between them. Each page's CSS lives in its own
+    // <style data-page> and only one is ever enabled (see
+    // setActiveStylesheet), so a second page rendered beside the first
+    // would be drawn with the wrong page's rules. Getting there means
+    // scoping all three stylesheets so they can be live at once, which is
+    // a much larger change than this one.
+    const SLOP = 8;            // px before the gesture claims an axis
+    const COMMIT_FRACTION = 0.22;  // of the screen -- past this, release navigates
+    const FLICK_SPEED = 0.45;      // px/ms -- a fast flick commits at any distance
+    const EDGE_PULL = 0.32;        // how much of the drag the ends give back
+    let g = null;
+
+    function columns() {
+      return Array.prototype.slice.call(document.querySelectorAll('.col-left, .col-right'));
+    }
+    function paint(dx) {
+      const cols = columns();
+      for (let i = 0; i < cols.length; i++) cols[i].style.transform = 'translateX(' + dx + 'px)';
+    }
+    // Hand the columns back to the stylesheet. Called before the content
+    // swap as well as on a spring-back: an inline transform left in place
+    // would beat html.ist-entering-* and the incoming page would never
+    // slide in.
+    function releaseColumns() {
+      const cols = columns();
+      for (let i = 0; i < cols.length; i++) { cols[i].style.transform = ''; cols[i].style.transition = ''; }
+      document.body.classList.remove('ist-dragging');
+    }
+    global.__istReleaseColumns = releaseColumns;
+
     document.addEventListener('touchstart', (e) => {
       if (!isMobile() || e.touches.length !== 1) return;
+      if (virtualNavInFlight || navigating) return;
       if (e.target.closest && e.target.closest('nav')) return; // let nav-bar taps through
-      sx = e.touches[0].clientX;
-      sy = e.touches[0].clientY;
-      st = Date.now();
-      active = true;
+      const t = e.touches[0];
+      const curr = currentIdx();
+      g = {
+        x: t.clientX, y: t.clientY, t: Date.now(),
+        lastX: t.clientX, lastT: Date.now(), speed: 0,
+        axis: null, curr,
+        // Whether there is anywhere to go each way, so the ends can pull
+        // back instead of sliding off into nothing.
+        canFwd: curr + 1 < NAV_PAGES.length,
+        canBack: curr - 1 >= 0,
+      };
     }, { passive: true });
 
-    document.addEventListener('touchend', (e) => {
-      if (!active) return;
-      active = false;
-      const t = e.changedTouches[0];
-      const dx = t.clientX - sx;
-      const dy = t.clientY - sy;
-      const dt = Date.now() - st;
-      if (dt > MAX_TIME) return;
-      if (Math.abs(dx) < MIN_DX) return;
-      if (Math.abs(dx) < Math.abs(dy) * 1.2) return; // vertical-dominant: let it scroll
-      const curr = currentIdx();
-      if (dx < 0) navigate(curr + 1, 'forward');
-      else        navigate(curr - 1, 'backward');
+    // passive: false, because a horizontal drag has to stop the page
+    // scrolling underneath it once it has claimed the axis.
+    document.addEventListener('touchmove', (e) => {
+      if (!g || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dx = t.clientX - g.x, dy = t.clientY - g.y;
+      if (!g.axis) {
+        if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return;
+        // Vertical-dominant belongs to whatever is underneath -- a feed
+        // scrolling, the petek changing depth.
+        g.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
+        if (g.axis === 'y') { g = null; return; }
+        document.body.classList.add('ist-dragging');
+      }
+      if (g.axis !== 'x') return;
+      const now = Date.now();
+      const dt = now - g.lastT;
+      if (dt > 0) g.speed = (t.clientX - g.lastX) / dt;
+      g.lastX = t.clientX; g.lastT = now;
+      // The ends are not a wall: they give, a little, so it is obvious
+      // that the pull was heard and that there is nothing past it.
+      const blocked = (dx < 0 && !g.canFwd) || (dx > 0 && !g.canBack);
+      g.dx = blocked ? dx * EDGE_PULL : dx;
+      if (e.cancelable) e.preventDefault();
+      paint(g.dx);
+    }, { passive: false });
+
+    document.addEventListener('touchend', () => {
+      if (!g) return;
+      const gesture = g;
+      g = null;
+      if (gesture.axis !== 'x') { releaseColumns(); return; }
+      const dx = gesture.dx || 0;
+      const blocked = (dx < 0 && !gesture.canFwd) || (dx > 0 && !gesture.canBack);
+      const far = Math.abs(dx) > window.innerWidth * COMMIT_FRACTION;
+      const flicked = Math.abs(gesture.speed) > FLICK_SPEED &&
+                      Math.sign(gesture.speed) === Math.sign(dx) && Math.abs(dx) > SLOP * 2;
+      if (!blocked && (far || flicked)) {
+        // Carry on from where the finger left off. The columns keep their
+        // inline transform and are animated to the same place the exit
+        // class would put them, so navigateTo's own awaitExitSlide sees
+        // the transitionend it is waiting for and nothing jumps.
+        const to = dx < 0 ? -window.innerWidth : window.innerWidth;
+        const cols = columns();
+        for (let i = 0; i < cols.length; i++) {
+          cols[i].style.transition = 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)';
+          cols[i].style.transform = 'translateX(' + to + 'px)';
+        }
+        document.body.classList.remove('ist-dragging');
+        navigate(gesture.curr + (dx < 0 ? 1 : -1), dx < 0 ? 'forward' : 'backward');
+        return;
+      }
+      // Not far enough, or there was nowhere to go: spring back.
+      const cols = columns();
+      for (let i = 0; i < cols.length; i++) {
+        cols[i].style.transition = 'transform 0.26s cubic-bezier(0.22, 1, 0.36, 1)';
+        cols[i].style.transform = 'translateX(0px)';
+      }
+      document.body.classList.remove('ist-dragging');
+      setTimeout(releaseColumns, 280);
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', () => {
+      if (!g) return;
+      g = null;
+      releaseColumns();
     }, { passive: true });
 
     if (document.readyState === 'loading') {
