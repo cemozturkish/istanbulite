@@ -15,10 +15,7 @@
 
   const STRINGS = {
     // anahane (home) — breaking news + events sidebars
-    'home.breaking':       { default: 'Son Dakika',          more_english: 'Breaking News' },
     'home.events':         { default: 'Etkinlikler',         more_english: 'Events' },
-    'home.filter.all':     { default: 'Tümü',                more_english: 'All' },
-    'home.events.thisweek':{ default: 'Bu hafta',            more_english: 'This week' },
     'home.events.rsvp.join': { default: 'Katılıyorum',       more_english: 'RSVP' },
     'home.events.rsvp.going':{ default: 'Katılıyorsun ✓',    more_english: 'Going ✓' },
     'home.events.rsvp.count':{ default: 'kişi katılıyor',    more_english: 'attending' },
@@ -39,50 +36,33 @@
     'home.events.emptysub':{ default: 'Kahvehane\'de etkinlik destesine göz at.', more_english: 'Flip through the event deck on Kahvehane.' },
 
     // profile / settings card
-    'profile.edit':        { default: 'Düzenle',             more_english: 'Edit' },
     'profile.customize':   { default: 'Kişiselleştir',       more_english: 'Customize' },
     'profile.save':        { default: 'Kaydet',              more_english: 'Save' },
     'profile.saving':      { default: 'Kaydediliyor...',     more_english: 'Saving...' },
-    'profile.cancel':      { default: 'İptal',               more_english: 'Cancel' },
     'profile.signout':     { default: 'Çıkış Yap',           more_english: 'Sign Out' },
     'profile.deleteaccount':{ default: 'Hesabımı Sil',       more_english: 'Delete My Account' },
     'profile.deleteaccount.confirm': { default: 'Hesabını silmek üzeresin. Bu geri alınamaz ve profilin, avatarın, mesajların ve tüm kayıtların kalıcı olarak silinir.', more_english: 'You\'re about to delete your account. This can\'t be undone — your profile, avatar, and all your data will be permanently removed.' },
-    'profile.deleteaccount.confirmbtn': { default: 'Evet, Hesabımı Sil', more_english: 'Yes, Delete My Account' },
     'profile.deleteaccount.deleting': { default: 'Siliniyor...', more_english: 'Deleting...' },
     'profile.deleteaccount.error': { default: 'Silinemedi, tekrar dene.', more_english: 'Couldn\'t delete — try again.' },
-    'profile.firstname':   { default: 'Ad',                  more_english: 'First Name' },
-    'profile.lastname':    { default: 'Soyad',               more_english: 'Last Name' },
-    'profile.district':    { default: 'Yaşadığı İlçe',       more_english: 'District' },
     'profile.birthplace':  { default: 'Doğum Yeri',          more_english: 'Birthplace' },
     'profile.membership':  { default: 'Üyelik',              more_english: 'Member Since' },
-    'profile.chooseavatar':{ default: 'Avatar Seç',          more_english: 'Choose Avatar' },
     'profile.langpref':    { default: 'Dil Tercihi',         more_english: 'Language' },
     'profile.appearance':  { default: 'Görünüm',             more_english: 'Appearance' },
     'profile.colortheme':  { default: 'Renk',                more_english: 'Color' },
-    'profile.years':       { default: 'yıl',                 more_english: 'yr' },
-    'profile.days':        { default: 'gün',                 more_english: 'd' },
-    'profile.hours':       { default: 'saat',                more_english: 'h' },
-    'profile.minutes':     { default: 'dakika',              more_english: 'min' },
     'profile.kefil':       { default: 'KEFİL',               more_english: 'SPONSOR' },
     'profile.account':     { default: 'Hesap',               more_english: 'Account' },
-    'profile.lastseen':    { default: 'Son Görülme',         more_english: 'Last Seen' },
     'profile.referralcode':{ default: 'Kefalet Kodu',        more_english: 'Sponsor Code' },
     'profile.sponsoredcount':{ default: 'Kefil Olduğu',      more_english: 'Vouched For' },
     'profile.sozcucount': { default: 'Sözcü Olduğu',       more_english: 'Sözcü Picks' },
     'profile.times':       { default: 'kez',                 more_english: 'times' },
     'profile.copy':        { default: 'Kopyala',             more_english: 'Copy' },
     'profile.copied':      { default: 'Kopyalandı',          more_english: 'Copied' },
-    'profile.gamescores':  { default: 'Oyun Skorları',       more_english: 'Game Scores' },
     'profile.people':      { default: 'kişi',                more_english: 'people' },
     'profile.unnamed':     { default: 'İsimsiz Üye',         more_english: 'Unnamed Member' },
     'profile.toggle':      { default: 'Profil',              more_english: 'Profile' },
-    'profile.tab.profil':  { default: 'Profil',              more_english: 'Profile' },
     'profile.tab.ayarlar': { default: 'Ayarlar',             more_english: 'Settings' },
-    'profile.tab.rozetler':{ default: 'Rozetler',            more_english: 'Badges' },
-    'profile.rozetler.hint':{ default: 'Doğum ilçenize ait rozetleri seçerek kapağınıza yerleştirin.', more_english: 'Pick badges tied to your birth district to pin them on your cover.' },
     'profile.email':        { default: 'E-posta',             more_english: 'Email' },
     'profile.thisweek':     { default: 'Bu Hafta',             more_english: 'This Week' },
-    'profile.profileinfo':  { default: 'Profil Bilgileri',     more_english: 'Profile Info' },
     // The petek — the shared grid opened from Anahane's map: your own
     // hexagon, its free sides, and everybody standing around you (see
     // hiveGridHTML in profile-card.js and db/hive_lattice_v4.sql).
@@ -136,12 +116,6 @@
 
     // games (shared bits)
     'games.howto':         { default: 'Nasıl Oynanır',       more_english: 'How to Play' },
-    'games.streak':        { default: 'Seri',                more_english: 'Streak' },
-    'games.played':        { default: 'Oynanan',             more_english: 'Played' },
-    'games.longest':       { default: 'En Uzun',              more_english: 'Longest' },
-    'games.winrate':       { default: 'Kazanma',              more_english: 'Win Rate' },
-    'games.personal':      { default: 'Kişisel İstatistikler',more_english: 'Personal Stats' },
-    'games.distribution':  { default: 'Tahmin Dağılımı',      more_english: 'Guess Distribution' },
 
     // sozcel "Nasıl Oynanır" body
     'sozcel.help.intro':   {
@@ -167,7 +141,6 @@
     // anahane — the PETEK button over the map, opening the hane
     // honeycomb (see openHiveOverlay in profile-card.js). The word
     // stands in both languages, the way "hane" does.
-    'hane.petek':    { default: 'Petek',                    more_english: 'Petek' },
 
     // kahvehane — coffee price index (Kahve Endeksi), read-only: the
     // index is curated from the admin portal, not reported by users.
@@ -213,7 +186,6 @@
     'games.step3':      { default: '3. OYUN',                 more_english: 'GAME 3' },
     'games.q.kicker':   { default: 'GÜNÜN SORUSU',            more_english: "TODAY'S QUESTION" },
     'games.q.hint':     { default: 'Kaydır ya da seç',        more_english: 'Swipe or pick' },
-    'games.q.thanks':   { default: 'Cevabın alındı.',         more_english: 'Your answer is in.' },
     'games.q.tallyone': { default: 'kişi seninle aynı fikirde', more_english: 'others answered the same' },
     'games.q.failed':   { default: 'Olmadı, tekrar dene.',    more_english: "That didn't work, try again." },
     'games.q.deckdone':    { default: 'Hepsi bu kadar.',       more_english: "That's all of it." },
