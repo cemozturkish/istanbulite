@@ -112,16 +112,28 @@
     });
   }
 
-  // The box the frames are drawn into: the map's own, measured live.
-  // Deliberately not stored anywhere -- the map box differs between the
-  // levels (Kütüphane's is the whole screen, Kahvehane's a square hero),
-  // and it is the OUTGOING page's box the strip starts in.
-  function mapBox() {
-    const panel = document.querySelector('.map-panel');
-    if (!panel) return null;
-    const r = panel.getBoundingClientRect();
-    if (r.width < 1 || r.height < 1) return null;
-    return r;
+  // ── The box the frames are drawn into: the whole screen ──
+  // Not the map panel's box, which is the obvious choice and the wrong
+  // one: the two levels do not share it (Kütüphane's map is the whole
+  // screen, Kahvehane's a square hero), so a strip measured onto it
+  // would start in one shape and have to end in another, and every
+  // frame would land somewhere slightly different from the last.
+  //
+  // The frames are drawn on ONE canvas at ONE aspect (9:16, see
+  // assets/map/zoom/README.md) and laid over the viewport with
+  // object-fit: cover -- so they are registered with each other by
+  // construction, which is the only property the drawings actually need
+  // from the code. Whatever the phone's own aspect is, all of them are
+  // cropped identically, so nothing shifts between one frame and the
+  // next.
+  //
+  // The two bars stay in front of it: this sits at z-index 7, they are
+  // at 400/401 (see "THE TWO BARS ARE OMNIPRESENT" in frames.css).
+  function stripBox() {
+    const w = document.documentElement.clientWidth;
+    const h = window.innerHeight;
+    if (w < 1 || h < 1) return null;
+    return { top: 0, left: 0, width: w, height: h };
   }
 
   function hitRegions() {
@@ -139,7 +151,7 @@
     // un-warmed journey silently falls back to the scale transform.
     const imgs = decoded[k];
     if (!imgs) return null;
-    const box = mapBox();
+    const box = stripBox();
     if (!box) return null;
 
     if (live) live.end();

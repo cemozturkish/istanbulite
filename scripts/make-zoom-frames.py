@@ -9,24 +9,23 @@ as video, and that is a decision worth making by feel.
 
     python3 scripts/make-zoom-frames.py [N]
 
-── The geometry this is drawn against, which is a finding ──
+── The canvas: 9:16, one shape for every frame ──
 
-The two endpoints are NOT displayed in the same box, measured on a 390x844
-phone:
+Every frame is 1080x1920 and they are laid over the whole viewport with
+object-fit: cover. That is the only thing the player asks of the
+drawings, and it is what "put them on top of each other correctly"
+means: identical size, identical crop, so nothing shifts between one
+frame and the next whatever the phone's own aspect turns out to be.
 
-    Kütüphane   .map-panel  390 x 896 at y=-52   full-bleed, the whole screen
-    Kahvehane   .map-panel  390 x 390 at y= 26   a 100vw square hero
+It deliberately is NOT the map panel's box. The two levels do not share
+one -- Kütüphane's map is the whole screen (390x896 at y=-52 on a 390x844
+phone) and Kahvehane's is a 390x390 square hero -- so a strip measured
+onto the map would begin in one shape and have to end in another. The
+frames own the screen instead, and the two bars stay in front of them.
 
-And the two drawings disagree the same way: the Türkiye artwork is
-1080x2420 (tall, and its box is so nearly the same ratio that cover barely
-crops it -- the reader sees essentially all of it), while the İstanbul
-artwork is 3510x1600 (wide, cropped hard to its square).
-
-So the journey cannot be one fixed canvas. These frames are drawn in
-Kütüphane's tall full-screen box, and the city ARRIVES as the square it
-will occupy on Kahvehane, growing into exactly the rectangle that page's
-hero really stands in. The player interpolates the box the same way, so
-whichever staging is chosen later it does not have to change.
+The last frame therefore has to look like the destination page as the
+reader will actually see it, hero square and all: it stands over that
+page's real map and fades, so a disagreement becomes a visible cut.
 """
 import sys, os, math
 from PIL import Image
@@ -42,14 +41,16 @@ ISTANBUL = os.path.join(ROOT, 'assets', 'map', 'istanbul-map-mobile.png')  # 351
 # the city. Change this and every frame re-aims.
 ANCHOR = (277.0, 818.0)
 
-# The frame canvas: Kütüphane's own box at about half its device pixels.
-W, H = 540, 1240
+# The frame canvas: 9:16, at half the drawn resolution. The in-betweens
+# are on screen for ~30ms each and in motion; the endpoints are the real
+# maps at full size. Draw at 1080x1920; these placeholders are 540x960.
+W, H = 540, 960
 
-# Where Kahvehane's hero square lands inside that same box, measured from
-# the real page: screen y 26..416 of a 844-tall viewport, against a map
-# box running from y=-52 to y=844.
-SQ_TOP = int((26 - (-52)) / 896 * H)     # 108
-SQ_SIDE = int(390 / 896 * H)             # 540
+# Where Kahvehane's hero square lands on screen, expressed in this
+# canvas: the page shows it at y 26..416 of a 844-tall viewport, and the
+# canvas is cover-fitted to that viewport.
+SQ_TOP = int(26 / 844 * H)
+SQ_SIDE = int(390 / 390 * W)
 
 ZOOM = 26.0        # İstanbul is ~40px across in a 1080-wide Türkiye map
 FADE_FROM = 0.5    # where the city starts taking over from the country

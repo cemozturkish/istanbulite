@@ -1351,6 +1351,34 @@ either bar's height as a number — the same value also reserves the space each 
 bottom so its last row of cards clears the tab bar, and one copy left behind is how the two bars
 end up different heights. The game pages hide the bottom bar outright for their fullscreen board.
 
+### The two bars are omnipresent — nothing may pass in front of them
+
+The profile bar and the tab bar are the phone's furniture: who is here, and where you can go. No
+card, column or map the page draws may ever be painted over either of them. Stated once in
+frames.css ("THE TWO BARS ARE OMNIPRESENT"), never per page.
+
+It needs a rule because the tab bar's own `z-index: 100` was a **lie**. The bar lives inside
+`.section-rule`, which is `position: absolute` with `z-index: 1` — a stacking context — so the 100
+was scoped *inside* it and the bar actually competed against the page at 1. Kahvehane's games
+column is also 1 and comes later in the DOM, so the two were tied and document order decided.
+Nothing ever overlapped, so nothing revealed it — until the zoom scaled that column and it grew
+over the bar and won.
+
+Two things about the fix, both of which fail silently:
+
+- **`.section-rule` must not create a stacking context on a phone.** It is a zero-sized nothing
+  there whose only job is to hold the fixed header; `z-index: auto` lets the bar compete at the
+  root, where its number means what it says.
+- **The rules are `!important`, and not for tidiness.** A virtually-navigated page has its
+  `<style data-page>` appended to `<head>` at navigation time, so it lands *after* frames.css and
+  beats it at equal specificity. Without it the bars held on every real page load and were climbed
+  over by the arriving page on every swipe — the harder bug to see, because it exists only
+  mid-transition.
+
+The bars sit at 400/401, deliberately still below the 500 overlay layer: THE sheet is a surface
+that rises *over* the page and comes to rest under the top bar by its own arithmetic, which is a
+different thing from a card climbing over the furniture.
+
 ### Two tabs, and a zoom stack inside one of them — `router.js`
 
 The bottom bar carries **two** tabs: **İstanbulite** and **Hane**. İstanbulite is not one page
@@ -1426,13 +1454,16 @@ is only the projector; it knows nothing about what is on the frames.
   fades (`settle`, called from `navigateTo` once `mount()` has run), so the strip and the real map
   have to agree on the final image. They do; break that and the handover becomes a visible cut.
 
-**The two endpoints are not displayed in the same box**, which is the open design question this
-raised. On a 390×844 phone Kütüphane's `.map-panel` is 390×896 at y=−52 — full-bleed, the whole
-screen — while Kahvehane's is a 390×390 square hero at y=26. (This section of the doc used to claim
-both were squares. They are not.) The artwork disagrees the same way: Türkiye is 1080×2420 and
-shown almost entire, İstanbul is 3510×1600 and cropped hard. The placeholders resolve it by drawing
-in Kütüphane's tall box and having the city *arrive* as the square it will occupy; squaring
-Kütüphane's map instead would make one canvas serve the whole journey. Not decided.
+**The strip owns the screen, not the map's box.** Every frame is drawn on one 9:16 canvas
+(1080×1920) and laid over the whole viewport with `object-fit: cover`, so all of them are cropped
+identically on any phone and nothing shifts between one and the next — which is the only thing the
+code owes the drawings. Measuring onto `.map-panel` would be the obvious choice and the wrong one:
+the two levels do not share that box. On a 390×844 phone Kütüphane's is 390×896 at y=−52 —
+full-bleed, the whole screen — while Kahvehane's is a 390×390 square hero at y=26. (This section
+used to claim both were squares. They are not.) So the reconciliation lands in the artwork instead:
+the last frame has to show the city sitting in its square hero exactly where that page puts it,
+because the strip fades out over the real map. What the frames before it do with that square is a
+drawing decision, not a code one.
 
 ### `mahalle.html` — the innermost level
 
