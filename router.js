@@ -563,13 +563,16 @@
       const enterClass = ENTER_CLASS[dir] || ENTER_CLASS.forward;
       const root = document.documentElement;
       root.classList.add(enterClass);
+      if (zooming) document.body.classList.add('ist-zoom-arriving');
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           root.classList.remove(enterClass);
           // Held for the length of the arrival, because on a zoom it is
           // `ist-zoom` that declares the transition the release animates
           // along -- dropped in the same frame, the page would snap.
-          if (zooming) setTimeout(() => document.body.classList.remove('ist-zoom'), zoomDurationMs() + 60);
+          if (zooming) setTimeout(() => {
+            document.body.classList.remove('ist-zoom', 'ist-zoom-arriving');
+          }, zoomDurationMs() + 60);
         });
       });
 
@@ -587,8 +590,19 @@
       // the base map again -- put the member's hand-painted district map
       // back before anything reads layout below (see home-map.js).
       if (global.IstHomeMap) global.IstHomeMap.refresh();
-      // The arriving map is in place now, so the last drawing can go.
-      if (pendingFrames) { pendingFrames.settle(140); pendingFrames = null; }
+      // The arriving map is in place -- but the page's own columns are
+      // still fading in over the strip, and lifting it before they are
+      // solid puts a bare map on screen for a beat, which is the exact
+      // flash this whole arrangement exists to remove. So it is held
+      // until that fade is done and then taken off slowly: the last
+      // drawing and the real map agree, so nobody should be able to see
+      // the moment one becomes the other.
+      if (pendingFrames) {
+        const strip = pendingFrames;
+        pendingFrames = null;
+        const d = zoomDurationMs();
+        setTimeout(() => strip.settle(Math.max(120, Math.round(d * 0.5))), Math.round(d * 0.45));
+      }
       // Deliberately after mount(): initMapZoom's own measure() reads
       // getBoundingClientRect(), which forces a synchronous layout --
       // done before mount() had a chance to run, that forced flush would
@@ -864,7 +878,13 @@
         nodes[i].style.transformOrigin = '50% 45%';
         nodes[i].style.transition = '';
         nodes[i].style.transform = 'scale(' + scale + ')';
-        nodes[i].style.opacity = String(1 - p * 0.9);
+        // The drag does NOT fade. It used to, from the very first
+        // millimetre -- so the page the reader had not yet decided to
+        // leave dissolved under their thumb, and an abandoned gesture
+        // meant watching it come back. A zoom moves the page toward you;
+        // it does not erase it. The crossfade belongs to the commit,
+        // where it happens late and under cover of the drawing.
+        nodes[i].style.opacity = '';
       }
     }
     function releaseZoom() {
@@ -887,7 +907,11 @@
       const nodes = contentNodes();
       for (let i = 0; i < nodes.length; i++) {
         nodes[i].style.transformOrigin = '50% 45%';
-        nodes[i].style.transition = ms ? ('transform ' + ms + 'ms ease, opacity ' + ms + 'ms ease') : 'none';
+        // Opacity in the last 40% only, matching frames.css -- the page
+        // holds while the drawing carries the reader, then leaves.
+        nodes[i].style.transition = ms
+          ? ('transform ' + ms + 'ms ease, opacity ' + Math.round(ms * 0.3) + 'ms ease ' + Math.round(ms * 0.7) + 'ms')
+          : 'none';
         nodes[i].style.transform = 'scale(' + to + ')';
         nodes[i].style.opacity = '0';
       }
@@ -898,9 +922,8 @@
       if (snap) { releaseZoom(); return; }
       const nodes = contentNodes();
       for (let i = 0; i < nodes.length; i++) {
-        nodes[i].style.transition = 'transform 0.26s ease, opacity 0.26s ease';
+        nodes[i].style.transition = 'transform 0.26s ease';
         nodes[i].style.transform = 'scale(1)';
-        nodes[i].style.opacity = '1';
       }
       document.body.classList.remove('ist-dragging');
       setTimeout(releaseZoom, 280);

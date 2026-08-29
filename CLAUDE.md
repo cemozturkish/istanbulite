@@ -1454,6 +1454,23 @@ is only the projector; it knows nothing about what is on the frames.
   fades (`settle`, called from `navigateTo` once `mount()` has run), so the strip and the real map
   have to agree on the final image. They do; break that and the handover becomes a visible cut.
 
+**The frames replace the MAP, not the screen** — the strip sits at `z-index: 0`, above the map
+(which is −1 on Kütüphane and inside `main` at 0 on Kahvehane) and below every column (6/3, 1/1,
+2/1 across the pages). That placement is the whole difference between a zoom and a reload: the
+page's own furniture goes on floating over the drawings exactly as it floats over the real map
+today. A strip painted over the columns blanks the entire screen for the length of the journey,
+which is what a reload looks like however good the drawings are.
+
+**And the page does not dissolve under the finger.** The drag scales and does not fade at all — a
+zoom moves the page toward you, it does not erase it, and an abandoned gesture should not mean
+watching the page come back. The crossfade belongs to the commit, where it happens in the last 30%
+and the arriving page is in within its first 30%, so the strip is lifted off a page that is already
+solid. Measured, Kütüphane → Kahvehane: the columns hold at opacity 1 for the whole drag and the
+first 240ms of the commit, there is a single ~80ms beat of map-only at the deepest point, and the
+arriving page is complete at +440ms while the strip does not begin to lift until +480ms. Before
+this the content was at 0.10 before the finger even left the glass and flat 0 for ~480ms, which is
+exactly what reads as a page reloading.
+
 **The strip owns the screen, not the map's box.** Every frame is drawn on one 9:16 canvas
 (1080×1920) and laid over the whole viewport with `object-fit: cover`, so all of them are cropped
 identically on any phone and nothing shifts between one and the next — which is the only thing the
