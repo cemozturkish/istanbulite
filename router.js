@@ -380,7 +380,18 @@
     });
     if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 4000 });
     else setTimeout(run, 1500);
+    // The drawn frames for whichever depth journey is one gesture away.
+    // Same reasoning and the same moment as the page prefetch: a strip
+    // that has to be fetched under the finger would stall, and stalling
+    // is the whole thing this mechanism exists to avoid.
+    if (global.IstMapFrames) global.IstMapFrames.warm(slug);
   }
+
+  // The frame strip left standing over the arriving page, if the journey
+  // that just ran had drawings. Faded out once the real map is mounted
+  // underneath it -- the last drawing hands over to the map instead of
+  // cutting to it.
+  let pendingFrames = null;
 
   let virtualNavInFlight = false;
   // The currently-displayed page, tracked independently of location.pathname
@@ -435,6 +446,7 @@
         console.error(e);
         document.body.classList.remove(exitClass);
         document.body.classList.remove('ist-zoom');
+        if (pendingFrames) { pendingFrames.end(); pendingFrames = null; }
         if (!fromPopstate) window.location.href = targetSlug + '.html';
         return;
       }
@@ -575,6 +587,8 @@
       // the base map again -- put the member's hand-painted district map
       // back before anything reads layout below (see home-map.js).
       if (global.IstHomeMap) global.IstHomeMap.refresh();
+      // The arriving map is in place now, so the last drawing can go.
+      if (pendingFrames) { pendingFrames.settle(140); pendingFrames = null; }
       // Deliberately after mount(): initMapZoom's own measure() reads
       // getBoundingClientRect(), which forces a synchronous layout --
       // done before mount() had a chance to run, that forced flush would
@@ -891,6 +905,19 @@
       document.body.classList.remove('ist-dragging');
       setTimeout(releaseZoom, 280);
     }
+    // ── The drawn journey, where one exists ──
+    // Only where its frames are already decoded (map-frames.js refuses
+    // otherwise), so this can be asked inside a touch handler and
+    // answered in the same frame. Where there is none -- İstanbul to
+    // mahalle, which has no map to zoom into -- the scale transform
+    // above is the whole transition, which is why that fallback is not
+    // a degraded mode but the ordinary one.
+    function beginFrames(target) {
+      if (!global.IstMapFrames || !target) return null;
+      try { return global.IstMapFrames.begin(activeSlug, target.slug); }
+      catch (e) { console.error(e); return null; }
+    }
+
     function releaseAll() { releaseColumns(); releaseZoom(); }
     global.__istReleaseColumns = releaseAll;
 
@@ -935,6 +962,11 @@
         pinch.fired = true;
         if (!target) return;
         if (e.cancelable) e.preventDefault();
+        const frames = beginFrames(target);
+        if (frames) {
+          frames.play(0, 1, zoomDurationMs() || 380);
+          pendingFrames = frames;
+        }
         flingZoom(target.dir);
         navigate(target.slug, target.dir);
         return;
@@ -950,6 +982,7 @@
           // scroller: hand the gesture back to whatever is underneath.
           g.zoom = g.noZoom ? null : verticalTarget(dy);
           if (!g.zoom) { g = null; return; }
+          g.frames = undefined;   // not yet asked; null means asked and none
         }
         document.body.classList.add('ist-dragging');
       }
@@ -973,10 +1006,20 @@
       g.lastY = t.clientY; g.lastT = now;
       const aimed = verticalTarget(dy);
       if (!aimed) { g.dy = dy * EDGE_PULL; if (e.cancelable) e.preventDefault(); paintZoom(g.dy); return; }
+      // Re-aiming mid-drag means the strip on screen is for the wrong
+      // journey -- drop it and take the other one.
+      if (g.frames && g.zoom && g.zoom.slug !== aimed.slug) { g.frames.end(); g.frames = null; }
       g.zoom = aimed;
       g.dy = dy;
       if (e.cancelable) e.preventDefault();
+      // The frames ARE the map's half of the movement, so they are
+      // scrubbed rather than played: progress maps onto frame index, and
+      // dragging slowly flips through the drawings one at a time. The
+      // scale still runs underneath for the furniture -- the columns and
+      // the two bars are printed on the screen, not drawn on the map.
+      if (g.frames === undefined) g.frames = beginFrames(aimed);
       paintZoom(dy);
+      if (g.frames) g.frames.paint(zoomProgress(dy));
     }, { passive: false });
 
     document.addEventListener('touchend', (e) => {
@@ -986,15 +1029,26 @@
       g = null;
       if (gesture.axis === 'y') {
         const dy = gesture.dy || 0;
+        const p = zoomProgress(dy);
         const target = verticalTarget(dy);
-        const far = zoomProgress(dy) > 0.55;
+        const far = p > 0.55;
         const flicked = Math.abs(gesture.speed) > FLICK_SPEED &&
                         Math.sign(gesture.speed) === Math.sign(dy) && Math.abs(dy) > SLOP * 2;
+        const frames = gesture.frames || null;
         if (target && (far || flicked)) {
+          // Run out whatever is left of the strip, at the same rate the
+          // rest of the transition moves, and hand it to navigateTo to
+          // fade once the real map is standing underneath it.
+          if (frames) {
+            frames.play(p, 1, Math.max(60, (zoomDurationMs() || 380) * (1 - p)));
+            pendingFrames = frames;
+          }
           flingZoom(target.dir);
           navigate(target.slug, target.dir);
           return;
         }
+        // Abandoned: the same drawings, run backwards.
+        if (frames) frames.play(p, 0, 220).then(function () { frames.end(); });
         springZoom();
         return;
       }
@@ -1034,6 +1088,7 @@
       pinch = null;
       if (!g) return;
       const wasY = g.axis === 'y';
+      if (g.frames) g.frames.end();
       g = null;
       if (wasY) springZoom(); else releaseColumns();
     }, { passive: true });
