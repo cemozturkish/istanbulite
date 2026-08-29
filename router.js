@@ -352,17 +352,90 @@
     const n = parseFloat(v) || 0;
     return /ms$/.test(v) ? n : n * 1000;
   }
+  // ── Letting the browser breathe mid-swap ──
+  // Everything navigateTo does after its await -- unmount, stylesheet,
+  // innerHTML, overlays, script, mount(), setBarLayout -- lands in ONE
+  // task, because it all runs inside the callback that resolved the
+  // wait. Measured on a 4x-throttled CPU that is a single 111ms
+  // TimerFire: nine frames in a row where nothing can paint, right in
+  // the middle of the transition. The work is necessary; doing it in one
+  // uninterruptible block is not.
+  //
+  // So the phases are separated by a yield that actually lets a frame
+  // through: rAF (wait for the frame) then a task (land after it has
+  // painted). Total CPU is unchanged -- what changes is that the strip
+  // keeps moving over the top of it, which is the whole difference
+  // between a transition and a freeze.
+  function yieldFrame() {
+    return new Promise(resolve => {
+      requestAnimationFrame(() => setTimeout(resolve, 0));
+    });
+  }
+
+  // How long the swap should hold off. The full duration is right for a
+  // tap or a pinch, which start the journey at the beginning -- but a
+  // finger released at 80% of the way in only has 20% of the strip left
+  // to play, and waiting the whole duration there is dead air the reader
+  // reads as the app thinking. Set by the gesture, consumed once.
+  let zoomWaitMs = null;
   function awaitZoom() {
-    const ms = zoomDurationMs();
+    const ms = zoomWaitMs != null ? zoomWaitMs : zoomDurationMs();
+    zoomWaitMs = null;
     if (!ms) return Promise.resolve();
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+  function setZoomWait(ms) { zoomWaitMs = ms; }
 
   // ── Prefetch the two pages a swipe can reach ──
   // ensurePageLoaded fetches the target and DOMParses it -- and these are
   // 6,000-8,500 line documents. Done inside a navigation that is the
   // reader waiting; done at idle beforehand it costs them nothing, and
   // the first swipe to a page becomes as quick as the second.
+  // ── Run the arriving page's script BEFORE the reader asks for it ──
+  // Each page's own script is 90-120 KB, and executing it is a single
+  // uninterruptible task. Done inside the navigation it froze the main
+  // thread for ~135ms on a 4x-throttled CPU -- nine dropped frames in the
+  // middle of the transition, on the FIRST visit to each page and only
+  // then, which is exactly the moment a reader forms their opinion of
+  // whether the app is smooth.
+  //
+  // It is safe to run early by construction: the script's own
+  // bottom-of-file auto-invoke is skipped while __istVirtualNavInjecting
+  // is set (see each page), so all it does is define things and register
+  // its mount/unmount pair. It is NOT safe to assume it will succeed --
+  // it runs here with the *previous* page's DOM in #ist-content, so any
+  // top-level DOM access finds nothing. Hence the guard below: if the
+  // script did not manage to register, this is left exactly as it was and
+  // navigateTo runs it at its old moment, with the right DOM in place.
+  const warmedScripts = {};
+  async function warmPageScript(slug) {
+    if (pages[slug] || warmedScripts[slug]) return;
+    warmedScripts[slug] = true;
+    let cached;
+    try {
+      cached = await ensurePageLoaded(slug);
+      await loadMissingScripts(cached);
+    } catch (e) { return; }
+    if (pages[slug] || !cached.scriptText) return;
+    global.__istVirtualNavInjecting = true;
+    try {
+      const el = document.createElement('script');
+      el.textContent = cached.scriptText;
+      document.body.appendChild(el);
+    } catch (e) {
+      console.warn('[router] pre-warming ' + slug + "'s script failed; it will run on arrival instead", e);
+    } finally {
+      global.__istVirtualNavInjecting = false;
+    }
+    if (!pages[slug]) {
+      // It ran but never registered -- something in it needs its own DOM.
+      // Say so once: this page pays the freeze on its first visit, and
+      // that is worth knowing rather than silently accepting.
+      console.warn('[router] ' + slug + ' did not register a lifecycle when pre-warmed; ' +
+                   'its script will re-run on arrival (and cost a frame drop there).');
+    }
+  }
+
   function prefetchNeighbours(slug) {
     if (!PAGES.includes(slug)) return;
     // What one gesture can reach from here: the level above and the level
@@ -376,7 +449,10 @@
     }
     want = want.filter(Boolean);
     const run = () => want.forEach(s => {
-      if (!pageCache[s]) ensurePageLoaded(s).catch(() => {});
+      // The document first, then its script -- so the heavy, single
+      // uninterruptible task lands here, at idle, instead of in the
+      // middle of the reader's gesture.
+      warmPageScript(s).catch(() => {});
     });
     if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 4000 });
     else setTimeout(run, 1500);
@@ -454,6 +530,9 @@
       if (pages[currentSlug] && pages[currentSlug].unmount) {
         try { pages[currentSlug].unmount(); } catch (e) { console.error(e); }
       }
+      // Between every phase below, see yieldFrame's own comment: these
+      // are the seams that stop the swap being one 111ms block.
+      await yieldFrame();
 
       if (!document.querySelector('style[data-page="' + targetSlug + '"]')) {
         const styleEl = document.createElement('style');
@@ -463,10 +542,13 @@
       }
       setActiveStylesheet(targetSlug);
 
+      await yieldFrame();
+
       const liveContent = document.getElementById('ist-content');
       if (liveContent) {
         liveContent.innerHTML = cached.contentHTML;
       }
+      await yieldFrame();
       // The seat card sits in the profile bar on a phone, and the bar is
       // deliberately outside #ist-content -- so unlike everything the swap
       // above just replaced, the seat survives it. Drop it here; the
@@ -488,6 +570,13 @@
       document.title = cached.title || document.title;
       document.body.dataset.page = targetSlug;
       document.body.classList.remove(exitClass);
+      // setBarLayout just above is a FLIP -- it reads
+      // getBoundingClientRect before and after re-laying out the row, so
+      // it forces two synchronous layouts of a document whose content
+      // was replaced one line earlier. That is the single most expensive
+      // thing in the swap after the swap itself; give the frame it
+      // dirtied a chance to be painted before the next phase piles on.
+      await yieldFrame();
 
       // Inject this page's modal/overlay markup (see ensurePageLoaded)
       // the first time it's needed -- skips any node whose id already
@@ -524,6 +613,8 @@
         }
       }
 
+      await yieldFrame();
+
       // Load any <script src> this page's <head> declares that the live
       // document doesn't already have (see loadMissingScripts above) --
       // must finish before the page's own script/mount runs below, since
@@ -538,6 +629,9 @@
       // auto-invoke (checkSession()/init()/mount(), whichever it is) to
       // skip itself -- this call below is the only thing that should
       // ever trigger mount() for a virtual navigation.
+      // Normally already done at idle by warmPageScript above, so this
+      // is the fallback for a page that could not be pre-warmed (its
+      // script needs its own DOM) or one reached before idle ever ran.
       if (!pages[targetSlug] && cached.scriptText) {
         global.__istVirtualNavInjecting = true;
         const scriptEl = document.createElement('script');
@@ -583,9 +677,12 @@
       activeSlug = targetSlug;
       if (isZoom(targetSlug)) lastZoom = targetSlug;
 
+      await yieldFrame();
+
       if (pages[targetSlug] && pages[targetSlug].mount) {
         try { pages[targetSlug].mount(); } catch (e) { console.error(e); }
       }
+      await yieldFrame();
       // The map image that just arrived is #ist-content's own, so it is
       // the base map again -- put the member's hand-painted district map
       // back before anything reads layout below (see home-map.js).
@@ -901,9 +998,14 @@
     // place the exit class puts it, then hand over to navigate(). The
     // inline styles die with the nodes when #ist-content is swapped, so
     // there is nothing to clean up on the happy path.
-    function flingZoom(dir) {
+    // `ms` is what is actually LEFT of the journey, not the whole of it:
+    // a finger released at 80% has 20% to run, and everything about the
+    // release -- the strip's playout, this fade, and how long the swap
+    // holds off -- has to agree on that one number or the page is cut
+    // instead of faded.
+    function flingZoom(dir, ms) {
       const to = dir === 'in' ? ZOOM_IN_SCALE : ZOOM_OUT_SCALE;
-      const ms = zoomDurationMs();
+      if (ms == null) ms = zoomDurationMs();
       const nodes = contentNodes();
       for (let i = 0; i < nodes.length; i++) {
         nodes[i].style.transformOrigin = '50% 45%';
@@ -1062,11 +1164,22 @@
           // Run out whatever is left of the strip, at the same rate the
           // rest of the transition moves, and hand it to navigateTo to
           // fade once the real map is standing underneath it.
+          // A floor, because "what is left" can be almost nothing: a
+          // finger dragged the whole way leaves no time to fade the
+          // outgoing page, and it was being cut rather than faded. 35%
+          // of the duration is enough for a real crossfade and still
+          // shorter than the fixed wait this replaced.
+          const dur = zoomDurationMs() || 380;
+          const rest = Math.max(Math.round(dur * 0.35), Math.round(dur * (1 - p)));
           if (frames) {
-            frames.play(p, 1, Math.max(60, (zoomDurationMs() || 380) * (1 - p)));
+            frames.play(p, 1, rest);
             pendingFrames = frames;
           }
-          flingZoom(target.dir);
+          // The swap begins the moment the drawing stops moving, rather
+          // than a fixed 380ms after the finger left -- which on a drag
+          // taken most of the way was a third of a second of nothing.
+          setZoomWait(rest);
+          flingZoom(target.dir, rest);
           navigate(target.slug, target.dir);
           return;
         }
