@@ -1395,6 +1395,45 @@ Five things about it:
   news deck and Kahvehane's two decks do not, so a vertical swipe over them zooms. Hane is not in
   the stack at all, so its vertical pull still belongs to the petek.
 
+### The zoom is DRAWN, not computed — `map-frames.js`
+
+Where a depth journey has drawings, the scale transform gives way to **a strip of frames,
+played**. The maps here are hand-painted: a mathematical zoom of one can only get bigger, and it
+has to choose between pixelating (raster) and losing the hand (traced to vector). A drawn journey
+has neither problem and gains what neither can offer — control of every in-between. `map-frames.js`
+is only the projector; it knows nothing about what is on the frames.
+
+- **The frame count is a style decision the code never encodes.** Eight frames over the transition
+  is ~21fps and reads as hand animation on twos; twenty is ~52fps and reads as video. Drop in
+  however many are drawn and set `count` in `JOURNEYS`. See `assets/map/zoom/README.md` for what to
+  draw and what it costs.
+- **A drag SCRUBS the strip**, it does not play it: progress maps onto frame index, so dragging
+  slowly flips through the drawings one at a time — the reader actually sees each one, which the
+  continuous scale could never show them. On release the remainder runs out at a fixed rate, or
+  backwards if the gesture was abandoned.
+- **Playing is a change of opacity and nothing else.** Every frame is its own node, decoded before
+  the gesture can begin (`warm`, at idle, beside the page prefetch). Never a `src` swap — an `<img>`
+  whose `src` changes goes blank until the new bytes decode, the same trap `home-map.js` documents
+  as "the city flickering out", and here it would land mid-drag.
+- **A journey whose frames are not decoded yet refuses**, and the scale transform runs instead.
+  That fallback is the ordinary path, not a degraded one: İstanbul ↔ mahalle is deliberately
+  undrawn, because a geographic zoom into the reader's own district would need one journey per
+  district (25 of them) and the mahalle level has no map to arrive at anyway.
+- **The traced hit-region overlay is hidden for the length of the journey** and restored at the far
+  end. It cannot follow hand-drawn frames — nobody is re-tracing the districts per frame — and taps
+  mid-zoom mean nothing.
+- **The last frame is handed over, not cut to.** It stands over the arriving page's own map and
+  fades (`settle`, called from `navigateTo` once `mount()` has run), so the strip and the real map
+  have to agree on the final image. They do; break that and the handover becomes a visible cut.
+
+**The two endpoints are not displayed in the same box**, which is the open design question this
+raised. On a 390×844 phone Kütüphane's `.map-panel` is 390×896 at y=−52 — full-bleed, the whole
+screen — while Kahvehane's is a 390×390 square hero at y=26. (This section of the doc used to claim
+both were squares. They are not.) The artwork disagrees the same way: Türkiye is 1080×2420 and
+shown almost entire, İstanbul is 3510×1600 and cropped hard. The placeholders resolve it by drawing
+in Kütüphane's tall box and having the city *arrive* as the square it will occupy; squaring
+Kütüphane's map instead would make one canvas serve the whole journey. Not decided.
+
 ### `mahalle.html` — the innermost level
 
 The reader's own ilçe, and the mahalles inside it, with theirs picked out. Deliberately the
