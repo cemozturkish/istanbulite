@@ -468,6 +468,11 @@
   // underneath it -- the last drawing hands over to the map instead of
   // cutting to it.
   let pendingFrames = null;
+  // The flip book left standing over the arriving page. Taken off only
+  // once that page is mounted underneath it -- its last drawing is the
+  // level being arrived at, so nobody should be able to see the moment
+  // one becomes the other.
+  let pendingFlip = null;
 
   let virtualNavInFlight = false;
   // The currently-displayed page, tracked independently of location.pathname
@@ -523,6 +528,7 @@
         document.body.classList.remove(exitClass);
         document.body.classList.remove('ist-zoom');
         if (pendingFrames) { pendingFrames.end(); pendingFrames = null; }
+        if (pendingFlip) { pendingFlip.end(); pendingFlip = null; }
         if (!fromPopstate) window.location.href = targetSlug + '.html';
         return;
       }
@@ -699,6 +705,16 @@
         pendingFrames = null;
         const d = zoomDurationMs();
         setTimeout(() => strip.settle(Math.max(120, Math.round(d * 0.5))), Math.round(d * 0.45));
+      }
+      if (pendingFlip) {
+        const book = pendingFlip;
+        pendingFlip = null;
+        // Put the real page's own elements back first, then take the
+        // layer off over them -- the last drawing and the page it is
+        // standing in for are the same picture, so the hand-over is
+        // meant to be invisible.
+        book.reveal();
+        requestAnimationFrame(() => book.fade(140));
       }
       // Deliberately after mount(): initMapZoom's own measure() reads
       // getBoundingClientRect(), which forces a synchronous layout --
@@ -1037,6 +1053,23 @@
     // mahalle, which has no map to zoom into -- the scale transform
     // above is the whole transition, which is why that fallback is not
     // a degraded mode but the ordinary one.
+    // ── The flip book ──
+    // Where a journey has a step table, the whole screen becomes one:
+    // the drawings, and the page's own elements posed over them (see
+    // flip.js and flip-steps.js). Where it has only drawings, the older
+    // strip still runs. Where it has neither -- İstanbul to mahalle,
+    // which has no map to zoom into -- the scale transform does it.
+    function beginFlip(target) {
+      if (!target || !global.IstFlip || !global.IstFlipSteps) return null;
+      const hit = global.IstFlipSteps.find(activeSlug, target.slug);
+      if (!hit) return null;
+      const strip = global.IstMapFrames
+        ? global.IstMapFrames.stripFor(activeSlug, target.slug)
+        : null;
+      try { return global.IstFlip.start(hit.def, strip); }
+      catch (e) { console.error(e); return null; }
+    }
+
     function beginFrames(target) {
       if (!global.IstMapFrames || !target) return null;
       try { return global.IstMapFrames.begin(activeSlug, target.slug); }
@@ -1108,6 +1141,7 @@
           g.zoom = g.noZoom ? null : verticalTarget(dy);
           if (!g.zoom) { g = null; return; }
           g.frames = undefined;   // not yet asked; null means asked and none
+          g.flip = undefined;
         }
         document.body.classList.add('ist-dragging');
       }
@@ -1133,7 +1167,11 @@
       if (!aimed) { g.dy = dy * EDGE_PULL; if (e.cancelable) e.preventDefault(); paintZoom(g.dy); return; }
       // Re-aiming mid-drag means the strip on screen is for the wrong
       // journey -- drop it and take the other one.
-      if (g.frames && g.zoom && g.zoom.slug !== aimed.slug) { g.frames.end(); g.frames = null; }
+      if (g.zoom && g.zoom.slug !== aimed.slug) {
+        if (g.frames) { g.frames.end(); }
+        if (g.flip) { g.flip.end(); }
+        g.frames = undefined; g.flip = undefined;
+      }
       g.zoom = aimed;
       g.dy = dy;
       if (e.cancelable) e.preventDefault();
@@ -1142,9 +1180,20 @@
       // dragging slowly flips through the drawings one at a time. The
       // scale still runs underneath for the furniture -- the columns and
       // the two bars are printed on the screen, not drawn on the map.
-      if (g.frames === undefined) g.frames = beginFrames(aimed);
-      paintZoom(dy);
-      if (g.frames) g.frames.paint(zoomProgress(dy));
+      if (g.flip === undefined) {
+        g.flip = beginFlip(aimed);
+        // Only fall back to the bare strip where there is no step table.
+        g.frames = g.flip ? null : beginFrames(aimed);
+      }
+      if (g.flip) {
+        // The flip book IS the screen for the length of the journey, so
+        // the page underneath must not also be scaling: two things
+        // moving to the same end is one too many.
+        g.flip.paint(zoomProgress(dy));
+      } else {
+        paintZoom(dy);
+        if (g.frames) g.frames.paint(zoomProgress(dy));
+      }
     }, { passive: false });
 
     document.addEventListener('touchend', (e) => {
@@ -1159,7 +1208,26 @@
         const far = p > 0.55;
         const flicked = Math.abs(gesture.speed) > FLICK_SPEED &&
                         Math.sign(gesture.speed) === Math.sign(dy) && Math.abs(dy) > SLOP * 2;
+        const flip = gesture.flip || null;
         const frames = gesture.frames || null;
+
+        // ── The flip book: there is no stopping in between ──
+        // Whichever end is nearer, it runs there. Committing, the page
+        // is swapped BEHIND the layer while the reader is still looking
+        // at a drawing -- which is the one moment that work is free,
+        // and the whole reason the middle of this journey is inert.
+        if (flip) {
+          const dur = zoomDurationMs() || 380;
+          if (target && (far || flicked)) {
+            pendingFlip = flip;
+            flip.run(p, 1, Math.max(120, Math.round(dur * (1 - p))));
+            setZoomWait(Math.max(120, Math.round(dur * (1 - p))));
+            navigate(target.slug, target.dir);
+          } else {
+            flip.run(p, 0, Math.max(120, Math.round(dur * p))).then(() => flip.end());
+          }
+          return;
+        }
         if (target && (far || flicked)) {
           // Run out whatever is left of the strip, at the same rate the
           // rest of the transition moves, and hand it to navigateTo to
@@ -1225,6 +1293,7 @@
       if (!g) return;
       const wasY = g.axis === 'y';
       if (g.frames) g.frames.end();
+      if (g.flip) g.flip.end();
       g = null;
       if (wasY) springZoom(); else releaseColumns();
     }, { passive: true });

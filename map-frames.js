@@ -231,10 +231,22 @@
     return !!decoded[key(hit.journey.from, hit.journey.to)];
   }
 
+  // The decoded strip for a journey, in the direction asked for, or
+  // null if it is not ready. The flip book borrows these rather than
+  // driving them itself -- there is one place that decodes frames.
+  function stripFor(from, to) {
+    const hit = find(from, to);
+    if (!hit) return null;
+    const imgs = decoded[key(hit.journey.from, hit.journey.to)];
+    if (!imgs) return null;
+    return hit.reverse ? imgs.slice().reverse() : imgs.slice();
+  }
+
   global.IstMapFrames = {
     warm: warm,
     ready: ready,
     begin: begin,
+    stripFor: stripFor,
     journeys: JOURNEYS,
   };
 })(window);
