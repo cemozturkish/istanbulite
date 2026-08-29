@@ -14,10 +14,29 @@ the manifest and cannot tell a drawn frame from a generated one.
 
 | | |
 |---|---|
-| **Canvas** | 540 × 1240, the same shape as Kütüphane's map box (390 × 896 on screen) |
+| **Canvas** | **1080 × 1920** — 9:16, every frame identical |
 | **Naming** | `tr-ist-00.jpg` … `tr-ist-NN.jpg`, zero-padded, in journey order |
 | **Order** | frame 00 is Türkiye, the last frame is İstanbul |
 | **Format** | JPEG (the existing maps are already JPEG despite their `.png` names). WebP would roughly halve the wire cost |
+
+**One canvas, identical for every frame** — that is the whole contract, and it
+is what "put them on top of each other correctly" reduces to. The strip is laid
+over the *whole viewport* with `object-fit: cover`, so every frame is cropped
+by exactly the same amount whatever phone it lands on, and nothing shifts
+between one and the next.
+
+It is deliberately **not** the map panel's box. The two levels do not share one
+(see the bottom of this file), so a strip measured onto the map would begin in
+one shape and have to end in another.
+
+Phones are taller than 9:16 — a 390 × 844 screen is 1 : 2.16 against 9:16's
+1 : 1.78 — so `cover` crops the **left and right** edges, about 9% off each
+side on that screen and more on a taller one. Keep anything that must survive
+inside the middle ~80% of the width. Vertically nothing is lost.
+
+The two bars are drawn **over** the strip (profile bar at the top, tab bar at
+the bottom), so the top ~56 px and bottom ~46 px of every frame sit behind
+furniture. Draw through them — map, not content.
 
 **The reverse direction is not drawn.** Going out plays these backwards, which
 costs nothing and cannot drift from the way in.
@@ -33,11 +52,13 @@ A style decision, not a technical one, and the code never encodes it — change
 | 12 | ~31 fps | the current placeholder set |
 | 20 | ~52 fps | video |
 
-Cost, at this canvas size: about 55 KB on the wire and 2.6 MB decoded per
-frame. Twelve frames is 0.7 MB downloaded and 31 MB held. Twenty is 1.1 MB and
-52 MB — still fine. Full resolution instead of half would be 125 MB for twelve,
-which is the number that would actually hurt, and is why the in-betweens are
-half size. Only the two endpoints are the real maps at full resolution.
+Cost, measured on the current placeholders (540 × 960, half the drawn size):
+about 50 KB on the wire and 2.1 MB decoded per frame. Twelve frames is
+**0.59 MB downloaded and 24 MB held**. Twenty would be ~1.0 MB and 40 MB —
+still fine. Drawn at full 1080 × 1920 and shipped that way it would be 8.3 MB
+per frame and 100 MB for twelve, which is the number that would actually hurt.
+So: **draw at 1080 × 1920, ship the in-betweens at half.** Only the two
+endpoints are the real maps at full resolution.
 
 ## The frames must end where the real map begins
 
@@ -46,30 +67,21 @@ The last frame is composited over the arriving page's own map and then faded
 frame is pixel-for-pixel what Kahvehane actually shows. Break that and the
 handover becomes a visible cut.
 
-## Two boxes, one journey — the open question
+## The two pages show their maps in different boxes
 
-The endpoints are **not displayed in the same box**, measured on a 390×844
-phone:
+Measured on a 390 × 844 phone:
 
 - **Kütüphane** — `.map-panel` is 390 × 896 at y = −52. Full-bleed, the whole
   screen, with the news column floating over it.
 - **Kahvehane** — `.map-panel` is 390 × 390 at y = 26. A square hero.
 
-And the artwork disagrees the same way: Türkiye is 1080 × 2420 (tall, and
-shown almost entire), İstanbul is 3510 × 1600 (wide, cropped hard to a square).
+(`CLAUDE.md` used to claim both were squares. They are not.) The artwork
+disagrees the same way: Türkiye is 1080 × 2420 shown almost entire, İstanbul is
+3510 × 1600 cropped hard to its square.
 
-So the placeholders are drawn in Kütüphane's tall box, and the city *arrives*
-as the square it will occupy — growing into exactly the rectangle Kahvehane's
-hero really stands in. That works, but it is one of three answers, and the
-choice is a design decision nobody has made yet:
-
-1. **The city arrives as a square inside the tall frame** (what these do). No
-   page changes. The square's edge is visible as it forms, which the drawings
-   can either hide or make a feature of.
-2. **Kütüphane's map becomes a square hero too.** Then both depths share one
-   box, the journey is one canvas end to end, and `CLAUDE.md`'s claim that the
-   hero is a square on both pages becomes true — it currently is not. The
-   biggest change to how Kütüphane looks.
-3. **The frame box itself animates** from the tall one to the square. The
-   player already interpolates nothing here, so this needs code as well as
-   drawings.
+The 9:16 strip sidesteps this by owning the screen rather than the map box —
+but it does not make it go away, and it lands in the **drawings** instead of in
+the code: the last frame has to show the İstanbul map sitting in its square
+hero, exactly where that page will put it, because the strip fades out over the
+real thing. Whatever the frames before it do with that square — let it grow, cut
+to it, draw it forming — is yours, and is the interesting part.

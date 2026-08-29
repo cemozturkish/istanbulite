@@ -685,3 +685,42 @@ html.ist-arriving-out body.ist-zoom #ist-content > * { transform: scale(1.35); o
      two drawings would produce a third one nobody drew. */
   transition: none;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   THE TWO BARS ARE OMNIPRESENT
+   ──────────────────────────────────────────────────────────────
+   Nothing the page draws may ever pass in front of the profile bar or
+   the tab bar. They are the phone's furniture: who is here, and where
+   you can go. A card sliding over one is the app losing its frame.
+
+   This needs saying because the tab bar's own `z-index: 100` was a lie.
+   It sits inside `.section-rule`, which is `position: absolute` with
+   `z-index: 1` -- a stacking context -- so the 100 was scoped INSIDE it
+   and the bar actually competed against the page at 1. Kahvehane's games
+   column is also 1 and comes later in the DOM, so the two were tied and
+   document order decided. Nothing overlapped, so nothing showed it --
+   until the zoom scaled the column and it grew over the bar and won.
+
+   So: on a phone `.section-rule` stops creating a stacking context (it
+   is a zero-sized nothing there anyway, whose only job is to hold the
+   fixed header), and both bars are stated together, once, above every
+   z-index the pages themselves use. Deliberately still below the 500
+   overlay layer -- THE sheet is a surface that rises OVER the page and
+   comes to rest under the top bar by its own arithmetic, which is a
+   different thing from a card climbing over the furniture.
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* !important, and not for tidiness: a virtually-navigated page has its
+     <style data-page> appended to <head> at navigation time, so it lands
+     AFTER this file and beats it at equal specificity. Without this the
+     bars held on every real page load and were climbed over by the
+     arriving page on every swipe -- which is the harder bug to see,
+     because it only exists mid-transition. */
+  .section-rule {
+    /* Un-trap the header: positioned + z-index:auto is not a stacking
+       context, so the bar below competes at the root, where it belongs. */
+    z-index: auto !important;
+  }
+  .section-rule > header { z-index: 400 !important; }
+  #ist-pc-mount { z-index: 401 !important; }
+}
