@@ -635,8 +635,28 @@ body.ist-dragging .col-right-slide {
 
 body.ist-zoom #ist-content > * {
   transform-origin: 50% 45%;
-  transition: transform var(--ist-zoom-dur) ease, opacity var(--ist-zoom-dur) ease;
+  /* The transform runs the whole journey; the OPACITY does not, and that
+     is deliberate. Fading the page across the full duration meant the
+     screen was empty of everything but the map for most of the
+     transition -- measured: content at 0.10 before the finger even
+     lifted, and flat 0.00 for ~480ms. That reads as the page reloading,
+     however good the drawings underneath are.
+
+     So the outgoing page holds and leaves late, in the last 40%, by
+     which time the drawing has already carried the reader most of the
+     way; and the arriving page is in within the first 40%, so it is
+     solid well before the strip is lifted off it. */
+  transition: transform var(--ist-zoom-dur) ease,
+              opacity calc(var(--ist-zoom-dur) * 0.3) ease calc(var(--ist-zoom-dur) * 0.7);
   will-change: transform, opacity;
+}
+html.ist-arriving-in #ist-content > *,
+html.ist-arriving-out #ist-content > * {
+  transition-delay: 0s;
+}
+body.ist-zoom.ist-zoom-arriving #ist-content > * {
+  transition: transform var(--ist-zoom-dur) ease,
+              opacity calc(var(--ist-zoom-dur) * 0.3) ease;
 }
 body.ist-zoom.ist-zooming-in  #ist-content > * { transform: scale(1.35); opacity: 0; }
 body.ist-zoom.ist-zooming-out #ist-content > * { transform: scale(0.72); opacity: 0; }
@@ -668,7 +688,14 @@ html.ist-arriving-out body.ist-zoom #ist-content > * { transform: scale(1.35); o
    ══════════════════════════════════════════════════════════════ */
 .ist-mapframes {
   position: fixed;
-  z-index: 7;
+  /* Above the map (which is -1 on Kütüphane and inside `main` at 0 on
+     Kahvehane) and BELOW every column (6/3, 1/1, 2/1 across the pages).
+     That placement is the whole difference between a zoom and a reload:
+     the frames replace the MAP, and the page's own furniture goes on
+     floating over them exactly as it floats over the real map today. A
+     strip painted over the columns blanks the entire screen for the
+     length of the journey, which is what a reload looks like. */
+  z-index: 0;
   pointer-events: none;
   overflow: hidden;
   background: var(--paper);

@@ -1454,6 +1454,39 @@ is only the projector; it knows nothing about what is on the frames.
   fades (`settle`, called from `navigateTo` once `mount()` has run), so the strip and the real map
   have to agree on the final image. They do; break that and the handover becomes a visible cut.
 
+**The swap is chunked, because one task is what jank actually is.** Everything `navigateTo` does
+after its await — unmount, stylesheet, `innerHTML`, overlays, script, `mount()`, `setBarLayout` —
+used to run inside the single callback that resolved that wait. Measured on a 4×-throttled CPU
+(roughly a real phone) that is one **111ms `TimerFire`**: a clean 17ms cadence, then nine frames in
+a row where nothing can paint, then clean again. No easing, no drawing and no fade fixes a frozen
+main thread. The work is necessary; doing it in one uninterruptible block is not — so the phases
+are separated by `yieldFrame()` (rAF, then a task, so a frame genuinely gets through). Total CPU is
+unchanged; what changes is that the strip keeps moving over the top of it. After: **no long tasks
+at all, worst frame 33–50ms** instead of 150.
+
+**And the release carries one number, not three.** A finger let go at 80% has 20% of the journey
+left, and the strip's playout, the outgoing page's fade and how long the swap holds off must all
+agree on that or the page is cut instead of faded — the wait used to be a flat full duration, which
+on a drag taken most of the way was a third of a second of nothing. `rest` is that number, floored
+at 35% of the duration so there is always room for a real crossfade.
+
+**The frames replace the MAP, not the screen** — the strip sits at `z-index: 0`, above the map
+(which is −1 on Kütüphane and inside `main` at 0 on Kahvehane) and below every column (6/3, 1/1,
+2/1 across the pages). That placement is the whole difference between a zoom and a reload: the
+page's own furniture goes on floating over the drawings exactly as it floats over the real map
+today. A strip painted over the columns blanks the entire screen for the length of the journey,
+which is what a reload looks like however good the drawings are.
+
+**And the page does not dissolve under the finger.** The drag scales and does not fade at all — a
+zoom moves the page toward you, it does not erase it, and an abandoned gesture should not mean
+watching the page come back. The crossfade belongs to the commit, where it happens in the last 30%
+and the arriving page is in within its first 30%, so the strip is lifted off a page that is already
+solid. Measured, Kütüphane → Kahvehane: the columns hold at opacity 1 for the whole drag and the
+first 240ms of the commit, there is a single ~80ms beat of map-only at the deepest point, and the
+arriving page is complete at +440ms while the strip does not begin to lift until +480ms. Before
+this the content was at 0.10 before the finger even left the glass and flat 0 for ~480ms, which is
+exactly what reads as a page reloading.
+
 **The strip owns the screen, not the map's box.** Every frame is drawn on one 9:16 canvas
 (1080×1920) and laid over the whole viewport with `object-fit: cover`, so all of them are cropped
 identically on any phone and nothing shifts between one and the next — which is the only thing the
