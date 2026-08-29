@@ -1423,6 +1423,38 @@ Five things about it:
   news deck and Kahvehane's two decks do not, so a vertical swipe over them zooms. Hane is not in
   the stack at all, so its vertical pull still belongs to the petek.
 
+### The flip book — `flip.js` + `flip-steps.js`
+
+A depth journey is a flip book: a dozen drawn steps scrubbed by the finger, with every element on
+screen having a defined place at each one. Release and it runs to whichever end is nearer. There is
+**no stopping in between and nothing to press there**, and that is not a limitation — it is the
+whole reason this is cheap.
+
+**It does not move the page; it replaces the screen.** The obvious reading is "animate the real page
+from one level to the next", and it is the expensive one: the two levels are different DOM styled by
+stylesheets that cannot both be live, so the page has to be rebuilt somewhere in the middle of the
+gesture — a single ~111ms task, and a frozen main thread is what "not smooth" actually is. Instead a
+layer of its own owns the screen for the length of the journey (the drawings, plus a few actors
+posed over them), it costs nothing but transforms and opacity, and the real page underneath is
+swapped **while the reader is looking at a drawing**. Measured on a 4× CPU: 60 frames under the
+finger, every one 17ms, none dropped.
+
+- **An actor is a clone parked on its own element's box**, so step 0 lines up with the page
+  underneath by construction rather than by anyone's arithmetic. The real element is hidden
+  (`visibility`, never `display` — the page must not re-lay-out mid-gesture) and put back on reveal.
+- **Poses are relative to where the element really sits**, so `{x:0, y:0, scale:1, opacity:1}` means
+  "exactly where it lives". A sparse table is enough: give a pose at step 0 and step 6 and it
+  travels evenly between them, holding after the last one you wrote.
+- **The frame is whole-numbered, the actors are continuous.** A flip book flips — interpolating two
+  drawings makes a third nobody drew — but type moving in whole-pixel jumps shimmers.
+- **A journey and its reverse are one table**, counted from the other end, so there is never a
+  second one to keep in sync.
+- **The step count should match the number of drawings.** They are the same journey seen two ways:
+  the drawings are the map, the step table is everything printed over it.
+
+The one rule the artwork owes: **step 0 has to look like the level being left and the last step like
+the one being arrived at**, because those are the two frames that hand over to a real page.
+
 ### The zoom is DRAWN, not computed — `map-frames.js`
 
 Where a depth journey has drawings, the scale transform gives way to **a strip of frames,
