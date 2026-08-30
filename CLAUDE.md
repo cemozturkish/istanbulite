@@ -1443,12 +1443,16 @@ ticks say whether every frame is being cropped identically.
 
 **Its two ends are the real maps**, so the rig is also the place the shape question gets settled.
 `OVERRIDE` in project.html swaps any frame for a picture; today frame 1 is
-`kutuphane-map-mobile.png` and frame 12 is `istanbul-map-mobile.png`. Neither is the book's own
-9:16: Kütüphane's is 1080×2420 (taller — `cover` trims a little off top and bottom, which is barely
-visible) and İstanbul's is 3510×1600 (landscape — `cover` keeps a tall strip out of its middle and
-drops most of its width, which is very visible). One `FIT` constant switches every frame between
-`cover` and `contain` together; they are never fitted individually, or no two frames would be
-registered with each other.
+`kutuphane-map-mobile.png` and frame 12 is `istanbul-map-mobile.png`. One `FIT` constant switches
+every frame between `cover` and `contain` together; they are never fitted individually, or no two
+frames would be registered with each other, which is the one property the code owes the drawings.
+
+**Every frame must be the same pixel size, or the book is not registered with itself.** The
+in-betweens and the İstanbul end are 1080×1920 (9:16); the Türkiye end is still 1080×2420, and the
+difference is visible at the 1→2 turn. On a 390×844 phone `cover` paints a 9:16 frame 475 css px
+wide for a 390 px screen — **9% is lost off each side, so only the middle 82% is safe to draw in**
+— while the 1080×2420 map paints exactly 390 wide and loses nothing sideways. Two frames cropped
+differently is a jump, however well they are drawn.
 
 The vertical gesture on this tab belongs to the page, not to the carousel — `verticalTarget()` in
 router.js returns nothing here, because this tab *is* a flip book and the zoom stack must keep its
