@@ -43,7 +43,16 @@
   const ZOOM = ['kutuphane', 'kahvehane', 'mahalle']; // out -> in
   const ZOOM_DEFAULT = 'kahvehane';
   const HANE = 'anahane';
-  const PAGES = ZOOM.concat([HANE]);
+  // A sandbox tab, deliberately between the two real ones: the flip
+  // book on its own, with no map, no data and no page swap behind it,
+  // so the mechanic can be judged with a thumb without anything else in
+  // the way (see project.html).
+  const PROJECT = 'project';
+  const PAGES = ZOOM.concat([PROJECT, HANE]);
+  // Left to right along the bottom bar. The İstanbulite tab is three
+  // pages deep, so it is represented here by whichever level the reader
+  // last stood on.
+  const TABS = ['istanbulite', PROJECT, 'hane'];
 
   // Which zoom level the reader was last standing on, so that leaving for
   // Hane and coming back returns them to the distance they were at rather
@@ -72,7 +81,17 @@
 
   function isZoom(slug) { return ZOOM.indexOf(slug) !== -1; }
   function zoomIndex(slug) { return ZOOM.indexOf(slug); }
-  function tabOf(slug) { return slug === HANE ? 'hane' : 'istanbulite'; }
+  function tabOf(slug) {
+    if (slug === HANE) return 'hane';
+    if (slug === PROJECT) return PROJECT;
+    return 'istanbulite';
+  }
+  // The page a tab opens on.
+  function pageOfTab(tab) {
+    if (tab === 'hane') return HANE;
+    if (tab === PROJECT) return PROJECT;
+    return lastZoom;
+  }
 
   // Two tabs, three of the four pages behind one of them. The İstanbulite
   // link also re-points at whichever level was last stood on, so tapping
@@ -86,6 +105,8 @@
       if (t === 'istanbulite') a.setAttribute('href', lastZoom + '.html');
     });
   }
+
+  function tabIndexOf(slug) { return TABS.indexOf(tabOf(slug)); }
 
   function currentPage() {
     const path = (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
@@ -408,6 +429,11 @@
   // script did not manage to register, this is left exactly as it was and
   // navigateTo runs it at its old moment, with the right DOM in place.
   const warmedScripts = {};
+  // A script that has been EXECUTED, whether or not it managed to
+  // register. Running one twice is not a retry -- its top-level consts
+  // are already declared, so the second run dies on a duplicate
+  // declaration and takes the page with it.
+  const ranScripts = {};
   async function warmPageScript(slug) {
     if (pages[slug] || warmedScripts[slug]) return;
     warmedScripts[slug] = true;
@@ -418,6 +444,7 @@
     } catch (e) { return; }
     if (pages[slug] || !cached.scriptText) return;
     global.__istVirtualNavInjecting = true;
+    ranScripts[slug] = true;
     try {
       const el = document.createElement('script');
       el.textContent = cached.scriptText;
@@ -441,11 +468,11 @@
     // What one gesture can reach from here: the level above and the level
     // below (vertically), and the other tab (horizontally).
     let want;
-    if (slug === HANE) {
-      want = [lastZoom];
+    if (slug === HANE || slug === PROJECT) {
+      want = [lastZoom, PROJECT, HANE].filter(s => s !== slug);
     } else {
       const i = zoomIndex(slug);
-      want = [ZOOM[i - 1], ZOOM[i + 1], HANE];
+      want = [ZOOM[i - 1], ZOOM[i + 1], PROJECT];
     }
     want = want.filter(Boolean);
     const run = () => want.forEach(s => {
@@ -638,7 +665,8 @@
       // Normally already done at idle by warmPageScript above, so this
       // is the fallback for a page that could not be pre-warmed (its
       // script needs its own DOM) or one reached before idle ever ran.
-      if (!pages[targetSlug] && cached.scriptText) {
+      if (!pages[targetSlug] && cached.scriptText && !ranScripts[targetSlug]) {
+        ranScripts[targetSlug] = true;
         global.__istVirtualNavInjecting = true;
         const scriptEl = document.createElement('script');
         scriptEl.textContent = cached.scriptText;
@@ -795,11 +823,16 @@
     // İstanbulite -- Hane is not in the stack, and its own vertical pull
     // belongs to the petek.
     function horizontalTarget(dx) {
-      const here = activeSlug;
-      if (here === HANE) return dx > 0 ? { slug: lastZoom, dir: 'backward' } : null;
-      return dx < 0 ? { slug: HANE, dir: 'forward' } : null;
+      const i = tabIndexOf(activeSlug);
+      if (i === -1) return null;
+      const next = dx < 0 ? i + 1 : i - 1;
+      if (next < 0 || next >= TABS.length) return null;
+      return { slug: pageOfTab(TABS[next]), dir: dx < 0 ? 'forward' : 'backward' };
     }
     function verticalTarget(dy) {
+      // Proje owns its own vertical gesture -- it IS a flip book -- so
+      // the carousel must keep its hands off it.
+      if (activeSlug === PROJECT) return null;
       const i = zoomIndex(activeSlug);
       if (i === -1) return null;
       // Down goes IN (toward the mahalle), up goes OUT (toward Türkiye) --
@@ -900,13 +933,13 @@
       const link = e.target.closest('nav a');
       if (!link) return;
       const tab = link.dataset.tab || (link.getAttribute('href') === 'anahane.html' ? 'hane' : 'istanbulite');
-      if (tab === tabOf(activeSlug)) { e.preventDefault(); return; }
+      const here = tabOf(activeSlug);
+      if (tab === here) { e.preventDefault(); return; }
       // The İstanbulite tab is three pages; tapping it returns the reader
       // to the distance they were last standing at, not to İstanbul.
-      const target = tab === 'hane' ? HANE : lastZoom;
-      const dir = tab === 'hane' ? 'forward' : 'backward';
+      const dir = TABS.indexOf(tab) > TABS.indexOf(here) ? 'forward' : 'backward';
       e.preventDefault();
-      navigate(target, dir);
+      navigate(pageOfTab(tab), dir);
     }, true);
 
     // ══════════════════════════════════════════

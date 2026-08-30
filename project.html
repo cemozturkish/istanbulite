@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="tr" class="ist-safe-area-pending">
+<head>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/favicon.png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f0f0f0">
+  <title>Proje — istanbulite.net</title>
+  <script src="safe-area-ready.js?v=2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="ist-date.js?v=2"></script>
+  <script src="page-css.js?v=1"></script>
+  <script src="router.js?v=13"></script>
+  <script src="i18n.js?v=18"></script>
+  <script src="map-frames.js?v=3"></script>
+  <script src="flip.js?v=1"></script>
+  <script src="flip-steps.js?v=1"></script>
+  <script src="palette.js?v=1"></script>
+  <link rel="stylesheet" href="palette.css?v=3">
+  <link rel="stylesheet" href="profile-card.css?v=22">
+  <script src="avatar.js?v=1" defer></script>
+  <script src="profile-card.js?v=25" defer></script>
+  <script src="sheet.js?v=5"></script>
+  <link rel="stylesheet" href="sheet.css?v=7">
+  <link rel="stylesheet" href="frames.css?v=7">
+
+  <style data-page="project">
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--paper); color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    #main-site { display: grid; grid-template-columns: 1fr; grid-template-rows: 1fr; min-height: 100dvh; }
+    .section-rule { grid-column: 1 / -1; grid-row: 1; display: flex; justify-content: center; align-items: center; }
+    main { grid-column: 1; grid-row: 1; position: relative; overflow: hidden; }
+
+    /* ── The flip book itself ──
+       Twelve frames stacked in one box, all decoded, one visible at a
+       time. Showing a frame is a change of OPACITY and nothing else --
+       never a src swap, which blanks an <img> until the new bytes
+       decode and would land in the middle of the drag. */
+    .fb {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      background: var(--paper);
+      touch-action: none;          /* the page must not scroll under the finger */
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .fb img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      /* No transition. A flip book flips: interpolating two drawings
+         makes a third nobody drew. */
+      transition: none;
+      pointer-events: none;
+      -webkit-user-drag: none;
+    }
+    .fb img.on { opacity: 1; }
+
+    /* Read-out, so what the thumb is doing is measurable by eye. */
+    .fb-hud {
+      position: fixed;
+      left: 0; right: 0;
+      top: calc(env(safe-area-inset-top) + var(--navbar-h-top, 56px) + 10px);
+      text-align: center;
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      pointer-events: none;
+      z-index: 2;
+      font-variant-numeric: tabular-nums;
+    }
+    .fb-hud b { color: var(--ink); }
+    .fb-hint {
+      position: fixed;
+      left: 0; right: 0;
+      bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px) + 14px);
+      text-align: center;
+      font-size: 0.74rem;
+      color: var(--muted);
+      pointer-events: none;
+      z-index: 2;
+    }
+    .fb-loading {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+      z-index: 3;
+    }
+  </style>
+</head>
+<body data-page="project">
+
+<div id="main-site">
+  <div id="ist-pc-mount"></div>
+
+  <div class="section-rule">
+    <header>
+      <nav>
+        <a href="kahvehane.html" data-tab="istanbulite">İstanbulite</a>
+        <a href="project.html" class="active" data-tab="project">Proje</a>
+        <a href="anahane.html" data-tab="hane">Hane</a>
+      </nav>
+    </header>
+  </div>
+
+  <div id="ist-content" style="display:contents">
+    <main>
+      <div class="fb" id="fb">
+        <div class="fb-loading" id="fb-loading">Kareler yükleniyor…</div>
+      </div>
+      <div class="fb-hud" id="fb-hud"></div>
+      <div class="fb-hint">Aşağı kaydır</div>
+    </main>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// PROJE — the flip book, on its own, with nothing else in the way
+//
+// A rig rather than a feature. Twelve numbered frames, scrubbed by the
+// finger, and the only two places it can come to rest are the first and
+// the last. Let go anywhere in between and it runs to whichever end is
+// nearer -- there is no stopping in the middle and nothing to press
+// there, which is the whole reason a journey like this costs nothing.
+//
+// Deliberately self-contained: no map, no data, no page swap, no shared
+// transition machinery. If it is not smooth here it is not the app's
+// fault, and if it is smooth here then everything that made it rough
+// elsewhere is something else.
+// ══════════════════════════════════════════════════════════════
+const FRAMES = 12;
+const SRC = i => 'assets/project/' + String(i + 1).padStart(2, '0') + '.png';
+
+// How far the thumb travels to cross the whole book. A fraction of the
+// screen rather than a pixel count, so it feels the same on every phone.
+const TRAVEL = 0.55;
+// Where a release decides which end it is running to.
+const TIP = 0.5;
+// How fast it runs out once let go, in frames per second.
+const RUN_FPS = 34;
+
+let imgs = [];
+let at = 0;             // 0..FRAMES-1, where the book is resting
+let shown = -1;
+let anim = null;
+
+// Looked up in mount(), never at the top level. router.js runs a page's
+// script at idle, before the reader ever asks for it -- which happens
+// while a DIFFERENT page's DOM is on screen, so a top-level
+// getElementById here finds nothing and throws, and a script that
+// throws half way has already declared its consts and cannot be run
+// again. Everything that touches the DOM waits for mount().
+let box = null;
+let hud = null;
+
+function paintHud(p) {
+  if (!hud) return;
+  const i = Math.round(p);
+  hud.innerHTML = '<b>' + (i + 1) + '</b> / ' + FRAMES;
+}
+
+// Showing a frame is one class swap. Nothing else touches the DOM
+// during a drag, which is what keeps the main thread free enough to
+// track the finger.
+function show(i) {
+  i = Math.max(0, Math.min(FRAMES - 1, Math.round(i)));
+  if (i === shown) return;
+  if (shown >= 0) imgs[shown].classList.remove('on');
+  imgs[i].classList.add('on');
+  shown = i;
+  paintHud(i);
+}
+
+// ── Loading ──
+// Every frame is decoded before the book will move at all. An <img>
+// whose bytes are not ready paints nothing, and a blank frame in the
+// middle of a flip is worse than a wait at the start.
+async function load() {
+  if (!box) return;
+  imgs = [];
+  for (let i = 0; i < FRAMES; i++) {
+    const img = new Image();
+    img.decoding = 'async';
+    img.alt = '';
+    img.src = SRC(i);
+    imgs.push(img);
+  }
+  await Promise.all(imgs.map(i => (i.decode ? i.decode().catch(() => {}) : Promise.resolve())));
+  const spinner = document.getElementById('fb-loading');
+  if (spinner) spinner.remove();
+  if (!box.isConnected) return;      // the reader left while it decoded
+  imgs.forEach(i => box.appendChild(i));
+  shown = -1;
+  at = 0;
+  show(0);
+}
+
+// ── The gesture ──
+// One pointer, vertical only. `at` is where the book was resting when
+// the finger landed, so a drag continues from there rather than
+// restarting -- pull down twice and it keeps going forward.
+let drag = null;
+
+function stopAnim() { if (anim) { cancelAnimationFrame(anim); anim = null; } }
+
+function onDown(e) {
+  if (!imgs.length) return;
+  stopAnim();
+  drag = { y: e.clientY, from: at, moved: false };
+  box.setPointerCapture && box.setPointerCapture(e.pointerId);
+}
+
+function onMove(e) {
+  if (!drag) return;
+  const dy = e.clientY - drag.y;
+  if (!drag.moved && Math.abs(dy) < 4) return;
+  drag.moved = true;
+  // Down is forward. The span is the whole book, so the finger is
+  // moving the pages rather than nudging a counter.
+  const span = window.innerHeight * TRAVEL;
+  const p = drag.from + (dy / span) * (FRAMES - 1);
+  at = Math.max(0, Math.min(FRAMES - 1, p));
+  show(at);
+  e.preventDefault();
+}
+
+// Run to an end at a steady rate. Deliberately frame-paced rather than
+// eased: this is a flip book being let go of, and the pages should turn
+// at the speed pages turn.
+function runTo(target) {
+  stopAnim();
+  const from = at;
+  const dist = Math.abs(target - from);
+  if (dist < 0.001) { at = target; show(at); return; }
+  const ms = (dist / RUN_FPS) * 1000;
+  const t0 = performance.now();
+  const step = (now) => {
+    const a = Math.min(1, (now - t0) / ms);
+    at = from + (target - from) * a;
+    show(at);
+    if (a < 1) anim = requestAnimationFrame(step);
+    else { anim = null; at = target; }
+  };
+  anim = requestAnimationFrame(step);
+}
+
+function onUp() {
+  if (!drag) return;
+  const wasDrag = drag.moved;
+  drag = null;
+  if (!wasDrag) return;
+  // The book only ever comes to rest on the first frame or the last.
+  const p = at / (FRAMES - 1);
+  runTo(p >= TIP ? FRAMES - 1 : 0);
+}
+
+// ── The page lifecycle router.js drives ──
+// Bound to the box rather than to the document, so the listeners leave
+// with the page when #ist-content is swapped (see CLAUDE.md: "A page
+// script must not delegate on `document` for anything another page also
+// has").
+function mount() {
+  document.getElementById('main-site').classList.add('active');
+  box = document.getElementById('fb');
+  hud = document.getElementById('fb-hud');
+  if (!box) return;
+  box.addEventListener('pointerdown', onDown, { passive: true });
+  box.addEventListener('pointermove', onMove, { passive: false });
+  box.addEventListener('pointerup', onUp, { passive: true });
+  box.addEventListener('pointercancel', onUp, { passive: true });
+  // A fresh box every mount, so the decoded frames have to be put back
+  // into it. They are kept, not re-fetched: decoding twelve
+  // 1080x1920 images is the one cost worth paying only once.
+  if (imgs.length) {
+    const spinner = document.getElementById('fb-loading');
+    if (spinner) spinner.remove();
+    imgs.forEach(i => { i.classList.remove('on'); box.appendChild(i); });
+    shown = -1; at = 0; show(0);
+  } else {
+    load();
+  }
+  if (window.IstProfileCard) IstProfileCard.setPage('project');
+}
+function unmount() { stopAnim(); drag = null; box = null; hud = null; }
+IstRouter.registerPage('project', { mount, unmount });
+
+if (!window.__istVirtualNavInjecting) {
+  mount();
+  window.addEventListener('DOMContentLoaded', () => {
+    if (window.IstProfileCard) IstProfileCard.mount({ sb: IstRouter.sb, I18N: window.I18N, page: 'project' });
+  });
+}
+</script>
+</body>
+</html>
