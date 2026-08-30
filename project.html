@@ -55,7 +55,7 @@
       inset: 0;
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: var(--fb-fit, cover);
       opacity: 0;
       /* No transition. A flip book flips: interpolating two drawings
          makes a third nobody drew. */
@@ -90,6 +90,47 @@
       pointer-events: none;
       z-index: 2;
     }
+    /* ── The phone's bottom tab bar ──
+       Same object as every other page's: the <header> comes out of the
+       grid and is pinned to the viewport's bottom edge, so the two
+       fixed bars stand in exactly the same place on this tab as on the
+       others (see "The phone's two bars" in CLAUDE.md). */
+    @media (max-width: 768px) {
+      .section-rule {
+        position: absolute; top: 0; left: 0;
+        width: 0; height: 0; padding: 0; overflow: visible;
+      }
+      header {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        height: calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom));
+        padding: 0 0 env(safe-area-inset-bottom);
+        margin: 0;
+        border-top: 1px solid var(--rule);
+        border-bottom: none;
+        background: var(--paper-navbar);
+        z-index: 100;
+        display: flex;
+        align-items: stretch;
+      }
+      nav {
+        display: flex; width: 100%; height: 100%;
+        gap: 0; padding: 0 18px; flex-wrap: nowrap; justify-content: stretch;
+      }
+      nav a {
+        flex: 1;
+        display: flex; align-items: flex-end; justify-content: center;
+        padding-bottom: 6px;
+        font-size: 16px; font-weight: 600; letter-spacing: 0.5px;
+        text-transform: uppercase; color: var(--muted);
+        border: none; text-decoration: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      nav a.active { color: var(--ink); font-weight: 700; }
+      nav a:first-child { justify-content: flex-start; }
+      nav a:last-child { justify-content: flex-end; margin-right: -0.5px; }
+    }
+
     .fb-loading {
       position: fixed; inset: 0;
       display: flex; align-items: center; justify-content: center;
@@ -140,7 +181,28 @@
 // elsewhere is something else.
 // ══════════════════════════════════════════════════════════════
 const FRAMES = 12;
-const SRC = i => 'assets/project/' + String(i + 1).padStart(2, '0') + '.png';
+
+// ── What each frame shows ──
+// The two ends are the real maps; everything between is still the
+// numbered test slide. Swap a number for a path here and that frame
+// becomes a picture -- there is nothing else to change.
+const OVERRIDE = {
+  0:  'assets/map/kutuphane-map-mobile.png',   // 1080 x 2420
+  11: 'assets/map/istanbul-map-mobile.png',    // 3510 x 1600
+};
+const SRC = i => OVERRIDE[i] || ('assets/project/' + String(i + 1).padStart(2, '0') + '.png');
+
+// How a frame is laid into the screen. `cover` fills it and crops what
+// does not fit; `contain` shows the whole picture and leaves paper
+// around it. Every frame is treated the same way, whatever its own
+// shape, so the book stays registered with itself.
+//
+// The frames are 9:16 (1080x1920) and the two maps are not: Kütüphane's
+// is 1080x2420, taller, so cover trims a little off its top and bottom;
+// İstanbul's is 3510x1600, landscape, so cover keeps a tall strip out
+// of the middle of it and drops most of its width. That is what the two
+// ends will look like until they are redrawn to the book's own shape.
+const FIT = 'cover';
 
 // How far the thumb travels to cross the whole book. A fraction of the
 // screen rather than a pixel count, so it feels the same on every phone.
@@ -275,6 +337,7 @@ function mount() {
   box = document.getElementById('fb');
   hud = document.getElementById('fb-hud');
   if (!box) return;
+  box.style.setProperty('--fb-fit', FIT);
   box.addEventListener('pointerdown', onDown, { passive: true });
   box.addEventListener('pointermove', onMove, { passive: false });
   box.addEventListener('pointerup', onUp, { passive: true });

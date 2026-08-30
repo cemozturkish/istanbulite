@@ -1441,6 +1441,15 @@ Three things it settles, which the frames carry printed on them: the big number 
 up, the travelling dot says whether the flip is tracking the finger or trailing it, and the corner
 ticks say whether every frame is being cropped identically.
 
+**Its two ends are the real maps**, so the rig is also the place the shape question gets settled.
+`OVERRIDE` in project.html swaps any frame for a picture; today frame 1 is
+`kutuphane-map-mobile.png` and frame 12 is `istanbul-map-mobile.png`. Neither is the book's own
+9:16: Kütüphane's is 1080×2420 (taller — `cover` trims a little off top and bottom, which is barely
+visible) and İstanbul's is 3510×1600 (landscape — `cover` keeps a tall strip out of its middle and
+drops most of its width, which is very visible). One `FIT` constant switches every frame between
+`cover` and `contain` together; they are never fitted individually, or no two frames would be
+registered with each other.
+
 The vertical gesture on this tab belongs to the page, not to the carousel — `verticalTarget()` in
 router.js returns nothing here, because this tab *is* a flip book and the zoom stack must keep its
 hands off it.
