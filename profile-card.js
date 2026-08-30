@@ -55,6 +55,8 @@
     // The innermost zoom level. Cover only, like Hane: the week's games
     // belong to İstanbul's own level and the account to Türkiye's.
     mahalle:   { hive: false, week: false, account: false, settings: false },
+    // The sandbox tab: cover only, like Hane.
+    project:   { hive: false, week: false, account: false, settings: false },
   };
   const DEFAULT_PAGE = 'anahane';
 
@@ -75,6 +77,7 @@
     // No seat: this level carries no map, and the district's own
     // Belediye Başkanı is already named one level out on Kahvehane.
     mahalle:   'ist-pc-seat-none',
+    project:   'ist-pc-seat-none',
   };
   const BAR_LAYOUT_CLASSES = ['ist-pc-seat-left', 'ist-pc-seat-none', 'ist-pc-seat-right'];
 
