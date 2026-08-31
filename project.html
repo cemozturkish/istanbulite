@@ -50,7 +50,12 @@
       user-select: none;
       -webkit-user-select: none;
     }
-    .fb img {
+    /* `> img`, not ` img`: the frames are direct children of .fb, and a
+       descendant selector also caught every image an ACTOR contains --
+       which inherited position:absolute, inset:0 and opacity:0 from
+       here. The Sözcel wordmark was laid out at full size, invisible and
+       out of flow, so its tile collapsed to the height of its label. */
+    .fb > img {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -63,7 +68,7 @@
       pointer-events: none;
       -webkit-user-drag: none;
     }
-    .fb img.on { opacity: 1; }
+    .fb > img.on { opacity: 1; }
 
     /* ── The cast ──
        The things that live on slide 1 and slide 12. They do not appear
@@ -85,11 +90,18 @@
     }
     .fb-actor.live { pointer-events: auto; }
 
-    /* ── Events, bottom-left, belonging to slide 12 ── */
+    /* ── Events and Sözcel, the foot of slide 12 ──
+       The two live on one line at the foot of slide 12: events on the
+       left, Sözcel filling what is left on the right. One number decides
+       the split, so narrowing one widens the other by construction
+       rather than by two numbers being kept in step by hand.
+       52.7% is the original 62% less 15%. */
+    .fb-cast { --fb-events-w: 52.7%; --fb-gap: 8px; }
+
     .fb-events {
       left: var(--screen-inset, 18px);
       bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px) + 16px);
-      width: 62%;
+      width: var(--fb-events-w);
       background: var(--paper-card, #ddc4b5);
       border: 2px solid var(--ink);
       padding: 9px 11px 10px;
@@ -111,6 +123,42 @@
     .fb-events .x p { margin: 6px 0 0; font-size: 0.72rem; line-height: 1.35; }
     .fb-events.open .x { display: block; }
     .fb-actor.live.fb-events:active { transform-origin: 0% 100%; }
+
+    /* ── Sözcel, bottom-right, also slide 12's ── */
+    .fb-sozcel {
+      right: var(--screen-inset, 18px);
+      bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px) + 16px);
+      width: calc(100% - var(--fb-events-w) - (var(--screen-inset, 18px) * 2) - var(--fb-gap));
+      background: var(--paper-card, #ddc4b5);
+      border: 2px solid var(--ink);
+      padding: 9px 8px 10px;
+      font: inherit;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .fb-sozcel img {
+      width: 100%;
+      max-width: 82px;
+      height: auto;
+      display: block;
+      /* In a column flex container the image's HEIGHT is the main size,
+         so it shrinks along it -- the wordmark was being squashed to a
+         third of its height. Nothing here should give. */
+      flex: none;
+      /* Deliberately no mix-blend-mode. The wordmark is white letters
+         with a black outline, and multiply turns that white fill into
+         the paper colour -- the letterforms vanish and the tile reads as
+         empty. */
+    }
+    .fb-sozcel .n {
+      font-size: 0.56rem; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--muted); text-align: center; line-height: 1.1;
+    }
 
     /* Read-out, so what the thumb is doing is measurable by eye. */
     .fb-hud {
@@ -224,6 +272,7 @@
 </div>
 
 <script>
+(function () {
 // ══════════════════════════════════════════════════════════════
 // PROJE — the flip book, on its own, with nothing else in the way
 //
@@ -328,6 +377,28 @@ const CAST = [
       6:  { x: -160, opacity: 1 },
       8:  { x: -95 },
       10: { x: -22 },
+      11: { x: 0 },
+    },
+  },
+  {
+    id: 'sozcel',
+    live: 11,
+    cls: 'fb-sozcel',
+    lag: 0.16,
+    // The wordmark is the tile's way of saying its name -- the same
+    // convention Kahvehane's square tiles use -- so the line under it
+    // says what the game IS rather than repeating the name.
+    html: '<img src="assets/sozcel-logo.png" alt="Sözcel"/><div class="n">Türkçe Wordle</div>',
+    onpress() { window.location.href = 'sozcel.html'; },
+    // The mirror of events: in from the right, home by the last slide,
+    // on the same timings and the same lag, so the pair travels as a
+    // pair. Give them different `lag` values instead and they arrive a
+    // beat apart, which is how a screenful of things gets depth.
+    poses: {
+      0:  { x: 160, opacity: 1 },
+      6:  { x: 160, opacity: 1 },
+      8:  { x: 95 },
+      10: { x: 22 },
       11: { x: 0 },
     },
   },
@@ -751,6 +822,26 @@ if (!window.__istVirtualNavInjecting) {
     if (window.IstProfileCard) IstProfileCard.mount({ sb: IstRouter.sb, I18N: window.I18N, page: 'project' });
   });
 }
+
+// ── One deliberate handle, for driving the book from outside ──
+// Everything above is inside this wrapper because the four carousel
+// pages share ONE document (see router.js): two of them declaring the
+// same top-level `const` is a SyntaxError that takes the second page's
+// whole script with it. This page had 26 top-level names and one of
+// them, NB_NAMES, already collided with mahalle's.
+window.__fb = {
+  get at() { return at; },
+  get cast() { return cast; },
+  get ready() { return ready; },
+  get busy() { return !!(anim || castTick || drag); },
+  frames: FRAMES,
+  // Put the book at a slide as if it had been dragged there and let go.
+  // `show` alone only paints -- it does not move the book -- which is
+  // exactly the distinction the drag handler depends on.
+  goto(p, snap) { stopAnim(); at = Math.max(0, Math.min(FRAMES - 1, p)); show(at, snap !== false); armCast(); },
+  show, armCast,
+};
+})();
 </script>
 </body>
 </html>
