@@ -1458,6 +1458,19 @@ The vertical gesture on this tab belongs to the page, not to the carousel — `v
 router.js returns nothing here, because this tab *is* a flip book and the zoom stack must keep its
 hands off it.
 
+**The first frame is fetched alone, and that is the whole of why the page feels quick.** Every frame
+has to be decoded before the book can reach it — an `<img>` whose bytes are not ready paints
+nothing, and a blank page mid-flip is worse than a wait at the start — but waiting for all twelve
+means staring at the word "loading" while ~4 MB of drawings arrive. Starting all twelve downloads at
+once shares the connection twelve ways and the first page arrives no sooner than the last: measured
+on a 4 Mbps link, 7.9s for both. Fetching frame 1 by itself puts it on screen at **2.1s** (the page
+itself is ready at 1.8s, so the frame costs 0.3s), and the other eleven have the rest of the wait to
+arrive in — all fetched at once, then decoded one at a time, because twelve simultaneous decodes of
+a 1080×1920 image allocate ~95 MB of surface in one go. `fetchPriority` alone does not do this: it
+reorders a queue, it does not empty one. The gesture arms only when every frame is in, so the book
+is never asked for a page it does not have; until then the reader sees the first drawing and a
+count, never a spinner.
+
 **Its own script must not touch the DOM at the top level, and that is a rule for every page.**
 router.js runs a page's script at idle, before the reader asks for it, which happens while a
 different page's DOM is on screen — so a top-level `getElementById` finds nothing and throws, and a

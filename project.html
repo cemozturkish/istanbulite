@@ -131,10 +131,20 @@
       nav a:last-child { justify-content: flex-end; margin-right: -0.5px; }
     }
 
+    /* Sits over the first frame once it is up, so what the reader sees
+       while the rest arrive is the book's first page and a count --
+       never a spinner on blank paper. */
     .fb-loading {
-      position: fixed; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+      position: fixed;
+      left: 0; right: 0;
+      bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px) + 44px);
+      text-align: center;
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
       z-index: 3;
     }
   </style>
@@ -250,27 +260,70 @@ function show(i) {
 }
 
 // ── Loading ──
-// Every frame is decoded before the book will move at all. An <img>
-// whose bytes are not ready paints nothing, and a blank frame in the
-// middle of a flip is worse than a wait at the start.
+// Two rules, and they pull against each other.
+//
+// Every frame must be decoded before the book can reach it: an <img>
+// whose bytes are not ready paints nothing, and a blank page in the
+// middle of a flip is worse than a wait at the start. But waiting for
+// all twelve before showing anything means staring at the word
+// "loading" while ~4 MB of drawings arrive, which is the app looking
+// broken at the exact moment it should look like a book.
+//
+// So the first frame is decoded on its own and put up straight away --
+// the page is a map within a moment -- and the rest are fetched in
+// parallel but decoded in order behind it. The gesture only arms once
+// they are all in, so the book is never asked for a page it does not
+// have. What the reader sees meanwhile is the first drawing and a count,
+// not a spinner.
+let ready = false;
+
+function loadingLine(n) {
+  const el = document.getElementById('fb-loading');
+  if (!el) return;
+  if (n >= FRAMES) { el.remove(); return; }
+  el.textContent = n + ' / ' + FRAMES;
+}
+
 async function load() {
   if (!box) return;
+  ready = false;
   imgs = [];
   for (let i = 0; i < FRAMES; i++) {
     const img = new Image();
     img.decoding = 'async';
     img.alt = '';
-    img.src = SRC(i);
     imgs.push(img);
   }
-  await Promise.all(imgs.map(i => (i.decode ? i.decode().catch(() => {}) : Promise.resolve())));
-  const spinner = document.getElementById('fb-loading');
-  if (spinner) spinner.remove();
-  if (!box.isConnected) return;      // the reader left while it decoded
-  imgs.forEach(i => box.appendChild(i));
-  shown = -1;
-  at = 0;
+  const decode = (img) => (img.decode ? img.decode().catch(() => {}) : Promise.resolve());
+
+  // The first frame is fetched ALONE. Starting all twelve at once shares
+  // the connection twelve ways and the first page arrives no sooner than
+  // the last -- measured on a 4 Mbps link, 7.9s for both. Fetching it by
+  // itself gets it on screen in a fraction of that, and the rest have
+  // the whole rest of the wait to arrive in. `fetchPriority` alone does
+  // not do this: it reorders a queue, it does not empty one.
+  if ('fetchPriority' in imgs[0]) imgs[0].fetchPriority = 'high';
+  imgs[0].src = SRC(0);
+  await decode(imgs[0]);
+  if (!box.isConnected) return;
+  box.appendChild(imgs[0]);
+  shown = -1; at = 0;
   show(0);
+  loadingLine(1);
+
+  // Now the rest: all fetched at once (the network is idle again and
+  // parallel is right for it), decoded one at a time (twelve
+  // simultaneous decodes of a 1080x1920 image allocate ~95 MB of
+  // surface in one go).
+  for (let i = 1; i < FRAMES; i++) imgs[i].src = SRC(i);
+
+  for (let i = 1; i < FRAMES; i++) {
+    await decode(imgs[i]);
+    if (!box.isConnected) return;
+    box.appendChild(imgs[i]);
+    loadingLine(i + 1);
+  }
+  ready = true;
 }
 
 // ── The gesture ──
@@ -282,7 +335,7 @@ let drag = null;
 function stopAnim() { if (anim) { cancelAnimationFrame(anim); anim = null; } }
 
 function onDown(e) {
-  if (!imgs.length) return;
+  if (!ready) return;
   stopAnim();
   drag = { y: e.clientY, from: at, moved: false };
   box.setPointerCapture && box.setPointerCapture(e.pointerId);
@@ -350,7 +403,7 @@ function mount() {
   // A fresh box every mount, so the decoded frames have to be put back
   // into it. They are kept, not re-fetched: decoding twelve
   // 1080x1920 images is the one cost worth paying only once.
-  if (imgs.length) {
+  if (imgs.length && ready) {
     const spinner = document.getElementById('fb-loading');
     if (spinner) spinner.remove();
     imgs.forEach(i => { i.classList.remove('on'); box.appendChild(i); });
