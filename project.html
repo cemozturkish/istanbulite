@@ -105,6 +105,11 @@
     }
     .fb-events .t { font-size: 0.95rem; font-weight: 700; line-height: 1.15; }
     .fb-events .m { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+    /* Opened in place. The card is docked bottom-left and poses are a
+       percentage of its OWN size, so growing upward moves nothing else. */
+    .fb-events .x { display: none; }
+    .fb-events .x p { margin: 6px 0 0; font-size: 0.72rem; line-height: 1.35; }
+    .fb-events.open .x { display: block; }
     .fb-actor.live.fb-events:active { transform-origin: 0% 100%; }
 
     /* Read-out, so what the thumb is doing is measurable by eye. */
@@ -305,10 +310,17 @@ const CAST = [
     // screenful of things read as having depth rather than being one
     // sheet. See CAST_LAG below for what the number means.
     lag: 0.16,
-    html: '<div class="k">Kadıköy</div>' +
-          '<div class="t">Sahaf Buluşması</div>' +
-          '<div class="m">Bu akşam · 19:00</div>',
-    onpress() { alert('Etkinlikler'); },
+    // Real rows from `events`, the same query and the same card the
+    // Kahvehane deck is built from. Its own fetch rather than a shared
+    // one: this tab is a rig and must not depend on another page having
+    // run first.
+    html: '<div class="k">Etkinlikler</div><div class="t">…</div>',
+    load: loadEventsActor,
+    onpress(e) {
+      // Interactable, and only here -- the card opens in place rather
+      // than going anywhere, since this tab has nowhere to go.
+      e.currentTarget.classList.toggle('open');
+    },
     // Slides in from the left over the second half of the book, and is
     // home by the last slide.
     poses: {
@@ -357,6 +369,79 @@ function paintHud(p) {
   hud.innerHTML = '<b>' + (i + 1) + '</b> / ' + FRAMES;
 }
 
+// ── The events actor's own content ──
+// One fetch, the next few evenings in the city, soonest first -- the
+// same rows and the same order Kahvehane's deck uses.
+const NB_NAMES = {
+  bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler', sisli:'Şişli',
+  eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa', esenler:'Esenler', bagcilar:'Bağcılar',
+  basaksehir:'Başakşehir', kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi',
+  uskudar:'Üsküdar', kadikoy:'Kadıköy', maltepe:'Maltepe', umraniye:'Ümraniye',
+  cekmekoy:'Çekmeköy', beykoz:'Beykoz', sariyer:'Sarıyer', besiktas:'Beşiktaş',
+  beyoglu:'Beyoğlu', gungoren:'Güngören', kagithane:'Kağıthane', atasehir:'Ataşehir',
+  zeytinburnu:'Zeytinburnu', fatih:'Fatih',
+};
+const MON_TR = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
+
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+// Everything Istanbul-dated goes through one clock (CLAUDE.md rule 10);
+// here that is just the timeZone these are formatted in.
+function eventWhen(iso) {
+  const d = new Date(iso);
+  const tz = 'Europe/Istanbul';
+  const day = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, day: 'numeric' }), 10);
+  const mon = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, month: 'numeric' }), 10);
+  const wd = d.toLocaleDateString('tr-TR', { timeZone: tz, weekday: 'short' }).toLocaleUpperCase('tr-TR');
+  const time = d.toLocaleTimeString('tr-TR', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
+  return day + ' ' + (MON_TR[mon - 1] || '') + ' ' + wd + ' · ' + time;
+}
+
+async function loadEventsActor(el) {
+  let rows = null, failed = false;
+  try {
+    const { data, error } = await IstRouter.sb.from('events')
+      .select('*')
+      .gte('event_date', new Date().toISOString())
+      .order('event_date', { ascending: true })
+      .limit(3);
+    if (error) throw error;
+    rows = data || [];
+  } catch (err) {
+    console.error('[proje events]', err);
+    failed = true;
+  }
+  if (!el.isConnected) return;
+
+  // Three states, and they say different things: a city with nothing on,
+  // and a fetch that never landed, are not the same fact.
+  if (failed) {
+    el.innerHTML = '<div class="k">Etkinlikler</div><div class="t">Yüklenemedi</div>' +
+                   '<div class="m">Bağlantını kontrol et.</div>';
+    return;
+  }
+  if (!rows.length) {
+    el.innerHTML = '<div class="k">Etkinlikler</div><div class="t">Şimdilik yok</div>' +
+                   '<div class="m">Bu aralar bir şey yok.</div>';
+    return;
+  }
+  const ev = rows[0];
+  const nb = ev.neighborhood ? (NB_NAMES[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
+  const more = rows.length - 1;
+  el.innerHTML =
+    '<div class="k">' + esc(nb.toLocaleUpperCase('tr-TR')) + '</div>' +
+    '<div class="t">' + esc(ev.title) + '</div>' +
+    '<div class="m">' + esc(eventWhen(ev.event_date)) +
+      (more > 0 ? ' · +' + more : '') + '</div>' +
+    '<div class="x">' +
+      (ev.location ? '<div class="m">' + esc(ev.location) + '</div>' : '') +
+      (ev.description ? '<p>' + esc(ev.description) + '</p>' : '') +
+    '</div>';
+}
+
 // ── Poses ──
 const POSE0 = { x: 0, y: 0, scale: 1, opacity: 1, rot: 0 };
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -398,6 +483,10 @@ function buildCast() {
     el.innerHTML = def.html;
     if (def.onpress) el.addEventListener('click', def.onpress);
     layer.appendChild(el);
+    // Fetched once per mount, after the element exists, and never
+    // awaited by anything: an actor whose rows have not landed yet is
+    // still an actor, and the book must not wait on the network.
+    if (def.load) { try { def.load(el); } catch (e) { console.error(e); } }
     return { def, el, poses: expandPoses(def.poses || {}), pos: 0,
              lag: def.lag == null ? CAST_LAG : def.lag };
   });
@@ -568,6 +657,12 @@ function stopAnim() { if (anim) { cancelAnimationFrame(anim); anim = null; } }
 
 function onDown(e) {
   if (!ready) return;
+  // A press that lands on a live actor is that actor's, not the book's.
+  // Without this the book swallows its own buttons: the drag handler
+  // takes pointer capture on the way down, which re-targets the eventual
+  // click at the capturing element, so the card never hears it. It looks
+  // exactly like a dead button and nothing throws.
+  if (e.target && e.target.closest && e.target.closest('.fb-actor.live')) return;
   stopAnim();
   drag = { y: e.clientY, from: at, moved: false };
   armCast();                    // a press begins: the cast goes inert

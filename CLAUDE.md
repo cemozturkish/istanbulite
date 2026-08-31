@@ -1478,7 +1478,14 @@ slide it belongs to, and a pose per slide. Two rules make them work:
 - **They are alive only at the two ends.** In between they are a picture of themselves and take no
   presses, because there is no landing in the middle of a flip book (`armCast`: an actor is live
   only while the book is *resting* on its own slide — not mid-drag, not mid-run-out, not at the
-  other end).
+  other end). And **a press that lands on a live actor is that actor's, not the book's** — the drag
+  handler must bail out on one. Without that the book swallows its own buttons: it takes pointer
+  capture on the way down, which re-targets the eventual click at the capturing element, so the card
+  never hears it. It looks exactly like a dead button and nothing throws.
+- **An actor carries real data.** `load(el)` is called once per mount, after the element exists and
+  awaited by nothing — the book must never wait on the network. The events actor runs the same query
+  Kahvehane's deck does, and says three different things: the next evening, a city with nothing on,
+  and a fetch that failed.
 - **They never appear or disappear.** Every slide gives each of them a place and they travel between
   those places with the finger. A pose is `{x, y, scale, opacity, rot}` where x and y are **percent
   of the actor's own size** — the units a CSS translate uses — so "parked off the left edge" is just
