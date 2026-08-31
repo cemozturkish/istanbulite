@@ -1471,6 +1471,24 @@ reorders a queue, it does not empty one. The gesture arms only when every frame 
 is never asked for a page it does not have; until then the reader sees the first drawing and a
 count, never a spinner.
 
+**The cast is the point of the rig now.** Slide 1 and slide 12 carry real things — buttons, panels,
+the page's own furniture — and `CAST` in project.html is where each one is declared: an element, the
+slide it belongs to, and a pose per slide. Two rules make them work:
+
+- **They are alive only at the two ends.** In between they are a picture of themselves and take no
+  presses, because there is no landing in the middle of a flip book (`armCast`: an actor is live
+  only while the book is *resting* on its own slide — not mid-drag, not mid-run-out, not at the
+  other end).
+- **They never appear or disappear.** Every slide gives each of them a place and they travel between
+  those places with the finger. A pose is `{x, y, scale, opacity, rot}` where x and y are **percent
+  of the actor's own size** — the units a CSS translate uses — so "parked off the left edge" is just
+  `x: -160` whatever the screen is, and `{}` means exactly where its CSS puts it. The table is
+  sparse: write the slides that matter, the rest interpolates, and it holds before the first pose and
+  after the last.
+
+The actors move **continuously** while the frame index jumps whole numbers — a flip book flips, but
+type sliding in whole-pixel steps shimmers.
+
 **Its own script must not touch the DOM at the top level, and that is a rule for every page.**
 router.js runs a page's script at idle, before the reader asks for it, which happens while a
 different page's DOM is on screen — so a top-level `getElementById` finds nothing and throws, and a

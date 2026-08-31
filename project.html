@@ -65,6 +65,48 @@
     }
     .fb img.on { opacity: 1; }
 
+    /* ── The cast ──
+       The things that live on slide 1 and slide 12. They do not appear
+       and disappear: every slide gives each of them a place, and they
+       travel between those places with the finger. Only transforms and
+       opacity move, so a slide costs a composite and nothing else. */
+    .fb-cast {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;   /* the layer never takes a press */
+      z-index: 1;
+    }
+    .fb-actor {
+      position: absolute;
+      will-change: transform, opacity;
+      /* Off at every slide except the two ends -- see armCast(). An
+         actor mid-flight is a picture of a button, not a button. */
+      pointer-events: none;
+    }
+    .fb-actor.live { pointer-events: auto; }
+
+    /* ── Events, bottom-left, belonging to slide 12 ── */
+    .fb-events {
+      left: var(--screen-inset, 18px);
+      bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px) + 16px);
+      width: 62%;
+      background: var(--paper-card, #ddc4b5);
+      border: 2px solid var(--ink);
+      padding: 9px 11px 10px;
+      text-align: left;
+      font: inherit;
+      color: var(--ink);
+      display: block;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .fb-events .k {
+      font-size: 0.56rem; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 3px;
+    }
+    .fb-events .t { font-size: 0.95rem; font-weight: 700; line-height: 1.15; }
+    .fb-events .m { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+    .fb-actor.live.fb-events:active { transform-origin: 0% 100%; }
+
     /* Read-out, so what the thumb is doing is measurable by eye. */
     .fb-hud {
       position: fixed;
@@ -168,6 +210,7 @@
     <main>
       <div class="fb" id="fb">
         <div class="fb-loading" id="fb-loading">Kareler yükleniyor…</div>
+        <div class="fb-cast" id="fb-cast"></div>
       </div>
       <div class="fb-hud" id="fb-hud"></div>
       <div class="fb-hint">Aşağı kaydır</div>
@@ -231,6 +274,49 @@ const TIP = 0.5;
 // How fast it runs out once let go, in frames per second.
 const RUN_FPS = 34;
 
+// ══════════════════════════════════════════════════════════════
+// THE CAST
+//
+// The things that live on slide 1 and slide 12 -- buttons, panels, the
+// page's own furniture. Two rules make them work:
+//
+//   1. They are only ALIVE at the two ends. In between they are a
+//      picture of themselves: they take no presses, because there is
+//      no landing in the middle of a flip book.
+//   2. They never appear or disappear. Every slide gives each of them a
+//      place, and they travel between those places with the finger.
+//
+// A pose is `{ x, y, scale, opacity, rot }` where x and y are PERCENT
+// OF THE ACTOR'S OWN SIZE -- the same units a CSS translate uses. That
+// makes "parked off the left edge" simply x: -160, whatever the screen
+// is, and `{}` means "exactly where its CSS puts it".
+//
+// The table is sparse: write the slides that matter and the rest is
+// interpolated. Before the first pose you give and after the last, it
+// holds.
+// ══════════════════════════════════════════════════════════════
+const CAST = [
+  {
+    id: 'events',
+    live: 11,                       // the slide it belongs to (0-based)
+    cls: 'fb-events',
+    html: '<div class="k">Kadıköy</div>' +
+          '<div class="t">Sahaf Buluşması</div>' +
+          '<div class="m">Bu akşam · 19:00</div>',
+    onpress() { alert('Etkinlikler'); },
+    // Slides in from the left over the second half of the book, and is
+    // home by the last slide.
+    poses: {
+      0:  { x: -160, opacity: 1 },
+      6:  { x: -160, opacity: 1 },
+      8:  { x: -95 },
+      10: { x: -22 },
+      11: { x: 0 },
+    },
+  },
+];
+
+let cast = [];
 let imgs = [];
 let at = 0;             // 0..FRAMES-1, where the book is resting
 let shown = -1;
@@ -251,11 +337,84 @@ function paintHud(p) {
   hud.innerHTML = '<b>' + (i + 1) + '</b> / ' + FRAMES;
 }
 
+// ── Poses ──
+const POSE0 = { x: 0, y: 0, scale: 1, opacity: 1, rot: 0 };
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// Fill a sparse table so every slide has a pose.
+function expandPoses(poses) {
+  const out = new Array(FRAMES);
+  const given = [];
+  for (let i = 0; i < FRAMES; i++) {
+    if (poses[i]) { out[i] = Object.assign({}, POSE0, poses[i]); given.push(i); }
+  }
+  if (!given.length) { out.fill(POSE0); return out; }
+  for (let i = 0; i < given[0]; i++) out[i] = out[given[0]];
+  for (let i = given[given.length - 1] + 1; i < FRAMES; i++) out[i] = out[given[given.length - 1]];
+  for (let g = 0; g < given.length - 1; g++) {
+    const a = given[g], b = given[g + 1];
+    for (let i = a + 1; i < b; i++) {
+      const t = (i - a) / (b - a);
+      out[i] = {
+        x: lerp(out[a].x, out[b].x, t), y: lerp(out[a].y, out[b].y, t),
+        scale: lerp(out[a].scale, out[b].scale, t),
+        opacity: lerp(out[a].opacity, out[b].opacity, t),
+        rot: lerp(out[a].rot, out[b].rot, t),
+      };
+    }
+  }
+  return out;
+}
+
+function buildCast() {
+  const layer = document.getElementById('fb-cast');
+  if (!layer) return;
+  layer.innerHTML = '';
+  cast = CAST.map(def => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'fb-actor ' + def.cls;
+    el.innerHTML = def.html;
+    if (def.onpress) el.addEventListener('click', def.onpress);
+    layer.appendChild(el);
+    return { def, el, poses: expandPoses(def.poses || {}) };
+  });
+}
+
+// The actors move continuously between poses while the frame index
+// jumps whole numbers: a flip book flips, but type sliding in
+// whole-pixel steps shimmers.
+function paintCast(p) {
+  const lo = Math.max(0, Math.min(FRAMES - 1, Math.floor(p)));
+  const hi = Math.max(0, Math.min(FRAMES - 1, lo + 1));
+  const t = p - lo;
+  for (const a of cast) {
+    const A = a.poses[lo], B = a.poses[hi];
+    const x = lerp(A.x, B.x, t), y = lerp(A.y, B.y, t);
+    const sc = lerp(A.scale, B.scale, t), rot = lerp(A.rot, B.rot, t);
+    a.el.style.transform = 'translate3d(' + x + '%,' + y + '%,0) scale(' + sc + ')' +
+                           (rot ? ' rotate(' + rot + 'deg)' : '');
+    a.el.style.opacity = String(lerp(A.opacity, B.opacity, t));
+  }
+}
+
+// Alive only when the book is actually resting on the slide an actor
+// belongs to. Mid-flight, and on the other end, it is a drawing.
+function armCast() {
+  const settled = ready && !drag && !anim;
+  for (const a of cast) {
+    a.el.classList.toggle('live', settled && Math.round(at) === a.def.live && Math.abs(at - a.def.live) < 0.01);
+  }
+}
+
 // Showing a frame is one class swap. Nothing else touches the DOM
 // during a drag, which is what keeps the main thread free enough to
 // track the finger.
-function show(i) {
-  i = Math.max(0, Math.min(FRAMES - 1, Math.round(i)));
+function show(p) {
+  // The actors get the continuous position; the drawings get the
+  // rounded one.
+  paintCast(Math.max(0, Math.min(FRAMES - 1, p)));
+  const i = Math.max(0, Math.min(FRAMES - 1, Math.round(p)));
   if (i === shown) return;
   if (shown >= 0) imgs[shown].classList.remove('on');
   imgs[i].classList.add('on');
@@ -328,6 +487,7 @@ async function load() {
     loadingLine(i + 1);
   }
   ready = true;
+  armCast();
 }
 
 // ── The gesture ──
@@ -342,6 +502,7 @@ function onDown(e) {
   if (!ready) return;
   stopAnim();
   drag = { y: e.clientY, from: at, moved: false };
+  armCast();                    // a press begins: the cast goes inert
   box.setPointerCapture && box.setPointerCapture(e.pointerId);
 }
 
@@ -366,7 +527,7 @@ function runTo(target) {
   stopAnim();
   const from = at;
   const dist = Math.abs(target - from);
-  if (dist < 0.001) { at = target; show(at); return; }
+  if (dist < 0.001) { at = target; show(at); armCast(); return; }
   const ms = (dist / RUN_FPS) * 1000;
   const t0 = performance.now();
   const step = (now) => {
@@ -374,7 +535,7 @@ function runTo(target) {
     at = from + (target - from) * a;
     show(at);
     if (a < 1) anim = requestAnimationFrame(step);
-    else { anim = null; at = target; }
+    else { anim = null; at = target; armCast(); }
   };
   anim = requestAnimationFrame(step);
 }
@@ -383,7 +544,7 @@ function onUp() {
   if (!drag) return;
   const wasDrag = drag.moved;
   drag = null;
-  if (!wasDrag) return;
+  if (!wasDrag) { armCast(); return; }
   // The book only ever comes to rest on the first frame or the last.
   const p = at / (FRAMES - 1);
   runTo(p >= TIP ? FRAMES - 1 : 0);
@@ -400,6 +561,7 @@ function mount() {
   hud = document.getElementById('fb-hud');
   if (!box) return;
   box.style.setProperty('--fb-fit', FIT);
+  buildCast();
   box.addEventListener('pointerdown', onDown, { passive: true });
   box.addEventListener('pointermove', onMove, { passive: false });
   box.addEventListener('pointerup', onUp, { passive: true });
@@ -411,7 +573,7 @@ function mount() {
     const spinner = document.getElementById('fb-loading');
     if (spinner) spinner.remove();
     imgs.forEach(i => { i.classList.remove('on'); box.appendChild(i); });
-    shown = -1; at = 0; show(0);
+    shown = -1; at = 0; show(0); armCast();
   } else {
     load();
   }
