@@ -287,7 +287,7 @@
 // fault, and if it is smooth here then everything that made it rough
 // elsewhere is something else.
 // ══════════════════════════════════════════════════════════════
-const FRAMES = 12;
+const FRAMES = 24;
 
 // ── What each frame shows ──
 // The two ends are the real maps; everything between is still the
@@ -320,12 +320,26 @@ const SRC = i => OVERRIDE[i] || ('assets/project/' + String(i + 1).padStart(2, '
 // one frame not yet registered with the rest of the book.
 const FIT = 'cover';
 
-// How far the thumb travels to cross the whole book. A fraction of the
-// screen rather than a pixel count, so it feels the same on every phone.
-const TRAVEL = 0.55;
-// Where a release decides which end it is running to.
+// How far the thumb travels PER PAGE, as a fraction of the screen's
+// height -- not per book. Stated this way on purpose: the book's length
+// is a thing that changes, and with a fixed whole-book distance every
+// slide added made every page flip faster, which quietly undoes the lag
+// tuning. 0.05 is the original 0.55 across the twelve-slide book.
+const TRAVEL_PER_SLIDE = 0.05;
+const TRAVEL = TRAVEL_PER_SLIDE * (FRAMES - 1);
+// Where a release decides which end it is running to, when the finger
+// was moving slowly enough for position to be the question.
 const TIP = 0.5;
-// How fast it runs out once let go, in frames per second.
+// px/ms. Past this the direction of the throw decides instead of the
+// distance -- otherwise a long book can only be crossed by dragging
+// half a screen, which is not a gesture anyone makes twice. 0.55 is the
+// app's own throw constant (FLICK_SPEED in router.js, and the deck
+// swipes on Kütüphane and Kahvehane), so a flick that turns the book
+// asks exactly as much of the thumb as a flick that throws a card away.
+const FLICK = 0.55;
+// How fast it runs out once let go, in pages per second. A longer book
+// takes longer to run out, which is right -- but only up to a point, so
+// this is the knob if the far end starts feeling distant.
 const RUN_FPS = 34;
 
 // ══════════════════════════════════════════════════════════════
@@ -352,7 +366,11 @@ const RUN_FPS = 34;
 const CAST = [
   {
     id: 'events',
-    live: 11,                       // the slide it belongs to (0-based)
+    // The last slide, 0-based. It was 11 when the book ended there; the
+    // book runs to 24 now, and an actor can only be live where the book
+    // can actually come to rest. Its poses still bring it in over slides
+    // 8-12 and then hold, so it arrives with İstanbul and rides along.
+    live: 23,
     cls: 'fb-events',
     // How closely it follows. Two numbers: `lag` while the finger is
     // down, `lagFree` once it is let go -- higher is tighter. Per-actor
@@ -382,7 +400,7 @@ const CAST = [
   },
   {
     id: 'sozcel',
-    live: 11,
+    live: 23,
     cls: 'fb-sozcel',
     lag: 0.43, lagFree: 0.135,
     // The wordmark is the tile's way of saying its name -- the same
@@ -778,7 +796,8 @@ function onDown(e) {
   // exactly like a dead button and nothing throws.
   if (e.target && e.target.closest && e.target.closest('.fb-actor.live')) return;
   stopAnim();
-  drag = { y: e.clientY, from: at, moved: false };
+  drag = { y: e.clientY, from: at, moved: false,
+           lastY: e.clientY, lastT: performance.now(), v: 0 };
   armCast();                    // a press begins: the cast goes inert
   box.setPointerCapture && box.setPointerCapture(e.pointerId);
 }
@@ -788,6 +807,10 @@ function onMove(e) {
   const dy = e.clientY - drag.y;
   if (!drag.moved && Math.abs(dy) < 4) return;
   drag.moved = true;
+  const now = performance.now();
+  const dt = now - drag.lastT;
+  if (dt > 0) drag.v = (e.clientY - drag.lastY) / dt;
+  drag.lastY = e.clientY; drag.lastT = now;
   // Down is forward. The span is the whole book, so the finger is
   // moving the pages rather than nudging a counter.
   const span = window.innerHeight * TRAVEL;
@@ -820,9 +843,12 @@ function runTo(target) {
 function onUp() {
   if (!drag) return;
   const wasDrag = drag.moved;
+  const v = drag.v;
   drag = null;
   if (!wasDrag) { armCast(); return; }
   // The book only ever comes to rest on the first frame or the last.
+  // A throw decides by DIRECTION; a slow release decides by position.
+  if (Math.abs(v) > FLICK) { runTo(v > 0 ? FRAMES - 1 : 0); return; }
   const p = at / (FRAMES - 1);
   runTo(p >= TIP ? FRAMES - 1 : 0);
 }
