@@ -1496,10 +1496,16 @@ slide it belongs to, and a pose per slide. Two rules make them work:
 The actors move **continuously** while the frame index jumps whole numbers — a flip book flips, but
 type sliding in whole-pixel steps shimmers.
 
-**And it all trails the finger.** The drawings ease toward the book's position on `FRAME_LAG` and
-each actor on its own `lag`, so the whole screen has weight rather than being pinned to the thumb;
-one `ease()` serves both, so they cannot drift apart in how they feel. Measured on a fast drag,
-paper and card both trail by ~0.69 of a slide. The position is continuous either way — what stays
+**And it all trails the finger — at two different rates.** The drawings ease toward the book's
+position and each actor toward its own, through one `ease()` so they cannot drift apart in how they
+feel. But the rate depends on whether a finger is on the glass: **tight while held** (`FRAME_LAG`,
+an actor's `lag`) and **heavy once let go** (`FRAME_LAG_FREE`, `lagFree`). A big trail under your
+own thumb reads as the app struggling rather than as weight; after release there is nothing to keep
+up with, and the slower catch-up is what makes the settle feel heavy rather than mechanical. Higher
+is tighter — it is the fraction of the remaining gap closed per 60Hz frame — so the held number is
+the big one. Measured: **0.27 of a slide under the finger, and ~790ms to settle after release**
+(0.69 and ~440ms when both phases shared one rate). The rate can change mid-flight without a jump,
+because it governs how fast the gap closes and never where anything is. The position is continuous either way — what stays
 whole-numbered is only which drawing that lands on, because blending two of them makes a third
 nobody drew. `FRAME_LAG: 0` puts the paper back under the finger while the furniture still trails. `lag` is per actor (the fraction of the remaining distance
 covered per 60Hz frame; 0.16 reads as weight rather than as lag), applied per elapsed time so a
