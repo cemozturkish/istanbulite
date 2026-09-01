@@ -71,8 +71,8 @@
     .fb > img.on { opacity: 1; }
 
     /* ── The cast ──
-       The things that live on slide 1 and slide 12. They do not appear
-       and disappear: every slide gives each of them a place, and they
+       The things that live on a stop -- today, slide 12's. They do not
+       appear and disappear: every slide gives each a place, and they
        travel between those places with the finger. Only transforms and
        opacity move, so a slide costs a composite and nothing else. */
     .fb-cast {
@@ -84,7 +84,7 @@
     .fb-actor {
       position: absolute;
       will-change: transform, opacity;
-      /* Off at every slide except the two ends -- see armCast(). An
+      /* Off at every slide except its own stop -- see armCast(). An
          actor mid-flight is a picture of a button, not a button. */
       pointer-events: none;
     }
@@ -277,9 +277,9 @@
 // PROJE — the flip book, on its own, with nothing else in the way
 //
 // A rig rather than a feature. Twelve numbered frames, scrubbed by the
-// finger, and the only two places it can come to rest are the first and
-// the last. Let go anywhere in between and it runs to whichever end is
-// nearer -- there is no stopping in the middle and nothing to press
+// finger, and it can only come to rest on a STOP. Let go anywhere in
+// between and it runs to whichever of the two stops it is between is
+// nearer -- there is no stopping in mid-book and nothing to press
 // there, which is the whole reason a journey like this costs nothing.
 //
 // Deliberately self-contained: no map, no data, no page swap, no shared
@@ -290,9 +290,10 @@
 const FRAMES = 24;
 
 // ── What each frame shows ──
-// The two ends are the real maps; everything between is still the
-// numbered test slide. Swap a number for a path here and that frame
-// becomes a picture -- there is nothing else to change.
+// The first two stops are the real maps -- frame 1 is Türkiye, frame 12
+// İstanbul -- and everything else, the run out to frame 24 included, is
+// still the numbered test slide. Swap a number for a path here and that
+// frame becomes a picture; there is nothing else to change.
 const OVERRIDE = {
   0:  'assets/map/kutuphane-map-mobile.png',     // 1080 x 2420 -- the odd one
   1:  'assets/map/istanbul-map-mobile02.png',    // 1080 x 1920
@@ -327,12 +328,39 @@ const FIT = 'cover';
 // tuning. 0.05 is the original 0.55 across the twelve-slide book.
 const TRAVEL_PER_SLIDE = 0.05;
 const TRAVEL = TRAVEL_PER_SLIDE * (FRAMES - 1);
-// Where a release decides which end it is running to, when the finger
-// was moving slowly enough for position to be the question.
+// ── The stops ──
+// The frames the book is allowed to come to rest on, 0-based and in
+// order. Everything else is mid-flip: a stop is where the drawing is a
+// real screen with real things on it, and the runs between two stops
+// are the journeys.
+//
+// Three of them, and the two runs are the same kind of thing: 1 -> 12
+// is one journey, 12 -> 24 is the next. A stop in the middle of the
+// book is not a landing the gesture has to be told about -- it is just
+// another entry here, which is why the whole of "add a stop" is adding
+// a number to this line.
+const STOPS = [0, 11, FRAMES - 1];
+
+// The two stops a position is between -- the same stop twice when the
+// book is resting on one. This is what makes a release a local
+// question: the run out of a drag is decided against the stops on
+// either side of the finger, never against the ends of the book.
+function bracket(p) {
+  let lo = STOPS[0];
+  let hi = STOPS[STOPS.length - 1];
+  for (const s of STOPS) if (s <= p) lo = s;
+  for (let i = STOPS.length - 1; i >= 0; i--) if (STOPS[i] >= p) hi = STOPS[i];
+  return [lo, hi];
+}
+
+// Where a release decides which stop it is running to, as a fraction of
+// the run it was let go in, when the finger was moving slowly enough
+// for position to be the question.
 const TIP = 0.5;
 // px/ms. Past this the direction of the throw decides instead of the
-// distance -- otherwise a long book can only be crossed by dragging
-// half a screen, which is not a gesture anyone makes twice. 0.55 is the
+// distance, and it commits to the next stop THAT WAY rather than to an
+// end of the book -- otherwise a long book can only be crossed by
+// dragging half a screen, which is not a gesture anyone makes twice. 0.55 is the
 // app's own throw constant (FLICK_SPEED in router.js, and the deck
 // swipes on Kütüphane and Kahvehane), so a flick that turns the book
 // asks exactly as much of the thumb as a flick that throws a card away.
@@ -345,12 +373,12 @@ const RUN_FPS = 34;
 // ══════════════════════════════════════════════════════════════
 // THE CAST
 //
-// The things that live on slide 1 and slide 12 -- buttons, panels, the
-// page's own furniture. Two rules make them work:
+// The things that live on a STOP -- buttons, panels, the page's own
+// furniture. Two rules make them work:
 //
-//   1. They are only ALIVE at the two ends. In between they are a
-//      picture of themselves: they take no presses, because there is
-//      no landing in the middle of a flip book.
+//   1. They are only ALIVE on their own stop. Anywhere else, including
+//      on another stop, they are a picture of themselves and take no
+//      presses -- an actor belongs to one screen, not to the book.
 //   2. They never appear or disappear. Every slide gives each of them a
 //      place, and they travel between those places with the finger.
 //
@@ -362,15 +390,21 @@ const RUN_FPS = 34;
 // The table is sparse: write the slides that matter and the rest is
 // interpolated. Before the first pose you give and after the last, it
 // holds.
+//
+// An actor on a middle stop is parked off-screen on BOTH sides of it:
+// it comes in over the run that arrives at its stop and leaves again
+// over the run that departs it, so it belongs to that screen coming and
+// going. Its poses are symmetric about its own slide, and the symmetry
+// is the whole of it -- there is no code that knows a stop is in the
+// middle.
 // ══════════════════════════════════════════════════════════════
 const CAST = [
   {
     id: 'events',
-    // The last slide, 0-based. It was 11 when the book ended there; the
-    // book runs to 24 now, and an actor can only be live where the book
-    // can actually come to rest. Its poses still bring it in over slides
-    // 8-12 and then hold, so it arrives with İstanbul and rides along.
-    live: 23,
+    // The stop it belongs to, 0-based: slide 12, the İstanbul map. Not
+    // the end of the book -- these are exceptional to that one screen,
+    // and slide 24 will have a cast of its own.
+    live: 11,
     cls: 'fb-events',
     // How closely it follows. Two numbers: `lag` while the finger is
     // down, `lagFree` once it is let go -- higher is tighter. Per-actor
@@ -388,19 +422,26 @@ const CAST = [
       // than going anywhere, since this tab has nowhere to go.
       e.currentTarget.classList.toggle('open');
     },
-    // Slides in from the left over the second half of the book, and is
-    // home by the last slide.
+    // In from the left over the back half of the 1 -> 12 run, home on
+    // slide 12, and back out the same way over the front half of the
+    // 12 -> 24 run. Symmetric about 11 on purpose: leaving a screen
+    // should look like arriving at it played backwards, which is what
+    // makes the two runs read as one gesture in either direction.
     poses: {
       0:  { x: -160, opacity: 1 },
       6:  { x: -160, opacity: 1 },
       8:  { x: -95 },
       10: { x: -22 },
       11: { x: 0 },
+      12: { x: -22 },
+      14: { x: -95 },
+      16: { x: -160 },
+      23: { x: -160, opacity: 1 },
     },
   },
   {
     id: 'sozcel',
-    live: 23,
+    live: 11,
     cls: 'fb-sozcel',
     lag: 0.43, lagFree: 0.135,
     // The wordmark is the tile's way of saying its name -- the same
@@ -408,16 +449,21 @@ const CAST = [
     // says what the game IS rather than repeating the name.
     html: '<img src="assets/sozcel-logo.png" alt="Sözcel"/><div class="n">Türkçe Wordle</div>',
     onpress() { window.location.href = 'sozcel.html'; },
-    // The mirror of events: in from the right, home by the last slide,
-    // on the same timings and the same lag, so the pair travels as a
-    // pair. Give them different `lag` values instead and they arrive a
-    // beat apart, which is how a screenful of things gets depth.
+    // The mirror of events: in from the right, home on slide 12, out to
+    // the right again, on the same timings and the same lag, so the
+    // pair travels as a pair. Give them different `lag` values instead
+    // and they arrive a beat apart, which is how a screenful of things
+    // gets depth.
     poses: {
       0:  { x: 160, opacity: 1 },
       6:  { x: 160, opacity: 1 },
       8:  { x: 95 },
       10: { x: 22 },
       11: { x: 0 },
+      12: { x: 22 },
+      14: { x: 95 },
+      16: { x: 160 },
+      23: { x: 160, opacity: 1 },
     },
   },
 ];
@@ -670,8 +716,8 @@ function paintCast() {
   }
 }
 
-// Alive only when the book is actually resting on the slide an actor
-// belongs to. Mid-flight, and on the other end, it is a drawing.
+// Alive only when the book is actually resting on the stop an actor
+// belongs to. Mid-flight, and on any other stop, it is a drawing.
 // How close an actor has to be to its own slide before it will take a
 // press. Not zero: an exponential ease never quite arrives, and waiting
 // for the last thousandth left the card unpressable for the better part
@@ -717,7 +763,7 @@ function show(p, snap) {
 // Every frame must be decoded before the book can reach it: an <img>
 // whose bytes are not ready paints nothing, and a blank page in the
 // middle of a flip is worse than a wait at the start. But waiting for
-// all twelve before showing anything means staring at the word
+// the whole book before showing anything means staring at the word
 // "loading" while ~4 MB of drawings arrive, which is the app looking
 // broken at the exact moment it should look like a book.
 //
@@ -748,8 +794,8 @@ async function load() {
   }
   const decode = (img) => (img.decode ? img.decode().catch(() => {}) : Promise.resolve());
 
-  // The first frame is fetched ALONE. Starting all twelve at once shares
-  // the connection twelve ways and the first page arrives no sooner than
+  // The first frame is fetched ALONE. Starting them all at once shares
+  // the connection between all of them and the first page arrives no sooner than
   // the last -- measured on a 4 Mbps link, 7.9s for both. Fetching it by
   // itself gets it on screen in a fraction of that, and the rest have
   // the whole rest of the wait to arrive in. `fetchPriority` alone does
@@ -764,9 +810,9 @@ async function load() {
   loadingLine(1);
 
   // Now the rest: all fetched at once (the network is idle again and
-  // parallel is right for it), decoded one at a time (twelve
-  // simultaneous decodes of a 1080x1920 image allocate ~95 MB of
-  // surface in one go).
+  // parallel is right for it), decoded one at a time (simultaneous
+  // decodes of a 1080x1920 image allocate ~8 MB of surface each, and
+  // the book is two dozen of them).
   for (let i = 1; i < FRAMES; i++) imgs[i].src = SRC(i);
 
   for (let i = 1; i < FRAMES; i++) {
@@ -820,7 +866,7 @@ function onMove(e) {
   e.preventDefault();
 }
 
-// Run to an end at a steady rate. Deliberately frame-paced rather than
+// Run to a stop at a steady rate. Deliberately frame-paced rather than
 // eased: this is a flip book being let go of, and the pages should turn
 // at the speed pages turn.
 function runTo(target) {
@@ -846,11 +892,13 @@ function onUp() {
   const v = drag.v;
   drag = null;
   if (!wasDrag) { armCast(); return; }
-  // The book only ever comes to rest on the first frame or the last.
+  // The book only ever comes to rest on a stop, and the question is
+  // always local: which of the two stops the finger was let go BETWEEN.
   // A throw decides by DIRECTION; a slow release decides by position.
-  if (Math.abs(v) > FLICK) { runTo(v > 0 ? FRAMES - 1 : 0); return; }
-  const p = at / (FRAMES - 1);
-  runTo(p >= TIP ? FRAMES - 1 : 0);
+  const [lo, hi] = bracket(at);
+  if (lo === hi) { runTo(lo); return; }
+  if (Math.abs(v) > FLICK) { runTo(v > 0 ? hi : lo); return; }
+  runTo((at - lo) / (hi - lo) >= TIP ? hi : lo);
 }
 
 // ── The page lifecycle router.js drives ──
@@ -870,7 +918,7 @@ function mount() {
   box.addEventListener('pointerup', onUp, { passive: true });
   box.addEventListener('pointercancel', onUp, { passive: true });
   // A fresh box every mount, so the decoded frames have to be put back
-  // into it. They are kept, not re-fetched: decoding twelve
+  // into it. They are kept, not re-fetched: decoding two dozen
   // 1080x1920 images is the one cost worth paying only once.
   if (imgs.length && ready) {
     const spinner = document.getElementById('fb-loading');
