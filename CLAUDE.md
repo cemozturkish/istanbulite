@@ -1503,7 +1503,7 @@ an actor's `lag`) and **heavy once let go** (`FRAME_LAG_FREE`, `lagFree`). A big
 own thumb reads as the app struggling rather than as weight; after release there is nothing to keep
 up with, and the slower catch-up is what makes the settle feel heavy rather than mechanical. Higher
 is tighter — it is the fraction of the remaining gap closed per 60Hz frame — so the held number is
-the big one. Measured: **0.27 of a slide under the finger, and ~790ms to settle after release**
+the big one. Measured: **0.16 of a slide under the finger, and ~610ms to settle after release**
 (0.69 and ~440ms when both phases shared one rate). The rate can change mid-flight without a jump,
 because it governs how fast the gap closes and never where anything is. The position is continuous either way — what stays
 whole-numbered is only which drawing that lands on, because blending two of them makes a third
