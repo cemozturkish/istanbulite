@@ -37,9 +37,11 @@
   // convention -- "a pull up is a scroll down, and down the levels is
   // outward" -- so one gesture means one thing everywhere in the app.
   //
-  // Hane is the other tab and is untouched, reached horizontally.
+  // Hane and Proje are the other tabs, and both are reached by TAPPING
+  // one -- no swipe anywhere on this site changes tabs any more (see the
+  // gesture block's own header further down).
   //
-  // So the grammar is: HORIZONTAL picks the tab, VERTICAL picks the depth.
+  // So the grammar is: the TAB is tapped, the DEPTH is swiped.
   const ZOOM = ['kutuphane', 'kahvehane', 'mahalle']; // out -> in
   const ZOOM_DEFAULT = 'kahvehane';
   const HANE = 'anahane';
@@ -105,8 +107,6 @@
       if (t === 'istanbulite') a.setAttribute('href', lastZoom + '.html');
     });
   }
-
-  function tabIndexOf(slug) { return TABS.indexOf(tabOf(slug)); }
 
   function currentPage() {
     const path = (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
@@ -465,8 +465,9 @@
 
   function prefetchNeighbours(slug) {
     if (!PAGES.includes(slug)) return;
-    // What one gesture can reach from here: the level above and the level
-    // below (vertically), and the other tab (horizontally).
+    // What the reader can reach from here in one move: the level above
+    // and the level below (a vertical swipe), and the other two tabs (a
+    // tap on the bar).
     let want;
     if (slug === HANE || slug === PROJECT) {
       want = [lastZoom, PROJECT, HANE].filter(s => s !== slug);
@@ -783,7 +784,18 @@
   });
 
   // ══════════════════════════════════════════
-  // Swipe pagination
+  // Tab taps, and the zoom gesture
+  // ──────────────────────────────────────────
+  // The tabs are TAPPED, never swiped. A horizontal swipe used to walk
+  // İstanbulite -> Proje -> Hane, and it was the wrong gesture for the
+  // wrong thing: a tab is a place you choose, the bottom bar names all
+  // of them, and a sideways drag reached them without ever being aimed
+  // at one. Worse, it collided with everything that has since learnt to
+  // read a horizontal throw of its own -- Proje's own page, the news and
+  // event decks -- so the reader's flick was answered by whichever
+  // listener saw it first. The vertical gesture is untouched: it is the
+  // ZOOM, and the zoom is not a tab.
+  //
   // Navigate Kütüphane → Hane → Kahvehane with a sliding transition.
   // Only the left and right columns translate; the map, datetime bar, and nav
   // bar stay fixed so the center of the screen is visually stable across pages.
@@ -817,18 +829,12 @@
     function isMobile() { return window.innerWidth <= 768; }
 
     // ── Where a gesture from here goes ──
-    // Horizontal picks the tab: from any İstanbulite level a leftward
-    // swipe reaches Hane, and from Hane a rightward one comes back to the
-    // level the reader left. Vertical picks the depth, and only inside
-    // İstanbulite -- Hane is not in the stack, and its own vertical pull
-    // belongs to the petek.
-    function horizontalTarget(dx) {
-      const i = tabIndexOf(activeSlug);
-      if (i === -1) return null;
-      const next = dx < 0 ? i + 1 : i - 1;
-      if (next < 0 || next >= TABS.length) return null;
-      return { slug: pageOfTab(TABS[next]), dir: dx < 0 ? 'forward' : 'backward' };
-    }
+    // Vertical only, and only inside İstanbulite: it picks the DEPTH.
+    // Nothing horizontal is a navigation any more -- the tab bar is the
+    // only way between the tabs (see this section's header) -- so a
+    // sideways drag here is somebody else's, and is handed straight back
+    // to whatever it started over. Hane is not in the zoom stack either,
+    // and its own vertical pull belongs to the petek.
     function verticalTarget(dy) {
       // Proje owns its own vertical gesture -- it IS a flip book -- so
       // the carousel must keep its hands off it.
@@ -966,12 +972,10 @@
     // scoping all three stylesheets so they can be live at once, which is
     // a much larger change than this one.
     const SLOP = 8;            // px before the gesture claims an axis
-    const COMMIT_FRACTION = 0.22;  // of the screen -- past this, release navigates
     // px/ms. 0.55 is the app's own throw constant -- NEWS_SWIPE_DEAL_VEL,
     // Q_SWIPE_DEAL_VEL and EV_SWIPE_DEAL_VEL are all 0.55 -- so a flick
-    // that changes the page asks exactly as much of the thumb as a flick
-    // that throws a card away. This was 0.45, which made a page change the
-    // easiest flick on the phone; a page is the bigger move of the two.
+    // that changes the depth asks exactly as much of the thumb as a flick
+    // that throws a card away.
     const FLICK_SPEED = 0.55;
     const EDGE_PULL = 0.32;        // how much of the drag the ends give back
     let g = null;
@@ -980,14 +984,10 @@
     function columns() {
       return Array.prototype.slice.call(document.querySelectorAll('.col-left, .col-right'));
     }
-    function paint(dx) {
-      const cols = columns();
-      for (let i = 0; i < cols.length; i++) cols[i].style.transform = 'translateX(' + dx + 'px)';
-    }
-    // Hand the columns back to the stylesheet. Called before the content
-    // swap as well as on a spring-back: an inline transform left in place
-    // would beat html.ist-entering-* and the incoming page would never
-    // slide in.
+    // Hand the columns back to the stylesheet. Nothing drags them any
+    // more, but navigateTo's own exit slide still sets a transform on
+    // them, so an inline one left in place would beat
+    // html.ist-entering-* and the incoming page would never slide in.
     function releaseColumns() {
       const cols = columns();
       for (let i = 0; i < cols.length; i++) { cols[i].style.transform = ''; cols[i].style.transition = ''; }
@@ -1010,8 +1010,7 @@
     // handover.
     const ZOOM_IN_SCALE = 1.35;
     const ZOOM_OUT_SCALE = 0.72;
-    // The travel is judged against a third of the screen, the same order
-    // as the horizontal COMMIT_FRACTION.
+    // The travel is judged against a third of the screen.
     function zoomProgress(dy) {
       return Math.min(1, Math.abs(dy) / (window.innerHeight * 0.34));
     }
@@ -1128,12 +1127,8 @@
       const t = e.touches[0];
       g = {
         x: t.clientX, y: t.clientY, t: Date.now(),
-        lastX: t.clientX, lastY: t.clientY, lastT: Date.now(), speed: 0,
+        lastY: t.clientY, lastT: Date.now(), speed: 0,
         axis: null,
-        // Whether there is anywhere to go each way, so the ends can pull
-        // back instead of sliding off into nothing.
-        canFwd: !!horizontalTarget(-1),
-        canBack: !!horizontalTarget(1),
         // A vertical drag that starts over something which can genuinely
         // scroll belongs to that thing, not to the zoom.
         noZoom: overScroller(e.target),
@@ -1167,30 +1162,23 @@
       const dx = t.clientX - g.x, dy = t.clientY - g.y;
       if (!g.axis) {
         if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return;
-        g.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
-        if (g.axis === 'y') {
-          // Nothing to zoom into this way, or the finger is on a
-          // scroller: hand the gesture back to whatever is underneath.
-          g.zoom = g.noZoom ? null : verticalTarget(dy);
-          if (!g.zoom) { g = null; return; }
-          g.frames = undefined;   // not yet asked; null means asked and none
-          g.flip = undefined;
-        }
+        // Horizontal is not this module's gesture any more: the tabs are
+        // tapped. Drop the gesture entirely rather than tracking an axis
+        // nothing acts on -- whatever the finger started over (a deck, a
+        // page with its own throw) is then free to answer it, and we
+        // have not called preventDefault on the way past.
+        if (Math.abs(dx) > Math.abs(dy) * 1.2) { g = null; return; }
+        g.axis = 'y';
+        // Nothing to zoom into this way, or the finger is on a
+        // scroller: hand the gesture back to whatever is underneath.
+        g.zoom = g.noZoom ? null : verticalTarget(dy);
+        if (!g.zoom) { g = null; return; }
+        g.frames = undefined;   // not yet asked; null means asked and none
+        g.flip = undefined;
         document.body.classList.add('ist-dragging');
       }
       const now = Date.now();
       const dt = now - g.lastT;
-      if (g.axis === 'x') {
-        if (dt > 0) g.speed = (t.clientX - g.lastX) / dt;
-        g.lastX = t.clientX; g.lastT = now;
-        // The ends are not a wall: they give, a little, so it is obvious
-        // that the pull was heard and that there is nothing past it.
-        const blocked = (dx < 0 && !g.canFwd) || (dx > 0 && !g.canBack);
-        g.dx = blocked ? dx * EDGE_PULL : dx;
-        if (e.cancelable) e.preventDefault();
-        paint(g.dx);
-        return;
-      }
       // Vertical: the zoom follows the finger. A direction reversal mid
       // drag means the reader changed their mind -- re-aim rather than
       // carrying on toward a level they are no longer heading for.
@@ -1289,46 +1277,18 @@
         springZoom();
         return;
       }
-      if (gesture.axis !== 'x') { releaseAll(); return; }
-      const dx = gesture.dx || 0;
-      const blocked = (dx < 0 && !gesture.canFwd) || (dx > 0 && !gesture.canBack);
-      const far = Math.abs(dx) > window.innerWidth * COMMIT_FRACTION;
-      const flicked = Math.abs(gesture.speed) > FLICK_SPEED &&
-                      Math.sign(gesture.speed) === Math.sign(dx) && Math.abs(dx) > SLOP * 2;
-      if (!blocked && (far || flicked)) {
-        // Carry on from where the finger left off. The columns keep their
-        // inline transform and are animated to the same place the exit
-        // class would put them, so navigateTo's own awaitExitSlide sees
-        // the transitionend it is waiting for and nothing jumps.
-        const to = dx < 0 ? -window.innerWidth : window.innerWidth;
-        const cols = columns();
-        for (let i = 0; i < cols.length; i++) {
-          cols[i].style.transition = 'transform 0.32s ease';
-          cols[i].style.transform = 'translateX(' + to + 'px)';
-        }
-        document.body.classList.remove('ist-dragging');
-        const target = horizontalTarget(dx);
-        if (target) navigate(target.slug, target.dir);
-        return;
-      }
-      // Not far enough, or there was nowhere to go: spring back.
-      const cols = columns();
-      for (let i = 0; i < cols.length; i++) {
-        cols[i].style.transition = 'transform 0.26s ease';
-        cols[i].style.transform = 'translateX(0px)';
-      }
-      document.body.classList.remove('ist-dragging');
-      setTimeout(releaseColumns, 280);
+      // A gesture that never claimed the vertical axis is not ours --
+      // there is nothing left to release but the drag class.
+      releaseAll();
     }, { passive: true });
 
     document.addEventListener('touchcancel', () => {
       pinch = null;
       if (!g) return;
-      const wasY = g.axis === 'y';
       if (g.frames) g.frames.end();
       if (g.flip) g.flip.end();
       g = null;
-      if (wasY) springZoom(); else releaseColumns();
+      springZoom();
     }, { passive: true });
 
     if (document.readyState === 'loading') {

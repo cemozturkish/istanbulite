@@ -1391,11 +1391,22 @@ but three, stacked by **zoom** rather than laid side by side — the same city a
 | `kahvehane` | İstanbul — the district map, the games, the events | where the reader lands |
 | `mahalle`   | the reader's own ilçe and its mahalles | furthest in |
 
-**The grammar is: horizontal picks the tab, vertical picks the depth.** A swipe left from any
-İstanbulite level reaches Hane and a swipe right comes back; a swipe **down** or a **pinch out**
+**The grammar is: the tab is TAPPED, the depth is swiped.** A swipe **down** or a **pinch out**
 goes *in* (toward the mahalle), a swipe **up** or a **pinch in** goes *out* (toward Türkiye).
 Down-is-in is the petek's own convention — "a pull up is a scroll down, and down the levels is
 outward" — so one gesture means one thing everywhere in the app.
+
+**Nothing horizontal is a navigation.** A sideways swipe used to walk İstanbulite → Proje → Hane,
+and it was the wrong gesture for the thing: the bottom bar names all three tabs, and a tab is a
+place you *choose* rather than one you drift into on the way past. It also collided with
+everything that has since learnt to read a horizontal throw of its own — Kütüphane's news deck,
+Kahvehane's two decks, Proje's own page — so a reader's flick was answered by whichever listener
+saw it first. router.js now drops a horizontal gesture the moment it claims that axis, without
+`preventDefault`, so whatever the finger started over is free to answer it. What is left to catch
+an unconsumed sideways drag is the **browser**, whose horizontal overscroll is a back/forward
+navigation — which on a page whose whole job is to stand still is the page leaving for no reason
+the reader can name. So `html, body { overscroll-behavior-x: contain }` in frames.css, stated once.
+Vertical is deliberately not contained: it is the zoom, and pull-to-refresh is a real gesture.
 
 Five things about it:
 
@@ -1476,7 +1487,36 @@ differently is a jump, however well they are drawn.
 
 The vertical gesture on this tab belongs to the page, not to the carousel — `verticalTarget()` in
 router.js returns nothing here, because this tab *is* a flip book and the zoom stack must keep its
-hands off it.
+hands off it. The **horizontal** one is the petek's, below; nothing anywhere on the site navigates
+on a sideways swipe any more, which is what left the axis free for it.
+
+**Pull right on slide 12 and the petek comes up** (`PETEK_STOP`, `runPetek`, `.fb-scrim` /
+`.fb-petek`). The buttons leave to the right, the drawing goes quiet under a wash, and the
+honeycomb — the same one Hane is, at its own middle depth — fades in over it. Five things about it:
+
+- **It is not a page and not a sheet.** Nothing navigates and nothing rises from the bottom: the
+  drawing underneath stays exactly where it is. That is the same argument the news page and the
+  olay board make — slide 12 is the one screen the petek is *about*, and a surface that covered it
+  would take back the very thing being answered.
+- **One number drives all of it.** The drag writes `--fb-petek-p` on the box every frame; the wash
+  is that number and the hexagons are `(p − 0.35) / 0.65` of it, so the page goes quiet *before*
+  the new thing appears rather than the two crossing. The cast reads the same number as a second
+  term on top of its pose (`paintCast`) — a different gesture happening at the same time is not a
+  different place in the book, so it is never a second pose table.
+- **It belongs to slide 12, exactly as the cast does.** `petekAtStop` is about where the *book* is,
+  not about whether a finger is down — asking `!drag` there made the very gesture it gates
+  impossible, since `armCast` runs on pointerdown and cleared the flag a frame before the drag
+  read it.
+- **It is built on arrival, never on the pull.** Mounting is a round trip to `hive_map()`, and a
+  reveal that waits on the network has a blank beat in it. Every arrival on slide 12 re-mounts
+  (somebody else's attachment may have carried the petek somewhere) — but never while it is
+  standing, which would pull the drawing out from under the reader.
+- **A press inside a standing petek is the petek's**, and is deliberately not *captured*: capture
+  would re-target every following event at the book's own box and kill the petek's handlers
+  outright. Only a horizontal drag is the book's, and horizontal is exactly what
+  `wireHiveGestures` hands back. Leaving the tab calls `unmountHivePage()` — the depth classes on
+  `<html>` and the module's `_hive` both outlive the swapped content, and left behind they are the
+  last word on a page that is gone.
 
 **The first frame is fetched alone, and that is the whole of why the page feels quick.** Every frame
 has to be decoded before the book can reach it — an `<img>` whose bytes are not ready paints
