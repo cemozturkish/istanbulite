@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=2"></script>
   <script src="page-css.js?v=1"></script>
-  <script src="router.js?v=14"></script>
+  <script src="router.js?v=15"></script>
   <script src="i18n.js?v=18"></script>
   <script src="map-frames.js?v=3"></script>
   <script src="flip.js?v=1"></script>
@@ -171,6 +171,16 @@
       font-size: 1.02rem; font-weight: 800; line-height: 1;
       letter-spacing: 0.02em; text-align: center;
     }
+    /* Opened in place, like the two cards on the left of either lane.
+       Docked bottom-right, and every pose is a percentage of the tile's
+       OWN size, so growing upward moves nothing else on the screen. */
+    .fb-olaylar .x { display: none; }
+    .fb-olaylar.open .x { display: block; width: 100%; }
+    .fb-olaylar .x p {
+      margin: 5px 0 0; font-size: 0.66rem; line-height: 1.3;
+      text-align: left; color: var(--ink);
+    }
+    .fb-actor.live.fb-olaylar:active { transform-origin: 100% 100%; }
 
     /* ── The middle lane: the petek over the book ──
        Slide 12's own reveal, and slide 12's alone. Nothing navigates and
@@ -227,76 +237,79 @@
     .fb.petek-open .fb-petek { visibility: visible; pointer-events: auto; }
     .fb.petek-pulling .fb-petek { visibility: visible; }
 
-    /* The book's own hint is about the book. With the petek coming up it
-       is pointing at a gesture that is no longer the one on offer, so it
-       goes with the drawing. The read-out stays: this is a rig, and
-       which slide the petek came off is exactly what it is for. */
-    .fb.petek-pulling ~ .fb-hint { opacity: 0; transition: opacity 0.2s ease; }
+    /* ── The bottom bar is a COMPASS, not a tab bar ──
+       Three marks -- Kütüphane, the İstanbulite wordmark, Kahvehane --
+       and none of them is a link. Nothing on this bar is pressed: the
+       reader moves the app with their finger, and the bar's whole job is
+       to say where that has put them. A tab bar answers "where can I
+       go"; this answers "where am I", which is the only question left
+       once the swipe is the navigation.
 
-    /* Read-out, so what the thumb is doing is measurable by eye. */
-    .fb-hud {
+       It lights CONTINUOUSLY, off the same lane presence the wash and
+       the hexagons run on (--fb-nav-0/1/2, written by paintNav), so the
+       middle mark comes up as the reader walks toward Hane and goes
+       down as they walk off it. A bar that snapped between three states
+       would be reporting the result of a gesture; this one is part of
+       the gesture.
+
+       It stands where every other bar on the site stands -- pinned to
+       the viewport's bottom edge, its own height plus the device's
+       inset, contents on --screen-inset (see "The phone's two bars" in
+       CLAUDE.md). */
+    .section-rule {
+      position: absolute; top: 0; left: 0;
+      width: 0; height: 0; padding: 0; overflow: visible;
+    }
+    header {
       position: fixed;
-      left: 0; right: 0;
-      top: calc(env(safe-area-inset-top) + var(--navbar-h-top, 56px) + 10px);
-      text-align: center;
-      font-size: 0.72rem;
-      letter-spacing: 0.16em;
+      bottom: 0; left: 0; right: 0;
+      height: calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom));
+      padding: 0 0 env(safe-area-inset-bottom);
+      margin: 0;
+      border-top: 1px solid var(--rule);
+      border-bottom: none;
+      background: var(--paper-navbar);
+      z-index: 100;
+      display: flex;
+      align-items: stretch;
+    }
+    nav {
+      display: flex; width: 100%; height: 100%;
+      padding: 0 var(--screen-inset, 18px);
+      align-items: flex-end;
+      /* Nothing here is pressable, so nothing here takes a press --
+         and the map underneath goes on answering a finger that lands
+         on the bar's own paper. */
+      pointer-events: none;
+      -webkit-user-select: none; user-select: none;
+    }
+    nav b {
+      flex: 1;
+      display: flex; align-items: flex-end;
+      padding-bottom: 6px;
+      font-size: 16px; letter-spacing: 0.5px;
       text-transform: uppercase;
-      color: var(--muted);
-      pointer-events: none;
-      z-index: 2;
-      font-variant-numeric: tabular-nums;
+      /* The INK is what moves, continuously: --muted at a lane's
+         distance, --ink standing on it, and the real middle in between,
+         so a mark half-lit is a reader half-way there. The WEIGHT is
+         deliberately not on the same number -- a fractional font-weight
+         re-measures the type on every frame of the pull, and the bar
+         would jitter its own words while the reader dragged. It steps
+         once, on the lane they land on. */
+      font-weight: 600;
+      color: color-mix(in srgb, var(--ink) calc(var(--p, 0) * 100%), var(--muted));
+      transition: none;   /* the finger is the animation */
     }
-    .fb-hud b { color: var(--ink); }
-    .fb-hint {
-      position: fixed;
-      left: 0; right: 0;
-      bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px) + 14px);
-      text-align: center;
-      font-size: 0.74rem;
-      color: var(--muted);
-      pointer-events: none;
-      z-index: 2;
-    }
-    /* ── The phone's bottom tab bar ──
-       Same object as every other page's: the <header> comes out of the
-       grid and is pinned to the viewport's bottom edge, so the two
-       fixed bars stand in exactly the same place on this tab as on the
-       others (see "The phone's two bars" in CLAUDE.md). */
-    @media (max-width: 768px) {
-      .section-rule {
-        position: absolute; top: 0; left: 0;
-        width: 0; height: 0; padding: 0; overflow: visible;
-      }
-      header {
-        position: fixed;
-        bottom: 0; left: 0; right: 0;
-        height: calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom));
-        padding: 0 0 env(safe-area-inset-bottom);
-        margin: 0;
-        border-top: 1px solid var(--rule);
-        border-bottom: none;
-        background: var(--paper-navbar);
-        z-index: 100;
-        display: flex;
-        align-items: stretch;
-      }
-      nav {
-        display: flex; width: 100%; height: 100%;
-        gap: 0; padding: 0 18px; flex-wrap: nowrap; justify-content: stretch;
-      }
-      nav a {
-        flex: 1;
-        display: flex; align-items: flex-end; justify-content: center;
-        padding-bottom: 6px;
-        font-size: 16px; font-weight: 600; letter-spacing: 0.5px;
-        text-transform: uppercase; color: var(--muted);
-        border: none; text-decoration: none;
-        -webkit-tap-highlight-color: transparent;
-      }
-      nav a.active { color: var(--ink); font-weight: 700; }
-      nav a:first-child { justify-content: flex-start; }
-      nav a:last-child { justify-content: flex-end; margin-right: -0.5px; }
+    nav b.on { font-weight: 700; }
+    nav b:first-child  { justify-content: flex-start; --p: var(--fb-nav-0, 0); }
+    nav b:nth-child(2) { justify-content: center;     --p: var(--fb-nav-1, 0); }
+    nav b:last-child   { justify-content: flex-end;   --p: var(--fb-nav-2, 0); }
+    /* The wordmark in the middle is the app's own name, so it is set
+       tighter and smaller than the two places either side of it: those
+       are where you are, this is what you are in. */
+    nav b:nth-child(2) {
+      font-size: 13px; letter-spacing: 0.14em;
+      flex: 0 0 auto; padding: 0 10px 7px;
     }
 
     /* Sits over the first frame once it is up, so what the reader sees
@@ -324,10 +337,8 @@
 
   <div class="section-rule">
     <header>
-      <nav>
-        <a href="kahvehane.html" data-tab="istanbulite">İstanbulite</a>
-        <a href="project.html" class="active" data-tab="project">Proje</a>
-        <a href="anahane.html" data-tab="hane">Hane</a>
+      <nav id="fb-nav">
+        <b>Kütüphane</b><b>İstanbulite</b><b>Kahvehane</b>
       </nav>
     </header>
   </div>
@@ -343,8 +354,6 @@
         <div class="fb-scrim" id="fb-scrim"></div>
         <div class="fb-petek" id="fb-petek"></div>
       </div>
-      <div class="fb-hud" id="fb-hud"></div>
-      <div class="fb-hint" id="fb-hint">Aşağı kaydır</div>
     </main>
   </div>
 </div>
@@ -604,7 +613,12 @@ const CAST = [
     lag: 0.43, lagFree: 0.135,
     html: '<div class="w">Olaylar</div><div class="n">…</div>',
     load: loadOlaylarActor,
-    onpress() { window.location.href = 'kutuphane.html'; },
+    // Opens in place. It used to send the reader to kutuphane.html, and
+    // that page is not a destination any more (see CLAUDE.md: the flip
+    // book is the app) -- the olay board itself has not been lifted into
+    // this lane yet, so what the tile can honestly do is name what is
+    // running.
+    onpress(e) { e.currentTarget.classList.toggle('open'); },
     poses: {
       0:  { x: 160, opacity: 1 },
       6:  { x: 160, opacity: 1 },
@@ -663,14 +677,7 @@ let anim = null;
 // throws half way has already declared its consts and cannot be run
 // again. Everything that touches the DOM waits for mount().
 let box = null;
-let hud = null;
-let hint = null;
 
-function paintHud(p) {
-  if (!hud) return;
-  const i = Math.round(p);
-  hud.innerHTML = '<b>' + (i + 1) + '</b> / ' + FRAMES;
-}
 
 // ── The events actor's own content ──
 // One fetch, the next few evenings in the city, soonest first -- the
@@ -810,19 +817,24 @@ function newsAge(iso) {
 // ABOUT, and how many of them are running is the fact that belongs on a
 // tile this size.
 async function loadOlaylarActor(el) {
-  let n = null;
+  let rows = null;
   try {
     const { data, error } = await IstRouter.sb.from('world_events')
-      .select('id')
-      .eq('status', 'ongoing');
+      .select('id, title')
+      .eq('status', 'ongoing')
+      .order('sort_order', { ascending: true })
+      .limit(6);
     if (error) throw error;
-    n = (data || []).length;
+    rows = data || [];
   } catch (err) {
     console.error('[proje olaylar]', err);
   }
   if (!el.isConnected) return;
   el.innerHTML = '<div class="w">Olaylar</div>' +
-    '<div class="n">' + (n == null ? 'Dünya' : n + ' olay sürüyor') + '</div>';
+    '<div class="n">' + (rows == null ? 'Dünya' : rows.length + ' olay sürüyor') + '</div>' +
+    (rows && rows.length
+      ? '<div class="x">' + rows.map(r => '<p>' + esc(r.title) + '</p>').join('') + '</div>'
+      : '');
 }
 
 // ── Poses ──
@@ -990,7 +1002,6 @@ function armCast() {
   // begins with a finger already down. Asking `!drag` here is what made
   // the very gesture this flag gates impossible: armCast runs on
   // pointerdown, so the flag was cleared a frame before it was read.
-  paintHint();
   atLaneStop = ready && Math.abs(framePos - PETEK_STOP) < LIVE_EPS;
   // Arriving on slide 12 is what BUILDS the petek, so the pull never
   // waits on a round trip. Once per arrival, and only once the book has
@@ -1012,7 +1023,6 @@ function paintFrame() {
   if (shown >= 0) imgs[shown].classList.remove('on');
   imgs[i].classList.add('on');
   shown = i;
-  paintHud(i);
 }
 
 // Aim everything at where the book now is. Nothing paints from `p`
@@ -1173,27 +1183,24 @@ function paintLanes() {
   box.classList.toggle('petek-pulling', petek > 0);
   box.classList.toggle('petek-open', lane === LANE_HANE && petek >= 1);
   paintCast();
-  paintHint();
+  paintNav();
 }
 
-// The hint says which way the book can actually be taken from here, and
-// that is now a question about the LANE as much as the slide: on
-// Kütüphane the only depth is upward, on Kahvehane downward, and on
-// Hane the gesture is not the book's at all. A line that said "aşağı
-// kaydır" while down was the one direction the lane refuses is a small
-// lie printed on the screen, which is worse than no line.
-function paintHint() {
-  // Held like `hud` rather than looked up: this runs on every frame of
-  // the ease, and a lookup per frame is a cost with nothing to show.
-  const el = hint;
-  if (!el) return;
-  const run = laneStops();
-  const word = run[0] === run[1] ? ''
-             : at <= run[0] + LIVE_EPS ? 'Aşağı kaydır'
-             : at >= run[1] - LIVE_EPS ? 'Yukarı kaydır'
-             : '';
-  if (el.textContent !== word) el.textContent = word;
+// The bar says where the reader is standing, continuously: each mark is
+// lit by its own lane's presence, the same number the wash and the
+// hexagons run on. Off slide 12 the lane still means something -- it is
+// which of the two runs the reader is on -- so Kütüphane stays lit all
+// the way out to Türkiye and Kahvehane all the way in.
+function paintNav() {
+  if (!box) return;
+  const root = document.documentElement;
+  const marks = box.ownerDocument.querySelectorAll('#fb-nav b');
+  for (let i = 0; i < LANES; i++) {
+    root.style.setProperty('--fb-nav-' + i, lanePresence(i).toFixed(3));
+    if (marks[i]) marks[i].classList.toggle('on', lane === i);
+  }
 }
+
 
 function setLanePos(p) {
   lanePos = Math.max(0, Math.min(LANES - 1, p));
@@ -1405,8 +1412,6 @@ function onUp() {
 function mount() {
   document.getElementById('main-site').classList.add('active');
   box = document.getElementById('fb');
-  hud = document.getElementById('fb-hud');
-  hint = document.getElementById('fb-hint');
   if (!box) return;
   box.style.setProperty('--fb-fit', FIT);
   // A fresh box, and a fresh #fb-petek inside it. The reader starts on
@@ -1444,7 +1449,10 @@ function unmount() {
   if (window.IstProfileCard && IstProfileCard.unmountHivePage) IstProfileCard.unmountHivePage();
   lane = LANE_KUTUPHANE; lanePos = LANE_KUTUPHANE;
   atLaneStop = false; petekBuilt = false;
-  drag = null; box = null; hud = null; hint = null;
+  drag = null; box = null;
+  // The lane variables live on <html> and would outlive this page.
+  const root = document.documentElement;
+  for (let i = 0; i < LANES; i++) root.style.removeProperty('--fb-nav-' + i);
 }
 IstRouter.registerPage('project', { mount, unmount });
 
