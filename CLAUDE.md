@@ -1490,33 +1490,72 @@ router.js returns nothing here, because this tab *is* a flip book and the zoom s
 hands off it. The **horizontal** one is the petek's, below; nothing anywhere on the site navigates
 on a sideways swipe any more, which is what left the axis free for it.
 
-**Pull right on slide 12 and the petek comes up** (`PETEK_STOP`, `runPetek`, `.fb-scrim` /
-`.fb-petek`). The buttons leave to the right, the drawing goes quiet under a wash, and the
-honeycomb — the same one Hane is, at its own middle depth — fades in over it. Five things about it:
+**Slide 12 is three screens, not one** (`LANES`, `lanePresence`, `runLane`). The book's stops are
+its *depth*; slide 12 also has a sideways axis, and it is the app's own carousel laid on the one
+slide that is the city:
+
+| | Lane 0 | Lane 1 | Lane 2 |
+|---|---|---|---|
+| | **Kütüphane** | **Hane** | **Kahvehane** |
+| what stands there | Haberler + Olaylar | the petek | Etkinlikler + Sözcel |
+| where the book may go | up, to slide 1 | nowhere | down, to slide 24 |
+
+Left to right on the screen, exactly as the three tabs stand. A pull right walks the strip right,
+so the reader moves *left* along it — Kahvehane, Hane, Kütüphane — and a pull left walks back. Each
+lane has its own cast and they never trade places: the buttons that left to the right are
+Kahvehane's and stay gone; the ones that arrive from the left are Kütüphane's.
+
+**The lane decides which way the book may move, and that is the point of the divergence rather
+than a rule bolted onto it.** Standing on Kütüphane you are facing *out*, so the only depth you can
+reach is slide 1 — Türkiye. Standing on Kahvehane you are facing *in*, so the only one is slide 24.
+Standing on Hane the vertical gesture is not the book's at all: it is the petek's own depth pull.
+**So there is no way from Türkiye to the innermost slide that does not pass through Hane** — the
+mall stairway in the smallest form it has had here: you cannot get from the reading to the doing
+without walking past the people. The vertical drag is clamped to the lane's own run rather than
+springing back from it, because paper that simply does not move says "not this way" more plainly.
+
+Seven things about it:
 
 - **It is not a page and not a sheet.** Nothing navigates and nothing rises from the bottom: the
   drawing underneath stays exactly where it is. That is the same argument the news page and the
-  olay board make — slide 12 is the one screen the petek is *about*, and a surface that covered it
-  would take back the very thing being answered.
-- **One number drives all of it.** The drag writes `--fb-petek-p` on the box every frame; the wash
-  is that number and the hexagons are `(p − 0.35) / 0.65` of it, so the page goes quiet *before*
-  the new thing appears rather than the two crossing. The cast reads the same number as a second
-  term on top of its pose (`paintCast`) — a different gesture happening at the same time is not a
-  different place in the book, so it is never a second pose table.
-- **It belongs to slide 12, exactly as the cast does.** `petekAtStop` is about where the *book* is,
+  olay board make — slide 12 is the one screen all three lanes are *about*, and a surface that
+  covered it would take back the very thing being answered.
+- **One number drives all of it**, and it is *how present a lane is*: 1 standing on it, 0 a lane
+  away either side, the linear middle in between (`lanePresence`). The middle lane's presence is
+  written to `--fb-petek-p`; the wash is that number and the hexagons are `(p − 0.35) / 0.65` of
+  it, so the page goes quiet *before* the new thing appears rather than the two crossing — and the
+  same wash and fade run whether the reader arrived from Kahvehane or from Kütüphane.
+- **An actor needs no lane table at all.** It is pushed a lane's width in whichever direction the
+  reader walked away from it (`paintCast`, one line), on top of whatever pose the *book* has it in.
+  That is the whole of what makes the two casts diverge without either knowing the other exists,
+  and it is why the lateral term is never a second pose table: a different gesture happening at the
+  same time is not a different place in the book.
+- **The strip moves at most one lane per gesture.** It is a carousel of three screens, not a scrub
+  through twenty-four, and a swipe that crossed two of them walked the reader straight past Hane —
+  the one screen the arrangement exists to put in the middle. The release brackets the lane the
+  reader is **committed to** and the one next to it in the direction pulled, never `floor()` of
+  where the drawing ended up, which at a whole number brackets the wrong pair and overshoots in one
+  direction only.
+- **It belongs to slide 12, exactly as the cast does.** `atLaneStop` is about where the *book* is,
   not about whether a finger is down — asking `!drag` there made the very gesture it gates
   impossible, since `armCast` runs on pointerdown and cleared the flag a frame before the drag
   read it.
-- **It is built on arrival, never on the pull.** Mounting is a round trip to `hive_map()`, and a
-  reveal that waits on the network has a blank beat in it. Every arrival on slide 12 re-mounts
-  (somebody else's attachment may have carried the petek somewhere) — but never while it is
-  standing, which would pull the drawing out from under the reader.
+- **The petek is built on arrival, never on the pull.** Mounting is a round trip to `hive_map()`,
+  and a reveal that waits on the network has a blank beat in it. Every arrival on slide 12
+  re-mounts (somebody else's attachment may have carried the petek somewhere) — but never while it
+  is standing, which would pull the drawing out from under the reader.
 - **A press inside a standing petek is the petek's**, and is deliberately not *captured*: capture
   would re-target every following event at the book's own box and kill the petek's handlers
   outright. Only a horizontal drag is the book's, and horizontal is exactly what
   `wireHiveGestures` hands back. Leaving the tab calls `unmountHivePage()` — the depth classes on
   `<html>` and the module's `_hive` both outlive the swapped content, and left behind they are the
   last word on a page that is gone.
+
+The reader **starts on Kütüphane**, because the book starts on slide 1 and slide 1 is Türkiye: the
+lane and the depth have to agree, or the first pull down is one the lane forbids. For the same
+reason `goto()` sets the lane from the slide it is given. And the hint under the book prints the
+direction the lane actually allows (`paintHint`) — a line reading "aşağı kaydır" where down is the
+one refused direction is a small lie printed on the screen, which is worse than no line.
 
 **The first frame is fetched alone, and that is the whole of why the page feels quick.** Every frame
 has to be decoded before the book can reach it — an `<img>` whose bytes are not ready paints
@@ -1535,9 +1574,11 @@ count, never a spinner.
 own furniture — and `CAST` in project.html is where each one is declared: an element, the stop it
 belongs to (`live`), and a pose per slide. Three rules make them work:
 
-- **An actor belongs to one stop, not to the book.** It is alive only while the book is *resting*
-  on that stop — not mid-drag, not mid-run-out, and not on a different stop (`armCast`). Events and
-  Sözcel are slide 12's, so they are as inert on slide 24 as they are on slide 1. And **a press that lands on a live actor is that actor's, not the book's** — the drag
+- **An actor belongs to one stop and one lane, not to the book.** It is alive only while the book
+  is *resting* on that stop and the reader is standing on that lane — not mid-drag, not
+  mid-run-out, not on a different stop, and not a lane along (`armCast`). Events and Sözcel are
+  slide 12's *and* Kahvehane's, so they are as inert on slide 24 as they are on slide 1, and as
+  inert on Kütüphane as they are on either. And **a press that lands on a live actor is that actor's, not the book's** — the drag
   handler must bail out on one. Without that the book swallows its own buttons: it takes pointer
   capture on the way down, which re-targets the eventual click at the capturing element, so the card
   never hears it. It looks exactly like a dead button and nothing throws.
