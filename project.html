@@ -304,13 +304,83 @@
     nav b:first-child  { justify-content: flex-start; --p: var(--fb-nav-0, 0); }
     nav b:nth-child(2) { justify-content: center;     --p: var(--fb-nav-1, 0); }
     nav b:last-child   { justify-content: flex-end;   --p: var(--fb-nav-2, 0); }
-    /* The wordmark in the middle is the app's own name, so it is set
-       tighter and smaller than the two places either side of it: those
-       are where you are, this is what you are in. */
+    /* The wordmark in the middle is the app's own name, so it is the
+       LOGO itself rather than the name set in type: the two either side
+       are places, written; this is the thing you are inside of, drawn.
+       Painted as a MASK rather than dropped in as a picture -- the file
+       is white letters on black with no transparency, so an <img> on
+       this bar is a black rectangle. Luminance-masking it makes the
+       letterforms the only ink and lets them take `currentColor`, which
+       is the same continuous color-mix the two words either side ride,
+       so the middle mark comes up and goes down with the pull exactly
+       as they do. */
     nav b:nth-child(2) {
       font-size: 13px; letter-spacing: 0.14em;
       flex: 0 0 auto; padding: 0 10px 7px;
     }
+    nav b .fb-logo {
+      display: block;
+      width: 86px; height: 26px;
+      background-color: currentColor;
+      -webkit-mask: url('assets/loading/logo-dark-mono-01.jpg') center / contain no-repeat;
+              mask: url('assets/loading/logo-dark-mono-01.jpg') center / contain no-repeat;
+      -webkit-mask-source-type: luminance;
+      mask-mode: luminance;
+    }
+    nav b .fb-wm { display: none; }
+    /* A browser that cannot luminance-mask gets the name in type, which
+       is what stood here before. */
+    @supports not ((mask-mode: luminance) or (-webkit-mask-source-type: luminance)) {
+      nav b .fb-logo { display: none; }
+      nav b .fb-wm { display: block; }
+    }
+
+    /* ── THE POSITION DOTS ──
+       The bar says which LANE the reader is standing on; these say how
+       far through that lane's own run of the book they are. Two marks a
+       side, joined by a double rule: on the left, the middle of the
+       city (slide 12) and Türkiye beyond it; on the right, the same
+       middle and the innermost slide beyond that. The shared mark is
+       dead centre of the screen on both sides and is Hane -- so the two
+       columns are one line broken in the middle, which is where the
+       reader always is.
+
+       Nothing here is pressed. Both the column's presence and each
+       mark's ink are continuous numbers written by paintNav: the
+       columns fade with the lane (--fb-dots-l / -r) and a mark fills
+       with ink as the book arrives at its stop (--fb-dot-*), so a mark
+       half-filled is a reader half-way there. */
+    .fb-dots {
+      position: fixed;
+      left: var(--screen-inset, 18px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      z-index: 4;
+    }
+    .fb-dots-l { top: 50%; }
+    .fb-dots-r { left: auto; right: var(--screen-inset, 18px); bottom: 50%; }
+    .fb-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      box-sizing: border-box;
+      border: 1.5px solid var(--ink);
+      /* Filled by how near the book is to this mark's own stop. */
+      background: color-mix(in srgb, var(--ink) calc(var(--d, 0) * 100%), transparent);
+    }
+    /* The double line the site sets its rules in, stood on end. */
+    .fb-rule {
+      width: 5px;
+      height: 46px;
+      border-left: 1px solid var(--ink);
+      border-right: 1px solid var(--ink);
+    }
+    .fb-dots-l { opacity: var(--fb-dots-l, 0); }
+    .fb-dots-r { opacity: var(--fb-dots-r, 0); }
+    .fb-dot[data-stop="out"] { --d: var(--fb-dot-out, 0); }
+    .fb-dot[data-stop="mid"] { --d: var(--fb-dot-mid, 0); }
+    .fb-dot[data-stop="in"]  { --d: var(--fb-dot-in, 0); }
 
     /* Sits over the first frame once it is up, so what the reader sees
        while the rest arrive is the book's first page and a count --
@@ -338,7 +408,7 @@
   <div class="section-rule">
     <header>
       <nav id="fb-nav">
-        <b>Kütüphane</b><b>İstanbulite</b><b>Kahvehane</b>
+        <b>Kütüphane</b><b><i class="fb-logo"></i><span class="fb-wm">İstanbulite</span></b><b>Kahvehane</b>
       </nav>
     </header>
   </div>
@@ -346,6 +416,18 @@
   <div id="ist-content" style="display:contents">
     <main>
       <div class="fb" id="fb">
+        <!-- Where the reader is in the book's own depth. Two marks a
+             side, the shared one dead centre. See "THE POSITION DOTS". -->
+        <div class="fb-dots fb-dots-l" aria-hidden="true">
+          <span class="fb-dot" data-stop="mid"></span>
+          <span class="fb-rule"></span>
+          <span class="fb-dot" data-stop="out"></span>
+        </div>
+        <div class="fb-dots fb-dots-r" aria-hidden="true">
+          <span class="fb-dot" data-stop="in"></span>
+          <span class="fb-rule"></span>
+          <span class="fb-dot" data-stop="mid"></span>
+        </div>
         <div class="fb-loading" id="fb-loading">Kareler yükleniyor…</div>
         <div class="fb-cast" id="fb-cast"></div>
         <!-- The petek, revealed by a rightward pull on slide 12. Not a
@@ -934,6 +1016,9 @@ function castStep(now) {
     if (np !== a.pos) { a.pos = np; moving = true; }
   }
   paintCast();
+  // The position marks ride the eased frame position, so they are
+  // repainted here rather than only when the lane changes.
+  paintNav();
   // Every frame, not only when the tick stops: an actor that has come
   // near enough to its own slide is pressable, even while the last few
   // pixels are still easing in.
@@ -1195,10 +1280,37 @@ function paintNav() {
   if (!box) return;
   const root = document.documentElement;
   const marks = box.ownerDocument.querySelectorAll('#fb-nav b');
+  const pres = [];
   for (let i = 0; i < LANES; i++) {
-    root.style.setProperty('--fb-nav-' + i, lanePresence(i).toFixed(3));
+    const p = lanePresence(i);
+    pres.push(p);
+    root.style.setProperty('--fb-nav-' + i, p.toFixed(3));
     if (marks[i]) marks[i].classList.toggle('on', lane === i);
   }
+  // A column belongs to its own lane AND to Hane, because the mark it
+  // shares with Hane is the one in the middle: standing on Hane both
+  // halves of the broken line are up, and the centre mark is inked from
+  // either side.
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  root.style.setProperty('--fb-dots-l',
+    clamp01(pres[LANE_KUTUPHANE] + pres[LANE_HANE]).toFixed(3));
+  root.style.setProperty('--fb-dots-r',
+    clamp01(pres[LANE_KAHVEHANE] + pres[LANE_HANE]).toFixed(3));
+  // The ink is where the BOOK is, eased, not where `at` is aimed: the
+  // marks travel with the paper rather than reporting the release.
+  const p = framePos;
+  const S = STOPS;
+  let out = 0, mid = 0, inn = 0;
+  if (p <= S[1]) {
+    const t = clamp01((S[1] - p) / (S[1] - S[0]));
+    out = t; mid = 1 - t;
+  } else {
+    const t = clamp01((p - S[1]) / (S[2] - S[1]));
+    inn = t; mid = 1 - t;
+  }
+  root.style.setProperty('--fb-dot-out', out.toFixed(3));
+  root.style.setProperty('--fb-dot-mid', mid.toFixed(3));
+  root.style.setProperty('--fb-dot-in', inn.toFixed(3));
 }
 
 
@@ -1453,6 +1565,10 @@ function unmount() {
   // The lane variables live on <html> and would outlive this page.
   const root = document.documentElement;
   for (let i = 0; i < LANES; i++) root.style.removeProperty('--fb-nav-' + i);
+  for (const k of ['--fb-dots-l', '--fb-dots-r',
+                   '--fb-dot-out', '--fb-dot-mid', '--fb-dot-in']) {
+    root.style.removeProperty(k);
+  }
 }
 IstRouter.registerPage('project', { mount, unmount });
 
