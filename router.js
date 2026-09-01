@@ -465,6 +465,11 @@
 
   function prefetchNeighbours(slug) {
     if (!PAGES.includes(slug)) return;
+    // Proje reaches nothing: it is the app now, one page whose depths
+    // and lanes are all inside itself (see CLAUDE.md's project.html
+    // section). Prefetching from here would pull down a couple of
+    // megabytes of pages the reader has no way to get to.
+    if (slug === PROJECT) return;
     // What the reader can reach from here in one move: the level above
     // and the level below (a vertical swipe), and the other two tabs (a
     // tap on the bar).
