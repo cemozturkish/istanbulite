@@ -98,7 +98,12 @@
        52.7% is the original 62% less 15%. */
     .fb-cast { --fb-events-w: 52.7%; --fb-gap: 8px; }
 
-    .fb-events {
+    /* Both lanes put a wide card on the left of the line and a narrow
+       tile on the right of it, so the geometry is written once and each
+       lane only says what it is OF. A lane that invented its own line
+       would land its cards a few pixels off the one before it, and the
+       walk between them would read as the page reflowing. */
+    .fb-events, .fb-haberler {
       left: var(--screen-inset, 18px);
       bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px) + 16px);
       width: var(--fb-events-w);
@@ -111,21 +116,22 @@
       display: block;
       -webkit-tap-highlight-color: transparent;
     }
-    .fb-events .k {
+    .fb-events .k, .fb-haberler .k {
       font-size: 0.56rem; letter-spacing: 0.16em; text-transform: uppercase;
       color: var(--muted); margin-bottom: 3px;
     }
-    .fb-events .t { font-size: 0.95rem; font-weight: 700; line-height: 1.15; }
-    .fb-events .m { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+    .fb-events .t, .fb-haberler .t { font-size: 0.95rem; font-weight: 700; line-height: 1.15; }
+    .fb-events .m, .fb-haberler .m { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
     /* Opened in place. The card is docked bottom-left and poses are a
        percentage of its OWN size, so growing upward moves nothing else. */
-    .fb-events .x { display: none; }
-    .fb-events .x p { margin: 6px 0 0; font-size: 0.72rem; line-height: 1.35; }
-    .fb-events.open .x { display: block; }
-    .fb-actor.live.fb-events:active { transform-origin: 0% 100%; }
+    .fb-events .x, .fb-haberler .x { display: none; }
+    .fb-events .x p, .fb-haberler .x p { margin: 6px 0 0; font-size: 0.72rem; line-height: 1.35; }
+    .fb-events.open .x, .fb-haberler.open .x { display: block; }
+    .fb-actor.live.fb-events:active,
+    .fb-actor.live.fb-haberler:active { transform-origin: 0% 100%; }
 
-    /* ── Sözcel, bottom-right, also slide 12's ── */
-    .fb-sozcel {
+    /* ── The narrow tile on the right of the line ── */
+    .fb-sozcel, .fb-olaylar {
       right: var(--screen-inset, 18px);
       bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px) + 16px);
       width: calc(100% - var(--fb-events-w) - (var(--screen-inset, 18px) * 2) - var(--fb-gap));
@@ -155,25 +161,35 @@
          the paper colour -- the letterforms vanish and the tile reads as
          empty. */
     }
-    .fb-sozcel .n {
+    .fb-sozcel .n, .fb-olaylar .n {
       font-size: 0.56rem; letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--muted); text-align: center; line-height: 1.1;
     }
+    /* Olaylar has no wordmark of its own, so its name is set in type
+       where Sözcel's picture stands -- same box, same two lines. */
+    .fb-olaylar .w {
+      font-size: 1.02rem; font-weight: 800; line-height: 1;
+      letter-spacing: 0.02em; text-align: center;
+    }
 
-    /* ── The petek over the book ──
+    /* ── The middle lane: the petek over the book ──
        Slide 12's own reveal, and slide 12's alone. Nothing navigates and
        nothing is opened: the drawing under it stays exactly where it is
-       (this is the one screen the petek is ABOUT -- covering it with a
-       sheet would take back the very thing being answered), goes quiet
-       under a wash, and the honeycomb fades in on top.
+       (this is the one screen all three lanes are ABOUT -- covering it
+       with a sheet would take back the very thing being answered), goes
+       quiet under a wash, and the honeycomb fades in on top.
 
-       Both layers are driven from one number, --fb-petek-p, which the
-       drag writes every frame: the wash arrives with the finger and the
-       hexagons follow it in over the back half of the pull, so the page
-       goes quiet BEFORE the new thing appears rather than the two
-       crossing. Nothing here transitions -- while a finger is on the
-       glass the number is the animation; the release adds a transition
-       of its own and takes it off again (see wirePetekPull). */
+       Both layers are driven from one number, --fb-petek-p, which is how
+       PRESENT the middle lane is: 1 standing on it, 0 a lane away either
+       side, and the linear middle in between (lanePresence). So the same
+       wash and the same fade run whether the reader came from Kahvehane
+       or from Kütüphane, and the petek is at full strength only when
+       they are actually standing on it. The wash arrives with the finger
+       and the hexagons follow it in over the back half of the pull, so
+       the page goes quiet BEFORE the new thing appears rather than the
+       two crossing. Nothing here transitions -- while a finger is on the
+       glass the number is the animation, and the release runs it in JS
+       (see runLane). */
     .fb-scrim {
       position: absolute;
       inset: 0;
@@ -328,7 +344,7 @@
         <div class="fb-petek" id="fb-petek"></div>
       </div>
       <div class="fb-hud" id="fb-hud"></div>
-      <div class="fb-hint">Aşağı kaydır</div>
+      <div class="fb-hint" id="fb-hint">Aşağı kaydır</div>
     </main>
   </div>
 </div>
@@ -432,15 +448,28 @@ const FLICK = 0.55;
 // this is the knob if the far end starts feeling distant.
 const RUN_FPS = 34;
 
+// ── The three lanes of slide 12 ──
+// Declared up here rather than beside the rest of the lane machinery
+// because the CAST table below is written in terms of them, and a
+// `const` read before its own line is a TDZ error that takes the whole
+// page script with it. See "SLIDE 12 IS THREE SCREENS" further down for
+// what they are.
+const PETEK_STOP = 11;      // the lanes are slide 12's, and slide 12's alone
+const LANE_KUTUPHANE = 0;   // left on the screen: the reading side
+const LANE_HANE = 1;        // the middle: the petek
+const LANE_KAHVEHANE = 2;   // right on the screen: the doing side
+const LANES = 3;
+
 // ══════════════════════════════════════════════════════════════
 // THE CAST
 //
 // The things that live on a STOP -- buttons, panels, the page's own
 // furniture. Two rules make them work:
 //
-//   1. They are only ALIVE on their own stop. Anywhere else, including
-//      on another stop, they are a picture of themselves and take no
-//      presses -- an actor belongs to one screen, not to the book.
+//   1. They are only ALIVE on their own stop AND their own LANE.
+//      Anywhere else -- another stop, another lane, or anywhere in
+//      between -- they are a picture of themselves and take no presses:
+//      an actor belongs to one screen, not to the book.
 //   2. They never appear or disappear. Every slide gives each of them a
 //      place, and they travel between those places with the finger.
 //
@@ -459,6 +488,13 @@ const RUN_FPS = 34;
 // going. Its poses are symmetric about its own slide, and the symmetry
 // is the whole of it -- there is no code that knows a stop is in the
 // middle.
+//
+// `lane` is the second axis and needs no table at all: an actor is
+// simply pushed a lane's width in whichever direction the reader walked
+// away from it (see paintCast). That is what makes the two casts
+// diverge without either of them knowing the other exists -- Kahvehane's
+// leave to the right because the reader went left, and Kütüphane's
+// arrive from the left because the reader kept going.
 // ══════════════════════════════════════════════════════════════
 const CAST = [
   {
@@ -467,6 +503,9 @@ const CAST = [
     // the end of the book -- these are exceptional to that one screen,
     // and slide 24 will have a cast of its own.
     live: 11,
+    // ...and the lane, which is the sideways half of the same answer.
+    // Events are the doing side, so they are Kahvehane's.
+    lane: LANE_KAHVEHANE,
     cls: 'fb-events',
     // How closely it follows. Two numbers: `lag` while the finger is
     // down, `lagFree` once it is let go -- higher is tighter. Per-actor
@@ -504,6 +543,7 @@ const CAST = [
   {
     id: 'sozcel',
     live: 11,
+    lane: LANE_KAHVEHANE,     // the games are the doing side too
     cls: 'fb-sozcel',
     lag: 0.43, lagFree: 0.135,
     // The wordmark is the tile's way of saying its name -- the same
@@ -516,6 +556,55 @@ const CAST = [
     // pair travels as a pair. Give them different `lag` values instead
     // and they arrive a beat apart, which is how a screenful of things
     // gets depth.
+    poses: {
+      0:  { x: 160, opacity: 1 },
+      6:  { x: 160, opacity: 1 },
+      8:  { x: 95 },
+      10: { x: 22 },
+      11: { x: 0 },
+      12: { x: 22 },
+      14: { x: 95 },
+      16: { x: 160 },
+      23: { x: 160, opacity: 1 },
+    },
+  },
+
+  // ── Kütüphane's own pair, on the same stop and the lane past Hane ──
+  // The mirror of the two above in every respect except which lane they
+  // stand in: the same split of the line, the same in-and-out over the
+  // book, the same weights. What differs is what they are OF -- these
+  // are the reading side, so they are the news and the olaylar rather
+  // than an evening out and a game.
+  {
+    id: 'haberler',
+    live: 11,
+    lane: LANE_KUTUPHANE,
+    cls: 'fb-haberler',
+    lag: 0.43, lagFree: 0.135,
+    html: '<div class="k">Haberler</div><div class="t">…</div>',
+    load: loadHaberlerActor,
+    onpress(e) { e.currentTarget.classList.toggle('open'); },
+    poses: {
+      0:  { x: -160, opacity: 1 },
+      6:  { x: -160, opacity: 1 },
+      8:  { x: -95 },
+      10: { x: -22 },
+      11: { x: 0 },
+      12: { x: -22 },
+      14: { x: -95 },
+      16: { x: -160 },
+      23: { x: -160, opacity: 1 },
+    },
+  },
+  {
+    id: 'olaylar',
+    live: 11,
+    lane: LANE_KUTUPHANE,
+    cls: 'fb-olaylar',
+    lag: 0.43, lagFree: 0.135,
+    html: '<div class="w">Olaylar</div><div class="n">…</div>',
+    load: loadOlaylarActor,
+    onpress() { window.location.href = 'kutuphane.html'; },
     poses: {
       0:  { x: 160, opacity: 1 },
       6:  { x: 160, opacity: 1 },
@@ -575,6 +664,7 @@ let anim = null;
 // again. Everything that touches the DOM waits for mount().
 let box = null;
 let hud = null;
+let hint = null;
 
 function paintHud(p) {
   if (!hud) return;
@@ -653,6 +743,86 @@ async function loadEventsActor(el) {
       (ev.location ? '<div class="m">' + esc(ev.location) + '</div>' : '') +
       (ev.description ? '<p>' + esc(ev.description) + '</p>' : '') +
     '</div>';
+}
+
+// ── Kütüphane's lane: the newest story ──
+// The same three states the events actor says, for the same reason, and
+// the same 72-hour window Kütüphane's own column reads in: what is on
+// this card has to be what is on that page, or the rig is testing a
+// screen the app does not have.
+async function loadHaberlerActor(el) {
+  let rows = null, failed = false;
+  try {
+    const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
+    const { data, error } = await IstRouter.sb.from('breaking_news')
+      .select('id, title, body, category, neighborhood, updated_at')
+      .gte('updated_at', cutoff)
+      .is('archived_at', null)
+      .order('updated_at', { ascending: false })
+      .limit(3);
+    if (error) throw error;
+    rows = data || [];
+  } catch (err) {
+    console.error('[proje haberler]', err);
+    failed = true;
+  }
+  if (!el.isConnected) return;
+  if (failed) {
+    el.innerHTML = '<div class="k">Haberler</div><div class="t">Yüklenemedi</div>' +
+                   '<div class="m">Bağlantını kontrol et.</div>';
+    return;
+  }
+  if (!rows.length) {
+    el.innerHTML = '<div class="k">Haberler</div><div class="t">Şimdilik yok</div>' +
+                   '<div class="m">Son üç günde bir şey yok.</div>';
+    return;
+  }
+  const n = rows[0];
+  const more = rows.length - 1;
+  el.innerHTML =
+    '<div class="k">' + esc(newsKicker(n)) + '</div>' +
+    '<div class="t">' + esc(n.title) + '</div>' +
+    '<div class="m">' + esc(newsAge(n.updated_at)) +
+      (more > 0 ? ' · +' + more : '') + '</div>' +
+    '<div class="x">' + (n.body ? '<p>' + esc(String(n.body).slice(0, 220)) + '</p>' : '') + '</div>';
+}
+
+// Which layer a story belongs to -- the same words Kütüphane's own cards
+// are kickered with (newsCategoryLabel there).
+function newsKicker(n) {
+  const c = n.category || n.neighborhood || 'turkiye';
+  if (c === 'turkiye') return 'TÜRKİYE';
+  if (c === 'istanbul') return 'İSTANBUL';
+  if (c === 'dunya') return 'DÜNYA';
+  return (NB_NAMES[c] || c).toLocaleUpperCase('tr-TR');
+}
+
+function newsAge(iso) {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 60) return mins + ' dk önce';
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return hrs + ' saat önce';
+  return Math.round(hrs / 24) + ' gün önce';
+}
+
+// ── And the olaylar board's own door ──
+// A count rather than a headline: an olay is the thing the stories are
+// ABOUT, and how many of them are running is the fact that belongs on a
+// tile this size.
+async function loadOlaylarActor(el) {
+  let n = null;
+  try {
+    const { data, error } = await IstRouter.sb.from('world_events')
+      .select('id')
+      .eq('status', 'ongoing');
+    if (error) throw error;
+    n = (data || []).length;
+  } catch (err) {
+    console.error('[proje olaylar]', err);
+  }
+  if (!el.isConnected) return;
+  el.innerHTML = '<div class="w">Olaylar</div>' +
+    '<div class="n">' + (n == null ? 'Dünya' : n + ' olay sürüyor') + '</div>';
 }
 
 // ── Poses ──
@@ -776,10 +946,17 @@ function paintCast() {
     // book has them: a second term rather than a second pose table,
     // because it is a different gesture happening at the same time,
     // not a different place in the book.
-    const x = lerp(A.x, B.x, t) + petekP * PETEK_CAST_EXIT;
+    // Where the reader is standing relative to THIS actor's lane, in
+    // lanes. One rule for both casts, and it is the whole of what makes
+    // them diverge: an actor is pushed away in the direction the reader
+    // walked, so Kahvehane's leave to the right as the reader goes left
+    // and Kütüphane's arrive from the left as they keep going. Nothing
+    // here knows which lane is which.
+    const d = Math.max(-1, Math.min(1, lanePos - a.def.lane));
+    const x = lerp(A.x, B.x, t) - d * LANE_EXIT;
     a.el.style.transform = 'translate3d(' + x + '%,' + y + '%,0) scale(' + sc + ')' +
                            (rot ? ' rotate(' + rot + 'deg)' : '');
-    a.el.style.opacity = String(lerp(A.opacity, B.opacity, t) * (1 - petekP));
+    a.el.style.opacity = String(lerp(A.opacity, B.opacity, t) * (1 - Math.abs(d)));
   }
 }
 
@@ -798,10 +975,14 @@ function armCast() {
   // catching up the book is visibly mid-flip, whatever `at` says. So is
   // the petek: an actor on its way off the screen is a picture of a
   // button exactly as one mid-flip is.
-  const settled = ready && !drag && !anim && !petekP &&
+  const settled = ready && !drag && !anim && !laneRun &&
                   Math.abs(framePos - castTarget) < LIVE_EPS;
   for (const a of cast) {
-    a.el.classList.toggle('live', settled && Math.abs(a.pos - a.def.live) < LIVE_EPS);
+    // Its own stop AND its own lane: slide 12 is three screens, and an
+    // actor belongs to one of them.
+    a.el.classList.toggle('live', settled &&
+      Math.abs(a.pos - a.def.live) < LIVE_EPS &&
+      Math.abs(lanePos - a.def.lane) < LIVE_EPS);
   }
   // Where the BOOK is, which is a different question from whether the
   // cast is live: a finger on the glass makes nothing live, but it does
@@ -809,10 +990,12 @@ function armCast() {
   // begins with a finger already down. Asking `!drag` here is what made
   // the very gesture this flag gates impossible: armCast runs on
   // pointerdown, so the flag was cleared a frame before it was read.
-  petekAtStop = ready && Math.abs(framePos - PETEK_STOP) < LIVE_EPS;
-  // Arriving on slide 12 is what BUILDS it, so the pull never waits on a
-  // round trip. Once per arrival, and only once the book has stopped.
-  if (!petekAtStop) petekBuilt = false;
+  paintHint();
+  atLaneStop = ready && Math.abs(framePos - PETEK_STOP) < LIVE_EPS;
+  // Arriving on slide 12 is what BUILDS the petek, so the pull never
+  // waits on a round trip. Once per arrival, and only once the book has
+  // stopped.
+  if (!atLaneStop) petekBuilt = false;
   else if (!petekBuilt && !drag && !anim) { petekBuilt = true; ensurePetek(); }
 }
 
@@ -915,82 +1098,146 @@ let drag = null;
 function stopAnim() { if (anim) { cancelAnimationFrame(anim); anim = null; } }
 
 // ══════════════════════════════════════════════════════════════
-// THE PETEK, ON SLIDE 12
+// SLIDE 12 IS THREE SCREENS, NOT ONE
 //
-// Pull right on slide 12 and the buttons leave to the right, the
-// drawing goes quiet, and the honeycomb fades in over it. It is
-// deliberately NOT a page and not a sheet: nothing navigates, nothing
+// The book's stops are its DEPTH -- slide 1 is Türkiye, slide 12 is
+// İstanbul, slide 24 is what is inside it. Slide 12 also has a
+// SIDEWAYS axis, and it is the app's own carousel laid on the one
+// slide that is the city:
+//
+//        LANE 0            LANE 1           LANE 2
+//      Kütüphane   <--     Hane      -->   Kahvehane
+//      (the read)       (the petek)        (the doing)
+//
+// left to right on the screen, exactly as the three tabs stand. A pull
+// right walks the strip right, so the reader moves LEFT along it --
+// Kahvehane, then Hane, then Kütüphane -- and a pull left walks back.
+//
+// Each lane has its own cast, and they never trade places: the buttons
+// that left to the right are Kahvehane's and stay gone; the ones that
+// arrive from the left are Kütüphane's. Nothing navigates, nothing
 // rises from the bottom, and the drawing underneath is left exactly
-// where it is -- this is the one screen the petek is about, and a
+// where it is -- this is the one screen all three are about, and a
 // surface that covered it would take back the thing being answered.
-// Pull left and it goes again.
 //
-// Slide 12 and slide 12 only, for the same reason its cast is: an
-// actor -- and this is one -- belongs to a stop, not to the book.
+// ── And the lane decides which way the book may move ──
+// This is the whole point of the divergence rather than a rule bolted
+// onto it. Standing on Kütüphane you are facing OUT, so the only depth
+// you can reach is slide 1 -- Türkiye. Standing on Kahvehane you are
+// facing IN, so the only one is slide 24. Standing on Hane the
+// vertical gesture is not the book's at all: it is the petek's own
+// depth pull.
+//
+// So there is no way from Türkiye to the innermost slide that does not
+// pass through Hane. That is the mall stairway in the smallest form it
+// has ever had here: you cannot go from the reading to the doing
+// without walking past the people.
 // ══════════════════════════════════════════════════════════════
-const PETEK_STOP = 11;
-// How far out the cast goes, in percent of each actor's own width. Both
-// leave to the RIGHT, the way the petek arrives: they are being pushed
-// off the screen by it, not going home the way they came.
-const PETEK_CAST_EXIT = 190;
-// The thumb distance for the whole pull, as a fraction of the screen's
-// width -- the same order as the book's own per-page travel.
-const PETEK_TRAVEL = 0.42;
-const PETEK_RUN_MS = 300;
+// How far an actor is pushed when the reader walks off its lane, in
+// percent of the actor's own width.
+const LANE_EXIT = 190;
+// The thumb distance for ONE lane, as a fraction of the screen's width
+// -- stated per lane rather than per strip, the same rule the book's
+// own travel follows.
+const LANE_TRAVEL = 0.42;
+const LANE_RUN_MS = 300;
 // px before a drag has to say which axis it is. The book's own gesture
-// is vertical and the petek's is horizontal, so this is the one place
+// is vertical and the lanes' is horizontal, so this is the one place
 // they are told apart.
 const AXIS_SLOP = 8;
 
-let petekP = 0;          // 0 shut, 1 standing; the drag writes it live
-let petekOpen = false;
-let petekRun = null;
-let petekAtStop = false; // whether the book is standing on PETEK_STOP
+// The reader starts on Kütüphane, because the book starts on slide 1
+// and slide 1 is Türkiye: the lane and the depth have to agree or the
+// first pull down would be one the lane forbids.
+let lane = LANE_KUTUPHANE;
+let lanePos = LANE_KUTUPHANE;   // continuous; the drag writes it live
+let laneRun = null;
+let atLaneStop = false;  // whether the book is standing on PETEK_STOP
 let petekBuilt = false;  // whether this arrival has already mounted it
 
 const clamp01 = (n) => n < 0 ? 0 : n > 1 ? 1 : n;
 
-// One number drives both layers and the cast: the wash and the
-// hexagons are the stylesheet's job off --fb-petek-p (see .fb-scrim /
-// .fb-petek), and the actors are painted from it here.
-function paintPetek() {
+// How present a lane's own things are: 1 standing on it, 0 a whole lane
+// away, and the linear middle in between. One function for the petek
+// and for every actor, so nothing can arrive on a different curve from
+// its neighbour.
+function lanePresence(l) { return 1 - Math.min(1, Math.abs(lanePos - l)); }
+
+// One number drives the wash, the hexagons and every actor's exit: the
+// two layers are the stylesheet's job off --fb-petek-p (see .fb-scrim /
+// .fb-petek), and the actors are painted from lanePos here.
+function paintLanes() {
   if (!box) return;
-  box.style.setProperty('--fb-petek-p', String(petekP));
-  box.classList.toggle('petek-pulling', petekP > 0);
-  box.classList.toggle('petek-open', petekOpen && petekP >= 1);
+  const petek = lanePresence(LANE_HANE);
+  box.style.setProperty('--fb-petek-p', String(petek));
+  box.classList.toggle('petek-pulling', petek > 0);
+  box.classList.toggle('petek-open', lane === LANE_HANE && petek >= 1);
   paintCast();
+  paintHint();
 }
 
-function setPetekP(p) { petekP = clamp01(p); paintPetek(); }
+// The hint says which way the book can actually be taken from here, and
+// that is now a question about the LANE as much as the slide: on
+// Kütüphane the only depth is upward, on Kahvehane downward, and on
+// Hane the gesture is not the book's at all. A line that said "aşağı
+// kaydır" while down was the one direction the lane refuses is a small
+// lie printed on the screen, which is worse than no line.
+function paintHint() {
+  // Held like `hud` rather than looked up: this runs on every frame of
+  // the ease, and a lookup per frame is a cost with nothing to show.
+  const el = hint;
+  if (!el) return;
+  const run = laneStops();
+  const word = run[0] === run[1] ? ''
+             : at <= run[0] + LIVE_EPS ? 'Aşağı kaydır'
+             : at >= run[1] - LIVE_EPS ? 'Yukarı kaydır'
+             : '';
+  if (el.textContent !== word) el.textContent = word;
+}
 
-// Whether a pull that way has anywhere to go. Not a general "is the
-// petek allowed": it is the direction as well, so a rightward pull on
-// a standing petek is nobody's and falls through.
-function petekPullable(dx) {
-  if (!petekAtStop) return false;
-  return dx > 0 ? !petekOpen : petekOpen;
+function setLanePos(p) {
+  lanePos = Math.max(0, Math.min(LANES - 1, p));
+  paintLanes();
+}
+
+// Whether a pull that way has anywhere to go. Not a general "are the
+// lanes open": it is the direction as well, so a pull off the end of
+// the strip is nobody's and falls through to whatever is underneath.
+function lanePullable(dx) {
+  if (!atLaneStop) return false;
+  // Right walks the strip right, so the reader moves toward lane 0.
+  return dx > 0 ? lane > 0 : lane < LANES - 1;
+}
+
+// ── What the lane lets the book reach ──
+// The two ends of the run the reader is standing on. Kütüphane's run is
+// slide 1 to slide 12, Kahvehane's is slide 12 to slide 24, and Hane
+// has none at all -- its vertical gesture belongs to the petek.
+function laneStops() {
+  if (lane === LANE_KUTUPHANE) return [STOPS[0], STOPS[1]];
+  if (lane === LANE_KAHVEHANE) return [STOPS[1], STOPS[2]];
+  return [STOPS[1], STOPS[1]];
 }
 
 // The release: carry on from where the finger left off. Timed rather
 // than frame-paced -- the book runs out at the speed pages turn, but
 // this is a wash and a fade, which have no pages in them.
-function runPetek(open) {
-  if (petekRun) { cancelAnimationFrame(petekRun); petekRun = null; }
-  petekOpen = open;
-  const from = petekP;
-  const to = open ? 1 : 0;
-  const dist = Math.abs(to - from);
-  if (dist < 0.001) { setPetekP(to); armCast(); return; }
-  const ms = PETEK_RUN_MS * dist;
+function runLane(to) {
+  if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
+  lane = Math.max(0, Math.min(LANES - 1, to));
+  const from = lanePos;
+  const dist = Math.abs(lane - from);
+  if (dist < 0.001) { setLanePos(lane); armCast(); return; }
+  const ms = LANE_RUN_MS * dist;
   const t0 = performance.now();
   const step = (now) => {
     const a = Math.min(1, (now - t0) / ms);
     const e = 1 - Math.pow(1 - a, 3);   // ease out
-    setPetekP(from + (to - from) * e);
-    if (a < 1) { petekRun = requestAnimationFrame(step); }
-    else { petekRun = null; setPetekP(to); armCast(); }
+    setLanePos(from + (lane - from) * e);
+    if (a < 1) { laneRun = requestAnimationFrame(step); }
+    else { laneRun = null; setLanePos(lane); armCast(); }
   };
-  petekRun = requestAnimationFrame(step);
+  laneRun = requestAnimationFrame(step);
 }
 
 // Built the moment the book comes to rest on slide 12, never on the
@@ -1001,7 +1248,7 @@ function runPetek(open) {
 // same rule Hane follows. Not while it is standing, though: that would
 // pull the drawing out from under the reader.
 function ensurePetek() {
-  if (petekP > 0) return;
+  if (lanePresence(LANE_HANE) > 0) return;
   if (!window.IstProfileCard || !IstProfileCard.mountHivePage) return;
   if (!document.getElementById('fb-petek')) return;
   try {
@@ -1026,9 +1273,11 @@ function onDown(e) {
   // So a press that lands in it is tracked but never CAPTURED: capture
   // would re-target every following event at this box and kill the
   // petek's own handlers outright.
-  const inPetek = petekP > 0 && !!(e.target && e.target.closest && e.target.closest('.fb-petek'));
+  const inPetek = lanePresence(LANE_HANE) > 0 &&
+                  !!(e.target && e.target.closest && e.target.closest('.fb-petek'));
   stopAnim();
-  drag = { x: e.clientX, y: e.clientY, from: at, fromP: petekP, axis: null, moved: false,
+  if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
+  drag = { x: e.clientX, y: e.clientY, from: at, fromLane: lanePos, axis: null, moved: false,
            lastX: e.clientX, lastY: e.clientY, lastT: performance.now(), v: 0, vx: 0, inPetek };
   armCast();                    // a press begins: the cast goes inert
   if (!inPetek) box.setPointerCapture && box.setPointerCapture(e.pointerId);
@@ -1045,10 +1294,16 @@ function onMove(e) {
   if (!drag.axis) {
     if (Math.abs(dx) < AXIS_SLOP && Math.abs(dy) < AXIS_SLOP) return;
     drag.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
-    if (drag.axis === 'x' && !petekPullable(dx)) { drag = null; armCast(); return; }
-    // A vertical drag while the petek is standing is the petek's own
+    if (drag.axis === 'x' && !lanePullable(dx)) { drag = null; armCast(); return; }
+    // A vertical drag while the petek is on screen is the petek's own
     // depth pull, not the book being scrubbed underneath it.
-    if (drag.axis === 'y' && (petekP > 0 || drag.inPetek)) { drag = null; armCast(); return; }
+    if (drag.axis === 'y' && (lanePresence(LANE_HANE) > 0 || drag.inPetek)) {
+      drag = null; armCast(); return;
+    }
+    // Which run the reader is on is the LANE's answer, not the book's --
+    // and it is taken once, at the moment the gesture claims its axis,
+    // so a drag cannot be re-scoped half way through.
+    if (drag.axis === 'y') drag.run = laneStops();
     drag.moved = true;
   }
   const now = performance.now();
@@ -1056,8 +1311,21 @@ function onMove(e) {
   if (drag.axis === 'x') {
     if (dt > 0) drag.vx = (e.clientX - drag.lastX) / dt;
     drag.lastX = e.clientX; drag.lastT = now;
-    // The reveal follows the finger, like everything else here.
-    setPetekP(drag.fromP + dx / (window.innerWidth * PETEK_TRAVEL));
+    // The strip follows the finger, like everything else here. A pull
+    // right walks the strip right, so the reader moves toward lane 0.
+    //
+    // At most ONE lane per gesture, however far the finger goes: this is
+    // a carousel of three screens, not a scrub through twenty-four, and
+    // a swipe that crossed two of them walked the reader straight past
+    // Hane -- which is the one screen the whole arrangement exists to
+    // put in the middle. The book's own vertical is deliberately not
+    // clamped this way: there it IS a scrub.
+    // Clamped around the lane the reader is COMMITTED to, not around
+    // where the drawing happened to be when the finger went down: an
+    // interrupted run leaves those two apart, and clamping to the
+    // drawing lets a long drag reach a lane two along.
+    const to = drag.fromLane - dx / (window.innerWidth * LANE_TRAVEL);
+    setLanePos(Math.max(lane - 1, Math.min(lane + 1, to)));
     e.preventDefault();
     return;
   }
@@ -1067,7 +1335,12 @@ function onMove(e) {
   // moving the pages rather than nudging a counter.
   const span = window.innerHeight * TRAVEL;
   const p = drag.from + (dy / span) * (FRAMES - 1);
-  at = Math.max(0, Math.min(FRAMES - 1, p));
+  // Clamped to the lane's run, not to the book: from Kütüphane the
+  // deepest the finger can reach is slide 12, and from Kahvehane the
+  // shallowest is. A pull the wrong way simply does not move the paper,
+  // which says "not this way" more plainly than springing back would.
+  const run = drag.run || STOPS;
+  at = Math.max(run[0], Math.min(run[1], p));
   show(at);
   e.preventDefault();
 }
@@ -1100,10 +1373,19 @@ function onUp() {
   const vx = drag.vx;
   drag = null;
   if (!wasDrag) { armCast(); return; }
-  // The petek's pull: a throw decides by direction, a slow release by
-  // how far it got -- the same two rules the book itself releases on.
+  // The lanes: a throw decides by direction, a slow release by how far
+  // it got -- the same two rules the book itself releases on, and the
+  // same local question, since the strip is a row of stops too.
   if (axis === 'x') {
-    runPetek(Math.abs(vx) > FLICK ? vx > 0 : petekP >= 0.5);
+    // The two candidates are always the lane the reader is on and the
+    // ONE next to it in the direction they pulled -- never `floor` of
+    // where the drawing ended up, which at a whole number brackets the
+    // wrong pair and overshoots by a lane in one direction only.
+    const step = (n) => Math.max(0, Math.min(LANES - 1, n));
+    if (Math.abs(vx) > FLICK) { runLane(step(lane + (vx > 0 ? -1 : 1))); return; }
+    const dir = lanePos < lane ? -1 : lanePos > lane ? 1 : 0;
+    if (!dir) { runLane(lane); return; }
+    runLane(Math.abs(lanePos - lane) >= TIP ? step(lane + dir) : lane);
     return;
   }
   // The book only ever comes to rest on a stop, and the question is
@@ -1124,14 +1406,16 @@ function mount() {
   document.getElementById('main-site').classList.add('active');
   box = document.getElementById('fb');
   hud = document.getElementById('fb-hud');
+  hint = document.getElementById('fb-hint');
   if (!box) return;
   box.style.setProperty('--fb-fit', FIT);
-  // A fresh box, and a fresh #fb-petek inside it: the petek starts shut
-  // on every entry, and is rebuilt by armCast when the book settles on
-  // its stop.
-  petekP = 0; petekOpen = false; petekAtStop = false; petekBuilt = false;
+  // A fresh box, and a fresh #fb-petek inside it. The reader starts on
+  // Kütüphane because the book starts on slide 1: the lane and the depth
+  // have to agree, or the first pull down is one the lane forbids.
+  lane = LANE_KUTUPHANE; lanePos = LANE_KUTUPHANE;
+  atLaneStop = false; petekBuilt = false;
   buildCast();
-  paintPetek();     // after buildCast: it paints the cast too
+  paintLanes();     // after buildCast: it paints the cast too
   box.addEventListener('pointerdown', onDown, { passive: true });
   box.addEventListener('pointermove', onMove, { passive: false });
   box.addEventListener('pointerup', onUp, { passive: true });
@@ -1151,15 +1435,16 @@ function mount() {
 }
 function unmount() {
   stopAnim();
-  if (petekRun) { cancelAnimationFrame(petekRun); petekRun = null; }
+  if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
   // The petek leaves two things behind it that live OUTSIDE this page --
   // the depth classes on <html> and the module's own _hive, which every
   // in-flight fetch checks itself against before drawing. Both have to
   // be unwound or they are the last word on a page that is gone (see
   // unmountHivePage in profile-card.js).
   if (window.IstProfileCard && IstProfileCard.unmountHivePage) IstProfileCard.unmountHivePage();
-  petekP = 0; petekOpen = false; petekAtStop = false; petekBuilt = false;
-  drag = null; box = null; hud = null;
+  lane = LANE_KUTUPHANE; lanePos = LANE_KUTUPHANE;
+  atLaneStop = false; petekBuilt = false;
+  drag = null; box = null; hud = null; hint = null;
 }
 IstRouter.registerPage('project', { mount, unmount });
 
@@ -1186,11 +1471,27 @@ window.__fb = {
   // Put the book at a slide as if it had been dragged there and let go.
   // `show` alone only paints -- it does not move the book -- which is
   // exactly the distinction the drag handler depends on.
-  goto(p, snap) { stopAnim(); at = Math.max(0, Math.min(FRAMES - 1, p)); show(at, snap !== false); armCast(); },
+  goto(p, snap) {
+    stopAnim();
+    at = Math.max(0, Math.min(FRAMES - 1, p));
+    // A slide off the middle stop can only be reached from one lane, so
+    // arriving there by hand has to leave the reader on it -- otherwise
+    // the handle can put the book somewhere its own lane forbids.
+    if (at < STOPS[1]) { lane = LANE_KUTUPHANE; setLanePos(lane); }
+    else if (at > STOPS[1]) { lane = LANE_KAHVEHANE; setLanePos(lane); }
+    show(at, snap !== false); armCast();
+  },
   show, armCast,
-  get petek() { return { p: petekP, open: petekOpen, atStop: petekAtStop }; },
-  setPetek(open) { runPetek(!!open); },
-  pullPetek(p) { setPetekP(p); },
+  lanes: LANES,
+  get lane() { return { at: lane, pos: lanePos, atStop: atLaneStop,
+                        petek: lanePresence(LANE_HANE), stops: laneStops() }; },
+  // Put the reader on a lane as if they had pulled there and let go.
+  goLane(n, snap) {
+    if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
+    if (snap === false) { runLane(n); return; }
+    lane = Math.max(0, Math.min(LANES - 1, n)); setLanePos(lane); armCast();
+  },
+  pullLane(p) { setLanePos(p); },
 };
 })();
 </script>
