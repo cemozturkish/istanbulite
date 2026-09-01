@@ -354,11 +354,11 @@ const CAST = [
     id: 'events',
     live: 11,                       // the slide it belongs to (0-based)
     cls: 'fb-events',
-    // How much it trails the finger. 0 is locked to it; higher is
-    // heavier. Per-actor on purpose: different weights are what make a
-    // screenful of things read as having depth rather than being one
-    // sheet. See CAST_LAG below for what the number means.
-    lag: 0.16,
+    // How closely it follows. Two numbers: `lag` while the finger is
+    // down, `lagFree` once it is let go -- higher is tighter. Per-actor
+    // on purpose: different weights are what make a screenful of things
+    // read as having depth rather than being one sheet.
+    lag: 0.32, lagFree: 0.10,
     // Real rows from `events`, the same query and the same card the
     // Kahvehane deck is built from. Its own fetch rather than a shared
     // one: this tab is a rig and must not depend on another page having
@@ -384,7 +384,7 @@ const CAST = [
     id: 'sozcel',
     live: 11,
     cls: 'fb-sozcel',
-    lag: 0.16,
+    lag: 0.32, lagFree: 0.10,
     // The wordmark is the tile's way of saying its name -- the same
     // convention Kahvehane's square tiles use -- so the line under it
     // says what the game IS rather than repeating the name.
@@ -414,12 +414,20 @@ const CAST = [
 // frame -- 0.16 catches up ~63% in 6 frames, which reads as weight
 // rather than as lag. It is applied per elapsed time, not per frame, so
 // it feels identical on a 120Hz screen.
-const CAST_LAG = 0.16;
-// The drawings trail too, on their own knob. Set it to 0 and the paper
-// is locked to the finger again while the furniture still trails, which
-// is where this started; matching CAST_LAG makes the whole screen move
-// as one weighted thing.
-const FRAME_LAG = 0.16;
+// Two rates, not one. While the finger is DOWN the screen should stay
+// close to it -- a big trail under your own thumb reads as the app
+// struggling, not as weight. Once it is let go there is nothing to keep
+// up with, and a slower catch-up is what makes the settle feel heavy
+// rather than mechanical.
+//
+// Higher is TIGHTER: it is the fraction of the remaining distance
+// covered per 60Hz frame. So the dragging number is the big one.
+const CAST_LAG = 0.32;        // following the finger
+const CAST_LAG_FREE = 0.10;   // let go
+// The drawings, on their own pair of knobs. Set both to 1 and the paper
+// is locked to the finger while the furniture still trails.
+const FRAME_LAG = 0.32;
+const FRAME_LAG_FREE = 0.10;
 let castTarget = 0;
 let castTick = null;
 let castLast = 0;
@@ -567,7 +575,8 @@ function buildCast() {
     // still an actor, and the book must not wait on the network.
     if (def.load) { try { def.load(el); } catch (e) { console.error(e); } }
     return { def, el, poses: expandPoses(def.poses || {}), pos: 0,
-             lag: def.lag == null ? CAST_LAG : def.lag };
+             lag: def.lag == null ? CAST_LAG : def.lag,
+             lagFree: def.lagFree == null ? CAST_LAG_FREE : def.lagFree };
   });
 }
 
@@ -605,11 +614,15 @@ function castStep(now) {
   const dt = Math.min(64, now - castLast) || 16.7;
   castLast = now;
   let moving = false;
-  const fp = ease(framePos, castTarget, FRAME_LAG, dt);
+  // Which pair is live depends on whether a finger is on the glass. The
+  // rate can change mid-flight without a jump: it governs how fast the
+  // gap closes, never where anything is.
+  const held = !!drag;
+  const fp = ease(framePos, castTarget, held ? FRAME_LAG : FRAME_LAG_FREE, dt);
   if (fp !== framePos) { framePos = fp; moving = true; }
   paintFrame();
   for (const a of cast) {
-    const np = ease(a.pos, castTarget, a.lag, dt);
+    const np = ease(a.pos, castTarget, held ? a.lag : a.lagFree, dt);
     if (np !== a.pos) { a.pos = np; moving = true; }
   }
   paintCast();
