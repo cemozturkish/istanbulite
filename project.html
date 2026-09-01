@@ -415,9 +415,17 @@ const CAST = [
 // rather than as lag. It is applied per elapsed time, not per frame, so
 // it feels identical on a 120Hz screen.
 const CAST_LAG = 0.16;
+// The drawings trail too, on their own knob. Set it to 0 and the paper
+// is locked to the finger again while the furniture still trails, which
+// is where this started; matching CAST_LAG makes the whole screen move
+// as one weighted thing.
+const FRAME_LAG = 0.16;
 let castTarget = 0;
 let castTick = null;
 let castLast = 0;
+// Where the DRAWINGS have caught up to. Continuous, like an actor's --
+// what gets rounded is only which frame that lands on.
+let framePos = 0;
 
 let cast = [];
 let imgs = [];
@@ -568,28 +576,41 @@ function stopCastTick() {
 }
 
 // Where the book is; the actors will get there in their own time.
-function aimCast(p, snap) {
+// Where the book is; the drawings and the actors will each get there in
+// their own time.
+function aim(p, snap) {
   castTarget = Math.max(0, Math.min(FRAMES - 1, p));
   if (snap) {
     stopCastTick();
+    framePos = castTarget;
     for (const a of cast) a.pos = castTarget;
+    paintFrame();
     paintCast();
     return;
   }
   if (!castTick) { castLast = performance.now(); castTick = requestAnimationFrame(castStep); }
 }
 
+// One ease, used by the drawings and by every actor, so they cannot
+// drift apart in how they feel. Per elapsed time rather than per frame,
+// so 60Hz and 120Hz behave the same rather than the faster screen
+// catching up twice as fast.
+function ease(pos, target, lag, dt) {
+  const d = target - pos;
+  if (Math.abs(d) < 0.0015) return target;
+  return pos + d * (1 - Math.pow(1 - lag, dt / 16.6667));
+}
+
 function castStep(now) {
   const dt = Math.min(64, now - castLast) || 16.7;
   castLast = now;
   let moving = false;
+  const fp = ease(framePos, castTarget, FRAME_LAG, dt);
+  if (fp !== framePos) { framePos = fp; moving = true; }
+  paintFrame();
   for (const a of cast) {
-    const d = castTarget - a.pos;
-    if (Math.abs(d) < 0.0015) { a.pos = castTarget; continue; }
-    // Per elapsed time rather than per frame, so 60Hz and 120Hz feel
-    // the same rather than the faster screen catching up twice as fast.
-    a.pos += d * (1 - Math.pow(1 - a.lag, dt / 16.6667));
-    moving = true;
+    const np = ease(a.pos, castTarget, a.lag, dt);
+    if (np !== a.pos) { a.pos = np; moving = true; }
   }
   paintCast();
   // Every frame, not only when the tick stops: an actor that has come
@@ -629,7 +650,9 @@ function paintCast() {
 const LIVE_EPS = 0.05;
 
 function armCast() {
-  const settled = ready && !drag && !anim;
+  // The drawings are part of "settled" now: while they are still
+  // catching up the book is visibly mid-flip, whatever `at` says.
+  const settled = ready && !drag && !anim && Math.abs(framePos - castTarget) < LIVE_EPS;
   for (const a of cast) {
     a.el.classList.toggle('live', settled && Math.abs(a.pos - a.def.live) < LIVE_EPS);
   }
@@ -638,16 +661,23 @@ function armCast() {
 // Showing a frame is one class swap. Nothing else touches the DOM
 // during a drag, which is what keeps the main thread free enough to
 // track the finger.
-function show(p, snap) {
-  // The actors are AIMED at the continuous position and arrive in their
-  // own time; the drawings get the rounded one, at once.
-  aimCast(Math.max(0, Math.min(FRAMES - 1, p)), snap);
-  const i = Math.max(0, Math.min(FRAMES - 1, Math.round(p)));
+// Which drawing is up. The position is continuous and eased like an
+// actor's; what is whole-numbered is only the frame it lands on -- a
+// flip book flips, and blending two drawings makes a third nobody drew.
+function paintFrame() {
+  if (!imgs.length) return;
+  const i = Math.max(0, Math.min(FRAMES - 1, Math.round(framePos)));
   if (i === shown) return;
   if (shown >= 0) imgs[shown].classList.remove('on');
   imgs[i].classList.add('on');
   shown = i;
   paintHud(i);
+}
+
+// Aim everything at where the book now is. Nothing paints from `p`
+// directly any more: the drawings and the actors each ease toward it.
+function show(p, snap) {
+  aim(Math.max(0, Math.min(FRAMES - 1, p)), snap);
 }
 
 // ── Loading ──
@@ -831,6 +861,7 @@ if (!window.__istVirtualNavInjecting) {
 // them, NB_NAMES, already collided with mahalle's.
 window.__fb = {
   get at() { return at; },
+  get framePos() { return framePos; },
   get cast() { return cast; },
   get ready() { return ready; },
   get busy() { return !!(anim || castTick || drag); },

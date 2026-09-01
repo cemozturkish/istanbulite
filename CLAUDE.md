@@ -1496,9 +1496,12 @@ slide it belongs to, and a pose per slide. Two rules make them work:
 The actors move **continuously** while the frame index jumps whole numbers — a flip book flips, but
 type sliding in whole-pixel steps shimmers.
 
-**And they trail the finger.** The drawings stay locked to it — a page that arrives late is just a
-slow page — but each actor eases toward wherever the book currently is, so the furniture has weight
-and settles a beat after the paper. `lag` is per actor (the fraction of the remaining distance
+**And it all trails the finger.** The drawings ease toward the book's position on `FRAME_LAG` and
+each actor on its own `lag`, so the whole screen has weight rather than being pinned to the thumb;
+one `ease()` serves both, so they cannot drift apart in how they feel. Measured on a fast drag,
+paper and card both trail by ~0.69 of a slide. The position is continuous either way — what stays
+whole-numbered is only which drawing that lands on, because blending two of them makes a third
+nobody drew. `FRAME_LAG: 0` puts the paper back under the finger while the furniture still trails. `lag` is per actor (the fraction of the remaining distance
 covered per 60Hz frame; 0.16 reads as weight rather than as lag), applied per elapsed time so a
 120Hz screen feels the same rather than catching up twice as fast. Measured on a fast drag the card
 trails the book by a steady ~0.65 of a slide.
@@ -1506,7 +1509,8 @@ trails the book by a steady ~0.65 of a slide.
 Two things the lag makes load-bearing. An actor is live once it is **near** its own slide
 (`LIVE_EPS`, about six pixels of drift), not once it has arrived: an exponential ease never quite
 arrives, and waiting for the last thousandth left the card unpressable for 771ms after it had
-visibly stopped — 430ms with the tolerance. And a **programmatic** move must snap rather than
+visibly stopped — 430ms with the tolerance. The same test covers the drawings, since a book whose
+paper is still catching up is visibly mid-flip whatever its target says. And a **programmatic** move must snap rather than
 travel (`show(p, true)`), or a page that mounts at a given slide slides its whole cast in from
 wherever the last one left them.
 
