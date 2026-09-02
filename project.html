@@ -427,6 +427,256 @@
       pointer-events: none;
       z-index: 3;
     }
+
+    /* ══════════════════════════════════════════════════════════════
+       THE APP MAP -- what the İstanbulite logo opens
+       ══════════════════════════════════════════════════════════════
+       The compass bar says WHERE YOU ARE. This says where you are in
+       relation to everywhere else: the app's five windows drawn in the
+       shape they actually stand in -- the three lanes across the middle,
+       Türkiye hanging off Kütüphane and the ilçe off Kahvehane, because
+       those are the depths each of those two lanes can reach and nobody
+       else can (see "What each screen carries" in CLAUDE.md).
+
+       Two things make it different from every other surface here:
+
+       - It is the ONE thing on the site that dims the two bars as well.
+         Everywhere else the bars are omnipresent furniture that nothing
+         may pass in front of (frames.css) -- and that is right, because
+         everywhere else they are the answer to "where can I go". Here
+         the whole screen IS that answer, so the furniture is part of
+         what goes quiet. The logo alone stays lit, because it is the way
+         back out -- the same move Kütüphane's Olaylar switch makes.
+       - Pressing a window does not JUMP there. It closes and then walks
+         the app to it one transition at a time, through every screen in
+         between (see travelTo). A map that teleported would be the
+         shortcut past everything, which is the one thing the whole
+         arrangement exists to prevent. */
+    /* The wash is ONE number used in both places -- over the page, and
+       inside the bottom bar -- because the two have to read as a single
+       thing going quiet rather than as two surfaces dimming by eye. */
+    :root { --fb-map-red: #B93631; --fb-map-dim: rgba(16, 14, 13, 0.62); }
+
+    #fb-map {
+      position: fixed;
+      inset: 0;
+      z-index: 600;          /* over both bars, which sit at 100 / ~400 */
+      opacity: 0;
+      transition: opacity 0.22s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #fb-map[hidden] { display: none; }
+    #fb-map.on { opacity: 1; }
+    /* The backdrop takes the press: anywhere off a window closes it. */
+    .fb-map-scrim { position: absolute; inset: 0; background: var(--fb-map-dim); }
+
+    .fb-map-grid {
+      position: absolute;
+      inset: calc(var(--navbar-h-top, 54px) + env(safe-area-inset-top) + 10px)
+             var(--screen-inset, 18px)
+             calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom) + 18px);
+      pointer-events: none;   /* only the windows answer a finger */
+    }
+
+    /* ── The wires ──
+       Drawn against the grid's own thirds rather than measured off the
+       windows, so a window changing size never leaves a wire hanging in
+       space. They lie UNDER the windows for the same reason. */
+    .fb-map-wire { position: absolute; background: #f2efec; opacity: 0.8; }
+    .fb-map-wire.h { height: 6px; top: 50%; transform: translateY(-50%); }
+    .fb-map-wire.v { width: 6px; left: 50%; transform: translateX(-50%); }
+    .fb-map-wire.w-ku-hane   { left: 16.66%; right: 50%; }
+    .fb-map-wire.w-hane-kah  { left: 50%; right: 16.66%; }
+    .fb-map-wire.w-ku-tr     { left: 16.66%; top: 50%; bottom: 16.66%; right: auto; }
+    .fb-map-wire.w-kah-ilce  { left: 83.33%; top: 16.66%; bottom: 50%; right: auto; }
+
+    /* ── A window ──
+       The app's screens are portrait, so these are too. Placed on a 3x3
+       whose middle row is the lane strip. */
+    .fb-map-win {
+      position: absolute;
+      width: min(26%, 132px);   /* of the grid, whose columns are its thirds */
+      aspect-ratio: 3 / 4;
+      transform: translate(-50%, -50%);
+      background: var(--paper, #f4f1ec);
+      border: 2px solid var(--ink, #17140f);
+      color: var(--ink, #17140f);
+      padding: 5px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font: inherit;
+      pointer-events: auto;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.14s ease;
+    }
+    .fb-map-win:active { transform: translate(-50%, -50%) scale(0.955); }
+    .fb-map-win.at-r1c3 { left: 83.33%; top: 16.66%; }
+    .fb-map-win.at-r2c1 { left: 16.66%; top: 50%; }
+    .fb-map-win.at-r2c2 { left: 50%;    top: 50%; }
+    .fb-map-win.at-r2c3 { left: 83.33%; top: 50%; }
+    .fb-map-win.at-r3c1 { left: 16.66%; top: 83.33%; }
+
+    /* WHERE YOU ARE. The only red on the layer, so it cannot be read as
+       anything else -- and it is not pressable, because you are already
+       standing in it. */
+    .fb-map-win.here {
+      border-color: var(--fb-map-red);
+      color: var(--fb-map-red);
+      cursor: default;
+    }
+    .fb-map-win.here:active { transform: translate(-50%, -50%); }
+
+    /* Hane is the petek, so its window is a hexagon rather than a screen
+       -- the middle page is the one that is not a page of tiles. */
+    .fb-map-win.hex {
+      border: none;
+      background: none;
+      padding: 0;
+      align-items: center;
+      justify-content: center;
+    }
+    .fb-map-hex {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      background: currentColor;
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    }
+    .fb-map-hex > span {
+      width: calc(100% - 5px); height: calc(100% - 5px);
+      background: var(--paper, #f4f1ec);
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    /* A head and shoulders in currentColor, so it goes red with the ring
+       when this is the window the reader is standing in. */
+    .fb-map-figure { position: relative; width: 46%; height: 58%; color: inherit; }
+    .fb-map-figure::before, .fb-map-figure::after {
+      content: ''; position: absolute; background: var(--ink, #17140f);
+    }
+    .fb-map-win.here .fb-map-figure::before,
+    .fb-map-win.here .fb-map-figure::after { background: var(--fb-map-red); }
+    .fb-map-figure::before {
+      left: 27%; top: 0; width: 46%; aspect-ratio: 1; border-radius: 50%;
+    }
+    .fb-map-figure::after {
+      left: 4%; right: 4%; top: 52%; bottom: 0;
+      border-radius: 48% 48% 0 0 / 62% 62% 0 0;
+    }
+
+    /* The window's own hero: the map at that depth, which is what the
+       real screen has at the top of it. */
+    /* The hero takes whatever the window's own ratio leaves, and the
+       picture inside it is OUT OF FLOW. A map PNG left in flow reports
+       its intrinsic height (1080x2420 for Türkiye's) into a box whose
+       height was supposed to come from aspect-ratio -- the two argue,
+       intrinsic wins, and every window comes out half again too tall and
+       overlapping the one below it. Nothing in here may have a height of
+       its own to offer. */
+    .fb-map-hero {
+      position: relative;
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      background: var(--paper-card, #e9e4dc);
+    }
+    .fb-map-hero img {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+      opacity: 0.85;
+    }
+    .fb-map-name {
+      flex: none;
+      font-size: 0.5rem;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      text-align: center;
+      line-height: 1;
+      color: inherit;
+    }
+    /* The stat squares: how much of that window's content the reader has
+       actually got through. Squares because the drawing says squares --
+       the same shape the right-hand column of every screen is. */
+    .fb-map-stats { flex: none; display: flex; gap: 4px; }
+    .fb-map-stat {
+      flex: 1;
+      aspect-ratio: 1;
+      border: 1.5px solid currentColor;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    /* What is waiting there, in the corner a badge goes. */
+    .fb-map-badge {
+      position: absolute;
+      top: 0; right: 0;
+      transform: translate(38%, -38%);
+      min-width: 19px; height: 19px;
+      padding: 0 4px;
+      border-radius: 999px;
+      background: var(--fb-map-red);
+      color: #fff;
+      font-size: 0.6rem;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── The logo is the door, so it is bigger and it stands proud ──
+       It spills over the bar's top edge on purpose: everything else on
+       this bar is a word printed ON the bar, and this is the one thing
+       that comes off it. Nothing else here is pressable, so `nav` still
+       takes no pointer events at all and only this one mark opts back
+       in -- the drawing under the bar's own paper goes on answering a
+       finger that lands beside it. */
+    nav b.fb-logo-btn {
+      pointer-events: auto;
+      cursor: pointer;
+      background: none;
+      border: 0;
+      position: relative;
+      z-index: 2;              /* over the bar's own share of the dim */
+      transform: translateY(-9px);
+      transition: transform 0.14s ease, filter 0.18s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    nav b.fb-logo-btn .fb-logo { width: 118px; height: 36px; }
+    nav b.fb-logo-btn:active { transform: translateY(-9px) scale(0.94); }
+    /* Lit while its map is open -- it is held down because it is the way
+       back out, exactly as Kütüphane's Olaylar box is. */
+    body.fb-map-on nav b.fb-logo-btn {
+      color: var(--fb-map-red);
+      filter: drop-shadow(0 0 9px rgba(185, 54, 49, 0.55));
+    }
+    /* The bar's own share of the dim. It is painted INSIDE the bar
+       rather than over it, so the logo can stand above it and stay the
+       one lit thing on the screen. */
+    /* !important, and not for tidiness. frames.css states that nothing may
+       ever pass in front of the two bars, and states it with !important so
+       a page's own <style data-page> cannot climb over them (see "THE TWO
+       BARS ARE OMNIPRESENT" in CLAUDE.md). This layer is the ONE
+       deliberate exception on the site -- it dims the bars rather than
+       resting under them -- so the bar it lets through has to say so at
+       the same weight, or it silently loses and the logo goes dark under
+       the wash it is supposed to be standing above. */
+    body.fb-map-on header { z-index: 610 !important; }
+    body.fb-map-on header::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--fb-map-dim);
+      pointer-events: none;
+      z-index: 1;
+    }
   </style>
 </head>
 <body data-page="project">
@@ -437,7 +687,7 @@
   <div class="section-rule">
     <header>
       <nav id="fb-nav">
-        <b>Kütüphane</b><b><i class="fb-logo"></i><span class="fb-wm">İstanbulite</span></b><b>Kahvehane</b>
+        <b>Kütüphane</b><b class="fb-logo-btn" id="fb-logo-btn" role="button" tabindex="0" aria-label="Uygulama haritası"><i class="fb-logo"></i><span class="fb-wm">İstanbulite</span></b><b>Kahvehane</b>
       </nav>
     </header>
   </div>
@@ -466,6 +716,21 @@
         <div class="fb-petek" id="fb-petek"></div>
       </div>
     </main>
+  </div>
+</div>
+
+<!-- ── THE APP MAP ──
+     Opened by the İstanbulite logo, which is the only thing on the
+     bottom bar that is pressed. Five windows in the shape the app
+     actually stands in; the one the reader is in is red, and pressing
+     another walks there rather than jumping. See the CSS block. -->
+<div id="fb-map" hidden>
+  <div class="fb-map-scrim" id="fb-map-scrim"></div>
+  <div class="fb-map-grid" id="fb-map-grid">
+    <span class="fb-map-wire h w-ku-hane"></span>
+    <span class="fb-map-wire h w-hane-kah"></span>
+    <span class="fb-map-wire v w-ku-tr"></span>
+    <span class="fb-map-wire v w-kah-ilce"></span>
   </div>
 </div>
 
@@ -1396,12 +1661,12 @@ function laneStops() {
 // The release: carry on from where the finger left off. Timed rather
 // than frame-paced -- the book runs out at the speed pages turn, but
 // this is a wash and a fade, which have no pages in them.
-function runLane(to) {
+function runLane(to, done) {
   if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
   lane = Math.max(0, Math.min(LANES - 1, to));
   const from = lanePos;
   const dist = Math.abs(lane - from);
-  if (dist < 0.001) { setLanePos(lane); armCast(); return; }
+  if (dist < 0.001) { setLanePos(lane); armCast(); if (done) done(); return; }
   const ms = LANE_RUN_MS * dist;
   const t0 = performance.now();
   const step = (now) => {
@@ -1409,7 +1674,7 @@ function runLane(to) {
     const e = 1 - Math.pow(1 - a, 3);   // ease out
     setLanePos(from + (lane - from) * e);
     if (a < 1) { laneRun = requestAnimationFrame(step); }
-    else { laneRun = null; setLanePos(lane); armCast(); }
+    else { laneRun = null; setLanePos(lane); armCast(); if (done) done(); }
   };
   laneRun = requestAnimationFrame(step);
 }
@@ -1522,11 +1787,11 @@ function onMove(e) {
 // Run to a stop at a steady rate. Deliberately frame-paced rather than
 // eased: this is a flip book being let go of, and the pages should turn
 // at the speed pages turn.
-function runTo(target) {
+function runTo(target, done) {
   stopAnim();
   const from = at;
   const dist = Math.abs(target - from);
-  if (dist < 0.001) { at = target; show(at); armCast(); return; }
+  if (dist < 0.001) { at = target; show(at); armCast(); if (done) done(); return; }
   const ms = (dist / RUN_FPS) * 1000;
   const t0 = performance.now();
   const step = (now) => {
@@ -1534,7 +1799,7 @@ function runTo(target) {
     at = from + (target - from) * a;
     show(at);
     if (a < 1) anim = requestAnimationFrame(step);
-    else { anim = null; at = target; armCast(); }
+    else { anim = null; at = target; armCast(); if (done) done(); }
   };
   anim = requestAnimationFrame(step);
 }
@@ -1604,9 +1869,16 @@ function mount() {
     load();
   }
   if (window.IstProfileCard) IstProfileCard.setPage('project');
+  // The map lives at body level (it has to cover both bars), so it is not
+  // swapped out with the content and its wiring is idempotent.
+  wireMap();
 }
 function unmount() {
   stopAnim();
+  // The map is body-level and would otherwise be the last word on a page
+  // that is gone -- along with the body class that dims the bottom bar.
+  closeMap();
+  traveling = false;
   if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
   // The petek leaves two things behind it that live OUTSIDE this page --
   // the depth classes on <html> and the module's own _hive, which every
@@ -1625,6 +1897,272 @@ function unmount() {
     root.style.removeProperty(k);
   }
 }
+
+// ══════════════════════════════════════════════════════════════
+// THE APP MAP -- opened by the logo, and the only thing on the
+// bottom bar that is pressed
+//
+// The compass says where you are. This says where you are IN RELATION
+// TO EVERYWHERE ELSE: the app's five windows drawn in the shape they
+// actually stand in -- the three lanes across the middle, Türkiye
+// hanging off Kütüphane and the ilçe off Kahvehane, because those are
+// the depths those two lanes can reach.
+//
+// A window is a (lane, slide) pair and nothing else, so the map cannot
+// drift from the app: there is no second table of places here, only the
+// five the book and the lane strip already have between them.
+// ══════════════════════════════════════════════════════════════
+const MAP_WINDOWS = [
+  { id: 'ilce',      cell: 'r1c3', lane: LANE_KAHVEHANE, slide: STOPS[2],
+    name: 'İlçen',     map: 'assets/map/istanbul-map-mobile.png', stats: ['kahve', 'yorum'] },
+  { id: 'kutuphane', cell: 'r2c1', lane: LANE_KUTUPHANE, slide: STOPS[1],
+    name: 'Kütüphane', map: 'assets/map/istanbul-map-mobile.png', stats: ['haber', 'olay'] },
+  { id: 'hane',      cell: 'r2c2', lane: LANE_HANE,      slide: STOPS[1],
+    name: 'Hane',      hex: true },
+  { id: 'kahvehane', cell: 'r2c3', lane: LANE_KAHVEHANE, slide: STOPS[1],
+    name: 'Kahvehane', map: 'assets/map/istanbul-map-mobile.png', stats: ['etkinlik', 'oyun'] },
+  { id: 'turkiye',   cell: 'r3c1', lane: LANE_KUTUPHANE, slide: STOPS[0],
+    name: 'Türkiye',   map: 'assets/map/kutuphane-map-mobile.png', stats: ['hikaye', 'bilgi'] },
+];
+
+// What each square counts. A dash is a square whose content is parked
+// (Fikirler, Bilgi) or not lifted out of the parts bin yet -- it still
+// prints, because the shape of a screen should not change on the day its
+// numbers arrive.
+let mapStats = null;      // { key: 'a/b' } once loaded
+let mapBadges = null;     // { windowId: n }
+let mapStatsAt = 0;       // when, so a reopen a minute later is free
+let traveling = false;
+
+function mapWinHTML(w) {
+  const badge = mapBadges && mapBadges[w.id] != null
+    ? '<span class="fb-map-badge">' + mapBadges[w.id] + '</span>' : '';
+  if (w.hex) {
+    // Hane is the petek, so its window is a hexagon rather than a screen
+    // of tiles -- the middle page is the one that is not a page.
+    return '<span class="fb-map-hex"><span><i class="fb-map-figure"></i></span></span>' + badge;
+  }
+  const stats = (w.stats || []).map(k =>
+    '<span class="fb-map-stat">' + ((mapStats && mapStats[k]) || '–') + '</span>').join('');
+  return '<span class="fb-map-hero">' +
+           (w.map ? '<img src="' + w.map + '" alt="" draggable="false">' : '') +
+         '</span>' +
+         '<span class="fb-map-name">' + w.name + '</span>' +
+         (stats ? '<span class="fb-map-stats">' + stats + '</span>' : '') +
+         badge;
+}
+
+// Which window the reader is standing in. The book can rest between
+// stops only while a finger is down, and the map is not openable then,
+// so the nearest stop is the honest answer.
+function mapHere() {
+  let best = null, bestD = Infinity;
+  for (const w of MAP_WINDOWS) {
+    // A lane away is further than any distance within a lane: you cannot
+    // be half in Hane and half in Kütüphane and be counted as either.
+    const d = Math.abs(w.lane - lane) * 1000 + Math.abs(w.slide - at);
+    if (d < bestD) { bestD = d; best = w; }
+  }
+  return best;
+}
+
+function buildMap() {
+  const grid = document.getElementById('fb-map-grid');
+  if (!grid) return;
+  grid.querySelectorAll('.fb-map-win').forEach(n => n.remove());
+  const here = mapHere();
+  for (const w of MAP_WINDOWS) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'fb-map-win at-' + w.cell + (w.hex ? ' hex' : '') +
+                   (w === here ? ' here' : '');
+    el.innerHTML = mapWinHTML(w);
+    if (w === here) {
+      el.setAttribute('aria-current', 'true');
+      el.disabled = true;
+    } else {
+      el.addEventListener('click', () => travelTo(w));
+    }
+    grid.appendChild(el);
+  }
+}
+
+function openMap() {
+  const layer = document.getElementById('fb-map');
+  if (!layer || traveling) return;
+  buildMap();
+  layer.hidden = false;
+  document.body.classList.add('fb-map-on');
+  requestAnimationFrame(() => layer.classList.add('on'));
+  loadMapStats();
+}
+
+function closeMap() {
+  const layer = document.getElementById('fb-map');
+  if (!layer || layer.hidden) return;
+  layer.classList.remove('on');
+  document.body.classList.remove('fb-map-on');
+  const hide = () => { layer.hidden = true; };
+  // Match the CSS fade rather than guessing at it.
+  setTimeout(hide, 240);
+}
+
+function mapIsOpen() {
+  const layer = document.getElementById('fb-map');
+  return !!(layer && !layer.hidden);
+}
+
+// ── Going there is a WALK, not a jump ──
+// The map closes and then the app moves, one transition at a time,
+// through every screen between here and there: down to the lane stop
+// first (the lanes can only be walked from slide 12), then one lane at a
+// time, then out to the target's own depth. So Türkiye to the ilçe is
+// four moves and passes through Hane -- you cannot get from the reading
+// to the doing without walking past the people. That is the whole point
+// of the map being a map and not a menu.
+function travelTo(w) {
+  if (traveling || !ready) return;
+  traveling = true;
+  closeMap();
+  // `at` is a float, so every comparison against a stop is a tolerance --
+  // a strict !== here would leave the walk one imperceptible step short
+  // and never clear `traveling`, which locks the map for the session.
+  const off = (a, b) => Math.abs(a - b) > 0.001;
+  const step = () => {
+    // The lanes can only be walked from the middle depth, so a window on
+    // another lane is reached by coming back to slide 12 first.
+    if (off(at, STOPS[1]) && lane !== w.lane) { runTo(STOPS[1], step); return; }
+    if (lane !== w.lane) { runLane(lane + (w.lane > lane ? 1 : -1), step); return; }
+    if (off(at, w.slide)) { runTo(w.slide, step); return; }
+    traveling = false;
+  };
+  // Let the layer get out of the way before the app starts moving --
+  // the walk is the thing to watch, and it is happening underneath it.
+  setTimeout(step, 260);
+}
+
+// ── The numbers in the squares ──
+// How much of each window's content the reader has actually got through.
+// Every one is best-effort and independent: a query that fails leaves
+// its own square as a dash rather than taking the map down with it.
+async function loadMapStats() {
+  if (mapStats && Date.now() - mapStatsAt < 60000) return;
+  const sb = window.IstRouter && IstRouter.sb;
+  if (!sb) return;
+  const stats = {}, badges = {};
+  let uid = null;
+  try { uid = (await sb.auth.getUser()).data.user.id; } catch (e) {}
+
+  const store = (key) => {
+    try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; }
+  };
+
+  // Haberler: the deck's own two numbers -- what is in the 72h window,
+  // and how much of it this member has already dealt with. Read from the
+  // same localStorage key the deck writes (see kutuphane.html), so the
+  // square cannot disagree with the deck it is counting.
+  const haber = (async () => {
+    const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
+    const { data, error } = await sb.from('breaking_news')
+      .select('id, updated_at').gte('updated_at', cutoff).is('archived_at', null);
+    if (error) throw error;
+    const rows = data || [];
+    // The store keeps each story's updated_at AS THROWN, so a gelişme
+    // puts it back in the deck -- and back into this count. Its first
+    // version was a plain array of ids with no stamp at all; that reads
+    // as "dealt with as it stands", the same reading kutuphane.html's own
+    // reconcileDealt gives it.
+    const raw = uid ? store('dunya_dealt_' + uid) : null;
+    const stampless = Array.isArray(raw) ? new Set(raw.map(String)) : null;
+    const dealt = (!stampless && raw && typeof raw === 'object') ? raw : {};
+    const done = rows.filter(r => stampless
+      ? stampless.has(String(r.id))
+      : dealt[r.id] === r.updated_at).length;
+    stats.haber = done + '/' + rows.length;
+    badges.kutuphane = rows.length - done;
+  })();
+
+  // Olaylar: how many of the ongoing ones the reader has opened at all.
+  const olay = (async () => {
+    const { data, error } = await sb.from('world_events')
+      .select('id').eq('status', 'ongoing');
+    if (error) throw error;
+    const rows = data || [];
+    const started = uid
+      ? rows.filter(r => store('olay_progress_' + uid + '_' + r.id) != null).length : 0;
+    stats.olay = started + '/' + rows.length;
+  })();
+
+  // Etkinlikler: what is still to come. A count rather than a fraction --
+  // an evening is not content to get through, it is somewhere to be.
+  const etkinlik = (async () => {
+    const { data, error } = await sb.from('events')
+      .select('id').gte('event_date', new Date().toISOString());
+    if (error) throw error;
+    const n = (data || []).length;
+    stats.etkinlik = n ? '+' + n : '0';
+    badges.kahvehane = (badges.kahvehane || 0) + n;
+  })();
+
+  // Oyunlar: today's sequence. A game the admin switched off is on
+  // neither side of the fraction -- it is not a step anybody has left to
+  // take (see game_day_toggles in CLAUDE.md).
+  const oyun = (async () => {
+    // Two different date keys, deliberately: game_day_toggles is keyed by
+    // the Istanbul ISO date and game_results by IstDate.daySeed(). Both go
+    // through ist-date.js, never a parsed locale string (CLAUDE.md rule 10).
+    const all = ['sozcel', 'tumcel', 'bulmaca'];
+    const off = await sb.from('game_day_toggles').select('game')
+      .eq('game_date', IstDate.iso());
+    const disabled = new Set(((off.data) || []).map(r => r.game));
+    const on = all.filter(g => !disabled.has(g));
+    let played = 0;
+    if (uid && on.length) {
+      const res = await sb.from('game_results')
+        .select('game, attempts').eq('user_id', uid).eq('date', IstDate.daySeed());
+      // PLAYED means finished. Every game writes an attempts:0 row on the
+      // reader's first interaction, so counting rows would call a game
+      // still being played done -- the same rule Kahvehane's deck uses.
+      const done = new Set(((res.data) || [])
+        .filter(r => (r.attempts || 0) >= 1).map(r => r.game));
+      played = on.filter(g => done.has(g)).length;
+    }
+    stats.oyun = played + '/' + on.length;
+    badges.kahvehane = (badges.kahvehane || 0) + (on.length - played);
+  })();
+
+  await Promise.allSettled([haber, olay, etkinlik, oyun]);
+  mapStats = stats;
+  mapBadges = badges;
+  mapStatsAt = Date.now();
+  // Only redraw if the map is still up: the reader may have gone.
+  if (mapIsOpen()) buildMap();
+}
+
+function wireMap() {
+  const btn = document.getElementById('fb-logo-btn');
+  const scrim = document.getElementById('fb-map-scrim');
+  if (btn && !btn.dataset.wired) {
+    btn.dataset.wired = '1';
+    // The logo is a switch, not a door: it opens the map and it closes
+    // it again, which is why it stays lit while the map is up.
+    btn.addEventListener('click', () => { mapIsOpen() ? closeMap() : openMap(); });
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
+    });
+  }
+  if (scrim && !scrim.dataset.wired) {
+    scrim.dataset.wired = '1';
+    scrim.addEventListener('click', closeMap);
+  }
+  if (!document.body.dataset.fbMapEsc) {
+    document.body.dataset.fbMapEsc = '1';
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && mapIsOpen()) closeMap();
+    });
+  }
+}
+
 IstRouter.registerPage('project', { mount, unmount });
 
 if (!window.__istVirtualNavInjecting) {
