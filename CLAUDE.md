@@ -1519,8 +1519,8 @@ fractional `font-weight` re-measures the type every frame and the bar would jitt
 under the finger, so the ink is continuous and the weight steps once, on the lane the reader
 lands on.
 
-**One thing on that bar IS pressed, and it is the logo** — bigger than the two words, standing
-proud of the bar's top edge because everything else there is printed *on* the bar and this is the
+**One thing on that bar IS pressed, and it is the logo** — bigger than the two words, resting
+below the bar's bottom edge because everything else there is printed *on* the bar and this is the
 one thing that comes off it. It opens **the app map**, and it is a switch rather than a door: it
 stays lit while the map is up, because it is also the way back out (the same move Kütüphane's
 Olaylar box makes). `nav` still takes no pointer events at all — only this one mark opts back in,
