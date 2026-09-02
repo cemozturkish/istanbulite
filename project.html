@@ -746,6 +746,34 @@
       height: 100%;
       border: none;
     }
+    /* Two paper pages, not a fade -- the entrance the book itself uses
+       nowhere else, because nowhere else opens a real separate page. The
+       iframe underneath is already loading at its true, untouched full
+       size the whole time (its own layoutGame() must never measure a
+       transformed box), so these are purely a cover: one descends from
+       above to where the word board sits, one rises from below to where
+       the keyboard sits, and once they've met at the middle -- and the
+       game has actually loaded -- they get out of the way instead of
+       staying on as a second frame around it. */
+    .fb-game-curtain {
+      position: absolute;
+      left: 0; right: 0;
+      height: 50%;
+      background: var(--paper, #f4f1ec);
+      transition: transform 0.42s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+    }
+    .fb-game-curtain-top {
+      top: 0;
+      transform: translateY(-100%);
+      border-bottom: 2px solid var(--ink, #17140f);
+    }
+    .fb-game-curtain-bottom {
+      bottom: 0;
+      transform: translateY(100%);
+      border-top: 2px solid var(--ink, #17140f);
+    }
+    #fb-game-overlay.in .fb-game-curtain { transform: translateY(0); }
+    #fb-game-overlay.gone .fb-game-curtain { opacity: 0; pointer-events: none; }
   </style>
 </head>
 <body data-page="project">
@@ -805,9 +833,12 @@
 
 <!-- ── THE GAME OVERLAY ──
      Sözcel opens here instead of navigating away -- see wireGameOverlay
-     and the CSS block above. -->
+     and the CSS block above. The two curtains are decoration only: the
+     iframe is the one live thing in here. -->
 <div id="fb-game-overlay" hidden>
   <iframe id="fb-game-frame" title="Oyun"></iframe>
+  <div class="fb-game-curtain fb-game-curtain-top"></div>
+  <div class="fb-game-curtain fb-game-curtain-bottom"></div>
 </div>
 
 <script>
@@ -2045,6 +2076,7 @@ let mapBadges = null;     // { windowId: n }
 let mapStatsAt = 0;       // when, so a reopen a minute later is free
 let traveling = false;
 let mapHideTimer = null;  // the pending hide of a fading-out layer
+let gameOverlayTimer = null; // the pending reveal of the game curtains
 
 // ── The middle window is the reader's OWN hexagon ──
 // Not a drawing of one: the actual cell out of the petek, cloned. Hane's
@@ -2204,17 +2236,37 @@ function openGameOverlay(href) {
   const layer = document.getElementById('fb-game-overlay');
   const frame = document.getElementById('fb-game-frame');
   if (!layer || !frame) return;
-  frame.src = href;
+  if (gameOverlayTimer) { clearTimeout(gameOverlayTimer); gameOverlayTimer = null; }
+  // Back to the curtains' resting, off-screen state before the next
+  // frame flips them in -- the same trap IstSheet.open documents: a
+  // previous close's pending reveal must not land on this opening.
+  layer.classList.remove('in', 'gone');
   layer.hidden = false;
+  // The curtains meet at the middle on a fixed clock; the reveal behind
+  // them waits on BOTH that and the iframe's own load, so a slow load
+  // never uncovers a blank page and a fast one never looks rushed.
+  let slid = false, loaded = false;
+  const reveal = () => { if (slid && loaded) layer.classList.add('gone'); };
+  frame.onload = () => { loaded = true; reveal(); };
+  frame.src = href;
+  requestAnimationFrame(() => {
+    layer.classList.add('in');
+    gameOverlayTimer = setTimeout(() => {
+      gameOverlayTimer = null;
+      slid = true; reveal();
+    }, 420);
+  });
 }
 function closeGameOverlay() {
   const layer = document.getElementById('fb-game-overlay');
   const frame = document.getElementById('fb-game-frame');
   if (!layer || layer.hidden) return;
+  if (gameOverlayTimer) { clearTimeout(gameOverlayTimer); gameOverlayTimer = null; }
   layer.hidden = true;
+  layer.classList.remove('in', 'gone');
   // Unloads the game rather than leaving it running behind the layer, so
   // the next open is a fresh start rather than wherever it was left.
-  if (frame) frame.src = 'about:blank';
+  if (frame) { frame.onload = null; frame.src = 'about:blank'; }
   // A game just played may have moved the Oyunlar square -- let the next
   // map open re-fetch it rather than show a stale count.
   mapStatsAt = 0;
