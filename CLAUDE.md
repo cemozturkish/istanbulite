@@ -1696,7 +1696,12 @@ start.
 **It stands in the exact room the map and the band already fill on every other page, not edge to
 edge.** The two bars stay up throughout (see "THE TWO BARS ARE OMNIPRESENT"): the overlay's own
 top is `--map-hero-top` and its bottom clears `--navbar-h`, the same two measurements every other
-page's map and band are built from — not a guessed fraction of the screen, the same box.
+page's map and band are built from — not a guessed fraction of the screen, the same box. Its
+z-index sits *under* the bars' own 400/401 (frames.css), the one place on the site content
+deliberately stacks below them rather than stopping flush against them: the profile bar's real
+height is taller than `--map-hero-top` by design (it already floats over the top sliver of the
+map on every page), so the overlay's own top edge sits a little way under it — and that sliver is
+what lets the entrance curtains read as sliding out from *behind* the bars rather than over them.
 
 **The opening is two paper pages, not a fade.** The iframe loads at its true, untouched full size
 the whole time (`sozcel.html`'s own `layoutGame()` must never measure a transformed box), and two
