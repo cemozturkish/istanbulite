@@ -2046,7 +2046,7 @@ function unmount() {
   // be the last word on a page that is gone -- along with the body class
   // that dims the bottom bar.
   closeMap();
-  closeGameOverlay();
+  closeGameOverlay(true);
   traveling = false;
   if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
   // The petek leaves two things behind it that live OUTSIDE this page --
@@ -2103,7 +2103,7 @@ let mapBadges = null;     // { windowId: n }
 let mapStatsAt = 0;       // when, so a reopen a minute later is free
 let traveling = false;
 let mapHideTimer = null;  // the pending hide of a fading-out layer
-let gameOverlayTimer = null; // the pending reveal of the game curtains
+let gameOverlayTimer = null; // the pending reveal/re-cover of the game curtains
 
 // ── The middle window is the reader's OWN hexagon ──
 // Not a drawing of one: the actual cell out of the petek, cloned. Hane's
@@ -2285,19 +2285,36 @@ function openGameOverlay(href) {
     }, 550);
   });
 }
-function closeGameOverlay() {
+function closeGameOverlay(immediate) {
   const layer = document.getElementById('fb-game-overlay');
   const frame = document.getElementById('fb-game-frame');
   if (!layer || layer.hidden) return;
   if (gameOverlayTimer) { clearTimeout(gameOverlayTimer); gameOverlayTimer = null; }
-  layer.hidden = true;
-  layer.classList.remove('in', 'gone');
-  // Unloads the game rather than leaving it running behind the layer, so
-  // the next open is a fresh start rather than wherever it was left.
-  if (frame) { frame.onload = null; frame.src = 'about:blank'; }
-  // A game just played may have moved the Oyunlar square -- let the next
-  // map open re-fetch it rather than show a stale count.
-  mapStatsAt = 0;
+  const finish = () => {
+    layer.hidden = true;
+    layer.classList.remove('in', 'gone');
+    // Unloads the game rather than leaving it running behind the layer, so
+    // the next open is a fresh start rather than wherever it was left.
+    if (frame) { frame.onload = null; frame.src = 'about:blank'; }
+    // A game just played may have moved the Oyunlar square -- let the next
+    // map open re-fetch it rather than show a stale count.
+    mapStatsAt = 0;
+  };
+  // A teardown (leaving project.html itself, unmount()) has nothing left
+  // to animate in front of, so it skips straight to `finish`. Every other
+  // close -- the back arrow -- leaves the way it arrived, reversed: the
+  // curtains close back over the game first, the same "never a snap" rule
+  // THE sheet's own close follows (sheet.js drops .open and only hides
+  // after the slide finishes) -- and only once they've met does the layer
+  // actually come down. Before this it was a bare `hidden = true`: the
+  // game vanished and the book was back in the same frame, the one
+  // surface on the site that closed with no motion at all.
+  if (immediate) { finish(); return; }
+  layer.classList.remove('gone');
+  gameOverlayTimer = setTimeout(() => {
+    gameOverlayTimer = null;
+    finish();
+  }, 300); // .fb-game-curtain's own opacity transition
 }
 function wireGameOverlay() {
   if (document.body.dataset.fbGameWired) return;

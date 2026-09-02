@@ -1712,6 +1712,15 @@ sheet's own slide (`sheet.css`), so this reads as the same object opening a diff
 than a second transition language. They only lift once BOTH that slide has finished and the iframe
 has actually fired `load`, so a slow load is never uncovered early and a fast one is never rushed.
 
+**Leaving reverses it, rather than snapping.** The back arrow's `postMessage` used to hide the
+layer outright — `hidden = true` in the same tick, the game gone and the book back in one frame,
+the one surface on the site that closed with no motion at all (every other one, THE sheet included,
+drops its open state and only hides once its own transition has actually finished). Pressing it now
+brings the curtains back over the game first — the same fade `.gone` already does in reverse, 0.3s —
+and only once they've met does the layer come down (`closeGameOverlay()`). A teardown of the page
+itself (`unmount()`, leaving project.html) has nothing left to animate in front of and skips straight
+to hidden (`closeGameOverlay(true)`).
+
 Visiting one of the three directly still works exactly as before — the
 `<a href="project.html">` fallback is what fires when there is no parent to postMessage — and
 their own bottom-bar link and back arrow still point at `project.html` for that case. Tümcel and
