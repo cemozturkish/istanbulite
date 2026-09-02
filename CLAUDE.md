@@ -1650,7 +1650,12 @@ Seven things about it:
 - **The petek is built on arrival, never on the pull.** Mounting is a round trip to `hive_map()`,
   and a reveal that waits on the network has a blank beat in it. Every arrival on slide 12
   re-mounts (somebody else's attachment may have carried the petek somewhere) — but never while it
-  is standing, which would pull the drawing out from under the reader.
+  is standing, which would pull the drawing out from under the reader. **An EMPTY petek is the exception**,
+  and it has to be: `ensurePetek` answers whether it actually settled the arrival and `petekBuilt`
+  latches on that answer, never on having made the call. Arriving on Hane through the app map walks
+  the book first and the lane second, and `framePos` lags `at` — so `atLaneStop` comes true a beat
+  later, by which time the lane is already Hane, and a latch set before the call spent that
+  arrival's one chance to mount on a call that declined. The reader landed on a blank Hane.
 - **A press inside a standing petek is the petek's**, and is deliberately not *captured*: capture
   would re-target every following event at the book's own box and kill the petek's handlers
   outright. Only a horizontal drag is the book's, and horizontal is exactly what
