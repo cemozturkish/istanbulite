@@ -1691,7 +1691,12 @@ own (now parked) game deck used, and the game pages already carry both halves of
 their back arrow into a `postMessage('ist-close-game-overlay', …)` instead of a navigation, which
 `wireGameOverlay()` in project.html listens for to close the layer. A page opened this way is torn
 down on close (`frame.src = 'about:blank'`) rather than kept alive behind the layer, so the next
-open is a fresh start. Visiting one of the three directly still works exactly as before — the
+open is a fresh start. **The opening is two paper pages, not a fade** — the iframe loads at its
+true, untouched full size the whole time (`sozcel.html`'s own `layoutGame()` must never measure a
+transformed box), and two decorative curtains cover it: one descending from above to where the
+word board sits, one rising from below to where the keyboard sits, meeting at the middle. They
+only lift once BOTH that slide has finished and the iframe has actually fired `load`, so a slow
+load is never uncovered early and a fast one is never rushed. Visiting one of the three directly still works exactly as before — the
 `<a href="project.html">` fallback is what fires when there is no parent to postMessage — and
 their own bottom-bar link and back arrow still point at `project.html` for that case. Tümcel and
 Bulmaca are not tiles yet (see "What of this is already standing in `project.html`" above), but
