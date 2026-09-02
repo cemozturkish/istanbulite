@@ -1616,6 +1616,14 @@ count, never a spinner.
 own furniture — and `CAST` in project.html is where each one is declared: an element, the stop it
 belongs to (`live`), and a pose per slide. Three rules make them work:
 
+- **An actor's shape is a word, not a stylesheet.** The drawing gives the app exactly two
+  buttons — a wide **row** in the left column and a small **square** in the right one — so an
+  actor declares `shape: 'row' | 'sq'` beside its `live` and `lane`, and `.fb-row` / `.fb-sq`
+  state the geometry once for both lanes. An actor's own class (`fb-events`, `fb-sozcel`) says
+  what it is OF and never how big it is. A square is genuinely square (`aspect-ratio: 1`),
+  which is why its side is derived from the line's one split (`--fb-row-w`) rather than
+  written down twice. A lane that restated the geometry would land its cards a few pixels off
+  the lane before it, and the walk between them would read as the page reflowing.
 - **An actor belongs to one stop and one lane, not to the book.** It is alive only while the book
   is *resting* on that stop and the reader is standing on that lane — not mid-drag, not
   mid-run-out, not on a different stop, and not a lane along (`armCast`). Events and Sözcel are
