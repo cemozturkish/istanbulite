@@ -1681,10 +1681,21 @@ same reason `goto()` sets the lane from the slide it is given. The entry frame i
 fetched **alone** ahead of the rest, since that is the drawing that has to be up before anything
 else has arrived.
 
-**The three games are the one thing still on a page of their own** — `sozcel.html`, `tumcel.html`
-and `bulmaca.html` are real navigations off the Sözcel tile, and their way back is the book: both
-their bottom bar and their back arrow point at `project.html`. They are fullscreen boards rather
-than screens in the carousel, which is why they were never carousel pages either.
+**The three games are still pages of their own, but the book never actually leaves for one.**
+`sozcel.html`, `tumcel.html` and `bulmaca.html` are real, otherwise-unmodified pages — fullscreen
+boards, which is why they were never carousel pages — but the Sözcel tile opens its page inside a
+full-bleed iframe (`#fb-game-overlay` / `#fb-game-frame`) laid over the whole book rather than
+navigating to it: no reload, no lost place in the flip. This is the same trick `kahvehane.html`'s
+own (now parked) game deck used, and the game pages already carry both halves of it unchanged —
+`window.self !== window.top` hides their own nav/columns behind `body.embedded-game` and turns
+their back arrow into a `postMessage('ist-close-game-overlay', …)` instead of a navigation, which
+`wireGameOverlay()` in project.html listens for to close the layer. A page opened this way is torn
+down on close (`frame.src = 'about:blank'`) rather than kept alive behind the layer, so the next
+open is a fresh start. Visiting one of the three directly still works exactly as before — the
+`<a href="project.html">` fallback is what fires when there is no parent to postMessage — and
+their own bottom-bar link and back arrow still point at `project.html` for that case. Tümcel and
+Bulmaca are not tiles yet (see "What of this is already standing in `project.html`" above), but
+carry the same embed support already, ready for whenever they are wired in the same way.
 
 **The first frame is fetched alone, and that is the whole of why the page feels quick.** Every frame
 has to be decoded before the book can reach it — an `<img>` whose bytes are not ready paints
