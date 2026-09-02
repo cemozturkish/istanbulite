@@ -615,6 +615,51 @@
       font-variant-numeric: tabular-nums;
       line-height: 1;
     }
+    /* ── The middle window is the reader's own hexagon ──
+       The cell is cloned out of the petek, so everything about how it
+       looks -- the drawn ring, the mask, the avatar, the badges -- is the
+       petek's own and there is no second version to keep in step. What
+       has to be undone is only its PLACE: in the petek it is absolutely
+       positioned on the plane by calc() against the packing's own step,
+       and here it simply fills the window. */
+    .fb-map-hex-slot { display: block; width: 100%; }
+    .fb-map-hex-slot .ist-hive-cell {
+      position: static;
+      width: 100%;
+      opacity: 1 !important;   /* the petek's own cells are being faded out */
+      transform: none;
+    }
+    /* Standing on Hane the window is pinned over the real cell, measured,
+       so opening the map changes nothing about where the reader's own
+       hexagon is -- only that everybody else has gone. */
+    .fb-map-win.pinned {
+      /* FIXED, not absolute. The rect is measured off the real cell in
+         viewport coordinates, and every other window is placed inside the
+         grid, which is inset by both bars -- left in that frame the pin
+         lands exactly the grid's own inset away from the hexagon it is
+         supposed to be standing on. */
+      position: fixed;
+      transform: none;
+      aspect-ratio: auto;
+      padding: 0;
+      border: none;
+      background: none;
+    }
+    .fb-map-win.pinned:active { transform: none; }
+    /* Red for "you are here" is the RING going red, which is what red on a
+       hexagon already means everywhere else in the petek (see the bar
+       member in profile-card.css) -- not a box drawn around it. */
+    .fb-map-win.here .ist-hive-frame { --hexframe-stroke: var(--fb-map-red); }
+
+    /* ── While the map is up, the petek is only the reader ──
+       Everybody else fades out under the wash and the reader's own cell
+       goes with them, because the pinned clone above is standing exactly
+       where it was. What the reader sees is the people leaving and
+       themselves staying put. */
+    body.fb-map-on #po-hive-mount .ist-hive-cell,
+    body.fb-map-on #po-hive-mount .ist-hive-name,
+    body.fb-map-on #po-hive-mount .ist-hive-stat { opacity: 0; }
+
     /* What is waiting there, in the corner a badge goes. */
     .fb-map-badge {
       position: absolute;
@@ -1945,12 +1990,53 @@ let mapBadges = null;     // { windowId: n }
 let mapStatsAt = 0;       // when, so a reopen a minute later is free
 let traveling = false;
 
+// ── The middle window is the reader's OWN hexagon ──
+// Not a drawing of one: the actual cell out of the petek, cloned. Hane's
+// window is the reader's profile, and that already exists at the petek's
+// middle depth -- building a second version of it here would be a second
+// thing to keep in step with the avatar, the badges and the ring.
+function mapMeCell() {
+  const me = document.querySelector('#po-hive-mount .ist-hive-cell[data-me]');
+  if (!me) return null;
+  const clone = me.cloneNode(true);
+  // Every id in there is a live handle somewhere else -- #po-avatar-preview
+  // is what the four avatar carousels replace on an arrow press, and the
+  // claim field is what a code is typed into. A second copy carrying them
+  // would steal both.
+  clone.removeAttribute('id');
+  clone.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+  clone.removeAttribute('data-me');
+  clone.classList.remove('ist-hive-cell-open');
+  clone.classList.add('fb-map-me');
+  // A picture of the hexagon, not a second button: it must not answer a
+  // press, and it must not be a second tab stop for the same cell.
+  clone.disabled = true;
+  clone.setAttribute('aria-hidden', 'true');
+  clone.querySelectorAll('.ist-hive-claim-in').forEach(n => n.remove());
+  return clone;
+}
+
+// Whether the petek is actually standing on screen behind the layer. If
+// it is, the middle window is pinned over the reader's own cell and the
+// rest of the petek fades out under the wash -- so opening the map reads
+// as everybody else leaving and the reader staying exactly where they
+// were, rather than as a new drawing arriving over the old one.
+function petekOnScreen() {
+  const me = document.querySelector('#po-hive-mount .ist-hive-cell[data-me]');
+  if (!me || !box || !box.classList.contains('petek-open')) return null;
+  const r = me.getBoundingClientRect();
+  return (r.width > 8 && r.height > 8) ? r : null;
+}
+
 function mapWinHTML(w) {
   const badge = mapBadges && mapBadges[w.id] != null
     ? '<span class="fb-map-badge">' + mapBadges[w.id] + '</span>' : '';
   if (w.hex) {
     // Hane is the petek, so its window is a hexagon rather than a screen
-    // of tiles -- the middle page is the one that is not a page.
+    // of tiles -- the middle page is the one that is not a page. The
+    // reader's own cell is dropped in afterwards, in buildMap; this is
+    // only the fallback for a petek that has never been mounted (the
+    // reader has not reached slide 12 yet).
     return '<span class="fb-map-hex"><span><i class="fb-map-figure"></i></span></span>' + badge;
   }
   const stats = (w.stats || []).map(k =>
@@ -1988,6 +2074,31 @@ function buildMap() {
     el.className = 'fb-map-win at-' + w.cell + (w.hex ? ' hex' : '') +
                    (w === here ? ' here' : '');
     el.innerHTML = mapWinHTML(w);
+    if (w.hex) {
+      const me = mapMeCell();
+      if (me) {
+        el.innerHTML = '';
+        const slot = document.createElement('span');
+        slot.className = 'fb-map-hex-slot';
+        slot.appendChild(me);
+        el.appendChild(slot);
+        el.innerHTML += mapBadges && mapBadges[w.id] != null
+          ? '<span class="fb-map-badge">' + mapBadges[w.id] + '</span>' : '';
+        // Standing on Hane, the cell is pinned exactly over the real one,
+        // so the only thing that changes on screen is that everybody else
+        // goes. The pin is a measurement rather than a guess: the petek is
+        // fitted to its window and nothing here can predict where that put
+        // the reader.
+        const r = petekOnScreen();
+        if (r) {
+          el.classList.add('pinned');
+          el.style.left = r.left + 'px';
+          el.style.top = r.top + 'px';
+          el.style.width = r.width + 'px';
+          el.style.height = r.height + 'px';
+        }
+      }
+    }
     if (w === here) {
       el.setAttribute('aria-current', 'true');
       el.disabled = true;
