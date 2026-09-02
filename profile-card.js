@@ -2203,6 +2203,26 @@
     state.hiveWaveTimer = setTimeout(() => page.classList.remove('ist-hive-wave-in'), 1600);
   }
 
+  // The mount's own first paint (see loadHive): rather than the whole
+  // grid fading in as one rectangle, the reader's own hexagon (--ring: 0)
+  // draws in first and the ring touching them follows a beat behind it
+  // (.ist-hive-reveal in profile-card.css). Starting the opacity:0 state
+  // and the transition to opacity:1 in the same class add would collapse
+  // both into one style pass and leave nothing for the transition to
+  // interpolate from — the same reason IstSheet.open reads a style back
+  // before its own .open class lands — so the two are split across a
+  // forced reflow and the next frame.
+  function hiveRevealFirst(state, page) {
+    page.classList.add('ist-hive-reveal');
+    void page.offsetWidth;
+    requestAnimationFrame(() => page.classList.add('ist-hive-reveal-in'));
+    clearTimeout(state.hiveRevealTimer);
+    // Only rings 0 and 1 are ever on screen at the depth a mount arrives
+    // at, so the whole stagger is done well inside this — it exists so a
+    // reader who swipes straight back out doesn't leave the classes on.
+    state.hiveRevealTimer = setTimeout(() => page.classList.remove('ist-hive-reveal', 'ist-hive-reveal-in'), 700);
+  }
+
   // ── Pressing a member ──
   // One member is named on the bar at a time, and pressing the one that
   // is already named puts your own name back — the same toggle every
@@ -2530,12 +2550,21 @@
     // Kept for the next mount of this page, so a swipe back to Hane
     // draws the petek it left rather than the reader alone for a beat.
     _hiveMap = state.hive;
+    // ist-hive-waiting is only ever on when this mount had nothing
+    // cached to start from (see mountHivePage) -- that is the one draw
+    // that is arriving from genuinely nothing, and the one that gets the
+    // staggered reveal below rather than the plain instant redraw every
+    // other render of this grid has always had.
+    const page = document.getElementById('po-hive-page');
+    const firstDraw = !!(page && page.classList.contains('ist-hive-waiting'));
     renderHive(state);
     // Whatever came back -- rows, an empty map, or nothing at all
     // because the migration hasn't been run -- the drawing is what the
     // reader is here for, so it is shown now.
-    const page = document.getElementById('po-hive-page');
-    if (page) page.classList.remove('ist-hive-waiting');
+    if (page) {
+      page.classList.remove('ist-hive-waiting');
+      if (firstDraw) hiveRevealFirst(state, page);
+    }
     // The drawing does not wait for it: the grid is the page, and where
     // everybody stands in their day is a caption on it. It lands on its
     // own and re-renders (see loadHiveStatus).

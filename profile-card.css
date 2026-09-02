@@ -709,10 +709,29 @@
    sides -- a shape several times the size of the real one, since the fit
    quite correctly fills the window with whatever it was handed -- and
    the page visibly collapses into itself a moment later. Blank paper for
-   that beat is not a lie; a wrong drawing is. The fade is on the way IN
-   only, so the honeycomb arrives rather than appearing. */
-.ist-hive { transition: opacity 200ms ease; }
-.ist-hive-page.ist-hive-waiting .ist-hive { opacity: 0; transition: none; }
+   that beat is not a lie; a wrong drawing is. */
+.ist-hive-page.ist-hive-waiting .ist-hive { opacity: 0; }
+/* The container itself never fades -- what arrives is the drawing, cell
+   by cell (see .ist-hive-reveal below), not a rectangle of it. */
+.ist-hive { transition: none; }
+/* The first paint of a mount that had no petek to start from (see
+   ist-hive-waiting above) draws itself in ring by ring rather than
+   arriving as one block: the reader's own hexagon (--ring: 0) first,
+   the ring touching them a beat behind it. Toggled once by
+   hiveRevealFirst in profile-card.js, right after loadHive's fetch
+   lands -- a level change, a status caption arriving, or a swipe back
+   to an already-cached petek re-renders the same cells without it, so
+   the stagger never repeats mid-session. Excludes cells the level
+   itself already keeps hidden (.ist-hive-away) -- without that a ring
+   past the reader's own would be forced briefly visible by this rule's
+   own specificity and then snap back out when the class comes off. */
+.ist-hive-page.ist-hive-reveal .ist-hive-cell {
+  opacity: 0;
+  transition: opacity 260ms ease;
+  transition-delay: calc(var(--ring, 0) * 160ms); /* fallback: no min() on times */
+  transition-delay: min(calc(var(--ring, 0) * 160ms), 320ms);
+}
+.ist-hive-page.ist-hive-reveal.ist-hive-reveal-in .ist-hive-cell:not(.ist-hive-away) { opacity: 1; }
 .ist-hive-pannable { cursor: grab; touch-action: none; }
 .ist-hive-pannable:active { cursor: grabbing; }
 /* The drawing itself. Hung off the middle of the window by the caller's
@@ -1328,6 +1347,11 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.955); }
   .ist-hive-plane, .ist-hive-cell, .ist-hive-name,
   .ist-hive-plus, .ist-hive-self, .ist-hive-rail-dot { transition: none; }
   .ist-hive-page.ist-hive-wave-in .ist-hive-cell { transition-delay: 0s; }
+  /* .ist-hive-reveal sets its own transition (not just a delay, see
+     above), so it needs its own override here rather than inheriting
+     the plain .ist-hive-cell reset two lines up -- same specificity,
+     declared later, wins the same way. */
+  .ist-hive-page.ist-hive-reveal .ist-hive-cell { transition: none; }
 }
 
 /* ── Weekly game grid ── 3 rows (Sözcel/Tümcel/Bulmaca) × 7 days
