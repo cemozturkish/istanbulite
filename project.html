@@ -722,6 +722,30 @@
       pointer-events: none;
       z-index: 1;
     }
+
+    /* ── THE GAME OVERLAY ──
+       Sözcel is still a real, unmodified page (sozcel.html) -- it needs
+       the room a "fullscreen board" needs (see CLAUDE.md) -- but pressing
+       its tile must not leave the book behind: no reload, no flash, no
+       lost place in the flip. So it renders inside an iframe laid full
+       bleed over everything, the same trick kahvehane.html's own now-
+       parked game deck used. sozcel.html already knows how to be embedded
+       (it checks `window.self !== window.top` and posts a close message
+       instead of navigating its own back arrow); nothing there had to
+       change. */
+    #fb-game-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 700;        /* over the map (600) and its dimmed header (610) */
+      background: var(--paper, #f4f1ec);
+    }
+    #fb-game-overlay[hidden] { display: none; }
+    #fb-game-frame {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
   </style>
 </head>
 <body data-page="project">
@@ -777,6 +801,13 @@
     <span class="fb-map-wire v w-ku-tr"></span>
     <span class="fb-map-wire v w-kah-ilce"></span>
   </div>
+</div>
+
+<!-- ── THE GAME OVERLAY ──
+     Sözcel opens here instead of navigating away -- see wireGameOverlay
+     and the CSS block above. -->
+<div id="fb-game-overlay" hidden>
+  <iframe id="fb-game-frame" title="Oyun"></iframe>
 </div>
 
 <script>
@@ -996,7 +1027,9 @@ const CAST = [
     // convention Kahvehane's square tiles use -- so the line under it
     // says what the game IS rather than repeating the name.
     html: '<img src="assets/sozcel-logo.png" alt="Sözcel"/><div class="n">Türkçe Wordle</div>',
-    onpress() { window.location.href = 'sozcel.html'; },
+    // Opens in place -- see "THE GAME OVERLAY" -- rather than navigating
+    // the book away.
+    onpress() { openGameOverlay('sozcel.html'); },
     // The mirror of events: in from the right, home on slide 12, out to
     // the right again, on the same timings and the same lag, so the
     // pair travels as a pair. Give them different `lag` values instead
@@ -1943,15 +1976,19 @@ function mount() {
     load();
   }
   if (window.IstProfileCard) IstProfileCard.setPage('project');
-  // The map lives at body level (it has to cover both bars), so it is not
-  // swapped out with the content and its wiring is idempotent.
+  // The map and the game overlay both live at body level (they have to
+  // cover both bars), so neither is swapped out with the content and
+  // both wirings are idempotent.
   wireMap();
+  wireGameOverlay();
 }
 function unmount() {
   stopAnim();
-  // The map is body-level and would otherwise be the last word on a page
-  // that is gone -- along with the body class that dims the bottom bar.
+  // The map and the game overlay are both body-level and would otherwise
+  // be the last word on a page that is gone -- along with the body class
+  // that dims the bottom bar.
   closeMap();
+  closeGameOverlay();
   traveling = false;
   if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
   // The petek leaves two things behind it that live OUTSIDE this page --
@@ -2158,6 +2195,41 @@ function closeMap() {
 function mapIsOpen() {
   const layer = document.getElementById('fb-map');
   return !!(layer && !layer.hidden);
+}
+
+// ── THE GAME OVERLAY ──
+// See the CSS block for why: a real page, an iframe rather than a swap,
+// so nothing about sozcel.html changes.
+function openGameOverlay(href) {
+  const layer = document.getElementById('fb-game-overlay');
+  const frame = document.getElementById('fb-game-frame');
+  if (!layer || !frame) return;
+  frame.src = href;
+  layer.hidden = false;
+}
+function closeGameOverlay() {
+  const layer = document.getElementById('fb-game-overlay');
+  const frame = document.getElementById('fb-game-frame');
+  if (!layer || layer.hidden) return;
+  layer.hidden = true;
+  // Unloads the game rather than leaving it running behind the layer, so
+  // the next open is a fresh start rather than wherever it was left.
+  if (frame) frame.src = 'about:blank';
+  // A game just played may have moved the Oyunlar square -- let the next
+  // map open re-fetch it rather than show a stale count.
+  mapStatsAt = 0;
+}
+function wireGameOverlay() {
+  if (document.body.dataset.fbGameWired) return;
+  document.body.dataset.fbGameWired = '1';
+  // sozcel.html's own back arrow posts this instead of navigating its
+  // iframe when it detects it is embedded (window.self !== window.top).
+  window.addEventListener('message', (e) => {
+    const frame = document.getElementById('fb-game-frame');
+    if (frame && e.source === frame.contentWindow && e.data === 'ist-close-game-overlay') {
+      closeGameOverlay();
+    }
+  });
 }
 
 // ── Going there is a WALK, not a jump ──
