@@ -1590,9 +1590,13 @@ Seven things about it:
   `<html>` and the module's `_hive` both outlive the swapped content, and left behind they are the
   last word on a page that is gone.
 
-The reader **starts on Kütüphane**, because the book starts on slide 1 and slide 1 is Türkiye: the
-lane and the depth have to agree, or the first pull down is one the lane forbids. For the same
-reason `goto()` sets the lane from the slide it is given.
+The reader **starts on Hane, slide 12** (`START_SLIDE` / `START_LANE`) — the middle stop and the
+middle lane. It is the app's own rule applied to the book: you always enter in the middle and swipe
+out from there, so the petek is the door and Türkiye is one pull away rather than the doorstep. The
+lane and the depth have to agree, or the first pull down would be one the lane forbids — and for the
+same reason `goto()` sets the lane from the slide it is given. The entry frame is also the one
+fetched **alone** ahead of the rest, since that is the drawing that has to be up before anything
+else has arrived.
 
 **The three games are the one thing still on a page of their own** — `sozcel.html`, `tumcel.html`
 and `bulmaca.html` are real navigations off the Sözcel tile, and their way back is the book: both
