@@ -1462,7 +1462,7 @@ function armCast() {
   // waits on a round trip. Once per arrival, and only once the book has
   // stopped.
   if (!atLaneStop) petekBuilt = false;
-  else if (!petekBuilt && !drag && !anim) { petekBuilt = true; ensurePetek(); }
+  else if (!petekBuilt && !drag && !anim) { petekBuilt = ensurePetek(); }
 }
 
 // Showing a frame is one class swap. Nothing else touches the DOM
@@ -1742,15 +1742,33 @@ function runLane(to, done) {
 // carried this whole petek somewhere since it was last drawn -- the
 // same rule Hane follows. Not while it is standing, though: that would
 // pull the drawing out from under the reader.
+// Answers whether it actually mounted, and the caller latches on that
+// rather than on having called it: this function is allowed to decline,
+// and a latch set before the call spends the one arrival that had a
+// chance of building the petek on a call that did nothing.
 function ensurePetek() {
-  if (lanePresence(LANE_HANE) > 0) return;
-  if (!window.IstProfileCard || !IstProfileCard.mountHivePage) return;
-  if (!document.getElementById('fb-petek')) return;
+  // Never REmount while it is standing -- that pulls the drawing out from
+  // under the reader. But an empty petek is not a drawing anybody is
+  // standing in: if nothing has been mounted yet there is nothing to
+  // disturb, and refusing here leaves the reader on a blank Hane.
+  //
+  // That is not hypothetical. Arriving on Hane through the app map walks
+  // the book first and the lane second, and `framePos` LAGS `at` -- so
+  // atLaneStop only comes true a beat later, by which time the lane is
+  // already Hane and the arrival's one chance to mount is refused.
+  // Standing on Hane with a petek already up: there is nothing to do, and
+  // nothing will change until the reader leaves -- so this arrival counts
+  // as settled. Only the cases that could not mount YET answer false.
+  const mounted = !!document.getElementById('po-hive-mount');
+  if (mounted && lanePresence(LANE_HANE) > 0) return true;
+  if (!window.IstProfileCard || !IstProfileCard.mountHivePage) return false;
+  if (!document.getElementById('fb-petek')) return false;
   try {
     IstProfileCard.mountHivePage({
       sb: IstRouter.sb, I18N: window.I18N, mountId: 'fb-petek',
     });
-  } catch (err) { console.error('[proje petek]', err); }
+    return true;
+  } catch (err) { console.error('[proje petek]', err); return false; }
 }
 
 function onDown(e) {
@@ -1989,6 +2007,7 @@ let mapStats = null;      // { key: 'a/b' } once loaded
 let mapBadges = null;     // { windowId: n }
 let mapStatsAt = 0;       // when, so a reopen a minute later is free
 let traveling = false;
+let mapHideTimer = null;  // the pending hide of a fading-out layer
 
 // ── The middle window is the reader's OWN hexagon ──
 // Not a drawing of one: the actual cell out of the petek, cloned. Hane's
@@ -2112,6 +2131,13 @@ function buildMap() {
 function openMap() {
   const layer = document.getElementById('fb-map');
   if (!layer || traveling) return;
+  // Whatever the last close still had pending is cancelled here. A close
+  // cannot hide the layer at once -- it has to stay on screen while it
+  // fades -- so it schedules the hide; left running, that timer lands on
+  // THIS opening and hides a layer that was just unhidden, with the body
+  // class still on it and the petek still faded out under a wash that is
+  // no longer there. It is the same trap IstSheet.open documents.
+  if (mapHideTimer) { clearTimeout(mapHideTimer); mapHideTimer = null; }
   buildMap();
   layer.hidden = false;
   document.body.classList.add('fb-map-on');
@@ -2124,9 +2150,9 @@ function closeMap() {
   if (!layer || layer.hidden) return;
   layer.classList.remove('on');
   document.body.classList.remove('fb-map-on');
-  const hide = () => { layer.hidden = true; };
-  // Match the CSS fade rather than guessing at it.
-  setTimeout(hide, 240);
+  if (mapHideTimer) clearTimeout(mapHideTimer);
+  // Matches the CSS fade; cancelled by the next open (see there).
+  mapHideTimer = setTimeout(() => { mapHideTimer = null; layer.hidden = true; }, 240);
 }
 
 function mapIsOpen() {
