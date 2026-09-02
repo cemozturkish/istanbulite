@@ -580,6 +580,14 @@ const LANE_HANE = 1;        // the middle: the petek
 const LANE_KAHVEHANE = 2;   // right on the screen: the doing side
 const LANES = 3;
 
+// ── Where the reader comes in ──
+// The middle stop and the middle lane: Hane, the petek, on slide 12.
+// Not slide 1 -- the app's own rule is that you always enter in the
+// MIDDLE and swipe out from there, so the book opens where the people
+// are and Türkiye is one pull away rather than the doorstep.
+const START_SLIDE = PETEK_STOP;
+const START_LANE = LANE_HANE;
+
 // ══════════════════════════════════════════════════════════════
 // THE CAST
 //
@@ -781,11 +789,11 @@ let castTick = null;
 let castLast = 0;
 // Where the DRAWINGS have caught up to. Continuous, like an actor's --
 // what gets rounded is only which frame that lands on.
-let framePos = 0;
+let framePos = START_SLIDE;
 
 let cast = [];
 let imgs = [];
-let at = 0;             // 0..FRAMES-1, where the book is resting
+let at = START_SLIDE;   // 0..FRAMES-1, where the book is resting
 let shown = -1;
 let anim = null;
 
@@ -1200,26 +1208,32 @@ async function load() {
   // itself gets it on screen in a fraction of that, and the rest have
   // the whole rest of the wait to arrive in. `fetchPriority` alone does
   // not do this: it reorders a queue, it does not empty one.
-  if ('fetchPriority' in imgs[0]) imgs[0].fetchPriority = 'high';
-  imgs[0].src = SRC(0);
-  await decode(imgs[0]);
+  // It is the frame the reader ENTERS on, not frame 0: the book opens on
+  // the middle stop, so that is the one drawing that has to be up before
+  // anything else has arrived.
+  const first = START_SLIDE;
+  if ('fetchPriority' in imgs[first]) imgs[first].fetchPriority = 'high';
+  imgs[first].src = SRC(first);
+  await decode(imgs[first]);
   if (!box || !box.isConnected) return;
-  box.appendChild(imgs[0]);
-  shown = -1; at = 0;
-  show(0, true);
+  box.appendChild(imgs[first]);
+  shown = -1; at = START_SLIDE;
+  show(at, true);
   loadingLine(1);
 
   // Now the rest: all fetched at once (the network is idle again and
   // parallel is right for it), decoded one at a time (simultaneous
   // decodes of a 1080x1920 image allocate ~8 MB of surface each, and
   // the book is two dozen of them).
-  for (let i = 1; i < FRAMES; i++) imgs[i].src = SRC(i);
+  let done = 1;
+  for (let i = 0; i < FRAMES; i++) if (i !== first) imgs[i].src = SRC(i);
 
-  for (let i = 1; i < FRAMES; i++) {
+  for (let i = 0; i < FRAMES; i++) {
+    if (i === first) continue;
     await decode(imgs[i]);
     if (!box || !box.isConnected) return;
     box.appendChild(imgs[i]);
-    loadingLine(i + 1);
+    loadingLine(++done);
   }
   ready = true;
   armCast();
@@ -1282,11 +1296,11 @@ const LANE_RUN_MS = 300;
 // they are told apart.
 const AXIS_SLOP = 8;
 
-// The reader starts on Kütüphane, because the book starts on slide 1
-// and slide 1 is Türkiye: the lane and the depth have to agree or the
-// first pull down would be one the lane forbids.
-let lane = LANE_KUTUPHANE;
-let lanePos = LANE_KUTUPHANE;   // continuous; the drag writes it live
+// The reader starts on Hane, because the book starts on the middle stop
+// and the middle stop's middle lane is the petek: the lane and the depth
+// have to agree, and from here either run of the book is one pull away.
+let lane = START_LANE;
+let lanePos = START_LANE;       // continuous; the drag writes it live
 let laneRun = null;
 let atLaneStop = false;  // whether the book is standing on PETEK_STOP
 let petekBuilt = false;  // whether this arrival has already mounted it
@@ -1568,9 +1582,9 @@ function mount() {
   if (!box) return;
   box.style.setProperty('--fb-fit', FIT);
   // A fresh box, and a fresh #fb-petek inside it. The reader starts on
-  // Kütüphane because the book starts on slide 1: the lane and the depth
-  // have to agree, or the first pull down is one the lane forbids.
-  lane = LANE_KUTUPHANE; lanePos = LANE_KUTUPHANE;
+  // Hane because the book starts on the middle stop: the lane and the
+  // depth have to agree, or the first pull down is one the lane forbids.
+  lane = START_LANE; lanePos = START_LANE;
   atLaneStop = false; petekBuilt = false;
   buildCast();
   paintLanes();     // after buildCast: it paints the cast too
@@ -1585,7 +1599,7 @@ function mount() {
     const spinner = document.getElementById('fb-loading');
     if (spinner) spinner.remove();
     imgs.forEach(i => { i.classList.remove('on'); box.appendChild(i); });
-    shown = -1; at = 0; show(0, true); armCast();
+    shown = -1; at = START_SLIDE; show(at, true); armCast();
   } else {
     load();
   }
