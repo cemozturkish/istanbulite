@@ -1675,6 +1675,75 @@ script that throws half way has already declared its `const`s and can never be r
 that touches the DOM waits for `mount()`; the router now also refuses to execute any page's script
 twice, for the same reason.
 
+### What each screen carries — one template, and the tiles are the difference
+
+Every screen in the app is the same object: **the maps at the top, and two columns of tiles under
+them** — a column of wide rows on the left and a column of small squares on the right. The whole of
+what makes one screen different from another is what stands in those two columns. That is the
+layout answer this app has been circling: a screen is not designed, it is *cast*, and adding a
+feature is adding a tile rather than inventing a page.
+
+**Hane is the one exception, and it is the exception on purpose.** Its hero is the petek, full
+bleed, and it carries no tiles at all — the middle page is the people and nothing else.
+
+```
+        (up / out)                                        (down / in)
+      Türkiye — slide 1                                the ilçe — slide 24
+      Hikâyeler · Bilgi                                 Kahve · Yorumlar
+              │                                              │
+        ┌─────┴──────┐        ┌──────────┐        ┌──────────┴───┐
+        │ KÜTÜPHANE  │ ────── │   HANE   │ ────── │  KAHVEHANE   │
+        │ Haberler   │        │ the petek│        │ Etkinlikler  │
+        │ Fikirler   │        │  alone   │        │ Oyunlar      │
+        └────────────┘        └────┬─────┘        └──────────────┘
+                                   │
+                    ▲ up / out — the whole petek: what İstanbul thinks
+                    ▼ down / in — Sen: your own hexagon, and what is yours to change
+```
+
+| Screen | The map(s) on top | Left column (wide rows) | Right column (squares) |
+|---|---|---|---|
+| Türkiye (slide 1) | Türkiye | **Hikâyeler** — the stories the map is grouped into | **Bilgi** |
+| Kütüphane (lane 0) | İstanbul · the ilçe | **Haberler** | **Fikirler** |
+| Hane (lane 1) | none — the petek, full bleed | — | — |
+| Kahvehane (lane 2) | İstanbul · the ilçe | **Etkinlikler** (RSVP goes to Hane) | **Oyunlar** — Sözcel, Tümcel, Bulmaca |
+| the ilçe (slide 24) | the ilçe, with the member's own picked out | **Kahve** — the Kahve Endeksi's rows | **Yorumlar** |
+
+Six things about it:
+
+- **Both distances are on screen from wherever you are standing.** The two side lanes carry
+  İstanbul *and* the reader's own ilçe side by side, so the zoom the reader is not currently at is
+  never out of sight — the depth stop each lane can reach is already showing at the top of the
+  screen they are standing on. It is the mall stairway drawn rather than argued, and it is "always
+  in the middle" applied to the drawing itself.
+- **The left column is a feed and the right column is a set.** Left are the things that arrive and
+  are taken one at a time — the news, the evenings, the cheapest cups; right is a small fixed
+  number of the same kind of thing, which is why Oyunlar is exactly three squares and Sözcel is one
+  of them. Never mix the two: a set that grows belongs on the left.
+- **Hane's vertical axis is the petek's own three depths, and there is nothing new above or below
+  it.** Up/out is level 2 (the whole petek), the reader arrives at level 1 (Yanındakiler), down/in
+  is level 0 (Sen — the hexagon with the avatar arrows on it and name, district and the three
+  preferences under it). It reads the same way the book does — up is out, down is in — which is
+  what makes the two axes one grammar: **the outermost thing on this side is the whole city, and
+  the innermost thing is you.** See the petek's own section for how the pull works.
+- **The daily opinions are the loop between the two sides.** The questions in the joints of the
+  game sequence take a daily opinion from İstanbulites (`daily_questions`, see the schema); the
+  city rates them; the result is shown back **the next day, at the petek's outermost depth** —
+  which is exactly the depth where the reader is standing far enough out to be looking at everybody
+  rather than at their own neighbours. It is the app's own formula in one move: people → their
+  ideas → our opinions on those ideas.
+- **Two columns, not a menu.** A screen with six unrelated tiles is a launcher, and a launcher is a
+  shortcut past everything — the one thing the arrangement exists to prevent.
+- **Fikirler is decided in shape and not in content.** The tile has its place on Kütüphane; what
+  fills it is parked until it is worth building, the way Makaleler and the neighbourhood comments
+  are parked rather than deleted. Bilgi is in the same state at the Türkiye stop.
+
+**What of this is already standing in `project.html`:** Etkinlikler and Sözcel on Kahvehane,
+Haberler and Olaylar on Kütüphane, the petek and its three depths on Hane, and the Türkiye map as
+slide 1's drawing. **What is still in the parts bin:** the second map on the two lane screens,
+Kahve and Yorumlar, Tümcel and Bulmaca beside Sözcel, Hikâyeler and Bilgi at the Türkiye stop, and
+slide 24 — which has neither a drawing of its own nor a cast.
+
 ### The flip book — `flip.js` + `flip-steps.js`
 
 A depth journey is a flip book: a dozen drawn steps scrubbed by the finger, with every element on
