@@ -1514,11 +1514,19 @@
     <div class="panel">
       <div class="panel-title">Post Breaking News</div>
 
-      <label>Headline</label>
+      <label>Başlık (TR)</label>
       <input type="text" id="n-title" placeholder="Breaking news headline..."/>
 
-      <label>Body (optional)</label>
+      <label>Metin (TR, opsiyonel)</label>
       <textarea id="n-body" placeholder="A sentence or two of detail..."></textarea>
+
+      <!-- The English half of the same story. Optional: a reader in
+           English falls back to the Turkish for anything left blank. -->
+      <label>Headline (EN, optional)</label>
+      <input type="text" id="n-title-en" placeholder="Same headline in English..."/>
+
+      <label>Body (EN, optional)</label>
+      <textarea id="n-body-en" placeholder="Same detail in English..."></textarea>
 
       <label>Category</label>
       <select id="n-category">
@@ -3258,7 +3266,9 @@ function renderNewsList() {
   const data = q
     ? allAdminNews.filter(n =>
         (n.title || '').toLocaleLowerCase('tr-TR').includes(q) ||
-        (n.body || '').toLocaleLowerCase('tr-TR').includes(q))
+        (n.body || '').toLocaleLowerCase('tr-TR').includes(q) ||
+        (n.title_en || '').toLocaleLowerCase('tr-TR').includes(q) ||
+        (n.body_en || '').toLocaleLowerCase('tr-TR').includes(q))
     : allAdminNews;
   if (!data.length) {
     listEl.innerHTML = `<div class="empty-state">${q ? 'No matching news.' : 'No active breaking news.'}</div>`;
@@ -3280,6 +3290,7 @@ function renderNewsList() {
           <span class="upd-time">${formatAgo(u.created_at)}</span>
           <strong>${escapeHtml(u.title)}</strong>
           ${u.body ? `<span class="upd-body-text">${escapeHtml(u.body)}</span>` : ''}
+          ${u.title_en ? `<span class="upd-body-text">EN · ${escapeHtml(u.title_en)}</span>` : ''}
         </div>
         <button class="btn-edit" data-act="edit-update" data-id="${u.id}">Düzenle</button>
         <button class="btn-del" data-act="del-update" data-id="${u.id}">×</button>
@@ -3287,6 +3298,8 @@ function renderNewsList() {
       <div class="upd-edit-form" data-upd-edit-id="${u.id}">
         <input type="text" class="ue-title" value="${escapeHtml(u.title)}"/>
         <textarea class="ue-body" rows="2">${escapeHtml(u.body || '')}</textarea>
+        <input type="text" class="ue-title-en" placeholder="Title (EN)" value="${escapeHtml(u.title_en || '')}"/>
+        <textarea class="ue-body-en" rows="2" placeholder="Body (EN)">${escapeHtml(u.body_en || '')}</textarea>
         <input type="datetime-local" class="ue-datetime" value="${toLocalDatetimeInputValue(u.created_at)}"/>
         <div class="btn-row">
           <button class="btn btn-primary" data-act="save-update-edit" data-id="${u.id}" data-news-id="${n.id}">Kaydet</button>
@@ -3334,12 +3347,19 @@ function renderNewsList() {
         <div class="a-neighborhood">${escapeHtml(categoryLabel(cat))}${seriesName ? ' · SERİ: ' + escapeHtml(seriesName) : ''}${escapeHtml(countriesLabel)} · ${ago}${n.archived_at ? ' · ARŞİVLENDİ' : ''}</div>
         <h4>${escapeHtml(n.title)}</h4>
         ${n.body ? `<p>${escapeHtml(n.body)}</p>` : ''}
+        <!-- The English half, so a story missing one is visible at a glance. -->
+        ${n.title_en
+          ? `<h4 style="color:var(--muted);">EN · ${escapeHtml(n.title_en)}</h4>
+             ${n.body_en ? `<p style="color:var(--muted);">${escapeHtml(n.body_en)}</p>` : ''}`
+          : `<div style="font-size:0.7rem;color:var(--muted);font-style:italic;">EN yok</div>`}
         <div class="sources-block">
           <div class="sources-label">Gelişmeler (${updates.length})</div>
           ${updatesHtml}
           <div class="upd-form">
             <input type="text" class="upd-title" placeholder="Yeni başlık (haberin güncel hali)"/>
             <textarea class="upd-body" rows="1" placeholder="Ek detay (opsiyonel)"></textarea>
+            <input type="text" class="upd-title-en" placeholder="New headline (EN, optional)"/>
+            <textarea class="upd-body-en" rows="1" placeholder="Extra detail (EN, optional)"></textarea>
             <input type="datetime-local" class="upd-datetime" title="Gelişme tarihi" value="${nowLocalDatetimeValue()}"/>
             <button class="btn btn-secondary" data-act="add-update" data-news-id="${n.id}">+ Gelişme Ekle</button>
             <div class="upd-status status-msg"></div>
@@ -3377,6 +3397,8 @@ function renderNewsList() {
         <div class="news-edit-form" data-id="${n.id}">
           <input type="text" class="ne-title" value="${escapeHtml(n.title)}"/>
           <textarea class="ne-body" rows="3">${escapeHtml(n.body || '')}</textarea>
+          <input type="text" class="ne-title-en" placeholder="Headline (EN)" value="${escapeHtml(n.title_en || '')}"/>
+          <textarea class="ne-body-en" rows="3" placeholder="Body (EN)">${escapeHtml(n.body_en || '')}</textarea>
           <select class="ne-category">${catOptions}</select>
           <div class="country-picker-block ne-countries-block">
             <label style="margin:0 0 4px;font-size:0.75rem;color:var(--muted);">Ülkeler</label>
@@ -3491,6 +3513,8 @@ async function saveNewsUpdateEdit(btn) {
   const form = document.querySelector(`.upd-edit-form[data-upd-edit-id="${id}"]`);
   const title = form.querySelector('.ue-title').value.trim();
   const body = form.querySelector('.ue-body').value.trim();
+  const titleEn = form.querySelector('.ue-title-en').value.trim();
+  const bodyEn = form.querySelector('.ue-body-en').value.trim();
   const dateVal = form.querySelector('.ue-datetime').value;
   const statusEl = form.querySelector('.ue-status');
 
@@ -3505,7 +3529,7 @@ async function saveNewsUpdateEdit(btn) {
   btn.innerHTML = '<span class="spinner"></span>';
   statusEl.textContent = '';
 
-  const payload = { title, body: body || null };
+  const payload = { title, body: body || null, title_en: titleEn || null, body_en: bodyEn || null };
   if (dateVal) payload.created_at = new Date(dateVal).toISOString();
 
   const { error } = await sb.from('breaking_news_updates')
@@ -3534,7 +3558,7 @@ async function saveNewsUpdateEdit(btn) {
   }
   if (latest.length && latest[0].id === id) {
     const { error: syncErr } = await sb.from('breaking_news')
-      .update({ title, body: body || null })
+      .update({ title, body: body || null, title_en: titleEn || null, body_en: bodyEn || null })
       .eq('id', newsId);
     if (syncErr) {
       btn.disabled = false;
@@ -3565,6 +3589,8 @@ async function saveNewsEdit(newsId, card) {
   const form = card.querySelector('.news-edit-form');
   const title = form.querySelector('.ne-title').value.trim();
   const body = form.querySelector('.ne-body').value.trim();
+  const titleEn = form.querySelector('.ne-title-en').value.trim();
+  const bodyEn = form.querySelector('.ne-body-en').value.trim();
   const category = form.querySelector('.ne-category').value;
   const seriesId = form.querySelector('.ne-series').value || null;
   const datetimeVal = form.querySelector('.ne-datetime').value;
@@ -3589,7 +3615,8 @@ async function saveNewsEdit(newsId, card) {
     timestamps.updated_at = iso;
   }
   const { error } = await sb.from('breaking_news')
-    .update({ title, body: body || null, category, neighborhood, series_id: seriesId, ...timestamps })
+    .update({ title, body: body || null, title_en: titleEn || null, body_en: bodyEn || null,
+              category, neighborhood, series_id: seriesId, ...timestamps })
     .eq('id', newsId);
 
   // A story moved off Dünya keeps no countries: they would sit there
@@ -3725,10 +3752,14 @@ async function addNewsUpdate(btn) {
   const newsId = btn.dataset.newsId;
   const titleEl = card.querySelector('.upd-title');
   const bodyEl = card.querySelector('.upd-body');
+  const titleEnEl = card.querySelector('.upd-title-en');
+  const bodyEnEl = card.querySelector('.upd-body-en');
   const dateEl = card.querySelector('.upd-datetime');
   const statusEl = card.querySelector('.upd-status');
   const title = titleEl.value.trim();
   const body = bodyEl.value.trim();
+  const titleEn = titleEnEl.value.trim();
+  const bodyEn = bodyEnEl.value.trim();
   const createdAt = dateEl.value ? new Date(dateEl.value).toISOString() : new Date().toISOString();
 
   statusEl.textContent = '';
@@ -3758,7 +3789,7 @@ async function addNewsUpdate(btn) {
   let latestExistingAt = existing.length ? existing[0].created_at : null;
   if (!existing.length) {
     const { data: current, error: curErr } = await sb.from('breaking_news')
-      .select('title, body, created_at').eq('id', newsId).single();
+      .select('title, body, title_en, body_en, created_at').eq('id', newsId).single();
     if (curErr) {
       btn.disabled = false; btn.textContent = origText;
       statusEl.textContent = curErr.message;
@@ -3766,7 +3797,8 @@ async function addNewsUpdate(btn) {
       return;
     }
     const { error: seedErr } = await sb.from('breaking_news_updates').insert([{
-      news_id: newsId, title: current.title, body: current.body, created_at: current.created_at,
+      news_id: newsId, title: current.title, body: current.body,
+      title_en: current.title_en, body_en: current.body_en, created_at: current.created_at,
     }]);
     if (seedErr) {
       btn.disabled = false; btn.textContent = origText;
@@ -3778,7 +3810,8 @@ async function addNewsUpdate(btn) {
   }
 
   const { error } = await sb.from('breaking_news_updates')
-    .insert([{ news_id: newsId, title, body: body || null, created_at: createdAt }]);
+    .insert([{ news_id: newsId, title, body: body || null,
+               title_en: titleEn || null, body_en: bodyEn || null, created_at: createdAt }]);
   if (error) {
     btn.disabled = false; btn.textContent = origText;
     statusEl.textContent = error.message;
@@ -3792,7 +3825,8 @@ async function addNewsUpdate(btn) {
   const isNewLatest = !latestExistingAt || new Date(createdAt) >= new Date(latestExistingAt);
   if (isNewLatest) {
     const { error: updErr } = await sb.from('breaking_news')
-      .update({ title, body: body || null, updated_at: new Date().toISOString() })
+      .update({ title, body: body || null, title_en: titleEn || null, body_en: bodyEn || null,
+                updated_at: new Date().toISOString() })
       .eq('id', newsId);
     if (updErr) {
       btn.disabled = false; btn.textContent = origText;
@@ -3804,6 +3838,8 @@ async function addNewsUpdate(btn) {
 
   titleEl.value = '';
   bodyEl.value = '';
+  titleEnEl.value = '';
+  bodyEnEl.value = '';
   dateEl.value = nowLocalDatetimeValue();
   btn.textContent = '✓ Eklendi';
   statusEl.textContent = '';
@@ -3868,6 +3904,10 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   const statusEl = document.getElementById('n-form-status');
   const title = document.getElementById('n-title').value.trim();
   const body = document.getElementById('n-body').value.trim();
+  // The English half of the same story (optional — see
+  // db/breaking_news_v2_bilingual.sql).
+  const titleEn = document.getElementById('n-title-en').value.trim();
+  const bodyEn = document.getElementById('n-body-en').value.trim();
   const category = document.getElementById('n-category').value;
   const seriesId = document.getElementById('n-series').value || null;
   const datetimeVal = document.getElementById('n-datetime').value;
@@ -3907,7 +3947,8 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   }
 
   const { data, error } = await sb.from('breaking_news').insert([{
-    title, body: body || null, neighborhood, category, series_id: seriesId, ...timestamps,
+    title, body: body || null, title_en: titleEn || null, body_en: bodyEn || null,
+    neighborhood, category, series_id: seriesId, ...timestamps,
   }]).select().single();
 
   // Countries only mean something on a Dünya story (that is the only feed
@@ -3948,7 +3989,7 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   }
   statusEl.textContent = 'Breaking news posted!';
   statusEl.className = 'status-msg ok';
-  ['n-title','n-body','n-datetime','n-poll-q','n-poll-a','n-poll-b'].forEach(id => document.getElementById(id).value = '');
+  ['n-title','n-body','n-title-en','n-body-en','n-datetime','n-poll-q','n-poll-a','n-poll-b'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('n-category').value = 'turkiye';
   document.querySelectorAll('#n-countries input[type="checkbox"]').forEach(cb => { cb.checked = false; });
   syncNewsCountryPicker();

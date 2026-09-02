@@ -6269,6 +6269,18 @@ function newsCategoryLabel(n) {
   if (c === 'dunya') return 'DÜNYA';
   return (neighborhoodNames[c] || c).toLocaleUpperCase('tr-TR');
 }
+// A story is entered in both languages (db/breaking_news_v2_bilingual.sql).
+// The English text is used only where the reader is in English AND that
+// half was actually written -- a story translated by halves still reads,
+// in Turkish, rather than going blank where nobody got round to it.
+// Gelişmeler carry the same pair, so a timeline never reverts mid-chain.
+function newsText(row, field) {
+  if (!row) return '';
+  const en = row[field + '_en'];
+  if (window.I18N && I18N.isEnglish() && en && String(en).trim()) return en;
+  return row[field];
+}
+
 function dunyaKickerLabel(n) {
   const seriesName = n.breaking_news_series && n.breaking_news_series.name;
   return seriesName ? seriesName.toLocaleUpperCase('tr-TR') : newsCategoryLabel(n);
@@ -6528,7 +6540,7 @@ function renderDunyaNewsFeed() {
             <div class="kicker">${libEsc(dunyaKickerLabel(n))}</div>
             <div class="ago" data-iso="${libEsc(lastTouch)}">${libEsc(libFormatNewsAge(lastTouch))}</div>
           </div>
-          <h3>${libEsc(n.title)}</h3>
+          <h3>${libEsc(newsText(n, 'title'))}</h3>
         </div>
       `;
     }).join('');
@@ -6605,7 +6617,9 @@ function newsTimelineHTML(n) {
   const updates = (n.breaking_news_updates || []).slice()
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   const same = (a, b) => (a || '').trim() === (b || '').trim();
-  if (updates.length && same(updates[0].title, n.title) && same(updates[0].body, n.body)) updates.shift();
+  if (updates.length
+      && same(newsText(updates[0], 'title'), newsText(n, 'title'))
+      && same(newsText(updates[0], 'body'), newsText(n, 'body'))) updates.shift();
   const timelineEvents = updates.map(u => ({ type: 'update', created_at: u.created_at, data: u }))
     .concat((n.breaking_news_polls || []).map(p => ({ type: 'poll', created_at: p.created_at, data: p })))
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -6628,8 +6642,8 @@ function newsTimelineHTML(n) {
               <span class="timeline-tick"></span>
               <div class="ago" data-iso="${libEsc(ev.created_at)}">${libEsc(libFormatAgoTRLong(ev.created_at))}</div>
             </div>
-            <strong>${libEsc(ev.data.title)}</strong>
-            ${ev.data.body ? `<p>${libEsc(ev.data.body)}</p>` : ''}
+            <strong>${libEsc(newsText(ev.data, 'title'))}</strong>
+            ${newsText(ev.data, 'body') ? `<p>${libEsc(newsText(ev.data, 'body'))}</p>` : ''}
           </div>
         `).join('')}
       </div>
@@ -6694,8 +6708,8 @@ function buildNewsPageHtml(n) {
       <div class="ago" data-iso="${libEsc(lastTouch)}">${libEsc(libFormatNewsAge(lastTouch))}</div>
     </div>
     <div class="news-page-body" id="news-page-body">
-      <h2 class="news-page-title">${libEsc(n.title)}</h2>
-      ${n.body ? `<p>${libEsc(n.body)}</p>` : ''}
+      <h2 class="news-page-title">${libEsc(newsText(n, 'title'))}</h2>
+      ${newsText(n, 'body') ? `<p>${libEsc(newsText(n, 'body'))}</p>` : ''}
       ${newsTimelineHTML(n)}
     </div>
     ${footHtml}
@@ -6791,6 +6805,7 @@ const NEWS_SWIPE_DEAL_PX = 84;    // throw past this and the story is dealt
 const NEWS_SWIPE_DEAL_VEL = 0.55; // ...or a flick this fast (px/ms)
 const NEWS_SWIPE_FLY_MS = 300;
 let _newsStory = null;            // the story the open page is printing
+let onI18NChangeForNews = null;   // dropped in unmount(), see mount()
 let _newsPollMine = new Map();    // poll id -> the reader's own vote, or null
 let _newsDealing = false;
 
@@ -6962,6 +6977,20 @@ function openDunyaNewsDetail(n, cardEl) {
   // the reader sees where the story is happening for as long as they are
   // reading it, not only until the page arrives.
   setNewsCountryHighlight(newsCountryIds(n));
+  (n.breaking_news_polls || []).forEach(p => loadAndRenderDunyaPoll(p));
+}
+
+// Reprint the open story in the language the reader has just switched
+// to. Same markup, same wiring as opening it -- what changes is only
+// which half of each field newsText picks.
+function repaintOpenNewsPage() {
+  const overlay = document.getElementById('news-overlay');
+  const inner = document.getElementById('news-page-inner');
+  if (!overlay || !inner || overlay.hidden || !_newsStory) return;
+  const n = _newsStory;
+  inner.innerHTML = buildNewsPageHtml(n);
+  const back = document.getElementById('news-page-back');
+  if (back) back.addEventListener('click', () => closeNewsPage());
   (n.breaking_news_polls || []).forEach(p => loadAndRenderDunyaPoll(p));
 }
 
@@ -8477,6 +8506,16 @@ function mount() {
   // re-entries, so this is one request per session, not per mount.
   loadCountryStories();
   loadDunyaNews();
+  // The cards and the open story print the reader's own language where
+  // the English half was entered, so both are rebuilt when it changes --
+  // registered here and dropped in unmount(), so a page entered twice
+  // doesn't end up with two listeners.
+  if (onI18NChangeForNews) I18N.offChange(onI18NChangeForNews);
+  onI18NChangeForNews = () => {
+    renderDunyaNewsFeed();
+    repaintOpenNewsPage();
+  };
+  I18N.onChange(onI18NChangeForNews);
   IstRouter.onTick(tickDunyaNewsAgo);
   loadPersonMentionsRoster();
   // politician-card.js is deferred -- on a fresh real page load this
@@ -8495,6 +8534,7 @@ function mount() {
 }
 function unmount() {
   IstRouter.offTick(tickDunyaNewsAgo);
+  if (onI18NChangeForNews) { I18N.offChange(onI18NChangeForNews); onI18NChangeForNews = null; }
   // A story swipes away with the page it belongs to.
   snapNewsPageShut();
 }
