@@ -1553,6 +1553,25 @@ you are already there.
   Every one is best-effort and independent: a query that fails leaves its own square a dash rather
   than taking the map down. A square whose content is parked (Fikirler, Bilgi, Kahve, Yorumlar)
   prints a dash too — the shape of a screen must not change on the day its numbers arrive.
+- **The middle window is the reader's OWN hexagon, cloned out of the petek.** Hane's window is the
+  reader's profile, and that already exists at the petek's middle depth — so the cell is
+  `cloneNode`d rather than redrawn, and the ring, the mask, the avatar and the badges stay the
+  petek's own with no second version to keep in step. Two things the clone must be stripped of:
+  every `id` in it (`#po-avatar-preview` is what the four avatar carousels replace on an arrow
+  press, and the claim field is what a code is typed into — a second copy carrying them steals
+  both), and its place, since in the petek it is absolutely positioned on the plane by `calc()`
+  against the packing's own step.
+- **Standing on Hane, opening the map is the people leaving and the reader staying put.** The whole
+  petek fades out under the wash — the reader's own cell with it — and the cloned window is
+  **pinned over the rect the real cell was measured at**, so nothing about where the reader's
+  hexagon is changes by a pixel. It has to be `position: fixed` for that: every other window is
+  placed inside the grid, which is inset by both bars, so a viewport-measured rect left in that
+  frame lands exactly the grid's own inset away from the hexagon it is supposed to be standing on.
+  Off Hane there is nothing to pin to and the same clone simply stands in the middle of the row;
+  a petek that has never been mounted (the reader has not reached slide 12 yet) falls back to a
+  drawn figure.
+- **Red for "you are here" is the RING going red**, not a box drawn around the hexagon — which is
+  what red on a hexagon already means everywhere else in the petek.
 - **A map PNG inside a window has to be out of flow.** The windows are sized by `aspect-ratio`, and
   an `<img>` left in flow reports its intrinsic height (1080×2420 for Türkiye's) into a box whose
   height was supposed to come from that ratio. The two argue, intrinsic wins, and every window
