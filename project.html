@@ -111,11 +111,14 @@
       --fb-row-w: 52.7%;
       --fb-gap: 8px;
       --fb-inset: var(--screen-inset, 18px);
-      /* What is left of the line once the row and both insets are taken.
-         It is the square's WIDTH; its height comes from aspect-ratio,
-         because a percentage in a height resolves against the parent's
-         height and would silently mean something else here. */
-      --fb-sq-side: calc(100% - var(--fb-row-w) - (var(--fb-inset) * 2) - var(--fb-gap));
+      /* The HEIGHT OF THE LINE, and the only number that decides the
+         square: a square's side is the row's height, so the two shapes
+         stand at one height whatever is printed inside them. It used to
+         be the other way round -- the square took whatever width the
+         split left over, which made it as wide as the row is tall twice
+         over and left the pair reading as a card and a poster rather
+         than as one line. */
+      --fb-line-h: 74px;
       /* Both columns hang from the same line above the tab bar -- the
          phone's stacks grow upward from the thumb (see "The phone's feeds
          hang from the bottom" in CLAUDE.md). */
@@ -131,31 +134,38 @@
       color: var(--ink);
       -webkit-tap-highlight-color: transparent;
     }
-    /* The left column: a wide row. Content-height on purpose -- a row
-       carries a kicker, a headline and a line of meta, and one that opens
-       in place grows upward from its own dock corner. */
+    /* The left column: a wide row. The line's height is a MINIMUM rather
+       than a height -- a row carries a kicker, a headline and a line of
+       meta, and one that opens in place grows upward from its own dock
+       corner; a fixed height would clip both. */
     .fb-row {
       left: var(--fb-inset);
       width: var(--fb-row-w);
+      min-height: var(--fb-line-h);
       padding: 9px 11px 10px;
       text-align: left;
       display: block;
     }
-    /* The right column: a small square, and actually square. Its height
-       is its own width, so the tile is the shape the drawing gives it
-       whatever is printed inside. aspect-ratio yields to content that
-       genuinely needs more room, which is what lets a tile open in place
-       without fighting it. */
+    /* The right column: a small square, and actually square -- its side
+       IS the line's height, so it stands exactly as tall as the row beside
+       it. aspect-ratio yields to content that genuinely needs more room,
+       which is what lets a tile open in place without fighting it. */
     .fb-sq {
       right: var(--fb-inset);
-      width: var(--fb-sq-side);
+      width: var(--fb-line-h);
       aspect-ratio: 1;
-      padding: 9px 8px 10px;
+      padding: 7px 6px 8px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 5px;
+      gap: 4px;
+      /* aspect-ratio yields to content that will not fit, and a tile whose
+         wordmark was an inch too tall silently stopped being square and
+         stood a third taller than the row beside it. Anything that cannot
+         fit is clipped rather than allowed to change the shape -- and
+         nothing below is left able to overflow, so nothing is clipped. */
+      overflow: hidden;
     }
     /* Each shape gives under the finger from the corner it is docked to,
        so the press reads as the card being pushed into its own corner
@@ -178,8 +188,13 @@
     .fb-row.open .x { display: block; }
 
     .fb-sozcel img {
-      width: 100%;
-      max-width: 82px;
+      /* Sized by its HEIGHT, not its width: the tile is the line's height
+         square, and what has to fit inside it is the wordmark plus its
+         line of type. Bounding the width instead let a nearly-square
+         wordmark take the whole box and push the label out of it. */
+      width: auto;
+      max-width: 100%;
+      max-height: calc(var(--fb-line-h) - 46px);
       height: auto;
       display: block;
       /* In a column flex container the image's HEIGHT is the main size,
@@ -192,13 +207,15 @@
          empty. */
     }
     .fb-sq .n {
-      font-size: 0.56rem; letter-spacing: 0.12em; text-transform: uppercase;
+      flex: none;
+      font-size: 0.48rem; letter-spacing: 0.08em; text-transform: uppercase;
       color: var(--muted); text-align: center; line-height: 1.1;
     }
     /* Olaylar has no wordmark of its own, so its name is set in type
        where Sözcel's picture stands -- same box, same two lines. */
     .fb-sq .w {
-      font-size: 1.02rem; font-weight: 800; line-height: 1;
+      flex: none;
+      font-size: 0.8rem; font-weight: 800; line-height: 1;
       letter-spacing: 0.02em; text-align: center;
     }
     /* Opened in place, like the rows on the left of either lane. Docked
