@@ -724,20 +724,31 @@
     }
 
     /* ── THE GAME OVERLAY ──
-       Sözcel is still a real, unmodified page (sozcel.html) -- it needs
-       the room a "fullscreen board" needs (see CLAUDE.md) -- but pressing
-       its tile must not leave the book behind: no reload, no flash, no
-       lost place in the flip. So it renders inside an iframe laid full
-       bleed over everything, the same trick kahvehane.html's own now-
-       parked game deck used. sozcel.html already knows how to be embedded
-       (it checks `window.self !== window.top` and posts a close message
+       Sözcel is still a real, unmodified page (sozcel.html) -- but
+       pressing its tile must not leave the book behind: no reload, no
+       flash, no lost place in the flip. So it renders inside an iframe
+       laid over the book, the same trick kahvehane.html's own now-parked
+       game deck used. sozcel.html already knows how to be embedded (it
+       checks `window.self !== window.top` and posts a close message
        instead of navigating its own back arrow); nothing there had to
-       change. */
+       change.
+
+       It stands in exactly the room the map + band fill on every other
+       page -- the two bars stay up, the same rule everywhere else on the
+       site (see "THE TWO BARS ARE OMNIPRESENT" in CLAUDE.md) -- and it
+       is framed by the SAME two measurements: --map-hero-top/--map-hero-
+       end for where the map's own square sits, --navbar-h for the room
+       the tab bar keeps clear. Not a fraction of the screen guessed at;
+       the exact box the map and the band already stand in everywhere
+       else. */
     #fb-game-overlay {
       position: fixed;
-      inset: 0;
+      top: var(--map-hero-top, 26px);
+      left: 0; right: 0;
+      bottom: calc(var(--navbar-h, 46px) + env(safe-area-inset-bottom));
       z-index: 700;        /* over the map (600) and its dimmed header (610) */
       background: var(--paper, #f4f1ec);
+      overflow: hidden;
     }
     #fb-game-overlay[hidden] { display: none; }
     #fb-game-frame {
@@ -750,24 +761,31 @@
        nowhere else, because nowhere else opens a real separate page. The
        iframe underneath is already loading at its true, untouched full
        size the whole time (its own layoutGame() must never measure a
-       transformed box), so these are purely a cover: one descends from
-       above to where the word board sits, one rises from below to where
-       the keyboard sits, and once they've met at the middle -- and the
-       game has actually loaded -- they get out of the way instead of
-       staying on as a second frame around it. */
+       transformed box), so these are purely a cover, sized to the same
+       two regions every other page already has: one the height of the
+       map's own square, descending from above to where the word board
+       sits; one the rest of the room down to the tab bar, rising from
+       below to where the keyboard sits. Once they've met -- and the game
+       has actually loaded -- they get out of the way rather than staying
+       on as a second frame around it. Same curve as THE sheet's own
+       0.55s slide (sheet.css), so this reads as the same object opening
+       a different way, not a second transition language. */
     .fb-game-curtain {
       position: absolute;
       left: 0; right: 0;
-      height: 50%;
       background: var(--paper, #f4f1ec);
-      transition: transform 0.42s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+                  opacity 0.3s ease;
     }
     .fb-game-curtain-top {
       top: 0;
+      /* The map's own square: --map-hero-end minus --map-hero-top. */
+      height: calc(var(--frame-pad, 10px) + 100vw);
       transform: translateY(-100%);
       border-bottom: 2px solid var(--ink, #17140f);
     }
     .fb-game-curtain-bottom {
+      top: calc(var(--frame-pad, 10px) + 100vw);
       bottom: 0;
       transform: translateY(100%);
       border-top: 2px solid var(--ink, #17140f);
@@ -2242,9 +2260,10 @@ function openGameOverlay(href) {
   // previous close's pending reveal must not land on this opening.
   layer.classList.remove('in', 'gone');
   layer.hidden = false;
-  // The curtains meet at the middle on a fixed clock; the reveal behind
-  // them waits on BOTH that and the iframe's own load, so a slow load
-  // never uncovers a blank page and a fast one never looks rushed.
+  // The curtains meet at the middle on THE sheet's own 0.55s clock; the
+  // reveal behind them waits on BOTH that and the iframe's own load, so a
+  // slow load never uncovers a blank page and a fast one never looks
+  // rushed.
   let slid = false, loaded = false;
   const reveal = () => { if (slid && loaded) layer.classList.add('gone'); };
   frame.onload = () => { loaded = true; reveal(); };
@@ -2254,7 +2273,7 @@ function openGameOverlay(href) {
     gameOverlayTimer = setTimeout(() => {
       gameOverlayTimer = null;
       slid = true; reveal();
-    }, 420);
+    }, 550);
   });
 }
 function closeGameOverlay() {

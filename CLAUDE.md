@@ -1683,20 +1683,31 @@ else has arrived.
 
 **The three games are still pages of their own, but the book never actually leaves for one.**
 `sozcel.html`, `tumcel.html` and `bulmaca.html` are real, otherwise-unmodified pages — fullscreen
-boards, which is why they were never carousel pages — but the Sözcel tile opens its page inside a
-full-bleed iframe (`#fb-game-overlay` / `#fb-game-frame`) laid over the whole book rather than
-navigating to it: no reload, no lost place in the flip. This is the same trick `kahvehane.html`'s
-own (now parked) game deck used, and the game pages already carry both halves of it unchanged —
-`window.self !== window.top` hides their own nav/columns behind `body.embedded-game` and turns
-their back arrow into a `postMessage('ist-close-game-overlay', …)` instead of a navigation, which
-`wireGameOverlay()` in project.html listens for to close the layer. A page opened this way is torn
-down on close (`frame.src = 'about:blank'`) rather than kept alive behind the layer, so the next
-open is a fresh start. **The opening is two paper pages, not a fade** — the iframe loads at its
-true, untouched full size the whole time (`sozcel.html`'s own `layoutGame()` must never measure a
-transformed box), and two decorative curtains cover it: one descending from above to where the
-word board sits, one rising from below to where the keyboard sits, meeting at the middle. They
-only lift once BOTH that slide has finished and the iframe has actually fired `load`, so a slow
-load is never uncovered early and a fast one is never rushed. Visiting one of the three directly still works exactly as before — the
+boards, which is why they were never carousel pages — but the Sözcel tile opens its page inside an
+iframe (`#fb-game-overlay` / `#fb-game-frame`) laid over the book rather than navigating to it: no
+reload, no lost place in the flip. This is the same trick `kahvehane.html`'s own (now parked) game
+deck used, and the game pages already carry both halves of it unchanged — `window.self !== window.top`
+hides their own nav/columns behind `body.embedded-game` and turns their back arrow into a
+`postMessage('ist-close-game-overlay', …)` instead of a navigation, which `wireGameOverlay()` in
+project.html listens for to close the layer. A page opened this way is torn down on close
+(`frame.src = 'about:blank'`) rather than kept alive behind the layer, so the next open is a fresh
+start.
+
+**It stands in the exact room the map and the band already fill on every other page, not edge to
+edge.** The two bars stay up throughout (see "THE TWO BARS ARE OMNIPRESENT"): the overlay's own
+top is `--map-hero-top` and its bottom clears `--navbar-h`, the same two measurements every other
+page's map and band are built from — not a guessed fraction of the screen, the same box.
+
+**The opening is two paper pages, not a fade.** The iframe loads at its true, untouched full size
+the whole time (`sozcel.html`'s own `layoutGame()` must never measure a transformed box), and two
+decorative curtains cover it, each sized to one of those same two regions: one the height of the
+map's own square, descending from above to where the word board sits; one the rest of the room
+down to the tab bar, rising from below to where the keyboard sits — the same 0.55s curve as THE
+sheet's own slide (`sheet.css`), so this reads as the same object opening a different way rather
+than a second transition language. They only lift once BOTH that slide has finished and the iframe
+has actually fired `load`, so a slow load is never uncovered early and a fast one is never rushed.
+
+Visiting one of the three directly still works exactly as before — the
 `<a href="project.html">` fallback is what fires when there is no parent to postMessage — and
 their own bottom-bar link and back arrow still point at `project.html` for that case. Tümcel and
 Bulmaca are not tiles yet (see "What of this is already standing in `project.html`" above), but
