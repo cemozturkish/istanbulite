@@ -1509,6 +1509,55 @@ fractional `font-weight` re-measures the type every frame and the bar would jitt
 under the finger, so the ink is continuous and the weight steps once, on the lane the reader
 lands on.
 
+**One thing on that bar IS pressed, and it is the logo** — bigger than the two words, standing
+proud of the bar's top edge because everything else there is printed *on* the bar and this is the
+one thing that comes off it. It opens **the app map**, and it is a switch rather than a door: it
+stays lit while the map is up, because it is also the way back out (the same move Kütüphane's
+Olaylar box makes). `nav` still takes no pointer events at all — only this one mark opts back in,
+so the drawing under the bar's paper goes on answering a finger that lands beside it.
+
+### The app map — what the logo opens (`#fb-map`)
+
+The compass says **where you are**. The map says where you are *in relation to everywhere else*:
+the app's five windows drawn in the shape they actually stand in — the three lanes across the
+middle, Türkiye hanging off Kütüphane and the ilçe off Kahvehane, because those are the depths
+those two lanes can reach and nobody else can. The window the reader is standing in is **red**, and
+it is the only red on the layer, so it cannot be read as anything else. It is also not pressable:
+you are already there.
+
+- **A window is a `(lane, slide)` pair and nothing else.** There is no second table of places in
+  `MAP_WINDOWS` — only the five the book and the lane strip already have between them, so the map
+  cannot drift from the app it is a map of.
+- **Pressing a window WALKS there. It never jumps** (`travelTo`). The layer closes and then the app
+  moves one transition at a time, through every screen in between: back to slide 12 first (the
+  lanes can only be walked from the middle depth), then one lane at a time, then out to the
+  target's own depth. So Türkiye to the ilçe is four moves and passes through Hane — you cannot get
+  from the reading to the doing without walking past the people. A map that teleported would be
+  the shortcut past everything, which is the one thing the whole arrangement exists to prevent.
+  `runTo` and `runLane` each take a `done` callback for exactly this, and every comparison against
+  a stop is a tolerance rather than `!==`: `at` is a float, and a walk left one imperceptible step
+  short never clears `traveling`, which locks the map for the session.
+- **It is the one surface on the site that dims the two bars**, and that is a deliberate exception
+  to "THE TWO BARS ARE OMNIPRESENT" (frames.css) rather than an oversight. Everywhere else the bars
+  answer "where can I go" and nothing may pass in front of them; here the whole screen *is* that
+  answer, so the furniture is part of what goes quiet. Two mechanical notes, both of which fail
+  silently: the wash is **one number** (`--fb-map-dim`) used over the page and again *inside* the
+  bottom bar, because the two have to read as a single thing going quiet rather than as two
+  surfaces dimmed by eye; and the rule that lets the bottom bar through the layer is
+  `z-index: 610 !important`, because the omnipresence rule is itself `!important` and a plain 610
+  loses to it — the logo then goes dark under the very wash it is supposed to be standing above.
+- **The squares are how far into each window's content the reader has got** — Haberler as
+  `dealt/total` read from the deck's own `dunya_dealt_<uid>` store (both its shapes, stamped and
+  the legacy stampless array), Olaylar as `started/ongoing`, Oyunlar as `played/on today`, and
+  Etkinlikler as a count rather than a fraction, because an evening is not content to get through.
+  Every one is best-effort and independent: a query that fails leaves its own square a dash rather
+  than taking the map down. A square whose content is parked (Fikirler, Bilgi, Kahve, Yorumlar)
+  prints a dash too — the shape of a screen must not change on the day its numbers arrive.
+- **A map PNG inside a window has to be out of flow.** The windows are sized by `aspect-ratio`, and
+  an `<img>` left in flow reports its intrinsic height (1080×2420 for Türkiye's) into a box whose
+  height was supposed to come from that ratio. The two argue, intrinsic wins, and every window
+  comes out half again too tall and overlapping the one below it.
+
 **Its two ends are the real maps**, so the rig is also the place the shape question gets settled.
 `OVERRIDE` in project.html swaps any frame for a picture; today the first two stops are the real
 maps — frame 1 `kutuphane-map-mobile.png`, frame 12 `istanbul-map-mobile.png` — with frames 2–11
