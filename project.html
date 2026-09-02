@@ -1154,7 +1154,7 @@ async function loadHaberlerActor(el) {
   try {
     const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
     const { data, error } = await IstRouter.sb.from('breaking_news')
-      .select('id, title, body, category, neighborhood, updated_at')
+      .select('id, title, body, title_en, body_en, category, neighborhood, updated_at')
       .gte('updated_at', cutoff)
       .is('archived_at', null)
       .order('updated_at', { ascending: false })
@@ -1180,10 +1180,21 @@ async function loadHaberlerActor(el) {
   const more = rows.length - 1;
   el.innerHTML =
     '<div class="k">' + esc(newsKicker(n)) + '</div>' +
-    '<div class="t">' + esc(n.title) + '</div>' +
+    '<div class="t">' + esc(newsText(n, 'title')) + '</div>' +
     '<div class="m">' + esc(newsAge(n.updated_at)) +
       (more > 0 ? ' · +' + more : '') + '</div>' +
-    '<div class="x">' + (n.body ? '<p>' + esc(String(n.body).slice(0, 220)) + '</p>' : '') + '</div>';
+    '<div class="x">' + (newsText(n, 'body')
+      ? '<p>' + esc(String(newsText(n, 'body')).slice(0, 220)) + '</p>' : '') + '</div>';
+}
+
+// A story is entered in both languages (db/breaking_news_v2_bilingual.sql);
+// the English half is used only where the reader is in English and it was
+// actually written, so a half-translated story still reads in Turkish.
+function newsText(row, field) {
+  if (!row) return '';
+  const en = row[field + '_en'];
+  if (window.I18N && I18N.isEnglish() && en && String(en).trim()) return en;
+  return row[field];
 }
 
 // Which layer a story belongs to -- the same words Kütüphane's own cards

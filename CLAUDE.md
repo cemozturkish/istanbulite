@@ -815,6 +815,16 @@ sb.from('articles').delete().eq('id', id)
   the way Kahvehane's comments are parked behind `COMMENTS_ENABLED` — removing the attribute is
   the whole of bringing it back (`.lib-box[hidden]` exists because the author `display: flex`
   would otherwise beat the UA stylesheet)
+- **A story is entered in both languages** (`db/breaking_news_v2_bilingual.sql`): the Turkish
+  `title`/`body` stay required and are what every reader sees by default, and an optional
+  `title_en`/`body_en` is used only where the reader's `language_pref` is English *and* that half
+  was actually written — so a story translated by halves still reads in Turkish rather than going
+  blank. `breaking_news_updates` carries the same pair, because a gelişme is part of the same story
+  and a Zaman Akışı that reverts to Turkish half way down is worse than one nobody translated. One
+  helper on each page that prints a story (`newsText(row, field)` in kutuphane.html and
+  project.html) makes that choice; Kütüphane rebuilds the feed and the open page when the language
+  changes. Both halves are entered from admin.html's Haberler tab (post form, edit form, and each
+  gelişme's own form), and a story with no English half is labelled "EN yok" in the list.
 - Everyone can read, like, and comment on articles
 - Per the vision, this side stays *less* interactive than Kahvehane — reading and observing
   the national level, not peer-to-peer engagement about it
