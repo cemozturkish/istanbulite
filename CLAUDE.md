@@ -1677,41 +1677,49 @@ twice, for the same reason.
 
 ### What each screen carries — one template, and the tiles are the difference
 
-Every screen in the app is the same object: **a hero block, and a grid of tiles under it.** The
-hero is the petek on the three lanes of slide 12 and the map at the two depth stops the side lanes
-reach; the whole of what makes one screen different from another is which two things are in the
-tiles. That is the layout answer this app has been circling — a screen is not designed, it is
-*cast*, and adding a feature is adding a tile rather than inventing a page.
+Every screen in the app is the same object: **the maps at the top, and two columns of tiles under
+them** — a column of wide rows on the left and a column of small squares on the right. The whole of
+what makes one screen different from another is what stands in those two columns. That is the
+layout answer this app has been circling: a screen is not designed, it is *cast*, and adding a
+feature is adding a tile rather than inventing a page.
+
+**Hane is the one exception, and it is the exception on purpose.** Its hero is the petek, full
+bleed, and it carries no tiles at all — the middle page is the people and nothing else.
 
 ```
         (up / out)                                        (down / in)
-      Türkiye — slide 1                              the district — slide 24
-      Hikâyeler · Bilgi                               Kahve · Yorumlar
+      Türkiye — slide 1                                the ilçe — slide 24
+      Hikâyeler · Bilgi                                 Kahve · Yorumlar
               │                                              │
         ┌─────┴──────┐        ┌──────────┐        ┌──────────┴───┐
         │ KÜTÜPHANE  │ ────── │   HANE   │ ────── │  KAHVEHANE   │
         │ Haberler   │        │ the petek│        │ Etkinlikler  │
-        │ Fikirler   │        │          │        │ Oyunlar      │
+        │ Fikirler   │        │  alone   │        │ Oyunlar      │
         └────────────┘        └────┬─────┘        └──────────────┘
                                    │
                     ▲ up / out — the whole petek: what İstanbul thinks
                     ▼ down / in — Sen: your own hexagon, and what is yours to change
 ```
 
-| Screen | Hero | Tiles |
-|---|---|---|
-| Türkiye (slide 1) | the Türkiye map | **Hikâyeler** (the stories the map is grouped into) · **Bilgi** |
-| Kütüphane (lane 0) | the petek, a lane away | **Haberler** · **Fikirler** |
-| Hane (lane 1) | the petek itself, full bleed | none — the petek *is* the screen |
-| Kahvehane (lane 2) | the petek, a lane away | **Etkinlikler** (RSVP goes to Hane) · **Oyunlar** (Sözcel, Tümcel, Bulmaca) |
-| the district (slide 24) | the map, one zoom further in | **Kahve** (the Kahve Endeksi's rows) · **Yorumlar** |
+| Screen | The map(s) on top | Left column (wide rows) | Right column (squares) |
+|---|---|---|---|
+| Türkiye (slide 1) | Türkiye | **Hikâyeler** — the stories the map is grouped into | **Bilgi** |
+| Kütüphane (lane 0) | İstanbul · the ilçe | **Haberler** | **Fikirler** |
+| Hane (lane 1) | none — the petek, full bleed | — | — |
+| Kahvehane (lane 2) | İstanbul · the ilçe | **Etkinlikler** (RSVP goes to Hane) | **Oyunlar** — Sözcel, Tümcel, Bulmaca |
+| the ilçe (slide 24) | the ilçe, with the member's own picked out | **Kahve** — the Kahve Endeksi's rows | **Yorumlar** |
 
-Five things about it:
+Six things about it:
 
-- **The petek is on screen from wherever you are standing.** Both side-lane screens carry it as a
-  corner block — not a fourth petek and not a link, but the middle page showing from one lane away,
-  so the people are never off the screen entirely. It is the mall stairway drawn rather than
-  argued: whatever you came for, the petek is in the corner of it.
+- **Both distances are on screen from wherever you are standing.** The two side lanes carry
+  İstanbul *and* the reader's own ilçe side by side, so the zoom the reader is not currently at is
+  never out of sight — the depth stop each lane can reach is already showing at the top of the
+  screen they are standing on. It is the mall stairway drawn rather than argued, and it is "always
+  in the middle" applied to the drawing itself.
+- **The left column is a feed and the right column is a set.** Left are the things that arrive and
+  are taken one at a time — the news, the evenings, the cheapest cups; right is a small fixed
+  number of the same kind of thing, which is why Oyunlar is exactly three squares and Sözcel is one
+  of them. Never mix the two: a set that grows belongs on the left.
 - **Hane's vertical axis is the petek's own three depths, and there is nothing new above or below
   it.** Up/out is level 2 (the whole petek), the reader arrives at level 1 (Yanındakiler), down/in
   is level 0 (Sen — the hexagon with the avatar arrows on it and name, district and the three
@@ -1724,17 +1732,17 @@ Five things about it:
   which is exactly the depth where the reader is standing far enough out to be looking at everybody
   rather than at their own neighbours. It is the app's own formula in one move: people → their
   ideas → our opinions on those ideas.
-- **Two tiles per screen, not a menu.** A screen with six tiles is a launcher, and a launcher is a
+- **Two columns, not a menu.** A screen with six unrelated tiles is a launcher, and a launcher is a
   shortcut past everything — the one thing the arrangement exists to prevent.
 - **Fikirler is decided in shape and not in content.** The tile has its place on Kütüphane; what
   fills it is parked until it is worth building, the way Makaleler and the neighbourhood comments
-  are parked rather than deleted.
+  are parked rather than deleted. Bilgi is in the same state at the Türkiye stop.
 
 **What of this is already standing in `project.html`:** Etkinlikler and Sözcel on Kahvehane,
 Haberler and Olaylar on Kütüphane, the petek and its three depths on Hane, and the Türkiye map as
-slide 1's drawing. **What is still in the parts bin:** Kahve and Yorumlar, Tümcel and Bulmaca
-beside Sözcel, Hikâyeler and Bilgi at the Türkiye stop, and slide 24 — which has neither a drawing
-of its own nor a cast.
+slide 1's drawing. **What is still in the parts bin:** the second map on the two lane screens,
+Kahve and Yorumlar, Tümcel and Bulmaca beside Sözcel, Hikâyeler and Bilgi at the Türkiye stop, and
+slide 24 — which has neither a drawing of its own nor a cast.
 
 ### The flip book — `flip.js` + `flip-steps.js`
 
