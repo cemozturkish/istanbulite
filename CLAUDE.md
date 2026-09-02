@@ -1705,12 +1705,17 @@ what lets the entrance curtains read as sliding out from *behind* the bars rathe
 
 **The opening is two paper pages, not a fade.** The iframe loads at its true, untouched full size
 the whole time (`sozcel.html`'s own `layoutGame()` must never measure a transformed box), and two
-decorative curtains cover it, each sized to one of those same two regions: one the height of the
-map's own square, descending from above to where the word board sits; one the rest of the room
-down to the tab bar, rising from below to where the keyboard sits — the same 0.55s curve as THE
-sheet's own slide (`sheet.css`), so this reads as the same object opening a different way rather
-than a second transition language. They only lift once BOTH that slide has finished and the iframe
-has actually fired `load`, so a slow load is never uncovered early and a fast one is never rushed.
+decorative curtains cover it — one the height of the map's own square, descending from above; one
+resting just above the actor row the tile was pressed from, rising from below the tab bar — the
+same 0.55s curve as THE sheet's own slide (`sheet.css`), so this reads as the same object opening a
+different way rather than a second transition language. **They land apart and stay apart —
+two windows, not one closed sheet**, so the room between the map and the row is in view the instant
+they land rather than being swallowed by a sheet that briefly covers the whole screen; where the
+bottom one rests is measured live off whichever actor is actually on screen
+(`--fb-curtain-bottom-top`, set in `openGameOverlay()`), never a guessed fraction, so a taller
+Etkinlikler card or a different device is never fought. They only lift once BOTH the slide has
+finished and the iframe has actually fired `load`, so a slow load is never uncovered early and a
+fast one is never rushed.
 
 **Leaving reverses it, rather than snapping.** The back arrow's `postMessage` used to hide the
 layer outright — `hidden = true` in the same tick, the game gone and the book back in one frame,
