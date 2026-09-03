@@ -1734,8 +1734,8 @@ to hidden (`closeGameOverlay(true)`).
 Visiting one of the three directly still works exactly as before — the
 `<a href="project.html">` fallback is what fires when there is no parent to postMessage — and
 their own bottom-bar link and back arrow still point at `project.html` for that case. Tümcel and
-Bulmaca are not tiles yet (see "What of this is already standing in `project.html`" above), but
-carry the same embed support already, ready for whenever they are wired in the same way.
+Bulmaca are tiles too now, the other two slots of Oyunlar beside Sözcel (see "What each screen
+carries" below) — all three open through the same embed.
 
 **The first frame is fetched alone, and that is the whole of why the page feels quick.** Every frame
 has to be decoded before the book can reach it — an `<img>` whose bytes are not ready paints
@@ -1754,18 +1754,21 @@ count, never a spinner.
 own furniture — and `CAST` in project.html is where each one is declared: an element, the stop it
 belongs to (`live`), and a pose per slide. Three rules make them work:
 
-- **An actor's shape is a word, not a stylesheet.** The drawing gives the app exactly two
-  buttons — a wide **row** in the left column and a small **square** in the right one — so an
-  actor declares `shape: 'row' | 'sq'` beside its `live` and `lane`, and `.fb-row` / `.fb-sq`
-  state the geometry once for both lanes. An actor's own class (`fb-events`, `fb-sozcel`) says
-  what it is OF and never how big it is. **One number is the height of the line**
-  (`--fb-line-h`): the square's side *is* that height, so the two shapes stand exactly as tall
-  as each other whatever is printed in them, and the row takes it as a `min-height` so it can
-  still grow when it opens in place. A square is genuinely square, and `overflow: hidden` is
-  what keeps it that way — `aspect-ratio` yields to content that will not fit, and a wordmark
-  an inch too tall silently stood a third higher than the row beside it. A lane that restated
-  any of this would land its cards a few pixels off the lane before it, and the walk between
-  them would read as the page reflowing.
+- **An actor's shape is a word, not a stylesheet.** The drawing gives the app exactly one
+  button — a rectangle — stacked three to a column: a wider column on the left, a narrower one
+  on the right, both the same height. An actor declares `col: 'l' | 'r'` beside its `live` and
+  `lane`, and `.fb-box` / `.fb-col-l` / `.fb-col-r` / `.fb-slot-0/1/2` state the geometry once
+  for every column on every lane — `stackActors()` is what turns one column description into
+  its three sibling actors. An actor's own class (`fb-events`, `fb-oyun`) says what it is OF and
+  never how big it is. **One number splits the line** (`--fb-unit`, five units wide, three to
+  the left column and two to the right — see "What each screen carries" below): left:right
+  width is always 3:2, and the left column's margin, the right column's margin and the gap
+  between them are all `--fb-inset`, the same number. A slot with nothing to put in it —
+  whether that column is a feed with fewer than three things or a fixed set with one of its
+  three switched off — is drawn `.fb-empty`: a dashed rectangle, the same "nothing here"
+  convention the rest of the site already uses, marking where the thing would be rather than
+  leaving a blank gap. A lane that restated any of this would land its cards a few pixels off
+  the lane before it, and the walk between them would read as the page reflowing.
 - **An actor belongs to one stop and one lane, not to the book.** It is alive only while the book
   is *resting* on that stop and the reader is standing on that lane — not mid-drag, not
   mid-run-out, not on a different stop, and not a lane along (`armCast`). Events and Sözcel are
@@ -1774,10 +1777,11 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   handler must bail out on one. Without that the book swallows its own buttons: it takes pointer
   capture on the way down, which re-targets the eventual click at the capturing element, so the card
   never hears it. It looks exactly like a dead button and nothing throws.
-- **An actor carries real data.** `load(el)` is called once per mount, after the element exists and
-  awaited by nothing — the book must never wait on the network. The events actor runs the same query
-  Kahvehane's deck does, and says three different things: the next evening, a city with nothing on,
-  and a fetch that failed.
+- **An actor carries real data.** `load(el, slot)` is called once per mount, per box, after the
+  element exists and awaited by nothing — the book must never wait on the network. A column's
+  three boxes share one fetch (`stackFetch`): Etkinlikler runs the same query Kahvehane's deck
+  does and fills up to three boxes with it, and says three different things where a feed comes
+  up short — a box per evening, a city with nothing on, and a fetch that failed.
 - **An actor on a middle stop is parked off-screen on both sides of it.** It comes in over the run
   that arrives at its stop and leaves again over the run that departs it, so it belongs to that
   screen coming and going — events slides in from the left across slides 8–12 and back out to the
@@ -1827,11 +1831,16 @@ twice, for the same reason.
 
 ### What each screen carries — one template, and the tiles are the difference
 
-Every screen in the app is the same object: **the maps at the top, and two columns of tiles under
-them** — a column of wide rows on the left and a column of small squares on the right. The whole of
-what makes one screen different from another is what stands in those two columns. That is the
-layout answer this app has been circling: a screen is not designed, it is *cast*, and adding a
-feature is adding a tile rather than inventing a page.
+Every screen in the app is the same object: **the maps at the top, and two columns of three
+rectangles under them** — a wider column on the left, a narrower one on the right, both the same
+height, left:right width always 3:2. The left column's margin, the right column's margin and the
+gap between the two columns are all one number, so the two columns and the rail between them read
+as three equal beats rather than two boxes and a leftover gap. The whole of what makes one screen
+different from another is what stands in those two columns. That is the layout answer this app has
+been circling: a screen is not designed, it is *cast*, and adding a feature is adding a tile rather
+than inventing a page. A column always shows exactly three boxes — a feed truncated (or padded) to
+three, a fixed set of three — and a slot with nothing to put in it (a feed short of three, or one
+of a fixed set switched off) is a dashed rectangle marking the place rather than a blank gap.
 
 **Hane is the one exception, and it is the exception on purpose.** Its hero is the petek, full
 bleed, and it carries no tiles at all — the middle page is the people and nothing else.
@@ -1851,7 +1860,7 @@ bleed, and it carries no tiles at all — the middle page is the people and noth
                     ▼ down / in — Sen: your own hexagon, and what is yours to change
 ```
 
-| Screen | The map(s) on top | Left column (wide rows) | Right column (squares) |
+| Screen | The map(s) on top | Left column (3 rectangles) | Right column (3 rectangles) |
 |---|---|---|---|
 | Türkiye (slide 1) | Türkiye | **Hikâyeler** — the stories the map is grouped into | **Bilgi** |
 | Kütüphane (lane 0) | İstanbul · the ilçe | **Haberler** | **Fikirler** |
@@ -1866,10 +1875,13 @@ Six things about it:
   never out of sight — the depth stop each lane can reach is already showing at the top of the
   screen they are standing on. It is the mall stairway drawn rather than argued, and it is "always
   in the middle" applied to the drawing itself.
-- **The left column is a feed and the right column is a set.** Left are the things that arrive and
-  are taken one at a time — the news, the evenings, the cheapest cups; right is a small fixed
-  number of the same kind of thing, which is why Oyunlar is exactly three squares and Sözcel is one
-  of them. Never mix the two: a set that grows belongs on the left.
+- **The left column is a feed and the right column is a set — both always three boxes.** Left are
+  the things that arrive and are taken one at a time — the news, the evenings, the cheapest cups —
+  truncated to the soonest three, with any slot the feed comes up short on left dashed. Right is a
+  fixed set of exactly three of the same kind of thing, which is why Oyunlar is Sözcel, Tümcel and
+  Bulmaca and nothing else; one of the three switched off for the day (`game_day_toggles`) goes
+  dashed in its own slot rather than shifting the other two over. Never mix the two: a set that
+  grows belongs on the left.
 - **Hane's vertical axis is the petek's own three depths, and there is nothing new above or below
   it.** Up/out is level 2 (the whole petek), the reader arrives at level 1 (Yanındakiler), down/in
   is level 0 (Sen — the hexagon with the avatar arrows on it and name, district and the three
@@ -1888,11 +1900,13 @@ Six things about it:
   fills it is parked until it is worth building, the way Makaleler and the neighbourhood comments
   are parked rather than deleted. Bilgi is in the same state at the Türkiye stop.
 
-**What of this is already standing in `project.html`:** Etkinlikler and Sözcel on Kahvehane,
-Haberler and Olaylar on Kütüphane, the petek and its three depths on Hane, and the Türkiye map as
-slide 1's drawing. **What is still in the parts bin:** the second map on the two lane screens,
-Kahve and Yorumlar, Tümcel and Bulmaca beside Sözcel, Hikâyeler and Bilgi at the Türkiye stop, and
-slide 24 — which has neither a drawing of its own nor a cast.
+**What of this is already standing in `project.html`:** Etkinlikler and Oyunlar (all three games)
+on Kahvehane, Haberler and Olaylar on Kütüphane, the petek and its three depths on Hane, and the
+Türkiye map as slide 1's drawing. Hikâyeler, Bilgi, Kahve and Yorumlar have their six boxes too,
+standing dashed at slides 1 and 24 (see the cast rules above) — the boxes are cast, the content
+behind them is not. **What is still in the parts bin:** the second map on the two lane screens,
+the ilçe's own drawing at slide 24, and whatever actually fills Hikâyeler, Bilgi, Kahve and
+Yorumlar.
 
 ### The flip book — `flip.js` + `flip-steps.js`
 
