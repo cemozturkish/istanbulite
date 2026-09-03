@@ -714,37 +714,30 @@
 /* The container itself never fades -- what arrives is the drawing, cell
    by cell (see .ist-hive-reveal below), not a rectangle of it. */
 .ist-hive { transition: none; }
-/* The first paint of a mount that had no petek to start from (see
-   ist-hive-waiting above) draws itself in ring by ring rather than
-   arriving as one block: the reader's own hexagon (--ring: 0) first,
-   the ring touching them a beat behind it. Toggled once by
-   hiveRevealFirst in profile-card.js, right after loadHive's fetch
-   lands -- a level change, a status caption arriving, or a swipe back
-   to an already-cached petek re-renders the same cells without it, so
-   the stagger never repeats mid-session. Excludes cells the level
-   itself already keeps hidden (.ist-hive-away) -- without that a ring
-   past the reader's own would be forced briefly visible by this rule's
-   own specificity and then snap back out when the class comes off. */
-.ist-hive-page.ist-hive-reveal .ist-hive-cell {
+/* ── The petek arrives in three beats ──
+   Rather than the whole grid arriving as one block: the reader's own
+   hexagon, then the ring touching them, then their names. Held by
+   .ist-hive-reveal and stepped by the three .ist-hive-reveal-N classes,
+   which armHiveReveal/playHiveReveal in profile-card.js add in turn --
+   deliberately NOT one class with per-cell transition-delays, because
+   the reveal can be armed while the layer carrying the petek is itself
+   still fading in (Proje's walk onto Hane), and a delay that runs out
+   under a layer nobody can see yet is a beat the reader never sees. */
+.ist-hive-page.ist-hive-reveal .ist-hive-cell,
+.ist-hive-page.ist-hive-reveal .ist-hive-name {
   opacity: 0;
   transition: opacity 260ms ease;
-  transition-delay: calc(var(--ring, 0) * 160ms); /* fallback: no min() on times */
-  transition-delay: min(calc(var(--ring, 0) * 160ms), 320ms);
 }
-.ist-hive-page.ist-hive-reveal.ist-hive-reveal-in .ist-hive-cell:not(.ist-hive-away) { opacity: 1; }
-/* And the names are the third beat, after the shape itself: you, then
-   the people around you, then who they are. A name arriving with its
-   own hexagon makes the reveal one movement of type and drawing at
-   once; held back, the drawing lands first and the paper is written on
-   afterwards. Excluded at the outermost depth, where names are not
-   drawn at all (see .ist-hive-level-2 above) -- this rule carries a
-   class more than that one and would otherwise overrule it. */
-.ist-hive-page.ist-hive-reveal:not(.ist-hive-level-2) .ist-hive-name {
-  opacity: 0;
-  transition: opacity 260ms ease;
-  transition-delay: 420ms;
-}
-.ist-hive-page.ist-hive-reveal.ist-hive-reveal-in:not(.ist-hive-level-2) .ist-hive-name { opacity: 1; }
+/* Beat one: you. Beat two: the ring touching you -- and everything
+   further out, which at the depth a mount arrives at is not drawn
+   anyway. Beat three: their names. Cells the level itself keeps hidden
+   are excluded, or a ring past the reader's own would be forced briefly
+   visible by these rules' specificity and snap back out when the
+   classes come off. Names are excluded at the outermost depth, where
+   they are not drawn at all (see .ist-hive-level-2 above). */
+.ist-hive-page.ist-hive-reveal.ist-hive-reveal-0 .ist-hive-cell[data-ring="0"]:not(.ist-hive-away) { opacity: 1; }
+.ist-hive-page.ist-hive-reveal.ist-hive-reveal-1 .ist-hive-cell:not(.ist-hive-away) { opacity: 1; }
+.ist-hive-page.ist-hive-reveal.ist-hive-reveal-2:not(.ist-hive-level-2) .ist-hive-name { opacity: 1; }
 .ist-hive-pannable { cursor: grab; touch-action: none; }
 .ist-hive-pannable:active { cursor: grabbing; }
 /* The drawing itself. Hung off the middle of the window by the caller's
@@ -1364,8 +1357,8 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.955); }
      above), so it needs its own override here rather than inheriting
      the plain .ist-hive-cell reset two lines up -- same specificity,
      declared later, wins the same way. */
-  .ist-hive-page.ist-hive-reveal .ist-hive-cell { transition: none; }
-  .ist-hive-page.ist-hive-reveal:not(.ist-hive-level-2) .ist-hive-name { transition: none; }
+  .ist-hive-page.ist-hive-reveal .ist-hive-cell,
+  .ist-hive-page.ist-hive-reveal .ist-hive-name { transition: none; }
 }
 
 /* ── Weekly game grid ── 3 rows (Sözcel/Tümcel/Bulmaca) × 7 days

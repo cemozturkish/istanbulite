@@ -2211,31 +2211,70 @@
     state.hiveWaveTimer = setTimeout(() => page.classList.remove('ist-hive-wave-in'), 1600);
   }
 
-  // The mount's own first paint (see loadHive): rather than the whole
-  // grid fading in as one rectangle, the reader's own hexagon (--ring: 0)
-  // draws in first and the ring touching them follows a beat behind it
-  // (.ist-hive-reveal in profile-card.css). Starting the opacity:0 state
-  // and the transition to opacity:1 in the same class add would collapse
-  // both into one style pass and leave nothing for the transition to
-  // interpolate from — the same reason IstSheet.open reads a style back
-  // before its own .open class lands — so the two are split across a
-  // forced reflow and the next frame.
-  function hiveRevealFirst(state, page) {
-    // Already running: a mount draws the cached petek and then loadHive
-    // re-renders the same cells a beat later, and restarting the two
-    // classes there would deal the reader a second reveal on top of the
-    // one they are watching. The new nodes pick the stagger up from the
-    // classes already on the page.
-    if (page.classList.contains('ist-hive-reveal')) return;
+  // ── The petek arrives in three beats ──
+  // Rather than the whole grid fading in as one rectangle: the reader's
+  // own hexagon first, then the ring touching them, then their names.
+  // The stages are three classes stepped in JS rather than one class
+  // with per-cell transition-delays, because the delays have to survive
+  // being armed while the layer carrying the petek is itself still
+  // fading in (Proje's slide-12 lane walk does exactly that) -- and a
+  // delay that runs out under a layer nobody can see yet is a beat the
+  // reader never sees.
+  //
+  // Arming and playing are separate for the same reason: the walk onto
+  // Hane asks for the reveal when it *starts* (so the cells are held
+  // back for the whole of it and nothing has to be flashed out) and
+  // plays it when it lands. Everything else does both at once.
+  const HIVE_REVEAL_BEAT = 300;   // between one beat and the next
+  const HIVE_REVEAL_HOLD = 1600;  // an armed reveal nobody played is played anyway
+
+  function armHiveReveal(state, page) {
+    if (!page || page.classList.contains('ist-hive-reveal')) return;
     page.classList.add('ist-hive-reveal');
+    // Committed now, so the first beat has something to interpolate
+    // from: adding the held state and the first stage in one style pass
+    // leaves nothing for the transition -- the same reason IstSheet.open
+    // reads a style back before its own .open class lands.
     void page.offsetWidth;
-    requestAnimationFrame(() => page.classList.add('ist-hive-reveal-in'));
+    state.hiveRevealPlayed = false;
+    clearTimeout(state.hiveRevealHoldTimer);
+    // A reveal that was armed and never played would hold the petek
+    // hidden for good -- an interrupted walk must not cost the reader
+    // the drawing.
+    state.hiveRevealHoldTimer = setTimeout(() => playHiveReveal(), HIVE_REVEAL_HOLD);
+  }
+
+  function playHiveReveal() {
+    const page = document.getElementById('po-hive-page');
+    const state = _hive;
+    if (!page || !state) return;
+    if (!page.classList.contains('ist-hive-reveal')) return;
+    if (state.hiveRevealPlayed) return;
+    state.hiveRevealPlayed = true;
+    clearTimeout(state.hiveRevealHoldTimer);
+    const beat = (n, ms) => setTimeout(() => {
+      if (document.getElementById('po-hive-page') === page) page.classList.add('ist-hive-reveal-' + n);
+    }, ms);
+    requestAnimationFrame(() => {
+      if (document.getElementById('po-hive-page') !== page) return;
+      page.classList.add('ist-hive-reveal-0');           // you
+      state.hiveRevealTimers = [
+        beat(1, HIVE_REVEAL_BEAT),                        // the people touching you
+        beat(2, HIVE_REVEAL_BEAT * 2),                    // who they are
+      ];
+    });
     clearTimeout(state.hiveRevealTimer);
-    // Only rings 0 and 1 are ever on screen at the depth a mount arrives
-    // at, so the whole stagger is done well inside this — it exists so a
-    // reader who swipes straight back out doesn't leave the classes on.
-    // Long enough to cover the names, which are the last beat of it.
-    state.hiveRevealTimer = setTimeout(() => page.classList.remove('ist-hive-reveal', 'ist-hive-reveal-in'), 1000);
+    state.hiveRevealTimer = setTimeout(() => {
+      page.classList.remove('ist-hive-reveal', 'ist-hive-reveal-0',
+                            'ist-hive-reveal-1', 'ist-hive-reveal-2');
+    }, HIVE_REVEAL_BEAT * 2 + 500);
+  }
+
+  // Both at once: the drawing is already on the screen and there is
+  // nothing to wait for (see loadHive's first draw).
+  function hiveRevealFirst(state, page) {
+    armHiveReveal(state, page);
+    playHiveReveal();
   }
 
   // ── Arriving on the petek without remounting it ──
@@ -2248,13 +2287,15 @@
   // A reveal already running is left alone, and a page that isn't there
   // is not an error: the caller has no way to know the petek's state and
   // shouldn't have to.
+  // Armed when the walk onto Hane starts; played by playHiveReveal when
+  // it lands (see the beats above).
   function revealHivePage() {
     const page = document.getElementById('po-hive-page');
     if (!page || !_hive) return;
     // Nothing has landed yet: this mount is still holding the drawing
     // back (see ist-hive-waiting), and loadHive reveals it when it does.
     if (page.classList.contains('ist-hive-waiting')) return;
-    hiveRevealFirst(_hive, page);
+    armHiveReveal(_hive, page);
   }
 
   // ── Pressing a member ──
@@ -3793,6 +3834,7 @@
     mountHivePage,
     unmountHivePage,
     revealHivePage,
+    playHiveReveal,
     paintHiveEventMarks,
     clearHiveEventMarks,
     initMemberSheet,
