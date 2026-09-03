@@ -2238,6 +2238,25 @@
     state.hiveRevealTimer = setTimeout(() => page.classList.remove('ist-hive-reveal', 'ist-hive-reveal-in'), 1000);
   }
 
+  // ── Arriving on the petek without remounting it ──
+  // The petek is mounted once and then kept: Proje's own ensurePetek
+  // refuses to REmount a standing one, because that would pull the
+  // drawing out from under a reader who is already in it. But arriving
+  // on Hane is arriving whether or not anything was rebuilt, and the
+  // reveal belongs to the arrival rather than to the mount -- so the
+  // page that owns the walk (the lane run toward Hane) asks for it here.
+  // A reveal already running is left alone, and a page that isn't there
+  // is not an error: the caller has no way to know the petek's state and
+  // shouldn't have to.
+  function revealHivePage() {
+    const page = document.getElementById('po-hive-page');
+    if (!page || !_hive) return;
+    // Nothing has landed yet: this mount is still holding the drawing
+    // back (see ist-hive-waiting), and loadHive reveals it when it does.
+    if (page.classList.contains('ist-hive-waiting')) return;
+    hiveRevealFirst(_hive, page);
+  }
+
   // ── Pressing a member ──
   // One member is named on the bar at a time, and pressing the one that
   // is already named puts your own name back — the same toggle every
@@ -3773,6 +3792,7 @@
     closeProfileOverlay,
     mountHivePage,
     unmountHivePage,
+    revealHivePage,
     paintHiveEventMarks,
     clearHiveEventMarks,
     initMemberSheet,
