@@ -1055,8 +1055,16 @@
     // lands (a beat, and blank paper is not a lie). Cleared by loadHive
     // whatever the answer -- including no answer at all, since a member
     // standing alone on their own petek is a real state and must draw.
-    if (!(_hiveMap && _hiveMap.cells)) page.classList.add('ist-hive-waiting');
+    const waiting = !(_hiveMap && _hiveMap.cells);
+    if (waiting) page.classList.add('ist-hive-waiting');
     renderHive(_hive);
+    // The petek arrives the same way every time the reader walks onto
+    // Hane, not only the first time in a session: you first, then the
+    // people touching you, then their names (see hiveRevealFirst). A
+    // mount with a cached map draws it here; a mount with nothing to
+    // start from has nothing to reveal yet and is revealed by loadHive
+    // when the map lands.
+    if (!waiting) hiveRevealFirst(_hive, page);
     wireHiveGestures(_hive);
     loadHive(_hive);
   }
@@ -2213,6 +2221,12 @@
   // before its own .open class lands — so the two are split across a
   // forced reflow and the next frame.
   function hiveRevealFirst(state, page) {
+    // Already running: a mount draws the cached petek and then loadHive
+    // re-renders the same cells a beat later, and restarting the two
+    // classes there would deal the reader a second reveal on top of the
+    // one they are watching. The new nodes pick the stagger up from the
+    // classes already on the page.
+    if (page.classList.contains('ist-hive-reveal')) return;
     page.classList.add('ist-hive-reveal');
     void page.offsetWidth;
     requestAnimationFrame(() => page.classList.add('ist-hive-reveal-in'));
@@ -2220,7 +2234,8 @@
     // Only rings 0 and 1 are ever on screen at the depth a mount arrives
     // at, so the whole stagger is done well inside this — it exists so a
     // reader who swipes straight back out doesn't leave the classes on.
-    state.hiveRevealTimer = setTimeout(() => page.classList.remove('ist-hive-reveal', 'ist-hive-reveal-in'), 700);
+    // Long enough to cover the names, which are the last beat of it.
+    state.hiveRevealTimer = setTimeout(() => page.classList.remove('ist-hive-reveal', 'ist-hive-reveal-in'), 1000);
   }
 
   // ── Pressing a member ──
