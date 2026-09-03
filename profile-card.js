@@ -2225,7 +2225,11 @@
   // Hane asks for the reveal when it *starts* (so the cells are held
   // back for the whole of it and nothing has to be flashed out) and
   // plays it when it lands. Everything else does both at once.
-  const HIVE_REVEAL_BEAT = 300;   // between one beat and the next
+  // The two gaps are not the same length: the reader's own hexagon is one
+  // shape and the ring is six, so waiting as long for the ring as for the
+  // names reads as a pause rather than as a beat.
+  const HIVE_REVEAL_BEAT = 150;   // you -> the ring touching you
+  const HIVE_REVEAL_BEAT_2 = 300; // the ring -> their names
   const HIVE_REVEAL_HOLD = 1600;  // an armed reveal nobody played is played anyway
 
   function armHiveReveal(state, page) {
@@ -2273,7 +2277,7 @@
       page.classList.add('ist-hive-reveal-0');           // you
       state.hiveRevealTimers = [
         beat(1, HIVE_REVEAL_BEAT),                        // the people touching you
-        beat(2, HIVE_REVEAL_BEAT * 2),                    // who they are
+        beat(2, HIVE_REVEAL_BEAT + HIVE_REVEAL_BEAT_2),   // who they are
       ];
     }));
     clearTimeout(state.hiveRevealTimer);
@@ -2281,7 +2285,7 @@
       page.classList.remove('ist-hive-reveal', 'ist-hive-reveal-arm',
                             'ist-hive-reveal-0', 'ist-hive-reveal-1',
                             'ist-hive-reveal-2');
-    }, HIVE_REVEAL_BEAT * 2 + 500);
+    }, HIVE_REVEAL_BEAT + HIVE_REVEAL_BEAT_2 + 500);
   }
 
   // Both at once: the drawing is already on the screen and there is
