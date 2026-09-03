@@ -90,142 +90,84 @@
     }
     .fb-actor.live { pointer-events: auto; }
 
-    /* ── The two shapes, and there are only two ──
-       The drawing says every screen is the maps on top and two columns of
-       tiles under them: a column of WIDE ROWS on the left and a column of
-       SMALL SQUARES on the right (see "What each screen carries" in
-       CLAUDE.md). So the whole app has exactly two button shapes, and
-       they are stated here ONCE rather than per lane -- an actor's own
-       class says what it is OF, never how big it is. It is declared as
-       `shape` on the actor beside `live` and `lane`, so a new tile is a
-       word in the cast table rather than a fifth copy of this geometry.
-       A lane that restated it would land its cards a few pixels off the
-       lane before it, and the walk between them would read as the page
-       reflowing.
-
-       One number splits the line (--fb-row-w) and the square's side falls
-       out of it, so narrowing one widens the other by construction rather
-       than by two numbers being kept in step by hand. 52.7% is the
-       original 62% less 15%. */
+    /* ── One box, three of them a side ──
+       Every screen is the maps on top and two columns of three
+       rectangles under them (see "What each screen carries" in
+       CLAUDE.md): a wider column on the left, a narrower one on the
+       right, both the same height. Left:right width is 3:2, and the
+       left column's distance from the left edge, the right column's
+       distance from the right edge and the gap between the two
+       columns are all --fb-inset -- one number stated once rather than
+       three that could drift apart. Splitting the remaining width into
+       five units and handing 3 to the left column and 2 to the right
+       is what keeps the ratio true by construction instead of by two
+       widths kept in step by hand. */
     .fb-cast {
-      --fb-row-w: 52.7%;
-      --fb-gap: 8px;
       --fb-inset: var(--screen-inset, 18px);
-      /* The HEIGHT OF THE LINE, and the only number that decides the
-         square: a square's side is the row's height, so the two shapes
-         stand at one height whatever is printed inside them. It used to
-         be the other way round -- the square took whatever width the
-         split left over, which made it as wide as the row is tall twice
-         over and left the pair reading as a card and a poster rather
-         than as one line. */
-      --fb-line-h: 74px;
+      --fb-unit: calc((100% - 3 * var(--fb-inset)) / 5);
+      --fb-col-l-w: calc(var(--fb-unit) * 3);
+      --fb-col-r-w: calc(var(--fb-unit) * 2);
+      --fb-box-h: 58px;
+      --fb-box-gap: 7px;
       /* Both columns hang from the same line above the tab bar -- the
          phone's stacks grow upward from the thumb (see "The phone's feeds
          hang from the bottom" in CLAUDE.md). */
       --fb-dock: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px) + 16px);
     }
 
-    /* Both shapes are cut from the same card stock. */
-    .fb-row, .fb-sq {
-      bottom: var(--fb-dock);
+    /* Every box is cut from the same card stock, whichever column or
+       slot it stands in -- only the width and the vertical offset
+       differ. */
+    .fb-box {
+      position: absolute;
+      height: var(--fb-box-h);
+      box-sizing: border-box;
       background: var(--paper-card, #ddc4b5);
       border: 2px solid var(--ink);
       font: inherit;
       color: var(--ink);
+      text-align: left;
+      padding: 7px 10px;
+      overflow: hidden;
       -webkit-tap-highlight-color: transparent;
     }
-    /* The left column: a wide row. The line's height is a MINIMUM rather
-       than a height -- a row carries a kicker, a headline and a line of
-       meta, and one that opens in place grows upward from its own dock
-       corner; a fixed height would clip both. */
-    .fb-row {
-      left: var(--fb-inset);
-      width: var(--fb-row-w);
-      min-height: var(--fb-line-h);
-      padding: 9px 11px 10px;
-      text-align: left;
-      display: block;
+    .fb-box.fb-col-l { left: var(--fb-inset); width: var(--fb-col-l-w); }
+    .fb-box.fb-col-r { right: var(--fb-inset); width: var(--fb-col-r-w); }
+    /* Three slots, stacked from the dock line upward. */
+    .fb-box.fb-slot-0 { bottom: var(--fb-dock); }
+    .fb-box.fb-slot-1 { bottom: calc(var(--fb-dock) + var(--fb-box-h) + var(--fb-box-gap)); }
+    .fb-box.fb-slot-2 { bottom: calc(var(--fb-dock) + 2 * (var(--fb-box-h) + var(--fb-box-gap))); }
+    /* A slot with nothing to put in it is drawn as an empty frame --
+       the same "nothing here" convention as everywhere else on the site
+       (.events-empty, deckFrameHTML): a dashed rectangle marking where
+       the thing would be, never a blank gap. */
+    .fb-box.fb-empty {
+      background: none;
+      border: 2px dashed var(--muted, #9a9a9a);
     }
-    /* The right column: a small square, and actually square -- its side
-       IS the line's height, so it stands exactly as tall as the row beside
-       it. aspect-ratio yields to content that genuinely needs more room,
-       which is what lets a tile open in place without fighting it. */
-    .fb-sq {
-      right: var(--fb-inset);
-      width: var(--fb-line-h);
-      aspect-ratio: 1;
-      padding: 7px 6px 8px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      /* aspect-ratio yields to content that will not fit, and a tile whose
-         wordmark was an inch too tall silently stopped being square and
-         stood a third taller than the row beside it. Anything that cannot
-         fit is clipped rather than allowed to change the shape -- and
-         nothing below is left able to overflow, so nothing is clipped. */
+    /* Each box gives under the finger from the corner it is docked to. */
+    .fb-actor.live.fb-col-l:active { transform-origin: 0% 100%; }
+    .fb-actor.live.fb-col-r:active { transform-origin: 100% 100%; }
+
+    /* ── What a filled box is OF -- one template for all of them ── */
+    .fb-box .k {
+      font-size: 0.52rem; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 2px;
+    }
+    .fb-box .t {
+      font-size: 0.82rem; font-weight: 700; line-height: 1.15;
+      display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    /* Each shape gives under the finger from the corner it is docked to,
-       so the press reads as the card being pushed into its own corner
-       rather than sliding across the line. */
-    .fb-actor.live.fb-row:active { transform-origin: 0% 100%; }
-    .fb-actor.live.fb-sq:active { transform-origin: 100% 100%; }
-
-    /* ── What each one is OF ──
-       Below here, nothing decides a size or a position. */
-    .fb-row .k {
-      font-size: 0.56rem; letter-spacing: 0.16em; text-transform: uppercase;
-      color: var(--muted); margin-bottom: 3px;
-    }
-    .fb-row .t { font-size: 0.95rem; font-weight: 700; line-height: 1.15; }
-    .fb-row .m { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
-    /* Opened in place. Poses are a percentage of the card's OWN size and
-       it is docked bottom-left, so growing upward moves nothing else. */
-    .fb-row .x { display: none; }
-    .fb-row .x p { margin: 6px 0 0; font-size: 0.72rem; line-height: 1.35; }
-    .fb-row.open .x { display: block; }
-
-    .fb-sozcel img {
-      /* Sized by its HEIGHT, not its width: the tile is the line's height
-         square, and what has to fit inside it is the wordmark plus its
-         line of type. Bounding the width instead let a nearly-square
-         wordmark take the whole box and push the label out of it. */
-      width: auto;
-      max-width: 100%;
-      max-height: calc(var(--fb-line-h) - 46px);
-      height: auto;
-      display: block;
-      /* In a column flex container the image's HEIGHT is the main size,
-         so it shrinks along it -- the wordmark was being squashed to a
-         third of its height. Nothing here should give. */
-      flex: none;
-      /* Deliberately no mix-blend-mode. The wordmark is white letters
-         with a black outline, and multiply turns that white fill into
-         the paper colour -- the letterforms vanish and the tile reads as
-         empty. */
-    }
-    .fb-sq .n {
-      flex: none;
-      font-size: 0.48rem; letter-spacing: 0.08em; text-transform: uppercase;
-      color: var(--muted); text-align: center; line-height: 1.1;
-    }
-    /* Olaylar has no wordmark of its own, so its name is set in type
-       where Sözcel's picture stands -- same box, same two lines. */
-    .fb-sq .w {
-      flex: none;
-      font-size: 0.8rem; font-weight: 800; line-height: 1;
-      letter-spacing: 0.02em; text-align: center;
-    }
-    /* Opened in place, like the rows on the left of either lane. Docked
-       bottom-right, and every pose is a percentage of the tile's OWN
-       size, so growing upward moves nothing else on the screen. */
-    .fb-sq .x { display: none; }
-    .fb-sq.open .x { display: block; width: 100%; }
-    .fb-sq .x p {
-      margin: 5px 0 0; font-size: 0.66rem; line-height: 1.3;
-      text-align: left; color: var(--ink);
+    .fb-box .m { font-size: 0.6rem; color: var(--muted); margin-top: 2px; }
+    /* A placeholder that has not been built yet (Hikâyeler, Bilgi, Kahve,
+       Yorumlar) still names its own slot, so a dashed box reads as "this
+       is reserved" rather than as the page being broken. */
+    .fb-box .ph {
+      font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--muted); text-align: center;
+      display: flex; align-items: center; justify-content: center;
+      height: 100%;
     }
 
     /* ── The middle lane: the petek over the book ──
@@ -819,18 +761,18 @@
       transform: translateY(-100%);
       border-bottom: 2px solid var(--ink, #17140f);
     }
-    /* Where this one rests is the actor row's own top edge, minus a
-       breath of margin -- set as --fb-curtain-bottom-top by
-       openGameOverlay() the instant it measures the live row, so a
+    /* Where this one rests is the topmost live box's own top edge,
+       minus a breath of margin -- set as --fb-curtain-bottom-top by
+       openGameOverlay() the instant it measures the live boxes, so a
        taller Etkinlikler card or a different device is never guessed
-       at. The calc() here is only the value's fallback, for the one
-       frame before that measurement lands: the row's own dock formula
-       (--fb-dock/--fb-line-h, see the cast block above) translated into
-       this layer's own coordinate space, since the two boxes don't
-       share an origin. */
+       at. The calc() here is only the value's fallback, for the rare
+       case no live box is found: three stacked boxes' worth of height
+       (see --fb-box-h/--fb-box-gap in the cast block above) translated
+       into this layer's own coordinate space, since the two boxes
+       don't share an origin. */
     .fb-game-curtain-bottom {
       top: var(--fb-curtain-bottom-top,
-            calc(100% - 16px - var(--fb-line-h, 74px) - var(--frame-pad, 10px)));
+            calc(100% - 16px - 188px - var(--frame-pad, 10px)));
       bottom: 0;
       transform: translateY(100%);
       border-top: 2px solid var(--ink, #17140f);
@@ -1059,142 +1001,330 @@ const START_LANE = LANE_HANE;
 // leave to the right because the reader went left, and Kütüphane's
 // arrive from the left because the reader kept going.
 //
-// `shape` is the one thing an actor says about how it LOOKS, and it
-// is a word rather than a stylesheet: 'row' is the wide card in the
-// left column and 'sq' the small square in the right one -- the only
-// two buttons the app has (see "What each screen carries" in
-// CLAUDE.md). Everything about their size and their place on the line
-// is stated once in .fb-row / .fb-sq; an actor's own class only ever
-// says what it is OF.
+// `col` ('l' / 'r') is the one thing an actor says about how it LOOKS,
+// and it is a word rather than a stylesheet: the wide column on the
+// left or the narrower one on the right, always three slots stacked
+// per column -- the only shape the app has (see "What each screen
+// carries" in CLAUDE.md). Everything about a box's size and place is
+// stated once in .fb-box / .fb-col-l / .fb-col-r / .fb-slot-N; an
+// actor's own class only ever says what it is OF. `stackActors()`
+// below is what turns one such description into the three sibling
+// actors (slot 0/1/2) it implies, so a new column is one call rather
+// than three hand-copied objects.
 // ══════════════════════════════════════════════════════════════
-const CAST = [
-  {
-    id: 'events',
-    // The stop it belongs to, 0-based: slide 12, the İstanbul map. Not
-    // the end of the book -- these are exceptional to that one screen,
-    // and slide 24 will have a cast of its own.
-    live: 11,
-    // ...and the lane, which is the sideways half of the same answer.
-    // Events are the doing side, so they are Kahvehane's.
-    lane: LANE_KAHVEHANE,
-    cls: 'fb-events', shape: 'row',
-    // How closely it follows. Two numbers: `lag` while the finger is
-    // down, `lagFree` once it is let go -- higher is tighter. Per-actor
-    // on purpose: different weights are what make a screenful of things
-    // read as having depth rather than being one sheet.
-    lag: 0.43, lagFree: 0.135,
-    // Real rows from `events`, the same query and the same card the
-    // Kahvehane deck is built from. Its own fetch rather than a shared
-    // one: this tab is a rig and must not depend on another page having
-    // run first.
-    html: '<div class="k">Etkinlikler</div><div class="t">…</div>',
-    load: loadEventsActor,
-    onpress(e) {
-      // Interactable, and only here -- the card opens in place rather
-      // than going anywhere, since this tab has nowhere to go.
-      e.currentTarget.classList.toggle('open');
-    },
-    // In from the left over the back half of the 1 -> 12 run, home on
-    // slide 12, and back out the same way over the front half of the
-    // 12 -> 24 run. Symmetric about 11 on purpose: leaving a screen
-    // should look like arriving at it played backwards, which is what
-    // makes the two runs read as one gesture in either direction.
-    poses: {
-      0:  { x: -160, opacity: 1 },
-      6:  { x: -160, opacity: 1 },
-      8:  { x: -95 },
-      10: { x: -22 },
-      11: { x: 0 },
-      12: { x: -22 },
-      14: { x: -95 },
-      16: { x: -160 },
-      23: { x: -160, opacity: 1 },
-    },
-  },
-  {
-    id: 'sozcel',
-    live: 11,
-    lane: LANE_KAHVEHANE,     // the games are the doing side too
-    cls: 'fb-sozcel', shape: 'sq',
-    lag: 0.43, lagFree: 0.135,
-    // The wordmark is the tile's way of saying its name -- the same
-    // convention Kahvehane's square tiles use -- so the line under it
-    // says what the game IS rather than repeating the name.
-    html: '<img src="assets/sozcel-logo.png" alt="Sözcel"/><div class="n">Türkçe Wordle</div>',
-    // Opens in place -- see "THE GAME OVERLAY" -- rather than navigating
-    // the book away.
-    onpress() { openGameOverlay('sozcel.html'); },
-    // The mirror of events: in from the right, home on slide 12, out to
-    // the right again, on the same timings and the same lag, so the
-    // pair travels as a pair. Give them different `lag` values instead
-    // and they arrive a beat apart, which is how a screenful of things
-    // gets depth.
-    poses: {
-      0:  { x: 160, opacity: 1 },
-      6:  { x: 160, opacity: 1 },
-      8:  { x: 95 },
-      10: { x: 22 },
-      11: { x: 0 },
-      12: { x: 22 },
-      14: { x: 95 },
-      16: { x: 160 },
-      23: { x: 160, opacity: 1 },
-    },
-  },
 
-  // ── Kütüphane's own pair, on the same stop and the lane past Hane ──
-  // The mirror of the two above in every respect except which lane they
-  // stand in: the same split of the line, the same in-and-out over the
-  // book, the same weights. What differs is what they are OF -- these
-  // are the reading side, so they are the news and the olaylar rather
-  // than an evening out and a game.
-  {
-    id: 'haberler',
-    live: 11,
-    lane: LANE_KUTUPHANE,
-    cls: 'fb-haberler', shape: 'row',
-    lag: 0.43, lagFree: 0.135,
-    html: '<div class="k">Haberler</div><div class="t">…</div>',
-    load: loadHaberlerActor,
-    onpress(e) { e.currentTarget.classList.toggle('open'); },
-    poses: {
-      0:  { x: -160, opacity: 1 },
-      6:  { x: -160, opacity: 1 },
-      8:  { x: -95 },
-      10: { x: -22 },
-      11: { x: 0 },
-      12: { x: -22 },
-      14: { x: -95 },
-      16: { x: -160 },
-      23: { x: -160, opacity: 1 },
-    },
-  },
-  {
-    id: 'olaylar',
-    live: 11,
-    lane: LANE_KUTUPHANE,
-    cls: 'fb-olaylar', shape: 'sq',
-    lag: 0.43, lagFree: 0.135,
-    html: '<div class="w">Olaylar</div><div class="n">…</div>',
-    load: loadOlaylarActor,
-    // Opens in place. It used to send the reader to kutuphane.html, and
-    // that page is not a destination any more (see CLAUDE.md: the flip
-    // book is the app) -- the olay board itself has not been lifted into
-    // this lane yet, so what the tile can honestly do is name what is
-    // running.
-    onpress(e) { e.currentTarget.classList.toggle('open'); },
-    poses: {
-      0:  { x: 160, opacity: 1 },
-      6:  { x: 160, opacity: 1 },
-      8:  { x: 95 },
-      10: { x: 22 },
-      11: { x: 0 },
-      12: { x: 22 },
-      14: { x: 95 },
-      16: { x: 160 },
-      23: { x: 160, opacity: 1 },
-    },
-  },
+// ── The events actor's own content ──
+// One fetch, the next few evenings in the city, soonest first -- the
+// same rows and the same order Kahvehane's deck uses.
+const NB_NAMES = {
+  bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler', sisli:'Şişli',
+  eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa', esenler:'Esenler', bagcilar:'Bağcılar',
+  basaksehir:'Başakşehir', kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi',
+  uskudar:'Üsküdar', kadikoy:'Kadıköy', maltepe:'Maltepe', umraniye:'Ümraniye',
+  cekmekoy:'Çekmeköy', beykoz:'Beykoz', sariyer:'Sarıyer', besiktas:'Beşiktaş',
+  beyoglu:'Beyoğlu', gungoren:'Güngören', kagithane:'Kağıthane', atasehir:'Ataşehir',
+  zeytinburnu:'Zeytinburnu', fatih:'Fatih',
+};
+const MON_TR = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
+
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+// Everything Istanbul-dated goes through one clock (CLAUDE.md rule 10);
+// here that is just the timeZone these are formatted in.
+function eventWhen(iso) {
+  const d = new Date(iso);
+  const tz = 'Europe/Istanbul';
+  const day = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, day: 'numeric' }), 10);
+  const mon = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, month: 'numeric' }), 10);
+  const wd = d.toLocaleDateString('tr-TR', { timeZone: tz, weekday: 'short' }).toLocaleUpperCase('tr-TR');
+  const time = d.toLocaleTimeString('tr-TR', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
+  return day + ' ' + (MON_TR[mon - 1] || '') + ' ' + wd + ' · ' + time;
+}
+
+// ── Filling a 3-box stack from one fetch ──
+// Etkinlikler, Haberler and Olaylar are all the same shape: fetch up
+// to 3 rows once, render each into its own box, and leave whichever
+// slots have no row as an empty dashed frame -- the same "nothing
+// here" convention the rest of the site already uses (.events-empty,
+// deckFrameHTML). One fetch serves all three slots via a shared
+// promise, so a column costs one round trip and not three.
+function stackFetch(fetchRows) {
+  let promise = null;
+  return function (el, slot) {
+    if (!promise) promise = fetchRows();
+    promise.then(({ rows, failed, emptyHtml, failedHtml }) => {
+      if (!el.isConnected) return;
+      // Three states, and they say different things: a fetch that
+      // never landed, a feed with nothing in it, and a feed with fewer
+      // than three things are not the same fact -- only the first slot
+      // ever carries the message, the rest are simply left dashed.
+      if (failed) {
+        if (slot === 0) { el.classList.remove('fb-empty'); el.innerHTML = failedHtml; }
+        else { el.classList.add('fb-empty'); el.innerHTML = ''; }
+        return;
+      }
+      if (!rows.length && slot === 0) {
+        el.classList.remove('fb-empty'); el.innerHTML = emptyHtml;
+        return;
+      }
+      const row = rows[slot];
+      if (!row) { el.classList.add('fb-empty'); el.innerHTML = ''; return; }
+      el.classList.remove('fb-empty'); el.innerHTML = row;
+    });
+  };
+}
+
+// ── Kahvehane's lane: the next few evenings ──
+const loadEventsActor = stackFetch(async () => {
+  try {
+    const { data, error } = await IstRouter.sb.from('events')
+      .select('*')
+      .gte('event_date', new Date().toISOString())
+      .order('event_date', { ascending: true })
+      .limit(3);
+    if (error) throw error;
+    const rows = (data || []).map(ev => {
+      const nb = ev.neighborhood ? (NB_NAMES[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
+      return '<div class="k">' + esc(nb.toLocaleUpperCase('tr-TR')) + '</div>' +
+             '<div class="t">' + esc(ev.title) + '</div>' +
+             '<div class="m">' + esc(eventWhen(ev.event_date)) + '</div>';
+    });
+    return { rows, failed: false,
+      emptyHtml: '<div class="k">Etkinlikler</div><div class="t">Şimdilik yok</div>' +
+                 '<div class="m">Bu aralar bir şey yok.</div>' };
+  } catch (err) {
+    console.error('[proje events]', err);
+    return { rows: [], failed: true,
+      failedHtml: '<div class="k">Etkinlikler</div><div class="t">Yüklenemedi</div>' +
+                  '<div class="m">Bağlantını kontrol et.</div>' };
+  }
+});
+
+// ── Kütüphane's lane: the newest stories ──
+// The same 72-hour window Kütüphane's own column reads in: what is on
+// these boxes has to be what is on that page, or the rig is testing a
+// screen the app does not have.
+const loadHaberlerActor = stackFetch(async () => {
+  try {
+    const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
+    const { data, error } = await IstRouter.sb.from('breaking_news')
+      .select('id, title, body, title_en, body_en, category, neighborhood, updated_at')
+      .gte('updated_at', cutoff)
+      .is('archived_at', null)
+      .order('updated_at', { ascending: false })
+      .limit(3);
+    if (error) throw error;
+    const rows = (data || []).map(n =>
+      '<div class="k">' + esc(newsKicker(n)) + '</div>' +
+      '<div class="t">' + esc(newsText(n, 'title')) + '</div>' +
+      '<div class="m">' + esc(newsAge(n.updated_at)) + '</div>');
+    return { rows, failed: false,
+      emptyHtml: '<div class="k">Haberler</div><div class="t">Şimdilik yok</div>' +
+                 '<div class="m">Son üç günde bir şey yok.</div>' };
+  } catch (err) {
+    console.error('[proje haberler]', err);
+    return { rows: [], failed: true,
+      failedHtml: '<div class="k">Haberler</div><div class="t">Yüklenemedi</div>' +
+                  '<div class="m">Bağlantını kontrol et.</div>' };
+  }
+});
+
+// A story is entered in both languages (db/breaking_news_v2_bilingual.sql);
+// the English half is used only where the reader is in English and it was
+// actually written, so a half-translated story still reads in Turkish.
+function newsText(row, field) {
+  if (!row) return '';
+  const en = row[field + '_en'];
+  if (window.I18N && I18N.isEnglish() && en && String(en).trim()) return en;
+  return row[field];
+}
+
+// Which layer a story belongs to -- the same words Kütüphane's own cards
+// are kickered with (newsCategoryLabel there).
+function newsKicker(n) {
+  const c = n.category || n.neighborhood || 'turkiye';
+  if (c === 'turkiye') return 'TÜRKİYE';
+  if (c === 'istanbul') return 'İSTANBUL';
+  if (c === 'dunya') return 'DÜNYA';
+  return (NB_NAMES[c] || c).toLocaleUpperCase('tr-TR');
+}
+
+function newsAge(iso) {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 60) return mins + ' dk önce';
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return hrs + ' saat önce';
+  return Math.round(hrs / 24) + ' gün önce';
+}
+
+// ── And the olaylar board's own door ──
+// The top ongoing olaylar, one to a box -- the same list the board
+// itself orders by (`sort_order`, see CLAUDE.md), just truncated to
+// the three slots this column has.
+const loadOlaylarActor = stackFetch(async () => {
+  try {
+    const { data, error } = await IstRouter.sb.from('world_events')
+      .select('id, title')
+      .eq('status', 'ongoing')
+      .order('sort_order', { ascending: true })
+      .limit(3);
+    if (error) throw error;
+    const rows = (data || []).map(r =>
+      '<div class="k">OLAY</div><div class="t">' + esc(r.title) + '</div>');
+    return { rows, failed: false,
+      emptyHtml: '<div class="k">Olaylar</div><div class="t">Sürmüyor</div>' +
+                 '<div class="m">Şu an süren bir olay yok.</div>' };
+  } catch (err) {
+    console.error('[proje olaylar]', err);
+    return { rows: [], failed: true,
+      failedHtml: '<div class="k">Olaylar</div><div class="t">Yüklenemedi</div>' +
+                  '<div class="m">Bağlantını kontrol et.</div>' };
+  }
+});
+
+// ── Kahvehane's other column: the fixed set of games ──
+// Not a feed -- always these three, in this order -- but a game the
+// admin switched off for today (game_day_toggles) is not a step the
+// reader has left to take (see CLAUDE.md), so its own slot goes
+// dashed exactly like an empty feed slot rather than opening a locked
+// page.
+const GAME_DEFS = [
+  { key: 'sozcel', kicker: '1. OYUN', title: 'Sözcel', meta: 'Türkçe Wordle', file: 'sozcel.html' },
+  { key: 'tumcel', kicker: '2. OYUN', title: 'Tümcel', meta: 'Cümle bul', file: 'tumcel.html' },
+  { key: 'bulmaca', kicker: '3. OYUN', title: 'Bulmaca', meta: 'Mini bulmaca', file: 'bulmaca.html' },
+];
+let gamesOffPromise = null;
+async function loadOyunActor(el, slot) {
+  if (!gamesOffPromise) {
+    gamesOffPromise = (async () => {
+      try {
+        const { data, error } = await IstRouter.sb.from('game_day_toggles')
+          .select('game').eq('game_date', IstDate.iso());
+        if (error) throw error;
+        return new Set((data || []).map(r => r.game));
+      } catch (err) {
+        console.error('[proje oyun]', err);
+        return new Set();   // best effort: nothing locked rather than everything locked
+      }
+    })();
+  }
+  const off = await gamesOffPromise;
+  if (!el.isConnected) return;
+  const g = GAME_DEFS[slot];
+  if (off.has(g.key)) { el.classList.add('fb-empty'); el.innerHTML = ''; return; }
+  el.classList.remove('fb-empty');
+  el.innerHTML = '<div class="k">' + g.kicker + '</div><div class="t">' + g.title + '</div>' +
+                 '<div class="m">' + g.meta + '</div>';
+}
+function onpressOyun(e, slot) {
+  if (e.currentTarget.classList.contains('fb-empty')) return;
+  openGameOverlay(GAME_DEFS[slot].file);
+}
+
+// ── The not-yet-built columns (Hikâyeler, Bilgi, Kahve, Yorumlar) ──
+// No content pipeline exists for these yet (see "What is still in the
+// parts bin" in CLAUDE.md), so their boxes stay permanently dashed,
+// naming their own slot rather than fabricating content nobody has
+// built.
+function placeholderBox(el, label) {
+  el.classList.add('fb-empty');
+  el.innerHTML = '<div class="ph">' + esc(label) + '</div>';
+}
+
+// Shared pose tables: the x-parking pattern depends only on which
+// column an actor stands in and which stop it belongs to, never on
+// what it is OF -- so every column on the same stop can share one
+// table instead of restating it per actor.
+//
+// The slide-12 pair (Kütüphane's and Kahvehane's own columns): parked
+// off its own side from 0-6, in over 8-11, home at 11, back out over
+// 12-16, parked again to 23. Symmetric about 11 on purpose -- leaving
+// a screen is arriving at it played backwards.
+const MID_POSES_L = {
+  0: { x: -160, opacity: 1 }, 6: { x: -160, opacity: 1 }, 8: { x: -95 },
+  10: { x: -22 }, 11: { x: 0 }, 12: { x: -22 }, 14: { x: -95 },
+  16: { x: -160 }, 23: { x: -160, opacity: 1 },
+};
+const MID_POSES_R = {
+  0: { x: 160, opacity: 1 }, 6: { x: 160, opacity: 1 }, 8: { x: 95 },
+  10: { x: 22 }, 11: { x: 0 }, 12: { x: 22 }, 14: { x: 95 },
+  16: { x: 160 }, 23: { x: 160, opacity: 1 },
+};
+// Slide 1 (Türkiye) is a book END, not a middle stop -- there is no
+// "before" side, so its columns simply stand at home on slide 0 and
+// fade off toward Kütüphane's own pair by slide 3, staying gone for
+// the rest of the book (a held pose holds past its last key).
+const END0_POSES_L = { 0: { x: 0, opacity: 1 }, 3: { x: -60, opacity: 0 }, 11: { x: -60, opacity: 0 } };
+const END0_POSES_R = { 0: { x: 0, opacity: 1 }, 3: { x: 60, opacity: 0 }, 11: { x: 60, opacity: 0 } };
+// The mirror at the other end of the book, slide 24 (the ilçe).
+const END23_POSES_L = { 11: { x: -60, opacity: 0 }, 20: { x: -60, opacity: 0 }, 23: { x: 0, opacity: 1 } };
+const END23_POSES_R = { 11: { x: 60, opacity: 0 }, 20: { x: 60, opacity: 0 }, 23: { x: 0, opacity: 1 } };
+
+// One column description in, three stacked actors out (slot 0 at the
+// dock, 1 and 2 above it). `load`/`onpress`, if given, are called with
+// the slot index appended, so one fetch can fill all three boxes and
+// one handler can tell them apart.
+function stackActors({ idBase, live, lane, col, cls, poses, lag, lagFree, load, onpress }) {
+  const out = [];
+  for (let slot = 0; slot < 3; slot++) {
+    out.push({
+      id: idBase + slot,
+      live, lane,
+      cls: cls + ' fb-box fb-col-' + col + ' fb-slot-' + slot,
+      lag, lagFree,
+      html: '',
+      load: load ? (el) => load(el, slot) : undefined,
+      onpress: onpress ? (e) => onpress(e, slot) : undefined,
+      poses,
+    });
+  }
+  return out;
+}
+
+const CAST = [
+  // ── Kahvehane's pair: the doing side ──
+  ...stackActors({
+    idBase: 'etkinlik', live: 11, lane: LANE_KAHVEHANE, col: 'l', cls: 'fb-events',
+    poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadEventsActor,
+  }),
+  ...stackActors({
+    idBase: 'oyun', live: 11, lane: LANE_KAHVEHANE, col: 'r', cls: 'fb-oyun',
+    poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadOyunActor, onpress: onpressOyun,
+  }),
+
+  // ── Kütüphane's pair: the reading side ──
+  ...stackActors({
+    idBase: 'haber', live: 11, lane: LANE_KUTUPHANE, col: 'l', cls: 'fb-haberler',
+    poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadHaberlerActor,
+  }),
+  ...stackActors({
+    idBase: 'olay', live: 11, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-olaylar',
+    poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadOlaylarActor,
+  }),
+
+  // ── Türkiye (slide 1) and the ilçe (slide 24): still in the parts
+  // bin (see CLAUDE.md), so their six boxes stay dashed placeholders
+  // naming their own slot rather than fabricating content nobody has
+  // built yet. ──
+  ...stackActors({
+    idBase: 'hikaye', live: 0, lane: LANE_KUTUPHANE, col: 'l', cls: 'fb-hikaye',
+    poses: END0_POSES_L, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Hikâyeler'),
+  }),
+  ...stackActors({
+    idBase: 'bilgi', live: 0, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-bilgi',
+    poses: END0_POSES_R, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Bilgi'),
+  }),
+  ...stackActors({
+    idBase: 'kahve', live: 23, lane: LANE_KAHVEHANE, col: 'l', cls: 'fb-kahve',
+    poses: END23_POSES_L, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Kahve'),
+  }),
+  ...stackActors({
+    idBase: 'yorum', live: 23, lane: LANE_KAHVEHANE, col: 'r', cls: 'fb-yorum',
+    poses: END23_POSES_R, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Yorumlar'),
+  }),
 ];
 
 // ── The lag ──
@@ -1242,176 +1372,6 @@ let anim = null;
 // again. Everything that touches the DOM waits for mount().
 let box = null;
 
-
-// ── The events actor's own content ──
-// One fetch, the next few evenings in the city, soonest first -- the
-// same rows and the same order Kahvehane's deck uses.
-const NB_NAMES = {
-  bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler', sisli:'Şişli',
-  eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa', esenler:'Esenler', bagcilar:'Bağcılar',
-  basaksehir:'Başakşehir', kucukcekmece:'Küçükçekmece', sultangazi:'Sultangazi',
-  uskudar:'Üsküdar', kadikoy:'Kadıköy', maltepe:'Maltepe', umraniye:'Ümraniye',
-  cekmekoy:'Çekmeköy', beykoz:'Beykoz', sariyer:'Sarıyer', besiktas:'Beşiktaş',
-  beyoglu:'Beyoğlu', gungoren:'Güngören', kagithane:'Kağıthane', atasehir:'Ataşehir',
-  zeytinburnu:'Zeytinburnu', fatih:'Fatih',
-};
-const MON_TR = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
-
-function esc(v) {
-  return String(v == null ? '' : v).replace(/[&<>"']/g, c =>
-    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
-}
-
-// Everything Istanbul-dated goes through one clock (CLAUDE.md rule 10);
-// here that is just the timeZone these are formatted in.
-function eventWhen(iso) {
-  const d = new Date(iso);
-  const tz = 'Europe/Istanbul';
-  const day = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, day: 'numeric' }), 10);
-  const mon = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, month: 'numeric' }), 10);
-  const wd = d.toLocaleDateString('tr-TR', { timeZone: tz, weekday: 'short' }).toLocaleUpperCase('tr-TR');
-  const time = d.toLocaleTimeString('tr-TR', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
-  return day + ' ' + (MON_TR[mon - 1] || '') + ' ' + wd + ' · ' + time;
-}
-
-async function loadEventsActor(el) {
-  let rows = null, failed = false;
-  try {
-    const { data, error } = await IstRouter.sb.from('events')
-      .select('*')
-      .gte('event_date', new Date().toISOString())
-      .order('event_date', { ascending: true })
-      .limit(3);
-    if (error) throw error;
-    rows = data || [];
-  } catch (err) {
-    console.error('[proje events]', err);
-    failed = true;
-  }
-  if (!el.isConnected) return;
-
-  // Three states, and they say different things: a city with nothing on,
-  // and a fetch that never landed, are not the same fact.
-  if (failed) {
-    el.innerHTML = '<div class="k">Etkinlikler</div><div class="t">Yüklenemedi</div>' +
-                   '<div class="m">Bağlantını kontrol et.</div>';
-    return;
-  }
-  if (!rows.length) {
-    el.innerHTML = '<div class="k">Etkinlikler</div><div class="t">Şimdilik yok</div>' +
-                   '<div class="m">Bu aralar bir şey yok.</div>';
-    return;
-  }
-  const ev = rows[0];
-  const nb = ev.neighborhood ? (NB_NAMES[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
-  const more = rows.length - 1;
-  el.innerHTML =
-    '<div class="k">' + esc(nb.toLocaleUpperCase('tr-TR')) + '</div>' +
-    '<div class="t">' + esc(ev.title) + '</div>' +
-    '<div class="m">' + esc(eventWhen(ev.event_date)) +
-      (more > 0 ? ' · +' + more : '') + '</div>' +
-    '<div class="x">' +
-      (ev.location ? '<div class="m">' + esc(ev.location) + '</div>' : '') +
-      (ev.description ? '<p>' + esc(ev.description) + '</p>' : '') +
-    '</div>';
-}
-
-// ── Kütüphane's lane: the newest story ──
-// The same three states the events actor says, for the same reason, and
-// the same 72-hour window Kütüphane's own column reads in: what is on
-// this card has to be what is on that page, or the rig is testing a
-// screen the app does not have.
-async function loadHaberlerActor(el) {
-  let rows = null, failed = false;
-  try {
-    const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
-    const { data, error } = await IstRouter.sb.from('breaking_news')
-      .select('id, title, body, title_en, body_en, category, neighborhood, updated_at')
-      .gte('updated_at', cutoff)
-      .is('archived_at', null)
-      .order('updated_at', { ascending: false })
-      .limit(3);
-    if (error) throw error;
-    rows = data || [];
-  } catch (err) {
-    console.error('[proje haberler]', err);
-    failed = true;
-  }
-  if (!el.isConnected) return;
-  if (failed) {
-    el.innerHTML = '<div class="k">Haberler</div><div class="t">Yüklenemedi</div>' +
-                   '<div class="m">Bağlantını kontrol et.</div>';
-    return;
-  }
-  if (!rows.length) {
-    el.innerHTML = '<div class="k">Haberler</div><div class="t">Şimdilik yok</div>' +
-                   '<div class="m">Son üç günde bir şey yok.</div>';
-    return;
-  }
-  const n = rows[0];
-  const more = rows.length - 1;
-  el.innerHTML =
-    '<div class="k">' + esc(newsKicker(n)) + '</div>' +
-    '<div class="t">' + esc(newsText(n, 'title')) + '</div>' +
-    '<div class="m">' + esc(newsAge(n.updated_at)) +
-      (more > 0 ? ' · +' + more : '') + '</div>' +
-    '<div class="x">' + (newsText(n, 'body')
-      ? '<p>' + esc(String(newsText(n, 'body')).slice(0, 220)) + '</p>' : '') + '</div>';
-}
-
-// A story is entered in both languages (db/breaking_news_v2_bilingual.sql);
-// the English half is used only where the reader is in English and it was
-// actually written, so a half-translated story still reads in Turkish.
-function newsText(row, field) {
-  if (!row) return '';
-  const en = row[field + '_en'];
-  if (window.I18N && I18N.isEnglish() && en && String(en).trim()) return en;
-  return row[field];
-}
-
-// Which layer a story belongs to -- the same words Kütüphane's own cards
-// are kickered with (newsCategoryLabel there).
-function newsKicker(n) {
-  const c = n.category || n.neighborhood || 'turkiye';
-  if (c === 'turkiye') return 'TÜRKİYE';
-  if (c === 'istanbul') return 'İSTANBUL';
-  if (c === 'dunya') return 'DÜNYA';
-  return (NB_NAMES[c] || c).toLocaleUpperCase('tr-TR');
-}
-
-function newsAge(iso) {
-  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (mins < 60) return mins + ' dk önce';
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return hrs + ' saat önce';
-  return Math.round(hrs / 24) + ' gün önce';
-}
-
-// ── And the olaylar board's own door ──
-// A count rather than a headline: an olay is the thing the stories are
-// ABOUT, and how many of them are running is the fact that belongs on a
-// tile this size.
-async function loadOlaylarActor(el) {
-  let rows = null;
-  try {
-    const { data, error } = await IstRouter.sb.from('world_events')
-      .select('id, title')
-      .eq('status', 'ongoing')
-      .order('sort_order', { ascending: true })
-      .limit(6);
-    if (error) throw error;
-    rows = data || [];
-  } catch (err) {
-    console.error('[proje olaylar]', err);
-  }
-  if (!el.isConnected) return;
-  el.innerHTML = '<div class="w">Olaylar</div>' +
-    '<div class="n">' + (rows == null ? 'Dünya' : rows.length + ' olay sürüyor') + '</div>' +
-    (rows && rows.length
-      ? '<div class="x">' + rows.map(r => '<p>' + esc(r.title) + '</p>').join('') + '</div>'
-      : '');
-}
-
 // ── Poses ──
 const POSE0 = { x: 0, y: 0, scale: 1, opacity: 1, rot: 0 };
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -1449,11 +1409,9 @@ function buildCast() {
   cast = CAST.map(def => {
     const el = document.createElement('button');
     el.type = 'button';
-    // Identity and shape are separate: `cls` says what the actor is OF
-    // and `shape` is one of the app's two buttons -- a wide row on the
-    // left of the line or a small square on the right of it. Nothing
-    // below the shape class decides a size.
-    el.className = 'fb-actor ' + def.cls + (def.shape ? ' fb-' + def.shape : '');
+    // `def.cls` already carries its own identity plus the shared box/
+    // column/slot classes stackActors() built it with.
+    el.className = 'fb-actor ' + def.cls;
     el.innerHTML = def.html;
     if (def.onpress) el.addEventListener('click', def.onpress);
     layer.appendChild(el);
