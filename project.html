@@ -1271,6 +1271,16 @@ const END23_POSES_R = { 11: { x: 60, opacity: 0 }, 20: { x: 60, opacity: 0 }, 23
 // dock, 1 and 2 above it). `load`/`onpress`, if given, are called with
 // the slot index appended, so one fetch can fill all three boxes and
 // one handler can tell them apart.
+//
+// All three share one pose table -- the same x/opacity numbers at the
+// same slide -- so what staggers them is purely how fast each one's
+// `pos` catches up to it (see `ease()`): SLOT_LAG multiplies slot 0's
+// (the dock-most box) lag and lagFree up and slot 2's down, keeping
+// their 3.2:1 ratio intact. Higher lag reaches wherever the target
+// currently is sooner, in EITHER direction, so the same ordering plays
+// both ways: entering, slot 0 is first to arrive; leaving, slot 0 is
+// first to be gone, with 1 and 2 following a beat behind each time.
+const SLOT_LAG = [1.25, 1, 0.8];
 function stackActors({ idBase, live, lane, col, cls, poses, lag, lagFree, load, onpress }) {
   const out = [];
   for (let slot = 0; slot < 3; slot++) {
@@ -1278,7 +1288,7 @@ function stackActors({ idBase, live, lane, col, cls, poses, lag, lagFree, load, 
       id: idBase + slot,
       live, lane,
       cls: cls + ' fb-box fb-col-' + col + ' fb-slot-' + slot,
-      lag, lagFree,
+      lag: lag * SLOT_LAG[slot], lagFree: lagFree * SLOT_LAG[slot],
       html: '',
       load: load ? (el) => load(el, slot) : undefined,
       onpress: onpress ? (e) => onpress(e, slot) : undefined,
