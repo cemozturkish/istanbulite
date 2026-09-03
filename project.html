@@ -1529,18 +1529,19 @@ function paintCast() {
     const A = a.poses[lo], B = a.poses[hi];
     const y = lerp(A.y, B.y, t);
     const sc = lerp(A.scale, B.scale, t), rot = lerp(A.rot, B.rot, t);
-    // The petek pushes them off to the right on top of wherever the
-    // book has them: a second term rather than a second pose table,
-    // because it is a different gesture happening at the same time,
-    // not a different place in the book.
+    // ── Leaving a lane is a FADE, not a slide ──
     // Where the reader is standing relative to THIS actor's lane, in
-    // lanes. One rule for both casts, and it is the whole of what makes
-    // them diverge: an actor is pushed away in the direction the reader
-    // walked, so Kahvehane's leave to the right as the reader goes left
-    // and Kütüphane's arrive from the left as they keep going. Nothing
-    // here knows which lane is which.
+    // lanes: 0 standing on it, 1 a lane away. It is the whole of what
+    // an actor knows about the strip -- nothing here knows which lane is
+    // which -- and all it does is take the actor's ink away. They used
+    // to be pushed a lane's width sideways as well, on top of whatever
+    // pose the book had them in; two things travelling in the same
+    // gesture (the cast sliding one way, the strip the other) read as
+    // the page being dragged apart rather than as one screen giving way
+    // to another. The petek is what arrives, so what leaves should only
+    // stop being there.
     const d = Math.max(-1, Math.min(1, lanePos - a.def.lane));
-    const x = lerp(A.x, B.x, t) - d * LANE_EXIT;
+    const x = lerp(A.x, B.x, t);
     a.el.style.transform = 'translate3d(' + x + '%,' + y + '%,0) scale(' + sc + ')' +
                            (rot ? ' rotate(' + rot + 'deg)' : '');
     a.el.style.opacity = String(lerp(A.opacity, B.opacity, t) * (1 - Math.abs(d)));
@@ -1724,9 +1725,6 @@ function stopAnim() { if (anim) { cancelAnimationFrame(anim); anim = null; } }
 // has ever had here: you cannot go from the reading to the doing
 // without walking past the people.
 // ══════════════════════════════════════════════════════════════
-// How far an actor is pushed when the reader walks off its lane, in
-// percent of the actor's own width.
-const LANE_EXIT = 190;
 // The thumb distance for ONE lane, as a fraction of the screen's width
 // -- stated per lane rather than per strip, the same rule the book's
 // own travel follows.

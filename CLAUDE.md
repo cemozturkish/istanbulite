@@ -1642,11 +1642,14 @@ Seven things about it:
   written to `--fb-petek-p`; the wash is that number and the hexagons are `(p − 0.35) / 0.65` of
   it, so the page goes quiet *before* the new thing appears rather than the two crossing — and the
   same wash and fade run whether the reader arrived from Kahvehane or from Kütüphane.
-- **An actor needs no lane table at all.** It is pushed a lane's width in whichever direction the
-  reader walked away from it (`paintCast`, one line), on top of whatever pose the *book* has it in.
-  That is the whole of what makes the two casts diverge without either knowing the other exists,
-  and it is why the lateral term is never a second pose table: a different gesture happening at the
-  same time is not a different place in the book.
+- **An actor needs no lane table at all.** All it knows about the strip is how far the reader is
+  standing from its own lane, and all that does is take its ink away (`paintCast`, one line), on
+  top of whatever pose the *book* has it in. That is the whole of what makes the two casts diverge
+  without either knowing the other exists. **Leaving a lane is a fade and not a slide**: an actor
+  used to be pushed a lane's width sideways as well, and two things travelling in the same gesture
+  — the cast one way, the strip the other — read as the page being dragged apart rather than as one
+  screen giving way to another. What arrives is the petek; what leaves should only stop being
+  there.
 - **The strip moves at most one lane per gesture.** It is a carousel of three screens, not a scrub
   through twenty-four, and a swipe that crossed two of them walked the reader straight past Hane —
   the one screen the arrangement exists to put in the middle. The release brackets the lane the
