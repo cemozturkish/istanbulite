@@ -2230,12 +2230,21 @@
 
   function armHiveReveal(state, page) {
     if (!page || page.classList.contains('ist-hive-reveal')) return;
-    page.classList.add('ist-hive-reveal');
+    // ── The hold is SNAPPED, never transitioned into ──
+    // The cells are standing at full strength when a reveal is armed, so
+    // holding them back through the same 260ms transition the beats use
+    // fades the whole petek OUT -- and on Proje that fade-out runs while
+    // the layer carrying it is fading IN, which is the entire shape
+    // showing itself faintly before the reader's own hexagon has even
+    // arrived. So the held state lands with no transition at all and the
+    // transition is put back on the next frame, in time for the beats.
+    page.classList.add('ist-hive-reveal', 'ist-hive-reveal-arm');
     // Committed now, so the first beat has something to interpolate
     // from: adding the held state and the first stage in one style pass
     // leaves nothing for the transition -- the same reason IstSheet.open
     // reads a style back before its own .open class lands.
     void page.offsetWidth;
+    requestAnimationFrame(() => page.classList.remove('ist-hive-reveal-arm'));
     state.hiveRevealPlayed = false;
     clearTimeout(state.hiveRevealHoldTimer);
     // A reveal that was armed and never played would hold the petek
@@ -2255,18 +2264,23 @@
     const beat = (n, ms) => setTimeout(() => {
       if (document.getElementById('po-hive-page') === page) page.classList.add('ist-hive-reveal-' + n);
     }, ms);
-    requestAnimationFrame(() => {
+    // Two frames, not one: an arm in this same tick (hiveRevealFirst does
+    // exactly that) still has its no-transition class on for the frame
+    // after it, and a first beat landing inside that frame would snap on
+    // instead of fading.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       if (document.getElementById('po-hive-page') !== page) return;
       page.classList.add('ist-hive-reveal-0');           // you
       state.hiveRevealTimers = [
         beat(1, HIVE_REVEAL_BEAT),                        // the people touching you
         beat(2, HIVE_REVEAL_BEAT * 2),                    // who they are
       ];
-    });
+    }));
     clearTimeout(state.hiveRevealTimer);
     state.hiveRevealTimer = setTimeout(() => {
-      page.classList.remove('ist-hive-reveal', 'ist-hive-reveal-0',
-                            'ist-hive-reveal-1', 'ist-hive-reveal-2');
+      page.classList.remove('ist-hive-reveal', 'ist-hive-reveal-arm',
+                            'ist-hive-reveal-0', 'ist-hive-reveal-1',
+                            'ist-hive-reveal-2');
     }, HIVE_REVEAL_BEAT * 2 + 500);
   }
 
