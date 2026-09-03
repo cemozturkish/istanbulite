@@ -18,9 +18,9 @@
   <script src="flip-steps.js?v=1"></script>
   <script src="palette.js?v=1"></script>
   <link rel="stylesheet" href="palette.css?v=3">
-  <link rel="stylesheet" href="profile-card.css?v=24">
+  <link rel="stylesheet" href="profile-card.css?v=25">
   <script src="avatar.js?v=1" defer></script>
-  <script src="profile-card.js?v=28" defer></script>
+  <script src="profile-card.js?v=29" defer></script>
   <script src="sheet.js?v=5"></script>
   <link rel="stylesheet" href="sheet.css?v=7">
   <link rel="stylesheet" href="frames.css?v=8">
@@ -1865,7 +1865,7 @@ function runLane(to, done) {
   }
   const from = lanePos;
   const dist = Math.abs(lane - from);
-  if (dist < 0.001) { setLanePos(lane); armCast(); if (done) done(); return; }
+  if (dist < 0.001) { setLanePos(lane); armCast(); landLane(); if (done) done(); return; }
   const ms = LANE_RUN_MS * dist;
   const t0 = performance.now();
   const step = (now) => {
@@ -1873,9 +1873,19 @@ function runLane(to, done) {
     const e = 1 - Math.pow(1 - a, 3);   // ease out
     setLanePos(from + (lane - from) * e);
     if (a < 1) { laneRun = requestAnimationFrame(step); }
-    else { laneRun = null; setLanePos(lane); armCast(); if (done) done(); }
+    else { laneRun = null; setLanePos(lane); armCast(); landLane(); if (done) done(); }
   };
   laneRun = requestAnimationFrame(step);
+}
+
+// The walk has landed. The petek's reveal was ARMED when it started
+// (see runLane) and is played here: the cells are held back for the
+// whole of the wash coming up, and the honeycomb then draws itself in
+// on a screen that has finished moving -- you, the ring touching you,
+// then their names.
+function landLane() {
+  if (lane !== LANE_HANE) return;
+  if (window.IstProfileCard && IstProfileCard.playHiveReveal) IstProfileCard.playHiveReveal();
 }
 
 // Built the moment the book comes to rest on slide 12, never on the
@@ -1953,10 +1963,12 @@ function onMove(e) {
     if (drag.axis === 'x' && !lanePullable(dx)) { drag = null; armCast(); return; }
     // Right walks the strip right, so the reader moves toward lane 0.
     // Taken once, with the axis: which lane this gesture is aimed at
-    // cannot change half way through it.
+    // cannot change half way through it. EVERY lane move is answered
+    // this way, onto Hane and off it alike -- the strip is a row of
+    // three screens the reader either goes to or does not, and a screen
+    // that comes half way with the thumb is a choice half made.
     if (drag.axis === 'x') {
-      const aim = Math.max(0, Math.min(LANES - 1, lane + (dx > 0 ? -1 : 1)));
-      drag.snapTo = aim === LANE_HANE ? aim : null;
+      drag.snapTo = Math.max(0, Math.min(LANES - 1, lane + (dx > 0 ? -1 : 1)));
     }
     // A vertical drag while the petek is on screen is the petek's own
     // depth pull, not the book being scrubbed underneath it.
