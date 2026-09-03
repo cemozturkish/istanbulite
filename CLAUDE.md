@@ -1639,9 +1639,11 @@ Seven things about it:
   covered it would take back the very thing being answered.
 - **One number drives all of it**, and it is *how present a lane is*: 1 standing on it, 0 a lane
   away either side, the linear middle in between (`lanePresence`). The middle lane's presence is
-  written to `--fb-petek-p`; the wash is that number and the hexagons are `(p − 0.35) / 0.65` of
-  it, so the page goes quiet *before* the new thing appears rather than the two crossing — and the
-  same wash and fade run whether the reader arrived from Kahvehane or from Kütüphane.
+  written to `--fb-petek-p`, and both the wash and the hexagons are that number — they cross on
+  purpose: the petek starts coming in on the same frame the lane's own buttons start going out, so
+  the two casts hand over in one movement rather than in two (the hexagons used to wait for the
+  back half of the pull). The same wash and fade run whether the reader arrived from Kahvehane or
+  from Kütüphane.
 - **An actor needs no lane table at all.** All it knows about the strip is how far the reader is
   standing from its own lane, and all that does is take its ink away (`paintCast`, one line), on
   top of whatever pose the *book* has it in. That is the whole of what makes the two casts diverge
