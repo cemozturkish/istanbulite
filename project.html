@@ -408,53 +408,6 @@
       nav b .fb-wm { display: block; }
     }
 
-    /* ── THE POSITION DOTS ──
-       The bar says which LANE the reader is standing on; these say how
-       far through that lane's own run of the book they are. Two marks a
-       side, joined by a double rule: on the left, the middle of the
-       city (slide 12) and Türkiye beyond it; on the right, the same
-       middle and the innermost slide beyond that. The shared mark is
-       dead centre of the screen on both sides and is Hane -- so the two
-       columns are one line broken in the middle, which is where the
-       reader always is.
-
-       Nothing here is pressed. Both the column's presence and each
-       mark's ink are continuous numbers written by paintNav: the
-       columns fade with the lane (--fb-dots-l / -r) and a mark fills
-       with ink as the book arrives at its stop (--fb-dot-*), so a mark
-       half-filled is a reader half-way there. */
-    .fb-dots {
-      position: fixed;
-      left: var(--screen-inset, 18px);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      pointer-events: none;
-      z-index: 4;
-    }
-    .fb-dots-l { top: 50%; }
-    .fb-dots-r { left: auto; right: var(--screen-inset, 18px); bottom: 50%; }
-    .fb-dot {
-      width: 9px; height: 9px;
-      border-radius: 50%;
-      box-sizing: border-box;
-      border: 1.5px solid var(--ink);
-      /* Filled by how near the book is to this mark's own stop. */
-      background: color-mix(in srgb, var(--ink) calc(var(--d, 0) * 100%), transparent);
-    }
-    /* The double line the site sets its rules in, stood on end. */
-    .fb-rule {
-      width: 5px;
-      height: 46px;
-      border-left: 1px solid var(--ink);
-      border-right: 1px solid var(--ink);
-    }
-    .fb-dots-l { opacity: var(--fb-dots-l, 0); }
-    .fb-dots-r { opacity: var(--fb-dots-r, 0); }
-    .fb-dot[data-stop="out"] { --d: var(--fb-dot-out, 0); }
-    .fb-dot[data-stop="mid"] { --d: var(--fb-dot-mid, 0); }
-    .fb-dot[data-stop="in"]  { --d: var(--fb-dot-in, 0); }
-
     /* Sits over the first frame once it is up, so what the reader sees
        while the rest arrive is the book's first page and a count --
        never a spinner on blank paper. */
@@ -742,19 +695,30 @@
       border: 0;
       position: relative;
       z-index: 2;              /* over the bar's own share of the dim */
-      transform: translateY(25px);
+      transform: translateY(14px);
       transition: transform 0.14s ease, filter 0.18s ease;
       -webkit-tap-highlight-color: transparent;
     }
+    /* The artwork's own margin is cropped off, so the PLAQUE hugs the
+       letters. The file is 1200x400 but the ink inside it is only
+       1147x266 -- 15% of the height is empty above it and 19% empty
+       below -- so a box fitted to the file is a box with a dead band
+       across its top and a bigger one across its bottom, which is
+       exactly what the plaque was printing. The mask is scaled up by
+       the reciprocal of those fractions (100/0.956 across, 100/0.665
+       down) so the ink alone fills the box, and the position splits the
+       overflow the way the margins are split (left is 75% of the
+       horizontal slack, top 44% of the vertical) so it lands centred on
+       the ink rather than on the file. The box is the INK's ratio,
+       4.31:1. Re-measure all four numbers if the file is ever redrawn. */
     nav b.fb-logo-btn .fb-logo {
-      /* 3:1 is the artwork's own ratio (1200x400), so the box holds no
-         slack: `contain` inside a box of any other shape fits the mark
-         to the SHORT side and leaves the rest as air, which is what kept
-         the ink from reaching the plaque's own edge however tall the box
-         was made. */
-      width: 165px; height: 55px;
+      width: 172px; height: 40px;
+      -webkit-mask-size: 104.6% 150.4%;
+              mask-size: 104.6% 150.4%;
+      -webkit-mask-position: 75.4% 44%;
+              mask-position: 75.4% 44%;
     }
-    nav b.fb-logo-btn:active { transform: translateY(25px) scale(0.94); }
+    nav b.fb-logo-btn:active { transform: translateY(14px) scale(0.94); }
     /* Lit while its map is open -- it is held down because it is the way
        back out, exactly as Kütüphane's Olaylar box is. */
     body.fb-map-on nav b.fb-logo-btn {
@@ -890,18 +854,6 @@
   <div id="ist-content" style="display:contents">
     <main>
       <div class="fb" id="fb">
-        <!-- Where the reader is in the book's own depth. Two marks a
-             side, the shared one dead centre. See "THE POSITION DOTS". -->
-        <div class="fb-dots fb-dots-l" aria-hidden="true">
-          <span class="fb-dot" data-stop="mid"></span>
-          <span class="fb-rule"></span>
-          <span class="fb-dot" data-stop="out"></span>
-        </div>
-        <div class="fb-dots fb-dots-r" aria-hidden="true">
-          <span class="fb-dot" data-stop="in"></span>
-          <span class="fb-rule"></span>
-          <span class="fb-dot" data-stop="mid"></span>
-        </div>
         <div class="fb-loading" id="fb-loading">Kareler yükleniyor…</div>
         <div class="fb-cast" id="fb-cast"></div>
         <!-- The petek, revealed by a rightward pull on slide 12. Not a
@@ -1628,7 +1580,7 @@ function paintCast() {
     // stop being there.
     //
     // `a.laneP` rather than the shared `lanePos`: the strip itself (the
-    // wash, the hexagons, the nav dots) still moves on the one true
+    // wash, the hexagons, the nav bar) still moves on the one true
     // `lanePos`, but each actor chases it at its own lag (see
     // castStep()), which is what makes a column's three boxes enter and
     // leave a lane in the same staggered order they already enter and
@@ -1939,36 +1891,12 @@ function paintNav() {
     root.style.setProperty('--fb-nav-' + i, p.toFixed(3));
     if (marks[i]) marks[i].classList.toggle('on', lane === i);
   }
-  paintNavWave(marks, clamp01);
-  // A column belongs to its own lane AND to Hane, because the mark it
-  // shares with Hane is the one in the middle: standing on Hane both
-  // halves of the broken line are up, and the centre mark is inked from
-  // either side.
-  root.style.setProperty('--fb-dots-l',
-    clamp01(pres[LANE_KUTUPHANE] + pres[LANE_HANE]).toFixed(3));
-  root.style.setProperty('--fb-dots-r',
-    clamp01(pres[LANE_KAHVEHANE] + pres[LANE_HANE]).toFixed(3));
-  // The ink is where the BOOK is, eased, not where `at` is aimed: the
-  // marks travel with the paper rather than reporting the release.
-  const p = framePos;
-  const S = STOPS;
-  let out = 0, mid = 0, inn = 0;
-  if (p <= S[1]) {
-    const t = clamp01((S[1] - p) / (S[1] - S[0]));
-    out = t; mid = 1 - t;
-  } else {
-    const t = clamp01((p - S[1]) / (S[2] - S[1]));
-    inn = t; mid = 1 - t;
-  }
-  root.style.setProperty('--fb-dot-out', out.toFixed(3));
-  root.style.setProperty('--fb-dot-mid', mid.toFixed(3));
-  root.style.setProperty('--fb-dot-in', inn.toFixed(3));
 }
 
 
 function setLanePos(p) {
   lanePos = Math.max(0, Math.min(LANES - 1, p));
-  // The strip itself (the wash, the hexagons, the nav dots) reads
+  // The strip itself (the wash, the hexagons, the nav bar) reads
   // `lanePos` straight away, unstaggered -- only the cast's own chase of
   // it (see castStep()/paintCast()) needs the tick running, whether this
   // call came from a live drag or from runLane()'s own release tween.
@@ -2313,10 +2241,6 @@ function unmount() {
   // The lane variables live on <html> and would outlive this page.
   const root = document.documentElement;
   for (let i = 0; i < LANES; i++) root.style.removeProperty('--fb-nav-' + i);
-  for (const k of ['--fb-dots-l', '--fb-dots-r',
-                   '--fb-dot-out', '--fb-dot-mid', '--fb-dot-in']) {
-    root.style.removeProperty(k);
-  }
 }
 
 // ══════════════════════════════════════════════════════════════
