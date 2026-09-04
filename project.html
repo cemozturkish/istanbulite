@@ -318,17 +318,49 @@
       padding-bottom: 5px;
       font-size: 13px; letter-spacing: 0.5px;
       text-transform: uppercase;
-      /* The INK is what moves, continuously: --muted at a lane's
-         distance, --ink standing on it, and the real middle in between,
-         so a mark half-lit is a reader half-way there. The WEIGHT is
-         deliberately not on the same number -- a fractional font-weight
-         re-measures the type on every frame of the pull, and the bar
-         would jitter its own words while the reader dragged. It steps
-         once, on the lane they land on. */
+      /* THE MARK YOU ARE STANDING ON IS THE PALE ONE. The bar is not a
+         menu of places to press -- it is a compass, and what it is
+         saying is "the city is over there": the two you are not on are
+         the ink, because they are the things still to be gone to, and
+         the one under your feet has already been reached and steps
+         back. So --ink is the resting colour here and --muted is what
+         arriving does to a word.
+
+         The WEIGHT is deliberately not on the same number -- a
+         fractional font-weight re-measures the type on every frame of
+         the pull, and the bar would jitter its own words while the
+         reader dragged. It steps once, on the lane they land on. */
       font-weight: 600;
-      color: color-mix(in srgb, var(--ink) calc(var(--p, 0) * 100%), var(--muted));
+      color: var(--ink);
       transition: none;   /* the finger is the animation */
     }
+    /* ...AND IT PALES ONE LETTER AT A TIME, in the direction of the
+       swipe. A word that changed colour in one piece would be reporting
+       the result of the gesture; a word crossed by a wave is part of it.
+       --f is the wave's front, written by paintNav in letters travelled
+       (0 .. n), and each letter carries its own index, so the whole
+       stagger is one subtraction per letter with nothing per-frame for
+       the JS to write but that single number.
+
+       The front always runs LEFT TO RIGHT, whichever word it is on,
+       because it is the reader's own direction of travel across the
+       strip: swiping Kütüphane -> Hane the K goes to ink first and the
+       E last; swiping back, the E comes back first. Kahvehane is the
+       same wave met from the other side -- moving right onto it, its K
+       pales first. */
+    nav b i.fb-ltr {
+      display: inline-block;
+      font-style: normal;
+      white-space: pre;
+      color: color-mix(in srgb, var(--muted) calc(var(--lit, 0) * 100%), var(--ink));
+    }
+    /* Leaving the left-hand mark: a letter is pale until the front
+       reaches it and inked once it has passed -- one letter wide, so
+       they go over one at a time. */
+    nav b:first-child i.fb-ltr { --lit: clamp(0, calc(var(--i) + 1 - var(--f, 0)), 1); }
+    /* Arriving at the right-hand one: the same front, read the other
+       way round -- a letter is inked until the front reaches it. */
+    nav b:last-child  i.fb-ltr { --lit: clamp(0, calc(var(--f, 0) - var(--i)), 1); }
     nav b.on { font-weight: 700; }
     nav b:first-child  { justify-content: flex-start; --p: var(--fb-nav-0, 0); }
     nav b:nth-child(2) { justify-content: center;     --p: var(--fb-nav-1, 0); }
@@ -350,13 +382,25 @@
     nav b .fb-logo {
       display: block;
       width: 86px; height: 26px;
-      background-color: currentColor;
+      /* The two words either side are crossed letter by letter; the
+         wordmark has no letters of its own to count, so the same wave
+         crosses it as a gradient -- one hard-ish edge sliding across the
+         mask from left to right, pale behind it and ink in front of it
+         (and the other way round on the way out). It is the same
+         movement, drawn rather than set. */
+      background-color: transparent;
+      background-image: linear-gradient(90deg,
+        var(--fb-logo-a, var(--ink)) calc(var(--fb-logo-f, 0%) - 14%),
+        var(--fb-logo-b, var(--muted)) calc(var(--fb-logo-f, 0%) + 14%));
       -webkit-mask: url('assets/loading/logo-dark-mono-01.jpg') center / contain no-repeat;
               mask: url('assets/loading/logo-dark-mono-01.jpg') center / contain no-repeat;
       -webkit-mask-source-type: luminance;
       mask-mode: luminance;
     }
-    nav b .fb-wm { display: none; }
+    nav b .fb-wm {
+      display: none;
+      color: color-mix(in srgb, var(--muted) calc(var(--p, 0) * 100%), var(--ink));
+    }
     /* A browser that cannot luminance-mask gets the name in type, which
        is what stood here before. */
     @supports not ((mask-mode: luminance) or (-webkit-mask-source-type: luminance)) {
@@ -1827,6 +1871,57 @@ function paintLanes() {
   paintNav();
 }
 
+// The two words on the bar are set letter by letter, because the light
+// that crosses them travels ALONG them. One <i> per character, each
+// carrying its own index, so a frame of the pull is one number written
+// per word rather than nine (see "nav b i.fb-ltr" in the stylesheet).
+// Idempotent: the bar lives outside #ist-content and survives a mount.
+function splitNavMarks() {
+  const marks = document.querySelectorAll('#fb-nav b');
+  [marks[0], marks[LANES - 1]].forEach((b) => {
+    if (!b || b.querySelector('.fb-ltr')) return;
+    const word = b.textContent;
+    b.textContent = '';
+    for (const ch of word) {
+      const l = document.createElement('i');
+      l.className = 'fb-ltr';
+      l.style.setProperty('--i', String(b.children.length));
+      l.textContent = ch;
+      b.appendChild(l);
+    }
+  });
+}
+
+// THE WAVE. It is one coordinate and it is the reader's own direction of
+// travel: how far right along the strip they have come out of the mark's
+// own segment, 0 to 1. Both words read it the same way round -- the
+// front runs left to right whichever of them it is on -- because the two
+// formulas that turn it into a letter's ink are mirrored in the
+// stylesheet rather than here (a wave that changed direction per word
+// would be two animations, and the reader is only making one gesture).
+//
+// The wordmark in the middle has no letters to count, so it takes the
+// same front as a gradient stop, with the pale side leading on the way
+// in and trailing on the way out.
+function paintNavWave(marks, clamp01) {
+  const left = marks[0], right = marks[LANES - 1], mid = marks[LANE_HANE];
+  if (left) left.style.setProperty('--f',
+    (clamp01(lanePos) * left.children.length).toFixed(3));
+  if (right) right.style.setProperty('--f',
+    (clamp01(lanePos - (LANES - 2)) * right.children.length).toFixed(3));
+  if (mid) {
+    // x < 0 is the walk in from Kütüphane (the wordmark is coming up),
+    // x > 0 the walk out to Kahvehane (it is going down). Both are the
+    // same edge crossing left to right; only which side of it is pale
+    // swaps, and at x = 0 the two spellings agree on "all pale".
+    const x = Math.max(-1, Math.min(1, lanePos - LANE_HANE));
+    const incoming = x <= 0;
+    mid.style.setProperty('--fb-logo-a', incoming ? 'var(--muted)' : 'var(--ink)');
+    mid.style.setProperty('--fb-logo-b', incoming ? 'var(--ink)' : 'var(--muted)');
+    mid.style.setProperty('--fb-logo-f', ((incoming ? x + 1 : x) * 100).toFixed(2) + '%');
+  }
+}
+
 // The bar says where the reader is standing, continuously: each mark is
 // lit by its own lane's presence, the same number the wash and the
 // hexagons run on. Off slide 12 the lane still means something -- it is
@@ -1836,6 +1931,7 @@ function paintNav() {
   if (!box) return;
   const root = document.documentElement;
   const marks = box.ownerDocument.querySelectorAll('#fb-nav b');
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
   const pres = [];
   for (let i = 0; i < LANES; i++) {
     const p = lanePresence(i);
@@ -1843,11 +1939,11 @@ function paintNav() {
     root.style.setProperty('--fb-nav-' + i, p.toFixed(3));
     if (marks[i]) marks[i].classList.toggle('on', lane === i);
   }
+  paintNavWave(marks, clamp01);
   // A column belongs to its own lane AND to Hane, because the mark it
   // shares with Hane is the one in the middle: standing on Hane both
   // halves of the broken line are up, and the centre mark is inked from
   // either side.
-  const clamp01 = (v) => Math.max(0, Math.min(1, v));
   root.style.setProperty('--fb-dots-l',
     clamp01(pres[LANE_KUTUPHANE] + pres[LANE_HANE]).toFixed(3));
   root.style.setProperty('--fb-dots-r',
@@ -2172,6 +2268,7 @@ function mount() {
   lane = START_LANE; lanePos = START_LANE;
   atLaneStop = false; petekBuilt = false;
   buildCast();
+  splitNavMarks();  // before paintLanes(): the wave needs its letters
   paintLanes();     // after buildCast: it paints the cast too
   box.addEventListener('pointerdown', onDown, { passive: true });
   box.addEventListener('pointermove', onMove, { passive: false });

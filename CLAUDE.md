@@ -1509,12 +1509,29 @@ is pressed, because the reader moves the app with their finger and the bar's who
 where that has put them. A tab bar answers "where can I go"; this answers "where am I", which is
 the only question left once the swipe is the navigation.
 
-It lights **continuously**, off the same `lanePresence` the wash and the hexagons run on
-(`--fb-nav-0/1/2`, written by `paintNav`), so the middle mark comes up as the reader walks toward
-Hane and goes down as they walk off it — a bar that snapped between three states would be
-reporting the result of a gesture, and this one is part of it. Off slide 12 the lane still means
-which of the two runs the reader is on, so Kütüphane stays lit all the way out to Türkiye and
-Kahvehane all the way in. One thing is deliberately **not** on that number: the font weight. A
+**The mark you are standing on is the PALE one**, and the two you are not on are the ink. The bar
+is not a menu of places to press: what it says is "the city is over there", so the words still to
+be gone to carry the weight of the ink and the one under your feet has already been reached and
+steps back. `--ink` is the resting colour of a mark and `--muted` is what arriving does to it.
+
+**And a word pales one letter at a time, in the direction of the swipe.** Kütüphane → Hane inks
+the K first, then the ü, the t, the ü, the p, the h, the a, the n, the e; swiping back brings them
+home in the same order reversed. The front always runs **left to right**, on either word, because
+it is the reader's own direction of travel across the strip — so moving right onto Kahvehane its K
+is the first letter to pale. It is one number per word (`--f`, the front in letters travelled,
+written by `paintNav` → `paintNavWave`); each letter is its own `<i>` carrying its index
+(`splitNavMarks`), and the stagger is one subtraction per letter in the stylesheet. Two mirrored
+formulas there, not two animations here: the reader is only making one gesture.
+
+The **wordmark** in the middle has no letters to count, so the same front crosses it as a gradient
+stop sliding over its mask — pale side leading on the way in, trailing on the way out, the two
+spellings agreeing on "all pale" at the moment the reader is standing on Hane.
+
+All of it is **continuous**, off the same `lanePos` the wash and the hexagons run on
+(`lanePresence` → `--fb-nav-0/1/2`, still what the fallback wordmark and the position dots read),
+so the bar is part of the gesture rather than a report of its result. Off slide 12 the lane still
+means which of the two runs the reader is on, so Kütüphane stays pale all the way out to Türkiye
+and Kahvehane all the way in. One thing is deliberately **not** on that number: the font weight. A
 fractional `font-weight` re-measures the type every frame and the bar would jitter its own words
 under the finger, so the ink is continuous and the weight steps once, on the lane the reader
 lands on.
