@@ -1433,7 +1433,9 @@ function buildCast() {
     // awaited by anything: an actor whose rows have not landed yet is
     // still an actor, and the book must not wait on the network.
     if (def.load) { try { def.load(el); } catch (e) { console.error(e); } }
-    return { def, el, poses: expandPoses(def.poses || {}), pos: 0,
+    // `laneP` starts already AT the current lane, not at 0 -- a fresh
+    // mount has nothing to catch up on, so there is nothing to animate.
+    return { def, el, poses: expandPoses(def.poses || {}), pos: 0, laneP: lanePos,
              lag: def.lag == null ? CAST_LAG : def.lag,
              lagFree: def.lagFree == null ? CAST_LAG_FREE : def.lagFree };
   });
@@ -1441,6 +1443,14 @@ function buildCast() {
 
 function stopCastTick() {
   if (castTick) { cancelAnimationFrame(castTick); castTick = null; }
+}
+
+// Starts the shared tick if it isn't already running -- the one place
+// that does, so anything that moves a target the cast chases (the
+// book's `castTarget`, or the lane's own `lanePos`) can just call this
+// rather than each keeping its own copy of the same three lines.
+function ensureCastTick() {
+  if (!castTick) { castLast = performance.now(); castTick = requestAnimationFrame(castStep); }
 }
 
 // Where the book is; the actors will get there in their own time.
@@ -1456,7 +1466,7 @@ function aim(p, snap) {
     paintCast();
     return;
   }
-  if (!castTick) { castLast = performance.now(); castTick = requestAnimationFrame(castStep); }
+  ensureCastTick();
 }
 
 // One ease, used by the drawings and by every actor, so they cannot
@@ -1483,6 +1493,12 @@ function castStep(now) {
   for (const a of cast) {
     const np = ease(a.pos, castTarget, held ? a.lag : a.lagFree, dt);
     if (np !== a.pos) { a.pos = np; moving = true; }
+    // The lane fade chases `lanePos` on the actor's OWN lag too -- see
+    // paintCast() -- so a column's three boxes stagger leaving a lane
+    // exactly as they already stagger arriving at or leaving a slide:
+    // same ease(), same per-slot rate, just a second target.
+    const nlp = ease(a.laneP, lanePos, held ? a.lag : a.lagFree, dt);
+    if (nlp !== a.laneP) { a.laneP = nlp; moving = true; }
   }
   paintCast();
   // The position marks ride the eased frame position, so they are
@@ -1519,7 +1535,14 @@ function paintCast() {
     // the page being dragged apart rather than as one screen giving way
     // to another. The petek is what arrives, so what leaves should only
     // stop being there.
-    const d = Math.max(-1, Math.min(1, lanePos - a.def.lane));
+    //
+    // `a.laneP` rather than the shared `lanePos`: the strip itself (the
+    // wash, the hexagons, the nav dots) still moves on the one true
+    // `lanePos`, but each actor chases it at its own lag (see
+    // castStep()), which is what makes a column's three boxes enter and
+    // leave a lane in the same staggered order they already enter and
+    // leave a slide.
+    const d = Math.max(-1, Math.min(1, a.laneP - a.def.lane));
     const x = lerp(A.x, B.x, t);
     a.el.style.transform = 'translate3d(' + x + '%,' + y + '%,0) scale(' + sc + ')' +
                            (rot ? ' rotate(' + rot + 'deg)' : '');
@@ -1546,10 +1569,12 @@ function armCast() {
                   Math.abs(framePos - castTarget) < LIVE_EPS;
   for (const a of cast) {
     // Its own stop AND its own lane: slide 12 is three screens, and an
-    // actor belongs to one of them.
+    // actor belongs to one of them. `a.laneP`, not `lanePos` -- a box
+    // still catching up to its own lane (see paintCast()) is still
+    // fading in, whatever the strip itself has already reached.
     a.el.classList.toggle('live', settled &&
       Math.abs(a.pos - a.def.live) < LIVE_EPS &&
-      Math.abs(lanePos - a.def.lane) < LIVE_EPS);
+      Math.abs(a.laneP - a.def.lane) < LIVE_EPS);
   }
   // Where the BOOK is, which is a different question from whether the
   // cast is live: a finger on the glass makes nothing live, but it does
@@ -1800,6 +1825,11 @@ function paintNav() {
 
 function setLanePos(p) {
   lanePos = Math.max(0, Math.min(LANES - 1, p));
+  // The strip itself (the wash, the hexagons, the nav dots) reads
+  // `lanePos` straight away, unstaggered -- only the cast's own chase of
+  // it (see castStep()/paintCast()) needs the tick running, whether this
+  // call came from a live drag or from runLane()'s own release tween.
+  ensureCastTick();
   paintLanes();
 }
 
