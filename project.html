@@ -288,16 +288,33 @@
        calc on this page already reads it, so the room the page leaves at
        the bottom shrinks with it rather than leaving a strip of dead
        paper above the bar. */
-    body { --navbar-h: 34px; }
+    body {
+      --navbar-h: 34px;
+      /* ── THE COMPASS'S TWO INKS ARE THE BAR'S, NOT THE PAGE'S ──
+         This bar is the charcoal one (frames.css: "the bar is BLACK on
+         every page and in every palette, with light-gray labels"), so
+         the page's own --ink is BLACK ON CHARCOAL: darker than the paper
+         it is printed on, and therefore not a mark at all. Both marks
+         are mixed out of the bar's own label tokens instead, which is
+         what those tokens are for -- the dark one sits a little above
+         the bar so it reads as recessed rather than as missing, and the
+         pale one a little under the near-white the site uses for "you
+         are here". */
+      --fb-mark-off: color-mix(in srgb, var(--navbar-ink-label, #9b9b9b) 52%, var(--navbar-ink, #2e2e2e));
+      --fb-mark-on: color-mix(in srgb, var(--navbar-ink-label-active, #f4f4f4) 62%, var(--navbar-ink-label, #9b9b9b));
+    }
     header {
       position: fixed;
       bottom: 0; left: 0; right: 0;
       height: calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom));
       padding: 0 0 env(safe-area-inset-bottom);
       margin: 0;
-      border-top: 1px solid var(--rule);
+      border-top: none;
       border-bottom: none;
-      background: var(--paper-navbar);
+      /* frames.css already forces this on a phone; stating it here too
+         means the desktop window prints the compass on the same paper
+         its two inks were mixed against. */
+      background: var(--navbar-ink, #2e2e2e);
       z-index: 100;
       display: flex;
       align-items: stretch;
@@ -331,7 +348,7 @@
          the pull, and the bar would jitter its own words while the
          reader dragged. It steps once, on the lane they land on. */
       font-weight: 600;
-      color: var(--ink);
+      color: var(--fb-mark-off);
       transition: none;   /* the finger is the animation */
     }
     /* ...AND IT PALES ONE LETTER AT A TIME, in the direction of the
@@ -342,17 +359,19 @@
        stagger is one subtraction per letter with nothing per-frame for
        the JS to write but that single number.
 
-       The front always runs LEFT TO RIGHT, whichever word it is on,
-       because it is the reader's own direction of travel across the
-       strip: swiping Kütüphane -> Hane the K goes to ink first and the
-       E last; swiping back, the E comes back first. Kahvehane is the
-       same wave met from the other side -- moving right onto it, its K
-       pales first. */
+       The front runs THE WAY THE FINGER IS GOING, which is why there is
+       one wave here and not two: it is the reader's own travel across
+       the strip, so both words are crossed by the same edge moving the
+       same way at the same moment. Pulling right (Kütüphane -> Hane ->
+       Kahvehane) it runs left to right: Kütüphane's K goes to ink first
+       and its E last, and Kahvehane's K is the first letter to pale.
+       Pulling back the other way is exactly that reversed -- the E ends
+       first on either word. */
     nav b i.fb-ltr {
       display: inline-block;
       font-style: normal;
       white-space: pre;
-      color: color-mix(in srgb, var(--muted) calc(var(--lit, 0) * 100%), var(--ink));
+      color: color-mix(in srgb, var(--fb-mark-on) calc(var(--lit, 0) * 100%), var(--fb-mark-off));
     }
     /* Leaving the left-hand mark: a letter is pale until the front
        reaches it and inked once it has passed -- one letter wide, so
@@ -390,8 +409,8 @@
          movement, drawn rather than set. */
       background-color: transparent;
       background-image: linear-gradient(90deg,
-        var(--fb-logo-a, var(--ink)) calc(var(--fb-logo-f, 0%) - 14%),
-        var(--fb-logo-b, var(--muted)) calc(var(--fb-logo-f, 0%) + 14%));
+        var(--fb-logo-a, var(--fb-mark-off)) calc(var(--fb-logo-f, 0%) - 12%),
+        var(--fb-logo-b, var(--fb-mark-on)) calc(var(--fb-logo-f, 0%) + 12%));
       -webkit-mask: url('assets/loading/logo-dark-mono-01.jpg') center / contain no-repeat;
               mask: url('assets/loading/logo-dark-mono-01.jpg') center / contain no-repeat;
       -webkit-mask-source-type: luminance;
@@ -399,7 +418,7 @@
     }
     nav b .fb-wm {
       display: none;
-      color: color-mix(in srgb, var(--muted) calc(var(--p, 0) * 100%), var(--ink));
+      color: color-mix(in srgb, var(--fb-mark-on) calc(var(--p, 0) * 100%), var(--fb-mark-off));
     }
     /* A browser that cannot luminance-mask gets the name in type, which
        is what stood here before. */
@@ -1456,6 +1475,20 @@ const CAST_LAG_FREE = 0.135;  // let go   (the same 3.2 : 1 ratio)
 // is locked to the finger while the furniture still trails.
 const FRAME_LAG = 0.43;
 const FRAME_LAG_FREE = 0.135;
+// ── THE WAVE TRAVELS AT ITS OWN, EVEN SPEED ──
+// The letters do not ride `lanePos` raw, and they do not chase it on an
+// ease() either. Two reasons, and they are different. The lane's release
+// tween is 300ms of ease-out: nine letters crossed inside it is not a
+// wave, it is the snap the wave was meant to replace. And an exponential
+// chase spends itself at the front -- five letters in the first two
+// hundred milliseconds and the last one still going half a second later,
+// which reads as a stutter rather than as a run. So once the finger is
+// off the glass the front moves at a CONSTANT rate, a whole lane (a
+// whole word) in NAV_RUN_MS, and every letter gets the same beat.
+// Under the finger there is nothing to chase: the gesture is the
+// animation, exactly as it is for the strip itself.
+const NAV_RUN_MS = 520;
+let navP = START_LANE;   // where the WAVE has got to; lanePos is where it is going
 let castTarget = 0;
 let castTick = null;
 let castLast = 0;
@@ -1590,6 +1623,17 @@ function castStep(now) {
     // same ease(), same per-slot rate, just a second target.
     const nlp = ease(a.laneP, lanePos, held ? a.lag : a.lagFree, dt);
     if (nlp !== a.laneP) { a.laneP = nlp; moving = true; }
+  }
+  // The compass's wave (see NAV_RUN_MS). It keeps the tick alive on its
+  // own account: the letters are still crossing after the strip itself
+  // has landed.
+  if (held) {
+    if (navP !== lanePos) { navP = lanePos; moving = true; }
+  } else if (navP !== lanePos) {
+    const d = lanePos - navP;
+    const stepP = dt / NAV_RUN_MS;
+    navP = Math.abs(d) <= stepP ? lanePos : navP + Math.sign(d) * stepP;
+    moving = true;
   }
   paintCast();
   // The position marks ride the eased frame position, so they are
@@ -1892,13 +1936,12 @@ function splitNavMarks() {
   });
 }
 
-// THE WAVE. It is one coordinate and it is the reader's own direction of
-// travel: how far right along the strip they have come out of the mark's
-// own segment, 0 to 1. Both words read it the same way round -- the
-// front runs left to right whichever of them it is on -- because the two
-// formulas that turn it into a letter's ink are mirrored in the
-// stylesheet rather than here (a wave that changed direction per word
-// would be two animations, and the reader is only making one gesture).
+// THE WAVE. One coordinate, and it is the reader's own travel across the
+// strip: how far along its own segment the wave has come, 0 to 1, in the
+// direction the finger is going. That is the whole of why there is one
+// wave here and not two -- both words are crossed by the same edge, at
+// the same moment, going the same way, and the two formulas that turn it
+// into a letter's ink are mirrored in the stylesheet rather than here.
 //
 // The wordmark in the middle has no letters to count, so it takes the
 // same front as a gradient stop, with the pale side leading on the way
@@ -1906,18 +1949,18 @@ function splitNavMarks() {
 function paintNavWave(marks, clamp01) {
   const left = marks[0], right = marks[LANES - 1], mid = marks[LANE_HANE];
   if (left) left.style.setProperty('--f',
-    (clamp01(lanePos) * left.children.length).toFixed(3));
+    (clamp01(navP) * left.children.length).toFixed(3));
   if (right) right.style.setProperty('--f',
-    (clamp01(lanePos - (LANES - 2)) * right.children.length).toFixed(3));
+    (clamp01(navP - (LANES - 2)) * right.children.length).toFixed(3));
   if (mid) {
     // x < 0 is the walk in from Kütüphane (the wordmark is coming up),
     // x > 0 the walk out to Kahvehane (it is going down). Both are the
     // same edge crossing left to right; only which side of it is pale
     // swaps, and at x = 0 the two spellings agree on "all pale".
-    const x = Math.max(-1, Math.min(1, lanePos - LANE_HANE));
+    const x = Math.max(-1, Math.min(1, navP - LANE_HANE));
     const incoming = x <= 0;
-    mid.style.setProperty('--fb-logo-a', incoming ? 'var(--muted)' : 'var(--ink)');
-    mid.style.setProperty('--fb-logo-b', incoming ? 'var(--ink)' : 'var(--muted)');
+    mid.style.setProperty('--fb-logo-a', incoming ? 'var(--fb-mark-on)' : 'var(--fb-mark-off)');
+    mid.style.setProperty('--fb-logo-b', incoming ? 'var(--fb-mark-off)' : 'var(--fb-mark-on)');
     mid.style.setProperty('--fb-logo-f', ((incoming ? x + 1 : x) * 100).toFixed(2) + '%');
   }
 }
@@ -1966,8 +2009,12 @@ function paintNav() {
 }
 
 
-function setLanePos(p) {
+function setLanePos(p, snap) {
   lanePos = Math.max(0, Math.min(LANES - 1, p));
+  // A programmatic placement (a fresh mount, the app map's own walk)
+  // puts the wave where the lane is rather than sending it across: a
+  // page that opens on Hane must not deal itself an entrance.
+  if (snap) navP = lanePos;
   // The strip itself (the wash, the hexagons, the nav dots) reads
   // `lanePos` straight away, unstaggered -- only the cast's own chase of
   // it (see castStep()/paintCast()) needs the tick running, whether this
@@ -2265,7 +2312,7 @@ function mount() {
   // A fresh box, and a fresh #fb-petek inside it. The reader starts on
   // Hane because the book starts on the middle stop: the lane and the
   // depth have to agree, or the first pull down is one the lane forbids.
-  lane = START_LANE; lanePos = START_LANE;
+  lane = START_LANE; lanePos = START_LANE; navP = START_LANE;
   atLaneStop = false; petekBuilt = false;
   buildCast();
   splitNavMarks();  // before paintLanes(): the wave needs its letters
@@ -2307,7 +2354,7 @@ function unmount() {
   // be unwound or they are the last word on a page that is gone (see
   // unmountHivePage in profile-card.js).
   if (window.IstProfileCard && IstProfileCard.unmountHivePage) IstProfileCard.unmountHivePage();
-  lane = LANE_KUTUPHANE; lanePos = LANE_KUTUPHANE;
+  lane = LANE_KUTUPHANE; lanePos = LANE_KUTUPHANE; navP = LANE_KUTUPHANE;
   atLaneStop = false; petekBuilt = false;
   drag = null; box = null;
   // The lane variables live on <html> and would outlive this page.
@@ -2782,8 +2829,8 @@ window.__fb = {
     // A slide off the middle stop can only be reached from one lane, so
     // arriving there by hand has to leave the reader on it -- otherwise
     // the handle can put the book somewhere its own lane forbids.
-    if (at < STOPS[1]) { lane = LANE_KUTUPHANE; setLanePos(lane); }
-    else if (at > STOPS[1]) { lane = LANE_KAHVEHANE; setLanePos(lane); }
+    if (at < STOPS[1]) { lane = LANE_KUTUPHANE; setLanePos(lane, true); }
+    else if (at > STOPS[1]) { lane = LANE_KAHVEHANE; setLanePos(lane, true); }
     show(at, snap !== false); armCast();
   },
   show, armCast,
@@ -2794,7 +2841,7 @@ window.__fb = {
   goLane(n, snap) {
     if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
     if (snap === false) { runLane(n); return; }
-    lane = Math.max(0, Math.min(LANES - 1, n)); setLanePos(lane); armCast();
+    lane = Math.max(0, Math.min(LANES - 1, n)); setLanePos(lane, true); armCast();
   },
   pullLane(p) { setLanePos(p); },
 };

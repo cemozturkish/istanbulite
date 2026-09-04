@@ -1512,16 +1512,31 @@ the only question left once the swipe is the navigation.
 **The mark you are standing on is the PALE one**, and the two you are not on are the ink. The bar
 is not a menu of places to press: what it says is "the city is over there", so the words still to
 be gone to carry the weight of the ink and the one under your feet has already been reached and
-steps back. `--ink` is the resting colour of a mark and `--muted` is what arriving does to it.
+steps back. The dark one is the resting colour of a mark and the pale one is what arriving does to it.
 
 **And a word pales one letter at a time, in the direction of the swipe.** Kütüphane → Hane inks
 the K first, then the ü, the t, the ü, the p, the h, the a, the n, the e; swiping back brings them
-home in the same order reversed. The front always runs **left to right**, on either word, because
-it is the reader's own direction of travel across the strip — so moving right onto Kahvehane its K
-is the first letter to pale. It is one number per word (`--f`, the front in letters travelled,
-written by `paintNav` → `paintNavWave`); each letter is its own `<i>` carrying its index
-(`splitNavMarks`), and the stagger is one subtraction per letter in the stylesheet. Two mirrored
-formulas there, not two animations here: the reader is only making one gesture.
+home in the same order reversed. The front runs **the way the finger is going**, which is what
+makes it one wave rather than two — both words are crossed by the same edge at the same moment, so
+pulling right also pales Kahvehane's K first, and pulling back ends on the K on either word. It is
+one number per word (`--f`, the front in letters travelled, written by `paintNav` →
+`paintNavWave`); each letter is its own `<i>` carrying its index (`splitNavMarks`), and the stagger
+is one subtraction per letter in the stylesheet. Two mirrored formulas there, not two animations
+here: the reader is only making one gesture.
+
+**And the wave has its own, even speed** (`NAV_RUN_MS`, a whole word in ~520ms). It deliberately
+does not ride `lanePos` raw: the lane's release tween is 300ms of ease-out, and nine letters
+crossed inside that is the snap the wave was meant to replace. Nor does it chase on the `ease()`
+the cast uses — an exponential chase spends itself at the front and leaves the last letter still
+going half a second later, which reads as a stutter rather than as a run. Under the finger there is
+nothing to chase (the gesture is the animation, as it is for the strip itself); once it is let go
+the front travels at a constant rate and every letter gets the same beat.
+
+**The two inks are the BAR's, not the page's.** This bar is the charcoal one (see "THE TWO BARS"),
+so the page's own `--ink` is black on charcoal — darker than the paper it is printed on, and
+therefore not a mark at all. Both are mixed out of the bar's own label tokens instead
+(`--fb-mark-off` / `--fb-mark-on` off `--navbar-ink-label` and `--navbar-ink-label-active`), which
+is what those tokens are for.
 
 The **wordmark** in the middle has no letters to count, so the same front crosses it as a gradient
 stop sliding over its mask — pale side leading on the way in, trailing on the way out, the two
