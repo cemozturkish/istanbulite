@@ -1779,9 +1779,11 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   never hears it. It looks exactly like a dead button and nothing throws.
 - **An actor carries real data.** `load(el, slot)` is called once per mount, per box, after the
   element exists and awaited by nothing — the book must never wait on the network. A column's
-  three boxes share one fetch (`stackFetch`): Etkinlikler runs the same query Kahvehane's deck
-  does and fills up to three boxes with it, and says three different things where a feed comes
-  up short — a box per evening, a city with nothing on, and a fetch that failed.
+  three boxes share one fetch: Olaylar still shares it the plain way (`stackFetch`, one query,
+  rows filled into slots in order), while Etkinlikler and Haberler fetch once and then bucket the
+  result themselves — by Istanbul calendar day and by category respectively — because which slot
+  a card lands in is a fact about the card, not just how new it is (see "What each screen carries"
+  below).
 - **An actor on a middle stop is parked off-screen on both sides of it.** It comes in over the run
   that arrives at its stop and leaves again over the run that departs it, so it belongs to that
   screen coming and going — events slides in from the left across slides 8–12 and back out to the
@@ -1875,13 +1877,16 @@ Six things about it:
   never out of sight — the depth stop each lane can reach is already showing at the top of the
   screen they are standing on. It is the mall stairway drawn rather than argued, and it is "always
   in the middle" applied to the drawing itself.
-- **The left column is a feed and the right column is a set — both always three boxes.** Left are
-  the things that arrive and are taken one at a time — the news, the evenings, the cheapest cups —
-  truncated to the soonest three, with any slot the feed comes up short on left dashed. Right is a
-  fixed set of exactly three of the same kind of thing, which is why Oyunlar is Sözcel, Tümcel and
-  Bulmaca and nothing else; one of the three switched off for the day (`game_day_toggles`) goes
-  dashed in its own slot rather than shifting the other two over. Never mix the two: a set that
-  grows belongs on the left.
+- **Every column is a fixed set of exactly three, and which slot a card lands in is a fact about
+  the card.** Haberler is İSTANBUL/TÜRKİYE/DÜNYA, top to bottom, each box that category's own
+  newest story inside the 72h window; Etkinlikler is BUGÜN/YARIN/EVVELSİ GÜN, each box that
+  Istanbul calendar day's own soonest evening. Oyunlar is Sözcel, Tümcel and Bulmaca and nothing
+  else. A bucket with nothing in it (no story in that category today, no evening that day, a game
+  switched off via `game_day_toggles`) goes dashed in its own slot, still carrying its own kicker —
+  the category or the day is known regardless of whether anything is in it — rather than shifting
+  the other two up to fill the gap. Olaylar alone stays a genuine feed (the top three ongoing
+  olaylar by `sort_order`, whichever those are on a given day) rather than three fixed buckets,
+  because there is no third axis to bucket an olay by.
 - **Hane's vertical axis is the petek's own three depths, and there is nothing new above or below
   it.** Up/out is level 2 (the whole petek), the reader arrives at level 1 (Yanındakiler), down/in
   is level 0 (Sen — the hexagon with the avatar arrows on it and name, district and the three

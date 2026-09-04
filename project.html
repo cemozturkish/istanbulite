@@ -171,30 +171,34 @@
     .fb-actor.live.fb-col-r:active { transform-origin: 100% 100%; }
 
     /* ── What a filled box is OF -- one template for all of them ── */
-    /* The kicker stays a normal, in-flow line -- same left edge as the
-       title under it by construction, never a separately-chosen inset
-       to keep in step. Only its color marks it: the site's one red
-       (--ink-red, palette.css), paired with the flag bar above. */
+    /* The kicker and the date are pinned the same way, one on each top
+       corner: both `position: absolute` at --fb-box-pad-y/-x from their
+       own edge, never a normal-flow line that merely happens to start
+       near the top. Kept as a category label even on an empty slot (see
+       the loaders) -- BUGÜN, İSTANBUL and the rest are known regardless
+       of whether that bucket has anything in it today. */
     .fb-box .k {
+      position: absolute;
+      top: var(--fb-box-pad-y); left: var(--fb-box-pad-x);
       font-size: 0.52rem; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--ink-red, #B93631); margin-bottom: 2px;
+      line-height: 1;
+      color: var(--ink-red, #B93631);
     }
-    /* The date/meta is pinned to the box's own top-right corner instead
-       of trailing the title, so it shares the kicker's row rather than
-       taking a line of its own underneath -- which is what frees the
-       room for the title to wrap onto a second line below. */
     .fb-box .m {
       position: absolute;
       top: var(--fb-box-pad-y); right: var(--fb-box-pad-x);
       font-size: 0.6rem; color: var(--muted);
     }
-    /* Two lines, not one -- the box grew 40% taller for exactly this --
-       and text-overflow: clip (paired with -webkit-line-clamp) drops
-       the browser's own "…" on the rare headline that still doesn't
-       fit: a hard edge, never three dots, because a title cut off with
-       an ellipsis reads as unfinished and a title cut off in silence
-       reads as a headline that simply ran out of room. */
+    /* Clears the pinned kicker above it -- the box's own top padding
+       only clears the corner tag, not a second line under it. Two
+       lines, not one -- the box grew 40% taller for exactly this -- and
+       text-overflow: clip (paired with -webkit-line-clamp) drops the
+       browser's own "…" on the rare headline that still doesn't fit: a
+       hard edge, never three dots, because a title cut off with an
+       ellipsis reads as unfinished and a title cut off in silence reads
+       as a headline that simply ran out of room. */
     .fb-box .t {
+      margin-top: 11px;
       font-size: 0.82rem; font-weight: 700; line-height: 1.15;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
       overflow: hidden; text-overflow: clip;
@@ -1052,9 +1056,7 @@ const START_LANE = LANE_HANE;
 // than three hand-copied objects.
 // ══════════════════════════════════════════════════════════════
 
-// ── The events actor's own content ──
-// One fetch, the next few evenings in the city, soonest first -- the
-// same rows and the same order Kahvehane's deck uses.
+// ── District names, shared by the events and news actors below ──
 const NB_NAMES = {
   bakirkoy:'Bakırköy', bayrampasa:'Bayrampaşa', bahcelievler:'Bahçelievler', sisli:'Şişli',
   eyupsultan:'Eyüpsultan', gop:'Gaziosmanpaşa', esenler:'Esenler', bagcilar:'Bağcılar',
@@ -1064,7 +1066,6 @@ const NB_NAMES = {
   beyoglu:'Beyoğlu', gungoren:'Güngören', kagithane:'Kağıthane', atasehir:'Ataşehir',
   zeytinburnu:'Zeytinburnu', fatih:'Fatih',
 };
-const MON_TR = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
 
 function esc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, c =>
@@ -1073,23 +1074,23 @@ function esc(v) {
 
 // Everything Istanbul-dated goes through one clock (CLAUDE.md rule 10);
 // here that is just the timeZone these are formatted in.
-function eventWhen(iso) {
-  const d = new Date(iso);
-  const tz = 'Europe/Istanbul';
-  const day = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, day: 'numeric' }), 10);
-  const mon = parseInt(d.toLocaleDateString('en-US', { timeZone: tz, month: 'numeric' }), 10);
-  const wd = d.toLocaleDateString('tr-TR', { timeZone: tz, weekday: 'short' }).toLocaleUpperCase('tr-TR');
-  const time = d.toLocaleTimeString('tr-TR', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
-  return day + ' ' + (MON_TR[mon - 1] || '') + ' ' + wd + ' · ' + time;
+// Just the clock, in Istanbul local time -- the day itself is already
+// said by which box a card landed in (BUGÜN/YARIN/...), so the meta
+// line under it only owes the reader the hour.
+function eventTimeOnly(iso) {
+  return new Date(iso).toLocaleTimeString('tr-TR',
+    { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 // ── Filling a 3-box stack from one fetch ──
-// Etkinlikler, Haberler and Olaylar are all the same shape: fetch up
-// to 3 rows once, render each into its own box, and leave whichever
-// slots have no row as an empty dashed frame -- the same "nothing
-// here" convention the rest of the site already uses (.events-empty,
-// deckFrameHTML). One fetch serves all three slots via a shared
-// promise, so a column costs one round trip and not three.
+// Olaylar is still this shape: fetch up to 3 rows once, render each
+// into its own box, and leave whichever slots have no row as an empty
+// dashed frame -- the same "nothing here" convention as everywhere
+// else on the site (.events-empty, deckFrameHTML). One fetch serves
+// all three slots via a shared promise, so a column costs one round
+// trip and not three. Etkinlikler and Haberler used to be this shape
+// too; they are bucketed columns now (see below), where which slot a
+// card lands in is a fact about the card, not just how new it is.
 function stackFetch(fetchRows) {
   let promise = null;
   return function (el, slot) {
@@ -1116,60 +1117,109 @@ function stackFetch(fetchRows) {
   };
 }
 
-// ── Kahvehane's lane: the next few evenings ──
-const loadEventsActor = stackFetch(async () => {
-  try {
-    const { data, error } = await IstRouter.sb.from('events')
-      .select('*')
-      .gte('event_date', new Date().toISOString())
-      .order('event_date', { ascending: true })
-      .limit(3);
-    if (error) throw error;
-    const rows = (data || []).map(ev => {
-      const nb = ev.neighborhood ? (NB_NAMES[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
-      return '<div class="k">' + esc(nb.toLocaleUpperCase('tr-TR')) + '</div>' +
-             '<div class="t">' + esc(ev.title) + '</div>' +
-             '<div class="m">' + esc(eventWhen(ev.event_date)) + '</div>';
-    });
-    return { rows, failed: false,
-      emptyHtml: '<div class="k">Etkinlikler</div><div class="t">Şimdilik yok</div>' +
-                 '<div class="m">Bu aralar bir şey yok.</div>' };
-  } catch (err) {
-    console.error('[proje events]', err);
-    return { rows: [], failed: true,
-      failedHtml: '<div class="k">Etkinlikler</div><div class="t">Yüklenemedi</div>' +
-                  '<div class="m">Bağlantını kontrol et.</div>' };
+// ── Kahvehane's lane: one box per DAY, not a feed ──
+// Fixed vertical order top to bottom -- BUGÜN, YARIN, EVVELSİ GÜN -- so
+// the slot a card lands in says WHICH day, never merely how soon.
+// Slots are stacked bottom-up (slot 0 lowest), so day offset 0 is
+// slot 2, offset 1 is slot 1, offset 2 is slot 0. Day boundaries go
+// through IstDate.iso() (CLAUDE.md rule 10) rather than a device-local
+// midnight, then get built as fixed +03:00 instants -- Istanbul carries
+// no DST, so this is exact rather than a guess.
+const ETKINLIK_LABELS = ['BUGÜN', 'YARIN', 'EVVELSİ GÜN']; // [day+0, day+1, day+2]
+let etkinlikPromise = null;
+async function loadEtkinlikActor(el, slot) {
+  if (!etkinlikPromise) {
+    etkinlikPromise = (async () => {
+      try {
+        const ranges = [0, 1, 2].map(off => ({
+          start: new Date(IstDate.iso(off) + 'T00:00:00+03:00').toISOString(),
+          end: new Date(IstDate.iso(off + 1) + 'T00:00:00+03:00').toISOString(),
+        }));
+        const results = await Promise.all(ranges.map(r => IstRouter.sb.from('events')
+          .select('*').gte('event_date', r.start).lt('event_date', r.end)
+          .order('event_date', { ascending: true }).limit(1)));
+        return { days: results.map(r => (r.error ? null : (r.data || [])[0] || null)), failed: false };
+      } catch (err) {
+        console.error('[proje etkinlik]', err);
+        return { days: [null, null, null], failed: true };
+      }
+    })();
   }
-});
+  const { days, failed } = await etkinlikPromise;
+  if (!el.isConnected) return;
+  const dayIdx = 2 - slot;
+  const label = ETKINLIK_LABELS[dayIdx];
+  if (failed) {
+    el.classList.toggle('fb-empty', slot !== 2);
+    el.innerHTML = '<div class="k">' + label + '</div>' +
+      (slot === 2 ? '<div class="t">Yüklenemedi</div>' : '');
+    return;
+  }
+  const ev = days[dayIdx];
+  if (!ev) { el.classList.add('fb-empty'); el.innerHTML = '<div class="k">' + label + '</div>'; return; }
+  el.classList.remove('fb-empty');
+  const nb = ev.neighborhood ? (NB_NAMES[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
+  el.innerHTML = '<div class="k">' + label + '</div>' +
+    '<div class="m">' + esc(eventTimeOnly(ev.event_date)) + '</div>' +
+    '<div class="t">' + esc(ev.title) + ' — ' + esc(nb) + '</div>';
+}
 
-// ── Kütüphane's lane: the newest stories ──
-// The same 72-hour window Kütüphane's own column reads in: what is on
-// these boxes has to be what is on that page, or the rig is testing a
-// screen the app does not have.
-const loadHaberlerActor = stackFetch(async () => {
-  try {
-    const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
-    const { data, error } = await IstRouter.sb.from('breaking_news')
-      .select('id, title, body, title_en, body_en, category, neighborhood, updated_at')
-      .gte('updated_at', cutoff)
-      .is('archived_at', null)
-      .order('updated_at', { ascending: false })
-      .limit(3);
-    if (error) throw error;
-    const rows = (data || []).map(n =>
-      '<div class="k">' + esc(newsKicker(n)) + '</div>' +
-      '<div class="t">' + esc(newsText(n, 'title')) + '</div>' +
-      '<div class="m">' + esc(newsAge(n.updated_at)) + '</div>');
-    return { rows, failed: false,
-      emptyHtml: '<div class="k">Haberler</div><div class="t">Şimdilik yok</div>' +
-                 '<div class="m">Son üç günde bir şey yok.</div>' };
-  } catch (err) {
-    console.error('[proje haberler]', err);
-    return { rows: [], failed: true,
-      failedHtml: '<div class="k">Haberler</div><div class="t">Yüklenemedi</div>' +
-                  '<div class="m">Bağlantını kontrol et.</div>' };
+// ── Kütüphane's lane: one box per CATEGORY, not a feed ──
+// Fixed vertical order top to bottom -- İSTANBUL, TÜRKİYE, DÜNYA -- each
+// showing that category's own newest story inside the 72h window
+// Kütüphane's own column reads. One fetch of the recent pool, bucketed
+// client-side by newsBucket() below -- a district story (`neighborhood`
+// set, no `category`) is still İstanbul for this column's purposes.
+const HABER_BUCKETS = ['istanbul', 'turkiye', 'dunya']; // [slot 2, slot 1, slot 0]
+const HABER_LABELS = { istanbul: 'İSTANBUL', turkiye: 'TÜRKİYE', dunya: 'DÜNYA' };
+function newsBucket(n) {
+  const c = n.category || n.neighborhood || 'turkiye';
+  if (c === 'dunya') return 'dunya';
+  if (c === 'turkiye') return 'turkiye';
+  return 'istanbul';
+}
+let haberlerPromise = null;
+async function loadHaberlerActor(el, slot) {
+  if (!haberlerPromise) {
+    haberlerPromise = (async () => {
+      try {
+        const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
+        const { data, error } = await IstRouter.sb.from('breaking_news')
+          .select('id, title, body, title_en, body_en, category, neighborhood, updated_at')
+          .gte('updated_at', cutoff)
+          .is('archived_at', null)
+          .order('updated_at', { ascending: false })
+          .limit(30);
+        if (error) throw error;
+        const byBucket = {};
+        for (const n of (data || [])) {
+          const b = newsBucket(n);
+          if (!byBucket[b]) byBucket[b] = n; // already newest-first: first wins
+        }
+        return { byBucket, failed: false };
+      } catch (err) {
+        console.error('[proje haberler]', err);
+        return { byBucket: {}, failed: true };
+      }
+    })();
   }
-});
+  const { byBucket, failed } = await haberlerPromise;
+  if (!el.isConnected) return;
+  const bucket = HABER_BUCKETS[2 - slot];
+  const label = HABER_LABELS[bucket];
+  if (failed) {
+    el.classList.toggle('fb-empty', slot !== 2);
+    el.innerHTML = '<div class="k">' + label + '</div>' +
+      (slot === 2 ? '<div class="t">Yüklenemedi</div>' : '');
+    return;
+  }
+  const n = byBucket[bucket];
+  if (!n) { el.classList.add('fb-empty'); el.innerHTML = '<div class="k">' + label + '</div>'; return; }
+  el.classList.remove('fb-empty');
+  el.innerHTML = '<div class="k">' + label + '</div>' +
+    '<div class="m">' + esc(newsAge(n.updated_at)) + '</div>' +
+    '<div class="t">' + esc(newsText(n, 'title')) + '</div>';
+}
 
 // A story is entered in both languages (db/breaking_news_v2_bilingual.sql);
 // the English half is used only where the reader is in English and it was
@@ -1179,16 +1229,6 @@ function newsText(row, field) {
   const en = row[field + '_en'];
   if (window.I18N && I18N.isEnglish() && en && String(en).trim()) return en;
   return row[field];
-}
-
-// Which layer a story belongs to -- the same words Kütüphane's own cards
-// are kickered with (newsCategoryLabel there).
-function newsKicker(n) {
-  const c = n.category || n.neighborhood || 'turkiye';
-  if (c === 'turkiye') return 'TÜRKİYE';
-  if (c === 'istanbul') return 'İSTANBUL';
-  if (c === 'dunya') return 'DÜNYA';
-  return (NB_NAMES[c] || c).toLocaleUpperCase('tr-TR');
 }
 
 function newsAge(iso) {
@@ -1337,7 +1377,7 @@ const CAST = [
   // ── Kahvehane's pair: the doing side ──
   ...stackActors({
     idBase: 'etkinlik', live: 11, lane: LANE_KAHVEHANE, col: 'l', cls: 'fb-events',
-    poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadEventsActor,
+    poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadEtkinlikActor,
   }),
   ...stackActors({
     idBase: 'oyun', live: 11, lane: LANE_KAHVEHANE, col: 'r', cls: 'fb-oyun',
