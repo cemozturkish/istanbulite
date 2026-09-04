@@ -1614,7 +1614,7 @@ slide that is the city:
 | | Lane 0 | Lane 1 | Lane 2 |
 |---|---|---|---|
 | | **Kütüphane** | **Hane** | **Kahvehane** |
-| what stands there | Haberler + Olaylar | the petek | Etkinlikler + Sözcel |
+| what stands there | Haberler + Bilgi | the petek | Etkinlikler + Sözcel |
 | where the book may go | up, to slide 1 | nowhere | down, to slide 24 |
 
 Left to right on the screen, exactly as the three tabs stand. A pull right walks the strip right,
@@ -1848,12 +1848,12 @@ bleed, and it carries no tiles at all — the middle page is the people and noth
 ```
         (up / out)                                        (down / in)
       Türkiye — slide 1                                the ilçe — slide 24
-      Hikâyeler · Bilgi                                 Kahve · Yorumlar
+      Hikâyeler · Olaylar                                 Yorumlar · Kahve
               │                                              │
         ┌─────┴──────┐        ┌──────────┐        ┌──────────┴───┐
         │ KÜTÜPHANE  │ ────── │   HANE   │ ────── │  KAHVEHANE   │
         │ Haberler   │        │ the petek│        │ Etkinlikler  │
-        │ Fikirler   │        │  alone   │        │ Oyunlar      │
+        │ Bilgi      │        │  alone   │        │ Oyunlar      │
         └────────────┘        └────┬─────┘        └──────────────┘
                                    │
                     ▲ up / out — the whole petek: what İstanbul thinks
@@ -1862,11 +1862,11 @@ bleed, and it carries no tiles at all — the middle page is the people and noth
 
 | Screen | The map(s) on top | Left column (3 rectangles) | Right column (3 rectangles) |
 |---|---|---|---|
-| Türkiye (slide 1) | Türkiye | **Hikâyeler** — the stories the map is grouped into | **Bilgi** |
-| Kütüphane (lane 0) | İstanbul · the ilçe | **Haberler** | **Fikirler** |
+| Türkiye (slide 1) | Türkiye | **Hikâyeler** — the stories the map is grouped into | **Olaylar** |
+| Kütüphane (lane 0) | İstanbul · the ilçe | **Haberler** | **Bilgi** |
 | Hane (lane 1) | none — the petek, full bleed | — | — |
 | Kahvehane (lane 2) | İstanbul · the ilçe | **Etkinlikler** (RSVP goes to Hane) | **Oyunlar** — Sözcel, Tümcel, Bulmaca |
-| the ilçe (slide 24) | the ilçe, with the member's own picked out | **Kahve** — the Kahve Endeksi's rows | **Yorumlar** |
+| the ilçe (slide 24) | the ilçe, with the member's own picked out | **Yorumlar** | **Kahve** — the Kahve Endeksi's rows |
 
 Six things about it:
 
@@ -1901,9 +1901,9 @@ Six things about it:
   are parked rather than deleted. Bilgi is in the same state at the Türkiye stop.
 
 **What of this is already standing in `project.html`:** Etkinlikler and Oyunlar (all three games)
-on Kahvehane, Haberler and Olaylar on Kütüphane, the petek and its three depths on Hane, and the
-Türkiye map as slide 1's drawing. Hikâyeler, Bilgi, Kahve and Yorumlar have their six boxes too,
-standing dashed at slides 1 and 24 (see the cast rules above) — the boxes are cast, the content
+on Kahvehane, Haberler on Kütüphane and Olaylar at the Türkiye stop, the petek and its three depths on Hane, and the
+Türkiye map as slide 1's drawing. Hikâyeler, Bilgi, Kahve and Yorumlar have their boxes too,
+standing dashed (see the cast rules above) — the boxes are cast, the content
 behind them is not. **What is still in the parts bin:** the second map on the two lane screens,
 the ilçe's own drawing at slide 24, and whatever actually fills Hikâyeler, Bilgi, Kahve and
 Yorumlar.
