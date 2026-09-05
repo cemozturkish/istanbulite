@@ -1897,12 +1897,33 @@ Six things about it:
   the card.** Haberler is İSTANBUL/TÜRKİYE/DÜNYA, top to bottom, each box that category's own
   newest story inside the 72h window; Etkinlikler is BUGÜN/YARIN/EVVELSİ GÜN, each box that
   Istanbul calendar day's own soonest evening. Oyunlar is Sözcel, Tümcel and Bulmaca and nothing
-  else. A bucket with nothing in it (no story in that category today, no evening that day, a game
+  else, **in that order, top to bottom** — the sequence reads downward the way a list of steps
+  does, so 1. Oyun is the box the eye lands on first and 3. Oyun is the one at the dock. The slots
+  are numbered from the dock up (`.fb-slot-N`), so the first game stands in the last slot;
+  `gameForSlot()` is the one place that arithmetic is written. A bucket with nothing in it (no story in that category today, no evening that day, a game
   switched off via `game_day_toggles`) goes dashed in its own slot, still carrying its own kicker —
   the category or the day is known regardless of whether anything is in it — rather than shifting
   the other two up to fill the gap. Olaylar alone stays a genuine feed (the top three ongoing
   olaylar by `sort_order`, whichever those are on a given day) rather than three fixed buckets,
   because there is no third axis to bucket an olay by.
+- **And the sequence is a gate: you cannot skip ahead.** Tümcel stays shut until Sözcel has been
+  played and Bulmaca until Tümcel has (`gameBlocker` in project.html). A locked box is **not**
+  `.fb-empty` — it still names its game and says what is standing in front of it ("Önce Sözcel"),
+  because a step you can see ahead of you is a different thing from a slot with nothing in it. It
+  goes muted in the ink, the red category rule included, and **never in opacity**: an actor's
+  opacity is its pose, and a rule here would be overwritten on the next frame. *Played* means
+  FINISHED (`attempts >= 1` in `game_results`), never merely opened — every game writes an
+  `attempts: 0` row on the reader's first interaction, so counting rows would open the next game
+  from under one still being played. It is the same rule Kahvehane's own deck and the app map's
+  square use, and the three must agree. A game the admin switched **off** for the day blocks
+  nothing: it is not a step anybody has left to take, so it leaves the sequence rather than
+  standing in the middle of it holding the rest shut. The column is re-read the moment a game is
+  closed (`refreshOyunColumn`, from `closeGameOverlay`) rather than at the next mount — finishing
+  Sözcel and finding Tümcel still locked is the whole of what that costs.
+- **The games column names its game in the bottom-left corner**, on every lane, including the
+  mirrored one. The other columns are feeds whose headline is the thing itself and reads from the
+  top; this one is a fixed set of three read by their names, and a name standing on the floor of
+  its box is on the same line in all three however long the line above it runs.
 - **Hane's vertical axis is the petek's own three depths, and there is nothing new above or below
   it.** Up/out is level 2 (the whole petek), the reader arrives at level 1 (Yanındakiler), down/in
   is level 0 (Sen — the hexagon with the avatar arrows on it and name, district and the three
