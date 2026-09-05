@@ -783,44 +783,26 @@
        instead of navigating its own back arrow); nothing there had to
        change.
 
-       It is a PLAIN POP UP: no curtains, no choreography. The layer
-       stands in exactly the room the map + band fill on every other
-       page -- the two bars stay up, the same rule everywhere else on
-       the site (see "THE TWO BARS ARE OMNIPRESENT" in CLAUDE.md) --
-       and it is framed by the SAME two measurements: --map-hero-top for
-       where the map's own square sits, --navbar-h for the room the tab
-       bar keeps clear. Not a fraction of the screen guessed at; the
-       exact box the map and the band already stand in everywhere else.
-       The game is a window sitting just inside that box -- slightly
-       smaller than the screen, on the page's own paper, rather than a
-       second full-bleed screen.
+       It is THE sheet -- the same object that rises from the bottom
+       when the reader presses their own name on the profile bar (see
+       "THE sheet" in CLAUDE.md and sheet.css). Not a bespoke pop up
+       with its own geometry: same markup, same IstSheet.open/close,
+       same 0.55s slide, and on a phone the same resting position under
+       the profile bar that sheet.js measures live. So the game arrives
+       the way every other surface on the site arrives, and there is no
+       second transition language to keep in step.
 
-       Its z-index has to sit UNDER the bars' own 400/401 (frames.css),
-       not over them -- the profile bar's real height is taller than
-       --map-hero-top on purpose (it floats over the top sliver of the
-       map on every page), so the overlay's own top edge already sits a
-       little way under it. */
-    #fb-game-overlay {
-      position: fixed;
-      top: var(--map-hero-top, 26px);
-      left: 0; right: 0;
-      bottom: calc(var(--navbar-h, 46px) + env(safe-area-inset-bottom));
-      z-index: 40;          /* under the omnipresent bars (400/401) on purpose */
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    #fb-game-overlay[hidden] { display: none; }
+       All this page states is what is genuinely its own: the iframe
+       fills the sheet edge to edge, instead of the padded, scrolling
+       .ist-sheet-body every other sheet carries -- a game page brings
+       its own chrome and does its own scrolling (sozcel.html's
+       layoutGame() measures the room it is actually given). */
     #fb-game-frame {
       display: block;
-      width: 96%;
-      height: 97%;
-      border: 2px solid var(--ink, #17140f);
-      border-radius: 6px;
+      width: 100%;
+      height: 100%;
+      border: 0;
       background: var(--paper, #f4f1ec);
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
-      overflow: hidden;
     }
   </style>
 </head>
@@ -869,10 +851,13 @@
 
 <!-- ── THE GAME OVERLAY ──
      Sözcel opens here instead of navigating away -- see wireGameOverlay
-     and the CSS block above. A plain pop up: the iframe is the only
-     thing in here. -->
-<div id="fb-game-overlay" hidden>
-  <iframe id="fb-game-frame" title="Oyun"></iframe>
+     and the CSS block above. THE sheet, exactly as the profile bar's
+     own name opens one; the iframe is the only thing in it. -->
+<div class="ist-sheet-overlay" id="fb-game-overlay" hidden>
+  <div class="ist-sheet-backdrop" id="fb-game-backdrop"></div>
+  <div class="ist-sheet fb-game-sheet">
+    <iframe id="fb-game-frame" title="Oyun"></iframe>
+  </div>
 </div>
 
 <script>
@@ -2255,7 +2240,7 @@ function unmount() {
   // be the last word on a page that is gone -- along with the body class
   // that dims the bottom bar.
   closeMap();
-  closeGameOverlay();
+  closeGameOverlay(true);
   traveling = false;
   if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
   // The petek leaves two things behind it that live OUTSIDE this page --
@@ -2471,19 +2456,32 @@ function openGameOverlay(href) {
   const frame = document.getElementById('fb-game-frame');
   if (!layer || !frame) return;
   frame.src = href;
-  layer.hidden = false;
+  IstSheet.open(layer);
 }
-function closeGameOverlay() {
+function closeGameOverlay(immediate) {
   const layer = document.getElementById('fb-game-overlay');
   const frame = document.getElementById('fb-game-frame');
   if (!layer || layer.hidden) return;
-  layer.hidden = true;
   // Unloads the game rather than leaving it running behind the layer, so
-  // the next open is a fresh start rather than wherever it was left.
-  if (frame) frame.src = 'about:blank';
-  // A game just played may have moved the Oyunlar square -- let the next
-  // map open re-fetch it rather than show a stale count.
-  mapStatsAt = 0;
+  // the next open is a fresh start rather than wherever it was left --
+  // and only once the sheet is off-screen, never mid-slide (which is
+  // exactly what IstSheet.close's `after` is for).
+  const done = () => {
+    if (frame) frame.src = 'about:blank';
+    // A game just played may have moved the Oyunlar square -- let the next
+    // map open re-fetch it rather than show a stale count.
+    mapStatsAt = 0;
+  };
+  // A teardown (leaving project.html itself, unmount()) has nothing left
+  // to slide in front of, so it skips straight to hidden.
+  if (immediate) {
+    layer.classList.remove('open');
+    layer.hidden = true;
+    IstSheet.syncDim();
+    done();
+    return;
+  }
+  IstSheet.close(layer, done);
 }
 function wireGameOverlay() {
   if (document.body.dataset.fbGameWired) return;
@@ -2495,6 +2493,13 @@ function wireGameOverlay() {
     if (frame && e.source === frame.contentWindow && e.data === 'ist-close-game-overlay') {
       closeGameOverlay();
     }
+  });
+  // The two ways out every other sheet on the site already has, beside
+  // the game's own back arrow above.
+  const backdrop = document.getElementById('fb-game-backdrop');
+  if (backdrop) backdrop.addEventListener('click', () => closeGameOverlay());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && IstSheet.isOpen('fb-game-overlay')) closeGameOverlay();
   });
 }
 
