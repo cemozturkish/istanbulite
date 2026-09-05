@@ -141,50 +141,94 @@
   // and the settle is already the release tween's own ease-out (runLane
   // in project.html), so a transition on top of it would be a second
   // curve fighting the first.
+  //
+  // ── And it is BOTH lines that walk, not the block ──
+  // Your name and your district are two lines of different lengths, and
+  // what has to end up against the edge of the bar is each of them —
+  // ranging the block alone leaves the shorter of the two (usually the
+  // district) still centred under the longer one, which reads as one of
+  // them not having arrived. So the travel is measured per line: the
+  // wider line is the block's own width and has nowhere further to go,
+  // and the narrower one covers the difference between them on top of
+  // the block's move. Same number `t` drives all of it, so the two lines
+  // and the block are one movement rather than three.
   let _barSlide = 0;
-  let _barSlack = null;   // px the block may travel each way; measured, cached
+  // Whether the flip book is driving this bar at all. It is what the
+  // stylesheet keys the two lines' shrink-wrap off, so it is a fact about
+  // the page being mounted and NOT about the current `t` — it must not
+  // come and go as a pull passes through the middle lane. Kept at module
+  // scope because the row is rebuilt under it (see renderPage).
+  let _barSliding = false;
+  // { slack, lines: [{ el, dx }] } — everything measured at t = 1, cached
+  let _barTravel = null;
 
   function setBarSlide(t) {
     const n = Math.max(-1, Math.min(1, Number(t) || 0));
-    if (n === _barSlide) return;
+    if (n === _barSlide && _barSliding) return;
     _barSlide = n;
+    // Switching the class on changes how the two lines are laid out, so
+    // anything measured before it is measured against the wrong boxes.
+    if (!_barSliding) { _barSliding = true; invalidateBarSlack(); }
     paintBarSlide();
   }
 
   function clearBarSlide() {
-    setBarSlide(0);
+    _barSlide = 0;
+    if (_barSliding) { _barSliding = false; invalidateBarSlack(); }
+    paintBarSlide();
   }
 
+  // How far each thing may travel toward either edge, at t = 1.
+  //
   // The block shrink-wraps its own type and is centred in the room the
-  // bar's own padding leaves (.ist-pc-seat-none), so the distance to
-  // either edge is half of what is left over. Measured rather than
-  // guessed at — a long name has less room to travel than a short one —
-  // and cached, because this is read on every frame of a drag and
-  // measuring there would lay the bar out sixty times a second.
-  function barSlack() {
-    if (_barSlack != null) return _barSlack;
+  // bar's own padding leaves (.ist-pc-seat-none), so it may cover half of
+  // what is left over; each line then covers half of what IT leaves
+  // inside the block. Measured rather than guessed at — a long name has
+  // less room to travel than a short one — and cached, because this is
+  // read on every frame of a drag and measuring there would lay the bar
+  // out sixty times a second.
+  function barTravel() {
+    if (_barTravel) return _barTravel;
     const me = document.getElementById('ist-pc-me');
     const id = me && me.querySelector('.ist-pc-id');
-    if (!me || !id) return 0;
-    const slack = Math.max(0, (me.clientWidth - id.offsetWidth) / 2);
+    if (!me || !id) return null;
     // A row that has not been laid out yet (the bar is display:none above
     // 768px, and a hidden document measures as nothing) measures zero —
     // which is a true answer for right now and a wrong one to cache.
-    if (!me.clientWidth) return 0;
-    _barSlack = slack;
-    return _barSlack;
+    if (!me.clientWidth) return null;
+    const inner = id.clientWidth;
+    _barTravel = {
+      slack: Math.max(0, (me.clientWidth - id.offsetWidth) / 2),
+      lines: Array.from(id.querySelectorAll('.ist-pc-name, .ist-pc-meta')).map(el => ({
+        el, dx: Math.max(0, (inner - el.offsetWidth) / 2),
+      })),
+    };
+    return _barTravel;
   }
 
-  function invalidateBarSlack() { _barSlack = null; }
+  function invalidateBarSlack() { _barTravel = null; }
 
-  // Painted onto .ist-pc-me rather than onto the block inside it, so it
-  // cannot collide with the transform setBarLayout's FLIP writes on
-  // .ist-pc-id (see above) — the two moves are different elements'.
+  // The block's own move is painted onto .ist-pc-me rather than onto the
+  // block inside it, so it cannot collide with the transform
+  // setBarLayout's FLIP writes on .ist-pc-id (see above) — the two moves
+  // are different elements'. Each line's own residual then rides on top,
+  // written to the line itself.
   function paintBarSlide() {
     const me = document.getElementById('ist-pc-me');
     if (!me) return;
-    const px = _barSlide * barSlack();
-    me.style.setProperty('--ist-pc-slide', px.toFixed(2) + 'px');
+    // Re-asserted here rather than only where it is switched, because
+    // this is also what runs after a renderPage that built a fresh row
+    // (see paintBarMe) — the class and the measurement both belong to a
+    // row that may not have existed when the lane last moved.
+    const row = me.closest('.ist-pc-row');
+    if (row) row.classList.toggle('ist-pc-sliding', _barSliding);
+    const travel = barTravel();
+    me.style.setProperty('--ist-pc-slide',
+      (_barSlide * (travel ? travel.slack : 0)).toFixed(2) + 'px');
+    if (!travel) return;
+    travel.lines.forEach(({ el, dx }) => {
+      el.style.setProperty('--ist-pc-line', (_barSlide * dx).toFixed(2) + 'px');
+    });
   }
 
   // The bar is a fixed row of type: what it can travel changes only when
