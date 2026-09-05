@@ -1715,6 +1715,11 @@ project.html listens for to close the layer. A page opened this way is torn down
 (`frame.src = 'about:blank'`) rather than kept alive behind the layer, so the next open is a fresh
 start.
 
+**It is a plain pop up, and deliberately nothing more.** It opens and it is there; it closes and
+it is gone. There is no entrance choreography — the paper curtains that used to slide in from
+above and below, the reveal that waited on both the slide and the iframe's `load`, and the reverse
+fade on the way out are all gone. The game is the one thing in the layer.
+
 **It stands in the exact room the map and the band already fill on every other page, not edge to
 edge.** The two bars stay up throughout (see "THE TWO BARS ARE OMNIPRESENT"): the overlay's own
 top is `--map-hero-top` and its bottom clears `--navbar-h`, the same two measurements every other
@@ -1722,31 +1727,11 @@ page's map and band are built from — not a guessed fraction of the screen, the
 z-index sits *under* the bars' own 400/401 (frames.css), the one place on the site content
 deliberately stacks below them rather than stopping flush against them: the profile bar's real
 height is taller than `--map-hero-top` by design (it already floats over the top sliver of the
-map on every page), so the overlay's own top edge sits a little way under it — and that sliver is
-what lets the entrance curtains read as sliding out from *behind* the bars rather than over them.
-
-**The opening is two paper pages, not a fade.** The iframe loads at its true, untouched full size
-the whole time (`sozcel.html`'s own `layoutGame()` must never measure a transformed box), and two
-decorative curtains cover it — one the height of the map's own square, descending from above; one
-resting just above the actor row the tile was pressed from, rising from below the tab bar — the
-same 0.55s curve as THE sheet's own slide (`sheet.css`), so this reads as the same object opening a
-different way rather than a second transition language. **They land apart and stay apart —
-two windows, not one closed sheet**, so the room between the map and the row is in view the instant
-they land rather than being swallowed by a sheet that briefly covers the whole screen; where the
-bottom one rests is measured live off whichever actor is actually on screen
-(`--fb-curtain-bottom-top`, set in `openGameOverlay()`), never a guessed fraction, so a taller
-Etkinlikler card or a different device is never fought. They only lift once BOTH the slide has
-finished and the iframe has actually fired `load`, so a slow load is never uncovered early and a
-fast one is never rushed.
-
-**Leaving reverses it, rather than snapping.** The back arrow's `postMessage` used to hide the
-layer outright — `hidden = true` in the same tick, the game gone and the book back in one frame,
-the one surface on the site that closed with no motion at all (every other one, THE sheet included,
-drops its open state and only hides once its own transition has actually finished). Pressing it now
-brings the curtains back over the game first — the same fade `.gone` already does in reverse, 0.3s —
-and only once they've met does the layer come down (`closeGameOverlay()`). A teardown of the page
-itself (`unmount()`, leaving project.html) has nothing left to animate in front of and skips straight
-to hidden (`closeGameOverlay(true)`).
+map on every page), so the overlay's own top edge sits a little way under it. Inside that box the
+game sits as a bordered window just inside its edges — **slightly smaller than the screen** — on
+the page's own paper rather than as a second full-bleed screen. The iframe is at its true,
+untouched size the whole time (`sozcel.html`'s own `layoutGame()` must never measure a transformed
+box).
 
 Visiting one of the three directly still works exactly as before — the
 `<a href="project.html">` fallback is what fires when there is no parent to postMessage — and

@@ -772,39 +772,30 @@
        instead of navigating its own back arrow); nothing there had to
        change.
 
-       Its STAGE stands in exactly the room the map + band fill on every
-       other page -- the two bars stay up, the same rule everywhere else
-       on the site (see "THE TWO BARS ARE OMNIPRESENT" in CLAUDE.md) --
-       and it is framed by the SAME two measurements: --map-hero-top/
-       --map-hero-end for where the map's own square sits, --navbar-h for
-       the room the tab bar keeps clear. Not a fraction of the screen
-       guessed at; the exact box the map and the band already stand in
-       everywhere else. The game itself is smaller than that stage --
-       #fb-game-frame is centered on it rather than filling it -- so the
-       curtains still cover the whole room for the reveal, and what they
-       uncover is a bordered window sitting on the page's own paper
-       rather than a second full-bleed screen.
+       It is a PLAIN POP UP: no curtains, no choreography. The layer
+       stands in exactly the room the map + band fill on every other
+       page -- the two bars stay up, the same rule everywhere else on
+       the site (see "THE TWO BARS ARE OMNIPRESENT" in CLAUDE.md) --
+       and it is framed by the SAME two measurements: --map-hero-top for
+       where the map's own square sits, --navbar-h for the room the tab
+       bar keeps clear. Not a fraction of the screen guessed at; the
+       exact box the map and the band already stand in everywhere else.
+       The game is a window sitting just inside that box -- slightly
+       smaller than the screen, on the page's own paper, rather than a
+       second full-bleed screen.
 
        Its z-index has to sit UNDER the bars' own 400/401 (frames.css),
        not over them -- the profile bar's real height is taller than
        --map-hero-top on purpose (it floats over the top sliver of the
        map on every page), so the overlay's own top edge already sits a
-       little way under it. Below the bars, that sliver -- and the
-       matching one the tab bar covers at the bottom -- is what makes the
-       curtains read as sliding out from BEHIND the bars rather than
-       over them. */
+       little way under it. */
     #fb-game-overlay {
       position: fixed;
       top: var(--map-hero-top, 26px);
       left: 0; right: 0;
       bottom: calc(var(--navbar-h, 46px) + env(safe-area-inset-bottom));
       z-index: 40;          /* under the omnipresent bars (400/401) on purpose */
-      background: var(--paper, #f4f1ec);
       overflow: hidden;
-      /* The STAGE stays the full band -- the curtains still cover all of
-         it, so the reveal choreography is untouched -- but the game
-         itself is a smaller window centered on that stage rather than
-         filling it edge to edge. */
       display: flex;
       align-items: center;
       justify-content: center;
@@ -812,62 +803,14 @@
     #fb-game-overlay[hidden] { display: none; }
     #fb-game-frame {
       display: block;
-      width: 90%;
-      height: 86%;
-      max-width: 460px;
-      max-height: 760px;
+      width: 96%;
+      height: 97%;
       border: 2px solid var(--ink, #17140f);
       border-radius: 6px;
+      background: var(--paper, #f4f1ec);
       box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
       overflow: hidden;
     }
-    /* Two paper pages, not a fade -- the entrance the book itself uses
-       nowhere else, because nowhere else opens a real separate page. The
-       iframe underneath is already loading at its true, untouched full
-       size the whole time (its own layoutGame() must never measure a
-       transformed box), so these are purely a cover: one the height of
-       the map's own square, descending from above; one resting just
-       above the actor row it was pressed from, rising from below the
-       tab bar. THEY DO NOT MEET -- two windows, not one closed sheet,
-       so the room between the map and the row stays exactly what it
-       already was, in view the instant the curtains land. Only once
-       the game has actually loaded do both get out of the way, fading
-       together rather than staying on as a frame around it. Same curve
-       as THE sheet's own 0.55s slide (sheet.css), so this reads as the
-       same object opening a different way, not a second transition
-       language. */
-    .fb-game-curtain {
-      position: absolute;
-      left: 0; right: 0;
-      background: var(--paper, #f4f1ec);
-      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-                  opacity 0.3s ease;
-    }
-    .fb-game-curtain-top {
-      top: 0;
-      /* The map's own square: --map-hero-end minus --map-hero-top. */
-      height: calc(var(--frame-pad, 10px) + 100vw);
-      transform: translateY(-100%);
-      border-bottom: 2px solid var(--ink, #17140f);
-    }
-    /* Where this one rests is the topmost live box's own top edge,
-       minus a breath of margin -- set as --fb-curtain-bottom-top by
-       openGameOverlay() the instant it measures the live boxes, so a
-       taller Etkinlikler card or a different device is never guessed
-       at. The calc() here is only the value's fallback, for the rare
-       case no live box is found: three stacked boxes' worth of height
-       (see --fb-box-h/--fb-box-gap in the cast block above) translated
-       into this layer's own coordinate space, since the two boxes
-       don't share an origin. */
-    .fb-game-curtain-bottom {
-      top: var(--fb-curtain-bottom-top,
-            calc(100% - 16px - 268px - var(--frame-pad, 10px)));
-      bottom: 0;
-      transform: translateY(100%);
-      border-top: 2px solid var(--ink, #17140f);
-    }
-    #fb-game-overlay.in .fb-game-curtain { transform: translateY(0); }
-    #fb-game-overlay.gone .fb-game-curtain { opacity: 0; pointer-events: none; }
   </style>
 </head>
 <body data-page="project">
@@ -915,12 +858,10 @@
 
 <!-- ── THE GAME OVERLAY ──
      Sözcel opens here instead of navigating away -- see wireGameOverlay
-     and the CSS block above. The two curtains are decoration only: the
-     iframe is the one live thing in here. -->
+     and the CSS block above. A plain pop up: the iframe is the only
+     thing in here. -->
 <div id="fb-game-overlay" hidden>
   <iframe id="fb-game-frame" title="Oyun"></iframe>
-  <div class="fb-game-curtain fb-game-curtain-top"></div>
-  <div class="fb-game-curtain fb-game-curtain-bottom"></div>
 </div>
 
 <script>
@@ -2294,7 +2235,7 @@ function unmount() {
   // be the last word on a page that is gone -- along with the body class
   // that dims the bottom bar.
   closeMap();
-  closeGameOverlay(true);
+  closeGameOverlay();
   traveling = false;
   if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
   // The petek leaves two things behind it that live OUTSIDE this page --
@@ -2347,7 +2288,6 @@ let mapBadges = null;     // { windowId: n }
 let mapStatsAt = 0;       // when, so a reopen a minute later is free
 let traveling = false;
 let mapHideTimer = null;  // the pending hide of a fading-out layer
-let gameOverlayTimer = null; // the pending reveal/re-cover of the game curtains
 
 // ── The middle window is the reader's OWN hexagon ──
 // Not a drawing of one: the actual cell out of the petek, cloned. Hane's
@@ -2507,77 +2447,20 @@ function openGameOverlay(href) {
   const layer = document.getElementById('fb-game-overlay');
   const frame = document.getElementById('fb-game-frame');
   if (!layer || !frame) return;
-  if (gameOverlayTimer) { clearTimeout(gameOverlayTimer); gameOverlayTimer = null; }
-  // Back to the curtains' resting, off-screen state before the next
-  // frame flips them in -- the same trap IstSheet.open documents: a
-  // previous close's pending reveal must not land on this opening.
-  layer.classList.remove('in', 'gone');
-  layer.hidden = false;
-  // The bottom curtain rests just above the actor row it was pressed
-  // from, not against the top curtain -- see the CSS block. Measured
-  // live off whichever row/square is actually on screen, so a taller
-  // Etkinlikler card or a different device is never guessed at; a
-  // press that finds no live actor (there always should be one) leaves
-  // the property unset and the CSS fallback takes over.
-  const overlayTop = layer.getBoundingClientRect().top;
-  let rowTop = null;
-  document.querySelectorAll('.fb-actor.live').forEach((el) => {
-    const r = el.getBoundingClientRect();
-    if (rowTop === null || r.top < rowTop) rowTop = r.top;
-  });
-  if (rowTop !== null) {
-    const margin = 16; // breathing room above the row
-    layer.style.setProperty('--fb-curtain-bottom-top',
-      Math.max(0, rowTop - overlayTop - margin) + 'px');
-  } else {
-    layer.style.removeProperty('--fb-curtain-bottom-top');
-  }
-  // The curtains land apart and stay apart; the reveal behind them
-  // waits on BOTH the slide finishing and the iframe's own load, so a
-  // slow load never uncovers a blank page and a fast one never looks
-  // rushed.
-  let slid = false, loaded = false;
-  const reveal = () => { if (slid && loaded) layer.classList.add('gone'); };
-  frame.onload = () => { loaded = true; reveal(); };
   frame.src = href;
-  requestAnimationFrame(() => {
-    layer.classList.add('in');
-    gameOverlayTimer = setTimeout(() => {
-      gameOverlayTimer = null;
-      slid = true; reveal();
-    }, 550);
-  });
+  layer.hidden = false;
 }
-function closeGameOverlay(immediate) {
+function closeGameOverlay() {
   const layer = document.getElementById('fb-game-overlay');
   const frame = document.getElementById('fb-game-frame');
   if (!layer || layer.hidden) return;
-  if (gameOverlayTimer) { clearTimeout(gameOverlayTimer); gameOverlayTimer = null; }
-  const finish = () => {
-    layer.hidden = true;
-    layer.classList.remove('in', 'gone');
-    // Unloads the game rather than leaving it running behind the layer, so
-    // the next open is a fresh start rather than wherever it was left.
-    if (frame) { frame.onload = null; frame.src = 'about:blank'; }
-    // A game just played may have moved the Oyunlar square -- let the next
-    // map open re-fetch it rather than show a stale count.
-    mapStatsAt = 0;
-  };
-  // A teardown (leaving project.html itself, unmount()) has nothing left
-  // to animate in front of, so it skips straight to `finish`. Every other
-  // close -- the back arrow -- leaves the way it arrived, reversed: the
-  // curtains close back over the game first, the same "never a snap" rule
-  // THE sheet's own close follows (sheet.js drops .open and only hides
-  // after the slide finishes) -- and only once they've met does the layer
-  // actually come down. Before this it was a bare `hidden = true`: the
-  // game vanished and the book was back in the same frame, the one
-  // surface on the site that closed with no motion at all.
-  if (immediate) { finish(); return; }
-  layer.classList.remove('gone');
-  gameOverlayTimer = setTimeout(() => {
-    gameOverlayTimer = null;
-    finish();
-  }, 300); // .fb-game-curtain's own opacity transition
+  layer.hidden = true;
+  // Unloads the game rather than leaving it running behind the layer, so
+  // the next open is a fresh start rather than wherever it was left.
+  if (frame) frame.src = 'about:blank';
+  // A game just played may have moved the Oyunlar square -- let the next
+  // map open re-fetch it rather than show a stale count.
+  mapStatsAt = 0;
 }
 function wireGameOverlay() {
   if (document.body.dataset.fbGameWired) return;
