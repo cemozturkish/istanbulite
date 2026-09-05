@@ -125,6 +125,72 @@
     });
   }
 
+  // ── Your own name walks with the lane (project.html) ──
+  // The three carousel pages moved the names by changing which end of a
+  // flex row each block stood at, because a navigation is a discrete
+  // thing (see setBarLayout above). The flip book's lanes are not: the
+  // strip follows the finger and everything on the screen is painted
+  // from one continuous number, so the name on the bar is painted from
+  // it too rather than being told about the result afterwards.
+  //
+  // `t` is where the reader is standing, as a signed lane: -1 on
+  // Kütüphane, 0 on Hane, +1 on Kahvehane. At 0 the block stands in the
+  // middle of the bar exactly as it does today; at either end it is
+  // ranged against that edge of its own box, and every position between
+  // is the linear middle. Nothing here eases: the drag IS the gesture,
+  // and the settle is already the release tween's own ease-out (runLane
+  // in project.html), so a transition on top of it would be a second
+  // curve fighting the first.
+  let _barSlide = 0;
+  let _barSlack = null;   // px the block may travel each way; measured, cached
+
+  function setBarSlide(t) {
+    const n = Math.max(-1, Math.min(1, Number(t) || 0));
+    if (n === _barSlide) return;
+    _barSlide = n;
+    paintBarSlide();
+  }
+
+  function clearBarSlide() {
+    setBarSlide(0);
+  }
+
+  // The block shrink-wraps its own type and is centred in the room the
+  // bar's own padding leaves (.ist-pc-seat-none), so the distance to
+  // either edge is half of what is left over. Measured rather than
+  // guessed at — a long name has less room to travel than a short one —
+  // and cached, because this is read on every frame of a drag and
+  // measuring there would lay the bar out sixty times a second.
+  function barSlack() {
+    if (_barSlack != null) return _barSlack;
+    const me = document.getElementById('ist-pc-me');
+    const id = me && me.querySelector('.ist-pc-id');
+    if (!me || !id) return 0;
+    const slack = Math.max(0, (me.clientWidth - id.offsetWidth) / 2);
+    // A row that has not been laid out yet (the bar is display:none above
+    // 768px, and a hidden document measures as nothing) measures zero —
+    // which is a true answer for right now and a wrong one to cache.
+    if (!me.clientWidth) return 0;
+    _barSlack = slack;
+    return _barSlack;
+  }
+
+  function invalidateBarSlack() { _barSlack = null; }
+
+  // Painted onto .ist-pc-me rather than onto the block inside it, so it
+  // cannot collide with the transform setBarLayout's FLIP writes on
+  // .ist-pc-id (see above) — the two moves are different elements'.
+  function paintBarSlide() {
+    const me = document.getElementById('ist-pc-me');
+    if (!me) return;
+    const px = _barSlide * barSlack();
+    me.style.setProperty('--ist-pc-slide', px.toFixed(2) + 'px');
+  }
+
+  // The bar is a fixed row of type: what it can travel changes only when
+  // the row itself changes size.
+  global.addEventListener('resize', () => { invalidateBarSlack(); paintBarSlide(); });
+
   // ── Somebody else's name, where your own name stands ──
   // Hane names no seat (see BAR_LAYOUT): the bar over the petek carries
   // you alone, in the middle. Pressing a member on the petek puts *them*
@@ -177,6 +243,10 @@
     const label = _barMember ? _barMember.name : (me.dataset.selfLabel || '');
     me.setAttribute('aria-label', label);
     me.setAttribute('title', label);
+    // A different name is a different width, so how far it may walk
+    // toward either edge is a different number (see barSlack).
+    invalidateBarSlack();
+    paintBarSlide();
   }
 
   // Which of the three carousel pages we're on. router.js stamps
@@ -3844,6 +3914,8 @@
     mount,
     setPage,
     setBarLayout,
+    setBarSlide,
+    clearBarSlide,
     clearBarMember,
     unmount,
     mountLibraryCard,
