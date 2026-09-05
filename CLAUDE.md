@@ -1756,14 +1756,16 @@ own furniture — and `CAST` in project.html is where each one is declared: an e
 belongs to (`live`), and a pose per slide. Three rules make them work:
 
 - **An actor's shape is a word, not a stylesheet.** The drawing gives the app exactly one
-  button — a rectangle — stacked three to a column: a wider column on the left, a narrower one
-  on the right, both the same height. An actor declares `col: 'l' | 'r'` beside its `live` and
-  `lane`, and `.fb-box` / `.fb-col-l` / `.fb-col-r` / `.fb-slot-0/1/2` state the geometry once
+  button — a rectangle — stacked three to a column: a wider column and a narrower one, both the
+  same height. An actor declares `col: 'l' | 'r'` — which side of the screen it is docked to —
+  beside its `live` and `lane`, plus `mirror: true` on the lanes whose wide column is the right
+  one, and `.fb-box` / `.fb-col-l` / `.fb-col-r` / `.fb-mirror` / `.fb-slot-0/1/2` state the
+  geometry once
   for every column on every lane — `stackActors()` is what turns one column description into
   its three sibling actors. An actor's own class (`fb-events`, `fb-oyun`) says what it is OF and
   never how big it is. **One number splits the line** (`--fb-unit`, five units wide, three to
-  the left column and two to the right — see "What each screen carries" below): left:right
-  width is always 3:2, and the left column's margin, the right column's margin and the gap
+  the wide column and two to the narrow one — see "What each screen carries" below):
+  wide:narrow width is always 3:2, and the left column's margin, the right column's margin and the gap
   between them are all `--fb-inset`, the same number. A slot with nothing to put in it —
   whether that column is a feed with fewer than three things or a fixed set with one of its
   three switched off — is drawn `.fb-empty`: a dashed rectangle, the same "nothing here"
@@ -1835,8 +1837,8 @@ twice, for the same reason.
 ### What each screen carries — one template, and the tiles are the difference
 
 Every screen in the app is the same object: **the maps at the top, and two columns of three
-rectangles under them** — a wider column on the left, a narrower one on the right, both the same
-height, left:right width always 3:2. The left column's margin, the right column's margin and the
+rectangles under them** — a wider column and a narrower one, both the same
+height, wide:narrow width always 3:2. The left column's margin, the right column's margin and the
 gap between the two columns are all one number, so the two columns and the rail between them read
 as three equal beats rather than two boxes and a leftover gap. The whole of what makes one screen
 different from another is what stands in those two columns. That is the layout answer this app has
@@ -1847,6 +1849,18 @@ of a fixed set switched off) is a dashed rectangle marking the place rather than
 
 **Hane is the one exception, and it is the exception on purpose.** Its hero is the petek, full
 bleed, and it carries no tiles at all — the middle page is the people and nothing else.
+
+**The two side lanes are mirror images of each other, not one layout repeated** (`.fb-mirror` in
+project.html). Kütüphane keeps the wide column on the left and ranges everything from there —
+kicker top-left, the red category rule down the left edge. Kahvehane is that turned over: the
+**short** column (Oyunlar, and Kahve at the ilçe stop) stands on the left and the **long** one
+(Etkinlikler, Yorumlar) on the right, with the headings pinned top-right and the red rule down the
+right edge. So the two sides lean *outward* from Hane — the heavy column of each lane is the one
+nearer the screen edge that lane sits at, and which way a screen is ranged says which side of the
+middle the reader is standing on before a word is read. Only the widths and the ranging flip: which
+side of the screen each column is docked to is still `fb-col-l` / `fb-col-r`, so the slots, the dock
+line and the press origins are one set of numbers. An actor still parks off **its own** side of the
+screen, which is why the pose tables swap along with the columns.
 
 ```
         (up / out)                                        (down / in)
@@ -1863,13 +1877,13 @@ bleed, and it carries no tiles at all — the middle page is the people and noth
                     ▼ down / in — Sen: your own hexagon, and what is yours to change
 ```
 
-| Screen | The map(s) on top | Left column (3 rectangles) | Right column (3 rectangles) |
+| Screen | The map(s) on top | Wide column (3 rectangles) | Narrow column (3 rectangles) |
 |---|---|---|---|
-| Türkiye (slide 1) | Türkiye | **Hikâyeler** — the stories the map is grouped into | **Olaylar** |
-| Kütüphane (lane 0) | İstanbul · the ilçe | **Haberler** | **Bilgi** |
+| Türkiye (slide 1) | Türkiye | left — **Hikâyeler**, the stories the map is grouped into | right — **Olaylar** |
+| Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler** | right — **Bilgi** |
 | Hane (lane 1) | none — the petek, full bleed | — | — |
-| Kahvehane (lane 2) | İstanbul · the ilçe | **Etkinlikler** (RSVP goes to Hane) | **Oyunlar** — Sözcel, Tümcel, Bulmaca |
-| the ilçe (slide 24) | the ilçe, with the member's own picked out | **Yorumlar** | **Kahve** — the Kahve Endeksi's rows |
+| Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (RSVP goes to Hane) | left — **Oyunlar**, Sözcel, Tümcel, Bulmaca |
+| the ilçe (slide 24) | the ilçe, with the member's own picked out | right — **Yorumlar** | left — **Kahve**, the Kahve Endeksi's rows |
 
 Six things about it:
 

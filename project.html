@@ -144,6 +144,19 @@
     }
     .fb-box.fb-col-l { left: var(--fb-inset); width: var(--fb-col-l-w); }
     .fb-box.fb-col-r { right: var(--fb-inset); width: var(--fb-col-r-w); }
+    /* Kahvehane's own pair is the mirror of that: the SHORT column
+       (Oyunlar) stands on the left and the LONG one (Etkinlikler) on the
+       right, and everything printed inside them is ranged the same way --
+       kicker top-right, the red category rule down the right edge. The
+       two lanes lean outward from Hane rather than being one layout
+       repeated, so the wide column is always the one nearer the screen
+       edge the lane sits at. Only the widths and the ranging flip; which
+       side of the screen each column is docked to is still fb-col-l /
+       fb-col-r, so the slots, the dock line and the press origins are
+       untouched. */
+    .fb-box.fb-mirror.fb-col-l { width: var(--fb-col-r-w); }
+    .fb-box.fb-mirror.fb-col-r { width: var(--fb-col-l-w); }
+    .fb-box.fb-mirror { text-align: right; }
     /* Three slots, stacked from the dock line upward. */
     .fb-box.fb-slot-0 { bottom: var(--fb-dock); }
     .fb-box.fb-slot-1 { bottom: calc(var(--fb-dock) + var(--fb-box-h) + var(--fb-box-gap)); }
@@ -166,6 +179,7 @@
       width: 4px;
       background: var(--ink-red, #B93631);
     }
+    .fb-box.fb-mirror:not(.fb-empty)::before { left: auto; right: 0; }
     /* Each box gives under the finger from the corner it is docked to. */
     .fb-actor.live.fb-col-l:active { transform-origin: 0% 100%; }
     .fb-actor.live.fb-col-r:active { transform-origin: 100% 100%; }
@@ -189,6 +203,11 @@
       top: var(--fb-box-pad-y); right: var(--fb-box-pad-x);
       font-size: 0.6rem; color: var(--muted);
     }
+    /* Mirrored, the two pinned corners swap: the kicker is the heading
+       and goes to the top-right corner the box is now ranged from, and
+       the date takes the corner it left. */
+    .fb-box.fb-mirror .k { left: auto; right: var(--fb-box-pad-x); }
+    .fb-box.fb-mirror .m { right: auto; left: var(--fb-box-pad-x); }
     /* Clears the pinned kicker above it -- the box's own top padding
        only clears the corner tag, not a second line under it. Two
        lines, not one -- the box grew 40% taller for exactly this -- and
@@ -1327,13 +1346,13 @@ const END23_POSES_R = { 11: { x: 60, opacity: 0 }, 20: { x: 60, opacity: 0 }, 23
 // both ways: entering, slot 0 is first to arrive; leaving, slot 0 is
 // first to be gone, with 1 and 2 following a beat behind each time.
 const SLOT_LAG = [1.25, 1, 0.8];
-function stackActors({ idBase, live, lane, col, cls, poses, lag, lagFree, load, onpress }) {
+function stackActors({ idBase, live, lane, col, mirror, cls, poses, lag, lagFree, load, onpress }) {
   const out = [];
   for (let slot = 0; slot < 3; slot++) {
     out.push({
       id: idBase + slot,
       live, lane,
-      cls: cls + ' fb-box fb-col-' + col + ' fb-slot-' + slot,
+      cls: cls + ' fb-box fb-col-' + col + (mirror ? ' fb-mirror' : '') + ' fb-slot-' + slot,
       lag: lag * SLOT_LAG[slot], lagFree: lagFree * SLOT_LAG[slot],
       html: '',
       load: load ? (el) => load(el, slot) : undefined,
@@ -1345,14 +1364,18 @@ function stackActors({ idBase, live, lane, col, cls, poses, lag, lagFree, load, 
 }
 
 const CAST = [
-  // ── Kahvehane's pair: the doing side ──
+  // ── Kahvehane's pair: the doing side, and the mirror of Kütüphane's ──
+  // The long column stands at the screen edge this lane sits at, so
+  // Etkinlikler is on the right and Oyunlar, the short one, on the left
+  // (see .fb-mirror). Each still parks off its OWN side of the screen,
+  // which is why the two pose tables swap with the two columns.
   ...stackActors({
-    idBase: 'etkinlik', live: 11, lane: LANE_KAHVEHANE, col: 'l', cls: 'fb-events',
-    poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadEtkinlikActor,
+    idBase: 'etkinlik', live: 11, lane: LANE_KAHVEHANE, col: 'r', mirror: true, cls: 'fb-events',
+    poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadEtkinlikActor,
   }),
   ...stackActors({
-    idBase: 'oyun', live: 11, lane: LANE_KAHVEHANE, col: 'r', cls: 'fb-oyun',
-    poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadOyunActor, onpress: onpressOyun,
+    idBase: 'oyun', live: 11, lane: LANE_KAHVEHANE, col: 'l', mirror: true, cls: 'fb-oyun',
+    poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadOyunActor, onpress: onpressOyun,
   }),
 
   // ── Kütüphane's pair: the reading side (Olaylar has moved out to
@@ -1380,12 +1403,12 @@ const CAST = [
     poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Bilgi'),
   }),
   ...stackActors({
-    idBase: 'kahve', live: 23, lane: LANE_KAHVEHANE, col: 'r', cls: 'fb-kahve',
-    poses: END23_POSES_R, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Kahve'),
+    idBase: 'kahve', live: 23, lane: LANE_KAHVEHANE, col: 'l', mirror: true, cls: 'fb-kahve',
+    poses: END23_POSES_L, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Kahve'),
   }),
   ...stackActors({
-    idBase: 'yorum', live: 23, lane: LANE_KAHVEHANE, col: 'l', cls: 'fb-yorum',
-    poses: END23_POSES_L, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Yorumlar'),
+    idBase: 'yorum', live: 23, lane: LANE_KAHVEHANE, col: 'r', mirror: true, cls: 'fb-yorum',
+    poses: END23_POSES_R, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Yorumlar'),
   }),
 ];
 
