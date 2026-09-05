@@ -1715,23 +1715,22 @@ project.html listens for to close the layer. A page opened this way is torn down
 (`frame.src = 'about:blank'`) rather than kept alive behind the layer, so the next open is a fresh
 start.
 
-**It is a plain pop up, and deliberately nothing more.** It opens and it is there; it closes and
-it is gone. There is no entrance choreography — the paper curtains that used to slide in from
-above and below, the reveal that waited on both the slide and the iframe's `load`, and the reverse
-fade on the way out are all gone. The game is the one thing in the layer.
+**It arrives as THE sheet, the same object the profile bar's own name opens.** Not a bespoke pop
+up with a geometry of its own: the same `.ist-sheet-overlay` markup, the same `IstSheet.open` /
+`IstSheet.close`, the same 0.55s slide up from the bottom, and on a phone the same resting position
+under the profile bar that `IstSheet.position` measures live — so the game clears the bar instead of
+sitting under it, and there is no second transition language on the site to keep in step. (It used
+to open behind two paper curtains that slid in from above and below and lifted once both the slide
+and the iframe's `load` had finished; that choreography is gone.)
 
-**It stands in the exact room the map and the band already fill on every other page, not edge to
-edge.** The two bars stay up throughout (see "THE TWO BARS ARE OMNIPRESENT"): the overlay's own
-top is `--map-hero-top` and its bottom clears `--navbar-h`, the same two measurements every other
-page's map and band are built from — not a guessed fraction of the screen, the same box. Its
-z-index sits *under* the bars' own 400/401 (frames.css), the one place on the site content
-deliberately stacks below them rather than stopping flush against them: the profile bar's real
-height is taller than `--map-hero-top` by design (it already floats over the top sliver of the
-map on every page), so the overlay's own top edge sits a little way under it. Inside that box the
-game sits as a bordered window just inside its edges — **slightly smaller than the screen** — on
-the page's own paper rather than as a second full-bleed screen. The iframe is at its true,
-untouched size the whole time (`sozcel.html`'s own `layoutGame()` must never measure a transformed
-box).
+What this page states for itself is only what is genuinely its own: the iframe fills the sheet edge
+to edge rather than sitting in the padded, scrolling `.ist-sheet-body` every other sheet carries,
+because a game page brings its own chrome and does its own scrolling (`sozcel.html`'s `layoutGame()`
+must measure the room it is actually given, untransformed). Closing is the sheet's own close, with
+the `src` torn down in its `after` callback so the game is unloaded once the sheet is off-screen
+rather than mid-slide; the game's back arrow, the backdrop and Escape are all ways out. A teardown
+of the page itself (`unmount()`) has nothing left to slide in front of and skips straight to hidden
+(`closeGameOverlay(true)`).
 
 Visiting one of the three directly still works exactly as before — the
 `<a href="project.html">` fallback is what fires when there is no parent to postMessage — and
