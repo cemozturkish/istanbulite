@@ -1093,6 +1093,23 @@ coordinates that say where each paper hangs.
   clip it, and a centred overflow has no scrollbar to recover it. `fitSozcuLine()` keeps
   the "Günün Sözcüsü: …" credit on **one line** at any name length — it must never wrap,
   because a second line moves the keyboard and re-flows the board under the reader's thumb
+- **Two combs, one plane: the word, and the last guess behind it** (`.syl-stack`,
+  `renderGhostBoard`). The board shows only the letters that *locked*, so everything else the
+  reader had just tried vanished the moment it was read out — the pips say how many guesses are
+  gone, they cannot say what was in them. So the guess just submitted stays on the table as a
+  faint second comb, nested into the live one the way a honeycomb nests: half a column across and
+  one level down, the same two offsets the syllable staircase itself steps by (`GHOST_DX` /
+  `GHOST_DY`), so the two interlock instead of overlapping. It is painted from the history the
+  game already keeps (`submittedGuesses` / `guessResults`), so a reloaded board brings it back for
+  free. `back` is which one to take: 0 while playing, 1 once the game is over — there the live
+  comb *is* the last guess, and a ghost of the same word behind it is a blur. **The room it takes
+  is reserved whether or not one is showing**, in `layoutBoard`'s own budget, or the board would
+  resize the first time the reader pressed GİR
+- **The hexagons have a body, and nothing else is framed.** A wash inside each tile's own mask
+  lights its top-left and shades its bottom-right, and the live comb casts one drop shadow as a
+  silhouette rather than each tile casting its own (a mask clips a `box-shadow` away). Embedded,
+  nothing draws a box around the board or the panel: the sheet is already a bordered window, and
+  each frame inside it only added another line a few pixels within the last
 
 ---
 
