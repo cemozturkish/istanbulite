@@ -1723,10 +1723,25 @@ sitting under it, and there is no second transition language on the site to keep
 to open behind two paper curtains that slid in from above and below and lifted once both the slide
 and the iframe's `load` had finished; that choreography is gone.)
 
-What this page states for itself is only what is genuinely its own: the iframe fills the sheet edge
+What this page states for itself is only what is genuinely its own. The iframe fills the sheet edge
 to edge rather than sitting in the padded, scrolling `.ist-sheet-body` every other sheet carries,
 because a game page brings its own chrome and does its own scrolling (`sozcel.html`'s `layoutGame()`
-must measure the room it is actually given, untransformed). Closing is the sheet's own close, with
+must measure the room it is actually given, untransformed). And **the tab bar stays up**: on a phone
+the *overlay's* own bottom is lifted to clear it, so the backdrop stops there too and the bar is not
+merely visible but still pressable — every other sheet on the site runs flush off the bottom edge
+and comes to rest over that bar, which is right for something read for a moment and dismissed, but a
+game is where the reader stays, with a keyboard under their thumb, and the bar saying where they are
+must not be what disappears for it. The sheet is anchored to the overlay's bottom edge either way, so
+it lands exactly above the bar with the keyboard resting on it, and it takes its bottom border back
+(frames.css drops it precisely because a sheet normally runs off the screen).
+
+**One frame, not two.** The game pages outline their board (`#play-area`) when embedded and no longer
+outline the whole `.game-panel` around it: the sheet is already a bordered window, so the panel
+outline drew a second line a few pixels inside the first with nothing between them. The window is the
+panel's box. The five floating top buttons are on one line with it — all three groups (back arrow,
+scoreboard, the right-hand controls) on the same 14px inset with the same 6px between them and drawn
+icons at the same size as the discs beside them; they used to carry three different insets and two
+different gaps, so the row was ragged and the help icon sat almost on the sheet's own border. Closing is the sheet's own close, with
 the `src` torn down in its `after` callback so the game is unloaded once the sheet is off-screen
 rather than mid-slide; the game's back arrow, the backdrop and Escape are all ways out. A teardown
 of the page itself (`unmount()`) has nothing left to slide in front of and skips straight to hidden
