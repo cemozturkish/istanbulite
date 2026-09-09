@@ -3747,12 +3747,19 @@ function renderSeriesList() {
   }
   listEl.innerHTML = SERIES_LIST.map(s => {
     const count = s.count || 0;
+    const slot = s.pinned_slot || '';
     return `
       <div class="src-row" data-series-id="${s.id}">
         <div class="src-info">
           <strong>${escapeHtml(s.name)}</strong>
           <span class="src-headline">${count} haber</span>
         </div>
+        <select class="src-slot-select" data-id="${s.id}" title="Dünya kutusu">
+          <option value=""${slot === '' ? ' selected' : ''}>Dünya kutusu yok</option>
+          <option value="1"${slot === 1 ? ' selected' : ''}>1. kutu</option>
+          <option value="2"${slot === 2 ? ' selected' : ''}>2. kutu</option>
+          <option value="3"${slot === 3 ? ' selected' : ''}>3. kutu</option>
+        </select>
         <button class="btn-edit" data-act="edit-series" data-id="${s.id}">Düzenle</button>
         <button class="btn-del" data-act="del-series" data-id="${s.id}">×</button>
       </div>
@@ -3776,6 +3783,29 @@ document.getElementById('series-list').addEventListener('click', function(e) {
   else if (act === 'save-series-edit') saveSeriesEdit(id);
   else if (act === 'del-series') deleteSeries(id);
 });
+
+// Kütüphane's three world-conflict boxes on the Türkiye stop
+// (project.html) each show one series, picked here. Only one series may
+// hold a given slot (db/breaking_news_series_v2_world_slot.sql's partial
+// unique index), so claiming a slot bumps whoever already had it back to
+// "Dünya kutusu yok" first.
+document.getElementById('series-list').addEventListener('change', async function(e) {
+  const sel = e.target.closest('.src-slot-select');
+  if (!sel) return;
+  await setSeriesPinnedSlot(sel.dataset.id, sel.value ? Number(sel.value) : null);
+});
+
+async function setSeriesPinnedSlot(id, slot) {
+  if (slot) {
+    const { error: clearErr } = await sb.from('breaking_news_series')
+      .update({ pinned_slot: null }).eq('pinned_slot', slot).neq('id', id);
+    if (clearErr) { alert('Error: ' + clearErr.message); loadSeries(); return; }
+  }
+  const { error } = await sb.from('breaking_news_series')
+    .update({ pinned_slot: slot }).eq('id', id);
+  if (error) { alert('Error: ' + error.message); }
+  loadSeries();
+}
 
 function showSeriesEditForm(id) {
   const form = document.querySelector(`.series-edit-row[data-series-edit-id="${id}"]`);
