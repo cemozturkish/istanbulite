@@ -1936,13 +1936,20 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
 - **The press honours the chunky foot it just grew, rather than borrowing the flat card's
   uniform scale** (`.fb-pressing`, `wireActorPress`). Pressing a box sinks it into its own base:
   the foot thins from 5px to 2px (the same drop every other filled box on the site keeps at rest),
-  a grey — deliberately never black — shadow grows under the top edge as the face recedes from
-  the frame's lip, and the printed content (`.k`/`.m`/`.t`) rides down by exactly the foot's own
-  loss, 3px, so the whole card reads as one block sinking rather than as text sliding inside a
-  static frame. Releasing reverses all three. This is the one press on the site that is *not*
-  Kütüphane's `.article`/the petek's hexagon scale (0.955 → 1.022) — because this is the one
+  a **flat** grey — deliberately never black — band grows down from the top edge as the face
+  recedes from the frame's lip, and the printed content (`.k`/`.m`/`.t`) rides down by exactly the
+  foot's own loss, 3px, so the whole card reads as one block sinking rather than as text sliding
+  inside a static frame. Releasing reverses all three. This is the one press on the site that is
+  *not* Kütüphane's `.article`/the petek's hexagon scale (0.955 → 1.022) — because this is the one
   object with actual dimensional geometry to honour (the chunky foot), a uniform scale would have
   flattened the very thing that makes it 3D.
+  **The band is a flat fill, zero blur and zero spread, not a soft drop shadow** — it reads as one
+  more sheet of the page's own paper (a printed panel of tone, the way a comic or a newspaper
+  halftone prints a flat grey rather than a gradient) rather than as light falling on the box. It
+  grows because it *is* the offset animating: an inset `box-shadow` with no blur paints exactly
+  the strip between the box's own top edge and a copy of itself pushed down by the offset, so a
+  transition on that offset from 0 to 4px is a flat band growing from nothing to 4px tall, hard
+  edge throughout — never a gradient falloff.
   Mechanically simpler than that scale press for the same reason it diverges from it: none of the
   three properties — `border-bottom-width`, `box-shadow`, a child's own `transform` — is the
   property `paintCast()` writes to the actor's own `transform` every frame, so nothing here
