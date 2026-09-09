@@ -1869,6 +1869,16 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   one class, and the browser interpolates all three. `wireActorPress` is only the gate that
   decides when the class is true, driven by **pointer events, never `:active`** — which sticks
   after a tap on iOS and would leave a box looking permanently sunk.
+  **The red category flag darkens with the press too** (`::before`, `rgb(185,54,49)` at rest →
+  `rgb(102,30,27)` pressed, measured). It has to be told separately: a pseudo-element paints
+  *above* its parent's own background layer, which is where an inset `box-shadow` lives — so the
+  grey band would otherwise pass invisibly behind the flag, leaving it lit at full strength while
+  the paper around it visibly goes into shadow, which read as the press not touching that one
+  stripe. The whole stripe darkens, not just the 4px the band visually crosses — partial darkening
+  would have to be clipped to the band's own growing height exactly, and a flag bright for its
+  lower length while the paper beside it has gone grey is two objects, not one block sinking. The
+  colour is `color-mix(in srgb, var(--ink-red) 55%, black)` rather than a hand-picked dark red, so
+  it keeps tracking `--ink-red` if the palette ever changes it.
 - **`fb-openable` says exactly one thing: this box answers a press**, and the cursor and the press
   effect are both hung off that one class. `fbSetPage` sets it for a box with a page; Oyunlar sets
   it for a game whose turn has come (its press opens a game rather than a page, which is a
