@@ -368,9 +368,10 @@
     .fb-box.fb-locked .k { color: var(--muted); }
     .fb-box.fb-locked:not(.fb-empty)::before { background: var(--muted, #9a9a9a); }
 
-    /* A placeholder that has not been built yet (Kahve, Yorumlar) still
-       names its own slot, so a dashed box reads as "this is reserved"
-       rather than as the page being broken. */
+    /* A reserved slot -- not yet built (Kahve, Yorumlar), parked
+       (Olaylar), or simply unassigned (a Dünya slot with no series
+       pinned to it) -- still names its own slot, so a dashed box reads
+       as "this is reserved" rather than as the page being broken. */
     .fb-box .ph {
       font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
       color: var(--muted); text-align: center;
@@ -1633,95 +1634,98 @@ function newsAge(iso) {
   return Math.round(hrs / 24) + ' gün önce';
 }
 
-// ── Türkiye stop, left column: three named conflicts, not a feed ──
+// ── Türkiye stop, left column: three ADMIN-PINNED series, not a feed ──
 // Hikâyeler (the country_stories grouping) has no content pipeline yet
 // and stays out of scope for now (see CLAUDE.md's "parts bin"). In its
-// place, three fixed slots -- the wars an İstanbulite actually talks
-// about -- each showing its own most recent development. It reads the
-// same `world_events` / `world_event_moments` rows the Olaylar
-// pinboard is built from (see db/world_events_seed.sql), just without
-// the board, the pins or the drawn strings: a plain news timeline,
-// newest first, is a smaller and much cheaper promise than the whole
-// dossier.
-const DUNYA_CONFLICTS = [ // [slot 2, slot 1, slot 0]
-  { id: 'rusya-ukrayna-savasi', kicker: 'RUSYA – UKRAYNA SAVAŞI' },
-  { id: 'gazze', kicker: 'İSRAİL’İN FİLİSTİN SOYKIRIMI' },
-  { id: 'iran-abd', kicker: 'İRAN – ABD ÇEKİŞMESİ' },
-];
-
-function worldMomentAge(d) {
-  const days = Math.max(0, Math.round(
-    (Date.now() - new Date(d + 'T00:00:00+03:00').getTime()) / 86400000));
-  if (days < 1) return 'Bugün';
-  if (days === 1) return 'Dün';
-  if (days < 30) return days + ' gün önce';
-  const months = Math.round(days / 30);
-  if (months < 12) return months + ' ay önce';
-  return Math.round(months / 12) + ' yıl önce';
-}
-
-function worldMomentDate(d) {
-  return new Date(d + 'T00:00:00+03:00').toLocaleDateString('tr-TR',
-    { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long', year: 'numeric' });
-}
-
+// place, three slots the admin fills from the Haberler tab: any
+// `breaking_news_series` can claim one of them
+// (db/breaking_news_series_v2_world_slot.sql), and the box shows that
+// series' own `breaking_news` rows as a timeline, newest first -- so
+// what stands here is whichever developing story the admin currently
+// wants an İstanbulite walking past to see, not three names baked into
+// this file.
 let dunyaPromise = null;
 async function loadDunyaActor(el, slot) {
   if (!dunyaPromise) {
     dunyaPromise = (async () => {
       try {
-        const { data, error } = await IstRouter.sb.from('world_event_moments')
-          .select('event_id, moment_date, title, body')
-          .in('event_id', DUNYA_CONFLICTS.map(c => c.id))
-          .order('moment_date', { ascending: false });
-        if (error) throw error;
-        const byEvent = {};
-        for (const m of (data || [])) (byEvent[m.event_id] || (byEvent[m.event_id] = [])).push(m);
-        return { byEvent, failed: false };
+        const { data: seriesRows, error: seriesErr } = await IstRouter.sb
+          .from('breaking_news_series')
+          .select('id, name, pinned_slot')
+          .not('pinned_slot', 'is', null);
+        if (seriesErr) throw seriesErr;
+        // Indexed by (pinned_slot - 1) so slot 1 is the array's own top
+        // entry -- the same top-to-bottom reading HABER_BUCKETS uses.
+        const slots = [null, null, null];
+        for (const s of (seriesRows || [])) {
+          if (s.pinned_slot >= 1 && s.pinned_slot <= 3) slots[s.pinned_slot - 1] = s;
+        }
+        const ids = slots.filter(Boolean).map(s => s.id);
+        const byId = {};
+        if (ids.length) {
+          const { data, error } = await IstRouter.sb.from('breaking_news')
+            .select('id, title, body, title_en, body_en, series_id, updated_at')
+            .in('series_id', ids)
+            .is('archived_at', null)
+            .order('updated_at', { ascending: false });
+          if (error) throw error;
+          for (const n of (data || [])) (byId[n.series_id] || (byId[n.series_id] = [])).push(n);
+        }
+        return { slots, byId, failed: false };
       } catch (err) {
         console.error('[proje dünya]', err);
-        return { byEvent: {}, failed: true };
+        return { slots: [null, null, null], byId: {}, failed: true };
       }
     })();
   }
-  const { byEvent, failed } = await dunyaPromise;
+  const { slots, byId, failed } = await dunyaPromise;
   if (!el.isConnected) return;
   // Cleared before every render, filled only on the path that actually
   // has something to open: a box with no payload is not pressable.
   fbSetPage(el, null);
-  const conflict = DUNYA_CONFLICTS[2 - slot];
-  const label = conflict.kicker;
   if (failed) {
     el.classList.toggle('fb-empty', slot !== 2);
-    el.innerHTML = '<div class="k">' + label + '</div>' +
-      (slot === 2 ? '<div class="t">Yüklenemedi</div>' : '');
+    el.innerHTML = slot === 2
+      ? '<div class="k">DÜNYA</div><div class="t">Yüklenemedi</div>' : '';
     return;
   }
-  const moments = byEvent[conflict.id] || [];
-  if (!moments.length) {
+  const series = slots[2 - slot];
+  // No series pinned to this slot at all -- a reserved box, same
+  // convention as Kahve/Yorumlar, naming what it is rather than what
+  // fills it.
+  if (!series) { placeholderBox(el, 'Dünya'); return; }
+  const label = series.name.toLocaleUpperCase('tr-TR');
+  const items = byId[series.id] || [];
+  if (!items.length) {
     el.classList.add('fb-empty');
-    el.innerHTML = '<div class="k">' + label + '</div>';
+    el.innerHTML = '<div class="k">' + esc(label) + '</div>';
     return;
   }
   el.classList.remove('fb-empty');
-  const latest = moments[0];
-  el.innerHTML = '<div class="k">' + label + '</div>' +
-    '<div class="m">' + esc(worldMomentAge(latest.moment_date)) + '</div>' +
-    '<div class="t">' + esc(latest.title) + '</div>';
-  // The page is the timeline itself, newest development first -- the
-  // last several moments rather than just the one the box had room for.
+  const latest = items[0];
+  el.innerHTML = '<div class="k">' + esc(label) + '</div>' +
+    '<div class="m">' + esc(newsAge(latest.updated_at)) + '</div>' +
+    '<div class="t">' + esc(newsText(latest, 'title')) + '</div>';
+  // The page is the series' own timeline, newest development first --
+  // the last several posts rather than just the one the box had room for.
   fbSetPage(el, {
-    kicker: label, meta: worldMomentAge(latest.moment_date), title: latest.title,
-    html: moments.slice(0, 8).map(m =>
+    kicker: label, meta: newsAge(latest.updated_at), title: newsText(latest, 'title'),
+    html: items.slice(0, 8).map(n =>
       '<div class="fb-dunya-moment">' +
-        '<div class="fb-dunya-moment-date">' + esc(worldMomentDate(m.moment_date)) + '</div>' +
-        '<div class="fb-dunya-moment-title">' + esc(m.title) + '</div>' +
-        (m.body ? '<p>' + esc(m.body) + '</p>' : '') +
+        '<div class="fb-dunya-moment-date">' + esc(newsAge(n.updated_at)) + '</div>' +
+        '<div class="fb-dunya-moment-title">' + esc(newsText(n, 'title')) + '</div>' +
+        (newsText(n, 'body') ? '<p>' + esc(newsText(n, 'body')) + '</p>' : '') +
       '</div>').join(''),
   });
 }
 
-// ── And the olaylar board's own door ──
+// ── And the olaylar board's own door -- parked, not deleted ──
+// The right column stood as the top ongoing olaylar, one to a box
+// (`sort_order`, see CLAUDE.md); it is parked for now in favour of the
+// left column's admin-pinned series (see loadDunyaActor above), the
+// same way Kahvehane's comments are parked behind COMMENTS_ENABLED.
+// Flipping this back on is the whole of bringing it back.
+const OLAYLAR_COLUMN_ENABLED = false;
 // The top ongoing olaylar, one to a box -- the same list the board
 // itself orders by (`sort_order`, see CLAUDE.md), just truncated to
 // the three slots this column has.
@@ -2321,20 +2325,22 @@ const CAST = [
     poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadOyunActor, onpress: onpressOyun,
   }),
 
-  // ── Kütüphane's pair: the reading side (Olaylar has moved out to
-  // the Türkiye stop; Anket is its own pair further down, once Türkiye's
-  // and the ilçe's placeholders) ──
+  // ── Kütüphane's pair: the reading side (Olaylar stands at the
+  // Türkiye stop's right column, parked for now -- see
+  // OLAYLAR_COLUMN_ENABLED above; Anket is its own pair further down) ──
   ...stackActors({
     idBase: 'haber', live: 11, lane: LANE_KUTUPHANE, col: 'l', cls: 'fb-haberler',
     poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadHaberlerActor, onpress: onpressBox,
   }),
   ...stackActors({
     idBase: 'olay', live: 0, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-olaylar',
-    poses: END0_POSES_R, lag: 0.43, lagFree: 0.135, load: loadOlaylarActor, onpress: onpressBox,
+    poses: END0_POSES_R, lag: 0.43, lagFree: 0.135,
+    load: OLAYLAR_COLUMN_ENABLED ? loadOlaylarActor : (el) => placeholderBox(el, 'Olaylar'),
+    onpress: OLAYLAR_COLUMN_ENABLED ? onpressBox : undefined,
   }),
 
   // ── Türkiye (slide 1) and the ilçe (slide 24): the left column now
-  // carries the three named conflicts (see loadDunyaActor above) in
+  // carries three admin-pinned series (see loadDunyaActor above) in
   // place of the Hikâyeler placeholder. Kahve and Yorumlar are still in
   // the parts bin (see CLAUDE.md), so their boxes stay dashed
   // placeholders naming their own slot. ──
