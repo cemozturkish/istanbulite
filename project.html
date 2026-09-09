@@ -365,7 +365,7 @@
     .fb-box.fb-locked .k { color: var(--muted); }
     .fb-box.fb-locked:not(.fb-empty)::before { background: var(--muted, #9a9a9a); }
 
-    /* A placeholder that has not been built yet (Hikâyeler, Bilgi, Kahve,
+    /* A placeholder that has not been built yet (Hikâyeler, Kahve,
        Yorumlar) still names its own slot, so a dashed box reads as "this
        is reserved" rather than as the page being broken. */
     .fb-box .ph {
@@ -1089,6 +1089,46 @@
     .fb-page-body p { margin: 0 0 9px; font-size: 0.85rem; line-height: 1.5; }
     .fb-page-body p:last-child { margin-bottom: 0; }
 
+    /* ── ANKET — the vote UI a poll's own page carries ──
+       Two plain buttons rather than a swipe: this page is a scrolling
+       sheet, not a deck card, so the direction-is-the-answer gesture
+       Kahvehane's own question cards use has nothing to attach to here.
+       Once answered (or on reopening one already answered), the buttons
+       give way to a result bar and, under it, the same split read per
+       DISTRICT -- the data a future district-colored map would paint
+       from (see db/neighborhood_polls.sql); until that map is drawn, the
+       swatch beside each district's name is the only place its color
+       actually shows. */
+    .anket-opts { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+    .anket-opt {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; border: 2px solid var(--ink); background: var(--paper);
+      font-size: 0.85rem; text-align: left; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .anket-opt:active { background: var(--paper-card, #ddc4b5); }
+    .anket-opt-swatch { flex: none; width: 12px; height: 12px; border: 1px solid var(--ink); }
+    .anket-note { color: var(--muted); font-size: 0.72rem; margin-top: 8px; }
+    .anket-result-bar {
+      display: flex; height: 22px; border: 2px solid var(--ink);
+      overflow: hidden; margin-top: 4px;
+    }
+    .anket-result-bar span { display: flex; align-items: center; height: 100%; }
+    .anket-result-row { display: flex; justify-content: space-between; font-size: 0.72rem; margin-top: 4px; color: var(--muted); }
+    .anket-districts { display: flex; flex-direction: column; gap: 5px; margin-top: 14px; }
+    .anket-district-title {
+      font-size: 0.7rem; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--muted); margin-top: 10px; margin-bottom: 2px;
+    }
+    .anket-district-row { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; }
+    .anket-district-swatch { flex: none; width: 10px; height: 10px; border: 1px solid var(--ink); }
+    .anket-district-swatch.none { border-style: dashed; border-color: var(--muted); background: none !important; }
+    .anket-district-name { flex: 0 0 84px; }
+    .anket-district-bar { flex: 1; height: 7px; display: flex; overflow: hidden; border: 1px solid var(--ink); }
+    .anket-district-bar span { height: 100%; }
+    .anket-district-pct { flex: 0 0 32px; text-align: right; color: var(--muted); }
+    .anket-district-none { flex: 1; color: var(--muted); font-style: italic; }
+
     /* THE TAB BAR STAYS UP. Every other sheet on the site runs flush off
        the bottom edge of the screen (frames.css even drops its bottom
        border to say so), and comes to rest OVER the tab bar -- which is
@@ -1611,6 +1651,189 @@ function worldEventWhen(r) {
   return [from, to].filter(Boolean).join('–');
 }
 
+// ── ANKET — district polls, the box that used to be the "Bilgi"
+// placeholder (db/neighborhood_polls.sql) ──
+// A member answers once, filed under their own district. What makes this
+// different from a plain city-wide poll is what the answer is FOR: the
+// per-district split under the result is exactly the data a future
+// district-colored map would read to pick each district's color, mixing
+// the poll's own color_a/color_b by that district's own a/b split. There
+// is no such map drawn yet -- project.html's İstanbul at slide 12 is
+// still a flat painted frame, not a traced one a fill can be set on (see
+// "The zoom is DRAWN, not computed" in CLAUDE.md) -- so for now the same
+// numbers print as a list, each row already wearing the color a map
+// would paint it.
+function anketText(poll, field) {
+  if (!poll) return '';
+  const en = poll[field + '_en'];
+  if (window.I18N && I18N.isEnglish() && en && String(en).trim()) return en;
+  return poll[field];
+}
+
+function anketHexToRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+// The same linear mix a choropleth would paint a district with, by that
+// district's own fraction choosing option A.
+function anketMixColor(colorA, colorB, fracA) {
+  const pa = anketHexToRgb(colorA), pb = anketHexToRgb(colorB);
+  if (!pa || !pb) return colorA || '#b93631';
+  const mix = (a, b) => Math.round(a * fracA + b * (1 - fracA));
+  return 'rgb(' + mix(pa.r, pb.r) + ',' + mix(pa.g, pb.g) + ',' + mix(pa.b, pb.b) + ')';
+}
+
+const loadAnketActor = stackFetch(async () => {
+  try {
+    const { data, error } = await IstRouter.sb.from('neighborhood_polls')
+      .select('id, question_tr, question_en, option_a_tr, option_a_en, option_b_tr, option_b_en, color_a, color_b')
+      .eq('active', true)
+      .order('created_at', { ascending: false })
+      .limit(3);
+    if (error) throw error;
+    const rows = (data || []).map(poll => ({
+      html: '<div class="k">ANKET</div><div class="t">' + esc(anketText(poll, 'question')) + '</div>',
+      page: anketPagePayload(poll),
+    }));
+    return { rows, failed: false,
+      emptyHtml: '<div class="k">Anket</div><div class="t">Şu an anket yok</div>' +
+                 '<div class="m">Yakında yeni bir soru gelecek.</div>' };
+  } catch (err) {
+    console.error('[proje anket]', err);
+    return { rows: [], failed: true,
+      failedHtml: '<div class="k">Anket</div><div class="t">Yüklenemedi</div>' +
+                  '<div class="m">Bağlantını kontrol et.</div>' };
+  }
+});
+
+// The page's body is filled in by `wire`, once its markup is actually in
+// the document (see openFbPage) -- voting has to happen after a fetch and
+// re-render the buttons into a result, which a static render can't do.
+function anketPagePayload(poll) {
+  return {
+    kicker: 'ANKET', title: anketText(poll, 'question'),
+    html: '<div id="anket-body-' + poll.id + '" class="anket-body">Yükleniyor…</div>',
+    wire: (inner) => wireAnketPage(inner, poll),
+  };
+}
+
+async function wireAnketPage(inner, poll) {
+  const body = inner.querySelector('#anket-body-' + poll.id);
+  if (!body) return;
+  const sb = IstRouter.sb;
+  let uid = null;
+  try { uid = (await sb.auth.getUser()).data.user.id; } catch (err) {}
+  let already = null;
+  if (uid) {
+    try {
+      const { data } = await sb.from('neighborhood_poll_votes')
+        .select('choice').eq('poll_id', poll.id).eq('user_id', uid).maybeSingle();
+      already = data ? data.choice : null;
+    } catch (err) { console.error('[anket]', err); }
+  }
+  if (!body.isConnected) return;
+  if (already) { renderAnketResults(body, poll, already); return; }
+  renderAnketButtons(body, poll, uid);
+}
+
+function renderAnketButtons(body, poll, uid) {
+  body.innerHTML =
+    '<div class="anket-opts">' +
+      '<button type="button" class="anket-opt" data-choice="a">' +
+        '<span class="anket-opt-swatch" style="background:' + esc(poll.color_a) + ';"></span>' +
+        esc(anketText(poll, 'option_a')) +
+      '</button>' +
+      '<button type="button" class="anket-opt" data-choice="b">' +
+        '<span class="anket-opt-swatch" style="background:' + esc(poll.color_b) + ';"></span>' +
+        esc(anketText(poll, 'option_b')) +
+      '</button>' +
+    '</div>' +
+    '<div class="anket-note">Oyun kendi mahallenin altına yazılır.</div>';
+  body.querySelectorAll('.anket-opt').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!uid) return;
+      const choice = btn.dataset.choice;
+      body.innerHTML = '<div class="anket-note">Kaydediliyor…</div>';
+      let neighborhood = null;
+      try {
+        const { data } = await IstRouter.sb.from('profiles')
+          .select('neighborhood').eq('id', uid).maybeSingle();
+        neighborhood = data ? data.neighborhood : null;
+      } catch (err) { console.error('[anket]', err); }
+      if (!neighborhood) {
+        body.innerHTML = '<div class="anket-note">Oy kaydedilemedi. Bağlantını kontrol et.</div>';
+        return;
+      }
+      const { error } = await IstRouter.sb.from('neighborhood_poll_votes')
+        .insert([{ poll_id: poll.id, user_id: uid, neighborhood, choice }]);
+      if (error) {
+        console.error('[anket]', error);
+        body.innerHTML = '<div class="anket-note">Oy kaydedilemedi.</div>';
+        return;
+      }
+      renderAnketResults(body, poll, choice);
+    });
+  });
+}
+
+// The per-district breakdown is the point of this poll: neighborhood_poll_
+// results() hands back every district (even one with no votes yet), and
+// each row's swatch is already mixed the way a future map would paint it.
+async function renderAnketResults(body, poll, myChoice) {
+  body.innerHTML = '<div class="anket-note">Yükleniyor…</div>';
+  let rows = [];
+  try {
+    const { data, error } = await IstRouter.sb.rpc('neighborhood_poll_results', { p_poll_id: poll.id });
+    if (error) throw error;
+    rows = data || [];
+  } catch (err) { console.error('[anket]', err); }
+  if (!body.isConnected) return;
+  const totalA = rows.reduce((s, r) => s + (r.a_count || 0), 0);
+  const totalB = rows.reduce((s, r) => s + (r.b_count || 0), 0);
+  const total = totalA + totalB;
+  const pctA = total ? Math.round((totalA / total) * 100) : 50;
+  const districtsHtml = rows
+    .map(r => ({
+      name: NB_NAMES[r.neighborhood] || r.neighborhood,
+      total: (r.a_count || 0) + (r.b_count || 0), a: r.a_count || 0,
+    }))
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'tr'))
+    .map(d => {
+      if (!d.total) {
+        return '<div class="anket-district-row">' +
+          '<span class="anket-district-swatch none"></span>' +
+          '<span class="anket-district-name">' + esc(d.name) + '</span>' +
+          '<span class="anket-district-none">Oy yok</span></div>';
+      }
+      const dPct = Math.round((d.a / d.total) * 100);
+      const color = anketMixColor(poll.color_a, poll.color_b, dPct / 100);
+      return '<div class="anket-district-row">' +
+        '<span class="anket-district-swatch" style="background:' + color + ';"></span>' +
+        '<span class="anket-district-name">' + esc(d.name) + '</span>' +
+        '<span class="anket-district-bar">' +
+          '<span style="width:' + dPct + '%;background:' + esc(poll.color_a) + ';"></span>' +
+          '<span style="width:' + (100 - dPct) + '%;background:' + esc(poll.color_b) + ';"></span>' +
+        '</span>' +
+        '<span class="anket-district-pct">%' + dPct + '</span>' +
+      '</div>';
+    }).join('');
+  body.innerHTML =
+    '<div class="anket-note">' +
+      (myChoice === 'a' ? esc(anketText(poll, 'option_a')) : esc(anketText(poll, 'option_b'))) +
+      ' dedin' + (total ? ' · ' + total + ' oy' : '') + '</div>' +
+    '<div class="anket-result-bar">' +
+      '<span style="width:' + pctA + '%;background:' + esc(poll.color_a) + ';"></span>' +
+      '<span style="width:' + (100 - pctA) + '%;background:' + esc(poll.color_b) + ';"></span>' +
+    '</div>' +
+    '<div class="anket-result-row"><span>' + esc(anketText(poll, 'option_a')) + ' · %' + pctA + '</span>' +
+      '<span>%' + (100 - pctA) + ' · ' + esc(anketText(poll, 'option_b')) + '</span></div>' +
+    '<div class="anket-district-title">İlçelere göre</div>' +
+    '<div class="anket-districts">' + districtsHtml + '</div>';
+}
+
 // ── Kahvehane's other column: the fixed set of games ──
 // Not a feed -- always these three, in this order -- but a game the
 // admin switched off for today (game_day_toggles) is not a step the
@@ -1777,7 +2000,12 @@ function fbPageHTML(p) {
       '<h2 class="fb-page-title">' + esc(p.title || '') + '</h2>' +
       (p.lines && p.lines.length
         ? '<div class="fb-page-meta">' + p.lines.map(esc).join('<br>') + '</div>' : '') +
-      (p.body ? fbParas(p.body) : '') +
+      // ANKET's page carries live vote buttons rather than plain text --
+      // p.html stands in for p.body wherever a box needs more than a
+      // paragraph of reading (see the anket-* rules above). Everything
+      // else still just writes body/lines, so this is the one place the
+      // two kinds of page diverge.
+      (p.html || (p.body ? fbParas(p.body) : '')) +
     '</div>';
 }
 
@@ -1820,6 +2048,11 @@ function openFbPage(payload, origin) {
   if (fbPageGrows()) IstSheet.grow({ page, inner, origin: _fbOrigin, dir: 'in' });
   const back = document.getElementById('fb-page-back');
   if (back) back.addEventListener('click', () => dismissFbPage());
+  // ANKET's page is stateful (vote, then show the result), which a static
+  // render can't do -- wire is the one hook a payload can carry to attach
+  // its own listeners once its markup is actually in the document. Every
+  // other box simply has no wire.
+  if (payload && payload.wire) { try { payload.wire(inner); } catch (err) { console.error(err); } }
   try { history.pushState({ fbPage: 1 }, ''); _fbPushed = true; } catch (err) {}
 }
 
@@ -1884,7 +2117,7 @@ function wireFbPage() {
   });
 }
 
-// ── The not-yet-built columns (Hikâyeler, Bilgi, Kahve, Yorumlar) ──
+// ── The not-yet-built columns (Hikâyeler, Kahve, Yorumlar) ──
 // No content pipeline exists for these yet (see "What is still in the
 // parts bin" in CLAUDE.md), so their boxes stay permanently dashed,
 // naming their own slot rather than fabricating content nobody has
@@ -1970,7 +2203,8 @@ const CAST = [
   }),
 
   // ── Kütüphane's pair: the reading side (Olaylar has moved out to
-  // the Türkiye stop, and Bilgi has come in from it) ──
+  // the Türkiye stop; Anket is its own pair further down, once Türkiye's
+  // and the ilçe's placeholders) ──
   ...stackActors({
     idBase: 'haber', live: 11, lane: LANE_KUTUPHANE, col: 'l', cls: 'fb-haberler',
     poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadHaberlerActor, onpress: onpressBox,
@@ -1981,17 +2215,17 @@ const CAST = [
   }),
 
   // ── Türkiye (slide 1) and the ilçe (slide 24): apart from Olaylar,
-  // which stands at the Türkiye stop's right column, these are still in
-  // the parts bin (see CLAUDE.md), so their boxes stay dashed
-  // placeholders naming their own slot rather than fabricating content
-  // nobody has built yet. ──
+  // which stands at the Türkiye stop's right column, and Anket, which now
+  // has a real content pipeline (see above), these are still in the parts
+  // bin (see CLAUDE.md), so their boxes stay dashed placeholders naming
+  // their own slot rather than fabricating content nobody has built yet. ──
   ...stackActors({
     idBase: 'hikaye', live: 0, lane: LANE_KUTUPHANE, col: 'l', cls: 'fb-hikaye',
     poses: END0_POSES_L, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Hikâyeler'),
   }),
   ...stackActors({
-    idBase: 'bilgi', live: 11, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-bilgi',
-    poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Bilgi'),
+    idBase: 'anket', live: 11, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-anket',
+    poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadAnketActor, onpress: onpressBox,
   }),
   ...stackActors({
     idBase: 'kahve', live: 23, lane: LANE_KAHVEHANE, col: 'l', mirror: true, cls: 'fb-kahve',
@@ -2925,7 +3159,7 @@ const MAP_WINDOWS = [
   { id: 'ilce',      cell: 'r1c3', lane: LANE_KAHVEHANE, slide: STOPS[2],
     name: 'İlçen',     map: 'assets/map/istanbul-map-mobile.png', stats: ['kahve', 'yorum'] },
   { id: 'kutuphane', cell: 'r2c1', lane: LANE_KUTUPHANE, slide: STOPS[1],
-    name: 'Kütüphane', map: 'assets/map/istanbul-map-mobile.png', stats: ['haber', 'bilgi'] },
+    name: 'Kütüphane', map: 'assets/map/istanbul-map-mobile.png', stats: ['haber', 'anket'] },
   { id: 'hane',      cell: 'r2c2', lane: LANE_HANE,      slide: STOPS[1],
     name: 'Hane',      hex: true },
   { id: 'kahvehane', cell: 'r2c3', lane: LANE_KAHVEHANE, slide: STOPS[1],
@@ -2935,9 +3169,9 @@ const MAP_WINDOWS = [
 ];
 
 // What each square counts. A dash is a square whose content is parked
-// (Fikirler, Bilgi) or not lifted out of the parts bin yet -- it still
-// prints, because the shape of a screen should not change on the day its
-// numbers arrive.
+// (Fikirler) or not lifted out of the parts bin yet -- it still prints,
+// because the shape of a screen should not change on the day its numbers
+// arrive.
 let mapStats = null;      // { key: 'a/b' } once loaded
 let mapBadges = null;     // { windowId: n }
 let mapStatsAt = 0;       // when, so a reopen a minute later is free
@@ -3217,7 +3451,10 @@ async function loadMapStats() {
       ? stampless.has(String(r.id))
       : dealt[r.id] === r.updated_at).length;
     stats.haber = done + '/' + rows.length;
-    badges.kutuphane = rows.length - done;
+    // += rather than =: the anket block below shares this same badge, and
+    // the two run concurrently -- whichever resolves second must not
+    // overwrite what the first one already added.
+    badges.kutuphane = (badges.kutuphane || 0) + (rows.length - done);
   })();
 
   // Olaylar: how many of the ongoing ones the reader has opened at all.
@@ -3269,7 +3506,22 @@ async function loadMapStats() {
     badges.kahvehane = (badges.kahvehane || 0) + (on.length - played);
   })();
 
-  await Promise.allSettled([haber, olay, etkinlik, oyun]);
+  // Anket: how many of the active polls this member has already answered.
+  const anket = (async () => {
+    const { data, error } = await sb.from('neighborhood_polls').select('id').eq('active', true);
+    if (error) throw error;
+    const rows = data || [];
+    let answered = 0;
+    if (uid && rows.length) {
+      const { data: votes } = await sb.from('neighborhood_poll_votes')
+        .select('poll_id').eq('user_id', uid).in('poll_id', rows.map(r => r.id));
+      answered = (votes || []).length;
+    }
+    stats.anket = answered + '/' + rows.length;
+    badges.kutuphane = (badges.kutuphane || 0) + (rows.length - answered);
+  })();
+
+  await Promise.allSettled([haber, olay, etkinlik, oyun, anket]);
   mapStats = stats;
   mapBadges = badges;
   mapStatsAt = Date.now();
