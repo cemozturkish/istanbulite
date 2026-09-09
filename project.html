@@ -204,15 +204,31 @@
       background: var(--ink-red, #B93631);
     }
     .fb-box.fb-mirror:not(.fb-empty)::before { left: auto; right: 0; }
-    /* Only a box with something behind it says so under a cursor: a page
-       to open (see fbSetPage) or, for the games column, a game whose
-       turn has come. A dashed slot, a placeholder and a locked game are
-       all boxes a press does nothing to. */
-    .fb-actor.live.fb-openable,
-    .fb-actor.live.fb-oyun:not(.fb-empty):not(.fb-locked) { cursor: pointer; }
-    /* Each box gives under the finger from the corner it is docked to. */
-    .fb-actor.live.fb-col-l:active { transform-origin: 0% 100%; }
-    .fb-actor.live.fb-col-r:active { transform-origin: 100% 100%; }
+    /* Only a box that answers a press says so under a cursor -- one class,
+       set by whichever loader knows (fbSetPage, loadOyunActor). A dashed
+       slot, a placeholder and a game whose turn has not come are all
+       boxes a press does nothing to. */
+    .fb-actor.live.fb-openable { cursor: pointer; }
+    /* ── The press ──
+       Each box gives from the corner it is docked to, so a column of
+       three reads as three cards pinned at one edge rather than three
+       things shrinking into the air. The origin is a class and not
+       `:active`, because `:active` is dropped on pointerup -- half way
+       through the pop -- and the spring would then come off the box's
+       centre while the give came off its corner. It is also the same
+       reason the press is driven by pointer events at all: `:active`
+       sticks after a tap on iOS (see wireCardPress in kutuphane.html).
+
+       The SCALE itself is deliberately not here. paintCast() writes an
+       inline transform to every actor on every frame, so any transform
+       stated in this stylesheet is overwritten before it can be seen --
+       which is exactly why these two rules have sat here since the cast
+       was written with nothing to give under the finger. The press is a
+       number the tick multiplies into that same transform instead (see
+       pressScale), which is also the right shape for this page: it
+       composes with the pose rather than fighting it. */
+    .fb-actor.fb-pressing.fb-col-l { transform-origin: 0% 100%; }
+    .fb-actor.fb-pressing.fb-col-r { transform-origin: 100% 100%; }
 
     /* ── What a filled box is OF -- one template for all of them ── */
     /* The kicker and the date are pinned the same way, one on each top
@@ -1609,10 +1625,18 @@ async function loadOyunActor(el, slot) {
   const idx = GAME_DEFS.length - 1 - slot;
   const g = GAME_DEFS[idx];
   el.classList.remove('fb-locked');
-  if (state.off.has(g.key)) { el.classList.add('fb-empty'); el.innerHTML = ''; return; }
+  if (state.off.has(g.key)) {
+    el.classList.add('fb-empty'); el.classList.remove('fb-openable');
+    el.innerHTML = ''; return;
+  }
   el.classList.remove('fb-empty');
   const blocker = gameBlocker(state, idx);
   if (blocker) el.classList.add('fb-locked');
+  // The same class every other column's boxes carry, and it means the
+  // same thing here: this box answers a press. A game whose turn has not
+  // come does not, so it does not wear it -- and neither the cursor nor
+  // the press effect has a second rule to state (see fbSetPage).
+  el.classList.toggle('fb-openable', !blocker);
   el.innerHTML = '<div class="k">' + g.kicker + '</div><div class="t">' + g.title + '</div>' +
                  '<div class="m">' + (blocker ? 'Önce ' + blocker.title : g.meta) + '</div>';
 }
@@ -1693,7 +1717,12 @@ function fbPageHTML(p) {
 // rather than a bare property, so "has a page" and "looks like it has
 // one" cannot drift apart: a dashed slot, a placeholder and a fetch that
 // failed are all boxes with nothing behind them, and none of the three
-// should say otherwise under a cursor.
+// should say otherwise under a cursor or give under a finger.
+//
+// `fb-openable` says exactly one thing -- THIS BOX ANSWERS A PRESS -- and
+// is the single condition the cursor and the press effect are both hung
+// off. Oyunlar sets it too (its press opens a game rather than a page),
+// so there is one predicate rather than one per column.
 function fbSetPage(el, page) {
   if (!el) return;
   el._fbPage = page || null;
@@ -2001,9 +2030,16 @@ function buildCast() {
     // `laneP` starts already AT the current lane, not at 0 -- a fresh
     // mount has nothing to catch up on, so there is nothing to animate.
     return { def, el, poses: expandPoses(def.poses || {}), pos: 0, laneP: lanePos,
+             // The press: 1 at rest, PRESS_SCALE held, running the pop
+             // curve while pressFrom is set (see pressScale).
+             press: 1, pressHeld: false, pressFrom: null, pressAt: 0,
              lag: def.lag == null ? CAST_LAG : def.lag,
              lagFree: def.lagFree == null ? CAST_LAG_FREE : def.lagFree };
   });
+  // Every box gets it -- whether a press does anything is asked at the
+  // moment of the press (fb-openable), not wired per column, so a box
+  // that gains or loses its page mid-session is right either way.
+  cast.forEach(wireActorPress);
 }
 
 function stopCastTick() {
@@ -2064,6 +2100,10 @@ function castStep(now) {
     // same ease(), same per-slot rate, just a second target.
     const nlp = ease(a.laneP, lanePos, held ? a.lag : a.lagFree, dt);
     if (nlp !== a.laneP) { a.laneP = nlp; moving = true; }
+    // The press rides the same tick as everything else on this page, so
+    // it cannot drift out of step with the pose it is multiplied into.
+    if (pressScale(a, now, dt)) moving = true;
+    else if (!a.pressHeld && a.press === 1) a.el.classList.remove('fb-pressing');
   }
   paintCast();
   // The position marks ride the eased frame position, so they are
@@ -2109,7 +2149,11 @@ function paintCast() {
     // leave a slide.
     const d = Math.max(-1, Math.min(1, a.laneP - a.def.lane));
     const x = lerp(A.x, B.x, t);
+    // The press is a second scale rather than a factor folded into `sc`,
+    // so the pose the book gives the box and the give under the finger
+    // stay two readable things in one transform.
     a.el.style.transform = 'translate3d(' + x + '%,' + y + '%,0) scale(' + sc + ')' +
+                           (a.press !== 1 ? ' scale(' + a.press + ')' : '') +
                            (rot ? ' rotate(' + rot + 'deg)' : '');
     a.el.style.opacity = String(lerp(A.opacity, B.opacity, t) * (1 - Math.abs(d)));
   }
@@ -2124,6 +2168,74 @@ function paintCast() {
 // six pixels of drift left -- close enough to press, far enough that
 // nothing is live while it is still visibly travelling.
 const LIVE_EPS = 0.05;
+
+// ── THE PRESS ──
+// The site has one press and this is it: the card gives to 0.955 under
+// the finger and springs back past its own size to 1.022 before settling
+// (kutuphane.html's .article.openable, profile-card.css's hive cell --
+// same three numbers, same 0.34s). Where the release opens something,
+// that overshoot is the first frame of the box growing into its page, so
+// the press and the page are one continuous move rather than two.
+//
+// It is a NUMBER here rather than a stylesheet rule, and that is forced:
+// paintCast() writes an inline transform to every actor every frame, so
+// a `:active { transform: scale() }` is overwritten before it is ever
+// painted. Folding it into that same transform is also the truer shape
+// for this page -- the press composes with whatever pose the book has
+// the box in, instead of the two fighting over one property.
+const PRESS_SCALE = 0.955;   // held
+const PRESS_POP = 1.022;     // the spring, at 52% of the release
+const PRESS_MS = 340;        // the release, end to end
+const PRESS_LAG = 0.45;      // how fast it gives -- tight, it is under a finger
+
+// Ease-out per segment, which is what puts the weight at the far end of
+// each half of the pop rather than in the middle of it.
+function outCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+// Where an actor's press scale stands right now. Holding eases toward
+// PRESS_SCALE; releasing runs the fixed curve above from wherever the
+// give had actually reached, so a tap too quick to reach 0.955 pops
+// proportionally rather than jumping down to it first.
+function pressScale(a, now, dt) {
+  if (a.pressHeld) {
+    a.press = ease(a.press, PRESS_SCALE, PRESS_LAG, dt);
+    return a.press !== PRESS_SCALE;
+  }
+  if (a.pressFrom == null) return false;
+  const t = Math.min(1, (now - a.pressAt) / PRESS_MS);
+  // 0 -> 52%: down to the pop. 52% -> 100%: back to rest.
+  a.press = t < 0.52
+    ? lerp(a.pressFrom, PRESS_POP, outCubic(t / 0.52))
+    : lerp(PRESS_POP, 1, outCubic((t - 0.52) / 0.48));
+  if (t >= 1) { a.press = 1; a.pressFrom = null; return false; }
+  return true;
+}
+
+// Pointer events, never :active -- which sticks after a tap on iOS, and
+// is dropped on pointerup half way through the pop besides. Only a real
+// pointerup pops, so a flick down the book that happened to start on a
+// box does not announce a press the reader never made.
+function wireActorPress(a) {
+  const el = a.el;
+  const down = () => {
+    if (!el.classList.contains('fb-openable') || !el.classList.contains('live')) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    a.pressHeld = true;
+    a.pressFrom = null;
+    el.classList.add('fb-pressing');
+    ensureCastTick();
+  };
+  const up = (pop) => {
+    if (!a.pressHeld) return;
+    a.pressHeld = false;
+    if (pop) { a.pressFrom = a.press; a.pressAt = performance.now(); }
+    else { a.press = 1; a.pressFrom = null; el.classList.remove('fb-pressing'); }
+    ensureCastTick();
+  };
+  el.addEventListener('pointerdown', down);
+  el.addEventListener('pointerup', () => up(true));
+  ['pointercancel', 'pointerleave'].forEach(e => el.addEventListener(e, () => up(false)));
+}
 
 function armCast() {
   // The drawings are part of "settled" now: while they are still
