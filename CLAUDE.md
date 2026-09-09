@@ -587,6 +587,51 @@ sb.from('articles').delete().eq('id', id)
   - One trap: at the moment those three run, the drawer's body is **detached**, so they must ask
     `inner.querySelector('#id')` — `document.getElementById` returns null there and the fold
     silently does nothing.
+- **A card is a headline; everything under it is FOLDED.** Gelişmeler, Anketler, Kaynaklar,
+  Bölümler and a country entry's Zaman Akışı are each a whole editor, and five of them standing
+  open at once turned a list of twenty stories into a page nobody could scan — the one thing a
+  list is for. They are `<details class="sources-block">` now, shut by default, so a story at
+  rest is its kicker, its headline and the count behind each fold. An olay's board settings
+  (which countries it lights, where its paper hangs) fold with them: the line is **content stays,
+  editors and settings fold**, which is why a story's own body and an olay's parties line are
+  still printed.
+  - Which folds are open is remembered in `OPEN_BLOCKS`, keyed by card and block, because every
+    one of these lists rebuilds its own `innerHTML` after each add — a fold the admin had just
+    opened to type into would be shut again by the very save that proved it worked. The key is
+    remembered rather than the element, since the element is gone by the time the answer lands,
+    and the listener is a single capture-phase one on `document` because `toggle` does not bubble.
+- **A story can be moved into another story's Zaman Akışı, and moved back out.** The connection
+  between two stories is usually noticed *after* both have been posted — that is what news is —
+  so neither the feed nor a timeline may be a place a story is stuck in. **Akışa Taşı** on a card
+  folds that story into another one's timeline; **Taşı** on a timeline entry moves it to a
+  different story, or (the picker's first option) lifts it back out as a story of its own. Every
+  one of those is undone by doing the opposite.
+  - **It needed no migration.** `news_id` is an ordinary column on `breaking_news_updates`,
+    `_sources` and `_polls`, and the admin already holds UPDATE on all three — so moving is
+    re-pointing a foreign key, not copying rows about. Only `breaking_news_countries` is
+    different (a tick list with insert/delete and no UPDATE, `db/breaking_news_countries.sql`),
+    so the countries the target does not already name are inserted and its own ticks are left
+    alone.
+  - **What hangs off a story goes with it.** Folding one in carries its own timeline, its
+    sources, its polls and its countries across *before* the story row is deleted, so the cascade
+    takes nothing with it. A story that already has a timeline needs no entry of its own — its
+    current headline already IS its latest entry — and one that has none becomes a single entry
+    at its own `created_at`.
+  - **The receiving story keeps its own first headline** (`seedNewsTimeline`, extracted from
+    `addNewsUpdate` so there is one implementation): the first entry of any Zaman Akışı has to be
+    that story's own original post, or the headline it started as is lost the moment it grows a
+    second one.
+  - **A story's headline is its latest entry, so anything that changes a timeline re-derives it**
+    (`resyncNewsHead`) — otherwise a story goes on showing a headline that now lives somewhere
+    else. That function deliberately does **not** bump `updated_at`: that column is what puts a
+    story back on top of every reader's deck (see Kütüphane's `dunya_dealt_<uid>` rule), and
+    re-filing is a correction to the record rather than a development in the story. Only a move
+    that genuinely gives the target a *newer* headline bumps it — the same backdating rule
+    `addNewsUpdate` already follows.
+  - The picker is filled when it is opened, never with the card (`ensureMovePicker`): "Tümü"
+    renders up to 300 stories, and a select of all of them inside each of them is 90,000 options
+    nobody asked to see. Same rule as `ensureCardCountryPicker`. It offers what the list has
+    loaded, so reaching an older story means switching to "Tümü" first.
 - **The phone is the live site, not a picture** (`#prev-frame`): the same origin and therefore
   the same session, drawn at 390×844 and scaled to whatever room the column has, so the page
   inside lays out at the width a real phone reports rather than at the width of a narrow panel.
