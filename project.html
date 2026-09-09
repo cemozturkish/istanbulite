@@ -24,6 +24,8 @@
   <script src="sheet.js?v=5"></script>
   <link rel="stylesheet" href="sheet.css?v=7">
   <link rel="stylesheet" href="frames.css?v=8">
+  <script src="loading-screen.js?v=3"></script>
+  <link rel="stylesheet" href="loading-screen.css?v=3">
 
   <style data-page="project">
     html, body {
@@ -586,23 +588,6 @@
       nav b .fb-wm { display: block; }
     }
 
-    /* Sits over the first frame once it is up, so what the reader sees
-       while the rest arrive is the book's first page and a count --
-       never a spinner on blank paper. */
-    .fb-loading {
-      position: fixed;
-      left: 0; right: 0;
-      bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px) + 44px);
-      text-align: center;
-      font-size: 0.72rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
-      pointer-events: none;
-      z-index: 3;
-    }
-
     /* ══════════════════════════════════════════════════════════════
        THE APP MAP -- what the İstanbulite logo opens
        ══════════════════════════════════════════════════════════════
@@ -1162,6 +1147,19 @@
 </head>
 <body data-page="project">
 
+<!-- ── THE LOADING SCREEN ──
+     The one wait the app has. This page is the app, and it cannot be
+     flipped until every one of its two dozen drawings has decoded --
+     so that decode happens behind the sea rising in the logo, the same
+     screen index.html opens with, rather than in front of the reader as
+     a count over blank paper. See loading-screen.js. -->
+<div id="loading-overlay" aria-hidden="true">
+  <div class="loading-frame-stack">
+    <img id="loading-frame-back" class="loading-frame" src="assets/loading/logo-dark-mono-01.jpg" alt="">
+    <img id="loading-frame-front" class="loading-frame loading-frame-front" src="assets/loading/logo-dark-mono-01.jpg" alt="">
+  </div>
+</div>
+
 <div id="main-site">
   <div id="ist-pc-mount"></div>
 
@@ -1176,7 +1174,6 @@
   <div id="ist-content" style="display:contents">
     <main>
       <div class="fb" id="fb">
-        <div class="fb-loading" id="fb-loading">Kareler yükleniyor…</div>
         <div class="fb-cast" id="fb-cast"></div>
         <!-- The petek, revealed by a rightward pull on slide 12. Not a
              page and not a sheet: the drawing stays where it is, goes
@@ -2552,31 +2549,33 @@ function show(p, snap) {
 }
 
 // ── Loading ──
-// Two rules, and they pull against each other.
-//
 // Every frame must be decoded before the book can reach it: an <img>
 // whose bytes are not ready paints nothing, and a blank page in the
-// middle of a flip is worse than a wait at the start. But waiting for
-// the whole book before showing anything means staring at the word
-// "loading" while ~4 MB of drawings arrive, which is the app looking
-// broken at the exact moment it should look like a book.
+// middle of a flip is worse than a wait at the start. So the whole of
+// that wait happens BEHIND THE LOADING SCREEN -- the sea rising in the
+// logo that index.html already opens with (loading-screen.js), held one
+// frame short of full until `resolveLoading` is called. The app has one
+// wait and one place it is shown; a second one, reported as a count over
+// the first drawing while the rest arrived, was the app looking like it
+// was still assembling itself at the exact moment it should look like a
+// book.
 //
-// So the first frame is decoded on its own and put up straight away --
-// the page is a map within a moment -- and the rest are fetched in
-// parallel but decoded in order behind it. The gesture only arms once
-// they are all in, so the book is never asked for a page it does not
-// have. What the reader sees meanwhile is the first drawing and a count,
-// not a spinner.
+// The order below still matters, because it is what the screen is
+// waiting on: the frame the reader ENTERS on is fetched alone and
+// decoded first, and the rest are fetched in parallel behind it but
+// decoded one at a time. The gesture only arms once they are all in, so
+// the book is never asked for a page it does not have.
 let ready = false;
-
-function loadingLine(n) {
-  const el = document.getElementById('fb-loading');
-  if (!el) return;
-  if (n >= FRAMES) { el.remove(); return; }
-  el.textContent = n + ' / ' + FRAMES;
-}
+let resolveLoading = function () {};
 
 async function load() {
+  // Whichever way this ends -- including a page torn down mid-fetch --
+  // the loading screen is let go. Nothing else can lift it, so an early
+  // return here would leave the reader looking at black paper for good.
+  try { await loadFrames(); } finally { resolveLoading(); }
+}
+
+async function loadFrames() {
   if (!box) return;
   ready = false;
   imgs = [];
@@ -2605,13 +2604,11 @@ async function load() {
   box.appendChild(imgs[first]);
   shown = -1; at = START_SLIDE;
   show(at, true);
-  loadingLine(1);
 
   // Now the rest: all fetched at once (the network is idle again and
   // parallel is right for it), decoded one at a time (simultaneous
   // decodes of a 1080x1920 image allocate ~8 MB of surface each, and
   // the book is two dozen of them).
-  let done = 1;
   for (let i = 0; i < FRAMES; i++) if (i !== first) imgs[i].src = SRC(i);
 
   for (let i = 0; i < FRAMES; i++) {
@@ -2619,7 +2616,6 @@ async function load() {
     await decode(imgs[i]);
     if (!box || !box.isConnected) return;
     box.appendChild(imgs[i]);
-    loadingLine(++done);
   }
   ready = true;
   armCast();
@@ -3115,10 +3111,9 @@ function mount() {
   // into it. They are kept, not re-fetched: decoding two dozen
   // 1080x1920 images is the one cost worth paying only once.
   if (imgs.length && ready) {
-    const spinner = document.getElementById('fb-loading');
-    if (spinner) spinner.remove();
     imgs.forEach(i => { i.classList.remove('on'); box.appendChild(i); });
     shown = -1; at = START_SLIDE; show(at, true); armCast();
+    resolveLoading();
   } else {
     load();
   }
@@ -3572,6 +3567,13 @@ function wireMap() {
 IstRouter.registerPage('project', { mount, unmount });
 
 if (!window.__istVirtualNavInjecting) {
+  // The loading screen goes up before anything is mounted and comes down
+  // once the book is in (see the Loading section above). `force`, because
+  // index.html has already marked this browser session as entered on its
+  // way here -- and what is being waited for on THIS page is not entry,
+  // it is the app itself. A page injected by a virtual navigation has no
+  // loading screen in it and none of this runs there.
+  if (window.LoadingScreen) resolveLoading = LoadingScreen.start(() => {}, { force: true });
   mount();
   window.addEventListener('DOMContentLoaded', () => {
     if (window.IstProfileCard) IstProfileCard.mount({ sb: IstRouter.sb, I18N: window.I18N, page: 'project' });

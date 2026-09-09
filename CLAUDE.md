@@ -1908,8 +1908,21 @@ puts it on screen at **2.1s** (the page itself is ready at 1.8s, so the frame co
 rest have the rest of the wait to arrive in — all fetched at once, then decoded one at a time, because simultaneous decodes of a
 1080×1920 image allocate ~8 MB of surface each, and the book is twenty-four of them. `fetchPriority` alone does not do this: it
 reorders a queue, it does not empty one. The gesture arms only when every frame is in, so the book
-is never asked for a page it does not have; until then the reader sees the first drawing and a
-count, never a spinner.
+is never asked for a page it does not have.
+
+**And none of that wait is shown.** All of it happens behind **the loading screen** — the sea rising
+in the logo that `index.html` opens with (`loading-screen.js` / `.css`, the same overlay markup, the
+same `resolveLoading` handle), which this page starts with `{ force: true }` because `index.html`
+has already marked the browser session as entered on its way here and what is being waited for
+*here* is not entry but the app itself. `load()` calls `resolveLoading` in a `finally`, so a page
+torn down mid-fetch still lets the screen go rather than leaving the reader on black paper. The
+count that used to stand over the first drawing while the rest arrived (`.fb-loading`, "2 / 24") is
+gone with it: the app has one wait and one place it is shown, and a page reporting its own assembly
+is the app looking like it is still being built at the exact moment it should look like a book.
+The other end of the same rule is that a signed-in reader **never waits the rise out on
+`index.html`**: `checkSession` hands them straight to `project.html` the moment it knows, leaving the
+overlay up, unresolved, until the navigation takes it — otherwise it is the same animation twice
+with a page load in the middle.
 
 **The cast is the point of the rig now.** A stop carries real things — buttons, panels, the page's
 own furniture — and `CAST` in project.html is where each one is declared: an element, the stop it
