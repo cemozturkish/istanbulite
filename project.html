@@ -865,49 +865,58 @@
       border: 0;
       position: relative;
       z-index: 2;              /* over the bar's own share of the dim */
-      transform: translateY(14px);
+      transform: translateY(20px);
       transition: transform 0.14s ease, filter 0.18s ease;
       -webkit-tap-highlight-color: transparent;
     }
-    /* The artwork's own margin is cropped off, so the PLAQUE hugs the
+    /* The artwork's own margin is cropped off, so the OUTLINE hugs the
        letters. The file is 1200x400 but the ink inside it is only
        1147x266 -- 15% of the height is empty above it and 19% empty
        below -- so a box fitted to the file is a box with a dead band
-       across its top and a bigger one across its bottom, which is
-       exactly what the plaque was printing. The mask is scaled up by
-       the reciprocal of those fractions (100/0.956 across, 100/0.665
-       down) so the ink alone fills the box, and the position splits the
-       overflow the way the margins are split (left is 75% of the
-       horizontal slack, top 44% of the vertical) so it lands centred on
-       the ink rather than on the file. The box is the INK's ratio,
-       4.31:1. Re-measure all four numbers if the file is ever redrawn. */
+       across its top and a bigger one across its bottom. The mask is
+       scaled up by the reciprocal of those fractions (100/0.956 across,
+       100/0.665 down) so the ink alone fills the box, and the position
+       splits the overflow the way the margins are split (left is 75% of
+       the horizontal slack, top 44% of the vertical) so it lands
+       centred on the ink rather than on the file. Re-measure all four
+       numbers if the file is ever redrawn. */
     nav b.fb-logo-btn .fb-logo {
-      width: 172px; height: 40px;
-      position: relative;
+      width: 176px; height: 41px;
       -webkit-mask-size: 104.6% 150.4%;
               mask-size: 104.6% 150.4%;
       -webkit-mask-position: 75.4% 44%;
               mask-position: 75.4% 44%;
+      /* A THICK, SOLID ring of the bar's own colour round every letter.
+         Scaling a second copy of the mask (the earlier attempt) scaled
+         the JPEG's own noise and antialiasing right along with it and
+         came out as a soft grey smudge rather than a clean stroke.
+         `drop-shadow` reads the mask's alpha directly and offsets a flat
+         copy of it with no resampling, so each one stays exactly as
+         crisp as the letters themselves. Sixteen of them, evenly spaced
+         round a ring, at two radii (4px and 7px) so the ring reads as
+         one solid band rather than sixteen dots -- one radius alone
+         left visible gaps between the shadows at the letters' outer
+         curves. */
+      --fb-logo-edge: var(--navbar-ink, #2e2e2e);
+      filter:
+        drop-shadow(4.0px  0.0px 0 var(--fb-logo-edge)) drop-shadow(3.7px  1.5px 0 var(--fb-logo-edge))
+        drop-shadow(2.8px  2.8px 0 var(--fb-logo-edge)) drop-shadow(1.5px  3.7px 0 var(--fb-logo-edge))
+        drop-shadow(0.0px  4.0px 0 var(--fb-logo-edge)) drop-shadow(-1.5px 3.7px 0 var(--fb-logo-edge))
+        drop-shadow(-2.8px 2.8px 0 var(--fb-logo-edge)) drop-shadow(-3.7px 1.5px 0 var(--fb-logo-edge))
+        drop-shadow(-4.0px 0.0px 0 var(--fb-logo-edge)) drop-shadow(-3.7px -1.5px 0 var(--fb-logo-edge))
+        drop-shadow(-2.8px -2.8px 0 var(--fb-logo-edge)) drop-shadow(-1.5px -3.7px 0 var(--fb-logo-edge))
+        drop-shadow(0.0px  -4.0px 0 var(--fb-logo-edge)) drop-shadow(1.5px -3.7px 0 var(--fb-logo-edge))
+        drop-shadow(2.8px  -2.8px 0 var(--fb-logo-edge)) drop-shadow(3.7px -1.5px 0 var(--fb-logo-edge))
+        drop-shadow(7.0px  0.0px 0 var(--fb-logo-edge)) drop-shadow(6.5px  2.7px 0 var(--fb-logo-edge))
+        drop-shadow(4.9px  4.9px 0 var(--fb-logo-edge)) drop-shadow(2.7px  6.5px 0 var(--fb-logo-edge))
+        drop-shadow(0.0px  7.0px 0 var(--fb-logo-edge)) drop-shadow(-2.7px 6.5px 0 var(--fb-logo-edge))
+        drop-shadow(-4.9px 4.9px 0 var(--fb-logo-edge)) drop-shadow(-6.5px 2.7px 0 var(--fb-logo-edge))
+        drop-shadow(-7.0px 0.0px 0 var(--fb-logo-edge)) drop-shadow(-6.5px -2.7px 0 var(--fb-logo-edge))
+        drop-shadow(-4.9px -4.9px 0 var(--fb-logo-edge)) drop-shadow(-2.7px -6.5px 0 var(--fb-logo-edge))
+        drop-shadow(0.0px  -7.0px 0 var(--fb-logo-edge)) drop-shadow(2.7px -6.5px 0 var(--fb-logo-edge))
+        drop-shadow(4.9px  -4.9px 0 var(--fb-logo-edge)) drop-shadow(6.5px -2.7px 0 var(--fb-logo-edge));
     }
-    /* The same mark a second time, larger, behind the first and painted
-       flat in the bar's own colour -- so the edge that shows around the
-       letters is the LOGO'S OWN SHAPE rather than a rectangle drawn
-       round it. It inherits its geometry from the rule above (both
-       copies carry one mask, one size, one position, so they can only
-       ever be concentric) and differs by the scale alone. */
-    nav b.fb-logo-btn .fb-logo::before {
-      content: '';
-      position: absolute; inset: 0; z-index: -1;
-      background-color: var(--navbar-ink, #2e2e2e);
-      -webkit-mask: url('assets/loading/logo-dark-mono-01.jpg') 75.4% 44% / 104.6% 150.4% no-repeat;
-              mask: url('assets/loading/logo-dark-mono-01.jpg') 75.4% 44% / 104.6% 150.4% no-repeat;
-      -webkit-mask-source-type: luminance; mask-mode: luminance;
-      /* Not one uniform scale: the box is 4.3:1, so a single factor
-         would print an edge four times thicker at the sides than at the
-         top. Each axis grows by the same number of pixels instead. */
-      transform: scale(calc(1 + 9 / 172), calc(1 + 9 / 40));
-    }
-    nav b.fb-logo-btn:active { transform: translateY(14px) scale(0.94); }
+    nav b.fb-logo-btn:active { transform: translateY(20px) scale(0.94); }
     /* Lit while its map is open -- it is held down because it is the way
        back out, exactly as Kütüphane's Olaylar box is. */
     body.fb-map-on nav b.fb-logo-btn {
