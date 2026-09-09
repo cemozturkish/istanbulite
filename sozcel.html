@@ -864,14 +864,14 @@
        through paper, and tinting each tile separately makes it a second
        colour scheme to keep in step with the first. */
     .syl-ghost {
-      opacity: 0.32;
+      opacity: 0.44;
       z-index: 0;
       pointer-events: none;
     }
     /* An absent tile is already dimmed to 0.4 to say "this letter is not
-       in the word"; behind the ghost's own 0.32 that came to 0.13, which
-       is not there at all. The ghost is one wash over one board -- the
-       tiles inside it keep their own weights relative to each other. */
+       in the word"; behind the ghost's own opacity that nearly vanished,
+       which is not there at all. The ghost is one wash over one board --
+       the tiles inside it keep their own weights relative to each other. */
     .syl-ghost .letter-box.absent { opacity: 0.8; }
     .syl-ghost[hidden] { display: none; }
     #syl-board { z-index: 1; }
@@ -4347,7 +4347,6 @@ function initWordGrid() {
   };
 
   const ghost = buildBoard('syl-ghost', 'syl-board syl-ghost', 'gbox-');
-  ghost.hidden = true;
   stack.appendChild(ghost);
   stack.appendChild(buildBoard('syl-board', 'syl-board', 'box-'));
   grid.appendChild(stack);
@@ -4536,13 +4535,14 @@ function renderGhostBoard(back) {
   const at = submittedGuesses.length - 1 - (back || 0);
   const word = submittedGuesses[at];
   const result = guessResults[at];
-  if (!word || !result) { ghost.hidden = true; return; }
-  ghost.hidden = false;
+  // The empty comb stands even before a first guess -- an empty ghost is
+  // the promise that the board's shape won't jump the moment one lands,
+  // not a lie about there being a guess already on the table.
   for (let i = 0; i < WORD_LENGTH; i++) {
     const box = document.getElementById(`gbox-${i}`);
     if (!box) continue;
-    box.textContent = word[i] || '';
-    box.className = `letter-box filled ${result[i] || ''}`;
+    box.textContent = (word && word[i]) || '';
+    box.className = (word && result) ? `letter-box filled ${result[i] || ''}` : 'letter-box';
   }
 }
 
