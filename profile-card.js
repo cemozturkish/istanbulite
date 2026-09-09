@@ -133,11 +133,16 @@
   // from one continuous number, so the name on the bar is painted from
   // it too rather than being told about the result afterwards.
   //
-  // `t` is where the reader is standing, as a signed lane: -1 on
-  // Kütüphane, 0 on Hane, +1 on Kahvehane. At 0 the block stands in the
-  // middle of the bar exactly as it does today; at either end it is
-  // ranged against that edge of its own box, and every position between
-  // is the linear middle. Nothing here eases: the drag IS the gesture,
+  // `t` is which edge the reader's own name is walking toward: -1 the
+  // left, +1 the right, 0 the middle. The lane it is written from is the
+  // page's own business (project.html reads it backwards, so Kütüphane
+  // ranges you right and Kahvehane left — the same turning-around the
+  // three carousel pages' BAR_LAYOUT above already spells out). At 0 the
+  // block stands in the middle of the bar exactly as it does today; at
+  // either end it is ranged against that edge of its own box, and every
+  // position between is the linear middle.
+  //
+  // Nothing here eases: the drag IS the gesture,
   // and the settle is already the release tween's own ease-out (runLane
   // in project.html), so a transition on top of it would be a second
   // curve fighting the first.
