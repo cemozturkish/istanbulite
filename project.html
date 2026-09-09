@@ -210,13 +210,20 @@
     }
     /* The category flag: a thin red bar down the inside of the left
        edge, on every filled box -- an empty/dashed slot has no category
-       to flag, so it stays plain. */
+       to flag, so it stays plain. It paints ABOVE the box's own
+       background (a pseudo-element is stacked over its parent's
+       background/box-shadow layer), so the press band -- drawn as the
+       box's own inset shadow -- passes invisibly *behind* it: the flag
+       would otherwise stay lit at full strength while the paper around
+       it goes into shadow, which reads as the press not touching this
+       one stripe. So the flag darkens with the box (see .fb-pressing). */
     .fb-box:not(.fb-empty)::before {
       content: '';
       position: absolute;
       top: 0; left: 0; bottom: 0;
       width: 4px;
       background: var(--ink-red, #B93631);
+      transition: background 0.1s ease-out;
     }
     .fb-box.fb-mirror:not(.fb-empty)::before { left: auto; right: 0; }
     /* Only a box that answers a press says so under a cursor -- one class,
@@ -254,6 +261,17 @@
       /* Grey, deliberately never black -- the box's own paper going into
          shadow, not a hole opening in it. */
       box-shadow: inset 0 4px 0 0 rgba(60, 60, 60, 0.4);
+    }
+    /* The flag darkens with it, whole stripe rather than only the top
+       4px it visually crosses: it sits in front of the band (see the
+       ::before comment above), so a partial darken would have to be
+       clipped to match the band's own growing height exactly, and a
+       flag that is bright red for its lower length while the paper
+       beside it has gone grey reads as two objects rather than one
+       block sinking. One dark red, mixed rather than hand-picked so it
+       tracks --ink-red if the palette ever changes it. */
+    .fb-actor.fb-pressing:not(.fb-empty)::before {
+      background: color-mix(in srgb, var(--ink-red, #B93631) 55%, black);
     }
     /* The foot lost 3px (5px -> 2px); the face -- everything printed in
        the box -- drops by exactly that much, so the whole card reads as
