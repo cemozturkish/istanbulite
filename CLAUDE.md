@@ -1966,16 +1966,17 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   one class, and the browser interpolates all three. `wireActorPress` is only the gate that
   decides when the class is true, driven by **pointer events, never `:active`** — which sticks
   after a tap on iOS and would leave a box looking permanently sunk.
-  **The red category flag darkens with the press too** (`::before`, `rgb(185,54,49)` at rest →
-  `rgb(102,30,27)` pressed, measured). It has to be told separately: a pseudo-element paints
-  *above* its parent's own background layer, which is where an inset `box-shadow` lives — so the
-  grey band would otherwise pass invisibly behind the flag, leaving it lit at full strength while
-  the paper around it visibly goes into shadow, which read as the press not touching that one
-  stripe. The whole stripe darkens, not just the 4px the band visually crosses — partial darkening
-  would have to be clipped to the band's own growing height exactly, and a flag bright for its
-  lower length while the paper beside it has gone grey is two objects, not one block sinking. The
-  colour is `color-mix(in srgb, var(--ink-red) 55%, black)` rather than a hand-picked dark red, so
-  it keeps tracking `--ink-red` if the palette ever changes it.
+  **The red category flag gets a dark cap over its own top, exactly as tall as the press band
+  beside it** (`::after`, 0 → 4px on the same 0.1s transition; `color-mix(in srgb, var(--ink-red)
+  55%, black)`, so it keeps tracking `--ink-red` if the palette ever changes it). The flag
+  (`::before`) is a pseudo-element and paints *above* its parent's own background layer, which is
+  where the band — an inset `box-shadow` — lives, so the band would otherwise pass invisibly
+  behind the flag: the paper around it visibly goes into shadow while the stripe over it stays lit
+  at full strength for its whole length. A second pseudo-element, painted after the first
+  (`::after` follows `::before` in generated-content order) and keyed to the same 0 → 4px offset
+  the band itself animates, so the two grow in lockstep — only the flag's own top few pixels sink
+  with the paper around them, the rest of the stripe stays its ordinary red, which is what the
+  band itself does to the paper below it.
 - **`fb-openable` says exactly one thing: this box answers a press**, and the cursor and the press
   effect are both hung off that one class. `fbSetPage` sets it for a box with a page; Oyunlar sets
   it for a game whose turn has come (its press opens a game rather than a page, which is a
