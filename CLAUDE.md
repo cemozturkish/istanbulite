@@ -1933,21 +1933,23 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   a card and should not borrow its weight. The page a box grows into (`.fb-page`) carries the same
   5px foot on its own bottom edge, since it is the same card standing at full size rather than a
   second object.
-- **Every box that answers a press gives under it, and it is the site's one press**
-  (`pressScale`, `wireActorPress`). The card gives to 0.955 under the finger and springs back past
-  its own size to 1.022 before settling over 0.34s — the same three numbers Kütüphane's `.article`
-  and the petek's hexagons already use, so a press means one thing everywhere. Where the release
-  opens something, that overshoot is the first frame of the box growing into its page: the press
-  and the page are one continuous move rather than two. Two mechanical notes, and the first is
-  forced rather than chosen: the scale **cannot** be a stylesheet rule here, because `paintCast()`
-  writes an inline transform to every actor on every frame and would overwrite it before it was
-  ever painted — which is why the `transform-origin` rules sat in project.html for as long as they
-  did with no give to orient. So the press is a number the tick multiplies into that same
-  transform, which is also the truer shape for this page: it composes with whatever pose the book
-  has the box in instead of fighting it for one property. And it is driven by **pointer events,
-  never `:active`** — which sticks after a tap on iOS, and is dropped on pointerup half way
-  through the pop, so the spring would come off the box's centre while the give came off its
-  docked corner.
+- **The press honours the chunky foot it just grew, rather than borrowing the flat card's
+  uniform scale** (`.fb-pressing`, `wireActorPress`). Pressing a box sinks it into its own base:
+  the foot thins from 5px to 2px (the same drop every other filled box on the site keeps at rest),
+  a grey — deliberately never black — shadow grows under the top edge as the face recedes from
+  the frame's lip, and the printed content (`.k`/`.m`/`.t`) rides down by exactly the foot's own
+  loss, 3px, so the whole card reads as one block sinking rather than as text sliding inside a
+  static frame. Releasing reverses all three. This is the one press on the site that is *not*
+  Kütüphane's `.article`/the petek's hexagon scale (0.955 → 1.022) — because this is the one
+  object with actual dimensional geometry to honour (the chunky foot), a uniform scale would have
+  flattened the very thing that makes it 3D.
+  Mechanically simpler than that scale press for the same reason it diverges from it: none of the
+  three properties — `border-bottom-width`, `box-shadow`, a child's own `transform` — is the
+  property `paintCast()` writes to the actor's own `transform` every frame, so nothing here
+  fights the tick and nothing needs a number computed on it. Three plain CSS transitions keyed to
+  one class, and the browser interpolates all three. `wireActorPress` is only the gate that
+  decides when the class is true, driven by **pointer events, never `:active`** — which sticks
+  after a tap on iOS and would leave a box looking permanently sunk.
 - **`fb-openable` says exactly one thing: this box answers a press**, and the cursor and the press
   effect are both hung off that one class. `fbSetPage` sets it for a box with a page; Oyunlar sets
   it for a game whose turn has come (its press opens a game rather than a page, which is a
