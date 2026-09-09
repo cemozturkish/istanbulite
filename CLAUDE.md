@@ -550,6 +550,49 @@ sb.from('articles').delete().eq('id', id)
 
 ### `admin.html` — Admin Dashboard
 - Login restricted to ADMIN_EMAIL
+- **THE DESK — three columns, and they never change.** The sections stack down the far
+  **left** as a rail, grouped by which of the app's places they change (Kütüphane · Kahvehane ·
+  Kişiler · Hane); the **work area** is in the middle; and a **phone** stands on the right with
+  the live site in it. The rail used to be a bar across the top that scrolled sideways —
+  fourteen tabs never fit — so the section you wanted was usually off the edge of a bar you had
+  to remember was scrollable. Stacked, they are all readable at once, and the width they cost is
+  width the two-panel body never used. All of it is stated once in the page's own `<style>`
+  ("THE DESK"); nothing here is shared with the site's stylesheets.
+- **A section is its LIST, and pressing a row opens the thing you pressed.** The editor used to
+  be a permanent left-hand column that was a blank form nearly all the time — half a screen
+  making room for writing nobody was doing. It is a **drawer** now (`.md-editor`), off-screen
+  until a row is pressed or "+ Yeni" is, and the list reads the way the site reads: the red
+  kicker, the headline, the line under it. The button that said "Düzenle" is gone from every row
+  whose press now does exactly that; the row's *other* actions (Arşivle, Sil) are not what the
+  press does and stay, quiet until the row is under the pointer.
+- **The drawer MOVES the form's own nodes; it never rebuilds them.** `deskBuildDrawer` takes the
+  editor panel apart into head / body / foot and puts the panel's existing children back into
+  the middle — so every id, every listener and every `document.getElementById` in the rest of the
+  file still finds exactly the field it always found. The head carries the form's **own**
+  `.panel-title` node (the one that says "Add New Event" or "Editing Event", which the page
+  writes to), and the foot carries its **own** action row, standing on the floor where it cannot
+  scroll away from the thing it commits. `DESK_MD` at the bottom of the script is the whole
+  configuration: which row actions open it, which button means "blank", where the action row is.
+- **Nothing knows what any form saves.** A save says so by turning its own status line green
+  (`.status-msg.ok`) — the one signal every one of these forms already gave — so that is what
+  closes the drawer and prints the toast. Adding a section means adding a line to `DESK_MD`.
+- **Writing a thing should not be a scroll**, which is the point of the whole rearrangement. The
+  fields are grouped (`deskWrapFields` — a label and everything under it up to the next one,
+  stopping at anything carrying a label of its own) and laid two across; the long explanations
+  each form carries fold into one line (`deskFoldHints`); and the fields that are real but are
+  not what you came to write — the id, where an olay's paper hangs, which seri — fold under
+  **Gelişmiş** (`deskFoldAdvanced`). Nine of the ten editors now open with nothing to scroll at
+  all; Olaylar, which carries a map picker and a 28-country checklist, went from ~810px of
+  overflow to ~80.
+  - One trap: at the moment those three run, the drawer's body is **detached**, so they must ask
+    `inner.querySelector('#id')` — `document.getElementById` returns null there and the fold
+    silently does nothing.
+- **The phone is the live site, not a picture** (`#prev-frame`): the same origin and therefore
+  the same session, drawn at 390×844 and scaled to whatever room the column has, so the page
+  inside lays out at the width a real phone reports rather than at the width of a narrow panel.
+  Picking a section aims it at the page that section changes — until the admin picks a page by
+  hand, at which point the rail stops steering it. It is a whole second copy of the app, so it is
+  not loaded until it is actually being looked at, and it is the first thing a narrow desk loses.
 - Full CRUD for articles: select neighborhood, enter title/summary/URL
 - Account management: create and assign user accounts to neighborhoods
 - Filter articles by neighborhood
