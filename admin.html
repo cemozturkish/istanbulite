@@ -487,6 +487,15 @@
     .btn-del { background: var(--ink-red); color: var(--paper); }
     .btn-del:hover { background: var(--brown-4); }
 
+    /* ── The blocks under a card are FOLDED ──
+       A card is a headline. Gelişmeler, Anketler, Kaynaklar, Bölümler and
+       Zaman Akışı are each a whole editor, and five of them open at once
+       turned a list of twenty stories into a page nobody could scan — the
+       one thing a list is for. They are <details> now: shut, a card is its
+       own two lines and the count of what is behind each fold. Which folds
+       are open is remembered across a re-render (see OPEN_BLOCKS) because
+       the list reloads after every single add, and a fold that slammed
+       shut on each one would be worse than no fold at all. */
     .sources-block {
       margin-top: 10px;
       padding-top: 10px;
@@ -498,7 +507,45 @@
       text-transform: uppercase;
       color: var(--muted);
       margin-bottom: 6px;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
+    .sources-label::-webkit-details-marker { display: none; }
+    /* The arrow is the whole affordance, so it is drawn rather than left
+       to whatever the platform's own marker happens to be. */
+    .sources-label::before {
+      content: '▸';
+      display: inline-block;
+      font-size: 0.62rem;
+      line-height: 1;
+      transition: transform 0.15s;
+      color: var(--ink-red);
+    }
+    .sources-block[open] > .sources-label::before { transform: rotate(90deg); }
+    .sources-block[open] > .sources-label { color: var(--ink); }
+    .sources-label:hover { color: var(--ink); }
+    /* The re-filing panel: a target and the two buttons, shut until asked
+       for. Same shape whether it is a whole story being folded in or one
+       entry of a timeline being moved. */
+    .move-form {
+      display: none;
+      grid-template-columns: 1fr auto auto;
+      gap: 6px;
+      align-items: center;
+      margin: 8px 0;
+      padding: 8px 10px;
+      border: 1px dashed var(--ink-red);
+      background: var(--paper);
+    }
+    .move-form.open { display: grid; }
+    .move-form .btn { padding: 6px 12px; font-size: 0.75rem; }
+    .move-form .move-status { grid-column: 1 / -1; margin-top: 0; text-align: left; }
+    .move-form .move-status:empty { display: none; }
+
     .src-row {
       display: flex;
       align-items: center;
@@ -2820,6 +2867,27 @@ function capitalizeName(s) {
   return s.trim().split(/\s+/).map(w => w ? w.charAt(0).toLocaleUpperCase('tr-TR') + w.slice(1).toLocaleLowerCase('tr-TR') : '').join(' ');
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// WHICH FOLDS ARE OPEN
+//
+// Every list on this page rebuilds its own innerHTML after each add — a
+// gelişme, a source, a poll, a chapter — so a <details> the admin had just
+// opened to type into would be shut again by the very save that proves it
+// worked. What is remembered is the fold's key, not its element, because
+// the element is gone by the time the answer lands.
+//
+// `toggle` does not bubble, hence the capture-phase listener: it is one
+// handler for every fold on the page rather than one per card.
+// ══════════════════════════════════════════════════════════════════════
+const OPEN_BLOCKS = new Set();
+function blockOpenAttr(key) { return OPEN_BLOCKS.has(key) ? ' open' : ''; }
+document.addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!d || !d.dataset || !d.dataset.blockKey) return;
+  if (d.open) OPEN_BLOCKS.add(d.dataset.blockKey);
+  else OPEN_BLOCKS.delete(d.dataset.blockKey);
+}, true);
+
 // ── Tab switching ──
 document.querySelectorAll('.admin-tab').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -3778,8 +3846,10 @@ function renderNewsList() {
           ${u.title_en ? `<span class="upd-body-text">EN · ${escapeHtml(u.title_en)}</span>` : ''}
         </div>
         <button class="btn-edit" data-act="edit-update" data-id="${u.id}">Düzenle</button>
+        <button class="btn-edit" data-act="move-update" data-id="${u.id}">Taşı</button>
         <button class="btn-del" data-act="del-update" data-id="${u.id}">×</button>
       </div>
+      ${moveFormHTML('move-upd', u.id, 'Kendi haberi olsun')}
       <div class="upd-edit-form" data-upd-edit-id="${u.id}">
         <input type="text" class="ue-title" value="${escapeHtml(u.title)}"/>
         <textarea class="ue-body" rows="2">${escapeHtml(u.body || '')}</textarea>
@@ -3837,8 +3907,8 @@ function renderNewsList() {
           ? `<h4 style="color:var(--muted);">EN · ${escapeHtml(n.title_en)}</h4>
              ${n.body_en ? `<p style="color:var(--muted);">${escapeHtml(n.body_en)}</p>` : ''}`
           : `<div style="font-size:0.7rem;color:var(--muted);font-style:italic;">EN yok</div>`}
-        <div class="sources-block">
-          <div class="sources-label">Gelişmeler (${updates.length})</div>
+        <details class="sources-block" data-block-key="news:${n.id}:upd"${blockOpenAttr(`news:${n.id}:upd`)}>
+          <summary class="sources-label">Gelişmeler (${updates.length})</summary>
           ${updatesHtml}
           <div class="upd-form">
             <input type="text" class="upd-title" placeholder="Yeni başlık (haberin güncel hali)"/>
@@ -3849,9 +3919,9 @@ function renderNewsList() {
             <button class="btn btn-secondary" data-act="add-update" data-news-id="${n.id}">+ Gelişme Ekle</button>
             <div class="upd-status status-msg"></div>
           </div>
-        </div>
-        <div class="sources-block">
-          <div class="sources-label">Anketler (${polls.length})</div>
+        </details>
+        <details class="sources-block" data-block-key="news:${n.id}:poll"${blockOpenAttr(`news:${n.id}:poll`)}>
+          <summary class="sources-label">Anketler (${polls.length})</summary>
           ${pollsHtml}
           <div class="src-form">
             <input type="text" class="poll-question" placeholder="Soru"/>
@@ -3860,9 +3930,9 @@ function renderNewsList() {
             <button class="btn btn-secondary" data-act="add-poll" data-news-id="${n.id}">+ Anket Ekle</button>
             <div class="poll-status status-msg"></div>
           </div>
-        </div>
-        <div class="sources-block">
-          <div class="sources-label">Kaynaklar (${sources.length})</div>
+        </details>
+        <details class="sources-block" data-block-key="news:${n.id}:src"${blockOpenAttr(`news:${n.id}:src`)}>
+          <summary class="sources-label">Kaynaklar (${sources.length})</summary>
           ${sourcesHtml}
           <div class="src-form">
             <input type="text" class="src-name" placeholder="Kaynak adı (ör. Cumhuriyet)"/>
@@ -3871,14 +3941,16 @@ function renderNewsList() {
             <button class="btn btn-secondary" data-act="add-src" data-news-id="${n.id}">+ Kaynak Ekle</button>
             <div class="src-status status-msg"></div>
           </div>
-        </div>
+        </details>
         <div class="card-actions">
           <button class="btn-edit" data-act="edit-news" data-id="${n.id}">Düzenle</button>
+          <button class="btn-edit" data-act="move-news" data-id="${n.id}">Akışa Taşı</button>
           ${n.archived_at
             ? `<button class="btn-edit" data-act="unarchive-news" data-id="${n.id}">Arşivden Çıkar</button>`
             : `<button class="btn-edit" data-act="archive-news" data-id="${n.id}">Arşivle</button>`}
           <button class="btn-del" data-act="del-news" data-id="${n.id}">Sil</button>
         </div>
+        ${moveFormHTML('move-news', n.id, '')}
         <div class="news-edit-form" data-id="${n.id}">
           <input type="text" class="ne-title" value="${escapeHtml(n.title)}"/>
           <textarea class="ne-body" rows="3">${escapeHtml(n.body || '')}</textarea>
@@ -3978,7 +4050,65 @@ document.getElementById('news-list').addEventListener('click', function(e) {
   else if (act === 'save-update-edit') saveNewsUpdateEdit(btn);
   else if (act === 'add-poll') addPoll(btn);
   else if (act === 'del-poll') deletePoll(btn.dataset.id);
+  // Re-filing: a story into another story's Zaman Akışı, or one entry of a
+  // timeline into a different one (or back out into a story of its own).
+  else if (act === 'move-news') openMovePanel(card, '.move-form[data-move-news]', btn.dataset.id);
+  else if (act === 'cancel-move-news') closeMovePanel(card, '.move-form[data-move-news]');
+  else if (act === 'do-move-news') doMoveNews(btn, card);
+  else if (act === 'move-update') openMovePanel(card, `.move-form[data-move-upd="${btn.dataset.id}"]`, card.dataset.id);
+  else if (act === 'cancel-move-upd') closeMovePanel(card, `.move-form[data-move-upd="${btn.dataset.id}"]`);
+  else if (act === 'do-move-upd') doMoveUpdate(btn, card);
 });
+
+// The picker is filled on opening, never with the card — see ensureMovePicker.
+function openMovePanel(card, selector, excludeId) {
+  const form = card.querySelector(selector);
+  if (!form) return;
+  ensureMovePicker(form.querySelector('.move-target'), excludeId);
+  form.classList.toggle('open');
+}
+
+function closeMovePanel(card, selector) {
+  const form = card.querySelector(selector);
+  if (form) form.classList.remove('open');
+}
+
+async function doMoveNews(btn, card) {
+  const form = card.querySelector('.move-form[data-move-news]');
+  const targetId = form.querySelector('.move-target').value;
+  const statusEl = form.querySelector('.move-status');
+  if (!targetId) {
+    statusEl.textContent = 'Taşınacak haberi seçin.';
+    statusEl.className = 'move-status status-msg err';
+    return;
+  }
+  const tgt = allAdminNews.find(n => n.id === targetId);
+  // Folding a story in ends it as a story, so it is said out loud before
+  // rather than regretted after.
+  if (!confirm(`Bu haber "${tgt ? tgt.title : ''}" haberinin zaman akışına taşınsın mı?\n\n`
+    + 'Kendi gelişmeleri, kaynakları, anketleri ve ülkeleri de oraya geçer, '
+    + 've ayrı bir haber olmaktan çıkar.')) return;
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  const ok = await moveNewsIntoTimeline(btn.dataset.id, targetId, statusEl);
+  btn.disabled = false;
+  btn.textContent = orig;
+  if (ok) setTimeout(() => loadBreakingNews(), 400);
+}
+
+async function doMoveUpdate(btn, card) {
+  const form = card.querySelector(`.move-form[data-move-upd="${btn.dataset.id}"]`);
+  const targetId = form.querySelector('.move-target').value;
+  const statusEl = form.querySelector('.move-status');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  const ok = await moveNewsUpdate(btn.dataset.id, card.dataset.id, targetId || null, statusEl);
+  btn.disabled = false;
+  btn.textContent = orig;
+  if (ok) setTimeout(() => loadBreakingNews(), 400);
+}
 
 function showUpdateEditForm(id) {
   const form = document.querySelector(`.upd-edit-form[data-upd-edit-id="${id}"]`);
@@ -4262,37 +4392,16 @@ async function addNewsUpdate(btn) {
 
   // First update on this story: snapshot its current headline into the
   // timeline (at its original created_at) before overwriting it, so the
-  // original post isn't lost.
-  const { data: existing, error: existingErr } = await sb.from('breaking_news_updates')
-    .select('created_at').eq('news_id', newsId).order('created_at', { ascending: false }).limit(1);
-  if (existingErr) {
+  // original post isn't lost. Shared with the move below, which needs the
+  // same guarantee about the story it is folding another one into.
+  const seed = await seedNewsTimeline(newsId);
+  if (seed.error) {
     btn.disabled = false; btn.textContent = origText;
-    statusEl.textContent = existingErr.message;
+    statusEl.textContent = seed.error.message;
     statusEl.className = 'upd-status status-msg err';
     return;
   }
-  let latestExistingAt = existing.length ? existing[0].created_at : null;
-  if (!existing.length) {
-    const { data: current, error: curErr } = await sb.from('breaking_news')
-      .select('title, body, title_en, body_en, created_at').eq('id', newsId).single();
-    if (curErr) {
-      btn.disabled = false; btn.textContent = origText;
-      statusEl.textContent = curErr.message;
-      statusEl.className = 'upd-status status-msg err';
-      return;
-    }
-    const { error: seedErr } = await sb.from('breaking_news_updates').insert([{
-      news_id: newsId, title: current.title, body: current.body,
-      title_en: current.title_en, body_en: current.body_en, created_at: current.created_at,
-    }]);
-    if (seedErr) {
-      btn.disabled = false; btn.textContent = origText;
-      statusEl.textContent = seedErr.message;
-      statusEl.className = 'upd-status status-msg err';
-      return;
-    }
-    latestExistingAt = current.created_at;
-  }
+  const latestExistingAt = seed.latestAt;
 
   const { error } = await sb.from('breaking_news_updates')
     .insert([{ news_id: newsId, title, body: body || null,
@@ -4329,6 +4438,218 @@ async function addNewsUpdate(btn) {
   btn.textContent = '✓ Eklendi';
   statusEl.textContent = '';
   setTimeout(() => loadBreakingNews(), 500);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// A STORY CAN BE MOVED INTO ANOTHER STORY'S ZAMAN AKIŞI
+//
+// The connection between two stories is usually noticed AFTER both have
+// been posted — that is what news is. So neither the feed nor a timeline
+// may be a place a story is stuck in: any story can be folded into any
+// other story's Zaman Akışı, any entry in a timeline can be moved to a
+// different one, and any entry can be lifted back out into a story of its
+// own. Every one of those is reversible by doing the opposite, which is
+// the whole point.
+//
+// It needs NO migration: `news_id` is an ordinary column on
+// breaking_news_updates / _sources / _polls and the admin already holds
+// UPDATE on all three (db/breaking_news_updates.sql and friends). Moving
+// is re-pointing a foreign key, not copying rows about.
+// ══════════════════════════════════════════════════════════════════════
+
+// The first entry of a story's Zaman Akışı has to be that story's OWN
+// original post, or the headline it started as is lost the moment it grows
+// a second one. Adding a gelişme and folding another story in both need
+// that guarantee, so it is stated once rather than twice.
+// Returns { seeded, latestAt } or { error }.
+async function seedNewsTimeline(newsId) {
+  const { data: existing, error } = await sb.from('breaking_news_updates')
+    .select('created_at').eq('news_id', newsId)
+    .order('created_at', { ascending: false }).limit(1);
+  if (error) return { error };
+  if (existing.length) return { seeded: false, latestAt: existing[0].created_at };
+
+  const { data: current, error: curErr } = await sb.from('breaking_news')
+    .select('title, body, title_en, body_en, created_at').eq('id', newsId).single();
+  if (curErr) return { error: curErr };
+  const { error: seedErr } = await sb.from('breaking_news_updates').insert([{
+    news_id: newsId, title: current.title, body: current.body,
+    title_en: current.title_en, body_en: current.body_en, created_at: current.created_at,
+  }]);
+  if (seedErr) return { error: seedErr };
+  return { seeded: true, latestAt: current.created_at };
+}
+
+// A story's displayed headline is its LATEST timeline entry (addNewsUpdate's
+// own rule). So anything that changes what is in a timeline has to re-derive
+// it, or a story goes on showing a headline that now lives somewhere else.
+//
+// `updated_at` is deliberately NOT bumped here: that column is what puts a
+// story back on top of every reader's deck, and re-filing is a correction to
+// the record rather than a development in the story. The one caller that
+// genuinely is a development bumps it itself.
+// Returns the head it applied, or null when the story has no timeline left.
+async function resyncNewsHead(newsId) {
+  const { data, error } = await sb.from('breaking_news_updates')
+    .select('title, body, title_en, body_en, created_at')
+    .eq('news_id', newsId).order('created_at', { ascending: false }).limit(1);
+  if (error || !data || !data.length) return null;
+  const u = data[0];
+  await sb.from('breaking_news').update({
+    title: u.title, body: u.body || null,
+    title_en: u.title_en || null, body_en: u.body_en || null,
+  }).eq('id', newsId);
+  return u;
+}
+
+// Fold one story into another's Zaman Akışı. The story stops being a story:
+// what was hanging off it — its own timeline, its sources, its polls and the
+// countries it named — follows it across rather than being deleted with it.
+async function moveNewsIntoTimeline(sourceId, targetId, statusEl) {
+  const say = (msg, cls) => {
+    if (!statusEl) return;
+    statusEl.textContent = msg;
+    statusEl.className = 'move-status status-msg' + (cls ? ' ' + cls : '');
+  };
+  const src = allAdminNews.find(n => n.id === sourceId);
+  const tgt = allAdminNews.find(n => n.id === targetId);
+  if (!src || !tgt) { say('Haber bulunamadı.', 'err'); return false; }
+
+  // The target keeps its own first headline in its own timeline.
+  const seed = await seedNewsTimeline(targetId);
+  if (seed.error) { say(seed.error.message, 'err'); return false; }
+
+  // A story that already has a timeline carries its whole history across
+  // and needs no entry of its own — its current headline IS its latest
+  // entry. One that has none becomes a single entry at its own date.
+  const srcUpdates = src.breaking_news_updates || [];
+  if (!srcUpdates.length) {
+    const { error } = await sb.from('breaking_news_updates').insert([{
+      news_id: targetId, title: src.title, body: src.body || null,
+      title_en: src.title_en || null, body_en: src.body_en || null,
+      created_at: src.created_at,
+    }]);
+    if (error) { say(error.message, 'err'); return false; }
+  } else {
+    const { error } = await sb.from('breaking_news_updates')
+      .update({ news_id: targetId }).eq('news_id', sourceId);
+    if (error) { say(error.message, 'err'); return false; }
+  }
+
+  // Everything else the story was carrying goes with it.
+  const { error: srcErr } = await sb.from('breaking_news_sources')
+    .update({ news_id: targetId }).eq('news_id', sourceId);
+  if (srcErr) { say(srcErr.message, 'err'); return false; }
+  const { error: pollErr } = await sb.from('breaking_news_polls')
+    .update({ news_id: targetId }).eq('news_id', sourceId);
+  if (pollErr) { say(pollErr.message, 'err'); return false; }
+
+  // Countries have no UPDATE policy (they are a tick list, not a record —
+  // db/breaking_news_countries.sql), so the ones the target does not
+  // already name are inserted. The target's own ticks are never touched.
+  const srcCountries = (src.breaking_news_countries || []).map(c => c.country);
+  const tgtCountries = new Set((tgt.breaking_news_countries || []).map(c => c.country));
+  const missing = srcCountries.filter(c => !tgtCountries.has(c));
+  if (missing.length) {
+    await sb.from('breaking_news_countries')
+      .insert(missing.map(country => ({ news_id: targetId, country })));
+  }
+
+  // Now the source is empty of everything that mattered, so deleting it
+  // takes nothing with it.
+  const { error: delErr } = await sb.from('breaking_news').delete().eq('id', sourceId);
+  if (delErr) { say(delErr.message, 'err'); return false; }
+
+  // The target's headline is its latest entry again — and if that is now a
+  // newer headline than the one it was showing, the story genuinely moved
+  // and belongs back on top of the reader's deck.
+  const head = await resyncNewsHead(targetId);
+  if (head && head.title !== tgt.title) {
+    await sb.from('breaking_news').update({ updated_at: new Date().toISOString() }).eq('id', targetId);
+  }
+  say('Taşındı.', 'ok');
+  return true;
+}
+
+// Move one timeline entry to a different story — or, with no target, lift it
+// back out as a story of its own. The two are one function because they are
+// one gesture in the portal: a picker whose first option is "its own story".
+async function moveNewsUpdate(updateId, fromNewsId, targetId, statusEl) {
+  const say = (msg, cls) => {
+    if (!statusEl) return;
+    statusEl.textContent = msg;
+    statusEl.className = 'move-status status-msg' + (cls ? ' ' + cls : '');
+  };
+  const from = allAdminNews.find(n => n.id === fromNewsId);
+  const entry = (from && (from.breaking_news_updates || []).find(u => u.id === updateId)) || null;
+  if (!entry) { say('Gelişme bulunamadı.', 'err'); return false; }
+
+  if (targetId) {
+    // The receiving story keeps its own first headline, exactly as it does
+    // when a whole story is folded in.
+    const seed = await seedNewsTimeline(targetId);
+    if (seed.error) { say(seed.error.message, 'err'); return false; }
+    const { error } = await sb.from('breaking_news_updates')
+      .update({ news_id: targetId }).eq('id', updateId);
+    if (error) { say(error.message, 'err'); return false; }
+    const tgt = allAdminNews.find(n => n.id === targetId);
+    const head = await resyncNewsHead(targetId);
+    if (tgt && head && head.title !== tgt.title) {
+      await sb.from('breaking_news').update({ updated_at: new Date().toISOString() }).eq('id', targetId);
+    }
+  } else {
+    // Out into a story of its own, standing where it stood in time and
+    // filed the way the story it came out of was filed.
+    const { data: made, error } = await sb.from('breaking_news').insert([{
+      title: entry.title, body: entry.body || null,
+      title_en: entry.title_en || null, body_en: entry.body_en || null,
+      neighborhood: from.neighborhood || null,
+      category: from.category || 'turkiye',
+      series_id: from.series_id || null,
+      created_at: entry.created_at, updated_at: entry.created_at,
+    }]).select().single();
+    if (error) { say(error.message, 'err'); return false; }
+    const srcCountries = (from.breaking_news_countries || []).map(c => c.country);
+    if (srcCountries.length) {
+      await sb.from('breaking_news_countries')
+        .insert(srcCountries.map(country => ({ news_id: made.id, country })));
+    }
+    const { error: delErr } = await sb.from('breaking_news_updates').delete().eq('id', updateId);
+    if (delErr) { say(delErr.message, 'err'); return false; }
+  }
+
+  // Whatever it left behind may have been that story's own headline.
+  await resyncNewsHead(fromNewsId);
+  say('Taşındı.', 'ok');
+  return true;
+}
+
+// The picker is filled when it is opened, never with the card — "Tümü"
+// renders up to 300 stories, and a select of all of them inside each of
+// them is 90,000 options nobody asked to see. Same rule as
+// ensureCardCountryPicker above.
+function ensureMovePicker(sel, excludeId) {
+  if (!sel || sel.dataset.filled) return;
+  sel.dataset.filled = '1';
+  const head = sel.dataset.selfOption
+    ? `<option value="">— ${escapeHtml(sel.dataset.selfOption)} —</option>` : '';
+  sel.innerHTML = head + allAdminNews
+    .filter(n => n.id !== excludeId)
+    .map(n => {
+      const cat = categoryLabel(n.category || n.neighborhood || 'turkiye');
+      return `<option value="${escapeHtml(n.id)}">${escapeHtml(cat + ' · ' + n.title)}</option>`;
+    }).join('');
+}
+
+// One panel markup for both directions: a target, and the two buttons.
+function moveFormHTML(attr, id, selfOption) {
+  return `
+    <div class="move-form" data-${attr}="${escapeHtml(id)}">
+      <select class="move-target"${selfOption ? ` data-self-option="${escapeHtml(selfOption)}"` : ''}></select>
+      <button class="btn btn-primary" data-act="${attr === 'move-news' ? 'do-move-news' : 'do-move-upd'}" data-id="${escapeHtml(id)}">Taşı</button>
+      <button class="btn btn-secondary" data-act="${attr === 'move-news' ? 'cancel-move-news' : 'cancel-move-upd'}" data-id="${escapeHtml(id)}">İptal</button>
+      <div class="move-status status-msg"></div>
+    </div>`;
 }
 
 async function deleteNewsUpdate(id) {
@@ -4971,8 +5292,8 @@ async function loadCountryEntriesList() {
         countryStoryOf(en.country) ? ' · ' + escapeHtml(countryStoryOf(en.country).name) : ''
       }${en.entry_date ? ' · ' + escapeHtml(en.entry_date) : ''}</div>
       <h4>${escapeHtml(en.title)}</h4>
-      <div class="sources-block">
-        <div class="sources-label">Zaman Akışı (${events.length})</div>
+      <details class="sources-block" data-block-key="ce:${en.id}"${blockOpenAttr(`ce:${en.id}`)}>
+        <summary class="sources-label">Zaman Akışı (${events.length})</summary>
         ${eventsHtml}
         <div class="ce-ev-form upd-form">
           <input type="date" class="upd-date cee-new-date" title="Tarih"/>
@@ -4981,7 +5302,7 @@ async function loadCountryEntriesList() {
           <button class="btn btn-secondary" data-act="ce-ev-add" data-entry-id="${en.id}">+ An Ekle</button>
           <div class="upd-status status-msg"></div>
         </div>
-      </div>
+      </details>
       <div class="card-actions">
         <button class="btn-edit" data-act="ce-edit" data-id="${en.id}">Edit</button>
         <button class="btn-del"  data-act="ce-del"  data-id="${en.id}">Delete</button>
@@ -5275,14 +5596,17 @@ async function loadWorldEventsList() {
       }</div>
       <h4>${escapeHtml(ev.name_tr)}</h4>
       ${ev.parties ? `<p>${escapeHtml(ev.parties)}</p>` : ''}
-      ${countries ? `<p style="color:var(--muted);">Haritada: ${escapeHtml(countries)}</p>` : ''}
-      <p style="color:var(--muted);">Kâğıt: ${
-        ev.paper_x == null || ev.paper_y == null
-          ? 'yeri seçilmedi — çizimin altına asılır'
-          : escapeHtml(`x ${ev.paper_x} · y ${ev.paper_y}`)
-      }</p>
-      <div class="sources-block">
-        <div class="sources-label">Bölümler (${moments.length})</div>
+      <details class="sources-block" data-block-key="we:${ev.id}:pano"${blockOpenAttr(`we:${ev.id}:pano`)}>
+        <summary class="sources-label">Pano</summary>
+        <p style="color:var(--muted);font-size:0.8rem;">Haritada: ${countries ? escapeHtml(countries) : 'ülke seçilmedi'}</p>
+        <p style="color:var(--muted);font-size:0.8rem;">Kâğıt: ${
+          ev.paper_x == null || ev.paper_y == null
+            ? 'yeri seçilmedi — çizimin altına asılır'
+            : escapeHtml(`x ${ev.paper_x} · y ${ev.paper_y}`)
+        }</p>
+      </details>
+      <details class="sources-block" data-block-key="we:${ev.id}"${blockOpenAttr(`we:${ev.id}`)}>
+        <summary class="sources-label">Bölümler (${moments.length})</summary>
         ${momentsHtml}
         <div class="we-m-form upd-form">
           <input type="date" class="upd-date wem-new-date" title="Tarih"/>
@@ -5292,7 +5616,7 @@ async function loadWorldEventsList() {
           <button class="btn btn-secondary" data-act="we-m-add" data-event-id="${escapeHtml(ev.id)}">+ Bölüm Ekle</button>
           <div class="upd-status status-msg"></div>
         </div>
-      </div>
+      </details>
       <div class="card-actions">
         <button class="btn-edit" data-act="we-edit" data-id="${escapeHtml(ev.id)}">Edit</button>
         <button class="btn-del"  data-act="we-del"  data-id="${escapeHtml(ev.id)}">Delete</button>
@@ -7720,7 +8044,9 @@ function deskBuildDrawer(tabId, cfg) {
   // own, so a press that landed on one (Delete, a toggle) is left alone.
   if (rowActs.length) {
     index.addEventListener('click', (e) => {
-      if (e.target.closest('button, a, input, select, textarea, label')) return;
+      // A press inside a fold the admin has opened, or inside the re-filing
+      // panel, belongs to that workspace — not to the row underneath it.
+      if (e.target.closest('button, a, input, select, textarea, label, summary, details[open], .move-form')) return;
       const card = e.target.closest('.article-card');
       if (!card || !index.contains(card)) return;
       // A card already standing open in its own editor is being written
