@@ -1837,6 +1837,14 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   and the device's own back — the page puts an entry on the history stack precisely so that last
   one closes it instead of leaving the app, and every reader-initiated close spends that entry
   (`dismissFbPage`) rather than leaving it behind.
+- **A filled box carries a chunky foot, the same convention every solid card on the site
+  already wears** (`.info-card`, `.library-card` and friends in kutuphane.html/kahvehane.html: 2px
+  on three sides, 5px on the one the card rests on). It reads as a base rather than an outline,
+  and it is deliberately what tells a real card apart from a dashed slot — `.fb-box.fb-empty`
+  stays a uniform 2px dashed rectangle, because a placeholder marking where a card would be is not
+  a card and should not borrow its weight. The page a box grows into (`.fb-page`) carries the same
+  5px foot on its own bottom edge, since it is the same card standing at full size rather than a
+  second object.
 - **Every box that answers a press gives under it, and it is the site's one press**
   (`pressScale`, `wireActorPress`). The card gives to 0.955 under the finger and springs back past
   its own size to 1.022 before settling over 0.34s — the same three numbers Kütüphane's `.article`
