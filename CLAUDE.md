@@ -250,9 +250,11 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > and open together as one story), `world_events` + `world_event_moments` +
 > `world_event_countries` (the OLAYLAR — the world events themselves, with their per-olay colour,
 > where their paper hangs on the map, the countries an open one lights, and their chapters —
-> oldest first, each optionally carrying its own photo) and `breaking_news_countries` (which
-> countries a Dünya story is about, lit on that map when the story opens), and more). When in doubt, read the relevant `db/` file — it is the
-> source of truth.
+> oldest first, each optionally carrying its own photo), `breaking_news_countries` (which
+> countries a Dünya story is about, lit on that map when the story opens), and `neighborhood_polls`
+> + `neighborhood_poll_votes` (İlçe Anketleri — district polls whose per-district split is meant to
+> color a future map, see the schema below), and more). When in doubt, read the relevant `db/` file
+> — it is the source of truth.
 
 **Table: `neighborhoods`** — lookup of valid neighborhood IDs.
 - `id text pk` (kebab-case slug), `name_tr text` (Turkish display name).
@@ -317,6 +319,34 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
   before this file existed. A feature that locks the app when its content table is empty is a
   feature that takes the app down.
 - Curated from admin.html's Oyunlar tab → **Sorular** panel (date × game, both languages).
+
+**Tables: `neighborhood_polls` + `neighborhood_poll_votes`** — İlçe Anketleri, the district polls
+behind Kütüphane's ANKET box (`db/neighborhood_polls.sql`).
+- What makes this a different object from `daily_questions` (a citywide opinion) and
+  `breaking_news_polls` (a reaction to one story) is what the answer is FOR: every vote is filed
+  under the member's own district, so the result is not one percentage but 25 of them — how
+  Beşiktaş answered, how Üsküdar answered.
+- `neighborhood_polls`: `id`, `question_tr`/`question_en`, `option_a_tr`/`option_a_en`,
+  `option_b_tr`/`option_b_en`, `color_a`/`color_b` (hex, defaulted to the site's own red and ink),
+  `active`. The two colors are what a future district-colored map would mix between for a district
+  by that district's own a/b split, the way a live election map does — there is no such map drawn
+  yet (project.html's İstanbul at slide 12 is still a flat painted frame, not a traced one a fill
+  can be set on; see "The zoom is DRAWN, not computed"), so `renderAnketResults` in project.html
+  prints the same split as a plain list, each district's row already wearing the color a map would
+  paint it with.
+- `neighborhood_poll_votes`: `(poll_id, user_id)` PK, `neighborhood` (the voter's own district AT
+  THE TIME they voted, not looked up later), `choice` (`a`/`b`). **Insert-only**, same reasoning as
+  `question_answers`: an answer is what you thought when you were asked. The insert's `with check`
+  cross-references the caller's own `profiles.neighborhood` rather than trusting whatever the
+  client sends, since a false district would quietly corrupt the very data a map exists to color.
+- RLS: polls readable by everyone signed in, writable by the admin alone. A vote is readable by
+  **its own voter and the admin**, and by nobody else — same privacy stance as `question_answers`.
+  The per-district breakdown a result view or a future map needs comes from
+  `neighborhood_poll_results(poll_id)` (SECURITY DEFINER, one row per district — every district,
+  even one with no votes yet — with `a_count`/`b_count` and no identities).
+- Curated from admin.html's **İlçe Anketleri** tab (kept apart from the per-story "Anketler" panel
+  already inside the Haberler tab, which is `breaking_news_polls` and answers a different
+  question).
 
 **Table: `sozcel_used_answers`** — one row per Istanbul day: that day's Sözcel answer (`db/sozcel_used_answers*.sql`).
 - `used_on date pk`, `word` (unique across all days, so an answer never repeats), `definition`, `syllables`, `sozcul_id`, `created_at`.
@@ -1689,11 +1719,12 @@ you are already there.
   loses to it — the logo then goes dark under the very wash it is supposed to be standing above.
 - **The squares are how far into each window's content the reader has got** — Haberler as
   `dealt/total` read from the deck's own `dunya_dealt_<uid>` store (both its shapes, stamped and
-  the legacy stampless array), Olaylar as `started/ongoing`, Oyunlar as `played/on today`, and
-  Etkinlikler as a count rather than a fraction, because an evening is not content to get through.
-  Every one is best-effort and independent: a query that fails leaves its own square a dash rather
-  than taking the map down. A square whose content is parked (Fikirler, Bilgi, Kahve, Yorumlar)
-  prints a dash too — the shape of a screen must not change on the day its numbers arrive.
+  the legacy stampless array), Olaylar as `started/ongoing`, Oyunlar as `played/on today`, Anket as
+  `answered/active`, and Etkinlikler as a count rather than a fraction, because an evening is not
+  content to get through. Every one is best-effort and independent: a query that fails leaves its
+  own square a dash rather than taking the map down. A square whose content is parked (Fikirler,
+  Kahve, Yorumlar) prints a dash too — the shape of a screen must not change on the day its numbers
+  arrive.
 - **The middle window is the reader's OWN hexagon, cloned out of the petek.** Hane's window is the
   reader's profile, and that already exists at the petek's middle depth — so the cell is
   `cloneNode`d rather than redrawn, and the ring, the mask, the avatar and the badges stay the
@@ -1745,7 +1776,7 @@ slide that is the city:
 | | Lane 0 | Lane 1 | Lane 2 |
 |---|---|---|---|
 | | **Kütüphane** | **Hane** | **Kahvehane** |
-| what stands there | Haberler + Bilgi | the petek | Etkinlikler + Sözcel |
+| what stands there | Haberler + Anket | the petek | Etkinlikler + Sözcel |
 | where the book may go | up, to slide 1 | nowhere | down, to slide 24 |
 
 Left to right on the screen, exactly as the three tabs stand. A pull right walks the strip right,
@@ -2072,7 +2103,7 @@ screen, which is why the pose tables swap along with the columns.
         ┌─────┴──────┐        ┌──────────┐        ┌──────────┴───┐
         │ KÜTÜPHANE  │ ────── │   HANE   │ ────── │  KAHVEHANE   │
         │ Haberler   │        │ the petek│        │ Etkinlikler  │
-        │ Bilgi      │        │  alone   │        │ Oyunlar      │
+        │ Anket      │        │  alone   │        │ Oyunlar      │
         └────────────┘        └────┬─────┘        └──────────────┘
                                    │
                     ▲ up / out — the whole petek: what İstanbul thinks
@@ -2082,7 +2113,7 @@ screen, which is why the pose tables swap along with the columns.
 | Screen | The map(s) on top | Wide column (3 rectangles) | Narrow column (3 rectangles) |
 |---|---|---|---|
 | Türkiye (slide 1) | Türkiye | left — **Hikâyeler**, the stories the map is grouped into | right — **Olaylar** |
-| Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler** | right — **Bilgi** |
+| Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler** | right — **Anket** |
 | Hane (lane 1) | none — the petek, full bleed | — | — |
 | Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (RSVP goes to Hane) | left — **Oyunlar**, Sözcel, Tümcel, Bulmaca |
 | the ilçe (slide 24) | the ilçe, with the member's own picked out | right — **Yorumlar** | left — **Kahve**, the Kahve Endeksi's rows |
@@ -2139,17 +2170,27 @@ Six things about it:
   ideas → our opinions on those ideas.
 - **Two columns, not a menu.** A screen with six unrelated tiles is a launcher, and a launcher is a
   shortcut past everything — the one thing the arrangement exists to prevent.
+- **Anket is a district poll, not a citywide one** (`db/neighborhood_polls.sql`) — what makes it
+  worth a column of its own rather than folding into `daily_questions` is what the answer is FOR:
+  every vote is filed under the member's own district, so the result is not one percentage but 25
+  of them. That per-district split (`neighborhood_poll_results()`) is meant to color the districts
+  on a future map the way a live election map does, mixing the poll's own `color_a`/`color_b` by
+  each district's own split — there is no such map drawn yet (see "The zoom is DRAWN, not
+  computed"), so for now `renderAnketResults` prints the same numbers as a plain list, each row
+  already wearing the color a map would paint it with. Curated from admin.html's own "İlçe
+  Anketleri" tab, kept apart from the per-story "Anketler" the Haberler tab already has (those are
+  a story's own reaction, `breaking_news_polls`, not a district's).
 - **Fikirler is decided in shape and not in content.** The tile has its place on Kütüphane; what
   fills it is parked until it is worth building, the way Makaleler and the neighbourhood comments
-  are parked rather than deleted. Bilgi is in the same state at the Türkiye stop.
+  are parked rather than deleted.
 
 **What of this is already standing in `project.html`:** Etkinlikler and Oyunlar (all three games)
-on Kahvehane, Haberler on Kütüphane and Olaylar at the Türkiye stop, the petek and its three depths on Hane, and the
-Türkiye map as slide 1's drawing. Hikâyeler, Bilgi, Kahve and Yorumlar have their boxes too,
-standing dashed (see the cast rules above) — the boxes are cast, the content
-behind them is not. **What is still in the parts bin:** the second map on the two lane screens,
-the ilçe's own drawing at slide 24, and whatever actually fills Hikâyeler, Bilgi, Kahve and
-Yorumlar.
+on Kahvehane, Haberler and Anket on Kütüphane, Olaylar at the Türkiye stop, the petek and its three
+depths on Hane, and the Türkiye map as slide 1's drawing. Hikâyeler, Kahve and Yorumlar have their
+boxes too, standing dashed (see the cast rules above) — the boxes are cast, the content behind them
+is not. **What is still in the parts bin:** the second map on the two lane screens, the ilçe's own
+drawing at slide 24, whatever actually fills Hikâyeler, Kahve and Yorumlar, and the district-colored
+map itself that Anket's own data is already shaped to feed.
 
 ### The flip book — `flip.js` + `flip-steps.js`
 

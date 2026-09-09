@@ -528,6 +528,20 @@
     .sources-block[open] > .sources-label::before { transform: rotate(90deg); }
     .sources-block[open] > .sources-label { color: var(--ink); }
     .sources-label:hover { color: var(--ink); }
+    /* ── İlçe Anketleri: the per-district split under a poll ──
+       The same numbers a future district-colored map would read to pick
+       each district's color (see db/neighborhood_polls.sql) -- for now
+       they print as a plain bar per district rather than paint one. */
+    .dp-results { display: flex; flex-direction: column; gap: 5px; max-height: 260px; overflow-y: auto; }
+    .dp-district-row { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; }
+    .dp-district-name { flex: 0 0 92px; color: var(--ink); }
+    .dp-district-bar {
+      flex: 1; height: 8px; display: flex; overflow: hidden;
+      border: 1px solid var(--rule);
+    }
+    .dp-district-bar span { height: 100%; }
+    .dp-district-pct { flex: 0 0 34px; text-align: right; color: var(--muted); }
+    .dp-district-none { flex: 1; color: var(--muted); font-style: italic; }
     /* The re-filing panel: a target and the two buttons, shut until asked
        for. Same shape whether it is a whole story being folded in or one
        entry of a timeline being moved. */
@@ -1605,6 +1619,7 @@
     <button class="admin-tab" data-tab="countries" data-preview="kutuphane.html">Ülkeler</button>
     <button class="admin-tab" data-tab="mektuplar" data-preview="kutuphane.html">Posta Kutusu</button>
     <button class="admin-tab" data-tab="quotes" data-preview="kutuphane.html">Alıntılar</button>
+    <button class="admin-tab" data-tab="district-polls" data-preview="kutuphane.html">İlçe Anketleri</button>
 
     <div class="rail-group">Kahvehane</div>
     <button class="admin-tab" data-tab="events" data-preview="kahvehane.html">Etkinlikler</button>
@@ -2423,6 +2438,71 @@
 
   </div>
 
+  <!-- ── İLÇE ANKETLERİ TAB ──
+       The ANKET box Kütüphane's lane carries at slide 12 (the district
+       reading opposite Haberler, see CLAUDE.md — this used to be the
+       placeholder "Bilgi" box). A member answers once; their vote is
+       filed under their own district (db/neighborhood_polls.sql), and
+       the two colors below are what a future district-colored map would
+       mix between by each district's own split -- neighborhood_poll_
+       results() already returns that breakdown, so the list under each
+       poll here is the same data a map would be painted from. -->
+  <div class="admin-body" id="district-polls-tab" style="display:none;">
+
+    <div class="panel">
+      <div class="panel-title" id="dp-form-mode-label">Add New District Poll</div>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        A member answers once, filed under their own district. The two colors are what a future
+        district map would mix between for a district by its own a/b split -- there is no such
+        map drawn yet, so for now the split prints as a list under each poll.
+      </p>
+
+      <label>Soru (Türkçe)</label>
+      <textarea id="dp-question-tr" rows="2" placeholder="Ör: Mahallende en çok neyin eksikliğini hissediyorsun?"></textarea>
+
+      <label>Question (English, optional)</label>
+      <textarea id="dp-question-en" rows="2" placeholder="Optional"></textarea>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:180px;">
+          <label>Seçenek A (Türkçe)</label>
+          <input type="text" id="dp-a-tr" placeholder="Ör: Yeşil alan">
+          <input type="text" id="dp-a-en" placeholder="Option A (English)">
+          <label>Seçenek A rengi</label>
+          <input type="color" id="dp-color-a" value="#b93631"/>
+        </div>
+        <div style="flex:1;min-width:180px;">
+          <label>Seçenek B (Türkçe)</label>
+          <input type="text" id="dp-b-tr" placeholder="Ör: Buluşacak yer">
+          <input type="text" id="dp-b-en" placeholder="Option B (English)">
+          <label>Seçenek B rengi</label>
+          <input type="color" id="dp-color-b" value="#2b2b2b"/>
+        </div>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:10px;">
+        <input type="checkbox" id="dp-active" checked style="width:auto;margin:0;"/>
+        Aktif — ANKET kutusunda görünür
+      </label>
+
+      <input type="hidden" id="dp-editing-id"/>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="dp-submit-btn">Add Poll</button>
+        <button class="btn btn-secondary" id="dp-cancel-btn" style="display:none;">Cancel Edit</button>
+      </div>
+      <div class="status-msg" id="dp-form-status"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">İlçe Anketleri</div>
+      <div class="articles-list" id="district-polls-list">
+        <div class="empty-state"><span class="spinner"></span></div>
+      </div>
+    </div>
+
+  </div>
+
   <!-- ── KAHVE ENDEKSİ TAB ──
        The coffee price index shown in Kahvehane (coffee_prices). Curated
        here only: the site renders it read-only and RLS allows writes to
@@ -2901,6 +2981,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('events-tab').style.display = (tab === 'events') ? '' : 'none';
     document.getElementById('games-tab').style.display = (tab === 'games') ? 'grid' : 'none';
     document.getElementById('quotes-tab').style.display = (tab === 'quotes') ? '' : 'none';
+    document.getElementById('district-polls-tab').style.display = (tab === 'district-polls') ? '' : 'none';
     document.getElementById('kahve-tab').style.display = (tab === 'kahve') ? '' : 'none';
     document.getElementById('people-tab').style.display = (tab === 'people') ? '' : 'none';
     document.getElementById('politicians-tab').style.display = (tab === 'politicians') ? '' : 'none';
@@ -2915,6 +2996,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
     if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); }
     if (tab === 'quotes') loadQuotesList();
+    if (tab === 'district-polls') loadDistrictPollsList();
     if (tab === 'kahve') loadCoffeeList();
     if (tab === 'people') loadPeopleTab();
     if (tab === 'politicians') loadPoliticiansTab();
@@ -6028,6 +6110,174 @@ async function deleteQuote(id) {
   loadQuotesList();
 }
 
+// ── İlçe Anketleri: district polls behind Kütüphane's ANKET box ──
+// A vote is filed under the member's own district (db/neighborhood_polls.sql).
+// The per-district breakdown printed under each poll here is exactly the
+// data a future district-colored map would read to pick each district's
+// color -- see that file's own comment for why there is no such map yet.
+let _nbNameCache = null;
+async function neighborhoodNames() {
+  if (_nbNameCache) return _nbNameCache;
+  const { data } = await sb.from('neighborhoods').select('id, name_tr').order('name_tr');
+  _nbNameCache = {};
+  (data || []).forEach(n => { _nbNameCache[n.id] = n.name_tr; });
+  return _nbNameCache;
+}
+
+async function loadDistrictPollsList() {
+  const listEl = document.getElementById('district-polls-list');
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const { data, error } = await sb.from('neighborhood_polls')
+    .select('*').order('created_at', { ascending: false });
+  if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
+  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No district polls yet.</div>'; return; }
+
+  const names = await neighborhoodNames();
+  // One result round-trip per poll -- there are only ever a handful of
+  // these live at once, so this costs far less than a second full fetch.
+  const withResults = await Promise.all(data.map(async (p) => {
+    const { data: rows, error: rErr } = await sb.rpc('neighborhood_poll_results', { p_poll_id: p.id });
+    return { poll: p, rows: rErr ? [] : (rows || []) };
+  }));
+
+  listEl.innerHTML = withResults.map(({ poll: p, rows }) => {
+    const totalA = rows.reduce((s, r) => s + r.a_count, 0);
+    const totalB = rows.reduce((s, r) => s + r.b_count, 0);
+    const total = totalA + totalB;
+    const pctA = total ? Math.round((totalA / total) * 100) : 0;
+    const districtRows = rows
+      .map(r => ({ neighborhood: r.neighborhood, a_count: r.a_count, b_count: r.b_count,
+                   total: r.a_count + r.b_count, name: names[r.neighborhood] || r.neighborhood }))
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'tr'))
+      .map(r => {
+        const rp = r.total ? Math.round((r.a_count / r.total) * 100) : null;
+        return '<div class="dp-district-row">' +
+          '<span class="dp-district-name">' + escapeHtml(r.name) + '</span>' +
+          (r.total
+            ? '<span class="dp-district-bar"><span style="width:' + rp + '%;background:' + escapeHtml(p.color_a) + ';"></span>' +
+                '<span style="width:' + (100 - rp) + '%;background:' + escapeHtml(p.color_b) + ';"></span></span>' +
+              '<span class="dp-district-pct">%' + rp + '</span>'
+            : '<span class="dp-district-none">Oy yok</span>') +
+          '</div>';
+      }).join('');
+    const blockKey = 'dp-results-' + p.id;
+    return `
+    <div class="article-card" data-id="${p.id}">
+      <p>${escapeHtml(p.question_tr)}${p.active ? '' : ' <span style="color:var(--muted);">(pasif)</span>'}</p>
+      <div class="a-neighborhood">
+        <span style="color:${escapeHtml(p.color_a)};">■</span> ${escapeHtml(p.option_a_tr)}
+        &nbsp;·&nbsp;
+        <span style="color:${escapeHtml(p.color_b)};">■</span> ${escapeHtml(p.option_b_tr)}
+        &nbsp;·&nbsp; ${total} oy${total ? ` (%${pctA} / %${100 - pctA})` : ''}
+      </div>
+      <details class="sources-block" data-block-key="${blockKey}"${blockOpenAttr(blockKey)}>
+        <summary class="sources-label">İlçelere göre sonuç</summary>
+        <div class="dp-results">${districtRows}</div>
+      </details>
+      <div class="card-actions">
+        <button class="btn-edit" data-act="dp-edit" data-id="${p.id}">Edit</button>
+        <button class="btn-del"  data-act="dp-del"  data-id="${p.id}">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  listEl.querySelectorAll('button[data-act]').forEach(btn => {
+    const p = data.find(x => x.id === btn.dataset.id);
+    if (!p) return;
+    if (btn.dataset.act === 'dp-edit') btn.addEventListener('click', () => editDistrictPoll(p));
+    if (btn.dataset.act === 'dp-del') btn.addEventListener('click', () => deleteDistrictPoll(p.id));
+  });
+}
+
+function editDistrictPoll(p) {
+  document.getElementById('dp-editing-id').value = p.id;
+  document.getElementById('dp-question-tr').value = p.question_tr || '';
+  document.getElementById('dp-question-en').value = p.question_en || '';
+  document.getElementById('dp-a-tr').value = p.option_a_tr || '';
+  document.getElementById('dp-a-en').value = p.option_a_en || '';
+  document.getElementById('dp-b-tr').value = p.option_b_tr || '';
+  document.getElementById('dp-b-en').value = p.option_b_en || '';
+  document.getElementById('dp-color-a').value = /^#[0-9a-fA-F]{6}$/.test(p.color_a || '') ? p.color_a : '#b93631';
+  document.getElementById('dp-color-b').value = /^#[0-9a-fA-F]{6}$/.test(p.color_b || '') ? p.color_b : '#2b2b2b';
+  document.getElementById('dp-active').checked = p.active !== false;
+  document.getElementById('dp-submit-btn').textContent = 'Update Poll';
+  document.getElementById('dp-form-mode-label').textContent = 'Editing District Poll';
+  document.getElementById('dp-cancel-btn').style.display = 'inline-block';
+  document.querySelector('#district-polls-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetDistrictPollForm() {
+  document.getElementById('dp-editing-id').value = '';
+  document.getElementById('dp-question-tr').value = '';
+  document.getElementById('dp-question-en').value = '';
+  document.getElementById('dp-a-tr').value = '';
+  document.getElementById('dp-a-en').value = '';
+  document.getElementById('dp-b-tr').value = '';
+  document.getElementById('dp-b-en').value = '';
+  document.getElementById('dp-color-a').value = '#b93631';
+  document.getElementById('dp-color-b').value = '#2b2b2b';
+  document.getElementById('dp-active').checked = true;
+  document.getElementById('dp-submit-btn').textContent = 'Add Poll';
+  document.getElementById('dp-form-mode-label').textContent = 'Add New District Poll';
+  document.getElementById('dp-cancel-btn').style.display = 'none';
+}
+
+document.getElementById('dp-cancel-btn').addEventListener('click', resetDistrictPollForm);
+
+document.getElementById('dp-submit-btn').addEventListener('click', async () => {
+  const editingId = document.getElementById('dp-editing-id').value;
+  const question_tr = document.getElementById('dp-question-tr').value.trim();
+  const question_en = document.getElementById('dp-question-en').value.trim() || null;
+  const option_a_tr = document.getElementById('dp-a-tr').value.trim();
+  const option_a_en = document.getElementById('dp-a-en').value.trim() || null;
+  const option_b_tr = document.getElementById('dp-b-tr').value.trim();
+  const option_b_en = document.getElementById('dp-b-en').value.trim() || null;
+  const color_a = document.getElementById('dp-color-a').value || '#b93631';
+  const color_b = document.getElementById('dp-color-b').value || '#2b2b2b';
+  const active = document.getElementById('dp-active').checked;
+  const statusEl = document.getElementById('dp-form-status');
+  const btn = document.getElementById('dp-submit-btn');
+
+  if (!question_tr || !option_a_tr || !option_b_tr) {
+    statusEl.textContent = 'Question and both Turkish options are required.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const row = { question_tr, question_en, option_a_tr, option_a_en, option_b_tr, option_b_en, color_a, color_b, active };
+  let result;
+  if (editingId) {
+    result = await sb.from('neighborhood_polls').update(row).eq('id', editingId);
+  } else {
+    const { data: { session } } = await sb.auth.getSession();
+    row.created_by = session && session.user ? session.user.id : null;
+    result = await sb.from('neighborhood_polls').insert([row]);
+  }
+
+  btn.textContent = editingId ? 'Update Poll' : 'Add Poll';
+
+  if (result.error) {
+    statusEl.textContent = result.error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = editingId ? 'Poll updated!' : 'Poll added!';
+  statusEl.className = 'status-msg ok';
+  resetDistrictPollForm();
+  loadDistrictPollsList();
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+async function deleteDistrictPoll(id) {
+  if (!confirm('Bu anketi ve tüm oylarını sil? Geri alınamaz.')) return;
+  const { error } = await sb.from('neighborhood_polls').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadDistrictPollsList();
+}
+
 // ── Kahve Endeksi: the coffee price index shown in Kahvehane ──
 // Admin-curated end to end (see db/coffee_prices_v2_admin_only.sql): the
 // site only reads coffee_prices, every row is written from this tab.
@@ -7881,6 +8131,7 @@ const DESK_MD = {
                          rowAct: 'edit-news', advanced: ['n-datetime', 'news-series-block'] },
   'events-tab':        { edit: ['ev-edit'], reset: 'ev-cancel-btn', submit: 'ev-submit-btn',    cols: 2, add: 'Yeni Etkinlik' },
   'quotes-tab':        { edit: ['q-edit'],  reset: 'q-cancel-btn',  submit: 'q-submit-btn',     cols: 2, add: 'Yeni Alıntı' },
+  'district-polls-tab':{ edit: ['dp-edit'], reset: 'dp-cancel-btn', submit: 'dp-submit-btn',    cols: 2, add: 'Yeni Anket' },
   'kahve-tab':         { edit: ['cf-edit'], reset: 'cf-cancel-btn', submit: 'cf-submit-btn',    cols: 2, add: 'Yeni Fiyat' },
   'people-tab':        { edit: ['pp-edit'], reset: 'pp-cancel-btn', submit: 'pp-submit-btn',    cols: 2, add: 'Yeni Kişi' },
   'politicians-tab':   { edit: ['p-edit'],  reset: null,            submit: 'p-submit-btn',     cols: 1, add: null },
