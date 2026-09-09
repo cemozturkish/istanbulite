@@ -1837,6 +1837,27 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   and the device's own back — the page puts an entry on the history stack precisely so that last
   one closes it instead of leaving the app, and every reader-initiated close spends that entry
   (`dismissFbPage`) rather than leaving it behind.
+- **Every box that answers a press gives under it, and it is the site's one press**
+  (`pressScale`, `wireActorPress`). The card gives to 0.955 under the finger and springs back past
+  its own size to 1.022 before settling over 0.34s — the same three numbers Kütüphane's `.article`
+  and the petek's hexagons already use, so a press means one thing everywhere. Where the release
+  opens something, that overshoot is the first frame of the box growing into its page: the press
+  and the page are one continuous move rather than two. Two mechanical notes, and the first is
+  forced rather than chosen: the scale **cannot** be a stylesheet rule here, because `paintCast()`
+  writes an inline transform to every actor on every frame and would overwrite it before it was
+  ever painted — which is why the `transform-origin` rules sat in project.html for as long as they
+  did with no give to orient. So the press is a number the tick multiplies into that same
+  transform, which is also the truer shape for this page: it composes with whatever pose the book
+  has the box in instead of fighting it for one property. And it is driven by **pointer events,
+  never `:active`** — which sticks after a tap on iOS, and is dropped on pointerup half way
+  through the pop, so the spring would come off the box's centre while the give came off its
+  docked corner.
+- **`fb-openable` says exactly one thing: this box answers a press**, and the cursor and the press
+  effect are both hung off that one class. `fbSetPage` sets it for a box with a page; Oyunlar sets
+  it for a game whose turn has come (its press opens a game rather than a page, which is a
+  different door but the same question). A dashed slot, a placeholder column and a locked game do
+  not wear it and so do not give — a box that moves under the finger and then does nothing is
+  worse than one that plainly does not answer.
 - **What a box opens is DESCRIBED, not wired** (`fbSetPage`). Each loader hands its box a payload
   as it renders — kicker, meta, title, lines, body — and one handler opens it, so a column gains a
   page by describing one. A box with **no** payload is not pressable and does not say it is: a
