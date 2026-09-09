@@ -196,7 +196,14 @@
        the same "nothing here" convention as everywhere else on the site
        (.events-empty, deckFrameHTML): a dashed rectangle marking where
        the thing would be, never a blank gap. */
-    .fb-box:not(.fb-empty) { border-bottom-width: 5px; }
+    /* border-bottom-width and box-shadow both animate on press (see
+       .fb-pressing below), so both are stated here rather than only at
+       rest. */
+    .fb-box:not(.fb-empty) {
+      border-bottom-width: 5px;
+      box-shadow: inset 0 0 0 0 rgba(60, 60, 60, 0);
+      transition: border-bottom-width 0.1s ease-out, box-shadow 0.1s ease-out;
+    }
     .fb-box.fb-empty {
       background: none;
       border: 2px dashed var(--muted, #9a9a9a);
@@ -218,25 +225,43 @@
        boxes a press does nothing to. */
     .fb-actor.live.fb-openable { cursor: pointer; }
     /* ── The press ──
-       Each box gives from the corner it is docked to, so a column of
-       three reads as three cards pinned at one edge rather than three
-       things shrinking into the air. The origin is a class and not
-       `:active`, because `:active` is dropped on pointerup -- half way
-       through the pop -- and the spring would then come off the box's
-       centre while the give came off its corner. It is also the same
-       reason the press is driven by pointer events at all: `:active`
-       sticks after a tap on iOS (see wireCardPress in kutuphane.html).
+       Now that a box has a chunky foot (see the border rule above), the
+       press honours that geometry literally rather than borrowing the
+       flat card's uniform scale-down: the foot thins as if the block
+       has sunk into its base, a dark grey shadow grows under the top
+       edge as the face recedes from the frame's lip, and the printed
+       content rides down with the face by exactly the foot's own loss.
+       Simple by construction -- three plain CSS transitions keyed to
+       one class -- and, unlike a scale, none of them fight paintCast()'s
+       own inline transform: border-bottom-width, box-shadow and a
+       child's own transform are none of them the property paintCast
+       writes, so there is nothing here for the tick to overwrite.
 
-       The SCALE itself is deliberately not here. paintCast() writes an
-       inline transform to every actor on every frame, so any transform
-       stated in this stylesheet is overwritten before it can be seen --
-       which is exactly why these two rules have sat here since the cast
-       was written with nothing to give under the finger. The press is a
-       number the tick multiplies into that same transform instead (see
-       pressScale), which is also the right shape for this page: it
-       composes with the pose rather than fighting it. */
-    .fb-actor.fb-pressing.fb-col-l { transform-origin: 0% 100%; }
-    .fb-actor.fb-pressing.fb-col-r { transform-origin: 100% 100%; }
+       The class itself is still driven by pointer events, not `:active`
+       -- `:active` sticks after a tap on iOS, which would leave the box
+       looking permanently pressed (see wireCardPress in kutuphane.html). */
+    .fb-actor.fb-pressing:not(.fb-empty) {
+      border-bottom-width: 2px;
+      /* Grey, deliberately never black -- the box's own paper going into
+         shadow, not a hole opening in it. */
+      box-shadow: inset 0 4px 6px -3px rgba(60, 60, 60, 0.4);
+    }
+    /* The foot lost 3px (5px -> 2px); the face -- everything printed in
+       the box -- drops by exactly that much, so the whole card reads as
+       one block sinking rather than as text sliding inside a static
+       frame. */
+    .fb-box .k, .fb-box .m, .fb-box .t {
+      transition: transform 0.1s ease-out;
+    }
+    .fb-actor.fb-pressing .k,
+    .fb-actor.fb-pressing .m,
+    .fb-actor.fb-pressing .t {
+      transform: translateY(3px);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .fb-box:not(.fb-empty) { transition: none; }
+      .fb-box .k, .fb-box .m, .fb-box .t { transition: none; }
+    }
 
     /* ── What a filled box is OF -- one template for all of them ── */
     /* The kicker and the date are pinned the same way, one on each top
@@ -2039,9 +2064,6 @@ function buildCast() {
     // `laneP` starts already AT the current lane, not at 0 -- a fresh
     // mount has nothing to catch up on, so there is nothing to animate.
     return { def, el, poses: expandPoses(def.poses || {}), pos: 0, laneP: lanePos,
-             // The press: 1 at rest, PRESS_SCALE held, running the pop
-             // curve while pressFrom is set (see pressScale).
-             press: 1, pressHeld: false, pressFrom: null, pressAt: 0,
              lag: def.lag == null ? CAST_LAG : def.lag,
              lagFree: def.lagFree == null ? CAST_LAG_FREE : def.lagFree };
   });
@@ -2109,10 +2131,6 @@ function castStep(now) {
     // same ease(), same per-slot rate, just a second target.
     const nlp = ease(a.laneP, lanePos, held ? a.lag : a.lagFree, dt);
     if (nlp !== a.laneP) { a.laneP = nlp; moving = true; }
-    // The press rides the same tick as everything else on this page, so
-    // it cannot drift out of step with the pose it is multiplied into.
-    if (pressScale(a, now, dt)) moving = true;
-    else if (!a.pressHeld && a.press === 1) a.el.classList.remove('fb-pressing');
   }
   paintCast();
   // The position marks ride the eased frame position, so they are
@@ -2158,11 +2176,7 @@ function paintCast() {
     // leave a slide.
     const d = Math.max(-1, Math.min(1, a.laneP - a.def.lane));
     const x = lerp(A.x, B.x, t);
-    // The press is a second scale rather than a factor folded into `sc`,
-    // so the pose the book gives the box and the give under the finger
-    // stay two readable things in one transform.
     a.el.style.transform = 'translate3d(' + x + '%,' + y + '%,0) scale(' + sc + ')' +
-                           (a.press !== 1 ? ' scale(' + a.press + ')' : '') +
                            (rot ? ' rotate(' + rot + 'deg)' : '');
     a.el.style.opacity = String(lerp(A.opacity, B.opacity, t) * (1 - Math.abs(d)));
   }
@@ -2179,71 +2193,30 @@ function paintCast() {
 const LIVE_EPS = 0.05;
 
 // ── THE PRESS ──
-// The site has one press and this is it: the card gives to 0.955 under
-// the finger and springs back past its own size to 1.022 before settling
-// (kutuphane.html's .article.openable, profile-card.css's hive cell --
-// same three numbers, same 0.34s). Where the release opens something,
-// that overshoot is the first frame of the box growing into its page, so
-// the press and the page are one continuous move rather than two.
+// A box that just grew a chunky foot (see the CSS) is pushed the way
+// that foot suggests: the border-bottom thins as the block sinks into
+// its base, a grey shadow grows under the top edge, and the printed
+// content rides down with the face -- three plain CSS transitions keyed
+// to one class (.fb-pressing, see the stylesheet). None of those three
+// properties is the one paintCast() writes every frame (`transform` on
+// the actor itself), so unlike everything else on this page a press
+// here needs no number computed on the tick -- the browser interpolates
+// it, and this function is only the gate that decides when the class is
+// true.
 //
-// It is a NUMBER here rather than a stylesheet rule, and that is forced:
-// paintCast() writes an inline transform to every actor every frame, so
-// a `:active { transform: scale() }` is overwritten before it is ever
-// painted. Folding it into that same transform is also the truer shape
-// for this page -- the press composes with whatever pose the book has
-// the box in, instead of the two fighting over one property.
-const PRESS_SCALE = 0.955;   // held
-const PRESS_POP = 1.022;     // the spring, at 52% of the release
-const PRESS_MS = 340;        // the release, end to end
-const PRESS_LAG = 0.45;      // how fast it gives -- tight, it is under a finger
-
-// Ease-out per segment, which is what puts the weight at the far end of
-// each half of the pop rather than in the middle of it.
-function outCubic(t) { return 1 - Math.pow(1 - t, 3); }
-
-// Where an actor's press scale stands right now. Holding eases toward
-// PRESS_SCALE; releasing runs the fixed curve above from wherever the
-// give had actually reached, so a tap too quick to reach 0.955 pops
-// proportionally rather than jumping down to it first.
-function pressScale(a, now, dt) {
-  if (a.pressHeld) {
-    a.press = ease(a.press, PRESS_SCALE, PRESS_LAG, dt);
-    return a.press !== PRESS_SCALE;
-  }
-  if (a.pressFrom == null) return false;
-  const t = Math.min(1, (now - a.pressAt) / PRESS_MS);
-  // 0 -> 52%: down to the pop. 52% -> 100%: back to rest.
-  a.press = t < 0.52
-    ? lerp(a.pressFrom, PRESS_POP, outCubic(t / 0.52))
-    : lerp(PRESS_POP, 1, outCubic((t - 0.52) / 0.48));
-  if (t >= 1) { a.press = 1; a.pressFrom = null; return false; }
-  return true;
-}
-
-// Pointer events, never :active -- which sticks after a tap on iOS, and
-// is dropped on pointerup half way through the pop besides. Only a real
-// pointerup pops, so a flick down the book that happened to start on a
-// box does not announce a press the reader never made.
+// Pointer events, never :active -- which sticks after a tap on iOS and
+// would leave a box looking permanently pressed. A flick that merely
+// passed over a box on its way somewhere else never sees the class:
+// pointerleave and pointercancel both clear it exactly as pointerup does.
 function wireActorPress(a) {
   const el = a.el;
   const down = () => {
     if (!el.classList.contains('fb-openable') || !el.classList.contains('live')) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    a.pressHeld = true;
-    a.pressFrom = null;
     el.classList.add('fb-pressing');
-    ensureCastTick();
   };
-  const up = (pop) => {
-    if (!a.pressHeld) return;
-    a.pressHeld = false;
-    if (pop) { a.pressFrom = a.press; a.pressAt = performance.now(); }
-    else { a.press = 1; a.pressFrom = null; el.classList.remove('fb-pressing'); }
-    ensureCastTick();
-  };
+  const up = () => el.classList.remove('fb-pressing');
   el.addEventListener('pointerdown', down);
-  el.addEventListener('pointerup', () => up(true));
-  ['pointercancel', 'pointerleave'].forEach(e => el.addEventListener(e, () => up(false)));
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(e => el.addEventListener(e, up));
 }
 
 function armCast() {
