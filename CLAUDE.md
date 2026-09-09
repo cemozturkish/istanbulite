@@ -1819,6 +1819,31 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   result themselves — by Istanbul calendar day and by category respectively — because which slot
   a card lands in is a fact about the card, not just how new it is (see "What each screen carries"
   below).
+- **A box opens into the band it stands in** (`#fb-page-overlay`, `openFbPage`). A box has room
+  for a kicker, a timestamp and two lines of headline; pressing it opens the whole of what it was
+  naming, and the one place that page can go without covering what it came out of is the band
+  itself — the left column's left edge, the right column's right edge, the top slot's top edge and
+  the dock line. It is the same argument Kütüphane's news page and Kahvehane's event page make, and
+  it is **THE sheet** either way (same markup, same `IstSheet.open`/`close`); only the way it
+  arrives differs, and that arrival is the shared `IstSheet.grow` — one clip-path run from the
+  pressed card's own box out to those four edges. The rect is the band's own tokens and nothing
+  else, which is why they are declared on `html` rather than on `.fb-cast`: the overlay is
+  body-level and cannot inherit from the cast, and a second set of numbers would land the window a
+  pixel or two off the boxes it came out of. Head over a scrolling body — the card's own two
+  corners with the way back beside them, and everything the card only had room to name underneath;
+  the red category flag follows the column the page came out of (`.fb-mirror`), the head
+  deliberately does not, because the arrow and the kicker should land in the same place on every
+  lane. **Four ways out, and they are one way out**: the hand-drawn arrow, a press outside, Escape,
+  and the device's own back — the page puts an entry on the history stack precisely so that last
+  one closes it instead of leaving the app, and every reader-initiated close spends that entry
+  (`dismissFbPage`) rather than leaving it behind.
+- **What a box opens is DESCRIBED, not wired** (`fbSetPage`). Each loader hands its box a payload
+  as it renders — kicker, meta, title, lines, body — and one handler opens it, so a column gains a
+  page by describing one. A box with **no** payload is not pressable and does not say it is: a
+  dashed slot, a placeholder column, a bucket with nothing in it today and a fetch that failed are
+  all boxes with nothing behind them, and the setter is one function precisely so "has a page" and
+  "looks like it has one" cannot drift apart. Oyunlar is the exception and stays one: pressing a
+  game opens the game, which is a different door (see the game overlay above).
 - **An actor on a middle stop is parked off-screen on both sides of it.** It comes in over the run
   that arrives at its stop and leaves again over the run that departs it, so it belongs to that
   screen coming and going — events slides in from the left across slides 8–12 and back out to the

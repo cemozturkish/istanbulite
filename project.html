@@ -102,7 +102,16 @@
        five units and handing 3 to the left column and 2 to the right
        is what keeps the ratio true by construction instead of by two
        widths kept in step by hand. */
-    .fb-cast {
+    /* Declared on the ROOT rather than on .fb-cast, because the band is
+       no longer only the cast's: pressing a box grows it into a window
+       filling exactly the rect the six boxes stand in (see THE BAND
+       PAGE below), and that overlay is body-level -- outside .fb-cast,
+       and so unable to inherit from it. One set of numbers, or the
+       window would land a pixel or two off the boxes it came out of and
+       the grow would read as a jump. The percentages are unaffected:
+       they are substituted at the point of USE and still resolve
+       against .fb-cast, which is the box every actor is positioned in. */
+    html {
       --fb-inset: var(--screen-inset, 18px);
       --fb-unit: calc((100% - 3 * var(--fb-inset)) / 5);
       --fb-col-l-w: calc(var(--fb-unit) * 3);
@@ -114,6 +123,21 @@
          since a stack reads as one column and doesn't need as much air
          between its own rows as it does from its neighbour. */
       --fb-box-gap: calc(var(--fb-inset) * 0.7);
+      /* The two top corners are ONE line of type, split. The kicker and
+         the timestamp share this size and this line-height so their
+         line boxes are identical -- pinned to the same `top`, that is
+         what actually puts them on one line. Two sizes chosen
+         separately is exactly what read as ragged: a smaller kicker
+         with `line-height: 1` sat high while the timestamp's own
+         half-leading pushed it down. The page a box grows into prints
+         the same pair, off the same two numbers. */
+      --fb-box-tag-size: 0.6rem;
+      --fb-box-tag-lh: 1;
+      /* The band the six boxes stand in, and the window they open into:
+         the left column's left edge, the right column's right edge, the
+         top slot's top edge and the dock line. Stated as the sum the
+         slots are already built from rather than as a fourth number. */
+      --fb-band-h: calc(3 * var(--fb-box-h) + 2 * var(--fb-box-gap));
       /* Both columns hang from the same line above the tab bar -- the
          phone's stacks grow upward from the thumb (see "The phone's feeds
          hang from the bottom" in CLAUDE.md). */
@@ -138,15 +162,6 @@
          is exactly what read as unaligned. */
       --fb-box-pad-x: 10px;
       --fb-box-pad-y: 7px;
-      /* The two top corners are ONE line of type, split. The kicker and
-         the timestamp share this size and this line-height so their
-         line boxes are identical -- pinned to the same `top`, that is
-         what actually puts them on one line. Two sizes chosen
-         separately is exactly what read as ragged: a smaller kicker
-         with `line-height: 1` sat high while the timestamp's own
-         half-leading pushed it down. */
-      --fb-box-tag-size: 0.6rem;
-      --fb-box-tag-lh: 1;
       padding: var(--fb-box-pad-y) var(--fb-box-pad-x);
       overflow: hidden;
       -webkit-tap-highlight-color: transparent;
@@ -189,6 +204,12 @@
       background: var(--ink-red, #B93631);
     }
     .fb-box.fb-mirror:not(.fb-empty)::before { left: auto; right: 0; }
+    /* Only a box with something behind it says so under a cursor: a page
+       to open (see fbSetPage) or, for the games column, a game whose
+       turn has come. A dashed slot, a placeholder and a locked game are
+       all boxes a press does nothing to. */
+    .fb-actor.live.fb-openable,
+    .fb-actor.live.fb-oyun:not(.fb-empty):not(.fb-locked) { cursor: pointer; }
     /* Each box gives under the finger from the corner it is docked to. */
     .fb-actor.live.fb-col-l:active { transform-origin: 0% 100%; }
     .fb-actor.live.fb-col-r:active { transform-origin: 100% 100%; }
@@ -862,6 +883,128 @@
       border: 0;
       background: var(--paper, #f4f1ec);
     }
+    /* ══════════════════════════════════════════════════════════════
+       THE BAND PAGE — what a box grows into
+       ══════════════════════════════════════════════════════════════
+       A box is a card with room for a kicker, a timestamp and two lines
+       of headline. Pressing it opens the whole of what it was naming,
+       and where that page goes is the one place it can go without
+       covering the thing it came out of: the band itself -- the left
+       column's left edge, the right column's right edge, the top slot's
+       top edge, the dock line. It is the same argument Kütüphane's news
+       page and Kahvehane's event page make, and it is THE sheet either
+       way (same markup, same IstSheet.open/close); only the way it
+       ARRIVES differs, and that arrival is the shared IstSheet.grow --
+       one clip-path run from the pressed card's own box out to these
+       four edges, with the frame drawn by a sibling box so the page is
+       never a raw cut edge mid-flight.
+
+       Every number here is the band's own (see the html block above),
+       so the window opens exactly on the boxes' edges by construction
+       rather than by two sets of numbers agreeing. */
+    .fb-page {
+      /* frames.css states .ist-sheet's chrome with !important -- rightly,
+         since every sheet on the site wears one frame. Two of its
+         declarations are wrong for a page that floats in a band rather
+         than running off the bottom of the screen: it needs its fourth
+         edge back, and it is the CARD becoming a page, so it keeps the
+         card's own paper rather than the sheet's. */
+      background: var(--paper-card, #ddc4b5) !important;
+      border-bottom-width: 2px !important;
+      left: var(--fb-inset);
+      right: var(--fb-inset);
+      bottom: var(--fb-dock);
+      top: auto;
+      width: auto;
+      height: var(--fb-band-h);
+      box-sizing: border-box;
+      /* It does not slide: it grows. The transform sheet.css slides a
+         sheet up with would be fighting the clip-path that opens this
+         one, and the page has to be standing exactly where it will end
+         up before the window onto it is animated at all. */
+      transform: none;
+      transition: none;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      text-align: left;
+    }
+    .ist-sheet-overlay.open .fb-page { transform: none; }
+    /* The same red category flag the card carried, on the same side --
+       the page came out of that column and says so. */
+    .fb-page::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      width: 4px;
+      background: var(--ink-red, #B93631);
+      z-index: 1;
+    }
+    .fb-page.fb-mirror::before { left: auto; right: 0; }
+    /* A real box, not display:contents: the grow cross-fades the page's
+       CONTENTS separately from the window opening onto them (see
+       IstSheet.grow), and opacity on a box that generates no box of its
+       own does nothing at all. */
+    .fb-page-inner {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Head / body, and only the body moves: what the page is stays on
+       the top line where the card printed it, and the reading scrolls
+       under it. The two corners are the card's own two corners, off the
+       same two tokens, so the type does not change size on the way out
+       of the box. Deliberately NOT mirrored with the column: the arrow
+       and the kicker are where the reader's eye lands, and they should
+       land in the same place on every lane. What says which column this
+       came out of is the red flag, which is the one thing here that
+       does flip. */
+    .fb-page-head {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--ink);
+    }
+    .fb-page-head .k {
+      font-size: var(--fb-box-tag-size); line-height: var(--fb-box-tag-lh);
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--ink-red, #B93631);
+    }
+    .fb-page-head .m {
+      margin-left: auto;
+      font-size: var(--fb-box-tag-size); line-height: var(--fb-box-tag-lh);
+      color: var(--muted);
+    }
+    /* The hand-drawn arrow the game pages and Kütüphane's own story
+       pages use -- the site has one back mark, not one per page. */
+    .fb-page-back {
+      flex: none;
+      width: 30px; height: 26px;
+      padding: 0; border: 0; background: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .fb-page-back img { width: 100%; height: 100%; object-fit: contain; }
+    .fb-page-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 11px 12px 14px;
+      /* The page owns nothing horizontal; the vertical axis stays the
+         browser's so this scrolls natively. The book underneath is
+         behind an overlay and hears nothing either way. */
+      touch-action: pan-y;
+    }
+    .fb-page-title { margin: 0 0 6px; font-size: 1.15rem; line-height: 1.2; }
+    .fb-page-meta { color: var(--muted); font-size: 0.78rem; line-height: 1.45; margin-bottom: 9px; }
+    .fb-page-body p { margin: 0 0 9px; font-size: 0.85rem; line-height: 1.5; }
+    .fb-page-body p:last-child { margin-bottom: 0; }
+
     /* THE TAB BAR STAYS UP. Every other sheet on the site runs flush off
        the bottom edge of the screen (frames.css even drops its bottom
        border to say so), and comes to rest OVER the tab bar -- which is
@@ -924,6 +1067,19 @@
     <span class="fb-map-wire h w-hane-kah"></span>
     <span class="fb-map-wire v w-ku-tr"></span>
     <span class="fb-map-wire v w-kah-ilce"></span>
+  </div>
+</div>
+
+<!-- ── THE BAND PAGE ──
+     What a box grows into: the whole rect the six boxes stand in. THE
+     sheet (same markup, same IstSheet.open/close), arriving by the
+     shared grow rather than by sliding -- see the CSS block above and
+     openFbPage below. Body-level, like the map and the game overlay,
+     because it has to cover the cast rather than stand inside it. -->
+<div class="ist-sheet-overlay ist-sheet-dim fb-page-overlay" id="fb-page-overlay" hidden>
+  <div class="ist-sheet-backdrop" id="fb-page-backdrop"></div>
+  <div class="ist-sheet fb-page" id="fb-page">
+    <div class="fb-page-inner" id="fb-page-inner"></div>
   </div>
 </div>
 
@@ -1131,6 +1287,15 @@ function eventTimeOnly(iso) {
     { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+// The whole stamp, for the page the card opens into: there the day is no
+// longer said by which box the reader pressed, so it has to be printed.
+function eventWhenLong(iso) {
+  return new Date(iso).toLocaleString('tr-TR', {
+    timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long',
+    weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+}
+
 // ── Filling a 3-box stack from one fetch ──
 // Olaylar is still this shape: fetch up to 3 rows once, render each
 // into its own box, and leave whichever slots have no row as an empty
@@ -1146,6 +1311,11 @@ function stackFetch(fetchRows) {
     if (!promise) promise = fetchRows();
     promise.then(({ rows, failed, emptyHtml, failedHtml }) => {
       if (!el.isConnected) return;
+      // Cleared before every render, filled only on the path that
+      // actually has something to open (see THE BAND PAGE): a message,
+      // an empty feed and a dashed slot are all boxes with nothing
+      // behind them, and none of the three is pressable.
+      fbSetPage(el, null);
       // Three states, and they say different things: a fetch that
       // never landed, a feed with nothing in it, and a feed with fewer
       // than three things are not the same fact -- only the first slot
@@ -1159,9 +1329,12 @@ function stackFetch(fetchRows) {
         el.classList.remove('fb-empty'); el.innerHTML = emptyHtml;
         return;
       }
+      // A row is the card AND the page it opens into -- one object, so
+      // a column cannot end up printing one thing and opening another.
       const row = rows[slot];
       if (!row) { el.classList.add('fb-empty'); el.innerHTML = ''; return; }
-      el.classList.remove('fb-empty'); el.innerHTML = row;
+      el.classList.remove('fb-empty'); el.innerHTML = row.html;
+      fbSetPage(el, row.page);
     });
   };
 }
@@ -1196,6 +1369,10 @@ async function loadEtkinlikActor(el, slot) {
   }
   const { days, failed } = await etkinlikPromise;
   if (!el.isConnected) return;
+  // Cleared before every render, filled only on the path that actually
+  // has something to open: a box with no payload is not pressable, which
+  // is the truth about a dashed slot or a fetch that failed.
+  fbSetPage(el, null);
   const dayIdx = 2 - slot;
   const label = ETKINLIK_LABELS[dayIdx];
   if (failed) {
@@ -1211,6 +1388,13 @@ async function loadEtkinlikActor(el, slot) {
   el.innerHTML = '<div class="k">' + label + '</div>' +
     '<div class="m">' + esc(eventTimeOnly(ev.event_date)) + '</div>' +
     '<div class="t">' + esc(ev.title) + ' — ' + esc(nb) + '</div>';
+  // What the box only had room to name (see THE BAND PAGE): the evening
+  // itself, where it is and what it is.
+  fbSetPage(el, {
+    kicker: label, meta: eventTimeOnly(ev.event_date), title: ev.title,
+    lines: [eventWhenLong(ev.event_date), [nb, ev.location].filter(Boolean).join(' · ')].filter(Boolean),
+    body: ev.description,
+  });
 }
 
 // ── Kütüphane's lane: one box per CATEGORY, not a feed ──
@@ -1254,6 +1438,10 @@ async function loadHaberlerActor(el, slot) {
   }
   const { byBucket, failed } = await haberlerPromise;
   if (!el.isConnected) return;
+  // Cleared before every render, filled only on the path that actually
+  // has something to open: a box with no payload is not pressable, which
+  // is the truth about a dashed slot or a fetch that failed.
+  fbSetPage(el, null);
   const bucket = HABER_BUCKETS[2 - slot];
   const label = HABER_LABELS[bucket];
   if (failed) {
@@ -1268,6 +1456,12 @@ async function loadHaberlerActor(el, slot) {
   el.innerHTML = '<div class="k">' + label + '</div>' +
     '<div class="m">' + esc(newsAge(n.updated_at)) + '</div>' +
     '<div class="t">' + esc(newsText(n, 'title')) + '</div>';
+  // The story itself, in whichever language it was actually written in
+  // (newsText) -- the same choice the headline above was printed with.
+  fbSetPage(el, {
+    kicker: label, meta: newsAge(n.updated_at),
+    title: newsText(n, 'title'), body: newsText(n, 'body'),
+  });
 }
 
 // A story is entered in both languages (db/breaking_news_v2_bilingual.sql);
@@ -1294,14 +1488,24 @@ function newsAge(iso) {
 // the three slots this column has.
 const loadOlaylarActor = stackFetch(async () => {
   try {
+    // `name_tr`, not `title` -- an olay is named, not headlined
+    // (db/world_events.sql). Asking for a column that does not exist is
+    // an error PostgREST answers the whole query with, so this column
+    // printed "Yüklenemedi" on a database that was perfectly healthy.
     const { data, error } = await IstRouter.sb.from('world_events')
-      .select('id, title')
+      .select('id, name_tr, blurb, parties, status, started_on, ended_on, body')
       .eq('status', 'ongoing')
       .order('sort_order', { ascending: true })
       .limit(3);
     if (error) throw error;
-    const rows = (data || []).map(r =>
-      '<div class="k">OLAY</div><div class="t">' + esc(r.title) + '</div>');
+    const rows = (data || []).map(r => ({
+      html: '<div class="k">OLAY</div><div class="t">' + esc(r.name_tr) + '</div>',
+      page: {
+        kicker: 'OLAY', title: r.name_tr,
+        lines: [r.parties, worldEventWhen(r)].filter(Boolean),
+        body: [r.blurb, r.body].filter(Boolean).join('\n\n'),
+      },
+    }));
     return { rows, failed: false,
       emptyHtml: '<div class="k">Olaylar</div><div class="t">Sürmüyor</div>' +
                  '<div class="m">Şu an süren bir olay yok.</div>' };
@@ -1312,6 +1516,16 @@ const loadOlaylarActor = stackFetch(async () => {
                   '<div class="m">Bağlantını kontrol et.</div>' };
   }
 });
+
+// Whether it is still going -- the one fact an olay carries that a news
+// item does not (db/world_events.sql). "2014 — sürüyor", "2003–2011".
+function worldEventWhen(r) {
+  const y = (d) => (d ? String(d).slice(0, 4) : '');
+  const from = y(r.started_on);
+  if (r.status === 'ongoing') return from ? from + ' — sürüyor' : 'Sürüyor';
+  const to = y(r.ended_on);
+  return [from, to].filter(Boolean).join('–');
+}
 
 // ── Kahvehane's other column: the fixed set of games ──
 // Not a feed -- always these three, in this order -- but a game the
@@ -1421,6 +1635,158 @@ function onpressOyun(e, slot) {
   openGameOverlay(gameForSlot(slot).file);
 }
 
+// ══════════════════════════════════════════════════════════════
+// THE BAND PAGE — a box, opened
+//
+// A box has room for a kicker, a timestamp and two lines of headline;
+// pressing it opens the whole of what it was naming. Where that page
+// goes is the one place it can go without covering what it came out of:
+// the band itself. It is THE sheet -- same markup, same IstSheet.open/
+// close -- arriving by the shared grow rather than by sliding, exactly
+// as Kütüphane's news page and Kahvehane's event page do.
+//
+// Every box that has something to open carries its own payload, set by
+// its loader at the moment it renders (`el._fbPage`). One handler reads
+// it, so a column adds a page by describing one rather than by wiring
+// one: a box with no payload -- a dashed slot, a placeholder, a feed
+// that failed -- is simply not pressable, which is the truth about it.
+// ══════════════════════════════════════════════════════════════
+
+let _fbOrigin = null;   // the box this page grew out of
+// Whether this page put an entry on the history stack. It does, so the
+// device's own back gesture closes the page rather than leaving the app
+// -- the reader's "back" is one thing, and on a phone it is not a mark
+// printed on the screen.
+let _fbPushed = false;
+
+function fbPageGrows() {
+  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+// Paragraph breaks are blank lines, single newlines are line breaks --
+// the same reading of a text column the rest of the site gives one.
+function fbParas(text) {
+  return String(text == null ? '' : text).split(/\n{2,}/)
+    .map(t => t.trim()).filter(Boolean)
+    .map(t => '<p>' + esc(t).replace(/\n/g, '<br>') + '</p>').join('');
+}
+
+// One page, whatever box it came out of: the card's own two corners on
+// the top line with the way back beside them, and everything the card
+// only had room to name underneath.
+function fbPageHTML(p) {
+  return '<div class="fb-page-head">' +
+      '<button class="fb-page-back" type="button" id="fb-page-back" ' +
+        'aria-label="Geri" title="Geri"><img src="assets/back.png" alt=""></button>' +
+      '<div class="k">' + esc(p.kicker || '') + '</div>' +
+      (p.meta ? '<div class="m">' + esc(p.meta) + '</div>' : '') +
+    '</div>' +
+    '<div class="fb-page-body">' +
+      '<h2 class="fb-page-title">' + esc(p.title || '') + '</h2>' +
+      (p.lines && p.lines.length
+        ? '<div class="fb-page-meta">' + p.lines.map(esc).join('<br>') + '</div>' : '') +
+      (p.body ? fbParas(p.body) : '') +
+    '</div>';
+}
+
+// What a box opens into, set by its loader as it renders. One setter
+// rather than a bare property, so "has a page" and "looks like it has
+// one" cannot drift apart: a dashed slot, a placeholder and a fetch that
+// failed are all boxes with nothing behind them, and none of the three
+// should say otherwise under a cursor.
+function fbSetPage(el, page) {
+  if (!el) return;
+  el._fbPage = page || null;
+  el.classList.toggle('fb-openable', !!page);
+}
+
+// The one press handler every openable column shares.
+function onpressBox(e) {
+  const el = e.currentTarget;
+  if (!el || !el._fbPage) return;
+  openFbPage(el._fbPage, el);
+}
+
+function openFbPage(payload, origin) {
+  const overlay = document.getElementById('fb-page-overlay');
+  const page = document.getElementById('fb-page');
+  const inner = document.getElementById('fb-page-inner');
+  if (!overlay || !page || !inner || !overlay.hidden) return;
+  _fbOrigin = origin || null;
+  inner.innerHTML = fbPageHTML(payload);
+  // The page came out of a column and keeps its ranging: Kahvehane's
+  // pair is the mirror of Kütüphane's (see .fb-mirror), so the red flag
+  // stands on the edge that column is ranged from.
+  page.classList.toggle('fb-mirror',
+    !!(origin && origin.classList.contains('fb-mirror')));
+  IstSheet.open(overlay);
+  if (fbPageGrows()) IstSheet.grow({ page, inner, origin: _fbOrigin, dir: 'in' });
+  const back = document.getElementById('fb-page-back');
+  if (back) back.addEventListener('click', () => dismissFbPage());
+  try { history.pushState({ fbPage: 1 }, ''); _fbPushed = true; } catch (err) {}
+}
+
+// Every way out that is the READER leaving goes through here, so the
+// history entry this page put on the stack is spent rather than left
+// behind -- otherwise the next back press would close a page that is
+// already gone. popstate does the actual closing in that case.
+function dismissFbPage() {
+  const overlay = document.getElementById('fb-page-overlay');
+  if (!overlay || overlay.hidden) return;
+  if (_fbPushed) { _fbPushed = false; history.back(); return; }
+  closeFbPage();
+}
+
+function closeFbPage() {
+  const overlay = document.getElementById('fb-page-overlay');
+  const page = document.getElementById('fb-page');
+  const inner = document.getElementById('fb-page-inner');
+  if (!overlay || !inner || overlay.hidden) return;
+  if (fbPageGrows()) IstSheet.grow({ page, inner, origin: _fbOrigin, dir: 'out' });
+  IstSheet.close(overlay, () => {
+    inner.innerHTML = '';
+    IstSheet.cancelGrow(page);
+    _fbOrigin = null;
+  });
+}
+
+// Gone this frame, with no fold-back: for a teardown of the page itself,
+// which has nothing left to fold back INTO. The overlay is body-level
+// and outlives the content swap, so a page left open would be the last
+// word on a page that is gone.
+function snapFbPageShut() {
+  const overlay = document.getElementById('fb-page-overlay');
+  const page = document.getElementById('fb-page');
+  const inner = document.getElementById('fb-page-inner');
+  if (!overlay || !inner || overlay.hidden) return;
+  IstSheet.cancelGrow(page);
+  overlay.classList.remove('open');
+  // This path drops .open by hand rather than through IstSheet.close, so
+  // the tint's other half has to be told (see syncDim there).
+  overlay.hidden = true;
+  IstSheet.syncDim();
+  inner.innerHTML = '';
+  _fbOrigin = null;
+  _fbPushed = false;
+}
+
+function wireFbPage() {
+  if (document.body.dataset.fbPageWired) return;
+  document.body.dataset.fbPageWired = '1';
+  const backdrop = document.getElementById('fb-page-backdrop');
+  if (backdrop) backdrop.addEventListener('click', () => dismissFbPage());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && IstSheet.isOpen('fb-page-overlay')) dismissFbPage();
+  });
+  // The device's own back. The entry is already off the stack by the
+  // time this runs, so this closes and never calls history again.
+  window.addEventListener('popstate', () => {
+    if (!IstSheet.isOpen('fb-page-overlay')) return;
+    _fbPushed = false;
+    closeFbPage();
+  });
+}
+
 // ── The not-yet-built columns (Hikâyeler, Bilgi, Kahve, Yorumlar) ──
 // No content pipeline exists for these yet (see "What is still in the
 // parts bin" in CLAUDE.md), so their boxes stay permanently dashed,
@@ -1499,7 +1865,7 @@ const CAST = [
   // which is why the two pose tables swap with the two columns.
   ...stackActors({
     idBase: 'etkinlik', live: 11, lane: LANE_KAHVEHANE, col: 'r', mirror: true, cls: 'fb-events',
-    poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadEtkinlikActor,
+    poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadEtkinlikActor, onpress: onpressBox,
   }),
   ...stackActors({
     idBase: 'oyun', live: 11, lane: LANE_KAHVEHANE, col: 'l', mirror: true, cls: 'fb-oyun',
@@ -1510,11 +1876,11 @@ const CAST = [
   // the Türkiye stop, and Bilgi has come in from it) ──
   ...stackActors({
     idBase: 'haber', live: 11, lane: LANE_KUTUPHANE, col: 'l', cls: 'fb-haberler',
-    poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadHaberlerActor,
+    poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadHaberlerActor, onpress: onpressBox,
   }),
   ...stackActors({
     idBase: 'olay', live: 0, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-olaylar',
-    poses: END0_POSES_R, lag: 0.43, lagFree: 0.135, load: loadOlaylarActor,
+    poses: END0_POSES_R, lag: 0.43, lagFree: 0.135, load: loadOlaylarActor, onpress: onpressBox,
   }),
 
   // ── Türkiye (slide 1) and the ilçe (slide 24): apart from Olaylar,
@@ -2384,6 +2750,7 @@ function mount() {
   // both wirings are idempotent.
   wireMap();
   wireGameOverlay();
+  wireFbPage();
 }
 function unmount() {
   stopAnim();
@@ -2392,6 +2759,7 @@ function unmount() {
   // that dims the bottom bar.
   closeMap();
   closeGameOverlay(true);
+  snapFbPageShut();
   traveling = false;
   if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
   // The petek leaves two things behind it that live OUTSIDE this page --
