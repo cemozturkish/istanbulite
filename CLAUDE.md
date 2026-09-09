@@ -1097,9 +1097,18 @@ coordinates that say where each paper hangs.
   `renderGhostBoard`). The board shows only the letters that *locked*, so everything else the
   reader had just tried vanished the moment it was read out — the pips say how many guesses are
   gone, they cannot say what was in them. So the guess just submitted stays on the table as a
-  faint second comb, nested into the live one the way a honeycomb nests: half a column across and
-  one level down, the same two offsets the syllable staircase itself steps by (`GHOST_DX` /
-  `GHOST_DY`), so the two interlock instead of overlapping. It is painted from the history the
+  faint second comb, nested into the live one the way a honeycomb nests: **three half-columns
+  across and one level down** (`GHOST_DX` / `GHOST_DY`), which is the one offset that can never
+  collide — and by arithmetic rather than by luck, which is why it needs no case for a word of two
+  syllables against one of three, or for syllables of two letters against three. The staircase
+  steps a syllable down one level and right by `2*len - 3` half-columns, so a ghost tile from
+  syllable *s* lands on level *s*+1 at `start(s) - 3 + 2j`, and the only live tiles it could hit
+  there are syllable *s*+1's, at `start(s) + 2*len(s) - 3 + 2i` — equal only where `j = len(s) + i`,
+  which `j` never reaches. What it lands on instead is the notch: that row's rightmost ghost tile
+  is exactly one full column left of the live row's first tile, so the two combs touch along their
+  edges. **The sign is load-bearing** — three half-columns to the *right* solves `j = len(s) - 3 + i`
+  and collides on any syllable of three letters or more, and one half-column either way (which this
+  was at first) collides on nearly every word there is. It is painted from the history the
   game already keeps (`submittedGuesses` / `guessResults`), so a reloaded board brings it back for
   free. `back` is which one to take: 0 while playing, 1 once the game is over — there the live
   comb *is* the last guess, and a ghost of the same word behind it is a blur. **The room it takes

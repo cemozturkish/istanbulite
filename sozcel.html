@@ -4251,11 +4251,28 @@ const TILE_GAP_RATIO = TILE_VISUAL_GAP - 2 * TILE_ART_PAD_X;
 // second term opens that back up until the slanted edges stand
 // TILE_VISUAL_GAP apart measured perpendicular, exactly like the vertical
 // edges do across.
-// Where the ghost of the last guess sits: one honeycomb cell behind the
-// live comb -- half a column across (in half-columns, so 1) and one level
-// down. The same two offsets a syllable steps by, which is what makes the
-// two combs interlock rather than overlap.
-const GHOST_DX = 1;
+// Where the ghost of the last guess sits: THREE half-columns to the left
+// and one level down. It is the one offset that never collides, and it
+// does so by arithmetic rather than by luck -- which is why the ghost can
+// be laid over any word, of any number of syllables, of any lengths,
+// without a single case to special-case.
+//
+// The staircase steps a syllable down by one level and right by
+// 2*len - 3 half-columns (see syllableLayout). So a ghost tile from
+// syllable s lands on level s+1 at half-column start(s) - 3 + 2j, and the
+// LIVE tiles it could hit there are syllable s+1's, at
+// start(s) + 2*len(s) - 3 + 2i. Equal only where j = len(s) + i -- and j
+// never reaches len(s), let alone passes it. No overlap, whatever the
+// lengths are.
+//
+// What it lands on instead is the notch: that row's rightmost ghost tile
+// is exactly one full column left of the live row's first tile, so the
+// two combs interlock the way a honeycomb does, touching along their
+// edges. The sign is load-bearing -- three half-columns to the RIGHT
+// solves j = len(s) - 3 + i and collides on any syllable of three letters
+// or more. One half-column either way (which is what this was) collides
+// on nearly every word there is.
+const GHOST_DX = 3;
 const GHOST_DY = 1;
 
 const LEVEL_STEP = (function () {
