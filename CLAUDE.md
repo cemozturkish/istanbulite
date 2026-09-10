@@ -1430,7 +1430,7 @@ confirms it; and the swap is aimed at images whose src *is* `istanbul-map.png`, 
 Turkey map wears the same `.map-photo` class in the same shared document. Adding a district is a
 file drop plus one id in `PAINTED` — see `assets/map/home/README.md`.
 
-### The map reads the palette — `map-ink.js` + the ladder in `palette.css`
+### The drawings read the palette — `map-ink.js` + the ladders in `palette.css`
 
 The hand-drawn maps used to be the one thing on the site that ignored the palette: the same
 near-white paper and black ink whether the reader was on the earth palette at noon or the mono one
@@ -1461,7 +1461,17 @@ Four things about it:
   swap in the dark theme. That is why these are seven tokens of their own rather than the page's.
 - **Mono at night is deliberately a step LIGHTER than earth at night.** Equal luminance is not
   equal darkness: the same gray reads flatter and heavier than the warm brown beside it, so
-  matching the two by number made the mono one look like the lights had gone out.
+  matching the two by number made the mono one look like the lights had gone out. The page's night palette (frames.css)
+  follows the maps in both respects: **night is the day with the PAPER turned down, not the day
+  turned over** — dark ink on lighter paper, the same ladder in the same order, and what makes it
+  night is that the paper drops ~80% in brightness while the ink, already near-black, barely moves.
+  What that costs is stated in the block itself: on the earth night paper even pure black reaches
+  only 3.86:1, so body text lands at 3.30:1 against noon's 8.21:1 and no amount of darkening the
+  ink recovers it — the paper decides, and `#8a7160` (that block's own `--page-bg`) is the darkest
+  paper that clears 4.5:1 with black ink. The fire orange is the one thing the palette cannot keep:
+  `#CB5A16` lands at 1.09:1 on that paper — the two are the same brightness — so it is walked down
+  its own hue to `#471f08` (2.63:1), since day parity would need `#410300`, a maroon with no orange
+  left in it.
 - **The red is lifted out before the ramp and merged back on top.** It is chromatic, so a
   luminance lookup would flatten it onto the browns. Its mask has to be something `feColorMatrix`
   can express, i.e. linear in R/G/B: `R − (G+B)/2` is zero on any gray by construction and 0.474 on
@@ -1496,6 +1506,41 @@ nothing when it did not — the `DOMContentLoaded` pass is the one that lands.
 page it is drawn on in the same frame. The selector list deliberately does not catch
 `.olay-draw image` — the olaylar drawings are hand-coloured per olay and are the one thing over
 these maps that is not gray.
+
+**And the maps are not the only drawn grays, so there are two ladders** (`LADDERS` in map-ink.js).
+The avatar family — `assets/avatar-*.png` plus `frame-background.png` — is the same measurement
+again and even cleaner: four flat tones, already transparent, already registered on the one
+1024×1536 hexframe canvas. `#f9f9f9` the figure's own paper (`--av-paper`), `#dcdbdb` the ground
+behind it (`--av-ground`), `#5b5b5b` the jail stripes (`--av-jail`), `#181818` the ink that draws
+the outline, the hair, the glasses and the shirt alike (`--av-ink`). Adding a third drawn family is
+a row in that table.
+
+Four things about that second ladder:
+
+- **It does not follow the theme the way the page does, and that is measured rather than
+  preferred.** An avatar is a stamp — a figure printed on its own paper — and its ink sits 13.2:1
+  off that paper by day, while the night page's paper is dark enough that even pure black reaches
+  3.9:1. An avatar dimmed with the page is an avatar nobody can read, so it steps down a little at
+  night and stays firmly its own light sheet.
+- **The alpha row of `feColorMatrix` must PASS ALPHA THROUGH** (`0 0 0 1 0`). Forcing it opaque
+  (`0 0 0 0 1`) is harmless on the maps, which fill their box with no transparency at all, and it
+  destroys the avatars: every pixel outside the drawing becomes opaque, and since transparent black
+  has luminance 0 the whole canvas floods with the darkest tone on the ladder. What you get is a
+  solid ink-coloured hexagon with the figure knocked out of it — which reads as a deliberate
+  inversion rather than as a bug, which is exactly why it is worth stating.
+- **Only `.ist-avatar-stack img` is filtered**, never every `<img>` on the site: a politician's
+  photograph is not a four-tone drawing and must not go through a four-tone lookup. `avatar.js`
+  always wraps the stack, so the stack is the fence.
+- **The ground behind the figure is a MASK, not a filtered picture.** It is one flat tone across
+  its whole silhouette, so all of its shape is in its alpha already — and it cannot be filtered
+  with the layers above it, because it is painted as the frame's own background and the drawn ring
+  (`::after`) is that same element's child: one filter on the box would push the ring, which
+  already follows `--hexframe-stroke`, through the ladder a second time. It goes on `::before`,
+  which lands under the `<img>` layers by tree order while the ring keeps its `z-index: 10` above
+  them.
+
+**The page's own paper IS the map's sea**, in both palettes and both themes (`--paper` ==
+`--map-sea`), which is what keeps the drawing and the page it lies on reading as one sheet.
 
 ### The map is scenery, and it drifts — `map-parallax.js`
 
