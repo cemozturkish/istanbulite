@@ -316,12 +316,10 @@
   // remapped via normalize* below to their nearest neighbour.
   // palette_pref reuses the column written by onboarding.js: 'mono' = siyah-beyaz, 'earth' = kahverengi.
   const LANG_VALUES    = ['more_english', 'default'];   // 0: Daha İngilizce, 1: Daha Türkçe
-  const THEME_VALUES   = ['light', 'dark'];             // 0: Açık,           1: Koyu
   const PALETTE_VALUES = ['mono', 'earth'];             // 0: Siyah-Beyaz,    1: Kahverengi
   const ADMIN_EMAIL = 'cemwozturk@gmail.com';
 
   function normalizeLang(v)    { return v === 'more_english' ? 'more_english' : 'default'; }
-  function normalizeTheme(v)   { return v === 'dark' ? 'dark' : 'light'; }
   function normalizePalette(v) { return v === 'earth' ? 'earth' : 'mono'; }
 
   // Which Istanbul-local weekdays each game runs on (Monday=0 … Sunday=6),
@@ -887,14 +885,12 @@
     }
 
     const palettePref = normalizePalette(profile?.palette_pref);
-    const themePrefForApply = normalizeTheme(profile?.theme_pref);
     // Apply the freshly-fetched DB value now, synchronously, so the
     // avatar (and everything else gated on Palette.current) renders in
     // the right colors immediately instead of racing the slower
     // Palette.syncFromSupabase call some pages also make on load.
     if (global.Palette) {
       global.Palette.setPalette(palettePref);
-      global.Palette.setTheme(themePrefForApply);
     }
 
     return {
@@ -2113,15 +2109,12 @@
       options: [{ value: 'default', label: 'Daha Türkçe' }, { value: 'more_english', label: 'Daha İngilizce' }] },
     { key: 'palette', column: 'palette_pref', label: 'profile.colortheme',
       options: [{ value: 'mono', label: 'Siyah-Beyaz' }, { value: 'earth', label: 'Kahverengi' }] },
-    { key: 'theme', column: 'theme_pref', label: 'profile.appearance',
-      options: [{ value: 'light', label: 'Açık' }, { value: 'dark', label: 'Koyu' }] },
   ];
 
   function hivePrefValue(state, pref) {
     const raw = state.profile ? state.profile[pref.column] : null;
     if (pref.key === 'lang') return normalizeLang(raw);
-    if (pref.key === 'palette') return normalizePalette(raw);
-    return normalizeTheme(raw);
+    return normalizePalette(raw);
   }
 
   function hiveSelfHTML(state) {
@@ -2172,7 +2165,6 @@
     if (msg) msg.textContent = '';
     state.profile = Object.assign({}, state.profile, { [pref.column]: value });
     if (key === 'palette' && global.Palette) global.Palette.setPalette(value);
-    if (key === 'theme' && global.Palette) global.Palette.setTheme(value);
     if (key === 'lang' && state.I18N && state.I18N.setLang) state.I18N.setLang(value);
     // The block is rebuilt rather than patched: a language change rewrites
     // every label on it, and the marks have to agree with what was just
@@ -3401,11 +3393,9 @@
     const phone = profile?.phone || '';
     const referralCode = profile?.referral_code || '';
     const languagePref = normalizeLang(profile?.language_pref);
-    const themePref = normalizeTheme(profile?.theme_pref);
     const palettePref = normalizePalette(profile?.palette_pref);
     const langLabel = LANG_VALUES.indexOf(languagePref) === 1 ? 'Daha Türkçe' : 'Daha İngilizce';
     const paletteLabel = PALETTE_VALUES.indexOf(palettePref) === 1 ? 'Kahverengi' : 'Siyah-Beyaz';
-    const themeLabel = THEME_VALUES.indexOf(themePref) === 1 ? 'Koyu' : 'Açık';
 
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
     const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
@@ -3485,14 +3475,6 @@
               <span data-idx="1">Kahverengi</span>
             </div>
           </div>
-          <div class="ist-pc-field">
-            <div class="ist-pc-label">${esc(t('profile.appearance'))}</div>
-            <input class="ist-pc-slider" id="po-theme" type="range" min="0" max="1" step="1" value="${THEME_VALUES.indexOf(themePref)}">
-            <div class="ist-pc-ticks" id="po-theme-ticks">
-              <span data-idx="0">Açık</span>
-              <span data-idx="1">Koyu</span>
-            </div>
-          </div>
           ` : `
           <div class="ist-pc-info-row">
             <div class="ist-pc-info-label">${esc(t('profile.langpref'))}</div>
@@ -3501,10 +3483,6 @@
           <div class="ist-pc-info-row">
             <div class="ist-pc-info-label">${esc(t('profile.colortheme'))}</div>
             <div class="ist-pc-info-value">${esc(paletteLabel)}</div>
-          </div>
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.appearance'))}</div>
-            <div class="ist-pc-info-value">${esc(themeLabel)}</div>
           </div>
           `}
           <div class="ist-pc-actions">
@@ -3564,7 +3542,6 @@
     }
     syncTicks('po-language', 'po-language-ticks');
     syncTicks('po-palette', 'po-palette-ticks');
-    syncTicks('po-theme', 'po-theme-ticks');
     const signoutBtn = document.getElementById('po-signout');
     if (signoutBtn) signoutBtn.addEventListener('click', async () => {
       await sb.auth.signOut();
@@ -3613,12 +3590,10 @@
       return values[parseInt(el.value, 10)] || values[0];
     };
     const newLang = sliderValue('po-language', LANG_VALUES, normalizeLang(state.profile?.language_pref));
-    const newTheme = sliderValue('po-theme', THEME_VALUES, normalizeTheme(state.profile?.theme_pref));
     const newPalette = sliderValue('po-palette', PALETTE_VALUES, normalizePalette(state.profile?.palette_pref));
 
     const payload = {
       language_pref: newLang,
-      theme_pref: newTheme,
       palette_pref: newPalette,
     };
 
@@ -3630,11 +3605,11 @@
       const { data, error } = await sb.from('profiles').update(payload).eq('id', user.id).select('id');
       if (error) throw error;
       if (!data || data.length === 0) throw new Error('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
-      // Cache the new palette/theme locally so the reload starts in the
-      // right colors instead of flashing the old ones.
+      // Cache the new palette locally so the reload starts in the right
+      // colors instead of flashing the old one. Light/dark isn't stored
+      // here at all any more — the sun decides that (see palette.js).
       if (global.Palette) {
         global.Palette.setPalette(newPalette);
-        global.Palette.setTheme(newTheme);
       }
       setTimeout(() => window.location.reload(), 400);
     } catch (err) {
