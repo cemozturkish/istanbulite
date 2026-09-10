@@ -2343,6 +2343,21 @@ Six things about it:
   the other two up to fill the gap. Olaylar alone stays a genuine feed (the top three ongoing
   olaylar by `sort_order`, whichever those are on a given day) rather than three fixed buckets,
   because there is no third axis to bucket an olay by.
+- **The bucket is only about the SLOT, never about what the box's own page holds.** Which of
+  İSTANBUL/TÜRKİYE/DÜNYA a story stands in is a fact about that one bucket's newest story and
+  nothing else — it is not a feed of everything in the category, and it is not the seri (`seri` ≠
+  bucket, see "OLAYLAR — the world events themselves" for how a seri differs from a country
+  entry's or an olay's own Zaman Akışı). But if the story filling a bucket is itself a `seri`'s own
+  gelişme — a fresh post linking back to earlier ones about the same developing thing that have
+  since aged out of the 72h window — pressing it opens its earlier siblings too
+  (`fetchSeriesSiblings`, `seriesTimelineHTML` in project.html), printed under its own paragraphs
+  as a "Zaman Akışı" exactly the way the Türkiye stop's pinned Dünya box already prints a seri's
+  history. Otherwise a member reading the newest update of something they were never shown the
+  start of has nowhere in the app to find it: the seri only otherwise surfaces if the admin has
+  also pinned it to one of the three Türkiye-stop slots, which most series never are. Same pool,
+  same cap (9, one seat for the fresh post and eight for its history) and the same `archived_at`
+  filter the pinned box reads, cached per `series_id` so two boxes opening onto the same seri never
+  fetch it twice.
 - **And the sequence is a gate: you cannot skip ahead.** Tümcel stays shut until Sözcel has been
   played and Bulmaca until Tümcel has (`gameBlocker` in project.html). A locked box is **not**
   `.fb-empty` — it still names its game and says what is standing in front of it ("Önce Sözcel"),
