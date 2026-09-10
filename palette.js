@@ -1,24 +1,21 @@
 // Shared palette helper for Istanbulite.
 // Reads `profiles.palette_pref` (cached in localStorage for instant first paint),
 // sets data-palette on <html>, and exposes a setter the AYARLAR panel calls.
-// Does the same for `profiles.theme_pref` (Görünüm, Açık/Koyu) as data-theme.
+// Also sets data-theme (Açık/Koyu) — but that one is never a member's
+// choice. It follows the sun over Istanbul (IstDate.isDaytime(), see
+// ist-date.js): light while it's up, dark once it has set. Every page that
+// loads this must also load ist-date.js first.
 //
 // Values: 'mono' (default — siyah-beyaz) | 'earth' (warm cream / brown).
 // Pages declare warm/earth tokens inline; palette.css overrides them when
 // data-palette="mono". See palette.css for the override block.
-//
-// theme_pref: 'light' (default) | 'dark'. Mono has no dark variant, so
-// data-theme only ever changes anything under data-palette="earth" — see
-// the `:root[data-palette="earth"][data-theme="…"]` blocks in frames.css.
-// Without it, earth's appearance just followed the OS's prefers-color-scheme
-// with no way to override it, so a member's own Açık/Koyu pick in the
-// profile sheet was stored but never actually applied.
 
 (function (global) {
   const STORAGE_KEY = 'istanbulite_palette_pref';
   const VALID = new Set(['mono', 'earth']);
-  const THEME_STORAGE_KEY = 'istanbulite_theme_pref';
-  const VALID_THEME = new Set(['light', 'dark']);
+  // Only a fallback for the instant between page load and IstDate being
+  // reachable (or the rare case it errors) — never a choice of its own.
+  const THEME_CACHE_KEY = 'istanbulite_theme_cache';
 
   function readCached() {
     try {
@@ -29,18 +26,28 @@
   function writeCached(v) {
     try { localStorage.setItem(STORAGE_KEY, v); } catch (e) { /* ignore */ }
   }
-  function readCachedTheme() {
-    try {
-      const v = localStorage.getItem(THEME_STORAGE_KEY);
-      return VALID_THEME.has(v) ? v : 'light';
-    } catch (e) { return 'light'; }
-  }
-  function writeCachedTheme(v) {
-    try { localStorage.setItem(THEME_STORAGE_KEY, v); } catch (e) { /* ignore */ }
-  }
 
   let current = readCached();
-  let currentTheme = readCachedTheme();
+
+  // The sun over Istanbul is the only thing that decides light vs. dark —
+  // see ist-date.js's isDaytime(). Falls back to whatever was cached last
+  // (and finally to light) only if IstDate itself is unreachable.
+  function computeTheme() {
+    try {
+      if (global.IstDate && global.IstDate.isDaytime) {
+        const v = global.IstDate.isDaytime() ? 'light' : 'dark';
+        try { localStorage.setItem(THEME_CACHE_KEY, v); } catch (e) { /* ignore */ }
+        return v;
+      }
+    } catch (e) { /* fall through to cache */ }
+    try {
+      const cached = localStorage.getItem(THEME_CACHE_KEY);
+      if (cached === 'light' || cached === 'dark') return cached;
+    } catch (e) { /* ignore */ }
+    return 'light';
+  }
+
+  let currentTheme = computeTheme();
 
   function apply() {
     document.documentElement.setAttribute('data-palette', current);
@@ -55,19 +62,22 @@
     apply();
   }
 
-  function setTheme(v) {
-    if (!VALID_THEME.has(v)) v = 'light';
+  // Re-derives the theme from the sun's own position and repaints if it
+  // moved. Called on a timer and whenever the tab becomes visible again,
+  // since a member can easily have the app open across an actual sunset.
+  function refreshTheme() {
+    const v = computeTheme();
+    if (v === currentTheme) return;
     currentTheme = v;
-    writeCachedTheme(v);
     apply();
   }
 
-  // Mirrors --page-bg (frames.css, varies by palette + OS light/dark
-  // scheme) onto <meta name="theme-color">, so the iOS/Android status
-  // bar and Safari's surrounding chrome match the page instead of
-  // defaulting to black in dark mode. frames.css loads after this
-  // script, so the very first call (before its rules exist) is a
-  // no-op -- window's load event below re-fires it once styles are in.
+  // Mirrors --page-bg (frames.css, varies by palette + light/dark theme)
+  // onto <meta name="theme-color">, so the iOS/Android status bar and
+  // Safari's surrounding chrome match the page instead of defaulting to
+  // black in dark mode. frames.css loads after this script, so the very
+  // first call (before its rules exist) is a no-op -- window's load event
+  // below re-fires it once styles are in.
   function syncThemeColor() {
     try {
       const meta = document.querySelector('meta[name="theme-color"]');
@@ -80,8 +90,13 @@
 
   try {
     window.addEventListener('load', syncThemeColor);
-    window.matchMedia('(prefers-color-scheme: dark)')
-      .addEventListener('change', syncThemeColor);
+    // The sun doesn't jump, but a member can leave the app open across an
+    // actual sunrise/sunset — a minute's grain is close enough to feel
+    // instant without polling harder than the change ever moves.
+    setInterval(refreshTheme, 60000);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) refreshTheme();
+    });
   } catch (e) { /* ignore */ }
 
   // Historically, avatar preset images shipped in two color variants (e.g.
@@ -100,24 +115,19 @@
     if (!sb || !userId) return;
     try {
       const { data } = await sb.from('profiles')
-        .select('palette_pref, theme_pref').eq('id', userId).maybeSingle();
+        .select('palette_pref').eq('id', userId).maybeSingle();
       // If DB has a known value, adopt it. If null/unset, KEEP the cached
       // choice — otherwise a freshly saved 'mono' on one page would flip
       // back to 'earth' on the next page before its update propagates.
       if (data && VALID.has(data.palette_pref)) setPalette(data.palette_pref);
-      // Same race as palette_pref above: only adopt a known DB value,
-      // otherwise keep the cached choice (which already defaults to
-      // 'light', matching how profile-card.js normalizes a null column).
-      if (data && VALID_THEME.has(data.theme_pref)) setTheme(data.theme_pref);
     } catch (e) { /* keep cached value */ }
   }
 
-  // Apply ASAP so the page renders in the right palette without flicker.
+  // Apply ASAP so the page renders in the right palette/theme without flicker.
   apply();
 
   global.Palette = {
     setPalette,
-    setTheme,
     syncFromSupabase,
     avatarSrc,
     get current() { return current; },

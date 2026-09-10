@@ -47,7 +47,6 @@
     'profile.birthplace':  { default: 'Doğum Yeri',          more_english: 'Birthplace' },
     'profile.membership':  { default: 'Üyelik',              more_english: 'Member Since' },
     'profile.langpref':    { default: 'Dil Tercihi',         more_english: 'Language' },
-    'profile.appearance':  { default: 'Görünüm',             more_english: 'Appearance' },
     'profile.colortheme':  { default: 'Renk',                more_english: 'Color' },
     'profile.kefil':       { default: 'KEFİL',               more_english: 'SPONSOR' },
     'profile.account':     { default: 'Hesap',               more_english: 'Account' },

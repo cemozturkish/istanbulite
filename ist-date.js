@@ -85,6 +85,80 @@
   }
 
 
+  // ── Sunrise/sunset over Istanbul — the clock the light/dark theme runs
+  // on now (see palette.js). No user picks Açık/Koyu any more: the sun
+  // does, so this has to be a real calculation rather than a stored
+  // preference. Standard sunrise equation (see
+  // https://en.wikipedia.org/wiki/Sunrise_equation), accurate to within a
+  // minute or two — plenty for a UI switch, and there is no elevation/
+  // horizon correction worth adding for a latitude that never sees a
+  // polar day or night.
+  const SUN_LAT = 41.0082;   // Istanbul
+  const SUN_LNG = 28.9784;  // east positive
+  const SUN_LW = -SUN_LNG;  // the equation's own convention: longitude WEST
+
+  function toRad(deg) { return deg * Math.PI / 180; }
+  function toDeg(rad) { return rad * 180 / Math.PI; }
+
+  // Julian Day Number for a Gregorian calendar date (proleptic formula).
+  function julianDayNumber(y, m, d) {
+    const a = Math.floor((14 - m) / 12);
+    const yy = y + 4800 - a;
+    const mm = m + 12 * a - 3;
+    return d + Math.floor((153 * mm + 2) / 5) + 365 * yy
+      + Math.floor(yy / 4) - Math.floor(yy / 100) + Math.floor(yy / 400) - 32045;
+  }
+
+  function julianToDate(J) {
+    return new Date((J - 2440587.5) * 86400000);
+  }
+
+  // Sunrise/sunset for the Istanbul calendar date `base` falls on
+  // (default: now), as real Date instants — not Istanbul wall-clock
+  // fields like now() returns, since these are compared straight against
+  // `new Date()` elsewhere.
+  function sunTimes(base) {
+    const p = parts(base);
+    const jdn = julianDayNumber(p.year, p.month, p.day);
+
+    const nStar = jdn - 2451545.0009 - SUN_LW / 360;
+    const n = Math.round(nStar);
+    const Jstar = 2451545.0009 + SUN_LW / 360 + n;
+
+    let M = (357.5291 + 0.98560028 * (Jstar - 2451545.0)) % 360;
+    if (M < 0) M += 360;
+    const Mr = toRad(M);
+    const C = 1.9148 * Math.sin(Mr) + 0.0200 * Math.sin(2 * Mr) + 0.0003 * Math.sin(3 * Mr);
+
+    let lambda = (M + 102.9372 + C + 180) % 360;
+    if (lambda < 0) lambda += 360;
+    const lambdaR = toRad(lambda);
+
+    const Jtransit = Jstar + 0.0053 * Math.sin(Mr) - 0.0069 * Math.sin(2 * lambdaR);
+
+    const delta = Math.asin(Math.sin(lambdaR) * Math.sin(toRad(23.4397)));
+    const latR = toRad(SUN_LAT);
+    const cosOmega = (Math.sin(toRad(-0.833)) - Math.sin(latR) * Math.sin(delta))
+      / (Math.cos(latR) * Math.cos(delta));
+    const omega = toDeg(Math.acos(Math.max(-1, Math.min(1, cosOmega))));
+
+    return {
+      sunrise: julianToDate(Jtransit - omega / 360),
+      sunset: julianToDate(Jtransit + omega / 360),
+      solarNoon: julianToDate(Jtransit),
+    };
+  }
+
+  // Whether `base` (default: now) falls between that Istanbul day's
+  // sunrise and sunset. This is the whole of what decides light vs. dark
+  // mode site-wide (palette.js) — there is no OS preference and no
+  // member setting behind it any more.
+  function isDaytime(base) {
+    const b = base || new Date();
+    const { sunrise, sunset } = sunTimes(b);
+    return b >= sunrise && b < sunset;
+  }
+
   // ── Two helpers the game-bearing pages each carried their own copy of ──
   // Both are about the Istanbul day, which is this file's whole subject,
   // so they belong here rather than four times over in four <script>
@@ -111,5 +185,5 @@
     return global.I18N ? global.I18N.formatCountdown(hours, minutes, opts) : '';
   }
 
-  global.IstDate = { parts, now, iso, daySeed, nextMidnight, parseYMD, untilMidnight, TZ };
+  global.IstDate = { parts, now, iso, daySeed, nextMidnight, parseYMD, untilMidnight, sunTimes, isDaytime, TZ };
 })(window);
