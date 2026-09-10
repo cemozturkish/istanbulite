@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════
-// THE MAP READS THE PALETTE — map-ink.js
+// THE DRAWINGS READ THE PALETTE — map-ink.js
 // ──────────────────────────────────────────────────────────────
 // The hand-drawn maps used to be the one thing on the site that ignored
 // the palette: the same near-white paper and black ink whether the reader
@@ -48,6 +48,22 @@
 // table lookup, one entry per 8-bit gray, so every anchor above lands
 // exactly on a sample and the output is the token to the last bit.
 //
+// ── Two ladders, one mechanism ──
+// The maps are not the only hand-drawn grays on the site. The avatar
+// family (assets/avatar-*.png, frame-background.png) is the same thing
+// again, measured the same way and even cleaner: four flat tones and
+// nothing else — #f9f9f9 the figure's own paper, #dcdbdb the ground it
+// stands on, #5b5b5b the jail stripes, #181818 the ink that draws the
+// outline, the hair, the glasses and the shirt alike. So LADDERS below
+// carries both, and adding a third drawn family is a row in that table.
+//
+// The avatar's ladder is deliberately NOT the page's. It is a stamp: a
+// figure printed on its own paper, and that paper stays light at night
+// while the page around it goes dark. Measured, that is not a taste —
+// the avatar's ink sits 13.2:1 off its own paper by day, and on a night
+// page even pure black reaches 3.9:1, so an avatar dimmed with the page
+// is an avatar nobody can read.
+//
 // The red is CHROMATIC and would be flattened onto that ramp, so it is
 // lifted out first and merged back on top. Its mask has to be something
 // feColorMatrix can express, i.e. linear in R/G/B: R − (G+B)/2 is zero on
@@ -67,7 +83,6 @@
 
 (function (global) {
   const NS = 'http://www.w3.org/2000/svg';
-  const FILTER_ID = 'ist-map-ink';
   // The class the maps' own `filter:` rule is gated on (palette.css). It
   // is added only once the filter is actually in the document and its
   // tables are written: a `filter: url()` pointing at a filter that is
@@ -76,20 +91,33 @@
   // failure than a map that stays gray.
   const READY_CLASS = 'ist-map-ink';
 
-  // The drawing's own tones, as 8-bit grays, DESCENDING — and the token
-  // each one reads. Order matters twice: it is the ladder, and the ramp
-  // below walks it from the lightest end down.
-  const TONES = [255, 247, 217, 198, 180, 0];
-  const VARS = ['--map-page', '--map-sea', '--map-land',
-                '--map-turkiye', '--map-edge', '--map-ink'];
-  const RED_VAR = '--map-red';
+  // Each drawn family's own tones, as 8-bit grays, DESCENDING — and the
+  // token each one reads. Order matters twice: it is the ladder, and the
+  // ramp below walks it from the lightest end down. `red` is the one
+  // chromatic layer, and only the maps have one.
+  const LADDERS = [
+    {
+      id: 'ist-map-ink',
+      tones: [255, 247, 217, 198, 180, 0],
+      vars: ['--map-page', '--map-sea', '--map-land',
+             '--map-turkiye', '--map-edge', '--map-ink'],
+      red: '--map-red',
+    },
+    {
+      id: 'ist-avatar-ink',
+      tones: [249, 220, 91, 24],
+      vars: ['--av-paper', '--av-ground', '--av-jail', '--av-ink'],
+      red: null,
+    },
+  ];
 
   // One entry per 8-bit gray. Not a round number picked for looks: every
   // tone above is k/255, so at this size each lands exactly on a sample
   // and no anchor is reached by interpolation.
   const STEPS = 256;
 
-  let filter = null, funcs = null, flood = null;
+  // id -> { filter, funcs, flood }
+  let built = null;
 
   // '#rgb' / '#rrggbb' / 'rgb(r, g, b)' -> [r, g, b] in 0..1
   function parseColor(raw) {
@@ -111,6 +139,54 @@
     return n;
   }
 
+  function buildOne(spec, defs) {
+    // sRGB, not the linearRGB filters default to: every ladder was
+    // measured off its artwork's own 8-bit values, so the lookup has to
+    // happen in the space those values are written in.
+    const filter = el('filter', {
+      id: spec.id, 'color-interpolation-filters': 'sRGB',
+      x: 0, y: 0, width: '100%', height: '100%',
+    });
+    const LUM = '0.2126 0.7152 0.0722 0 0 ';
+    // The alpha row PASSES ALPHA THROUGH ('0 0 0 1 0'), and that is not a
+    // formality. Forcing it opaque ('0 0 0 0 1') is harmless on the maps,
+    // which fill their box with no transparency at all -- and it destroys
+    // the avatars, which are transparent PNGs: every pixel outside the
+    // drawing becomes opaque, and since transparent black has luminance 0
+    // the whole 1024x1536 canvas floods with the darkest tone on the
+    // ladder. What you get is a solid ink-coloured hexagon with the
+    // figure knocked out of it, which reads as a deliberate inversion
+    // rather than as a bug -- so it is worth stating.
+    filter.appendChild(el('feColorMatrix', {
+      type: 'matrix', result: 'lum', values: LUM + LUM + LUM + '0 0 0 1 0',
+    }));
+    const tr = el('feComponentTransfer', { in: 'lum', result: 'tones' });
+    const funcs = {};
+    for (const ch of ['R', 'G', 'B']) {
+      funcs[ch] = el('feFunc' + ch, { type: 'table', tableValues: '0 1' });
+      tr.appendChild(funcs[ch]);
+    }
+    filter.appendChild(tr);
+    let flood = null;
+    if (spec.red) {
+      filter.appendChild(el('feColorMatrix', {
+        in: 'SourceGraphic', type: 'matrix', result: 'redmask',
+        values: '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  2.1 -1.05 -1.05 0 0',
+      }));
+      flood = el('feFlood', { 'flood-color': '#ba433f', result: 'redfill' });
+      filter.appendChild(flood);
+      filter.appendChild(el('feComposite', {
+        in: 'redfill', in2: 'redmask', operator: 'in', result: 'red',
+      }));
+      const merge = el('feMerge', {});
+      merge.appendChild(el('feMergeNode', { in: 'tones' }));
+      merge.appendChild(el('feMergeNode', { in: 'red' }));
+      filter.appendChild(merge);
+    }
+    defs.appendChild(filter);
+    return { filter, funcs, flood };
+  }
+
   // Built with DOM calls and hung in the BODY, and both halves of that are
   // deliberate rather than style. `svg.innerHTML` parses an SVG fragment
   // through the HTML parser and is the kind of thing engines disagree
@@ -126,43 +202,13 @@
   // simply does not add the ready class, and the DOMContentLoaded pass
   // below builds it for real.
   function build() {
-    if (filter) return true;
+    if (built) return true;
     if (!document.body) return false;
     const svg = el('svg', { width: 0, height: 0, 'aria-hidden': 'true' });
     svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
     const defs = el('defs', {});
-    // sRGB, not the linearRGB filters default to: the ladder was measured
-    // off the artwork's own 8-bit values, so the lookup has to happen in
-    // the space those values are written in.
-    filter = el('filter', {
-      id: FILTER_ID, 'color-interpolation-filters': 'sRGB',
-      x: 0, y: 0, width: '100%', height: '100%',
-    });
-    const LUM = '0.2126 0.7152 0.0722 0 0 ';
-    filter.appendChild(el('feColorMatrix', {
-      type: 'matrix', result: 'lum', values: LUM + LUM + LUM + '0 0 0 0 1',
-    }));
-    const tr = el('feComponentTransfer', { in: 'lum', result: 'tones' });
-    funcs = {};
-    for (const ch of ['R', 'G', 'B']) {
-      funcs[ch] = el('feFunc' + ch, { type: 'table', tableValues: '0 1' });
-      tr.appendChild(funcs[ch]);
-    }
-    filter.appendChild(tr);
-    filter.appendChild(el('feColorMatrix', {
-      in: 'SourceGraphic', type: 'matrix', result: 'redmask',
-      values: '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  2.1 -1.05 -1.05 0 0',
-    }));
-    flood = el('feFlood', { 'flood-color': '#ba433f', result: 'redfill' });
-    filter.appendChild(flood);
-    filter.appendChild(el('feComposite', {
-      in: 'redfill', in2: 'redmask', operator: 'in', result: 'red',
-    }));
-    const merge = el('feMerge', {});
-    merge.appendChild(el('feMergeNode', { in: 'tones' }));
-    merge.appendChild(el('feMergeNode', { in: 'red' }));
-    filter.appendChild(merge);
-    defs.appendChild(filter);
+    built = {};
+    for (const spec of LADDERS) built[spec.id] = buildOne(spec, defs);
     svg.appendChild(defs);
     document.body.appendChild(svg);
     return true;
@@ -171,13 +217,13 @@
   // The ladder, sampled. A pixel between two adjacent tones is the blend
   // of them the antialiasing actually made, so each step down the ladder
   // is a plain ramp between one tone's luminance and the next.
-  function tables(cols) {
+  function tables(tones, cols) {
     const out = [[], [], []];
     for (let i = 0; i < STEPS; i++) {
       const L = i / (STEPS - 1);
       const c = cols[0].slice();
-      for (let j = 1; j < TONES.length; j++) {
-        const hi = TONES[j - 1] / 255, lo = TONES[j] / 255;
+      for (let j = 1; j < tones.length; j++) {
+        const hi = tones[j - 1] / 255, lo = tones[j] / 255;
         const a = Math.min(1, Math.max(0, (hi - L) / (hi - lo)));
         for (let k = 0; k < 3; k++) c[k] = c[k] * (1 - a) + cols[j][k] * a;
       }
@@ -192,21 +238,28 @@
   function refresh() {
     try {
       const cs = getComputedStyle(document.documentElement);
-      const cols = VARS.map(v => parseColor(cs.getPropertyValue(v)));
-      const red = String(cs.getPropertyValue(RED_VAR) || '').trim();
-      // No tokens, no filter: a page that never declared the ladder keeps
-      // the drawings exactly as they were drawn.
-      if (!red || cols.some(c => !c)) return;
-      // No body yet (this runs from <head>): nothing built, nothing
-      // claimed. The DOMContentLoaded pass below comes back to it.
+      const want = [];
+      for (const spec of LADDERS) {
+        const cols = spec.vars.map(v => parseColor(cs.getPropertyValue(v)));
+        const red = spec.red ? String(cs.getPropertyValue(spec.red) || '').trim() : '';
+        // No tokens, no filter: a page that never declared a ladder keeps
+        // that family's drawings exactly as they were drawn. All or
+        // nothing across the ladders, so the ready class can never mean
+        // "half of them are painted".
+        if (cols.some(c => !c) || (spec.red && !red)) return;
+        want.push({ spec, cols, red });
+      }
       if (!build()) return;
-      const t = tables(cols);
-      funcs.R.setAttribute('tableValues', t[0]);
-      funcs.G.setAttribute('tableValues', t[1]);
-      funcs.B.setAttribute('tableValues', t[2]);
-      flood.setAttribute('flood-color', red);
+      for (const { spec, cols, red } of want) {
+        const b = built[spec.id];
+        const t = tables(spec.tones, cols);
+        b.funcs.R.setAttribute('tableValues', t[0]);
+        b.funcs.G.setAttribute('tableValues', t[1]);
+        b.funcs.B.setAttribute('tableValues', t[2]);
+        if (b.flood) b.flood.setAttribute('flood-color', red);
+      }
       document.documentElement.classList.add(READY_CLASS);
-    } catch (e) { /* the maps stay as drawn */ }
+    } catch (e) { /* the drawings stay as drawn */ }
   }
 
   // Two reasons this cannot be a single call from <head>: there is no
@@ -223,5 +276,5 @@
     window.addEventListener('load', refresh);
   } catch (e) { /* ignore */ }
 
-  global.IstMapInk = { refresh, FILTER_ID, READY_CLASS };
+  global.IstMapInk = { refresh, READY_CLASS, LADDERS };
 })(window);
