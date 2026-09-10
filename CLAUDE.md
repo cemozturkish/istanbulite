@@ -1477,13 +1477,20 @@ Four things about it:
   identical unfiltered — and p95 within 0.4 ms. What it costs is one rasterisation the first time
   each frame is painted.
 
-Two mechanical notes, both of which fail silently. The `filter:` rule is gated on
+Three mechanical notes, all of which fail silently. The `filter:` rule is gated on
 `html.ist-map-ink`, which `map-ink.js` adds only once the filter is really in the document: a
 `filter: url()` pointing at a filter that is not there is, per spec, an element that does not
 render, and a map that vanishes because a shared script failed to load is a worse failure than a
-map that stays gray. And the lookup is **256 entries** — not a round number picked for looks, but
-one per 8-bit gray, so every tone above lands exactly on a sample and no anchor is reached by
-interpolation.
+map that stays gray. The lookup is **256 entries** — not a round number picked for looks, but one
+per 8-bit gray, so every tone above lands exactly on a sample and no anchor is reached by
+interpolation. And **the filter hangs in the BODY and is built with DOM calls, never
+`innerHTML`** — both because of the engine this app actually runs on. A filter is resolved off the
+render tree, and `<head>` is `display: none` with children an engine need never attach; setting
+`innerHTML` on an SVG element runs an SVG fragment through the HTML parser. Chromium is happy with
+both, which is no evidence at all for WebKit, and WebKit is ~90% of the readership (see Vision).
+Neither shortcut was worth an untestable difference. The module runs from `<head>`, so there is no
+body on its first pass: `build()` answers whether it actually built anything and `refresh()` claims
+nothing when it did not — the `DOMContentLoaded` pass is the one that lands.
 
 `palette.js` calls `IstMapInk.refresh()` from its own `apply()`, so a sunset moves the city and the
 page it is drawn on in the same frame. The selector list deliberately does not catch

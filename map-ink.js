@@ -53,6 +53,16 @@
 // feColorMatrix can express, i.e. linear in R/G/B: R − (G+B)/2 is zero on
 // any gray by construction and 0.474 on the drawn #ba433f, so ×2.1 makes
 // it a coverage mask and nothing else in the drawing can trip it.
+//
+// ── Where the filter hangs, and why it is built by hand ──
+// In the BODY, with DOM calls rather than innerHTML. A filter is resolved
+// off the render tree, and <head> is display:none with children an engine
+// need never attach — Chromium resolves a definition from there, which is
+// no evidence at all for WebKit, and WebKit is what ~90% of this app runs
+// on. Same argument for the construction: setting innerHTML on an SVG
+// element runs an SVG fragment through the HTML parser, which is exactly
+// the sort of thing engines disagree about. Neither shortcut was worth an
+// untestable difference, so neither is taken.
 // ══════════════════════════════════════════════════════════════
 
 (function (global) {
@@ -95,48 +105,67 @@
     return m ? [+m[1] / 255, +m[2] / 255, +m[3] / 255] : null;
   }
 
+  function el(name, attrs) {
+    const n = document.createElementNS(NS, name);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+
+  // Built with DOM calls and hung in the BODY, and both halves of that are
+  // deliberate rather than style. `svg.innerHTML` parses an SVG fragment
+  // through the HTML parser and is the kind of thing engines disagree
+  // about; and a filter is resolved off the render tree, so a definition
+  // sitting inside <head> -- which the UA stylesheet gives display:none,
+  // and whose children an engine is free never to attach -- is a
+  // definition an engine may never see. Chromium resolves it from there;
+  // that is not evidence for WebKit, which is what ~90% of this app runs
+  // on. The body always attaches, so it needs no such argument.
+  //
+  // Returns false when there is no body yet -- this module runs from
+  // <head>, before one exists. Nothing is claimed in that case: refresh()
+  // simply does not add the ready class, and the DOMContentLoaded pass
+  // below builds it for real.
   function build() {
-    if (filter) return;
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('width', '0');
-    svg.setAttribute('height', '0');
-    svg.setAttribute('aria-hidden', 'true');
+    if (filter) return true;
+    if (!document.body) return false;
+    const svg = el('svg', { width: 0, height: 0, 'aria-hidden': 'true' });
     svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+    const defs = el('defs', {});
     // sRGB, not the linearRGB filters default to: the ladder was measured
     // off the artwork's own 8-bit values, so the lookup has to happen in
     // the space those values are written in.
-    svg.innerHTML =
-      '<defs><filter id="' + FILTER_ID + '" color-interpolation-filters="sRGB" ' +
-        'x="0" y="0" width="100%" height="100%">' +
-        '<feColorMatrix type="matrix" result="lum" values="' +
-          '0.2126 0.7152 0.0722 0 0 ' +
-          '0.2126 0.7152 0.0722 0 0 ' +
-          '0.2126 0.7152 0.0722 0 0 ' +
-          '0 0 0 0 1"/>' +
-        '<feComponentTransfer in="lum" result="tones">' +
-          '<feFuncR type="table" tableValues="0 1"/>' +
-          '<feFuncG type="table" tableValues="0 1"/>' +
-          '<feFuncB type="table" tableValues="0 1"/>' +
-        '</feComponentTransfer>' +
-        '<feColorMatrix in="SourceGraphic" type="matrix" result="redmask" values="' +
-          '0 0 0 0 0 ' +
-          '0 0 0 0 0 ' +
-          '0 0 0 0 0 ' +
-          '2.1 -1.05 -1.05 0 0"/>' +
-        '<feFlood flood-color="#ba433f" result="redfill"/>' +
-        '<feComposite in="redfill" in2="redmask" operator="in" result="red"/>' +
-        '<feMerge><feMergeNode in="tones"/><feMergeNode in="red"/></feMerge>' +
-      '</filter></defs>';
-    // <head> is where this can go at parse time, before <body> exists —
-    // a filter is a definition, not a drawing, and resolves from there.
-    (document.head || document.documentElement).appendChild(svg);
-    filter = svg.querySelector('#' + FILTER_ID);
-    funcs = {
-      R: filter.querySelector('feFuncR'),
-      G: filter.querySelector('feFuncG'),
-      B: filter.querySelector('feFuncB'),
-    };
-    flood = filter.querySelector('feFlood');
+    filter = el('filter', {
+      id: FILTER_ID, 'color-interpolation-filters': 'sRGB',
+      x: 0, y: 0, width: '100%', height: '100%',
+    });
+    const LUM = '0.2126 0.7152 0.0722 0 0 ';
+    filter.appendChild(el('feColorMatrix', {
+      type: 'matrix', result: 'lum', values: LUM + LUM + LUM + '0 0 0 0 1',
+    }));
+    const tr = el('feComponentTransfer', { in: 'lum', result: 'tones' });
+    funcs = {};
+    for (const ch of ['R', 'G', 'B']) {
+      funcs[ch] = el('feFunc' + ch, { type: 'table', tableValues: '0 1' });
+      tr.appendChild(funcs[ch]);
+    }
+    filter.appendChild(tr);
+    filter.appendChild(el('feColorMatrix', {
+      in: 'SourceGraphic', type: 'matrix', result: 'redmask',
+      values: '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  2.1 -1.05 -1.05 0 0',
+    }));
+    flood = el('feFlood', { 'flood-color': '#ba433f', result: 'redfill' });
+    filter.appendChild(flood);
+    filter.appendChild(el('feComposite', {
+      in: 'redfill', in2: 'redmask', operator: 'in', result: 'red',
+    }));
+    const merge = el('feMerge', {});
+    merge.appendChild(el('feMergeNode', { in: 'tones' }));
+    merge.appendChild(el('feMergeNode', { in: 'red' }));
+    filter.appendChild(merge);
+    defs.appendChild(filter);
+    svg.appendChild(defs);
+    document.body.appendChild(svg);
+    return true;
   }
 
   // The ladder, sampled. A pixel between two adjacent tones is the blend
@@ -168,7 +197,9 @@
       // No tokens, no filter: a page that never declared the ladder keeps
       // the drawings exactly as they were drawn.
       if (!red || cols.some(c => !c)) return;
-      build();
+      // No body yet (this runs from <head>): nothing built, nothing
+      // claimed. The DOMContentLoaded pass below comes back to it.
+      if (!build()) return;
       const t = tables(cols);
       funcs.R.setAttribute('tableValues', t[0]);
       funcs.G.setAttribute('tableValues', t[1]);
@@ -178,12 +209,16 @@
     } catch (e) { /* the maps stay as drawn */ }
   }
 
+  // Two reasons this cannot be a single call from <head>: there is no
+  // body to hang the filter in yet, and palette.css may not have arrived
+  // for its tokens to be read. Both are settled by DOMContentLoaded; the
+  // load pass is the belt and braces.
   refresh();
-  // palette.css may not have arrived when this first runs; the tokens are
-  // read again once the stylesheets are in.
   try {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', refresh);
+    } else {
+      refresh();
     }
     window.addEventListener('load', refresh);
   } catch (e) { /* ignore */ }
