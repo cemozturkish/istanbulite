@@ -2026,9 +2026,12 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   `--muted`: the box stops being a *card* rather than merely getting a tick. The rail is the right
   thing to spend because it says nothing a done box still needs to say — it is one uniform
   `--ink-red` on every filled box on every lane (the **category** is said by the kicker), so what it
-  actually means is "this is a filled card", which is exactly what stops being true. Colour only,
-  never opacity — an actor's opacity is its pose and would be overwritten on the next frame, the
-  same rule `.fb-locked` follows. A done box stays pressable: a story can be read twice.
+  actually means is "this is a filled card", which is exactly what stops being true. And the
+  **paper goes 20% translucent** with it, so the card sinks back into the page rather than only
+  changing colour on it — but that is the box's own **background** thinning, never `opacity`:
+  `paintCast()` writes the actor's inline opacity on every frame of the flip, so an opacity rule
+  here is overwritten a frame later, the same trap `.fb-locked`'s own note is about. A background is
+  nothing the tick touches. A done box stays pressable: a story can be read twice.
   - **It cannot be confused with `.fb-locked`, and not by luck.** `gameBlocker` only ever locks a
     game with an earlier unplayed one in front of it, and that earlier game is itself always open —
     so the Oyunlar column is always `[done…][open][locked…]` and the two greys can never stand side
