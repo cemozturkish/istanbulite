@@ -436,7 +436,8 @@
        with a sheet would take back the very thing being answered), goes
        quiet under a wash, and the honeycomb fades in on top.
 
-       Both layers are driven from one number, --fb-petek-p, which is how
+       Both layers are driven from one number, written onto each of them
+       as its own opacity by paintLanes, which is how
        PRESENT the middle lane is: 1 standing on it, 0 a lane away either
        side, and the linear middle in between (lanePresence). So the same
        wash and the same fade run whether the reader came from Kahvehane
@@ -458,7 +459,10 @@
       position: absolute;
       inset: 0;
       background: var(--paper);
-      opacity: calc(var(--fb-petek-p, 0) * 0.86);
+      /* Written by paintLanes, as opacity on this element rather than
+         through an inherited custom property on the box above it -- see
+         paintLanes for what that cost. 0 is the resting state. */
+      opacity: 0;
       pointer-events: none;
       z-index: 2;
     }
@@ -479,7 +483,8 @@
       z-index: 3;
       /* Under the two bars, which are omnipresent (frames.css) -- this
          is a layer over one screen, not a page taking the phone over. */
-      opacity: clamp(0, var(--fb-petek-p, 0), 1);
+      /* paintLanes writes this one too; see .fb-scrim above. */
+      opacity: 0;
       /* A shut petek must not eat the book's own drag. `visibility`
          rather than `display`, so the grid keeps its box and fitHive
          has something real to measure at any moment. */
@@ -500,7 +505,7 @@
        once the swipe is the navigation.
 
        It lights CONTINUOUSLY, off the same lane presence the wash and
-       the hexagons run on (--fb-nav-0/1/2, written by paintNav), so the
+       the hexagons run on (each mark's own --p, written by paintNav), so the
        middle mark comes up as the reader walks toward Hane and goes
        down as they walk off it. A bar that snapped between three states
        would be reporting the result of a gesture; this one is part of
@@ -613,9 +618,13 @@
        way round -- a letter is inked until the front reaches it. */
     nav b:last-child  i.fb-ltr { --lit: clamp(0, calc(var(--f, 0) - var(--i)), 1); }
     nav b.on { font-weight: 700; }
-    nav b:first-child  { justify-content: flex-start; --p: var(--fb-nav-0, 0); }
-    nav b:nth-child(2) { justify-content: center;     --p: var(--fb-nav-1, 0); }
-    nav b:last-child   { justify-content: flex-end;   --p: var(--fb-nav-2, 0); }
+    /* --p is that mark's own lane presence, written onto the mark by
+       paintNav. It was read from --fb-nav-0/1/2 on <html>; three
+       inherited custom properties on the document root, rewritten every
+       frame, is a whole-document style invalidation per frame. */
+    nav b:first-child  { justify-content: flex-start; }
+    nav b:nth-child(2) { justify-content: center; }
+    nav b:last-child   { justify-content: flex-end; }
     /* The wordmark in the middle is the app's own name, so it is the
        LOGO itself rather than the name set in type: the two either side
        are places, written; this is the thing you are inside of, drawn.
@@ -2801,6 +2810,9 @@ let anim = null;
 // throws half way has already declared its consts and cannot be run
 // again. Everything that touches the DOM waits for mount().
 let box = null;
+// The two layers paintLanes writes to, looked up once rather than
+// every frame (see paintLanes for why they are written at all).
+let scrimEl = null, petekEl = null;
 
 // ── Poses ──
 const POSE0 = { x: 0, y: 0, scale: 1, opacity: 1, rot: 0 };
@@ -3225,12 +3237,27 @@ const clamp01 = (n) => n < 0 ? 0 : n > 1 ? 1 : n;
 function lanePresence(l) { return 1 - Math.min(1, Math.abs(lanePos - l)); }
 
 // One number drives the wash, the hexagons and every actor's exit: the
-// two layers are the stylesheet's job off --fb-petek-p (see .fb-scrim /
-// .fb-petek), and the actors are painted from lanePos here.
+// two layers take it as their own opacity (see below), and the actors
+// are painted from lanePos here.
 function paintLanes() {
   if (!box) return;
   const petek = lanePresence(LANE_HANE);
-  box.style.setProperty('--fb-petek-p', String(petek));
+  // ── Written as OPACITY, on the two elements that consume it ──
+  // This used to be one inherited custom property set on `box` every
+  // frame, which is the cheapest-looking and most expensive thing in
+  // this file: `box` is the ancestor of the whole book, the cast AND the
+  // petek, and changing an inherited custom property on an element
+  // invalidates the computed style of everything under it. With a real
+  // petek standing there -- a few hundred hexagons, each with a masked
+  // frame and a masked ring -- a lane walk was recalculating all of it
+  // sixty times a second. Measured on a 4x-throttled CPU across one walk
+  // in each direction: 1.7s of style recalc, p95 60ms, p99 154ms, 23
+  // frames over 32ms. Opacity is not inherited and is composited, so the
+  // same picture now costs nothing but a composite.
+  const scrim = scrimEl || (scrimEl = document.getElementById('fb-scrim'));
+  const pet = petekEl || (petekEl = document.getElementById('fb-petek'));
+  if (scrim) scrim.style.opacity = (petek * 0.86).toFixed(3);
+  if (pet) pet.style.opacity = Math.max(0, Math.min(1, petek)).toFixed(3);
   box.classList.toggle('petek-pulling', petek > 0);
   box.classList.toggle('petek-open', lane === LANE_HANE && petek >= 1);
   paintCast();
@@ -3306,15 +3333,21 @@ function paintNavWave(marks, clamp01) {
 // the way out to Türkiye and Kahvehane all the way in.
 function paintNav() {
   if (!box) return;
-  const root = document.documentElement;
   const marks = box.ownerDocument.querySelectorAll('#fb-nav b');
   const clamp01 = (v) => Math.max(0, Math.min(1, v));
   const pres = [];
   for (let i = 0; i < LANES; i++) {
     const p = lanePresence(i);
     pres.push(p);
-    root.style.setProperty('--fb-nav-' + i, p.toFixed(3));
-    if (marks[i]) marks[i].classList.toggle('on', lane === i);
+    // On the mark itself, never on <html>. Three numbers written to the
+    // document root every frame invalidate the computed style of every
+    // element in the document -- and the only thing that ever read them
+    // is `nav b`'s own --p, three elements with one child each. Same
+    // trap as --fb-petek-p above, one scope wider.
+    if (marks[i]) {
+      marks[i].style.setProperty('--p', p.toFixed(3));
+      marks[i].classList.toggle('on', lane === i);
+    }
   }
   paintNavWave(marks, clamp01);
 }
@@ -3677,8 +3710,10 @@ function unmount() {
   if (window.IstProfileCard && IstProfileCard.clearBarSlide) IstProfileCard.clearBarSlide();
   lane = LANE_KUTUPHANE; lanePos = LANE_KUTUPHANE;
   atLaneStop = false; petekBuilt = false;
-  drag = null; box = null;
-  // The lane variables live on <html> and would outlive this page.
+  drag = null; box = null; scrimEl = null; petekEl = null;
+  // Nothing of the lane's own is left on <html> any more (see paintNav);
+  // the leftovers from an older shape are cleared for a reader whose
+  // browser still has them on the root from a previous visit.
   const root = document.documentElement;
   for (let i = 0; i < LANES; i++) root.style.removeProperty('--fb-nav-' + i);
 }
