@@ -44,6 +44,98 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
+   THE MAP READS THE PALETTE — the tone ladder
+   ──────────────────────────────────────────────────────────────
+   The hand-drawn maps in assets/map/ are flat grays, not photographs
+   (see map-ink.js for the measurement and for how the swap is made).
+   Each tone the drawing is made of gets a token here, and map-ink.js
+   turns these seven into the lookup the maps are painted through.
+
+   The ORDER is the drawing's meaning and is load-bearing:
+
+       sayfa  >  DENİZ  >  kara  >  TÜRKİYE  >  kenar  >  çizgi
+       lightest ─────────────────────────────────────► darkest
+
+   Night darkens the whole ladder and NEVER turns it over. An inverted
+   map is one whose sea is darker than its land, which is a map of
+   somewhere else — so both gece blocks below keep the same order the
+   gündüz blocks have, just further down.
+
+   The cascade, as everywhere else in this file: the plain :root is the
+   earth palette by day (0,1,0); [data-palette="mono"] and
+   [data-theme="dark"] are both (0,2,0), so the dark block is written
+   AFTER the mono one and wins where they collide; and mono-at-night is
+   (0,3,0) and beats both.
+   ══════════════════════════════════════════════════════════════ */
+
+/* kahverengi · gündüz */
+:root {
+  --map-page:    #f4e8de;
+  --map-sea:     #eddbd0;
+  --map-land:    #d4bbad;
+  --map-turkiye: #c9ac99;
+  --map-edge:    #b8a08a;
+  --map-ink:     #4C382A;
+  --map-red:     #CB5A16;
+}
+
+/* siyah-beyaz · gündüz — the tones the artwork was actually drawn in,
+   which is why this palette needed nothing changing: the maps have been
+   showing mono's own daytime ladder all along. */
+:root[data-palette="mono"] {
+  --map-page:    #ffffff;
+  --map-sea:     #f7f7f7;
+  --map-land:    #d9d9d9;
+  --map-turkiye: #c6c6c6;
+  --map-edge:    #b4b4b4;
+  --map-ink:     #000000;
+  --map-red:     #B93631;
+}
+
+/* kahverengi · gece */
+:root[data-theme="dark"] {
+  --map-page:    #8a7160;
+  --map-sea:     #7d6553;
+  --map-land:    #6a5342;
+  --map-turkiye: #614b3b;
+  --map-edge:    #573f2e;
+  --map-ink:     #241a12;
+  --map-red:     #CB5A16;
+}
+
+/* siyah-beyaz · gece — deliberately a step LIGHTER than the earth night
+   above. Equal luminance is not equal darkness: the same gray reads
+   flatter and heavier than the warm brown beside it, so matching them by
+   number made this one look like the lights had gone out. */
+:root[data-theme="dark"][data-palette="mono"] {
+  --map-page:    #8e8e8e;
+  --map-sea:     #828282;
+  --map-land:    #6f6f6f;
+  --map-turkiye: #656565;
+  --map-edge:    #5a5a5a;
+  --map-ink:     #151515;
+  --map-red:     #C43D38;
+}
+
+/* Every drawing of the city, wherever it is standing: the flip book's
+   frames, the app map's window heroes, the two parts-bin pages' own map
+   photo, and the world the olay board is pinned to.
+
+   Gated on the class map-ink.js adds only once the filter is really in
+   the document — never applied blind. It deliberately does NOT catch the
+   olaylar drawings (`.olay-draw image`), which are hand-coloured per olay
+   and are the one thing over these maps that is not gray. */
+html.ist-map-ink :is(
+  .fb > img,
+  .fb-map-hero img,
+  .map-panel img.map-photo,
+  image.olay-basemap,
+  image.olay-pagemap
+) {
+  filter: url(#ist-map-ink);
+}
+
+/* ══════════════════════════════════════════════════════════════
    The earth palette's base tokens
    ──────────────────────────────────────────────────────────────
    These 28 were declared identically in the inline :root of every page
@@ -79,7 +171,7 @@
   --hover:           #d8c0b1;
   --ink:             #4C382A;
   --ink-deep:        #4C382A;
-  --ink-red:         #B93631;
+  --ink-red:         #CB5A16;
   --ink-rgb:         76, 56, 42;
   --muted:           #867264;
   --paper:           #eddbd0;

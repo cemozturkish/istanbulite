@@ -53,6 +53,10 @@
     document.documentElement.setAttribute('data-palette', current);
     document.documentElement.setAttribute('data-theme', currentTheme);
     syncThemeColor();
+    // The hand-drawn maps read this palette too (map-ink.js). Repainted
+    // from here rather than from a watcher of their own, so a sunset
+    // moves the city and the page it is drawn on in the same frame.
+    try { if (global.IstMapInk) global.IstMapInk.refresh(); } catch (e) { /* ignore */ }
   }
 
   function setPalette(v) {

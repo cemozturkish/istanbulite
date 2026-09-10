@@ -1430,6 +1430,66 @@ confirms it; and the swap is aimed at images whose src *is* `istanbul-map.png`, 
 Turkey map wears the same `.map-photo` class in the same shared document. Adding a district is a
 file drop plus one id in `PAINTED` — see `assets/map/home/README.md`.
 
+### The map reads the palette — `map-ink.js` + the ladder in `palette.css`
+
+The hand-drawn maps used to be the one thing on the site that ignored the palette: the same
+near-white paper and black ink whether the reader was on the earth palette at noon or the mono one
+after sunset. They looked like a photograph of a drawing laid over the app rather than part of it.
+
+**They are not photographs, and that is the whole opening.** Measured, every map in `assets/map/`
+is a handful of FLAT grays plus one red — 1483 distinct colours in `istanbul-map-mobile.png`, but
+93% of its pixels sit within 8/255 of one of four tones and the rest is the antialiasing between
+them. So each tone is bound to a token instead of being repainted, and the drawing follows the
+palette for free:
+
+| tone | what it is | token |
+|---|---|---|
+| `#ffffff` | sayfa — the band above the Türkiye map | `--map-page` |
+| `#f7f7f7` | **deniz** — the water, and İstanbul's own page ground | `--map-sea` |
+| `#d9d9d9` | kara — land, the neighbouring countries | `--map-land` |
+| `#c6c6c6` | **Türkiye** — drawn a step darker than its neighbours, so it gets its own | `--map-turkiye` |
+| `#b4b4b4` | kenar — the extruded side of the 3D edge | `--map-edge` |
+| `#000000` | çizgi — the outline | `--map-ink` |
+| `#ba433f` | the Ankara star, the marks, a painted home ilçe | `--map-red` |
+
+Four things about it:
+
+- **The ladder's ORDER is the drawing's meaning, and night never turns it over.** The sea is the
+  lightest tone in both maps and stays the lightest in all four states; night slides the whole
+  ladder down and keeps its order. A map whose sea is darker than its land is a map of somewhere
+  else — which is exactly what binding the sea to `--paper` produced, since `--paper` and `--ink`
+  swap in the dark theme. That is why these are seven tokens of their own rather than the page's.
+- **Mono at night is deliberately a step LIGHTER than earth at night.** Equal luminance is not
+  equal darkness: the same gray reads flatter and heavier than the warm brown beside it, so
+  matching the two by number made the mono one look like the lights had gone out.
+- **The red is lifted out before the ramp and merged back on top.** It is chromatic, so a
+  luminance lookup would flatten it onto the browns. Its mask has to be something `feColorMatrix`
+  can express, i.e. linear in R/G/B: `R − (G+B)/2` is zero on any gray by construction and 0.474 on
+  the drawn `#ba433f`, so ×2.1 makes it a coverage mask and nothing else in the drawing trips it.
+  In the earth palette that red is a fire orange (`#CB5A16`), the same one `--ink-red` carries
+  there.
+- **A filter, not four sets of PNGs and not masks.** Recolouring offline is one set of files per
+  palette per theme — four copies of 7.2 MB, plus a `src` swap at sunrise and sunset, which is the
+  "`<img>` goes blank until the new bytes decode" trap `home-map.js` documents. Per-tone alpha
+  layers are exact but multiply the flip book's 24 decoded frames by four. The filter costs nothing
+  on disk and nothing at rest: measured on a harness reproducing the book exactly, at 390×844@3 on
+  a 4×-throttled CPU, scrubbing the whole book and back left the median frame at 16.7 ms —
+  identical unfiltered — and p95 within 0.4 ms. What it costs is one rasterisation the first time
+  each frame is painted.
+
+Two mechanical notes, both of which fail silently. The `filter:` rule is gated on
+`html.ist-map-ink`, which `map-ink.js` adds only once the filter is really in the document: a
+`filter: url()` pointing at a filter that is not there is, per spec, an element that does not
+render, and a map that vanishes because a shared script failed to load is a worse failure than a
+map that stays gray. And the lookup is **256 entries** — not a round number picked for looks, but
+one per 8-bit gray, so every tone above lands exactly on a sample and no anchor is reached by
+interpolation.
+
+`palette.js` calls `IstMapInk.refresh()` from its own `apply()`, so a sunset moves the city and the
+page it is drawn on in the same frame. The selector list deliberately does not catch
+`.olay-draw image` — the olaylar drawings are hand-coloured per olay and are the one thing over
+these maps that is not gray.
+
 ### The map is scenery, and it drifts — `map-parallax.js`
 
 The map is the one thing on the two pages that carry one that is *scenery* rather than content
