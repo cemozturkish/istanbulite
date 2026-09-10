@@ -1924,7 +1924,18 @@ Seven things about it:
   covered it would take back the very thing being answered.
 - **One number drives all of it**, and it is *how present a lane is*: 1 standing on it, 0 a lane
   away either side, the linear middle in between (`lanePresence`). The middle lane's presence is
-  written to `--fb-petek-p`, and both the wash and the hexagons are that number — they cross on
+  written as the **opacity of the wash and of the petek**, on each of those two elements — never as
+  an inherited custom property on the box above them, which is what it used to be and is the single
+  most expensive thing this file ever did. `box` is the ancestor of the whole book, the cast AND the
+  petek, and changing an inherited custom property on an element invalidates the computed style of
+  everything under it: with a real petek standing there — a few hundred hexagons, each with a masked
+  frame and a masked ring — a lane walk recalculated all of it sixty times a second. The same trap
+  one scope wider was `paintNav` writing `--fb-nav-0/1/2` to `<html>`, which is a whole-document
+  invalidation per frame for three numbers only `nav b`'s own `--p` ever read; each mark carries its
+  own `--p` now. Measured on a 4×-throttled CPU over one walk in each direction, before → after:
+  **style recalc 2130ms → 1099ms, p95 51.5ms → 21.8ms, p99 157ms → 77ms, frames over 32ms 20 → 13.**
+  Opacity is not inherited and is composited, so the same picture costs a composite and nothing
+  else. Both the wash and the hexagons are still that one number — they cross on
   purpose: the petek starts coming in on the same frame the lane's own buttons start going out, so
   the two casts hand over in one movement rather than in two (the hexagons used to wait for the
   back half of the pull). The same wash and fade run whether the reader arrived from Kahvehane or
