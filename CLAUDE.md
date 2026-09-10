@@ -2021,6 +2021,45 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   the band itself animates, so the two grow in lockstep — only the flag's own top few pixels sink
   with the paper around them, the rest of the stripe stays its ordinary red, which is what the
   band itself does to the paper below it.
+- **A box the reader has DEALT WITH goes quiet, and the day is finishable** (`.fb-done`,
+  `fbSetDone`, `refreshDayMeter`). The red rail drains to a hairline and the ink steps back to
+  `--muted`: the box stops being a *card* rather than merely getting a tick. The rail is the right
+  thing to spend because it says nothing a done box still needs to say — it is one uniform
+  `--ink-red` on every filled box on every lane (the **category** is said by the kicker), so what it
+  actually means is "this is a filled card", which is exactly what stops being true. Colour only,
+  never opacity — an actor's opacity is its pose and would be overwritten on the next frame, the
+  same rule `.fb-locked` follows. A done box stays pressable: a story can be read twice.
+  - **It cannot be confused with `.fb-locked`, and not by luck.** `gameBlocker` only ever locks a
+    game with an earlier unplayed one in front of it, and that earlier game is itself always open —
+    so the Oyunlar column is always `[done…][open][locked…]` and the two greys can never stand side
+    by side. Every other column has no locked state at all. What the reader is left looking at is a
+    column gone quiet with the one thing they can actually do still in full ink.
+  - **What counts as done, per column:** a **story** the moment its page is *opened* (a wrong
+    "unread" is worse than a lenient "read"; it is marked on the way IN so the card has already gone
+    quiet when the page folds back into it), a **game** at `attempts >= 1` (finished, never merely
+    opened — the same reading the lock and the app map's square use, and the three must agree), an
+    **anket** once voted. **Etkinlikler is deliberately not completable** — an evening is somewhere
+    to be, not content to get through — and a pinned Dünya seri is a running timeline rather than
+    one thing to finish.
+  - **No new storage.** The three facts already existed: `dunya_dealt_<uid>` in `localStorage`
+    mirrored server-side as `news_dealt` (which is what lets a neighbour's petek caption say how
+    deep their deck is), `game_results`, and `neighborhood_poll_votes`. `newsDealtStore` /
+    `newsIsDealt` are the one reading of that store — the boxes, the day meter and the app map's own
+    square all go through them, stamp semantics (the story's `updated_at` **as thrown**, so a
+    gelişme brings it back) and the legacy stampless array included.
+  - **And the ring around the logo is the day's own sea** (`--fb-day`, `paintDayMeter`). As each
+    thing is dealt with the sea rises through the outline ring, and at the last one it is full: the
+    loading screen's rising sea, met again as the progress of a day. It rides the **ring** and never
+    the letters — the letterforms already carry the lane wave (`--fb-logo-a/-b/-f`), and two meanings
+    on the same 86×26 mark is mush; the ring had no meaning at all before this. Drawn as
+    `background-size` from the bottom rather than a gradient stop, because that is the property that
+    transitions everywhere. A day with **nothing on it** is not a finished day — an empty ring says
+    "nothing to do", which is the truth, rather than "well done".
+  - **This is the app's whole reward, and it is closure rather than accumulation.** No streak, no
+    lifetime total, no points, and never a cosmetic: avatar items and badges are earned by going
+    outside and must stay unbuyable and ungrindable (see Trust and the earned avatar). Finishing
+    means the app is **over for today** — the app map prints the deck's own bottom line,
+    "Bugünlük bu kadar. / Dışarısı seni bekliyor.", and lets the reader go.
 - **`fb-openable` says exactly one thing: this box answers a press**, and the cursor and the press
   effect are both hung off that one class. `fbSetPage` sets it for a box with a page; Oyunlar sets
   it for a game whose turn has come (its press opens a game rather than a page, which is a

@@ -204,7 +204,12 @@
     .fb-box:not(.fb-empty) {
       border-bottom-width: 5px;
       box-shadow: inset 0 0 0 0 rgba(60, 60, 60, 0);
-      transition: border-bottom-width 0.1s ease-out, box-shadow 0.1s ease-out;
+      /* The last two are the "dealt with" fade (see .fb-done below): the
+         press's own two properties snap in 0.1s because a finger is on
+         the glass, but a box going quiet is a thing the reader watches
+         happen as the page folds back into it. */
+      transition: border-bottom-width 0.1s ease-out, box-shadow 0.1s ease-out,
+                  color 0.4s ease, border-color 0.4s ease;
     }
     .fb-box.fb-empty {
       background: none;
@@ -219,6 +224,7 @@
       top: 0; left: 0; bottom: 0;
       width: 4px;
       background: var(--ink-red, #B93631);
+      transition: width 0.4s ease, background 0.4s ease;
     }
     .fb-box.fb-mirror:not(.fb-empty)::before { left: auto; right: 0; }
     /* Its own dark cap, growing down from the top exactly as far as the
@@ -367,6 +373,40 @@
     }
     .fb-box.fb-locked .k { color: var(--muted); }
     .fb-box.fb-locked:not(.fb-empty)::before { background: var(--muted, #9a9a9a); }
+
+    /* ── A box the reader has already dealt with ──
+       The story that has been read, the game that has been played, the
+       poll that has been answered. Two things at once, and they are one
+       gesture: the red rail DRAINS to a hairline and the ink steps back
+       to --muted, so the box stops being a card rather than merely
+       getting a tick. The rail is the right thing to spend because it
+       says nothing a done box still needs to say -- it is one uniform
+       --ink-red on every filled box on every lane (the CATEGORY is said
+       by the kicker), so what it actually means is "this is a filled
+       card", which is exactly what stops being true.
+
+       It reads next to .fb-locked above without colliding, and not by
+       luck: gameBlocker only ever locks a game that has an earlier
+       unplayed one in front of it, and that earlier game is itself
+       always open -- so the Oyunlar column is always
+       [done...][open][locked...] and the two greys can never stand
+       side by side. Every other column has no locked state at all.
+       What the reader is left looking at is a column gone quiet with
+       the one thing they can actually do still in full ink.
+
+       Colour only, never opacity -- an actor's opacity is its pose (see
+       CAST) and would be overwritten on the next frame, the same reason
+       .fb-locked states it that way. A done box is still pressable: a
+       story can be read twice, and .fb-openable is untouched here. */
+    .fb-box.fb-done:not(.fb-empty) {
+      color: var(--muted);
+      border-color: var(--muted, #9a9a9a);
+    }
+    .fb-box.fb-done:not(.fb-empty) .k { color: var(--muted); }
+    .fb-box.fb-done:not(.fb-empty)::before {
+      width: 1px;
+      background: var(--muted, #9a9a9a);
+    }
 
     /* A reserved slot -- not yet built (Kahve, Yorumlar), parked
        (Olaylar), or simply unassigned (a Dünya slot with no series
@@ -837,6 +877,23 @@
       display: flex; align-items: center; justify-content: center;
       font-variant-numeric: tabular-nums;
     }
+    /* The day, closed. It stands under the windows rather than over
+       them: the squares are what has just been finished, and this is
+       the sentence they add up to. The deck's own bottom line
+       ("Hepsi bu kadar. / Dışarısı seni bekliyor."), promoted to being
+       the app's one reward -- the reader is let go, not congratulated. */
+    .fb-map-done {
+      position: absolute;
+      left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px) + 18px);
+      margin: 0;
+      padding: 0 var(--screen-inset, 18px);
+      text-align: center;
+      font-size: 0.8rem; line-height: 1.45;
+      color: var(--paper);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+      pointer-events: none;
+      z-index: 2;
+    }
 
     /* ── The logo is the door, so it is bigger and it rests on the floor ──
        It hangs below the bar's own bottom edge on purpose: everything
@@ -903,12 +960,46 @@
        this script font's own counters are that tight at 1200x400, so
        10px is as far as the ink can grow before it stops reading as
        type. */
+    /* ── AND THE RING IS THE DAY'S OWN SEA ──
+       The day is finishable: three category boxes of news, the games
+       that are on, the polls that are open. As each one is dealt with
+       the sea rises through this ring, and at the last one it is full.
+       It is the loading screen's own rising sea (loading-screen.js),
+       met again as the progress of a day rather than of a page load --
+       and it needs no number printed anywhere, which is the point: a
+       streak counts days at you, a level that is simply full says the
+       day is done and lets you go.
+
+       It rides the RING and never the letters, deliberately. The
+       letterforms are already carrying the lane wave (--fb-logo-a/-b/-f
+       above), and two meanings stacked on the same 86x26 mark is mush:
+       the letters say WHERE you are standing, the ring around them says
+       HOW MUCH of the day is behind you. The ring had no meaning at all
+       before this -- it was one flat colour.
+
+       Drawn as background-size rather than a gradient stop because that
+       is the property that transitions everywhere: one solid image, no
+       repeat, anchored to the bottom, grown from 0% to 100% of the
+       ring's own height. --fb-day is written by paintDayMeter(). */
     nav b.fb-logo-btn .fb-logo::before {
       content: '';
       position: absolute; inset: 0; z-index: -1;
-      background-color: var(--navbar-ink, #2e2e2e);
+      background-color: color-mix(in srgb, var(--navbar-ink, #2e2e2e) 30%, transparent);
+      background-image: linear-gradient(var(--navbar-ink, #2e2e2e), var(--navbar-ink, #2e2e2e));
+      background-repeat: no-repeat;
+      background-position: bottom;
+      background-size: 100% var(--fb-day, 0%);
+      transition: background-size 0.55s cubic-bezier(.22,.8,.3,1);
       -webkit-mask: url('assets/loading/logo-outline-mask.png') 54.2% 40.4% / 108.7% 169.1% no-repeat;
               mask: url('assets/loading/logo-outline-mask.png') 54.2% 40.4% / 108.7% 169.1% no-repeat;
+    }
+    /* The day is done. The only moment this app celebrates anything, and
+       what it says is "you can stop now". */
+    nav b.fb-logo-btn.fb-day-full .fb-logo::before {
+      filter: drop-shadow(0 0 7px color-mix(in srgb, var(--navbar-ink, #2e2e2e) 55%, transparent));
+    }
+    @media (prefers-reduced-motion: reduce) {
+      nav b.fb-logo-btn .fb-logo::before { transition: none; }
     }
     nav b.fb-logo-btn:active { transform: scale(0.94); }
     /* Lit while its map is open -- it is held down because it is the way
@@ -1220,6 +1311,7 @@
     <span class="fb-map-wire v w-ku-tr"></span>
     <span class="fb-map-wire v w-kah-ilce"></span>
   </div>
+  <p class="fb-map-done" id="fb-map-done" hidden>Bugünlük bu kadar.<br>Dışarısı seni bekliyor.</p>
 </div>
 
 <!-- ── THE BAND PAGE ──
@@ -1459,7 +1551,7 @@ function eventWhenLong(iso) {
 // card lands in is a fact about the card, not just how new it is.
 function stackFetch(fetchRows) {
   let promise = null;
-  return function (el, slot) {
+  const run = function (el, slot) {
     if (!promise) promise = fetchRows();
     promise.then(({ rows, failed, emptyHtml, failedHtml }) => {
       if (!el.isConnected) return;
@@ -1468,6 +1560,7 @@ function stackFetch(fetchRows) {
       // an empty feed and a dashed slot are all boxes with nothing
       // behind them, and none of the three is pressable.
       fbSetPage(el, null);
+      fbSetDone(el, false);
       // Three states, and they say different things: a fetch that
       // never landed, a feed with nothing in it, and a feed with fewer
       // than three things are not the same fact -- only the first slot
@@ -1487,8 +1580,18 @@ function stackFetch(fetchRows) {
       if (!row) { el.classList.add('fb-empty'); el.innerHTML = ''; return; }
       el.classList.remove('fb-empty'); el.innerHTML = row.html;
       fbSetPage(el, row.page);
+      // A row may say it has already been dealt with (Anket does; Olaylar
+      // has nothing to be done with, so it never sets this).
+      fbSetDone(el, row.done);
     });
   };
+  // A column that can change while the reader is standing on it (Anket,
+  // the moment a vote lands) needs the shared fetch dropped as well as
+  // its own source promise -- this closure caches independently of
+  // whatever the fetcher itself remembers, so nulling only that one
+  // would re-render the same rows and look like nothing happened.
+  run.reset = () => { promise = null; };
+  return run;
 }
 
 // ── Kahvehane's lane: one box per DAY, not a feed ──
@@ -1525,6 +1628,11 @@ async function loadEtkinlikActor(el, slot) {
   // has something to open: a box with no payload is not pressable, which
   // is the truth about a dashed slot or a fetch that failed.
   fbSetPage(el, null);
+  // An evening is never "done". It is somewhere to be, not content to
+  // get through -- so Etkinlikler is deliberately outside the day's
+  // meter as well (see refreshDayMeter). Cleared all the same, because
+  // a class outlives a re-render.
+  fbSetDone(el, false);
   const dayIdx = 2 - slot;
   const label = ETKINLIK_LABELS[dayIdx];
   if (failed) {
@@ -1550,6 +1658,159 @@ async function loadEtkinlikActor(el, slot) {
 }
 
 // ── Kütüphane's lane: one box per CATEGORY, not a feed ──
+// ══════════════════════════════════════════════════════════════
+// WHAT THE READER HAS ALREADY DEALT WITH — and the day's own meter
+//
+// The app's dopamine is CLOSURE, not accumulation: the day is a small
+// finite set of things -- the three categories of news, the games that
+// are on, the polls that are open -- and finishing it means the app is
+// over for today. So there is no streak here, no lifetime total and no
+// points; there is a box that goes quiet when you are done with it (see
+// .fb-done) and a ring that fills as the day does (see --fb-day). The
+// reward for finishing is being let go, which is the only reward this
+// app is allowed to offer (see the anti-screen-time rule in CLAUDE.md).
+//
+// Nothing new is stored. The three facts already exist:
+//   * news    -- dunya_dealt_<uid> in localStorage, mirrored server-side
+//                as news_dealt (db/hive_member_status.sql), which is what
+//                lets somebody's petek caption say how deep their deck is
+//   * games   -- game_results, attempts >= 1
+//   * anket   -- neighborhood_poll_votes, insert-only
+// ══════════════════════════════════════════════════════════════
+
+let _doneUid;   // undefined = not asked yet, null = signed out
+function doneUid() {
+  if (_doneUid === undefined) {
+    _doneUid = (async () => {
+      const sb = window.IstRouter && IstRouter.sb;
+      if (!sb) return null;
+      try { return (await sb.auth.getUser()).data.user.id; } catch (err) { return null; }
+    })();
+  }
+  return _doneUid;
+}
+
+function lsRead(key) {
+  try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (err) { return null; }
+}
+
+// The deck's own store, normalised. Its first version was a plain array
+// of ids with no stamp at all; those entries are kept as the sentinel
+// `true`, which reads as "dealt with as it stands" -- the same reading
+// kutuphane.html's reconcileDealt and the app map's own square give it.
+function newsDealtStore(uid) {
+  const raw = uid ? lsRead('dunya_dealt_' + uid) : null;
+  if (Array.isArray(raw)) {
+    const map = {};
+    raw.forEach(id => { map[String(id)] = true; });
+    return map;
+  }
+  return (raw && typeof raw === 'object') ? raw : {};
+}
+
+// What is remembered is not "this story is done" but the story's own
+// updated_at AS THROWN -- so a gelişme landing on its timeline (which
+// bumps breaking_news.updated_at) brings the story back, and back into
+// the day's denominator with it. A story that has not moved stays done.
+function newsIsDealt(store, row) {
+  if (!row) return false;
+  const v = store[row.id];
+  if (v == null) return false;
+  return v === true || v === row.updated_at;
+}
+
+async function newsMarkDealt(row) {
+  const uid = await doneUid();
+  if (!uid || !row) return;
+  const store = newsDealtStore(uid);
+  if (store[row.id] === row.updated_at) return;
+  store[row.id] = row.updated_at;
+  try { localStorage.setItem('dunya_dealt_' + uid, JSON.stringify(store)); } catch (err) {}
+  // The server copy is written BESIDE the local one, never instead of
+  // it: localStorage is what the reader's own screen runs on and must
+  // not wait for a round trip, while news_dealt is what somebody else's
+  // petek reads. A database without that migration simply answers an
+  // error here and the column behaves exactly as it did before.
+  const sb = window.IstRouter && IstRouter.sb;
+  if (!sb) return;
+  try {
+    const { error } = await sb.from('news_dealt').upsert(
+      { user_id: uid, news_id: row.id, dealt_stamp: row.updated_at },
+      { onConflict: 'user_id,news_id' });
+    if (error) throw error;
+  } catch (err) {
+    console.error('[proje okundu]', err);
+  }
+}
+
+// One setter, so "is done" and "looks done" cannot drift apart -- the
+// same reason fbSetPage is one function. A done box stays pressable:
+// a story can be read twice.
+function fbSetDone(el, done) {
+  if (el) el.classList.toggle('fb-done', !!done);
+}
+
+// ── The day's own denominator ──
+// Every part is best-effort and independent, exactly as the app map's
+// squares are: a query that fails contributes nothing rather than
+// taking the meter (or the page) down with it.
+let dayMeter = { done: 0, total: 0 };
+
+async function refreshDayMeter() {
+  const uid = await doneUid();
+  let done = 0, total = 0;
+
+  try {
+    const { byBucket, failed } = await haberlerData();
+    if (!failed) {
+      const store = newsDealtStore(uid);
+      for (const b of HABER_BUCKETS) {
+        const n = byBucket[b];
+        if (!n) continue;                       // no story in that category today
+        total++;
+        if (newsIsDealt(store, n)) done++;
+      }
+    }
+  } catch (err) { console.error('[proje gün]', err); }
+
+  try {
+    const state = await gamesStateToday();
+    for (const g of GAME_DEFS) {
+      // A game the admin switched off is not a step anybody has left to
+      // take, so it is on neither side of the fraction -- the same
+      // reading hive_member_status and the app map's square give it.
+      if (state.off.has(g.key)) continue;
+      total++;
+      if (state.played.has(g.key)) done++;
+    }
+  } catch (err) { console.error('[proje gün]', err); }
+
+  try {
+    const { polls, voted, failed } = await anketData();
+    if (!failed) {
+      for (const p of polls) { total++; if (voted.has(p.id)) done++; }
+    }
+  } catch (err) { console.error('[proje gün]', err); }
+
+  dayMeter = { done, total };
+  paintDayMeter();
+}
+
+function paintDayMeter() {
+  const btn = document.getElementById('fb-logo-btn');
+  const line = document.getElementById('fb-map-done');
+  const { done, total } = dayMeter;
+  // A day with nothing on it is not a finished day -- an empty ring says
+  // "nothing to do", which is the truth, rather than "well done".
+  const full = total > 0 && done >= total;
+  const pct = total > 0 ? (done / total) * 100 : 0;
+  if (btn) {
+    btn.style.setProperty('--fb-day', pct.toFixed(1) + '%');
+    btn.classList.toggle('fb-day-full', full);
+  }
+  if (line) line.hidden = !full;
+}
+
 // Fixed vertical order top to bottom -- İSTANBUL, TÜRKİYE, DÜNYA -- each
 // showing that category's own newest story inside the 72h window
 // Kütüphane's own column reads. One fetch of the recent pool, bucketed
@@ -1564,7 +1825,10 @@ function newsBucket(n) {
   return 'istanbul';
 }
 let haberlerPromise = null;
-async function loadHaberlerActor(el, slot) {
+// One fetch, shared by the three boxes AND by the day meter -- the meter
+// must never be able to count a different set of stories than the column
+// is printing.
+function haberlerData() {
   if (!haberlerPromise) {
     haberlerPromise = (async () => {
       try {
@@ -1588,12 +1852,17 @@ async function loadHaberlerActor(el, slot) {
       }
     })();
   }
-  const { byBucket, failed } = await haberlerPromise;
+  return haberlerPromise;
+}
+
+async function loadHaberlerActor(el, slot) {
+  const { byBucket, failed } = await haberlerData();
   if (!el.isConnected) return;
   // Cleared before every render, filled only on the path that actually
   // has something to open: a box with no payload is not pressable, which
   // is the truth about a dashed slot or a fetch that failed.
   fbSetPage(el, null);
+  fbSetDone(el, false);
   const bucket = HABER_BUCKETS[2 - slot];
   const label = HABER_LABELS[bucket];
   if (failed) {
@@ -1608,11 +1877,27 @@ async function loadHaberlerActor(el, slot) {
   el.innerHTML = '<div class="k">' + label + '</div>' +
     '<div class="m">' + esc(newsAge(n.updated_at)) + '</div>' +
     '<div class="t">' + esc(newsText(n, 'title')) + '</div>';
+  // Already read on this device (or on another one, via news_dealt)
+  // before the reader ever arrived: the box is quiet from the first
+  // frame rather than going quiet in front of them.
+  doneUid().then(uid => {
+    if (el.isConnected) fbSetDone(el, newsIsDealt(newsDealtStore(uid), n));
+  });
   // The story itself, in whichever language it was actually written in
   // (newsText) -- the same choice the headline above was printed with.
   fbSetPage(el, {
     kicker: label, meta: newsAge(n.updated_at),
     title: newsText(n, 'title'), body: newsText(n, 'body'),
+    // OPENING is the deal, not reaching the foot of the page. A wrong
+    // "unread" is worse than a lenient "read": the reader saw the story,
+    // and a box that stays loud after they have been inside it is the
+    // app arguing with them about whether they read it. It is marked on
+    // the way IN so the card has already gone quiet when the page folds
+    // back into it.
+    onOpen: () => {
+      fbSetDone(el, true);
+      newsMarkDealt(n).then(refreshDayMeter);
+    },
   });
 }
 
@@ -1683,6 +1968,9 @@ async function loadDunyaActor(el, slot) {
   // Cleared before every render, filled only on the path that actually
   // has something to open: a box with no payload is not pressable.
   fbSetPage(el, null);
+  // A pinned seri is a running timeline rather than one thing to finish,
+  // so it has no done state -- the same reasoning as Etkinlikler.
+  fbSetDone(el, false);
   if (failed) {
     el.classList.toggle('fb-empty', slot !== 2);
     el.innerHTML = slot === 2
@@ -1809,27 +2097,77 @@ function anketMixColor(colorA, colorB, fracA) {
   return 'rgb(' + mix(pa.r, pb.r) + ',' + mix(pa.g, pb.g) + ',' + mix(pa.b, pb.b) + ')';
 }
 
+// One fetch, shared by the three boxes and by the day meter -- and it
+// carries the reader's own votes, because "answered" is what makes an
+// anket box done and the meter must count the same set the column shows.
+let anketPromise = null;
+function anketData() {
+  if (!anketPromise) {
+    anketPromise = (async () => {
+      try {
+        const { data, error } = await IstRouter.sb.from('neighborhood_polls')
+          .select('id, question_tr, question_en, option_a_tr, option_a_en, option_b_tr, option_b_en, color_a, color_b')
+          .eq('active', true)
+          .order('created_at', { ascending: false })
+          .limit(3);
+        if (error) throw error;
+        const polls = data || [];
+        const voted = new Set();
+        const uid = await doneUid();
+        if (uid && polls.length) {
+          // Best-effort: a vote lookup that fails leaves the boxes loud
+          // rather than taking the column down. RLS only ever hands back
+          // the caller's own rows (db/neighborhood_polls.sql).
+          try {
+            const { data: votes, error: vErr } = await IstRouter.sb
+              .from('neighborhood_poll_votes')
+              .select('poll_id').eq('user_id', uid)
+              .in('poll_id', polls.map(p => p.id));
+            if (vErr) throw vErr;
+            (votes || []).forEach(v => voted.add(v.poll_id));
+          } catch (err) { console.error('[proje anket oy]', err); }
+        }
+        return { polls, voted, failed: false };
+      } catch (err) {
+        console.error('[proje anket]', err);
+        return { polls: [], voted: new Set(), failed: true };
+      }
+    })();
+  }
+  return anketPromise;
+}
+
+// Voting is exactly what changes this column, so it is re-read the
+// moment a vote lands rather than at the next mount -- the same rule
+// refreshOyunColumn follows for a game just played.
+function refreshAnketColumn() {
+  anketPromise = null;
+  loadAnketActor.reset();
+  (cast || []).forEach(a => {
+    if (!/\bfb-anket\b/.test(a.def.cls) || !a.def.load) return;
+    try { a.def.load(a.el); } catch (err) { console.error(err); }
+  });
+  refreshDayMeter();
+}
+
+// anketData() never rejects -- it reports a failed fetch in its own
+// return value and has already logged it, so there is nothing to catch
+// here and nothing to log twice.
 const loadAnketActor = stackFetch(async () => {
-  try {
-    const { data, error } = await IstRouter.sb.from('neighborhood_polls')
-      .select('id, question_tr, question_en, option_a_tr, option_a_en, option_b_tr, option_b_en, color_a, color_b')
-      .eq('active', true)
-      .order('created_at', { ascending: false })
-      .limit(3);
-    if (error) throw error;
-    const rows = (data || []).map(poll => ({
-      html: '<div class="k">ANKET</div><div class="t">' + esc(anketText(poll, 'question')) + '</div>',
-      page: anketPagePayload(poll),
-    }));
-    return { rows, failed: false,
-      emptyHtml: '<div class="k">Anket</div><div class="t">Şu an anket yok</div>' +
-                 '<div class="m">Yakında yeni bir soru gelecek.</div>' };
-  } catch (err) {
-    console.error('[proje anket]', err);
+  const { polls, voted, failed } = await anketData();
+  if (failed) {
     return { rows: [], failed: true,
       failedHtml: '<div class="k">Anket</div><div class="t">Yüklenemedi</div>' +
                   '<div class="m">Bağlantını kontrol et.</div>' };
   }
+  const rows = polls.map(poll => ({
+    html: '<div class="k">ANKET</div><div class="t">' + esc(anketText(poll, 'question')) + '</div>',
+    page: anketPagePayload(poll),
+    done: voted.has(poll.id),
+  }));
+  return { rows, failed: false,
+    emptyHtml: '<div class="k">Anket</div><div class="t">Şu an anket yok</div>' +
+               '<div class="m">Yakında yeni bir soru gelecek.</div>' };
 });
 
 // The page's body is filled in by `wire`, once its markup is actually in
@@ -1898,6 +2236,9 @@ function renderAnketButtons(body, poll, uid) {
         return;
       }
       renderAnketResults(body, poll, choice);
+      // The box behind this page has just become one the reader is done
+      // with, and the day is one step shorter.
+      refreshAnketColumn();
     });
   });
 }
@@ -2039,11 +2380,16 @@ async function loadOyunActor(el, slot) {
   const idx = GAME_DEFS.length - 1 - slot;
   const g = GAME_DEFS[idx];
   el.classList.remove('fb-locked');
+  fbSetDone(el, false);
   if (state.off.has(g.key)) {
     el.classList.add('fb-empty'); el.classList.remove('fb-openable');
     el.innerHTML = '<div class="k">' + g.kicker + '</div>'; return;
   }
   el.classList.remove('fb-empty');
+  // PLAYED means finished (attempts >= 1), the same reading the lock
+  // below and the app map's own square use -- all three have to agree or
+  // a game opens the next one while still saying it has not been played.
+  fbSetDone(el, state.played.has(g.key));
   const blocker = gameBlocker(state, idx);
   if (blocker) el.classList.add('fb-locked');
   // The same class every other column's boxes carry, and it means the
@@ -2065,6 +2411,8 @@ function refreshOyunColumn() {
     if (!/\bfb-oyun\b/.test(a.def.cls) || !a.def.load) return;
     try { a.def.load(a.el); } catch (err) { console.error(err); }
   });
+  // A game just finished is also a step off the day's own meter.
+  refreshDayMeter();
 }
 
 function onpressOyun(e, slot) {
@@ -2176,6 +2524,10 @@ function openFbPage(payload, origin) {
   // its own listeners once its markup is actually in the document. Every
   // other box simply has no wire.
   if (payload && payload.wire) { try { payload.wire(inner); } catch (err) { console.error(err); } }
+  // Opening IS the deal for a box that can be dealt with (see the news
+  // loader's own onOpen). Every other box simply has no onOpen, exactly
+  // as it has no wire.
+  if (payload && payload.onOpen) { try { payload.onOpen(); } catch (err) { console.error(err); } }
   try { history.pushState({ fbPage: 1 }, ''); _fbPushed = true; } catch (err) {}
 }
 
@@ -3239,6 +3591,12 @@ function mount() {
   wireMap();
   wireGameOverlay();
   wireFbPage();
+  // The ring is painted from whatever the last visit worked out before
+  // the fetches are asked again, so a swipe back does not empty the sea
+  // for a round trip and then refill it. Never awaited: the book must
+  // not wait on the network (see an actor's own load).
+  paintDayMeter();
+  refreshDayMeter();
 }
 function unmount() {
   stopAnim();
@@ -3565,17 +3923,12 @@ async function loadMapStats() {
       .select('id, updated_at').gte('updated_at', cutoff).is('archived_at', null);
     if (error) throw error;
     const rows = data || [];
-    // The store keeps each story's updated_at AS THROWN, so a gelişme
-    // puts it back in the deck -- and back into this count. Its first
-    // version was a plain array of ids with no stamp at all; that reads
-    // as "dealt with as it stands", the same reading kutuphane.html's own
-    // reconcileDealt gives it.
-    const raw = uid ? store('dunya_dealt_' + uid) : null;
-    const stampless = Array.isArray(raw) ? new Set(raw.map(String)) : null;
-    const dealt = (!stampless && raw && typeof raw === 'object') ? raw : {};
-    const done = rows.filter(r => stampless
-      ? stampless.has(String(r.id))
-      : dealt[r.id] === r.updated_at).length;
+    // Read through the same two helpers the boxes and the day meter use
+    // (newsDealtStore / newsIsDealt), so this square cannot come to a
+    // different answer than the column it is counting -- stamp semantics
+    // and the legacy stampless format included.
+    const dealt = newsDealtStore(uid);
+    const done = rows.filter(r => newsIsDealt(dealt, r)).length;
     stats.haber = done + '/' + rows.length;
     // += rather than =: the anket block below shares this same badge, and
     // the two run concurrently -- whichever resolves second must not
