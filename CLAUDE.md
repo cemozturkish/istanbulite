@@ -1542,6 +1542,17 @@ Four things about that second ladder:
 **The page's own paper IS the map's sea**, in both palettes and both themes (`--paper` ==
 `--map-sea`), which is what keeps the drawing and the page it lies on reading as one sheet.
 
+**`?ink=0` turns every ladder off, and `?ink=1` turns them back on** (`KILL_KEY` in map-ink.js,
+remembered in `localStorage` because `index.html` drops the query on its way to `project.html`).
+It exists because this is the one thing on the site that cannot be measured where it is written.
+Filtered against unfiltered, the cost is nil in Chromium everywhere it has been looked for — a
+flip-book scrub, a 305-cell petek with 73 avatars under a depth drag, and the composited layer
+count and surface memory alike — and every one of those numbers is from the engine ~10% of readers
+use. There is no WebKit build in the sandbox. So rather than anyone arguing from the wrong engine's
+numbers, the reader carries the A/B in their pocket: open the app, note it, add `?ink=0`, note it
+again. Switched off, every drawing renders exactly as it was drawn, which is the same degradation
+the ready class already guarantees when the module fails to load at all.
+
 ### The map is scenery, and it drifts — `map-parallax.js`
 
 The map is the one thing on the two pages that carry one that is *scenery* rather than content

@@ -91,6 +91,29 @@
   // failure than a map that stays gray.
   const READY_CLASS = 'ist-map-ink';
 
+  // ── The kill switch ──
+  // `?ink=0` anywhere in the app turns every ladder off and remembers it;
+  // `?ink=1` turns them back on. It exists because this is the one thing
+  // on the site that cannot be measured where it is written: the filters
+  // are free in Chromium at every revision measured -- flip-book scrub,
+  // a 305-cell petek under a depth drag, layer count and surface memory
+  // alike -- and ~90% of readers are in WebKit, which has no build here
+  // to check against. So the reader carries the A/B in their pocket
+  // instead of anybody guessing: open the app, note it, add ?ink=0,
+  // note it again. Remembered in localStorage rather than read from the
+  // query each time, because index.html redirects to project.html and
+  // drops the query on the way.
+  const KILL_KEY = 'istanbulite_map_ink_off';
+
+  function killed() {
+    try {
+      const v = new URLSearchParams(location.search).get('ink');
+      if (v === '0' || v === 'off') { localStorage.setItem(KILL_KEY, '1'); return true; }
+      if (v === '1' || v === 'on') { localStorage.removeItem(KILL_KEY); return false; }
+      return localStorage.getItem(KILL_KEY) === '1';
+    } catch (e) { return false; }
+  }
+
   // Each drawn family's own tones, as 8-bit grays, DESCENDING — and the
   // token each one reads. Order matters twice: it is the ladder, and the
   // ramp below walks it from the lightest end down. `red` is the one
@@ -237,6 +260,10 @@
   // maps in the same frame it repaints everything else.
   function refresh() {
     try {
+      // Switched off: the ready class is never added, so every drawing
+      // renders exactly as it was drawn -- the same degradation the class
+      // guarantees when this module fails to load at all.
+      if (killed()) { document.documentElement.classList.remove(READY_CLASS); return; }
       const cs = getComputedStyle(document.documentElement);
       const want = [];
       for (const spec of LADDERS) {
@@ -276,5 +303,5 @@
     window.addEventListener('load', refresh);
   } catch (e) { /* ignore */ }
 
-  global.IstMapInk = { refresh, READY_CLASS, LADDERS };
+  global.IstMapInk = { refresh, READY_CLASS, LADDERS, KILL_KEY };
 })(window);
