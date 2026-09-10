@@ -1221,6 +1221,13 @@
     .fb-page-body p { margin: 0 0 9px; font-size: 0.85rem; line-height: 1.5; }
     .fb-page-body p:last-child { margin-bottom: 0; }
 
+    /* The heading over a seri's earlier posts, printed under a fresh
+       gelişme's own paragraphs -- the same small-caps label kutuphane.html's
+       sidebar prints before a Zaman Akışı, so it reads as one convention. */
+    .fb-page-divider {
+      font-size: 0.6rem; letter-spacing: 0.14em; color: var(--muted);
+      margin: 14px 0 8px; text-transform: uppercase;
+    }
     /* The three fixed conflicts' own page: a plain news timeline, newest
        first -- unlike an olay's chapters (oldest first, a shape read like
        a book), this is a feed of "what's happened lately", so it reads
@@ -1872,7 +1879,7 @@ function haberlerData() {
       try {
         const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
         const { data, error } = await IstRouter.sb.from('breaking_news')
-          .select('id, title, body, title_en, body_en, category, neighborhood, updated_at')
+          .select('id, title, body, title_en, body_en, category, neighborhood, series_id, updated_at')
           .gte('updated_at', cutoff)
           .is('archived_at', null)
           .order('updated_at', { ascending: false })
@@ -1921,11 +1928,25 @@ async function loadHaberlerActor(el, slot) {
   doneUid().then(uid => {
     if (el.isConnected) fbSetDone(el, newsIsDealt(newsDealtStore(uid), n));
   });
+  // This box picks a category's own NEWEST story inside the 72h window --
+  // that bucketing is only about which slot a story stands in, never about
+  // what its own page holds. If this update is itself part of a `seri`
+  // (it links back to earlier, now-outside-the-window posts about the
+  // same thing), its page carries their Zaman Akışı too, so pressing a
+  // fresh gelişme still hands the reader the story it grew out of instead
+  // of stranding them on one paragraph with no way to the rest of it.
+  let siblings = [];
+  if (n.series_id) {
+    try { siblings = await fetchSeriesSiblings(n.series_id, n.id); }
+    catch (err) { console.error('[proje haber seri]', err); }
+  }
+  if (!el.isConnected) return;
   // The story itself, in whichever language it was actually written in
   // (newsText) -- the same choice the headline above was printed with.
   fbSetPage(el, {
     kicker: label, meta: newsAge(n.updated_at),
-    title: newsText(n, 'title'), body: newsText(n, 'body'),
+    title: newsText(n, 'title'),
+    html: fbParas(newsText(n, 'body')) + (siblings.length ? seriesTimelineHTML(siblings) : ''),
     // OPENING is the deal, not reaching the foot of the page. A wrong
     // "unread" is worse than a lenient "read": the reader saw the story,
     // and a box that stays loud after they have been inside it is the
@@ -1937,6 +1958,41 @@ async function loadHaberlerActor(el, slot) {
       newsMarkDealt(n).then(refreshDayMeter);
     },
   });
+}
+
+// A seri's earlier posts, newest first -- the same pool and the same cap
+// (`db/breaking_news_series.sql`) the Türkiye stop's own pinned box reads,
+// just keyed per series instead of per pinned slot, and shared by every
+// box that opens onto the same seri so two boxes never fetch it twice.
+const seriesSiblingsCache = new Map();
+function fetchSeriesSiblings(seriesId, selfId) {
+  if (!seriesSiblingsCache.has(seriesId)) {
+    seriesSiblingsCache.set(seriesId, (async () => {
+      const { data, error } = await IstRouter.sb.from('breaking_news')
+        .select('id, title, body, title_en, body_en, series_id, updated_at')
+        .eq('series_id', seriesId)
+        .is('archived_at', null)
+        .order('updated_at', { ascending: false })
+        .limit(9);
+      if (error) throw error;
+      return data || [];
+    })());
+  }
+  return seriesSiblingsCache.get(seriesId).then(rows => rows.filter(r => r.id !== selfId));
+}
+
+// The seri's earlier posts, printed under the fresh one exactly the way
+// the Dünya box's own timeline reads (newest of the rest first) -- one
+// heading borrowed from the same "Zaman Akışı" label kutuphane.html's
+// sidebar carries, so the two objects read as one convention.
+function seriesTimelineHTML(items) {
+  return '<div class="fb-page-divider">Zaman Akışı</div>' +
+    items.map(it =>
+      '<div class="fb-dunya-moment">' +
+        '<div class="fb-dunya-moment-date">' + esc(newsAge(it.updated_at)) + '</div>' +
+        '<div class="fb-dunya-moment-title">' + esc(newsText(it, 'title')) + '</div>' +
+        (newsText(it, 'body') ? '<p>' + esc(newsText(it, 'body')) + '</p>' : '') +
+      '</div>').join('');
 }
 
 // A story is entered in both languages (db/breaking_news_v2_bilingual.sql);
