@@ -67,6 +67,14 @@
   }
 
   function start(onFinish, opts) {
+    // The curtain reads the palette too (map-ink.js's third ladder), and
+    // it is the one surface that paints BEFORE DOMContentLoaded -- this
+    // runs from an inline script half way down the body. That module
+    // declines to build its filters until there is a body to hang them
+    // in, so without this the first frames paint in the gray they were
+    // drawn in and snap to the palette a moment later. There is a body by
+    // the time we are here, so this is the call that lands.
+    try { if (global.IstMapInk) global.IstMapInk.refresh(); } catch (e) { /* stays as drawn */ }
     const overlay = document.getElementById('loading-overlay');
     const back = document.getElementById('loading-frame-back');
     const front = document.getElementById('loading-frame-front');
