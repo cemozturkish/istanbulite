@@ -250,9 +250,11 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > and open together as one story), `world_events` + `world_event_moments` +
 > `world_event_countries` (the OLAYLAR — the world events themselves, with their per-olay colour,
 > where their paper hangs on the map, the countries an open one lights, and their chapters —
-> oldest first, each optionally carrying its own photo) and `breaking_news_countries` (which
-> countries a Dünya story is about, lit on that map when the story opens), and more). When in doubt, read the relevant `db/` file — it is the
-> source of truth.
+> oldest first, each optionally carrying its own photo), `breaking_news_countries` (which
+> countries a Dünya story is about, lit on that map when the story opens), and `neighborhood_polls`
+> + `neighborhood_poll_votes` (İlçe Anketleri — district polls whose per-district split is meant to
+> color a future map, see the schema below), and more). When in doubt, read the relevant `db/` file
+> — it is the source of truth.
 
 **Table: `neighborhoods`** — lookup of valid neighborhood IDs.
 - `id text pk` (kebab-case slug), `name_tr text` (Turkish display name).
@@ -317,6 +319,34 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
   before this file existed. A feature that locks the app when its content table is empty is a
   feature that takes the app down.
 - Curated from admin.html's Oyunlar tab → **Sorular** panel (date × game, both languages).
+
+**Tables: `neighborhood_polls` + `neighborhood_poll_votes`** — İlçe Anketleri, the district polls
+behind Kütüphane's ANKET box (`db/neighborhood_polls.sql`).
+- What makes this a different object from `daily_questions` (a citywide opinion) and
+  `breaking_news_polls` (a reaction to one story) is what the answer is FOR: every vote is filed
+  under the member's own district, so the result is not one percentage but 25 of them — how
+  Beşiktaş answered, how Üsküdar answered.
+- `neighborhood_polls`: `id`, `question_tr`/`question_en`, `option_a_tr`/`option_a_en`,
+  `option_b_tr`/`option_b_en`, `color_a`/`color_b` (hex, defaulted to the site's own red and ink),
+  `active`. The two colors are what a future district-colored map would mix between for a district
+  by that district's own a/b split, the way a live election map does — there is no such map drawn
+  yet (project.html's İstanbul at slide 12 is still a flat painted frame, not a traced one a fill
+  can be set on; see "The zoom is DRAWN, not computed"), so `renderAnketResults` in project.html
+  prints the same split as a plain list, each district's row already wearing the color a map would
+  paint it with.
+- `neighborhood_poll_votes`: `(poll_id, user_id)` PK, `neighborhood` (the voter's own district AT
+  THE TIME they voted, not looked up later), `choice` (`a`/`b`). **Insert-only**, same reasoning as
+  `question_answers`: an answer is what you thought when you were asked. The insert's `with check`
+  cross-references the caller's own `profiles.neighborhood` rather than trusting whatever the
+  client sends, since a false district would quietly corrupt the very data a map exists to color.
+- RLS: polls readable by everyone signed in, writable by the admin alone. A vote is readable by
+  **its own voter and the admin**, and by nobody else — same privacy stance as `question_answers`.
+  The per-district breakdown a result view or a future map needs comes from
+  `neighborhood_poll_results(poll_id)` (SECURITY DEFINER, one row per district — every district,
+  even one with no votes yet — with `a_count`/`b_count` and no identities).
+- Curated from admin.html's **İlçe Anketleri** tab (kept apart from the per-story "Anketler" panel
+  already inside the Haberler tab, which is `breaking_news_polls` and answers a different
+  question).
 
 **Table: `sozcel_used_answers`** — one row per Istanbul day: that day's Sözcel answer (`db/sozcel_used_answers*.sql`).
 - `used_on date pk`, `word` (unique across all days, so an answer never repeats), `definition`, `syllables`, `sozcul_id`, `created_at`.
@@ -550,6 +580,94 @@ sb.from('articles').delete().eq('id', id)
 
 ### `admin.html` — Admin Dashboard
 - Login restricted to ADMIN_EMAIL
+- **THE DESK — three columns, and they never change.** The sections stack down the far
+  **left** as a rail, grouped by which of the app's places they change (Kütüphane · Kahvehane ·
+  Kişiler · Hane); the **work area** is in the middle; and a **phone** stands on the right with
+  the live site in it. The rail used to be a bar across the top that scrolled sideways —
+  fourteen tabs never fit — so the section you wanted was usually off the edge of a bar you had
+  to remember was scrollable. Stacked, they are all readable at once, and the width they cost is
+  width the two-panel body never used. All of it is stated once in the page's own `<style>`
+  ("THE DESK"); nothing here is shared with the site's stylesheets.
+- **A section is its LIST, and pressing a row opens the thing you pressed.** The editor used to
+  be a permanent left-hand column that was a blank form nearly all the time — half a screen
+  making room for writing nobody was doing. It is a **drawer** now (`.md-editor`), off-screen
+  until a row is pressed or "+ Yeni" is, and the list reads the way the site reads: the red
+  kicker, the headline, the line under it. The button that said "Düzenle" is gone from every row
+  whose press now does exactly that; the row's *other* actions (Arşivle, Sil) are not what the
+  press does and stay, quiet until the row is under the pointer.
+- **The drawer MOVES the form's own nodes; it never rebuilds them.** `deskBuildDrawer` takes the
+  editor panel apart into head / body / foot and puts the panel's existing children back into
+  the middle — so every id, every listener and every `document.getElementById` in the rest of the
+  file still finds exactly the field it always found. The head carries the form's **own**
+  `.panel-title` node (the one that says "Add New Event" or "Editing Event", which the page
+  writes to), and the foot carries its **own** action row, standing on the floor where it cannot
+  scroll away from the thing it commits. `DESK_MD` at the bottom of the script is the whole
+  configuration: which row actions open it, which button means "blank", where the action row is.
+- **Nothing knows what any form saves.** A save says so by turning its own status line green
+  (`.status-msg.ok`) — the one signal every one of these forms already gave — so that is what
+  closes the drawer and prints the toast. Adding a section means adding a line to `DESK_MD`.
+- **Writing a thing should not be a scroll**, which is the point of the whole rearrangement. The
+  fields are grouped (`deskWrapFields` — a label and everything under it up to the next one,
+  stopping at anything carrying a label of its own) and laid two across; the long explanations
+  each form carries fold into one line (`deskFoldHints`); and the fields that are real but are
+  not what you came to write — the id, where an olay's paper hangs, which seri — fold under
+  **Gelişmiş** (`deskFoldAdvanced`). Nine of the ten editors now open with nothing to scroll at
+  all; Olaylar, which carries a map picker and a 28-country checklist, went from ~810px of
+  overflow to ~80.
+  - One trap: at the moment those three run, the drawer's body is **detached**, so they must ask
+    `inner.querySelector('#id')` — `document.getElementById` returns null there and the fold
+    silently does nothing.
+- **A card is a headline; everything under it is FOLDED.** Gelişmeler, Anketler, Kaynaklar,
+  Bölümler and a country entry's Zaman Akışı are each a whole editor, and five of them standing
+  open at once turned a list of twenty stories into a page nobody could scan — the one thing a
+  list is for. They are `<details class="sources-block">` now, shut by default, so a story at
+  rest is its kicker, its headline and the count behind each fold. An olay's board settings
+  (which countries it lights, where its paper hangs) fold with them: the line is **content stays,
+  editors and settings fold**, which is why a story's own body and an olay's parties line are
+  still printed.
+  - Which folds are open is remembered in `OPEN_BLOCKS`, keyed by card and block, because every
+    one of these lists rebuilds its own `innerHTML` after each add — a fold the admin had just
+    opened to type into would be shut again by the very save that proved it worked. The key is
+    remembered rather than the element, since the element is gone by the time the answer lands,
+    and the listener is a single capture-phase one on `document` because `toggle` does not bubble.
+- **A story can be moved into another story's Zaman Akışı, and moved back out.** The connection
+  between two stories is usually noticed *after* both have been posted — that is what news is —
+  so neither the feed nor a timeline may be a place a story is stuck in. **Akışa Taşı** on a card
+  folds that story into another one's timeline; **Taşı** on a timeline entry moves it to a
+  different story, or (the picker's first option) lifts it back out as a story of its own. Every
+  one of those is undone by doing the opposite.
+  - **It needed no migration.** `news_id` is an ordinary column on `breaking_news_updates`,
+    `_sources` and `_polls`, and the admin already holds UPDATE on all three — so moving is
+    re-pointing a foreign key, not copying rows about. Only `breaking_news_countries` is
+    different (a tick list with insert/delete and no UPDATE, `db/breaking_news_countries.sql`),
+    so the countries the target does not already name are inserted and its own ticks are left
+    alone.
+  - **What hangs off a story goes with it.** Folding one in carries its own timeline, its
+    sources, its polls and its countries across *before* the story row is deleted, so the cascade
+    takes nothing with it. A story that already has a timeline needs no entry of its own — its
+    current headline already IS its latest entry — and one that has none becomes a single entry
+    at its own `created_at`.
+  - **The receiving story keeps its own first headline** (`seedNewsTimeline`, extracted from
+    `addNewsUpdate` so there is one implementation): the first entry of any Zaman Akışı has to be
+    that story's own original post, or the headline it started as is lost the moment it grows a
+    second one.
+  - **A story's headline is its latest entry, so anything that changes a timeline re-derives it**
+    (`resyncNewsHead`) — otherwise a story goes on showing a headline that now lives somewhere
+    else. That function deliberately does **not** bump `updated_at`: that column is what puts a
+    story back on top of every reader's deck (see Kütüphane's `dunya_dealt_<uid>` rule), and
+    re-filing is a correction to the record rather than a development in the story. Only a move
+    that genuinely gives the target a *newer* headline bumps it — the same backdating rule
+    `addNewsUpdate` already follows.
+  - The picker is filled when it is opened, never with the card (`ensureMovePicker`): "Tümü"
+    renders up to 300 stories, and a select of all of them inside each of them is 90,000 options
+    nobody asked to see. Same rule as `ensureCardCountryPicker`. It offers what the list has
+    loaded, so reaching an older story means switching to "Tümü" first.
+- **The phone is the live site, not a picture** (`#prev-frame`): the same origin and therefore
+  the same session, drawn at 390×844 and scaled to whatever room the column has, so the page
+  inside lays out at the width a real phone reports rather than at the width of a narrow panel.
+  Picking a section aims it at the page that section changes — until the admin picks a page by
+  hand, at which point the rail stops steering it. It is a whole second copy of the app, so it is
+  not loaded until it is actually being looked at, and it is the first thing a narrow desk loses.
 - Full CRUD for articles: select neighborhood, enter title/summary/URL
 - Account management: create and assign user accounts to neighborhoods
 - Filter articles by neighborhood
@@ -1093,6 +1211,32 @@ coordinates that say where each paper hangs.
   clip it, and a centred overflow has no scrollbar to recover it. `fitSozcuLine()` keeps
   the "Günün Sözcüsü: …" credit on **one line** at any name length — it must never wrap,
   because a second line moves the keyboard and re-flows the board under the reader's thumb
+- **Two combs, one plane: the word, and the last guess behind it** (`.syl-stack`,
+  `renderGhostBoard`). The board shows only the letters that *locked*, so everything else the
+  reader had just tried vanished the moment it was read out — the pips say how many guesses are
+  gone, they cannot say what was in them. So the guess just submitted stays on the table as a
+  faint second comb, nested into the live one the way a honeycomb nests: **three half-columns
+  across and one level down** (`GHOST_DX` / `GHOST_DY`), which is the one offset that can never
+  collide — and by arithmetic rather than by luck, which is why it needs no case for a word of two
+  syllables against one of three, or for syllables of two letters against three. The staircase
+  steps a syllable down one level and right by `2*len - 3` half-columns, so a ghost tile from
+  syllable *s* lands on level *s*+1 at `start(s) - 3 + 2j`, and the only live tiles it could hit
+  there are syllable *s*+1's, at `start(s) + 2*len(s) - 3 + 2i` — equal only where `j = len(s) + i`,
+  which `j` never reaches. What it lands on instead is the notch: that row's rightmost ghost tile
+  is exactly one full column left of the live row's first tile, so the two combs touch along their
+  edges. **The sign is load-bearing** — three half-columns to the *right* solves `j = len(s) - 3 + i`
+  and collides on any syllable of three letters or more, and one half-column either way (which this
+  was at first) collides on nearly every word there is. It is painted from the history the
+  game already keeps (`submittedGuesses` / `guessResults`), so a reloaded board brings it back for
+  free. `back` is which one to take: 0 while playing, 1 once the game is over — there the live
+  comb *is* the last guess, and a ghost of the same word behind it is a blur. **The room it takes
+  is reserved whether or not one is showing**, in `layoutBoard`'s own budget, or the board would
+  resize the first time the reader pressed GİR
+- **The hexagons have a body, and nothing else is framed.** A wash inside each tile's own mask
+  lights its top-left and shades its bottom-right, and the live comb casts one drop shadow as a
+  silhouette rather than each tile casting its own (a mask clips a `box-shadow` away). Embedded,
+  nothing draws a box around the board or the panel: the sheet is already a bordered window, and
+  each frame inside it only added another line a few pixels within the last
 
 ---
 
@@ -1285,6 +1429,118 @@ remembered in `localStorage`, so a reload has the right map up before the profil
 confirms it; and the swap is aimed at images whose src *is* `istanbul-map.png`, because Kütüphane's
 Turkey map wears the same `.map-photo` class in the same shared document. Adding a district is a
 file drop plus one id in `PAINTED` — see `assets/map/home/README.md`.
+
+### The drawings read the palette — `map-ink.js` + the ladders in `palette.css`
+
+The hand-drawn maps used to be the one thing on the site that ignored the palette: the same
+near-white paper and black ink whether the reader was on the earth palette at noon or the mono one
+after sunset. They looked like a photograph of a drawing laid over the app rather than part of it.
+
+**They are not photographs, and that is the whole opening.** Measured, every map in `assets/map/`
+is a handful of FLAT grays plus one red — 1483 distinct colours in `istanbul-map-mobile.png`, but
+93% of its pixels sit within 8/255 of one of four tones and the rest is the antialiasing between
+them. So each tone is bound to a token instead of being repainted, and the drawing follows the
+palette for free:
+
+| tone | what it is | token |
+|---|---|---|
+| `#ffffff` | sayfa — the band above the Türkiye map | `--map-page` |
+| `#f7f7f7` | **deniz** — the water, and İstanbul's own page ground | `--map-sea` |
+| `#d9d9d9` | kara — land, the neighbouring countries | `--map-land` |
+| `#c6c6c6` | **Türkiye** — drawn a step darker than its neighbours, so it gets its own | `--map-turkiye` |
+| `#b4b4b4` | kenar — the extruded side of the 3D edge | `--map-edge` |
+| `#000000` | çizgi — the outline | `--map-ink` |
+| `#ba433f` | the Ankara star, the marks, a painted home ilçe | `--map-red` |
+
+Four things about it:
+
+- **The ladder's ORDER is the drawing's meaning, and night never turns it over.** The sea is the
+  lightest tone in both maps and stays the lightest in all four states; night slides the whole
+  ladder down and keeps its order. A map whose sea is darker than its land is a map of somewhere
+  else — which is exactly what binding the sea to `--paper` produced, since `--paper` and `--ink`
+  swap in the dark theme. That is why these are seven tokens of their own rather than the page's.
+- **Mono at night is deliberately a step LIGHTER than earth at night.** Equal luminance is not
+  equal darkness: the same gray reads flatter and heavier than the warm brown beside it, so
+  matching the two by number made the mono one look like the lights had gone out. The page's night palette (frames.css)
+  follows the maps in both respects: **night is the day with the PAPER turned down, not the day
+  turned over** — dark ink on lighter paper, the same ladder in the same order, and what makes it
+  night is that the paper drops ~80% in brightness while the ink, already near-black, barely moves.
+  What that costs is stated in the block itself: on the earth night paper even pure black reaches
+  only 3.86:1, so body text lands at 3.30:1 against noon's 8.21:1 and no amount of darkening the
+  ink recovers it — the paper decides, and `#8a7160` (that block's own `--page-bg`) is the darkest
+  paper that clears 4.5:1 with black ink. The fire orange is the one thing the palette cannot keep:
+  `#CB5A16` lands at 1.09:1 on that paper — the two are the same brightness — so it is walked down
+  its own hue to `#471f08` (2.63:1), since day parity would need `#410300`, a maroon with no orange
+  left in it.
+- **The red is lifted out before the ramp and merged back on top.** It is chromatic, so a
+  luminance lookup would flatten it onto the browns. Its mask has to be something `feColorMatrix`
+  can express, i.e. linear in R/G/B: `R − (G+B)/2` is zero on any gray by construction and 0.474 on
+  the drawn `#ba433f`, so ×2.1 makes it a coverage mask and nothing else in the drawing trips it.
+  In the earth palette that red is a fire orange (`#CB5A16`), the same one `--ink-red` carries
+  there.
+- **A filter, not four sets of PNGs and not masks.** Recolouring offline is one set of files per
+  palette per theme — four copies of 7.2 MB, plus a `src` swap at sunrise and sunset, which is the
+  "`<img>` goes blank until the new bytes decode" trap `home-map.js` documents. Per-tone alpha
+  layers are exact but multiply the flip book's 24 decoded frames by four. The filter costs nothing
+  on disk and nothing at rest: measured on a harness reproducing the book exactly, at 390×844@3 on
+  a 4×-throttled CPU, scrubbing the whole book and back left the median frame at 16.7 ms —
+  identical unfiltered — and p95 within 0.4 ms. What it costs is one rasterisation the first time
+  each frame is painted.
+
+Three mechanical notes, all of which fail silently. The `filter:` rule is gated on
+`html.ist-map-ink`, which `map-ink.js` adds only once the filter is really in the document: a
+`filter: url()` pointing at a filter that is not there is, per spec, an element that does not
+render, and a map that vanishes because a shared script failed to load is a worse failure than a
+map that stays gray. The lookup is **256 entries** — not a round number picked for looks, but one
+per 8-bit gray, so every tone above lands exactly on a sample and no anchor is reached by
+interpolation. And **the filter hangs in the BODY and is built with DOM calls, never
+`innerHTML`** — both because of the engine this app actually runs on. A filter is resolved off the
+render tree, and `<head>` is `display: none` with children an engine need never attach; setting
+`innerHTML` on an SVG element runs an SVG fragment through the HTML parser. Chromium is happy with
+both, which is no evidence at all for WebKit, and WebKit is ~90% of the readership (see Vision).
+Neither shortcut was worth an untestable difference. The module runs from `<head>`, so there is no
+body on its first pass: `build()` answers whether it actually built anything and `refresh()` claims
+nothing when it did not — the `DOMContentLoaded` pass is the one that lands.
+
+`palette.js` calls `IstMapInk.refresh()` from its own `apply()`, so a sunset moves the city and the
+page it is drawn on in the same frame. The selector list deliberately does not catch
+`.olay-draw image` — the olaylar drawings are hand-coloured per olay and are the one thing over
+these maps that is not gray.
+
+**And the maps are not the only drawn grays, so there are two ladders** (`LADDERS` in map-ink.js).
+The avatar family — `assets/avatar-*.png` plus `frame-background.png` — is the same measurement
+again and even cleaner: four flat tones, already transparent, already registered on the one
+1024×1536 hexframe canvas. `#f9f9f9` the figure's own paper (`--av-paper`), `#dcdbdb` the ground
+behind it (`--av-ground`), `#5b5b5b` the jail stripes (`--av-jail`), `#181818` the ink that draws
+the outline, the hair, the glasses and the shirt alike (`--av-ink`). Adding a third drawn family is
+a row in that table.
+
+Four things about that second ladder:
+
+- **It does not follow the theme the way the page does, and that is measured rather than
+  preferred.** An avatar is a stamp — a figure printed on its own paper — and its ink sits 13.2:1
+  off that paper by day, while the night page's paper is dark enough that even pure black reaches
+  3.9:1. An avatar dimmed with the page is an avatar nobody can read, so it steps down a little at
+  night and stays firmly its own light sheet.
+- **The alpha row of `feColorMatrix` must PASS ALPHA THROUGH** (`0 0 0 1 0`). Forcing it opaque
+  (`0 0 0 0 1`) is harmless on the maps, which fill their box with no transparency at all, and it
+  destroys the avatars: every pixel outside the drawing becomes opaque, and since transparent black
+  has luminance 0 the whole canvas floods with the darkest tone on the ladder. What you get is a
+  solid ink-coloured hexagon with the figure knocked out of it — which reads as a deliberate
+  inversion rather than as a bug, which is exactly why it is worth stating.
+- **Only `.ist-avatar-stack img` is filtered**, never every `<img>` on the site: a politician's
+  photograph is not a four-tone drawing and must not go through a four-tone lookup. `avatar.js`
+  always wraps the stack, so the stack is the fence.
+- **The ground behind the figure is a MASK, not a filtered picture.** It is one flat tone across
+  its whole silhouette, so all of its shape is in its alpha already — and it cannot be filtered
+  with the layers above it, because it is painted as the frame's own background and the drawn ring
+  (`::after`) is that same element's child: one filter on the box would push the ring, which
+  already follows `--hexframe-stroke`, through the ladder a second time. It goes on `::before`,
+  which lands under the `<img>` layers by tree order while the ring keeps its `z-index: 10` above
+  them.
+
+**The page's own paper IS the map's sea**, in both palettes and both themes (`--paper` ==
+`--map-sea`), which is what keeps the drawing and the page it lies on reading as one sheet.
 
 ### The map is scenery, and it drifts — `map-parallax.js`
 
@@ -1590,11 +1846,12 @@ you are already there.
   loses to it — the logo then goes dark under the very wash it is supposed to be standing above.
 - **The squares are how far into each window's content the reader has got** — Haberler as
   `dealt/total` read from the deck's own `dunya_dealt_<uid>` store (both its shapes, stamped and
-  the legacy stampless array), Olaylar as `started/ongoing`, Oyunlar as `played/on today`, and
-  Etkinlikler as a count rather than a fraction, because an evening is not content to get through.
-  Every one is best-effort and independent: a query that fails leaves its own square a dash rather
-  than taking the map down. A square whose content is parked (Fikirler, Bilgi, Kahve, Yorumlar)
-  prints a dash too — the shape of a screen must not change on the day its numbers arrive.
+  the legacy stampless array), Olaylar as `started/ongoing`, Oyunlar as `played/on today`, Anket as
+  `answered/active`, and Etkinlikler as a count rather than a fraction, because an evening is not
+  content to get through. Every one is best-effort and independent: a query that fails leaves its
+  own square a dash rather than taking the map down. A square whose content is parked (Fikirler,
+  Kahve, Yorumlar) prints a dash too — the shape of a screen must not change on the day its numbers
+  arrive.
 - **The middle window is the reader's OWN hexagon, cloned out of the petek.** Hane's window is the
   reader's profile, and that already exists at the petek's middle depth — so the cell is
   `cloneNode`d rather than redrawn, and the ring, the mask, the avatar and the badges stay the
@@ -1646,7 +1903,7 @@ slide that is the city:
 | | Lane 0 | Lane 1 | Lane 2 |
 |---|---|---|---|
 | | **Kütüphane** | **Hane** | **Kahvehane** |
-| what stands there | Haberler + Bilgi | the petek | Etkinlikler + Sözcel |
+| what stands there | Haberler + Anket | the petek | Etkinlikler + Sözcel |
 | where the book may go | up, to slide 1 | nowhere | down, to slide 24 |
 
 Left to right on the screen, exactly as the three tabs stand. A pull right walks the strip right,
@@ -1730,38 +1987,37 @@ project.html listens for to close the layer. A page opened this way is torn down
 (`frame.src = 'about:blank'`) rather than kept alive behind the layer, so the next open is a fresh
 start.
 
-**It stands in the exact room the map and the band already fill on every other page, not edge to
-edge.** The two bars stay up throughout (see "THE TWO BARS ARE OMNIPRESENT"): the overlay's own
-top is `--map-hero-top` and its bottom clears `--navbar-h`, the same two measurements every other
-page's map and band are built from — not a guessed fraction of the screen, the same box. Its
-z-index sits *under* the bars' own 400/401 (frames.css), the one place on the site content
-deliberately stacks below them rather than stopping flush against them: the profile bar's real
-height is taller than `--map-hero-top` by design (it already floats over the top sliver of the
-map on every page), so the overlay's own top edge sits a little way under it — and that sliver is
-what lets the entrance curtains read as sliding out from *behind* the bars rather than over them.
+**It arrives as THE sheet, the same object the profile bar's own name opens.** Not a bespoke pop
+up with a geometry of its own: the same `.ist-sheet-overlay` markup, the same `IstSheet.open` /
+`IstSheet.close`, the same 0.55s slide up from the bottom, and on a phone the same resting position
+under the profile bar that `IstSheet.position` measures live — so the game clears the bar instead of
+sitting under it, and there is no second transition language on the site to keep in step. (It used
+to open behind two paper curtains that slid in from above and below and lifted once both the slide
+and the iframe's `load` had finished; that choreography is gone.)
 
-**The opening is two paper pages, not a fade.** The iframe loads at its true, untouched full size
-the whole time (`sozcel.html`'s own `layoutGame()` must never measure a transformed box), and two
-decorative curtains cover it — one the height of the map's own square, descending from above; one
-resting just above the actor row the tile was pressed from, rising from below the tab bar — the
-same 0.55s curve as THE sheet's own slide (`sheet.css`), so this reads as the same object opening a
-different way rather than a second transition language. **They land apart and stay apart —
-two windows, not one closed sheet**, so the room between the map and the row is in view the instant
-they land rather than being swallowed by a sheet that briefly covers the whole screen; where the
-bottom one rests is measured live off whichever actor is actually on screen
-(`--fb-curtain-bottom-top`, set in `openGameOverlay()`), never a guessed fraction, so a taller
-Etkinlikler card or a different device is never fought. They only lift once BOTH the slide has
-finished and the iframe has actually fired `load`, so a slow load is never uncovered early and a
-fast one is never rushed.
+What this page states for itself is only what is genuinely its own. The iframe fills the sheet edge
+to edge rather than sitting in the padded, scrolling `.ist-sheet-body` every other sheet carries,
+because a game page brings its own chrome and does its own scrolling (`sozcel.html`'s `layoutGame()`
+must measure the room it is actually given, untransformed). And **the tab bar stays up**: on a phone
+the *overlay's* own bottom is lifted to clear it, so the backdrop stops there too and the bar is not
+merely visible but still pressable — every other sheet on the site runs flush off the bottom edge
+and comes to rest over that bar, which is right for something read for a moment and dismissed, but a
+game is where the reader stays, with a keyboard under their thumb, and the bar saying where they are
+must not be what disappears for it. The sheet is anchored to the overlay's bottom edge either way, so
+it lands exactly above the bar with the keyboard resting on it, and it takes its bottom border back
+(frames.css drops it precisely because a sheet normally runs off the screen).
 
-**Leaving reverses it, rather than snapping.** The back arrow's `postMessage` used to hide the
-layer outright — `hidden = true` in the same tick, the game gone and the book back in one frame,
-the one surface on the site that closed with no motion at all (every other one, THE sheet included,
-drops its open state and only hides once its own transition has actually finished). Pressing it now
-brings the curtains back over the game first — the same fade `.gone` already does in reverse, 0.3s —
-and only once they've met does the layer come down (`closeGameOverlay()`). A teardown of the page
-itself (`unmount()`, leaving project.html) has nothing left to animate in front of and skips straight
-to hidden (`closeGameOverlay(true)`).
+**One frame, not two.** The game pages outline their board (`#play-area`) when embedded and no longer
+outline the whole `.game-panel` around it: the sheet is already a bordered window, so the panel
+outline drew a second line a few pixels inside the first with nothing between them. The window is the
+panel's box. The five floating top buttons are on one line with it — all three groups (back arrow,
+scoreboard, the right-hand controls) on the same 14px inset with the same 6px between them and drawn
+icons at the same size as the discs beside them; they used to carry three different insets and two
+different gaps, so the row was ragged and the help icon sat almost on the sheet's own border. Closing is the sheet's own close, with
+the `src` torn down in its `after` callback so the game is unloaded once the sheet is off-screen
+rather than mid-slide; the game's back arrow, the backdrop and Escape are all ways out. A teardown
+of the page itself (`unmount()`) has nothing left to slide in front of and skips straight to hidden
+(`closeGameOverlay(true)`).
 
 Visiting one of the three directly still works exactly as before — the
 `<a href="project.html">` fallback is what fires when there is no parent to postMessage — and
@@ -1779,22 +2035,37 @@ puts it on screen at **2.1s** (the page itself is ready at 1.8s, so the frame co
 rest have the rest of the wait to arrive in — all fetched at once, then decoded one at a time, because simultaneous decodes of a
 1080×1920 image allocate ~8 MB of surface each, and the book is twenty-four of them. `fetchPriority` alone does not do this: it
 reorders a queue, it does not empty one. The gesture arms only when every frame is in, so the book
-is never asked for a page it does not have; until then the reader sees the first drawing and a
-count, never a spinner.
+is never asked for a page it does not have.
+
+**And none of that wait is shown.** All of it happens behind **the loading screen** — the sea rising
+in the logo that `index.html` opens with (`loading-screen.js` / `.css`, the same overlay markup, the
+same `resolveLoading` handle), which this page starts with `{ force: true }` because `index.html`
+has already marked the browser session as entered on its way here and what is being waited for
+*here* is not entry but the app itself. `load()` calls `resolveLoading` in a `finally`, so a page
+torn down mid-fetch still lets the screen go rather than leaving the reader on black paper. The
+count that used to stand over the first drawing while the rest arrived (`.fb-loading`, "2 / 24") is
+gone with it: the app has one wait and one place it is shown, and a page reporting its own assembly
+is the app looking like it is still being built at the exact moment it should look like a book.
+The other end of the same rule is that a signed-in reader **never waits the rise out on
+`index.html`**: `checkSession` hands them straight to `project.html` the moment it knows, leaving the
+overlay up, unresolved, until the navigation takes it — otherwise it is the same animation twice
+with a page load in the middle.
 
 **The cast is the point of the rig now.** A stop carries real things — buttons, panels, the page's
 own furniture — and `CAST` in project.html is where each one is declared: an element, the stop it
 belongs to (`live`), and a pose per slide. Three rules make them work:
 
 - **An actor's shape is a word, not a stylesheet.** The drawing gives the app exactly one
-  button — a rectangle — stacked three to a column: a wider column on the left, a narrower one
-  on the right, both the same height. An actor declares `col: 'l' | 'r'` beside its `live` and
-  `lane`, and `.fb-box` / `.fb-col-l` / `.fb-col-r` / `.fb-slot-0/1/2` state the geometry once
+  button — a rectangle — stacked three to a column: a wider column and a narrower one, both the
+  same height. An actor declares `col: 'l' | 'r'` — which side of the screen it is docked to —
+  beside its `live` and `lane`, plus `mirror: true` on the lanes whose wide column is the right
+  one, and `.fb-box` / `.fb-col-l` / `.fb-col-r` / `.fb-mirror` / `.fb-slot-0/1/2` state the
+  geometry once
   for every column on every lane — `stackActors()` is what turns one column description into
   its three sibling actors. An actor's own class (`fb-events`, `fb-oyun`) says what it is OF and
   never how big it is. **One number splits the line** (`--fb-unit`, five units wide, three to
-  the left column and two to the right — see "What each screen carries" below): left:right
-  width is always 3:2, and the left column's margin, the right column's margin and the gap
+  the wide column and two to the narrow one — see "What each screen carries" below):
+  wide:narrow width is always 3:2, and the left column's margin, the right column's margin and the gap
   between them are all `--fb-inset`, the same number. A slot with nothing to put in it —
   whether that column is a feed with fewer than three things or a fixed set with one of its
   three switched off — is drawn `.fb-empty`: a dashed rectangle, the same "nothing here"
@@ -1811,9 +2082,127 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   never hears it. It looks exactly like a dead button and nothing throws.
 - **An actor carries real data.** `load(el, slot)` is called once per mount, per box, after the
   element exists and awaited by nothing — the book must never wait on the network. A column's
-  three boxes share one fetch (`stackFetch`): Etkinlikler runs the same query Kahvehane's deck
-  does and fills up to three boxes with it, and says three different things where a feed comes
-  up short — a box per evening, a city with nothing on, and a fetch that failed.
+  three boxes share one fetch: Olaylar still shares it the plain way (`stackFetch`, one query,
+  rows filled into slots in order), while Etkinlikler and Haberler fetch once and then bucket the
+  result themselves — by Istanbul calendar day and by category respectively — because which slot
+  a card lands in is a fact about the card, not just how new it is (see "What each screen carries"
+  below).
+- **A box opens into the band it stands in** (`#fb-page-overlay`, `openFbPage`). A box has room
+  for a kicker, a timestamp and two lines of headline; pressing it opens the whole of what it was
+  naming, and the one place that page can go without covering what it came out of is the band
+  itself — the left column's left edge, the right column's right edge, the top slot's top edge and
+  the dock line. It is the same argument Kütüphane's news page and Kahvehane's event page make, and
+  it is **THE sheet** either way (same markup, same `IstSheet.open`/`close`); only the way it
+  arrives differs, and that arrival is the shared `IstSheet.grow` — one clip-path run from the
+  pressed card's own box out to those four edges. The rect is the band's own tokens and nothing
+  else, which is why they are declared on `html` rather than on `.fb-cast`: the overlay is
+  body-level and cannot inherit from the cast, and a second set of numbers would land the window a
+  pixel or two off the boxes it came out of. Head over a scrolling body — the card's own two
+  corners with the way back beside them, and everything the card only had room to name underneath;
+  the red category flag follows the column the page came out of (`.fb-mirror`), the head
+  deliberately does not, because the arrow and the kicker should land in the same place on every
+  lane. **Four ways out, and they are one way out**: the hand-drawn arrow, a press outside, Escape,
+  and the device's own back — the page puts an entry on the history stack precisely so that last
+  one closes it instead of leaving the app, and every reader-initiated close spends that entry
+  (`dismissFbPage`) rather than leaving it behind.
+- **A filled box carries a chunky foot, the same convention every solid card on the site
+  already wears** (`.info-card`, `.library-card` and friends in kutuphane.html/kahvehane.html: 2px
+  on three sides, 5px on the one the card rests on). It reads as a base rather than an outline,
+  and it is deliberately what tells a real card apart from a dashed slot — `.fb-box.fb-empty`
+  stays a uniform 2px dashed rectangle, because a placeholder marking where a card would be is not
+  a card and should not borrow its weight. The page a box grows into (`.fb-page`) carries the same
+  5px foot on its own bottom edge, since it is the same card standing at full size rather than a
+  second object.
+- **The press honours the chunky foot it just grew, rather than borrowing the flat card's
+  uniform scale** (`.fb-pressing`, `wireActorPress`). Pressing a box sinks it into its own base:
+  the foot thins from 5px to 2px (the same drop every other filled box on the site keeps at rest),
+  a **flat** grey — deliberately never black — band grows down from the top edge as the face
+  recedes from the frame's lip, and the printed content (`.k`/`.m`/`.t`) rides down by exactly the
+  foot's own loss, 3px, so the whole card reads as one block sinking rather than as text sliding
+  inside a static frame. Releasing reverses all three. This is the one press on the site that is
+  *not* Kütüphane's `.article`/the petek's hexagon scale (0.955 → 1.022) — because this is the one
+  object with actual dimensional geometry to honour (the chunky foot), a uniform scale would have
+  flattened the very thing that makes it 3D.
+  **The band is a flat fill, zero blur and zero spread, not a soft drop shadow** — it reads as one
+  more sheet of the page's own paper (a printed panel of tone, the way a comic or a newspaper
+  halftone prints a flat grey rather than a gradient) rather than as light falling on the box. It
+  grows because it *is* the offset animating: an inset `box-shadow` with no blur paints exactly
+  the strip between the box's own top edge and a copy of itself pushed down by the offset, so a
+  transition on that offset from 0 to 4px is a flat band growing from nothing to 4px tall, hard
+  edge throughout — never a gradient falloff.
+  Mechanically simpler than that scale press for the same reason it diverges from it: none of the
+  three properties — `border-bottom-width`, `box-shadow`, a child's own `transform` — is the
+  property `paintCast()` writes to the actor's own `transform` every frame, so nothing here
+  fights the tick and nothing needs a number computed on it. Three plain CSS transitions keyed to
+  one class, and the browser interpolates all three. `wireActorPress` is only the gate that
+  decides when the class is true, driven by **pointer events, never `:active`** — which sticks
+  after a tap on iOS and would leave a box looking permanently sunk.
+  **The red category flag gets a dark cap over its own top, exactly as tall as the press band
+  beside it** (`::after`, 0 → 4px on the same 0.1s transition; `color-mix(in srgb, var(--ink-red)
+  55%, black)`, so it keeps tracking `--ink-red` if the palette ever changes it). The flag
+  (`::before`) is a pseudo-element and paints *above* its parent's own background layer, which is
+  where the band — an inset `box-shadow` — lives, so the band would otherwise pass invisibly
+  behind the flag: the paper around it visibly goes into shadow while the stripe over it stays lit
+  at full strength for its whole length. A second pseudo-element, painted after the first
+  (`::after` follows `::before` in generated-content order) and keyed to the same 0 → 4px offset
+  the band itself animates, so the two grow in lockstep — only the flag's own top few pixels sink
+  with the paper around them, the rest of the stripe stays its ordinary red, which is what the
+  band itself does to the paper below it.
+- **A box the reader has DEALT WITH goes quiet, and the day is finishable** (`.fb-done`,
+  `fbSetDone`, `refreshDayMeter`). The red rail drains to a hairline and the ink steps back to
+  `--muted`: the box stops being a *card* rather than merely getting a tick. The rail is the right
+  thing to spend because it says nothing a done box still needs to say — it is one uniform
+  `--ink-red` on every filled box on every lane (the **category** is said by the kicker), so what it
+  actually means is "this is a filled card", which is exactly what stops being true. And the
+  **paper goes 20% translucent** with it, so the card sinks back into the page rather than only
+  changing colour on it — but that is the box's own **background** thinning, never `opacity`:
+  `paintCast()` writes the actor's inline opacity on every frame of the flip, so an opacity rule
+  here is overwritten a frame later, the same trap `.fb-locked`'s own note is about. A background is
+  nothing the tick touches. A done box stays pressable: a story can be read twice.
+  - **It cannot be confused with `.fb-locked`, and not by luck.** `gameBlocker` only ever locks a
+    game with an earlier unplayed one in front of it, and that earlier game is itself always open —
+    so the Oyunlar column is always `[done…][open][locked…]` and the two greys can never stand side
+    by side. Every other column has no locked state at all. What the reader is left looking at is a
+    column gone quiet with the one thing they can actually do still in full ink.
+  - **What counts as done, per column:** a **story** the moment its page is *opened* (a wrong
+    "unread" is worse than a lenient "read"; it is marked on the way IN so the card has already gone
+    quiet when the page folds back into it), a **game** at `attempts >= 1` (finished, never merely
+    opened — the same reading the lock and the app map's square use, and the three must agree), an
+    **anket** once voted. **Etkinlikler is deliberately not completable** — an evening is somewhere
+    to be, not content to get through — and a pinned Dünya seri is a running timeline rather than
+    one thing to finish.
+  - **No new storage.** The three facts already existed: `dunya_dealt_<uid>` in `localStorage`
+    mirrored server-side as `news_dealt` (which is what lets a neighbour's petek caption say how
+    deep their deck is), `game_results`, and `neighborhood_poll_votes`. `newsDealtStore` /
+    `newsIsDealt` are the one reading of that store — the boxes, the day meter and the app map's own
+    square all go through them, stamp semantics (the story's `updated_at` **as thrown**, so a
+    gelişme brings it back) and the legacy stampless array included.
+  - **And the ring around the logo is the day's own sea** (`--fb-day`, `paintDayMeter`). As each
+    thing is dealt with the sea rises through the outline ring, and at the last one it is full: the
+    loading screen's rising sea, met again as the progress of a day. It rides the **ring** and never
+    the letters — the letterforms already carry the lane wave (`--fb-logo-a/-b/-f`), and two meanings
+    on the same 86×26 mark is mush; the ring had no meaning at all before this. Drawn as
+    `background-size` from the bottom rather than a gradient stop, because that is the property that
+    transitions everywhere. A day with **nothing on it** is not a finished day — an empty ring says
+    "nothing to do", which is the truth, rather than "well done".
+  - **This is the app's whole reward, and it is closure rather than accumulation.** No streak, no
+    lifetime total, no points, and never a cosmetic: avatar items and badges are earned by going
+    outside and must stay unbuyable and ungrindable (see Trust and the earned avatar). Finishing
+    means the app is **over for today** — the app map prints the deck's own bottom line,
+    "Bugünlük bu kadar. / Dışarısı seni bekliyor.", and lets the reader go.
+- **`fb-openable` says exactly one thing: this box answers a press**, and the cursor and the press
+  effect are both hung off that one class. `fbSetPage` sets it for a box with a page; Oyunlar sets
+  it for a game whose turn has come (its press opens a game rather than a page, which is a
+  different door but the same question). A dashed slot, a placeholder column and a locked game do
+  not wear it and so do not give — a box that moves under the finger and then does nothing is
+  worse than one that plainly does not answer.
+- **What a box opens is DESCRIBED, not wired** (`fbSetPage`). Each loader hands its box a payload
+  as it renders — kicker, meta, title, lines, body — and one handler opens it, so a column gains a
+  page by describing one. A box with **no** payload is not pressable and does not say it is: a
+  dashed slot, a placeholder column, a bucket with nothing in it today and a fetch that failed are
+  all boxes with nothing behind them, and the setter is one function precisely so "has a page" and
+  "looks like it has one" cannot drift apart. Oyunlar is the exception and stays one: pressing a
+  game opens the game, which is a different door (see the game overlay above).
 - **An actor on a middle stop is parked off-screen on both sides of it.** It comes in over the run
   that arrives at its stop and leaves again over the run that departs it, so it belongs to that
   screen coming and going — events slides in from the left across slides 8–12 and back out to the
@@ -1864,8 +2253,8 @@ twice, for the same reason.
 ### What each screen carries — one template, and the tiles are the difference
 
 Every screen in the app is the same object: **the maps at the top, and two columns of three
-rectangles under them** — a wider column on the left, a narrower one on the right, both the same
-height, left:right width always 3:2. The left column's margin, the right column's margin and the
+rectangles under them** — a wider column and a narrower one, both the same
+height, wide:narrow width always 3:2. The left column's margin, the right column's margin and the
 gap between the two columns are all one number, so the two columns and the rail between them read
 as three equal beats rather than two boxes and a leftover gap. The whole of what makes one screen
 different from another is what stands in those two columns. That is the layout answer this app has
@@ -1877,6 +2266,18 @@ of a fixed set switched off) is a dashed rectangle marking the place rather than
 **Hane is the one exception, and it is the exception on purpose.** Its hero is the petek, full
 bleed, and it carries no tiles at all — the middle page is the people and nothing else.
 
+**The two side lanes are mirror images of each other, not one layout repeated** (`.fb-mirror` in
+project.html). Kütüphane keeps the wide column on the left and ranges everything from there —
+kicker top-left, the red category rule down the left edge. Kahvehane is that turned over: the
+**short** column (Oyunlar, and Kahve at the ilçe stop) stands on the left and the **long** one
+(Etkinlikler, Yorumlar) on the right, with the headings pinned top-right and the red rule down the
+right edge. So the two sides lean *outward* from Hane — the heavy column of each lane is the one
+nearer the screen edge that lane sits at, and which way a screen is ranged says which side of the
+middle the reader is standing on before a word is read. Only the widths and the ranging flip: which
+side of the screen each column is docked to is still `fb-col-l` / `fb-col-r`, so the slots, the dock
+line and the press origins are one set of numbers. An actor still parks off **its own** side of the
+screen, which is why the pose tables swap along with the columns.
+
 ```
         (up / out)                                        (down / in)
       Türkiye — slide 1                                the ilçe — slide 24
@@ -1885,20 +2286,20 @@ bleed, and it carries no tiles at all — the middle page is the people and noth
         ┌─────┴──────┐        ┌──────────┐        ┌──────────┴───┐
         │ KÜTÜPHANE  │ ────── │   HANE   │ ────── │  KAHVEHANE   │
         │ Haberler   │        │ the petek│        │ Etkinlikler  │
-        │ Bilgi      │        │  alone   │        │ Oyunlar      │
+        │ Anket      │        │  alone   │        │ Oyunlar      │
         └────────────┘        └────┬─────┘        └──────────────┘
                                    │
                     ▲ up / out — the whole petek: what İstanbul thinks
                     ▼ down / in — Sen: your own hexagon, and what is yours to change
 ```
 
-| Screen | The map(s) on top | Left column (3 rectangles) | Right column (3 rectangles) |
+| Screen | The map(s) on top | Wide column (3 rectangles) | Narrow column (3 rectangles) |
 |---|---|---|---|
-| Türkiye (slide 1) | Türkiye | **Hikâyeler** — the stories the map is grouped into | **Olaylar** |
-| Kütüphane (lane 0) | İstanbul · the ilçe | **Haberler** | **Bilgi** |
+| Türkiye (slide 1) | Türkiye | left — **Hikâyeler**, the stories the map is grouped into | right — **Olaylar** |
+| Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler** | right — **Anket** |
 | Hane (lane 1) | none — the petek, full bleed | — | — |
-| Kahvehane (lane 2) | İstanbul · the ilçe | **Etkinlikler** (RSVP goes to Hane) | **Oyunlar** — Sözcel, Tümcel, Bulmaca |
-| the ilçe (slide 24) | the ilçe, with the member's own picked out | **Yorumlar** | **Kahve** — the Kahve Endeksi's rows |
+| Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (RSVP goes to Hane) | left — **Oyunlar**, Sözcel, Tümcel, Bulmaca |
+| the ilçe (slide 24) | the ilçe, with the member's own picked out | right — **Yorumlar** | left — **Kahve**, the Kahve Endeksi's rows |
 
 Six things about it:
 
@@ -1907,13 +2308,37 @@ Six things about it:
   never out of sight — the depth stop each lane can reach is already showing at the top of the
   screen they are standing on. It is the mall stairway drawn rather than argued, and it is "always
   in the middle" applied to the drawing itself.
-- **The left column is a feed and the right column is a set — both always three boxes.** Left are
-  the things that arrive and are taken one at a time — the news, the evenings, the cheapest cups —
-  truncated to the soonest three, with any slot the feed comes up short on left dashed. Right is a
-  fixed set of exactly three of the same kind of thing, which is why Oyunlar is Sözcel, Tümcel and
-  Bulmaca and nothing else; one of the three switched off for the day (`game_day_toggles`) goes
-  dashed in its own slot rather than shifting the other two over. Never mix the two: a set that
-  grows belongs on the left.
+- **Every column is a fixed set of exactly three, and which slot a card lands in is a fact about
+  the card.** Haberler is İSTANBUL/TÜRKİYE/DÜNYA, top to bottom, each box that category's own
+  newest story inside the 72h window; Etkinlikler is BUGÜN/YARIN/EVVELSİ GÜN, each box that
+  Istanbul calendar day's own soonest evening. Oyunlar is Sözcel, Tümcel and Bulmaca and nothing
+  else, **in that order, top to bottom** — the sequence reads downward the way a list of steps
+  does, so 1. Oyun is the box the eye lands on first and 3. Oyun is the one at the dock. The slots
+  are numbered from the dock up (`.fb-slot-N`), so the first game stands in the last slot;
+  `gameForSlot()` is the one place that arithmetic is written. A bucket with nothing in it (no story in that category today, no evening that day, a game
+  switched off via `game_day_toggles`) goes dashed in its own slot, still carrying its own kicker —
+  the category or the day is known regardless of whether anything is in it — rather than shifting
+  the other two up to fill the gap. Olaylar alone stays a genuine feed (the top three ongoing
+  olaylar by `sort_order`, whichever those are on a given day) rather than three fixed buckets,
+  because there is no third axis to bucket an olay by.
+- **And the sequence is a gate: you cannot skip ahead.** Tümcel stays shut until Sözcel has been
+  played and Bulmaca until Tümcel has (`gameBlocker` in project.html). A locked box is **not**
+  `.fb-empty` — it still names its game and says what is standing in front of it ("Önce Sözcel"),
+  because a step you can see ahead of you is a different thing from a slot with nothing in it. It
+  goes muted in the ink, the red category rule included, and **never in opacity**: an actor's
+  opacity is its pose, and a rule here would be overwritten on the next frame. *Played* means
+  FINISHED (`attempts >= 1` in `game_results`), never merely opened — every game writes an
+  `attempts: 0` row on the reader's first interaction, so counting rows would open the next game
+  from under one still being played. It is the same rule Kahvehane's own deck and the app map's
+  square use, and the three must agree. A game the admin switched **off** for the day blocks
+  nothing: it is not a step anybody has left to take, so it leaves the sequence rather than
+  standing in the middle of it holding the rest shut. The column is re-read the moment a game is
+  closed (`refreshOyunColumn`, from `closeGameOverlay`) rather than at the next mount — finishing
+  Sözcel and finding Tümcel still locked is the whole of what that costs.
+- **The games column names its game in the bottom-left corner**, on every lane, including the
+  mirrored one. The other columns are feeds whose headline is the thing itself and reads from the
+  top; this one is a fixed set of three read by their names, and a name standing on the floor of
+  its box is on the same line in all three however long the line above it runs.
 - **Hane's vertical axis is the petek's own three depths, and there is nothing new above or below
   it.** Up/out is level 2 (the whole petek), the reader arrives at level 1 (Yanındakiler), down/in
   is level 0 (Sen — the hexagon with the avatar arrows on it and name, district and the three
@@ -1928,17 +2353,27 @@ Six things about it:
   ideas → our opinions on those ideas.
 - **Two columns, not a menu.** A screen with six unrelated tiles is a launcher, and a launcher is a
   shortcut past everything — the one thing the arrangement exists to prevent.
+- **Anket is a district poll, not a citywide one** (`db/neighborhood_polls.sql`) — what makes it
+  worth a column of its own rather than folding into `daily_questions` is what the answer is FOR:
+  every vote is filed under the member's own district, so the result is not one percentage but 25
+  of them. That per-district split (`neighborhood_poll_results()`) is meant to color the districts
+  on a future map the way a live election map does, mixing the poll's own `color_a`/`color_b` by
+  each district's own split — there is no such map drawn yet (see "The zoom is DRAWN, not
+  computed"), so for now `renderAnketResults` prints the same numbers as a plain list, each row
+  already wearing the color a map would paint it with. Curated from admin.html's own "İlçe
+  Anketleri" tab, kept apart from the per-story "Anketler" the Haberler tab already has (those are
+  a story's own reaction, `breaking_news_polls`, not a district's).
 - **Fikirler is decided in shape and not in content.** The tile has its place on Kütüphane; what
   fills it is parked until it is worth building, the way Makaleler and the neighbourhood comments
-  are parked rather than deleted. Bilgi is in the same state at the Türkiye stop.
+  are parked rather than deleted.
 
 **What of this is already standing in `project.html`:** Etkinlikler and Oyunlar (all three games)
-on Kahvehane, Haberler on Kütüphane and Olaylar at the Türkiye stop, the petek and its three depths on Hane, and the
-Türkiye map as slide 1's drawing. Hikâyeler, Bilgi, Kahve and Yorumlar have their boxes too,
-standing dashed (see the cast rules above) — the boxes are cast, the content
-behind them is not. **What is still in the parts bin:** the second map on the two lane screens,
-the ilçe's own drawing at slide 24, and whatever actually fills Hikâyeler, Bilgi, Kahve and
-Yorumlar.
+on Kahvehane, Haberler and Anket on Kütüphane, Olaylar at the Türkiye stop, the petek and its three
+depths on Hane, and the Türkiye map as slide 1's drawing. Hikâyeler, Kahve and Yorumlar have their
+boxes too, standing dashed (see the cast rules above) — the boxes are cast, the content behind them
+is not. **What is still in the parts bin:** the second map on the two lane screens, the ilçe's own
+drawing at slide 24, whatever actually fills Hikâyeler, Kahve and Yorumlar, and the district-colored
+map itself that Anket's own data is already shaped to feed.
 
 ### The flip book — `flip.js` + `flip-steps.js`
 

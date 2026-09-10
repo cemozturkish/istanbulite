@@ -8,17 +8,18 @@
   <meta name="theme-color" content="#f0f0f0">
   <title>Sözcel — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="ist-date.js?v=2"></script>
-  <script src="i18n.js?v=18"></script>
+  <script src="ist-date.js?v=3"></script>
+  <script src="i18n.js?v=19"></script>
   <script src="scoreboard.js?v=1"></script>
-  <script src="palette.js?v=1"></script>
+  <script src="map-ink.js?v=4"></script>
+  <script src="palette.js?v=3"></script>
   <script src="avatar.js?v=1"></script>
-  <link rel="stylesheet" href="palette.css?v=3">
+  <link rel="stylesheet" href="palette.css?v=5">
   <script src="game-locks.js?v=2" defer></script>
-  <link rel="stylesheet" href="onboarding.css?v=1">
+  <link rel="stylesheet" href="onboarding.css?v=2">
   <script src="onboarding.js?v=1" defer></script>
-  <link rel="stylesheet" href="profile-card.css?v=26">
-  <script src="profile-card.js?v=31" defer></script>
+  <link rel="stylesheet" href="profile-card.css?v=30">
+  <script src="profile-card.js?v=35" defer></script>
   <script src="sheet.js?v=5"></script>
   <link rel="stylesheet" href="sheet.css?v=7">
   <style>
@@ -824,8 +825,9 @@
       max-width: 100%;
     }
 
-    /* The board: one syllable-staircase skeleton, and that's all it holds
-       — no guess history under it. Tile positions/sizes are computed in
+    /* The board: one syllable-staircase skeleton, plus the ghost of the
+       last guess nested behind it (see .syl-stack) — never the full
+       guess history a Wordle grid prints. Tile positions/sizes are computed in
        initWordGrid() — each syllable sits one level lower, its first tile
        tucked half a tile left of the previous syllable's last tile,
        nesting into the hexagons' tapered corners (see the mock). */
@@ -837,8 +839,76 @@
       flex-shrink: 0;
     }
 
-    .syl-board { position: relative; margin: 0 auto; }
+    /* ── THE STACK: the live board, and the last guess behind it ──
+       Two boards on one plane. The live one carries the word as it
+       stands; the ghost carries the guess just submitted, nested into it
+       the way a honeycomb nests -- half a column across and one level
+       down, the same two offsets the syllable staircase itself steps by
+       (see syllableLayout/LEVEL_STEP), so the two combs interlock
+       instead of overlapping.
+
+       Why it exists: the board shows only the letters that LOCKED, so
+       everything else the reader just tried vanished the moment it was
+       read out. The pips say how many guesses are gone; they cannot say
+       what was in them. The ghost is that -- what you last tried, still
+       on the table, faint enough that the live word stays the thing in
+       front of you.
+
+       The stack is sized by layoutBoard() to hold both, so the pair is
+       centred as one object and neither half hangs into the pips. */
+    .syl-stack { position: relative; margin: 0 auto; }
+    .syl-board { position: absolute; top: 0; left: 0; }
     .syl-board .letter-box { position: absolute; }
+
+    /* Behind, and quiet. One opacity on the layer rather than a paler
+       ink per state: the ghost has to read as the same board seen
+       through paper, and tinting each tile separately makes it a second
+       colour scheme to keep in step with the first. */
+    .syl-ghost {
+      opacity: 0.44;
+      z-index: 0;
+      pointer-events: none;
+    }
+    /* An absent tile is already dimmed to 0.4 to say "this letter is not
+       in the word"; behind the ghost's own opacity that nearly vanished,
+       which is not there at all. The ghost is one wash over one board --
+       the tiles inside it keep their own weights relative to each other. */
+    .syl-ghost .letter-box.absent { opacity: 0.8; }
+    .syl-ghost[hidden] { display: none; }
+    #syl-board { z-index: 1; }
+
+    /* ── THE HEXAGONS HAVE A BODY ──
+       A flat fill inside the drawn ring reads as a sticker. This lights
+       the top-left of every tile and shades its bottom-right, so the
+       hexagon reads as something with a thickness sitting on the page.
+       It is painted inside the tile's own hexagonal mask (frames.css
+       masks .letter-box), so it costs no extra shape.
+
+       z-index: -1 is load-bearing: a positioned pseudo-element at 0 or
+       above paints AFTER the parent's inline content, which would put
+       this wash over the letter. Negative paints it after the parent's
+       background and before its text -- which is exactly where a body
+       belongs. */
+    /* The mask frames.css puts on a .letter-box already makes it a
+       stacking context, which is what puts the wash below over the
+       tile's own fill rather than under it -- stated here as well so
+       the body does not quietly vanish if that mask ever moves. */
+    .letter-box { isolation: isolate; }
+    .letter-box::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background:
+        linear-gradient(155deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0) 48%),
+        linear-gradient(155deg, rgba(0, 0, 0, 0) 54%, rgba(0, 0, 0, 0.2) 100%);
+    }
+    /* And the whole comb casts one shadow rather than each tile casting
+       its own: a mask clips a box-shadow away, and a drop-shadow filter
+       on the board applies to the silhouette the tiles make together --
+       which is the thing that is actually lying on the paper. */
+    #syl-board { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.22)); }
 
     .letter-box {
       overflow: hidden;
@@ -873,7 +943,9 @@
        keyboard: how many guesses you have left, and nothing else. Empty
        dot = still yours, filled = spent. They used to stand in a column
        beside the board, each spent one growing into a pill printing the
-       word guessed — that history is gone on purpose (see updatePips).
+       word guessed — that full history is gone on purpose (see
+       updatePips); the one guess still worth seeing is the last, and it
+       is behind the board rather than beside it (see .syl-stack).
        Sits outside .word-grid so it never grows/shifts the board. */
     .attempt-pips {
       display: flex;
@@ -1581,21 +1653,12 @@
       box-shadow: none !important;
       background: transparent !important;
     }
-    /* The board and the keyboard read as two framed boxes, one line
-       between them rather than a real gap: #play-area and #keyboard are
-       deliberately flush (.game-panel's own gap: 0, see there) so the
-       pips stay centred on the true midpoint, and a real gap here would
-       throw that off. Outlining #play-area draws that shared line (its
-       own bottom edge) plus the board's other three sides; outlining
-       .game-panel closes the keyboard's box with the remaining three.
-       outline, not border, on purpose: it paints without touching either
-       element's measured size, and layoutGame() reads those sizes
-       directly to place everything else. */
-    body.embedded-game .game-panel,
-    body.embedded-game #play-area {
-      outline: 2px solid var(--ink, #17140f);
-      outline-offset: -2px;
-    }
+    /* NOTHING is framed inside the sheet. The sheet the game is embedded
+       in is already a bordered window (frames.css's .ist-sheet), and
+       everything drawn inside it -- the panel, and then the play area --
+       only added another line a few pixels within the last one. The
+       hexagons are the object here; they need no box drawn round them,
+       and the board reads as standing on the sheet's own paper. */
     /* The mobile score popup toggle ("≡") is redundant on desktop —
        kahvehane's own right column already shows the scoreboard next to
        the sheet, so this only needs to appear once the game truly falls
@@ -1704,6 +1767,28 @@
         top: 10px;
       }
 
+      /* ONE ROW, ONE LINE, ONE BOX SIZE. The five top buttons are three
+         separate absolutely-placed groups, and each used to carry its
+         own inset: the back arrow on 10px, the scoreboard on a hardcoded
+         58px (which is 10 + 38 + 10, a different gap from the 6px the
+         right-hand group uses), the right group on 10px against a panel
+         padded to 14px -- so nothing lined up with anything and the help
+         icon sat almost on the sheet's own border. They are all on the
+         same 14px inset from either edge now, with the same 6px between
+         them, so the left pair and the right trio read as one row.
+
+         The drawn icons come down to 30px with it: at 34px they stood
+         visibly taller than the 38px discs beside them, which is what
+         made the row look ragged even where it was level. */
+      body.embedded-game .game-back-btn { left: 14px; }
+      body.embedded-game .game-controls-left { left: calc(14px + 38px + 6px); }
+      body.embedded-game .game-controls { right: 14px; }
+      body.embedded-game .game-ctrl-btn .ctrl-icon,
+      body.embedded-game .game-back-btn .back-icon {
+        width: 30px;
+        height: 30px;
+      }
+
       /* Main: fullscreen game area. It does NOT scroll: everything inside
          is sized to the space that exists (see layoutGame), so a scroll
          here would only ever mean something overflowed — and with the
@@ -1746,7 +1831,7 @@
     }
     .author-link:hover { text-decoration: underline; }
   </style>
-  <link rel="stylesheet" href="frames.css?v=8">
+  <link rel="stylesheet" href="frames.css?v=11">
 </head>
 <body>
 
@@ -4167,6 +4252,30 @@ const TILE_GAP_RATIO = TILE_VISUAL_GAP - 2 * TILE_ART_PAD_X;
 // second term opens that back up until the slanted edges stand
 // TILE_VISUAL_GAP apart measured perpendicular, exactly like the vertical
 // edges do across.
+// Where the ghost of the last guess sits: THREE half-columns to the left
+// and one level down. It is the one offset that never collides, and it
+// does so by arithmetic rather than by luck -- which is why the ghost can
+// be laid over any word, of any number of syllables, of any lengths,
+// without a single case to special-case.
+//
+// The staircase steps a syllable down by one level and right by
+// 2*len - 3 half-columns (see syllableLayout). So a ghost tile from
+// syllable s lands on level s+1 at half-column start(s) - 3 + 2j, and the
+// LIVE tiles it could hit there are syllable s+1's, at
+// start(s) + 2*len(s) - 3 + 2i. Equal only where j = len(s) + i -- and j
+// never reaches len(s), let alone passes it. No overlap, whatever the
+// lengths are.
+//
+// What it lands on instead is the notch: that row's rightmost ghost tile
+// is exactly one full column left of the live row's first tile, so the
+// two combs interlock the way a honeycomb does, touching along their
+// edges. The sign is load-bearing -- three half-columns to the RIGHT
+// solves j = len(s) - 3 + i and collides on any syllable of three letters
+// or more. One half-column either way (which is what this was) collides
+// on nearly every word there is.
+const GHOST_DX = 3;
+const GHOST_DY = 1;
+
 const LEVEL_STEP = (function () {
   const shoulderX = TILE_ART_W / 2;               // centre → straight side
   const offsetX = (1 + TILE_GAP_RATIO) / 2;       // half a column
@@ -4213,21 +4322,35 @@ function initWordGrid() {
   const { starts, totalHalfCols } = syllableLayout(sylls);
   const levels = sylls.length;
 
-  const board = document.createElement('div');
-  board.className = 'syl-board';
-  board.id = 'syl-board';
+  // Two identical combs on one plane: the ghost of the last guess behind,
+  // the live word in front. Same tiles, same geometry, different id
+  // prefix -- layoutBoard() places both off one set of numbers, so they
+  // can never drift out of register with each other.
+  const stack = document.createElement('div');
+  stack.className = 'syl-stack';
+  stack.id = 'syl-stack';
 
-  let letterIdx = 0;
-  sylls.forEach(syl => {
-    for (let j = 0; j < syl.length; j++) {
-      const box = document.createElement('div');
-      box.className = 'letter-box';
-      box.id = `box-${letterIdx}`;
-      board.appendChild(box);
-      letterIdx++;
-    }
-  });
-  grid.appendChild(board);
+  const buildBoard = (id, cls, prefix) => {
+    const b = document.createElement('div');
+    b.className = cls;
+    b.id = id;
+    let k = 0;
+    sylls.forEach(syl => {
+      for (let j = 0; j < syl.length; j++) {
+        const box = document.createElement('div');
+        box.className = 'letter-box';
+        box.id = `${prefix}${k}`;
+        b.appendChild(box);
+        k++;
+      }
+    });
+    return b;
+  };
+
+  const ghost = buildBoard('syl-ghost', 'syl-board syl-ghost', 'gbox-');
+  stack.appendChild(ghost);
+  stack.appendChild(buildBoard('syl-board', 'syl-board', 'box-'));
+  grid.appendChild(stack);
 
   // Where every tile goes is layoutBoard()'s job, off measurements taken
   // from the play area — this is just the word's own shape, kept so the
@@ -4321,7 +4444,9 @@ function layoutGame() {
 function layoutBoard() {
   const area = document.getElementById('play-area');
   const board = document.getElementById('syl-board');
-  if (!BOARD_GEOM || !area || !board) return;
+  const ghost = document.getElementById('syl-ghost');
+  const stack = document.getElementById('syl-stack');
+  if (!BOARD_GEOM || !area || !board || !stack) return;
   const { sylls, starts, totalHalfCols, levels } = BOARD_GEOM;
 
   const availW = area.clientWidth - 4;
@@ -4339,8 +4464,13 @@ function layoutBoard() {
   // Solve the width budget for tileW instead of estimating the gap from
   // the cap: board width is totalHalfCols·(tileW+gap)/2 − gap, and gap is
   // itself a multiple of tileW, so the whole thing is linear in tileW.
-  const widthPerTile = totalHalfCols * (1 + TILE_GAP_RATIO) / 2 - TILE_GAP_RATIO;
-  const levelFactor = 1 + (levels - 1) * LEVEL_STEP;
+  // The ghost's own half-column across and level down are part of the
+  // budget WHETHER OR NOT one is showing: reserving it only once a guess
+  // has landed would resize the board the first time the reader pressed
+  // GIR, which is the one moment they are looking straight at it.
+  const widthPerTile = totalHalfCols * (1 + TILE_GAP_RATIO) / 2 - TILE_GAP_RATIO
+    + GHOST_DX * (1 + TILE_GAP_RATIO) / 2;
+  const levelFactor = 1 + (levels - 1 + GHOST_DY) * LEVEL_STEP;
   let tileW = Math.min(TILE_MAX_W, Math.floor(availW / widthPerTile));
   tileW = Math.min(tileW, Math.floor(availH * TILE_RATIO / levelFactor));
   tileW = Math.max(tileW, TILE_MIN_W);
@@ -4355,22 +4485,66 @@ function layoutBoard() {
   const halfStep = (tileW + gap) / 2;
   const vStep = Math.round(tileH * LEVEL_STEP);
 
-  board.style.width = Math.ceil(totalHalfCols * halfStep - gap) + 'px';
-  board.style.height = (vStep * (levels - 1) + tileH) + 'px';
+  const boardW = Math.ceil(totalHalfCols * halfStep - gap);
+  const boardH = vStep * (levels - 1) + tileH;
+  // The ghost is nested one honeycomb cell behind: half a column to the
+  // left and one level down. The stack holds both, so what gets centred
+  // in the board row is the pair rather than the live comb alone.
+  const offX = Math.round(GHOST_DX * halfStep);
+  const offY = Math.round(GHOST_DY * vStep);
+  stack.style.width = (boardW + offX) + 'px';
+  stack.style.height = (boardH + offY) + 'px';
 
-  let letterIdx = 0;
-  sylls.forEach((syl, s) => {
-    for (let j = 0; j < syl.length; j++) {
-      const box = document.getElementById(`box-${letterIdx}`);
-      if (box) {
-        box.style.left = Math.round((starts[s] + 2 * j) * halfStep) + 'px';
-        box.style.top = (s * vStep) + 'px';
-        box.style.width = tileW + 'px';
-        box.style.fontSize = Math.max(11, Math.round(tileW * 0.42)) + 'px';
-      }
-      letterIdx++;
+  const place = (prefix, el, left, top) => {
+    if (el) {
+      el.style.left = left + 'px';
+      el.style.top = top + 'px';
+      el.style.width = boardW + 'px';
+      el.style.height = boardH + 'px';
     }
-  });
+    let letterIdx = 0;
+    sylls.forEach((syl, s) => {
+      for (let j = 0; j < syl.length; j++) {
+        const box = document.getElementById(`${prefix}${letterIdx}`);
+        if (box) {
+          box.style.left = Math.round((starts[s] + 2 * j) * halfStep) + 'px';
+          box.style.top = (s * vStep) + 'px';
+          box.style.width = tileW + 'px';
+          box.style.fontSize = Math.max(11, Math.round(tileW * 0.42)) + 'px';
+        }
+        letterIdx++;
+      }
+    });
+  };
+  place('box-', board, offX, 0);
+  place('gbox-', ghost, 0, offY);
+}
+
+// ── The last guess, still on the table ──
+// Painted from the history the game already keeps (submittedGuesses /
+// guessResults), so it comes back with a reloaded board for free. Nothing
+// to show -- the first guess of the day is not yet in -- and the layer is
+// simply hidden; the room it would take is already reserved either way.
+// `back` is how far from the end to take it: 0 while playing, where the
+// live comb holds the locked letters and whatever is being typed, so the
+// last guess is the one thing missing from the screen -- and 1 once the
+// game is over, where the live comb IS the last guess and a ghost of the
+// same word behind it would just be a blur.
+function renderGhostBoard(back) {
+  const ghost = document.getElementById('syl-ghost');
+  if (!ghost) return;
+  const at = submittedGuesses.length - 1 - (back || 0);
+  const word = submittedGuesses[at];
+  const result = guessResults[at];
+  // The empty comb stands even before a first guess -- an empty ghost is
+  // the promise that the board's shape won't jump the moment one lands,
+  // not a lie about there being a guess already on the table.
+  for (let i = 0; i < WORD_LENGTH; i++) {
+    const box = document.getElementById(`gbox-${i}`);
+    if (!box) continue;
+    box.textContent = (word && word[i]) || '';
+    box.className = (word && result) ? `letter-box filled ${result[i] || ''}` : 'letter-box';
+  }
 }
 
 // The credit line under the keyboard is ONE line on every screen, always:
@@ -4442,6 +4616,7 @@ function paintSkeleton(word, result) {
     box.textContent = word[i] || '';
     box.className = `letter-box filled ${result[i]}`;
   }
+  renderGhostBoard(1);
 }
 
 function initKeyboard() {
@@ -4576,6 +4751,7 @@ function updateDisplay() {
       box.className = 'letter-box' + (ch ? ' filled' : '');
     }
   }
+  renderGhostBoard(0);
 }
 
 function submitGuess(fullGuess) {

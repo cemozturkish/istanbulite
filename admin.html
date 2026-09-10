@@ -8,14 +8,15 @@
   <meta name="theme-color" content="#f0f0f0">
   <title>Admin — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="ist-date.js?v=2"></script>
-  <script src="palette.js?v=1"></script>
+  <script src="ist-date.js?v=3"></script>
+  <script src="map-ink.js?v=4"></script>
+  <script src="palette.js?v=3"></script>
   <script src="avatar.js?v=1"></script>
   <script src="tbmm.js?v=1"></script>
   <!-- Shared with kahvehane.html so the Kahve tab's live preview reads a
        venue's schedule exactly the way the public board does. -->
   <script src="coffee-index.js?v=1"></script>
-  <link rel="stylesheet" href="palette.css?v=3">
+  <link rel="stylesheet" href="palette.css?v=5">
   <style>
     :root {
       /* Core ink & paper — warm cream newspaper palette */
@@ -487,6 +488,15 @@
     .btn-del { background: var(--ink-red); color: var(--paper); }
     .btn-del:hover { background: var(--brown-4); }
 
+    /* ── The blocks under a card are FOLDED ──
+       A card is a headline. Gelişmeler, Anketler, Kaynaklar, Bölümler and
+       Zaman Akışı are each a whole editor, and five of them open at once
+       turned a list of twenty stories into a page nobody could scan — the
+       one thing a list is for. They are <details> now: shut, a card is its
+       own two lines and the count of what is behind each fold. Which folds
+       are open is remembered across a re-render (see OPEN_BLOCKS) because
+       the list reloads after every single add, and a fold that slammed
+       shut on each one would be worse than no fold at all. */
     .sources-block {
       margin-top: 10px;
       padding-top: 10px;
@@ -498,7 +508,59 @@
       text-transform: uppercase;
       color: var(--muted);
       margin-bottom: 6px;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
+    .sources-label::-webkit-details-marker { display: none; }
+    /* The arrow is the whole affordance, so it is drawn rather than left
+       to whatever the platform's own marker happens to be. */
+    .sources-label::before {
+      content: '▸';
+      display: inline-block;
+      font-size: 0.62rem;
+      line-height: 1;
+      transition: transform 0.15s;
+      color: var(--ink-red);
+    }
+    .sources-block[open] > .sources-label::before { transform: rotate(90deg); }
+    .sources-block[open] > .sources-label { color: var(--ink); }
+    .sources-label:hover { color: var(--ink); }
+    /* ── İlçe Anketleri: the per-district split under a poll ──
+       The same numbers a future district-colored map would read to pick
+       each district's color (see db/neighborhood_polls.sql) -- for now
+       they print as a plain bar per district rather than paint one. */
+    .dp-results { display: flex; flex-direction: column; gap: 5px; max-height: 260px; overflow-y: auto; }
+    .dp-district-row { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; }
+    .dp-district-name { flex: 0 0 92px; color: var(--ink); }
+    .dp-district-bar {
+      flex: 1; height: 8px; display: flex; overflow: hidden;
+      border: 1px solid var(--rule);
+    }
+    .dp-district-bar span { height: 100%; }
+    .dp-district-pct { flex: 0 0 34px; text-align: right; color: var(--muted); }
+    .dp-district-none { flex: 1; color: var(--muted); font-style: italic; }
+    /* The re-filing panel: a target and the two buttons, shut until asked
+       for. Same shape whether it is a whole story being folded in or one
+       entry of a timeline being moved. */
+    .move-form {
+      display: none;
+      grid-template-columns: 1fr auto auto;
+      gap: 6px;
+      align-items: center;
+      margin: 8px 0;
+      padding: 8px 10px;
+      border: 1px dashed var(--ink-red);
+      background: var(--paper);
+    }
+    .move-form.open { display: grid; }
+    .move-form .btn { padding: 6px 12px; font-size: 0.75rem; }
+    .move-form .move-status { grid-column: 1 / -1; margin-top: 0; text-align: left; }
+    .move-form .move-status:empty { display: none; }
+
     .src-row {
       display: flex;
       align-items: center;
@@ -916,14 +978,6 @@
         overflow: visible;
       }
 
-      /* Hints that the tab bar scrolls sideways (11 tabs never fit on a
-         phone width) — fades both edges so a partially-cut tab reads as
-         "more this way" instead of looking clipped/broken. */
-      .admin-tabs {
-        -webkit-mask-image: linear-gradient(to right, transparent, black 14px, black calc(100% - 14px), transparent);
-        mask-image: linear-gradient(to right, transparent, black 14px, black calc(100% - 14px), transparent);
-      }
-
       .sozcu-assign-row {
         grid-template-columns: 1fr;
       }
@@ -1080,8 +1134,453 @@
        local here since this page doesn't otherwise load that stylesheet. */
     .ist-avatar-stack { position: relative; display: block; width: 100%; height: 100%; }
     .ist-avatar-stack img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+    /* ══════════════════════════════════════════════════════════════════
+       THE DESK — the admin portal's own shell.
+
+       Three columns, always the same three: the rail of sections down the
+       far left, the work area in the middle, and a phone standing on the
+       right showing the site the way a member actually sees it. The tab
+       bar used to run across the top and scroll sideways (fourteen tabs
+       never fit), which meant the section you wanted was usually off the
+       edge of a bar you had to remember was scrollable. Stacked down the
+       side they are all readable at once, and the width they cost is
+       width the two-panel body never used anyway.
+       ══════════════════════════════════════════════════════════════════ */
+    .admin-shell {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+    }
+
+    /* ── THE RAIL — every section, stacked, grouped by what it is ── */
+    .admin-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      width: 176px;
+      flex-shrink: 0;
+      max-width: none;
+      margin: 0;
+      padding: 10px 8px 24px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      background: var(--paper-banner);
+      border-right: 1px solid var(--ink);
+      -webkit-mask-image: none;
+      mask-image: none;
+    }
+    .rail-group {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 16px 10px 6px;
+    }
+    .rail-group:first-child { padding-top: 4px; }
+
+    .admin-tab {
+      width: 100%;
+      text-align: left;
+      padding: 8px 10px;
+      border: 1px solid transparent;
+      border-bottom: 1px solid transparent;
+      font-size: 0.74rem;
+      letter-spacing: 1.2px;
+      text-transform: none;
+      font-weight: 400;
+      color: var(--ink);
+      transition: background 0.15s, color 0.15s;
+    }
+    .admin-tab:hover { background: var(--paper); }
+    .admin-tab.active {
+      background: var(--ink);
+      color: var(--paper);
+      border-color: var(--ink);
+      font-weight: 700;
+    }
+
+    /* ── THE WORK AREA ── */
+    .admin-work {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .admin-body {
+      max-width: none;
+      padding: 14px 18px;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       MASTER — DETAIL
+
+       A section is a LIST first. The list reads the way the site reads —
+       kicker, headline, the line under it — and pressing a row opens the
+       thing you pressed as a drawer over the list rather than filling a
+       column that is permanently half a form. Nothing is being written
+       most of the time, so nothing should be permanently making room for
+       the writing.
+       ══════════════════════════════════════════════════════════════════ */
+    .admin-body.md {
+      grid-template-columns: 1fr;
+      position: relative;
+    }
+
+    .md-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(20, 16, 12, 0.32);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.28s ease;
+      z-index: 20;
+    }
+    .admin-body.md-open > .md-backdrop { opacity: 1; pointer-events: auto; }
+
+    .panel.md-editor {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(760px, 100%);
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      overflow: hidden;
+      border: 2px solid var(--ink);
+      box-shadow: -22px 0 46px rgba(20, 16, 12, 0.22);
+      transform: translateX(calc(100% + 30px));
+      transition: transform 0.3s cubic-bezier(0.22, 0.72, 0.28, 1);
+    }
+    .admin-body.md-open > .panel.md-editor { transform: none; }
+
+    .md-head {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 16px 11px 20px;
+      background: var(--paper-banner);
+      border-bottom: 1px solid var(--ink);
+    }
+    .md-head > .panel-title {
+      margin: 0;
+      padding: 0;
+      border: none;
+      background: none;
+      flex: 1;
+      min-width: 0;
+    }
+    .md-close {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      line-height: 1;
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .md-close:hover { background: var(--ink); color: var(--paper); }
+
+    .md-body {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 16px 20px 22px;
+      align-content: start;
+    }
+    /* Two columns of fields where the form is long enough to need them —
+       the whole point is that writing a thing should not be a scroll. */
+    .md-body.cols2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 20px;
+    }
+    .md-body.cols2 > * { align-self: start; }
+    .md-body.cols2 > :not(.af) { grid-column: 1 / -1; }
+    .md-body.cols2 > .af:has(textarea),
+    .md-body.cols2 > .af:has(.country-picker),
+    .md-body.cols2 > .af:has(.olay-map-pick),
+    .md-body.cols2 > .af:has(.cf-daypicker),
+    .md-body.cols2 > .af.af-wide { grid-column: 1 / -1; }
+
+    .md-body .af { margin: 0 0 13px; }
+    .md-body .af > label { margin-top: 0; }
+    .md-body > p { font-size: 0.74rem; }
+
+    /* The long explanations each form carries are worth keeping and are
+       not worth a screenful — they fold away, and the form starts at the
+       top of the drawer where it belongs. */
+    .md-hint {
+      grid-column: 1 / -1;
+      border: 1px dashed var(--rule);
+      background: var(--paper);
+      padding: 0 12px;
+      margin-bottom: 14px;
+    }
+    .md-hint > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 8px 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .md-hint > summary::-webkit-details-marker { display: none; }
+    .md-hint > summary::before { content: '? '; color: var(--ink-red); }
+    .md-hint[open] > summary { border-bottom: 1px dashed var(--rule); margin-bottom: 8px; }
+    .md-hint p { font-size: 0.75rem; color: var(--muted); font-style: italic; line-height: 1.45; margin-bottom: 10px; }
+    .md-adv { margin-top: 4px; }
+    .md-adv > summary::before { content: '+ '; }
+    .md-adv[open] { padding-bottom: 10px; }
+    .md-adv .af { margin-bottom: 12px; }
+    /* The map picker stands beside what it is being picked for, rather
+       than above it — half a metre of drawer for one 230px thumbnail. */
+    .md-body .af:has(.olay-map-pick) { display: grid; grid-template-columns: 190px minmax(0, 1fr); column-gap: 14px; }
+    .md-body .af:has(.olay-map-pick) > label { grid-column: 1 / -1; }
+    .md-body .af:has(.olay-map-pick) > .olay-map-pick { grid-row: span 3; width: 190px; margin-top: 0; }
+    .md-body .af:has(.olay-map-pick) > p { margin-top: 0 !important; }
+
+    /* The action stands on the drawer's floor, where it cannot scroll
+       away from the thing it commits. */
+    .md-foot {
+      flex-shrink: 0;
+      padding: 12px 20px;
+      background: var(--paper-banner);
+      border-top: 1px solid var(--ink);
+    }
+    .md-foot .btn-row { margin-top: 0; }
+    .md-foot .status-msg { margin-top: 8px; min-height: 0; }
+    .md-foot .status-msg:empty { display: none; }
+
+    /* ── THE LIST — a row is the thing, and the thing is pressable ── */
+    .md-index > .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .md-new-btn {
+      flex-shrink: 0;
+      border: 1px solid var(--ink-red);
+      background: var(--ink-red);
+      color: var(--paper);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 5px 12px;
+      cursor: pointer;
+    }
+    .md-new-btn:hover { background: var(--ink); border-color: var(--ink); }
+
+    .md-clickable .article-card { cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
+    .md-clickable .article-card:hover { border-color: var(--ink); transform: translateX(-2px); }
+    /* Editing is what pressing the row already does, so the button that
+       said so is one button too many — and ONLY that one: a row's other
+       actions (Arşivle, Sil) are not what the press does and stay. Delete
+       stays quiet until the row is under the pointer. */
+    .md-clickable .card-actions > [data-act$="-edit"],
+    .md-clickable .card-actions > [data-act="edit-news"] { display: none; }
+    .md-clickable .article-card .card-actions { opacity: 0.4; transition: opacity 0.15s; }
+    .md-clickable .article-card:hover .card-actions { opacity: 1; }
+    /* A card the list has swapped into its own editor is being written
+       in, not browsed — it stops being a button. */
+    .md-index .article-card:has(.news-edit-form.open) { cursor: default; }
+    .md-index .article-card:has(.news-edit-form.open) .card-actions { opacity: 1; }
+
+    .md-toast {
+      position: fixed;
+      left: 50%;
+      top: 62px;
+      transform: translate(-50%, -14px);
+      z-index: 900;
+      background: var(--ink);
+      color: var(--paper);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.78rem;
+      letter-spacing: 1px;
+      padding: 9px 18px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .md-toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+    /* ══════════════════════════════════════════════════════════════════
+       THE PHONE — the site, standing on the desk
+
+       Everything on this page is written FOR a phone screen ~90% of
+       members read it on, and the portal never showed one. It is a live
+       page, not a picture: the same document a member gets, on the same
+       origin and the same session, so a story posted on the left is one
+       reload away from being read on the right.
+       ══════════════════════════════════════════════════════════════════ */
+    .admin-preview {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      width: 372px;
+      border-left: 1px solid var(--ink);
+      background: var(--paper-banner);
+      min-height: 0;
+    }
+    .admin-preview[hidden] { display: none; }
+
+    .prev-head {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--ink);
+    }
+    .prev-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--ink-red);
+      margin-right: auto;
+    }
+    .prev-head select {
+      width: auto;
+      padding: 4px 6px;
+      font-size: 0.72rem;
+    }
+    .prev-btn {
+      flex-shrink: 0;
+      width: 26px;
+      height: 26px;
+      line-height: 1;
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .prev-btn:hover { background: var(--ink); color: var(--paper); }
+
+    .prev-stage {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 12px;
+      overflow: hidden;
+    }
+    /* The device is drawn at its real size and scaled to whatever room
+       the column has, so the page inside it lays out at the width a
+       member's phone actually reports. */
+    .prev-fit { position: relative; flex-shrink: 0; }
+    .prev-device {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 390px;
+      height: 844px;
+      transform-origin: top left;
+      background: #000;
+      border: 8px solid #17130f;
+      border-radius: 42px;
+      box-shadow: 0 18px 40px rgba(20, 16, 12, 0.28);
+      overflow: hidden;
+    }
+    .prev-device iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: var(--paper);
+    }
+    .prev-notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 118px;
+      height: 26px;
+      background: #17130f;
+      border-radius: 0 0 15px 15px;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .prev-empty {
+      font-size: 0.78rem;
+      font-style: italic;
+      color: var(--muted);
+      text-align: center;
+      padding: 30px 16px;
+    }
+
+    /* The handle that brings the phone back once it has been sent away. */
+    #prev-show {
+      position: fixed;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 120;
+      border: 1px solid var(--ink);
+      border-right: none;
+      background: var(--paper-banner);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      writing-mode: vertical-rl;
+      padding: 14px 6px;
+      cursor: pointer;
+    }
+    #prev-show[hidden] { display: none; }
+    #prev-show:hover { background: var(--ink); color: var(--paper); }
+
+    /* A narrow desk loses the phone before it loses the work. */
+    @media (max-width: 1180px) {
+      .admin-preview { display: none; }
+      #prev-show { display: none !important; }
+    }
+
+    /* ── Phone / small tablet: the rail lies back down across the top ── */
+    @media (max-width: 860px) {
+      .admin-shell { flex-direction: column; }
+      .admin-tabs {
+        flex-direction: row;
+        width: 100%;
+        gap: 4px;
+        padding: 8px 12px;
+        border-right: none;
+        border-bottom: 1px solid var(--ink);
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-mask-image: linear-gradient(to right, transparent, black 14px, black calc(100% - 14px), transparent);
+        mask-image: linear-gradient(to right, transparent, black 14px, black calc(100% - 14px), transparent);
+      }
+      .admin-tab { width: auto; flex-shrink: 0; white-space: nowrap; border-color: var(--border); }
+      .rail-group { display: none; }
+      .admin-work { overflow: visible; }
+      .admin-body { overflow-x: hidden; }
+      .panel.md-editor { width: 100%; border-width: 1px; }
+      .md-body.cols2 { display: block; }
+    }
   </style>
-  <link rel="stylesheet" href="frames.css?v=8">
+  <link rel="stylesheet" href="frames.css?v=11">
 </head>
 <body>
 
@@ -1110,22 +1609,35 @@
     </div>
   </header>
 
-  <div class="admin-tabs">
-    <button class="admin-tab active" data-tab="kutuphane">Kütüphane</button>
-    <button class="admin-tab" data-tab="mektuplar">Posta Kutusu</button>
-    <button class="admin-tab" data-tab="countries">Ülkeler</button>
-    <button class="admin-tab" data-tab="worldevents">Olaylar</button>
-    <button class="admin-tab" data-tab="news">Breaking News</button>
-    <button class="admin-tab" data-tab="events">Events</button>
-    <button class="admin-tab" data-tab="games">Oyunlar</button>
-    <button class="admin-tab" data-tab="quotes">Alıntılar</button>
-    <button class="admin-tab" data-tab="kahve">Kahve</button>
-    <button class="admin-tab" data-tab="people">Kişiler</button>
-    <button class="admin-tab" data-tab="politicians">Koltuklar</button>
-    <button class="admin-tab" data-tab="tbmm">TBMM</button>
-    <button class="admin-tab" data-tab="notifications">Notifications</button>
-    <button class="admin-tab" data-tab="users">Users</button>
-  </div>
+  <div class="admin-shell">
+
+  <!-- ── THE RAIL: every section, stacked, grouped by what it is ── -->
+  <nav class="admin-tabs" id="admin-tabs" aria-label="Bölümler">
+    <div class="rail-group">Kütüphane</div>
+    <button class="admin-tab active" data-tab="kutuphane" data-preview="kutuphane.html">Kütüphane</button>
+    <button class="admin-tab" data-tab="news" data-preview="kutuphane.html">Haberler</button>
+    <button class="admin-tab" data-tab="worldevents" data-preview="kutuphane.html">Olaylar</button>
+    <button class="admin-tab" data-tab="countries" data-preview="kutuphane.html">Ülkeler</button>
+    <button class="admin-tab" data-tab="mektuplar" data-preview="kutuphane.html">Posta Kutusu</button>
+    <button class="admin-tab" data-tab="quotes" data-preview="kutuphane.html">Alıntılar</button>
+    <button class="admin-tab" data-tab="district-polls" data-preview="kutuphane.html">İlçe Anketleri</button>
+
+    <div class="rail-group">Kahvehane</div>
+    <button class="admin-tab" data-tab="events" data-preview="kahvehane.html">Etkinlikler</button>
+    <button class="admin-tab" data-tab="games" data-preview="kahvehane.html">Oyunlar</button>
+    <button class="admin-tab" data-tab="kahve" data-preview="kahvehane.html">Kahve Endeksi</button>
+
+    <div class="rail-group">Kişiler</div>
+    <button class="admin-tab" data-tab="people" data-preview="kutuphane.html">Kişiler</button>
+    <button class="admin-tab" data-tab="politicians" data-preview="kutuphane.html">Koltuklar</button>
+    <button class="admin-tab" data-tab="tbmm" data-preview="kutuphane.html">TBMM</button>
+
+    <div class="rail-group">Hane</div>
+    <button class="admin-tab" data-tab="users" data-preview="anahane.html">Üyeler</button>
+    <button class="admin-tab" data-tab="notifications" data-preview="anahane.html">Bildirimler</button>
+  </nav>
+
+  <main class="admin-work" id="admin-work">
 
   <div class="admin-body" id="kutuphane-tab">
 
@@ -1571,7 +2083,7 @@
         Breaking news auto-disappears 24 hours after posting.
       </p>
 
-      <div style="margin-top:18px;">
+      <div id="news-series-block" style="margin-top:18px;">
         <div class="panel-title" style="margin-top:8px;">Seriler</div>
         <p style="font-size:0.72rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:10px;">
           Ayrı haberleri aynı gelişen olay altında toplamak için seri adı verin.
@@ -1927,6 +2439,71 @@
 
   </div>
 
+  <!-- ── İLÇE ANKETLERİ TAB ──
+       The ANKET box Kütüphane's lane carries at slide 12 (the district
+       reading opposite Haberler, see CLAUDE.md — this used to be the
+       placeholder "Bilgi" box). A member answers once; their vote is
+       filed under their own district (db/neighborhood_polls.sql), and
+       the two colors below are what a future district-colored map would
+       mix between by each district's own split -- neighborhood_poll_
+       results() already returns that breakdown, so the list under each
+       poll here is the same data a map would be painted from. -->
+  <div class="admin-body" id="district-polls-tab" style="display:none;">
+
+    <div class="panel">
+      <div class="panel-title" id="dp-form-mode-label">Add New District Poll</div>
+      <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.4;margin-bottom:14px;">
+        A member answers once, filed under their own district. The two colors are what a future
+        district map would mix between for a district by its own a/b split -- there is no such
+        map drawn yet, so for now the split prints as a list under each poll.
+      </p>
+
+      <label>Soru (Türkçe)</label>
+      <textarea id="dp-question-tr" rows="2" placeholder="Ör: Mahallende en çok neyin eksikliğini hissediyorsun?"></textarea>
+
+      <label>Question (English, optional)</label>
+      <textarea id="dp-question-en" rows="2" placeholder="Optional"></textarea>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:180px;">
+          <label>Seçenek A (Türkçe)</label>
+          <input type="text" id="dp-a-tr" placeholder="Ör: Yeşil alan">
+          <input type="text" id="dp-a-en" placeholder="Option A (English)">
+          <label>Seçenek A rengi</label>
+          <input type="color" id="dp-color-a" value="#b93631"/>
+        </div>
+        <div style="flex:1;min-width:180px;">
+          <label>Seçenek B (Türkçe)</label>
+          <input type="text" id="dp-b-tr" placeholder="Ör: Buluşacak yer">
+          <input type="text" id="dp-b-en" placeholder="Option B (English)">
+          <label>Seçenek B rengi</label>
+          <input type="color" id="dp-color-b" value="#2b2b2b"/>
+        </div>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:10px;">
+        <input type="checkbox" id="dp-active" checked style="width:auto;margin:0;"/>
+        Aktif — ANKET kutusunda görünür
+      </label>
+
+      <input type="hidden" id="dp-editing-id"/>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="dp-submit-btn">Add Poll</button>
+        <button class="btn btn-secondary" id="dp-cancel-btn" style="display:none;">Cancel Edit</button>
+      </div>
+      <div class="status-msg" id="dp-form-status"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">İlçe Anketleri</div>
+      <div class="articles-list" id="district-polls-list">
+        <div class="empty-state"><span class="spinner"></span></div>
+      </div>
+    </div>
+
+  </div>
+
   <!-- ── KAHVE ENDEKSİ TAB ──
        The coffee price index shown in Kahvehane (coffee_prices). Curated
        here only: the site renders it read-only and RLS allows writes to
@@ -2265,6 +2842,35 @@
     </div>
 
   </div>
+
+  </main>
+
+  <!-- ── THE PHONE: the live site, on the same session, beside the desk ── -->
+  <aside class="admin-preview" id="admin-preview">
+    <div class="prev-head">
+      <span class="prev-title">Önizleme</span>
+      <select id="prev-target" title="Hangi sayfa">
+        <option value="project.html">Uygulama</option>
+        <option value="kutuphane.html">Kütüphane</option>
+        <option value="anahane.html">Hane</option>
+        <option value="kahvehane.html">Kahvehane</option>
+        <option value="mahalle.html">Mahalle</option>
+      </select>
+      <button class="prev-btn" id="prev-reload" title="Yenile" aria-label="Yenile">&#8635;</button>
+      <button class="prev-btn" id="prev-hide" title="Gizle" aria-label="Gizle">&rsaquo;</button>
+    </div>
+    <div class="prev-stage" id="prev-stage">
+      <div class="prev-fit" id="prev-fit">
+        <div class="prev-device">
+          <div class="prev-notch"></div>
+          <iframe id="prev-frame" title="Site önizleme"></iframe>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  </div>
+  <button id="prev-show" hidden>Önizleme</button>
 </div>
 
 <script>
@@ -2292,6 +2898,10 @@ function showAdminPanel(user) {
   document.getElementById('access-screen').style.display = 'none';
   document.getElementById('admin-panel').style.display = 'flex';
   document.getElementById('adm-email-display').textContent = user.email;
+  // The phone has no size to be scaled into until the shell around it is
+  // on screen, and nothing to show until there is a session to show it to.
+  deskFitPhone();
+  deskLoadPhone(false);
 }
 
 // ── Login ──
@@ -2338,6 +2948,27 @@ function capitalizeName(s) {
   return s.trim().split(/\s+/).map(w => w ? w.charAt(0).toLocaleUpperCase('tr-TR') + w.slice(1).toLocaleLowerCase('tr-TR') : '').join(' ');
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// WHICH FOLDS ARE OPEN
+//
+// Every list on this page rebuilds its own innerHTML after each add — a
+// gelişme, a source, a poll, a chapter — so a <details> the admin had just
+// opened to type into would be shut again by the very save that proves it
+// worked. What is remembered is the fold's key, not its element, because
+// the element is gone by the time the answer lands.
+//
+// `toggle` does not bubble, hence the capture-phase listener: it is one
+// handler for every fold on the page rather than one per card.
+// ══════════════════════════════════════════════════════════════════════
+const OPEN_BLOCKS = new Set();
+function blockOpenAttr(key) { return OPEN_BLOCKS.has(key) ? ' open' : ''; }
+document.addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!d || !d.dataset || !d.dataset.blockKey) return;
+  if (d.open) OPEN_BLOCKS.add(d.dataset.blockKey);
+  else OPEN_BLOCKS.delete(d.dataset.blockKey);
+}, true);
+
 // ── Tab switching ──
 document.querySelectorAll('.admin-tab').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -2351,6 +2982,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     document.getElementById('events-tab').style.display = (tab === 'events') ? '' : 'none';
     document.getElementById('games-tab').style.display = (tab === 'games') ? 'grid' : 'none';
     document.getElementById('quotes-tab').style.display = (tab === 'quotes') ? '' : 'none';
+    document.getElementById('district-polls-tab').style.display = (tab === 'district-polls') ? '' : 'none';
     document.getElementById('kahve-tab').style.display = (tab === 'kahve') ? '' : 'none';
     document.getElementById('people-tab').style.display = (tab === 'people') ? '' : 'none';
     document.getElementById('politicians-tab').style.display = (tab === 'politicians') ? '' : 'none';
@@ -2365,12 +2997,16 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
     if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); }
     if (tab === 'quotes') loadQuotesList();
+    if (tab === 'district-polls') loadDistrictPollsList();
     if (tab === 'kahve') loadCoffeeList();
     if (tab === 'people') loadPeopleTab();
     if (tab === 'politicians') loadPoliticiansTab();
     if (tab === 'tbmm') loadTBMMTab();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'users') { loadUsersList(); loadOnboardingToggle(); }
+    // The rail's follow-through: shut whatever drawer stood on the section
+    // being left, and aim the phone at the page this section changes.
+    deskOnTab(btn);
   });
 });
 
@@ -3112,12 +3748,19 @@ function renderSeriesList() {
   }
   listEl.innerHTML = SERIES_LIST.map(s => {
     const count = s.count || 0;
+    const slot = s.pinned_slot || '';
     return `
       <div class="src-row" data-series-id="${s.id}">
         <div class="src-info">
           <strong>${escapeHtml(s.name)}</strong>
           <span class="src-headline">${count} haber</span>
         </div>
+        <select class="src-slot-select" data-id="${s.id}" title="Dünya kutusu">
+          <option value=""${slot === '' ? ' selected' : ''}>Dünya kutusu yok</option>
+          <option value="1"${slot === 1 ? ' selected' : ''}>1. kutu</option>
+          <option value="2"${slot === 2 ? ' selected' : ''}>2. kutu</option>
+          <option value="3"${slot === 3 ? ' selected' : ''}>3. kutu</option>
+        </select>
         <button class="btn-edit" data-act="edit-series" data-id="${s.id}">Düzenle</button>
         <button class="btn-del" data-act="del-series" data-id="${s.id}">×</button>
       </div>
@@ -3141,6 +3784,29 @@ document.getElementById('series-list').addEventListener('click', function(e) {
   else if (act === 'save-series-edit') saveSeriesEdit(id);
   else if (act === 'del-series') deleteSeries(id);
 });
+
+// Kütüphane's three world-conflict boxes on the Türkiye stop
+// (project.html) each show one series, picked here. Only one series may
+// hold a given slot (db/breaking_news_series_v2_world_slot.sql's partial
+// unique index), so claiming a slot bumps whoever already had it back to
+// "Dünya kutusu yok" first.
+document.getElementById('series-list').addEventListener('change', async function(e) {
+  const sel = e.target.closest('.src-slot-select');
+  if (!sel) return;
+  await setSeriesPinnedSlot(sel.dataset.id, sel.value ? Number(sel.value) : null);
+});
+
+async function setSeriesPinnedSlot(id, slot) {
+  if (slot) {
+    const { error: clearErr } = await sb.from('breaking_news_series')
+      .update({ pinned_slot: null }).eq('pinned_slot', slot).neq('id', id);
+    if (clearErr) { alert('Error: ' + clearErr.message); loadSeries(); return; }
+  }
+  const { error } = await sb.from('breaking_news_series')
+    .update({ pinned_slot: slot }).eq('id', id);
+  if (error) { alert('Error: ' + error.message); }
+  loadSeries();
+}
 
 function showSeriesEditForm(id) {
   const form = document.querySelector(`.series-edit-row[data-series-edit-id="${id}"]`);
@@ -3293,8 +3959,10 @@ function renderNewsList() {
           ${u.title_en ? `<span class="upd-body-text">EN · ${escapeHtml(u.title_en)}</span>` : ''}
         </div>
         <button class="btn-edit" data-act="edit-update" data-id="${u.id}">Düzenle</button>
+        <button class="btn-edit" data-act="move-update" data-id="${u.id}">Taşı</button>
         <button class="btn-del" data-act="del-update" data-id="${u.id}">×</button>
       </div>
+      ${moveFormHTML('move-upd', u.id, 'Kendi haberi olsun')}
       <div class="upd-edit-form" data-upd-edit-id="${u.id}">
         <input type="text" class="ue-title" value="${escapeHtml(u.title)}"/>
         <textarea class="ue-body" rows="2">${escapeHtml(u.body || '')}</textarea>
@@ -3352,8 +4020,8 @@ function renderNewsList() {
           ? `<h4 style="color:var(--muted);">EN · ${escapeHtml(n.title_en)}</h4>
              ${n.body_en ? `<p style="color:var(--muted);">${escapeHtml(n.body_en)}</p>` : ''}`
           : `<div style="font-size:0.7rem;color:var(--muted);font-style:italic;">EN yok</div>`}
-        <div class="sources-block">
-          <div class="sources-label">Gelişmeler (${updates.length})</div>
+        <details class="sources-block" data-block-key="news:${n.id}:upd"${blockOpenAttr(`news:${n.id}:upd`)}>
+          <summary class="sources-label">Gelişmeler (${updates.length})</summary>
           ${updatesHtml}
           <div class="upd-form">
             <input type="text" class="upd-title" placeholder="Yeni başlık (haberin güncel hali)"/>
@@ -3364,9 +4032,9 @@ function renderNewsList() {
             <button class="btn btn-secondary" data-act="add-update" data-news-id="${n.id}">+ Gelişme Ekle</button>
             <div class="upd-status status-msg"></div>
           </div>
-        </div>
-        <div class="sources-block">
-          <div class="sources-label">Anketler (${polls.length})</div>
+        </details>
+        <details class="sources-block" data-block-key="news:${n.id}:poll"${blockOpenAttr(`news:${n.id}:poll`)}>
+          <summary class="sources-label">Anketler (${polls.length})</summary>
           ${pollsHtml}
           <div class="src-form">
             <input type="text" class="poll-question" placeholder="Soru"/>
@@ -3375,9 +4043,9 @@ function renderNewsList() {
             <button class="btn btn-secondary" data-act="add-poll" data-news-id="${n.id}">+ Anket Ekle</button>
             <div class="poll-status status-msg"></div>
           </div>
-        </div>
-        <div class="sources-block">
-          <div class="sources-label">Kaynaklar (${sources.length})</div>
+        </details>
+        <details class="sources-block" data-block-key="news:${n.id}:src"${blockOpenAttr(`news:${n.id}:src`)}>
+          <summary class="sources-label">Kaynaklar (${sources.length})</summary>
           ${sourcesHtml}
           <div class="src-form">
             <input type="text" class="src-name" placeholder="Kaynak adı (ör. Cumhuriyet)"/>
@@ -3386,14 +4054,16 @@ function renderNewsList() {
             <button class="btn btn-secondary" data-act="add-src" data-news-id="${n.id}">+ Kaynak Ekle</button>
             <div class="src-status status-msg"></div>
           </div>
-        </div>
+        </details>
         <div class="card-actions">
           <button class="btn-edit" data-act="edit-news" data-id="${n.id}">Düzenle</button>
+          <button class="btn-edit" data-act="move-news" data-id="${n.id}">Akışa Taşı</button>
           ${n.archived_at
             ? `<button class="btn-edit" data-act="unarchive-news" data-id="${n.id}">Arşivden Çıkar</button>`
             : `<button class="btn-edit" data-act="archive-news" data-id="${n.id}">Arşivle</button>`}
           <button class="btn-del" data-act="del-news" data-id="${n.id}">Sil</button>
         </div>
+        ${moveFormHTML('move-news', n.id, '')}
         <div class="news-edit-form" data-id="${n.id}">
           <input type="text" class="ne-title" value="${escapeHtml(n.title)}"/>
           <textarea class="ne-body" rows="3">${escapeHtml(n.body || '')}</textarea>
@@ -3493,7 +4163,65 @@ document.getElementById('news-list').addEventListener('click', function(e) {
   else if (act === 'save-update-edit') saveNewsUpdateEdit(btn);
   else if (act === 'add-poll') addPoll(btn);
   else if (act === 'del-poll') deletePoll(btn.dataset.id);
+  // Re-filing: a story into another story's Zaman Akışı, or one entry of a
+  // timeline into a different one (or back out into a story of its own).
+  else if (act === 'move-news') openMovePanel(card, '.move-form[data-move-news]', btn.dataset.id);
+  else if (act === 'cancel-move-news') closeMovePanel(card, '.move-form[data-move-news]');
+  else if (act === 'do-move-news') doMoveNews(btn, card);
+  else if (act === 'move-update') openMovePanel(card, `.move-form[data-move-upd="${btn.dataset.id}"]`, card.dataset.id);
+  else if (act === 'cancel-move-upd') closeMovePanel(card, `.move-form[data-move-upd="${btn.dataset.id}"]`);
+  else if (act === 'do-move-upd') doMoveUpdate(btn, card);
 });
+
+// The picker is filled on opening, never with the card — see ensureMovePicker.
+function openMovePanel(card, selector, excludeId) {
+  const form = card.querySelector(selector);
+  if (!form) return;
+  ensureMovePicker(form.querySelector('.move-target'), excludeId);
+  form.classList.toggle('open');
+}
+
+function closeMovePanel(card, selector) {
+  const form = card.querySelector(selector);
+  if (form) form.classList.remove('open');
+}
+
+async function doMoveNews(btn, card) {
+  const form = card.querySelector('.move-form[data-move-news]');
+  const targetId = form.querySelector('.move-target').value;
+  const statusEl = form.querySelector('.move-status');
+  if (!targetId) {
+    statusEl.textContent = 'Taşınacak haberi seçin.';
+    statusEl.className = 'move-status status-msg err';
+    return;
+  }
+  const tgt = allAdminNews.find(n => n.id === targetId);
+  // Folding a story in ends it as a story, so it is said out loud before
+  // rather than regretted after.
+  if (!confirm(`Bu haber "${tgt ? tgt.title : ''}" haberinin zaman akışına taşınsın mı?\n\n`
+    + 'Kendi gelişmeleri, kaynakları, anketleri ve ülkeleri de oraya geçer, '
+    + 've ayrı bir haber olmaktan çıkar.')) return;
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  const ok = await moveNewsIntoTimeline(btn.dataset.id, targetId, statusEl);
+  btn.disabled = false;
+  btn.textContent = orig;
+  if (ok) setTimeout(() => loadBreakingNews(), 400);
+}
+
+async function doMoveUpdate(btn, card) {
+  const form = card.querySelector(`.move-form[data-move-upd="${btn.dataset.id}"]`);
+  const targetId = form.querySelector('.move-target').value;
+  const statusEl = form.querySelector('.move-status');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  const ok = await moveNewsUpdate(btn.dataset.id, card.dataset.id, targetId || null, statusEl);
+  btn.disabled = false;
+  btn.textContent = orig;
+  if (ok) setTimeout(() => loadBreakingNews(), 400);
+}
 
 function showUpdateEditForm(id) {
   const form = document.querySelector(`.upd-edit-form[data-upd-edit-id="${id}"]`);
@@ -3777,37 +4505,16 @@ async function addNewsUpdate(btn) {
 
   // First update on this story: snapshot its current headline into the
   // timeline (at its original created_at) before overwriting it, so the
-  // original post isn't lost.
-  const { data: existing, error: existingErr } = await sb.from('breaking_news_updates')
-    .select('created_at').eq('news_id', newsId).order('created_at', { ascending: false }).limit(1);
-  if (existingErr) {
+  // original post isn't lost. Shared with the move below, which needs the
+  // same guarantee about the story it is folding another one into.
+  const seed = await seedNewsTimeline(newsId);
+  if (seed.error) {
     btn.disabled = false; btn.textContent = origText;
-    statusEl.textContent = existingErr.message;
+    statusEl.textContent = seed.error.message;
     statusEl.className = 'upd-status status-msg err';
     return;
   }
-  let latestExistingAt = existing.length ? existing[0].created_at : null;
-  if (!existing.length) {
-    const { data: current, error: curErr } = await sb.from('breaking_news')
-      .select('title, body, title_en, body_en, created_at').eq('id', newsId).single();
-    if (curErr) {
-      btn.disabled = false; btn.textContent = origText;
-      statusEl.textContent = curErr.message;
-      statusEl.className = 'upd-status status-msg err';
-      return;
-    }
-    const { error: seedErr } = await sb.from('breaking_news_updates').insert([{
-      news_id: newsId, title: current.title, body: current.body,
-      title_en: current.title_en, body_en: current.body_en, created_at: current.created_at,
-    }]);
-    if (seedErr) {
-      btn.disabled = false; btn.textContent = origText;
-      statusEl.textContent = seedErr.message;
-      statusEl.className = 'upd-status status-msg err';
-      return;
-    }
-    latestExistingAt = current.created_at;
-  }
+  const latestExistingAt = seed.latestAt;
 
   const { error } = await sb.from('breaking_news_updates')
     .insert([{ news_id: newsId, title, body: body || null,
@@ -3844,6 +4551,218 @@ async function addNewsUpdate(btn) {
   btn.textContent = '✓ Eklendi';
   statusEl.textContent = '';
   setTimeout(() => loadBreakingNews(), 500);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// A STORY CAN BE MOVED INTO ANOTHER STORY'S ZAMAN AKIŞI
+//
+// The connection between two stories is usually noticed AFTER both have
+// been posted — that is what news is. So neither the feed nor a timeline
+// may be a place a story is stuck in: any story can be folded into any
+// other story's Zaman Akışı, any entry in a timeline can be moved to a
+// different one, and any entry can be lifted back out into a story of its
+// own. Every one of those is reversible by doing the opposite, which is
+// the whole point.
+//
+// It needs NO migration: `news_id` is an ordinary column on
+// breaking_news_updates / _sources / _polls and the admin already holds
+// UPDATE on all three (db/breaking_news_updates.sql and friends). Moving
+// is re-pointing a foreign key, not copying rows about.
+// ══════════════════════════════════════════════════════════════════════
+
+// The first entry of a story's Zaman Akışı has to be that story's OWN
+// original post, or the headline it started as is lost the moment it grows
+// a second one. Adding a gelişme and folding another story in both need
+// that guarantee, so it is stated once rather than twice.
+// Returns { seeded, latestAt } or { error }.
+async function seedNewsTimeline(newsId) {
+  const { data: existing, error } = await sb.from('breaking_news_updates')
+    .select('created_at').eq('news_id', newsId)
+    .order('created_at', { ascending: false }).limit(1);
+  if (error) return { error };
+  if (existing.length) return { seeded: false, latestAt: existing[0].created_at };
+
+  const { data: current, error: curErr } = await sb.from('breaking_news')
+    .select('title, body, title_en, body_en, created_at').eq('id', newsId).single();
+  if (curErr) return { error: curErr };
+  const { error: seedErr } = await sb.from('breaking_news_updates').insert([{
+    news_id: newsId, title: current.title, body: current.body,
+    title_en: current.title_en, body_en: current.body_en, created_at: current.created_at,
+  }]);
+  if (seedErr) return { error: seedErr };
+  return { seeded: true, latestAt: current.created_at };
+}
+
+// A story's displayed headline is its LATEST timeline entry (addNewsUpdate's
+// own rule). So anything that changes what is in a timeline has to re-derive
+// it, or a story goes on showing a headline that now lives somewhere else.
+//
+// `updated_at` is deliberately NOT bumped here: that column is what puts a
+// story back on top of every reader's deck, and re-filing is a correction to
+// the record rather than a development in the story. The one caller that
+// genuinely is a development bumps it itself.
+// Returns the head it applied, or null when the story has no timeline left.
+async function resyncNewsHead(newsId) {
+  const { data, error } = await sb.from('breaking_news_updates')
+    .select('title, body, title_en, body_en, created_at')
+    .eq('news_id', newsId).order('created_at', { ascending: false }).limit(1);
+  if (error || !data || !data.length) return null;
+  const u = data[0];
+  await sb.from('breaking_news').update({
+    title: u.title, body: u.body || null,
+    title_en: u.title_en || null, body_en: u.body_en || null,
+  }).eq('id', newsId);
+  return u;
+}
+
+// Fold one story into another's Zaman Akışı. The story stops being a story:
+// what was hanging off it — its own timeline, its sources, its polls and the
+// countries it named — follows it across rather than being deleted with it.
+async function moveNewsIntoTimeline(sourceId, targetId, statusEl) {
+  const say = (msg, cls) => {
+    if (!statusEl) return;
+    statusEl.textContent = msg;
+    statusEl.className = 'move-status status-msg' + (cls ? ' ' + cls : '');
+  };
+  const src = allAdminNews.find(n => n.id === sourceId);
+  const tgt = allAdminNews.find(n => n.id === targetId);
+  if (!src || !tgt) { say('Haber bulunamadı.', 'err'); return false; }
+
+  // The target keeps its own first headline in its own timeline.
+  const seed = await seedNewsTimeline(targetId);
+  if (seed.error) { say(seed.error.message, 'err'); return false; }
+
+  // A story that already has a timeline carries its whole history across
+  // and needs no entry of its own — its current headline IS its latest
+  // entry. One that has none becomes a single entry at its own date.
+  const srcUpdates = src.breaking_news_updates || [];
+  if (!srcUpdates.length) {
+    const { error } = await sb.from('breaking_news_updates').insert([{
+      news_id: targetId, title: src.title, body: src.body || null,
+      title_en: src.title_en || null, body_en: src.body_en || null,
+      created_at: src.created_at,
+    }]);
+    if (error) { say(error.message, 'err'); return false; }
+  } else {
+    const { error } = await sb.from('breaking_news_updates')
+      .update({ news_id: targetId }).eq('news_id', sourceId);
+    if (error) { say(error.message, 'err'); return false; }
+  }
+
+  // Everything else the story was carrying goes with it.
+  const { error: srcErr } = await sb.from('breaking_news_sources')
+    .update({ news_id: targetId }).eq('news_id', sourceId);
+  if (srcErr) { say(srcErr.message, 'err'); return false; }
+  const { error: pollErr } = await sb.from('breaking_news_polls')
+    .update({ news_id: targetId }).eq('news_id', sourceId);
+  if (pollErr) { say(pollErr.message, 'err'); return false; }
+
+  // Countries have no UPDATE policy (they are a tick list, not a record —
+  // db/breaking_news_countries.sql), so the ones the target does not
+  // already name are inserted. The target's own ticks are never touched.
+  const srcCountries = (src.breaking_news_countries || []).map(c => c.country);
+  const tgtCountries = new Set((tgt.breaking_news_countries || []).map(c => c.country));
+  const missing = srcCountries.filter(c => !tgtCountries.has(c));
+  if (missing.length) {
+    await sb.from('breaking_news_countries')
+      .insert(missing.map(country => ({ news_id: targetId, country })));
+  }
+
+  // Now the source is empty of everything that mattered, so deleting it
+  // takes nothing with it.
+  const { error: delErr } = await sb.from('breaking_news').delete().eq('id', sourceId);
+  if (delErr) { say(delErr.message, 'err'); return false; }
+
+  // The target's headline is its latest entry again — and if that is now a
+  // newer headline than the one it was showing, the story genuinely moved
+  // and belongs back on top of the reader's deck.
+  const head = await resyncNewsHead(targetId);
+  if (head && head.title !== tgt.title) {
+    await sb.from('breaking_news').update({ updated_at: new Date().toISOString() }).eq('id', targetId);
+  }
+  say('Taşındı.', 'ok');
+  return true;
+}
+
+// Move one timeline entry to a different story — or, with no target, lift it
+// back out as a story of its own. The two are one function because they are
+// one gesture in the portal: a picker whose first option is "its own story".
+async function moveNewsUpdate(updateId, fromNewsId, targetId, statusEl) {
+  const say = (msg, cls) => {
+    if (!statusEl) return;
+    statusEl.textContent = msg;
+    statusEl.className = 'move-status status-msg' + (cls ? ' ' + cls : '');
+  };
+  const from = allAdminNews.find(n => n.id === fromNewsId);
+  const entry = (from && (from.breaking_news_updates || []).find(u => u.id === updateId)) || null;
+  if (!entry) { say('Gelişme bulunamadı.', 'err'); return false; }
+
+  if (targetId) {
+    // The receiving story keeps its own first headline, exactly as it does
+    // when a whole story is folded in.
+    const seed = await seedNewsTimeline(targetId);
+    if (seed.error) { say(seed.error.message, 'err'); return false; }
+    const { error } = await sb.from('breaking_news_updates')
+      .update({ news_id: targetId }).eq('id', updateId);
+    if (error) { say(error.message, 'err'); return false; }
+    const tgt = allAdminNews.find(n => n.id === targetId);
+    const head = await resyncNewsHead(targetId);
+    if (tgt && head && head.title !== tgt.title) {
+      await sb.from('breaking_news').update({ updated_at: new Date().toISOString() }).eq('id', targetId);
+    }
+  } else {
+    // Out into a story of its own, standing where it stood in time and
+    // filed the way the story it came out of was filed.
+    const { data: made, error } = await sb.from('breaking_news').insert([{
+      title: entry.title, body: entry.body || null,
+      title_en: entry.title_en || null, body_en: entry.body_en || null,
+      neighborhood: from.neighborhood || null,
+      category: from.category || 'turkiye',
+      series_id: from.series_id || null,
+      created_at: entry.created_at, updated_at: entry.created_at,
+    }]).select().single();
+    if (error) { say(error.message, 'err'); return false; }
+    const srcCountries = (from.breaking_news_countries || []).map(c => c.country);
+    if (srcCountries.length) {
+      await sb.from('breaking_news_countries')
+        .insert(srcCountries.map(country => ({ news_id: made.id, country })));
+    }
+    const { error: delErr } = await sb.from('breaking_news_updates').delete().eq('id', updateId);
+    if (delErr) { say(delErr.message, 'err'); return false; }
+  }
+
+  // Whatever it left behind may have been that story's own headline.
+  await resyncNewsHead(fromNewsId);
+  say('Taşındı.', 'ok');
+  return true;
+}
+
+// The picker is filled when it is opened, never with the card — "Tümü"
+// renders up to 300 stories, and a select of all of them inside each of
+// them is 90,000 options nobody asked to see. Same rule as
+// ensureCardCountryPicker above.
+function ensureMovePicker(sel, excludeId) {
+  if (!sel || sel.dataset.filled) return;
+  sel.dataset.filled = '1';
+  const head = sel.dataset.selfOption
+    ? `<option value="">— ${escapeHtml(sel.dataset.selfOption)} —</option>` : '';
+  sel.innerHTML = head + allAdminNews
+    .filter(n => n.id !== excludeId)
+    .map(n => {
+      const cat = categoryLabel(n.category || n.neighborhood || 'turkiye');
+      return `<option value="${escapeHtml(n.id)}">${escapeHtml(cat + ' · ' + n.title)}</option>`;
+    }).join('');
+}
+
+// One panel markup for both directions: a target, and the two buttons.
+function moveFormHTML(attr, id, selfOption) {
+  return `
+    <div class="move-form" data-${attr}="${escapeHtml(id)}">
+      <select class="move-target"${selfOption ? ` data-self-option="${escapeHtml(selfOption)}"` : ''}></select>
+      <button class="btn btn-primary" data-act="${attr === 'move-news' ? 'do-move-news' : 'do-move-upd'}" data-id="${escapeHtml(id)}">Taşı</button>
+      <button class="btn btn-secondary" data-act="${attr === 'move-news' ? 'cancel-move-news' : 'cancel-move-upd'}" data-id="${escapeHtml(id)}">İptal</button>
+      <div class="move-status status-msg"></div>
+    </div>`;
 }
 
 async function deleteNewsUpdate(id) {
@@ -4486,8 +5405,8 @@ async function loadCountryEntriesList() {
         countryStoryOf(en.country) ? ' · ' + escapeHtml(countryStoryOf(en.country).name) : ''
       }${en.entry_date ? ' · ' + escapeHtml(en.entry_date) : ''}</div>
       <h4>${escapeHtml(en.title)}</h4>
-      <div class="sources-block">
-        <div class="sources-label">Zaman Akışı (${events.length})</div>
+      <details class="sources-block" data-block-key="ce:${en.id}"${blockOpenAttr(`ce:${en.id}`)}>
+        <summary class="sources-label">Zaman Akışı (${events.length})</summary>
         ${eventsHtml}
         <div class="ce-ev-form upd-form">
           <input type="date" class="upd-date cee-new-date" title="Tarih"/>
@@ -4496,7 +5415,7 @@ async function loadCountryEntriesList() {
           <button class="btn btn-secondary" data-act="ce-ev-add" data-entry-id="${en.id}">+ An Ekle</button>
           <div class="upd-status status-msg"></div>
         </div>
-      </div>
+      </details>
       <div class="card-actions">
         <button class="btn-edit" data-act="ce-edit" data-id="${en.id}">Edit</button>
         <button class="btn-del"  data-act="ce-del"  data-id="${en.id}">Delete</button>
@@ -4790,14 +5709,17 @@ async function loadWorldEventsList() {
       }</div>
       <h4>${escapeHtml(ev.name_tr)}</h4>
       ${ev.parties ? `<p>${escapeHtml(ev.parties)}</p>` : ''}
-      ${countries ? `<p style="color:var(--muted);">Haritada: ${escapeHtml(countries)}</p>` : ''}
-      <p style="color:var(--muted);">Kâğıt: ${
-        ev.paper_x == null || ev.paper_y == null
-          ? 'yeri seçilmedi — çizimin altına asılır'
-          : escapeHtml(`x ${ev.paper_x} · y ${ev.paper_y}`)
-      }</p>
-      <div class="sources-block">
-        <div class="sources-label">Bölümler (${moments.length})</div>
+      <details class="sources-block" data-block-key="we:${ev.id}:pano"${blockOpenAttr(`we:${ev.id}:pano`)}>
+        <summary class="sources-label">Pano</summary>
+        <p style="color:var(--muted);font-size:0.8rem;">Haritada: ${countries ? escapeHtml(countries) : 'ülke seçilmedi'}</p>
+        <p style="color:var(--muted);font-size:0.8rem;">Kâğıt: ${
+          ev.paper_x == null || ev.paper_y == null
+            ? 'yeri seçilmedi — çizimin altına asılır'
+            : escapeHtml(`x ${ev.paper_x} · y ${ev.paper_y}`)
+        }</p>
+      </details>
+      <details class="sources-block" data-block-key="we:${ev.id}"${blockOpenAttr(`we:${ev.id}`)}>
+        <summary class="sources-label">Bölümler (${moments.length})</summary>
         ${momentsHtml}
         <div class="we-m-form upd-form">
           <input type="date" class="upd-date wem-new-date" title="Tarih"/>
@@ -4807,7 +5729,7 @@ async function loadWorldEventsList() {
           <button class="btn btn-secondary" data-act="we-m-add" data-event-id="${escapeHtml(ev.id)}">+ Bölüm Ekle</button>
           <div class="upd-status status-msg"></div>
         </div>
-      </div>
+      </details>
       <div class="card-actions">
         <button class="btn-edit" data-act="we-edit" data-id="${escapeHtml(ev.id)}">Edit</button>
         <button class="btn-del"  data-act="we-del"  data-id="${escapeHtml(ev.id)}">Delete</button>
@@ -5217,6 +6139,174 @@ async function deleteQuote(id) {
   const { error } = await sb.from('quotes').delete().eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   loadQuotesList();
+}
+
+// ── İlçe Anketleri: district polls behind Kütüphane's ANKET box ──
+// A vote is filed under the member's own district (db/neighborhood_polls.sql).
+// The per-district breakdown printed under each poll here is exactly the
+// data a future district-colored map would read to pick each district's
+// color -- see that file's own comment for why there is no such map yet.
+let _nbNameCache = null;
+async function neighborhoodNames() {
+  if (_nbNameCache) return _nbNameCache;
+  const { data } = await sb.from('neighborhoods').select('id, name_tr').order('name_tr');
+  _nbNameCache = {};
+  (data || []).forEach(n => { _nbNameCache[n.id] = n.name_tr; });
+  return _nbNameCache;
+}
+
+async function loadDistrictPollsList() {
+  const listEl = document.getElementById('district-polls-list');
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const { data, error } = await sb.from('neighborhood_polls')
+    .select('*').order('created_at', { ascending: false });
+  if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
+  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No district polls yet.</div>'; return; }
+
+  const names = await neighborhoodNames();
+  // One result round-trip per poll -- there are only ever a handful of
+  // these live at once, so this costs far less than a second full fetch.
+  const withResults = await Promise.all(data.map(async (p) => {
+    const { data: rows, error: rErr } = await sb.rpc('neighborhood_poll_results', { p_poll_id: p.id });
+    return { poll: p, rows: rErr ? [] : (rows || []) };
+  }));
+
+  listEl.innerHTML = withResults.map(({ poll: p, rows }) => {
+    const totalA = rows.reduce((s, r) => s + r.a_count, 0);
+    const totalB = rows.reduce((s, r) => s + r.b_count, 0);
+    const total = totalA + totalB;
+    const pctA = total ? Math.round((totalA / total) * 100) : 0;
+    const districtRows = rows
+      .map(r => ({ neighborhood: r.neighborhood, a_count: r.a_count, b_count: r.b_count,
+                   total: r.a_count + r.b_count, name: names[r.neighborhood] || r.neighborhood }))
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'tr'))
+      .map(r => {
+        const rp = r.total ? Math.round((r.a_count / r.total) * 100) : null;
+        return '<div class="dp-district-row">' +
+          '<span class="dp-district-name">' + escapeHtml(r.name) + '</span>' +
+          (r.total
+            ? '<span class="dp-district-bar"><span style="width:' + rp + '%;background:' + escapeHtml(p.color_a) + ';"></span>' +
+                '<span style="width:' + (100 - rp) + '%;background:' + escapeHtml(p.color_b) + ';"></span></span>' +
+              '<span class="dp-district-pct">%' + rp + '</span>'
+            : '<span class="dp-district-none">Oy yok</span>') +
+          '</div>';
+      }).join('');
+    const blockKey = 'dp-results-' + p.id;
+    return `
+    <div class="article-card" data-id="${p.id}">
+      <p>${escapeHtml(p.question_tr)}${p.active ? '' : ' <span style="color:var(--muted);">(pasif)</span>'}</p>
+      <div class="a-neighborhood">
+        <span style="color:${escapeHtml(p.color_a)};">■</span> ${escapeHtml(p.option_a_tr)}
+        &nbsp;·&nbsp;
+        <span style="color:${escapeHtml(p.color_b)};">■</span> ${escapeHtml(p.option_b_tr)}
+        &nbsp;·&nbsp; ${total} oy${total ? ` (%${pctA} / %${100 - pctA})` : ''}
+      </div>
+      <details class="sources-block" data-block-key="${blockKey}"${blockOpenAttr(blockKey)}>
+        <summary class="sources-label">İlçelere göre sonuç</summary>
+        <div class="dp-results">${districtRows}</div>
+      </details>
+      <div class="card-actions">
+        <button class="btn-edit" data-act="dp-edit" data-id="${p.id}">Edit</button>
+        <button class="btn-del"  data-act="dp-del"  data-id="${p.id}">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  listEl.querySelectorAll('button[data-act]').forEach(btn => {
+    const p = data.find(x => x.id === btn.dataset.id);
+    if (!p) return;
+    if (btn.dataset.act === 'dp-edit') btn.addEventListener('click', () => editDistrictPoll(p));
+    if (btn.dataset.act === 'dp-del') btn.addEventListener('click', () => deleteDistrictPoll(p.id));
+  });
+}
+
+function editDistrictPoll(p) {
+  document.getElementById('dp-editing-id').value = p.id;
+  document.getElementById('dp-question-tr').value = p.question_tr || '';
+  document.getElementById('dp-question-en').value = p.question_en || '';
+  document.getElementById('dp-a-tr').value = p.option_a_tr || '';
+  document.getElementById('dp-a-en').value = p.option_a_en || '';
+  document.getElementById('dp-b-tr').value = p.option_b_tr || '';
+  document.getElementById('dp-b-en').value = p.option_b_en || '';
+  document.getElementById('dp-color-a').value = /^#[0-9a-fA-F]{6}$/.test(p.color_a || '') ? p.color_a : '#b93631';
+  document.getElementById('dp-color-b').value = /^#[0-9a-fA-F]{6}$/.test(p.color_b || '') ? p.color_b : '#2b2b2b';
+  document.getElementById('dp-active').checked = p.active !== false;
+  document.getElementById('dp-submit-btn').textContent = 'Update Poll';
+  document.getElementById('dp-form-mode-label').textContent = 'Editing District Poll';
+  document.getElementById('dp-cancel-btn').style.display = 'inline-block';
+  document.querySelector('#district-polls-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetDistrictPollForm() {
+  document.getElementById('dp-editing-id').value = '';
+  document.getElementById('dp-question-tr').value = '';
+  document.getElementById('dp-question-en').value = '';
+  document.getElementById('dp-a-tr').value = '';
+  document.getElementById('dp-a-en').value = '';
+  document.getElementById('dp-b-tr').value = '';
+  document.getElementById('dp-b-en').value = '';
+  document.getElementById('dp-color-a').value = '#b93631';
+  document.getElementById('dp-color-b').value = '#2b2b2b';
+  document.getElementById('dp-active').checked = true;
+  document.getElementById('dp-submit-btn').textContent = 'Add Poll';
+  document.getElementById('dp-form-mode-label').textContent = 'Add New District Poll';
+  document.getElementById('dp-cancel-btn').style.display = 'none';
+}
+
+document.getElementById('dp-cancel-btn').addEventListener('click', resetDistrictPollForm);
+
+document.getElementById('dp-submit-btn').addEventListener('click', async () => {
+  const editingId = document.getElementById('dp-editing-id').value;
+  const question_tr = document.getElementById('dp-question-tr').value.trim();
+  const question_en = document.getElementById('dp-question-en').value.trim() || null;
+  const option_a_tr = document.getElementById('dp-a-tr').value.trim();
+  const option_a_en = document.getElementById('dp-a-en').value.trim() || null;
+  const option_b_tr = document.getElementById('dp-b-tr').value.trim();
+  const option_b_en = document.getElementById('dp-b-en').value.trim() || null;
+  const color_a = document.getElementById('dp-color-a').value || '#b93631';
+  const color_b = document.getElementById('dp-color-b').value || '#2b2b2b';
+  const active = document.getElementById('dp-active').checked;
+  const statusEl = document.getElementById('dp-form-status');
+  const btn = document.getElementById('dp-submit-btn');
+
+  if (!question_tr || !option_a_tr || !option_b_tr) {
+    statusEl.textContent = 'Question and both Turkish options are required.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  statusEl.textContent = ''; statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const row = { question_tr, question_en, option_a_tr, option_a_en, option_b_tr, option_b_en, color_a, color_b, active };
+  let result;
+  if (editingId) {
+    result = await sb.from('neighborhood_polls').update(row).eq('id', editingId);
+  } else {
+    const { data: { session } } = await sb.auth.getSession();
+    row.created_by = session && session.user ? session.user.id : null;
+    result = await sb.from('neighborhood_polls').insert([row]);
+  }
+
+  btn.textContent = editingId ? 'Update Poll' : 'Add Poll';
+
+  if (result.error) {
+    statusEl.textContent = result.error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = editingId ? 'Poll updated!' : 'Poll added!';
+  statusEl.className = 'status-msg ok';
+  resetDistrictPollForm();
+  loadDistrictPollsList();
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+async function deleteDistrictPoll(id) {
+  if (!confirm('Bu anketi ve tüm oylarını sil? Geri alınamaz.')) return;
+  const { error } = await sb.from('neighborhood_polls').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadDistrictPollsList();
 }
 
 // ── Kahve Endeksi: the coffee price index shown in Kahvehane ──
@@ -7042,6 +8132,383 @@ async function deleteNotification(id) {
   loadNotifications();
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// THE DESK — the rail, the drawers, and the phone
+//
+// Nothing below owns any data. It rearranges the surface the fourteen
+// sections were already drawn on: the sections stack down the left, a
+// section is its LIST until you press a row, and the site itself stands
+// on the right at the size a member actually holds it. Every form, every
+// handler and every id underneath is exactly where it was — the drawer
+// MOVES the editor panel's own nodes rather than rebuilding them, so a
+// field the rest of this file reaches for by id is still that field.
+// ══════════════════════════════════════════════════════════════════════
+
+// One entry per section that is a list with an editor behind it.
+//   edit   — the row actions that mean "open this one"
+//   reset  — the form's own back-to-blank button, which is what "+ Yeni" means
+//   submit — locates the action row, so it can stand on the drawer's floor
+//   cols   — two columns of fields, for the forms long enough to need them
+//   add    — the label of the button that opens a blank one (null: no such thing)
+const DESK_MD = {
+  'mektuplar-tab':     { edit: ['lt-edit'], reset: 'lt-cancel-btn', submit: 'lt-submit-btn',    cols: 2, add: 'Yeni Mektup' },
+  'countries-tab':     { edit: ['ce-edit'], reset: 'ce-cancel-btn', submit: 'ce-submit-btn',    cols: 2, add: 'Yeni Girdi' },
+  'worldevents-tab':   { edit: ['we-edit'], reset: 'we-cancel-btn', submit: 'we-submit-btn',    cols: 2, add: 'Yeni Olay',
+                         advanced: ['we-id', 'we-map-pick', 'we-image', 'we-series', 'we-sort'] },
+  // A news row's editor is the row: sources, gelişmeler and polls are all
+  // managed inside the card, so pressing it opens THAT rather than a
+  // drawer. `rowAct` is the press without the drawer; `edit` is both.
+  'news-tab':          { edit: [],          reset: null,            submit: 'n-submit-btn',     cols: 2, add: 'Yeni Haber',
+                         rowAct: 'edit-news', advanced: ['n-datetime', 'news-series-block'] },
+  'events-tab':        { edit: ['ev-edit'], reset: 'ev-cancel-btn', submit: 'ev-submit-btn',    cols: 2, add: 'Yeni Etkinlik' },
+  'quotes-tab':        { edit: ['q-edit'],  reset: 'q-cancel-btn',  submit: 'q-submit-btn',     cols: 2, add: 'Yeni Alıntı' },
+  'district-polls-tab':{ edit: ['dp-edit'], reset: 'dp-cancel-btn', submit: 'dp-submit-btn',    cols: 2, add: 'Yeni Anket' },
+  'kahve-tab':         { edit: ['cf-edit'], reset: 'cf-cancel-btn', submit: 'cf-submit-btn',    cols: 2, add: 'Yeni Fiyat' },
+  'people-tab':        { edit: ['pp-edit'], reset: 'pp-cancel-btn', submit: 'pp-submit-btn',    cols: 2, add: 'Yeni Kişi' },
+  'politicians-tab':   { edit: ['p-edit'],  reset: null,            submit: 'p-submit-btn',     cols: 1, add: null },
+  'notifications-tab': { edit: [],          reset: null,            submit: 'notif-submit-btn', cols: 1, add: 'Yeni Bildirim' },
+};
+
+// ── A field is a label and everything under it up to the next one ──
+// The forms are flat sequences of label / control / hint, so the grouping
+// has to be inferred rather than read off the markup. It stops at anything
+// that carries a label of its own (a toggle row, a country picker): those
+// are blocks in their own right and swallowing one into the field above it
+// would put two questions in one box.
+function deskWrapFields(inner) {
+  const stops = (el) =>
+    el.tagName === 'LABEL' ||
+    el.tagName === 'DETAILS' ||
+    el.classList.contains('btn-row') ||
+    el.classList.contains('panel-title') ||
+    el.classList.contains('status-msg') ||
+    !!el.querySelector('label');
+
+  const kids = Array.from(inner.children);
+  let i = 0;
+  while (i < kids.length) {
+    if (kids[i].tagName !== 'LABEL') { i++; continue; }
+    const group = [kids[i]];
+    let j = i + 1;
+    while (j < kids.length && !stops(kids[j])) { group.push(kids[j]); j++; }
+    const wrap = document.createElement('div');
+    wrap.className = 'af';
+    kids[i].parentNode.insertBefore(wrap, kids[i]);
+    group.forEach(el => wrap.appendChild(el));
+    i = j;
+  }
+}
+
+// ── The explanations fold away ──
+// Every form carries a paragraph or four saying what the thing is. They
+// are worth keeping and are not worth the top half of the drawer, so what
+// is left loose after the fields have been grouped folds into one line.
+function deskFoldHints(inner) {
+  const loose = Array.from(inner.children).filter(el => el.tagName === 'P');
+  if (!loose.length) return;
+  const det = document.createElement('details');
+  det.className = 'md-hint';
+  const sum = document.createElement('summary');
+  sum.textContent = 'Nasıl çalışır';
+  det.appendChild(sum);
+  loose.forEach(p => det.appendChild(p));
+  inner.insertBefore(det, inner.firstChild);
+}
+
+// ── The second half of a long form folds away too ──
+// A form the reader meets is the handful of fields that are actually the
+// thing; the id it will be filed under, where its paper hangs, which seri
+// it belongs to are all real and none of them is what you came to write.
+// They stand at the bottom behind one line, so the common path is short
+// and nothing has been taken away.
+function deskFoldAdvanced(inner, ids) {
+  if (!ids || !ids.length) return;
+  const nodes = [];
+  ids.forEach(id => {
+    // The drawer's body is still detached at this point, so it has to be
+    // asked directly — the document does not know these ids yet.
+    const el = inner.querySelector('#' + id);
+    if (!el) return;
+    const field = el.closest('.af');
+    const node = (field && field.parentElement === inner) ? field
+               : (el.parentElement === inner ? el : null);
+    if (node && nodes.indexOf(node) === -1) nodes.push(node);
+  });
+  if (!nodes.length) return;
+  const det = document.createElement('details');
+  det.className = 'md-hint md-adv';
+  const sum = document.createElement('summary');
+  sum.textContent = 'Gelişmiş';
+  det.appendChild(sum);
+  inner.appendChild(det);
+  nodes.forEach(n => det.appendChild(n));
+}
+
+function deskBuildDrawer(tabId, cfg) {
+  const body = document.getElementById(tabId);
+  if (!body) return;
+  const panels = Array.from(body.children).filter(el => el.classList.contains('panel'));
+  if (panels.length < 2) return;
+  const editor = panels[0];
+  const index = panels[1];
+
+  body.classList.add('md');
+  editor.classList.add('md-editor');
+  index.classList.add('md-index');
+  const rowActs = cfg.edit.concat(cfg.rowAct ? [cfg.rowAct] : []);
+  if (rowActs.length) index.classList.add('md-clickable');
+
+  // The backdrop is what makes the drawer read as being over the list
+  // rather than beside it, and is the largest of the four ways out.
+  const backdrop = document.createElement('div');
+  backdrop.className = 'md-backdrop';
+  backdrop.addEventListener('click', () => deskCloseDrawer(tabId));
+  body.insertBefore(backdrop, body.firstChild);
+
+  // Head / body / foot: only the middle scrolls. The title is the form's
+  // OWN node, moved rather than copied, because it is the thing that says
+  // "Add New Event" or "Edit Event" and the rest of this file writes to it.
+  const head = document.createElement('div');
+  head.className = 'md-head';
+  const inner = document.createElement('div');
+  inner.className = 'md-body' + (cfg.cols === 2 ? ' cols2' : '');
+  while (editor.firstChild) inner.appendChild(editor.firstChild);
+
+  const title = inner.querySelector(':scope > .panel-title');
+  if (title) head.appendChild(title);
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'md-close';
+  close.title = 'Kapat';
+  close.setAttribute('aria-label', 'Kapat');
+  close.innerHTML = '&#10005;';
+  close.addEventListener('click', () => deskCloseDrawer(tabId));
+  head.appendChild(close);
+
+  deskWrapFields(inner);
+  deskFoldHints(inner);
+  deskFoldAdvanced(inner, cfg.advanced);
+
+  editor.appendChild(head);
+  editor.appendChild(inner);
+
+  // The action stands on the floor, where it cannot scroll away from the
+  // thing it commits — and the status line stands with it, since that is
+  // where the answer to pressing it appears.
+  let statusEl = null;
+  const submit = cfg.submit ? inner.querySelector('#' + cfg.submit) : null;
+  if (submit) {
+    const row = submit.closest('.btn-row');
+    if (row && row.parentElement === inner) {
+      const next = row.nextElementSibling;
+      statusEl = (next && next.classList.contains('status-msg')) ? next : null;
+      const foot = document.createElement('div');
+      foot.className = 'md-foot';
+      foot.appendChild(row);
+      if (statusEl) foot.appendChild(statusEl);
+      editor.appendChild(foot);
+    }
+  }
+
+  // A save says so by turning its own status line green. That is the one
+  // signal every one of these forms already gives, so it is what closes
+  // the drawer — no handler here has to know what any of them saves.
+  if (statusEl) {
+    new MutationObserver(() => {
+      if (!statusEl.classList.contains('ok')) return;
+      if (!body.classList.contains('md-open')) return;
+      deskToast(statusEl.textContent || 'Kaydedildi');
+      setTimeout(() => deskCloseDrawer(tabId), 420);
+    }).observe(statusEl, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  // Pressing a row opens the row. The buttons a row carries are still its
+  // own, so a press that landed on one (Delete, a toggle) is left alone.
+  if (rowActs.length) {
+    index.addEventListener('click', (e) => {
+      // A press inside a fold the admin has opened, or inside the re-filing
+      // panel, belongs to that workspace — not to the row underneath it.
+      if (e.target.closest('button, a, input, select, textarea, label, summary, details[open], .move-form')) return;
+      const card = e.target.closest('.article-card');
+      if (!card || !index.contains(card)) return;
+      // A card already standing open in its own editor is being written
+      // in — pressing inside it is not another request to open it.
+      if (card.querySelector('.news-edit-form.open')) return;
+      for (const act of rowActs) {
+        const btn = card.querySelector('.card-actions > [data-act="' + act + '"]');
+        if (btn) { btn.click(); return; }
+      }
+    });
+    // Whatever fired the edit — the row, or the button still under it —
+    // the drawer opens on the way past.
+    if (cfg.edit.length) {
+      index.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-act]');
+        if (btn && cfg.edit.includes(btn.dataset.act)) deskOpenDrawer(tabId);
+      });
+    }
+  }
+
+  // "+ Yeni" is the form's own reset followed by the drawer. Sections
+  // whose editor is not a thing you add (the seats are fixed) get none.
+  if (cfg.add) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'md-new-btn';
+    btn.textContent = '+ ' + cfg.add;
+    btn.addEventListener('click', () => {
+      if (cfg.reset) {
+        const reset = document.getElementById(cfg.reset);
+        if (reset) reset.click();
+      }
+      deskOpenDrawer(tabId);
+    });
+    const indexTitle = index.querySelector(':scope > .panel-title');
+    if (indexTitle) indexTitle.appendChild(btn);
+    else index.insertBefore(btn, index.firstChild);
+  }
+}
+
+function deskOpenDrawer(tabId) {
+  const body = document.getElementById(tabId);
+  if (!body || body.classList.contains('md-open')) return;
+  body.classList.add('md-open');
+  const first = body.querySelector('.md-body input:not([type="hidden"]), .md-body select, .md-body textarea');
+  if (first) setTimeout(() => first.focus({ preventScroll: true }), 320);
+}
+
+function deskCloseDrawer(tabId) {
+  const body = document.getElementById(tabId);
+  if (body) body.classList.remove('md-open');
+}
+
+function deskCloseAllDrawers() {
+  document.querySelectorAll('.admin-body.md-open').forEach(el => el.classList.remove('md-open'));
+}
+
+let _deskToastTimer = null;
+function deskToast(text) {
+  let el = document.getElementById('desk-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'desk-toast';
+    el.className = 'md-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  requestAnimationFrame(() => el.classList.add('on'));
+  clearTimeout(_deskToastTimer);
+  _deskToastTimer = setTimeout(() => el.classList.remove('on'), 2600);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// THE PHONE
+//
+// The site itself, in an iframe, on the same origin and therefore the
+// same session — so what is posted on the left is one reload away from
+// being read on the right, exactly as a member reads it. It is drawn at
+// 390×844 and scaled to whatever room the column has, so the page inside
+// lays out at the width a real phone reports rather than at the width of
+// a panel that happens to be narrow.
+// ══════════════════════════════════════════════════════════════════════
+const PREV_W = 406;   // 390 screen + the 8px case either side
+const PREV_H = 860;
+let _prevManual = false;   // once the target is picked by hand, tabs stop steering it
+let _prevLoaded = false;
+
+function deskPhoneVisible() {
+  const aside = document.getElementById('admin-preview');
+  return !!aside && !aside.hidden && aside.offsetParent !== null;
+}
+
+function deskFitPhone() {
+  const stage = document.getElementById('prev-stage');
+  const fit = document.getElementById('prev-fit');
+  if (!stage || !fit) return;
+  const dev = fit.querySelector('.prev-device');
+  if (!dev) return;
+  const cs = getComputedStyle(stage);
+  const w = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const h = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  if (w <= 0 || h <= 0) return;
+  const scale = Math.min(w / PREV_W, h / PREV_H, 1);
+  dev.style.transform = 'scale(' + scale + ')';
+  fit.style.width = (PREV_W * scale) + 'px';
+  fit.style.height = (PREV_H * scale) + 'px';
+}
+
+// The iframe is a whole second copy of the app, so it is not loaded until
+// the phone is actually being looked at.
+function deskLoadPhone(force) {
+  const frame = document.getElementById('prev-frame');
+  const sel = document.getElementById('prev-target');
+  if (!frame || !sel || !deskPhoneVisible()) return;
+  const want = sel.value;
+  if (!force && _prevLoaded && frame.dataset.src === want) return;
+  frame.dataset.src = want;
+  frame.src = want + (want.includes('?') ? '&' : '?') + 'adminpreview=' + Date.now();
+  _prevLoaded = true;
+}
+
+function deskShowPhone(on) {
+  const aside = document.getElementById('admin-preview');
+  const handle = document.getElementById('prev-show');
+  if (!aside || !handle) return;
+  aside.hidden = !on;
+  handle.hidden = !!on;
+  try { localStorage.setItem('admin_preview_on', on ? '1' : '0'); } catch (e) {}
+  if (on) { deskFitPhone(); deskLoadPhone(false); }
+}
+
+// ── Tab switching: the rail's own follow-through ──
+// Called by the tab handler above. Closes whatever drawer was standing on
+// the section being left, and points the phone at the page the section
+// changes — until the admin picks a page by hand, at which point the rail
+// stops steering it.
+function deskOnTab(btn) {
+  deskCloseAllDrawers();
+  const target = btn && btn.dataset.preview;
+  const sel = document.getElementById('prev-target');
+  if (!target || !sel || _prevManual) return;
+  if (sel.value !== target) {
+    sel.value = target;
+    deskLoadPhone(false);
+  }
+}
+
+function initDesk() {
+  Object.keys(DESK_MD).forEach(id => deskBuildDrawer(id, DESK_MD[id]));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') deskCloseAllDrawers();
+  });
+
+  const sel = document.getElementById('prev-target');
+  const reload = document.getElementById('prev-reload');
+  const hide = document.getElementById('prev-hide');
+  const show = document.getElementById('prev-show');
+  let stored = null;
+  try { stored = localStorage.getItem('admin_preview_target'); } catch (e) {}
+  if (sel) {
+    if (stored) { sel.value = stored; _prevManual = true; }
+    sel.addEventListener('change', () => {
+      _prevManual = true;
+      try { localStorage.setItem('admin_preview_target', sel.value); } catch (e) {}
+      deskLoadPhone(true);
+    });
+  }
+  if (reload) reload.addEventListener('click', () => deskLoadPhone(true));
+  if (hide) hide.addEventListener('click', () => deskShowPhone(false));
+  if (show) show.addEventListener('click', () => deskShowPhone(true));
+
+  let on = true;
+  try { on = localStorage.getItem('admin_preview_on') !== '0'; } catch (e) {}
+  deskShowPhone(on);
+
+  window.addEventListener('resize', deskFitPhone);
+}
+
+initDesk();
 checkAdmin();
 </script>
 </body>

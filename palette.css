@@ -44,6 +44,193 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
+   THE MAP READS THE PALETTE — the tone ladder
+   ──────────────────────────────────────────────────────────────
+   The hand-drawn maps in assets/map/ are flat grays, not photographs
+   (see map-ink.js for the measurement and for how the swap is made).
+   Each tone the drawing is made of gets a token here, and map-ink.js
+   turns these seven into the lookup the maps are painted through.
+
+   The ORDER is the drawing's meaning and is load-bearing:
+
+       sayfa  >  DENİZ  >  kara  >  TÜRKİYE  >  kenar  >  çizgi
+       lightest ─────────────────────────────────────► darkest
+
+   Night darkens the whole ladder and NEVER turns it over. An inverted
+   map is one whose sea is darker than its land, which is a map of
+   somewhere else — so both gece blocks below keep the same order the
+   gündüz blocks have, just further down.
+
+   The cascade, as everywhere else in this file: the plain :root is the
+   earth palette by day (0,1,0); [data-palette="mono"] and
+   [data-theme="dark"] are both (0,2,0), so the dark block is written
+   AFTER the mono one and wins where they collide; and mono-at-night is
+   (0,3,0) and beats both.
+   ══════════════════════════════════════════════════════════════ */
+
+/* kahverengi · gündüz */
+:root {
+  --map-page:    #f4e8de;
+  --map-sea:     #eddbd0;
+  --map-land:    #d4bbad;
+  --map-turkiye: #c9ac99;
+  --map-edge:    #b8a08a;
+  --map-ink:     #4C382A;
+  --map-red:     #CB5A16;
+}
+
+/* siyah-beyaz · gündüz — the tones the artwork was actually drawn in,
+   which is why this palette needed nothing changing: the maps have been
+   showing mono's own daytime ladder all along. */
+:root[data-palette="mono"] {
+  --map-page:    #ffffff;
+  --map-sea:     #f7f7f7;
+  --map-land:    #d9d9d9;
+  --map-turkiye: #c6c6c6;
+  --map-edge:    #b4b4b4;
+  --map-ink:     #000000;
+  --map-red:     #B93631;
+}
+
+/* kahverengi · gece */
+:root[data-theme="dark"] {
+  --map-page:    #8a7160;
+  --map-sea:     #7d6553;
+  --map-land:    #6a5342;
+  --map-turkiye: #614b3b;
+  --map-edge:    #573f2e;
+  --map-ink:     #241a12;
+  --map-red:     #CB5A16;
+}
+
+/* siyah-beyaz · gece — deliberately a step LIGHTER than the earth night
+   above. Equal luminance is not equal darkness: the same gray reads
+   flatter and heavier than the warm brown beside it, so matching them by
+   number made this one look like the lights had gone out. */
+:root[data-theme="dark"][data-palette="mono"] {
+  --map-page:    #8e8e8e;
+  --map-sea:     #828282;
+  --map-land:    #6f6f6f;
+  --map-turkiye: #656565;
+  --map-edge:    #5a5a5a;
+  --map-ink:     #151515;
+  --map-red:     #C43D38;
+}
+
+/* Every drawing of the city, wherever it is standing: the flip book's
+   frames, the app map's window heroes, the two parts-bin pages' own map
+   photo, and the world the olay board is pinned to.
+
+   Gated on the class map-ink.js adds only once the filter is really in
+   the document — never applied blind. It deliberately does NOT catch the
+   olaylar drawings (`.olay-draw image`), which are hand-coloured per olay
+   and are the one thing over these maps that is not gray. */
+html.ist-map-ink :is(
+  .fb > img,
+  .fb-map-hero img,
+  .map-panel img.map-photo,
+  image.olay-basemap,
+  image.olay-pagemap
+) {
+  filter: url(#ist-map-ink);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THE AVATAR READS THE PALETTE TOO — the second ladder
+   ──────────────────────────────────────────────────────────────
+   Same measurement, same mechanism (map-ink.js). The avatar family is
+   even cleaner than the maps: four flat grays and nothing else, already
+   transparent, already registered on one 1024x1536 canvas.
+
+       #f9f9f9  the figure's own paper        --av-paper
+       #dcdbdb  the ground behind it          --av-ground
+                (frame-background.png)
+       #5b5b5b  the jail stripes              --av-jail
+       #181818  the ink -- the outline, the   --av-ink
+                hair, the glasses, the shirt
+
+   **This ladder does not follow the theme the way the page does, and
+   that is measured rather than preferred.** An avatar is a stamp: a
+   figure printed on its own paper. Its ink sits 13.2:1 off that paper by
+   day, and the night page's paper is dark enough that even pure black
+   reaches 3.9:1 -- so an avatar dimmed with the page is an avatar nobody
+   can read. It steps down a little at night so it does not glare, and
+   stays firmly its own light sheet.
+   ══════════════════════════════════════════════════════════════ */
+
+/* kahverengi · gündüz */
+:root {
+  --av-paper:  #f7ece2;
+  --av-ground: #ddc9b9;
+  --av-jail:   #8a7160;
+  --av-ink:    #2a1e15;
+}
+
+/* siyah-beyaz — the tones the figures were actually drawn in */
+:root[data-palette="mono"] {
+  --av-paper:  #f9f9f9;
+  --av-ground: #dcdbdb;
+  --av-jail:   #5b5b5b;
+  --av-ink:    #181818;
+}
+
+/* kahverengi · gece */
+:root[data-theme="dark"] {
+  --av-paper:  #e8dacc;
+  --av-ground: #c8b09c;
+  --av-jail:   #7d6553;
+  --av-ink:    #241a12;
+}
+
+/* siyah-beyaz · gece */
+:root[data-theme="dark"][data-palette="mono"] {
+  --av-paper:  #ebebeb;
+  --av-ground: #c9c9c9;
+  --av-jail:   #565656;
+  --av-ink:    #141414;
+}
+
+/* The drawn avatar layers, and nothing else on the site that happens to
+   be an <img> — a politician's photograph is not a four-tone drawing and
+   must not go through a four-tone lookup. avatar.js always wraps the
+   stack, so the stack is the fence. */
+html.ist-map-ink .ist-avatar-stack img {
+  filter: url(#ist-avatar-ink);
+}
+
+/* The ground behind the figure is one flat tone across its whole
+   silhouette, so it is a MASK rather than a picture: all of its shape is
+   in its alpha already. It cannot simply be filtered with the layers
+   above, because it is painted as the frame's own background and the
+   drawn ring (::after) is that same element's child — one filter on the
+   box would push the ring, which already follows --hexframe-stroke,
+   through the ladder a second time.
+   ::before rather than the box itself for the same reason, and it lands
+   under the <img> layers by tree order while the ring keeps its z-index
+   10 above them. !important because the rule it replaces (frames.css,
+   "Image-bearing avatars") carries one. */
+html.ist-map-ink :is(
+  .hexframe, .ist-pc-cover-avatar, .library-card .avatar, .avatar,
+  .poll-voter-avatar, .ev-attendee-avatar, .politician-detail-avatar,
+  .tbmm-detail-avatar
+):has(img) {
+  background: transparent !important;
+}
+html.ist-map-ink :is(
+  .hexframe, .ist-pc-cover-avatar, .library-card .avatar, .avatar,
+  .poll-voter-avatar, .ev-attendee-avatar, .politician-detail-avatar,
+  .tbmm-detail-avatar
+):has(img)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--av-ground);
+  -webkit-mask: url("assets/frame-background.png") center / contain no-repeat;
+  mask: url("assets/frame-background.png") center / contain no-repeat;
+}
+
+/* ══════════════════════════════════════════════════════════════
    The earth palette's base tokens
    ──────────────────────────────────────────────────────────────
    These 28 were declared identically in the inline :root of every page
@@ -79,7 +266,7 @@
   --hover:           #d8c0b1;
   --ink:             #4C382A;
   --ink-deep:        #4C382A;
-  --ink-red:         #B93631;
+  --ink-red:         #CB5A16;
   --ink-rgb:         76, 56, 42;
   --muted:           #867264;
   --paper:           #eddbd0;

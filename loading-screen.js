@@ -25,6 +25,13 @@
 // full page load too, but it's not "entering" the site, so it's skipped
 // there — the auth check still runs, it just doesn't animate.
 //
+// `{ force: true }` overrides that: project.html always plays it,
+// because that page is not merely "entered" — it has two dozen drawings
+// to decode before the book can be flipped at all, and index.html has
+// already marked the session as entered on its way there. What is being
+// waited for on that page is the app itself, so there is nowhere else
+// for the wait to happen.
+//
 // Usage:
 //   const resolveLoading = LoadingScreen.start(() => { ...reveal content... });
 //   // later, once the real async work (e.g. auth check) is done:
@@ -59,13 +66,13 @@
     try { sessionStorage.setItem(ENTERED_KEY, '1'); } catch (e) { /* ignore */ }
   }
 
-  function start(onFinish) {
+  function start(onFinish, opts) {
     const overlay = document.getElementById('loading-overlay');
     const back = document.getElementById('loading-frame-back');
     const front = document.getElementById('loading-frame-front');
     if (!overlay || !back || !front) { onFinish(); return () => {}; }
 
-    if (!shouldPlay()) {
+    if (!(opts && opts.force) && !shouldPlay()) {
       overlay.remove();
       let resolved = false;
       return function resolve() {

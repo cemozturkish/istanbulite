@@ -125,6 +125,121 @@
     });
   }
 
+  // ── Your own name walks with the lane (project.html) ──
+  // The three carousel pages moved the names by changing which end of a
+  // flex row each block stood at, because a navigation is a discrete
+  // thing (see setBarLayout above). The flip book's lanes are not: the
+  // strip follows the finger and everything on the screen is painted
+  // from one continuous number, so the name on the bar is painted from
+  // it too rather than being told about the result afterwards.
+  //
+  // `t` is which edge the reader's own name is walking toward: -1 the
+  // left, +1 the right, 0 the middle. The lane it is written from is the
+  // page's own business (project.html reads it backwards, so Kütüphane
+  // ranges you right and Kahvehane left — the same turning-around the
+  // three carousel pages' BAR_LAYOUT above already spells out). At 0 the
+  // block stands in the middle of the bar exactly as it does today; at
+  // either end it is ranged against that edge of its own box, and every
+  // position between is the linear middle.
+  //
+  // Nothing here eases: the drag IS the gesture,
+  // and the settle is already the release tween's own ease-out (runLane
+  // in project.html), so a transition on top of it would be a second
+  // curve fighting the first.
+  //
+  // ── And it is BOTH lines that walk, not the block ──
+  // Your name and your district are two lines of different lengths, and
+  // what has to end up against the edge of the bar is each of them —
+  // ranging the block alone leaves the shorter of the two (usually the
+  // district) still centred under the longer one, which reads as one of
+  // them not having arrived. So the travel is measured per line: the
+  // wider line is the block's own width and has nowhere further to go,
+  // and the narrower one covers the difference between them on top of
+  // the block's move. Same number `t` drives all of it, so the two lines
+  // and the block are one movement rather than three.
+  let _barSlide = 0;
+  // Whether the flip book is driving this bar at all. It is what the
+  // stylesheet keys the two lines' shrink-wrap off, so it is a fact about
+  // the page being mounted and NOT about the current `t` — it must not
+  // come and go as a pull passes through the middle lane. Kept at module
+  // scope because the row is rebuilt under it (see renderPage).
+  let _barSliding = false;
+  // { slack, lines: [{ el, dx }] } — everything measured at t = 1, cached
+  let _barTravel = null;
+
+  function setBarSlide(t) {
+    const n = Math.max(-1, Math.min(1, Number(t) || 0));
+    if (n === _barSlide && _barSliding) return;
+    _barSlide = n;
+    // Switching the class on changes how the two lines are laid out, so
+    // anything measured before it is measured against the wrong boxes.
+    if (!_barSliding) { _barSliding = true; invalidateBarSlack(); }
+    paintBarSlide();
+  }
+
+  function clearBarSlide() {
+    _barSlide = 0;
+    if (_barSliding) { _barSliding = false; invalidateBarSlack(); }
+    paintBarSlide();
+  }
+
+  // How far each thing may travel toward either edge, at t = 1.
+  //
+  // The block shrink-wraps its own type and is centred in the room the
+  // bar's own padding leaves (.ist-pc-seat-none), so it may cover half of
+  // what is left over; each line then covers half of what IT leaves
+  // inside the block. Measured rather than guessed at — a long name has
+  // less room to travel than a short one — and cached, because this is
+  // read on every frame of a drag and measuring there would lay the bar
+  // out sixty times a second.
+  function barTravel() {
+    if (_barTravel) return _barTravel;
+    const me = document.getElementById('ist-pc-me');
+    const id = me && me.querySelector('.ist-pc-id');
+    if (!me || !id) return null;
+    // A row that has not been laid out yet (the bar is display:none above
+    // 768px, and a hidden document measures as nothing) measures zero —
+    // which is a true answer for right now and a wrong one to cache.
+    if (!me.clientWidth) return null;
+    const inner = id.clientWidth;
+    _barTravel = {
+      slack: Math.max(0, (me.clientWidth - id.offsetWidth) / 2),
+      lines: Array.from(id.querySelectorAll('.ist-pc-name, .ist-pc-meta')).map(el => ({
+        el, dx: Math.max(0, (inner - el.offsetWidth) / 2),
+      })),
+    };
+    return _barTravel;
+  }
+
+  function invalidateBarSlack() { _barTravel = null; }
+
+  // The block's own move is painted onto .ist-pc-me rather than onto the
+  // block inside it, so it cannot collide with the transform
+  // setBarLayout's FLIP writes on .ist-pc-id (see above) — the two moves
+  // are different elements'. Each line's own residual then rides on top,
+  // written to the line itself.
+  function paintBarSlide() {
+    const me = document.getElementById('ist-pc-me');
+    if (!me) return;
+    // Re-asserted here rather than only where it is switched, because
+    // this is also what runs after a renderPage that built a fresh row
+    // (see paintBarMe) — the class and the measurement both belong to a
+    // row that may not have existed when the lane last moved.
+    const row = me.closest('.ist-pc-row');
+    if (row) row.classList.toggle('ist-pc-sliding', _barSliding);
+    const travel = barTravel();
+    me.style.setProperty('--ist-pc-slide',
+      (_barSlide * (travel ? travel.slack : 0)).toFixed(2) + 'px');
+    if (!travel) return;
+    travel.lines.forEach(({ el, dx }) => {
+      el.style.setProperty('--ist-pc-line', (_barSlide * dx).toFixed(2) + 'px');
+    });
+  }
+
+  // The bar is a fixed row of type: what it can travel changes only when
+  // the row itself changes size.
+  global.addEventListener('resize', () => { invalidateBarSlack(); paintBarSlide(); });
+
   // ── Somebody else's name, where your own name stands ──
   // Hane names no seat (see BAR_LAYOUT): the bar over the petek carries
   // you alone, in the middle. Pressing a member on the petek puts *them*
@@ -177,6 +292,10 @@
     const label = _barMember ? _barMember.name : (me.dataset.selfLabel || '');
     me.setAttribute('aria-label', label);
     me.setAttribute('title', label);
+    // A different name is a different width, so how far it may walk
+    // toward either edge is a different number (see barSlack).
+    invalidateBarSlack();
+    paintBarSlide();
   }
 
   // Which of the three carousel pages we're on. router.js stamps
@@ -197,12 +316,10 @@
   // remapped via normalize* below to their nearest neighbour.
   // palette_pref reuses the column written by onboarding.js: 'mono' = siyah-beyaz, 'earth' = kahverengi.
   const LANG_VALUES    = ['more_english', 'default'];   // 0: Daha İngilizce, 1: Daha Türkçe
-  const THEME_VALUES   = ['light', 'dark'];             // 0: Açık,           1: Koyu
   const PALETTE_VALUES = ['mono', 'earth'];             // 0: Siyah-Beyaz,    1: Kahverengi
   const ADMIN_EMAIL = 'cemwozturk@gmail.com';
 
   function normalizeLang(v)    { return v === 'more_english' ? 'more_english' : 'default'; }
-  function normalizeTheme(v)   { return v === 'dark' ? 'dark' : 'light'; }
   function normalizePalette(v) { return v === 'earth' ? 'earth' : 'mono'; }
 
   // Which Istanbul-local weekdays each game runs on (Monday=0 … Sunday=6),
@@ -768,14 +885,12 @@
     }
 
     const palettePref = normalizePalette(profile?.palette_pref);
-    const themePrefForApply = normalizeTheme(profile?.theme_pref);
     // Apply the freshly-fetched DB value now, synchronously, so the
     // avatar (and everything else gated on Palette.current) renders in
     // the right colors immediately instead of racing the slower
     // Palette.syncFromSupabase call some pages also make on load.
     if (global.Palette) {
       global.Palette.setPalette(palettePref);
-      global.Palette.setTheme(themePrefForApply);
     }
 
     return {
@@ -1994,15 +2109,12 @@
       options: [{ value: 'default', label: 'Daha Türkçe' }, { value: 'more_english', label: 'Daha İngilizce' }] },
     { key: 'palette', column: 'palette_pref', label: 'profile.colortheme',
       options: [{ value: 'mono', label: 'Siyah-Beyaz' }, { value: 'earth', label: 'Kahverengi' }] },
-    { key: 'theme', column: 'theme_pref', label: 'profile.appearance',
-      options: [{ value: 'light', label: 'Açık' }, { value: 'dark', label: 'Koyu' }] },
   ];
 
   function hivePrefValue(state, pref) {
     const raw = state.profile ? state.profile[pref.column] : null;
     if (pref.key === 'lang') return normalizeLang(raw);
-    if (pref.key === 'palette') return normalizePalette(raw);
-    return normalizeTheme(raw);
+    return normalizePalette(raw);
   }
 
   function hiveSelfHTML(state) {
@@ -2053,7 +2165,6 @@
     if (msg) msg.textContent = '';
     state.profile = Object.assign({}, state.profile, { [pref.column]: value });
     if (key === 'palette' && global.Palette) global.Palette.setPalette(value);
-    if (key === 'theme' && global.Palette) global.Palette.setTheme(value);
     if (key === 'lang' && state.I18N && state.I18N.setLang) state.I18N.setLang(value);
     // The block is rebuilt rather than patched: a language change rewrites
     // every label on it, and the marks have to agree with what was just
@@ -3282,11 +3393,9 @@
     const phone = profile?.phone || '';
     const referralCode = profile?.referral_code || '';
     const languagePref = normalizeLang(profile?.language_pref);
-    const themePref = normalizeTheme(profile?.theme_pref);
     const palettePref = normalizePalette(profile?.palette_pref);
     const langLabel = LANG_VALUES.indexOf(languagePref) === 1 ? 'Daha Türkçe' : 'Daha İngilizce';
     const paletteLabel = PALETTE_VALUES.indexOf(palettePref) === 1 ? 'Kahverengi' : 'Siyah-Beyaz';
-    const themeLabel = THEME_VALUES.indexOf(themePref) === 1 ? 'Koyu' : 'Açık';
 
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
     const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
@@ -3366,14 +3475,6 @@
               <span data-idx="1">Kahverengi</span>
             </div>
           </div>
-          <div class="ist-pc-field">
-            <div class="ist-pc-label">${esc(t('profile.appearance'))}</div>
-            <input class="ist-pc-slider" id="po-theme" type="range" min="0" max="1" step="1" value="${THEME_VALUES.indexOf(themePref)}">
-            <div class="ist-pc-ticks" id="po-theme-ticks">
-              <span data-idx="0">Açık</span>
-              <span data-idx="1">Koyu</span>
-            </div>
-          </div>
           ` : `
           <div class="ist-pc-info-row">
             <div class="ist-pc-info-label">${esc(t('profile.langpref'))}</div>
@@ -3382,10 +3483,6 @@
           <div class="ist-pc-info-row">
             <div class="ist-pc-info-label">${esc(t('profile.colortheme'))}</div>
             <div class="ist-pc-info-value">${esc(paletteLabel)}</div>
-          </div>
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.appearance'))}</div>
-            <div class="ist-pc-info-value">${esc(themeLabel)}</div>
           </div>
           `}
           <div class="ist-pc-actions">
@@ -3445,7 +3542,6 @@
     }
     syncTicks('po-language', 'po-language-ticks');
     syncTicks('po-palette', 'po-palette-ticks');
-    syncTicks('po-theme', 'po-theme-ticks');
     const signoutBtn = document.getElementById('po-signout');
     if (signoutBtn) signoutBtn.addEventListener('click', async () => {
       await sb.auth.signOut();
@@ -3494,12 +3590,10 @@
       return values[parseInt(el.value, 10)] || values[0];
     };
     const newLang = sliderValue('po-language', LANG_VALUES, normalizeLang(state.profile?.language_pref));
-    const newTheme = sliderValue('po-theme', THEME_VALUES, normalizeTheme(state.profile?.theme_pref));
     const newPalette = sliderValue('po-palette', PALETTE_VALUES, normalizePalette(state.profile?.palette_pref));
 
     const payload = {
       language_pref: newLang,
-      theme_pref: newTheme,
       palette_pref: newPalette,
     };
 
@@ -3511,11 +3605,11 @@
       const { data, error } = await sb.from('profiles').update(payload).eq('id', user.id).select('id');
       if (error) throw error;
       if (!data || data.length === 0) throw new Error('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
-      // Cache the new palette/theme locally so the reload starts in the
-      // right colors instead of flashing the old ones.
+      // Cache the new palette locally so the reload starts in the right
+      // colors instead of flashing the old one. Light/dark isn't stored
+      // here at all any more — the sun decides that (see palette.js).
       if (global.Palette) {
         global.Palette.setPalette(newPalette);
-        global.Palette.setTheme(newTheme);
       }
       setTimeout(() => window.location.reload(), 400);
     } catch (err) {
@@ -3844,6 +3938,8 @@
     mount,
     setPage,
     setBarLayout,
+    setBarSlide,
+    clearBarSlide,
     clearBarMember,
     unmount,
     mountLibraryCard,
