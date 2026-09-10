@@ -132,6 +132,19 @@
       vars: ['--av-paper', '--av-ground', '--av-jail', '--av-ink'],
       red: null,
     },
+    // The loading screen: the sea rising in the logo. Three tones and
+    // nothing else -- the ground it is drawn on, the sea itself, and the
+    // letterforms -- measured off the ten frames the same way. It is
+    // deliberately per PALETTE and not per theme: this is a curtain, not
+    // a page, and it is dark in both. The earth sea is the same #7d6553
+    // that is the night map's water and the night page's paper, because
+    // it is the same sea in all three places.
+    {
+      id: 'ist-loading-ink',
+      tones: [255, 125, 0],
+      vars: ['--load-logo', '--load-sea', '--load-ground'],
+      red: null,
+    },
   ];
 
   // One entry per 8-bit gray. Not a round number picked for looks: every

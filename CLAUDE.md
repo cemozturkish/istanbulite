@@ -1539,8 +1539,26 @@ Four things about that second ladder:
   which lands under the `<img>` layers by tree order while the ring keeps its `z-index: 10` above
   them.
 
+**And the loading screen is the third ladder.** The sea rising in the logo is ten JPEG frames and
+the same measurement once more: pure gray, three flat tones — `255` the letterforms
+(`--load-logo`), `125` the sea (`--load-sea`), `0` the ground it is drawn on (`--load-ground`).
+It is **per palette and not per theme**: this is a curtain rather than a page, it is dark in both,
+and a splash that is pale at noon and dark at night is two different front doors. Two things about
+it:
+
+- **The overlay's own background is gated on the same class as the frames.** Switched off, the
+  frames stay as drawn AND the ground behind them stays the black they were drawn against — the
+  two must never disagree, or the logo sits in a brown window on a black screen.
+- **`LoadingScreen.start()` calls `IstMapInk.refresh()` before it plays**, and it is the one
+  surface that needs to. Everything else on the site paints after `DOMContentLoaded`; the curtain
+  paints from an inline script half way down the body, before map-ink.js's own pass has run, so
+  without that call the first frames come up in the gray they were drawn in and snap to the palette
+  a moment later. There is a body by then, which is the condition `build()` was waiting on.
+
 **The page's own paper IS the map's sea**, in both palettes and both themes (`--paper` ==
-`--map-sea`), which is what keeps the drawing and the page it lies on reading as one sheet.
+`--map-sea`) — and so is the loading screen's rising water in the earth palette (`#7d6553` in all
+three), because it is the same sea in all three places. That is what keeps the drawing, the page it
+lies on and the door into it reading as one sheet.
 
 **`?ink=0` turns every ladder off, and `?ink=1` turns them back on** (`KILL_KEY` in map-ink.js,
 remembered in `localStorage` because `index.html` drops the query on its way to `project.html`).
