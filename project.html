@@ -982,10 +982,19 @@
               mask-position: 77.4% 44.4%;
     }
     /* A THICK, SOLID ring of the bar's own colour, drawn from a SECOND
-       FILE rather than computed in CSS -- `logo-outline-mask.png` is
-       the source JPEG thresholded to pure black/white and then dilated
-       23px (scripts/none, done once with Pillow and committed as an
-       asset). Two failed attempts before this: scaling a second copy of
+       FILE rather than computed in CSS -- `logo-outline-mask.png` is the
+       source JPEG thresholded to pure black/white, dilated 10px on a
+       24px-padded canvas, and then THE LETTERS THEMSELVES KNOCKED BACK
+       OUT of it (scripts/none, done once with Pillow and committed as an
+       asset). The knockout is what makes it a ring rather than a PLATE:
+       a filled, dilated copy of the wordmark sat behind the letters as a
+       slab of the bar's own dark, which above the bar is a brown block
+       hanging over the page's paper. What is wanted there is the drawing
+       and nothing else -- the letters solid, the contour around them,
+       and the page in between. It also carries the alpha channel a CSS
+       image mask actually reads: a grayscale PNG with no alpha masks
+       NOTHING under `mask-mode: match-source`, which is why this layer
+       was a plain rectangle until its shape came from somewhere else. Two failed attempts before this: scaling a second copy of
        the mask scaled the JPEG's own compression noise right along
        with it into a grey smudge, and a ring of `drop-shadow`s left
        semi-transparent seams wherever the source jpg's edges were
@@ -2803,9 +2812,12 @@ const FRAME_LAG_FREE = 0.135;
 // which reads as a stutter rather than as a run. So once the finger is
 // off the glass the front moves at a CONSTANT rate, a whole lane (a
 // whole word) in NAV_RUN_MS, and every letter gets the same beat.
+// It runs a whole word in about a quarter of a second: the release tween
+// is 300ms, so a wave much slower than that is still crossing letters
+// after the strip it belongs to has stopped moving.
 // Under the finger there is nothing to chase: the gesture is the
 // animation, exactly as it is for the strip itself.
-const NAV_RUN_MS = 520;
+const NAV_RUN_MS = 260;
 let navP = START_LANE;   // where the WAVE has got to; lanePos is where it is going
 let castTarget = 0;
 let castTick = null;
@@ -3339,7 +3351,16 @@ function paintNavWave(marks, clamp01) {
     const incoming = x <= 0;
     mid.style.setProperty('--fb-logo-a', incoming ? 'var(--fb-mark-on)' : 'var(--fb-mark-off)');
     mid.style.setProperty('--fb-logo-b', incoming ? 'var(--fb-mark-off)' : 'var(--fb-mark-on)');
-    mid.style.setProperty('--fb-logo-f', ((incoming ? x + 1 : x) * 100).toFixed(2) + '%');
+    // The front has to leave the box ENTIRELY at either end, or the two
+    // neighbours' light is still on the wordmark while the reader is
+    // standing a whole lane away from it: the ramp is 24% of the box
+    // wide (+/-12% either side of the front), so a front parked at 0% or
+    // 100% leaves a lit sliver against the edge it sits on. It travels
+    // -12% -> 112% instead, which is the same journey with both ends of
+    // the ramp pushed off the paper -- x = 0 is still all pale, and a
+    // whole lane out is now all ink.
+    mid.style.setProperty('--fb-logo-f',
+      (((incoming ? x + 1 : x) * 124) - 12).toFixed(2) + '%');
   }
 }
 
