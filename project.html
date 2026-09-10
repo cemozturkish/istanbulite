@@ -973,7 +973,9 @@
          not just a sliver breaking the line. Ratio stays the ink's own
          (4.33:1) so it grows without distorting. */
       width: 208px; height: 48px;
-      position: relative;
+      /* Above the ring the button paints under it (see the note there) --
+         the letters are the last thing drawn, on every day. */
+      position: relative; z-index: 1;
       -webkit-mask-size: 104.5% 150.9%;
               mask-size: 104.5% 150.9%;
       -webkit-mask-position: 77.4% 44.4%;
@@ -1019,9 +1021,24 @@
        is the property that transitions everywhere: one solid image, no
        repeat, anchored to the bottom, grown from 0% to 100% of the
        ring's own height. --fb-day is written by paintDayMeter(). */
-    nav b.fb-logo-btn .fb-logo::before {
+    /* ── IT IS THE BUTTON'S LAYER, NOT THE LETTERS' ──
+       This ring used to be `.fb-logo::before`, and it drowned the
+       wordmark on the one day it mattered: the letters are the
+       `.fb-logo` element's own BACKGROUND, and a `z-index: -1` pseudo
+       paints behind its parent's CONTENT but still in front of that
+       parent's background (CSS painting order; `.fb-logo` is a stacking
+       context of its own because it carries a mask, so the negative
+       index cannot escape it). At --fb-day: 0% that was invisible -- the
+       ring was a 30% tint -- and as the day filled it turned into solid
+       ink laid over letters it is a dilated copy of, so a finished day
+       replaced the wordmark with a black blob. Hung off the BUTTON
+       instead, it is a sibling layer under `.fb-logo` in the button's own
+       stacking context, so the letters are always painted on top of it.
+       The inset is the button's own padding, so the ring still lands
+       exactly on the logo's box. */
+    nav b.fb-logo-btn::before {
       content: '';
-      position: absolute; inset: 0; z-index: -1;
+      position: absolute; inset: 0 10px 5px; z-index: 0;
       background-color: color-mix(in srgb, var(--navbar-ink, #2e2e2e) 30%, transparent);
       background-image: linear-gradient(var(--navbar-ink, #2e2e2e), var(--navbar-ink, #2e2e2e));
       background-repeat: no-repeat;
@@ -1033,11 +1050,11 @@
     }
     /* The day is done. The only moment this app celebrates anything, and
        what it says is "you can stop now". */
-    nav b.fb-logo-btn.fb-day-full .fb-logo::before {
+    nav b.fb-logo-btn.fb-day-full::before {
       filter: drop-shadow(0 0 7px color-mix(in srgb, var(--navbar-ink, #2e2e2e) 55%, transparent));
     }
     @media (prefers-reduced-motion: reduce) {
-      nav b.fb-logo-btn .fb-logo::before { transition: none; }
+      nav b.fb-logo-btn::before { transition: none; }
     }
     nav b.fb-logo-btn:active { transform: scale(0.94); }
     /* Lit while its map is open -- it is held down because it is the way
