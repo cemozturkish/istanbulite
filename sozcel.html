@@ -864,14 +864,14 @@
        leftover space, which is what let the board drift up under the
        buttons on a screen where the two didn't both fit. */
     .board-row {
+      /* The guess log hangs off this row's left edge, out of flow, so
+         what is centred here is the board alone. */
+      position: relative;
+      width: 100%;
       display: flex;
       flex-direction: row;
       align-items: center;
       justify-content: center;
-      /* The channel between the guess log and the board. Stated as a
-         token so layoutBoard() can take the same number out of the
-         board's width budget — see GL_CHANNEL. */
-      gap: var(--gl-channel, 8px);
       flex-shrink: 0;
       max-width: 100%;
     }
@@ -909,48 +909,50 @@
        BEHIND the live board, interlocked with it the way a honeycomb
        nests. It was arithmetically exact and readers could not read it —
        two combs on one plane is a puzzle of its own, and people were
-       solving that instead of the word. So it is a list instead, which is
-       what a guess history is: every guess so far, oldest at the top,
-       beside the board rather than under it, printed as the same hexagons
-       in the same three states the board and the keyboard use, so there is
-       one colour vocabulary on the page and not two.
+       solving that instead of the word.
 
-       Its width is taken out of the board's budget in layoutBoard()
-       whether or not there is anything in it yet — reserving it only once
-       the first guess had landed would resize the board the moment the
-       reader pressed GİR, which is the one moment they are looking
-       straight at it. */
+       So it is a list, and it is printed as TYPE rather than as more
+       hexagons. A hexagon is the board's own object: it is the thing being
+       played, it is what a letter locks into, and at fingernail size a
+       second field of them beside the board is a second board to read.
+       What is wanted here is the plainest possible record of what has been
+       tried — a word, in the order it was tried, with each letter wearing
+       the state it came back as. The three states are the page's same
+       three (ink / the accent / muted-and-stepped-back), so the vocabulary
+       still carries across without the shape coming with it.
+
+       It is absolutely placed, out of the board row's flow, because the
+       BOARD is the thing that has to sit in the middle of the screen — see
+       layoutBoard(), which keeps the strip's width out of the board's
+       budget on BOTH sides so the centred board can never reach it. */
     .guess-log {
-      /* It holds its width from the first paint, empty or not: the strip
-         is already out of the board's budget, so a log that collapsed
-         until the first guess landed would slide the board sideways at
-         exactly the moment the reader is watching it. */
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
       width: var(--gl-w, 0px);
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      align-items: flex-start;
-      gap: var(--gl-gap, 2px);
-      flex: 0 0 auto;
-      align-self: center;
+      gap: var(--gl-row-gap, 3px);
+      pointer-events: none;
     }
     .gl-row {
       display: flex;
-      gap: var(--gl-gap, 2px);
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: var(--gl-font, 10px);
+      line-height: 1.1;
     }
-    .guess-log .letter-box {
-      position: relative;
-      flex: 0 0 auto;
-      width: var(--gl-cell, 13px);
-      font-size: var(--gl-font, 8px);
-      /* The flip belongs to the board, where a letter is actually being
-         revealed. In here it would replay across the whole history every
-         time the list is rebuilt. */
-      animation: none !important;
+    .gl-row span {
+      flex: 0 0 var(--gl-cell, 10px);
+      text-align: center;
+      color: var(--tile-absent-ink);
+      opacity: 0.55;
     }
-    /* A tile the size of a fingernail cannot also carry the drop wash and
-       the lit corner the board's hexagons do — at this size it is mud. */
-    .guess-log .letter-box::before { display: none; }
+    /* The same ladder the tiles carry, in ink instead of in fill: the
+       letter itself is what is inked, stepped back, or in the accent. */
+    .gl-row span.correct { color: var(--tile-correct); opacity: 1; }
+    .gl-row span.present { color: var(--tile-present); opacity: 1; }
 
     /* ── THE HEXAGONS HAVE A BODY ──
        A flat fill inside the drawn ring reads as a sticker. This lights
@@ -4335,17 +4337,18 @@ const TILE_GAP_RATIO = TILE_VISUAL_GAP - 2 * TILE_ART_PAD_X;
 // play area the log may take across. It is a list of what has already
 // been played, so it gets the smallest width that still reads; the board
 // is the thing on this page worth looking at (see .guess-log).
-const GL_GAP = 2;
-// The cell is sized off the play area rather than off a fixed strip
-// width, so an eight-letter word gets the same readable hexagon a
-// five-letter one does instead of being squeezed to fit a box; the strip
-// is then capped at a third of the area across, which is what stops a
-// long word from eating the board.
-const GL_CELL_SHARE = 0.033;
-const GL_CELL_MIN = 8;
-const GL_CELL_MAX = 16;
-const GL_MAX_SHARE = 0.34;
-const GL_CHANNEL = 8;   // and the channel between the log and the board
+// The guess log's letter cell, as a share of the play area across, and
+// the channel it keeps from the board. The cell is sized off the area
+// rather than off a fixed strip width so an eight-letter word gets the
+// same readable type a five-letter one does; the strip is then capped at
+// a share of the area, which is what stops a long word from eating the
+// board.
+const GL_CELL_SHARE = 0.024;
+const GL_CELL_MIN = 7;
+const GL_CELL_MAX = 11;
+const GL_MAX_SHARE = 0.20;
+const GL_ROW_GAP = 3;
+const GL_CHANNEL = 8;
 
 const LEVEL_STEP = (function () {
   const shoulderX = TILE_ART_W / 2;               // centre → straight side
@@ -4536,17 +4539,22 @@ function layoutBoard() {
   let logW = 0;
   if (log) {
     let cell = Math.round(area.clientWidth * GL_CELL_SHARE);
-    cell = Math.min(cell, Math.floor((area.clientWidth * GL_MAX_SHARE - (WORD_LENGTH - 1) * GL_GAP) / WORD_LENGTH));
-    cell = Math.min(cell, Math.floor((availH / 6 - GL_GAP) * TILE_RATIO));
+    cell = Math.min(cell, Math.floor(area.clientWidth * GL_MAX_SHARE / WORD_LENGTH));
     cell = Math.max(GL_CELL_MIN, Math.min(GL_CELL_MAX, cell));
-    logW = cell * WORD_LENGTH + GL_GAP * (WORD_LENGTH - 1);
+    logW = cell * WORD_LENGTH;
     log.style.setProperty('--gl-w', logW + 'px');
     log.style.setProperty('--gl-cell', cell + 'px');
-    log.style.setProperty('--gl-gap', GL_GAP + 'px');
-    log.style.setProperty('--gl-font', Math.max(7, Math.round(cell * 0.52)) + 'px');
+    log.style.setProperty('--gl-row-gap', GL_ROW_GAP + 'px');
+    log.style.setProperty('--gl-font', Math.max(8, Math.round(cell * 1.05)) + 'px');
   }
 
-  const availW = area.clientWidth - 4 - logW - (logW ? GL_CHANNEL : 0);
+  // Both sides, not one: the board is centred in the play area, so the
+  // only width it can safely take is what is left once the strip and its
+  // channel are held back at BOTH edges. Held back whether or not there
+  // is anything in the log yet — reserving it only once the first guess
+  // had landed would resize the board the moment the reader pressed GİR,
+  // which is the one moment they are looking straight at it.
+  const availW = area.clientWidth - 4 - 2 * (logW + GL_CHANNEL);
   if (!(availW > 0) || !(availH > 0)) return;
 
   // Solve the width budget for tileW instead of estimating the gap from
@@ -4617,10 +4625,10 @@ function renderGuessLog() {
     const row = document.createElement('div');
     row.className = 'gl-row';
     for (let j = 0; j < word.length; j++) {
-      const box = document.createElement('div');
-      box.className = ('letter-box filled ' + (result[j] || '')).trim();
-      box.textContent = word[j];
-      row.appendChild(box);
+      const cell = document.createElement('span');
+      cell.className = result[j] || '';
+      cell.textContent = word[j];
+      row.appendChild(cell);
     }
     log.appendChild(row);
   });
