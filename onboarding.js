@@ -91,14 +91,25 @@
     // ── The lane tour ──
     // The app is project.html now: three lanes on one slide, walked by a
     // sideways pull (see CLAUDE.md, "Slide 12 is three screens"). Each beat
-    // either talks (tap anywhere) or asks for the real pull and waits for
-    // the reader to arrive. The old four-page tour that hopped anahane →
-    // kahvehane → kutuphane by navigating is gone with the pages it walked.
+    // either talks (tap anywhere), asks for the real pull and waits for the
+    // reader to arrive, or asks them to actually change something.
+    //
+    // It OPENS ON THE READER THEMSELVES -- the petek's innermost depth, where
+    // the avatar arrows are -- and only then pulls out to the shape. A brand
+    // new account's petek is one hexagon and six empty sides: nobody has
+    // handed them a code yet, because they signed up thirty seconds ago. So
+    // the petek cannot be the first thing the mascot points at, and nothing
+    // here may say "these are the people next to you" -- for every reader
+    // seeing this for the first time, that sentence is false. What IS true on
+    // day one is the reader's own hexagon, so the tour starts there, has them
+    // make their avatar, and then pulls out and says where the others WILL be.
     lanes: {
       tr: {
         cat: {
-          reveal:  'Hâlâ buradasın demek. Peki. Burası Hane — ortası. Her şey buradan bir kaydırma uzakta.',
-          petek:   'Bu petek. Ortadaki sensin, yanındakiler de gerçekten yanındakiler. Kimse seni buraya ekleyemez; birinin sana kodunu vermesi gerekir.',
+          reveal:  'Hâlâ buradasın demek. Peki. Burası Hane — uygulamanın ortası. Her şey buradan bir kaydırma uzakta.',
+          sen:     'Şu ortadaki sensin. Şimdilik tek başına. Oklarla kendine benzet — ne seçersen anında kaydediliyor, onay filan yok.',
+          senDone: 'Oldu. Gerisi — şapkalar, rozetler — dışarıda kazanılıyor. Satın alınmıyor, uğraşma.',
+          petek:   'Şimdi geri çekildik: bu petek. Şu an sadece sen varsın, doğru. Biri sana kendi kodunu okuduğunda, o boş yanlardan birine oturuyor. Gerçek hayatta, yüz yüze.',
           toKahve: 'Sağda Kahvehane var. Parmağını sola kaydır — ben burada bekliyorum.',
           events:  'Etkinlikler. Bunlar internette değil, dışarıda. Beğendiğini seç, Hane\'de seni bekler.',
           games:   'Üç oyun, her gün yeni. Sırayla açılırlar — acelen varsa yanlış uygulamadasın.',
@@ -109,7 +120,9 @@
         },
         dog: {
           reveal:  'SELAAM!! Burası Hane! Uygulamanın tam ortası — her yere buradan gidiliyor!',
-          petek:   'BAK, PETEK! Ortadaki sensin! Etrafındakiler de yanındaki İstanbulite\'lar! Birbirimize kodla ekleniyoruz, çok tatlı değil mi?',
+          sen:     'VE BU SENSİN! Şu an tek başınasın ama merak etme! Hadi oklarla kendine bir şeyler seç — hemen kaydediliyor!',
+          senDone: 'ÇOK YAKIŞTI! Kalanları — şapkalar, rozetler — dışarı çıkıp kazanacaksın. Parayla alınmıyor, öyle bir şey yok burada!',
+          petek:   'Şimdi biraz geri çekilelim — işte PETEK! Şu an sadece sen varsın, biliyorum. Ama biri sana kodunu okuduğunda şu boş yanlardan birine oturacak! Yüz yüze, gerçekten tanışarak!',
           toKahve: 'Hadi Kahvehane\'ye gidelim! Parmağını SOLA kaydır!',
           events:  'ETKİNLİKLER! Bunlar gerçek hayatta oluyor! Beğendiğini seç, Hane\'de seni bekler — sonra da GİT!',
           games:   'VE OYUNLAR! Her gün üç yeni tane! Sırayla açılıyorlar, acele etme!',
@@ -121,8 +134,10 @@
       },
       en: {
         cat: {
-          reveal:  "Still here. Fine. This is Hane — the middle. Everything else is one pull away.",
-          petek:   "The petek. You're the one in the centre, and the ones touching you are actually next to you. Nobody can add you here — someone has to hand you their code.",
+          reveal:  "Still here. Fine. This is Hane — the middle of the app. Everything else is one pull away.",
+          sen:     "That one in the middle is you. On your own, for now. Use the arrows and make it look like you — whatever you pick saves itself, there's nothing to confirm.",
+          senDone: "Good. The rest of it — hats, badges — is earned outside. It cannot be bought, so don't go looking.",
+          petek:   "Now we've stepped back: this is the petek. Right now it is only you, yes. When somebody reads you their code, they take one of those empty sides. In person, face to face.",
           toKahve: 'Kahvehane is to the right. Pull your finger left. I\'ll wait.',
           events:  "Events. These happen outside, not in here. Keep the ones you want; they'll be waiting on Hane.",
           games:   "Three games, new every day. They unlock in order — if you're in a hurry you're in the wrong app.",
@@ -133,7 +148,9 @@
         },
         dog: {
           reveal:  "HI!! This is Hane! The very middle of the app — everything starts here!",
-          petek:   "LOOK, THE PETEK! That's YOU in the middle! And those are the Istanbulites right next to you! We attach with codes, isn't that lovely?",
+          sen:     "AND THIS IS YOU! You're on your own right now but don't worry! Go on, pick something with the arrows — it saves straight away!",
+          senDone: "THAT SUITS YOU! The rest — hats, badges — you earn by going outside. You can't buy any of it, there's no such thing here!",
+          petek:   "Now let's step back a bit — THE PETEK! It's only you right now, I know. But when somebody reads you their code they'll take one of those empty sides! Face to face, actually meeting!",
           toKahve: "Let's go to Kahvehane! Pull your finger LEFT!",
           events:  "EVENTS! These are real-life things! Keep the ones you like, they'll wait for you on Hane — then GO!",
           games:   "AND THE GAMES! Three new ones every day! They unlock in order, no rushing!",
@@ -144,13 +161,19 @@
         },
       },
     },
-    // Prompts under the mascot on a beat that waits for a real pull, and
-    // the harder nudge that replaces it if the reader stalls (see STALL_MS).
+    // Prompts under the mascot on a beat that waits for the reader to do
+    // something real, and the harder nudge that replaces one if they stall
+    // (see STALL_MS). Nothing here ever dead-ends.
     pullLeft:    { tr: 'parmağını sola kaydır',  en: 'pull left' },
     pullRight:   { tr: 'parmağını sağa kaydır',  en: 'pull right' },
     pullNudge: {
       tr: 'kaydıramıyor musun? devam etmek için dokun',
       en: "can't pull? tap to carry on",
+    },
+    tapArrows:   { tr: 'oklardan birine dokun',  en: 'press one of the arrows' },
+    tapArrowsNudge: {
+      tr: 'sonra da yapabilirsin — devam etmek için dokun',
+      en: 'you can do this later — tap to carry on',
     },
     kefilShare: {
       tr: {
@@ -664,8 +687,8 @@
   // shape of the old stuck-states, so it is stated here rather than relied
   // on from the stylesheet.
   function isPassthrough(target) {
-    if (!document.body.classList.contains('ist-onb-passthru')) return false;
-    return !!(target && target.closest && target.closest('#fb'));
+    if (!passScope) return false;
+    return !!(target && target.closest && target.closest(passScope));
   }
   function gestureFirewall(e) {
     if (isInsideOnboarding(e.target)) return;
@@ -816,13 +839,29 @@
     if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
   }
 
-  // Hand the book back to the reader for the length of a pull beat.
-  // body.ist-onb-locked sets `pointer-events: none` on everything outside
-  // the onboarding, which is exactly right for a talk beat and exactly
-  // wrong for this one -- without lifting it the swipe the mascot is
-  // asking for never reaches project.html's own pointer handlers.
-  function openPassthrough() { document.body.classList.add('ist-onb-passthru'); }
-  function closePassthrough() { document.body.classList.remove('ist-onb-passthru'); }
+  // Hand part of the page back to the reader for the length of a beat that
+  // asks them to do something real. body.ist-onb-locked sets
+  // `pointer-events: none` on everything outside the onboarding, which is
+  // exactly right for a talk beat and exactly wrong for this one -- without
+  // lifting it, the swipe or the press the mascot is asking for never
+  // reaches the app at all.
+  //
+  // It is SCOPED, and that is what keeps each beat to its own question: a
+  // pull beat opens the whole book (`#fb`), because the gesture is a drag on
+  // it; the avatar beat opens only the petek (`#fb-petek`), so a stray
+  // sideways drag cannot walk the reader off the screen the mascot is
+  // currently talking about.
+  let passScope = null;
+  function openPassthrough(scope) {
+    passScope = scope || '#fb';
+    document.body.classList.add('ist-onb-passthru');
+    document.body.dataset.onbPass = passScope === '#fb' ? 'book' : 'petek';
+  }
+  function closePassthrough() {
+    passScope = null;
+    document.body.classList.remove('ist-onb-passthru');
+    delete document.body.dataset.onbPass;
+  }
 
   // ───── Tour steps ─────
   function stepTour() {
@@ -834,12 +873,31 @@
     enterSpotlightMode();
     const lines = COPY.lanes[lang][mascot];
 
+    // The petek's own depths (HIVE_LEVELS in profile-card.js): 0 is Sen --
+    // the reader's own hexagon with the avatar arrows on it -- and 2 is the
+    // whole shape. Driven through IstProfileCard.setHivePageLevel, which is
+    // that module's own documented handle and no-ops when no petek is
+    // standing, exactly as fb() does for the book.
+    const HIVE_SEN = 0, HIVE_ALL = 2;
+    function setDepth(n) {
+      const pc = global.IstProfileCard;
+      if (pc && pc.setHivePageLevel) pc.setHivePageLevel(n);
+    }
+
     // `lane` is the lane the beat belongs to and is asserted before it runs,
     // so a reader who wandered is put back rather than talked at about a
     // screen they are not on. `pull` is the lane a pull beat waits for.
     const beats = [
       { lane: LANE_HANE,       target: null,        speech: lines.reveal },
-      { lane: LANE_HANE,       target: '#fb-petek', speech: lines.petek },
+      // The reader first, the shape second. On day one the petek is one
+      // hexagon and six empty sides, so there is nothing true to say about
+      // neighbours yet -- but there is always something true to say about
+      // the reader, and something for them to DO (see COPY.lanes).
+      { lane: LANE_HANE,       depth: HIVE_SEN, target: '.ist-hive-picker',
+        speech: lines.sen, act: '.ist-hive-picker', prompt: 'tapArrows',
+        nudge: 'tapArrowsNudge' },
+      { lane: LANE_HANE,       depth: HIVE_SEN, target: '.ist-hive-picker', speech: lines.senDone },
+      { lane: LANE_HANE,       depth: HIVE_ALL, target: '#fb-petek', speech: lines.petek },
       { lane: LANE_HANE,       speech: lines.toKahve, pull: LANE_KAHVEHANE },
       // A column is three boxes with no wrapper between them, and the
       // mascot is talking about the column -- so the beat lights all of it.
@@ -866,13 +924,17 @@
       // test reads the one pull beat that aims at it as a talk beat.
       if (b.pull !== undefined) { runPull(b); return; }
 
-      // A talk beat is about a screen, so it asserts that screen -- a reader
-      // who wandered is put back rather than talked at about a lane they are
-      // not standing on. Never on a pull beat: snapping the book there would
-      // fight the very gesture being asked for.
+      // Every other beat is about a screen, so it asserts that screen -- a
+      // reader who wandered is put back rather than talked at about a lane
+      // they are not standing on. Never on a pull beat: snapping the book
+      // there would fight the very gesture being asked for.
       closePassthrough();
       const f = fb();
       if (f && f.lane && f.lane.at !== b.lane) f.goLane(b.lane);
+      // ...and, on Hane, about a DEPTH of the petek as well.
+      if (b.depth !== undefined) setDepth(b.depth);
+
+      if (b.act) { runAct(b); return; }
 
       // A cast box is drawn where the book puts it and can be mid-flight
       // for a beat after a lane change, so the spotlight is taken on the
@@ -886,9 +948,45 @@
       addHint(COPY.tapToContinue[lang], advance);
     }
 
+    // An act beat: the reader is asked to actually change something, and
+    // doing it is the advance. Only the thing being asked for is live (the
+    // scoped passthrough), and the first real press on it is enough -- the
+    // point is that they find the control and see it answer, not that they
+    // dress the whole avatar while a cat watches.
+    function runAct(b) {
+      // The depth change rescales the plane and the arrows arrive with it,
+      // so the rect is taken a frame later or the ring lands where the
+      // picker was before the level changed.
+      requestAnimationFrame(() => {
+        const el = document.querySelector(b.target);
+        addSpotlight(el);
+        if (!el) { done(); return; }   // no petek standing: nothing to ask for
+        openPassthrough('#fb-petek');
+        el.addEventListener('click', onPress, true);
+      });
+      renderPane({ speech: b.speech, promptText: COPY[b.prompt][lang] });
+
+      function onPress() { done(); }
+      function done() {
+        const el = document.querySelector(b.target);
+        if (el) el.removeEventListener('click', onPress, true);
+        stopLaneWatch();
+        closePassthrough();
+        advance();
+      }
+      // Same escape hatch as a pull beat, and the same reason: the avatar
+      // can be changed any day from this exact screen, so a reader who does
+      // not want to right now must not be held here.
+      stallTimer = setTimeout(() => {
+        stallTimer = null;
+        renderPane({ speech: b.speech, promptText: COPY[b.nudge][lang] });
+        addHint(COPY[b.nudge][lang], done);
+      }, STALL_MS);
+    }
+
     // A pull beat: dim stays, the book goes live, and arrival is the advance.
     function runPull(b) {
-      openPassthrough();
+      openPassthrough('#fb');
       // Nothing on the page is "lit" during a pull -- the thing being
       // pointed at is the gesture, not an element.
       clearSpotlight();
