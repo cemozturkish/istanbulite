@@ -2617,6 +2617,16 @@
     const belowMe = (maxB - cy) * scale;
     const clearY = (vhFull - reserve - HIVE_CARD_GAP) - vhFull / 2 - belowMe;
     const offsetY = Math.min(restY, clearY);
+    // ── Level 0's block sits right under the hexagon, not at the foot of
+    // the window ──
+    // The window spans the whole band between the two bars, and centring
+    // the hexagon in that leaves a wide, empty middle on any screen taller
+    // than a hexagon plus its block — a bottom-pinned block then reads as
+    // stranded at the very foot of the screen instead of belonging to the
+    // avatar above it. So at level 0 the block's own top is set from where
+    // the fitted hexagon (and its avatar arrows, already in belowMe) actually
+    // ends, the same arithmetic clearY already uses.
+    if (level === 0 && selfEl) selfEl.style.top = `${vhFull / 2 + offsetY + belowMe + HIVE_SELF_GAP}px`;
     state.hiveFit = { scale, cx, cy, vw, vh, reqW, reqH, offsetY, vwFull: view.clientWidth, vhFull: view.clientHeight };
     plane.style.transformOrigin = `${cx}px ${cy}px`;
     // ── A fresh plane is placed, not animated into place ──
