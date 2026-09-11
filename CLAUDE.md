@@ -2430,16 +2430,33 @@ that gates going further) → language → palette + mascot → **the lane tour*
 kefil code → finish, which writes `onboarded_at`, `language_pref`, `palette_pref` and `mascot` in
 one update. The admin's kill switch is `app_settings.onboarding_enabled` (missing row = on).
 
+**It opens on the READER, not on the petek, and that is a correctness rule rather than a
+preference.** A brand-new account's petek is one hexagon with six empty sides: nobody has handed
+them a code yet, because they signed up a minute ago. So any line like "those are the Istanbulites
+right next to you" is false for *every* reader who will ever see this — it is only ever read once,
+on day one, which is precisely the day it cannot be true. What IS true on day one is the reader's
+own hexagon. So the tour stands them at the petek's innermost depth (**Sen**, level 0), has them
+actually **make their avatar** with the arrows that live there, says the rest of it is earned
+outside and cannot be bought, and only *then* pulls out to the whole shape — where it says where
+the others **will** be rather than pretending they are already there. The same test applies to any
+beat added later: read it as somebody whose account is sixty seconds old.
+
 **The tour walks the lanes, and the reader does the walking.** It used to hop anahane → kahvehane
 → sozcel → kutuphane → anahane by *navigating*, keeping its place in `sessionStorage` between the
 pages and lighting each one's nav link to hand over. Those pages are the parts bin now (see the
 router's own section) and nothing links to them, so that whole leg went with them. What replaced
-it is the three lanes of slide 12: nine beats, and the three that change lane ask for the **real
+it is the three lanes of slide 12: eleven beats, and the ones that change lane ask for the **real
 sideways pull** rather than moving the book themselves — the gesture the reader will use forever
 after is the one they are taught by making it. Reaching Kütüphane from Kahvehane is deliberately
 two pulls, because the strip moves one lane per gesture and the way between them is through Hane.
 
-Five things about it, each of which fails silently if forgotten:
+A beat is one of three things: it **talks** (tap anywhere), it asks for a **pull** and waits for
+the reader to arrive on a lane, or it asks them to **act** — to actually change something, which
+today is the avatar. Depth is driven through `IstProfileCard.setHivePageLevel`, that module's own
+handle (it is exactly what pressing a rail mark does, and no-ops when no petek is standing), the
+same way the book is driven through `window.__fb`.
+
+Six things about it, each of which fails silently if forgotten:
 
 - **The tour watches the book through `window.__fb` and never reaches inside it.** That handle is
   project.html's own documented one; nothing here touches its internals, and a page without it (a
@@ -2449,13 +2466,17 @@ Five things about it, each of which fails silently if forgotten:
   `lane.at` flips the instant the reader lets go, while the strip is still tweening to it on
   project.html's own rAF — which `__fb.busy` does not cover — so advancing on `at` alone lights a
   box that is still in flight and lands the ring beside it.
-- **A pull beat hands the book back, and the firewall has to stand down with it.** The lock is
-  `pointer-events: none` on everything outside the onboarding, which is right for a beat the
-  reader only taps through and exactly wrong for one where the gesture *is* the answer. The
-  stylesheet alone is not enough: the firewall `preventDefault`s `touchmove` in the capture phase,
-  which on a phone cancels the very pull just asked for, and the beat then waits forever on a
-  gesture the page is swallowing. Both halves are needed — `body.ist-onb-passthru` in
-  onboarding.css and `isPassthrough()` in onboarding.js.
+- **A beat that asks for something real hands part of the page back, and the firewall has to
+  stand down with it.** The lock is `pointer-events: none` on everything outside the onboarding,
+  which is right for a beat the reader only taps through and exactly wrong for one where the
+  gesture *is* the answer. The stylesheet alone is not enough: the firewall `preventDefault`s
+  `touchmove` in the capture phase, which on a phone cancels the very pull just asked for, and the
+  beat then waits forever on a gesture the page is swallowing. Both halves are needed —
+  `body.ist-onb-passthru` in onboarding.css and `isPassthrough()` in onboarding.js.
+  **And it is scoped**, which is what keeps each beat to its own question: a pull beat opens the
+  whole book (`#fb`, since the gesture is a drag on it), while the avatar beat opens `#fb-petek`
+  alone — so a stray sideways drag cannot walk the reader off the screen the mascot is currently
+  talking about. `data-onb-pass` on the body is which of the two is open.
 - **The dim is a punched sheet, not a lift.** The obvious spelling — raise the lit element over
   the dim with `position: relative` + `z-index` — cannot work here: `.fb-cast` is `position:
   absolute` with `z-index: 1` and so is its own stacking context, so a box inside it never rises
@@ -2464,11 +2485,13 @@ Five things about it, each of which fails silently if forgotten:
   app's DOM at all — the holes are cut with one `fill-rule: evenodd` clip-path (the same idiom
   `IstSheet.lightTheMap` uses on the map's tint) and the rings are drawn in a layer of our own
   over the top. The rects are measured, so they are re-measured on resize.
-- **No pull beat can dead-end.** After `STALL_MS` the prompt becomes a tap-to-continue and the
-  tour carries on without the gesture. A reader who cannot swipe — a trackpad, an assistive
-  pointer, a phone that ate the touch — must still reach the end, because the end is where
-  `onboarded_at` is written and an account stuck short of it is an account that gets the whole
-  flow again on every launch.
+- **No beat that waits can dead-end.** After `STALL_MS` the prompt becomes a tap-to-continue and
+  the tour carries on without the gesture — on a pull beat and on the avatar beat alike (the
+  avatar can be changed any day from that exact screen, so a reader who does not want to right now
+  must not be held there). A reader who cannot swipe — a trackpad, an assistive pointer, a phone
+  that ate the touch — must still reach the end, because the end is where `onboarded_at` is
+  written and an account stuck short of it is an account that gets the whole flow again on every
+  launch. A beat whose control is not on the page at all does not wait for it either.
 
 **It runs on the parts-bin pages nowhere and never.** They no longer load the script at all: a
 flow completed on a page nobody can reach would still write `onboarded_at`, and so suppress the

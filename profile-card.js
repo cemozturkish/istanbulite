@@ -3957,6 +3957,14 @@
     closeProfileOverlay,
     mountHivePage,
     unmountHivePage,
+    // ── Driving the petek's depth from outside ──
+    // The onboarding tour walks the reader through the three depths and
+    // has to be able to stand them on one. It is exactly what pressing a
+    // rail mark does -- the same setHiveLevel, with the module's own
+    // state -- rather than a second way in, and it no-ops when the petek
+    // is not standing (nothing is mounted, or the reader is elsewhere).
+    setHivePageLevel(n) { if (_hive) setHiveLevel(_hive, n); },
+    hivePageLevel() { return _hive ? hiveLevel(_hive) : null; },
     revealHivePage,
     playHiveReveal,
     paintHiveEventMarks,
