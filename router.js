@@ -489,23 +489,7 @@
     });
     if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 4000 });
     else setTimeout(run, 1500);
-    // The drawn frames for whichever depth journey is one gesture away.
-    // Same reasoning and the same moment as the page prefetch: a strip
-    // that has to be fetched under the finger would stall, and stalling
-    // is the whole thing this mechanism exists to avoid.
-    if (global.IstMapFrames) global.IstMapFrames.warm(slug);
   }
-
-  // The frame strip left standing over the arriving page, if the journey
-  // that just ran had drawings. Faded out once the real map is mounted
-  // underneath it -- the last drawing hands over to the map instead of
-  // cutting to it.
-  let pendingFrames = null;
-  // The flip book left standing over the arriving page. Taken off only
-  // once that page is mounted underneath it -- its last drawing is the
-  // level being arrived at, so nobody should be able to see the moment
-  // one becomes the other.
-  let pendingFlip = null;
 
   let virtualNavInFlight = false;
   // The currently-displayed page, tracked independently of location.pathname
@@ -560,8 +544,6 @@
         console.error(e);
         document.body.classList.remove(exitClass);
         document.body.classList.remove('ist-zoom');
-        if (pendingFrames) { pendingFrames.end(); pendingFrames = null; }
-        if (pendingFlip) { pendingFlip.end(); pendingFlip = null; }
         if (!fromPopstate) window.location.href = targetSlug + '.html';
         return;
       }
@@ -727,29 +709,6 @@
       // the base map again -- put the member's hand-painted district map
       // back before anything reads layout below (see home-map.js).
       if (global.IstHomeMap) global.IstHomeMap.refresh();
-      // The arriving map is in place -- but the page's own columns are
-      // still fading in over the strip, and lifting it before they are
-      // solid puts a bare map on screen for a beat, which is the exact
-      // flash this whole arrangement exists to remove. So it is held
-      // until that fade is done and then taken off slowly: the last
-      // drawing and the real map agree, so nobody should be able to see
-      // the moment one becomes the other.
-      if (pendingFrames) {
-        const strip = pendingFrames;
-        pendingFrames = null;
-        const d = zoomDurationMs();
-        setTimeout(() => strip.settle(Math.max(120, Math.round(d * 0.5))), Math.round(d * 0.45));
-      }
-      if (pendingFlip) {
-        const book = pendingFlip;
-        pendingFlip = null;
-        // Put the real page's own elements back first, then take the
-        // layer off over them -- the last drawing and the page it is
-        // standing in for are the same picture, so the hand-over is
-        // meant to be invisible.
-        book.reveal();
-        requestAnimationFrame(() => book.fade(140));
-      }
       // Deliberately after mount(): initMapZoom's own measure() reads
       // getBoundingClientRect(), which forces a synchronous layout --
       // done before mount() had a chance to run, that forced flush would
@@ -1083,35 +1042,12 @@
       document.body.classList.remove('ist-dragging');
       setTimeout(releaseZoom, 280);
     }
-    // ── The drawn journey, where one exists ──
-    // Only where its frames are already decoded (map-frames.js refuses
-    // otherwise), so this can be asked inside a touch handler and
-    // answered in the same frame. Where there is none -- İstanbul to
-    // mahalle, which has no map to zoom into -- the scale transform
-    // above is the whole transition, which is why that fallback is not
-    // a degraded mode but the ordinary one.
-    // ── The flip book ──
-    // Where a journey has a step table, the whole screen becomes one:
-    // the drawings, and the page's own elements posed over them (see
-    // flip.js and flip-steps.js). Where it has only drawings, the older
-    // strip still runs. Where it has neither -- İstanbul to mahalle,
-    // which has no map to zoom into -- the scale transform does it.
-    function beginFlip(target) {
-      if (!target || !global.IstFlip || !global.IstFlipSteps) return null;
-      const hit = global.IstFlipSteps.find(activeSlug, target.slug);
-      if (!hit) return null;
-      const strip = global.IstMapFrames
-        ? global.IstMapFrames.stripFor(activeSlug, target.slug)
-        : null;
-      try { return global.IstFlip.start(hit.def, strip); }
-      catch (e) { console.error(e); return null; }
-    }
-
-    function beginFrames(target) {
-      if (!global.IstMapFrames || !target) return null;
-      try { return global.IstMapFrames.begin(activeSlug, target.slug); }
-      catch (e) { console.error(e); return null; }
-    }
+    // ── The zoom is the scale transform above, and only that ──
+    // There used to be a second, richer implementation of this same
+    // movement: a strip of hand-drawn frames scrubbed by the finger,
+    // with a flip book of posed page elements over it. project.html
+    // carries its own flip book and IS the app now, so the shared one
+    // was removed rather than kept as a copy that could drift from it.
 
     function releaseAll() { releaseColumns(); releaseZoom(); }
     global.__istReleaseColumns = releaseAll;
@@ -1153,11 +1089,6 @@
         pinch.fired = true;
         if (!target) return;
         if (e.cancelable) e.preventDefault();
-        const frames = beginFrames(target);
-        if (frames) {
-          frames.play(0, 1, zoomDurationMs() || 380);
-          pendingFrames = frames;
-        }
         flingZoom(target.dir);
         navigate(target.slug, target.dir);
         return;
@@ -1178,8 +1109,6 @@
         // scroller: hand the gesture back to whatever is underneath.
         g.zoom = g.noZoom ? null : verticalTarget(dy);
         if (!g.zoom) { g = null; return; }
-        g.frames = undefined;   // not yet asked; null means asked and none
-        g.flip = undefined;
         document.body.classList.add('ist-dragging');
       }
       const now = Date.now();
@@ -1191,35 +1120,10 @@
       g.lastY = t.clientY; g.lastT = now;
       const aimed = verticalTarget(dy);
       if (!aimed) { g.dy = dy * EDGE_PULL; if (e.cancelable) e.preventDefault(); paintZoom(g.dy); return; }
-      // Re-aiming mid-drag means the strip on screen is for the wrong
-      // journey -- drop it and take the other one.
-      if (g.zoom && g.zoom.slug !== aimed.slug) {
-        if (g.frames) { g.frames.end(); }
-        if (g.flip) { g.flip.end(); }
-        g.frames = undefined; g.flip = undefined;
-      }
       g.zoom = aimed;
       g.dy = dy;
       if (e.cancelable) e.preventDefault();
-      // The frames ARE the map's half of the movement, so they are
-      // scrubbed rather than played: progress maps onto frame index, and
-      // dragging slowly flips through the drawings one at a time. The
-      // scale still runs underneath for the furniture -- the columns and
-      // the two bars are printed on the screen, not drawn on the map.
-      if (g.flip === undefined) {
-        g.flip = beginFlip(aimed);
-        // Only fall back to the bare strip where there is no step table.
-        g.frames = g.flip ? null : beginFrames(aimed);
-      }
-      if (g.flip) {
-        // The flip book IS the screen for the length of the journey, so
-        // the page underneath must not also be scaling: two things
-        // moving to the same end is one too many.
-        g.flip.paint(zoomProgress(dy));
-      } else {
-        paintZoom(dy);
-        if (g.frames) g.frames.paint(zoomProgress(dy));
-      }
+      paintZoom(dy);
     }, { passive: false });
 
     document.addEventListener('touchend', (e) => {
@@ -1234,30 +1138,7 @@
         const far = p > 0.55;
         const flicked = Math.abs(gesture.speed) > FLICK_SPEED &&
                         Math.sign(gesture.speed) === Math.sign(dy) && Math.abs(dy) > SLOP * 2;
-        const flip = gesture.flip || null;
-        const frames = gesture.frames || null;
-
-        // ── The flip book: there is no stopping in between ──
-        // Whichever end is nearer, it runs there. Committing, the page
-        // is swapped BEHIND the layer while the reader is still looking
-        // at a drawing -- which is the one moment that work is free,
-        // and the whole reason the middle of this journey is inert.
-        if (flip) {
-          const dur = zoomDurationMs() || 380;
-          if (target && (far || flicked)) {
-            pendingFlip = flip;
-            flip.run(p, 1, Math.max(120, Math.round(dur * (1 - p))));
-            setZoomWait(Math.max(120, Math.round(dur * (1 - p))));
-            navigate(target.slug, target.dir);
-          } else {
-            flip.run(p, 0, Math.max(120, Math.round(dur * p))).then(() => flip.end());
-          }
-          return;
-        }
         if (target && (far || flicked)) {
-          // Run out whatever is left of the strip, at the same rate the
-          // rest of the transition moves, and hand it to navigateTo to
-          // fade once the real map is standing underneath it.
           // A floor, because "what is left" can be almost nothing: a
           // finger dragged the whole way leaves no time to fade the
           // outgoing page, and it was being cut rather than faded. 35%
@@ -1265,10 +1146,6 @@
           // shorter than the fixed wait this replaced.
           const dur = zoomDurationMs() || 380;
           const rest = Math.max(Math.round(dur * 0.35), Math.round(dur * (1 - p)));
-          if (frames) {
-            frames.play(p, 1, rest);
-            pendingFrames = frames;
-          }
           // The swap begins the moment the drawing stops moving, rather
           // than a fixed 380ms after the finger left -- which on a drag
           // taken most of the way was a third of a second of nothing.
@@ -1277,8 +1154,7 @@
           navigate(target.slug, target.dir);
           return;
         }
-        // Abandoned: the same drawings, run backwards.
-        if (frames) frames.play(p, 0, 220).then(function () { frames.end(); });
+        // Abandoned.
         springZoom();
         return;
       }
@@ -1290,8 +1166,6 @@
     document.addEventListener('touchcancel', () => {
       pinch = null;
       if (!g) return;
-      if (g.frames) g.frames.end();
-      if (g.flip) g.flip.end();
       g = null;
       springZoom();
     }, { passive: true });
