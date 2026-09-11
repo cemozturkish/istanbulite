@@ -602,10 +602,23 @@
 
   function spotlightPad() { return 6; }
 
-  // One polygon: the whole viewport, then a subpath per hole. evenodd makes
-  // the holes holes. Falls back to an undimmed sheet if the browser will not
-  // take it -- a spotlight that cannot cut is better off not painting a
-  // rectangle over the thing it is pointing at.
+  // ONE path with real subpaths: the viewport, then one per hole, evenodd.
+  //
+  // It must be `path()` and never `polygon()`, and that is not a style
+  // preference -- `polygon()` is a single closed ring, so listing the outer
+  // rect's corners and then a hole's runs one continuous edge from the last
+  // hole corner back to the first outer corner, and evenodd carves a
+  // DIAGONAL WEDGE out of the dim that has nothing to do with either. It
+  // hit-tests correctly, which is what made it look fine in a test that only
+  // asked `elementFromPoint`; sampling the painted pixels is what shows it.
+  // Only `path()` can express more than one subpath.
+  //
+  // The element is `position: fixed; inset: 0`, so viewport coordinates are
+  // its own. A browser without `path()` support keeps a plain dim: no hole is
+  // a worse spotlight, a wrong hole is a broken page.
+  const CAN_CUT = !window.CSS || !CSS.supports
+    || CSS.supports('clip-path', 'path("M0 0H1V1H0Z")');
+
   function paintSpotlight() {
     if (!spotlightEl) return;
     const rects = litTargets
@@ -619,13 +632,14 @@
     }
 
     const pad = spotlightPad();
-    const pt = (x, y) => `${x.toFixed(1)}px ${y.toFixed(1)}px`;
-    const outer = [pt(0, 0), pt(1e5, 0), pt(1e5, 1e5), pt(0, 1e5)].join(',');
-    const holes = rects.map(r => {
-      const l = r.left - pad, t = r.top - pad, rt = r.right + pad, b = r.bottom + pad;
-      return [pt(l, t), pt(rt, t), pt(rt, b), pt(l, b)].join(',');
-    }).join(',');
-    spotlightEl.style.clipPath = `polygon(evenodd, ${outer}, ${holes})`;
+    if (CAN_CUT) {
+      const n = (v) => v.toFixed(1);
+      const box = (l, t, r, b) => `M${n(l)} ${n(t)}H${n(r)}V${n(b)}H${n(l)}Z`;
+      const W = window.innerWidth, H = window.innerHeight;
+      const d = [box(0, 0, W, H)].concat(rects.map(r =>
+        box(r.left - pad, r.top - pad, r.right + pad, r.bottom + pad))).join(' ');
+      spotlightEl.style.clipPath = `path(evenodd, "${d}")`;
+    }
 
     // The rings: fixed boxes over the same rects, drawing only. The last
     // one lit is the brighter one, so the reader can tell which of the
@@ -893,10 +907,16 @@
       // hexagon and six empty sides, so there is nothing true to say about
       // neighbours yet -- but there is always something true to say about
       // the reader, and something for them to DO (see COPY.lanes).
-      { lane: LANE_HANE,       depth: HIVE_SEN, target: '.ist-hive-picker',
+      // `.ist-hive-pick-col`, never `.ist-hive-picker`: the picker's own box is
+      // exactly the hexagon (--ist-hive-cell-w/h) and both arrow columns are
+      // laid OUTSIDE it (`right: 100%` / `left: 100%`), so a ring measured on
+      // the wrapper is a box drawn over the avatar with the arrows outside
+      // the hole. Two columns, so two rings -- `all`.
+      { lane: LANE_HANE,       depth: HIVE_SEN, target: '.ist-hive-pick-col', all: true,
         speech: lines.sen, act: '.ist-hive-picker', prompt: 'tapArrows',
         nudge: 'tapArrowsNudge' },
-      { lane: LANE_HANE,       depth: HIVE_SEN, target: '.ist-hive-picker', speech: lines.senDone },
+      { lane: LANE_HANE,       depth: HIVE_SEN, target: '.ist-hive-pick-col', all: true,
+        speech: lines.senDone },
       { lane: LANE_HANE,       depth: HIVE_ALL, target: '#fb-petek', speech: lines.petek },
       { lane: LANE_HANE,       speech: lines.toKahve, pull: LANE_KAHVEHANE },
       // A column is three boxes with no wrapper between them, and the
@@ -919,6 +939,13 @@
     function runBeat() {
       const b = beats[idx];
       stopLaneWatch();
+      // The last beat's hint is still on the page, and still live: addHint
+      // sets tapAdvanceFn, so a pull or act beat that adds no hint of its own
+      // inherited "tap anywhere to continue" AND the tap that fires it. The
+      // reader could tap straight past the very gesture just asked for, and
+      // the prompt under the mascot said one thing while the button over the
+      // tab bar said another. Only beats that add a hint have one.
+      clearHint();
 
       // `=== undefined`, never `!b.pull`: Kütüphane is lane 0, so a falsy
       // test reads the one pull beat that aims at it as a talk beat.
@@ -943,9 +970,20 @@
         if (!b.target) { addSpotlight(null); return; }
         addSpotlight(b.all ? document.querySelectorAll(b.target)
                            : document.querySelector(b.target));
+        if (b.depth !== undefined) settleSpotlight();
       });
       renderPane({ speech: b.speech });
       addHint(COPY.tapToContinue[lang], advance);
+    }
+
+    // Changing depth rescales the plane, and that is a CSS transition -- so
+    // the arrows go on moving for a few hundred ms after setDepth returns,
+    // and a rect taken on the next frame is where they were on the way. The
+    // paint is idempotent, so it is simply re-taken as they settle.
+    function settleSpotlight() {
+      [0, 140, 300, 460].forEach(ms => setTimeout(() => {
+        if (litTargets.length) paintSpotlight();
+      }, ms));
     }
 
     // An act beat: the reader is asked to actually change something, and
@@ -955,11 +993,11 @@
     // dress the whole avatar while a cat watches.
     function runAct(b) {
       // The depth change rescales the plane and the arrows arrive with it,
-      // so the rect is taken a frame later or the ring lands where the
-      // picker was before the level changed.
+      // so the rects are taken a frame later and re-taken as they settle.
       requestAnimationFrame(() => {
-        const el = document.querySelector(b.target);
-        addSpotlight(el);
+        addSpotlight(document.querySelectorAll(b.target));
+        settleSpotlight();
+        const el = document.querySelector(b.act);
         if (!el) { done(); return; }   // no petek standing: nothing to ask for
         openPassthrough('#fb-petek');
         el.addEventListener('click', onPress, true);
@@ -968,7 +1006,10 @@
 
       function onPress() { done(); }
       function done() {
-        const el = document.querySelector(b.target);
+        // b.act, not b.target: the listener is on the picker (which contains
+        // both arrow columns), while b.target is what is LIT. They are
+        // deliberately different elements -- see the beat's own note.
+        const el = document.querySelector(b.act);
         if (el) el.removeEventListener('click', onPress, true);
         stopLaneWatch();
         closePassthrough();
