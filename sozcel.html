@@ -32,12 +32,59 @@
       /* Warm neutrals */
       /* Newspaper accents */
       /* Semantic aliases */
-      /* Sözcel tile colors — warm browns */
-      --success: #4C3B31;      /* correct letter — dark brown */
-      --present: #c07840;      /* wrong position — orange-brown */
-      --absent: var(--ink-red);      /* not in word — same red as the sözcü's name, shown faded */
-      --absent-key: var(--ink-red);  /* not in word, on-keyboard — same tone as --absent */
+      /* ── Sözcel tile states: THE INK, THE RED, AND NOTHING ──
+         Three brown-family fills on brown paper is what the board used to
+         be — dark brown correct, orange-brown present, a faded red absent —
+         and readers could not tell the first two apart, while the red on
+         the third read as an error rather than as "this letter is gone"
+         (red on this site is the accent: the sözcü's own name is printed
+         in it two lines further down the page).
+
+         So the ladder is the page's own two inks and the paper between
+         them: a letter in the right place is filled SOLID with --ink, a
+         letter in the word is filled with the one accent --ink-red, and a
+         letter that is not in the word is not filled at all — paper, muted,
+         and stepped back. Full / accent / empty, which is a difference in
+         WEIGHT before it is a difference in colour.
+
+         They are stated as --ink/--ink-red/--muted rather than as fixed
+         hexes precisely so they follow the palette: the old values were
+         daylight browns and stayed daylight browns on the night paper,
+         where --success (#4C3B31) was within a hair of the page's own ink.
+         They are new names rather than the old --success/--present/--absent
+         for a mechanical reason as well: palette.css overrides those three
+         at :root[data-palette="mono"] (0,2,0, so it beats this file) with
+         fixed light-theme greys, which is exactly the thing the night paper
+         cannot carry. --absent and --absent-key are gone with the board
+         that read them; --success stays below, for the status lines. */
+      /* Still the "this worked" ink for the status lines that print it —
+         a saved suggestion, the win message, the result card's own mark.
+         It is no longer a tile colour, and the board no longer reads it;
+         palette.css deliberately leaves this one to the pages, so the
+         earth value has to stay stated here. */
+      --success: #4C3B31;
+      --tile-correct:     var(--ink);
+      --tile-correct-ink: var(--paper);
+      --tile-present:     var(--ink-red);
+      --tile-present-ink: var(--paper);
+      --tile-absent-ink:  var(--muted);
       /* Border shortcuts */
+    }
+
+    /* Night walks --ink-red down its own hue for the dark paper (see
+       frames.css), which lands it a shade off --ink itself — so "in the
+       word" and "in the right place" would come out as two near-identical
+       dark hexagons, which is the exact confusion this ladder exists to
+       end. At night the present tile is lifted back off that hue instead
+       and takes the ink as its letter, the one pairing this paper still
+       reads at (3.1:1 against the night paper's own 3.86:1 ceiling). */
+    :root[data-theme="dark"] {
+      --tile-present:     #a04d1c;
+      --tile-present-ink: var(--ink);
+    }
+    :root[data-theme="dark"][data-palette="mono"] {
+      --tile-present:     #a8443f;
+      --tile-present-ink: var(--ink);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -805,9 +852,9 @@
       margin-right: 6px;
       border: 1px solid var(--rule);
     }
-    .help-body .swatch.correct { background: var(--success); border-color: var(--success); }
-    .help-body .swatch.present { background: var(--present); border-color: var(--present); }
-    .help-body .swatch.absent { background: var(--absent); border-color: var(--absent); opacity: 0.4; }
+    .help-body .swatch.correct { background: var(--tile-correct); border-color: var(--tile-correct); }
+    .help-body .swatch.present { background: var(--tile-present); border-color: var(--tile-present); }
+    .help-body .swatch.absent { background: var(--paper); border-color: var(--tile-absent-ink); opacity: 0.5; }
 
     /* The board's own row. It used to pair a vertical attempt list on the
        left with the syllable skeleton on the right; the pips have moved
@@ -821,6 +868,10 @@
       flex-direction: row;
       align-items: center;
       justify-content: center;
+      /* The channel between the guess log and the board. Stated as a
+         token so layoutBoard() can take the same number out of the
+         board's width budget — see GL_CHANNEL. */
+      gap: var(--gl-channel, 8px);
       flex-shrink: 0;
       max-width: 100%;
     }
@@ -839,43 +890,67 @@
       flex-shrink: 0;
     }
 
-    /* ── THE STACK: the live board, and the last guess behind it ──
-       Two boards on one plane. The live one carries the word as it
-       stands; the ghost carries the guess just submitted, nested into it
-       the way a honeycomb nests -- half a column across and one level
-       down, the same two offsets the syllable staircase itself steps by
-       (see syllableLayout/LEVEL_STEP), so the two combs interlock
-       instead of overlapping.
-
-       Why it exists: the board shows only the letters that LOCKED, so
-       everything else the reader just tried vanished the moment it was
-       read out. The pips say how many guesses are gone; they cannot say
-       what was in them. The ghost is that -- what you last tried, still
-       on the table, faint enough that the live word stays the thing in
-       front of you.
-
-       The stack is sized by layoutBoard() to hold both, so the pair is
-       centred as one object and neither half hangs into the pips. */
+    /* The live board stands alone on its plane now. There used to be a
+       second comb behind it carrying the last guess, nested three
+       half-columns across and one level down; it is gone — see .guess-log
+       below for what replaced it and why. The stack stays because it is
+       what layoutBoard() sizes and centres the board inside. */
     .syl-stack { position: relative; margin: 0 auto; }
     .syl-board { position: absolute; top: 0; left: 0; }
     .syl-board .letter-box { position: absolute; }
-
-    /* Behind, and quiet. One opacity on the layer rather than a paler
-       ink per state: the ghost has to read as the same board seen
-       through paper, and tinting each tile separately makes it a second
-       colour scheme to keep in step with the first. */
-    .syl-ghost {
-      opacity: 0.44;
-      z-index: 0;
-      pointer-events: none;
-    }
-    /* An absent tile is already dimmed to 0.4 to say "this letter is not
-       in the word"; behind the ghost's own opacity that nearly vanished,
-       which is not there at all. The ghost is one wash over one board --
-       the tiles inside it keep their own weights relative to each other. */
-    .syl-ghost .letter-box.absent { opacity: 0.8; }
-    .syl-ghost[hidden] { display: none; }
     #syl-board { z-index: 1; }
+
+    /* ── THE LOG: everything already guessed, down the LEFT ──
+       The board shows only the letters that LOCKED, so everything else a
+       guess taught vanished the moment it was read out — the pips say how
+       many attempts are gone, they cannot say what was in them.
+
+       That used to be answered by a ghost comb: the last guess drawn faint
+       BEHIND the live board, interlocked with it the way a honeycomb
+       nests. It was arithmetically exact and readers could not read it —
+       two combs on one plane is a puzzle of its own, and people were
+       solving that instead of the word. So it is a list instead, which is
+       what a guess history is: every guess so far, oldest at the top,
+       beside the board rather than under it, printed as the same hexagons
+       in the same three states the board and the keyboard use, so there is
+       one colour vocabulary on the page and not two.
+
+       Its width is taken out of the board's budget in layoutBoard()
+       whether or not there is anything in it yet — reserving it only once
+       the first guess had landed would resize the board the moment the
+       reader pressed GİR, which is the one moment they are looking
+       straight at it. */
+    .guess-log {
+      /* It holds its width from the first paint, empty or not: the strip
+         is already out of the board's budget, so a log that collapsed
+         until the first guess landed would slide the board sideways at
+         exactly the moment the reader is watching it. */
+      width: var(--gl-w, 0px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      gap: var(--gl-gap, 2px);
+      flex: 0 0 auto;
+      align-self: center;
+    }
+    .gl-row {
+      display: flex;
+      gap: var(--gl-gap, 2px);
+    }
+    .guess-log .letter-box {
+      position: relative;
+      flex: 0 0 auto;
+      width: var(--gl-cell, 13px);
+      font-size: var(--gl-font, 8px);
+      /* The flip belongs to the board, where a letter is actually being
+         revealed. In here it would replay across the whole history every
+         time the list is rebuilt. */
+      animation: none !important;
+    }
+    /* A tile the size of a fingernail cannot also carry the drop wash and
+       the lit corner the board's hexagons do — at this size it is mud. */
+    .guess-log .letter-box::before { display: none; }
 
     /* ── THE HEXAGONS HAVE A BODY ──
        A flat fill inside the drawn ring reads as a sticker. This lights
@@ -923,19 +998,22 @@
     }
 
     .letter-box.correct {
-      background: var(--success);
-      color: var(--paper);
+      background: var(--tile-correct);
+      color: var(--tile-correct-ink);
       animation: flip 0.5s ease;
     }
     .letter-box.present {
-      background: var(--present);
-      color: var(--paper);
+      background: var(--tile-present);
+      color: var(--tile-present-ink);
       animation: flip 0.5s ease;
     }
+    /* Not in the word: not filled at all. It keeps its letter readable —
+       the old 0.4 nearly rubbed it out, and a guess you cannot read back
+       is a guess you will make again. */
     .letter-box.absent {
       background: var(--paper);
-      color: var(--absent);
-      opacity: 0.4;
+      color: var(--tile-absent-ink);
+      opacity: 0.55;
       animation: flip 0.5s ease;
     }
 
@@ -1026,9 +1104,9 @@
       width: var(--kb-key-wide);
       font-size: var(--kb-font-wide, 11px);
     }
-    .key.correct { background: var(--success); color: var(--paper); }
-    .key.present { background: var(--present); color: var(--paper); }
-    .key.absent { background: var(--rule); color: var(--absent-key); opacity: 0.4; }
+    .key.correct { background: var(--tile-correct); color: var(--tile-correct-ink); }
+    .key.present { background: var(--tile-present); color: var(--tile-present-ink); }
+    .key.absent { background: var(--rule); color: var(--tile-absent-ink); opacity: 0.35; }
     /* Q/W/X sit in their native-keyboard position but never do anything —
        no valid Turkish word contains them. */
     .key:disabled, .key.key-disabled {
@@ -1908,6 +1986,7 @@
            any screen; neither is a number tuned for one phone. -->
       <div class="play-area" id="play-area">
         <div class="board-row" id="board-row">
+          <div class="guess-log" id="guess-log"></div>
           <div class="word-grid" id="word-grid"></div>
         </div>
         <div class="attempt-pips" id="attempt-pips"></div>
@@ -4252,29 +4331,21 @@ const TILE_GAP_RATIO = TILE_VISUAL_GAP - 2 * TILE_ART_PAD_X;
 // second term opens that back up until the slanted edges stand
 // TILE_VISUAL_GAP apart measured perpendicular, exactly like the vertical
 // edges do across.
-// Where the ghost of the last guess sits: THREE half-columns to the left
-// and one level down. It is the one offset that never collides, and it
-// does so by arithmetic rather than by luck -- which is why the ghost can
-// be laid over any word, of any number of syllables, of any lengths,
-// without a single case to special-case.
-//
-// The staircase steps a syllable down by one level and right by
-// 2*len - 3 half-columns (see syllableLayout). So a ghost tile from
-// syllable s lands on level s+1 at half-column start(s) - 3 + 2j, and the
-// LIVE tiles it could hit there are syllable s+1's, at
-// start(s) + 2*len(s) - 3 + 2i. Equal only where j = len(s) + i -- and j
-// never reaches len(s), let alone passes it. No overlap, whatever the
-// lengths are.
-//
-// What it lands on instead is the notch: that row's rightmost ghost tile
-// is exactly one full column left of the live row's first tile, so the
-// two combs interlock the way a honeycomb does, touching along their
-// edges. The sign is load-bearing -- three half-columns to the RIGHT
-// solves j = len(s) - 3 + i and collides on any syllable of three letters
-// or more. One half-column either way (which is what this was) collides
-// on nearly every word there is.
-const GHOST_DX = 3;
-const GHOST_DY = 1;
+// The gap between two hexagons in the guess log, and the share of the
+// play area the log may take across. It is a list of what has already
+// been played, so it gets the smallest width that still reads; the board
+// is the thing on this page worth looking at (see .guess-log).
+const GL_GAP = 2;
+// The cell is sized off the play area rather than off a fixed strip
+// width, so an eight-letter word gets the same readable hexagon a
+// five-letter one does instead of being squeezed to fit a box; the strip
+// is then capped at a third of the area across, which is what stops a
+// long word from eating the board.
+const GL_CELL_SHARE = 0.033;
+const GL_CELL_MIN = 8;
+const GL_CELL_MAX = 16;
+const GL_MAX_SHARE = 0.34;
+const GL_CHANNEL = 8;   // and the channel between the log and the board
 
 const LEVEL_STEP = (function () {
   const shoulderX = TILE_ART_W / 2;               // centre → straight side
@@ -4322,10 +4393,8 @@ function initWordGrid() {
   const { starts, totalHalfCols } = syllableLayout(sylls);
   const levels = sylls.length;
 
-  // Two identical combs on one plane: the ghost of the last guess behind,
-  // the live word in front. Same tiles, same geometry, different id
-  // prefix -- layoutBoard() places both off one set of numbers, so they
-  // can never drift out of register with each other.
+  // One comb on the plane. What was guessed before is in the log beside
+  // it (see renderGuessLog), never behind it.
   const stack = document.createElement('div');
   stack.className = 'syl-stack';
   stack.id = 'syl-stack';
@@ -4347,8 +4416,6 @@ function initWordGrid() {
     return b;
   };
 
-  const ghost = buildBoard('syl-ghost', 'syl-board syl-ghost', 'gbox-');
-  stack.appendChild(ghost);
   stack.appendChild(buildBoard('syl-board', 'syl-board', 'box-'));
   grid.appendChild(stack);
 
@@ -4370,6 +4437,8 @@ function initWordGrid() {
     for (let i = 0; i < 6; i++) pips.appendChild(document.createElement('span'));
   }
   updatePips();
+  _logLen = -1;
+  renderGuessLog();
   layoutGame();
 }
 
@@ -4444,12 +4513,10 @@ function layoutGame() {
 function layoutBoard() {
   const area = document.getElementById('play-area');
   const board = document.getElementById('syl-board');
-  const ghost = document.getElementById('syl-ghost');
   const stack = document.getElementById('syl-stack');
   if (!BOARD_GEOM || !area || !board || !stack) return;
   const { sylls, starts, totalHalfCols, levels } = BOARD_GEOM;
 
-  const availW = area.clientWidth - 4;
   const areaH = area.clientHeight;
   // What the board may take: the play area minus the status line at the
   // bottom (measured — it is one line while playing, two once the game ends
@@ -4459,18 +4526,34 @@ function layoutBoard() {
   const status = area.querySelector('.game-status');
   const statusH = status ? status.offsetHeight : 0;
   const availH = Math.max(56, areaH - statusH - 2 * PIPS_BAND);
+
+  // The log takes its width first, and keeps it whether or not there is
+  // anything in it yet: a board that resized itself the first time the
+  // reader pressed GİR would be moving at the one moment they are looking
+  // straight at it. Six rows have to stand in the same height the board
+  // does, so the cell is capped by that too.
+  const log = document.getElementById('guess-log');
+  let logW = 0;
+  if (log) {
+    let cell = Math.round(area.clientWidth * GL_CELL_SHARE);
+    cell = Math.min(cell, Math.floor((area.clientWidth * GL_MAX_SHARE - (WORD_LENGTH - 1) * GL_GAP) / WORD_LENGTH));
+    cell = Math.min(cell, Math.floor((availH / 6 - GL_GAP) * TILE_RATIO));
+    cell = Math.max(GL_CELL_MIN, Math.min(GL_CELL_MAX, cell));
+    logW = cell * WORD_LENGTH + GL_GAP * (WORD_LENGTH - 1);
+    log.style.setProperty('--gl-w', logW + 'px');
+    log.style.setProperty('--gl-cell', cell + 'px');
+    log.style.setProperty('--gl-gap', GL_GAP + 'px');
+    log.style.setProperty('--gl-font', Math.max(7, Math.round(cell * 0.52)) + 'px');
+  }
+
+  const availW = area.clientWidth - 4 - logW - (logW ? GL_CHANNEL : 0);
   if (!(availW > 0) || !(availH > 0)) return;
 
   // Solve the width budget for tileW instead of estimating the gap from
   // the cap: board width is totalHalfCols·(tileW+gap)/2 − gap, and gap is
   // itself a multiple of tileW, so the whole thing is linear in tileW.
-  // The ghost's own half-column across and level down are part of the
-  // budget WHETHER OR NOT one is showing: reserving it only once a guess
-  // has landed would resize the board the first time the reader pressed
-  // GIR, which is the one moment they are looking straight at it.
-  const widthPerTile = totalHalfCols * (1 + TILE_GAP_RATIO) / 2 - TILE_GAP_RATIO
-    + GHOST_DX * (1 + TILE_GAP_RATIO) / 2;
-  const levelFactor = 1 + (levels - 1 + GHOST_DY) * LEVEL_STEP;
+  const widthPerTile = totalHalfCols * (1 + TILE_GAP_RATIO) / 2 - TILE_GAP_RATIO;
+  const levelFactor = 1 + (levels - 1) * LEVEL_STEP;
   let tileW = Math.min(TILE_MAX_W, Math.floor(availW / widthPerTile));
   tileW = Math.min(tileW, Math.floor(availH * TILE_RATIO / levelFactor));
   tileW = Math.max(tileW, TILE_MIN_W);
@@ -4487,13 +4570,8 @@ function layoutBoard() {
 
   const boardW = Math.ceil(totalHalfCols * halfStep - gap);
   const boardH = vStep * (levels - 1) + tileH;
-  // The ghost is nested one honeycomb cell behind: half a column to the
-  // left and one level down. The stack holds both, so what gets centred
-  // in the board row is the pair rather than the live comb alone.
-  const offX = Math.round(GHOST_DX * halfStep);
-  const offY = Math.round(GHOST_DY * vStep);
-  stack.style.width = (boardW + offX) + 'px';
-  stack.style.height = (boardH + offY) + 'px';
+  stack.style.width = boardW + 'px';
+  stack.style.height = boardH + 'px';
 
   const place = (prefix, el, left, top) => {
     if (el) {
@@ -4516,35 +4594,36 @@ function layoutBoard() {
       }
     });
   };
-  place('box-', board, offX, 0);
-  place('gbox-', ghost, 0, offY);
+  place('box-', board, 0, 0);
 }
 
-// ── The last guess, still on the table ──
+// ── The log: every guess so far, down the left of the board ──
 // Painted from the history the game already keeps (submittedGuesses /
-// guessResults), so it comes back with a reloaded board for free. Nothing
-// to show -- the first guess of the day is not yet in -- and the layer is
-// simply hidden; the room it would take is already reserved either way.
-// `back` is how far from the end to take it: 0 while playing, where the
-// live comb holds the locked letters and whatever is being typed, so the
-// last guess is the one thing missing from the screen -- and 1 once the
-// game is over, where the live comb IS the last guess and a ghost of the
-// same word behind it would just be a blur.
-function renderGhostBoard(back) {
-  const ghost = document.getElementById('syl-ghost');
-  if (!ghost) return;
-  const at = submittedGuesses.length - 1 - (back || 0);
-  const word = submittedGuesses[at];
-  const result = guessResults[at];
-  // The empty comb stands even before a first guess -- an empty ghost is
-  // the promise that the board's shape won't jump the moment one lands,
-  // not a lie about there being a guess already on the table.
-  for (let i = 0; i < WORD_LENGTH; i++) {
-    const box = document.getElementById(`gbox-${i}`);
-    if (!box) continue;
-    box.textContent = (word && word[i]) || '';
-    box.className = (word && result) ? `letter-box filled ${result[i] || ''}` : 'letter-box';
-  }
+// guessResults), so a reloaded board brings the whole list back for free.
+// Rebuilt only when a guess has actually landed: updateBoard() calls this
+// on every keystroke, and re-making the nodes each time would be churn
+// for a list that cannot have changed.
+let _logLen = -1;
+function renderGuessLog() {
+  const log = document.getElementById('guess-log');
+  if (!log) return;
+  if (_logLen === submittedGuesses.length) return;
+  _logLen = submittedGuesses.length;
+  log.innerHTML = '';
+  // Oldest at the top: it is a list of what happened, and that is the
+  // order it happened in.
+  submittedGuesses.forEach((word, i) => {
+    const result = guessResults[i] || [];
+    const row = document.createElement('div');
+    row.className = 'gl-row';
+    for (let j = 0; j < word.length; j++) {
+      const box = document.createElement('div');
+      box.className = ('letter-box filled ' + (result[j] || '')).trim();
+      box.textContent = word[j];
+      row.appendChild(box);
+    }
+    log.appendChild(row);
+  });
 }
 
 // The credit line under the keyboard is ONE line on every screen, always:
@@ -4616,7 +4695,7 @@ function paintSkeleton(word, result) {
     box.textContent = word[i] || '';
     box.className = `letter-box filled ${result[i]}`;
   }
-  renderGhostBoard(1);
+  renderGuessLog();
 }
 
 function initKeyboard() {
@@ -4751,7 +4830,7 @@ function updateDisplay() {
       box.className = 'letter-box' + (ch ? ' filled' : '');
     }
   }
-  renderGhostBoard(0);
+  renderGuessLog();
 }
 
 function submitGuess(fullGuess) {
@@ -4803,6 +4882,10 @@ function submitGuess(fullGuess) {
     revealing = false;
     revealIndices.forEach(i => { if (result[i] === 'correct') lockedLetters[i] = guessSnap[i]; });
     updatePips();
+    // The guess that just landed joins the list beside the board — here
+    // rather than in updateDisplay(), which the two end-of-game branches
+    // below never reach.
+    renderGuessLog();
     if (guessSnap === TARGET_WORD) {
       document.getElementById('game-message').textContent = I18N.t('games.congrats');
       document.getElementById('game-message').className = 'game-message win';
