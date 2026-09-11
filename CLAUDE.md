@@ -148,7 +148,7 @@ default one.
 ├── router.js             # Shared shell: single Supabase client, the two tabs + the zoom stack, virtual navigation, clock
 ├── sheet.css/.js         # THE sheet: the one page that rises from the bottom — see "Site-wide defaults"
 ├── profile-card.js/.css  # Profile bar (the phone's top bar), avatar, badges — shared across pages
-├── onboarding.js/.css    # New-account onboarding flow
+├── onboarding.js/.css    # New-account onboarding — project.html ONLY (see its own section)
 ├── game-locks.js         # Per-day game on/off enforcement + the sequence's question gates
 ├── event-interest.js     # "İlgimi çekti": the verdict Kahvehane's event deck records, Hane reads
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
@@ -2421,6 +2421,58 @@ Six things about it:
 - **Fikirler is decided in shape and not in content.** The tile has its place on Kütüphane; what
   fills it is parked until it is worth building, the way Makaleler and the neighbourhood comments
   are parked rather than deleted.
+
+### Onboarding — `onboarding.js` + `.css`
+
+A brand-new account is walked through the app once, on `project.html` and nowhere else, and
+`profiles.onboarded_at` is what says it has happened. Welcome (the kefil line, and the T&C tick
+that gates going further) → language → palette + mascot → **the lane tour** → the member's own
+kefil code → finish, which writes `onboarded_at`, `language_pref`, `palette_pref` and `mascot` in
+one update. The admin's kill switch is `app_settings.onboarding_enabled` (missing row = on).
+
+**The tour walks the lanes, and the reader does the walking.** It used to hop anahane → kahvehane
+→ sozcel → kutuphane → anahane by *navigating*, keeping its place in `sessionStorage` between the
+pages and lighting each one's nav link to hand over. Those pages are the parts bin now (see the
+router's own section) and nothing links to them, so that whole leg went with them. What replaced
+it is the three lanes of slide 12: nine beats, and the three that change lane ask for the **real
+sideways pull** rather than moving the book themselves — the gesture the reader will use forever
+after is the one they are taught by making it. Reaching Kütüphane from Kahvehane is deliberately
+two pulls, because the strip moves one lane per gesture and the way between them is through Hane.
+
+Five things about it, each of which fails silently if forgotten:
+
+- **The tour watches the book through `window.__fb` and never reaches inside it.** That handle is
+  project.html's own documented one; nothing here touches its internals, and a page without it (a
+  parts-bin page opened directly) skips the tour and goes straight to the closing beats rather
+  than spotlighting elements that are not there.
+- **Arrival is the committed lane AND a settled strip** (`lane.at` plus `lane.pos` within 0.01).
+  `lane.at` flips the instant the reader lets go, while the strip is still tweening to it on
+  project.html's own rAF — which `__fb.busy` does not cover — so advancing on `at` alone lights a
+  box that is still in flight and lands the ring beside it.
+- **A pull beat hands the book back, and the firewall has to stand down with it.** The lock is
+  `pointer-events: none` on everything outside the onboarding, which is right for a beat the
+  reader only taps through and exactly wrong for one where the gesture *is* the answer. The
+  stylesheet alone is not enough: the firewall `preventDefault`s `touchmove` in the capture phase,
+  which on a phone cancels the very pull just asked for, and the beat then waits forever on a
+  gesture the page is swallowing. Both halves are needed — `body.ist-onb-passthru` in
+  onboarding.css and `isPassthrough()` in onboarding.js.
+- **The dim is a punched sheet, not a lift.** The obvious spelling — raise the lit element over
+  the dim with `position: relative` + `z-index` — cannot work here: `.fb-cast` is `position:
+  absolute` with `z-index: 1` and so is its own stacking context, so a box inside it never rises
+  above a dim at 99989 however large a z-index it is given; and `position: relative` on a
+  `.fb-box` would move it, since the book positions those absolutely. So nothing is added to the
+  app's DOM at all — the holes are cut with one `fill-rule: evenodd` clip-path (the same idiom
+  `IstSheet.lightTheMap` uses on the map's tint) and the rings are drawn in a layer of our own
+  over the top. The rects are measured, so they are re-measured on resize.
+- **No pull beat can dead-end.** After `STALL_MS` the prompt becomes a tap-to-continue and the
+  tour carries on without the gesture. A reader who cannot swipe — a trackpad, an assistive
+  pointer, a phone that ate the touch — must still reach the end, because the end is where
+  `onboarded_at` is written and an account stuck short of it is an account that gets the whole
+  flow again on every launch.
+
+**It runs on the parts-bin pages nowhere and never.** They no longer load the script at all: a
+flow completed on a page nobody can reach would still write `onboarded_at`, and so suppress the
+real one on the page the member actually opens.
 
 **What of this is already standing in `project.html`:** Etkinlikler and Oyunlar (all three games)
 on Kahvehane, Haberler and Anket on Kütüphane, Olaylar at the Türkiye stop, the petek and its three

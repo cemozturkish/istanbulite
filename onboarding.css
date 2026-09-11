@@ -25,11 +25,28 @@ body.ist-onb-locked {
 body.ist-onb-locked #ist-onb-root,
 body.ist-onb-locked #ist-onb-pane,
 body.ist-onb-locked .ist-onb-hint,
-body.ist-onb-locked .ist-onb-target,
 /* The dim layer must stay a real hit-testable target — see the comment
    on #ist-onb-spotlight below for why it can't rely on pointer-events:none
    "falling through" to a clickable ancestor. */
 body.ist-onb-locked #ist-onb-spotlight { pointer-events: auto !important; }
+
+/* ── The pull beats ──
+   A tour beat that asks for a real sideways pull has to hand the book back:
+   the lock above is `pointer-events: none` on everything outside the
+   onboarding, which is right for a beat the reader only taps through and
+   exactly wrong for one where the gesture IS the answer. While
+   .ist-onb-passthru is set, #fb (project.html's book, which owns the
+   pointer handlers) takes events again and the dim stops hit-testing, so
+   the swipe lands on the app rather than on the overlay.
+
+   The dim stays VISIBLE -- only its hit-testing goes. The reader is still
+   being talked to; they are just being talked to about a gesture. And the
+   mascot pane keeps its own pointer-events (it is inside the onboarding and
+   so was never in the lock's scope), which is what lets the stall nudge
+   still be tappable. */
+body.ist-onb-locked.ist-onb-passthru #fb,
+body.ist-onb-locked.ist-onb-passthru #fb * { pointer-events: auto !important; }
+body.ist-onb-locked.ist-onb-passthru #ist-onb-spotlight { pointer-events: none !important; }
 
 /* Per-palette tokens applied to the onboarding root only. The 4 modes
    come from data-palette × data-theme (see frames.css: data-theme is
@@ -335,9 +352,9 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
 }
 
 /* ───────── Spotlight tour (Phase 2) ─────────
-   Persistent dim layer covers the page. Any element marked .ist-onb-target
-   gets lifted above the dim with a soft glow, so each area the mascot has
-   introduced stays lit for the rest of the tour. */
+   A persistent dim over the page with a hole cut in it for each area the
+   mascot has introduced -- everything lit stays lit for the rest of the
+   tour, and the rings over the holes are drawn separately (see below). */
 
 #ist-onb-spotlight {
   position: fixed;
@@ -347,46 +364,42 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
      for non-interactive beats. It needs to be the real click target that
      the tap-anywhere firewall catches — relying on the click "falling
      through" to <html> is a happy Chromium quirk, not something mobile
-     Safari can be trusted to do. .ist-onb-target/.ist-onb-nav-flash sit
-     above it (z-index 99990) so interactive beats still tap the real
-     element underneath. */
+     Safari can be trusted to do. It stops hit-testing only on a pull
+     beat, where the gesture belongs to the book (see .ist-onb-passthru). */
   pointer-events: auto;
   cursor: pointer;
   z-index: 99989;
   background: rgba(0, 0, 0, 0.62);
   display: none;
-  transition: background 200ms ease;
 }
 #ist-onb-spotlight.show { display: block; }
 
-/* A "lit" element. position:relative + z-index raises it above the dim,
-   glow ring makes the highlight obvious. The .latest variant is brighter
-   so the user can tell which area the mascot is currently talking about. */
-.ist-onb-target {
-  position: relative;
-  z-index: 99990;
+/* ── The rings ──
+   Drawn in a layer of our own, over the dim, rather than by lifting the
+   element the way this used to (.ist-onb-target: position:relative +
+   z-index). That lift cannot reach over project.html's cast, which sits
+   in its own stacking context, and `position: relative` would move an
+   absolutely-positioned .fb-box -- see the note in onboarding.js. The
+   holes themselves are cut out of the dim with an evenodd clip-path.
+
+   Drawing only: the layer never takes a press. What may be pressed is
+   decided by the firewall, which is a different question from what is
+   lit, and keeping the two apart is what stops a "lit" element from
+   looking pressable when it is not. */
+#ist-onb-rings {
+  position: fixed;
+  inset: 0;
+  z-index: 99991;
+  pointer-events: none;
+}
+.ist-onb-ring {
+  position: fixed;
+  border-radius: 4px;
   box-shadow: 0 0 0 2px rgba(255,255,255,0.55), 0 0 18px rgba(255,255,255,0.12);
   transition: box-shadow 220ms ease;
 }
-.ist-onb-target.latest {
+.ist-onb-ring.latest {
   box-shadow: 0 0 0 2px rgba(255,255,255,0.95), 0 0 28px rgba(255,255,255,0.22);
-}
-.ist-onb-target.interactive {
-  cursor: pointer;
-}
-
-/* Nav link "flash" — used in place of the box-shadow ring when we want
-   to call attention to a nav title without a hard rectangle around it.
-   Lifts the link above the dim and pulses its color + opacity. */
-.ist-onb-nav-flash {
-  position: relative;
-  z-index: 99990;
-  cursor: pointer;
-  animation: ist-onb-flash 1100ms ease-in-out infinite;
-}
-@keyframes ist-onb-flash {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.35; }
 }
 
 /* Mascot speech pane — fixed bottom-right corner.

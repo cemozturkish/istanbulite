@@ -23,6 +23,8 @@
   <link rel="stylesheet" href="frames.css?v=11">
   <script src="loading-screen.js?v=4"></script>
   <link rel="stylesheet" href="loading-screen.css?v=3">
+  <link rel="stylesheet" href="onboarding.css?v=3">
+  <script src="onboarding.js?v=2" defer></script>
 
   <style data-page="project">
     html, body {
@@ -3220,6 +3222,30 @@ async function load() {
   // the loading screen is let go. Nothing else can lift it, so an early
   // return here would leave the reader looking at black paper for good.
   try { await loadFrames(); } finally { resolveLoading(); }
+  // A brand-new account is walked through the app once, HERE and nowhere
+  // else -- this is the only page a member can reach. It goes last on
+  // purpose: the tour asks the reader for real pulls and watches the book
+  // arrive, so it must not start before the book can be pulled (`ready`,
+  // set at the end of loadFrames) or its first gesture beat would wait on
+  // a page that cannot answer. Awaited by nothing: onboarding is a whole
+  // conversation and the app is usable the moment the frames are in.
+  runOnboarding();
+}
+
+// Fire-and-forget, and deliberately quiet about every way it can decline:
+// no window.IstOnboarding (the script is `defer`red and could be missing),
+// no session, the admin kill switch, or an account that has already been
+// through it. None of those is a failure the reader should see -- the app
+// behind it is complete either way.
+async function runOnboarding() {
+  if (!window.IstOnboarding) return;
+  try {
+    const { data } = await IstRouter.sb.auth.getUser();
+    if (!data || !data.user) return;
+    await IstOnboarding.maybeRun({ sb: IstRouter.sb, user: data.user });
+  } catch (err) {
+    console.error('onboarding did not run', err);
+  }
 }
 
 async function loadFrames() {
