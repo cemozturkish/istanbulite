@@ -1,16 +1,25 @@
 // Onboarding flow for brand-new accounts.
-// Runs on first login: locks the rest of the page behind a full-screen overlay,
-// walks the user through 8 beats (welcome → language → palette+mascot → tour →
-// kefil code → profile prompt), then writes onboarded_at, language_pref,
-// palette_pref, and mascot to profiles.
+// Runs on first login: locks the page behind a full-screen overlay, then
+// welcome → language → palette+mascot → the lane tour → kefil code →
+// profile prompt, and writes onboarded_at, language_pref, palette_pref and
+// mascot to profiles at the end.
 //
-// Mount from any page after auth:
+// It runs in ONE page, because the app is one page (project.html). The tour
+// used to walk anahane → kahvehane → sozcel → kutuphane → anahane by
+// navigating, saving its place in sessionStorage between them; those pages
+// are a parts bin now and nothing links to them, so that whole leg is gone.
+// What replaced it is the three lanes of slide 12, walked with the same
+// sideways pull the reader will use forever after -- see stepTour.
+//
+// Mount once after auth:
 //   IstOnboarding.maybeRun({ sb, user, kefilName })
 // It checks profiles.onboarded_at — if null, runs the flow; otherwise no-op.
+// Without window.__fb (a parts-bin page opened directly) the tour is
+// skipped and the flow goes welcome → … → kefil code → finish.
 
 (function (global) {
   const ROOT_ID = 'ist-onb-root';
-  // Cross-page state so the flow can hop anahane → kahvehane → kutuphane → anahane.
+  // Only ever cleared now -- see clearState.
   const STATE_KEY = 'istanbulite_onboarding';
 
   // ── Copy ──
@@ -51,8 +60,9 @@
       tcLabel: 'I agree to the terms and conditions.',
     },
     languageScreen: {
-      // Unused now — the picker is inline on the welcome screen — but
-      // kept so any caller that still references stepLanguage doesn't break.
+      // `body` is unused (the picker is inline on the welcome screen and
+      // needs no lead paragraph); `choices` is what renderLanguageChoicesInline
+      // reads.
       body: 'ISTANBULITE is, by default, in Turglish. Before we get started, we would like to ask your preference. You can choose to have most things in Turkish, or most things in English — but never not both.',
       choices: [
         { value: 'default',      label: 'TÜRKÇE AĞIRLIKLI', sub: 'Turkish-heavy' },
@@ -78,138 +88,69 @@
         ],
       },
     },
-    // Spotlight tour: each beat targets a real element on the page.
-    // null target = no spotlight (just mascot floating).
-    tour: {
+    // ── The lane tour ──
+    // The app is project.html now: three lanes on one slide, walked by a
+    // sideways pull (see CLAUDE.md, "Slide 12 is three screens"). Each beat
+    // either talks (tap anywhere) or asks for the real pull and waits for
+    // the reader to arrive. The old four-page tour that hopped anahane →
+    // kahvehane → kutuphane by navigating is gone with the pages it walked.
+    lanes: {
       tr: {
         cat: {
-          reveal:  'Hâlâ buradasın demek. Peki, sana Hane\'yi göstereyim. Ayak uydurmaya çalış.',
-          news:    'Mahallenden ve dünyadan son dakika. Acil bir şey yoksa, yenilemene gerek yok.',
-          map:     'Harita. Buradaki ışıklı kısım senin mahallen. Üzerine bir dokun bakalım.',
-          events:  'Bu haftanın etkinlikleri. İnternette daha fazla vakit geçirmen için değil — dışarı çıkasın diye.',
-          nav:     'Kütüphane ve Kahvehane buradan. Kahvehane\'de her gün değişen üç oyun var: Sözcel, Tümcel, Bulmaca. Serini kaybetme.',
+          reveal:  'Hâlâ buradasın demek. Peki. Burası Hane — ortası. Her şey buradan bir kaydırma uzakta.',
+          petek:   'Bu petek. Ortadaki sensin, yanındakiler de gerçekten yanındakiler. Kimse seni buraya ekleyemez; birinin sana kodunu vermesi gerekir.',
+          toKahve: 'Sağda Kahvehane var. Parmağını sola kaydır — ben burada bekliyorum.',
+          events:  'Etkinlikler. Bunlar internette değil, dışarıda. Beğendiğini seç, Hane\'de seni bekler.',
+          games:   'Üç oyun, her gün yeni. Sırayla açılırlar — acelen varsa yanlış uygulamadasın.',
+          toKutup: 'Şimdi ters yöne. Kütüphane en solda: sağa kaydır, Hane\'den geçip devam et.',
+          news:    'Haberler. İstanbul, Türkiye, Dünya — üçü de burada, günde bir avuç. Bitince biter.',
+          anket:   'Anket. Cevabın kendi ilçenin altına yazılır, yani sonuç tek bir yüzde değil — yirmi beş tane.',
+          toHane:  'Yeter bu kadar. Sola kaydır, Hane\'ye dönelim.',
         },
         dog: {
-          reveal:  'SELAAM!! Vay, merhaba! Hane\'ye hoş geldin! Hadi sana her şeyi göstereyim!!',
-          news:    'Burada mahallenden ve dünyadan son haberler var! Hepsi tek yerde, ne güzel değil mi?',
-          map:     'Bak, harita! Işıklı olan kısım senin mahallen! Hadi üstüne bir dokun, beraber selamlayalım!',
-          events:  'Ve bu hafta neler oluyor! Bunlar gerçek hayatta — git, eğlen, biriyle tanış!',
-          nav:     'Buradan Kütüphane ve Kahvehane\'ye gidebilirsin! Kahvehane\'de her gün üç yeni oyun var: Sözcel, Tümcel, Bulmaca — çok eğlenceli!',
-        },
-      },
-      en: {
-        cat: {
-          reveal:  "Oh. You're still here. Fine — let me show you around Hane. Try to keep up.",
-          news:    "Breaking news from your hood and the world. If nothing's urgent, don't refresh.",
-          map:     'The map. The lit-up one is your district. Go on, tap it.',
-          events:  "What's happening this week. Not so you spend more time online — so you go outside.",
-          nav:     "Kütüphane and Kahvehane are up here. Kahvehane has three games that change every day: Sözcel, Tümcel, Bulmaca. Don't lose your streak.",
-        },
-        dog: {
-          reveal:  "HI!! Oh wow, hi! Welcome to Hane! Come on, let me show you everything!!",
-          news:    "Here's the breaking news from your hood and the world! All in one place, isn't that nice?",
-          map:     "Look, a map! The glowing one is YOUR district! Tap it, let's say hi together!",
-          events:  "And here's what's happening this week! These are real-life things — go, have fun, meet someone!",
-          nav:     "Up here you can get to Kütüphane and Kahvehane! Kahvehane has three new games every day: Sözcel, Tümcel, Bulmaca — so fun!",
-        },
-      },
-    },
-    // Last anahane beat tells the user the mascot is taking them to Kahvehane.
-    navLeave: {
-      tr: {
-        cat: 'Yukarıda diğer salonlar da var. Gel — önce Kahvehane.',
-        dog: 'Yukarıda başka yerler de var! Hadi seni önce Kahvehane\'ye götüreyim!',
-      },
-      en: {
-        cat: "Other halls are up here. Come — Kahvehane first.",
-        dog: "There are other places up here too! Come on, let me take you to Kahvehane first!",
-      },
-    },
-    // Kahvehane multi-beat tour (replaces the single-beat intro).
-    // intro → discussion → tap your hood → comment rule → games + tap Sözcel.
-    // The map is pre-lit since the user already met it on Hane.
-    kahvehaneTour: {
-      tr: {
-        cat: {
-          intro:   'Kahvehane. Diğerlerinin oturup konuştuğu yer.',
-          discuss: 'Tartışmalar burada. Şimdilik sadece okuyacaksın — yazma sırası az kaldı.',
-          hoodTap: 'Mahalleni tıkla. Kendin gör.',
-          rule:    'İşte. Sadece yaşadığın yerde yorum yazabilirsin. Başka mahalleleri kirletmeye gerek yok.',
-          games:   'Üç oyun. Her gün yeni. Önce Sözcel\'i dene — dokun.',
-        },
-        dog: {
-          intro:   'GELDİK! Burası Kahvehane! Herkes burada takılır!',
-          discuss: 'Tartışmalara baksana! İstanbul\'un her yerinden insanların ne dediğini okuyabilirsin!',
-          hoodTap: 'Şimdi KENDİ mahalleni tıkla! Hadi haritada bul!',
-          rule:    'Gördün mü? Sadece KENDİ mahallende yorum yapabilirsin! Daha samimi oluyor!',
-          games:   'VE OYUNLAR! Her gün üç yeni! Sözcel\'e dokun — beraber oynayalım!',
+          reveal:  'SELAAM!! Burası Hane! Uygulamanın tam ortası — her yere buradan gidiliyor!',
+          petek:   'BAK, PETEK! Ortadaki sensin! Etrafındakiler de yanındaki İstanbulite\'lar! Birbirimize kodla ekleniyoruz, çok tatlı değil mi?',
+          toKahve: 'Hadi Kahvehane\'ye gidelim! Parmağını SOLA kaydır!',
+          events:  'ETKİNLİKLER! Bunlar gerçek hayatta oluyor! Beğendiğini seç, Hane\'de seni bekler — sonra da GİT!',
+          games:   'VE OYUNLAR! Her gün üç yeni tane! Sırayla açılıyorlar, acele etme!',
+          toKutup: 'Şimdi diğer tarafa! Kütüphane en solda — SAĞA kaydır, Hane\'den geçip devam et!',
+          news:    'HABERLER! İstanbul, Türkiye ve Dünya, hepsi burada! Günde bir avuç, bitince biter!',
+          anket:   'Anket! Cevabın kendi ilçene yazılıyor — yani Beşiktaş ne demiş, Üsküdar ne demiş, hepsi ayrı ayrı görülüyor!',
+          toHane:  'Tamamdır! Hadi Hane\'ye dönelim — SOLA kaydır!',
         },
       },
       en: {
         cat: {
-          intro:   'Kahvehane. The coffeehouse. Where the rest of us drink and talk.',
-          discuss: "The discussion. You can read it everywhere — and soon you'll write too.",
-          hoodTap: 'Tap your district. See for yourself.',
-          rule:    "There. You can only post where you live. Don't spam other districts. Keep it honest.",
-          games:   'Three games. Daily. Try Sözcel first — tap it.',
+          reveal:  "Still here. Fine. This is Hane — the middle. Everything else is one pull away.",
+          petek:   "The petek. You're the one in the centre, and the ones touching you are actually next to you. Nobody can add you here — someone has to hand you their code.",
+          toKahve: 'Kahvehane is to the right. Pull your finger left. I\'ll wait.',
+          events:  "Events. These happen outside, not in here. Keep the ones you want; they'll be waiting on Hane.",
+          games:   "Three games, new every day. They unlock in order — if you're in a hurry you're in the wrong app.",
+          toKutup: "Now the other way. Kütüphane is all the way left: pull right, past Hane, and keep going.",
+          news:    "The news. İstanbul, Türkiye, Dünya — all three, a handful a day. When it's done, it's done.",
+          anket:   "The poll. Your answer is filed under your own district, so the result isn't one percentage — it's twenty-five.",
+          toHane:  "That's enough. Pull left, back to Hane.",
         },
         dog: {
-          intro:   'WE MADE IT! This is Kahvehane! Everyone hangs out here!',
-          discuss: 'Look at the discussions! You can read what people across Istanbul are saying!',
-          hoodTap: 'Now tap YOUR district! Go on, find it on the map!',
-          rule:    'See? You can only post in YOUR district! Keeps things real!',
-          games:   "AND THE GAMES! Three new ones every day! Tap Sözcel — let's play together!",
+          reveal:  "HI!! This is Hane! The very middle of the app — everything starts here!",
+          petek:   "LOOK, THE PETEK! That's YOU in the middle! And those are the Istanbulites right next to you! We attach with codes, isn't that lovely?",
+          toKahve: "Let's go to Kahvehane! Pull your finger LEFT!",
+          events:  "EVENTS! These are real-life things! Keep the ones you like, they'll wait for you on Hane — then GO!",
+          games:   "AND THE GAMES! Three new ones every day! They unlock in order, no rushing!",
+          toKutup: "Now the other way! Kütüphane is all the way left — pull RIGHT, past Hane, and keep going!",
+          news:    "THE NEWS! İstanbul, Türkiye and Dünya, all here! A handful a day, and then it's done!",
+          anket:   "The poll! Your answer goes under YOUR district — so what Beşiktaş said and what Üsküdar said are counted apart!",
+          toHane:  "All done! Let's go back to Hane — pull LEFT!",
         },
       },
     },
-    sozcelIntro: {
-      tr: {
-        cat: 'Sözcel. Altı denemede beş harfli Türkçe sözcüğü bul. Kaybedersen herkes görür. Hadi oyna — bittiğinde Kütüphane\'ye geçelim.',
-        dog: 'Sözcel! Altı denemede beş harfli Türkçe sözcüğü bul! Hadi oyna, bitince Kütüphane\'ye gidelim!',
-      },
-      en: {
-        cat: "Sözcel. Guess the five-letter Turkish word in six tries. Lose and we'll all see. Play it — then on to Kütüphane.",
-        dog: "Sözcel! Guess the five-letter Turkish word in six tries! Play it, then we'll head to Kütüphane!",
-      },
-    },
-    promptTapSozcel:         { tr: 'SÖZCEL\'e dokun',  en: 'tap SÖZCEL' },
-    promptTapHoodKahvehane:  { tr: 'mahallene dokun',  en: 'tap your district' },
-    kutuphaneIntro: {
-      tr: {
-        cat: 'Kütüphane. Uzun okumalar burada. Vaktin olduğunda gez. Şimdi Hane\'ye dönelim — neredeyse bitti.',
-        dog: 'Ve burası Kütüphane! Bütün uzun yazılar burada! Son durak — Hane\'ye dönüyoruz!',
-      },
-      en: {
-        cat: "Kütüphane. The longer reading lives here. Browse when you've got time. Back to Hane — almost done.",
-        dog: "And this is Kütüphane! All the long reads live here! Last stop — back to Hane!",
-      },
-    },
-    btnTakeKahvehane: { tr: 'KAHVEHANE\'YE GİT', en: 'GO TO KAHVEHANE' },
-    btnTakeKutuphane: { tr: 'KÜTÜPHANE\'YE GİT', en: 'GO TO KÜTÜPHANE' },
-    btnBackToHane:    { tr: 'HANE\'YE DÖN',      en: 'BACK TO HANE' },
-    promptTapKahvehane:       { tr: 'üstteki menüden KAHVEHANE\'ye dokun', en: 'tap KAHVEHANE in the nav above' },
-    promptTapKahvehaneMobile: { tr: 'alttaki sekmeden KAHVEHANE\'ye dokun', en: 'tap KAHVEHANE in the tab bar below' },
-    promptTapKutuphane:       { tr: 'üstteki menüden KÜTÜPHANE\'ye dokun', en: 'tap KÜTÜPHANE in the nav above' },
-    promptTapKutuphaneMobile: { tr: 'alttaki sekmeden KÜTÜPHANE\'ye dokun', en: 'tap KÜTÜPHANE in the tab bar below' },
-    promptTapHane:            { tr: 'üstteki menüden HANE\'ye dokun',       en: 'tap HANE in the nav above' },
-    promptTapHaneMobile:      { tr: 'alttaki sekmeden HANE\'ye dokun',      en: 'tap HANE in the tab bar below' },
-
-    // Mascot reaction after the user actually taps their neighborhood.
-    // Calls out the news-feed filter switching to "mahalle" — the news
-    // section is still lit on the left, so the user can see the change.
-    mapTapped: {
-      tr: {
-        cat: 'İşte. Mahallen. Sola bak — haber akışı da artık sadece senin mahallenden. Aklında bulunsun.',
-        dog: 'EVET! İşte burada — senin mahallen! Bak, sol taraftaki haberler de değişti! Şimdi sadece mahallenden son dakika!',
-      },
-      en: {
-        cat: 'There. Your district. Look left — the feed is filtered to your hood now. Keep it in mind.',
-        dog: "YES! There it is — your district! And look, the news on the left changed too! It's just your hood's breaking news now!",
-      },
-    },
-    promptTapHood: {
-      tr: 'mahallene dokun',
-      en: 'tap your district',
+    // Prompts under the mascot on a beat that waits for a real pull, and
+    // the harder nudge that replaces it if the reader stalls (see STALL_MS).
+    pullLeft:    { tr: 'parmağını sola kaydır',  en: 'pull left' },
+    pullRight:   { tr: 'parmağını sağa kaydır',  en: 'pull right' },
+    pullNudge: {
+      tr: 'kaydıramıyor musun? devam etmek için dokun',
+      en: "can't pull? tap to carry on",
     },
     kefilShare: {
       tr: {
@@ -247,16 +188,14 @@
   let spotlightEl;     // The persistent dim overlay
   let pane;            // The mascot pane (corner bubble)
   let litTargets = []; // Every element the mascot has introduced so far
-  let interactiveTarget; // Only set when the user must tap this element
+  let latestTargets = []; // The set lit by the CURRENT beat (brighter ring)
+  let ringLayer;       // Our own layer for the rings drawn over the dim
   let firewallInstalled = false;
   // When set, a click anywhere on the page (outside the pane / interactive
   // target) advances the tour. Cleared after firing once.
   let tapAdvanceFn = null;
 
   // ── Helpers ──
-  // Matches the 768px breakpoint used by all page layouts.
-  function isMobile() { return window.matchMedia('(max-width: 768px)').matches; }
-
   function fillKefil(s) {
     return (s || '').replace(/\{KEFIL\}/g, escapeHTML(kefilName || ''));
   }
@@ -265,12 +204,12 @@
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
     }[c]));
   }
+  // TEMP: dog art isn't drawn yet -- assets/mascot/ has the cat only, so a
+  // dog mascot shows the cat PNG rather than a broken image. One place, so
+  // restoring the dog is one line: `mascot-${mascot}-right.png`.
+  function mascotSrc() { return 'assets/mascot/mascot-cat-right.png'; }
   function mascotImgHTML() {
-    // TEMP: dog art isn't uploaded yet — use the cat PNG for dog mascots too
-    // so onboarding doesn't show a broken image. Restore the dog branch once
-    // assets/mascot-dog-right.png exists.
-    const src = 'assets/mascot/mascot-cat-right.png';
-    return `<div class="ist-onb-mascot"><img src="${src}" alt=""></div>`;
+    return `<div class="ist-onb-mascot"><img src="${mascotSrc()}" alt=""></div>`;
   }
   function clearStage() {
     const stage = document.getElementById('ist-onb-stage');
@@ -395,30 +334,13 @@
     const hint = document.body.querySelector('.ist-onb-hint');
     if (hint) hint.remove();
   }
-  function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-  // ── Cross-page state ──
-  function saveState(stage) {
-    try {
-      sessionStorage.setItem(STATE_KEY, JSON.stringify({
-        stage, lang, palette, mascot, kefilName, referralCode, homeNb,
-      }));
-    } catch (e) { /* sessionStorage might be unavailable; flow restarts on next page */ }
-  }
-  function loadState() {
-    try { return JSON.parse(sessionStorage.getItem(STATE_KEY) || 'null'); }
-    catch (e) { return null; }
-  }
+  // ── Stale cross-page state ──
+  // The flow used to hop four pages and keep its place here between them.
+  // It is one page now, so nothing is ever written -- this only clears what
+  // an older build may have left behind (see maybeRun).
   function clearState() {
     try { sessionStorage.removeItem(STATE_KEY); } catch (e) { /* ignore */ }
-  }
-  function hydrateFromState(s) {
-    lang = s.lang || 'en';
-    palette = s.palette || 'mono';
-    mascot = s.mascot || 'cat';
-    kefilName = s.kefilName || '';
-    referralCode = s.referralCode || '';
-    homeNb = s.homeNb || null;
   }
 
   // Render a row of choice buttons + a Confirm button below.
@@ -583,23 +505,6 @@
     addChoices(s.choices, onPick, onConfirm, c => `<div>${c.label}</div><small>${c.sub}</small>`, opts && opts.slow);
   }
 
-  function stepLanguage() {
-    clearStage();
-    const s = COPY.languageScreen;
-    addMsg(s.body);
-    let selected = null;
-    const onPick = (c) => {
-      selected = c;
-      lang = c.value === 'more_english' ? 'en' : 'tr';
-    };
-    const onConfirm = () => {
-      if (!selected) return;
-      if (global.I18N && I18N.setLang) I18N.setLang(selected.value);
-      stepPalette();
-    };
-    addChoices(s.choices, onPick, onConfirm, c => `<div>${c.label}</div><small>${c.sub}</small>`);
-  }
-
   async function stepPalette() {
     clearStage();
     const s = COPY.paletteScreen[lang];
@@ -616,7 +521,7 @@
       if (!selected) return;
       palette = selected.value;
       mascot = selected.mascot;
-      stepTour(0);
+      stepTour();
     };
     addChoices(s.choices, onPick, onConfirm, c => `
       <div class="ist-onb-swatch ${c.value}"><span></span><span></span><span></span></div>
@@ -635,6 +540,10 @@
       spotlightEl = document.createElement('div');
       spotlightEl.id = 'ist-onb-spotlight';
       document.body.appendChild(spotlightEl);
+      // The holes are measured, so a screen that changes size has to be
+      // re-measured or they sit where the boxes used to be. Cheap: it only
+      // ever runs while something is actually lit.
+      window.addEventListener('resize', () => { if (litTargets.length) paintSpotlight(); });
     }
     if (!pane) {
       pane = document.createElement('div');
@@ -644,42 +553,123 @@
     pane.setAttribute('data-palette', palette || 'mono');
   }
 
-  // Add a newly-introduced element to the lit set. Previously-lit elements
-  // stay lit (just lose the `.latest` brighter ring). Passing null = no new
-  // spotlight (the mascot is speaking generally, e.g. reveal beat).
-  function addSpotlight(el) {
-    spotlightEl.classList.add('show');
-    // Demote the previous "latest" so only the newest gets the brighter ring.
-    litTargets.forEach(t => t.classList.remove('latest'));
-    if (!el) return;
-    if (!litTargets.includes(el)) litTargets.push(el);
-    el.classList.add('ist-onb-target', 'latest');
-    // Scroll into view if needed so the user can see the new highlight.
-    const r = el.getBoundingClientRect();
-    if (r.top < 0 || r.bottom > window.innerHeight) {
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  // ── The spotlight ──
+  // The dim is a PUNCHED SHEET, not a lift. The obvious spelling -- raise the
+  // lit element over the dim with position/z-index -- cannot work on the app:
+  // project.html's cast lives in .fb-cast, which is `position: absolute` with
+  // `z-index: 1` and therefore its own stacking context, so a box inside it
+  // can never rise above a dim at 99989 however large a z-index it is given.
+  // (And `position: relative` on a .fb-box, which is absolutely positioned by
+  // the book, would move it.) So nothing is added to the app's DOM at all:
+  // the holes are cut out of the dim with one evenodd clip-path -- the same
+  // idiom IstSheet.lightTheMap uses to punch the districts out of its tint --
+  // and the rings are drawn in a layer of our own over the top.
+  //
+  // The rects are measured, so they are re-measured on resize. The book is at
+  // rest on every beat that lights anything (a pull beat lights nothing, see
+  // runPull), so there is nothing in flight to chase.
+  function ensureRingLayer() {
+    if (!ringLayer) {
+      ringLayer = document.createElement('div');
+      ringLayer.id = 'ist-onb-rings';
+      document.body.appendChild(ringLayer);
     }
+    return ringLayer;
+  }
+
+  function spotlightPad() { return 6; }
+
+  // One polygon: the whole viewport, then a subpath per hole. evenodd makes
+  // the holes holes. Falls back to an undimmed sheet if the browser will not
+  // take it -- a spotlight that cannot cut is better off not painting a
+  // rectangle over the thing it is pointing at.
+  function paintSpotlight() {
+    if (!spotlightEl) return;
+    const rects = litTargets
+      .map(el => el.getBoundingClientRect())
+      .filter(r => r.width > 0 && r.height > 0);
+
+    if (!rects.length) {
+      spotlightEl.style.clipPath = '';
+      if (ringLayer) ringLayer.innerHTML = '';
+      return;
+    }
+
+    const pad = spotlightPad();
+    const pt = (x, y) => `${x.toFixed(1)}px ${y.toFixed(1)}px`;
+    const outer = [pt(0, 0), pt(1e5, 0), pt(1e5, 1e5), pt(0, 1e5)].join(',');
+    const holes = rects.map(r => {
+      const l = r.left - pad, t = r.top - pad, rt = r.right + pad, b = r.bottom + pad;
+      return [pt(l, t), pt(rt, t), pt(rt, b), pt(l, b)].join(',');
+    }).join(',');
+    spotlightEl.style.clipPath = `polygon(evenodd, ${outer}, ${holes})`;
+
+    // The rings: fixed boxes over the same rects, drawing only. The last
+    // one lit is the brighter one, so the reader can tell which of the
+    // areas already introduced the mascot is talking about NOW.
+    const layer = ensureRingLayer();
+    layer.innerHTML = '';
+    const newest = latestTargets;
+    litTargets.forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const ring = document.createElement('div');
+      ring.className = 'ist-onb-ring' + (newest.includes(el) ? ' latest' : '');
+      ring.style.left   = (r.left - pad) + 'px';
+      ring.style.top    = (r.top - pad) + 'px';
+      ring.style.width  = (r.width + pad * 2) + 'px';
+      ring.style.height = (r.height + pad * 2) + 'px';
+      layer.appendChild(ring);
+    });
+  }
+
+  // Light one element or several (a column of cast boxes is three boxes and
+  // no wrapper, and the mascot is talking about the column). Everything lit
+  // before stays lit; only the newest set wears the brighter ring. Passing
+  // nothing lights nothing -- the mascot is speaking generally.
+  function addSpotlight(target) {
+    spotlightEl.classList.add('show');
+    const els = !target ? []
+      : (target.length !== undefined && !target.nodeType ? Array.from(target) : [target]);
+    latestTargets = els;
+    els.forEach(el => { if (el && !litTargets.includes(el)) litTargets.push(el); });
+    paintSpotlight();
   }
 
   function clearSpotlight() {
-    litTargets.forEach(t => t.classList.remove('ist-onb-target', 'interactive', 'latest', 'ist-onb-nav-flash'));
     litTargets = [];
-    interactiveTarget = null;
-    if (spotlightEl) spotlightEl.classList.remove('show');
+    latestTargets = [];
+    if (ringLayer) ringLayer.innerHTML = '';
+    if (spotlightEl) {
+      spotlightEl.style.clipPath = '';
+      spotlightEl.classList.remove('show');
+    }
   }
 
   // Block clicks/swipes/wheel/keyboard on the rest of the page during the
   // whole onboarding so the user can't navigate away. anahane.html attaches
   // touchstart + wheel listeners on `document` for swipe-pagination — we
   // stopImmediatePropagation in the capture phase so those never see the
-  // event. Pane / modal clicks pass through, and the interactiveTarget (the
-  // user's hood polygon) is allowed during the map step.
+  // event. Pane / modal clicks pass through, and so does the book while a
+  // pull beat is waiting on one (see isPassthrough).
   function isInsideOnboarding(target) {
     return target && target.closest && target.closest('#ist-onb-root, #ist-onb-pane, .ist-onb-hint');
   }
+  // While a pull beat is waiting, the book is the reader's again and the
+  // firewall has to stand down over it -- the CSS passthrough alone is not
+  // enough. project.html drags on POINTER events, which this firewall never
+  // sees, but it does preventDefault the touchmove underneath them: on a
+  // phone that cancels the very pull the mascot just asked for, and the
+  // beat waits forever on a gesture the page is swallowing. That is the
+  // shape of the old stuck-states, so it is stated here rather than relied
+  // on from the stylesheet.
+  function isPassthrough(target) {
+    if (!document.body.classList.contains('ist-onb-passthru')) return false;
+    return !!(target && target.closest && target.closest('#fb'));
+  }
   function gestureFirewall(e) {
     if (isInsideOnboarding(e.target)) return;
-    if (interactiveTarget && interactiveTarget.contains(e.target)) return;
+    if (isPassthrough(e.target)) return;
     if (typeof e.preventDefault === 'function' && e.cancelable) e.preventDefault();
     e.stopImmediatePropagation();
     // Tap-anywhere advance for non-interactive spotlight beats. Only on
@@ -698,7 +688,7 @@
   function keyFirewall(e) {
     if (e.key === 'Tab' || e.key === 'Escape') return;
     if (isInsideOnboarding(e.target)) return;
-    if (interactiveTarget && interactiveTarget.contains(e.target)) return;
+    if (isPassthrough(e.target)) return;
     if (e.cancelable) e.preventDefault();
     e.stopImmediatePropagation();
   }
@@ -715,7 +705,7 @@
   }
   function focusTrap(e) {
     if (isInsideOnboarding(e.target)) return;
-    if (interactiveTarget && interactiveTarget.contains(e.target)) return;
+    if (isPassthrough(e.target)) return;
     const el = firstFocusableIn(focusableContainer());
     if (el) el.focus();
   }
@@ -746,10 +736,7 @@
     row.className = 'ist-onb-mascot-row';
     const mImg = document.createElement('div');
     mImg.className = 'ist-onb-mascot';
-    // TEMP: dog art isn't uploaded yet — use the cat PNG regardless of
-    // mascot so the pane doesn't show a broken image. Restore
-    // `assets/mascot-${mascot}-right.png` once the dog PNG exists.
-    mImg.innerHTML = `<img src="assets/mascot/mascot-cat-right.png" alt="">`;
+    mImg.innerHTML = `<img src="${mascotSrc()}" alt="">`;
     const bubble = document.createElement('div');
     bubble.className = 'ist-onb-bubble';
     bubble.innerHTML = speech;
@@ -794,21 +781,78 @@
     document.body.classList.remove('ist-onb-spot');
   }
 
+  // ───── The lane tour ─────
+  // The app is one page now (project.html), so nothing here navigates: the
+  // reader walks the three lanes of slide 12 with the same sideways pull
+  // they will use forever after, and the tour watches the book rather than
+  // driving it. `window.__fb` is project.html's own deliberate handle.
+  //
+  // Two kinds of beat:
+  //   talk    — the mascot speaks, the page is locked, a tap anywhere advances
+  //   pull    — the mascot asks for a real pull; the book is handed back to
+  //             the reader (see passthrough) and the beat ends when they
+  //             actually arrive on the lane it named.
+  //
+  // A pull beat can never dead-end. If the reader has not arrived after
+  // STALL_MS the prompt turns into a tap-to-continue and the tour carries on
+  // without them having made the gesture -- a reader who cannot swipe (a
+  // trackpad, a stuck finger, an assistive pointer) must still reach the end.
+  const STALL_MS = 12000;
+
+  // project.html's lane numbering, mirrored here rather than imported:
+  // 0 Kütüphane (left on screen), 1 Hane (the middle), 2 Kahvehane (right).
+  const LANE_KUTUPHANE = 0, LANE_HANE = 1, LANE_KAHVEHANE = 2;
+
+  // The book, when this is running inside project.html. Absent on the
+  // parts-bin pages (anahane/kahvehane/kutuphane/mahalle), which no longer
+  // have lanes to walk -- there the tour is skipped outright (see stepTour).
+  function fb() { return global.__fb || null; }
+
+  let laneWatch = null;   // rAF id for the arrival watcher
+  let stallTimer = null;  // the STALL_MS escape hatch
+
+  function stopLaneWatch() {
+    if (laneWatch) { cancelAnimationFrame(laneWatch); laneWatch = null; }
+    if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
+  }
+
+  // Hand the book back to the reader for the length of a pull beat.
+  // body.ist-onb-locked sets `pointer-events: none` on everything outside
+  // the onboarding, which is exactly right for a talk beat and exactly
+  // wrong for this one -- without lifting it the swipe the mascot is
+  // asking for never reaches project.html's own pointer handlers.
+  function openPassthrough() { document.body.classList.add('ist-onb-passthru'); }
+  function closePassthrough() { document.body.classList.remove('ist-onb-passthru'); }
+
   // ───── Tour steps ─────
   function stepTour() {
-    enterSpotlightMode();
-    const lines = COPY.tour[lang][mascot];
+    // No book, no lanes: a parts-bin page opened directly. Skip the walk
+    // and go straight to the closing beats rather than spotlighting
+    // elements that are not there.
+    if (!fb()) { stepKefilShare(); return; }
 
+    enterSpotlightMode();
+    const lines = COPY.lanes[lang][mascot];
+
+    // `lane` is the lane the beat belongs to and is asserted before it runs,
+    // so a reader who wandered is put back rather than talked at about a
+    // screen they are not on. `pull` is the lane a pull beat waits for.
     const beats = [
-      { target: null,                   speech: lines.reveal },
-      { target: 'aside.col-left',       speech: lines.news },
-      { target: '.map-panel',           speech: lines.map,    interactive: 'hood' },
-      { target: 'aside.col-right',      speech: lines.events },
-      // Last beat hands off to the cross-page leg. On desktop the nav lives
-      // inside .section-rule (top bar); on mobile it's a fixed bottom tab bar
-      // (header). Spotlight whichever is relevant so the user looks in the
-      // right place for the Kahvehane link.
-      { target: isMobile() ? 'header' : '.section-rule', speech: COPY.navLeave[lang][mascot], interactive: 'nav-kahvehane' },
+      { lane: LANE_HANE,       target: null,        speech: lines.reveal },
+      { lane: LANE_HANE,       target: '#fb-petek', speech: lines.petek },
+      { lane: LANE_HANE,       speech: lines.toKahve, pull: LANE_KAHVEHANE },
+      // A column is three boxes with no wrapper between them, and the
+      // mascot is talking about the column -- so the beat lights all of it.
+      { lane: LANE_KAHVEHANE,  target: '.fb-events', all: true, speech: lines.events },
+      { lane: LANE_KAHVEHANE,  target: '.fb-oyun',   all: true, speech: lines.games },
+      // Two pulls, not one: the strip moves at most one lane per gesture,
+      // so reaching Kütüphane from Kahvehane goes through Hane. That is the
+      // point rather than a cost -- there is no way from the doing to the
+      // reading that does not pass the people.
+      { lane: LANE_KAHVEHANE,  speech: lines.toKutup, pull: LANE_KUTUPHANE },
+      { lane: LANE_KUTUPHANE,  target: '.fb-haberler', all: true, speech: lines.news },
+      { lane: LANE_KUTUPHANE,  target: '.fb-anket',    all: true, speech: lines.anket },
+      { lane: LANE_KUTUPHANE,  speech: lines.toHane, pull: LANE_HANE },
     ];
 
     let idx = 0;
@@ -816,65 +860,81 @@
 
     function runBeat() {
       const b = beats[idx];
-      const el = b.target ? document.querySelector(b.target) : null;
-      addSpotlight(el);
+      stopLaneWatch();
 
-      if (b.interactive === 'hood' && homeNb) {
-        const hoodEl = document.getElementById(homeNb);
-        if (hoodEl) {
-          // Let ONLY the user's hood polygon receive clicks through the firewall.
-          interactiveTarget = hoodEl;
-          hoodEl.classList.add('ist-onb-target', 'interactive', 'latest');
-          if (!litTargets.includes(hoodEl)) litTargets.push(hoodEl);
-          renderPane({
-            speech: b.speech,
-            promptText: COPY.promptTapHood[lang],
-          });
-          const handler = () => {
-            hoodEl.removeEventListener('click', handler, true);
-            interactiveTarget = null;
-            // Switch the breaking-news feed to the user's neighborhood so
-            // the reaction line ("see how the news changed?") actually
-            // reflects what's on screen. The news section is still lit.
-            // Calling applyNewsFilter directly bypasses our click firewall.
-            if (typeof window.applyNewsFilter === 'function') {
-              window.applyNewsFilter('mahalle');
-            }
-            // Mascot reaction — nothing specific to click, so use the
-            // tap-anywhere pattern instead of a Next button.
-            renderPane({ speech: COPY.mapTapped[lang][mascot] });
-            addHint(COPY.tapToContinue[lang], advance);
-          };
-          hoodEl.addEventListener('click', handler, true);
-          return;
-        }
-      }
+      // `=== undefined`, never `!b.pull`: Kütüphane is lane 0, so a falsy
+      // test reads the one pull beat that aims at it as a talk beat.
+      if (b.pull !== undefined) { runPull(b); return; }
 
-      // Handoff to Kahvehane: user taps the real navbar link instead of
-      // a Next button. We light the link, save state on click, then let
-      // the page's own click handlers (view transition / swipe-pagination)
-      // take over the navigation.
-      if (b.interactive === 'nav-kahvehane') {
-        renderPane({
-          speech: b.speech,
-          promptText: isMobile()
-            ? COPY.promptTapKahvehaneMobile[lang]
-            : COPY.promptTapKahvehane[lang],
-        });
-        wireNavLink('kahvehane.html', 'phase2-kahvehane');
-        return;
-      }
+      // A talk beat is about a screen, so it asserts that screen -- a reader
+      // who wandered is put back rather than talked at about a lane they are
+      // not standing on. Never on a pull beat: snapping the book there would
+      // fight the very gesture being asked for.
+      closePassthrough();
+      const f = fb();
+      if (f && f.lane && f.lane.at !== b.lane) f.goLane(b.lane);
 
-      // Non-interactive beat: no NEXT button — user taps anywhere to advance.
-      // The hint at the bottom of the screen tells them so; clicks on the
-      // dim go through the firewall, which fires tapAdvanceFn (set by addHint).
+      // A cast box is drawn where the book puts it and can be mid-flight
+      // for a beat after a lane change, so the spotlight is taken on the
+      // next frame rather than now.
+      requestAnimationFrame(() => {
+        if (!b.target) { addSpotlight(null); return; }
+        addSpotlight(b.all ? document.querySelectorAll(b.target)
+                           : document.querySelector(b.target));
+      });
       renderPane({ speech: b.speech });
-      addHint(COPY.tapToContinue[lang] || 'tap anywhere to continue', advance);
+      addHint(COPY.tapToContinue[lang], advance);
+    }
+
+    // A pull beat: dim stays, the book goes live, and arrival is the advance.
+    function runPull(b) {
+      openPassthrough();
+      // Nothing on the page is "lit" during a pull -- the thing being
+      // pointed at is the gesture, not an element.
+      clearSpotlight();
+      if (spotlightEl) spotlightEl.classList.add('show');
+      renderPane({
+        speech: b.speech,
+        // Pulling RIGHT walks the strip right, which moves the reader
+        // toward lane 0 (see CLAUDE.md, "A pull right walks the strip
+        // right"). So a lower target lane is a rightward pull.
+        promptText: b.pull < laneNow() ? COPY.pullRight[lang] : COPY.pullLeft[lang],
+      });
+
+      // Arrival is COMMITTED lane plus SETTLED strip, not either alone.
+      // `lane.at` flips the instant the reader lets go, while the strip is
+      // still tweening to it (project.html runs that release on its own
+      // rAF, which `busy` does not cover) -- advancing there lights a box
+      // that is still in flight, and the ring lands next to it.
+      const tick = () => {
+        const f = fb();
+        const settled = f && f.lane && f.lane.at === b.pull
+          && Math.abs(f.lane.pos - b.pull) < 0.01;
+        if (settled) { stopLaneWatch(); closePassthrough(); advance(); return; }
+        laneWatch = requestAnimationFrame(tick);
+      };
+      laneWatch = requestAnimationFrame(tick);
+
+      // The escape hatch. It does not move the book: the next beat asserts
+      // its own lane anyway, so a reader who never pulled still lands on
+      // the right screen for what the mascot says next.
+      stallTimer = setTimeout(() => {
+        stallTimer = null;
+        renderPane({ speech: b.speech, promptText: COPY.pullNudge[lang] });
+        addHint(COPY.pullNudge[lang], () => { stopLaneWatch(); closePassthrough(); advance(); });
+      }, STALL_MS);
+    }
+
+    function laneNow() {
+      const f = fb();
+      return f && f.lane ? f.lane.at : LANE_HANE;
     }
 
     function advance() {
       idx++;
       if (idx >= beats.length) {
+        stopLaneWatch();
+        closePassthrough();
         exitSpotlightMode();
         stepKefilShare();
       } else {
@@ -882,79 +942,6 @@
       }
     }
   }
-
-  // Save state + hop to the next page. The destination page's onboarding
-  // script picks up where we left off via loadState().
-  function goToPage(href, nextStage) {
-    saveState(nextStage);
-    window.location.href = href;
-  }
-
-  // Wire a real navbar link as the interactive target for a handoff beat.
-  // The user has to tap the link themselves; saveState fires in capture
-  // phase so the value is committed to sessionStorage before the page's
-  // own click handlers (view-transitions, swipe-pagination) take over.
-  function wireNavLink(linkHref, nextStage, onPick) {
-    const link = document.querySelector(`header nav a[href="${linkHref}"]`);
-    if (!link) {
-      // Page doesn't have the expected nav link — fall back to plain navigation.
-      goToPage(linkHref, nextStage);
-      return;
-    }
-    interactiveTarget = link;
-    // Don't use the box-shadow ring on the link itself — flash the title
-    // text instead so it draws attention without a hard rectangle around it.
-    // The link still needs to render above the dim, so lift z-index but skip
-    // the .ist-onb-target ring styles.
-    link.classList.add('ist-onb-nav-flash');
-    litTargets.push(link); // tracked so clearSpotlight strips the class
-    const handler = () => {
-      saveState(nextStage);
-      // Don't preventDefault: the page's own click handler will run the
-      // view-transition + navigate, OR the browser will follow the href.
-      if (onPick) onPick();
-    };
-    link.addEventListener('click', handler, true);
-  }
-
-  // ───── Kahvehane multi-beat tour ─────
-  // intro (masthead) → discussion (col-left) → tap your hood on the map
-  // (interactive) → comment rule speech → games (col-right) with the
-  // user tapping the Sözcel link (interactive, leaves the page).
-  // The map is pre-lit on entry since the user already met it on Hane.
-  function stepKahvehaneTour() {
-    enterSpotlightMode();
-    // Light the right-column aside (the games stack) AND the nav bar.
-    // On desktop the nav lives in .section-rule (top); on mobile it's
-    // the fixed bottom tab bar (header).
-    const games = document.querySelector('aside.col-right') || document.querySelector('main');
-    if (games) addSpotlight(games);
-    const navBar = document.querySelector(isMobile() ? 'header' : '.section-rule');
-    if (navBar) addSpotlight(navBar);
-    renderPane({
-      speech: COPY.kahvehaneIntro[lang][mascot],
-      promptText: isMobile()
-        ? COPY.promptTapKutuphaneMobile[lang]
-        : COPY.promptTapKutuphane[lang],
-    });
-  }
-
-  // ───── Kütüphane mini-tour ─────
-  function stepKutuphaneTour() {
-    enterSpotlightMode();
-    const lib = document.querySelector('aside.col-left') || document.querySelector('main');
-    if (lib) addSpotlight(lib);
-    const navBar = document.querySelector(isMobile() ? 'header' : '.section-rule');
-    if (navBar) addSpotlight(navBar);
-    renderPane({
-      speech: COPY.kutuphaneIntro[lang][mascot],
-      promptText: isMobile()
-        ? COPY.promptTapHaneMobile[lang]
-        : COPY.promptTapHane[lang],
-    });
-    wireNavLink('anahane.html', 'phase3-finale');
-  }
-
   function stepKefilShare() {
     clearStage();
     const stage = document.getElementById('ist-onb-stage');
@@ -1021,11 +1008,17 @@
     document.body.appendChild(root);
   }
 
+  // Once per document. maybeRun is public and the app's own mount is
+  // idempotent, so a second call must not start a second flow on top of
+  // the first -- they would share one root and one firewall, and the
+  // second would rewind a reader who was half way through.
+  let running = false;
+
   async function maybeRun(opts) {
+    if (running) return false;
     sb = opts.sb;
     user = opts.user;
     if (!sb || !user) return false;
-    const page = opts.page || 'anahane';
 
     // Admin kill switch (app_settings.onboarding_enabled). Missing row = enabled.
     const { data: setting } = await sb.from('app_settings')
@@ -1039,37 +1032,12 @@
       .maybeSingle();
     if (!profile || profile.onboarded_at) { clearState(); return false; }
 
-    const saved = loadState();
+    // The flow ran across four pages once and saved its place between them
+    // (STATE_KEY). It is one page now and runs start to finish in one go, so
+    // there is nothing to resume -- and a stage left in sessionStorage by an
+    // older build must not be honoured by this one. Drop it.
+    clearState();
 
-    // ── kahvehane / sozcel / kutuphane: only run if we're mid-flow on
-    // this stage. Otherwise the user opened the page on their own and
-    // we should stay quiet.
-    if (page === 'kahvehane') {
-      if (!saved || saved.stage !== 'phase2-kahvehane') return false;
-      hydrateFromState(saved);
-      ensureRoot();
-      show();
-      stepKahvehaneTour();
-      return true;
-    }
-    if (page === 'sozcel') {
-      if (!saved || saved.stage !== 'phase2-sozcel') return false;
-      hydrateFromState(saved);
-      ensureRoot();
-      show();
-      stepSozcelTour();
-      return true;
-    }
-    if (page === 'kutuphane') {
-      if (!saved || saved.stage !== 'phase2-kutuphane') return false;
-      hydrateFromState(saved);
-      ensureRoot();
-      show();
-      stepKutuphaneTour();
-      return true;
-    }
-
-    // ── anahane: either fresh start or returning for the finale.
     referralCode = profile.referral_code || '';
     homeNb = profile.neighborhood || opts.homeNb || null;
 
@@ -1085,31 +1053,9 @@
     }
     if (!kefilName) kefilName = opts.kefilName || 'your sponsor';
 
-    // If the user navigated back to anahane while mid-flow on another page,
-    // bounce them to where they were supposed to be instead of restarting.
-    if (saved && saved.stage === 'phase2-kahvehane') {
-      window.location.replace('kahvehane.html');
-      return false;
-    }
-    if (saved && saved.stage === 'phase2-sozcel') {
-      window.location.replace('sozcel.html');
-      return false;
-    }
-    if (saved && saved.stage === 'phase2-kutuphane') {
-      window.location.replace('kutuphane.html');
-      return false;
-    }
-
+    running = true;
     ensureRoot();
     show();
-
-    if (saved && saved.stage === 'phase3-finale') {
-      hydrateFromState(saved);
-      // Skip the welcome/language/palette/tour — go straight to the closing modals.
-      stepKefilShare();
-      return true;
-    }
-
     stepWelcome();
     return true;
   }
