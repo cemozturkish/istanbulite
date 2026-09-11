@@ -1,6 +1,6 @@
 // Onboarding flow for brand-new accounts.
 // Runs on first login: locks the page behind a full-screen overlay, then
-// welcome → language → palette+mascot → the lane tour → kefil code →
+// welcome → language → palette → the lane tour → kefil code →
 // profile prompt, and writes onboarded_at, language_pref, palette_pref and
 // mascot to profiles at the end.
 //
@@ -75,16 +75,16 @@
         instant: 'Harika!',
         typed:   'Uygulamanın renklerini de seçebilirsin. Bu ayarları istediğin zaman değiştirebilirsin.',
         choices: [
-          { value: 'mono',  mascot: 'cat', label: 'SİYAH & BEYAZ', sub: 'kedi' },
-          { value: 'earth', mascot: 'dog', label: 'TOPRAK TONLARI', sub: 'köpek' },
+          { value: 'mono',  mascot: 'cat', label: 'SİYAH & BEYAZ' },
+          { value: 'earth', mascot: 'dog', label: 'TOPRAK TONLARI' },
         ],
       },
       en: {
         instant: 'Great!',
         typed:   'You can also choose the colors in which your application comes. You can always change these settings whenever you want.',
         choices: [
-          { value: 'mono',  mascot: 'cat', label: 'BLACK & WHITE', sub: 'cat' },
-          { value: 'earth', mascot: 'dog', label: 'EARTHY TONES',  sub: 'dog' },
+          { value: 'mono',  mascot: 'cat', label: 'BLACK & WHITE' },
+          { value: 'earth', mascot: 'dog', label: 'EARTHY TONES' },
         ],
       },
     },
@@ -94,74 +94,50 @@
     // either talks (tap anywhere), asks for the real pull and waits for the
     // reader to arrive, or asks them to actually change something.
     //
+    // ONE VOICE, plain and clear. It used to branch into a sarcastic cat and
+    // an excitable dog on top of the TR/EN branch -- four versions of every
+    // line to keep true and in step, so a correction to one of them silently
+    // left three behind. The first run through an app is not the place for a
+    // character: the reader is trying to find out what this is.
+    //
     // It OPENS ON THE READER THEMSELVES -- the petek's innermost depth, where
     // the avatar arrows are -- and only then pulls out to the shape. A brand
     // new account's petek is one hexagon and six empty sides: nobody has
     // handed them a code yet, because they signed up thirty seconds ago. So
-    // the petek cannot be the first thing the mascot points at, and nothing
-    // here may say "these are the people next to you" -- for every reader
-    // seeing this for the first time, that sentence is false. What IS true on
-    // day one is the reader's own hexagon, so the tour starts there, has them
-    // make their avatar, and then pulls out and says where the others WILL be.
+    // the petek cannot be the first thing pointed at, and nothing here may
+    // say "these are the people next to you" -- for every reader seeing this
+    // for the first time, that sentence is false. What IS true on day one is
+    // the reader's own hexagon, so the tour starts there, has them make their
+    // avatar, and then pulls out and says where the others WILL be.
     lanes: {
       tr: {
-        cat: {
-          reveal:  'Hâlâ buradasın demek. Peki. Burası Hane — uygulamanın ortası. Her şey buradan bir kaydırma uzakta.',
-          sen:     'Şu ortadaki sensin. Şimdilik tek başına. Oklarla kendine benzet — ne seçersen anında kaydediliyor, onay filan yok.',
-          senDone: 'Oldu. Gerisi — şapkalar, rozetler — dışarıda kazanılıyor. Satın alınmıyor, uğraşma.',
-          petek:   'Şimdi geri çekildik: bu petek. Şu an sadece sen varsın, doğru. Biri sana kendi kodunu okuduğunda, o boş yanlardan birine oturuyor. Gerçek hayatta, yüz yüze.',
-          toKahve: 'Sağda Kahvehane var. Parmağını sola kaydır — ben burada bekliyorum.',
-          events:  'Etkinlikler. Bunlar internette değil, dışarıda. Beğendiğini seç, Hane\'de seni bekler.',
-          games:   'Üç oyun, her gün yeni. Sırayla açılırlar — acelen varsa yanlış uygulamadasın.',
-          toKutup: 'Şimdi ters yöne. Kütüphane en solda: sağa kaydır, Hane\'den geçip devam et.',
-          news:    'Haberler. İstanbul, Türkiye, Dünya — üçü de burada, günde bir avuç. Bitince biter.',
-          anket:   'Anket. Cevabın kendi ilçenin altına yazılır, yani sonuç tek bir yüzde değil — yirmi beş tane.',
-          toHane:  'Yeter bu kadar. Sola kaydır, Hane\'ye dönelim.',
-        },
-        dog: {
-          reveal:  'SELAAM!! Burası Hane! Uygulamanın tam ortası — her yere buradan gidiliyor!',
-          sen:     'VE BU SENSİN! Şu an tek başınasın ama merak etme! Hadi oklarla kendine bir şeyler seç — hemen kaydediliyor!',
-          senDone: 'ÇOK YAKIŞTI! Kalanları — şapkalar, rozetler — dışarı çıkıp kazanacaksın. Parayla alınmıyor, öyle bir şey yok burada!',
-          petek:   'Şimdi biraz geri çekilelim — işte PETEK! Şu an sadece sen varsın, biliyorum. Ama biri sana kodunu okuduğunda şu boş yanlardan birine oturacak! Yüz yüze, gerçekten tanışarak!',
-          toKahve: 'Hadi Kahvehane\'ye gidelim! Parmağını SOLA kaydır!',
-          events:  'ETKİNLİKLER! Bunlar gerçek hayatta oluyor! Beğendiğini seç, Hane\'de seni bekler — sonra da GİT!',
-          games:   'VE OYUNLAR! Her gün üç yeni tane! Sırayla açılıyorlar, acele etme!',
-          toKutup: 'Şimdi diğer tarafa! Kütüphane en solda — SAĞA kaydır, Hane\'den geçip devam et!',
-          news:    'HABERLER! İstanbul, Türkiye ve Dünya, hepsi burada! Günde bir avuç, bitince biter!',
-          anket:   'Anket! Cevabın kendi ilçene yazılıyor — yani Beşiktaş ne demiş, Üsküdar ne demiş, hepsi ayrı ayrı görülüyor!',
-          toHane:  'Tamamdır! Hadi Hane\'ye dönelim — SOLA kaydır!',
-        },
+        reveal:  'Burası Hane — uygulamanın ortası. Her yere buradan, parmağınla gidiliyor.',
+        sen:     'Ortadaki sensin. Şimdilik tek başına. Oklarla kendine benzet; ne seçersen anında kaydedilir.',
+        senDone: 'Geri kalanı — şapkalar, rozetler — dışarıda kazanılır. Satın alınamaz.',
+        petek:   'Bu petek. Şu an sadece sen varsın. Biri sana kendi kodunu verdiğinde, yanındaki boş yerlerden birine oturur — gerçek hayatta, yüz yüze.',
+        toKahve: 'Kahvehane sağda. Parmağını sola kaydır.',
+        events:  'Etkinlikler. Bunlar internette değil, dışarıda. Beğendiğin Hane\'de seni bekler.',
+        games:   'Üç oyun, her gün yeni. Sırayla açılır.',
+        toKutup: 'Kütüphane en solda. Sağa kaydır, Hane\'den geçip devam et.',
+        news:    'Haberler. İstanbul, Türkiye ve Dünya — günde bir avuç, bitince biter.',
+        anket:   'Anket. Cevabın kendi ilçenin altına yazılır, yani sonuç tek bir yüzde değil — yirmi beş tane.',
+        toHane:  'Hane\'ye dönelim. Sola kaydır.',
       },
       en: {
-        cat: {
-          reveal:  "Still here. Fine. This is Hane — the middle of the app. Everything else is one pull away.",
-          sen:     "That one in the middle is you. On your own, for now. Use the arrows and make it look like you — whatever you pick saves itself, there's nothing to confirm.",
-          senDone: "Good. The rest of it — hats, badges — is earned outside. It cannot be bought, so don't go looking.",
-          petek:   "Now we've stepped back: this is the petek. Right now it is only you, yes. When somebody reads you their code, they take one of those empty sides. In person, face to face.",
-          toKahve: 'Kahvehane is to the right. Pull your finger left. I\'ll wait.',
-          events:  "Events. These happen outside, not in here. Keep the ones you want; they'll be waiting on Hane.",
-          games:   "Three games, new every day. They unlock in order — if you're in a hurry you're in the wrong app.",
-          toKutup: "Now the other way. Kütüphane is all the way left: pull right, past Hane, and keep going.",
-          news:    "The news. İstanbul, Türkiye, Dünya — all three, a handful a day. When it's done, it's done.",
-          anket:   "The poll. Your answer is filed under your own district, so the result isn't one percentage — it's twenty-five.",
-          toHane:  "That's enough. Pull left, back to Hane.",
-        },
-        dog: {
-          reveal:  "HI!! This is Hane! The very middle of the app — everything starts here!",
-          sen:     "AND THIS IS YOU! You're on your own right now but don't worry! Go on, pick something with the arrows — it saves straight away!",
-          senDone: "THAT SUITS YOU! The rest — hats, badges — you earn by going outside. You can't buy any of it, there's no such thing here!",
-          petek:   "Now let's step back a bit — THE PETEK! It's only you right now, I know. But when somebody reads you their code they'll take one of those empty sides! Face to face, actually meeting!",
-          toKahve: "Let's go to Kahvehane! Pull your finger LEFT!",
-          events:  "EVENTS! These are real-life things! Keep the ones you like, they'll wait for you on Hane — then GO!",
-          games:   "AND THE GAMES! Three new ones every day! They unlock in order, no rushing!",
-          toKutup: "Now the other way! Kütüphane is all the way left — pull RIGHT, past Hane, and keep going!",
-          news:    "THE NEWS! İstanbul, Türkiye and Dünya, all here! A handful a day, and then it's done!",
-          anket:   "The poll! Your answer goes under YOUR district — so what Beşiktaş said and what Üsküdar said are counted apart!",
-          toHane:  "All done! Let's go back to Hane — pull LEFT!",
-        },
+        reveal:  'This is Hane — the middle of the app. Everywhere else is a finger away from here.',
+        sen:     'The one in the middle is you. On your own, for now. Use the arrows to make it look like you; whatever you pick saves itself.',
+        senDone: 'The rest of it — hats, badges — is earned outside. It cannot be bought.',
+        petek:   'This is the petek. Right now it is only you. When somebody gives you their code they take one of the empty places beside you — in person, face to face.',
+        toKahve: 'Kahvehane is to the right. Pull your finger left.',
+        events:  'Events. These happen outside, not in here. The ones you keep wait for you on Hane.',
+        games:   'Three games, new every day. They unlock in order.',
+        toKutup: 'Kütüphane is all the way left. Pull right, past Hane, and keep going.',
+        news:    'The news. İstanbul, Türkiye and Dünya — a handful a day, and then it is done.',
+        anket:   'The poll. Your answer is filed under your own district, so the result is not one percentage — it is twenty-five.',
+        toHane:  'Back to Hane. Pull left.',
       },
     },
-    // Prompts under the mascot on a beat that waits for the reader to do
+    // Printed under the line on a beat that waits for the reader to do
     // something real, and the harder nudge that replaces one if they stall
     // (see STALL_MS). Nothing here ever dead-ends.
     pullLeft:    { tr: 'parmağını sola kaydır',  en: 'pull left' },
@@ -176,24 +152,12 @@
       en: 'you can do this later — tap to carry on',
     },
     kefilShare: {
-      tr: {
-        cat: 'Bu senin kodun. Gerçekten kefil olabileceğin birine ver. Yanlış davranırsa, sorumluluk sende. İyi seç.',
-        dog: 'Ve bu da SENİN kodun! Güvendiğin birine ver — sen onun kefili olacaksın, tıpkı <em class="kefil-name">{KEFIL}</em>\'in senin kefilin olduğu gibi! Harika birini seç!',
-      },
-      en: {
-        cat: "This is your code. Give it to someone you'd actually vouch for. If they misbehave, it's on you. Choose wisely.",
-        dog: "And this is YOUR code! Share it with someone you trust — you'll be their sponsor, just like <em class=\"kefil-name\">{KEFIL}</em> is yours! Choose someone wonderful!",
-      },
+      tr: 'Bu senin kodun. Gerçekten kefil olabileceğin birine ver — <em class="kefil-name">{KEFIL}</em> sana nasıl kefil olduysa, sen de ona öyle olacaksın. Yanlış davranırsa sorumluluk sende.',
+      en: "This is your code. Give it to somebody you would actually vouch for — you will be their sponsor, the way <em class=\"kefil-name\">{KEFIL}</em> is yours. If they misbehave, it is on you.",
     },
     profilePrompt: {
-      tr: {
-        cat: 'Son bir şey. Profilini doldur ki diğerlerimiz kimi içeri aldığımızı bilelim. Sonra dışarı çık.',
-        dog: 'Son bir şey! Profilini doldur ki herkes selam verebilsin! Sonra — dışarı çık, dünya seni bekliyor!',
-      },
-      en: {
-        cat: 'Last thing. Fill out your profile so the rest of us know who we let in. Then go outside.',
-        dog: 'One last thing! Fill out your profile so everyone can say hi! Then — go outside, the world is waiting!',
-      },
+      tr: 'Hepsi bu kadar. Dışarısı seni bekliyor.',
+      en: 'That is all of it. Outside is waiting for you.',
     },
     finishLabel: { tr: 'BİTİR', en: 'FINISH' },
     confirmLabel: { tr: 'ONAYLA', en: 'CONFIRM' },
@@ -206,13 +170,16 @@
   let sb, user, kefilName, referralCode, homeNb;
   let lang = 'en';     // 'en' or 'tr' for mascot-led beats
   let palette = null;  // 'mono' | 'earth'
-  let mascot = null;   // 'cat' | 'dog'
+  // Not chosen and never shown: the onboarding has no mascot any more. It is
+  // still DERIVED from the palette and written to profiles.mascot at the end,
+  // because admin-notification.js reads that column for its own bubble and an
+  // unset one would quietly change that feature. Bringing a mascot back here
+  // is putting the picture back, not re-adding the data.
+  let mascot = null;   // 'cat' | 'dog', implied by the palette
   let root;            // DOM root for fullscreen modal phases
   let spotlightEl;     // The persistent dim overlay
   let pane;            // The mascot pane (corner bubble)
-  let litTargets = []; // Every element the mascot has introduced so far
-  let latestTargets = []; // The set lit by the CURRENT beat (brighter ring)
-  let ringLayer;       // Our own layer for the rings drawn over the dim
+  let litTargets = []; // Every element lit so far; the dim is punched for each
   let firewallInstalled = false;
   // When set, a click anywhere on the page (outside the pane / interactive
   // target) advances the tour. Cleared after firing once.
@@ -226,13 +193,6 @@
     return String(s).replace(/[&<>"']/g, c => ({
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
     }[c]));
-  }
-  // TEMP: dog art isn't drawn yet -- assets/mascot/ has the cat only, so a
-  // dog mascot shows the cat PNG rather than a broken image. One place, so
-  // restoring the dog is one line: `mascot-${mascot}-right.png`.
-  function mascotSrc() { return 'assets/mascot/mascot-cat-right.png'; }
-  function mascotImgHTML() {
-    return `<div class="ist-onb-mascot"><img src="${mascotSrc()}" alt=""></div>`;
   }
   function clearStage() {
     const stage = document.getElementById('ist-onb-stage');
@@ -549,7 +509,6 @@
     addChoices(s.choices, onPick, onConfirm, c => `
       <div class="ist-onb-swatch ${c.value}"><span></span><span></span><span></span></div>
       <div>${c.label}</div>
-      <small>${c.sub}</small>
     `, true);
   }
 
@@ -577,29 +536,21 @@
   }
 
   // ── The spotlight ──
-  // The dim is a PUNCHED SHEET, not a lift. The obvious spelling -- raise the
-  // lit element over the dim with position/z-index -- cannot work on the app:
+  // The dim is a PUNCHED SHEET, and the hole is the whole of the highlight.
+  // There is no ring: a rectangle drawn around a control is a second object
+  // competing with it, and the thing being pointed at is already the only
+  // thing on the screen at full strength. Everything else going quiet says
+  // "this one" more plainly than an outline around it does.
+  //
+  // It is punched rather than lifted because a lift cannot work on the app:
   // project.html's cast lives in .fb-cast, which is `position: absolute` with
   // `z-index: 1` and therefore its own stacking context, so a box inside it
   // can never rise above a dim at 99989 however large a z-index it is given.
-  // (And `position: relative` on a .fb-box, which is absolutely positioned by
-  // the book, would move it.) So nothing is added to the app's DOM at all:
-  // the holes are cut out of the dim with one evenodd clip-path -- the same
-  // idiom IstSheet.lightTheMap uses to punch the districts out of its tint --
-  // and the rings are drawn in a layer of our own over the top.
+  // (And `position: relative` on a .fb-box, which the book positions
+  // absolutely, would move it.) So nothing is added to the app's DOM at all.
   //
-  // The rects are measured, so they are re-measured on resize. The book is at
-  // rest on every beat that lights anything (a pull beat lights nothing, see
-  // runPull), so there is nothing in flight to chase.
-  function ensureRingLayer() {
-    if (!ringLayer) {
-      ringLayer = document.createElement('div');
-      ringLayer.id = 'ist-onb-rings';
-      document.body.appendChild(ringLayer);
-    }
-    return ringLayer;
-  }
-
+  // The rects are measured, so they are re-measured on resize and again as a
+  // depth change's own transition settles.
   function spotlightPad() { return 6; }
 
   // ONE path with real subpaths: the viewport, then one per hole, evenodd.
@@ -620,63 +571,36 @@
     || CSS.supports('clip-path', 'path("M0 0H1V1H0Z")');
 
   function paintSpotlight() {
-    if (!spotlightEl) return;
+    if (!spotlightEl || !CAN_CUT) return;
     const rects = litTargets
       .map(el => el.getBoundingClientRect())
       .filter(r => r.width > 0 && r.height > 0);
 
-    if (!rects.length) {
-      spotlightEl.style.clipPath = '';
-      if (ringLayer) ringLayer.innerHTML = '';
-      return;
-    }
+    if (!rects.length) { spotlightEl.style.clipPath = ''; return; }
 
     const pad = spotlightPad();
-    if (CAN_CUT) {
-      const n = (v) => v.toFixed(1);
-      const box = (l, t, r, b) => `M${n(l)} ${n(t)}H${n(r)}V${n(b)}H${n(l)}Z`;
-      const W = window.innerWidth, H = window.innerHeight;
-      const d = [box(0, 0, W, H)].concat(rects.map(r =>
-        box(r.left - pad, r.top - pad, r.right + pad, r.bottom + pad))).join(' ');
-      spotlightEl.style.clipPath = `path(evenodd, "${d}")`;
-    }
-
-    // The rings: fixed boxes over the same rects, drawing only. The last
-    // one lit is the brighter one, so the reader can tell which of the
-    // areas already introduced the mascot is talking about NOW.
-    const layer = ensureRingLayer();
-    layer.innerHTML = '';
-    const newest = latestTargets;
-    litTargets.forEach((el) => {
-      const r = el.getBoundingClientRect();
-      if (!r.width || !r.height) return;
-      const ring = document.createElement('div');
-      ring.className = 'ist-onb-ring' + (newest.includes(el) ? ' latest' : '');
-      ring.style.left   = (r.left - pad) + 'px';
-      ring.style.top    = (r.top - pad) + 'px';
-      ring.style.width  = (r.width + pad * 2) + 'px';
-      ring.style.height = (r.height + pad * 2) + 'px';
-      layer.appendChild(ring);
-    });
+    const n = (v) => v.toFixed(1);
+    const box = (l, t, r, b) => `M${n(l)} ${n(t)}H${n(r)}V${n(b)}H${n(l)}Z`;
+    const W = window.innerWidth, H = window.innerHeight;
+    const d = [box(0, 0, W, H)].concat(rects.map(r =>
+      box(r.left - pad, r.top - pad, r.right + pad, r.bottom + pad))).join(' ');
+    spotlightEl.style.clipPath = `path(evenodd, "${d}")`;
   }
 
   // Light one element or several (a column of cast boxes is three boxes and
-  // no wrapper, and the mascot is talking about the column). Everything lit
-  // before stays lit; only the newest set wears the brighter ring. Passing
-  // nothing lights nothing -- the mascot is speaking generally.
+  // no wrapper, and a beat talks about the column). Everything lit before
+  // stays lit; passing nothing lights nothing, which is a beat speaking
+  // generally rather than pointing.
   function addSpotlight(target) {
     spotlightEl.classList.add('show');
     const els = !target ? []
       : (target.length !== undefined && !target.nodeType ? Array.from(target) : [target]);
-    latestTargets = els;
     els.forEach(el => { if (el && !litTargets.includes(el)) litTargets.push(el); });
     paintSpotlight();
   }
 
   function clearSpotlight() {
     litTargets = [];
-    latestTargets = [];
-    if (ringLayer) ringLayer.innerHTML = '';
     if (spotlightEl) {
       spotlightEl.style.clipPath = '';
       spotlightEl.classList.remove('show');
@@ -769,17 +693,10 @@
 
   function renderPane({ speech, actionLabel, onAction, promptText }) {
     pane.innerHTML = '';
-    const row = document.createElement('div');
-    row.className = 'ist-onb-mascot-row';
-    const mImg = document.createElement('div');
-    mImg.className = 'ist-onb-mascot';
-    mImg.innerHTML = `<img src="${mascotSrc()}" alt="">`;
     const bubble = document.createElement('div');
     bubble.className = 'ist-onb-bubble';
     bubble.innerHTML = speech;
-    row.appendChild(mImg);
-    row.appendChild(bubble);
-    pane.appendChild(row);
+    pane.appendChild(bubble);
 
     const actions = document.createElement('div');
     actions.className = 'ist-onb-actions';
@@ -885,7 +802,7 @@
     if (!fb()) { stepKefilShare(); return; }
 
     enterSpotlightMode();
-    const lines = COPY.lanes[lang][mascot];
+    const lines = COPY.lanes[lang];
 
     // The petek's own depths (HIVE_LEVELS in profile-card.js): 0 is Sen --
     // the reader's own hexagon with the avatar arrows on it -- and 2 is the
@@ -1084,8 +1001,7 @@
   function stepKefilShare() {
     clearStage();
     const stage = document.getElementById('ist-onb-stage');
-    stage.insertAdjacentHTML('beforeend', mascotImgHTML());
-    addMsg(fillKefil(COPY.kefilShare[lang][mascot]));
+    addMsg(fillKefil(COPY.kefilShare[lang]));
     const box = document.createElement('div');
     box.className = 'ist-onb-codebox';
     const codeSpan = document.createElement('span');
@@ -1108,8 +1024,7 @@
   function stepProfilePrompt() {
     clearStage();
     const stage = document.getElementById('ist-onb-stage');
-    stage.insertAdjacentHTML('beforeend', mascotImgHTML());
-    addMsg(COPY.profilePrompt[lang][mascot]);
+    addMsg(COPY.profilePrompt[lang]);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'ist-onb-btn';
