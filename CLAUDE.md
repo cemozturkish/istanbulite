@@ -2484,7 +2484,24 @@ Six things about it, each of which fails silently if forgotten:
   `.fb-box` would move it, since the book positions those absolutely. So nothing is added to the
   app's DOM at all — the holes are cut with one `fill-rule: evenodd` clip-path (the same idiom
   `IstSheet.lightTheMap` uses on the map's tint) and the rings are drawn in a layer of our own
-  over the top. The rects are measured, so they are re-measured on resize.
+  over the top. The rects are measured, so they are re-measured on resize, and again as a depth
+  change's own transition settles.
+  - **It has to be `path()`, never `polygon()`.** A CSS `polygon()` is ONE closed ring, so listing
+    the viewport's corners and then a hole's runs a continuous edge from the last hole corner back
+    to the first outer corner, and evenodd carves a **diagonal wedge** out of the dim that has
+    nothing to do with either shape. Only `path()` can carry more than one subpath. It hit-tests
+    correctly either way, which is exactly what makes it survive a test that asks
+    `elementFromPoint` — sampling the painted pixels is what catches it.
+  - **What is LIT and what is PRESSED are different elements, and the beat names both.** The
+    avatar beat lights `.ist-hive-pick-col` (two of them) and listens on `.ist-hive-picker`: the
+    picker's own box is exactly the hexagon (`--ist-hive-cell-w/h`) and both arrow columns are
+    laid *outside* it at `right: 100%` / `left: 100%`, so a ring measured on the wrapper is a box
+    drawn over the reader's own avatar with the arrows outside the hole.
+- **A beat that adds no hint takes the last one down.** `addHint` sets `tapAdvanceFn`, so a pull
+  or act beat inheriting the previous beat's hint inherited a live "tap anywhere to continue" as
+  well — the reader could tap straight past the gesture just asked for, and the prompt under the
+  mascot said one thing while the button over the tab bar said another. Every beat clears it;
+  only the ones that add one have one.
 - **No beat that waits can dead-end.** After `STALL_MS` the prompt becomes a tap-to-continue and
   the tour carries on without the gesture — on a pull beat and on the avatar beat alike (the
   avatar can be changed any day from that exact screen, so a reader who does not want to right now
