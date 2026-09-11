@@ -16,13 +16,6 @@
   <link rel="stylesheet" href="palette.css?v=7">
   <link rel="stylesheet" href="loading-screen.css?v=3">
   <script src="game-locks.js?v=2" defer></script>
-  <!-- "İlgimi çekti": what the reader kept out of Kahvehane's event deck.
-       This column is the other end of that gesture. Shared with
-       kahvehane.html. -->
-  <script src="event-interest.js?v=2" defer></script>
-  <!-- The .event-item template, shared with the copy of this same stack
-       standing inside the petek's level 1 (profile-card.js). -->
-  <script src="event-interest-cards.js?v=2" defer></script>
   <link rel="stylesheet" href="profile-card.css?v=31">
   <script src="avatar.js?v=1" defer></script>
   <script src="person-mentions.js?v=1" defer></script>
@@ -491,38 +484,10 @@
        neighborhood comments used to hold, and came back with that
        column's styling -- same box, same flex chain -- when the Kahve
        Endeksi took the column there. */
-    .events-section {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      flex: 1;
-      min-height: 0;
-      /* .event-grow-page is positioned against this box, not the
-         viewport -- it fills exactly the events column's own space,
-         below the petek, never over it. On the phone that box is a
-         fixed height (--hane-events-h on .col-left), so the room a card
-         grows into is simply the room the column always has: nothing is
-         forced open while a card is standing and nothing has to be
-         cleared afterwards. It used to be an inline min-height set for
-         as long as a card was open -- and a single missed cleanup left
-         the column holding a third of the screen with nothing drawn in
-         it, which pushed the petek off centre with no visible cause.
-
-         It replaces reserving the band the moment the column has a card
-         in it: that kept a press from moving the petek, but left the
-         reader's own position a function of how many things were on. A
-         box that is the same size on every night is the same fix,
-         extended to the nights themselves. */
-      position: relative;
-    }
-    #events-panel {
-      flex: 1;
-      overflow-y: auto;
-      padding: 10px 14px 16px 14px;
-    }
+    
+    
     /* Only the middle depth of the petek is about who is standing beside
        the reader, which is the whole reason a kept event's verdict is
-       worth showing at all (see paintHiveEventMarks) -- at the other
        two depths the column has nothing to say. Keyed on the OFF class
        (applyHiveLevel sets ist-hive-offmid at levels 0 and 2), never on
        :not(.ist-hive-mid): the default with no class at all has to be
@@ -540,315 +505,7 @@
        still while only what's around it changes. visibility:hidden
        keeps the row's height (and the petek's) constant across every
        level. */
-    html.ist-hive-offmid .events-section { visibility: hidden; }
-    /* The page a kept card grows into. Its box is measured onto the
-       cards' own content box when it opens (measureEventGrowBand), the
-       same way Kütüphane's news page is measured onto its feed's --
-       inset:0 here is the frame before that measurement lands, and the
-       desktop fallback. It never changes anything in the layout: the
-       events column reserves its band the moment it has a card in it
-       (see renderEventsNow), so the petek above stands exactly where it
-       stood before the press. */
-    .event-grow-page {
-      position: absolute;
-      inset: 0;
-      z-index: 2;
-      /* Two layers, and it has to be two: --paper-card is deliberately
-         translucent on this page (white at 85%, from the days the cards
-         floated over a map photo), and this page now stands OVER the
-         petek -- one translucent layer and the reader's own honeycomb
-         reads straight through the event they just opened. The card's
-         own tint composited onto the page's paper is the same colour it
-         has always been, and opaque. */
-      background-color: var(--paper);
-      background-image: linear-gradient(var(--paper-card), var(--paper-card));
-      border: 2px solid var(--card-border-color);
-      box-sizing: border-box;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-    .event-grow-page[hidden] { display: none; }
-    .event-grow-page-inner {
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      box-sizing: border-box;
-    }
-    /* ── head / body / foot, and only the middle moves ──
-       The same three-part page a story opens as on Kütüphane: what this
-       is (and the way back out) on the top line, the event scrolling in
-       the middle, and the RSVP row on the bottom line where it cannot
-       scroll away. */
-    .ev-page-head {
-      flex: none;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 12px 16px 10px;
-      border-bottom: 1px solid var(--rule);
-    }
-    /* The same hand-drawn arrow every page inside a reader wears -- the
-       reader arrived by touching a card, so the way back out is the
-       drawing, not a word. */
-    .ev-page-back {
-      flex: none;
-      width: 26px; height: 26px;
-      display: flex; align-items: center; justify-content: center;
-      background: none; border: none; padding: 0; cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    .ev-page-back:hover { opacity: 0.6; }
-    .ev-page-back img { width: 24px; height: 24px; display: block; }
-    .ev-page-head .ev-kicker { flex: 1; min-width: 0; margin-bottom: 0; }
-    .ev-page-when {
-      flex: none;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 11px;
-      color: var(--muted);
-    }
-    .ev-page-body {
-      flex: 1;
-      min-height: 0;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-      padding: 14px 16px 16px;
-    }
-    .ev-page-title {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 1.35rem;
-      font-weight: 700;
-      line-height: 1.2;
-      text-wrap: balance;
-      margin: 0 0 8px;
-      color: var(--ink);
-    }
-    .ev-page-body .ev-meta { margin-bottom: 12px; }
-    .ev-page-body .ev-desc {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.88rem;
-      line-height: 1.55;
-      color: var(--ink);
-    }
-    .ev-page-foot {
-      flex: none;
-      padding: 10px 16px;
-      border-top: 1px solid var(--rule);
-      background: var(--frame-bg);
-    }
-    /* The mini card behind the grown one, gone from the drawing while it
-       is standing in for it -- same move Kütüphane's own .news-open and
-       Kahvehane's own .ev-open make. */
-    .event-item.event-grow-open { visibility: hidden; }
-
-    .event-item {
-      display: grid;
-      grid-template-columns: 38px 1fr;
-      column-gap: 10px;
-      padding: 14px 16px 14px 14px;
-      margin-bottom: 12px;
-      /* Opaque, for the same reason the grown page is (see there): the
-         strip these stand in is laid over the foot of the petek. */
-      background-color: var(--paper);
-      background-image: linear-gradient(var(--paper-card), var(--paper-card));
-      border: 2px solid var(--card-border-color);
-      border-bottom: 5px solid var(--card-border-color);
-      transition: background 0.15s, transform 0.15s ease;
-    }
-    .event-item:last-child { margin-bottom: 0; }
-    /* The reader has a city with things on in it and has kept none of
-       them yet -- the same dashed frame the decks on the other two pages
-       end with, saying where the deck is rather than apologising for an
-       empty column. */
-    .events-empty {
-      padding: 16px 12px;
-      text-align: center;
-      border: 2px dashed var(--rule);
-      background: transparent;
-      box-sizing: border-box;
-      /* It fills the column rather than sitting in it: the column is a
-         fixed box on the phone (see .col-left below), and a frame that
-         only wrapped its own two lines would leave bare paper between
-         itself and the petek -- which is the very thing the frame is
-         there to stop. */
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-    .events-empty-line {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.9rem;
-      font-weight: 700;
-      color: var(--ink);
-    }
-    .events-empty-sub {
-      margin-top: 3px;
-      font-size: 0.72rem;
-      font-style: italic;
-      color: var(--muted);
-    }
-    /* ── Set like Kahvehane's own event cards ──
-       Same object on both pages: what the reader threw right over there
-       is what stands here. The type scale, the weights and the ink are
-       that page's (.ev-card / .event-page-* in kahvehane.html) rather
-       than a second set of numbers -- and the ink is --ink/--muted, so
-       it follows the palette instead of the fixed dark that these cards
-       carried from the days they floated over a map photo (which, on the
-       dark theme, was dark text on a dark card). */
-    .event-item .ev-date-block {
-      text-align: center;
-      padding-top: 14px;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      color: var(--ink);
-    }
-    .event-item .ev-day {
-      font-size: 1.7rem;
-      font-weight: 700;
-      line-height: 1;
-    }
-    .event-item .ev-mon {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.6rem;
-      font-weight: 600;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-top: 4px;
-    }
-    .event-item .ev-wd {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.55rem;
-      font-weight: 600;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-top: 2px;
-      opacity: 0.75;
-    }
-    .event-item .ev-body { min-width: 0; }
-    .event-item .ev-kicker {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--ink-red);
-      margin-bottom: 2px;
-    }
-    .event-item .ev-title {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 18px;
-      font-weight: 700;
-      line-height: 1.25;
-      margin-bottom: 0;
-      color: var(--ink);
-    }
-    .event-item .ev-meta {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 11px;
-      letter-spacing: 0.5px;
-      color: var(--muted);
-      line-height: 1.4;
-    }
-    .event-item.openable { cursor: pointer; }
-    /* Plain hover only, for a mouse -- a lighter background, no nudge.
-       Tapping the card grows it in place instead (see
-       openEventGrowPage/.event-grow-page), so there is no lingering
-       "pressed" look to hold once the tap has already answered. */
-    /* A mouse only. `:hover` sticks after a tap on iOS, so on a phone
-       this left the card the reader had just opened and closed sitting
-       grey in the strip with no way to clear it -- the same reason
-       Kütüphane's cards press with pointer events rather than :hover. */
-    @media (hover: hover) and (pointer: fine) {
-      .event-item.openable:hover { background: #e8e8e8; }
-    }
-    /* Only ever rendered inside the detail sheet (see buildEventDetailHtml)
-       -- the column's preview card doesn't include it. */
-    .event-item .ev-details {
-      grid-column: 1 / -1;
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px dashed var(--card-border);
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.82rem;
-      line-height: 1.5;
-      color: var(--card-fg);
-    }
-    .event-item .ev-desc { margin-bottom: 10px; }
-    .detail-overlay-body .event-item { max-width: 520px; margin: 0 auto; }
-    .ev-rsvp-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .ev-rsvp-btn {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.62rem;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      padding: 7px 14px;
-      background: transparent;
-      color: var(--ink-red);
-      border: 1px solid var(--ink-red);
-      cursor: pointer;
-      transition: background 0.15s, color 0.15s;
-    }
-    .ev-rsvp-btn:hover { background: rgba(185, 54, 49, 0.15); }
-    .ev-rsvp-btn.attending {
-      background: var(--ink-red);
-      color: #1a1a1a;
-    }
-    .ev-rsvp-btn.attending:hover { opacity: 0.85; }
-    .ev-rsvp-btn:disabled { opacity: 0.6; cursor: default; }
-    .ev-rsvp-count {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 11px;
-      letter-spacing: 0.5px;
-      color: var(--muted);
-    }
-    .ev-attendees {
-      display: flex;
-      align-items: center;
-    }
-    /* Preview-card attendee stack: shown under the title on every
-       breakpoint, in the space the compact card otherwise leaves empty.
-       The detail sheet's .ev-attendees (inside .ev-rsvp-row) is
-       unaffected since it isn't matched by this class. */
-    .ev-attendees-preview {
-      display: flex;
-      margin-top: 10px;
-    }
-    .ev-attendees-preview:empty { display: none !important; }
-    .ev-attendee-avatar {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      background: var(--paper-dark);
-      border: 1.5px solid var(--paper-card, #fff);
-      box-shadow: 0 0 0 1px var(--card-border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: 0.62rem;
-      font-weight: 700;
-      color: var(--accent);
-      overflow: hidden;
-      margin-left: -8px;
-    }
-    .ev-attendee-avatar:first-child { margin-left: 0; }
-    .ev-attendee-avatar img { width: 100%; height: 100%; object-fit: cover; }
-    .ev-attendee-avatar.ev-attendee-more {
-      font-size: 0.56rem;
-      color: var(--card-fg-muted);
-    }
+    
 
     /* ── MOBILE RESPONSIVE ──
        Stacked flow instead of desktop's floating-over-fullscreen-map
@@ -897,24 +554,13 @@
            which is where the reader's own avatar then sits, dead centre
            of the screen. */
         grid-template-rows: minmax(0, 1fr);
-        /* The strip the events stand in, resting and opened (see
-           .col-left below). Resting it is one preview card with a little
-           air around it; opened it is what one card's date, title,
-           description and RSVP row need to be read in -- and no more
-           than that, because it opens UPWARD over the petek's own
-           window: the drawing is lifted clear of it (--ist-hive-lift in
-           profile-card.css), and every pixel this number grows is a
-           pixel the reader has to be lifted by. */
-        --hane-events-h: 90px;
-        --hane-events-open-h: min(23vh, 185px);
-        /* Both handed to the petek, which does different things with
-           them (see fitHive in profile-card.js): the drawing is fitted
-           small enough to clear the OPENED box, and stands centred in
-           what the RESTING strip leaves -- which is where it is nearly
-           all the time. Handed over rather than restated, so a card can
-           never grow past what the drawing was moved out of the way of. */
-        --ist-hive-reserve: var(--hane-events-open-h);
-        --ist-hive-reserve-rest: var(--hane-events-h);
+        /* The events strip used to stand along the foot of this band,
+           and the petek was fitted to clear it. It moved to
+           project.html's Kahvehane lane, so there is nothing to reserve
+           and the drawing gets the whole band (see fitHive in
+           profile-card.js). */
+        --ist-hive-reserve: 0px;
+        --ist-hive-reserve-rest: 0px;
         /* frames.css's gap (row + column) exposed a sliver of the raw
            page canvas (--page-bg, warm beige/mono gray) directly under
            the map -- a different color from the map's own #f7f7f7,
@@ -1005,91 +651,6 @@
         overflow: visible;
       }
 
-      /* Events fill .col-left's height exactly; min-height:0 lets
-         #events-panel below shrink to fit rather than overflowing the
-         fixed column. */
-      .events-section {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        min-height: 0;
-        overflow: visible;
-      }
-      /* ── One evening at a time, and you slide between them ──
-         The strip is one card tall (see .col-left), so a stack in it
-         could only ever be a scroller with a card and a half showing --
-         a list you read half of. It is a row instead: one whole card
-         fills the strip, and the next one is a swipe to the side, the
-         way every other stack of cards on this app is dealt. Native
-         scroll-snap does it, so the gesture is the platform's own --
-         momentum, rubber-band, the lot -- and there is no drag handler
-         here to fight the carousel's.
-         8px side padding (on top of #main-site's own 10px frame padding)
-         puts the cards on the shared 18px screen inset -- the same line
-         the comments used to hold and the game tiles still do. */
-      #events-panel {
-        padding: 6px 8px 10px;
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: row;
-        align-items: stretch;
-        gap: 8px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        scroll-snap-type: x mandatory;
-        /* The page carousel is one swipe away in the same direction
-           (router.js listens on the document), so a slide that runs off
-           the end of this strip must not become a page change. The
-           listener is stopped in JS as well -- see wireEventStripSwipe;
-           this is the scroll half of the same rule. */
-        overscroll-behavior-x: contain;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-      }
-      #events-panel::-webkit-scrollbar { display: none; }
-      /* Each card is the strip: a whole one, never a peek at the next.
-         flex-basis 100% against a row that may hold ten of them, so they
-         must not shrink either. */
-      #events-panel > * {
-        flex: 0 0 100%;
-        min-width: 0;
-        margin: 0;
-        scroll-snap-align: center;
-        overflow: hidden;
-      }
-      /* With more than one kept evening the cards give up a strip of
-         their width so the next one shows at the edge. Nothing else on
-         this page says there is another card to the side -- the strip is
-         one card tall and there is no room in it for dots -- and a
-         carousel nobody knows is a carousel is a list with one item in
-         it. A single card (or the frame on an empty night) keeps the
-         full width: there is nothing to peek at, and 26px of bare paper
-         beside it would just read as a mistake. */
-      #events-panel:has(> :nth-child(2)) > * { flex-basis: calc(100% - 26px); }
-      .event-item {
-        grid-template-columns: 30px 1fr;
-        column-gap: 8px;
-        padding: 8px 9px;
-        align-content: center;
-      }
-      .event-item .ev-date-block { padding-top: 2px; }
-      .event-item .ev-day { font-size: 1.05rem; line-height: 1; }
-      .event-item .ev-mon { font-size: 0.5rem; margin-top: 2px; }
-      .event-item .ev-wd { font-size: 0.46rem; margin-top: 1px; }
-      .event-item .ev-kicker { font-size: 9px; letter-spacing: 1.5px; margin-bottom: 2px; }
-      .event-item .ev-title { font-size: 16px; margin-bottom: 0; line-height: 1.2; }
-      .ev-attendees-preview { margin-top: 6px; }
-      .ev-attendees-preview .ev-attendee-avatar {
-        width: 20px;
-        height: 20px;
-        font-size: 0.5rem;
-        margin-left: -6px;
-      }
-
-      /* The card columns keep their shape (flex columns, bottom-up
-         stacks): the events are in the left one, and whatever lands in
-         the right behaves the way Kahvehane's and Kütüphane's do. */
       .col-left, .col-right {
         position: static;
         top: auto; bottom: auto; left: auto; right: auto;
@@ -1100,46 +661,12 @@
         overflow: visible;
         z-index: 1;
       }
-      .col-left {
-        /* ── Laid over the foot of the petek's own window ──
-           The events used to have a grid row of their own, which made
-           the petek's box (and the reader standing at the middle of it)
-           a function of how tall this column was: it stood the drawing
-           above the middle of the screen by exactly half the strip. So
-           the petek now gets the WHOLE band between the two bars -- it
-           is the page, and the reader is dead centre of it -- and this
-           strip is laid over its foot, the same move level 0's own block
-           makes inside the petek (see .ist-hive-self in
-           profile-card.css).
-           It also means a card opening changes nothing about the layout:
-           the strip simply grows upward over the drawing and folds back,
-           and the reader never moves. */
-        grid-area: hero;
-        align-self: end;
-        position: relative;
-        z-index: 2;
-        /* ── Their share of the band, and always exactly that share ──
-           A fixed box, not a row that grows with what is in it. The
-           petek is centred in whatever is left above this (see fitHive),
-           so every pixel this row gains or loses moves the reader
-           himself: a night with three things on used to stand the
-           drawing higher than a night with none, and an empty column
-           left it hanging above a band of bare paper. So the column is
-           the same height whatever it holds -- a night with a lot on
-           scrolls inside it, and a night with nothing on prints the
-           dashed frame across it (see .events-empty), the way the decks
-           on the other two pages always keep their own corner.
-           It is also the room a card grows into (.event-grow-page fills
-           this box exactly), which is why it is stated once here rather
-           than forced open for as long as a card is standing. */
-        height: var(--hane-events-h);
-        max-height: none;
-        /* Opening and folding back is this one number changing (see
-           openEventGrowPage), which is why the card's own grow can be
-           measured against a box that is already the size it will be. */
-        transition: height 200ms cubic-bezier(0.22, 1, 0.36, 1);
-      }
-      .col-left.events-open { height: var(--hane-events-open-h); }
+      /* The events strip stood here, laid over the foot of the petek's
+         own window. It moved to project.html's Kahvehane lane, so this
+         column has nothing in it on a phone and the petek gets the whole
+         band on its own. */
+      .col-left { display: none; }
+
       /* Nothing on this page's right column shows on a phone -- it is
          empty (the seat it used to carry is gone from Hane entirely, see
          the col-right markup). Hidden outright rather than given a track
@@ -1269,7 +796,8 @@
       body.ist-exiting-backward .col-right {
         transform: translateX(100vw);
       }
-    }
+    
+}
 
     /* ── Desktop swipe pagination: left column slides out/in toward the
        left edge, right column toward the right edge — regardless of nav
@@ -1301,7 +829,8 @@
       body.ist-exiting-backward .col-right-slide {
         transform: translateX(-100vw);
       }
-    }
+    
+}
 
     /* ══════════════════════════════════════════════
        View Transitions API — cross-document slide
@@ -1366,7 +895,8 @@
       ::view-transition-new(ist-col-right) {
         animation: 400ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-col-right-enter;
       }
-    }
+    
+}
 
     @media (max-width: 768px) {
       @keyframes ist-vt-out-left { from { transform: translateX(0); } to { transform: translateX(-100vw); } }
@@ -1391,13 +921,15 @@
       html.vt-backward::view-transition-new(ist-col-right) {
         animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both ist-vt-in-right;
       }
-    }
+    
+}
 
     /* ── Small-phone overrides (≤ 400px, e.g. iPhone 15) ── */
     @media (max-width: 400px) {
       /* Tighten padding inside the narrower news/events columns */
       .sidebar-right-inner { padding: 6px 6px; }
-    }
+    
+}
 
     /* ── News / event detail: opened as THE sheet (see sheet.css) —
        the same object a game, an article or a profile opens as, so its
@@ -1566,26 +1098,11 @@
   <div id="ist-content" style="display:contents">
   <aside class="col-left">
     <div class="library-card" id="library-card"><div class="card-loading"><span class="spinner"></span></div></div>
-    <!-- The events, back where they started. They belong beside the petek:
-         the petek is who you are standing next to, and an event is the
-         one thing on the site that ends with you actually standing next
-         to them. Kahvehane holds the map and what a cup costs on it;
-         Hane holds the people and where they will be. Unscoped by
-         construction -- there is no map on this page to filter by, so
-         this is the whole city's list (each card kickered with its own
-         district), and choosing a district is Kahvehane's job. -->
-    <div class="col-left-slide">
-      <section class="events-section">
-        <div id="events-panel"></div>
-        <!-- A kept event grows into this, in place, the same way
-             Kahvehane's own event page and Kütüphane's news cards do
-             (IstSheet.grow) -- see openEventGrowPage. It stays inside
-             the events column itself, below the petek, never over it. -->
-        <div class="event-grow-page" id="event-grow-page" hidden>
-          <div class="event-grow-page-inner" id="event-grow-page-inner"></div>
-        </div>
-      </section>
-    </div>
+    <!-- The events used to stand here, beside the petek. They live in
+         project.html's Kahvehane lane now (see its Etkinlikler column),
+         and the copy that was here has been removed rather than left to
+         drift from it. -->
+    <div class="col-left-slide"></div>
     <!-- Bottom-right corner card (mirrors #library-card above, pinned to
          the bottom instead of the top) -- empty for now, buttons TBD. -->
     <div class="corner-card" id="corner-card-right"></div>
@@ -1620,15 +1137,9 @@
   </div>
 </div>
 
-<!-- Detail overlay: the bottom sheet this page opens things full-size
-     in -- an event. See openDetail/closeDetail further down. -->
-<div class="ist-sheet-overlay ist-sheet-pull detail-overlay" id="anahane-detail" hidden>
-  <div class="ist-sheet-backdrop" id="anahane-detail-backdrop"></div>
-  <div class="ist-sheet detail-overlay-sheet" id="anahane-detail-sheet">
-    <button type="button" class="ist-sheet-close" id="anahane-detail-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-    <div class="ist-sheet-body detail-overlay-body" id="anahane-detail-body"></div>
-  </div>
-</div>
+<!-- The detail sheet that stood here opened one thing: an event. The
+     events moved to project.html's Kahvehane lane, so it opened nothing
+     and has been removed with them. -->
 
 <script>
 // Wrapped in a scoping IIFE so this page's top-level declarations (sb,
@@ -1682,8 +1193,6 @@ function mount() {
   // showSite() entirely) leaves the nav bar and profile card inheriting
   // pointer-events:none with nothing to unlock it.
   document.getElementById('main-site').classList.add('active');
-  loadEvents();
-  wireEventStripSwipe();
   loadPersonMentionsRoster();
   mountPetek();
   // #library-card lives inside #ist-content, so a virtual re-entry into
@@ -1741,9 +1250,8 @@ function unmount() {
   // The petek is the one thing this page leaves behind it: its state is
   // profile-card.js's own (so an in-flight fetch has something to check
   // itself against) and the classes saying which depth the reader was
-  // standing at are on <html>, which the router does not swap. Left
-  // there at level 0 or 2, ist-hive-offmid hides the kept-events column
-  // on the way back in -- see unmountHivePage.
+  // standing at are on <html>, which the router does not swap -- see
+  // unmountHivePage.
   if (window.IstProfileCard && IstProfileCard.unmountHivePage) IstProfileCard.unmountHivePage();
 }
 
@@ -1970,496 +1478,16 @@ onEl('signup-submit-btn', 'click', async () => {
 // looking at is a fact of the two sides -- Kahvehane's own district and
 // Kütüphane's countries -- and lives there, in politician-card.js.
 
-// ── Events (left column) ──────────────────
-// Beside the petek: the petek is who you are standing next to, an event
-// is where you can go and actually stand next to them. This page has no
-// map, so the list is the whole city's -- every district, each card
-// kickered with its own -- and picking a district is Kahvehane's job.
-// The filter argument survives for whoever wants to scope it later; the
-// page never passes one.
-// Date formatting and the .event-item template itself now live in
-// event-interest-cards.js, shared with the copy of this stack standing
-// inside the petek's level 1 (profile-card.js).
-function eventDateParts(iso) {
-  return IstEventCards.dateParts(iso, I18N.isEnglish());
-}
-
-let allEvents = [];
-// Whether the last attempt to fetch the city's calendar failed, as
-// against coming back with nothing in it. The column says different
-// things about the two (see renderEventsNow): a city with nothing on
-// tonight is a fact about İstanbul, and printing it because this phone
-// could not ask is the app lying about the city on its behalf.
-let eventsFailed = false;
-let eventsRequestSeq = 0;
-let rsvpCounts = {};       // event_id -> attendee count
-let myRsvpIds = new Set(); // event_ids the current user has RSVP'd to
-let rsvpAttendees = {};    // event_id -> [profile, ...] (capped)
-const MAX_ATTENDEE_AVATARS = 6;
-// The kept event currently grown into .event-grow-page (see
-// openEventGrowPage), and the card it grew out of.
-let _eventGrowId = null;
-let _eventGrowOrigin = null;
-
-async function loadEvents(neighborhoodFilter = null, instant = false) {
-  const reqId = ++eventsRequestSeq;
-  const now = new Date().toISOString();
-  // The column says something from the first frame. It is a fixed box
-  // under the petek (see .col-left), so while this was awaiting its two
-  // round trips that box stood there as bare paper -- and a request that
-  // never came back, or threw on the way, left it that way for good.
-  // Drawing what is known right now (nothing yet, and the frame that
-  // says so) costs nothing and means the band is never empty.
-  renderEvents(true);
-  try {
-    // Scope the query to the selected neighborhood so the 30-row cap
-    // doesn't hide matching rows that sit past the global top-30 window.
-    let query = sb.from('events')
-      .select('*')
-      .gte('event_date', now)
-      .order('event_date', { ascending: true })
-      .limit(30);
-    if (neighborhoodFilter) query = query.eq('neighborhood', neighborhoodFilter);
-    const { data, error } = await query;
-    // Drop responses from superseded requests so a slow older fetch
-    // can't clobber a newer one with stale rows.
-    if (reqId !== eventsRequestSeq) return;
-    if (error) { console.error('[kahvehane events]', error); allEvents = []; eventsFailed = true; }
-    else { allEvents = data || []; eventsFailed = false; }
-    // What the reader threw right on Kahvehane's deck is kept in their
-    // own browser (event-interest.js), which is the right home for a
-    // verdict -- but a browser is not a member. A cleared cache, a
-    // second device, the app beside mobile Safari: the deck's own
-    // mirror of those verdicts (db/hive_event_interest.sql) is read
-    // back here so the evenings they kept are waiting for them beside
-    // the petek wherever they open it. Best-effort and never
-    // authoritative: the device's own verdict wins, and a database
-    // without the migration simply answers nothing.
-    if (window.IstEventInterest && IstEventInterest.hydrate) {
-      await IstEventInterest.hydrate(window.__currentUser && window.__currentUser.id, sb);
-    }
-    await loadRsvps();
-  } catch (e) {
-    // A rejected fetch (offline, a blocked request) used to take the
-    // render with it, since it sat after the awaits.
-    console.error('[kahvehane events]', e);
-    eventsFailed = true;
-  }
-  if (reqId !== eventsRequestSeq) return;
-  renderEvents(instant);
-}
-
-async function loadRsvps() {
-  rsvpCounts = {};
-  myRsvpIds = new Set();
-  rsvpAttendees = {};
-  const ids = allEvents.map(ev => ev.id);
-  if (!ids.length) return;
-  const { data, error } = await sb.from('event_rsvps')
-    .select('event_id, user_id, created_at')
-    .in('event_id', ids)
-    .order('created_at', { ascending: true });
-  if (error) { console.error('[kahvehane rsvps]', error); return; }
-  const myId = window.__currentUser && window.__currentUser.id;
-  (data || []).forEach(r => {
-    rsvpCounts[r.event_id] = (rsvpCounts[r.event_id] || 0) + 1;
-    if (myId && r.user_id === myId) myRsvpIds.add(r.event_id);
-  });
-  // Resolve attendee profile pictures in one batched query.
-  const userIds = Array.from(new Set((data || []).map(r => r.user_id)));
-  if (userIds.length) {
-    const { data: profs, error: profErr } = await sb.from('profiles')
-      .select('id, first_name, last_name, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt')
-      .in('id', userIds);
-    if (profErr) { console.error('[kahvehane rsvp attendees]', profErr); return; }
-    const profMap = new Map((profs || []).map(p => [p.id, p]));
-    (data || []).forEach(r => {
-      const p = profMap.get(r.user_id);
-      if (!p) return;
-      (rsvpAttendees[r.event_id] = rsvpAttendees[r.event_id] || []).push(p);
-    });
-  }
-}
-
-function buildAttendeeAvatarsHtml(eventId) {
-  const list = rsvpAttendees[eventId] || [];
-  if (!list.length) return '';
-  const shown = list.slice(0, MAX_ATTENDEE_AVATARS);
-  const extra = list.length - shown.length;
-  const avatarsHtml = shown.map(p => {
-    const name = capitalizeName([p.first_name, p.last_name].filter(Boolean).join(' ')) || 'Üye';
-    const inner = IstAvatar.html(p.avatar_url, p.avatar_hair, p.avatar_hat, p.avatar_accessory, p.avatar_shirt);
-    return `<span class="ev-attendee-avatar" title="${esc(name)}">${inner}</span>`;
-  }).join('');
-  const moreHtml = extra > 0
-    ? `<span class="ev-attendee-avatar ev-attendee-more" title="+${extra}">+${extra}</span>`
-    : '';
-  return avatarsHtml + moreHtml;
-}
-
-async function toggleRsvp(eventId, btn) {
-  const myId = window.__currentUser && window.__currentUser.id;
-  if (!myId || btn.disabled) return;
-  const attending = myRsvpIds.has(eventId);
-  btn.disabled = true;
-  try {
-    if (attending) {
-      const { error } = await sb.from('event_rsvps').delete().eq('event_id', eventId).eq('user_id', myId);
-      if (error) throw error;
-    } else {
-      const { error } = await sb.from('event_rsvps').insert({ event_id: eventId, user_id: myId });
-      if (error) throw error;
-    }
-  } catch (err) {
-    console.error('[kahvehane rsvp]', err);
-    btn.disabled = false;
-    return;
-  }
-  // Refetch counts + attendee avatars so the stack reflects the change,
-  // then patch just this event's row in place so the card doesn't collapse.
-  await loadRsvps();
-  const nowAttending = myRsvpIds.has(eventId);
-  btn.classList.toggle('attending', nowAttending);
-  btn.textContent = nowAttending ? I18N.t('home.events.rsvp.going') : I18N.t('home.events.rsvp.join');
-  const row = btn.closest('.ev-rsvp-row');
-  const countEl = row?.querySelector('.ev-rsvp-count');
-  if (countEl) countEl.textContent = `${rsvpCounts[eventId] || 0} ${I18N.t('home.events.rsvp.count')}`;
-  const avatarsEl = row?.querySelector('.ev-attendees');
-  if (avatarsEl) avatarsEl.innerHTML = buildAttendeeAvatarsHtml(eventId);
-  // Also patch the (separate) preview card in the column behind the sheet,
-  // so its attendee stack matches without waiting for a reload.
-  const previewEl = document.querySelector(`.event-item[data-event-id="${CSS.escape(eventId)}"] .ev-attendees-preview`);
-  if (previewEl) previewEl.innerHTML = buildAttendeeAvatarsHtml(eventId);
-  // The petek is printing who is going, the reader included -- so
-  // answering the question repaints it rather than waiting for the card
-  // to be closed and opened again.
-  if (String(eventId) === String(_eventGrowId)) paintHiveForEvent(eventId);
-  btn.disabled = false;
-}
-
-// ── A kept event's card, grown in place ──
-// Same primitive Kahvehane's own event page and Kütüphane's news cards
-// use (IstSheet.grow) -- the card becomes the page rather than a sheet
-// rising over it, and it stays inside .events-section, below the petek,
-// never over it (see .event-grow-page in the head <style>).
-
-// Where the page's four sides fall: on the strip's own box, measured off
-// #events-panel rather than restated as the sum of the column's padding
-// -- one number written in two places is how those end up a couple of
-// pixels apart. Same measurement Kütüphane's news page makes against its
-// own feed (measureNewsPageBand there). Absolute inside .events-section,
-// so everything is in that box's own coordinates.
-//
-// The panel's PADDING box, not its content box: the strip is a sideways
-// scroller (see #events-panel's phone CSS), and a scroller draws its
-// content right out to the padding edge -- so a page inset by the
-// padding left an 8px sliver of the next card showing down the side of
-// the event just opened.
-function measureEventGrowBand() {
-  const page = document.getElementById('event-grow-page');
-  const panel = document.getElementById('events-panel');
-  const section = document.querySelector('.events-section');
-  if (!page || !panel || !section) return;
-  const pr = panel.getBoundingClientRect();
-  const sr = section.getBoundingClientRect();
-  if (!(pr.width > 0) || !(sr.width > 0)) return;
-  const px = (v) => Math.max(0, v).toFixed(2) + 'px';
-  page.style.top = px(pr.top - sr.top);
-  page.style.left = px(pr.left - sr.left);
-  page.style.right = px(sr.right - pr.right);
-  page.style.bottom = px(sr.bottom - pr.bottom);
-}
-
-function openEventGrowPage(ev, cardEl) {
-  const page = document.getElementById('event-grow-page');
-  const inner = document.getElementById('event-grow-page-inner');
-  if (!page || !inner || !window.IstSheet) return;
-  closeEventGrowPage(); // only one open at a time
-  _eventGrowId = String(ev.id);
-  _eventGrowOrigin = cardEl;
-  cardEl.classList.add('event-grow-open');
-  inner.innerHTML = buildEventPageHtml(ev);
-  // The strip opens to the room a whole card needs. It is laid over the
-  // foot of the petek's window rather than standing in a row of its own
-  // (see .col-left), so this changes nothing about the layout and the
-  // reader does not move: the strip grows upward over the drawing and
-  // folds back down when the card is shut. Set before the measurement
-  // below, so what the grow is measured against is already the box it
-  // will be standing in.
-  const col = document.querySelector('.col-left');
-  if (col) { col.classList.add('events-open'); void col.offsetHeight; }
-  page.hidden = false;
-  measureEventGrowBand();
-  IstSheet.grow({ page, inner, origin: cardEl, dir: 'in' });
-  // Where the reader's own petek stands on it, painted straight onto
-  // their hexagons: what they said about it on Kahvehane's deck, and --
-  // the thing this page actually asks -- who among them is going
-  // (profile-card.js owns the honeycomb, so this calls into it rather
-  // than reaching for .ist-hive-cell here).
-  paintHiveForEvent(ev.id);
-}
-
-function closeEventGrowPage() {
-  const page = document.getElementById('event-grow-page');
-  const inner = document.getElementById('event-grow-page-inner');
-  if (!page || page.hidden || !window.IstSheet) return;
-  if (window.IstProfileCard) IstProfileCard.clearHiveEventMarks();
-  IstSheet.grow({ page, inner, origin: _eventGrowOrigin, dir: 'out' });
-  const origin = _eventGrowOrigin;
-  _eventGrowId = null;
-  _eventGrowOrigin = null;
-  setTimeout(() => {
-    page.hidden = true;
-    inner.innerHTML = '';
-    if (origin) origin.classList.remove('event-grow-open');
-    // Back to the resting strip -- one card's worth, above the tab bar.
-    const col = document.querySelector('.col-left');
-    if (col) col.classList.remove('events-open');
-    // And the frame the grow drew around the page (see IstSheet.grow):
-    // it is deliberately left standing after an 'out', holding the
-    // collapsed card's outline until the sheet it belongs to hides. On
-    // the other two pages that is the overlay, so it goes with it -- but
-    // this page's grow lives inside the events strip itself, which is
-    // never hidden, so nothing was taking it away. It stayed on the
-    // screen at the *opened* geometry: two black rules running out of
-    // the strip and down over the tab bar, with no way to get rid of
-    // them short of a reload.
-    IstSheet.cancelGrow(page);
-  }, IstSheet.GROW_MS);
-}
-
-// The petek's own answer to the open card: the yes/no verdicts its
-// members gave the event on Kahvehane's deck, and who has actually
-// RSVP'd. The reader's own hexagon is painted from what this page
-// already knows (myRsvpIds) -- the RPC deliberately answers only for
-// everybody else.
-function paintHiveForEvent(eventId) {
-  if (!window.IstProfileCard || !IstProfileCard.paintHiveEventMarks) return;
-  IstProfileCard.paintHiveEventMarks(sb, eventId, { mine: myRsvpIds.has(eventId) });
-}
-
-// The page is re-measured on resize like Kütüphane's is: it is a box
-// pinned to another box, and a rotation moves the one it is pinned to.
-window.addEventListener('resize', () => {
-  const page = document.getElementById('event-grow-page');
-  if (page && !page.hidden) measureEventGrowBand();
-});
-
-// ── The strip's own sideways slide ──
-// One kept evening fills the strip and the next is a swipe to the side
-// (see #events-panel's phone CSS, which does the sliding natively). The
-// three-page carousel listens for exactly that gesture on the document
-// (router.js), so a slide here has to stop at the strip or it deals the
-// reader to Kütüphane instead of to their next evening -- the same
-// stopPropagation Kahvehane's open event page makes for its own throw.
-//
-// Only while there is genuinely something to slide to, though: with one
-// card in it (or the frame that says there are none) the strip is not a
-// carousel, and swallowing the swipe there would leave a dead 90px band
-// across the bottom of the screen that the page carousel cannot be
-// reached from.
-function wireEventStripSwipe() {
-  const panel = document.getElementById('events-panel');
-  if (!panel || panel.dataset.swipeWired) return;
-  panel.dataset.swipeWired = '1';
-  panel.addEventListener('touchstart', (e) => {
-    if (e.touches.length !== 1) return;
-    if (panel.scrollWidth <= panel.clientWidth + 1) return;
-    e.stopPropagation();
-  }, { passive: true });
-}
-
-// What the member kept. The city's whole calendar is dealt with one card
-// at a time on Kahvehane -- thrown right is "ilgimi çekti", thrown left
-// is gone (see event-interest.js) -- and this column is the other end of
-// that gesture: the evenings that were actually theirs, standing beside
-// the people they would be standing next to. A list of everything on in
-// İstanbul is a listings page; this is a plan.
-function keptEvents() {
-  // No store, no filter: the column degrades to the whole city's list
-  // rather than to an empty page, which is the failure a reader can
-  // actually make sense of.
-  if (!window.IstEventInterest) return allEvents;
-  const kept = IstEventInterest.interestedIds(window.__currentUser && window.__currentUser.id);
-  return allEvents.filter(ev => kept.has(String(ev.id)));
-}
-
-function renderEvents(instant) {
-  const panel = document.getElementById('events-panel');
-  if (!panel) return;
-  // 'left': this column sits to the left of the map, so its cards enter
-  // and leave by the left edge -- the same way the comments did here.
-  renderEventsNow(panel, keptEvents());
-}
-
-// The page a kept card grows into -- head / body / foot, the same
-// three-part page a story opens as on Kütüphane. There is no throw on
-// it: a kept event has already had its verdict given on Kahvehane's
-// deck, and the one thing this page asks is whether you are going, which
-// is the button standing on its bottom line.
-function buildEventPageHtml(ev) {
-  const parts = eventDateParts(ev.event_date);
-  return IstEventCards.pageHTML(ev, parts, {
-    backLabel: 'Hane',
-    districtLabel: (id) => districtNames[id] || id,
-    attendeesHTML: buildAttendeeAvatarsHtml,
-    rsvp: {
-      count: rsvpCounts[ev.id] || 0,
-      attending: myRsvpIds.has(ev.id),
-      joinLabel: I18N.t('home.events.rsvp.join'),
-      goingLabel: I18N.t('home.events.rsvp.going'),
-      countLabel: I18N.t('home.events.rsvp.count'),
-    },
-  });
-}
-
-// The column reserves nothing on render and nothing on open: it is a
-// fixed box (--hane-events-h, see .col-left), the same size on a night
-// with three things on, a night with none, and while a card is standing
-// grown open in it. Which is the whole of why the petek above holds
-// still -- row 1 is minmax(0,1fr), so every pixel this column gains or
-// loses comes out of the drawing the reader is standing in the middle
-// of.
-function renderEventsNow(panel, rows) {
-  if (!rows.length) {
-    // Two different empties, and they still say different things -- a
-    // city with nothing on says exactly that, while a city with events
-    // on and none of them kept is a reader who hasn't been through the
-    // deck yet, and that is worth one line pointing at where it is. But
-    // both say it inside the SAME dashed frame, which is the rule the
-    // decks on the other two pages already follow (see Kahvehane's own
-    // deckFrameHTML): a column with nothing in it at all reads as the
-    // page being broken rather than as there being nothing on, and this
-    // one is standing under the petek where its absence moved the
-    // drawing itself.
-    const city = allEvents.length > 0;
-    const line = city ? 'home.events.kept' : (eventsFailed ? 'events.failed' : 'events.none');
-    const sub = city ? 'home.events.emptysub' : (eventsFailed ? 'events.failedsub' : 'events.nonesub');
-    panel.innerHTML = `
-      <div class="events-empty">
-        <div class="events-empty-line">${esc(I18N.t(line))}</div>
-        <div class="events-empty-sub">${esc(I18N.t(sub))}</div>
-      </div>
-    `;
-    return;
-  }
-  const rowsById = new Map(rows.map(ev => [String(ev.id), ev]));
-  // Weekday lives in the date block (day / month / weekday); time and
-  // location are both dropped from the preview -- see buildEventDetailHtml
-  // for the full date/time/location, still shown once you open the card.
-  // That frees this card for a bigger title.
-  panel.innerHTML = rows.map(ev => IstEventCards.previewHTML(ev, eventDateParts(ev.event_date), {
-    districtLabel: (id) => districtNames[id] || id,
-    attendeesHTML: buildAttendeeAvatarsHtml,
-  })).join('');
-
-  panel.querySelectorAll('.event-item.openable').forEach(el => {
-    const ev = rowsById.get(el.dataset.eventId);
-    if (!ev) return;
-    el.addEventListener('click', () => openEventGrowPage(ev, el));
-  });
-
-  // Re-render (live refresh) rebuilds every card from scratch -- if the
-  // one standing grown is still in this batch, hide its new copy the
-  // same way the original was (see openEventGrowPage); otherwise the
-  // card it grew out of is simply gone, so fold the page back.
-  if (_eventGrowId != null) {
-    // Only while a page is genuinely standing open. The mark this puts
-    // on a card is `visibility: hidden` (see .event-grow-open), so a
-    // stale id -- a close that took the early return, a virtual
-    // navigation that swapped the markup out from under this module's
-    // own state -- would hide the card on every render from then on,
-    // with nothing on screen to say why.
-    const page = document.getElementById('event-grow-page');
-    if (!page || page.hidden) {
-      _eventGrowId = null;
-      _eventGrowOrigin = null;
-    } else if (rowsById.has(_eventGrowId)) {
-      const el = panel.querySelector(`[data-event-id="${CSS.escape(_eventGrowId)}"]`);
-      if (el) { el.classList.add('event-grow-open'); _eventGrowOrigin = el; }
-    } else {
-      closeEventGrowPage();
-    }
-  }
-}
-
-// The RSVP button lives inside the detail sheet, which is re-rendered on
-// every open -- delegated on the sheet body so it survives that, and bound
-// to the element rather than to document (the sheet's body belongs to this
-// page's markup, but a document listener would outlive a virtual
-// navigation away from it -- see router.js).
-(function initEventRsvpClicks() {
-  const onRsvpClick = (e) => {
-    const btn = e.target.closest('.ev-rsvp-btn');
-    if (!btn) return;
-    e.stopPropagation();
-    toggleRsvp(btn.dataset.eventId, btn);
-  };
-  const body = document.getElementById('anahane-detail-body');
-  if (body) body.addEventListener('click', onRsvpClick);
-  const grown = document.getElementById('event-grow-page-inner');
-  if (grown) grown.addEventListener('click', onRsvpClick);
-})();
-
-// The way back out is the arrow drawn into the page's own head, which is
-// rebuilt on every open -- so the press is delegated on the inner rather
-// than bound to a button that only exists between two renders. Bound to
-// the element, never to document: all three carousel pages share one
-// document (see router.js).
-(function initEventGrowClose() {
-  const inner = document.getElementById('event-grow-page-inner');
-  if (!inner) return;
-  inner.addEventListener('click', (e) => {
-    if (e.target.closest('.ev-page-back')) closeEventGrowPage();
-  });
-})();
+// ── Events ──
+// This page carried the events column beside the petek. It lives in
+// project.html's Kahvehane lane now (its Etkinlikler column), and the
+// copy that stood here has been removed rather than left to drift.
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
 }
-
-// Detail overlay: a bottom sheet for whatever this page opens full-size
-// -- an event. Mirrors Kahvehane's game overlay / Kütüphane's reader
-// overlay.
-// The phone pull handler (IstSheet.pull, assigned below). Opening and
-// closing need nothing from it, since IstSheet drives it itself.
-let detailPull = null;
-function openDetail(html) {
-  const overlay = document.getElementById('anahane-detail');
-  const body = document.getElementById('anahane-detail-body');
-  if (!overlay || !body) return;
-  body.innerHTML = html;
-  if (window.IstPersonMentions) IstPersonMentions.linkify(body, personMentionsRoster);
-  // The sheet's body is the scroll container on desktop (see sheet.css) --
-  // reset so a tall card left scrolled from a previous open doesn't reopen
-  // mid-scroll. IstSheet.open does the same for the phone pull.
-  body.scrollTop = 0;
-  IstSheet.open(overlay);
-}
-function closeDetail() {
-  const overlay = document.getElementById('anahane-detail');
-  if (!overlay) return;
-  IstSheet.close(overlay);
-}
-(function initDetailOverlay() {
-  const overlay = document.getElementById('anahane-detail');
-  const backdrop = document.getElementById('anahane-detail-backdrop');
-  const closeBtn = document.getElementById('anahane-detail-close');
-  const body = document.getElementById('anahane-detail-body');
-  if (!overlay || !backdrop || !closeBtn || !body) return;
-  backdrop.addEventListener('click', closeDetail);
-  closeBtn.addEventListener('click', closeDetail);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && overlay.classList.contains('open')) closeDetail();
-  });
-})();
-
-// The pull is the shared sheet's (see IstSheet.pull in sheet.js) — the
-// same gesture Kütüphane's reader opens with, so an event and a story
-// behave identically in the hand.
-detailPull = IstSheet.pull('anahane-detail', { onDismiss: closeDetail });
 
 // ── Init ──
 // Skipped when this script is being injected by a virtual navigation
