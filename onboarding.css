@@ -211,30 +211,40 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
   letter-spacing: 1px;
   text-transform: uppercase;
   white-space: nowrap;
-  /* Lives on <body>, outside the palette-scoped #ist-onb-root, so it can't
-     read --ist-onb-muted — it needs a color that stays readable over any
-     palette/theme combination behind it, hence the fixed dark pill. */
-  color: rgba(255, 255, 255, 0.95);
-  background: rgba(0, 0, 0, 0.72);
-  /* A visible frame, the same convention every solid surface on the site
-     wears (frames.css' own ".ist-sheet": a real border, not a soft blur) --
-     this used to be border:none floating on translucency alone, and read as
-     a smudge rather than a button. Same reasoning as the color above: fixed
-     white rather than a palette token, since this pill sits over whatever
-     the tour is currently pointing at, not over the modal's own paper. */
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  border-radius: 999px;
+  /* THE SAME CARD as the Haberler / Etkinlikler boxes it stands beside
+     during the tour (.fb-box in project.html): --ink border, --paper-card
+     fill, a chunky 5px foot on the resting edge instead of a uniform 2px
+     -- the site's own convention for a solid card, stated once in
+     project.html's own comment on .fb-box. It reads right over ANY
+     backdrop for the same reason those tokens read right everywhere else
+     on the site: --ink and --paper-card are declared on :root (palette.css)
+     rather than scoped to #ist-onb-root, so this pill -- sitting on <body>,
+     outside that scope -- inherits them from the very same cascade the
+     news and event cards do. It used to be a translucent dark pill
+     because the tokens it COULD reach (--ist-onb-*) are scoped to
+     #ist-onb-root and go dark/invisible once that root hides for the
+     spotlight tour; --ink/--paper-card carry no such scoping and are
+     never unavailable. The one fallback (#ddc4b5 on --paper-card) is
+     .fb-box's own -- the earth palette in its light theme is the one
+     combination that never actually defines the token. */
+  color: var(--ink);
+  background: var(--paper-card, #ddc4b5);
+  border: 2px solid var(--ink);
+  border-bottom-width: 5px;
+  border-radius: 0;
   user-select: none;
-  padding: 8px 16px;
-  transition: opacity 200ms, background 200ms;
+  padding: 7px 16px 5px;
+  transition: opacity 200ms, border-bottom-width 0.1s ease-out, padding-bottom 0.1s ease-out;
   opacity: 0;
   cursor: pointer;
   pointer-events: auto;
 }
 .ist-onb-hint:focus-visible {
-  /* Keyboard focus indicator is kept subtle — background shift, no rectangle. */
+  /* Keyboard focus indicator is kept subtle -- the foot thins the way
+     .fb-box's own press does (5px -> 2px), no rectangle drawn around it. */
   outline: none;
-  background: rgba(0, 0, 0, 0.75);
+  border-bottom-width: 2px;
+  padding-bottom: 8px;
 }
 .ist-onb-hint.show { opacity: 1; }
 
@@ -373,7 +383,10 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
   .ist-onb-hint {
     font-size: 0.5rem;
     letter-spacing: 0.5px;
-    padding: 6px 12px;
+    /* Same 3-value shape as the base rule (top/sides/bottom) -- a plain
+       2-value shorthand here would have flattened the chunky foot back
+       to a uniform edge at exactly the width where the pill runs smallest. */
+    padding: 5px 12px 3px;
   }
 }
 
