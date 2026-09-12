@@ -186,7 +186,11 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
 .ist-onb-hint {
   position: fixed;
   left: 50%;
-  bottom: 28px;
+  /* Clears project.html's own compass bar (--navbar-h, fixed to the
+     viewport's bottom edge on every screen size there) plus its safe-area
+     inset, so the pill never sits on top of the İstanbulite wordmark. A
+     flat 28px predates the bar and simply overlapped it. */
+  bottom: calc(var(--navbar-h, 34px) + env(safe-area-inset-bottom) + 16px);
   transform: translateX(-50%);
   /* Above the modal root (99999), the pane (99992), and the dim (99989)
      so the hint stays visible in every onboarding mode. The previous
@@ -211,40 +215,38 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
   letter-spacing: 1px;
   text-transform: uppercase;
   white-space: nowrap;
-  /* THE SAME CARD as the Haberler / Etkinlikler boxes it stands beside
-     during the tour (.fb-box in project.html): --ink border, --paper-card
-     fill, a chunky 5px foot on the resting edge instead of a uniform 2px
-     -- the site's own convention for a solid card, stated once in
-     project.html's own comment on .fb-box. It reads right over ANY
-     backdrop for the same reason those tokens read right everywhere else
-     on the site: --ink and --paper-card are declared on :root (palette.css)
-     rather than scoped to #ist-onb-root, so this pill -- sitting on <body>,
-     outside that scope -- inherits them from the very same cascade the
-     news and event cards do. It used to be a translucent dark pill
-     because the tokens it COULD reach (--ist-onb-*) are scoped to
-     #ist-onb-root and go dark/invisible once that root hides for the
-     spotlight tour; --ink/--paper-card carry no such scoping and are
-     never unavailable. The one fallback (#ddc4b5 on --paper-card) is
+  /* The site's own ink-bordered paper (.fb-box, .ist-sheet, and now the
+     bubble above it): --ink border, --paper-card fill, sharp corners. It
+     reads right over ANY backdrop for the same reason those tokens read
+     right everywhere else on the site: --ink and --paper-card are declared
+     on :root (palette.css) rather than scoped to #ist-onb-root, so this
+     pill -- sitting on <body>, outside that scope -- inherits them from
+     the very same cascade the news and event cards do. It used to be a
+     translucent dark pill because the tokens it COULD reach (--ist-onb-*)
+     are scoped to #ist-onb-root and go dark/invisible once that root hides
+     for the spotlight tour; --ink/--paper-card carry no such scoping and
+     are never unavailable. The one fallback (#ddc4b5 on --paper-card) is
      .fb-box's own -- the earth palette in its light theme is the one
-     combination that never actually defines the token. */
+     combination that never actually defines the token.
+
+     NO chunky foot, unlike .fb-box: that foot means "this is the one thing
+     to press", and it isn't -- the text says "tap anywhere", and the whole
+     screen really does advance the beat (see gestureFirewall). A single
+     uniform border, same as the bubble above it. */
   color: var(--ink);
   background: var(--paper-card, #ddc4b5);
   border: 2px solid var(--ink);
-  border-bottom-width: 5px;
   border-radius: 0;
   user-select: none;
-  padding: 7px 16px 5px;
-  transition: opacity 200ms, border-bottom-width 0.1s ease-out, padding-bottom 0.1s ease-out;
+  padding: 7px 16px;
+  transition: opacity 200ms;
   opacity: 0;
   cursor: pointer;
   pointer-events: auto;
 }
 .ist-onb-hint:focus-visible {
-  /* Keyboard focus indicator is kept subtle -- the foot thins the way
-     .fb-box's own press does (5px -> 2px), no rectangle drawn around it. */
-  outline: none;
-  border-bottom-width: 2px;
-  padding-bottom: 8px;
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 .ist-onb-hint.show { opacity: 1; }
 
@@ -383,10 +385,7 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
   .ist-onb-hint {
     font-size: 0.5rem;
     letter-spacing: 0.5px;
-    /* Same 3-value shape as the base rule (top/sides/bottom) -- a plain
-       2-value shorthand here would have flattened the chunky foot back
-       to a uniform edge at exactly the width where the pill runs smallest. */
-    padding: 5px 12px 3px;
+    padding: 5px 12px;
   }
 }
 
@@ -494,12 +493,19 @@ html[data-theme="dark"] #ist-onb-pane[data-palette="mono"] {
 }
 
 @media (max-width: 768px) {
-  /* On mobile the nav is a fixed 96px tab bar at the bottom.
-     Push the pane above it so the two don't overlap. */
+  /* Cleared upward off the compass bar's real height (--navbar-h, not the
+     96px tab-bar guess this predates) by just enough to also clear the
+     hint pill sitting between them: the hint's own bottom is
+     --navbar-h + safe-area + 16px, a hint pill runs to roughly 30px tall,
+     and this leaves a further ~14px above it -- 16 + 30 + 14 = 60. Kept
+     tight on purpose: the bubble should sit a little LOWER than it used
+     to (this predates the compass entirely and sat higher up by
+     comparison), away from whatever cast is standing above it on the
+     screen (the petek's hexagons on Hane), not crowding the two together. */
   #ist-onb-pane {
     left: 12px;
     right: 12px;
-    bottom: calc(96px + env(safe-area-inset-bottom) + 12px);
+    bottom: calc(var(--navbar-h, 34px) + env(safe-area-inset-bottom) + 60px);
     max-width: none;
     align-items: stretch;
   }

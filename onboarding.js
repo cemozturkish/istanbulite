@@ -633,9 +633,16 @@
     if (isPassthrough(e.target)) return;
     if (typeof e.preventDefault === 'function' && e.cancelable) e.preventDefault();
     e.stopImmediatePropagation();
-    // Tap-anywhere advance for non-interactive spotlight beats. Only on
-    // real clicks — touchstart/wheel/etc shouldn't trigger this.
-    if (e.type === 'click' && tapAdvanceFn) {
+    // Tap-anywhere advance for non-interactive spotlight beats. Fires on a
+    // real click (mouse / trackpad / assistive pointer) OR on touchend --
+    // NOT on touchstart, even though touchstart reaches this same handler.
+    // touchstart's own preventDefault() two lines up is exactly what stops
+    // the browser from ever synthesizing that click on a touch device: a
+    // click that only fires on desktop is what made "tap anywhere" actually
+    // mean "tap the one button excluded from this firewall" on a phone.
+    // touchend calling preventDefault() here does the same to whatever
+    // synthetic click would otherwise follow it, so this never double-fires.
+    if ((e.type === 'click' || e.type === 'touchend') && tapAdvanceFn) {
       const fn = tapAdvanceFn;
       tapAdvanceFn = null;
       fn();
@@ -676,6 +683,7 @@
     document.addEventListener('wheel', gestureFirewall, { capture: true, passive: false });
     document.addEventListener('touchstart', gestureFirewall, { capture: true, passive: false });
     document.addEventListener('touchmove', gestureFirewall, { capture: true, passive: false });
+    document.addEventListener('touchend', gestureFirewall, { capture: true, passive: false });
     document.addEventListener('keydown', keyFirewall, true);
     document.addEventListener('focusin', focusTrap, true);
     firewallInstalled = true;
@@ -686,6 +694,7 @@
     document.removeEventListener('wheel', gestureFirewall, { capture: true });
     document.removeEventListener('touchstart', gestureFirewall, { capture: true });
     document.removeEventListener('touchmove', gestureFirewall, { capture: true });
+    document.removeEventListener('touchend', gestureFirewall, { capture: true });
     document.removeEventListener('keydown', keyFirewall, true);
     document.removeEventListener('focusin', focusTrap, true);
     firewallInstalled = false;
