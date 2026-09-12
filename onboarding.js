@@ -101,40 +101,51 @@
     // character: the reader is trying to find out what this is.
     //
     // It OPENS ON THE READER THEMSELVES -- the petek's innermost depth, where
-    // the avatar arrows are -- and only then pulls out to the shape. A brand
-    // new account's petek is one hexagon and six empty sides: nobody has
-    // handed them a code yet, because they signed up thirty seconds ago. So
-    // the petek cannot be the first thing pointed at, and nothing here may
-    // say "these are the people next to you" -- for every reader seeing this
-    // for the first time, that sentence is false. What IS true on day one is
-    // the reader's own hexagon, so the tour starts there, has them make their
-    // avatar, and then pulls out and says where the others WILL be.
+    // the avatar arrows are -- and only then pulls out to the shape, one
+    // level at a time (Sen -> Yanındakiler -> the whole petek), each a real
+    // pull rather than a jump. A brand new account's petek is one hexagon
+    // and six empty sides: nobody has handed them a code yet, because they
+    // signed up thirty seconds ago. So the petek cannot be the first thing
+    // pointed at, and nothing here may say "these are the people next to
+    // you" -- for every reader seeing this for the first time, that
+    // sentence is false. What IS true on day one is the reader's own
+    // hexagon, so the tour starts there, has them make their avatar one
+    // open category at a time, and only then pulls out and says where the
+    // others WILL be.
     lanes: {
       tr: {
-        reveal:  'Burası Hane — uygulamanın ortası. Her yere buradan, parmağınla gidiliyor.',
-        sen:     'Ortadaki sensin. Şimdilik tek başına. Oklarla kendine benzet; ne seçersen anında kaydedilir.',
-        senDone: 'Geri kalanı — şapkalar, rozetler — dışarıda kazanılır. Satın alınamaz.',
-        petek:   'Bu petek. Şu an sadece sen varsın. Biri sana kendi kodunu verdiğinde, yanındaki boş yerlerden birine oturur — gerçek hayatta, yüz yüze.',
-        toKahve: 'Kahvehane sağda. Parmağını sola kaydır.',
-        events:  'Etkinlikler. Bunlar internette değil, dışarıda. Beğendiğin Hane\'de seni bekler.',
-        games:   'Üç oyun, her gün yeni. Sırayla açılır.',
-        toKutup: 'Kütüphane en solda. Sağa kaydır, Hane\'den geçip devam et.',
-        news:    'Haberler. İstanbul, Türkiye ve Dünya — günde bir avuç, bitince biter.',
-        anket:   'Anket. Cevabın kendi ilçenin altına yazılır, yani sonuç tek bir yüzde değil — yirmi beş tane.',
-        toHane:  'Hane\'ye dönelim. Sola kaydır.',
+        reveal:      'Burası Hane — uygulamanın ortası. Her yere buradan, parmağınla gidiliyor.',
+        avatarIntro: 'Öncelikle, senin avatarını yaratalım.',
+        pickHair:    'Saçını seç.',
+        pickShirt:   'Tişörtünü seç.',
+        senDone:     'Geri kalanı — şapkalar, rozetler — dışarıda kazanılır. Satın alınamaz.',
+        near:        'Bu petek. Şu an sadece sen varsın. Biri sana kendi kodunu verdiğinde, yanındaki boş yerlerden birine oturur — gerçek hayatta, yüz yüze.',
+        petekAll:    'Bütün petek bu. Sen sadece kendi altı komşununla değil, koca şehirle aynı ağdasın.',
+        twoSides:    'İstanbul Avrupa ve Anadolu yakası diye ikiye ayrılır. İstanbulite de öyle — sağda Kahvehane, solda Kütüphane.',
+        toKahve:     'Kahvehane sağda. Parmağını sola kaydır.',
+        events:      'Etkinlikler. Bunlar internette değil, dışarıda. Beğendiğin Hane\'de seni bekler.',
+        games:       'Üç oyun, her gün yeni. Sırayla açılır.',
+        toKutup:     'Kütüphane en solda. Sağa kaydır, Hane\'den geçip devam et.',
+        news:        'Haberler. İstanbul, Türkiye ve Dünya — günde bir avuç, bitince biter.',
+        anket:       'Anket. Cevabın kendi ilçenin altına yazılır, yani sonuç tek bir yüzde değil — yirmi beş tane.',
+        toHane:      'Hane\'ye dönelim. Sola kaydır.',
       },
       en: {
-        reveal:  'This is Hane — the middle of the app. Everywhere else is a finger away from here.',
-        sen:     'The one in the middle is you. On your own, for now. Use the arrows to make it look like you; whatever you pick saves itself.',
-        senDone: 'The rest of it — hats, badges — is earned outside. It cannot be bought.',
-        petek:   'This is the petek. Right now it is only you. When somebody gives you their code they take one of the empty places beside you — in person, face to face.',
-        toKahve: 'Kahvehane is to the right. Pull your finger left.',
-        events:  'Events. These happen outside, not in here. The ones you keep wait for you on Hane.',
-        games:   'Three games, new every day. They unlock in order.',
-        toKutup: 'Kütüphane is all the way left. Pull right, past Hane, and keep going.',
-        news:    'The news. İstanbul, Türkiye and Dünya — a handful a day, and then it is done.',
-        anket:   'The poll. Your answer is filed under your own district, so the result is not one percentage — it is twenty-five.',
-        toHane:  'Back to Hane. Pull left.',
+        reveal:      'This is Hane — the middle of the app. Everywhere else is a finger away from here.',
+        avatarIntro: 'First, let\'s create your avatar.',
+        pickHair:    'Pick your hair.',
+        pickShirt:   'Pick your shirt.',
+        senDone:     'The rest of it — hats, badges — is earned outside. It cannot be bought.',
+        near:        'This is the petek. Right now it is only you. When somebody gives you their code they take one of the empty places beside you — in person, face to face.',
+        petekAll:    'This is the whole petek. You are not just connected to your own six neighbours — you are on the same network as the whole city.',
+        twoSides:    'Istanbul splits into a European side and an Anatolian side. Istanbulite splits the same way — Kahvehane on the right, Kütüphane on the left.',
+        toKahve:     'Kahvehane is to the right. Pull your finger left.',
+        events:      'Events. These happen outside, not in here. The ones you keep wait for you on Hane.',
+        games:       'Three games, new every day. They unlock in order.',
+        toKutup:     'Kütüphane is all the way left. Pull right, past Hane, and keep going.',
+        news:        'The news. İstanbul, Türkiye and Dünya — a handful a day, and then it is done.',
+        anket:       'The poll. Your answer is filed under your own district, so the result is not one percentage — it is twenty-five.',
+        toHane:      'Back to Hane. Pull left.',
       },
     },
     // Printed under the line on a beat that waits for the reader to do
@@ -142,6 +153,12 @@
     // (see STALL_MS). Nothing here ever dead-ends.
     pullLeft:    { tr: 'parmağını sola kaydır',  en: 'pull left' },
     pullRight:   { tr: 'parmağını sağa kaydır',  en: 'pull right' },
+    // The petek's own two level-pull beats always go the same way -- out,
+    // from Sen toward the whole shape -- which on the plane is a finger
+    // pulled UP (see wireHiveGestures in profile-card.js: the level only
+    // ever increases when the drag overshoots upward). Never "down": that
+    // is the physical opposite of the gesture that actually advances it.
+    pullUp:      { tr: 'parmağını yukarı kaydır', en: 'pull up' },
     pullNudge: {
       tr: 'kaydıramıyor musun? devam etmek için dokun',
       en: "can't pull? tap to carry on",
@@ -814,11 +831,12 @@
     const lines = COPY.lanes[lang];
 
     // The petek's own depths (HIVE_LEVELS in profile-card.js): 0 is Sen --
-    // the reader's own hexagon with the avatar arrows on it -- and 2 is the
-    // whole shape. Driven through IstProfileCard.setHivePageLevel, which is
-    // that module's own documented handle and no-ops when no petek is
-    // standing, exactly as fb() does for the book.
-    const HIVE_SEN = 0, HIVE_ALL = 2;
+    // the reader's own hexagon with the avatar arrows on it -- 1 is
+    // Yanındakiler, the six touching places -- and 2 is the whole shape.
+    // Driven through IstProfileCard.setHivePageLevel, which is that
+    // module's own documented handle and no-ops when no petek is standing,
+    // exactly as fb() does for the book.
+    const HIVE_SEN = 0, HIVE_NEAR = 1, HIVE_ALL = 2;
     function setDepth(n) {
       const pc = global.IstProfileCard;
       if (pc && pc.setHivePageLevel) pc.setHivePageLevel(n);
@@ -826,24 +844,44 @@
 
     // `lane` is the lane the beat belongs to and is asserted before it runs,
     // so a reader who wandered is put back rather than talked at about a
-    // screen they are not on. `pull` is the lane a pull beat waits for.
+    // screen they are not on. `pull` is the lane a pull beat waits for;
+    // `levelPull` is the same idea for the petek's own vertical gesture.
     const beats = [
       { lane: LANE_HANE,       target: null,        speech: lines.reveal },
       // The reader first, the shape second. On day one the petek is one
       // hexagon and six empty sides, so there is nothing true to say about
       // neighbours yet -- but there is always something true to say about
       // the reader, and something for them to DO (see COPY.lanes).
+      { lane: LANE_HANE,       depth: HIVE_SEN, speech: lines.avatarIntro },
+      // One category at a time, and only the ones already open to
+      // EVERYONE: AVATAR_HAT_OPTIONS (profile-card.js) carries only 'Yok'
+      // today (the Sözcü crown is parked, unbuilt art) and
+      // AVATAR_ACCESSORY_OPTIONS's one alternative (glasses) is
+      // unconditionally `locked: true` -- neither has a second OPEN choice
+      // to hand a reader on day one. Hair and shirt do, so those are the
+      // two beats. `act` matches BOTH of a pair's arrows (either commits
+      // the pick), and lights the same pair rather than the whole column.
+      { lane: LANE_HANE,       depth: HIVE_SEN, target: '#po-hair-prev, #po-hair-next',
+        speech: lines.pickHair, act: '#po-hair-prev, #po-hair-next', prompt: 'tapArrows',
+        nudge: 'tapArrowsNudge' },
+      { lane: LANE_HANE,       depth: HIVE_SEN, target: '#po-shirt-prev, #po-shirt-next',
+        speech: lines.pickShirt, act: '#po-shirt-prev, #po-shirt-next', prompt: 'tapArrows',
+        nudge: 'tapArrowsNudge' },
       // `.ist-hive-pick-col`, never `.ist-hive-picker`: the picker's own box is
       // exactly the hexagon (--ist-hive-cell-w/h) and both arrow columns are
       // laid OUTSIDE it (`right: 100%` / `left: 100%`), so a ring measured on
       // the wrapper is a box drawn over the avatar with the arrows outside
       // the hole. Two columns, so two rings -- `all`.
       { lane: LANE_HANE,       depth: HIVE_SEN, target: '.ist-hive-pick-col', all: true,
-        speech: lines.sen, act: '.ist-hive-picker', prompt: 'tapArrows',
-        nudge: 'tapArrowsNudge' },
-      { lane: LANE_HANE,       depth: HIVE_SEN, target: '.ist-hive-pick-col', all: true,
         speech: lines.senDone },
-      { lane: LANE_HANE,       depth: HIVE_ALL, target: '#fb-petek', speech: lines.petek },
+      // Two real pulls out from Sen, one level at a time, each waiting for
+      // the actual gesture rather than jumping there -- the reader is
+      // taught the gesture by making it, the same rule the lane pulls
+      // already follow. Yanındakiler first (the six touching places, all
+      // still empty), then the whole shape.
+      { lane: LANE_HANE,       speech: lines.near,     levelPull: HIVE_NEAR },
+      { lane: LANE_HANE,       speech: lines.petekAll, levelPull: HIVE_ALL },
+      { lane: LANE_HANE,       speech: lines.twoSides },
       { lane: LANE_HANE,       speech: lines.toKahve, pull: LANE_KAHVEHANE },
       // A column is three boxes with no wrapper between them, and the
       // mascot is talking about the column -- so the beat lights all of it.
@@ -876,6 +914,9 @@
       // `=== undefined`, never `!b.pull`: Kütüphane is lane 0, so a falsy
       // test reads the one pull beat that aims at it as a talk beat.
       if (b.pull !== undefined) { runPull(b); return; }
+      // Same idea for a level pull, aimed at the petek's own depth instead
+      // of a lane -- Sen is level 0, so this needs the same `!== undefined`.
+      if (b.levelPull !== undefined) { runLevelPull(b); return; }
 
       // Every other beat is about a screen, so it asserts that screen -- a
       // reader who wandered is put back rather than talked at about a lane
@@ -917,26 +958,30 @@
     // scoped passthrough), and the first real press on it is enough -- the
     // point is that they find the control and see it answer, not that they
     // dress the whole avatar while a cat watches.
+    //
+    // `b.act` is a selector and may match MORE than one element -- picking
+    // a single category (hair, shirt) is answered by either its prev or
+    // its next arrow, so both are wired and either firing is the advance.
     function runAct(b) {
       // The depth change rescales the plane and the arrows arrive with it,
       // so the rects are taken a frame later and re-taken as they settle.
       requestAnimationFrame(() => {
         addSpotlight(document.querySelectorAll(b.target));
         settleSpotlight();
-        const el = document.querySelector(b.act);
-        if (!el) { done(); return; }   // no petek standing: nothing to ask for
+        const els = Array.from(document.querySelectorAll(b.act));
+        if (!els.length) { done(); return; }   // no petek standing: nothing to ask for
         openPassthrough('#fb-petek');
-        el.addEventListener('click', onPress, true);
+        els.forEach(el => el.addEventListener('click', onPress, true));
       });
       renderPane({ speech: b.speech, promptText: COPY[b.prompt][lang] });
 
       function onPress() { done(); }
       function done() {
-        // b.act, not b.target: the listener is on the picker (which contains
-        // both arrow columns), while b.target is what is LIT. They are
-        // deliberately different elements -- see the beat's own note.
-        const el = document.querySelector(b.act);
-        if (el) el.removeEventListener('click', onPress, true);
+        // b.act, not b.target: the listener sits on the arrow(s) that
+        // actually commit a pick, while b.target is what is LIT -- on a
+        // beat that lights a whole column, the two still need to be
+        // different elements (see the beat's own note further down).
+        document.querySelectorAll(b.act).forEach(el => el.removeEventListener('click', onPress, true));
         stopLaneWatch();
         closePassthrough();
         advance();
@@ -983,6 +1028,44 @@
       // The escape hatch. It does not move the book: the next beat asserts
       // its own lane anyway, so a reader who never pulled still lands on
       // the right screen for what the mascot says next.
+      stallTimer = setTimeout(() => {
+        stallTimer = null;
+        renderPane({ speech: b.speech, promptText: COPY.pullNudge[lang] });
+        addHint(COPY.pullNudge[lang], () => { stopLaneWatch(); closePassthrough(); advance(); });
+      }, STALL_MS);
+    }
+
+    // A level-pull beat: the same shape as a lane pull, aimed at the
+    // petek's own vertical gesture instead of the book's horizontal one --
+    // dim stays, the petek goes live, and reaching the named depth is the
+    // advance. Unlike a lane's `pos`, a hive level has no separate tween
+    // value to wait for: `setHiveLevel` (profile-card.js) writes
+    // `state.hiveLevel` the instant the drag is released, and what follows
+    // is only the plane's own CSS transition -- so reading
+    // `hivePageLevel()` back is enough, with no settling check needed.
+    function runLevelPull(b) {
+      const pc = global.IstProfileCard;
+      // No petek standing (a parts-bin page, or a mount that never
+      // landed): nothing to pull, so this beat has nothing to ask for.
+      if (!pc || !pc.hivePageLevel || pc.hivePageLevel() == null) { advance(); return; }
+
+      openPassthrough('#fb-petek');
+      // Nothing on the page is "lit" during a pull -- the thing being
+      // pointed at is the gesture, not an element.
+      clearSpotlight();
+      if (spotlightEl) spotlightEl.classList.add('show');
+      renderPane({ speech: b.speech, promptText: COPY.pullUp[lang] });
+
+      const tick = () => {
+        if (pc.hivePageLevel() === b.levelPull) { stopLaneWatch(); closePassthrough(); advance(); return; }
+        laneWatch = requestAnimationFrame(tick);
+      };
+      laneWatch = requestAnimationFrame(tick);
+
+      // Same escape hatch as every other beat that waits on a real
+      // gesture: the next beat still asserts the lane it needs, and the
+      // level a reader is standing at is never wrong, only possibly not
+      // where this beat wanted them yet.
       stallTimer = setTimeout(() => {
         stallTimer = null;
         renderPane({ speech: b.speech, promptText: COPY.pullNudge[lang] });

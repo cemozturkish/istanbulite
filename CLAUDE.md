@@ -2446,25 +2446,51 @@ them a code yet, because they signed up a minute ago. So any line like "those ar
 right next to you" is false for *every* reader who will ever see this — it is only ever read once,
 on day one, which is precisely the day it cannot be true. What IS true on day one is the reader's
 own hexagon. So the tour stands them at the petek's innermost depth (**Sen**, level 0), has them
-actually **make their avatar** with the arrows that live there, says the rest of it is earned
-outside and cannot be bought, and only *then* pulls out to the whole shape — where it says where
-the others **will** be rather than pretending they are already there. The same test applies to any
-beat added later: read it as somebody whose account is sixty seconds old.
+actually **make their avatar** one category at a time, says the rest of it is earned outside and
+cannot be bought, and only *then* pulls out — one real level at a time — to the whole shape, where
+it says where the others **will** be rather than pretending they are already there. The same test
+applies to any beat added later: read it as somebody whose account is sixty seconds old.
 
-**The tour walks the lanes, and the reader does the walking.** It used to hop anahane → kahvehane
-→ sozcel → kutuphane → anahane by *navigating*, keeping its place in `sessionStorage` between the
-pages and lighting each one's nav link to hand over. Those pages are the parts bin now (see the
-router's own section) and nothing links to them, so that whole leg went with them. What replaced
-it is the three lanes of slide 12: eleven beats, and the ones that change lane ask for the **real
-sideways pull** rather than moving the book themselves — the gesture the reader will use forever
-after is the one they are taught by making it. Reaching Kütüphane from Kahvehane is deliberately
-two pulls, because the strip moves one lane per gesture and the way between them is through Hane.
+**Only the categories already open to EVERYONE get a beat.** `AVATAR_HAT_OPTIONS` (profile-card.js)
+carries only `'Yok'` today (the Sözcü crown is parked, unbuilt art) and
+`AVATAR_ACCESSORY_OPTIONS`'s one alternative (glasses) is unconditionally `locked: true` — handing
+a reader on day one a category whose only other option is locked, or that has no other option at
+all, is asking them to choose from an empty menu. Hair and shirt both have a real second choice, so
+those are the two beats (`pickHair`, `pickShirt`), each lighting and listening on just that
+category's own pair of arrows (`#po-hair-prev, #po-hair-next` / `#po-shirt-prev, #po-shirt-next`) —
+`runAct`'s `b.act` selector may match more than one element, and either one committing a pick is
+the advance. Adding a category later is adding a beat the same way, once it is genuinely open.
 
-A beat is one of three things: it **talks** (tap anywhere), it asks for a **pull** and waits for
-the reader to arrive on a lane, or it asks them to **act** — to actually change something, which
-today is the avatar. Depth is driven through `IstProfileCard.setHivePageLevel`, that module's own
-handle (it is exactly what pressing a rail mark does, and no-ops when no petek is standing), the
-same way the book is driven through `window.__fb`.
+**The tour walks the lanes AND the petek's own depth, and the reader does the walking for both.**
+It used to hop anahane → kahvehane → sozcel → kutuphane → anahane by *navigating*, keeping its
+place in `sessionStorage` between the pages and lighting each one's nav link to hand over. Those
+pages are the parts bin now (see the router's own section) and nothing links to them, so that whole
+leg went with them. What replaced it is the three lanes of slide 12, walked with the same sideways
+pull the reader will use forever after, PLUS the petek's own vertical pull, walked the same way:
+Sen → Yanındakiler → the whole shape is two real upward drags, not a jump, for the same reason a
+lane change is a real sideways one. Reaching Kütüphane from Kahvehane is deliberately two pulls,
+because the strip moves one lane per gesture and the way between them is through Hane.
+
+A beat is one of four things: it **talks** (tap anywhere), it asks for a **pull** and waits for the
+reader to arrive on a lane, a **levelPull** and waits for them to reach a depth of the petek, or it
+asks them to **act** — to actually change something, which today is the avatar. Depth is driven
+through `IstProfileCard.setHivePageLevel`/`hivePageLevel()`, that module's own handle (it is
+exactly what pressing a rail mark does, and no-ops when no petek is standing), the same way the
+book is driven through `window.__fb`. A `levelPull` beat (`runLevelPull`) is the vertical mirror of
+a lane `pull` (`runPull`): the same scoped passthrough (`#fb-petek`), the same "nothing is lit, the
+gesture is the point" dim, the same `STALL_MS` tap-to-carry-on escape hatch — the one difference is
+that a hive level has no separate tween value to wait for the way a lane's `pos` does
+(`setHiveLevel` in profile-card.js writes `state.hiveLevel` the instant a drag is released), so
+`runLevelPull` only ever has to read `hivePageLevel()` back. **The gesture is always UP, never
+down**: going from Sen toward the whole shape is *outward*, and per `wireHiveGestures`
+(profile-card.js), the level only increases when the drag overshoots upward — so `COPY.pullUp` is
+the only vertical prompt this tour ever shows.
+
+**After the whole shape, one line ties it to the city it is standing on**: just as Istanbul itself
+splits into a European side and an Anatolian one, Istanbulite splits into Kütüphane and Kahvehane —
+left and right of the same middle. That beat (`twoSides`) is what the reader is told right before
+the first lane pull actually asks them to cross to one of those sides, so the split is named before
+it is walked.
 
 Six things about it, each of which fails silently if forgotten:
 
@@ -2483,10 +2509,11 @@ Six things about it, each of which fails silently if forgotten:
   `touchmove` in the capture phase, which on a phone cancels the very pull just asked for, and the
   beat then waits forever on a gesture the page is swallowing. Both halves are needed —
   `body.ist-onb-passthru` in onboarding.css and `isPassthrough()` in onboarding.js.
-  **And it is scoped**, which is what keeps each beat to its own question: a pull beat opens the
-  whole book (`#fb`, since the gesture is a drag on it), while the avatar beat opens `#fb-petek`
-  alone — so a stray sideways drag cannot walk the reader off the screen the mascot is currently
-  talking about. `data-onb-pass` on the body is which of the two is open.
+  **And it is scoped**, which is what keeps each beat to its own question: a lane `pull` beat opens
+  the whole book (`#fb`, since the gesture is a drag on it), while an avatar `act` beat or a petek
+  `levelPull` beat opens `#fb-petek` alone — so a stray sideways drag cannot walk the reader off the
+  screen the mascot is currently talking about. `data-onb-pass` on the body is which of the two is
+  open.
 - **The dim is a punched sheet, and the hole IS the highlight.** Nothing is drawn around a lit
   control: a rectangle around it is a second object competing with the thing it is pointing at,
   and what is being pointed at is already the only thing on screen at full strength. Everything
@@ -2504,11 +2531,15 @@ Six things about it, each of which fails silently if forgotten:
     nothing to do with either shape. Only `path()` can carry more than one subpath. It hit-tests
     correctly either way, which is exactly what makes it survive a test that asks
     `elementFromPoint` — sampling the painted pixels is what catches it.
-  - **What is LIT and what is PRESSED are different elements, and the beat names both.** The
-    avatar beat lights `.ist-hive-pick-col` (two of them) and listens on `.ist-hive-picker`: the
-    picker's own box is exactly the hexagon (`--ist-hive-cell-w/h`) and both arrow columns are
-    laid *outside* it at `right: 100%` / `left: 100%`, so a hole measured on the wrapper is a box
-    cut over the reader's own avatar with the arrows left outside it.
+  - **What is LIT and what is PRESSED can be the same selector now, and don't have to be.** Each
+    avatar beat (`pickHair`, `pickShirt`) lights and listens on the same pair of arrows
+    (`#po-hair-prev, #po-hair-next`, etc.) — a hole is cut around each of the two independently,
+    since they sit either side of the avatar rather than inside one wrapper. The closing `senDone`
+    beat still lights the whole `.ist-hive-pick-col` (two of them, one per side) purely to talk
+    about it, with nothing to press — the picker's own box is exactly the hexagon
+    (`--ist-hive-cell-w/h`) and both arrow columns are laid *outside* it at `right: 100%` /
+    `left: 100%`, so a hole measured on the wrapper is a box cut over the reader's own avatar with
+    the arrows left outside it.
 - **A beat that adds no hint takes the last one down.** `addHint` sets `tapAdvanceFn`, so a pull
   or act beat inheriting the previous beat's hint inherited a live "tap anywhere to continue" as
   well — the reader could tap straight past the gesture just asked for, and the instruction panel
