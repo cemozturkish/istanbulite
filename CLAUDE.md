@@ -2514,6 +2514,23 @@ Six things about it, each of which fails silently if forgotten:
   well — the reader could tap straight past the gesture just asked for, and the instruction panel
   said one thing while the button over the tab bar said another. Every beat clears it; only the
   ones that add one have one.
+- **"Tap anywhere" has to mean it on a phone, not just under a mouse.** `gestureFirewall` fires
+  `tapAdvanceFn` on `click` OR `touchend`, never on `touchstart` alone — because `touchstart`'s own
+  `preventDefault()`, three lines above it in the same handler, is exactly what stops the browser
+  from ever synthesizing that `click` on a touch device. A version that only listened for `click`
+  passed every test driven by `element.click()` or a mouse, and on a real phone advanced only when
+  the reader happened to hit the one element excluded from the firewall — the hint pill itself.
+  `touchend` calls the same `preventDefault()`, which suppresses the click that would otherwise
+  follow it, so this never double-fires.
+- **The hint pill is a caption, not the button — the whole screen is.** It reads "tap anywhere",
+  and it means it: `.ist-onb-hint` carries the site's ink-bordered-paper look (`--ink` border,
+  `--paper-card` fill, same as `.fb-box`) but *not* that convention's chunky 5px foot, because that
+  foot means "this one specific thing is what you press" and here that would be a lie. It sits at
+  `bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom) + 16px)` so it clears project.html's
+  own compass bar rather than sitting on top of it, and the spotlight pane above it is pushed down
+  to `+60px` on the same base for the same reason — just far enough to clear the pill in turn,
+  which also means it sits a little lower on the screen than the cast standing above it (the
+  petek's hexagons on Hane), instead of crowding the two together.
 - **No beat that waits can dead-end.** After `STALL_MS` the prompt becomes a tap-to-continue and
   the tour carries on without the gesture — on a pull beat and on the avatar beat alike (the
   avatar can be changed any day from that exact screen, so a reader who does not want to right now
