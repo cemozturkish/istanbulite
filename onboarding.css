@@ -193,21 +193,41 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
      value (99993) sat behind the welcome modal and the hint vanished. */
   z-index: 100001;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 0.7rem;
+  /* ONE LINE, on every device -- and never wider than the screen, which
+     white-space:nowrap alone does not promise: at the old 0.7rem/2px, the
+     longest phrase in COPY ("sonra da yapabilirsin — devam etmek için
+     dokun") is ~430px wide, well past a 375px phone, and nowrap alone would
+     have kept that one line while bleeding both edges off-screen -- the
+     tour asking for a gesture with half the instruction invisible. 0.62rem
+     is the size every phrase in COPY (walked by hand, both languages) fits
+     inside a real phone's width at, down to 375px -- an iPhone SE (2nd gen)
+     and up, i.e. every device the App Store still runs this app's iOS
+     minimum on. Below that (see the media query) the size steps down once
+     more, since a screen that narrow is rare enough that fluid scaling
+     would only cost every other phone crisper type for a device this app
+     is not tuned for regardless. */
+  font-size: 0.62rem;
   font-weight: 500;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   text-transform: uppercase;
+  white-space: nowrap;
   /* Lives on <body>, outside the palette-scoped #ist-onb-root, so it can't
      read --ist-onb-muted — it needs a color that stays readable over any
      palette/theme combination behind it, hence the fixed dark pill. */
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(0, 0, 0, 0.72);
+  /* A visible frame, the same convention every solid surface on the site
+     wears (frames.css' own ".ist-sheet": a real border, not a soft blur) --
+     this used to be border:none floating on translucency alone, and read as
+     a smudge rather than a button. Same reasoning as the color above: fixed
+     white rather than a palette token, since this pill sits over whatever
+     the tour is currently pointing at, not over the modal's own paper. */
+  border: 2px solid rgba(255, 255, 255, 0.9);
   border-radius: 999px;
   user-select: none;
   padding: 8px 16px;
   transition: opacity 200ms, background 200ms;
   opacity: 0;
-  border: none;
   cursor: pointer;
   pointer-events: auto;
 }
@@ -285,17 +305,6 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
 .ist-onb-swatch.earth span:nth-child(2) { background: #b8947a; }
 .ist-onb-swatch.earth span:nth-child(3) { background: #4C382A; }
 
-/* Mascot illustration block */
-.ist-onb-mascot {
-  width: 140px;
-  height: 140px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ist-onb-ink);
-}
-.ist-onb-mascot img { width: 100%; height: 100%; object-fit: contain; }
-
 /* Kefil code share block */
 .ist-onb-codebox {
   display: flex;
@@ -356,6 +365,18 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
   .ist-onb-choices { grid-template-columns: 1fr; }
 }
 
+/* Below 375px (an iPhone SE 1st gen / very narrow Android): the second,
+   smaller size .ist-onb-hint's own comment refers to. Measured to keep
+   every phrase in COPY inside an 8px gutter on each side even at 320px --
+   see onboarding.js's COPY object for the actual strings this has to fit. */
+@media (max-width: 374px) {
+  .ist-onb-hint {
+    font-size: 0.5rem;
+    letter-spacing: 0.5px;
+    padding: 6px 12px;
+  }
+}
+
 /* ───────── Spotlight tour (Phase 2) ─────────
    A persistent dim over the page with a hole cut in it for each area the
    mascot has introduced -- everything lit stays lit for the rest of the
@@ -379,35 +400,9 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
 }
 #ist-onb-spotlight.show { display: block; }
 
-/* ── The rings ──
-   Drawn in a layer of our own, over the dim, rather than by lifting the
-   element the way this used to (.ist-onb-target: position:relative +
-   z-index). That lift cannot reach over project.html's cast, which sits
-   in its own stacking context, and `position: relative` would move an
-   absolutely-positioned .fb-box -- see the note in onboarding.js. The
-   holes themselves are cut out of the dim with an evenodd clip-path.
-
-   Drawing only: the layer never takes a press. What may be pressed is
-   decided by the firewall, which is a different question from what is
-   lit, and keeping the two apart is what stops a "lit" element from
-   looking pressable when it is not. */
-#ist-onb-rings {
-  position: fixed;
-  inset: 0;
-  z-index: 99991;
-  pointer-events: none;
-}
-.ist-onb-ring {
-  position: fixed;
-  border-radius: 4px;
-  box-shadow: 0 0 0 2px rgba(255,255,255,0.55), 0 0 18px rgba(255,255,255,0.12);
-  transition: box-shadow 220ms ease;
-}
-.ist-onb-ring.latest {
-  box-shadow: 0 0 0 2px rgba(255,255,255,0.95), 0 0 28px rgba(255,255,255,0.22);
-}
-
-/* Mascot speech pane — fixed bottom-right corner.
+/* The instruction panel — fixed to the bottom (full width on a phone).
+   It carries the line the tour is saying and, under it, what the reader has
+   to do. It was a speech bubble beside a mascot; there is no mascot.
    Mirrors the palette tokens so child elements (buttons, prompts) inherit
    the same --ist-onb-bg / --ist-onb-ink values as the modal. */
 #ist-onb-pane {
@@ -459,18 +454,12 @@ html[data-theme="dark"] #ist-onb-pane[data-palette="mono"] {
   padding: 14px 16px;
   font-size: 1rem;
   line-height: 1.45;
-  border-radius: 10px 10px 2px 10px;
+  /* Square, not 10/10/2/10: that sharp corner was a speech-bubble tail
+     pointing at the mascot that used to stand beside it. With nothing to
+     point at it reads as a rounding mistake. */
+  border-radius: 10px;
   box-shadow: 0 6px 24px rgba(0,0,0,0.25);
   position: relative;
-}
-#ist-onb-pane .ist-onb-mascot-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-}
-#ist-onb-pane .ist-onb-mascot {
-  width: 90px; height: 90px;
-  flex-shrink: 0;
 }
 #ist-onb-pane .ist-onb-actions {
   display: flex;
@@ -501,6 +490,5 @@ html[data-theme="dark"] #ist-onb-pane[data-palette="mono"] {
     max-width: none;
     align-items: stretch;
   }
-  #ist-onb-pane .ist-onb-mascot { width: 64px; height: 64px; }
   #ist-onb-pane .ist-onb-bubble { font-size: 0.95rem; }
 }

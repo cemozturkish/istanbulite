@@ -2426,9 +2426,19 @@ Six things about it:
 
 A brand-new account is walked through the app once, on `project.html` and nowhere else, and
 `profiles.onboarded_at` is what says it has happened. Welcome (the kefil line, and the T&C tick
-that gates going further) → language → palette + mascot → **the lane tour** → the member's own
-kefil code → finish, which writes `onboarded_at`, `language_pref`, `palette_pref` and `mascot` in
-one update. The admin's kill switch is `app_settings.onboarding_enabled` (missing row = on).
+that gates going further) → language → palette → **the lane tour** → the member's own kefil code →
+finish, which writes `onboarded_at`, `language_pref`, `palette_pref` and `mascot` in one update.
+The admin's kill switch is `app_settings.onboarding_enabled` (missing row = on).
+
+**One voice, and no mascot.** Every line used to branch into a sarcastic cat and an excitable dog
+on top of the TR/EN branch — four versions of each to keep true and in step, so a correction to one
+of them silently left three behind, and the palette picker doubled as an animal picker. There is
+one plain voice now and no portrait beside it: the first run through an app is not the place for a
+character, because the reader is trying to find out what this is. `profiles.mascot` is still
+written, **derived from the palette** (mono → cat, earth → dog) and never shown, because
+`admin-notification.js` reads that column for its own bubble and leaving it unset would quietly
+change a feature that has nothing to do with onboarding. Bringing a mascot back here is putting
+the picture back, not re-adding the data.
 
 **It opens on the READER, not on the petek, and that is a correctness rule rather than a
 preference.** A brand-new account's petek is one hexagon with six empty sides: nobody has handed
@@ -2477,15 +2487,17 @@ Six things about it, each of which fails silently if forgotten:
   whole book (`#fb`, since the gesture is a drag on it), while the avatar beat opens `#fb-petek`
   alone — so a stray sideways drag cannot walk the reader off the screen the mascot is currently
   talking about. `data-onb-pass` on the body is which of the two is open.
-- **The dim is a punched sheet, not a lift.** The obvious spelling — raise the lit element over
-  the dim with `position: relative` + `z-index` — cannot work here: `.fb-cast` is `position:
+- **The dim is a punched sheet, and the hole IS the highlight.** Nothing is drawn around a lit
+  control: a rectangle around it is a second object competing with the thing it is pointing at,
+  and what is being pointed at is already the only thing on screen at full strength. Everything
+  else going quiet says "this one" more plainly than an outline does.
+  It is punched rather than lifted because a lift cannot work here: `.fb-cast` is `position:
   absolute` with `z-index: 1` and so is its own stacking context, so a box inside it never rises
   above a dim at 99989 however large a z-index it is given; and `position: relative` on a
   `.fb-box` would move it, since the book positions those absolutely. So nothing is added to the
-  app's DOM at all — the holes are cut with one `fill-rule: evenodd` clip-path (the same idiom
-  `IstSheet.lightTheMap` uses on the map's tint) and the rings are drawn in a layer of our own
-  over the top. The rects are measured, so they are re-measured on resize, and again as a depth
-  change's own transition settles.
+  app's DOM at all — the holes are cut with one `fill-rule: evenodd` clip-path, the same idiom
+  `IstSheet.lightTheMap` uses on the map's tint. The rects are measured, so they are re-measured
+  on resize, and again as a depth change's own transition settles.
   - **It has to be `path()`, never `polygon()`.** A CSS `polygon()` is ONE closed ring, so listing
     the viewport's corners and then a hole's runs a continuous edge from the last hole corner back
     to the first outer corner, and evenodd carves a **diagonal wedge** out of the dim that has
@@ -2495,13 +2507,13 @@ Six things about it, each of which fails silently if forgotten:
   - **What is LIT and what is PRESSED are different elements, and the beat names both.** The
     avatar beat lights `.ist-hive-pick-col` (two of them) and listens on `.ist-hive-picker`: the
     picker's own box is exactly the hexagon (`--ist-hive-cell-w/h`) and both arrow columns are
-    laid *outside* it at `right: 100%` / `left: 100%`, so a ring measured on the wrapper is a box
-    drawn over the reader's own avatar with the arrows outside the hole.
+    laid *outside* it at `right: 100%` / `left: 100%`, so a hole measured on the wrapper is a box
+    cut over the reader's own avatar with the arrows left outside it.
 - **A beat that adds no hint takes the last one down.** `addHint` sets `tapAdvanceFn`, so a pull
   or act beat inheriting the previous beat's hint inherited a live "tap anywhere to continue" as
-  well — the reader could tap straight past the gesture just asked for, and the prompt under the
-  mascot said one thing while the button over the tab bar said another. Every beat clears it;
-  only the ones that add one have one.
+  well — the reader could tap straight past the gesture just asked for, and the instruction panel
+  said one thing while the button over the tab bar said another. Every beat clears it; only the
+  ones that add one have one.
 - **No beat that waits can dead-end.** After `STALL_MS` the prompt becomes a tap-to-continue and
   the tour carries on without the gesture — on a pull beat and on the avatar beat alike (the
   avatar can be changed any day from that exact screen, so a reader who does not want to right now
