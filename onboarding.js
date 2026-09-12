@@ -112,14 +112,22 @@
     // hexagon, so the tour starts there, has them make their avatar one
     // open category at a time, and only then pulls out and says where the
     // others WILL be.
+    // `toNear`/`toAll` are the two level pulls, and their copy is only ever
+    // the instruction to pull -- never the description of what is up
+    // there, which would be true a beat too early (see runLevelPull).
+    // `near`/`petekAll` carry that description and run as plain talk beats
+    // straight AFTER arrival, the same order toKahve -> events already
+    // uses for a lane.
     lanes: {
       tr: {
         reveal:      'Burası Hane — uygulamanın ortası. Her yere buradan, parmağınla gidiliyor.',
         avatarIntro: 'Öncelikle, senin avatarını yaratalım.',
-        pickHair:    'Saçını seç.',
-        pickShirt:   'Tişörtünü seç.',
+        pickHair:    'Saçını seç. Beğenince devam et.',
+        pickShirt:   'Tişörtünü seç. Beğenince devam et.',
         senDone:     'Geri kalanı — şapkalar, rozetler — dışarıda kazanılır. Satın alınamaz.',
+        toNear:      'Şimdi yukarı kaydır.',
         near:        'Bu petek. Şu an sadece sen varsın. Biri sana kendi kodunu verdiğinde, yanındaki boş yerlerden birine oturur — gerçek hayatta, yüz yüze.',
+        toAll:       'Bir kere daha yukarı kaydır.',
         petekAll:    'Bütün petek bu. Sen sadece kendi altı komşununla değil, koca şehirle aynı ağdasın.',
         twoSides:    'İstanbul Avrupa ve Anadolu yakası diye ikiye ayrılır. İstanbulite de öyle — sağda Kahvehane, solda Kütüphane.',
         toKahve:     'Kahvehane sağda. Parmağını sola kaydır.',
@@ -133,10 +141,12 @@
       en: {
         reveal:      'This is Hane — the middle of the app. Everywhere else is a finger away from here.',
         avatarIntro: 'First, let\'s create your avatar.',
-        pickHair:    'Pick your hair.',
-        pickShirt:   'Pick your shirt.',
+        pickHair:    'Pick your hair. Continue once you like it.',
+        pickShirt:   'Pick your shirt. Continue once you like it.',
         senDone:     'The rest of it — hats, badges — is earned outside. It cannot be bought.',
+        toNear:      'Now pull up.',
         near:        'This is the petek. Right now it is only you. When somebody gives you their code they take one of the empty places beside you — in person, face to face.',
+        toAll:       'Pull up once more.',
         petekAll:    'This is the whole petek. You are not just connected to your own six neighbours — you are on the same network as the whole city.',
         twoSides:    'Istanbul splits into a European side and an Anatolian side. Istanbulite splits the same way — Kahvehane on the right, Kütüphane on the left.',
         toKahve:     'Kahvehane is to the right. Pull your finger left.',
@@ -163,11 +173,10 @@
       tr: 'kaydıramıyor musun? devam etmek için dokun',
       en: "can't pull? tap to carry on",
     },
-    tapArrows:   { tr: 'oklardan birine dokun',  en: 'press one of the arrows' },
-    tapArrowsNudge: {
-      tr: 'sonra da yapabilirsin — devam etmek için dokun',
-      en: 'you can do this later — tap to carry on',
-    },
+    // The avatar-picking beats no longer advance on an arrow press (the
+    // reader may want to browse several before settling) -- this is the
+    // real button that does, in renderPane's own actionLabel slot.
+    continueLabel: { tr: 'DEVAM ET', en: 'CONTINUE' },
     kefilShare: {
       tr: 'Bu senin kodun. Gerçekten kefil olabileceğin birine ver — <em class="kefil-name">{KEFIL}</em> sana nasıl kefil olduysa, sen de ona öyle olacaksın. Yanlış davranırsa sorumluluk sende.',
       en: "This is your code. Give it to somebody you would actually vouch for — you will be their sponsor, the way <em class=\"kefil-name\">{KEFIL}</em> is yours. If they misbehave, it is on you.",
@@ -193,16 +202,37 @@
   // unset one would quietly change that feature. Bringing a mascot back here
   // is putting the picture back, not re-adding the data.
   let mascot = null;   // 'cat' | 'dog', implied by the palette
+  // Admin-editable overrides for COPY.lanes, keyed the same way
+  // (db/onboarding_copy.sql; edited from admin.html's Users tab). null
+  // until fetched, {} if the table is empty or missing -- either way
+  // laneCopy() falls back to the hardcoded default per key, so a database
+  // without the migration behaves exactly as it did before this existed.
+  let dbLaneCopy = null;
   let root;            // DOM root for fullscreen modal phases
   let spotlightEl;     // The persistent dim overlay
   let pane;            // The mascot pane (corner bubble)
-  let litTargets = []; // Every element lit so far; the dim is punched for each
+  let litTargets = []; // { el, round }[] -- every element lit so far, and the shape of its hole
   let firewallInstalled = false;
   // When set, a click anywhere on the page (outside the pane / interactive
   // target) advances the tour. Cleared after firing once.
   let tapAdvanceFn = null;
 
   // ── Helpers ──
+  // COPY.lanes[lang] with any admin-edited rows laid over it, key for key.
+  // An empty or missing body for a key leaves the hardcoded default in
+  // place rather than showing a blank bubble -- an admin clearing a field
+  // means "I have not written one," not "say nothing here."
+  function laneCopy(lang) {
+    const base = COPY.lanes[lang];
+    if (!dbLaneCopy) return base;
+    const merged = Object.assign({}, base);
+    Object.keys(base).forEach(key => {
+      const row = dbLaneCopy[key];
+      const text = row && (lang === 'en' ? row.body_en : row.body_tr);
+      if (text) merged[key] = text;
+    });
+    return merged;
+  }
   function fillKefil(s) {
     return (s || '').replace(/\{KEFIL\}/g, escapeHTML(kefilName || ''));
   }
@@ -569,6 +599,13 @@
   // The rects are measured, so they are re-measured on resize and again as a
   // depth change's own transition settles.
   function spotlightPad() { return 6; }
+  // A ROUND hole reads as the control GLOWING, a rectangular one reads as
+  // it being boxed -- see the avatar-picking beats (pickHair/pickShirt),
+  // which light one small arrow at a time and want to say "this" without
+  // drawing a square around it the way a whole-column beat's box does.
+  // Rounder and roomier than the square pad, since a tight circle around
+  // a 12px icon would read as a dot rather than a glow.
+  function spotlightRoundPad() { return 14; }
 
   // ONE path with real subpaths: the viewport, then one per hole, evenodd.
   //
@@ -590,29 +627,39 @@
   function paintSpotlight() {
     if (!spotlightEl || !CAN_CUT) return;
     const rects = litTargets
-      .map(el => el.getBoundingClientRect())
-      .filter(r => r.width > 0 && r.height > 0);
+      .map(t => ({ r: t.el.getBoundingClientRect(), round: t.round }))
+      .filter(t => t.r.width > 0 && t.r.height > 0);
 
     if (!rects.length) { spotlightEl.style.clipPath = ''; return; }
 
     const pad = spotlightPad();
+    const roundPad = spotlightRoundPad();
     const n = (v) => v.toFixed(1);
     const box = (l, t, r, b) => `M${n(l)} ${n(t)}H${n(r)}V${n(b)}H${n(l)}Z`;
+    // Two half-circle arcs closing back on themselves -- path() has no
+    // dedicated circle command, only arcs.
+    const circle = (cx, cy, radius) =>
+      `M${n(cx - radius)} ${n(cy)}A${n(radius)} ${n(radius)} 0 1 0 ${n(cx + radius)} ${n(cy)}`
+      + `A${n(radius)} ${n(radius)} 0 1 0 ${n(cx - radius)} ${n(cy)}Z`;
     const W = window.innerWidth, H = window.innerHeight;
-    const d = [box(0, 0, W, H)].concat(rects.map(r =>
-      box(r.left - pad, r.top - pad, r.right + pad, r.bottom + pad))).join(' ');
+    const holes = rects.map(({ r, round }) => round
+      ? circle(r.left + r.width / 2, r.top + r.height / 2, Math.max(r.width, r.height) / 2 + roundPad)
+      : box(r.left - pad, r.top - pad, r.right + pad, r.bottom + pad));
+    const d = [box(0, 0, W, H)].concat(holes).join(' ');
     spotlightEl.style.clipPath = `path(evenodd, "${d}")`;
   }
 
   // Light one element or several (a column of cast boxes is three boxes and
   // no wrapper, and a beat talks about the column). Everything lit before
   // stays lit; passing nothing lights nothing, which is a beat speaking
-  // generally rather than pointing.
-  function addSpotlight(target) {
+  // generally rather than pointing. `opts.round` cuts a circular hole
+  // instead of the default rectangular one (see paintSpotlight).
+  function addSpotlight(target, opts) {
     spotlightEl.classList.add('show');
+    const round = !!(opts && opts.round);
     const els = !target ? []
       : (target.length !== undefined && !target.nodeType ? Array.from(target) : [target]);
-    els.forEach(el => { if (el && !litTargets.includes(el)) litTargets.push(el); });
+    els.forEach(el => { if (el && !litTargets.some(t => t.el === el)) litTargets.push({ el, round }); });
     paintSpotlight();
   }
 
@@ -828,7 +875,7 @@
     if (!fb()) { stepKefilShare(); return; }
 
     enterSpotlightMode();
-    const lines = COPY.lanes[lang];
+    const lines = laneCopy(lang);
 
     // The petek's own depths (HIVE_LEVELS in profile-card.js): 0 is Sen --
     // the reader's own hexagon with the avatar arrows on it -- 1 is
@@ -859,14 +906,13 @@
       // AVATAR_ACCESSORY_OPTIONS's one alternative (glasses) is
       // unconditionally `locked: true` -- neither has a second OPEN choice
       // to hand a reader on day one. Hair and shirt do, so those are the
-      // two beats. `act` matches BOTH of a pair's arrows (either commits
-      // the pick), and lights the same pair rather than the whole column.
-      { lane: LANE_HANE,       depth: HIVE_SEN, target: '#po-hair-prev, #po-hair-next',
-        speech: lines.pickHair, act: '#po-hair-prev, #po-hair-next', prompt: 'tapArrows',
-        nudge: 'tapArrowsNudge' },
-      { lane: LANE_HANE,       depth: HIVE_SEN, target: '#po-shirt-prev, #po-shirt-next',
-        speech: lines.pickShirt, act: '#po-shirt-prev, #po-shirt-next', prompt: 'tapArrows',
-        nudge: 'tapArrowsNudge' },
+      // two beats. `pick: true` lights the pair with a round hole (see
+      // paintSpotlight) rather than boxing it, and never advances on a
+      // press -- browsing IS the point, see runPick.
+      { lane: LANE_HANE,       depth: HIVE_SEN, target: '#po-hair-prev, #po-hair-next', round: true,
+        speech: lines.pickHair, pick: true },
+      { lane: LANE_HANE,       depth: HIVE_SEN, target: '#po-shirt-prev, #po-shirt-next', round: true,
+        speech: lines.pickShirt, pick: true },
       // `.ist-hive-pick-col`, never `.ist-hive-picker`: the picker's own box is
       // exactly the hexagon (--ist-hive-cell-w/h) and both arrow columns are
       // laid OUTSIDE it (`right: 100%` / `left: 100%`), so a ring measured on
@@ -877,10 +923,16 @@
       // Two real pulls out from Sen, one level at a time, each waiting for
       // the actual gesture rather than jumping there -- the reader is
       // taught the gesture by making it, the same rule the lane pulls
-      // already follow. Yanındakiler first (the six touching places, all
-      // still empty), then the whole shape.
-      { lane: LANE_HANE,       speech: lines.near,     levelPull: HIVE_NEAR },
-      { lane: LANE_HANE,       speech: lines.petekAll, levelPull: HIVE_ALL },
+      // already follow. Each pull beat asks ONLY for the pull -- what is
+      // actually up there is a beat too early to say true things about,
+      // exactly the reasoning that opened this whole tour on the reader
+      // rather than the petek -- and the plain talk beat right after it
+      // describes what arriving actually shows: Yanındakiler first (the
+      // six touching places, all still empty), then the whole shape.
+      { lane: LANE_HANE,       speech: lines.toNear, levelPull: HIVE_NEAR },
+      { lane: LANE_HANE,       speech: lines.near },
+      { lane: LANE_HANE,       speech: lines.toAll,  levelPull: HIVE_ALL },
+      { lane: LANE_HANE,       speech: lines.petekAll },
       { lane: LANE_HANE,       speech: lines.twoSides },
       { lane: LANE_HANE,       speech: lines.toKahve, pull: LANE_KAHVEHANE },
       // A column is three boxes with no wrapper between them, and the
@@ -928,7 +980,7 @@
       // ...and, on Hane, about a DEPTH of the petek as well.
       if (b.depth !== undefined) setDepth(b.depth);
 
-      if (b.act) { runAct(b); return; }
+      if (b.pick) { runPick(b); return; }
 
       // A cast box is drawn where the book puts it and can be mid-flight
       // for a beat after a lane change, so the spotlight is taken on the
@@ -953,47 +1005,31 @@
       }, ms));
     }
 
-    // An act beat: the reader is asked to actually change something, and
-    // doing it is the advance. Only the thing being asked for is live (the
-    // scoped passthrough), and the first real press on it is enough -- the
-    // point is that they find the control and see it answer, not that they
-    // dress the whole avatar while a cat watches.
-    //
-    // `b.act` is a selector and may match MORE than one element -- picking
-    // a single category (hair, shirt) is answered by either its prev or
-    // its next arrow, so both are wired and either firing is the advance.
-    function runAct(b) {
+    // A pick beat: browsing an avatar category is not itself an answer, so
+    // a press on one of its arrows only ever changes the preview (the real
+    // app's own carousel handler does that, untouched) -- what advances
+    // the tour is a real press on the CONTINUE button below, the same
+    // object the closing screens already use (renderPane's actionLabel).
+    // There is deliberately no tap-anywhere hint and no stall/nudge here:
+    // unlike a gesture, a button press needs no accessibility fallback,
+    // and a reader who does not want to browse can press it immediately.
+    function runPick(b) {
       // The depth change rescales the plane and the arrows arrive with it,
-      // so the rects are taken a frame later and re-taken as they settle.
+      // so the rect is taken a frame later and re-taken as they settle.
       requestAnimationFrame(() => {
-        addSpotlight(document.querySelectorAll(b.target));
+        addSpotlight(document.querySelectorAll(b.target), { round: !!b.round });
         settleSpotlight();
-        const els = Array.from(document.querySelectorAll(b.act));
-        if (!els.length) { done(); return; }   // no petek standing: nothing to ask for
+        // Passthrough so the reader can actually reach the arrows -- the
+        // firewall's lock is pointer-events:none on everything outside
+        // the onboarding otherwise. Scoped to the petek alone, same as
+        // every other beat that hands part of the page back.
         openPassthrough('#fb-petek');
-        els.forEach(el => el.addEventListener('click', onPress, true));
       });
-      renderPane({ speech: b.speech, promptText: COPY[b.prompt][lang] });
-
-      function onPress() { done(); }
-      function done() {
-        // b.act, not b.target: the listener sits on the arrow(s) that
-        // actually commit a pick, while b.target is what is LIT -- on a
-        // beat that lights a whole column, the two still need to be
-        // different elements (see the beat's own note further down).
-        document.querySelectorAll(b.act).forEach(el => el.removeEventListener('click', onPress, true));
-        stopLaneWatch();
-        closePassthrough();
-        advance();
-      }
-      // Same escape hatch as a pull beat, and the same reason: the avatar
-      // can be changed any day from this exact screen, so a reader who does
-      // not want to right now must not be held here.
-      stallTimer = setTimeout(() => {
-        stallTimer = null;
-        renderPane({ speech: b.speech, promptText: COPY[b.nudge][lang] });
-        addHint(COPY[b.nudge][lang], done);
-      }, STALL_MS);
+      renderPane({
+        speech: b.speech,
+        actionLabel: COPY.continueLabel[lang],
+        onAction: () => { closePassthrough(); advance(); },
+      });
     }
 
     // A pull beat: dim stays, the book goes live, and arrival is the advance.
@@ -1198,6 +1234,16 @@
       }
     }
     if (!kefilName) kefilName = opts.kefilName || 'your sponsor';
+
+    // Admin-edited tour copy, if any (db/onboarding_copy.sql). Best-effort:
+    // a missing table or a network hiccup leaves dbLaneCopy at {} and
+    // laneCopy() falls straight back to the hardcoded COPY.lanes, exactly
+    // the site's own "no data, no gate" rule for optional content.
+    try {
+      const { data: rows } = await sb.from('onboarding_copy').select('key, body_tr, body_en');
+      dbLaneCopy = {};
+      (rows || []).forEach(r => { dbLaneCopy[r.key] = r; });
+    } catch (e) { dbLaneCopy = {}; }
 
     running = true;
     ensureRoot();

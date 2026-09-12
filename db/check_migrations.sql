@@ -172,7 +172,9 @@ with checks(sira, dosya, aranan, var) as (
     (42, 'db/daily_questions.sql',                    'daily_questions + question_tally()',
          to_regclass('public.daily_questions') is not null and pg_temp.has_fn('question_tally')),
     (43, 'db/hive_slot_codes_v5.sql',                 'hive_slot_offers + hive_claim_slot()',
-         to_regclass('public.hive_slot_offers') is not null and pg_temp.has_fn('hive_claim_slot'))
+         to_regclass('public.hive_slot_offers') is not null and pg_temp.has_fn('hive_claim_slot')),
+    (44, 'db/onboarding_copy.sql',                    'onboarding_copy tablosunda satır',
+         pg_temp.rows_or_missing('public.onboarding_copy') > 0)
 )
 select
   case when var then '✓ VAR' else '✗ EKSİK' end as durum,
