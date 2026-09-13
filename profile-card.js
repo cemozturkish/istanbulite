@@ -1514,6 +1514,13 @@
   const HIVE_GESTURE_SLOP = 8;
   // The air between the drawing and the block under it on level 0.
   const HIVE_SELF_GAP = 14;
+  // Level 0's own extra breathing room above its resting centre: the
+  // block below the hexagon lost its name line (the top bar already
+  // carries it whenever this depth is on screen), so the hexagon alone
+  // would drift down toward the middle of the window without this --
+  // pulled up a further fixed amount rather than left to fall out of a
+  // now-shorter reserve.
+  const HIVE_SELF_LIFT = 22;
   // The paper left between the foot of the drawing and a card standing
   // open in the strip below it (see fitHive's offsetY).
   const HIVE_CARD_GAP = 10;
@@ -2135,9 +2142,12 @@
           <span class="ist-hive-pref-seg" role="group" aria-label="${esc(t(pref.label))}">${options}</span>
         </div>`;
     }).join('');
+    // No name here: the top bar already carries it (you, at your own end
+    // of the row) whenever this depth is on screen, and printing it twice
+    // said the same word from two directions at once. District and
+    // member-since stay -- the bar's own name line has no room for those.
     return `
       <div class="ist-hive-self" id="po-hive-self">
-        <div class="ist-hive-self-name">${esc(capitalizeName(state.hiveDisplayName || ''))}</div>
         <div class="ist-hive-self-meta">${esc(district)}</div>
         ${since ? `<div class="ist-hive-self-since">${esc(since)}</div>` : ''}
         <div class="ist-hive-prefs">${prefs}</div>
@@ -2613,7 +2623,9 @@
     // foot of the drawing would meet a card standing open (the strip's
     // opened height, plus a little paper). The first is where the petek
     // wants to be; the second is the promise that nothing lands on it.
-    const restY = -Math.max(selfReserve, restReserve) / 2;
+    const restY = level === 0
+      ? -(Math.max(selfReserve, restReserve) / 2 + HIVE_SELF_LIFT)
+      : -Math.max(selfReserve, restReserve) / 2;
     const belowMe = (maxB - cy) * scale;
     const clearY = (vhFull - reserve - HIVE_CARD_GAP) - vhFull / 2 - belowMe;
     const offsetY = Math.min(restY, clearY);
