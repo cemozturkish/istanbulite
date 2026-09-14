@@ -159,6 +159,39 @@
     return b >= sunrise && b < sunset;
   }
 
+  // ── WHICH EDITION IS OUT ──
+  // The app prints two editions a day and the sun decides which: the
+  // morning paper from sunrise, the evening one from sunset. This is the
+  // whole of that switch -- isDaytime() already answers it exactly, and
+  // nothing else needs to know how a sunrise is computed.
+  function edition(base) { return isDaytime(base) ? 'gun' : 'gece'; }
+
+  // Istanbul calendar date for `base`, offset by whole days. Same
+  // arithmetic as iso(), which is always about *now*; this one is about a
+  // given instant, which is what makes an edition key testable.
+  function isoAt(base, offsetDays) {
+    const p = parts(base);
+    const d = new Date(Date.UTC(p.year, p.month - 1, p.day));
+    if (offsetDays) d.setUTCDate(d.getUTCDate() + Number(offsetDays));
+    return d.toISOString().slice(0, 10);
+  }
+
+  // An edition and the day it belongs to.
+  //
+  // The night edition SPANS MIDNIGHT -- in December it runs 17:37 to
+  // 08:22 -- so a reader holding the paper at 01:00 is holding the one
+  // that came out yesterday evening. Keying that on today's calendar date
+  // would file the back half of every winter night under the wrong day,
+  // and two readers on the same night would be looking at different
+  // editions depending on which side of midnight they opened the app.
+  // So a night is named for the day it BEGAN on.
+  function editionKey(base) {
+    const b = base || new Date();
+    if (isDaytime(b)) return { edition: 'gun', date: isoAt(b, 0) };
+    // Before this morning's sunrise = still last night's paper.
+    return { edition: 'gece', date: isoAt(b, b < sunTimes(b).sunrise ? -1 : 0) };
+  }
+
   // ── Two helpers the game-bearing pages each carried their own copy of ──
   // Both are about the Istanbul day, which is this file's whole subject,
   // so they belong here rather than four times over in four <script>
@@ -185,5 +218,6 @@
     return global.I18N ? global.I18N.formatCountdown(hours, minutes, opts) : '';
   }
 
-  global.IstDate = { parts, now, iso, daySeed, nextMidnight, parseYMD, untilMidnight, sunTimes, isDaytime, TZ };
+  global.IstDate = { parts, now, iso, daySeed, nextMidnight, parseYMD, untilMidnight,
+                     sunTimes, isDaytime, edition, editionKey, TZ };
 })(window);

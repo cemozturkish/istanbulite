@@ -152,7 +152,8 @@ default one.
 ├── game-locks.js         # Per-day game on/off enforcement + the sequence's question gates
 ├── event-interest.js     # "İlgimi çekti": the verdict Kahvehane's event deck records, Hane reads
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
-├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it
+├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it,
+│                         plus sunTimes/isDaytime/edition — which paper is out
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
@@ -1932,8 +1933,80 @@ slide that is the city:
 | | Lane 0 | Lane 1 | Lane 2 |
 |---|---|---|---|
 | | **Kütüphane** | **Hane** | **Kahvehane** |
-| what stands there | Haberler + Anket | the petek | Etkinlikler + Sözcel |
+| what stands there (gündüz) | Haberler + Anket | the petek | Etkinlikler + Skor Tahtası |
+| what stands there (gece) | Anket sonuçları + Haberler | the petek | Etkinlikler + Oyunlar |
 | where the book may go | up, to slide 1 | nowhere | nowhere *(see ILCE_STOP_ENABLED)* |
+
+**THE İSTANBUL LEVEL PRINTS TWO EDITIONS, AND THE SUN DECIDES WHICH**
+(`IstDate.edition()` / `IstDate.editionKey()`, `fbEdition` in project.html). The palette already
+follows the sun over İstanbul, so the app is genuinely light by day and dark by night; this makes
+that more than a colour. From sunrise the paper **asks** — the three news buckets, each opening
+into a page a reader answers by THROWING it, and the three evenings, each thrown into an RSVP.
+From sunset it **answers** — the district polls come out, every one of the 25 wearing the colour
+its own split mixes to.
+
+Four things about it:
+
+- **The two Kütüphane columns TRADE PLACES; neither goes away.** "The polls come out" means they
+  take the front page, not that the paper stops carrying news at night — so the wide column leads
+  with the results and the news moves into the narrow one. Nothing is lost at either end of the day.
+- **The cast is never rebuilt for an edition.** An actor keeps its slot, its column, its poses and
+  its lag; only its `load` branches (`loadKutuphaneWide` / `loadKutuphaneNarrow` / `loadKahveNarrow`).
+  A column that rebuilt itself would land its cards a few pixels off the ones beside it and the walk
+  between lanes would read as the page reflowing.
+- **The edition turns on ARRIVAL, never on a timer** (`syncEdition`). The theme flips live on
+  palette.js's own 60s tick, and that is right for colour — a page going dark around you is the room
+  going dark. It is exactly wrong for CONTENT: a reader half way through a story at 20:38 in June
+  must not have it replaced by a poll result. So it is re-read at a fresh `mount()`, at `landLane()`
+  when they walk onto a lane, and on `visibilitychange` when the app comes back with **nothing
+  open** — refused outright, not deferred, while a page or a game is up or a gesture is in flight.
+- **A night SPANS MIDNIGHT, so it is named for the day it began on** (`IstDate.editionKey`). In
+  December the evening edition runs 17:37 to 08:22; keying it on today's calendar date would file
+  the back half of every winter night under the wrong day, and two readers on the same night would
+  be holding different editions depending on which side of midnight they opened the app.
+
+**The games are night-only, behind one flag** (`NIGHT_GAMES_ENABLED`). By day Kahvehane's narrow
+column is the **Skor Tahtası** — how last night went, top three by `IstScoreboard.weekly` — and the
+games take it back at sunset. That is a real restriction: in June the window is 20:38 to 05:32,
+under nine hours. It is one flag rather than a rule spread through the column precisely so a
+season's data can reverse it without a refactor. `scoreboard.js` is loaded **not deferred** on
+project.html, matching every other page that carries it: a deferred copy executes after `mount()`
+has already run `buildCast`, so the column's first fill finds no `IstScoreboard` and prints
+"Yüklenemedi" on a board that was about to exist.
+
+**A page is answered by THROWING it** (`wirePageThrow`, `throwFootHTML`). Right is the first
+option, left the second, and the option is **stamped on the paper as it goes** so nobody ever
+answers a question they did not see — the gesture Kütüphane's news deck and Kahvehane's event deck
+both taught in the parts bin. One implementation for both: a story's poll
+(`breaking_news_polls` → `breaking_news_poll_option_votes`, insert-only) and an evening's RSVP are
+the same gesture with different words and different writes. Three notes, each of which fails
+silently:
+
+- **The stamp is authored inside the reading but moved onto `#fb-page` when the throw is wired.**
+  It is printed on the paper, not written in the column, so it must not scroll with the body — and
+  both close paths remove it along with any inline transform the throw left mid-flight.
+- **Only a sideways drag is the throw.** The axis is claimed once and never re-decided; a vertical
+  drag is handed straight back to the body's own scroll without ever calling `preventDefault`, which
+  is what keeps the two from competing (`.fb-page-body` is already `touch-action: pan-y`).
+- **Two buttons are rendered as well, deliberately.** A desktop reader has no finger, and a throw is
+  not discoverable on its own the first time. The gesture is the fast path; the buttons are the floor.
+
+**The RSVP throw writes BOTH tables, and that is not redundancy.** Right inserts `event_rsvps`
+(presence — "somebody is going") *and* `event_interest` `'yes'`; left removes the RSVP and records
+`'no'`. Hane paints them as two separate marks on the petek — a corner dot for the verdict, a red
+disc for actually going — and they are not the same fact, so collapsing the *gesture* must not
+collapse the *record*. A left throw is a real "no" rather than the absence of a yes, which is the
+whole reason `event_interest` exists. There is no `localStorage` mirror: `event-interest.js` left
+with kahvehane's own events deck, so that table IS the record now rather than a copy of one.
+
+**The district map is not coloured yet, and the list is not a placeholder for it.** Slide 12's
+İstanbul is `assets/map/istanbul-map-mobile.png` — a flat 1080×1920 drawing with **no traced
+overlay**; the only İstanbul tracing that exists is `assets/map/istanbul-map.svg`, whose viewBox is
+the landscape `0 0 5046 2300` frame and whose polygons land nowhere near the portrait artwork.
+(project.html carries no SVG at all.) So `renderAnketResults` prints the 25 districts as rows, each
+already wearing the colour a map would paint it with. Colouring the drawing itself needs an
+`istanbul-map-mobile.svg` — the two PNGs are visibly the same artwork rescaled into a portrait
+canvas, so it is derivable rather than hand-traced, but it is still a pass of its own.
 
 Left to right on the screen, exactly as the three tabs stand. A pull right walks the strip right,
 so the reader moves *left* along it — Kahvehane, Hane, Kütüphane — and a pull left walks back. Each
@@ -2355,9 +2428,9 @@ screen, which is why the pose tables swap along with the columns.
 | Screen | The map(s) on top | Wide column (3 rectangles) | Narrow column (3 rectangles) |
 |---|---|---|---|
 | Türkiye (slide 1) | Türkiye | left — **Hikâyeler**, the stories the map is grouped into | right — **Olaylar** |
-| Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler** | right — **Anket** |
+| Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler** (gündüz) / **Anket sonuçları** (gece) | right — **Anket** (gündüz) / **Haberler** (gece) |
 | Hane (lane 1) | none — the petek, full bleed | — | — |
-| Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (RSVP goes to Hane) | left — **Oyunlar**, Sözcel, Tümcel, Bulmaca |
+| Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (a throw is the RSVP) | left — **Skor Tahtası** (gündüz) / **Oyunlar** (gece) |
 | ~~the ilçe (slide 24)~~ *parked* | the ilçe, with the member's own picked out | right — **Yorumlar** | left — **Kahve**, the Kahve Endeksi's rows |
 
 Six things about it:

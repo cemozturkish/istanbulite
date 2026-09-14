@@ -9,7 +9,7 @@
   <title>Proje — istanbulite.net</title>
   <script src="safe-area-ready.js?v=2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="ist-date.js?v=3"></script>
+  <script src="ist-date.js?v=4"></script>
   <script src="router.js?v=15"></script>
   <script src="i18n.js?v=19"></script>
   <script src="map-ink.js?v=6"></script>
@@ -18,6 +18,13 @@
   <link rel="stylesheet" href="profile-card.css?v=33">
   <script src="avatar.js?v=1" defer></script>
   <script src="profile-card.js?v=39" defer></script>
+  <!-- The weekly board. Kahvehane's narrow column leads with it by day,
+       since the games are the night's and the morning gets their result. -->
+  <!-- NOT deferred, and every other page that carries it agrees: a
+       deferred copy executes after mount() has already run buildCast,
+       so the first fill of the Skor column finds no IstScoreboard and
+       prints "Yüklenemedi" on a board that was about to exist. -->
+  <script src="scoreboard.js?v=1"></script>
   <script src="sheet.js?v=5"></script>
   <link rel="stylesheet" href="sheet.css?v=7">
   <link rel="stylesheet" href="frames.css?v=11">
@@ -1273,6 +1280,80 @@
          behind an overlay and hears nothing either way. */
       touch-action: pan-y;
     }
+
+    /* ── THE THROW ──
+       What an opened page ASKS, and the two ways to answer it. The
+       question stands on its own rule at the foot of the reading, so it
+       is the last thing in the column rather than a panel over it. */
+    .fb-throw-q {
+      margin-top: 14px;
+      padding-top: 11px;
+      border-top: 2px solid var(--ink);
+      font-weight: 800;
+      font-size: 0.95rem;
+      line-height: 1.3;
+      text-wrap: balance;
+    }
+    /* The stamp the paper wears as it goes. It is not a label on a
+       control -- it is the answer being printed on the page while the
+       reader is still deciding, which is the whole reason nobody ever
+       answers a question they did not see. Pinned to the page rather
+       than to the scroller, so it does not travel with the reading. */
+    .fb-throw-cue {
+      position: absolute;
+      top: 46%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-7deg);
+      padding: 6px 14px;
+      border: 3px solid var(--ink-red);
+      color: var(--ink-red);
+      background: var(--paper-card);
+      font-weight: 900;
+      font-size: 1.15rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      max-width: 88%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 6;
+    }
+    .fb-throw-cue.on-right { transform: translate(-50%, -50%) rotate(7deg); }
+    /* The floor under the gesture: a desktop reader has no finger, and a
+       throw is not discoverable the first time. Same chunky foot every
+       pressable thing on the site wears, because these genuinely are the
+       thing you press. */
+    .fb-throw-row {
+      display: flex;
+      gap: 9px;
+      margin-top: 12px;
+    }
+    .fb-throw-btn {
+      flex: 1 1 0;
+      min-width: 0;
+      padding: 9px 8px;
+      border: 2px solid var(--ink);
+      border-bottom-width: 5px;
+      background: var(--paper-card);
+      color: var(--ink);
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.82rem;
+      line-height: 1.2;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      overflow-wrap: anywhere;
+    }
+    .fb-throw-btn:active { border-bottom-width: 2px; transform: translateY(3px); }
+    .fb-throw-note {
+      margin-top: 7px;
+      font-size: 0.68rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
     .fb-page-title { margin: 0 0 6px; font-size: 1.15rem; line-height: 1.2; }
     .fb-page-meta { color: var(--muted); font-size: 0.78rem; line-height: 1.45; margin-bottom: 9px; }
     .fb-page-body p { margin: 0 0 9px; font-size: 0.85rem; line-height: 1.5; }
@@ -1591,6 +1672,113 @@ const START_SLIDE = PETEK_STOP;
 const START_LANE = LANE_HANE;
 
 // ══════════════════════════════════════════════════════════════
+// THE TWO EDITIONS — the sun decides which paper is out
+//
+// The palette already follows the sun over İstanbul (IstDate.isDaytime,
+// read by palette.js), so the app is genuinely light by day and dark by
+// night. This makes that more than a colour: the İstanbul level prints
+// two editions, and which one is out is the same question the theme is
+// already asking.
+//
+//   GÜNDÜZ  Kütüphane  wide: the three news buckets; pressing one opens
+//                            it and a THROW answers the story's own poll
+//                      narrow: Anket — the district poll, to vote in
+//           Kahvehane  wide: the three evenings; a throw is the RSVP
+//                      narrow: Skor Tahtası — how last night's games went
+//
+//   GECE    Kütüphane  wide: ANKET SONUÇLARI — every district, coloured
+//                            by its own split (the reveal)
+//                      narrow: the news, still there, no longer leading
+//           Kahvehane  wide: the evenings, unchanged — an event you RSVP
+//                            to at 21:00 is the most normal thing here
+//                      narrow: Oyunlar — the three games, playable
+//
+// The two Kütüphane columns TRADE PLACES rather than one of them going
+// away: "the polls come out" means they take the front page, not that
+// the news stops existing. Nothing is lost at either end of the day.
+//
+// The games being night-only is a real restriction -- in June that is a
+// window from 20:38 to 05:32, under nine hours -- so it is one flag
+// rather than a rule spread through the column. Set it false and the
+// games stand in their column around the clock, with the scoreboard
+// reached the way it always was.
+const NIGHT_GAMES_ENABLED = true;
+
+// 'gun' | 'gece'. Null until the first sync, which is mount().
+let fbEdition = null;
+
+function readEdition() {
+  try {
+    if (window.IstDate && IstDate.edition) return IstDate.edition();
+  } catch (err) { console.error('[proje baski]', err); }
+  // A clock that cannot be reached is a day, not a night: the morning
+  // paper is the one with the news in it, so an app that fails open is
+  // an app with something to read.
+  return 'gun';
+}
+
+// ── THE EDITION TURNS ON ARRIVAL, NEVER UNDER THE READER'S HANDS ──
+// The theme flips live, on palette.js's own 60s timer, and that is right
+// for colour: a page going dark around you is the room going dark. It is
+// exactly wrong for CONTENT. A reader half way through a story at 20:38
+// in June must not have it replaced by a poll result, so nothing here is
+// on a timer -- the edition is re-read when the reader ARRIVES (a fresh
+// mount, a lane they have just walked onto, the app coming back from the
+// background with nothing open) and held otherwise.
+// Answers whether it actually changed, so the caller only re-renders
+// when there is something to re-render.
+function syncEdition(force) {
+  const next = readEdition();
+  if (!force && next === fbEdition) return false;
+  fbEdition = next;
+  // The stylesheet gets to know too: a night column and a day column are
+  // the same box with different content, but a kicker or a rule may want
+  // to say which paper this is.
+  document.documentElement.setAttribute('data-ist-edition', fbEdition);
+  return true;
+}
+
+// ── The third arrival: the app coming back from the background ──
+// Most readers cross a sunset with the app shut rather than by walking a
+// lane, so without this the edition would only ever turn on a cold
+// start. It is still an ARRIVAL and not a timer: the turn is refused
+// outright while a page is open, because that is precisely the reader
+// holding the paper (see syncEdition), and while a finger is down or the
+// book is in flight, because a column rebuilt mid-gesture is the strip
+// reflowing under the thumb. Refused, not deferred -- the next lane they
+// walk onto will pick it up, which is the same rule stated once.
+let _editionReturnWired = false;
+function wireEditionReturn() {
+  if (_editionReturnWired) return;
+  _editionReturnWired = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    const overlay = document.getElementById('fb-page-overlay');
+    if (overlay && !overlay.hidden) return;
+    const game = document.getElementById('fb-game-overlay');
+    if (game && !game.hidden) return;
+    if (drag || anim || laneRun) return;
+    if (syncEdition()) refreshEditionColumns();
+  });
+}
+
+// Every actor whose content is decided by the edition, re-read in place.
+// The same move refreshOyunColumn and refreshAnketColumn already make --
+// the cast is not rebuilt, only its boxes are filled again.
+function refreshEditionColumns() {
+  anketPromise = null;
+  if (loadAnketActor && loadAnketActor.reset) loadAnketActor.reset();
+  gamesStatePromise = null;
+  scoreboardPromise = null;
+  (cast || []).forEach(a => {
+    if (!a.def.load) return;
+    if (!/\bfb-haberler\b|\bfb-anket\b|\bfb-oyun\b/.test(a.def.cls)) return;
+    try { a.def.load(a.el); } catch (err) { console.error(err); }
+  });
+  refreshDayMeter();
+}
+
+// ══════════════════════════════════════════════════════════════
 // THE CAST
 //
 // The things that live on a STOP -- buttons, panels, the page's own
@@ -1781,12 +1969,87 @@ async function loadEtkinlikActor(el, slot) {
   el.innerHTML = '<div class="k">' + label + '</div>' +
     '<div class="m">' + esc(eventTimeOnly(ev.event_date)) + '</div>' +
     '<div class="t">' + esc(ev.title) + ' — ' + esc(nb) + '</div>';
+  // Where the reader already stands on this evening, so the page can say
+  // so instead of asking again as if they had never seen it.
+  const rsvp = await eventVerdictFor(ev.id);
+  if (!el.isConnected) return;
   // What the box only had room to name (see THE BAND PAGE): the evening
-  // itself, where it is and what it is.
+  // itself, where it is and what it is -- and the one thing it asks.
   fbSetPage(el, {
     kicker: label, meta: eventTimeOnly(ev.event_date), title: ev.title,
     lines: [eventWhenLong(ev.event_date), [nb, ev.location].filter(Boolean).join(' · ')].filter(Boolean),
-    body: ev.description,
+    html: fbParas(ev.description || '') +
+      (rsvp === 'yes'
+        ? '<div class="fb-throw-q">Gidiyorsun.</div>' + throwFootHTML('Vazgeç', 'Gidiyorum', 'Fikrini değiştirebilirsin.')
+        : '<div class="fb-throw-q">Gidiyor musun?</div>' + throwFootHTML('Gitmiyorum', 'Gidiyorum', 'Sola ya da sağa at.')),
+    wire: (inner) => wirePageThrow(inner, {
+      right: { label: 'Gidiyorum', run: () => setEventRsvp(ev, true) },
+      left:  { label: rsvp === 'yes' ? 'Vazgeç' : 'Gitmiyorum', run: () => setEventRsvp(ev, false) },
+    }),
+  });
+}
+
+// ── An evening's verdict ──
+// Two tables, on purpose, and this pass writes BOTH: event_rsvps is
+// presence ("somebody is going") and event_interest carries the yes/no
+// ("there is somebody to go with"). Hane paints them as two separate
+// marks on the petek -- a corner dot for the verdict, a red disc for
+// actually going -- and they are not the same fact, so collapsing the
+// gesture must not collapse the record. A left throw is a real "no"
+// rather than the absence of a yes, which is the whole reason
+// event_interest exists (db/hive_event_interest.sql).
+async function eventVerdictFor(eventId) {
+  try {
+    const uid = await doneUid();
+    if (!uid) return null;
+    const { data, error } = await IstRouter.sb.from('event_rsvps')
+      .select('event_id').eq('event_id', eventId).eq('user_id', uid).maybeSingle();
+    if (error) throw error;
+    return data ? 'yes' : null;
+  } catch (err) { console.error('[proje etkinlik rsvp]', err); return null; }
+}
+
+async function setEventRsvp(ev, going) {
+  const sb = IstRouter.sb;
+  let uid = null;
+  try { uid = await doneUid(); } catch (err) {}
+  if (!uid) return;
+  // Each half is independent and best-effort: a database without the
+  // event_interest migration still records the RSVP, which is the half
+  // the reader can actually see on this page.
+  try {
+    if (going) {
+      // The unique (event_id, user_id) makes a second yes a no-op rather
+      // than a duplicate, so throwing right twice is harmless.
+      const { error } = await sb.from('event_rsvps')
+        .upsert([{ event_id: ev.id, user_id: uid }], { onConflict: 'event_id,user_id' });
+      if (error) throw error;
+    } else {
+      const { error } = await sb.from('event_rsvps')
+        .delete().eq('event_id', ev.id).eq('user_id', uid);
+      if (error) throw error;
+    }
+  } catch (err) { console.error('[proje rsvp]', err); }
+  try {
+    const { error } = await sb.from('event_interest')
+      .upsert([{ user_id: uid, event_id: ev.id, verdict: going ? 'yes' : 'no' }],
+              { onConflict: 'user_id,event_id' });
+    if (error) throw error;
+  } catch (err) { console.error('[proje etkinlik verdict]', err); }
+  // No localStorage mirror here on purpose: event-interest.js is gone
+  // (it left with kahvehane's own events deck), so event_interest IS the
+  // record now rather than a server copy of one. Hane's petek reads it
+  // through hive_event_interest_status either way.
+  refreshEtkinlikColumn();
+}
+
+// The column is re-read the moment a verdict lands, the same rule
+// refreshOyunColumn and refreshAnketColumn follow.
+function refreshEtkinlikColumn() {
+  etkinlikPromise = null;
+  (cast || []).forEach(a => {
+    if (!/\bfb-events\b/.test(a.def.cls) || !a.def.load) return;
+    try { a.def.load(a.el); } catch (err) { console.error(err); }
   });
 }
 
@@ -2031,10 +2294,24 @@ async function loadHaberlerActor(el, slot) {
   if (!el.isConnected) return;
   // The story itself, in whichever language it was actually written in
   // (newsText) -- the same choice the headline above was printed with.
+  // The story's own question, if it has one the reader has not answered.
+  // Fetched with the story rather than when the page opens: the throw has
+  // to be armed from the page's first frame, and a gesture that only
+  // starts working a beat after the paper arrives is one nobody trusts.
+  const poll = await newsPollFor(n.id);
+  if (!el.isConnected) return;
   fbSetPage(el, {
     kicker: label, meta: newsAge(n.updated_at),
     title: newsText(n, 'title'),
-    html: fbParas(newsText(n, 'body')) + (siblings.length ? seriesTimelineHTML(siblings) : ''),
+    html: fbParas(newsText(n, 'body')) + (siblings.length ? seriesTimelineHTML(siblings) : '') +
+      (poll ? '<div class="fb-throw-q">' + esc(poll.question) + '</div>' +
+              throwFootHTML(poll.option_b, poll.option_a, 'Sola ya da sağa at.') : ''),
+    wire: poll ? (inner) => wirePageThrow(inner, {
+      // Right is the FIRST option and left the second, the same reading
+      // Kütüphane's own news deck gave the gesture in the parts bin.
+      right: { label: poll.option_a, run: () => voteNewsPoll(poll, 1) },
+      left:  { label: poll.option_b, run: () => voteNewsPoll(poll, 2) },
+    }) : undefined,
     // OPENING is the deal, not reaching the foot of the page. A wrong
     // "unread" is worse than a lenient "read": the reader saw the story,
     // and a box that stays loud after they have been inside it is the
@@ -2046,6 +2323,49 @@ async function loadHaberlerActor(el, slot) {
       newsMarkDealt(n).then(refreshDayMeter);
     },
   });
+}
+
+// ── A story's own question (breaking_news_polls) ──
+// The NEWEST poll on this story the reader has not already answered, or
+// null -- a story with nothing left to ask opens and reads exactly as it
+// did before, which is most of them. Best-effort in both directions: a
+// table that is missing, a policy that refuses, or a network that never
+// answers all leave the story readable and unthrowable rather than
+// taking the column down.
+async function newsPollFor(newsId) {
+  try {
+    const sb = IstRouter.sb;
+    const { data: polls, error } = await sb.from('breaking_news_polls')
+      .select('id, question, option_a, option_b')
+      .eq('news_id', newsId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    if (error) throw error;
+    if (!polls || !polls.length) return null;
+    const uid = await doneUid();
+    if (!uid) return null;
+    const { data: votes, error: vErr } = await sb.from('breaking_news_poll_option_votes')
+      .select('poll_id').eq('user_id', uid).in('poll_id', polls.map(p => p.id));
+    if (vErr) throw vErr;
+    const answered = new Set((votes || []).map(v => v.poll_id));
+    return polls.find(p => !answered.has(p.id)) || null;
+  } catch (err) {
+    console.error('[proje haber anket]', err);
+    return null;
+  }
+}
+
+// `option` is 1 or 2, which is what the column stores. Insert-only by
+// policy: an answer is what you thought when you were asked, so there is
+// nothing here that edits one.
+async function voteNewsPoll(poll, option) {
+  try {
+    const uid = await doneUid();
+    if (!uid) return;
+    const { error } = await IstRouter.sb.from('breaking_news_poll_option_votes')
+      .insert([{ poll_id: poll.id, user_id: uid, option }]);
+    if (error) throw error;
+  } catch (err) { console.error('[proje haber oy]', err); }
 }
 
 // A seri's earlier posts, newest first -- the same pool and the same cap
@@ -2480,6 +2800,98 @@ async function renderAnketResults(body, poll, myChoice) {
     '<div class="anket-districts">' + districtsHtml + '</div>';
 }
 
+// ══════════════════════════════════════════════════════════════
+// THE NIGHT EDITION — the polls come out
+//
+// After sunset Kütüphane's wide column stops leading with the news and
+// leads with the day's ANSWERS instead: one box per open poll, each
+// printing the city's own split, opening onto the 25 districts each
+// wearing the colour its own split mixes to. The news does not go away
+// -- it trades places with the poll, into the narrow column -- because
+// "the polls come out" means they take the front page, not that the
+// paper stops carrying news at night.
+//
+// It is the same neighborhood_polls the day's narrow column votes in, so
+// there is no second table and no second fetch: anketData() already has
+// the polls and the reader's own votes.
+const loadAnketSonucActor = stackFetch(async () => {
+  const { polls, voted, failed } = await anketData();
+  if (failed) {
+    return { rows: [], failed: true,
+      failedHtml: '<div class="k">ANKET</div><div class="t">Yüklenemedi</div>' +
+                  '<div class="m">Bağlantını kontrol et.</div>' };
+  }
+  // The kicker and the meta share ONE line, ranged to its two ends -- the
+  // same row İSTANBUL / "0 dk önce" sits on by day. So both have to stay
+  // about that long: "AKŞAM · ANKET" against "Önce sen ne diyorsun?"
+  // overran the box and the two printed on top of each other. The edition
+  // needs no naming here anyway -- it is night, the whole app is dark,
+  // and the box says ANKET where a story would say its category.
+  const rows = polls.map(poll => ({
+    html: '<div class="k">ANKET</div>' +
+      '<div class="t">' + esc(anketText(poll, 'question')) + '</div>' +
+      '<div class="m">' + (voted.has(poll.id) ? 'İlçelere göre' : 'Oy ver') + '</div>',
+    // The same page the day's own Anket box opens. A reader who never
+    // voted is asked first and sees the result the moment they do --
+    // wireAnketPage already decides which of the two it is, so the night
+    // needs no second version of that question.
+    page: anketPagePayload(poll),
+    done: voted.has(poll.id),
+  }));
+  return { rows, failed: false,
+    emptyHtml: '<div class="k">ANKET</div><div class="t">Bu gece sonuç yok</div>' +
+               '<div class="m">Gündüz anket açılmamış.</div>' };
+});
+
+// ── Kahvehane's narrow column by DAY: how last night went ──
+// The games are the night's, so the morning gets their result. One fetch
+// for the whole column, the same shape every other stack uses.
+let scoreboardPromise = null;
+const loadSkorActor = stackFetch(async () => {
+  try {
+    if (!window.IstScoreboard || !IstScoreboard.weekly) throw new Error('scoreboard yok');
+    if (!scoreboardPromise) scoreboardPromise = IstScoreboard.weekly(IstRouter.sb, {});
+    const { rows, error } = await scoreboardPromise;
+    if (error) throw error;
+    const top = (rows || []).slice(0, 3);
+    return {
+      rows: top.map((r, i) => ({
+        html: '<div class="k">' + (i + 1) + '. SIRA</div>' +
+          '<div class="t">' + esc(r.name || 'Anonim') + '</div>' +
+          '<div class="m">' + esc(String(r.score != null ? r.score : 0)) + ' puan</div>',
+        page: null,
+      })),
+      failed: false,
+      emptyHtml: '<div class="k">SKOR TAHTASI</div><div class="t">Henüz kimse oynamadı</div>' +
+                 '<div class="m">Oyunlar gece açılıyor.</div>',
+    };
+  } catch (err) {
+    console.error('[proje skor]', err);
+    return { rows: [], failed: true,
+      failedHtml: '<div class="k">SKOR TAHTASI</div><div class="t">Yüklenemedi</div>' +
+                  '<div class="m">Bağlantını kontrol et.</div>' };
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// WHICH LOADER A COLUMN USES — the whole of the day/night switch
+//
+// The cast is never rebuilt for an edition: an actor keeps its slot, its
+// column, its poses and its lag, and only what fills it changes. That is
+// what keeps the walk between lanes identical at noon and at midnight --
+// a column that rebuilt itself would land its cards a few pixels off the
+// ones beside it and the whole strip would read as reflowing.
+function loadKutuphaneWide(el, slot) {
+  return fbEdition === 'gece' ? loadAnketSonucActor(el, slot) : loadHaberlerActor(el, slot);
+}
+function loadKutuphaneNarrow(el, slot) {
+  return fbEdition === 'gece' ? loadHaberlerActor(el, slot) : loadAnketActor(el, slot);
+}
+function loadKahveNarrow(el, slot) {
+  if (!NIGHT_GAMES_ENABLED) return loadOyunActor(el, slot);
+  return fbEdition === 'gece' ? loadOyunActor(el, slot) : loadSkorActor(el, slot);
+}
+
 // ── Kahvehane's other column: the fixed set of games ──
 // Not a feed -- always these three, in this order -- but a game the
 // admin switched off for today (game_day_toggles) is not a step the
@@ -2600,6 +3012,11 @@ function refreshOyunColumn() {
 function onpressOyun(e, slot) {
   const el = e.currentTarget;
   if (el.classList.contains('fb-empty') || el.classList.contains('fb-locked')) return;
+  // By day this column is the scoreboard, and a scoreboard row opens
+  // nothing. Its rows carry no page (see loadSkorActor) so they are not
+  // pressable anyway -- this is the second fence, because the press
+  // handler is the actor's and does not change with the edition.
+  if (NIGHT_GAMES_ENABLED && fbEdition !== 'gece') return;
   openGameOverlay(gameForSlot(slot).file);
 }
 
@@ -2732,6 +3149,11 @@ function closeFbPage() {
   if (fbPageGrows()) IstSheet.grow({ page, inner, origin: _fbOrigin, dir: 'out' });
   IstSheet.close(overlay, () => {
     inner.innerHTML = '';
+    // The throw moved its stamp onto the page and may have left an
+    // inline transform on it mid-flight; neither belongs to the next
+    // page that opens here.
+    page.querySelectorAll(':scope > .fb-throw-cue').forEach(n => n.remove());
+    page.style.transform = ''; page.style.opacity = ''; page.style.transition = '';
     IstSheet.cancelGrow(page);
     _fbOrigin = null;
   });
@@ -2747,6 +3169,8 @@ function snapFbPageShut() {
   const inner = document.getElementById('fb-page-inner');
   if (!overlay || !inner || overlay.hidden) return;
   IstSheet.cancelGrow(page);
+  page.querySelectorAll(':scope > .fb-throw-cue').forEach(n => n.remove());
+  page.style.transform = ''; page.style.opacity = ''; page.style.transition = '';
   overlay.classList.remove('open');
   // This path drops .open by hand rather than through IstSheet.close, so
   // the tint's other half has to be told (see syncDim there).
@@ -2755,6 +3179,143 @@ function snapFbPageShut() {
   inner.innerHTML = '';
   _fbOrigin = null;
   _fbPushed = false;
+}
+
+// ══════════════════════════════════════════════════════════════
+// THE THROW — how an opened page is answered
+//
+// A box opens into the band, and the one thing the page then asks is
+// answered by throwing it: right is the first option, left the second,
+// and the option is STAMPED on the paper as it goes so nobody ever
+// answers a question they did not see. It is the gesture Kütüphane's
+// news deck and Kahvehane's event deck both taught in the parts bin, and
+// the same one the reader already uses to walk the lanes -- so the page
+// is answered with the finger that opened it rather than with a row of
+// buttons underneath.
+//
+// One implementation for both: a story's poll and an evening's RSVP are
+// the same gesture with different words and different writes. What
+// differs is passed in; nothing about the movement is stated twice.
+//
+// Two buttons are rendered as well, and deliberately: a desktop reader
+// has no finger, and a throw is not discoverable on its own the first
+// time. The gesture is the fast path, the buttons are the floor.
+const THROW_COMMIT = 0.28;   // of the page's own width
+const THROW_FLICK = 0.55;    // px/ms -- the app's own throw constant
+
+function wirePageThrow(inner, opts) {
+  const page = document.getElementById('fb-page');
+  if (!page || !inner) return;
+  // The stamp is authored inside the reading (it belongs to the question
+  // it answers) but it must not SCROLL with it -- it is printed on the
+  // paper, not written in the column. Moved up to the page itself, which
+  // is the positioned box it is pinned against. Any stamp a previous
+  // page left behind goes with it.
+  page.querySelectorAll(':scope > .fb-throw-cue').forEach(n => n.remove());
+  const cue = inner.querySelector('.fb-throw-cue');
+  if (cue) page.appendChild(cue);
+  let drag = null;
+  let spent = false;
+
+  const setCue = (dx) => {
+    if (!cue) return;
+    const w = page.offsetWidth || 1;
+    const t = Math.min(1, Math.abs(dx) / (w * THROW_COMMIT));
+    cue.textContent = dx > 0 ? opts.right.label : opts.left.label;
+    cue.classList.toggle('on-right', dx > 0);
+    cue.style.opacity = String(t);
+  };
+  const clearCue = () => { if (cue) { cue.style.opacity = '0'; cue.textContent = ''; } };
+
+  const settle = () => {
+    page.style.transition = 'transform 260ms cubic-bezier(.2,.7,.3,1)';
+    page.style.transform = '';
+    clearCue();
+    setTimeout(() => { page.style.transition = ''; }, 280);
+  };
+
+  // The answer, and then the page goes. The write is fired first and the
+  // page leaves without waiting on it: a verdict the reader has already
+  // given should not sit under a spinner, and every one of these writes
+  // reports its own failure where the column will show it.
+  const commit = (side) => {
+    if (spent) return;
+    spent = true;
+    const dir = side === 'right' ? 1 : -1;
+    const w = page.offsetWidth || 400;
+    page.style.transition = 'transform 300ms cubic-bezier(.4,0,.8,.3), opacity 300ms linear';
+    page.style.transform = 'translateX(' + (dir * w * 1.25) + 'px) rotate(' + (dir * 4) + 'deg)';
+    page.style.opacity = '0';
+    try { opts[side].run(); } catch (err) { console.error('[proje throw]', err); }
+    setTimeout(() => {
+      page.style.transition = ''; page.style.transform = ''; page.style.opacity = '';
+      dismissFbPage();
+    }, 300);
+  };
+
+  inner.querySelectorAll('[data-throw]').forEach(btn => {
+    btn.addEventListener('click', () => commit(btn.dataset.throw));
+  });
+
+  const down = (e) => {
+    if (spent) return;
+    // A press on a control is that control's. Everything else on the
+    // page is fair game for a throw: the body scrolls VERTICALLY, and
+    // the axis test below hands a vertical drag straight back to it
+    // without ever calling preventDefault, so the two never compete.
+    if (e.target.closest('button, a')) return;
+    drag = { x: e.clientX, y: e.clientY, t: performance.now(), axis: null, lastX: e.clientX, v: 0 };
+  };
+  const move = (e) => {
+    if (!drag || spent) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.axis) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      // Vertical belongs to the page's own scroll; only a sideways drag
+      // is the throw. Claimed once and never re-decided mid-gesture.
+      drag.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      if (drag.axis === 'x') { try { page.setPointerCapture(e.pointerId); } catch (err) {} }
+    }
+    if (drag.axis !== 'x') return;
+    const now = performance.now();
+    if (now > drag.t) drag.v = (e.clientX - drag.lastX) / (now - drag.t);
+    drag.lastX = e.clientX; drag.t = now;
+    page.style.transition = '';
+    page.style.transform = 'translateX(' + dx + 'px) rotate(' + (dx * 0.012) + 'deg)';
+    setCue(dx);
+    e.preventDefault();
+  };
+  const up = (e) => {
+    if (!drag || spent) { drag = null; return; }
+    const wasX = drag.axis === 'x';
+    const dx = e.clientX - drag.x;
+    const v = drag.v;
+    drag = null;
+    if (!wasX) return;
+    const w = page.offsetWidth || 1;
+    // Distance OR speed, the same pair the book's own release uses: a
+    // flick that never travelled far is still a throw.
+    if (Math.abs(dx) > w * THROW_COMMIT || Math.abs(v) > THROW_FLICK) {
+      commit(dx > 0 ? 'right' : 'left');
+    } else settle();
+  };
+
+  page.addEventListener('pointerdown', down);
+  page.addEventListener('pointermove', move);
+  page.addEventListener('pointerup', up);
+  page.addEventListener('pointercancel', up);
+}
+
+// The two-option foot every throwable page carries: the stamp that
+// appears as the paper moves, and the two buttons that say the same
+// thing for a reader with no finger.
+function throwFootHTML(leftLabel, rightLabel, note) {
+  return '<div class="fb-throw-cue"></div>' +
+    '<div class="fb-throw-row">' +
+      '<button type="button" class="fb-throw-btn" data-throw="left">' + esc(leftLabel) + '</button>' +
+      '<button type="button" class="fb-throw-btn" data-throw="right">' + esc(rightLabel) + '</button>' +
+    '</div>' +
+    (note ? '<div class="fb-throw-note">' + esc(note) + '</div>' : '');
 }
 
 function wireFbPage() {
@@ -2856,7 +3417,7 @@ const CAST = [
   }),
   ...stackActors({
     idBase: 'oyun', live: 11, lane: LANE_KAHVEHANE, col: 'l', mirror: true, cls: 'fb-oyun',
-    poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadOyunActor, onpress: onpressOyun,
+    poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadKahveNarrow, onpress: onpressOyun,
   }),
 
   // ── Kütüphane's pair: the reading side (Olaylar stands at the
@@ -2864,7 +3425,7 @@ const CAST = [
   // OLAYLAR_COLUMN_ENABLED above; Anket is its own pair further down) ──
   ...stackActors({
     idBase: 'haber', live: 11, lane: LANE_KUTUPHANE, col: 'l', cls: 'fb-haberler',
-    poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadHaberlerActor, onpress: onpressBox,
+    poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadKutuphaneWide, onpress: onpressBox,
   }),
   ...stackActors({
     idBase: 'olay', live: 0, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-olaylar',
@@ -2884,7 +3445,7 @@ const CAST = [
   }),
   ...stackActors({
     idBase: 'anket', live: 11, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-anket',
-    poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadAnketActor, onpress: onpressBox,
+    poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadKutuphaneNarrow, onpress: onpressBox,
   }),
   // Kahve and Yorumlar stand on the ilçe stop, which is parked (see
   // ILCE_STOP_ENABLED). They are left out entirely rather than merely
@@ -3624,6 +4185,12 @@ function runLane(to, done) {
 // on a screen that has finished moving -- you, the ring touching you,
 // then their names.
 function landLane() {
+  // ── The edition may have turned while the reader was elsewhere ──
+  // Arriving on a lane is exactly the moment it is safe to change what a
+  // column carries: nothing is open, nothing is mid-read, and the boxes
+  // are about to be looked at for the first time. Never on a timer --
+  // see syncEdition for why.
+  if (syncEdition()) refreshEditionColumns();
   if (lane !== LANE_HANE) return;
   if (window.IstProfileCard && IstProfileCard.playHiveReveal) IstProfileCard.playHiveReveal();
 }
@@ -3851,6 +4418,10 @@ function mount() {
   // depth have to agree, or the first pull down is one the lane forbids.
   lane = START_LANE; lanePos = START_LANE; navP = START_LANE;
   atLaneStop = false; petekBuilt = false;
+  // Which paper is out, decided before a single box is filled: buildCast
+  // runs the loaders, and they each ask fbEdition.
+  syncEdition(true);
+  wireEditionReturn();
   buildCast();
   splitNavMarks();  // before paintLanes(): the wave needs its letters
   paintLanes();     // after buildCast: it paints the cast too
