@@ -38,6 +38,14 @@ neither. The app's architecture mirrors this. The user always enters on the **mi
 swipes left/right from there — and no matter which way they go, they should feel like they are
 still in the middle. Not this, not that: **both**.
 
+**In the app as shipped the middle screen is the APP MAP** — the shape of the whole thing, with
+the reader's own hexagon in the centre of it — and the **petek** is one press of the İstanbulite
+logo away from wherever they are standing. The principle is unchanged and if anything more
+literal: the middle is not a destination, it is the place every destination is chosen from, and
+the reader is drawn standing in the middle of it. See "The petek is behind the logo, and the app
+map is the middle lane" under `project.html`. The rest of this section describes the three
+carousel pages, which are the parts bin (see the router's own section).
+
 The three pages, and what each direction *means*:
 
 - **Middle — `anahane.html` (Hane, "home"):** the self and the people, and nothing else. The
@@ -1838,41 +1846,77 @@ lands on.
 
 **One thing on that bar IS pressed, and it is the logo** — bigger than the two words, resting
 below the bar's bottom edge because everything else there is printed *on* the bar and this is the
-one thing that comes off it. It opens **the app map**, and it is a switch rather than a door: it
-stays lit while the map is up, because it is also the way back out (the same move Kütüphane's
-Olaylar box makes). `nav` still takes no pointer events at all — only this one mark opts back in,
-so the drawing under the bar's paper goes on answering a finger that lands beside it.
+one thing that comes off it. It opens **the petek**, and it is a switch rather than a door: it
+stays lit while the petek is standing, because it is also the way back out (the same move
+Kütüphane's Olaylar box makes). `nav` still takes no pointer events at all — only this one mark
+opts back in, so the drawing under the bar's paper goes on answering a finger that lands beside it.
 
-### The app map — what the logo opens (`#fb-map`)
+### The petek is behind the logo, and the app map is the middle lane
+
+**These two swapped places.** The petek used to be the middle lane of slide 12 and the app map
+used to be a layer the logo opened over whatever screen the reader was standing on. The reasoning
+runs the same way in both directions: **the middle screen is the one every other screen is reached
+FROM**, so what belongs there is the shape of the app — and the petek is not a place in that shape
+at all, it is the reader, which is exactly what a mark on the bar should open.
+
+Two things follow that are worth stating on their own, because both were properties of the old
+arrangement that are now gone:
+
+- **Nothing on the site dims the two bars any more.** The app map was the one deliberate exception
+  to "THE TWO BARS ARE OMNIPRESENT" (frames.css), and the petek that replaced it behind the logo
+  must not inherit it: pressing a hexagon names that member on the **top bar** and pressing the bar
+  is how their profile is opened, so a layer over that bar would take away the second half of its
+  own gesture. The petek rests under both bars, like everything else the app draws. The
+  `z-index: 610 !important` that used to let the bottom bar through the map's wash is gone with it.
+- **The petek is mounted from the start and simply kept shut** (`mountPetek` in project.html,
+  `#fb-petek-layer` hidden with `visibility`, never `display`). Two reasons, and the second is the
+  one that is easy to miss: `fitHive` has to be able to measure the grid at any moment, and the app
+  map's own middle window is the reader's cell **cloned out of this petek** — with nothing mounted
+  there is nothing to clone and the map falls back to a drawn figure on every screen. Opening it
+  re-mounts (somebody else's attachment may have carried the whole petek somewhere), which is also
+  what plays its reveal; it is never re-mounted while the layer is open, because that would pull
+  the drawing out from under a reader standing in it.
+
+The way out is the logo and Escape, and there is deliberately no backdrop to press: the petek fills
+the whole band between the two bars, so there is no backdrop left. Every hexagon is already its own
+close button, and this is the same argument one level up.
+
+### The app map — the middle lane (`#fb-map`)
 
 The compass says **where you are**. The map says where you are *in relation to everywhere else*:
-the app's five windows drawn in the shape they actually stand in — the three lanes across the
+the app's windows drawn in the shape they actually stand in — the two side lanes either side of the
 middle, Türkiye hanging off Kütüphane and the ilçe off Kahvehane, because those are the depths
-those two lanes can reach and nobody else can. The window the reader is standing in is **red**, and
-it is the only red on the layer, so it cannot be read as anything else. It is also not pressable:
-you are already there.
+those two lanes can reach and nobody else can — with the reader's own hexagon standing in the
+middle of it.
 
 - **A window is a `(lane, slide)` pair and nothing else.** There is no second table of places in
-  `MAP_WINDOWS` — only the five the book and the lane strip already have between them, so the map
-  cannot drift from the app it is a map of.
-- **Pressing a window WALKS there. It never jumps** (`travelTo`). The layer closes and then the app
-  moves one transition at a time, through every screen in between: back to slide 12 first (the
-  lanes can only be walked from the middle depth), then one lane at a time, then out to the
-  target's own depth. So Türkiye to the ilçe is four moves and passes through Hane — you cannot get
-  from the reading to the doing without walking past the people. A map that teleported would be
-  the shortcut past everything, which is the one thing the whole arrangement exists to prevent.
-  `runTo` and `runLane` each take a `done` callback for exactly this, and every comparison against
-  a stop is a tolerance rather than `!==`: `at` is a float, and a walk left one imperceptible step
-  short never clears `traveling`, which locks the map for the session.
-- **It is the one surface on the site that dims the two bars**, and that is a deliberate exception
-  to "THE TWO BARS ARE OMNIPRESENT" (frames.css) rather than an oversight. Everywhere else the bars
-  answer "where can I go" and nothing may pass in front of them; here the whole screen *is* that
-  answer, so the furniture is part of what goes quiet. Two mechanical notes, both of which fail
-  silently: the wash is **one number** (`--fb-map-dim`) used over the page and again *inside* the
-  bottom bar, because the two have to read as a single thing going quiet rather than as two
-  surfaces dimmed by eye; and the rule that lets the bottom bar through the layer is
-  `z-index: 610 !important`, because the omnipresence rule is itself `!important` and a plain 610
-  loses to it — the logo then goes dark under the very wash it is supposed to be standing above.
+  `MAP_WINDOWS` — only the ones the book and the lane strip already have between them, so the map
+  cannot drift from the app it is a map of. The one exception is the **middle** window, which is
+  not a place on the strip at all: it is the reader, it carries no pair, and pressing it opens the
+  petek — the same door the logo is, standing where the thing itself is.
+- **There is no "you are here" window any more, and that is not a loss.** The map used to be
+  openable from anywhere, so the question had a different answer each time it was asked; it can
+  only be seen from the map now, so the answer would be the same every time. What is marked instead
+  is the one thing always true of the middle: the reader is in it. That is what the red hexagon
+  says, and it is still the only red on the screen.
+- **Pressing a window WALKS there. It never jumps** (`travelTo`). The app moves one transition at a
+  time, through every screen in between: back to slide 12 first (the lanes can only be walked from
+  the middle depth), then one lane at a time, then out to the target's own depth. A map that
+  teleported would be the shortcut past everything, which is the one thing the whole arrangement
+  exists to prevent. `runTo` and `runLane` each take a `done` callback for exactly this, and every
+  comparison against a stop is a tolerance rather than `!==`: `at` is a float, and a walk left one
+  imperceptible step short never clears `traveling`, which locks the map for the session.
+- **It is drawn in ink on paper, not white on a dark scrim.** The wires, the closing line and the
+  windows' own fill were all drawn for a dark backdrop, because that is what a layer over the phone
+  had; the middle lane's wash is the page's own `--paper` (`.fb-scrim`), so the whole drawing
+  inverts — wires and line in `--ink`/`--muted`, and the windows filled with `--paper-card`, since a
+  window filled with `--paper` on a `--paper` wash is nothing but its own border.
+- **A badge of zero is not a badge.** It was `!= null` while this was a layer somebody opened; on a
+  permanent screen a red `0` would sit there all day saying nothing, so it is `> 0`.
+- **The closing line and the bottom row of windows share one box now**, so the grid gives that line
+  its strip only on the day there is a line to give it to
+  (`#fb-map:has(> .fb-map-done:not([hidden]))`). An unconditional reserve would take 56px off every
+  other day for nothing.
 - **The squares are how far into each window's content the reader has got** — Haberler as
   `dealt/total` read from the deck's own `dunya_dealt_<uid>` store (both its shapes, stamped and
   the legacy stampless array), Olaylar as `started/ongoing`, Oyunlar as `played/on today`, Anket as
@@ -1881,29 +1925,35 @@ you are already there.
   own square a dash rather than taking the map down. A square whose content is parked (Fikirler,
   Kahve, Yorumlar) prints a dash too — the shape of a screen must not change on the day its numbers
   arrive.
-- **The middle window is the reader's OWN hexagon, cloned out of the petek.** Hane's window is the
-  reader's profile, and that already exists at the petek's middle depth — so the cell is
+- **The middle window is the reader's OWN hexagon, cloned out of the petek.** That window is the
+  reader's profile, and it already exists at the petek's innermost depth — so the cell is
   `cloneNode`d rather than redrawn, and the ring, the mask, the avatar and the badges stay the
-  petek's own with no second version to keep in step. Two things the clone must be stripped of:
+  petek's own with no second version to keep in step. Three things the clone must be dealt with:
   every `id` in it (`#po-avatar-preview` is what the four avatar carousels replace on an arrow
   press, and the claim field is what a code is typed into — a second copy carrying them steals
-  both), and its place, since in the petek it is absolutely positioned on the plane by `calc()`
-  against the packing's own step.
-- **Standing on Hane, opening the map is the people leaving and the reader staying put.** The whole
-  petek fades out under the wash — the reader's own cell with it — and the cloned window is
-  **pinned over the rect the real cell was measured at**, so nothing about where the reader's
-  hexagon is changes by a pixel. It has to be `position: fixed` for that: every other window is
-  placed inside the grid, which is inset by both bars, so a viewport-measured rect left in that
-  frame lands exactly the grid's own inset away from the hexagon it is supposed to be standing on.
-  Off Hane there is nothing to pin to and the same clone simply stands in the middle of the row;
-  a petek that has never been mounted (the reader has not reached slide 12 yet) falls back to a
-  drawn figure.
+  both); its place, since in the petek it is absolutely positioned on the plane by `calc()`
+  against the packing's own step; and its **opacity**, which is forced to 1, because the petek's
+  own reveal holds its cells at 0 for the first beats after a mount and a clone taken then would
+  print an empty hexagon. `buildMap` is re-run when a mount lands, so the drawn-figure fallback is
+  only ever the first paint (or a fetch that failed).
 - **Red for "you are here" is the RING going red**, not a box drawn around the hexagon — which is
-  what red on a hexagon already means everywhere else in the petek.
+  what red on a hexagon already means everywhere else in the petek. It is on unconditionally: the
+  middle window is the reader, and the reader is always in the middle.
 - **A map PNG inside a window has to be out of flow.** The windows are sized by `aspect-ratio`, and
   an `<img>` left in flow reports its intrinsic height (1080×2420 for Türkiye's) into a box whose
   height was supposed to come from that ratio. The two argue, intrinsic wins, and every window
   comes out half again too tall and overlapping the one below it.
+- **A press on a window is TRACKED by the book but never CAPTURED** (`onWindow` in `onDown`). This
+  is the one thing that broke the moment the map moved inside `.fb`: the book takes pointer capture
+  on the way down, which re-targets the eventual click at its own box, so every window was a dead
+  button with nothing thrown — the exact trap the live-actor guard beside it documents. It is
+  deliberately not a *bail* either, the way an actor is: the map fills most of the middle screen,
+  and bailing would make that whole area a dead zone for the lane swipe. Tracked without capture, a
+  sideways drag over a window still walks the strip and a tap on one still reaches it.
+- **The press is a pointer-driven class, never `:active`** (`wireMapPress`, `.fb-map-pressing`),
+  which sticks after a tap on iOS — the same reason `.fb-box` and Kütüphane's cards press the way
+  they do. It mattered less while this was a layer somebody opened, since a stuck press left with
+  it; on a permanent screen a window left shrunk simply stays shrunk.
 
 **Its two ends are the real maps**, so the rig is also the place the shape question gets settled.
 `OVERRIDE` in project.html swaps any frame for a picture; today the first two stops are the real
@@ -1922,8 +1972,8 @@ differently is a jump, however well they are drawn.
 
 The vertical gesture on this tab belongs to the page, not to the carousel — `verticalTarget()` in
 router.js returns nothing here, because this tab *is* a flip book and the zoom stack must keep its
-hands off it. The **horizontal** one is the petek's, below; nothing anywhere on the site navigates
-on a sideways swipe any more, which is what left the axis free for it.
+hands off it. The **horizontal** one is the lane strip's, below; nothing anywhere on the site
+navigates on a sideways swipe any more, which is what left the axis free for it.
 
 **Slide 12 is three screens, not one** (`LANES`, `lanePresence`, `runLane`). The book's stops are
 its *depth*; slide 12 also has a sideways axis, and it is the app's own carousel laid on the one
@@ -1931,21 +1981,22 @@ slide that is the city:
 
 | | Lane 0 | Lane 1 | Lane 2 |
 |---|---|---|---|
-| | **Kütüphane** | **Hane** | **Kahvehane** |
-| what stands there | Haberler + Anket | the petek | Etkinlikler + Sözcel |
+| | **Kütüphane** | **the app map** | **Kahvehane** |
+| what stands there | Haberler + Anket | where you are in relation to it all | Etkinlikler + Sözcel |
 | where the book may go | up, to slide 1 | nowhere | nowhere *(see ILCE_STOP_ENABLED)* |
 
-Left to right on the screen, exactly as the three tabs stand. A pull right walks the strip right,
-so the reader moves *left* along it — Kahvehane, Hane, Kütüphane — and a pull left walks back. Each
-lane has its own cast and they never trade places: the buttons that left to the right are
-Kahvehane's and stay gone; the ones that arrive from the left are Kütüphane's.
+Left to right on the screen, exactly as the two side tabs stand. A pull right walks the strip
+right, so the reader moves *left* along it — Kahvehane, the map, Kütüphane — and a pull left walks
+back. Each lane has its own cast and they never trade places: the buttons that left to the right
+are Kahvehane's and stay gone; the ones that arrive from the left are Kütüphane's. The middle lane
+has no cast at all — it is the app map, which is one drawing rather than two columns of boxes.
 
 **THE İLÇE STOP IS PARKED** (`ILCE_STOP_ENABLED` in project.html, currently `false`). Slides 13–24 —
 Kahvehane's run down to the reader's own ilçe — were never drawn: every frame is still the numbered
 placeholder, and the stop they arrive at carries two dashed boxes whose content is in the parts bin.
 A run of test frames ending on an empty screen is worse than no run at all, so **the run does not
-exist**: a pull down on Kahvehane simply does not move the paper, exactly as Hane's own vertical
-already doesn't. The local level is worth drawing when there are enough members per district for it
+exist**: a pull down on Kahvehane simply does not move the paper, exactly as the middle lane's own
+vertical already doesn't. The local level is worth drawing when there are enough members per district for it
 to say anything.
 
 It is parked the way kahvehane.html's comments and Kütüphane's Olaylar column are — one flag, and
@@ -1962,10 +2013,12 @@ on every screen in the app. A parked actor has to be absent, not idle.
 than a rule bolted onto it.** Standing on Kütüphane you are facing *out*, so the only depth you can
 reach is slide 1 — Türkiye. Standing on Kahvehane you are facing *in*, so the only one is slide 24 —
 parked, as above, so for now that lane reaches nothing.
-Standing on Hane the vertical gesture is not the book's at all: it is the petek's own depth pull.
-**So there is no way from Türkiye to the innermost slide that does not pass through Hane** — the
-mall stairway in the smallest form it has had here: you cannot get from the reading to the doing
-without walking past the people. The vertical drag is clamped to the lane's own run rather than
+Standing on the map there is no run at all: the middle is where a direction is chosen, not a depth
+to fall down.
+**So there is no way from Türkiye to the innermost slide that does not pass through the middle** —
+the mall stairway in the smallest form it has had here: you cannot get from the reading to the
+doing without walking past the whole shape of the thing, and the people, whose door stands in the
+middle of it. The vertical drag is clamped to the lane's own run rather than
 springing back from it, because paper that simply does not move says "not this way" more plainly.
 
 Seven things about it:
@@ -1976,7 +2029,7 @@ Seven things about it:
   covered it would take back the very thing being answered.
 - **One number drives all of it**, and it is *how present a lane is*: 1 standing on it, 0 a lane
   away either side, the linear middle in between (`lanePresence`). The middle lane's presence is
-  written as the **opacity of the wash and of the petek**, on each of those two elements — never as
+  written as the **opacity of the wash and of the map layer**, on each of those two elements — never as
   an inherited custom property on the box above them, which is what it used to be and is the single
   most expensive thing this file ever did. `box` is the ancestor of the whole book, the cast AND the
   petek, and changing an inherited custom property on an element invalidates the computed style of
@@ -1987,22 +2040,24 @@ Seven things about it:
   own `--p` now. Measured on a 4×-throttled CPU over one walk in each direction, before → after:
   **style recalc 2130ms → 1099ms, p95 51.5ms → 21.8ms, p99 157ms → 77ms, frames over 32ms 20 → 13.**
   Opacity is not inherited and is composited, so the same picture costs a composite and nothing
-  else. Both the wash and the hexagons are still that one number — they cross on
-  purpose: the petek starts coming in on the same frame the lane's own buttons start going out, so
-  the two casts hand over in one movement rather than in two (the hexagons used to wait for the
-  back half of the pull). The same wash and fade run whether the reader arrived from Kahvehane or
-  from Kütüphane.
+  else. (The trap is recorded in the petek's terms because the petek is what used to stand here and
+  is what made it expensive; the map layer that stands here now is cheap either way, and the rule
+  is the same.) Both the wash and the map are still that one number — they cross on
+  purpose: the map starts coming in on the same frame the lane's own buttons start going out, so
+  the two casts hand over in one movement rather than in two (the arriving layer used to wait for
+  the back half of the pull). The same wash and fade run whether the reader arrived from Kahvehane
+  or from Kütüphane.
 - **An actor needs no lane table at all.** All it knows about the strip is how far the reader is
   standing from its own lane, and all that does is take its ink away (`paintCast`, one line), on
   top of whatever pose the *book* has it in. That is the whole of what makes the two casts diverge
   without either knowing the other exists. **Leaving a lane is a fade and not a slide**: an actor
   used to be pushed a lane's width sideways as well, and two things travelling in the same gesture
   — the cast one way, the strip the other — read as the page being dragged apart rather than as one
-  screen giving way to another. What arrives is the petek; what leaves should only stop being
+  screen giving way to another. What arrives is the map; what leaves should only stop being
   there.
 - **The strip moves at most one lane per gesture.** It is a carousel of three screens, not a scrub
-  through twenty-four, and a swipe that crossed two of them walked the reader straight past Hane —
-  the one screen the arrangement exists to put in the middle. The release brackets the lane the
+  through twenty-four, and a swipe that crossed two of them walked the reader straight past the
+  middle — the one screen the arrangement exists to put there. The release brackets the lane the
   reader is **committed to** and the one next to it in the direction pulled, never `floor()` of
   where the drawing ended up, which at a whole number brackets the wrong pair and overshoots in one
   direction only.
@@ -2010,25 +2065,21 @@ Seven things about it:
   not about whether a finger is down — asking `!drag` there made the very gesture it gates
   impossible, since `armCast` runs on pointerdown and cleared the flag a frame before the drag
   read it.
-- **The petek is built on arrival, never on the pull.** Mounting is a round trip to `hive_map()`,
-  and a reveal that waits on the network has a blank beat in it. Every arrival on slide 12
-  re-mounts (somebody else's attachment may have carried the petek somewhere) — but never while it
-  is standing, which would pull the drawing out from under the reader. **An EMPTY petek is the exception**,
-  and it has to be: `ensurePetek` answers whether it actually settled the arrival and `petekBuilt`
-  latches on that answer, never on having made the call. Arriving on Hane through the app map walks
-  the book first and the lane second, and `framePos` lags `at` — so `atLaneStop` comes true a beat
-  later, by which time the lane is already Hane, and a latch set before the call spent that
-  arrival's one chance to mount on a call that declined. The reader landed on a blank Hane.
-- **A press inside a standing petek is the petek's**, and is deliberately not *captured*: capture
-  would re-target every following event at the book's own box and kill the petek's handlers
-  outright. Only a horizontal drag is the book's, and horizontal is exactly what
-  `wireHiveGestures` hands back. Leaving the tab calls `unmountHivePage()` — the depth classes on
-  `<html>` and the module's `_hive` both outlive the swapped content, and left behind they are the
-  last word on a page that is gone.
+- **The map lane is drawn on mount, not on arrival.** It is the screen the reader is already
+  standing on when the page opens, so `buildMap()` and `loadMapStats()` both run from `mount()`;
+  arriving back in the middle asks for the numbers again (`landLane`), behind the 60s cache, and
+  neither is ever awaited — the book must not wait on the network.
+- **A standing petek owns EVERY gesture, and the book bails rather than capturing.** The petek is a
+  layer over the book now rather than one of the lanes, so there is nothing here for a drag on it
+  to mean: `onDown` returns outright while it is open. It has to be a bail — the layer is inside
+  `.fb`, so its events bubble to that box, and capturing there would re-target every following
+  event at the box and kill the petek's own handlers outright (`wireHiveGestures`). Leaving the tab
+  calls `unmountHivePage()` — the depth classes on `<html>` and the module's `_hive` both outlive
+  the swapped content, and left behind they are the last word on a page that is gone.
 
-The reader **starts on Hane, slide 12** (`START_SLIDE` / `START_LANE`) — the middle stop and the
+The reader **starts on the app map, slide 12** (`START_SLIDE` / `START_LANE`) — the middle stop and the
 middle lane. It is the app's own rule applied to the book: you always enter in the middle and swipe
-out from there, so the petek is the door and Türkiye is one pull away rather than the doorstep. The
+out from there, so the shape of the whole thing is the doorstep and Türkiye is one pull away. The
 lane and the depth have to agree, or the first pull down would be one the lane forbids — and for the
 same reason `goto()` sets the lane from the slide it is given. The entry frame is also the one
 fetched **alone** ahead of the rest, since that is the drawing that has to be up before anything
@@ -2322,15 +2373,18 @@ than inventing a page. A column always shows exactly three boxes — a feed trun
 three, a fixed set of three — and a slot with nothing to put in it (a feed short of three, or one
 of a fixed set switched off) is a dashed rectangle marking the place rather than a blank gap.
 
-**Hane is the one exception, and it is the exception on purpose.** Its hero is the petek, full
-bleed, and it carries no tiles at all — the middle page is the people and nothing else.
+**The middle lane is the one exception, and it is the exception on purpose.** It is the **app map**
+— the app's own shape, full bleed — and it carries no tiles at all, because it is not a screen made
+of content: it is the answer to "where am I in relation to everything else". Its middle window is
+the reader's own hexagon, and pressing it (or the logo, which is the same door) opens the **petek**
+over the top of whatever lane the reader is standing on.
 
 **The two side lanes are mirror images of each other, not one layout repeated** (`.fb-mirror` in
 project.html). Kütüphane keeps the wide column on the left and ranges everything from there —
 kicker top-left, the red category rule down the left edge. Kahvehane is that turned over: the
 **short** column (Oyunlar, and Kahve at the ilçe stop) stands on the left and the **long** one
 (Etkinlikler, Yorumlar) on the right, with the headings pinned top-right and the red rule down the
-right edge. So the two sides lean *outward* from Hane — the heavy column of each lane is the one
+right edge. So the two sides lean *outward* from the middle — the heavy column of each lane is the one
 nearer the screen edge that lane sits at, and which way a screen is ranged says which side of the
 middle the reader is standing on before a word is read. Only the widths and the ranging flip: which
 side of the screen each column is docked to is still `fb-col-l` / `fb-col-r`, so the slots, the dock
@@ -2343,22 +2397,25 @@ screen, which is why the pose tables swap along with the columns.
       Hikâyeler · Olaylar                                 Yorumlar · Kahve
               │                                              │
         ┌─────┴──────┐        ┌──────────┐        ┌──────────┴───┐
-        │ KÜTÜPHANE  │ ────── │   HANE   │ ────── │  KAHVEHANE   │
-        │ Haberler   │        │ the petek│        │ Etkinlikler  │
-        │ Anket      │        │  alone   │        │ Oyunlar      │
+        │ KÜTÜPHANE  │ ────── │ THE MAP  │ ────── │  KAHVEHANE   │
+        │ Haberler   │        │ where you│        │ Etkinlikler  │
+        │ Anket      │        │    are   │        │ Oyunlar      │
         └────────────┘        └────┬─────┘        └──────────────┘
-                                   │
-                    ▲ up / out — the whole petek: what İstanbul thinks
-                    ▼ down / in — Sen: your own hexagon, and what is yours to change
+                                   │ the logo, from ANY lane
+                              ┌────┴─────┐
+                              │  PETEK   │   ▲ up / out — the whole petek
+                              │ 3 depths │   ▼ down / in — Sen, and what is yours
+                              └──────────┘
 ```
 
 | Screen | The map(s) on top | Wide column (3 rectangles) | Narrow column (3 rectangles) |
 |---|---|---|---|
 | Türkiye (slide 1) | Türkiye | left — **Hikâyeler**, the stories the map is grouped into | right — **Olaylar** |
 | Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler** | right — **Anket** |
-| Hane (lane 1) | none — the petek, full bleed | — | — |
-| Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (RSVP goes to Hane) | left — **Oyunlar**, Sözcel, Tümcel, Bulmaca |
+| the app map (lane 1) | none — the app's own shape, full bleed | — | — |
+| Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (the kept ones go to the petek) | left — **Oyunlar**, Sözcel, Tümcel, Bulmaca |
 | ~~the ilçe (slide 24)~~ *parked* | the ilçe, with the member's own picked out | right — **Yorumlar** | left — **Kahve**, the Kahve Endeksi's rows |
+| the **petek** | — *not a lane: the logo opens it over whichever lane you are on* | — | — |
 
 Six things about it:
 
@@ -2413,12 +2470,14 @@ Six things about it:
   mirrored one. The other columns are feeds whose headline is the thing itself and reads from the
   top; this one is a fixed set of three read by their names, and a name standing on the floor of
   its box is on the same line in all three however long the line above it runs.
-- **Hane's vertical axis is the petek's own three depths, and there is nothing new above or below
+- **The petek's own vertical axis is its three depths, and there is nothing new above or below
   it.** Up/out is level 2 (the whole petek), the reader arrives at level 1 (Yanındakiler), down/in
   is level 0 (Sen — the hexagon with the avatar arrows on it and name, district and the three
   preferences under it). It reads the same way the book does — up is out, down is in — which is
   what makes the two axes one grammar: **the outermost thing on this side is the whole city, and
-  the innermost thing is you.** See the petek's own section for how the pull works.
+  the innermost thing is you.** It is a layer over a lane rather than a lane of its own now, so
+  while it is standing the book takes no gesture at all and this is the only axis live. See the
+  petek's own section for how the pull works.
 - **The daily opinions are the loop between the two sides.** The questions in the joints of the
   game sequence take a daily opinion from İstanbulites (`daily_questions`, see the schema); the
   city rates them; the result is shown back **the next day, at the petek's outermost depth** —
@@ -2498,11 +2557,20 @@ leg went with them. What replaced it is the three lanes of slide 12, walked with
 pull the reader will use forever after, PLUS the petek's own vertical pull, walked the same way:
 Sen → Yanındakiler → the whole shape is two real upward drags, not a jump, for the same reason a
 lane change is a real sideways one. Reaching Kütüphane from Kahvehane is deliberately two pulls,
-because the strip moves one lane per gesture and the way between them is through Hane.
+because the strip moves one lane per gesture and the way between them is through the middle.
 
-A beat is one of four things: it **talks** (tap anywhere), it asks for a **pull** and waits for the
-reader to arrive on a lane, a **levelPull** and waits for them to reach a depth of the petek, or it
-is a **pick** (see above). Depth is driven through
+**And the reader opens the petek's own door themselves, both ways** (`toPetek` / `backToMap`,
+`runPetekDoor`). The petek is behind the logo rather than being a lane, so the tour lights that one
+mark, hands it back with a passthrough scoped to `#fb-logo-btn` alone, and waits for the petek to
+actually open — then, after the whole shape, waits for the reader to press it again and shut it.
+It is the same rule every lane pull here follows: the one door they will use forever after is
+taught by being used once, and the way in and the way out being the same mark is the thing worth
+learning. Everything between those two beats carries `inPetek: true` rather than a lane, because
+asserting a lane there would walk the strip behind a layer the reader is standing in.
+
+A beat is one of five things: it **talks** (tap anywhere), it asks for a **pull** and waits for the
+reader to arrive on a lane, a **levelPull** and waits for them to reach a depth of the petek, a
+**petek** door press and waits for it to open or shut, or it is a **pick** (see above). Depth is driven through
 `IstProfileCard.setHivePageLevel`/`hivePageLevel()`, that module's own handle (it is exactly what
 pressing a rail mark does, and no-ops when no petek is standing), the same way the book is driven
 through `window.__fb`. A `levelPull` beat (`runLevelPull`) is the vertical mirror of a lane `pull`
@@ -2514,6 +2582,15 @@ ever has to read `hivePageLevel()` back. **The gesture is always UP, never down*
 toward the whole shape is *outward*, and per `wireHiveGestures` (profile-card.js), the level only
 increases when the drag overshoots upward — so `COPY.pullUp` is the only vertical prompt this tour
 ever shows.
+
+**A depth has to be asserted more than once** (`holdDepth`). Opening the petek REMOUNTS it
+(project.html's `openPetek`), a mount is a round trip, and a mount lands at the middle depth by
+construction (`HIVE_LEVEL_DEFAULT`) — so a beat that names a depth can be answered before the mount
+it is aiming at even exists, and the mount then puts the reader back in the middle. On the first
+avatar beat that is the difference between the arrows being on screen and not.
+`setHivePageLevel` is idempotent, so the depth is simply re-said as things settle (0/120/300/600/900ms),
+guarded on the beat asking for it still being the beat on screen so it can never fight the next one.
+It is the same "re-take it as it settles" rule `settleSpotlight` already follows for the ring.
 
 **A levelPull beat asks ONLY for the pull — describing what is up there is a plain talk beat
 straight after it, never the same beat.** Combining the two used to say "this is the petek" while
@@ -2557,10 +2634,12 @@ Six things about it, each of which fails silently if forgotten:
   beat then waits forever on a gesture the page is swallowing. Both halves are needed —
   `body.ist-onb-passthru` in onboarding.css and `isPassthrough()` in onboarding.js.
   **And it is scoped**, which is what keeps each beat to its own question: a lane `pull` beat opens
-  the whole book (`#fb`, since the gesture is a drag on it), while an avatar `pick` beat or a petek
-  `levelPull` beat opens `#fb-petek` alone — so a stray sideways drag cannot walk the reader off the
-  screen the mascot is currently talking about. `data-onb-pass` on the body is which of the two is
-  open.
+  the whole book (`#fb`, since the gesture is a drag on it), an avatar `pick` beat or a petek
+  `levelPull` beat opens `#fb-petek` alone, and a `petek` door beat opens `#fb-logo-btn` alone —
+  so a stray sideways drag cannot walk the reader off the screen the mascot is currently talking
+  about. `data-onb-pass` on the body (`book` / `petek` / `logo`, from `PASS_SCOPES`) is which of
+  the three is open. The logo needs a scope of its own because it lives on a `<nav>` that takes no
+  pointer events at all and opts that one mark back in (project.html).
 - **The dim is a punched sheet, and the hole IS the highlight.** Nothing is drawn around a lit
   control: a rectangle around it is a second object competing with the thing it is pointing at,
   and what is being pointed at is already the only thing on screen at full strength. Everything
@@ -2626,8 +2705,9 @@ flow completed on a page nobody can reach would still write `onboarded_at`, and 
 real one on the page the member actually opens.
 
 **What of this is already standing in `project.html`:** Etkinlikler and Oyunlar (all three games)
-on Kahvehane, Haberler and Anket on Kütüphane, Olaylar at the Türkiye stop, the petek and its three
-depths on Hane, and the Türkiye map as slide 1's drawing. Hikâyeler has its boxes too, standing
+on Kahvehane, Haberler and Anket on Kütüphane, Olaylar at the Türkiye stop, the app map as the
+middle lane, the petek and its three depths behind the logo, and the Türkiye map as slide 1's
+drawing. Hikâyeler has its boxes too, standing
 dashed (see the cast rules above) — the boxes are cast, the content behind them is not. Kahve and
 Yorumlar are no longer cast at all: they stood on the ilçe stop, which is parked (see
 `ILCE_STOP_ENABLED`). **What is still in the parts bin:** the second map on the two lane screens,
@@ -2782,16 +2862,22 @@ account (kefil code, Çıkış Yap, Hesabımı Sil) is printed on the petek's in
 the petek's own section. Turning a parts-bin page back on is what makes this sheet's account block
 reachable again, and the two share one implementation precisely so that day needs no second copy.
 
-### The petek — which is Hane itself (`IstProfileCard.mountHivePage`)
+### The petek (`IstProfileCard.mountHivePage`)
 
 The petek (`hiveGridHTML`) is **one shared honeycomb**, drawn from where the reader is standing in
 it: their own cover frame in the middle, everybody else on their map placed exactly where they
 actually are around it, and — at its outermost depth — a "+" on each free side of their own
 hexagon. It is not six slots of your own — see the schema section above for what that means and why.
 
-**It is the middle page**, not something opened over one. It was a page of your profile, then a
-sheet grown out of a PETEK button over Hane's map; the map is gone and the honeycomb is simply
-what Hane *is*. **A mount starts from the map the last one ended with** (`_hiveMap`): every entry
+**In the app as shipped it is what the İstanbulite LOGO opens** — see "The petek is behind the
+logo, and the app map is the middle lane" under project.html. Everything in this section is about
+the object itself (the grid, the three depths, the codes, the names, the fit) and is true wherever
+it is mounted; what follows immediately below describes the arrangement on `anahane.html`, which is
+a parts-bin page.
+
+**On Hane it is the middle page**, not something opened over one. It was a page of your profile,
+then a sheet grown out of a PETEK button over Hane's map; the map is gone and the honeycomb is
+simply what Hane *is*. **A mount starts from the map the last one ended with** (`_hiveMap`): every entry
 re-fetches it, but the fetch takes a beat, and a grid drawn from nothing in the meantime is the
 reader alone in six empty sides — a shape several times the size of the real one, since the fit
 quite correctly fills the window with whatever it was handed — which then visibly collapses into
