@@ -15,9 +15,9 @@
   <script src="map-ink.js?v=6"></script>
   <script src="palette.js?v=3"></script>
   <link rel="stylesheet" href="palette.css?v=7">
-  <link rel="stylesheet" href="profile-card.css?v=32">
+  <link rel="stylesheet" href="profile-card.css?v=33">
   <script src="avatar.js?v=1" defer></script>
-  <script src="profile-card.js?v=38" defer></script>
+  <script src="profile-card.js?v=39" defer></script>
   <script src="sheet.js?v=5"></script>
   <link rel="stylesheet" href="sheet.css?v=7">
   <link rel="stylesheet" href="frames.css?v=11">
@@ -1411,7 +1411,10 @@
     <span class="fb-map-wire h w-ku-hane"></span>
     <span class="fb-map-wire h w-hane-kah"></span>
     <span class="fb-map-wire v w-ku-tr"></span>
-    <span class="fb-map-wire v w-kah-ilce"></span>
+    <!-- The wire down to the ilçe is hidden with the window it leads to
+         (see ILCE_STOP_ENABLED); a line drawn to nothing is worse than
+         no line. buildMap removes it when the stop is parked. -->
+    <span class="fb-map-wire v w-kah-ilce" data-wire="ilce"></span>
   </div>
   <p class="fb-map-done" id="fb-map-done" hidden>Bugünlük bu kadar.<br>Dışarısı seni bekliyor.</p>
 </div>
@@ -1456,7 +1459,31 @@
 // fault, and if it is smooth here then everything that made it rough
 // elsewhere is something else.
 // ══════════════════════════════════════════════════════════════
-const FRAMES = 24;
+// ── THE İLÇE STOP IS PARKED ──
+// The book's second run -- slide 12 down to slide 24, Kahvehane out to
+// the reader's own ilçe -- is not drawn and has nothing behind it: every
+// frame from 13 to 24 is still the numbered placeholder, and the stop
+// they arrive at carries two dashed boxes (Kahve, Yorumlar) whose
+// content is in the parts bin. A run of test frames ending on an empty
+// screen is worse than no run at all, so the run does not exist: a pull
+// down on Kahvehane simply does not move the paper, which is the same
+// "not this way" Hane's own vertical already says (see laneStops).
+//
+// It is parked rather than deleted, the way kahvehane.html's comments
+// and Kütüphane's Olaylar column are. Turning it back on is this one
+// line -- the poses, the actors, the app map's window and the wire to it
+// are all still written, each gated on this flag. The local level is
+// worth drawing when there are enough members per district for it to say
+// anything; until then it is twelve PNGs every reader downloads before
+// the book will arm, to reach a screen with nothing on it.
+const ILCE_STOP_ENABLED = false;
+
+// The book is genuinely as long as it is reachable. This is not a clamp
+// over a 24-frame book: FRAMES drives the image array and the loader
+// (see loadFrames), so parking the second run also stops those twelve
+// frames being fetched at all -- and the gesture arms only once every
+// frame is in, so it is the reader's first-open wait that gets shorter.
+const FRAMES = ILCE_STOP_ENABLED ? 24 : 12;
 
 // ── What each frame shows ──
 // The first two stops are the real maps -- frame 1 is Türkiye, frame 12
@@ -1508,7 +1535,11 @@ const TRAVEL = TRAVEL_PER_SLIDE * (FRAMES - 1);
 // book is not a landing the gesture has to be told about -- it is just
 // another entry here, which is why the whole of "add a stop" is adding
 // a number to this line.
-const STOPS = [0, 11, FRAMES - 1];
+// With the ilçe stop parked there are TWO of them, not three, and that
+// is all the rest of the release logic needs to hear: bracket() reads
+// this list and nothing else, so a release on Kahvehane now brackets
+// [11, 11] and has nowhere to run to.
+const STOPS = ILCE_STOP_ENABLED ? [0, 11, FRAMES - 1] : [0, 11];
 
 // The two stops a position is between -- the same stop twice when the
 // book is resting on one. This is what makes a release a local
@@ -2855,14 +2886,23 @@ const CAST = [
     idBase: 'anket', live: 11, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-anket',
     poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadAnketActor, onpress: onpressBox,
   }),
-  ...stackActors({
-    idBase: 'kahve', live: 23, lane: LANE_KAHVEHANE, col: 'l', mirror: true, cls: 'fb-kahve',
-    poses: END23_POSES_L, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Kahve'),
-  }),
-  ...stackActors({
-    idBase: 'yorum', live: 23, lane: LANE_KAHVEHANE, col: 'r', mirror: true, cls: 'fb-yorum',
-    poses: END23_POSES_R, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Yorumlar'),
-  }),
+  // Kahve and Yorumlar stand on the ilçe stop, which is parked (see
+  // ILCE_STOP_ENABLED). They are left out entirely rather than merely
+  // going unreached, because expandPoses fills a table FRAMES long: with
+  // the book twelve pages, nothing in END23_POSES_* is ever read and
+  // every slide falls back to POSE0 -- which is `opacity: 1` at the
+  // column's resting place, so both would stand at full strength on
+  // every screen in the app. A parked actor has to be absent, not idle.
+  ...(ILCE_STOP_ENABLED ? [
+    ...stackActors({
+      idBase: 'kahve', live: 23, lane: LANE_KAHVEHANE, col: 'l', mirror: true, cls: 'fb-kahve',
+      poses: END23_POSES_L, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Kahve'),
+    }),
+    ...stackActors({
+      idBase: 'yorum', live: 23, lane: LANE_KAHVEHANE, col: 'r', mirror: true, cls: 'fb-yorum',
+      poses: END23_POSES_R, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Yorumlar'),
+    }),
+  ] : []),
 ];
 
 // ── The lag ──
@@ -3531,7 +3571,11 @@ function lanePullable(dx) {
 // has none at all -- its vertical gesture belongs to the petek.
 function laneStops() {
   if (lane === LANE_KUTUPHANE) return [STOPS[0], STOPS[1]];
-  if (lane === LANE_KAHVEHANE) return [STOPS[1], STOPS[2]];
+  // Kahvehane's run is parked (see ILCE_STOP_ENABLED), so it answers the
+  // way Hane always has: both ends the same stop, which the drag clamps
+  // to and the release resolves to without moving. Nothing springs back,
+  // because nothing ever left.
+  if (lane === LANE_KAHVEHANE && ILCE_STOP_ENABLED) return [STOPS[1], STOPS[2]];
   return [STOPS[1], STOPS[1]];
 }
 
@@ -3882,8 +3926,13 @@ function unmount() {
 // five the book and the lane strip already have between them.
 // ══════════════════════════════════════════════════════════════
 const MAP_WINDOWS = [
-  { id: 'ilce',      cell: 'r1c3', lane: LANE_KAHVEHANE, slide: STOPS[2],
-    name: 'İlçen',     map: 'assets/map/istanbul-map-mobile.png', stats: ['kahve', 'yorum'] },
+  // The ilçe window only exists while the stop it walks to does. A map
+  // is a map OF the app, so a window onto a screen no gesture can reach
+  // would be the one thing this layer must never be: a picture of a
+  // place that is not there. It comes back with ILCE_STOP_ENABLED, along
+  // with the wire drawn to it in the markup above.
+  ...(ILCE_STOP_ENABLED ? [{ id: 'ilce', cell: 'r1c3', lane: LANE_KAHVEHANE, slide: STOPS[2],
+    name: 'İlçen',     map: 'assets/map/istanbul-map-mobile.png', stats: ['kahve', 'yorum'] }] : []),
   { id: 'kutuphane', cell: 'r2c1', lane: LANE_KUTUPHANE, slide: STOPS[1],
     name: 'Kütüphane', map: 'assets/map/istanbul-map-mobile.png', stats: ['haber', 'anket'] },
   { id: 'hane',      cell: 'r2c2', lane: LANE_HANE,      slide: STOPS[1],
@@ -3981,6 +4030,10 @@ function buildMap() {
   const grid = document.getElementById('fb-map-grid');
   if (!grid) return;
   grid.querySelectorAll('.fb-map-win').forEach(n => n.remove());
+  // The wire to a parked window goes with it. Done here rather than in
+  // the markup so the two can never disagree: the same flag that drops
+  // the window drops the line drawn to it.
+  if (!ILCE_STOP_ENABLED) grid.querySelectorAll('[data-wire="ilce"]').forEach(n => n.remove());
   const here = mapHere();
   for (const w of MAP_WINDOWS) {
     const el = document.createElement('button');

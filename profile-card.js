@@ -2124,6 +2124,59 @@
     return normalizePalette(raw);
   }
 
+  // ── The three account actions, one implementation ──
+  // They are printed in two places now: the profile sheet's account block
+  // (Kütüphane's, see PROFILE_SECTIONS) and the petek's innermost depth,
+  // Sen — which is the only one of the two a member can actually reach,
+  // since project.html is the app and its sheet carries the cover alone.
+  // The behaviour lives here rather than being typed out beside each set
+  // of buttons, or the two drift and the one nobody is looking at is the
+  // one that rots.
+  //
+  // Each takes the elements it acts on rather than looking them up,
+  // because the two surfaces deliberately carry DIFFERENT ids: one
+  // document holds both (router.js keeps a single document across the
+  // whole app), and a duplicate id would leave whichever rendered second
+  // silently wiring the other one's button.
+  function wireCopyCode(btn, state) {
+    if (!btn) return;
+    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
+    btn.addEventListener('click', () => {
+      navigator.clipboard?.writeText(state.profile?.referral_code || '');
+      const orig = btn.textContent;
+      btn.textContent = t('profile.copied');
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    });
+  }
+
+  async function doSignOut(sb) {
+    await sb.auth.signOut();
+    window.location.href = 'index.html';
+  }
+
+  // Deleting the auth.users row — and, by cascade, profiles and
+  // everything FK'd to it — runs entirely inside Postgres via the
+  // public.delete_own_account() SECURITY DEFINER function (see
+  // db/delete_own_account.sql): it executes with the function owner's
+  // privileges, so no service role key ever needs to reach client code or
+  // a separately-deployed Edge Function.
+  async function doDeleteAccount(state, btn, msgEl) {
+    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
+    if (!confirm(t('profile.deleteaccount.confirm'))) return;
+    btn.disabled = true;
+    const orig = btn.textContent;
+    btn.textContent = t('profile.deleteaccount.deleting');
+    const { error } = await state.sb.rpc('delete_own_account');
+    if (error) {
+      btn.disabled = false;
+      btn.textContent = orig;
+      if (msgEl) msgEl.textContent = t('profile.deleteaccount.error');
+      return;
+    }
+    await state.sb.auth.signOut();
+    window.location.href = 'index.html';
+  }
+
   function hiveSelfHTML(state) {
     const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
     const district = state.profile && state.profile.neighborhood
@@ -2142,6 +2195,41 @@
           <span class="ist-hive-pref-seg" role="group" aria-label="${esc(t(pref.label))}">${options}</span>
         </div>`;
     }).join('');
+    // ── Your account, on the depth that IS you ──
+    // Sen is where what is yours to change is printed, and these are the
+    // rest of it: the code you hand to somebody so they can stand next to
+    // you, the way out, and the way out for good. They used to live in
+    // the profile sheet's account block, which is Kütüphane's — a page in
+    // the parts bin that nothing links to, so in the app as shipped there
+    // was no logout, no account deletion and no way for a member to find
+    // their own kefil code after onboarding had shown it once.
+    //
+    // The code is its OWN copy button rather than carrying one beside it.
+    // A label, a value and a third control is three things on a row that
+    // has room for two, and the value is what you want to press anyway —
+    // so pressing it copies it and says so in its own place.
+    //
+    // Nothing on this page scrolls (see mountHivePage), and fitHive
+    // reserves whatever this block measures — so every row added here is
+    // taken out of the reader's own hexagon. That is the whole reason the
+    // account's READ-ONLY half (e-posta, telefon, the kefil chain, who
+    // you have sponsored) is deliberately not here: it is a record to be
+    // looked up, not a thing to be done, and it stays in the sheet.
+    const referralCode = state.profile && state.profile.referral_code
+      ? state.profile.referral_code : '';
+    const account = `
+      <div class="ist-hive-account">
+        ${referralCode ? `
+        <div class="ist-hive-pref ist-hive-code">
+          <span class="ist-hive-pref-label">${esc(t('profile.referralcode'))}</span>
+          <button type="button" class="ist-hive-code-val" id="po-hive-copy"
+                  aria-label="${esc(t('profile.referralcode'))}">${esc(referralCode)}</button>
+        </div>` : ''}
+        <div class="ist-hive-acts">
+          <button type="button" class="ist-hive-act" id="po-hive-signout">${esc(t('profile.signout'))}</button>
+          <button type="button" class="ist-hive-act ist-hive-act-danger" id="po-hive-delete">${esc(t('profile.deleteaccount'))}</button>
+        </div>
+      </div>`;
     // No name here: the top bar already carries it (you, at your own end
     // of the row) whenever this depth is on screen, and printing it twice
     // said the same word from two directions at once. District and
@@ -2151,6 +2239,7 @@
         <div class="ist-hive-self-meta">${esc(district)}</div>
         ${since ? `<div class="ist-hive-self-since">${esc(since)}</div>` : ''}
         <div class="ist-hive-prefs">${prefs}</div>
+        ${account}
         <div class="ist-hive-self-msg" id="po-hive-self-msg" role="status" aria-live="polite"></div>
       </div>
     `;
@@ -2186,6 +2275,17 @@
     document.querySelectorAll('#po-hive-self .ist-hive-pref-opt').forEach(btn => {
       btn.addEventListener('click', () => pickHivePref(state, btn.dataset.pref, btn.dataset.value));
     });
+    // The three account actions, shared with the profile sheet's own
+    // block. The status line they report into is the one this depth
+    // already has for a failed preference save -- a second one would be
+    // another row out of the hexagon for a message that is almost never
+    // on screen.
+    wireCopyCode(document.getElementById('po-hive-copy'), state);
+    const signout = document.getElementById('po-hive-signout');
+    if (signout) signout.addEventListener('click', () => doSignOut(state.sb));
+    const del = document.getElementById('po-hive-delete');
+    if (del) del.addEventListener('click',
+      () => doDeleteAccount(state, del, document.getElementById('po-hive-self-msg')));
   }
 
   // Level 0's block, re-rendered in place. It is the page's furniture
@@ -3553,45 +3653,17 @@
         renderOverlayBody();
       }
     });
-    const copyBtn = document.getElementById('po-copy');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(state.profile?.referral_code || '');
-        const orig = copyBtn.textContent;
-        copyBtn.textContent = t('profile.copied');
-        setTimeout(() => { copyBtn.textContent = orig; }, 1500);
-      });
-    }
+    // The same three actions the petek's Sen depth carries — see
+    // wireCopyCode/doSignOut/doDeleteAccount above for why the behaviour
+    // is shared and the ids are not.
+    wireCopyCode(document.getElementById('po-copy'), state);
     syncTicks('po-language', 'po-language-ticks');
     syncTicks('po-palette', 'po-palette-ticks');
     const signoutBtn = document.getElementById('po-signout');
-    if (signoutBtn) signoutBtn.addEventListener('click', async () => {
-      await sb.auth.signOut();
-      window.location.href = 'index.html';
-    });
+    if (signoutBtn) signoutBtn.addEventListener('click', () => doSignOut(sb));
     const deleteBtn = document.getElementById('po-delete-account');
-    if (deleteBtn) deleteBtn.addEventListener('click', async () => {
-      if (!confirm(t('profile.deleteaccount.confirm'))) return;
-      deleteBtn.disabled = true;
-      const orig = deleteBtn.textContent;
-      deleteBtn.textContent = t('profile.deleteaccount.deleting');
-      // Deleting the auth.users row (and, by cascade, profiles and
-      // everything FK'd to it) runs entirely inside Postgres via the
-      // public.delete_own_account() SECURITY DEFINER function (see
-      // db/delete_own_account.sql) -- it executes with the function
-      // owner's privileges, so no service role key ever needs to reach
-      // client code or a separately-deployed Edge Function.
-      const { error } = await sb.rpc('delete_own_account');
-      if (error) {
-        deleteBtn.disabled = false;
-        deleteBtn.textContent = orig;
-        const msgEl = document.getElementById('po-save-msg');
-        if (msgEl) msgEl.textContent = t('profile.deleteaccount.error');
-        return;
-      }
-      await sb.auth.signOut();
-      window.location.href = 'index.html';
-    });
+    if (deleteBtn) deleteBtn.addEventListener('click',
+      () => doDeleteAccount(state, deleteBtn, document.getElementById('po-save-msg')));
   }
 
   // Saves the settings page's only editable fields — language/palette/

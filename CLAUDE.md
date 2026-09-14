@@ -1933,16 +1933,35 @@ slide that is the city:
 |---|---|---|---|
 | | **Kütüphane** | **Hane** | **Kahvehane** |
 | what stands there | Haberler + Anket | the petek | Etkinlikler + Sözcel |
-| where the book may go | up, to slide 1 | nowhere | down, to slide 24 |
+| where the book may go | up, to slide 1 | nowhere | nowhere *(see ILCE_STOP_ENABLED)* |
 
 Left to right on the screen, exactly as the three tabs stand. A pull right walks the strip right,
 so the reader moves *left* along it — Kahvehane, Hane, Kütüphane — and a pull left walks back. Each
 lane has its own cast and they never trade places: the buttons that left to the right are
 Kahvehane's and stay gone; the ones that arrive from the left are Kütüphane's.
 
+**THE İLÇE STOP IS PARKED** (`ILCE_STOP_ENABLED` in project.html, currently `false`). Slides 13–24 —
+Kahvehane's run down to the reader's own ilçe — were never drawn: every frame is still the numbered
+placeholder, and the stop they arrive at carries two dashed boxes whose content is in the parts bin.
+A run of test frames ending on an empty screen is worse than no run at all, so **the run does not
+exist**: a pull down on Kahvehane simply does not move the paper, exactly as Hane's own vertical
+already doesn't. The local level is worth drawing when there are enough members per district for it
+to say anything.
+
+It is parked the way kahvehane.html's comments and Kütüphane's Olaylar column are — one flag, and
+everything it gates is still written: `FRAMES` (24 → 12, so those twelve PNGs are not even fetched
+and the reader's first-open wait is shorter, since the gesture arms only once every frame is in),
+`STOPS` (three → two, which is all `bracket()` reads), `laneStops()`, the app map's `ilce` window
+and the wire drawn to it, and the Kahve/Yorumlar actors. Those last two must be left **out of
+`CAST` entirely** rather than merely going unreached: `expandPoses` fills a table `FRAMES` long, so
+with a twelve-page book nothing in `END23_POSES_*` is ever read and every slide falls back to
+`POSE0` — which is `opacity: 1` at the column's resting place, so both would stand at full strength
+on every screen in the app. A parked actor has to be absent, not idle.
+
 **The lane decides which way the book may move, and that is the point of the divergence rather
 than a rule bolted onto it.** Standing on Kütüphane you are facing *out*, so the only depth you can
-reach is slide 1 — Türkiye. Standing on Kahvehane you are facing *in*, so the only one is slide 24.
+reach is slide 1 — Türkiye. Standing on Kahvehane you are facing *in*, so the only one is slide 24 —
+parked, as above, so for now that lane reaches nothing.
 Standing on Hane the vertical gesture is not the book's at all: it is the petek's own depth pull.
 **So there is no way from Türkiye to the innermost slide that does not pass through Hane** — the
 mall stairway in the smallest form it has had here: you cannot get from the reading to the doing
@@ -2339,7 +2358,7 @@ screen, which is why the pose tables swap along with the columns.
 | Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler** | right — **Anket** |
 | Hane (lane 1) | none — the petek, full bleed | — | — |
 | Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (RSVP goes to Hane) | left — **Oyunlar**, Sözcel, Tümcel, Bulmaca |
-| the ilçe (slide 24) | the ilçe, with the member's own picked out | right — **Yorumlar** | left — **Kahve**, the Kahve Endeksi's rows |
+| ~~the ilçe (slide 24)~~ *parked* | the ilçe, with the member's own picked out | right — **Yorumlar** | left — **Kahve**, the Kahve Endeksi's rows |
 
 Six things about it:
 
@@ -2608,11 +2627,12 @@ real one on the page the member actually opens.
 
 **What of this is already standing in `project.html`:** Etkinlikler and Oyunlar (all three games)
 on Kahvehane, Haberler and Anket on Kütüphane, Olaylar at the Türkiye stop, the petek and its three
-depths on Hane, and the Türkiye map as slide 1's drawing. Hikâyeler, Kahve and Yorumlar have their
-boxes too, standing dashed (see the cast rules above) — the boxes are cast, the content behind them
-is not. **What is still in the parts bin:** the second map on the two lane screens, the ilçe's own
-drawing at slide 24, whatever actually fills Hikâyeler, Kahve and Yorumlar, and the district-colored
-map itself that Anket's own data is already shaped to feed.
+depths on Hane, and the Türkiye map as slide 1's drawing. Hikâyeler has its boxes too, standing
+dashed (see the cast rules above) — the boxes are cast, the content behind them is not. Kahve and
+Yorumlar are no longer cast at all: they stood on the ilçe stop, which is parked (see
+`ILCE_STOP_ENABLED`). **What is still in the parts bin:** the second map on the two lane screens,
+the ilçe's own drawing at slide 24 and everything on that stop, whatever actually fills Hikâyeler,
+and the district-colored map itself that Anket's own data is already shaped to feed.
 
 ### The flip book — `flip.js` + `flip-steps.js`
 
@@ -2753,7 +2773,14 @@ The profile card opens your profile as the sheet above, but **what it contains d
 the three pages you opened it from** (`PROFILE_SECTIONS` in `profile-card.js`): the cover (frame,
 avatar, name, district) shows on all three; the week's game grid is Kahvehane's; your account and
 settings — with the Kişiselleştir and Çıkış Yap buttons that act on them — are Kütüphane's.
-Anahane's is the cover and nothing else.
+Anahane's is the cover and nothing else, and so is `project`'s.
+
+**Which means this sheet is not where a member's account lives any more.** These are all parts-bin
+pages: project.html is the app, its own entry here is cover-only, and nothing links to Kütüphane —
+so the account block below is, in practice, unreachable. What a member can actually *do* to their
+account (kefil code, Çıkış Yap, Hesabımı Sil) is printed on the petek's innermost depth instead; see
+the petek's own section. Turning a parts-bin page back on is what makes this sheet's account block
+reachable again, and the two share one implementation precisely so that day needs no second copy.
 
 ### The petek — which is Hane itself (`IstProfileCard.mountHivePage`)
 
@@ -2824,9 +2851,34 @@ preferences (dil, renk, görünüm) are printed under it. **Not their name** —
 carries it whenever this depth is on screen (you, at your own end of the row; see "The phone's two
 bars"), and printing it a second time under the hexagon said the same word from two directions at
 once. `hiveSelfHTML` simply never renders it. **Every control commits itself**, the way the
-avatar arrows already did — so there is no Kaydet here either, and nothing to confirm. What is *not*
-here is the account (email, kefil, referral code, Çıkış Yap): that is not personalization, and it
-stays on Kütüphane's profile page. Two mechanical notes: the arrow block is a node of its own
+avatar arrows already did — so there is no Kaydet here either, and nothing to confirm.
+
+**And the account's ACTIONS are here too, under a rule**: the reader's kefil code (which is its own
+copy button — a label, a value and a third control is three things on a row with room for two), Çıkış
+Yap, and Hesabımı Sil. They used to live in the profile sheet's account block, which is Kütüphane's
+— and Kütüphane is in the parts bin, so in the app as actually shipped there was **no way to log
+out, no way to delete an account, and no way for a member to find their own kefil code** after
+onboarding showed it once. The first two are an App Store requirement (5.1.1(v)) and the third is
+the entire growth model. Sen is the right home for them on the merits as well: this depth is the
+reader, and these are the reader's.
+
+What stays in the sheet is the account's **read-only half** — e-posta, telefon, the kefil chain, who
+you have sponsored. The line is not personalization-vs-account any more, it is **what you DO vs what
+is on record about you**: nothing on this page scrolls, and `fitHive` reserves whatever this block
+measures, so every row added here is taken out of the reader's own hexagon (the account block costs
+~52px on a phone). A record to look up does not earn that; a way out does.
+
+The three behaviours are one implementation — `wireCopyCode`, `doSignOut`, `doDeleteAccount` in
+profile-card.js — called by both surfaces. The **ids deliberately differ** (`po-hive-copy` /
+`po-hive-signout` / `po-hive-delete` against the sheet's `po-copy` / `po-signout` /
+`po-delete-account`): router.js keeps one document across the whole app, and a duplicate id leaves
+whichever rendered second silently wiring the other one's button. Hesabımı Sil is `--ink-red` and
+not `--accent` — `--accent` is a dark brown/grey, so the destructive action came out as the heaviest
+thing in the block, which says "press me" rather than "careful". It cannot collide with the petek's
+other red either: a red ring means "this is the member named on the bar", and that only happens at
+the outermost depth, where this block is not drawn at all.
+
+Two mechanical notes: the arrow block is a node of its own
 standing on the me cell's coordinates, because the me cell is a `<button>` and a button inside a
 button is not something the parser keeps; and it is `display: none` away from level 0 rather than
 faded, both to keep the arrows out of the tab order and so `fitHive` can tell they are not on the
