@@ -161,7 +161,8 @@ default one.
 ├── event-interest.js     # "İlgimi çekti": the verdict Kahvehane's event deck records, Hane reads
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
 ├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it,
-│                         plus sunTimes/isDaytime/edition — which paper is out
+│                         plus sunTimes/isDaytime/edition — which paper is out —
+│                         and gameNight/gameNightSeed/nextGameNight — which NIGHT is being played
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
@@ -2118,7 +2119,35 @@ reason the daytime half of this column is not a scoreboard.
 the games ran all day, and broken the moment they became night-only: a night spans midnight, so a
 member playing at 22:00 and one playing at 01:00 were handed **two different words for the same
 night**, both landing on one scoreboard. `sozcel_daily_word(candidates, p_night)` takes the night
-the caller is playing, and sozcel.html passes `IstDate.editionKey().date` (`sozcelGameNight()`).
+the caller is playing, and sozcel.html passes `IstDate.gameNight()` (`sozcelGameNight()`).
+
+**And so does EVERY OTHER KEY a night's games write.** v7 moved the word and left the rest of the
+page on the calendar date, which is the same bug one layer out: at midnight the save key rolled, so
+the board blanked under a reader who was still playing and handed them back the word they had
+already solved; a second `game_results` row for the same word landed on the shared scoreboard; the
+admin's own off-switch turned a game back on; Tümcel re-locked behind a question already answered;
+and the page promised "Yeni sözcük 1 saat 49 dakika sonra" some four hours before the word actually
+changed. **The rule is: anything about a night's games is keyed to the NIGHT, and the only clock
+that ends one is the sun.** `IstDate.gameNight()` is that key as padded ISO (`used_on`,
+`game_day_toggles.game_date`, `daily_questions.question_date`), `IstDate.gameNightSeed()` is the
+same night in the unpadded `YYYY-M-D` shape `game_results.date`, `game_state.date` and every
+per-day `localStorage` key are written in — two functions rather than one with a format argument,
+because those shapes address different columns and must never be swapped. Both are
+`editionKey().date` underneath, so a night is named for the day it began on and the weekly grid in
+`profile-card.js` still lands it on the right square with no change at all.
+
+**A "new puzzle in…" countdown therefore counts to the next SUNSET**, not to midnight
+(`IstDate.nextGameNight()` / `untilNextNight()`, which the three game pages and project.html's own
+offer box all share). Midnight is the middle of a night, not the end of one. Two mechanical notes:
+the comparison is between real instants and never `IstDate.now()`, whose *local* fields read as
+Istanbul's wall clock — subtracting it from a sunset instant silently offsets the answer by the
+device's own distance from Istanbul; and because `nextGameNight()` names the next sunset *strictly
+after* now, the number jumps forward a whole day at sunset rather than crossing zero, so anything
+asking "are the games open" asks `IstDate.edition() === 'gece'` instead of `ms <= 0`.
+
+The one thing deliberately left on the calendar date is the **Sözcü's own side**: a submission
+deadline is midnight at the start of `used_on`, fenced that way by the RLS policy itself, so
+`getIstanbulDateISO()` in sozcel.html still means the calendar day and is now only used there.
 
 This is **not** the client-side pick v5 exists to prevent: the database still decides what the word
 IS, the caller only names which night is being asked for — and reading another night's row was

@@ -9,7 +9,7 @@
   <title>Proje — istanbulite.net</title>
   <script src="safe-area-ready.js?v=2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="ist-date.js?v=4"></script>
+  <script src="ist-date.js?v=5"></script>
   <script src="router.js?v=15"></script>
   <script src="i18n.js?v=19"></script>
   <script src="map-ink.js?v=6"></script>
@@ -2981,7 +2981,7 @@ const SUBMIT_DEFS = [
 // of it will share once it starts (see ist-date.js).
 function tonightKey() {
   try {
-    if (window.IstDate && IstDate.editionKey) return IstDate.editionKey().date;
+    if (window.IstDate && IstDate.gameNight) return IstDate.gameNight();
   } catch (err) { console.error('[proje gece]', err); }
   return IstDate.iso();
 }
@@ -3169,11 +3169,18 @@ function stopSozcelCountdown() {
   if (_sozcelCountdownTimer) { clearInterval(_sozcelCountdownTimer); _sozcelCountdownTimer = null; }
 }
 
-// Milliseconds until tonight's sunset -- the same sun ist-date.js already
-// draws the day/night edition from, so this box and the edition switch
-// can never disagree about when the games unlock.
+// Milliseconds until the next night's games open -- the same sun ist-date.js
+// already draws the day/night edition from, so this box, the edition switch
+// and every game page's own "yeni sözcük" countdown can never disagree about
+// when the games unlock.
+//
+// Through IstDate.nextGameNight() rather than sunTimes() directly, because
+// that comparison has to be between two real instants: IstDate.now() returns
+// a Date whose *local* fields read as Istanbul's wall clock, so subtracting
+// it from a real sunset instant silently offsets the answer by the device's
+// own distance from Istanbul.
 function sozcelUnlockMs() {
-  try { return IstDate.sunTimes(IstDate.now()).sunset.getTime() - IstDate.now().getTime(); }
+  try { return IstDate.nextGameNight() - new Date(); }
   catch (err) { return null; }
 }
 
@@ -3186,10 +3193,20 @@ function fmtCountdown(ms) {
   return (h > 0 ? h + ':' + pad(m) : m) + ':' + pad(s);
 }
 
+// Whether the games are open right now. Asked of the edition rather than of
+// the countdown above: nextGameNight() names the next sunset strictly after
+// now, so the instant this evening's arrives the number jumps forward a
+// whole day rather than crossing zero, and a label reading `ms > 0` would
+// never say "Açıldı" at all.
+function gamesAreOpen() {
+  try { return IstDate.edition() === 'gece'; } catch (err) { return false; }
+}
+
 function sozcelCountdownLabel() {
+  if (gamesAreOpen()) return 'Açıldı';
   const ms = sozcelUnlockMs();
   if (ms == null) return '';
-  return ms > 0 ? fmtCountdown(ms) + ' sonra' : 'Açıldı';
+  return fmtCountdown(ms) + ' sonra';
 }
 
 function wireSozcelCountdown(inner) {
@@ -3197,13 +3214,13 @@ function wireSozcelCountdown(inner) {
   stopSozcelCountdown();
   if (!el) return;
   const paint = () => {
-    const ms = sozcelUnlockMs();
-    if (ms == null) return;
-    el.textContent = sozcelCountdownLabel();
-    // Once it hits zero the wait this box was naming is over -- the box
-    // itself is re-read on the next mount/refresh, this just stops ticking
-    // a clock that has nothing left to count down.
-    if (ms <= 0) stopSozcelCountdown();
+    const label = sozcelCountdownLabel();
+    if (!label) return;
+    el.textContent = label;
+    // Once the games are open the wait this box was naming is over -- the
+    // box itself is re-read on the next mount/refresh, this just stops
+    // ticking a clock that has nothing left to count down.
+    if (gamesAreOpen()) stopSozcelCountdown();
   };
   paint();
   _sozcelCountdownTimer = setInterval(paint, 1000);
@@ -3488,13 +3505,14 @@ function gamesStateToday() {
     const state = { off: new Set(), played: new Set() };
     const sb = window.IstRouter && IstRouter.sb;
     if (!sb) return state;
-    // Two different date keys, deliberately: game_day_toggles is keyed
-    // by the Istanbul ISO date and game_results by IstDate.daySeed().
-    // Both go through ist-date.js, never a parsed locale string
-    // (CLAUDE.md rule 10).
+    // Two different date SHAPES, deliberately: game_day_toggles is keyed
+    // by the padded ISO key and game_results by the unpadded seed. Both
+    // name the same thing — the NIGHT being played, which spans midnight,
+    // so neither may be the calendar date (see ist-date.js). Both go
+    // through ist-date.js, never a parsed locale string (CLAUDE.md rule 10).
     try {
       const { data, error } = await sb.from('game_day_toggles')
-        .select('game').eq('game_date', IstDate.iso());
+        .select('game').eq('game_date', IstDate.gameNight());
       if (error) throw error;
       (data || []).forEach(r => state.off.add(r.game));
     } catch (err) {
@@ -3505,7 +3523,7 @@ function gamesStateToday() {
     if (uid) {
       try {
         const { data, error } = await sb.from('game_results')
-          .select('game, attempts').eq('user_id', uid).eq('date', IstDate.daySeed());
+          .select('game, attempts').eq('user_id', uid).eq('date', IstDate.gameNightSeed());
         if (error) throw error;
         // PLAYED means FINISHED, not opened. Every game writes an
         // attempts:0 row on the reader's first interaction, so counting
@@ -5369,18 +5387,21 @@ async function loadMapStats() {
   // neither side of the fraction -- it is not a step anybody has left to
   // take (see game_day_toggles in CLAUDE.md).
   const oyun = (async () => {
-    // Two different date keys, deliberately: game_day_toggles is keyed by
-    // the Istanbul ISO date and game_results by IstDate.daySeed(). Both go
-    // through ist-date.js, never a parsed locale string (CLAUDE.md rule 10).
+    // Two different date SHAPES, deliberately: game_day_toggles is keyed by
+    // the padded ISO key and game_results by the unpadded seed. Both name
+    // the NIGHT being played, which spans midnight — the square has to say
+    // the same thing at 23:50 and at 00:10, and the boxes it is counting
+    // are keyed that way too. Both go through ist-date.js, never a parsed
+    // locale string (CLAUDE.md rule 10).
     const all = ['sozcel', 'tumcel', 'bulmaca'];
     const off = await sb.from('game_day_toggles').select('game')
-      .eq('game_date', IstDate.iso());
+      .eq('game_date', IstDate.gameNight());
     const disabled = new Set(((off.data) || []).map(r => r.game));
     const on = all.filter(g => !disabled.has(g));
     let played = 0;
     if (uid && on.length) {
       const res = await sb.from('game_results')
-        .select('game, attempts').eq('user_id', uid).eq('date', IstDate.daySeed());
+        .select('game, attempts').eq('user_id', uid).eq('date', IstDate.gameNightSeed());
       // PLAYED means finished. Every game writes an attempts:0 row on the
       // reader's first interaction, so counting rows would call a game
       // still being played done -- the same rule Kahvehane's deck uses.

@@ -774,14 +774,14 @@
   </style>
   <link rel="stylesheet" href="frames.css?v=11">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="ist-date.js?v=4"></script>
+  <script src="ist-date.js?v=5"></script>
   <script src="i18n.js?v=19"></script>
   <script src="scoreboard.js?v=1"></script>
   <script src="map-ink.js?v=6"></script>
   <script src="palette.js?v=3"></script>
   <script src="avatar.js?v=1"></script>
   <link rel="stylesheet" href="palette.css?v=7">
-  <script src="game-locks.js?v=2" defer></script>
+  <script src="game-locks.js?v=3" defer></script>
   <link rel="stylesheet" href="profile-card.css?v=35">
   <script src="profile-card.js?v=40" defer></script>
 </head>
@@ -963,10 +963,15 @@ I18N.onChange(updateDateTime);
 
 // Daily seed for puzzle rotation
 // Was a one-line wrapper in three pages; it still is, but over one seed.
-function getDailySeed() { return IstDate.daySeed(); }
+// The seed is the NIGHT rather than the calendar date, because a night
+// spans midnight and the games are night-only: keyed on the date, the
+// puzzle rotated and the board blanked in the middle of a night somebody
+// was playing. See ist-date.js.
+function getDailySeed() { return IstDate.gameNightSeed(); }
 
-// The countdown to the Istanbul day rolling over, in ist-date.js.
-function getTimeUntilMidnight() { return IstDate.untilMidnight({ prefixTr: 'Yeni bulmaca', prefixEn: 'New puzzle in' }); }
+// The countdown to the next night's games opening — the next sunset, which
+// is when the puzzle actually rotates. Midnight is the middle of a night.
+function getTimeUntilNextNight() { return IstDate.untilNextNight({ prefixTr: 'Yeni bulmaca', prefixEn: 'New puzzle in' }); }
 
 // Multiple puzzles for daily rotation
 const PUZZLES = [
@@ -1335,7 +1340,7 @@ async function restoreState() {
     if (gameCompleted) {
       document.getElementById('game-message').textContent = I18N.t('bulmaca.congrats');
       document.getElementById('game-message').style.color = 'var(--success)';
-      document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+      document.getElementById('reset-info').textContent = getTimeUntilNextNight();
     }
     return true;
   } catch (e) { return false; }
@@ -1363,7 +1368,7 @@ document.getElementById('check-btn').addEventListener('click', async () => {
   if (allCorrect) {
     msgEl.textContent = I18N.t('bulmaca.congrats');
     msgEl.style.color = 'var(--success)';
-    document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+    document.getElementById('reset-info').textContent = getTimeUntilNextNight();
     gameCompleted = true;
     // Insert the winning row first so renderStats() (Supabase-backed)
     // reflects this game immediately. Streaks are derived from row data.
