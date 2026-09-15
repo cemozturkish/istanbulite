@@ -7788,9 +7788,15 @@ async function pickSozcelSuggestion(id, word) {
     const { error: wErr } = await sb.from('sozcel_used_answers')
       .upsert([{ used_on: night, word }], { onConflict: 'used_on' });
     if (wErr) throw wErr;
-    // Anything previously picked for this night is no longer the answer.
+    // Everything else offered for this night is PASSED, including whatever
+    // was picked before if this is a correction. Marked rather than left
+    // pending, because "not picked" is then a fact the member's own app
+    // can read off their row -- the next morning it asks them whether to
+    // send the same word again or write another (see lastUnpickedWord in
+    // project.html), and a night that quietly stayed pending forever
+    // would be indistinguishable from one still being decided.
     await sb.from('sozcel_word_suggestions')
-      .update({ status: 'pending' }).eq('for_night', night).eq('status', 'picked');
+      .update({ status: 'passed' }).eq('for_night', night).neq('id', id);
     const { error: sErr } = await sb.from('sozcel_word_suggestions')
       .update({ status: 'picked' }).eq('id', id);
     if (sErr) throw sErr;

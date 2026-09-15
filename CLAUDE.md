@@ -2044,6 +2044,27 @@ reason the daytime half of this column is not a scoreboard.
 - **The Turkish lowercase fold is `toLocaleLowerCase('tr-TR')`, never `toLowerCase()`.** In Turkish
   `I`/`ı` and `İ`/`i` are the case pairs, not `I`/`i` — the word lists are lowercase Turkish, so a
   word folded with the invariant rule never matches the pool it is supposed to join.
+- **A word that was not played is asked about again the next morning** (`lastUnpickedWord`,
+  `renderSubmitAgain`): the box says "Tekrar mı, başka mı?" and the page prints the word, that it
+  was not chosen, and **what was played instead** — `sozcel_used_answers` is readable by every
+  member and that word has already been played, so naming it gives nothing away and answers the
+  question the reader would ask next. Two ways on and no third: send the same word again, or write
+  another (the field arrives pre-filled with the old one, since changing a letter is the likeliest
+  edit). Declining is leaving the page — there is no "no thanks", because not offering is what
+  every other morning already looks like and needs no answer.
+  - It is the member's **last** offer and not a queue of them: let one go and offer something else
+    and the chain moves on, rather than nagging about a word they stopped caring about. Only asked
+    on a morning they have not already offered.
+  - **Both paths write through one function** (`offerWord`), so the "has this been played since"
+    check cannot drift between them — a word that went unpicked one night can perfectly well have
+    been taken by somebody else's offer or by the auto-pick since, and `sozcel_used_answers.word`
+    is unique across all days, so it could never be an answer again.
+  - Picking one marks every **other** offer for that night `'passed'` — that is what lets the
+    member's own app tell "not picked" from "not decided yet", since a night left quietly pending
+    forever says neither.
+  - Sözcel only, and not by omission: `tumcel_quote_suggestions` has no `for_night` at all — it is
+    a standing pool that sits until it is used — so an unpicked quote never expires and there is
+    nothing to re-send. Only a per-night offer can be missed.
 
 **And the word now belongs to a NIGHT rather than to a date**
 (`db/sozcel_used_answers_v7_game_night.sql`). v5 resolved it with

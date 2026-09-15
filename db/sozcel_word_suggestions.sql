@@ -86,7 +86,11 @@ create policy "sozcel_word_suggestions delete own pending"
   to authenticated
   using ((suggested_by = auth.uid() and status = 'pending') or public.is_admin());
 
--- Only the admin marks one picked or passed.
+-- Only the admin marks one picked or passed. Picking one marks every
+-- other offer for that night 'passed' (admin.html's pickSozcelSuggestion),
+-- which is what lets a member's own app tell "not picked" from "not
+-- decided yet" the next morning and ask whether to send the same word
+-- again — a night left quietly pending forever says neither.
 drop policy if exists "sozcel_word_suggestions update admin"
   on public.sozcel_word_suggestions;
 create policy "sozcel_word_suggestions update admin"
