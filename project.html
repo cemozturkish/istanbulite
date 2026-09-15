@@ -434,12 +434,12 @@
       height: 100%;
     }
 
-    /* ── The middle lane: the petek over the book ──
+    /* ── The middle lane: the app map over the book ──
        Slide 12's own reveal, and slide 12's alone. Nothing navigates and
        nothing is opened: the drawing under it stays exactly where it is
        (this is the one screen all three lanes are ABOUT -- covering it
        with a sheet would take back the very thing being answered), goes
-       quiet under a wash, and the honeycomb fades in on top.
+       quiet under a wash, and the app's own shape fades in on top.
 
        Both layers are driven from one number, written onto each of them
        as its own opacity by paintLanes, which is how
@@ -447,18 +447,15 @@
        side, and the linear middle in between (lanePresence). So the same
        wash and the same fade run whether the reader came from Kahvehane
        or from Kütüphane, and the petek is at full strength only when
-       they are actually standing on it. The wash arrives with the finger
-       and the hexagons follow it in over the back half of the pull, so
-       the page goes quiet BEFORE the new thing appears rather than the
-       two crossing. Nothing here transitions -- while a finger is on the
-       glass the number is the animation, and the release runs it in JS
-       (see runLane).
+       they are actually standing on it. Nothing here transitions --
+       while a finger is on the glass the number is the animation, and
+       the release runs it in JS (see runLane).
 
        The two used to be staggered -- the wash arriving with the finger
-       and the hexagons only over the back half of the pull -- so the
-       page went quiet BEFORE the new thing appeared. They cross on
-       purpose now: the petek starts coming in as the lane's own buttons
-       start going out, so the two casts hand over to each other in one
+       and the windows only over the back half of the pull -- so the page
+       went quiet BEFORE the new thing appeared. They cross on purpose
+       now: the map starts coming in as the lane's own buttons start
+       going out, so the two casts hand over to each other in one
        movement rather than in two. */
     .fb-scrim {
       position: absolute;
@@ -471,13 +468,57 @@
       pointer-events: none;
       z-index: 2;
     }
+    /* ══════════════════════════════════════════════════════════════
+       THE PETEK -- what the İstanbulite logo opens
+       ══════════════════════════════════════════════════════════════
+       It used to be the middle lane and the app map used to be behind
+       the logo; the two have swapped. The reasoning is the same in both
+       directions: the middle screen is the one thing every other screen
+       is reached FROM, so what belongs there is the app's own shape --
+       and the petek is not a place in that shape, it is the reader
+       themselves, which is exactly what a mark on the bar should open.
+
+       It is a switch and not a door: the logo opens it, the logo closes
+       it again, and it stays lit for as long as the petek is standing --
+       the same move Kütüphane's Olaylar box makes.
+
+       It RESTS UNDER THE TWO BARS, and that is load-bearing rather than
+       tidy. The map, when it was the thing behind the logo, was the one
+       surface on the site that dimmed them (frames.css: nothing may pass
+       in front of the two bars) -- and the petek must not inherit that
+       exception, because pressing a hexagon names that member on the TOP
+       bar and pressing the bar is how their profile is opened. A layer
+       over the bar would take away the second half of its own gesture.
+
+       Inside .fb rather than at body level so it is swapped out with the
+       page (see "A page script must not delegate on `document`" in
+       CLAUDE.md); a press that lands in it is the petek's, and onDown
+       hands the whole gesture over for as long as it is open. */
+    #fb-petek-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 10;             /* over the map lane and the cast, under the bars */
+      opacity: 0;
+      transition: opacity 0.22s ease;
+      -webkit-tap-highlight-color: transparent;
+      /* MOUNTED AND MEASURABLE EVEN WHILE SHUT. `visibility`, never
+         `display`: the grid has to keep its box, both so fitHive has
+         something real to measure at any moment and so the app map's
+         middle window has a live cell to clone (see mapMeCell). */
+      visibility: hidden;
+      pointer-events: none;
+    }
+    #fb-petek-layer.on { opacity: 1; visibility: visible; pointer-events: auto; }
+    /* The book goes quiet behind it -- the page's own paper rather than a
+       dark scrim, because what is arriving is a drawing on paper too. */
+    .fb-petek-wash { position: absolute; inset: 0; background: var(--paper); }
     .fb-petek {
       position: absolute;
       /* Between the two bars, so the reader sits in the middle of the
-         same room they sit in on Hane. The petek's own geometry -- the
-         cell size, the packing, the window it is scaled into, the three
-         depths -- is .ist-hive-page's in profile-card.css and is never
-         restated here; all this is, is the box it stands in. */
+         room the bars leave. The petek's own geometry -- the cell size,
+         the packing, the window it is scaled into, the three depths --
+         is .ist-hive-page's in profile-card.css and is never restated
+         here; all this is, is the box it stands in. */
       top: calc(env(safe-area-inset-top) + var(--navbar-h-top, 56px));
       bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px));
       left: 0; right: 0;
@@ -485,21 +526,7 @@
       flex-direction: column;
       min-height: 0;
       overflow: hidden;
-      z-index: 3;
-      /* Under the two bars, which are omnipresent (frames.css) -- this
-         is a layer over one screen, not a page taking the phone over. */
-      /* paintLanes writes this one too; see .fb-scrim above. */
-      opacity: 0;
-      /* A shut petek must not eat the book's own drag. `visibility`
-         rather than `display`, so the grid keeps its box and fitHive
-         has something real to measure at any moment. */
-      visibility: hidden;
-      pointer-events: none;
     }
-    /* Live only once the pull has committed. Mid-drag it is a picture of
-       a petek, exactly as an actor mid-flight is a picture of a button. */
-    .fb.petek-open .fb-petek { visibility: visible; pointer-events: auto; }
-    .fb.petek-pulling .fb-petek { visibility: visible; }
 
     /* ── The bottom bar is a COMPASS, not a tab bar ──
        Three marks -- Kütüphane, the İstanbulite wordmark, Kahvehane --
@@ -674,33 +701,42 @@
     }
 
     /* ══════════════════════════════════════════════════════════════
-       THE APP MAP -- what the İstanbulite logo opens
+       THE APP MAP -- the MIDDLE LANE
        ══════════════════════════════════════════════════════════════
        The compass bar says WHERE YOU ARE. This says where you are in
-       relation to everywhere else: the app's five windows drawn in the
-       shape they actually stand in -- the three lanes across the middle,
+       relation to everywhere else: the app's windows drawn in the shape
+       they actually stand in -- the two side lanes across the middle,
        Türkiye hanging off Kütüphane and the ilçe off Kahvehane, because
        those are the depths each of those two lanes can reach and nobody
-       else can (see "What each screen carries" in CLAUDE.md).
+       else can (see "What each screen carries" in CLAUDE.md) -- and the
+       reader's own hexagon in the middle of it.
 
-       Two things make it different from every other surface here:
+       It used to be a layer the logo opened over whatever screen the
+       reader was standing on, which is why it dimmed the two bars and
+       had a backdrop to press. It is a SCREEN now: the middle lane of
+       slide 12, reached by the same sideways pull as the two beside it,
+       resting under the two bars like everything else the app draws.
+       That swap is what the whole arrangement turns on -- the middle
+       screen is the one every other screen is reached FROM, so what
+       stands there is the shape of the app rather than one place inside
+       it (the petek, which is what the logo opens now).
 
-       - It is the ONE thing on the site that dims the two bars as well.
-         Everywhere else the bars are omnipresent furniture that nothing
-         may pass in front of (frames.css) -- and that is right, because
-         everywhere else they are the answer to "where can I go". Here
-         the whole screen IS that answer, so the furniture is part of
-         what goes quiet. The logo alone stays lit, because it is the way
-         back out -- the same move Kütüphane's Olaylar switch makes.
-       - Pressing a window does not JUMP there. It closes and then walks
-         the app to it one transition at a time, through every screen in
-         between (see travelTo). A map that teleported would be the
-         shortcut past everything, which is the one thing the whole
-         arrangement exists to prevent. */
-    /* The wash is ONE number used in both places -- over the page, and
-       inside the bottom bar -- because the two have to read as a single
-       thing going quiet rather than as two surfaces dimming by eye. */
-    /* "You are here" is the ONE red on this layer, so it has to be the
+       Three things follow from it being a screen:
+
+       - There is NO "you are here" window to walk to any more. The map
+         can only be seen from the map, so the answer would be the same
+         every time it was asked. What is marked instead is the one thing
+         that is always true of the middle: the reader is in it, and the
+         hexagon in the centre is them.
+       - Pressing a window does not JUMP there. It walks the app to it
+         one transition at a time, through every screen in between (see
+         travelTo). A map that teleported would be the shortcut past
+         everything, which is the one thing the whole arrangement exists
+         to prevent.
+       - Pressing the MIDDLE window opens the petek, because that window
+         is the reader. The logo is the same door; this is the handle
+         that is standing where the thing itself is. */
+    /* The red is the ONE red on this layer, so it has to be the
        palette's own red and not a hardcoded one: on the earth palette
        that red is a fire orange, and a mark left at #B93631 was the one
        thing on a brown screen still printed in the mono palette's ink.
@@ -708,34 +744,51 @@
        site does -- including at night, where the palette walks the
        orange down its own hue (frames.css) because the night paper
        cannot carry the daytime one. */
-    :root { --fb-map-red: var(--ink-red, #B93631); --fb-map-dim: rgba(16, 14, 13, 0.62); }
+    :root { --fb-map-red: var(--ink-red, #B93631); }
 
     #fb-map {
-      position: fixed;
-      inset: 0;
-      z-index: 600;          /* over both bars, which sit at 100 / ~400 */
+      position: absolute;
+      /* Between the two bars, the same room every other screen is drawn
+         in -- it is one of the three, not a surface over them. */
+      top: calc(env(safe-area-inset-top) + var(--navbar-h-top, 56px));
+      bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px));
+      left: 0; right: 0;
+      z-index: 3;
+      /* paintLanes writes this one; see .fb-scrim above. 0 is the
+         resting state -- a lane away either side. */
       opacity: 0;
-      transition: opacity 0.22s ease;
+      /* A lane the reader is not standing on must not eat the book's own
+         drag. `visibility` rather than `display`, so the windows keep
+         their boxes and nothing re-lays-out mid-pull. */
+      visibility: hidden;
+      pointer-events: none;
       -webkit-tap-highlight-color: transparent;
     }
-    #fb-map[hidden] { display: none; }
-    #fb-map.on { opacity: 1; }
-    /* The backdrop takes the press: anywhere off a window closes it. */
-    .fb-map-scrim { position: absolute; inset: 0; background: var(--fb-map-dim); }
+    /* Live only once the pull has committed. Mid-drag it is a picture of
+       a map, exactly as an actor mid-flight is a picture of a button. */
+    .fb.map-open #fb-map { visibility: visible; pointer-events: auto; }
+    .fb.map-pulling #fb-map { visibility: visible; }
 
     .fb-map-grid {
       position: absolute;
-      inset: calc(var(--navbar-h-top, 54px) + env(safe-area-inset-top) + 10px)
-             var(--screen-inset, 18px)
-             calc(var(--navbar-h, 38px) + env(safe-area-inset-bottom) + 18px);
+      inset: 10px var(--screen-inset, 18px) 18px;
       pointer-events: none;   /* only the windows answer a finger */
     }
+    /* The closing line and the bottom row of windows share one box now
+       that this is a screen rather than a layer over the whole phone --
+       so the grid gives the line its strip, and only on the day there is
+       a line to give it to. An unconditional reserve would take 50px off
+       every other day for nothing. */
+    #fb-map:has(> .fb-map-done:not([hidden])) .fb-map-grid { bottom: 56px; }
 
     /* ── The wires ──
        Drawn against the grid's own thirds rather than measured off the
        windows, so a window changing size never leaves a wire hanging in
        space. They lie UNDER the windows for the same reason. */
-    .fb-map-wire { position: absolute; background: #f2efec; opacity: 0.8; }
+    /* Ink on paper. They were a near-white line because this layer used
+       to lie over a dark scrim; it lies on the page's own paper now (the
+       middle lane's wash, see .fb-scrim), so the whole drawing inverts. */
+    .fb-map-wire { position: absolute; background: var(--ink, #17140f); opacity: 0.5; }
     .fb-map-wire.h { height: 6px; top: 50%; transform: translateY(-50%); }
     .fb-map-wire.v { width: 6px; left: 50%; transform: translateX(-50%); }
     .fb-map-wire.w-ku-hane   { left: 16.66%; right: 50%; }
@@ -751,7 +804,9 @@
       width: min(26%, 132px);   /* of the grid, whose columns are its thirds */
       aspect-ratio: 3 / 4;
       transform: translate(-50%, -50%);
-      background: var(--paper, #f4f1ec);
+      /* --paper-card, not --paper: the wash behind this lane IS --paper,
+         so a window filled with it would be nothing but its own border. */
+      background: var(--paper-card, #e9e4dc);
       border: 2px solid var(--ink, #17140f);
       color: var(--ink, #17140f);
       padding: 5px;
@@ -764,25 +819,21 @@
       -webkit-tap-highlight-color: transparent;
       transition: transform 0.14s ease;
     }
-    .fb-map-win:active { transform: translate(-50%, -50%) scale(0.955); }
+    /* Pointer events, never :active -- which sticks after a tap on iOS,
+       the same reason .fb-box and Kütüphane's cards press the way they do.
+       It mattered less while this was a layer somebody opened (a stuck
+       press left with it); the map is a permanent screen now, so a window
+       left shrunk would simply stay shrunk. See wireMapPress. */
+    .fb-map-win.fb-map-pressing { transform: translate(-50%, -50%) scale(0.955); }
     .fb-map-win.at-r1c3 { left: 83.33%; top: 16.66%; }
     .fb-map-win.at-r2c1 { left: 16.66%; top: 50%; }
     .fb-map-win.at-r2c2 { left: 50%;    top: 50%; }
     .fb-map-win.at-r2c3 { left: 83.33%; top: 50%; }
     .fb-map-win.at-r3c1 { left: 16.66%; top: 83.33%; }
 
-    /* WHERE YOU ARE. The only red on the layer, so it cannot be read as
-       anything else -- and it is not pressable, because you are already
-       standing in it. */
-    .fb-map-win.here {
-      border-color: var(--fb-map-red);
-      color: var(--fb-map-red);
-      cursor: default;
-    }
-    .fb-map-win.here:active { transform: translate(-50%, -50%); }
-
-    /* Hane is the petek, so its window is a hexagon rather than a screen
-       -- the middle page is the one that is not a page of tiles. */
+    /* The middle window is the petek, so it is a hexagon rather than a
+       screen of tiles -- the one window here that is not a place on the
+       strip but the reader standing on it. */
     .fb-map-win.hex {
       border: none;
       background: none;
@@ -798,19 +849,17 @@
     }
     .fb-map-hex > span {
       width: calc(100% - 5px); height: calc(100% - 5px);
-      background: var(--paper, #f4f1ec);
+      background: var(--paper-card, #e9e4dc);
       clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
       display: flex; align-items: center; justify-content: center;
       overflow: hidden;
     }
-    /* A head and shoulders in currentColor, so it goes red with the ring
-       when this is the window the reader is standing in. */
+    /* A head and shoulders in currentColor, drawn red like the ring
+       around it: this window is the reader, and the reader is here. */
     .fb-map-figure { position: relative; width: 46%; height: 58%; color: inherit; }
     .fb-map-figure::before, .fb-map-figure::after {
-      content: ''; position: absolute; background: var(--ink, #17140f);
+      content: ''; position: absolute; background: var(--fb-map-red);
     }
-    .fb-map-win.here .fb-map-figure::before,
-    .fb-map-win.here .fb-map-figure::after { background: var(--fb-map-red); }
     .fb-map-figure::before {
       left: 27%; top: 0; width: 46%; aspect-ratio: 1; border-radius: 50%;
     }
@@ -879,39 +928,18 @@
     .fb-map-hex-slot .ist-hive-cell {
       position: static;
       width: 100%;
-      opacity: 1 !important;   /* the petek's own cells are being faded out */
+      /* The petek's own reveal holds its cells at opacity 0 for the first
+         beats after a mount (see hiveRevealFirst), and this is a CLONE --
+         it would carry that held state and print an empty hexagon. */
+      opacity: 1 !important;
       transform: none;
     }
-    /* Standing on Hane the window is pinned over the real cell, measured,
-       so opening the map changes nothing about where the reader's own
-       hexagon is -- only that everybody else has gone. */
-    .fb-map-win.pinned {
-      /* FIXED, not absolute. The rect is measured off the real cell in
-         viewport coordinates, and every other window is placed inside the
-         grid, which is inset by both bars -- left in that frame the pin
-         lands exactly the grid's own inset away from the hexagon it is
-         supposed to be standing on. */
-      position: fixed;
-      transform: none;
-      aspect-ratio: auto;
-      padding: 0;
-      border: none;
-      background: none;
-    }
-    .fb-map-win.pinned:active { transform: none; }
-    /* Red for "you are here" is the RING going red, which is what red on a
+    /* "You are here" is the RING going red, which is what red on a
        hexagon already means everywhere else in the petek (see the bar
-       member in profile-card.css) -- not a box drawn around it. */
-    .fb-map-win.here .ist-hive-frame { --hexframe-stroke: var(--fb-map-red); }
-
-    /* ── While the map is up, the petek is only the reader ──
-       Everybody else fades out under the wash and the reader's own cell
-       goes with them, because the pinned clone above is standing exactly
-       where it was. What the reader sees is the people leaving and
-       themselves staying put. */
-    body.fb-map-on #po-hive-mount .ist-hive-cell,
-    body.fb-map-on #po-hive-mount .ist-hive-name,
-    body.fb-map-on #po-hive-mount .ist-hive-stat { opacity: 0; }
+       member in profile-card.css) -- not a box drawn around it. It is on
+       unconditionally, because the middle window is the reader and the
+       reader is always in the middle. */
+    .fb-map-win.hex .ist-hive-frame { --hexframe-stroke: var(--fb-map-red); }
 
     /* What is waiting there, in the corner a badge goes. */
     .fb-map-badge {
@@ -935,13 +963,14 @@
        the app's one reward -- the reader is let go, not congratulated. */
     .fb-map-done {
       position: absolute;
-      left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px) + 18px);
+      left: 0; right: 0; bottom: 0;
       margin: 0;
       padding: 0 var(--screen-inset, 18px);
       text-align: center;
       font-size: 0.8rem; line-height: 1.45;
-      color: var(--paper);
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+      /* Ink on paper, for the same reason the wires are: this used to be
+         printed over a dark scrim and is printed on the page now. */
+      color: var(--muted, #6b6459);
       pointer-events: none;
       z-index: 2;
     }
@@ -959,7 +988,7 @@
       background: none;
       border: 0;
       position: relative;
-      z-index: 2;              /* over the bar's own share of the dim */
+      z-index: 2;              /* over the bar's own ring and wordmark layers */
       /* No translateY here on purpose. `nav` aligns its three columns to
          its own BOTTOM edge (align-items: flex-end) -- so a box taller
          than the row overflows upward, past the header's own top, all
@@ -1104,31 +1133,30 @@
       nav b.fb-logo-btn::before { transition: none; }
     }
     nav b.fb-logo-btn:active { transform: scale(0.94); }
-    /* Lit while its map is open -- it is held down because it is the way
-       back out, exactly as Kütüphane's Olaylar box is. */
-    body.fb-map-on nav b.fb-logo-btn {
+    /* Lit while the petek is standing -- it is held down because it is
+       the way back out, exactly as Kütüphane's Olaylar box is.
+       Nothing on this page dims the two bars any more: the map used to,
+       being a layer over the whole screen, and the petek that replaced
+       it behind this logo deliberately does not (see #fb-petek-layer --
+       the top bar is half of the petek's own gesture). So the site's one
+       exception to "THE TWO BARS ARE OMNIPRESENT" is gone with it. */
+    body.fb-petek-on nav b.fb-logo-btn {
       color: var(--fb-map-red);
       filter: drop-shadow(0 0 9px color-mix(in srgb, var(--fb-map-red) 55%, transparent));
     }
-    /* The bar's own share of the dim. It is painted INSIDE the bar
-       rather than over it, so the logo can stand above it and stay the
-       one lit thing on the screen. */
-    /* !important, and not for tidiness. frames.css states that nothing may
-       ever pass in front of the two bars, and states it with !important so
-       a page's own <style data-page> cannot climb over them (see "THE TWO
-       BARS ARE OMNIPRESENT" in CLAUDE.md). This layer is the ONE
-       deliberate exception on the site -- it dims the bars rather than
-       resting under them -- so the bar it lets through has to say so at
-       the same weight, or it silently loses and the logo goes dark under
-       the wash it is supposed to be standing above. */
-    body.fb-map-on header { z-index: 610 !important; }
-    body.fb-map-on header::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: var(--fb-map-dim);
-      pointer-events: none;
-      z-index: 1;
+    /* `color` alone never reached the mark, and that is worth stating
+       because it looked like it did: the letterforms are a masked
+       GRADIENT between --fb-logo-a and --fb-logo-b, and paintNavWave
+       writes both as INLINE styles on the <b> on every frame of a lane
+       walk. So only the glow around the logo changed and the logo itself
+       kept its lane ink. Declared on the .fb-logo child rather than on
+       the <b>, which is what wins: a declaration on the element beats a
+       value inherited from its parent's inline style, with no
+       !important needed anywhere. The wave those two carry means nothing
+       while the petek is standing over the lanes in any case. */
+    body.fb-petek-on nav b.fb-logo-btn .fb-logo {
+      --fb-logo-a: var(--fb-map-red);
+      --fb-logo-b: var(--fb-map-red);
     }
 
     /* ── THE GAME OVERLAY ──
@@ -1462,7 +1490,7 @@
   <div class="section-rule">
     <header>
       <nav id="fb-nav">
-        <b>Kütüphane</b><b class="fb-logo-btn" id="fb-logo-btn" role="button" tabindex="0" aria-label="Uygulama haritası"><i class="fb-logo"></i><span class="fb-wm">İstanbulite</span></b><b>Kahvehane</b>
+        <b>Kütüphane</b><b class="fb-logo-btn" id="fb-logo-btn" role="button" tabindex="0" aria-label="Petek"><i class="fb-logo"></i><span class="fb-wm">İstanbulite</span></b><b>Kahvehane</b>
       </nav>
     </header>
   </div>
@@ -1471,33 +1499,43 @@
     <main>
       <div class="fb" id="fb">
         <div class="fb-cast" id="fb-cast"></div>
-        <!-- The petek, revealed by a rightward pull on slide 12. Not a
-             page and not a sheet: the drawing stays where it is, goes
-             quiet under a wash, and the honeycomb fades in over it. -->
+        <!-- The middle lane, revealed by a pull from either side on slide
+             12. Not a page and not a sheet: the drawing stays where it
+             is, goes quiet under a wash, and the app's own shape fades in
+             over it. -->
         <div class="fb-scrim" id="fb-scrim"></div>
-        <div class="fb-petek" id="fb-petek"></div>
+
+        <!-- ── THE APP MAP -- the middle lane ──
+             The windows in the shape the app actually stands in; the
+             middle one is the reader's own hexagon and opens the petek,
+             and pressing any other walks there rather than jumping. See
+             the CSS block. -->
+        <div id="fb-map">
+          <div class="fb-map-grid" id="fb-map-grid">
+            <span class="fb-map-wire h w-ku-hane"></span>
+            <span class="fb-map-wire h w-hane-kah"></span>
+            <span class="fb-map-wire v w-ku-tr"></span>
+            <!-- The wire down to the ilçe is hidden with the window it
+                 leads to (see ILCE_STOP_ENABLED); a line drawn to nothing
+                 is worse than no line. buildMap removes it when the stop
+                 is parked. -->
+            <span class="fb-map-wire v w-kah-ilce" data-wire="ilce"></span>
+          </div>
+          <p class="fb-map-done" id="fb-map-done" hidden>Bugünlük bu kadar.<br>Dışarısı seni bekliyor.</p>
+        </div>
+
+        <!-- ── THE PETEK -- what the logo opens ──
+             A switch rather than a door: the logo opens it and the logo
+             closes it, and it rests UNDER the two bars because pressing a
+             hexagon names that member on the top one. Inside .fb so it
+             leaves with the page. See the CSS block. -->
+        <div id="fb-petek-layer">
+          <div class="fb-petek-wash"></div>
+          <div class="fb-petek" id="fb-petek"></div>
+        </div>
       </div>
     </main>
   </div>
-</div>
-
-<!-- ── THE APP MAP ──
-     Opened by the İstanbulite logo, which is the only thing on the
-     bottom bar that is pressed. Five windows in the shape the app
-     actually stands in; the one the reader is in is red, and pressing
-     another walks there rather than jumping. See the CSS block. -->
-<div id="fb-map" hidden>
-  <div class="fb-map-scrim" id="fb-map-scrim"></div>
-  <div class="fb-map-grid" id="fb-map-grid">
-    <span class="fb-map-wire h w-ku-hane"></span>
-    <span class="fb-map-wire h w-hane-kah"></span>
-    <span class="fb-map-wire v w-ku-tr"></span>
-    <!-- The wire down to the ilçe is hidden with the window it leads to
-         (see ILCE_STOP_ENABLED); a line drawn to nothing is worse than
-         no line. buildMap removes it when the stop is parked. -->
-    <span class="fb-map-wire v w-kah-ilce" data-wire="ilce"></span>
-  </div>
-  <p class="fb-map-done" id="fb-map-done" hidden>Bugünlük bu kadar.<br>Dışarısı seni bekliyor.</p>
 </div>
 
 <!-- ── THE BAND PAGE ──
@@ -1657,19 +1695,20 @@ const RUN_FPS = 34;
 // `const` read before its own line is a TDZ error that takes the whole
 // page script with it. See "SLIDE 12 IS THREE SCREENS" further down for
 // what they are.
-const PETEK_STOP = 11;      // the lanes are slide 12's, and slide 12's alone
+const LANE_STOP = 11;       // the lanes are slide 12's, and slide 12's alone
 const LANE_KUTUPHANE = 0;   // left on the screen: the reading side
-const LANE_HANE = 1;        // the middle: the petek
+const LANE_MAP = 1;         // the middle: the app map (see THE APP MAP below)
 const LANE_KAHVEHANE = 2;   // right on the screen: the doing side
 const LANES = 3;
 
 // ── Where the reader comes in ──
-// The middle stop and the middle lane: Hane, the petek, on slide 12.
-// Not slide 1 -- the app's own rule is that you always enter in the
-// MIDDLE and swipe out from there, so the book opens where the people
-// are and Türkiye is one pull away rather than the doorstep.
-const START_SLIDE = PETEK_STOP;
-const START_LANE = LANE_HANE;
+// The middle stop and the middle lane: the app map, on slide 12. Not
+// slide 1 -- the app's own rule is that you always enter in the MIDDLE
+// and swipe out from there, so the book opens on the shape of the whole
+// thing and Türkiye is one pull away rather than the doorstep. The petek
+// is one press of the logo away from it, wherever the reader is standing.
+const START_SLIDE = LANE_STOP;
+const START_LANE = LANE_MAP;
 
 // ══════════════════════════════════════════════════════════════
 // THE TWO EDITIONS — the sun decides which paper is out
@@ -3529,7 +3568,7 @@ let anim = null;
 let box = null;
 // The two layers paintLanes writes to, looked up once rather than
 // every frame (see paintLanes for why they are written at all).
-let scrimEl = null, petekEl = null;
+let scrimEl = null, mapLaneEl = null;
 
 // ── Poses ──
 const POSE0 = { x: 0, y: 0, scale: 1, opacity: 1, rot: 0 };
@@ -3765,16 +3804,11 @@ function armCast() {
   }
   // Where the BOOK is, which is a different question from whether the
   // cast is live: a finger on the glass makes nothing live, but it does
-  // not move the book off slide 12 -- and the pull that opens the petek
-  // begins with a finger already down. Asking `!drag` here is what made
-  // the very gesture this flag gates impossible: armCast runs on
-  // pointerdown, so the flag was cleared a frame before it was read.
-  atLaneStop = ready && Math.abs(framePos - PETEK_STOP) < LIVE_EPS;
-  // Arriving on slide 12 is what BUILDS the petek, so the pull never
-  // waits on a round trip. Once per arrival, and only once the book has
-  // stopped.
-  if (!atLaneStop) petekBuilt = false;
-  else if (!petekBuilt && !drag && !anim) { petekBuilt = ensurePetek(); }
+  // not move the book off slide 12 -- and a lane pull begins with a
+  // finger already down. Asking `!drag` here is what made the very
+  // gesture this flag gates impossible: armCast runs on pointerdown, so
+  // the flag was cleared a frame before it was read.
+  atLaneStop = ready && Math.abs(framePos - LANE_STOP) < LIVE_EPS;
 }
 
 // Showing a frame is one class swap. Nothing else touches the DOM
@@ -3912,12 +3946,20 @@ function stopAnim() { if (anim) { cancelAnimationFrame(anim); anim = null; } }
 // slide that is the city:
 //
 //        LANE 0            LANE 1           LANE 2
-//      Kütüphane   <--     Hane      -->   Kahvehane
-//      (the read)       (the petek)        (the doing)
+//      Kütüphane   <--    the MAP    -->   Kahvehane
+//      (the read)     (where you are in    (the doing)
+//                      relation to it all)
 //
-// left to right on the screen, exactly as the three tabs stand. A pull
-// right walks the strip right, so the reader moves LEFT along it --
-// Kahvehane, then Hane, then Kütüphane -- and a pull left walks back.
+// left to right on the screen, exactly as the two side tabs stand. A
+// pull right walks the strip right, so the reader moves LEFT along it --
+// Kahvehane, then the map, then Kütüphane -- and a pull left walks back.
+//
+// The middle used to be the petek and the map used to be a layer behind
+// the logo; the two have swapped. The middle screen is the one every
+// other screen is reached FROM, so what belongs there is the shape of
+// the app rather than one place inside it -- and the petek is not a
+// place in that shape at all, it is the reader, which is what the logo
+// on the bar opens now (see THE PETEK below).
 //
 // Each lane has its own cast, and they never trade places: the buttons
 // that left to the right are Kahvehane's and stay gone; the ones that
@@ -3930,44 +3972,45 @@ function stopAnim() { if (anim) { cancelAnimationFrame(anim); anim = null; } }
 // This is the whole point of the divergence rather than a rule bolted
 // onto it. Standing on Kütüphane you are facing OUT, so the only depth
 // you can reach is slide 1 -- Türkiye. Standing on Kahvehane you are
-// facing IN, so the only one is slide 24. Standing on Hane the
-// vertical gesture is not the book's at all: it is the petek's own
-// depth pull.
+// facing IN, so the only one is slide 24. Standing on the map there is
+// no run at all: the middle is where you choose a direction, not a
+// depth to fall down.
 //
 // So there is no way from Türkiye to the innermost slide that does not
-// pass through Hane. That is the mall stairway in the smallest form it
-// has ever had here: you cannot go from the reading to the doing
-// without walking past the people.
+// pass through the middle. That is the mall stairway in the smallest
+// form it has ever had here: you cannot go from the reading to the
+// doing without walking past the whole shape of the thing -- and the
+// people, whose door stands in the middle of it.
 // ══════════════════════════════════════════════════════════════
 // The thumb distance for ONE lane, as a fraction of the screen's width
 // -- stated per lane rather than per strip, the same rule the book's
 // own travel follows.
 const LANE_TRAVEL = 0.42;
 const LANE_RUN_MS = 300;
-// ── The walk back to Hane is ANSWERED, not dragged ──
+// ── The walk back to the middle is ANSWERED, not dragged ──
 // Every other gesture here follows the finger, and that is right for a
-// scrub: the reader is choosing where in the strip to stand. Arriving on
-// Hane is not that -- it is the one screen the whole arrangement puts in
-// the middle, and it is a place the reader either goes to or does not.
+// scrub: the reader is choosing where in the strip to stand. Arriving in
+// the middle is not that -- it is the one screen the whole arrangement
+// puts there, and it is a place the reader either goes to or does not.
 // So a pull toward it does not walk the strip under the finger at all:
 // the swipe is READ, and the app answers it by making the move itself.
-// The two outward pulls (Hane -> either side) still follow the finger,
-// because there the reader is stepping off the middle rather than into
-// it.
+// The two outward pulls (the map -> either side) still follow the
+// finger, because there the reader is stepping off the middle rather
+// than into it.
 const LANE_SNAP_TRAVEL = 0.18;   // how far the finger goes before the app answers
 // px before a drag has to say which axis it is. The book's own gesture
 // is vertical and the lanes' is horizontal, so this is the one place
 // they are told apart.
 const AXIS_SLOP = 8;
 
-// The reader starts on Hane, because the book starts on the middle stop
-// and the middle stop's middle lane is the petek: the lane and the depth
-// have to agree, and from here either run of the book is one pull away.
+// The reader starts on the map, because the book starts on the middle
+// stop and the middle stop's middle lane is the map: the lane and the
+// depth have to agree, and from here either run of the book is one pull
+// away.
 let lane = START_LANE;
 let lanePos = START_LANE;       // continuous; the drag writes it live
 let laneRun = null;
-let atLaneStop = false;  // whether the book is standing on PETEK_STOP
-let petekBuilt = false;  // whether this arrival has already mounted it
+let atLaneStop = false;  // whether the book is standing on LANE_STOP
 
 const clamp01 = (n) => n < 0 ? 0 : n > 1 ? 1 : n;
 
@@ -3982,7 +4025,7 @@ function lanePresence(l) { return 1 - Math.min(1, Math.abs(lanePos - l)); }
 // are painted from lanePos here.
 function paintLanes() {
   if (!box) return;
-  const petek = lanePresence(LANE_HANE);
+  const mid = lanePresence(LANE_MAP);
   // ── Written as OPACITY, on the two elements that consume it ──
   // This used to be one inherited custom property set on `box` every
   // frame, which is the cheapest-looking and most expensive thing in
@@ -3996,14 +4039,15 @@ function paintLanes() {
   // frames over 32ms. Opacity is not inherited and is composited, so the
   // same picture now costs nothing but a composite.
   const scrim = scrimEl || (scrimEl = document.getElementById('fb-scrim'));
-  const pet = petekEl || (petekEl = document.getElementById('fb-petek'));
-  if (scrim) scrim.style.opacity = (petek * 0.86).toFixed(3);
-  if (pet) pet.style.opacity = Math.max(0, Math.min(1, petek)).toFixed(3);
-  box.classList.toggle('petek-pulling', petek > 0);
-  box.classList.toggle('petek-open', lane === LANE_HANE && petek >= 1);
+  const mapEl = mapLaneEl || (mapLaneEl = document.getElementById('fb-map'));
+  if (scrim) scrim.style.opacity = (mid * 0.86).toFixed(3);
+  if (mapEl) mapEl.style.opacity = Math.max(0, Math.min(1, mid)).toFixed(3);
+  box.classList.toggle('map-pulling', mid > 0);
+  box.classList.toggle('map-open', lane === LANE_MAP && mid >= 1);
   paintCast();
   paintNav();
-  // Your own name on the top bar walks with the strip: centred on Hane,
+  // Your own name on the top bar walks with the strip: centred on the
+  // middle lane,
   // ranged against the RIGHT edge on Kütüphane and the left one on
   // Kahvehane — you turn around to face the way you came, which is also
   // the rule the three carousel pages' own bar already follows (see
@@ -4013,7 +4057,7 @@ function paintLanes() {
   // arrival, so it is part of the pull and the release's own ease-out
   // carries it into place (see setBarSlide in profile-card.js).
   if (window.IstProfileCard && IstProfileCard.setBarSlide) {
-    IstProfileCard.setBarSlide(LANE_HANE - lanePos);
+    IstProfileCard.setBarSlide(LANE_MAP - lanePos);
   }
 }
 
@@ -4049,7 +4093,7 @@ function splitNavMarks() {
 // same front as a gradient stop, with the pale side leading on the way
 // in and trailing on the way out.
 function paintNavWave(marks, clamp01) {
-  const left = marks[0], right = marks[LANES - 1], mid = marks[LANE_HANE];
+  const left = marks[0], right = marks[LANES - 1], mid = marks[LANE_MAP];
   if (left) left.style.setProperty('--f',
     (clamp01(navP) * left.children.length).toFixed(3));
   if (right) right.style.setProperty('--f',
@@ -4059,7 +4103,7 @@ function paintNavWave(marks, clamp01) {
     // x > 0 the walk out to Kahvehane (it is going down). Both are the
     // same edge crossing left to right; only which side of it is pale
     // swaps, and at x = 0 the two spellings agree on "all pale".
-    const x = Math.max(-1, Math.min(1, navP - LANE_HANE));
+    const x = Math.max(-1, Math.min(1, navP - LANE_MAP));
     const incoming = x <= 0;
     mid.style.setProperty('--fb-logo-a', incoming ? 'var(--fb-mark-on)' : 'var(--fb-mark-off)');
     mid.style.setProperty('--fb-logo-b', incoming ? 'var(--fb-mark-off)' : 'var(--fb-mark-on)');
@@ -4128,14 +4172,15 @@ function lanePullable(dx) {
 
 // ── What the lane lets the book reach ──
 // The two ends of the run the reader is standing on. Kütüphane's run is
-// slide 1 to slide 12, Kahvehane's is slide 12 to slide 24, and Hane
-// has none at all -- its vertical gesture belongs to the petek.
+// slide 1 to slide 12, Kahvehane's is slide 12 to slide 24, and the map
+// in the middle has none at all -- it is where a direction is chosen,
+// not a depth to fall down.
 function laneStops() {
   if (lane === LANE_KUTUPHANE) return [STOPS[0], STOPS[1]];
   // Kahvehane's run is parked (see ILCE_STOP_ENABLED), so it answers the
-  // way Hane always has: both ends the same stop, which the drag clamps
-  // to and the release resolves to without moving. Nothing springs back,
-  // because nothing ever left.
+  // way the middle lane always has: both ends the same stop, which the
+  // drag clamps to and the release resolves to without moving. Nothing
+  // springs back, because nothing ever left.
   if (lane === LANE_KAHVEHANE && ILCE_STOP_ENABLED) return [STOPS[1], STOPS[2]];
   return [STOPS[1], STOPS[1]];
 }
@@ -4146,24 +4191,6 @@ function laneStops() {
 function runLane(to, done) {
   if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
   lane = Math.max(0, Math.min(LANES - 1, to));
-  // ── The petek arrives WITH the walk, not after it ──
-  // The reveal belongs to the arrival: armed here, at the moment the
-  // move is answered, the reader watches the wash come up and the
-  // honeycomb draw itself in behind it -- you, the ring touching you,
-  // then the names. Armed at the end instead, the cells would already be
-  // standing there at full strength and the stagger would read as a
-  // flash. ensurePetek deliberately refuses to remount a standing petek,
-  // so this cannot ride on the mount (see revealHivePage).
-  if (lane === LANE_HANE && lanePos !== LANE_HANE &&
-      window.IstProfileCard && IstProfileCard.revealHivePage) {
-    IstProfileCard.revealHivePage();
-    // Played straight away rather than on arrival: the petek's first
-    // beat belongs with the first frame of the lane's own buttons going
-    // out, so the two casts hand over in one movement. landLane still
-    // plays it for anything that reaches Hane another way -- it is a
-    // no-op once this has run.
-    if (IstProfileCard.playHiveReveal) IstProfileCard.playHiveReveal();
-  }
   const from = lanePos;
   const dist = Math.abs(lane - from);
   if (dist < 0.001) { setLanePos(lane); armCast(); landLane(); if (done) done(); return; }
@@ -4179,56 +4206,86 @@ function runLane(to, done) {
   laneRun = requestAnimationFrame(step);
 }
 
-// The walk has landed. The petek's reveal was ARMED when it started
-// (see runLane) and is played here: the cells are held back for the
-// whole of the wash coming up, and the honeycomb then draws itself in
-// on a screen that has finished moving -- you, the ring touching you,
-// then their names.
+// The walk has landed. Arriving in the middle is arriving on the map, so
+// the numbers in its squares are asked for again -- behind the 60s cache
+// in loadMapStats, so coming back twice in a minute costs nothing, and
+// never awaited, because the book must not wait on the network.
 function landLane() {
-  // ── The edition may have turned while the reader was elsewhere ──
-  // Arriving on a lane is exactly the moment it is safe to change what a
-  // column carries: nothing is open, nothing is mid-read, and the boxes
-  // are about to be looked at for the first time. Never on a timer --
-  // see syncEdition for why.
-  if (syncEdition()) refreshEditionColumns();
-  if (lane !== LANE_HANE) return;
-  if (window.IstProfileCard && IstProfileCard.playHiveReveal) IstProfileCard.playHiveReveal();
+  if (lane !== LANE_MAP) return;
+  loadMapStats();
 }
 
-// Built the moment the book comes to rest on slide 12, never on the
-// pull itself: mounting is a round trip to hive_map(), and a reveal
-// that waits on the network is a reveal with a blank beat in it. Every
-// arrival re-mounts, because somebody else's attachment may have
-// carried this whole petek somewhere since it was last drawn -- the
-// same rule Hane follows. Not while it is standing, though: that would
-// pull the drawing out from under the reader.
-// Answers whether it actually mounted, and the caller latches on that
-// rather than on having called it: this function is allowed to decline,
-// and a latch set before the call spends the one arrival that had a
-// chance of building the petek on a call that did nothing.
-function ensurePetek() {
-  // Never REmount while it is standing -- that pulls the drawing out from
-  // under the reader. But an empty petek is not a drawing anybody is
-  // standing in: if nothing has been mounted yet there is nothing to
-  // disturb, and refusing here leaves the reader on a blank Hane.
-  //
-  // That is not hypothetical. Arriving on Hane through the app map walks
-  // the book first and the lane second, and `framePos` LAGS `at` -- so
-  // atLaneStop only comes true a beat later, by which time the lane is
-  // already Hane and the arrival's one chance to mount is refused.
-  // Standing on Hane with a petek already up: there is nothing to do, and
-  // nothing will change until the reader leaves -- so this arrival counts
-  // as settled. Only the cases that could not mount YET answer false.
-  const mounted = !!document.getElementById('po-hive-mount');
-  if (mounted && lanePresence(LANE_HANE) > 0) return true;
-  if (!window.IstProfileCard || !IstProfileCard.mountHivePage) return false;
-  if (!document.getElementById('fb-petek')) return false;
+// ══════════════════════════════════════════════════════════════
+// THE PETEK -- what the logo opens
+//
+// It was the middle lane; the app map that used to stand behind this
+// logo is the middle lane now and this is what the logo opens. A switch
+// rather than a door, exactly as the map was: the logo opens it, the
+// logo closes it again, and it stays lit for as long as the petek is
+// standing (see body.fb-petek-on in the stylesheet).
+//
+// It rests UNDER the two bars, deliberately, where the map used to dim
+// them: pressing a hexagon names that member on the TOP bar and pressing
+// the bar is how their profile is opened, so a layer over it would take
+// away the second half of its own gesture. That also makes this page one
+// fewer exception to "THE TWO BARS ARE OMNIPRESENT" (frames.css).
+// ══════════════════════════════════════════════════════════════
+let petekHideTimer = null;   // nothing pending: the layer is never display:none
+
+function petekIsOpen() {
+  const layer = document.getElementById('fb-petek-layer');
+  return !!(layer && layer.classList.contains('on'));
+}
+
+// Mounted, and kept mounted even while the layer is shut. Two reasons,
+// and the second is the one that is easy to miss: the grid has to be
+// measurable for fitHive at any moment (which is why the layer hides
+// with `visibility`, never `display`), and the app map's middle window
+// is the reader's own cell CLONED out of this petek -- with nothing
+// mounted there is nothing to clone and the map falls back to a drawn
+// figure on every screen.
+//
+// Every mount re-fetches hive_map(), because somebody else's attachment
+// may have carried this whole petek somewhere since it was last drawn.
+// It is never remounted while the layer is OPEN, though: that would pull
+// the drawing out from under a reader who is standing in it.
+function mountPetek() {
+  if (petekIsOpen() && document.getElementById('po-hive-mount')) return;
+  if (!window.IstProfileCard || !IstProfileCard.mountHivePage) return;
+  if (!document.getElementById('fb-petek')) return;
   try {
-    IstProfileCard.mountHivePage({
+    const p = IstProfileCard.mountHivePage({
       sb: IstRouter.sb, I18N: window.I18N, mountId: 'fb-petek',
     });
-    return true;
-  } catch (err) { console.error('[proje petek]', err); return false; }
+    // The middle window of the app map is a clone of the cell this mount
+    // is about to draw, so the map is rebuilt once it lands. Never
+    // awaited by anything: the book must not wait on the network.
+    if (p && p.then) p.then(() => { if (box) buildMap(); }, () => {});
+  } catch (err) { console.error('[proje petek]', err); }
+}
+
+function openPetek() {
+  const layer = document.getElementById('fb-petek-layer');
+  if (!layer || traveling) return;
+  if (petekHideTimer) { clearTimeout(petekHideTimer); petekHideTimer = null; }
+  // Remounted on the way IN rather than on the way out, so the shape the
+  // reader sees is the shape the petek is in right now. mountHivePage
+  // draws from the map it was left standing on and only moves it when
+  // the fetch lands, so there is no blank beat to watch.
+  mountPetek();
+  document.body.classList.add('fb-petek-on');
+  requestAnimationFrame(() => layer.classList.add('on'));
+}
+
+function closePetek() {
+  const layer = document.getElementById('fb-petek-layer');
+  if (!layer || !layer.classList.contains('on')) return;
+  layer.classList.remove('on');
+  document.body.classList.remove('fb-petek-on');
+  // A member named on the top bar is named BY the petek (see
+  // pickHiveMember in profile-card.js) -- left on it, the bar would go on
+  // naming a hexagon that is no longer on the screen.
+  if (window.IstProfileCard && IstProfileCard.clearBarMember) IstProfileCard.clearBarMember();
 }
 
 function onDown(e) {
@@ -4239,21 +4296,34 @@ function onDown(e) {
   // click at the capturing element, so the card never hears it. It looks
   // exactly like a dead button and nothing throws.
   if (e.target && e.target.closest && e.target.closest('.fb-actor.live')) return;
-  // While the petek is standing, everything inside it is ITS gesture --
-  // the depth pull, a hexagon, the field that takes a code. Only a
-  // horizontal drag is ours, and horizontal is exactly what the petek's
-  // own handler hands back (see wireHiveGestures in profile-card.js).
-  // So a press that lands in it is tracked but never CAPTURED: capture
-  // would re-target every following event at this box and kill the
-  // petek's own handlers outright.
-  const inPetek = lanePresence(LANE_HANE) > 0 &&
-                  !!(e.target && e.target.closest && e.target.closest('.fb-petek'));
+  // ── A standing petek owns EVERY gesture ──
+  // It is a layer over the book now rather than one of the lanes, so
+  // there is nothing here for a drag on it to mean: the depth pull, a
+  // hexagon and the field that takes a code are all the petek's, and the
+  // way out is the logo. The book takes nothing at all until it is shut.
+  //
+  // It has to be a bail rather than a capture. The layer is inside .fb,
+  // so its events bubble to this box -- and capturing here would
+  // re-target every following event at the box and kill the petek's own
+  // handlers outright (see wireHiveGestures in profile-card.js).
+  if (petekIsOpen()) return;
+  // ── A press on a map window is TRACKED but never CAPTURED ──
+  // The app map is one of the lanes now rather than a layer over the whole
+  // phone, so its windows are inside this box and every press on one
+  // arrives here first. Capturing would re-target the eventual click at
+  // the box, and the window would never hear it -- a dead button, with
+  // nothing thrown, which is the exact trap the actor guard above
+  // documents. It is not a bail, though: the map fills most of the middle
+  // screen, and bailing would make that whole area a dead zone for the
+  // lane swipe. Tracked without capture, a sideways drag over a window
+  // still walks the strip and a tap on one still reaches it.
+  const onWindow = !!(e.target && e.target.closest && e.target.closest('.fb-map-win'));
   stopAnim();
   if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
   drag = { x: e.clientX, y: e.clientY, from: at, fromLane: lanePos, axis: null, moved: false,
-           lastX: e.clientX, lastY: e.clientY, lastT: performance.now(), v: 0, vx: 0, inPetek };
+           lastX: e.clientX, lastY: e.clientY, lastT: performance.now(), v: 0, vx: 0 };
   armCast();                    // a press begins: the cast goes inert
-  if (!inPetek) box.setPointerCapture && box.setPointerCapture(e.pointerId);
+  if (!onWindow) box.setPointerCapture && box.setPointerCapture(e.pointerId);
 }
 
 function onMove(e) {
@@ -4277,11 +4347,6 @@ function onMove(e) {
     if (drag.axis === 'x') {
       drag.snapTo = Math.max(0, Math.min(LANES - 1, lane + (dx > 0 ? -1 : 1)));
     }
-    // A vertical drag while the petek is on screen is the petek's own
-    // depth pull, not the book being scrubbed underneath it.
-    if (drag.axis === 'y' && (lanePresence(LANE_HANE) > 0 || drag.inPetek)) {
-      drag = null; armCast(); return;
-    }
     // Which run the reader is on is the LANE's answer, not the book's --
     // and it is taken once, at the moment the gesture claims its axis,
     // so a drag cannot be re-scoped half way through.
@@ -4299,14 +4364,14 @@ function onMove(e) {
     // At most ONE lane per gesture, however far the finger goes: this is
     // a carousel of three screens, not a scrub through twenty-four, and
     // a swipe that crossed two of them walked the reader straight past
-    // Hane -- which is the one screen the whole arrangement exists to
-    // put in the middle. The book's own vertical is deliberately not
+    // the middle -- which is the one screen the whole arrangement exists
+    // to put there. The book's own vertical is deliberately not
     // clamped this way: there it IS a scrub.
     // Clamped around the lane the reader is COMMITTED to, not around
     // where the drawing happened to be when the finger went down: an
     // interrupted run leaves those two apart, and clamping to the
     // drawing lets a long drag reach a lane two along.
-    // A pull toward Hane is read rather than followed (see
+    // A pull toward the middle is read rather than followed (see
     // LANE_SNAP_TRAVEL): the drawing does not move at all until the
     // finger has said enough, and then the app makes the whole move on
     // its own. Either a throw or enough travel is "enough"; anything
@@ -4380,8 +4445,8 @@ function onUp() {
     // where the drawing ended up, which at a whole number brackets the
     // wrong pair and overshoots by a lane in one direction only.
     const step = (n) => Math.max(0, Math.min(LANES - 1, n));
-    // A pull toward Hane that was let go before the app answered it: the
-    // strip never moved, so there is nothing to run back -- only a throw
+    // A pull toward the middle that was let go before the app answered
+    // it: the strip never moved, so there is nothing to run back -- only a throw
     // still counts, which is the same rule the move itself is read by.
     if (snapTo !== null && snapTo !== undefined) {
       if (Math.abs(vx) > FLICK) runLane(snapTo);
@@ -4413,15 +4478,12 @@ function mount() {
   box = document.getElementById('fb');
   if (!box) return;
   box.style.setProperty('--fb-fit', FIT);
-  // A fresh box, and a fresh #fb-petek inside it. The reader starts on
-  // Hane because the book starts on the middle stop: the lane and the
-  // depth have to agree, or the first pull down is one the lane forbids.
+  // A fresh box, and a fresh #fb-map and #fb-petek inside it. The reader
+  // starts on the map because the book starts on the middle stop: the
+  // lane and the depth have to agree, or the first pull down is one the
+  // lane forbids.
   lane = START_LANE; lanePos = START_LANE; navP = START_LANE;
-  atLaneStop = false; petekBuilt = false;
-  // Which paper is out, decided before a single box is filled: buildCast
-  // runs the loaders, and they each ask fbEdition.
-  syncEdition(true);
-  wireEditionReturn();
+  atLaneStop = false;
   buildCast();
   splitNavMarks();  // before paintLanes(): the wave needs its letters
   paintLanes();     // after buildCast: it paints the cast too
@@ -4440,12 +4502,23 @@ function mount() {
     load();
   }
   if (window.IstProfileCard) IstProfileCard.setPage('project');
-  // The map and the game overlay both live at body level (they have to
-  // cover both bars), so neither is swapped out with the content and
-  // both wirings are idempotent.
+  // The map is one of the lanes and leaves with the content; the game
+  // overlay lives at body level. Both wirings are idempotent either way.
   wireMap();
   wireGameOverlay();
   wireFbPage();
+  // ── The middle lane is drawn before it is looked at ──
+  // It is a screen the reader is already standing on when the page
+  // opens, not something that gets built on a press, so it is drawn on
+  // mount and its numbers asked for straight away. Both are best-effort
+  // and neither is awaited (see an actor's own load).
+  buildMap();
+  loadMapStats();
+  // The petek is mounted from the start and simply kept hidden (see
+  // mountPetek): the map's own middle window is a clone of the reader's
+  // cell out of it, and fitHive has to be able to measure the grid at
+  // any moment.
+  mountPetek();
   // The ring is painted from whatever the last visit worked out before
   // the fetches are asked again, so a swipe back does not empty the sea
   // for a round trip and then refill it. Never awaited: the book must
@@ -4455,10 +4528,12 @@ function mount() {
 }
 function unmount() {
   stopAnim();
-  // The map and the game overlay are both body-level and would otherwise
-  // be the last word on a page that is gone -- along with the body class
-  // that dims the bottom bar.
-  closeMap();
+  // The petek layer leaves with the content, but the body class that
+  // lights the logo does not -- and the logo is on the bar, which
+  // outlives this page. The game overlay is body-level outright.
+  closePetek();
+  if (petekHideTimer) { clearTimeout(petekHideTimer); petekHideTimer = null; }
+  document.body.classList.remove('fb-petek-on');
   closeGameOverlay(true);
   snapFbPageShut();
   traveling = false;
@@ -4473,8 +4548,8 @@ function unmount() {
   // walked-off name has to be put back in the middle.
   if (window.IstProfileCard && IstProfileCard.clearBarSlide) IstProfileCard.clearBarSlide();
   lane = LANE_KUTUPHANE; lanePos = LANE_KUTUPHANE;
-  atLaneStop = false; petekBuilt = false;
-  drag = null; box = null; scrimEl = null; petekEl = null;
+  atLaneStop = false;
+  drag = null; box = null; scrimEl = null; mapLaneEl = null;
   // Nothing of the lane's own is left on <html> any more (see paintNav);
   // the leftovers from an older shape are cleared for a reader whose
   // browser still has them on the root from a previous visit.
@@ -4483,18 +4558,27 @@ function unmount() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// THE APP MAP -- opened by the logo, and the only thing on the
-// bottom bar that is pressed
+// THE APP MAP -- the middle lane
 //
 // The compass says where you are. This says where you are IN RELATION
-// TO EVERYWHERE ELSE: the app's five windows drawn in the shape they
-// actually stand in -- the three lanes across the middle, Türkiye
+// TO EVERYWHERE ELSE: the app's windows drawn in the shape they actually
+// stand in -- the two side lanes either side of the middle, Türkiye
 // hanging off Kütüphane and the ilçe off Kahvehane, because those are
-// the depths those two lanes can reach.
+// the depths those two lanes can reach -- with the reader's own hexagon
+// standing in the middle of it.
 //
 // A window is a (lane, slide) pair and nothing else, so the map cannot
 // drift from the app: there is no second table of places here, only the
-// five the book and the lane strip already have between them.
+// ones the book and the lane strip already have between them. The one
+// exception is the middle window, which is not a place on the strip at
+// all: it is the reader, and pressing it opens the petek -- the same
+// door the logo is.
+//
+// There is deliberately no "you are here" window any more. The map used
+// to be a layer openable from anywhere, so the question had a different
+// answer each time; now it can only be seen from the map, and the only
+// thing always true of the middle is that the reader is in it. That is
+// what the red hexagon says.
 // ══════════════════════════════════════════════════════════════
 const MAP_WINDOWS = [
   // The ilçe window only exists while the stop it walks to does. A map
@@ -4506,7 +4590,10 @@ const MAP_WINDOWS = [
     name: 'İlçen',     map: 'assets/map/istanbul-map-mobile.png', stats: ['kahve', 'yorum'] }] : []),
   { id: 'kutuphane', cell: 'r2c1', lane: LANE_KUTUPHANE, slide: STOPS[1],
     name: 'Kütüphane', map: 'assets/map/istanbul-map-mobile.png', stats: ['haber', 'anket'] },
-  { id: 'hane',      cell: 'r2c2', lane: LANE_HANE,      slide: STOPS[1],
+  // Not a lane and not a slide: the reader themselves. Pressing it opens
+  // the petek rather than walking anywhere, which is why it carries no
+  // (lane, slide) pair for travelTo to read.
+  { id: 'hane',      cell: 'r2c2', petek: true,
     name: 'Hane',      hex: true },
   { id: 'kahvehane', cell: 'r2c3', lane: LANE_KAHVEHANE, slide: STOPS[1],
     name: 'Kahvehane', map: 'assets/map/istanbul-map-mobile.png', stats: ['etkinlik', 'oyun'] },
@@ -4520,9 +4607,8 @@ const MAP_WINDOWS = [
 // arrive.
 let mapStats = null;      // { key: 'a/b' } once loaded
 let mapBadges = null;     // { windowId: n }
-let mapStatsAt = 0;       // when, so a reopen a minute later is free
+let mapStatsAt = 0;       // when, so coming back a minute later is free
 let traveling = false;
-let mapHideTimer = null;  // the pending hide of a fading-out layer
 
 // ── The middle window is the reader's OWN hexagon ──
 // Not a drawing of one: the actual cell out of the petek, cloned. Hane's
@@ -4550,27 +4636,18 @@ function mapMeCell() {
   return clone;
 }
 
-// Whether the petek is actually standing on screen behind the layer. If
-// it is, the middle window is pinned over the reader's own cell and the
-// rest of the petek fades out under the wash -- so opening the map reads
-// as everybody else leaving and the reader staying exactly where they
-// were, rather than as a new drawing arriving over the old one.
-function petekOnScreen() {
-  const me = document.querySelector('#po-hive-mount .ist-hive-cell[data-me]');
-  if (!me || !box || !box.classList.contains('petek-open')) return null;
-  const r = me.getBoundingClientRect();
-  return (r.width > 8 && r.height > 8) ? r : null;
-}
-
 function mapWinHTML(w) {
-  const badge = mapBadges && mapBadges[w.id] != null
+  // `> 0`, not `!= null`: this is a permanent screen now rather than a
+  // layer the reader opened, so a red "0" would be sitting on the map all
+  // day saying nothing. Nothing waiting means no badge.
+  const badge = mapBadges && mapBadges[w.id] > 0
     ? '<span class="fb-map-badge">' + mapBadges[w.id] + '</span>' : '';
   if (w.hex) {
-    // Hane is the petek, so its window is a hexagon rather than a screen
-    // of tiles -- the middle page is the one that is not a page. The
-    // reader's own cell is dropped in afterwards, in buildMap; this is
-    // only the fallback for a petek that has never been mounted (the
-    // reader has not reached slide 12 yet).
+    // The middle window is the petek, so it is a hexagon rather than a
+    // screen of tiles -- the one window here that is a person and not a
+    // place. The reader's own cell is dropped in afterwards, in buildMap;
+    // this is only the fallback for a petek whose mount has not landed
+    // yet (a first paint, or a fetch that failed).
     return '<span class="fb-map-hex"><span><i class="fb-map-figure"></i></span></span>' + badge;
   }
   const stats = (w.stats || []).map(k =>
@@ -4583,20 +4660,6 @@ function mapWinHTML(w) {
          badge;
 }
 
-// Which window the reader is standing in. The book can rest between
-// stops only while a finger is down, and the map is not openable then,
-// so the nearest stop is the honest answer.
-function mapHere() {
-  let best = null, bestD = Infinity;
-  for (const w of MAP_WINDOWS) {
-    // A lane away is further than any distance within a lane: you cannot
-    // be half in Hane and half in Kütüphane and be counted as either.
-    const d = Math.abs(w.lane - lane) * 1000 + Math.abs(w.slide - at);
-    if (d < bestD) { bestD = d; best = w; }
-  }
-  return best;
-}
-
 function buildMap() {
   const grid = document.getElementById('fb-map-grid');
   if (!grid) return;
@@ -4605,12 +4668,10 @@ function buildMap() {
   // the markup so the two can never disagree: the same flag that drops
   // the window drops the line drawn to it.
   if (!ILCE_STOP_ENABLED) grid.querySelectorAll('[data-wire="ilce"]').forEach(n => n.remove());
-  const here = mapHere();
   for (const w of MAP_WINDOWS) {
     const el = document.createElement('button');
     el.type = 'button';
-    el.className = 'fb-map-win at-' + w.cell + (w.hex ? ' hex' : '') +
-                   (w === here ? ' here' : '');
+    el.className = 'fb-map-win at-' + w.cell + (w.hex ? ' hex' : '');
     el.innerHTML = mapWinHTML(w);
     if (w.hex) {
       const me = mapMeCell();
@@ -4620,63 +4681,26 @@ function buildMap() {
         slot.className = 'fb-map-hex-slot';
         slot.appendChild(me);
         el.appendChild(slot);
-        el.innerHTML += mapBadges && mapBadges[w.id] != null
+        el.innerHTML += mapBadges && mapBadges[w.id] > 0
           ? '<span class="fb-map-badge">' + mapBadges[w.id] + '</span>' : '';
-        // Standing on Hane, the cell is pinned exactly over the real one,
-        // so the only thing that changes on screen is that everybody else
-        // goes. The pin is a measurement rather than a guess: the petek is
-        // fitted to its window and nothing here can predict where that put
-        // the reader.
-        const r = petekOnScreen();
-        if (r) {
-          el.classList.add('pinned');
-          el.style.left = r.left + 'px';
-          el.style.top = r.top + 'px';
-          el.style.width = r.width + 'px';
-          el.style.height = r.height + 'px';
-        }
       }
+      el.setAttribute('aria-label', w.name);
     }
-    if (w === here) {
-      el.setAttribute('aria-current', 'true');
-      el.disabled = true;
-    } else {
-      el.addEventListener('click', () => travelTo(w));
-    }
+    el.addEventListener('click', () => travelTo(w));
+    wireMapPress(el);
     grid.appendChild(el);
   }
 }
 
-function openMap() {
-  const layer = document.getElementById('fb-map');
-  if (!layer || traveling) return;
-  // Whatever the last close still had pending is cancelled here. A close
-  // cannot hide the layer at once -- it has to stay on screen while it
-  // fades -- so it schedules the hide; left running, that timer lands on
-  // THIS opening and hides a layer that was just unhidden, with the body
-  // class still on it and the petek still faded out under a wash that is
-  // no longer there. It is the same trap IstSheet.open documents.
-  if (mapHideTimer) { clearTimeout(mapHideTimer); mapHideTimer = null; }
-  buildMap();
-  layer.hidden = false;
-  document.body.classList.add('fb-map-on');
-  requestAnimationFrame(() => layer.classList.add('on'));
-  loadMapStats();
-}
-
-function closeMap() {
-  const layer = document.getElementById('fb-map');
-  if (!layer || layer.hidden) return;
-  layer.classList.remove('on');
-  document.body.classList.remove('fb-map-on');
-  if (mapHideTimer) clearTimeout(mapHideTimer);
-  // Matches the CSS fade; cancelled by the next open (see there).
-  mapHideTimer = setTimeout(() => { mapHideTimer = null; layer.hidden = true; }, 240);
-}
-
-function mapIsOpen() {
-  const layer = document.getElementById('fb-map');
-  return !!(layer && !layer.hidden);
+// The press, driven by pointer events for the reason stated on
+// .fb-map-pressing. A flick that merely passed over a window on its way
+// somewhere else never keeps the class: pointerleave and pointercancel
+// both clear it exactly as pointerup does.
+function wireMapPress(el) {
+  const down = () => el.classList.add('fb-map-pressing');
+  const up = () => el.classList.remove('fb-map-pressing');
+  el.addEventListener('pointerdown', down);
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(k => el.addEventListener(k, up));
 }
 
 // ── THE GAME OVERLAY ──
@@ -4735,17 +4759,21 @@ function wireGameOverlay() {
 }
 
 // ── Going there is a WALK, not a jump ──
-// The map closes and then the app moves, one transition at a time,
-// through every screen between here and there: down to the lane stop
-// first (the lanes can only be walked from slide 12), then one lane at a
-// time, then out to the target's own depth. So Türkiye to the ilçe is
-// four moves and passes through Hane -- you cannot get from the reading
-// to the doing without walking past the people. That is the whole point
-// of the map being a map and not a menu.
+// The app moves one transition at a time, through every screen between
+// here and there: down to the lane stop first (the lanes can only be
+// walked from slide 12), then one lane at a time, then out to the
+// target's own depth. So the map to the ilçe is two moves and passes
+// through Kahvehane's own screen -- you never arrive anywhere without
+// having gone past what stands between. That is the whole point of the
+// map being a map and not a menu.
+//
+// The one window that is not walked to is the middle one: it is the
+// reader, not a place, and what it opens is the petek (the same door the
+// logo is). Nothing moves for it, because nothing has to.
 function travelTo(w) {
   if (traveling || !ready) return;
+  if (w.petek) { openPetek(); return; }
   traveling = true;
-  closeMap();
   // `at` is a float, so every comparison against a stop is a tolerance --
   // a strict !== here would leave the walk one imperceptible step short
   // and never clear `traveling`, which locks the map for the session.
@@ -4758,9 +4786,7 @@ function travelTo(w) {
     if (off(at, w.slide)) { runTo(w.slide, step); return; }
     traveling = false;
   };
-  // Let the layer get out of the way before the app starts moving --
-  // the walk is the thing to watch, and it is happening underneath it.
-  setTimeout(step, 260);
+  step();
 }
 
 // ── The numbers in the squares ──
@@ -4870,30 +4896,30 @@ async function loadMapStats() {
   mapStats = stats;
   mapBadges = badges;
   mapStatsAt = Date.now();
-  // Only redraw if the map is still up: the reader may have gone.
-  if (mapIsOpen()) buildMap();
+  // Only redraw if the page is still standing: the reader may have gone.
+  if (box) buildMap();
 }
 
+// The logo lives on the bottom bar, which is OUTSIDE #ist-content and so
+// survives a virtual navigation -- hence the idempotence guard rather
+// than a fresh binding per mount.
 function wireMap() {
   const btn = document.getElementById('fb-logo-btn');
-  const scrim = document.getElementById('fb-map-scrim');
   if (btn && !btn.dataset.wired) {
     btn.dataset.wired = '1';
-    // The logo is a switch, not a door: it opens the map and it closes
-    // it again, which is why it stays lit while the map is up.
-    btn.addEventListener('click', () => { mapIsOpen() ? closeMap() : openMap(); });
+    // The logo is a switch, not a door: it opens the petek and it closes
+    // it again, which is why it stays lit while the petek is standing.
+    btn.addEventListener('click', () => { petekIsOpen() ? closePetek() : openPetek(); });
     btn.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
     });
   }
-  if (scrim && !scrim.dataset.wired) {
-    scrim.dataset.wired = '1';
-    scrim.addEventListener('click', closeMap);
-  }
-  if (!document.body.dataset.fbMapEsc) {
-    document.body.dataset.fbMapEsc = '1';
+  // The petek fills the whole band between the two bars, so there is no
+  // backdrop left to press -- the way out is the logo, and Escape.
+  if (!document.body.dataset.fbPetekEsc) {
+    document.body.dataset.fbPetekEsc = '1';
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && mapIsOpen()) closeMap();
+      if (e.key === 'Escape' && petekIsOpen()) closePetek();
     });
   }
 }
@@ -4943,7 +4969,13 @@ window.__fb = {
   show, armCast,
   lanes: LANES,
   get lane() { return { at: lane, pos: lanePos, atStop: atLaneStop,
-                        petek: lanePresence(LANE_HANE), stops: laneStops() }; },
+                        map: lanePresence(LANE_MAP), stops: laneStops() }; },
+  // ── The petek, which is the logo's ──
+  // The onboarding tour has to be able to stand the reader in it and
+  // take them back out again, and it is behind a press rather than a
+  // lane now, so it needs a handle of its own.
+  get petekOpen() { return petekIsOpen(); },
+  openPetek, closePetek,
   // Put the reader on a lane as if they had pulled there and let go.
   goLane(n, snap) {
     if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
