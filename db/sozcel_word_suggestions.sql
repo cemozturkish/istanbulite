@@ -24,9 +24,15 @@ create table if not exists public.sozcel_word_suggestions (
   -- Lowercase, the way sozcel_kelime_listesi.txt holds them, so a
   -- suggestion and a pool word are the same string.
   word         text        not null,
-  -- Optional: why this word. The admin is choosing between words, and a
-  -- line of reasoning is most of what makes one choosable.
-  note         text,
+  -- The word's MEANING, not a line of reasoning about it.
+  -- sozcel_used_answers carries a `definition` for every word it has
+  -- played and sozcel.html prints it when the round is over, so what is
+  -- asked for here is the thing that actually gets used: picking a
+  -- suggestion copies this straight into that row
+  -- (admin.html's pickSozcelSuggestion). Nullable in the schema and
+  -- required by the form -- an older row offered before this existed is
+  -- still a perfectly good word.
+  definition   text,
   suggested_by uuid        not null references public.profiles(id) on delete cascade,
   suggested_at timestamptz not null default now(),
   status       text        not null default 'pending'
@@ -38,6 +44,27 @@ create table if not exists public.sozcel_word_suggestions (
   -- admin's list is a list of distinct choices rather than a tally.
   unique (for_night, word)
 );
+
+-- ── The rename, for a database the first cut of this file already ran
+-- against ──
+-- The column was `note` ("why this word") and is `definition` (what it
+-- means). Guarded on both sides so this file stays runnable end to end
+-- whichever state it finds: a fresh database created the column above
+-- and has nothing to rename, an older one has `note` and no
+-- `definition`, and a second run of this block has neither condition
+-- true and does nothing.
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'sozcel_word_suggestions'
+               and column_name = 'note')
+     and not exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'sozcel_word_suggestions'
+               and column_name = 'definition')
+  then
+    alter table public.sozcel_word_suggestions rename column note to definition;
+  end if;
+end $$;
 
 create index if not exists sozcel_word_suggestions_night_idx
   on public.sozcel_word_suggestions (for_night, status);
