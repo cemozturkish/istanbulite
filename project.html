@@ -537,9 +537,8 @@
       transition: opacity 0.22s ease;
       -webkit-tap-highlight-color: transparent;
       /* MOUNTED AND MEASURABLE EVEN WHILE SHUT. `visibility`, never
-         `display`: the grid has to keep its box, both so fitHive has
-         something real to measure at any moment and so the app map's
-         middle window has a live cell to clone (see mapMeCell). */
+         `display`: the grid has to keep its box so fitHive has something
+         real to measure at any moment. */
       visibility: hidden;
       pointer-events: none;
     }
@@ -862,70 +861,28 @@
     .fb-map-win.fb-map-pressing { transform: translate(-50%, -50%) scale(0.955); }
     .fb-map-win.at-r1c3 { left: 83.33%; top: 16.66%; }
     .fb-map-win.at-r2c1 { left: 16.66%; top: 50%; }
-    .fb-map-win.at-r2c2 { left: 50%;    top: 50%; }
     .fb-map-win.at-r2c3 { left: 83.33%; top: 50%; }
     .fb-map-win.at-r3c1 { left: 16.66%; top: 83.33%; }
 
-    /* The middle window is the petek, so it is a hexagon rather than a
-       screen of tiles -- the one window here that is not a place on the
-       strip but the reader standing on it. */
-    .fb-map-win.hex {
-      border: none;
-      background: none;
-      padding: 0;
-      align-items: center;
+    /* A locked window (Türkiye, for now) is muted in the ink rather than
+       in opacity -- the same rule a locked game tile follows, and for the
+       same reason: `paintCast`-style per-frame writes are not in play
+       here, but a box that merely looked switched off would read as
+       broken rather than as parked. No press-scale either: nothing here
+       answers a press with a walk, so nothing here should look like it's
+       about to. */
+    .fb-map-win.fb-map-locked {
+      color: var(--muted, #7a7368);
+      cursor: default;
       justify-content: center;
+      align-items: center;
+      text-align: center;
     }
-    .fb-map-hex {
-      width: 100%; height: 100%;
-      display: flex; align-items: center; justify-content: center;
-      background: currentColor;
-      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-    }
-    .fb-map-hex > span {
-      width: calc(100% - 5px); height: calc(100% - 5px);
-      background: var(--paper-card, #e9e4dc);
-      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-      display: flex; align-items: center; justify-content: center;
-      overflow: hidden;
-    }
-    /* A head and shoulders in currentColor, drawn red like the ring
-       around it: this window is the reader, and the reader is here. */
-    .fb-map-figure { position: relative; width: 46%; height: 58%; color: inherit; }
-    .fb-map-figure::before, .fb-map-figure::after {
-      content: ''; position: absolute; background: var(--fb-map-red);
-    }
-    .fb-map-figure::before {
-      left: 27%; top: 0; width: 46%; aspect-ratio: 1; border-radius: 50%;
-    }
-    .fb-map-figure::after {
-      left: 4%; right: 4%; top: 52%; bottom: 0;
-      border-radius: 48% 48% 0 0 / 62% 62% 0 0;
-    }
-
-    /* The window's own hero: the map at that depth, which is what the
-       real screen has at the top of it. */
-    /* The hero takes whatever the window's own ratio leaves, and the
-       picture inside it is OUT OF FLOW. A map PNG left in flow reports
-       its intrinsic height (1080x2420 for Türkiye's) into a box whose
-       height was supposed to come from aspect-ratio -- the two argue,
-       intrinsic wins, and every window comes out half again too tall and
-       overlapping the one below it. Nothing in here may have a height of
-       its own to offer. */
-    .fb-map-hero {
-      position: relative;
-      flex: 1 1 0;
-      min-height: 0;
-      overflow: hidden;
-      background: var(--paper-card, #e9e4dc);
-    }
-    .fb-map-hero img {
-      position: absolute;
-      inset: 0;
-      width: 100%; height: 100%;
-      object-fit: cover;
-      display: block;
-      opacity: 0.85;
+    .fb-map-win.fb-map-locked.fb-map-pressing { transform: translate(-50%, -50%); }
+    .fb-map-soon {
+      font-size: 0.62rem;
+      font-style: italic;
+      letter-spacing: 0.02em;
     }
     .fb-map-name {
       flex: none;
@@ -952,30 +909,6 @@
       font-variant-numeric: tabular-nums;
       line-height: 1;
     }
-    /* ── The middle window is the reader's own hexagon ──
-       The cell is cloned out of the petek, so everything about how it
-       looks -- the drawn ring, the mask, the avatar, the badges -- is the
-       petek's own and there is no second version to keep in step. What
-       has to be undone is only its PLACE: in the petek it is absolutely
-       positioned on the plane by calc() against the packing's own step,
-       and here it simply fills the window. */
-    .fb-map-hex-slot { display: block; width: 100%; }
-    .fb-map-hex-slot .ist-hive-cell {
-      position: static;
-      width: 100%;
-      /* The petek's own reveal holds its cells at opacity 0 for the first
-         beats after a mount (see hiveRevealFirst), and this is a CLONE --
-         it would carry that held state and print an empty hexagon. */
-      opacity: 1 !important;
-      transform: none;
-    }
-    /* "You are here" is the RING going red, which is what red on a
-       hexagon already means everywhere else in the petek (see the bar
-       member in profile-card.css) -- not a box drawn around it. It is on
-       unconditionally, because the middle window is the reader and the
-       reader is always in the middle. */
-    .fb-map-win.hex .ist-hive-frame { --hexframe-stroke: var(--fb-map-red); }
-
     /* What is waiting there, in the corner a badge goes. */
     .fb-map-badge {
       position: absolute;
@@ -5103,6 +5036,15 @@ function unmount() {
 // thing always true of the middle is that the reader is in it. That is
 // what the red hexagon says.
 // ══════════════════════════════════════════════════════════════
+// No map artwork on these any more, and no hexagon in the middle -- the
+// map used to carry a thumbnail per window and the reader's own petek
+// cell cloned into the centre one, and both read as scenery competing
+// with the two boxes that actually matter. What is here now is two plain
+// screens, named honestly: Kütüphane on the left, Kahvehane on the right
+// -- the app itself, for now, while everything past İstanbul (Türkiye)
+// is parked (see `locked` below) and Hane's own window is gone outright,
+// since the logo already opens the petek from anywhere and a second door
+// to the same place was the one thing this layer never needed.
 const MAP_WINDOWS = [
   // The ilçe window only exists while the stop it walks to does. A map
   // is a map OF the app, so a window onto a screen no gesture can reach
@@ -5110,18 +5052,16 @@ const MAP_WINDOWS = [
   // place that is not there. It comes back with ILCE_STOP_ENABLED, along
   // with the wire drawn to it in the markup above.
   ...(ILCE_STOP_ENABLED ? [{ id: 'ilce', cell: 'r1c3', lane: LANE_KAHVEHANE, slide: STOPS[2],
-    name: 'İlçen',     map: 'assets/map/istanbul-map-mobile.png', stats: ['kahve', 'yorum'] }] : []),
+    name: 'İlçen', stats: ['kahve', 'yorum'] }] : []),
   { id: 'kutuphane', cell: 'r2c1', lane: LANE_KUTUPHANE, slide: STOPS[1],
-    name: 'Kütüphane', map: 'assets/map/istanbul-map-mobile.png', stats: ['haber', 'anket'] },
-  // Not a lane and not a slide: the reader themselves. Pressing it opens
-  // the petek rather than walking anywhere, which is why it carries no
-  // (lane, slide) pair for travelTo to read.
-  { id: 'hane',      cell: 'r2c2', petek: true,
-    name: 'Hane',      hex: true },
+    name: 'Kütüphane', stats: ['haber', 'anket'] },
   { id: 'kahvehane', cell: 'r2c3', lane: LANE_KAHVEHANE, slide: STOPS[1],
-    name: 'Kahvehane', map: 'assets/map/istanbul-map-mobile.png', stats: ['etkinlik', 'oyun'] },
-  { id: 'turkiye',   cell: 'r3c1', lane: LANE_KUTUPHANE, slide: STOPS[0],
-    name: 'Türkiye',   map: 'assets/map/kutuphane-map-mobile.png', stats: ['hikaye', 'olay'] },
+    name: 'Kahvehane', stats: ['etkinlik', 'oyun'] },
+  // Türkiye is parked, not deleted -- locked and honestly labelled
+  // "Yakında" rather than silently doing nothing on a press, the same
+  // rule a locked game tile already follows ("Önce Sözcel"). No `lane`/
+  // `slide` at all: a locked window is never walked to.
+  { id: 'turkiye', cell: 'r3c1', name: 'Türkiye', locked: true },
 ];
 
 // What each square counts. A dash is a square whose content is parked
@@ -5133,52 +5073,24 @@ let mapBadges = null;     // { windowId: n }
 let mapStatsAt = 0;       // when, so coming back a minute later is free
 let traveling = false;
 
-// ── The middle window is the reader's OWN hexagon ──
-// Not a drawing of one: the actual cell out of the petek, cloned. Hane's
-// window is the reader's profile, and that already exists at the petek's
-// middle depth -- building a second version of it here would be a second
-// thing to keep in step with the avatar, the badges and the ring.
-function mapMeCell() {
-  const me = document.querySelector('#po-hive-mount .ist-hive-cell[data-me]');
-  if (!me) return null;
-  const clone = me.cloneNode(true);
-  // Every id in there is a live handle somewhere else -- #po-avatar-preview
-  // is what the four avatar carousels replace on an arrow press, and the
-  // claim field is what a code is typed into. A second copy carrying them
-  // would steal both.
-  clone.removeAttribute('id');
-  clone.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
-  clone.removeAttribute('data-me');
-  clone.classList.remove('ist-hive-cell-open');
-  clone.classList.add('fb-map-me');
-  // A picture of the hexagon, not a second button: it must not answer a
-  // press, and it must not be a second tab stop for the same cell.
-  clone.disabled = true;
-  clone.setAttribute('aria-hidden', 'true');
-  clone.querySelectorAll('.ist-hive-claim-in').forEach(n => n.remove());
-  return clone;
-}
-
 function mapWinHTML(w) {
+  // A locked window is honest about being parked rather than silently
+  // doing nothing on a press -- the same rule a locked game tile already
+  // follows ("Önce Sözcel"): it names what is coming rather than
+  // pretending to work. No stats either; there is nothing behind it yet
+  // to count.
+  if (w.locked) {
+    return '<span class="fb-map-name">' + w.name + '</span>' +
+           '<span class="fb-map-soon">Yakında</span>';
+  }
   // `> 0`, not `!= null`: this is a permanent screen now rather than a
   // layer the reader opened, so a red "0" would be sitting on the map all
   // day saying nothing. Nothing waiting means no badge.
   const badge = mapBadges && mapBadges[w.id] > 0
     ? '<span class="fb-map-badge">' + mapBadges[w.id] + '</span>' : '';
-  if (w.hex) {
-    // The middle window is the petek, so it is a hexagon rather than a
-    // screen of tiles -- the one window here that is a person and not a
-    // place. The reader's own cell is dropped in afterwards, in buildMap;
-    // this is only the fallback for a petek whose mount has not landed
-    // yet (a first paint, or a fetch that failed).
-    return '<span class="fb-map-hex"><span><i class="fb-map-figure"></i></span></span>' + badge;
-  }
   const stats = (w.stats || []).map(k =>
     '<span class="fb-map-stat">' + ((mapStats && mapStats[k]) || '–') + '</span>').join('');
-  return '<span class="fb-map-hero">' +
-           (w.map ? '<img src="' + w.map + '" alt="" draggable="false">' : '') +
-         '</span>' +
-         '<span class="fb-map-name">' + w.name + '</span>' +
+  return '<span class="fb-map-name">' + w.name + '</span>' +
          (stats ? '<span class="fb-map-stats">' + stats + '</span>' : '') +
          badge;
 }
@@ -5194,22 +5106,11 @@ function buildMap() {
   for (const w of MAP_WINDOWS) {
     const el = document.createElement('button');
     el.type = 'button';
-    el.className = 'fb-map-win at-' + w.cell + (w.hex ? ' hex' : '');
+    el.className = 'fb-map-win at-' + w.cell + (w.locked ? ' fb-map-locked' : '');
     el.innerHTML = mapWinHTML(w);
-    if (w.hex) {
-      const me = mapMeCell();
-      if (me) {
-        el.innerHTML = '';
-        const slot = document.createElement('span');
-        slot.className = 'fb-map-hex-slot';
-        slot.appendChild(me);
-        el.appendChild(slot);
-        el.innerHTML += mapBadges && mapBadges[w.id] > 0
-          ? '<span class="fb-map-badge">' + mapBadges[w.id] + '</span>' : '';
-      }
-      el.setAttribute('aria-label', w.name);
-    }
-    el.addEventListener('click', () => travelTo(w));
+    // A locked window answers a press with a shrug, not a walk -- it
+    // carries no click handler at all, the same as a locked game tile.
+    if (!w.locked) el.addEventListener('click', () => travelTo(w));
     wireMapPress(el);
     grid.appendChild(el);
   }
@@ -5289,13 +5190,8 @@ function wireGameOverlay() {
 // through Kahvehane's own screen -- you never arrive anywhere without
 // having gone past what stands between. That is the whole point of the
 // map being a map and not a menu.
-//
-// The one window that is not walked to is the middle one: it is the
-// reader, not a place, and what it opens is the petek (the same door the
-// logo is). Nothing moves for it, because nothing has to.
 function travelTo(w) {
-  if (traveling || !ready) return;
-  if (w.petek) { openPetek(); return; }
+  if (traveling || !ready || w.locked) return;
   traveling = true;
   // `at` is a float, so every comparison against a stop is a tolerance --
   // a strict !== here would leave the walk one imperceptible step short
@@ -5324,21 +5220,16 @@ async function loadMapStats() {
   let uid = null;
   try { uid = (await sb.auth.getUser()).data.user.id; } catch (e) {}
 
-  const store = (key) => {
-    try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; }
-  };
-
-  // Haberler: the deck's own two numbers -- what is in the 72h window,
-  // and how much of it this member has already dealt with. Read from the
-  // same localStorage key the deck writes (see kutuphane.html), so the
-  // square cannot disagree with the deck it is counting.
+  // Haberler: the day's own edition -- read through haberlerData(), the
+  // same curated stack the column itself renders, so this square can
+  // never disagree with what the reader actually sees there (see
+  // db/breaking_news_v3_edition.sql). Türkiye's own "Olaylar" square is
+  // gone with its window: a locked window has nothing to count.
   const haber = (async () => {
-    const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
-    const { data, error } = await sb.from('breaking_news')
-      .select('id, updated_at').gte('updated_at', cutoff).is('archived_at', null);
-    if (error) throw error;
-    const rows = data || [];
-    // Read through the same two helpers the boxes and the day meter use
+    const { byBucket, failed } = await haberlerData();
+    if (failed) { stats.haber = '–'; return; }
+    const rows = HABER_BUCKETS.flatMap(b => byBucket[b] || []);
+    // Read through the same two helpers the box and the day meter use
     // (newsDealtStore / newsIsDealt), so this square cannot come to a
     // different answer than the column it is counting -- stamp semantics
     // and the legacy stampless format included.
@@ -5349,17 +5240,6 @@ async function loadMapStats() {
     // the two run concurrently -- whichever resolves second must not
     // overwrite what the first one already added.
     badges.kutuphane = (badges.kutuphane || 0) + (rows.length - done);
-  })();
-
-  // Olaylar: how many of the ongoing ones the reader has opened at all.
-  const olay = (async () => {
-    const { data, error } = await sb.from('world_events')
-      .select('id').eq('status', 'ongoing');
-    if (error) throw error;
-    const rows = data || [];
-    const started = uid
-      ? rows.filter(r => store('olay_progress_' + uid + '_' + r.id) != null).length : 0;
-    stats.olay = started + '/' + rows.length;
   })();
 
   // Etkinlikler: what is still to come. A count rather than a fraction --
@@ -5415,7 +5295,7 @@ async function loadMapStats() {
     badges.kutuphane = (badges.kutuphane || 0) + (rows.length - answered);
   })();
 
-  await Promise.allSettled([haber, olay, etkinlik, oyun, anket]);
+  await Promise.allSettled([haber, etkinlik, oyun, anket]);
   mapStats = stats;
   mapBadges = badges;
   mapStatsAt = Date.now();
