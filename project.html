@@ -2288,10 +2288,10 @@ async function refreshDayMeter() {
     if (!failed) {
       const store = newsDealtStore(uid);
       for (const b of HABER_BUCKETS) {
-        const n = byBucket[b];
-        if (!n) continue;                       // no story in that category today
-        total++;
-        if (newsIsDealt(store, n)) done++;
+        const arr = byBucket[b];
+        if (!arr || !arr.length) continue;      // no story in that category's edition
+        total += arr.length;
+        done += arr.filter(n => newsIsDealt(store, n)).length;
       }
     }
   } catch (err) { console.error('[proje gün]', err); }
@@ -2335,10 +2335,12 @@ function paintDayMeter() {
 }
 
 // Fixed vertical order top to bottom -- İSTANBUL, TÜRKİYE, DÜNYA -- each
-// showing that category's own newest story inside the 72h window
-// Kütüphane's own column reads. One fetch of the recent pool, bucketed
-// client-side by newsBucket() below -- a district story (`neighborhood`
-// set, no `category`) is still İstanbul for this column's purposes.
+// showing that category's own EDITION: the stories the admin curated for
+// the day, in the admin's own order, not the newest thing posted. Posting
+// a story is not publishing it any more -- a story only reaches this
+// column once it carries a hook, a poll, and an edition_date
+// (db/breaking_news_v3_edition.sql). A district story (`neighborhood` set,
+// no `category`) is still İstanbul for this column's purposes.
 const HABER_BUCKETS = ['istanbul', 'turkiye', 'dunya']; // [slot 2, slot 1, slot 0]
 const HABER_LABELS = { istanbul: 'İSTANBUL', turkiye: 'TÜRKİYE', dunya: 'DÜNYA' };
 function newsBucket(n) {
@@ -2350,36 +2352,57 @@ function newsBucket(n) {
 let haberlerPromise = null;
 // One fetch, shared by the three boxes AND by the day meter -- the meter
 // must never be able to count a different set of stories than the column
-// is printing.
+// is printing. `byBucket[b]` is now a STACK (admin's own edition_order),
+// not a single row -- some days one category carries seven stories and
+// another carries one, and the slot is the same either way.
 function haberlerData() {
   if (!haberlerPromise) {
     haberlerPromise = (async () => {
       try {
-        const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
+        // "Today's edition" is the newest one that has actually gone out
+        // (news_current_edition, SECURITY DEFINER) -- never a future one
+        // the admin is still assembling, and never rolled by a timer: it
+        // holds until the admin sets a newer edition_date, whenever that
+        // is. IstDate.iso() (never a parsed locale string, CLAUDE.md rule 10).
+        const today = IstDate.iso();
+        const { data: editionDate, error: edErr } = await IstRouter.sb
+          .rpc('news_current_edition', { p_today: today });
+        if (edErr) throw edErr;
+        if (!editionDate) return { byBucket: {}, editionDate: null, failed: false };
         const { data, error } = await IstRouter.sb.from('breaking_news')
-          .select('id, title, body, title_en, body_en, category, neighborhood, series_id, updated_at')
-          .gte('updated_at', cutoff)
+          .select('id, title, body, title_en, body_en, hook_tr, hook_en, hook_author, category, neighborhood, series_id, updated_at, edition_order')
+          .eq('edition_date', editionDate)
           .is('archived_at', null)
-          .order('updated_at', { ascending: false })
-          .limit(30);
+          .order('edition_order', { ascending: true });
         if (error) throw error;
         const byBucket = {};
         for (const n of (data || [])) {
           const b = newsBucket(n);
-          if (!byBucket[b]) byBucket[b] = n; // already newest-first: first wins
+          (byBucket[b] || (byBucket[b] = [])).push(n);
         }
-        return { byBucket, failed: false };
+        return { byBucket, editionDate, failed: false };
       } catch (err) {
         console.error('[proje haberler]', err);
-        return { byBucket: {}, failed: true };
+        return { byBucket: {}, editionDate: null, failed: true };
       }
     })();
   }
   return haberlerPromise;
 }
 
+// A vote just answered is what lets the next story in the stack stand up
+// in this box -- see loadHaberlerActor's own note on why dealing waits
+// for the throw rather than the open.
+function refreshHaberlerColumn() {
+  (cast || []).forEach(a => {
+    if (!/\bfb-haberler\b|\bfb-anket\b/.test(a.def.cls) || !a.def.load) return;
+    try { a.def.load(a.el); } catch (err) { console.error(err); }
+  });
+  refreshDayMeter();
+}
+
 async function loadHaberlerActor(el, slot) {
-  const { byBucket, failed } = await haberlerData();
+  const { byBucket, editionDate, failed } = await haberlerData();
   if (!el.isConnected) return;
   // Cleared before every render, filled only on the path that actually
   // has something to open: a box with no payload is not pressable, which
@@ -2394,37 +2417,48 @@ async function loadHaberlerActor(el, slot) {
       (slot === 2 ? '<div class="t">Yüklenemedi</div>' : '');
     return;
   }
-  const n = byBucket[bucket];
-  if (!n) { el.classList.add('fb-empty'); el.innerHTML = '<div class="k">' + label + '</div>'; return; }
+  const arr = byBucket[bucket] || [];
+  if (!arr.length) {
+    el.classList.add('fb-empty');
+    el.innerHTML = '<div class="k">' + label + '</div>' +
+      (slot === 2 && !editionDate ? '<div class="t">Bugün için bir sayı çıkmadı.</div>' : '');
+    return;
+  }
+  const uid = await doneUid();
+  if (!el.isConnected) return;
+  const store = newsDealtStore(uid);
+  // The stack shows the first story nobody has answered yet -- and once
+  // every one of them has been, it settles on the last, the same "a done
+  // box stays pressable" rule every other box follows.
+  const undealt = arr.filter(n => !newsIsDealt(store, n));
+  const n = undealt[0] || arr[arr.length - 1];
+  const stackTag = arr.length > 1 ? ' · ' + (arr.indexOf(n) + 1) + '/' + arr.length : '';
+  const byline = n.hook_author ? '— ' + n.hook_author : '';
   el.classList.remove('fb-empty');
-  el.innerHTML = '<div class="k">' + label + '</div>' +
-    '<div class="m">' + esc(newsAge(n.updated_at)) + '</div>' +
-    '<div class="t">' + esc(newsText(n, 'title')) + '</div>';
-  // Already read on this device (or on another one, via news_dealt)
-  // before the reader ever arrived: the box is quiet from the first
-  // frame rather than going quiet in front of them.
-  doneUid().then(uid => {
-    if (el.isConnected) fbSetDone(el, newsIsDealt(newsDealtStore(uid), n));
-  });
-  // This box picks a category's own NEWEST story inside the 72h window --
-  // that bucketing is only about which slot a story stands in, never about
-  // what its own page holds. If this update is itself part of a `seri`
-  // (it links back to earlier, now-outside-the-window posts about the
-  // same thing), its page carries their Zaman Akışı too, so pressing a
-  // fresh gelişme still hands the reader the story it grew out of instead
-  // of stranding them on one paragraph with no way to the rest of it.
+  // The front of the card is the HOOK, not the headline -- a teaser the
+  // admin (for now; see db/breaking_news_v3_edition.sql) writes on its
+  // own, with its own byline. The real headline and body are the reveal,
+  // printed only once the page is opened. Falling back to the real title
+  // is "no data, no gate": an older row never given a hook still opens.
+  el.innerHTML = '<div class="k">' + label + stackTag + '</div>' +
+    (byline ? '<div class="m">' + esc(byline) + '</div>' : '') +
+    '<div class="t">' + esc(hookText(n) || newsText(n, 'title')) + '</div>';
+  fbSetDone(el, newsIsDealt(store, n));
+  // If this update is itself part of a `seri` (it links back to earlier
+  // posts about the same thing), its page carries their Zaman Akışı too,
+  // so pressing a fresh gelişme still hands the reader the story it grew
+  // out of instead of stranding them on one paragraph with no way to the
+  // rest of it.
   let siblings = [];
   if (n.series_id) {
     try { siblings = await fetchSeriesSiblings(n.series_id, n.id); }
     catch (err) { console.error('[proje haber seri]', err); }
   }
   if (!el.isConnected) return;
-  // The story itself, in whichever language it was actually written in
-  // (newsText) -- the same choice the headline above was printed with.
-  // The story's own question, if it has one the reader has not answered.
-  // Fetched with the story rather than when the page opens: the throw has
-  // to be armed from the page's first frame, and a gesture that only
-  // starts working a beat after the paper arrives is one nobody trusts.
+  // The story's own question -- every curated story carries one (the
+  // admin's curation panel refuses to add a story to an edition without
+  // one), fetched with the story rather than when the page opens, so the
+  // throw is armed from the page's first frame.
   const poll = await newsPollFor(n.id);
   if (!el.isConnected) return;
   fbSetPage(el, {
@@ -2436,16 +2470,21 @@ async function loadHaberlerActor(el, slot) {
     wire: poll ? (inner) => wirePageThrow(inner, {
       // Right is the FIRST option and left the second, the same reading
       // Kütüphane's own news deck gave the gesture in the parts bin.
-      right: { label: poll.option_a, run: () => voteNewsPoll(poll, 1) },
-      left:  { label: poll.option_b, run: () => voteNewsPoll(poll, 2) },
+      right: { label: poll.option_a, run: () => voteNewsPoll(poll, 1).then(() => {
+        newsMarkDealt(n).then(refreshHaberlerColumn);
+      }) },
+      left:  { label: poll.option_b, run: () => voteNewsPoll(poll, 2).then(() => {
+        newsMarkDealt(n).then(refreshHaberlerColumn);
+      }) },
     }) : undefined,
-    // OPENING is the deal, not reaching the foot of the page. A wrong
-    // "unread" is worse than a lenient "read": the reader saw the story,
-    // and a box that stays loud after they have been inside it is the
-    // app arguing with them about whether they read it. It is marked on
-    // the way IN so the card has already gone quiet when the page folds
-    // back into it.
-    onOpen: () => {
+    // What we hand the reader is not news, it is a POLL -- so the story is
+    // dealt with (and the next one in its stack stands up) at the THROW,
+    // not at the open, the same rule Kütüphane's own news deck always
+    // followed ("a story leaves the deck by being swiped, not by being
+    // opened"). A story with no poll at all (a malformed or pre-edition
+    // row) has nothing to wait on, so it still deals on open -- a box
+    // that could never be dismissed would be worse than a lenient one.
+    onOpen: poll ? undefined : () => {
       fbSetDone(el, true);
       newsMarkDealt(n).then(refreshDayMeter);
     },
@@ -2538,6 +2577,17 @@ function newsText(row, field) {
   const en = row[field + '_en'];
   if (window.I18N && I18N.isEnglish() && en && String(en).trim()) return en;
   return row[field];
+}
+
+// The hook's own language choice -- same rule as newsText, kept separate
+// because a hook can exist where the real headline hasn't been written yet
+// (or vice versa on an older, pre-edition row), so the two must not share
+// one fallback chain.
+function hookText(row) {
+  if (!row) return '';
+  const en = row.hook_en;
+  if (window.I18N && I18N.isEnglish() && en && String(en).trim()) return en;
+  return row.hook_tr || '';
 }
 
 function newsAge(iso) {

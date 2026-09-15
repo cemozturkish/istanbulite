@@ -2087,9 +2087,27 @@
       <label>Tarih ve saat (opsiyonel — boş bırakırsan şu an kullanılır)</label>
       <input type="datetime-local" id="n-datetime"/>
 
-      <label>Poll (optional — fill all three or leave all blank)</label>
+      <label>Kanca / Hook (TR)</label>
       <p style="margin-top:-4px;font-size:0.7rem;color:var(--muted);font-style:italic;">
-        You can add more polls to this story after posting it.
+        Kartın kapalı yüzünde okuyucunun göreceği tek satır — gerçek başlık değil, bir tuzak.
+        Basınca gerçek başlık ve metin açılır. Boş bırakılırsa gerçek başlık kullanılır, ama
+        bir sayıya girecek her haberin bir kancası olmalı.
+      </p>
+      <input type="text" id="n-hook" placeholder="Kısa, meraklandıran tek cümle..."/>
+
+      <label>Hook (EN, opsiyonel)</label>
+      <input type="text" id="n-hook-en" placeholder="Same teaser in English..."/>
+
+      <label>Kancanın imzası</label>
+      <p style="margin-top:-4px;font-size:0.7rem;color:var(--muted);font-style:italic;">
+        Sözcel'in Sözcü'sü gibi — her kanca bir isim taşır. Şimdilik yalnız sen yazıyorsun.
+      </p>
+      <input type="text" id="n-hook-author" placeholder="ör. Cem" value="Cem"/>
+
+      <label>Poll (required to run in an edition — fill all three, or leave all blank for now)</label>
+      <p style="margin-top:-4px;font-size:0.7rem;color:var(--muted);font-style:italic;">
+        Bir sayıya eklenen her haberin bir anketi olmalı — okura verdiğimiz şey haber değil,
+        anket. Buradan girmezsen aşağıdaki listeden sonra ekleyebilirsin.
       </p>
       <input type="text" id="n-poll-q" placeholder="Question..."/>
       <input type="text" id="n-poll-a" placeholder="Option A..." style="margin-top:8px;"/>
@@ -4065,6 +4083,20 @@ function renderNewsList() {
     const countriesLabel = newsCountries.length
       ? ' · ' + newsCountries.map(id => countryNameTr(id).toLocaleUpperCase('tr-TR')).join(', ')
       : '';
+    // A story can only run in an edition once it carries both a hook and
+    // at least one poll — the two things the reader's card actually needs
+    // (see db/breaking_news_v3_edition.sql). Missing either is flagged
+    // right on the card rather than only failing silently when the admin
+    // tries to schedule it.
+    const hasHook = !!(n.hook_tr && n.hook_tr.trim());
+    const hasPoll = polls.length > 0;
+    const editionReady = hasHook && hasPoll;
+    const warnBits = [];
+    if (!hasHook) warnBits.push('Hook yok');
+    if (!hasPoll) warnBits.push('Anket yok');
+    const editionLabel = n.edition_date
+      ? `SAYIDA · ${escapeHtml(n.edition_date)} · sıra ${n.edition_order ?? 0}`
+      : 'Sayıda değil';
     return `
       <div class="article-card" data-id="${n.id}"${n.archived_at ? ' style="opacity:0.6;"' : ''}>
         <div class="a-neighborhood">${escapeHtml(categoryLabel(cat))}${seriesName ? ' · SERİ: ' + escapeHtml(seriesName) : ''}${escapeHtml(countriesLabel)} · ${ago}${n.archived_at ? ' · ARŞİVLENDİ' : ''}</div>
@@ -4075,6 +4107,29 @@ function renderNewsList() {
           ? `<h4 style="color:var(--muted);">EN · ${escapeHtml(n.title_en)}</h4>
              ${n.body_en ? `<p style="color:var(--muted);">${escapeHtml(n.body_en)}</p>` : ''}`
           : `<div style="font-size:0.7rem;color:var(--muted);font-style:italic;">EN yok</div>`}
+        <div style="margin-top:6px;font-size:0.78rem;font-style:italic;${hasHook ? 'color:var(--ink);' : 'color:var(--muted);'}">
+          Kanca: ${hasHook ? escapeHtml(n.hook_tr) : '— yazılmadı —'}${n.hook_author ? ' <span style="font-style:normal;color:var(--muted);">— ' + escapeHtml(n.hook_author) + '</span>' : ''}
+        </div>
+        <details class="sources-block" data-block-key="news:${n.id}:hook"${blockOpenAttr(`news:${n.id}:hook`)}>
+          <summary class="sources-label">Kancayı düzenle</summary>
+          <div class="src-form" style="grid-template-columns:1fr;">
+            <input type="text" class="nh-hook" placeholder="Hook (TR)" value="${escapeHtml(n.hook_tr || '')}"/>
+            <input type="text" class="nh-hook-en" placeholder="Hook (EN)" value="${escapeHtml(n.hook_en || '')}"/>
+            <input type="text" class="nh-hook-author" placeholder="İmza" value="${escapeHtml(n.hook_author || '')}"/>
+            <button class="btn btn-secondary" data-act="save-hook" data-id="${n.id}">Kaydet</button>
+          </div>
+          <div class="nh-status status-msg"></div>
+        </details>
+        <div class="news-edition-row" style="margin-top:8px;padding:8px;border:1px dashed var(--rule);display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:0.78rem;">
+          <strong>${editionLabel}</strong>
+          ${warnBits.length ? `<span style="color:var(--ink-red);">${warnBits.join(' · ')}</span>` : ''}
+          <input type="date" class="ned-date" value="${escapeHtml(n.edition_date || '')}" style="width:150px;"/>
+          <label style="margin:0;">Sıra</label>
+          <input type="number" class="ned-order" value="${n.edition_order ?? 0}" style="width:60px;"/>
+          <button class="btn btn-secondary" data-act="save-edition" data-id="${n.id}" ${editionReady ? '' : 'disabled title="Önce hook ve anket ekle"'}>Sayıya Ekle / Güncelle</button>
+          ${n.edition_date ? `<button class="btn-del" data-act="clear-edition" data-id="${n.id}">Sayıdan Çıkar</button>` : ''}
+          <div class="ned-status status-msg"></div>
+        </div>
         <details class="sources-block" data-block-key="news:${n.id}:upd"${blockOpenAttr(`news:${n.id}:upd`)}>
           <summary class="sources-label">Gelişmeler (${updates.length})</summary>
           ${updatesHtml}
@@ -4218,6 +4273,9 @@ document.getElementById('news-list').addEventListener('click', function(e) {
   else if (act === 'save-update-edit') saveNewsUpdateEdit(btn);
   else if (act === 'add-poll') addPoll(btn);
   else if (act === 'del-poll') deletePoll(btn.dataset.id);
+  else if (act === 'save-hook') saveNewsHook(btn);
+  else if (act === 'save-edition') saveNewsEdition(btn);
+  else if (act === 'clear-edition') clearNewsEdition(btn);
   // Re-filing: a story into another story's Zaman Akışı, or one entry of a
   // timeline into a different one (or back out into a story of its own).
   else if (act === 'move-news') openMovePanel(card, '.move-form[data-move-news]', btn.dataset.id);
@@ -4423,6 +4481,81 @@ async function saveNewsEdit(newsId, card) {
     if (countriesErr) loadBreakingNews();
     return;
   }
+  loadBreakingNews();
+}
+
+// The hook is its own small form rather than living in the big edit form
+// — it is what admin writes far more often than the headline itself once
+// a story is already posted, and folding it into the details block keeps
+// it a tap away without crowding the always-visible card.
+async function saveNewsHook(btn) {
+  const card = btn.closest('.article-card');
+  const newsId = btn.dataset.id;
+  const block = btn.closest('details');
+  const hookTr = block.querySelector('.nh-hook').value.trim();
+  const hookEn = block.querySelector('.nh-hook-en').value.trim();
+  const hookAuthor = block.querySelector('.nh-hook-author').value.trim();
+  const statusEl = block.querySelector('.nh-status');
+  btn.disabled = true;
+  statusEl.textContent = '';
+  const { error } = await sb.from('breaking_news')
+    .update({ hook_tr: hookTr || null, hook_en: hookEn || null, hook_author: hookAuthor || null })
+    .eq('id', newsId);
+  btn.disabled = false;
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'nh-status status-msg err';
+    return;
+  }
+  loadBreakingNews();
+}
+
+// Assigning a story to an edition is what actually publishes it — see
+// db/breaking_news_v3_edition.sql. Refused client-side (the button is
+// already disabled) without a hook and a poll, and refused here again in
+// case the card is stale, since what the reader gets is not news, it is
+// a poll, and a story with neither has nothing to hand them.
+async function saveNewsEdition(btn) {
+  const wrap = btn.closest('.news-edition-row');
+  const newsId = btn.dataset.id;
+  const n = allAdminNews.find(x => String(x.id) === String(newsId));
+  const statusEl = wrap.querySelector('.ned-status');
+  const dateVal = wrap.querySelector('.ned-date').value;
+  const orderVal = parseInt(wrap.querySelector('.ned-order').value, 10) || 0;
+  if (!dateVal) {
+    statusEl.textContent = 'Bir tarih seç.';
+    statusEl.className = 'ned-status status-msg err';
+    return;
+  }
+  const hasHook = n && n.hook_tr && n.hook_tr.trim();
+  const hasPoll = n && (n.breaking_news_polls || []).length > 0;
+  if (!hasHook || !hasPoll) {
+    statusEl.textContent = (!hasHook ? 'Önce bir hook yaz.' : 'Önce bir anket ekle.');
+    statusEl.className = 'ned-status status-msg err';
+    return;
+  }
+  btn.disabled = true;
+  statusEl.textContent = '';
+  const { error } = await sb.from('breaking_news')
+    .update({ edition_date: dateVal, edition_order: orderVal })
+    .eq('id', newsId);
+  btn.disabled = false;
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.className = 'ned-status status-msg err';
+    return;
+  }
+  loadBreakingNews();
+}
+
+async function clearNewsEdition(btn) {
+  const newsId = btn.dataset.id;
+  btn.disabled = true;
+  const { error } = await sb.from('breaking_news')
+    .update({ edition_date: null, edition_order: 0 })
+    .eq('id', newsId);
+  btn.disabled = false;
+  if (error) { alert(error.message); return; }
   loadBreakingNews();
 }
 
@@ -4885,6 +5018,9 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   const category = document.getElementById('n-category').value;
   const seriesId = document.getElementById('n-series').value || null;
   const datetimeVal = document.getElementById('n-datetime').value;
+  const hookTr = document.getElementById('n-hook').value.trim();
+  const hookEn = document.getElementById('n-hook-en').value.trim();
+  const hookAuthor = document.getElementById('n-hook-author').value.trim();
   const pollQ = document.getElementById('n-poll-q').value.trim();
   const pollA = document.getElementById('n-poll-a').value.trim();
   const pollB = document.getElementById('n-poll-b').value.trim();
@@ -4922,6 +5058,7 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
 
   const { data, error } = await sb.from('breaking_news').insert([{
     title, body: body || null, title_en: titleEn || null, body_en: bodyEn || null,
+    hook_tr: hookTr || null, hook_en: hookEn || null, hook_author: hookAuthor || null,
     neighborhood, category, series_id: seriesId, ...timestamps,
   }]).select().single();
 
@@ -4963,7 +5100,7 @@ document.getElementById('n-submit-btn').addEventListener('click', async () => {
   }
   statusEl.textContent = 'Breaking news posted!';
   statusEl.className = 'status-msg ok';
-  ['n-title','n-body','n-title-en','n-body-en','n-datetime','n-poll-q','n-poll-a','n-poll-b'].forEach(id => document.getElementById(id).value = '');
+  ['n-title','n-body','n-title-en','n-body-en','n-datetime','n-hook','n-hook-en','n-poll-q','n-poll-a','n-poll-b'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('n-category').value = 'turkiye';
   document.querySelectorAll('#n-countries input[type="checkbox"]').forEach(cb => { cb.checked = false; });
   syncNewsCountryPicker();
