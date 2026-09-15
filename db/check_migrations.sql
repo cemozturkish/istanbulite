@@ -174,7 +174,11 @@ with checks(sira, dosya, aranan, var) as (
     (43, 'db/hive_slot_codes_v5.sql',                 'hive_slot_offers + hive_claim_slot()',
          to_regclass('public.hive_slot_offers') is not null and pg_temp.has_fn('hive_claim_slot')),
     (44, 'db/onboarding_copy.sql',                    'onboarding_copy tablosunda satır',
-         pg_temp.rows_or_missing('public.onboarding_copy') > 0)
+         pg_temp.rows_or_missing('public.onboarding_copy') > 0),
+
+    -- ── Eylül: eksik ilçeler ──
+    (45, 'db/neighborhoods_v2_missing_districts.sql', 'neighborhoods tablosunda 40 satır (39 ilçe + istanbul_disi)',
+         pg_temp.rows_or_missing('public.neighborhoods') >= 40)
 )
 select
   case when var then '✓ VAR' else '✗ EKSİK' end as durum,
