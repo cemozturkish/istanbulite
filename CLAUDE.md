@@ -1933,7 +1933,7 @@ slide that is the city:
 | | Lane 0 | Lane 1 | Lane 2 |
 |---|---|---|---|
 | | **Kütüphane** | **Hane** | **Kahvehane** |
-| what stands there (gündüz) | Haberler + Anket | the petek | Etkinlikler + Skor Tahtası |
+| what stands there (gündüz) | Haberler + Anket | the petek | Etkinlikler + Oyun Önerileri |
 | what stands there (gece) | Anket sonuçları + Haberler | the petek | Etkinlikler + Oyunlar |
 | where the book may go | up, to slide 1 | nowhere | nowhere *(see ILCE_STOP_ENABLED)* |
 
@@ -1965,14 +1965,59 @@ Four things about it:
   the back half of every winter night under the wrong day, and two readers on the same night would
   be holding different editions depending on which side of midnight they opened the app.
 
-**The games are night-only, behind one flag** (`NIGHT_GAMES_ENABLED`). By day Kahvehane's narrow
-column is the **Skor Tahtası** — how last night went, top three by `IstScoreboard.weekly` — and the
-games take it back at sunset. That is a real restriction: in June the window is 20:38 to 05:32,
+**The games are night-only, behind one flag** (`NIGHT_GAMES_ENABLED`) — and by day that column is
+where the city WRITES them. It is the edition's own rule applied to the one column that is not
+reading at all: from sunrise the three boxes collect what the night's games will be made of, and at
+sunset the same three boxes, in the same order, ARE those games.
+
+| slot | gündüz | gece |
+|---|---|---|
+| 1. Oyun | a word for tonight → `sozcel_word_suggestions` | Sözcel, playing whichever word was chosen |
+| 2. Oyun | a quote for tonight → `tumcel_quote_suggestions` | Tümcel |
+| 3. Oyun | nothing to offer — it is generated, and says so | Bulmaca |
+
+Nothing a member writes here reaches another member except by the admin picking it (admin.html's
+Oyunlar → Sözcel panel, **Bu Gecenin Kelimesi**). That makes the member who came only for the games
+put something into the day rather than finding a locked door until sunset — which is the whole
+reason the daytime half of this column is not a scoreboard.
+
+- **`sozcel_word_suggestions` is NOT world-readable, and that is the one place it diverges from
+  `tumcel_quote_suggestions`** (which is `using (true)`). A Tümcel suggestion is a quote; a Sözcel
+  suggestion is a candidate **answer**, and the admin picks tonight's word out of exactly that
+  table — so world-readable, the whole candidate pool and then the answer itself would be sitting
+  in a table any signed-in member can select from before the game is played. A member reads their
+  own row and nobody else's; the count the box prints comes from `sozcel_suggestion_count(night)`
+  (SECURITY DEFINER, one integer, no words and no identities), the same shape `question_tally` has.
+- **One offer per member per night**, and two members cannot offer the same word for one night
+  (two unique constraints). It is an offer, not a channel to fill; changing your mind is
+  withdrawing yours (`Vazgeç`, allowed only while `pending`) and making another.
+- **The Turkish lowercase fold is `toLocaleLowerCase('tr-TR')`, never `toLowerCase()`.** In Turkish
+  `I`/`ı` and `İ`/`i` are the case pairs, not `I`/`i` — the word lists are lowercase Turkish, so a
+  word folded with the invariant rule never matches the pool it is supposed to join.
+
+**And the word now belongs to a NIGHT rather than to a date**
+(`db/sozcel_used_answers_v7_game_night.sql`). v5 resolved it with
+`(now() at time zone 'Europe/Istanbul')::date`, which rolls at **midnight** — exactly right while
+the games ran all day, and broken the moment they became night-only: a night spans midnight, so a
+member playing at 22:00 and one playing at 01:00 were handed **two different words for the same
+night**, both landing on one scoreboard. `sozcel_daily_word(candidates, p_night)` takes the night
+the caller is playing, and sozcel.html passes `IstDate.editionKey().date` (`sozcelGameNight()`).
+
+This is **not** the client-side pick v5 exists to prevent: the database still decides what the word
+IS, the caller only names which night is being asked for — and reading another night's row was
+always possible anyway, since `sozcel_used_answers` is SELECT-able by every authenticated user. The
+auto-pick is still fenced to within a day of the server's own date, so a wrong clock cannot mint
+words onto arbitrary days. Two mechanical notes: the old one-argument signature is **dropped**
+explicitly, because a defaulted second parameter otherwise leaves two candidate functions and a
+one-argument call fails as ambiguous (42725) rather than resolving; and `WORD_LENGTH` is derived
+from the night's own key too, or a Sunday night (six letters) would ask for five-letter candidates
+after midnight. The same Sunday rule is stated in `sozcelWordLengthFor` (sozcel.html) and
+`sozcelLengthForNight` (project.html) — **two copies that must agree**, or a member is asked for a
+word the game will not take.
+
+That the games are night-only at all is a real restriction: in June the window is 20:38 to 05:32,
 under nine hours. It is one flag rather than a rule spread through the column precisely so a
-season's data can reverse it without a refactor. `scoreboard.js` is loaded **not deferred** on
-project.html, matching every other page that carries it: a deferred copy executes after `mount()`
-has already run `buildCast`, so the column's first fill finds no `IstScoreboard` and prints
-"Yüklenemedi" on a board that was about to exist.
+season's data can reverse it without a refactor.
 
 **A page is answered by THROWING it** (`wirePageThrow`, `throwFootHTML`). Right is the first
 option, left the second, and the option is **stamped on the paper as it goes** so nobody ever
@@ -2430,7 +2475,7 @@ screen, which is why the pose tables swap along with the columns.
 | Türkiye (slide 1) | Türkiye | left — **Hikâyeler**, the stories the map is grouped into | right — **Olaylar** |
 | Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler** (gündüz) / **Anket sonuçları** (gece) | right — **Anket** (gündüz) / **Haberler** (gece) |
 | Hane (lane 1) | none — the petek, full bleed | — | — |
-| Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (a throw is the RSVP) | left — **Skor Tahtası** (gündüz) / **Oyunlar** (gece) |
+| Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (a throw is the RSVP) | left — **Oyun önerileri** (gündüz) / **Oyunlar** (gece) |
 | ~~the ilçe (slide 24)~~ *parked* | the ilçe, with the member's own picked out | right — **Yorumlar** | left — **Kahve**, the Kahve Endeksi's rows |
 
 Six things about it:

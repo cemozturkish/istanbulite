@@ -2197,6 +2197,34 @@
 
       <!-- SÖZCEL -->
       <div class="games-subpanel" id="games-sozcel-panel">
+        <!-- ── TONIGHT'S WORD, CHOSEN FROM WHAT THE CITY OFFERED ──
+             The İstanbul level asks from sunrise and answers from sunset
+             (see CLAUDE.md): by day Kahvehane's games column collects a
+             word from anyone who wants to offer one, and this is where
+             one of them becomes the night's game. It stands ABOVE the
+             Sözcü assignments because it is the daily job and those are
+             the standing arrangement. -->
+        <div style="margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid var(--rule);">
+          <div class="panel-title" style="margin:0 0 14px;">Bu Gecenin Kelimesi</div>
+          <p style="margin-bottom:12px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
+            What members offered for a night, newest first. Choosing one writes it as that night's
+            answer — a night is named for the day it BEGINS on, so tonight is today's date even
+            though the game runs past midnight. Only you can read these; the table is deliberately
+            not member-readable, because a suggestion is a candidate answer.
+          </p>
+          <div class="sozcu-assign-row">
+            <div>
+              <label style="margin-top:0;">Gece</label>
+              <select id="sw-night"></select>
+            </div>
+            <button class="btn" id="sw-reload" style="padding:9px 14px;white-space:nowrap;">Yenile</button>
+          </div>
+          <div id="sw-list" style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+            <div class="empty-state">—</div>
+          </div>
+          <div class="status-msg" id="sw-status" style="margin-top:8px;"></div>
+        </div>
+
         <div class="panel-title">Sözcel — Sözcü Atamaları</div>
         <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
           Pick a member to be the Sözcü for an upcoming day. They will enter the word and its
@@ -3018,7 +3046,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'worldevents') loadWorldEventsTab();
     if (tab === 'news') { loadSeries(); loadBreakingNews(); }
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
-    if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); }
+    if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); initSozcelSuggestions(); }
     if (tab === 'quotes') loadQuotesList();
     if (tab === 'district-polls') loadDistrictPollsList();
     if (tab === 'kahve') loadCoffeeList();
@@ -7654,6 +7682,147 @@ async function toggleGameDay(game, date, currentlyOff) {
     if (error) { alert('Hata: ' + error.message); return; }
   }
   loadGameStatusBoard();
+}
+
+// ══════════════════════════════════════════════════════════════
+// SÖZCEL: tonight's word, chosen from what the city offered
+//
+// db/sozcel_word_suggestions.sql. Members offer during the day edition;
+// picking one writes it as that night's answer in sozcel_used_answers
+// (the admin holds INSERT/UPDATE there with no deadline —
+// db/sozcel_used_answers_v6_admin_override.sql) and flips the suggestion
+// to 'picked'.
+//
+// A night is named for the day it BEGINS on, which is what
+// sozcel_used_answers.used_on is keyed by now (v7) and what the game
+// asks for. So "tonight" is today's date even though the game runs past
+// midnight — the picker says so rather than making anyone work it out.
+function swNightOptions() {
+  const sel = document.getElementById('sw-night');
+  if (!sel || sel.options.length) return;
+  const out = [];
+  // Yesterday is offered too: a night is still being played at 02:00, and
+  // that is exactly when a wrong word most needs replacing.
+  for (let off = -1; off <= 5; off++) {
+    const iso = IstDate.iso(off);
+    const label = off === 0 ? iso + ' (bu gece)' : (off === -1 ? iso + ' (dün gece)' : iso);
+    out.push('<option value="' + iso + '"' + (off === 0 ? ' selected' : '') + '>' + label + '</option>');
+  }
+  sel.innerHTML = out.join('');
+}
+
+async function loadSozcelSuggestions() {
+  const list = document.getElementById('sw-list');
+  const sel = document.getElementById('sw-night');
+  const status = document.getElementById('sw-status');
+  if (!list || !sel) return;
+  const night = sel.value;
+  list.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  if (status) { status.textContent = ''; status.className = 'status-msg'; }
+
+  let rows = [], already = null;
+  try {
+    const [sug, used] = await Promise.all([
+      sb.from('sozcel_word_suggestions')
+        .select('id, word, note, status, suggested_at, suggested_by')
+        .eq('for_night', night).order('suggested_at', { ascending: false }),
+      sb.from('sozcel_used_answers').select('word, sozcul_id').eq('used_on', night).maybeSingle(),
+    ]);
+    if (sug.error) throw sug.error;
+    rows = sug.data || [];
+    already = used && used.data ? used.data : null;
+  } catch (err) {
+    console.error('[sw]', err);
+    list.innerHTML = '<div class="empty-state">Yüklenemedi — migration uygulandı mı? ' +
+                     'db/sozcel_word_suggestions.sql</div>';
+    return;
+  }
+
+  // Who offered each one. Best-effort: a name that will not resolve is
+  // printed as a dash rather than taking the list down.
+  let names = new Map();
+  try {
+    const ids = [...new Set(rows.map(r => r.suggested_by))];
+    if (ids.length) {
+      const { data } = await sb.from('profiles').select('id, first_name, last_name').in('id', ids);
+      (data || []).forEach(p => names.set(p.id, [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'));
+    }
+  } catch (err) { /* names are a nicety */ }
+
+  const head = already
+    ? '<div class="status-msg ok" style="margin:0 0 6px;">Bu gecenin kelimesi zaten var: <b>' +
+        escapeHtml(already.word) + '</b> — başka birini seçmek onu değiştirir.</div>'
+    : '';
+  if (!rows.length) {
+    list.innerHTML = head + '<div class="empty-state">Bu gece için öneri yok.</div>';
+    return;
+  }
+  list.innerHTML = head + rows.map(r => {
+    const picked = r.status === 'picked';
+    return '<div class="sources-row" style="display:flex;align-items:center;gap:10px;' +
+      'border:1px solid var(--rule);padding:8px 10px;' + (picked ? 'background:var(--paper-card);' : '') + '">' +
+      '<b style="font-family:ui-monospace,monospace;letter-spacing:0.14em;font-size:0.95rem;">' +
+        escapeHtml(r.word) + '</b>' +
+      '<span style="flex:1;min-width:0;font-size:0.76rem;color:var(--muted);">' +
+        escapeHtml(names.get(r.suggested_by) || '—') +
+        (r.note ? ' — ' + escapeHtml(r.note) : '') + '</span>' +
+      (picked
+        ? '<span style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-red);">Seçildi</span>'
+        : '<button class="btn btn-primary" data-sw-pick="' + escapeHtml(r.id) + '" ' +
+          'data-sw-word="' + escapeHtml(r.word) + '" style="padding:5px 12px;">Seç</button>') +
+      '</div>';
+  }).join('');
+}
+
+async function pickSozcelSuggestion(id, word) {
+  const sel = document.getElementById('sw-night');
+  const status = document.getElementById('sw-status');
+  const night = sel ? sel.value : IstDate.iso();
+  if (!confirm(night + ' gecesinin kelimesi "' + word + '" olsun mu?')) return;
+  if (status) { status.textContent = 'Kaydediliyor…'; status.className = 'status-msg'; }
+  try {
+    // The word row first: if this fails the suggestion must NOT be marked
+    // picked, or the list would claim a night has a word it does not.
+    // upsert on used_on, because replacing a wrong word is exactly the
+    // case the admin override exists for.
+    const { error: wErr } = await sb.from('sozcel_used_answers')
+      .upsert([{ used_on: night, word }], { onConflict: 'used_on' });
+    if (wErr) throw wErr;
+    // Anything previously picked for this night is no longer the answer.
+    await sb.from('sozcel_word_suggestions')
+      .update({ status: 'pending' }).eq('for_night', night).eq('status', 'picked');
+    const { error: sErr } = await sb.from('sozcel_word_suggestions')
+      .update({ status: 'picked' }).eq('id', id);
+    if (sErr) throw sErr;
+    if (status) { status.textContent = 'Seçildi: ' + word; status.className = 'status-msg ok'; }
+    loadSozcelSuggestions();
+  } catch (err) {
+    console.error('[sw pick]', err);
+    if (status) { status.textContent = 'Kaydedilemedi: ' + (err.message || err); status.className = 'status-msg err'; }
+  }
+}
+
+// Called on every open of the Oyunlar tab, so the wiring half runs once
+// and the LOAD half runs every time: re-binding on each open would stack
+// a listener per visit onto the same nodes.
+let _swWired = false;
+function initSozcelSuggestions() {
+  swNightOptions();
+  if (_swWired) { loadSozcelSuggestions(); return; }
+  _swWired = true;
+  const sel = document.getElementById('sw-night');
+  const reload = document.getElementById('sw-reload');
+  const list = document.getElementById('sw-list');
+  if (sel) sel.addEventListener('change', loadSozcelSuggestions);
+  if (reload) reload.addEventListener('click', loadSozcelSuggestions);
+  // Delegated: the rows are rebuilt on every load, so a listener per
+  // button would be re-bound each time and leak the old ones.
+  if (list) list.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-sw-pick]');
+    if (!btn) return;
+    pickSozcelSuggestion(btn.dataset.swPick, btn.dataset.swWord);
+  });
+  loadSozcelSuggestions();
 }
 
 // ── Sözcel: Sözcü assignment + day status ──

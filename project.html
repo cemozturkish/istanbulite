@@ -20,11 +20,6 @@
   <script src="profile-card.js?v=39" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
-  <!-- NOT deferred, and every other page that carries it agrees: a
-       deferred copy executes after mount() has already run buildCast,
-       so the first fill of the Skor column finds no IstScoreboard and
-       prints "Yüklenemedi" on a board that was about to exist. -->
-  <script src="scoreboard.js?v=1"></script>
   <script src="sheet.js?v=5"></script>
   <link rel="stylesheet" href="sheet.css?v=7">
   <link rel="stylesheet" href="frames.css?v=11">
@@ -1354,6 +1349,57 @@
       text-transform: uppercase;
       color: var(--muted);
     }
+
+    /* ── THE OFFER ──
+       What the games column asks for by day. Plain ruled fields on the
+       page's own paper: this is a form on a sheet of newsprint, not a
+       dialog, so nothing here is boxed or raised. */
+    .submit-label {
+      display: block;
+      margin: 12px 0 5px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .submit-in {
+      width: 100%;
+      box-sizing: border-box;
+      border: 2px solid var(--ink);
+      background: var(--paper);
+      color: var(--ink);
+      font-family: inherit;
+      font-size: 0.95rem;
+      padding: 8px 10px;
+      -webkit-appearance: none;
+      appearance: none;
+      border-radius: 0;
+    }
+    /* The word is the one field whose SHAPE is the rule — it has to be a
+       given number of Turkish letters — so it is set wide and monospaced
+       and the reader can count it without being told twice. */
+    #submit-in:not(.submit-area) {
+      font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+      letter-spacing: 0.22em;
+      text-transform: lowercase;
+    }
+    .submit-area { resize: none; line-height: 1.4; letter-spacing: 0; }
+    .submit-in:focus { outline: 2px solid var(--ink-red); outline-offset: 1px; }
+    /* What you already offered, printed as the thing itself rather than
+       as a field you can no longer use. */
+    .submit-made {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 2px solid var(--ink);
+      border-bottom-width: 5px;
+      background: var(--paper-card);
+      font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      overflow-wrap: anywhere;
+    }
     .fb-page-title { margin: 0 0 6px; font-size: 1.15rem; line-height: 1.2; }
     .fb-page-meta { color: var(--muted); font-size: 0.78rem; line-height: 1.45; margin-bottom: 9px; }
     .fb-page-body p { margin: 0 0 9px; font-size: 0.85rem; line-height: 1.5; }
@@ -1684,7 +1730,9 @@ const START_LANE = LANE_HANE;
 //                            it and a THROW answers the story's own poll
 //                      narrow: Anket — the district poll, to vote in
 //           Kahvehane  wide: the three evenings; a throw is the RSVP
-//                      narrow: Skor Tahtası — how last night's games went
+//                      narrow: the three games, COLLECTING -- a word for
+//                              Sözcel, a quote for Tümcel, and Bulmaca
+//                              saying it builds itself
 //
 //   GECE    Kütüphane  wide: ANKET SONUÇLARI — every district, coloured
 //                            by its own split (the reveal)
@@ -1769,7 +1817,7 @@ function refreshEditionColumns() {
   anketPromise = null;
   if (loadAnketActor && loadAnketActor.reset) loadAnketActor.reset();
   gamesStatePromise = null;
-  scoreboardPromise = null;
+  submitPromise = null;
   (cast || []).forEach(a => {
     if (!a.def.load) return;
     if (!/\bfb-haberler\b|\bfb-anket\b|\bfb-oyun\b/.test(a.def.cls)) return;
@@ -2843,35 +2891,233 @@ const loadAnketSonucActor = stackFetch(async () => {
                '<div class="m">Gündüz anket açılmamış.</div>' };
 });
 
-// ── Kahvehane's narrow column by DAY: how last night went ──
-// The games are the night's, so the morning gets their result. One fetch
-// for the whole column, the same shape every other stack uses.
-let scoreboardPromise = null;
-const loadSkorActor = stackFetch(async () => {
+// ══════════════════════════════════════════════════════════════
+// KAHVEHANE'S NARROW COLUMN BY DAY — the city writes tonight's games
+//
+// The same three boxes, in the same order, doing the opposite thing. By
+// night they ARE the games; by day they collect what the games will be
+// made of, and the admin chooses between what came in. It is the
+// edition's own rule (ask from sunrise, answer from sunset) applied to
+// the one column that is not reading at all — so the member who comes
+// only for the games still puts something into the day rather than
+// finding a locked door until sunset.
+//
+//   Sözcel   a word for tonight        -> sozcel_word_suggestions
+//   Tümcel   a quote for tonight       -> tumcel_quote_suggestions
+//   Bulmaca  nothing to offer          -> it is generated, and says so
+//
+// Both tables are admin-curated by construction: nothing a member writes
+// here reaches another member except by the admin picking it.
+const SUBMIT_DEFS = [
+  { key: 'sozcel', kicker: '1. OYUN', title: 'Sözcel', ask: 'Bu geceye bir kelime öner' },
+  { key: 'tumcel', kicker: '2. OYUN', title: 'Tümcel', ask: 'Bu geceye bir alıntı öner' },
+  { key: 'bulmaca', kicker: '3. OYUN', title: 'Bulmaca', ask: null },
+];
+
+// The night these offers are FOR. By day editionKey() is simply today,
+// which is the night that begins this evening — the one key both halves
+// of it will share once it starts (see ist-date.js).
+function tonightKey() {
   try {
-    if (!window.IstScoreboard || !IstScoreboard.weekly) throw new Error('scoreboard yok');
-    if (!scoreboardPromise) scoreboardPromise = IstScoreboard.weekly(IstRouter.sb, {});
-    const { rows, error } = await scoreboardPromise;
-    if (error) throw error;
-    const top = (rows || []).slice(0, 3);
-    return {
-      rows: top.map((r, i) => ({
-        html: '<div class="k">' + (i + 1) + '. SIRA</div>' +
-          '<div class="t">' + esc(r.name || 'Anonim') + '</div>' +
-          '<div class="m">' + esc(String(r.score != null ? r.score : 0)) + ' puan</div>',
-        page: null,
-      })),
-      failed: false,
-      emptyHtml: '<div class="k">SKOR TAHTASI</div><div class="t">Henüz kimse oynamadı</div>' +
-                 '<div class="m">Oyunlar gece açılıyor.</div>',
-    };
-  } catch (err) {
-    console.error('[proje skor]', err);
-    return { rows: [], failed: true,
-      failedHtml: '<div class="k">SKOR TAHTASI</div><div class="t">Yüklenemedi</div>' +
-                  '<div class="m">Bağlantını kontrol et.</div>' };
+    if (window.IstDate && IstDate.editionKey) return IstDate.editionKey().date;
+  } catch (err) { console.error('[proje gece]', err); }
+  return IstDate.iso();
+}
+
+// Sunday nights are six letters — the same rule sozcel.html states in
+// `sozcelWordLengthFor`, and the two must agree or a member is asked for
+// a word the game will not take. Read off the night's own key rather
+// than off `today`, for the reason that file gives.
+function sozcelLengthForNight(nightKey) {
+  const d = IstDate.parseYMD(nightKey);
+  return d && d.getDay() === 0 ? 6 : 5;
+}
+
+let submitPromise = null;
+function submitData() {
+  if (!submitPromise) {
+    submitPromise = (async () => {
+      const night = tonightKey();
+      const out = { night, mine: {}, count: 0, failed: false };
+      try {
+        const uid = await doneUid();
+        if (!uid) return out;
+        // RLS hands back only the caller's own row (see the migration's
+        // own note on why this table is not world-readable).
+        const [sz, tm, cnt] = await Promise.all([
+          IstRouter.sb.from('sozcel_word_suggestions')
+            .select('id, word, status').eq('for_night', night).eq('suggested_by', uid).maybeSingle(),
+          IstRouter.sb.from('tumcel_quote_suggestions')
+            .select('id, body, status').eq('suggested_by', uid).eq('status', 'pending').limit(1),
+          IstRouter.sb.rpc('sozcel_suggestion_count', { p_night: night }),
+        ]);
+        if (sz && sz.data) out.mine.sozcel = sz.data;
+        if (tm && tm.data && tm.data.length) out.mine.tumcel = tm.data[0];
+        if (cnt && typeof cnt.data === 'number') out.count = cnt.data;
+      } catch (err) {
+        console.error('[proje öneri]', err);
+        out.failed = true;
+      }
+      return out;
+    })();
   }
-});
+  return submitPromise;
+}
+
+function refreshSubmitColumn() {
+  submitPromise = null;
+  (cast || []).forEach(a => {
+    if (!/\bfb-oyun\b/.test(a.def.cls) || !a.def.load) return;
+    try { a.def.load(a.el); } catch (err) { console.error(err); }
+  });
+}
+
+async function loadSubmitActor(el, slot) {
+  const data = await submitData();
+  if (!el.isConnected) return;
+  fbSetPage(el, null);
+  fbSetDone(el, false);
+  el.classList.remove('fb-locked', 'fb-empty');
+  // The same slot arithmetic the games use: the column reads downward,
+  // so the first game stands in the last slot (see gameForSlot).
+  const g = SUBMIT_DEFS[SUBMIT_DEFS.length - 1 - slot];
+  // Bulmaca is generated — there is nothing to offer it, and a box that
+  // asks for something it cannot take is worse than one that says so.
+  if (!g.ask) {
+    el.classList.add('fb-empty');
+    el.innerHTML = '<div class="k">' + g.kicker + '</div><div class="t">' + g.title + '</div>' +
+                   '<div class="m">Kendi kurulur</div>';
+    return;
+  }
+  const mine = data.mine[g.key];
+  // An offer already made is this column's "done": the box goes quiet the
+  // way a read story does, and stays pressable so it can be withdrawn.
+  fbSetDone(el, !!mine);
+  el.innerHTML = '<div class="k">' + g.kicker + '</div><div class="t">' + g.title + '</div>' +
+    '<div class="m">' + (mine ? 'Önerdin' : esc(g.ask)) + '</div>';
+  fbSetPage(el, submitPagePayload(g, data, mine));
+}
+
+// What an offer box opens: a field, or what you already offered. Built
+// by `wire` rather than statically, for the same reason ANKET's page is
+// — it is stateful, and submitting has to turn the form into a receipt
+// without closing the page.
+function submitPagePayload(g, data, mine) {
+  const need = g.key === 'sozcel' ? sozcelLengthForNight(data.night) : 0;
+  return {
+    kicker: g.kicker + ' · ÖNERİ',
+    meta: data.count ? data.count + ' öneri' : '',
+    title: g.title,
+    html: '<div id="submit-body" class="anket-body">Yükleniyor…</div>',
+    wire: (inner) => wireSubmitPage(inner, g, data, mine, need),
+  };
+}
+
+function wireSubmitPage(inner, g, data, mine, need) {
+  const body = inner.querySelector('#submit-body');
+  if (!body) return;
+  if (mine) { renderSubmitMade(body, g, mine); return; }
+  renderSubmitForm(body, g, data, need);
+}
+
+// What you offered, and the one thing left to do with it: take it back.
+function renderSubmitMade(body, g, mine) {
+  const what = g.key === 'sozcel' ? (mine.word || '') : (mine.body || '');
+  body.innerHTML =
+    '<div class="submit-made">' + esc(what) + '</div>' +
+    '<div class="anket-note">' +
+      (mine.status === 'picked'
+        ? 'Seçildi — bu gece bu oynanıyor.'
+        : 'Gönderildi. Akşam hangisinin oynanacağına yönetici karar veriyor.') +
+    '</div>' +
+    (mine.status === 'picked' ? '' :
+      '<div class="fb-throw-row"><button type="button" class="fb-throw-btn" id="submit-undo">Vazgeç</button></div>');
+  const undo = body.querySelector('#submit-undo');
+  if (undo) undo.addEventListener('click', async () => {
+    undo.disabled = true;
+    const table = g.key === 'sozcel' ? 'sozcel_word_suggestions' : 'tumcel_quote_suggestions';
+    const { error } = await IstRouter.sb.from(table).delete().eq('id', mine.id);
+    if (error) {
+      console.error('[proje öneri sil]', error);
+      undo.disabled = false;
+      body.insertAdjacentHTML('beforeend', '<div class="anket-note">Geri alınamadı.</div>');
+      return;
+    }
+    refreshSubmitColumn();
+    dismissFbPage();
+  });
+}
+
+function renderSubmitForm(body, g, data, need) {
+  const isWord = g.key === 'sozcel';
+  body.innerHTML =
+    '<label class="submit-label" for="submit-in">' +
+      (isWord ? need + ' harfli bir kelime' : 'Alıntı') + '</label>' +
+    (isWord
+      ? '<input class="submit-in" id="submit-in" type="text" inputmode="text" autocomplete="off" ' +
+        'autocapitalize="off" spellcheck="false" maxlength="' + need + '">'
+      : '<textarea class="submit-in submit-area" id="submit-in" rows="3" maxlength="240"></textarea>') +
+    (isWord
+      ? '<label class="submit-label" for="submit-note">Neden? (isteğe bağlı)</label>' +
+        '<input class="submit-in" id="submit-note" type="text" maxlength="120">'
+      : '<label class="submit-label" for="submit-note">Kimden?</label>' +
+        '<input class="submit-in" id="submit-note" type="text" maxlength="120">') +
+    '<div class="fb-throw-row"><button type="button" class="fb-throw-btn" id="submit-go">Gönder</button></div>' +
+    '<div class="anket-note" id="submit-msg">Bu gece oynanacak oyun için.</div>';
+
+  const field = body.querySelector('#submit-in');
+  const note = body.querySelector('#submit-note');
+  const go = body.querySelector('#submit-go');
+  const msg = body.querySelector('#submit-msg');
+  if (!field || !go) return;
+
+  go.addEventListener('click', async () => {
+    // Turkish lowercase: İ/I are not each other's case pair in tr, so
+    // toLocaleLowerCase('tr') is the only correct fold here — the word
+    // lists are lowercase Turkish and a mismatched I never matches.
+    const raw = (field.value || '').trim().toLocaleLowerCase('tr-TR');
+    const extra = (note && note.value || '').trim();
+    if (!raw) { msg.textContent = 'Önce bir şey yaz.'; return; }
+    if (isWord) {
+      if (raw.length !== need) { msg.textContent = 'Bu gece ' + need + ' harfli olmalı.'; return; }
+      // Turkish letters only. The pool is Turkish words; anything else is
+      // a word the game could never take.
+      if (!/^[a-zçğıöşü]+$/.test(raw)) { msg.textContent = 'Sadece Türkçe harfler.'; return; }
+    }
+    go.disabled = true;
+    msg.textContent = 'Gönderiliyor…';
+    const uid = await doneUid();
+    if (!uid) { go.disabled = false; msg.textContent = 'Oturum bulunamadı.'; return; }
+    let error = null;
+    if (isWord) {
+      // A word that has already been an answer can never be one again
+      // (sozcel_used_answers.word is unique across all days), so it is
+      // worth saying here rather than letting the admin find out.
+      try {
+        const { data: used } = await IstRouter.sb.from('sozcel_used_answers')
+          .select('word').eq('word', raw).maybeSingle();
+        if (used) { go.disabled = false; msg.textContent = 'Bu kelime daha önce oynandı.'; return; }
+      } catch (err) { /* best effort: the insert is still fenced */ }
+      ({ error } = await IstRouter.sb.from('sozcel_word_suggestions')
+        .insert([{ for_night: data.night, word: raw, note: extra || null, suggested_by: uid }]));
+    } else {
+      ({ error } = await IstRouter.sb.from('tumcel_quote_suggestions')
+        .insert([{ body: (field.value || '').trim(), source: extra || '—', suggested_by: uid }]));
+    }
+    if (error) {
+      console.error('[proje öneri]', error);
+      go.disabled = false;
+      // 23505 is the unique constraint: either this member already
+      // offered tonight, or somebody else already offered this word.
+      msg.textContent = error.code === '23505'
+        ? 'Bu öneri zaten var — ya seninki ya da aynı kelime.'
+        : 'Gönderilemedi, tekrar dene.';
+      return;
+    }
+    refreshSubmitColumn();
+    dismissFbPage();
+  });
+}
 
 // ══════════════════════════════════════════════════════════════
 // WHICH LOADER A COLUMN USES — the whole of the day/night switch
@@ -2889,7 +3135,7 @@ function loadKutuphaneNarrow(el, slot) {
 }
 function loadKahveNarrow(el, slot) {
   if (!NIGHT_GAMES_ENABLED) return loadOyunActor(el, slot);
-  return fbEdition === 'gece' ? loadOyunActor(el, slot) : loadSkorActor(el, slot);
+  return fbEdition === 'gece' ? loadOyunActor(el, slot) : loadSubmitActor(el, slot);
 }
 
 // ── Kahvehane's other column: the fixed set of games ──
@@ -3012,11 +3258,14 @@ function refreshOyunColumn() {
 function onpressOyun(e, slot) {
   const el = e.currentTarget;
   if (el.classList.contains('fb-empty') || el.classList.contains('fb-locked')) return;
-  // By day this column is the scoreboard, and a scoreboard row opens
-  // nothing. Its rows carry no page (see loadSkorActor) so they are not
-  // pressable anyway -- this is the second fence, because the press
-  // handler is the actor's and does not change with the edition.
-  if (NIGHT_GAMES_ENABLED && fbEdition !== 'gece') return;
+  // ── The press handler belongs to the ACTOR, not to the edition ──
+  // This column is two different things across the day, so the one
+  // handler both of them carry has to route: by night a press opens the
+  // game, by day it opens that game's offer page, which is an ordinary
+  // payload and so goes through the ordinary door (onpressBox). Without
+  // this the daytime boxes looked pressable, set `_fbPage`, and did
+  // nothing at all when pressed.
+  if (NIGHT_GAMES_ENABLED && fbEdition !== 'gece') { onpressBox(e); return; }
   openGameOverlay(gameForSlot(slot).file);
 }
 
