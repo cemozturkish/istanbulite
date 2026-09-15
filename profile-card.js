@@ -125,120 +125,36 @@
     });
   }
 
-  // ── Your own name walks with the lane (project.html) ──
-  // The three carousel pages moved the names by changing which end of a
-  // flex row each block stood at, because a navigation is a discrete
-  // thing (see setBarLayout above). The flip book's lanes are not: the
-  // strip follows the finger and everything on the screen is painted
-  // from one continuous number, so the name on the bar is painted from
-  // it too rather than being told about the result afterwards.
+  // ── Your own meta line reads the flip book's DEPTH, not its lane ──
+  // The name used to also walk sideways with project.html's lane drag
+  // (setBarSlide/paintBarSlide, now removed) — the block travelled toward
+  // whichever edge the reader was pulling the strip. It reads better held
+  // dead centre, always, on every page: nothing about where you are
+  // standing needs the words themselves to move.
   //
-  // `t` is which edge the reader's own name is walking toward: -1 the
-  // left, +1 the right, 0 the middle. The lane it is written from is the
-  // page's own business (project.html reads it backwards, so Kütüphane
-  // ranges you right and Kahvehane left — the same turning-around the
-  // three carousel pages' BAR_LAYOUT above already spells out). At 0 the
-  // block stands in the middle of the bar exactly as it does today; at
-  // either end it is ranged against that edge of its own box, and every
-  // position between is the linear middle.
-  //
-  // Nothing here eases: the drag IS the gesture,
-  // and the settle is already the release tween's own ease-out (runLane
-  // in project.html), so a transition on top of it would be a second
-  // curve fighting the first.
-  //
-  // ── And it is BOTH lines that walk, not the block ──
-  // Your name and your district are two lines of different lengths, and
-  // what has to end up against the edge of the bar is each of them —
-  // ranging the block alone leaves the shorter of the two (usually the
-  // district) still centred under the longer one, which reads as one of
-  // them not having arrived. So the travel is measured per line: the
-  // wider line is the block's own width and has nowhere further to go,
-  // and the narrower one covers the difference between them on top of
-  // the block's move. Same number `t` drives all of it, so the two lines
-  // and the block are one movement rather than three.
-  let _barSlide = 0;
-  // Whether the flip book is driving this bar at all. It is what the
-  // stylesheet keys the two lines' shrink-wrap off, so it is a fact about
-  // the page being mounted and NOT about the current `t` — it must not
-  // come and go as a pull passes through the middle lane. Kept at module
-  // scope because the row is rebuilt under it (see renderPage).
-  let _barSliding = false;
-  // { slack, lines: [{ el, dx }] } — everything measured at t = 1, cached
-  let _barTravel = null;
+  // What DOES change with the flip book is which zoom level you are
+  // standing at, and that is said by the second line instead — the same
+  // slot your own district normally sits in. project.html calls
+  // setBarLevelLabel(text) on every frame of the book's own depth as the
+  // reader scrubs through it: "TÜRKİYE" at the outermost stop, "İSTANBUL"
+  // at the middle one, and (once drawn) the reader's own ilçe at the
+  // innermost. clearBarLevelLabel() hands the line back to the real
+  // district the moment the page is left, so every other page keeps
+  // printing what it always has.
+  let _barLevelLabel = null;
 
-  function setBarSlide(t) {
-    const n = Math.max(-1, Math.min(1, Number(t) || 0));
-    if (n === _barSlide && _barSliding) return;
-    _barSlide = n;
-    // Switching the class on changes how the two lines are laid out, so
-    // anything measured before it is measured against the wrong boxes.
-    if (!_barSliding) { _barSliding = true; invalidateBarSlack(); }
-    paintBarSlide();
+  function setBarLevelLabel(text) {
+    const next = text == null ? null : String(text);
+    if (next === _barLevelLabel) return;
+    _barLevelLabel = next;
+    paintBarMe();
   }
 
-  function clearBarSlide() {
-    _barSlide = 0;
-    if (_barSliding) { _barSliding = false; invalidateBarSlack(); }
-    paintBarSlide();
+  function clearBarLevelLabel() {
+    if (_barLevelLabel === null) return;
+    _barLevelLabel = null;
+    paintBarMe();
   }
-
-  // How far each thing may travel toward either edge, at t = 1.
-  //
-  // The block shrink-wraps its own type and is centred in the room the
-  // bar's own padding leaves (.ist-pc-seat-none), so it may cover half of
-  // what is left over; each line then covers half of what IT leaves
-  // inside the block. Measured rather than guessed at — a long name has
-  // less room to travel than a short one — and cached, because this is
-  // read on every frame of a drag and measuring there would lay the bar
-  // out sixty times a second.
-  function barTravel() {
-    if (_barTravel) return _barTravel;
-    const me = document.getElementById('ist-pc-me');
-    const id = me && me.querySelector('.ist-pc-id');
-    if (!me || !id) return null;
-    // A row that has not been laid out yet (the bar is display:none above
-    // 768px, and a hidden document measures as nothing) measures zero —
-    // which is a true answer for right now and a wrong one to cache.
-    if (!me.clientWidth) return null;
-    const inner = id.clientWidth;
-    _barTravel = {
-      slack: Math.max(0, (me.clientWidth - id.offsetWidth) / 2),
-      lines: Array.from(id.querySelectorAll('.ist-pc-name, .ist-pc-meta')).map(el => ({
-        el, dx: Math.max(0, (inner - el.offsetWidth) / 2),
-      })),
-    };
-    return _barTravel;
-  }
-
-  function invalidateBarSlack() { _barTravel = null; }
-
-  // The block's own move is painted onto .ist-pc-me rather than onto the
-  // block inside it, so it cannot collide with the transform
-  // setBarLayout's FLIP writes on .ist-pc-id (see above) — the two moves
-  // are different elements'. Each line's own residual then rides on top,
-  // written to the line itself.
-  function paintBarSlide() {
-    const me = document.getElementById('ist-pc-me');
-    if (!me) return;
-    // Re-asserted here rather than only where it is switched, because
-    // this is also what runs after a renderPage that built a fresh row
-    // (see paintBarMe) — the class and the measurement both belong to a
-    // row that may not have existed when the lane last moved.
-    const row = me.closest('.ist-pc-row');
-    if (row) row.classList.toggle('ist-pc-sliding', _barSliding);
-    const travel = barTravel();
-    me.style.setProperty('--ist-pc-slide',
-      (_barSlide * (travel ? travel.slack : 0)).toFixed(2) + 'px');
-    if (!travel) return;
-    travel.lines.forEach(({ el, dx }) => {
-      el.style.setProperty('--ist-pc-line', (_barSlide * dx).toFixed(2) + 'px');
-    });
-  }
-
-  // The bar is a fixed row of type: what it can travel changes only when
-  // the row itself changes size.
-  global.addEventListener('resize', () => { invalidateBarSlack(); paintBarSlide(); });
 
   // ── Somebody else's name, where your own name stands ──
   // Hane names no seat (see BAR_LAYOUT): the bar over the petek carries
@@ -287,15 +203,15 @@
     const metaEl = me.querySelector('.ist-pc-meta');
     if (!nameEl || !metaEl) return;
     nameEl.textContent = _barMember ? _barMember.name : (me.dataset.selfName || '');
-    metaEl.textContent = _barMember ? _barMember.meta : (me.dataset.selfMeta || '');
+    // Someone else's name always carries their own district; yours reads
+    // the flip book's depth when project.html has set one (see
+    // setBarLevelLabel above), and otherwise your real district.
+    metaEl.textContent = _barMember ? _barMember.meta
+      : (_barLevelLabel != null ? _barLevelLabel : (me.dataset.selfMeta || ''));
     me.classList.toggle('ist-pc-me-other', !!_barMember);
     const label = _barMember ? _barMember.name : (me.dataset.selfLabel || '');
     me.setAttribute('aria-label', label);
     me.setAttribute('title', label);
-    // A different name is a different width, so how far it may walk
-    // toward either edge is a different number (see barSlack).
-    invalidateBarSlack();
-    paintBarSlide();
   }
 
   // Which of the three carousel pages we're on. router.js stamps
@@ -4034,8 +3950,8 @@
     mount,
     setPage,
     setBarLayout,
-    setBarSlide,
-    clearBarSlide,
+    setBarLevelLabel,
+    clearBarLevelLabel,
     clearBarMember,
     unmount,
     mountLibraryCard,
