@@ -67,8 +67,13 @@
     return `Bugün ${GAME_LABELS[game] || game} yok!`;
   }
 
-  function istanbulDateISO() {
-    return IstDate.iso();
+  // The NIGHT these gates are about, not the calendar date. The games are
+  // night-only and a night spans midnight, so a key that rolled over at
+  // 00:00 switched a game the admin had turned off back on, and re-locked
+  // Tümcel behind a question the reader had already answered, half way
+  // through the night they were playing. See ist-date.js.
+  function gameNightKey() {
+    return IstDate.gameNight();
   }
 
   let _stylesInjected = false;
@@ -146,7 +151,7 @@
       const { data, error } = await sb
         .from('game_day_toggles')
         .select('game')
-        .eq('game_date', istanbulDateISO())
+        .eq('game_date', gameNightKey())
         .in('game', ALL_GAMES);
       if (!error && data) data.forEach(r => off.add(r.game));
     } catch (_) {}
@@ -218,7 +223,7 @@
       const { data, error } = await sb
         .from('daily_questions')
         .select('id, after_game')
-        .eq('question_date', istanbulDateISO());
+        .eq('question_date', gameNightKey());
       if (!error && data) data.forEach(q => { stats.questions[q.after_game] = q.id; });
     } catch (_) {}
     const qIds = Object.values(stats.questions);

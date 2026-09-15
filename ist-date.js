@@ -192,6 +192,58 @@
     return { edition: 'gece', date: isoAt(b, b < sunTimes(b).sunrise ? -1 : 0) };
   }
 
+  // ── WHICH NIGHT'S GAMES ARE THESE ──
+  // The games are night-only now, and a night SPANS MIDNIGHT, so every key
+  // a night's games write has to be the NIGHT and not the calendar date:
+  // the word's used_on, the game_results row, the saved board, the admin's
+  // own on/off switch, the question in each joint of the sequence. Keyed on
+  // the date, a member playing at 23:50 and the same member at 00:10 are
+  // two different players of two different days -- the board blanks under
+  // them, the word they already solved comes back, and a second result
+  // lands on the shared scoreboard.
+  //
+  // db/sozcel_used_answers_v7_game_night.sql moved the WORD to this key.
+  // These two are the same key in the two shapes the rest of the tables are
+  // written in, so nothing else is left on the old footing.
+  function gameNight(base) { return editionKey(base).date; }   // 'YYYY-MM-DD'
+
+  // The same night unpadded ('YYYY-M-D') -- the historical shape of
+  // game_results.date, game_state.date and every per-day localStorage key.
+  // Kept a separate function rather than a format argument because those
+  // two shapes address different columns and must never be swapped.
+  function gameNightSeed(base) {
+    const [y, m, d] = gameNight(base).split('-').map(Number);
+    return `${y}-${m}-${d}`;
+  }
+
+  // The instant the NEXT night's games open: the first sunset strictly
+  // after `base`. That is the moment gameNight() changes, so it is what a
+  // "new puzzle in…" countdown is actually counting down to -- midnight is
+  // the middle of a night, not the end of one.
+  //
+  // Real instants throughout, never now()'s wall-clock-shifted Date: these
+  // are compared against each other, and mixing the two silently offsets
+  // the answer by the device's own distance from Istanbul.
+  function nextGameNight(base) {
+    const b = base || new Date();
+    const tonight = sunTimes(b).sunset;
+    if (tonight > b) return tonight;
+    // Past this evening's sunset, so the next one is tomorrow's. Stepping a
+    // whole day off an instant that is already evening lands mid-evening
+    // again, nowhere near a date boundary.
+    return sunTimes(new Date(b.getTime() + 86400000)).sunset;
+  }
+
+  // How long until then, already worded. Same shape as untilMidnight()
+  // below, which is what every game page used to call.
+  function untilNextNight(opts) {
+    const b = new Date();
+    const diff = Math.max(0, nextGameNight(b) - b);
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return global.I18N ? global.I18N.formatCountdown(hours, minutes, opts) : '';
+  }
+
   // ── Two helpers the game-bearing pages each carried their own copy of ──
   // Both are about the Istanbul day, which is this file's whole subject,
   // so they belong here rather than four times over in four <script>
@@ -211,6 +263,10 @@
   // How long until the Istanbul day rolls over, already worded. opts is
   // passed straight through to I18N.formatCountdown, which is what lets
   // Bulmaca say "Yeni bulmaca" where the others use the default.
+  //
+  // NOT what a game page's "new puzzle in…" should call while the games are
+  // night-only -- midnight falls in the middle of a night and nothing about
+  // the puzzle changes there. That is untilNextNight() above.
   function untilMidnight(opts) {
     const diff = nextMidnight() - now();
     const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -219,5 +275,6 @@
   }
 
   global.IstDate = { parts, now, iso, daySeed, nextMidnight, parseYMD, untilMidnight,
-                     sunTimes, isDaytime, edition, editionKey, TZ };
+                     sunTimes, isDaytime, edition, editionKey,
+                     gameNight, gameNightSeed, nextGameNight, untilNextNight, TZ };
 })(window);

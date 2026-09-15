@@ -8,14 +8,14 @@
   <meta name="theme-color" content="#f0f0f0">
   <title>Sözcel — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="ist-date.js?v=4"></script>
-  <script src="i18n.js?v=20"></script>
+  <script src="ist-date.js?v=5"></script>
+  <script src="i18n.js?v=19"></script>
   <script src="scoreboard.js?v=1"></script>
   <script src="map-ink.js?v=6"></script>
   <script src="palette.js?v=3"></script>
   <script src="avatar.js?v=1"></script>
   <link rel="stylesheet" href="palette.css?v=7">
-  <script src="game-locks.js?v=2" defer></script>
+  <script src="game-locks.js?v=3" defer></script>
   <link rel="stylesheet" href="profile-card.css?v=35">
   <script src="profile-card.js?v=41" defer></script>
   <script src="sheet.js?v=5"></script>
@@ -2203,13 +2203,22 @@ function lettersMatch(a, b) {
 }
 
 // ── Daily seed ──
-// "YYYY-M-D" Istanbul-local — the historical key format of game_results.date
+// "YYYY-M-D" — the historical key format of game_results.date, game_state
 // and the per-day localStorage keys, so it stays unpadded.
-// Was a one-line wrapper in three pages; it still is, but over one seed.
-function getDailySeed() { return IstDate.daySeed(); }
+//
+// It is the NIGHT and no longer the calendar date. A night spans midnight,
+// so a seed that rolled over at 00:00 blanked the board under a reader who
+// was still playing, handed them back the word they had already solved, and
+// let a second result for it land on the shared scoreboard. The word itself
+// has been keyed to the night since db/sozcel_used_answers_v7_game_night.sql
+// — everything the page writes beside it now agrees (see ist-date.js).
+function getDailySeed() { return IstDate.gameNightSeed(); }
 
-// The countdown to the Istanbul day rolling over, in ist-date.js.
-function getTimeUntilMidnight() { return IstDate.untilMidnight(); }
+// The countdown to the next night's games opening — the next sunset, which
+// is when the word actually changes. It used to count down to midnight,
+// which is the middle of a night rather than the end of one, so the page
+// promised a new puzzle several hours before there was one.
+function getTimeUntilNextNight() { return IstDate.untilNextNight(); }
 
 const VALID_WORDS_5 = new Set([
   'ABACI','ABADİ','ABALI','ABANA','ABANİ','ABAZA','ABAŞO','ABBAS','ABDAL','ABECE',
@@ -3960,7 +3969,7 @@ function sozcelWordLengthFor(date) {
 // below.
 function sozcelGameNight() {
   try {
-    if (window.IstDate && IstDate.editionKey) return IstDate.editionKey().date;
+    if (window.IstDate && IstDate.gameNight) return IstDate.gameNight();
   } catch (e) { /* fall through */ }
   return IstDate.iso();
 }
@@ -3988,7 +3997,12 @@ let VALID_WORDS = WORD_LENGTH === 6 ? VALID_WORDS_6 : VALID_WORDS_5;
 // Ensure every possible answer is always accepted as a guess.
 WORD_LIST_5.forEach(w => VALID_WORDS_5.add(w));
 
-// Istanbul-local ISO date (YYYY-MM-DD) for the sozcel_used_answers table.
+// Istanbul-local ISO calendar date (YYYY-MM-DD). This is the SÖZCÜ side's
+// key and not the game's: a Sözcü's submission deadline is midnight at the
+// start of used_on, fenced that way by the RLS policy itself
+// (db/sozcel_used_answers*.sql), so "today" there genuinely means the
+// calendar day. Anything about the word being PLAYED wants
+// sozcelGameNight() instead — the night the reader is standing in.
 function getIstanbulDateISO() {
   return IstDate.iso();
 }
@@ -4097,17 +4111,20 @@ function adoptDailyRow(row) {
   return row.word;
 }
 
-// Direct read of today's recorded answer, used only as the fallback above.
-// The date key is this client's Istanbul date (IstDate, built from
-// Intl parts — not a re-parsed localized string), and it is only ever used
-// to *look up* a row: getting it wrong finds nothing and shows the empty
-// state, it can never write a word onto the wrong day.
+// Direct read of the recorded answer for the night being played, used only
+// as the fallback above. The key is the NIGHT (sozcelGameNight), the same
+// one the RPC is asked for — on the calendar date this fallback went looking
+// for tomorrow's row the moment midnight passed, so an outage of the
+// function turned into "bugün kelime yok" half way through a night that had
+// one. It is only ever used to *look up* a row: getting it wrong finds
+// nothing and shows the empty state, it can never write a word onto the
+// wrong day.
 async function readRecordedWordForToday() {
   try {
     const { data, error } = await sb
       .from('sozcel_used_answers')
       .select('word, definition, syllables')
-      .eq('used_on', getIstanbulDateISO())
+      .eq('used_on', sozcelGameNight())
       .maybeSingle();
     if (error) {
       console.error('[sozcel readRecordedWordForToday]', error);
@@ -4266,7 +4283,7 @@ async function restoreState() {
         document.getElementById('game-message').textContent = `Kelime: ${TARGET_WORD}`;
         document.getElementById('game-message').className = 'game-message lose';
       }
-      document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+      document.getElementById('reset-info').textContent = getTimeUntilNextNight();
       // Do NOT auto-open the result popup on revisit — the share button stays
       // available in the top-right for the user to reopen it manually.
       enableShareButton(wasWon);
@@ -4941,7 +4958,7 @@ function submitGuess(fullGuess) {
     if (guessSnap === TARGET_WORD) {
       document.getElementById('game-message').textContent = I18N.t('games.congrats');
       document.getElementById('game-message').className = 'game-message win';
-      document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+      document.getElementById('reset-info').textContent = getTimeUntilNextNight();
       gameOver = true;
       // Check before inserting — count = 0 means no one has won today yet.
       const firstTier = await checkFirstWinner(dailySeed, userNeighborhood);
@@ -4955,7 +4972,7 @@ function submitGuess(fullGuess) {
     } else if (rowSnap === 5) {
       document.getElementById('game-message').textContent = `Kelime: ${TARGET_WORD}`;
       document.getElementById('game-message').className = 'game-message lose';
-      document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+      document.getElementById('reset-info').textContent = getTimeUntilNextNight();
       gameOver = true;
       await recordGameResult('sozcel', dailySeed, 7, false, userNeighborhood, guessResults);
       await saveState();
@@ -5398,7 +5415,7 @@ function showResultPopup(won) {
       dictEntry.style.display = 'none';
     }
   }
-  document.getElementById('result-next-info').textContent = getTimeUntilMidnight();
+  document.getElementById('result-next-info').textContent = getTimeUntilNextNight();
   overlay.classList.add('open');
 }
 
@@ -5656,7 +5673,10 @@ async function loadSozcuOfTheDay() {
   const el = document.getElementById('sozcu-line');
   if (!el) return;
   try {
-    const today = getIstanbulDateISO();
+    // The night being played, not the calendar date: this line names whoever
+    // picked the word on the board, and after midnight that is still last
+    // evening's Sözcü.
+    const today = sozcelGameNight();
     const { data, error } = await sb
       .from('sozcel_used_answers')
       .select('sozcul_id')

@@ -8,14 +8,14 @@
   <meta name="theme-color" content="#f0f0f0">
   <title>Tümcel — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="ist-date.js?v=4"></script>
-  <script src="i18n.js?v=20"></script>
+  <script src="ist-date.js?v=5"></script>
+  <script src="i18n.js?v=19"></script>
   <script src="scoreboard.js?v=1"></script>
   <script src="map-ink.js?v=6"></script>
   <script src="palette.js?v=3"></script>
   <script src="avatar.js?v=1"></script>
   <link rel="stylesheet" href="palette.css?v=7">
-  <script src="game-locks.js?v=2" defer></script>
+  <script src="game-locks.js?v=3" defer></script>
   <link rel="stylesheet" href="profile-card.css?v=35">
   <script src="profile-card.js?v=41" defer></script>
   <script src="sheet.js?v=5"></script>
@@ -1211,10 +1211,15 @@ setInterval(updateDateTime, 60000);
 // Supabase, instead of waiting for the next interval tick.
 I18N.onChange(updateDateTime);
 // Was a one-line wrapper in three pages; it still is, but over one seed.
-function getDailySeed() { return IstDate.daySeed(); }
+// The seed is the NIGHT rather than the calendar date, because a night
+// spans midnight and the games are night-only: keyed on the date, the
+// puzzle changed and the board blanked in the middle of a night somebody
+// was playing. See ist-date.js.
+function getDailySeed() { return IstDate.gameNightSeed(); }
 
-// The countdown to the Istanbul day rolling over, in ist-date.js.
-function getTimeUntilMidnight() { return IstDate.untilMidnight(); }
+// The countdown to the next night's games opening — the next sunset, which
+// is when the puzzle actually changes. Midnight is the middle of a night.
+function getTimeUntilNextNight() { return IstDate.untilNextNight(); }
 
 const dailySeed = getDailySeed();
 
@@ -1368,7 +1373,7 @@ async function checkGuess() {
       statusEl.textContent = I18N.t('tumcel.congrats');
       statusEl.style.color = 'var(--success)';
       document.getElementById('submit-btn').disabled = true;
-      document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+      document.getElementById('reset-info').textContent = getTimeUntilNextNight();
       gameOver = true;
       await recordGameResult('tumcel', dailySeed, 4 - mistakes, true, userNeighborhood);
       await saveState();
@@ -1409,7 +1414,7 @@ async function checkGuess() {
     statusEl.textContent = 'Oyun bitti!';
     statusEl.style.color = 'var(--accent)';
     document.getElementById('submit-btn').disabled = true;
-    document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+    document.getElementById('reset-info').textContent = getTimeUntilNextNight();
     gameOver = true;
     revealUnsolvedQuotes();
     await recordGameResult('tumcel', dailySeed, 4, false, userNeighborhood);
@@ -1583,7 +1588,7 @@ async function restoreState() {
         revealUnsolvedQuotes();
       }
       document.getElementById('submit-btn').disabled = true;
-      document.getElementById('reset-info').textContent = getTimeUntilMidnight();
+      document.getElementById('reset-info').textContent = getTimeUntilNextNight();
     }
 
     return true;
