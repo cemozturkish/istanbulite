@@ -22,7 +22,7 @@
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=5"></script>
   <link rel="stylesheet" href="sheet.css?v=7">
-  <link rel="stylesheet" href="frames.css?v=11">
+  <link rel="stylesheet" href="frames.css?v=12">
   <script src="loading-screen.js?v=4"></script>
   <link rel="stylesheet" href="loading-screen.css?v=3">
   <link rel="stylesheet" href="onboarding.css?v=9">
@@ -165,7 +165,11 @@
       position: absolute;
       height: var(--fb-box-h);
       box-sizing: border-box;
-      background: var(--paper-card, #ddc4b5);
+      /* --lit, not --paper-card: after sunset a box the reader can act
+         on is a lit window and the page it stands on is the street (see
+         "GECE = THE LIGHTS COMING ON" in frames.css). By day the token
+         IS --paper-card, so nothing here changes at noon. */
+      background: var(--lit, #ddc4b5);
       border: 2px solid var(--ink);
       font: inherit;
       color: var(--ink);
@@ -220,7 +224,14 @@
        rest. */
     .fb-box:not(.fb-empty) {
       border-bottom-width: 5px;
-      box-shadow: inset 0 0 0 0 rgba(60, 60, 60, 0);
+      /* Two shadows in one list: the light this box spills onto the
+         street around it (a no-op transparent shadow by day) and the
+         press band's own slot. box-shadow is one property, so they
+         cannot be stated separately -- and both states below must
+         carry both, in this order, or the press interpolates against
+         a list of a different length and pops. */
+      box-shadow: var(--lit-glow, 0 0 0 0 rgba(0, 0, 0, 0)),
+                  inset 0 0 0 0 rgba(60, 60, 60, 0);
       /* The last two are the "dealt with" fade (see .fb-done below): the
          press's own two properties snap in 0.1s because a finger is on
          the glass, but a box going quiet is a thing the reader watches
@@ -240,7 +251,15 @@
       position: absolute;
       top: 0; left: 0; bottom: 0;
       width: 4px;
-      background: var(--ink-red, #B93631);
+      /* --lit-red, not --ink-red: this stripe is printed ON the card, and
+         --ink-red is walked a long way down its own hue for the night
+         STREET -- on lit paper it is a near-black smudge (see frames.css).
+         Scoped to the two pseudo-elements rather than declared on the box,
+         deliberately: `.k` is a CHILD of the box but stands on the street
+         above it, so a token set here would take the kicker with it and
+         drop it from 2.63:1 to 1.32:1 on that paper. By day both tokens
+         are the same colour. */
+      background: var(--lit-red, #B93631);
       transition: width 0.4s ease, background 0.4s ease;
     }
     .fb-box.fb-mirror:not(.fb-empty)::before { left: auto; right: 0; }
@@ -260,7 +279,7 @@
       position: absolute;
       top: 0; left: 0;
       width: 4px; height: 0;
-      background: color-mix(in srgb, var(--ink-red, #B93631) 55%, black);
+      background: color-mix(in srgb, var(--lit-red, #B93631) 55%, black);
       transition: height 0.1s ease-out;
     }
     .fb-box.fb-mirror:not(.fb-empty)::after { left: auto; right: 0; }
@@ -297,8 +316,10 @@
     .fb-actor.fb-pressing:not(.fb-empty) {
       border-bottom-width: 2px;
       /* Grey, deliberately never black -- the box's own paper going into
-         shadow, not a hole opening in it. */
-      box-shadow: inset 0 4px 0 0 rgba(60, 60, 60, 0.4);
+         shadow, not a hole opening in it. The glow rides along unchanged:
+         pressing a lit window does not switch it off. */
+      box-shadow: var(--lit-glow, 0 0 0 0 rgba(0, 0, 0, 0)),
+                  inset 0 4px 0 0 rgba(60, 60, 60, 0.4);
     }
     /* The flag's own cap, same height the band grows to -- see the
        ::after comment above. */
@@ -411,6 +432,13 @@
       color: var(--muted);
       border-color: var(--muted, #9a9a9a);
       cursor: default;
+      /* And its light is off. Redeclaring the token rather than the
+         background takes the spill with the paper in one line, and
+         never fights the press's own box-shadow on specificity -- see
+         frames.css. By day both tokens already mean "not a light", so
+         this says nothing at noon. */
+      --lit: var(--paper-card, #ddc4b5);
+      --lit-glow: 0 0 0 0 rgba(0, 0, 0, 0);
     }
     .fb-box.fb-locked .k { color: var(--muted); }
     .fb-box.fb-locked:not(.fb-empty)::before { background: var(--muted, #9a9a9a); }
@@ -451,6 +479,12 @@
       color: var(--muted);
       border-color: var(--muted, #9a9a9a);
       background: color-mix(in srgb, var(--paper-card, #ddc4b5) 80%, transparent);
+      /* The light goes out with it -- the shop you have already been to,
+         closed for the night. Same one-line form .fb-locked above uses,
+         and the reason the background here can go on naming --paper-card:
+         that is what --lit means once it is switched off. */
+      --lit: var(--paper-card, #ddc4b5);
+      --lit-glow: 0 0 0 0 rgba(0, 0, 0, 0);
     }
     .fb-box.fb-done:not(.fb-empty) .k { color: var(--muted); }
     .fb-box.fb-done:not(.fb-empty)::before {
@@ -674,15 +708,19 @@
       display: inline-block;
       font-style: normal;
       white-space: pre;
-      color: color-mix(in srgb, var(--fb-mark-on) calc(var(--lit, 0) * 100%), var(--fb-mark-off));
+      /* --fb-ltr-on, not --lit: that name belongs to the night's lit
+         paper site-wide (frames.css), and this one is a 0..1 scalar --
+         a letter inheriting a COLOUR into this calc() is an invalid
+         property the wave silently stops on. */
+      color: color-mix(in srgb, var(--fb-mark-on) calc(var(--fb-ltr-on, 0) * 100%), var(--fb-mark-off));
     }
     /* Leaving the left-hand mark: a letter is pale until the front
        reaches it and inked once it has passed -- one letter wide, so
        they go over one at a time. */
-    nav b:first-child i.fb-ltr { --lit: clamp(0, calc(var(--i) + 1 - var(--f, 0)), 1); }
+    nav b:first-child i.fb-ltr { --fb-ltr-on: clamp(0, calc(var(--i) + 1 - var(--f, 0)), 1); }
     /* Arriving at the right-hand one: the same front, read the other
        way round -- a letter is inked until the front reaches it. */
-    nav b:last-child  i.fb-ltr { --lit: clamp(0, calc(var(--f, 0) - var(--i)), 1); }
+    nav b:last-child  i.fb-ltr { --fb-ltr-on: clamp(0, calc(var(--f, 0) - var(--i)), 1); }
     nav b.on { font-weight: 700; }
     /* --p is that mark's own lane presence, written onto the mark by
        paintNav. It was read from --fb-nav-0/1/2 on <html>; three
@@ -838,9 +876,22 @@
       width: min(26%, 132px);   /* of the grid, whose columns are its thirds */
       aspect-ratio: 3 / 4;
       transform: translate(-50%, -50%);
-      /* --paper-card, not --paper: the wash behind this lane IS --paper,
-         so a window filled with it would be nothing but its own border. */
-      background: var(--paper-card, #e9e4dc);
+      /* --lit, not --paper: the wash behind this lane IS --paper, so a
+         window filled with it would be nothing but its own border. And
+         after sunset these are the one thing on the site the word
+         "window" is already literal about -- the city drawn as its own
+         lit windows (see frames.css).
+
+         By day --lit is --paper-card, which is what this rule has always
+         resolved to in every state but ONE: --paper-card is undefined on
+         the earth palette at noon, and the literal standing in for it
+         here was #e9e4dc -- a cool near-white left over from the days
+         this layer lay on a dark scrim, printed beside boxes on #ddc4b5.
+         The fallback is the boxes' own now, so a window is cut from the
+         same card stock as everything else on the screen. */
+      background: var(--lit, #ddc4b5);
+      box-shadow: var(--lit-glow, 0 0 0 0 rgba(0, 0, 0, 0));
+      --ink-red: var(--lit-red, #B93631);
       border: 2px solid var(--ink, #17140f);
       color: var(--ink, #17140f);
       padding: 5px;
@@ -873,6 +924,10 @@
        about to. */
     .fb-map-win.fb-map-locked {
       color: var(--muted, #7a7368);
+      /* Parked, so its light is off -- the same one-line form .fb-locked
+         uses on a box whose turn has not come. */
+      --lit: var(--paper-card, #ddc4b5);
+      --lit-glow: 0 0 0 0 rgba(0, 0, 0, 0);
       cursor: default;
       justify-content: center;
       align-items: center;
@@ -1184,8 +1239,21 @@
          than running off the bottom of the screen: it needs its fourth
          edge back, at the CARD's own chunky foot rather than the sheet's
          thin one (see .fb-box), and it is the card becoming a page, so
-         it keeps the card's own paper rather than the sheet's. */
-      background: var(--paper-card, #ddc4b5) !important;
+         it keeps the card's own paper rather than the sheet's -- lit
+         after sunset exactly as that card was, since this IS that card
+         standing at full size (see frames.css). The glow needs its own
+         !important for the same reason the other three do: .ist-sheet
+         states `box-shadow: none` with one. */
+      background: var(--lit, #ddc4b5) !important;
+      box-shadow: var(--lit-glow, 0 0 0 0 rgba(0, 0, 0, 0)) !important;
+      /* Everything printed INSIDE a lit page reads against lit paper,
+         so the two tokens the contents name are re-pointed here rather
+         than in each of their own rules -- a throw button, the stamp,
+         an anket option. One place, and it cannot drift from the paper
+         it is standing on. */
+      --paper: var(--lit-hi, #eddbd0);
+      --paper-card: var(--lit, #ddc4b5);
+      --ink-red: var(--lit-red, #B93631);
       border-bottom-width: 5px !important;
       left: var(--fb-inset);
       right: var(--fb-inset);
