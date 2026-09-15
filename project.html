@@ -3232,11 +3232,61 @@ async function offerWord(word, definition, night) {
     .insert([{ for_night: night, word, definition: definition || null, suggested_by: uid }]);
   if (!error) return null;
   console.error('[proje öneri]', error);
-  // 23505 is the unique constraint: either this member already offered
-  // tonight, or somebody else already offered this word.
-  return error.code === '23505'
-    ? 'Bu öneri zaten var — ya seninki ya da aynı kelime.'
-    : 'Gönderilemedi, tekrar dene.';
+  return offerWordError(error);
+}
+
+// ── What went wrong, said in a way somebody can act on ──
+// Every failure used to print "Gönderilemedi, tekrar dene." — which is
+// actively WRONG advice for the two failures that are actually likely,
+// because neither of them will ever come right by trying again: the
+// table is not there, or it is there in its first shape and does not
+// have the column this page writes. Both are one unrun migration, and a
+// member told to retry will simply keep retrying while nobody finds out.
+// So a permanent failure says it is permanent and names the file that
+// fixes it; only a genuinely transient one says "tekrar dene".
+//
+// PostgREST answers from a cached schema, so a missing table and a
+// missing column are both reported as cache misses rather than as the
+// Postgres errors underneath them — which is why the codes here are
+// PGRST2xx and not 42P01/42703.
+function offerWordError(error) {
+  const code = error && error.code;
+  // The CODE decides wherever there is one, because it is the only part
+  // of the answer that is unambiguous. Every message below names the
+  // table it was about — "Could not find the 'definition' column OF
+  // 'sozcel_word_suggestions'", 'violates row-level security policy FOR
+  // TABLE "sozcel_word_suggestions"' — so any table-shaped pattern
+  // matches all three of them and whichever test runs first wins. Two
+  // different wrong answers came out of trying to order those patterns;
+  // the codes have no such overlap.
+  const BY_CODE = {
+    // The table is at its first shape: `note`, not `definition`.
+    'PGRST204': 'stale', '42703': 'stale',
+    // The table has never been created.
+    'PGRST205': 'missing', '42P01': 'missing',
+    // RLS refused the row. By day for_night is today and the policy's
+    // fence is "not a night already past", so in practice this is a
+    // session the database does not recognise rather than a member
+    // offering too late.
+    '42501': 'rls',
+    // Either this member already offered tonight, or somebody else
+    // already offered this word.
+    '23505': 'dupe',
+  };
+  let kind = Object.prototype.hasOwnProperty.call(BY_CODE, code) ? BY_CODE[code] : null;
+  // No code at all (a network-level failure, or a client that dropped
+  // it): fall back to the message, narrowest test first.
+  if (!kind) {
+    const msg = ((error && error.message) || '') + ' ' + ((error && error.details) || '');
+    if (/'?definition'? column/i.test(msg)) kind = 'stale';
+    else if (/row-level security/i.test(msg)) kind = 'rls';
+    else if (/(could not find the table|relation).*sozcel_word_suggestions/i.test(msg)) kind = 'missing';
+  }
+  if (kind === 'stale')   return 'Öneri tablosu güncel değil (db/sozcel_word_suggestions.sql).';
+  if (kind === 'missing') return 'Öneri tablosu kurulu değil (db/sozcel_word_suggestions.sql).';
+  if (kind === 'rls')     return 'Bu öneri kaydedilemedi — oturumu kapatıp tekrar açar mısın?';
+  if (kind === 'dupe')    return 'Bu öneri zaten var — ya seninki ya da aynı kelime.';
+  return 'Gönderilemedi, tekrar dene.';
 }
 
 // What you offered, and the one thing left to do with it: take it back.

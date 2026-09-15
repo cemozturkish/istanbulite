@@ -2052,6 +2052,17 @@ reason the daytime half of this column is not a scoreboard.
   The column was `note` and is renamed in place by `db/sozcel_word_suggestions.sql`, guarded on
   both sides so that file stays runnable against a fresh database and against one the first cut
   already ran on.
+- **A refusal names the migration that fixes it** (`offerWordError`). Every failure used to print
+  "Gönderilemedi, tekrar dene.", which is actively wrong advice for the two failures that are
+  actually likely — the table is not there, or it is there in its first shape and has no
+  `definition` column — because neither will ever come right by retrying, and a member told to try
+  again keeps trying while nobody finds out. So a permanent failure says so and names
+  `db/sozcel_word_suggestions.sql`; only a genuinely transient one says "tekrar dene". **It
+  dispatches on the error CODE, never on the message**: PostgREST names the table inside the
+  missing-column message *and* Postgres names it inside the RLS one, so any table-shaped pattern
+  matches all three and whichever test runs first wins — two different wrong answers came out of
+  trying to order those patterns before the codes were used. The message is a fallback only, for an
+  error that arrives without a code, narrowest test first.
 - **One offer per member per night**, and two members cannot offer the same word for one night
   (two unique constraints). It is an offer, not a channel to fill; changing your mind is
   withdrawing yours (`Vazgeç`, allowed only while `pending`) and making another.
