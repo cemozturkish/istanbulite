@@ -1874,6 +1874,76 @@ stays lit while the petek is standing, because it is also the way back out (the 
 Kütüphane's Olaylar box makes). `nav` still takes no pointer events at all — only this one mark
 opts back in, so the drawing under the bar's paper goes on answering a finger that lands beside it.
 
+### Hold the logo and the app changes language — `--fb-hold`
+
+The logo is a switch that opens the petek. **Held down, it is the one other thing it can be without
+becoming a menu**: after half a second the **sea rises inside the mark**, over a second and a half,
+and at full the app changes language — wherever the reader is standing, because this bar is
+standing there too (see "THE TWO BARS ARE OMNIPRESENT"). A language is not a mode with a door, so
+it gets no tile and no settings page: it is one gesture on the thing the app is named after.
+
+**It is the loading screen's own rising sea met a third time, and each of the three fills a
+different part of the same drawing** — which is what keeps the three meanings from being confused.
+The **ring** around the letters is the day (`--fb-day`), the **letters** are the lane wave
+(`--fb-logo-a/-b/-f`), and the mark's own **body** is this. The first two are states the app is
+in; this one only exists while a finger is on it, which is the only reason it may share the mark
+at all. It needs no layer of its own either: the body is already `::after`'s `logo-fill-mask.png`
+silhouette, so the solid body is that layer's background COLOUR and the sea is a background IMAGE
+grown from the bottom by `--fb-hold` — the same one-image, no-repeat, anchored-to-bottom trick the
+day ring makes on `::before`, and under `.fb-logo` either way, so the strokes stand over the water
+exactly as they do in the ten frames.
+
+Seven things about it:
+
+- **The tone is read off those frames rather than picked by eye** — there the ground is 0, the sea
+  125 and the letters 255 — but it sits **higher** up that ladder (76% toward `--fb-mark-on`, not
+  49%) for a reason the curtain does not have: the curtain draws its sea on its own black ground,
+  while this mark hangs BELOW the bar over the page itself. At the measured ratio the full mark
+  came out within a few values of the night paper behind it and the fill read as nothing happening.
+  It is `color-mix`ed off `--navbar-ink` and `--fb-mark-on` rather than being a token, so it
+  follows the earth palette's own brown bar instead of being the one thing on it that ignores it.
+- **A release part way is the water running back out**, fast, and nothing changes. That is also
+  why there is no "are you sure" at the other end: the mark filling to the top IS the confirmation.
+- **A press that got as far as the sea rising is the language's, not the petek's** (`langHoldTook`).
+  The click that follows a `pointerup` is the door, and a reader who has just watched the mark fill
+  — or watched it drain — did not also ask for it. The flag is cleared by the next `pointerdown` as
+  well, so a `pointercancel`, which is followed by no click at all, cannot leave it standing to
+  swallow the press after it.
+- **`--fb-hold-ms` is written by the same code that writes `--fb-hold`**, so the duration and the
+  target can never disagree: the rise is a slow even 1.5s (a sea, not an ease) and the run back out
+  is a fast one, and both are the same property moving. A fresh hold sets the pair to `0%`/`0ms`
+  and forces a reflow before it starts, or a hold begun over a half-drained mark would spend its
+  first half second undoing the last press.
+- **The word it says back is the new language's own, in the new language** (`sayLang`,
+  `lang.default` / `lang.more_english` in i18n.js — one source, since the petek's preference row
+  prints the same pair). It carries its own `lang` attribute: CSS case folding is locale-aware and
+  the document is `lang="tr"`, so "English" uppercased under it comes out "ENGLİSH".
+- **The flip is applied before the uid is known.** `doneUid()` is a round trip on the first ask,
+  and a reader who has held the mark to the top is watching for the app to change, not for it to
+  find out who they are — so `I18N.setLang` runs at once and `saveToSupabase` writes the profile row
+  behind it (its own `setLang` is then a no-op).
+- **Keyboard and screen readers still get the petek, and the language a different way.** Enter and
+  Space are the door; the same preference is a pair of buttons at the petek's innermost depth (Sen).
+  This is the shortcut for a thumb, not the only route. It also stands down entirely while the
+  onboarding tour is running (`ist-onb-locked`), which drives this same mark and has a language
+  step of its own.
+
+**What a flip repaints is registered against `I18N.onChange`, not called from the hold**
+(`wireLangRelabel`), so the petek's own preference row relabels the app by exactly the same path
+and neither surface has to know what the other owes. It re-reads every column in place — the cast
+is never rebuilt, only its boxes filled again, the same move `refreshEditionColumns` makes, so
+nothing on the strip moves under the reader — redraws the app map, and tells the game overlay's
+iframe (same origin, its own `I18N`). Every cached fetch is dropped first: those caches are keyed
+by nothing but "already asked", and the rows in them carry the text that was chosen when they were
+built, so re-rendering without dropping them prints the old language from a fresh render.
+
+**A page standing open needs nothing, and that is worth stating** because the opposite looks
+obvious. One of THE sheet's four ways out is a press outside it, and its backdrop is over the bar
+(the overlay layer is 500, the two bars 400/401) — so a press aimed at the logo while a page stands
+open closes the page before the gesture can begin. The game overlay is the one surface that is not
+like this, and deliberately: it lifts its own bottom edge to leave the tab bar pressable, because a
+game is where the reader stays.
+
 ### The petek is behind the logo, and the app map is the middle lane
 
 **These two swapped places.** The petek used to be the middle lane of slide 12 and the app map
