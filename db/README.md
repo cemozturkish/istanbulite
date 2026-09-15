@@ -41,6 +41,7 @@ kurarken yine de sırayla gerekir.
 |---|---|
 | Profil eklentileri | `avatar_hair` → `avatar_hair_v2`, `avatar_hat`, `avatar_accessory`, `avatar_shirt`, `profile_badges` |
 | Uygulama ayarları | `onboarding`, `app_settings`, `admin_notifications` → `admin_notification_reads` |
+| İlçeler | `neighborhoods_v2_missing_districts` (kuruluş şeması dışında kalan 14 ilçeyi ekler) |
 | Mahalleler | `mahalles` |
 | Etkinlikler | `events` → `event_rsvps` |
 | Haberler | `breaking_news` → `breaking_news_sources`, `breaking_news_updates`, `breaking_news_series` → **`breaking_news_series_v2_world_slot`**, `breaking_news_archive`, `breaking_news_polls` → **`breaking_news_polls_v2`**, `breaking_news_countries` |
