@@ -3151,7 +3151,13 @@ async function loadSubmitActor(el, slot) {
 function submitPagePayload(g, data, mine, again) {
   return {
     kicker: g.kicker + ' · ÖNERİ',
-    meta: data.count ? data.count + ' öneri' : '',
+    // Sözcel's own box names when the game actually unlocks -- sunset --
+    // in the one corner every fb-page already reserves for its meta (see
+    // .fb-page-head .m); it ticks live once wired (see
+    // wireSozcelCountdown), so the render-time value is only the first
+    // paint. The other two games have no such wait, so they keep the
+    // suggestion count that used to stand here.
+    meta: g.key === 'sozcel' ? sozcelCountdownLabel() : (data.count ? data.count + ' öneri' : ''),
     title: g.title,
     html: '<div id="submit-body" class="anket-body">Yükleniyor…</div>',
     wire: (inner) => wireSubmitPage(inner, g, data, mine, again),
@@ -3161,9 +3167,63 @@ function submitPagePayload(g, data, mine, again) {
 function wireSubmitPage(inner, g, data, mine, again) {
   const body = inner.querySelector('#submit-body');
   if (!body) return;
+  if (g.key === 'sozcel') wireSozcelCountdown(inner);
   if (mine) { renderSubmitMade(body, g, mine); return; }
   if (again) { renderSubmitAgain(body, g, data, again); return; }
   renderSubmitForm(body, g, data);
+}
+
+// ── The countdown to sunset, in the offer box's own top-right corner ──
+// The games are night-only (see NIGHT_GAMES_ENABLED), and Sözcel's daytime
+// box is exactly the reader waiting on that -- so its page names the wait
+// rather than leaving the reader to wonder when "bu gece" actually starts.
+// It ticks in the same corner every fb-page already reserves for its meta
+// (.fb-page-head .m, margin-left: auto) rather than a second element, so
+// there is nothing new to place.
+let _sozcelCountdownTimer = null;
+
+function stopSozcelCountdown() {
+  if (_sozcelCountdownTimer) { clearInterval(_sozcelCountdownTimer); _sozcelCountdownTimer = null; }
+}
+
+// Milliseconds until tonight's sunset -- the same sun ist-date.js already
+// draws the day/night edition from, so this box and the edition switch
+// can never disagree about when the games unlock.
+function sozcelUnlockMs() {
+  try { return IstDate.sunTimes(IstDate.now()).sunset.getTime() - IstDate.now().getTime(); }
+  catch (err) { return null; }
+}
+
+function fmtCountdown(ms) {
+  const total = Math.max(0, Math.floor((ms || 0) / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = n => String(n).padStart(2, '0');
+  return (h > 0 ? h + ':' + pad(m) : m) + ':' + pad(s);
+}
+
+function sozcelCountdownLabel() {
+  const ms = sozcelUnlockMs();
+  if (ms == null) return '';
+  return ms > 0 ? fmtCountdown(ms) + ' sonra' : 'Açıldı';
+}
+
+function wireSozcelCountdown(inner) {
+  const el = inner.querySelector('.fb-page-head .m');
+  stopSozcelCountdown();
+  if (!el) return;
+  const paint = () => {
+    const ms = sozcelUnlockMs();
+    if (ms == null) return;
+    el.textContent = sozcelCountdownLabel();
+    // Once it hits zero the wait this box was naming is over -- the box
+    // itself is re-read on the next mount/refresh, this just stops ticking
+    // a clock that has nothing left to count down.
+    if (ms <= 0) stopSozcelCountdown();
+  };
+  paint();
+  _sozcelCountdownTimer = setInterval(paint, 1000);
 }
 
 // How a past night is named to the reader. Almost always the one before
@@ -3623,6 +3683,7 @@ function closeFbPage() {
   const page = document.getElementById('fb-page');
   const inner = document.getElementById('fb-page-inner');
   if (!overlay || !inner || overlay.hidden) return;
+  stopSozcelCountdown();
   if (fbPageGrows()) IstSheet.grow({ page, inner, origin: _fbOrigin, dir: 'out' });
   IstSheet.close(overlay, () => {
     inner.innerHTML = '';
@@ -3645,6 +3706,7 @@ function snapFbPageShut() {
   const page = document.getElementById('fb-page');
   const inner = document.getElementById('fb-page-inner');
   if (!overlay || !inner || overlay.hidden) return;
+  stopSozcelCountdown();
   IstSheet.cancelGrow(page);
   page.querySelectorAll(':scope > .fb-throw-cue').forEach(n => n.remove());
   page.style.transform = ''; page.style.opacity = ''; page.style.transition = '';
