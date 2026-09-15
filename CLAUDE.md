@@ -1460,6 +1460,68 @@ confirms it; and the swap is aimed at images whose src *is* `istanbul-map.png`, 
 Turkey map wears the same `.map-photo` class in the same shared document. Adding a district is a
 file drop plus one id in `PAINTED` — see `assets/map/home/README.md`.
 
+### Gece is the lights coming ON — the lit tier in `frames.css`
+
+The night palette turns the **paper** down and leaves the ink where it is (see the `data-theme="dark"`
+blocks). That is the street after sunset, and on its own it is only half of what happens at that hour
+in İstanbul: the shops switch their lights on. A night where everything gets uniformly darker is a
+power cut, not a nightlife — and it had a measurable cost. A card sits 1.24:1 off the page it lies on
+at noon; at night the paper came down and the card came down with it, to **1.09:1**, which is not a
+card at all, it is the page with a border drawn on it.
+
+So after sunset a surface the reader can **act on** — a `.fb-box` card, the page it grows into, a
+window on the app map — is a **lit window**, and the page it stands on is the street it is lit
+against. What cannot be acted on stays dark, which is the same sentence read the other way: a game
+whose turn has not come (`.fb-locked`) and a story already dealt with (`.fb-done`) are the shop that
+has not opened and the one that has closed.
+
+Four tokens, declared in all four palette/theme states so nothing has to ask which one it is in:
+`--lit` (the lit paper), `--lit-hi` (one step **above** it, for something raised on lit paper),
+`--lit-red` (the house red as it reads on that paper) and `--lit-glow` (the spill onto the street).
+The first two are the day's own `--paper-card` / `--paper` pair moved bodily into the light, and night
+keeps that order and the size of the step — `--lit-hi` is 1.25:1 off `--lit` (earth) and 1.12:1 (mono)
+against the day pair's own 1.24:1 and 1.09:1 — the same rule that says the map's tone ladder is never
+turned over at night. **By day none of them is a light**: `--lit` *is* `var(--paper-card)` and
+`--lit-hi` is `var(--paper)`, both by reference so they keep following each page's own values rather
+than freezing a copy here, `--lit-red` is `--ink-red` unchanged, and the glow is a no-op shadow — a
+daytime screen renders byte for byte as it did.
+
+Five things about it:
+
+- **It buys back the one thing the night palette costs**, which that block states and cannot fix from
+  inside itself: on the night paper even pure black reaches 3.86:1, so body text lands at 3.30:1
+  against noon's 8.21:1, and the **paper** is the only lever. A lit card is that lever pulled for
+  exactly the surfaces that carry the reading — the night ink on `--lit` is **7.82:1**. The street
+  keeps its measured darkness; the reading moves into the light. Lit, a card is 1.98:1 (earth) /
+  2.21:1 (mono) off its own background — further off at night than it has ever been by day, which is
+  what a lit window is.
+- **And the red comes back with it.** `--ink-red` is walked a long way down its own hue *for the night
+  street*; on a lit card that leaves the site's one chromatic mark reading as a near-black smudge.
+  `--lit-red` is that walk undone by exactly as much as the lit paper gives back: `#98390b` on `--lit`
+  is 3.13:1 against the day red's own 3.12:1 on day paper, and mono's `#992522` is 5.80:1 against
+  5.78:1. Deliberately **not** the day red itself — on paper this bright `#CB5A16` washes out to
+  1.82:1. It is the fire at its noon strength, which is a different thing from the noon fire.
+- **`--lit-red` is scoped to the two flag pseudo-elements, never declared on the box.** `.fb-box .k`
+  is a DOM child of the card but is printed on the **street** above it, so a token set on the box
+  takes the kicker with it and drops it from 2.63:1 to 1.32:1 on that paper. What is on the lit paper
+  is the flag (`::before`) and its press cap (`::after`), and those are what read the lit red. The
+  band page and the map's windows *are* wholly lit surfaces, so those two do carry the token — the
+  page also re-points `--paper`/`--paper-card` at `--lit-hi`/`--lit` in one place, so a throw button,
+  the stamp and an anket option all read against the paper they are standing on, in the same order
+  they read in at noon, without any of them naming it.
+- **The glow is a no-op SHADOW, never `none`.** `box-shadow` is one property and a box's press band
+  (`.fb-pressing`) is an inset shadow in the same list: `none` cannot be composed with it, a zero-size
+  transparent shadow can, and it also interpolates against the pressed state instead of popping. Both
+  states must carry both shadows, in the same order.
+- **Turning a box's light off is the TOKEN, not a second background rule.** `.fb-locked` and
+  `.fb-done` redeclare `--lit` and `--lit-glow` on themselves, which takes the paper and the spill
+  together in one line and never fights the press's own `box-shadow` on specificity — which it would,
+  since those rules and `.fb-pressing` are the same weight and the later one would win in both states.
+
+One rename came with it: the nav wave's per-letter scalar was also called `--lit` (project.html) and
+is `--fb-ltr-on` now. A letter inheriting a *colour* into `calc(var(--lit) * 100%)` is an invalid
+property the whole wave silently stops on.
+
 ### The drawings read the palette — `map-ink.js` + the ladders in `palette.css`
 
 The hand-drawn maps used to be the one thing on the site that ignored the palette: the same
