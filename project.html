@@ -125,7 +125,7 @@
          scaled down 30% -- tighter than the side-to-side gap on purpose,
          since a stack reads as one column and doesn't need as much air
          between its own rows as it does from its neighbour. */
-      --fb-box-gap: calc(var(--fb-inset) * 0.7);
+      --fb-box-gap: calc(var(--fb-inset) * 0.7 + var(--fb-kicker-h));
       /* The two top corners are ONE line of type, split. The kicker and
          the timestamp share this size and this line-height so their
          line boxes are identical -- pinned to the same `top`, that is
@@ -136,11 +136,22 @@
          the same pair, off the same two numbers. */
       --fb-box-tag-size: 0.6rem;
       --fb-box-tag-lh: 1;
+      /* The kicker stands OUTSIDE the box now -- on its own line just
+         above it, ranged to the same edge the column is ranged from (see
+         .fb-box .k). So the room it takes is room the column takes: one
+         line of tag type plus the air between it and the card it names.
+         Stated here as a number the gap and the band are both built
+         from, rather than left to each of them to guess at -- a kicker
+         taller than the gap it hangs in would print over the box above
+         it, and a band that did not include the top one would open the
+         page with that kicker standing outside its own window. */
+      --fb-box-tag-gap: 4px;
+      --fb-kicker-h: calc(var(--fb-box-tag-size) * var(--fb-box-tag-lh) + var(--fb-box-tag-gap));
       /* The band the six boxes stand in, and the window they open into:
          the left column's left edge, the right column's right edge, the
          top slot's top edge and the dock line. Stated as the sum the
          slots are already built from rather than as a fourth number. */
-      --fb-band-h: calc(3 * var(--fb-box-h) + 2 * var(--fb-box-gap));
+      --fb-band-h: calc(3 * var(--fb-box-h) + 2 * var(--fb-box-gap) + var(--fb-kicker-h));
       /* Both columns hang from the same line above the tab bar -- the
          phone's stacks grow upward from the thumb (see "The phone's feeds
          hang from the bottom" in CLAUDE.md). */
@@ -173,7 +184,12 @@
       --fb-box-pad-x: 10px;
       --fb-box-pad-y: 7px;
       padding: var(--fb-box-pad-y) var(--fb-box-pad-x);
-      overflow: hidden;
+      /* NOT `overflow: hidden` -- the kicker is printed above the box's
+         own top edge (see .fb-box .k) and a clipping box would cut it
+         off entirely. Nothing else here needs the clip: `.t` carries its
+         own (it is a -webkit-line-clamp), and `.m` is a corner tag of a
+         few characters. */
+      overflow: visible;
       -webkit-tap-highlight-color: transparent;
     }
     .fb-box.fb-col-l { left: var(--fb-inset); width: var(--fb-col-l-w); }
@@ -292,47 +308,71 @@
     /* The foot lost 3px (5px -> 2px); the face -- everything printed in
        the box -- drops by exactly that much, so the whole card reads as
        one block sinking rather than as text sliding inside a static
-       frame. */
-    .fb-box .k, .fb-box .m, .fb-box .t {
+       frame.
+
+       The kicker is deliberately NOT in that set: it stands above the
+       box rather than on its face (see .fb-box .k), so riding it down
+       would close the gap it hangs in instead of reading as the face
+       sinking. */
+    .fb-box .m, .fb-box .t {
       transition: transform 0.1s ease-out;
     }
-    .fb-actor.fb-pressing .k,
     .fb-actor.fb-pressing .m,
     .fb-actor.fb-pressing .t {
       transform: translateY(3px);
     }
     @media (prefers-reduced-motion: reduce) {
       .fb-box:not(.fb-empty), .fb-box:not(.fb-empty)::after { transition: none; }
-      .fb-box .k, .fb-box .m, .fb-box .t { transition: none; }
+      .fb-box .m, .fb-box .t { transition: none; }
     }
 
     /* ── What a filled box is OF -- one template for all of them ── */
-    /* The kicker and the date are pinned the same way, one on each top
-       corner: both `position: absolute` at --fb-box-pad-y/-x from their
-       own edge, never a normal-flow line that merely happens to start
-       near the top. Kept as a category label even on an empty slot (see
-       the loaders) -- BUGÜN, İSTANBUL and the rest are known regardless
-       of whether that bucket has anything in it today. */
+    /* The date is pinned to the box's own top corner -- `position:
+       absolute` at --fb-box-pad-y/-x from its own edge, never a
+       normal-flow line that merely happens to start near the top. The
+       kicker used to share that line from the other end and now stands
+       above the box entirely (see below). Kept as a category label even
+       on an empty slot (see the loaders) -- BUGÜN, İSTANBUL and the rest
+       are known regardless of whether that bucket has anything in it
+       today, so the line over an empty slot still names it. */
+    /* The kicker stands ABOVE its box, not inside it -- BUGÜN sits on
+       the line over the card it names rather than in its top corner.
+       Two reasons, and the first is a bug: inside, the kicker and the
+       date share one line ranged to its two ends, so a box whose meta
+       runs long ("Bu geceye bir kelime öner") printed the two on top of
+       each other. And outside, the category reads as a heading over the
+       card rather than as one more thing crowded into it, which is what
+       a kicker is. Ranged to the box's own outer edge (no padding
+       inset): it is not printed on the card any more, so it lines up
+       with the card's frame rather than with the type inside it. */
     .fb-box .k {
       position: absolute;
-      top: var(--fb-box-pad-y); left: var(--fb-box-pad-x);
+      bottom: calc(100% + var(--fb-box-tag-gap)); left: 0;
       font-size: var(--fb-box-tag-size); letter-spacing: 0.14em; text-transform: uppercase;
       line-height: var(--fb-box-tag-lh);
       color: var(--ink-red, #B93631);
+      white-space: nowrap;
     }
     .fb-box .m {
       position: absolute;
       top: var(--fb-box-pad-y); right: var(--fb-box-pad-x);
       font-size: var(--fb-box-tag-size); line-height: var(--fb-box-tag-lh);
       color: var(--muted);
+      /* It has the whole inner width to itself now that the kicker has
+         left this line -- and it needs the clamp stated, because the box
+         no longer clips (see .fb-box): a long meta would otherwise run
+         out past the card's own frame. Cut hard rather than with an
+         ellipsis, the same reason .t does. */
+      max-width: calc(100% - 2 * var(--fb-box-pad-x));
+      white-space: nowrap; overflow: hidden; text-overflow: clip;
     }
-    /* Mirrored, the two pinned corners swap: the kicker is the heading
-       and goes to the top-right corner the box is now ranged from, and
-       the date takes the corner it left. */
-    .fb-box.fb-mirror .k { left: auto; right: var(--fb-box-pad-x); }
+    /* Mirrored, both swap sides with the column: the kicker's line above
+       the box ranges from its right edge, and the date takes the top-left
+       corner inside it. */
+    .fb-box.fb-mirror .k { left: auto; right: 0; }
     .fb-box.fb-mirror .m { right: auto; left: var(--fb-box-pad-x); }
-    /* Clears the pinned kicker above it -- the box's own top padding
-       only clears the corner tag, not a second line under it. Two
+    /* Clears the pinned date in the corner above it -- the box's own top
+       padding only clears that tag, not a second line under it. Two
        lines, not one -- the box grew 40% taller for exactly this -- and
        text-overflow: clip (paired with -webkit-line-clamp) drops the
        browser's own "…" on the rare headline that still doesn't fit: a
@@ -2963,13 +3003,27 @@ function tonightKey() {
   return IstDate.iso();
 }
 
-// Sunday nights are six letters — the same rule sozcel.html states in
-// `sozcelWordLengthFor`, and the two must agree or a member is asked for
-// a word the game will not take. Read off the night's own key rather
-// than off `today`, for the reason that file gives.
-function sozcelLengthForNight(nightKey) {
-  const d = IstDate.parseYMD(nightKey);
-  return d && d.getDay() === 0 ? 6 : 5;
+// ── What Sözcel actually wants: 2 or 3 SYLLABLES ──
+// The board is a syllable staircase, not a row of five tiles — the game
+// adopts whatever length the recorded word has (WORD_LENGTH =
+// TARGET_WORD.length in sozcel.html) — so asking a member for "5 harfli
+// bir kelime" was asking for the wrong thing entirely: a letter count is
+// a fact about the auto-pick's own pool, not about the game. What the
+// staircase can actually draw is two or three syllables.
+//
+// In Turkish a syllable has exactly one vowel, so counting vowels IS
+// counting syllables — which is also what syllabifyTr() in sozcel.html
+// produces, one chunk per vowel. Written here as the count rather than
+// as a call into that file because the two pages share no script; if the
+// rule ever stops being "one vowel, one syllable" they have to move
+// together.
+const TR_VOWELS_LOWER = 'aeıioöuü';
+const SOZCEL_SYL_MIN = 2;
+const SOZCEL_SYL_MAX = 3;
+function syllableCountTr(word) {
+  let n = 0;
+  for (const ch of word) if (TR_VOWELS_LOWER.includes(ch)) n++;
+  return n;
 }
 
 let submitPromise = null;
@@ -3025,7 +3079,7 @@ function submitData() {
 async function lastUnpickedWord(uid, night) {
   try {
     const { data, error } = await IstRouter.sb.from('sozcel_word_suggestions')
-      .select('id, word, note, status, for_night')
+      .select('id, word, definition, status, for_night')
       .eq('suggested_by', uid)
       .neq('status', 'picked')
       .lt('for_night', night)
@@ -3040,7 +3094,7 @@ async function lastUnpickedWord(uid, night) {
         .select('word').eq('used_on', row.for_night).maybeSingle();
       if (used) played = used.word;
     } catch (err) { /* the night may simply have had no game */ }
-    return { word: row.word, note: row.note || '', night: row.for_night, played };
+    return { word: row.word, definition: row.definition || '', night: row.for_night, played };
   } catch (err) {
     // A database without the migration, or a policy that refuses: the box
     // falls back to an ordinary empty form, which is the state it had
@@ -3095,22 +3149,21 @@ async function loadSubmitActor(el, slot) {
 // — it is stateful, and submitting has to turn the form into a receipt
 // without closing the page.
 function submitPagePayload(g, data, mine, again) {
-  const need = g.key === 'sozcel' ? sozcelLengthForNight(data.night) : 0;
   return {
     kicker: g.kicker + ' · ÖNERİ',
     meta: data.count ? data.count + ' öneri' : '',
     title: g.title,
     html: '<div id="submit-body" class="anket-body">Yükleniyor…</div>',
-    wire: (inner) => wireSubmitPage(inner, g, data, mine, need, again),
+    wire: (inner) => wireSubmitPage(inner, g, data, mine, again),
   };
 }
 
-function wireSubmitPage(inner, g, data, mine, need, again) {
+function wireSubmitPage(inner, g, data, mine, again) {
   const body = inner.querySelector('#submit-body');
   if (!body) return;
   if (mine) { renderSubmitMade(body, g, mine); return; }
-  if (again) { renderSubmitAgain(body, g, data, need, again); return; }
-  renderSubmitForm(body, g, data, need);
+  if (again) { renderSubmitAgain(body, g, data, again); return; }
+  renderSubmitForm(body, g, data);
 }
 
 // How a past night is named to the reader. Almost always the one before
@@ -3131,7 +3184,7 @@ function nightWord(key) {
 // send the same one again, or write another. Declining is simply leaving
 // the page -- there is no "no thanks" button, because not offering is
 // what every other morning already looks like and it needs no answer.
-function renderSubmitAgain(body, g, data, need, again) {
+function renderSubmitAgain(body, g, data, again) {
   body.innerHTML =
     '<div class="submit-made">' + esc(again.word) + '</div>' +
     '<div class="anket-note">' +
@@ -3145,7 +3198,7 @@ function renderSubmitAgain(body, g, data, need, again) {
     '<div class="anket-note" id="submit-msg">Bu gece için tekrar önerebilirsin.</div>';
 
   const other = body.querySelector('#submit-other');
-  if (other) other.addEventListener('click', () => renderSubmitForm(body, g, data, need, again.word));
+  if (other) other.addEventListener('click', () => renderSubmitForm(body, g, data, again.word, again.definition));
 
   const go = body.querySelector('#submit-again');
   if (go) go.addEventListener('click', async () => {
@@ -3157,7 +3210,7 @@ function renderSubmitAgain(body, g, data, need, again) {
     // offering it, or the auto-pick taking it -- and sozcel_used_answers
     // .word is unique across all days, so it could never be an answer
     // again. Better to say so here than to let the admin find out.
-    const err = await offerWord(again.word, again.note, data.night);
+    const err = await offerWord(again.word, again.definition, data.night);
     if (err) { go.disabled = false; msg.innerHTML = esc(err); return; }
     refreshSubmitColumn();
     dismissFbPage();
@@ -3167,7 +3220,7 @@ function renderSubmitAgain(body, g, data, need, again) {
 // The one path that writes a word, shared by the form and by "tekrar
 // gönder" so the checks cannot drift apart. Returns a message to print,
 // or null when it landed.
-async function offerWord(word, note, night) {
+async function offerWord(word, definition, night) {
   const uid = await doneUid();
   if (!uid) return 'Oturum bulunamadı.';
   try {
@@ -3176,7 +3229,7 @@ async function offerWord(word, note, night) {
     if (used) return 'Bu kelime bu arada oynandı — başka bir tane seç.';
   } catch (err) { /* best effort: the insert is still fenced */ }
   const { error } = await IstRouter.sb.from('sozcel_word_suggestions')
-    .insert([{ for_night: night, word, note: note || null, suggested_by: uid }]);
+    .insert([{ for_night: night, word, definition: definition || null, suggested_by: uid }]);
   if (!error) return null;
   console.error('[proje öneri]', error);
   // 23505 is the unique constraint: either this member already offered
@@ -3214,18 +3267,23 @@ function renderSubmitMade(body, g, mine) {
   });
 }
 
-function renderSubmitForm(body, g, data, need, prefill) {
+function renderSubmitForm(body, g, data, prefill, prefillNote) {
   const isWord = g.key === 'sozcel';
   body.innerHTML =
     '<label class="submit-label" for="submit-in">' +
-      (isWord ? need + ' harfli bir kelime' : 'Alıntı') + '</label>' +
+      (isWord ? SOZCEL_SYL_MIN + ' ya da ' + SOZCEL_SYL_MAX + ' heceli bir kelime' : 'Alıntı') + '</label>' +
     (isWord
       ? '<input class="submit-in" id="submit-in" type="text" inputmode="text" autocomplete="off" ' +
-        'autocapitalize="off" spellcheck="false" maxlength="' + need + '">'
+        'autocapitalize="off" spellcheck="false" maxlength="16">'
       : '<textarea class="submit-in submit-area" id="submit-in" rows="3" maxlength="240"></textarea>') +
     (isWord
-      ? '<label class="submit-label" for="submit-note">Neden? (isteğe bağlı)</label>' +
-        '<input class="submit-in" id="submit-note" type="text" maxlength="120">'
+      // Not "why this word" any more: the MEANING. sozcel_used_answers
+      // carries a `definition` for every word it has played and the game
+      // prints it when the round is over, so what is asked for here is
+      // the thing that actually gets used rather than a line of
+      // reasoning that stops at the admin's desk.
+      ? '<label class="submit-label" for="submit-note">Sözcüğün anlamı</label>' +
+        '<input class="submit-in" id="submit-note" type="text" maxlength="160">'
       : '<label class="submit-label" for="submit-note">Kimden?</label>' +
         '<input class="submit-in" id="submit-note" type="text" maxlength="120">') +
     '<div class="fb-throw-row"><button type="button" class="fb-throw-btn" id="submit-go">Gönder</button></div>' +
@@ -3238,8 +3296,12 @@ function renderSubmitForm(body, g, data, need, prefill) {
   if (!field || !go) return;
   // Arriving from "başka kelime": the word they are replacing is in the
   // field, because changing one letter of it is the likeliest edit and
-  // retyping five is the likeliest reason not to bother.
+  // retyping the whole thing is the likeliest reason not to bother. Its
+  // meaning comes with it -- a word edited by a letter usually means the
+  // same thing, and a field cleared behind the reader's back reads as
+  // work lost.
   if (prefill) { field.value = prefill; field.select && setTimeout(() => field.select(), 0); }
+  if (note && prefillNote) note.value = prefillNote;
 
   go.addEventListener('click', async () => {
     // Turkish lowercase: İ/I are not each other's case pair in tr, so
@@ -3249,10 +3311,18 @@ function renderSubmitForm(body, g, data, need, prefill) {
     const extra = (note && note.value || '').trim();
     if (!raw) { msg.textContent = 'Önce bir şey yaz.'; return; }
     if (isWord) {
-      if (raw.length !== need) { msg.textContent = 'Bu gece ' + need + ' harfli olmalı.'; return; }
       // Turkish letters only. The pool is Turkish words; anything else is
-      // a word the game could never take.
+      // a word the game could never take. Checked before the syllables,
+      // since the vowel count of a string with digits in it means nothing.
       if (!/^[a-zçğıöşü]+$/.test(raw)) { msg.textContent = 'Sadece Türkçe harfler.'; return; }
+      const syl = syllableCountTr(raw);
+      if (syl < SOZCEL_SYL_MIN || syl > SOZCEL_SYL_MAX) {
+        msg.textContent = 'Kelime ' + SOZCEL_SYL_MIN + ' ya da ' + SOZCEL_SYL_MAX + ' heceli olmalı.';
+        return;
+      }
+      // The meaning is what the game prints when the round is over, so a
+      // word offered without one is a word the admin cannot play.
+      if (!extra) { msg.textContent = 'Sözcüğün anlamını da yaz.'; return; }
     }
     go.disabled = true;
     msg.textContent = 'Gönderiliyor…';

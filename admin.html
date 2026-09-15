@@ -7724,7 +7724,7 @@ async function loadSozcelSuggestions() {
   try {
     const [sug, used] = await Promise.all([
       sb.from('sozcel_word_suggestions')
-        .select('id, word, note, status, suggested_at, suggested_by')
+        .select('id, word, definition, status, suggested_at, suggested_by')
         .eq('for_night', night).order('suggested_at', { ascending: false }),
       sb.from('sozcel_used_answers').select('word, sozcul_id').eq('used_on', night).maybeSingle(),
     ]);
@@ -7765,16 +7765,17 @@ async function loadSozcelSuggestions() {
         escapeHtml(r.word) + '</b>' +
       '<span style="flex:1;min-width:0;font-size:0.76rem;color:var(--muted);">' +
         escapeHtml(names.get(r.suggested_by) || '—') +
-        (r.note ? ' — ' + escapeHtml(r.note) : '') + '</span>' +
+        (r.definition ? ' — ' + escapeHtml(r.definition) : '') + '</span>' +
       (picked
         ? '<span style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-red);">Seçildi</span>'
         : '<button class="btn btn-primary" data-sw-pick="' + escapeHtml(r.id) + '" ' +
-          'data-sw-word="' + escapeHtml(r.word) + '" style="padding:5px 12px;">Seç</button>') +
+          'data-sw-word="' + escapeHtml(r.word) + '" ' +
+          'data-sw-def="' + escapeHtml(r.definition || '') + '" style="padding:5px 12px;">Seç</button>') +
       '</div>';
   }).join('');
 }
 
-async function pickSozcelSuggestion(id, word) {
+async function pickSozcelSuggestion(id, word, definition) {
   const sel = document.getElementById('sw-night');
   const status = document.getElementById('sw-status');
   const night = sel ? sel.value : IstDate.iso();
@@ -7785,8 +7786,14 @@ async function pickSozcelSuggestion(id, word) {
     // picked, or the list would claim a night has a word it does not.
     // upsert on used_on, because replacing a wrong word is exactly the
     // case the admin override exists for.
+    // The meaning the member offered the word WITH is what sozcel.html
+    // prints once the round is over, so it travels with the word instead
+    // of stopping at this desk -- which is the whole reason the form asks
+    // for a definition rather than for a line of reasoning.
+    const row = { used_on: night, word };
+    if (definition) row.definition = definition;
     const { error: wErr } = await sb.from('sozcel_used_answers')
-      .upsert([{ used_on: night, word }], { onConflict: 'used_on' });
+      .upsert([row], { onConflict: 'used_on' });
     if (wErr) throw wErr;
     // Everything else offered for this night is PASSED, including whatever
     // was picked before if this is a correction. Marked rather than left
@@ -7826,7 +7833,7 @@ function initSozcelSuggestions() {
   if (list) list.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-sw-pick]');
     if (!btn) return;
-    pickSozcelSuggestion(btn.dataset.swPick, btn.dataset.swWord);
+    pickSozcelSuggestion(btn.dataset.swPick, btn.dataset.swWord, btn.dataset.swDef || '');
   });
   loadSozcelSuggestions();
 }

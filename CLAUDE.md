@@ -2038,6 +2038,20 @@ reason the daytime half of this column is not a scoreboard.
   in a table any signed-in member can select from before the game is played. A member reads their
   own row and nobody else's; the count the box prints comes from `sozcel_suggestion_count(night)`
   (SECURITY DEFINER, one integer, no words and no identities), the same shape `question_tally` has.
+- **What is asked for is 2 or 3 SYLLABLES and the word's MEANING — never a letter count and never
+  "why this word".** Sözcel's board is a syllable staircase that adopts whatever length the
+  recorded word has (`WORD_LENGTH = TARGET_WORD.length`), so "5 harfli bir kelime" was asking for a
+  fact about the auto-pick's own pool rather than about the game; what the staircase can actually
+  draw is two or three syllables. In Turkish a syllable has exactly one vowel, so counting vowels
+  IS counting syllables (`syllableCountTr` in project.html, the same thing `syllabifyTr` in
+  sozcel.html produces one chunk per). And the second field is the word's **definition**, not a
+  line of reasoning: `sozcel_used_answers.definition` is what the game prints once the round is
+  over, so picking a suggestion copies it straight across (admin.html's `pickSozcelSuggestion`) and
+  what the member wrote is the thing that actually gets used. It is nullable in the schema and
+  required by the form — an older row offered before this existed is still a perfectly good word.
+  The column was `note` and is renamed in place by `db/sozcel_word_suggestions.sql`, guarded on
+  both sides so that file stays runnable against a fresh database and against one the first cut
+  already ran on.
 - **One offer per member per night**, and two members cannot offer the same word for one night
   (two unique constraints). It is an offer, not a channel to fill; changing your mind is
   withdrawing yours (`Vazgeç`, allowed only while `pending`) and making another.
@@ -2082,9 +2096,11 @@ words onto arbitrary days. Two mechanical notes: the old one-argument signature 
 explicitly, because a defaulted second parameter otherwise leaves two candidate functions and a
 one-argument call fails as ambiguous (42725) rather than resolving; and `WORD_LENGTH` is derived
 from the night's own key too, or a Sunday night (six letters) would ask for five-letter candidates
-after midnight. The same Sunday rule is stated in `sozcelWordLengthFor` (sozcel.html) and
-`sozcelLengthForNight` (project.html) — **two copies that must agree**, or a member is asked for a
-word the game will not take.
+after midnight. That Sunday rule is now stated **once**, in `sozcelWordLengthFor` (sozcel.html),
+and it governs only which pool the auto-pick proposes from: the game itself adopts whatever length
+the recorded word has (`WORD_LENGTH = TARGET_WORD.length`), and what project.html asks a member to
+offer is a **syllable** count rather than a letter count (see the submission column below), so
+there is no second copy of the rule left to drift.
 
 That the games are night-only at all is a real restriction: in June the window is 20:38 to 05:32,
 under nine hours. It is one flag rather than a rule spread through the column precisely so a
@@ -2324,7 +2340,19 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   whether that column is a feed with fewer than three things or a fixed set with one of its
   three switched off — is drawn `.fb-empty`: a dashed rectangle, the same "nothing here"
   convention the rest of the site already uses, marking where the thing would be rather than
-  leaving a blank gap. A lane that restated any of this would land its cards a few pixels off
+  leaving a blank gap.
+  **The kicker stands OUTSIDE its box**, on its own line just above it and ranged to the edge that
+  column is ranged from — BUGÜN over the card rather than in its top corner. Inside, the kicker and
+  the timestamp shared one line pinned to its two ends, so any box whose meta ran long ("Bu geceye
+  bir kelime öner") printed the two on top of each other; and a category is a **heading over** a
+  card rather than one more thing crowded into it. The room it takes is stated once
+  (`--fb-kicker-h`) and both `--fb-box-gap` and `--fb-band-h` are built from it, or a kicker taller
+  than the gap it hangs in would print over the box above it and the page a box grows into would
+  open with the top kicker standing outside its own window. Two consequences, both of which fail
+  silently: `.fb-box` is `overflow: visible` (a clipping box cuts the kicker off entirely), so `.m`
+  states its own clamp; and the kicker is left **out** of the press's `translateY(3px)` — it is not
+  on the face that sinks, and riding it down would close the gap it hangs in.
+  A lane that restated any of this would land its cards a few pixels off
   the lane before it, and the walk between them would read as the page reflowing.
 - **An actor belongs to one stop and one lane, not to the book.** It is alive only while the book
   is *resting* on that stop and the reader is standing on that lane — not mid-drag, not
@@ -2342,7 +2370,8 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   a card lands in is a fact about the card, not just how new it is (see "What each screen carries"
   below).
 - **A box opens into the band it stands in** (`#fb-page-overlay`, `openFbPage`). A box has room
-  for a kicker, a timestamp and two lines of headline; pressing it opens the whole of what it was
+  for a timestamp and two lines of headline under the kicker standing over it; pressing it opens
+  the whole of what it was
   naming, and the one place that page can go without covering what it came out of is the band
   itself — the left column's left edge, the right column's right edge, the top slot's top edge and
   the dock line. It is the same argument Kütüphane's news page and Kahvehane's event page make, and
@@ -2525,10 +2554,10 @@ over the top of whatever lane the reader is standing on.
 
 **The two side lanes are mirror images of each other, not one layout repeated** (`.fb-mirror` in
 project.html). Kütüphane keeps the wide column on the left and ranges everything from there —
-kicker top-left, the red category rule down the left edge. Kahvehane is that turned over: the
-**short** column (Oyunlar, and Kahve at the ilçe stop) stands on the left and the **long** one
-(Etkinlikler, Yorumlar) on the right, with the headings pinned top-right and the red rule down the
-right edge. So the two sides lean *outward* from the middle — the heavy column of each lane is the one
+kicker over the box's top-left corner, the red category rule down the left edge. Kahvehane is that
+turned over: the **short** column (Oyunlar, and Kahve at the ilçe stop) stands on the left and the
+**long** one (Etkinlikler, Yorumlar) on the right, with the kickers ranged from the top-right and
+the red rule down the right edge. So the two sides lean *outward* from the middle — the heavy column of each lane is the one
 nearer the screen edge that lane sits at, and which way a screen is ranged says which side of the
 middle the reader is standing on before a word is read. Only the widths and the ranging flip: which
 side of the screen each column is docked to is still `fb-col-l` / `fb-col-r`, so the slots, the dock
