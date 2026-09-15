@@ -3950,7 +3950,33 @@ const VALID_WORDS_6 = new Set([
 function sozcelWordLengthFor(date) {
   return IstDate.now(date).getDay() === 0 ? 6 : 5;
 }
-let WORD_LENGTH = sozcelWordLengthFor();
+
+// ── The night this page is playing ──
+// A night spans midnight, so "which night" is not "what is today" once
+// the games are night-only: at 01:00 the reader is still playing the
+// night that began yesterday evening. editionKey() is that key (see
+// ist-date.js); by day it is simply today, so a page opened at noon is
+// unchanged. One definition, used by pickDailyTarget and by the length
+// below.
+function sozcelGameNight() {
+  try {
+    if (window.IstDate && IstDate.editionKey) return IstDate.editionKey().date;
+  } catch (e) { /* fall through */ }
+  return IstDate.iso();
+}
+
+// Sunday nights are six letters. Derived from the NIGHT and not from
+// today, or a Sunday night would ask for six-letter candidates before
+// midnight and five-letter ones after it. getDay() is read off the
+// parsed key directly rather than through sozcelWordLengthFor(), whose
+// argument is an instant — midnight local is not necessarily the same
+// calendar day in İstanbul. (The length only decides which pool the
+// auto-pick proposes from: once a word is actually recorded the game
+// adopts its real length, see TARGET_WORD.length below.)
+let WORD_LENGTH = (function () {
+  const d = IstDate.parseYMD(sozcelGameNight());
+  return d ? (d.getDay() === 0 ? 6 : 5) : sozcelWordLengthFor();
+})();
 
 // Bind the active list/set for today's word length.
 let WORD_LIST = WORD_LENGTH === 6 ? WORD_LIST_6 : WORD_LIST_5;
@@ -4015,8 +4041,20 @@ async function pickDailyTarget(seed) {
   let rpcFailure = null;
   try {
     const candidates = await buildDailyCandidates(seed);
+    // ── WHICH NIGHT IS BEING PLAYED ──
+    // The games are night-only now (see CLAUDE.md), and a night SPANS
+    // MIDNIGHT — 17:37 to 08:22 in December. Keyed on the calendar date
+    // the way v5 did it, a member playing at 22:00 and one playing at
+    // 01:00 were handed two different words for the same night, both
+    // landing on one scoreboard. editionKey() returns the day a night
+    // BEGAN on, which is the key both halves of it share; by day it is
+    // simply today, so a page opened at noon behaves exactly as before.
+    // The server still decides what the word IS (db/..._v7_game_night.sql)
+    // — this only names the night being asked for.
+    const night = sozcelGameNight();
     const { data, error } = await sb.rpc('sozcel_daily_word', {
       candidates: candidates.length > 0 ? candidates : null,
+      p_night: night,
     });
     if (error) rpcFailure = error;
     else {

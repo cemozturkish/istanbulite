@@ -1983,8 +1983,151 @@ slide that is the city:
 | | Lane 0 | Lane 1 | Lane 2 |
 |---|---|---|---|
 | | **Kütüphane** | **the app map** | **Kahvehane** |
-| what stands there | Haberler + Anket | where you are in relation to it all | Etkinlikler + Sözcel |
+| what stands there (gündüz) | Haberler + Anket | where you are in relation to it all | Etkinlikler + Oyun Önerileri |
+| what stands there (gece) | Anket sonuçları + Haberler | where you are in relation to it all | Etkinlikler + Oyunlar |
 | where the book may go | up, to slide 1 | nowhere | nowhere *(see ILCE_STOP_ENABLED)* |
+
+**THE İSTANBUL LEVEL PRINTS TWO EDITIONS, AND THE SUN DECIDES WHICH**
+(`IstDate.edition()` / `IstDate.editionKey()`, `fbEdition` in project.html). The palette already
+follows the sun over İstanbul, so the app is genuinely light by day and dark by night; this makes
+that more than a colour. From sunrise the paper **asks** — the three news buckets, each opening
+into a page a reader answers by THROWING it, and the three evenings, each thrown into an RSVP.
+From sunset it **answers** — the district polls come out, every one of the 25 wearing the colour
+its own split mixes to.
+
+Four things about it:
+
+- **The two Kütüphane columns TRADE PLACES; neither goes away.** "The polls come out" means they
+  take the front page, not that the paper stops carrying news at night — so the wide column leads
+  with the results and the news moves into the narrow one. Nothing is lost at either end of the day.
+- **The cast is never rebuilt for an edition.** An actor keeps its slot, its column, its poses and
+  its lag; only its `load` branches (`loadKutuphaneWide` / `loadKutuphaneNarrow` / `loadKahveNarrow`).
+  A column that rebuilt itself would land its cards a few pixels off the ones beside it and the walk
+  between lanes would read as the page reflowing.
+- **The edition turns on ARRIVAL, never on a timer** (`syncEdition`). The theme flips live on
+  palette.js's own 60s tick, and that is right for colour — a page going dark around you is the room
+  going dark. It is exactly wrong for CONTENT: a reader half way through a story at 20:38 in June
+  must not have it replaced by a poll result. So it is re-read at a fresh `mount()`, at `landLane()`
+  when they walk onto a lane, and on `visibilitychange` when the app comes back with **nothing
+  open** — refused outright, not deferred, while a page or a game is up or a gesture is in flight.
+- **A night SPANS MIDNIGHT, so it is named for the day it began on** (`IstDate.editionKey`). In
+  December the evening edition runs 17:37 to 08:22; keying it on today's calendar date would file
+  the back half of every winter night under the wrong day, and two readers on the same night would
+  be holding different editions depending on which side of midnight they opened the app.
+
+**The games are night-only, behind one flag** (`NIGHT_GAMES_ENABLED`) — and by day that column is
+where the city WRITES them. It is the edition's own rule applied to the one column that is not
+reading at all: from sunrise the three boxes collect what the night's games will be made of, and at
+sunset the same three boxes, in the same order, ARE those games.
+
+| slot | gündüz | gece |
+|---|---|---|
+| 1. Oyun | a word for tonight → `sozcel_word_suggestions` | Sözcel, playing whichever word was chosen |
+| 2. Oyun | a quote for tonight → `tumcel_quote_suggestions` | Tümcel |
+| 3. Oyun | nothing to offer — it is generated, and says so | Bulmaca |
+
+Nothing a member writes here reaches another member except by the admin picking it (admin.html's
+Oyunlar → Sözcel panel, **Bu Gecenin Kelimesi**). That makes the member who came only for the games
+put something into the day rather than finding a locked door until sunset — which is the whole
+reason the daytime half of this column is not a scoreboard.
+
+- **`sozcel_word_suggestions` is NOT world-readable, and that is the one place it diverges from
+  `tumcel_quote_suggestions`** (which is `using (true)`). A Tümcel suggestion is a quote; a Sözcel
+  suggestion is a candidate **answer**, and the admin picks tonight's word out of exactly that
+  table — so world-readable, the whole candidate pool and then the answer itself would be sitting
+  in a table any signed-in member can select from before the game is played. A member reads their
+  own row and nobody else's; the count the box prints comes from `sozcel_suggestion_count(night)`
+  (SECURITY DEFINER, one integer, no words and no identities), the same shape `question_tally` has.
+- **One offer per member per night**, and two members cannot offer the same word for one night
+  (two unique constraints). It is an offer, not a channel to fill; changing your mind is
+  withdrawing yours (`Vazgeç`, allowed only while `pending`) and making another.
+- **The Turkish lowercase fold is `toLocaleLowerCase('tr-TR')`, never `toLowerCase()`.** In Turkish
+  `I`/`ı` and `İ`/`i` are the case pairs, not `I`/`i` — the word lists are lowercase Turkish, so a
+  word folded with the invariant rule never matches the pool it is supposed to join.
+- **A word that was not played is asked about again the next morning** (`lastUnpickedWord`,
+  `renderSubmitAgain`): the box says "Tekrar mı, başka mı?" and the page prints the word, that it
+  was not chosen, and **what was played instead** — `sozcel_used_answers` is readable by every
+  member and that word has already been played, so naming it gives nothing away and answers the
+  question the reader would ask next. Two ways on and no third: send the same word again, or write
+  another (the field arrives pre-filled with the old one, since changing a letter is the likeliest
+  edit). Declining is leaving the page — there is no "no thanks", because not offering is what
+  every other morning already looks like and needs no answer.
+  - It is the member's **last** offer and not a queue of them: let one go and offer something else
+    and the chain moves on, rather than nagging about a word they stopped caring about. Only asked
+    on a morning they have not already offered.
+  - **Both paths write through one function** (`offerWord`), so the "has this been played since"
+    check cannot drift between them — a word that went unpicked one night can perfectly well have
+    been taken by somebody else's offer or by the auto-pick since, and `sozcel_used_answers.word`
+    is unique across all days, so it could never be an answer again.
+  - Picking one marks every **other** offer for that night `'passed'` — that is what lets the
+    member's own app tell "not picked" from "not decided yet", since a night left quietly pending
+    forever says neither.
+  - Sözcel only, and not by omission: `tumcel_quote_suggestions` has no `for_night` at all — it is
+    a standing pool that sits until it is used — so an unpicked quote never expires and there is
+    nothing to re-send. Only a per-night offer can be missed.
+
+**And the word now belongs to a NIGHT rather than to a date**
+(`db/sozcel_used_answers_v7_game_night.sql`). v5 resolved it with
+`(now() at time zone 'Europe/Istanbul')::date`, which rolls at **midnight** — exactly right while
+the games ran all day, and broken the moment they became night-only: a night spans midnight, so a
+member playing at 22:00 and one playing at 01:00 were handed **two different words for the same
+night**, both landing on one scoreboard. `sozcel_daily_word(candidates, p_night)` takes the night
+the caller is playing, and sozcel.html passes `IstDate.editionKey().date` (`sozcelGameNight()`).
+
+This is **not** the client-side pick v5 exists to prevent: the database still decides what the word
+IS, the caller only names which night is being asked for — and reading another night's row was
+always possible anyway, since `sozcel_used_answers` is SELECT-able by every authenticated user. The
+auto-pick is still fenced to within a day of the server's own date, so a wrong clock cannot mint
+words onto arbitrary days. Two mechanical notes: the old one-argument signature is **dropped**
+explicitly, because a defaulted second parameter otherwise leaves two candidate functions and a
+one-argument call fails as ambiguous (42725) rather than resolving; and `WORD_LENGTH` is derived
+from the night's own key too, or a Sunday night (six letters) would ask for five-letter candidates
+after midnight. The same Sunday rule is stated in `sozcelWordLengthFor` (sozcel.html) and
+`sozcelLengthForNight` (project.html) — **two copies that must agree**, or a member is asked for a
+word the game will not take.
+
+That the games are night-only at all is a real restriction: in June the window is 20:38 to 05:32,
+under nine hours. It is one flag rather than a rule spread through the column precisely so a
+season's data can reverse it without a refactor.
+
+**A page is answered by THROWING it** (`wirePageThrow`, `throwFootHTML`). Right is the first
+option, left the second, and the option is **stamped on the paper as it goes** so nobody ever
+answers a question they did not see — the gesture Kütüphane's news deck and Kahvehane's event deck
+both taught in the parts bin. One implementation for both: a story's poll
+(`breaking_news_polls` → `breaking_news_poll_option_votes`, insert-only) and an evening's RSVP are
+the same gesture with different words and different writes. Three notes, each of which fails
+silently:
+
+- **The stamp is authored inside the reading but moved onto `#fb-page` when the throw is wired.**
+  It is printed on the paper, not written in the column, so it must not scroll with the body — and
+  both close paths remove it along with any inline transform the throw left mid-flight.
+- **Only a sideways drag is the throw.** The axis is claimed once and never re-decided; a vertical
+  drag is handed straight back to the body's own scroll without ever calling `preventDefault`, which
+  is what keeps the two from competing (`.fb-page-body` is already `touch-action: pan-y`).
+- **Two buttons are rendered as well, deliberately.** A desktop reader has no finger, and a throw is
+  not discoverable on its own the first time. The gesture is the fast path; the buttons are the floor.
+
+**The RSVP throw writes BOTH tables, and that is not redundancy.** Right inserts `event_rsvps`
+(presence — "somebody is going") *and* `event_interest` `'yes'`; left removes the RSVP and records
+`'no'`. Hane paints them as two separate marks on the petek — a corner dot for the verdict, a red
+disc for actually going — and they are not the same fact, so collapsing the *gesture* must not
+collapse the *record*. A left throw is a real "no" rather than the absence of a yes, which is the
+whole reason `event_interest` exists. There is no `localStorage` mirror: `event-interest.js` left
+with kahvehane's own events deck, so that table IS the record now rather than a copy of one.
+
+**The district map is not coloured yet, and the list is not a placeholder for it.** Slide 12's
+İstanbul is `assets/map/istanbul-map-mobile.png` — a flat 1080×1920 drawing with **no traced
+overlay**; the only İstanbul tracing that exists is `assets/map/istanbul-map.svg`, whose viewBox is
+the landscape `0 0 5046 2300` frame and whose polygons land nowhere near the portrait artwork.
+(project.html carries no SVG at all.) So `renderAnketResults` prints the 25 districts as rows, each
+already wearing the colour a map would paint it with. Colouring the drawing itself needs an
+`istanbul-map-mobile.svg` — the two PNGs are visibly the same artwork rescaled into a portrait
+canvas, so it is derivable rather than hand-traced, but it is still a pass of its own.
+
+Left to right on the screen, exactly as the three tabs stand. A pull right walks the strip right,
+so the reader moves *left* along it — Kahvehane, Hane, Kütüphane — and a pull left walks back. Each
+lane has its own cast and they never trade places: the buttons that left to the right are
+Kahvehane's and stay gone; the ones that arrive from the left are Kütüphane's.
 
 Left to right on the screen, exactly as the two side tabs stand. A pull right walks the strip
 right, so the reader moves *left* along it — Kahvehane, the map, Kütüphane — and a pull left walks
@@ -2412,9 +2555,9 @@ screen, which is why the pose tables swap along with the columns.
 | Screen | The map(s) on top | Wide column (3 rectangles) | Narrow column (3 rectangles) |
 |---|---|---|---|
 | Türkiye (slide 1) | Türkiye | left — **Hikâyeler**, the stories the map is grouped into | right — **Olaylar** |
-| Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler** | right — **Anket** |
+| Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler** (gündüz) / **Anket sonuçları** (gece) | right — **Anket** (gündüz) / **Haberler** (gece) |
 | the app map (lane 1) | none — the app's own shape, full bleed | — | — |
-| Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (the kept ones go to the petek) | left — **Oyunlar**, Sözcel, Tümcel, Bulmaca |
+| Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (a throw is the RSVP; the kept ones go to the petek) | left — **Oyun önerileri** (gündüz) / **Oyunlar** (gece) |
 | ~~the ilçe (slide 24)~~ *parked* | the ilçe, with the member's own picked out | right — **Yorumlar** | left — **Kahve**, the Kahve Endeksi's rows |
 | the **petek** | — *not a lane: the logo opens it over whichever lane you are on* | — | — |
 
