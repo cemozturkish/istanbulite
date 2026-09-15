@@ -11,13 +11,13 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=4"></script>
   <script src="router.js?v=15"></script>
-  <script src="i18n.js?v=19"></script>
+  <script src="i18n.js?v=20"></script>
   <script src="map-ink.js?v=6"></script>
   <script src="palette.js?v=3"></script>
   <link rel="stylesheet" href="palette.css?v=7">
   <link rel="stylesheet" href="profile-card.css?v=35">
   <script src="avatar.js?v=1" defer></script>
-  <script src="profile-card.js?v=40" defer></script>
+  <script src="profile-card.js?v=41" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=5"></script>
@@ -955,6 +955,44 @@
       cursor: pointer;
       background: none;
       border: 0;
+      /* ── THE SEA THAT RISES WHEN THE LOGO IS HELD ──
+         The mark fills from the bottom while a finger stays on it, and
+         at full it changes the app's language (see THE LANGUAGE HOLD in
+         the script). It is the loading screen's own rising sea met a
+         third time -- the ring around the letters carries the day
+         (--fb-day), the letters carry the lane wave, and this is the
+         MARK'S OWN BODY filling up, which is exactly the picture those
+         ten JPEGs draw: a grey sea rising inside the silhouette with
+         the white strokes standing over it.
+
+         So the tone is read off the loading screen's own ratio rather
+         than picked by eye: there the ground is 0, the sea 125 and the
+         letters 255, and here the body is --navbar-ink and the strokes
+         are --fb-mark-on. Mixed rather than a token of its own because
+         it has to follow whatever the bar is: the earth palette gives
+         --navbar-ink its own brown (frames.css), and a fixed grey would
+         be the one thing on this bar that ignored it.
+
+         It sits HIGHER up that ladder than the 49% the frames measure,
+         though, and for a reason the curtain does not have: the curtain
+         draws its sea on its own black ground, while this mark hangs
+         BELOW the bar over the page itself (see the note on the button's
+         padding). At the measured ratio the full mark came out within a
+         few values of the night paper behind it and the fill read as
+         nothing happening. Three quarters of the way to the strokes
+         clears the paper in all four states while still leaving the
+         strokes standing over the water, which is the one relationship
+         in those frames that actually has to hold. */
+      --fb-logo-sea: color-mix(in srgb, var(--fb-mark-on) 76%, var(--navbar-ink, #2e2e2e));
+      /* A long press on anything pressable is a callout and a selection
+         on iOS, and both would land in the middle of this gesture. */
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      /* The hold is a vertical-ish nothing, but the book underneath
+         reads a sideways drag -- and a press that starts here is this
+         mark's, not the strip's. */
+      touch-action: none;
       position: relative;
       z-index: 2;              /* over the bar's own ring and wordmark layers */
       /* No translateY here on purpose. `nav` aligns its three columns to
@@ -1085,13 +1123,63 @@
        cannot get underneath its own parent's background. Tree order puts
        it over the ring and .fb-logo's z-index puts the letters over
        both: contour, fill, letters. */
+    /* ── AND THIS SILHOUETTE IS ALSO WHAT THE HOLD FILLS ──
+       The fill layer is the mark's BODY, so it is already exactly the
+       shape a sea rises inside (see --fb-logo-sea above). It needs no
+       layer of its own: the solid body is the background COLOUR and the
+       sea is a background IMAGE over it, grown from the bottom by
+       --fb-hold -- the same one-image, no-repeat, anchored-to-bottom
+       trick the day ring makes on ::before, for the same reason
+       (background-size is the property that transitions everywhere).
+       Under .fb-logo either way, so the strokes stand over the water
+       exactly as they do in the loading screen's own frames.
+
+       --fb-hold-ms is the duration, written by the same code that writes
+       --fb-hold: the rise is a slow, even 1.5s (a sea, not an ease) and
+       the run-back-out is a fast one, and both are the same property
+       moving. */
     nav b.fb-logo-btn::after {
       content: '';
       position: absolute; inset: 0 10px 5px; z-index: 0;
-      background: var(--navbar-ink, #2e2e2e);
+      background-color: var(--navbar-ink, #2e2e2e);
+      background-image: linear-gradient(var(--fb-logo-sea), var(--fb-logo-sea));
+      background-repeat: no-repeat;
+      background-position: bottom;
+      background-size: 100% var(--fb-hold, 0%);
+      transition: background-size var(--fb-hold-ms, 320ms) linear;
       -webkit-mask: url('assets/loading/logo-fill-mask.png') 77.4% 44.4% / 104.5% 150.9% no-repeat;
               mask: url('assets/loading/logo-fill-mask.png') 77.4% 44.4% / 104.5% 150.9% no-repeat;
     }
+    /* Ta da. The one beat this gesture celebrates itself, and it is the
+       same one the day's own full ring gets: a glow, and then the water
+       runs back out while the app re-labels around the reader. */
+    nav b.fb-logo-btn.fb-lang-done {
+      filter: drop-shadow(0 0 9px color-mix(in srgb, var(--fb-logo-sea) 70%, transparent));
+    }
+    /* The word the flip says back, printed over the logo rather than
+       beside it -- this bar has no room for a row, and the mark is where
+       the reader is already looking. On the page's own paper (the logo
+       hangs BELOW the bar, so above it is the app), which is why it is
+       ink on paper like every other card on the site and not the bar's
+       pale label ink. */
+    nav b.fb-logo-btn .fb-lang-say {
+      position: absolute; left: 50%; bottom: calc(100% + 2px);
+      transform: translate(-50%, 6px);
+      white-space: nowrap;
+      /* Uppercased, and the element carries its own `lang` (written by
+         sayLang): CSS case folding is locale-aware and this document is
+         lang="tr", so an English word uppercased under it comes out
+         "ENGLİSH". It is also what a screen reader needs to read the
+         live region in the right voice. */
+      font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+      font-weight: 700;
+      color: var(--ink); background: var(--paper-card, var(--paper));
+      border: 2px solid var(--ink);
+      padding: 3px 8px;
+      opacity: 0; pointer-events: none; z-index: 3;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+    nav b.fb-logo-btn .fb-lang-say.on { opacity: 1; transform: translate(-50%, 0); }
     /* The day is done. The only moment this app celebrates anything, and
        what it says is "you can stop now". */
     nav b.fb-logo-btn.fb-day-full::before {
@@ -1509,7 +1597,7 @@
   <div class="section-rule">
     <header>
       <nav id="fb-nav">
-        <b>Kütüphane</b><b class="fb-logo-btn" id="fb-logo-btn" role="button" tabindex="0" aria-label="Petek"><i class="fb-logo"></i><span class="fb-wm">İstanbulite</span></b><b>Kahvehane</b>
+        <b>Kütüphane</b><b class="fb-logo-btn" id="fb-logo-btn" role="button" tabindex="0" aria-label="Petek"><i class="fb-logo"></i><span class="fb-wm">İstanbulite</span><span class="fb-lang-say" id="fb-lang-say" role="status" aria-live="polite"></span></b><b>Kahvehane</b>
       </nav>
     </header>
   </div>
@@ -5074,6 +5162,10 @@ function mount() {
   wireMap();
   wireGameOverlay();
   wireFbPage();
+  // What a language change has to repaint on this page. Registered
+  // against I18N, so the petek's own preference row and the logo's hold
+  // relabel the app by exactly the same path.
+  wireLangRelabel();
   // ── The middle lane is drawn before it is looked at ──
   // It is a screen the reader is already standing on when the page
   // opens, not something that gets built on a press, so it is drawn on
@@ -5415,6 +5507,232 @@ async function loadMapStats() {
   if (box) buildMap();
 }
 
+// ══════════════════════════════════════════════════════════════
+// THE LANGUAGE HOLD — press the logo and keep pressing
+//
+// The logo is a switch that opens the petek. Held down, it is the one
+// other thing it can be without becoming a menu: after half a second the
+// SEA RISES INSIDE THE MARK, over a second and a half, and at full the
+// app changes language — wherever the reader is standing, because this
+// bar is standing there too (see "THE TWO BARS ARE OMNIPRESENT").
+//
+// It is the loading screen's own rising sea (loading-screen.js) met a
+// third time, and each of the three fills a different part of the same
+// drawing so the three meanings can never be confused: the RING around
+// the letters is the day (--fb-day), the LETTERS are the lane wave
+// (--fb-logo-a/-b/-f), and the mark's own BODY is this. The other two
+// are states the app is in; this one only exists while a finger is on
+// it, which is the whole reason it may share the mark at all.
+//
+// A language is not a mode with a door, so it gets no tile and no row on
+// a settings page: it is one gesture on the thing the app is named
+// after. The petek's innermost depth still carries the same preference
+// as a pair of buttons (Sen — see profile-card.js), which is the
+// keyboard and screen-reader route and what Enter on this mark still
+// reaches; this is the shortcut for a thumb.
+// ══════════════════════════════════════════════════════════════
+
+const LANG_HOLD_DELAY = 500;    // before the water starts to rise
+const LANG_HOLD_FILL = 1500;    // and how long it takes to reach the top
+const LANG_HOLD_DRAIN = 320;    // how fast it runs back out again
+const LANG_HOLD_TADA = 420;     // how long it stands full before it does
+const LANG_HOLD_SAY = 1600;     // how long the mark says what it just did
+const LANG_HOLD_SLOP = 12;      // px of travel before this is a drag, not a hold
+
+let langHold = null;
+// Whether the press that is ending got far enough to be about the
+// language. The click that follows a pointerup is the petek's door, and
+// a reader who just watched the mark fill (or watched it run back out)
+// did not also ask for the door.
+let langHoldTook = false;
+let langSayTimer = null;
+
+function cancelLangHold() {
+  if (!langHold) return;
+  clearTimeout(langHold.timer);
+  langHold = null;
+}
+
+// One place writes the two properties, so the duration and the target
+// can never disagree — and a duration of 0 is how the water is PUT
+// somewhere rather than moved there. A fresh hold has to start from
+// empty, and the last one may have left it anywhere between a committed
+// 100% and a half-drained middle: easing down to zero first would spend
+// the reader's first half second undoing the press before it.
+function setLangFill(btn, pct, ms) {
+  btn.style.setProperty('--fb-hold-ms', ms + 'ms');
+  btn.style.setProperty('--fb-hold', pct + '%');
+}
+
+function onLangDown(e) {
+  langHoldTook = false;
+  // The tour drives this same mark (it is the petek's door, and its own
+  // beat asks the reader to press it) and has a language step of its
+  // own. A flip in the middle of that is the app arguing with itself.
+  if (document.body.classList.contains('ist-onb-locked')) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  cancelLangHold();
+  const btn = e.currentTarget;
+  langHold = { btn, x: e.clientX, y: e.clientY, filling: false, timer: 0 };
+  langHold.timer = setTimeout(() => startLangFill(), LANG_HOLD_DELAY);
+}
+
+// A finger that travels is not a press. The threshold is checked against
+// where it went DOWN rather than against the last frame, so a slow slide
+// off the mark cancels just as a quick one does.
+function onLangMove(e) {
+  if (!langHold) return;
+  if (Math.abs(e.clientX - langHold.x) <= LANG_HOLD_SLOP &&
+      Math.abs(e.clientY - langHold.y) <= LANG_HOLD_SLOP) return;
+  endLangHold();
+}
+
+function startLangFill() {
+  if (!langHold) return;
+  const btn = langHold.btn;
+  langHold.filling = true;
+  // From here on the press is the language's, whatever happens next:
+  // the reader has been shown something, so the door must not also open
+  // when they let go.
+  langHoldTook = true;
+  setLangFill(btn, 0, 0);
+  void btn.offsetWidth;   // commit the empty mark before it starts to fill
+  setLangFill(btn, 100, LANG_HOLD_FILL);
+  langHold.timer = setTimeout(() => commitLangHold(), LANG_HOLD_FILL);
+}
+
+function endLangHold() {
+  if (!langHold) return;
+  const btn = langHold.btn;
+  const filling = langHold.filling;
+  cancelLangHold();
+  // Let go part way and the water simply runs back out. Nothing was
+  // changed and the drawing says so without a word — which is also why
+  // there is no confirmation at the other end: the mark filling to the
+  // top IS the confirmation.
+  if (filling) setLangFill(btn, 0, LANG_HOLD_DRAIN);
+}
+
+function commitLangHold() {
+  if (!langHold) return;
+  const btn = langHold.btn;
+  cancelLangHold();
+  langHoldTook = true;
+  if (!window.I18N || !I18N.otherLang) { setLangFill(btn, 0, LANG_HOLD_DRAIN); return; }
+  const next = I18N.otherLang();
+  // Ta da. The mark stands full and glowing for a beat — the app is
+  // re-labelling itself around the reader while it does — and then the
+  // water runs back out of it.
+  btn.classList.add('fb-lang-done');
+  setTimeout(() => {
+    btn.classList.remove('fb-lang-done');
+    setLangFill(btn, 0, LANG_HOLD_DRAIN);
+  }, LANG_HOLD_TADA);
+  // Applied here and now, and NOT behind the uid: doneUid() is a round
+  // trip on the first ask, and a reader who has held the mark to the top
+  // is watching for the app to change, not for it to find out who they
+  // are. The profile row is written once that lands (saveToSupabase in
+  // i18n.js, whose own setLang is then a no-op) -- and it is what the
+  // word below is said in, so the flip names itself in the language it
+  // has just arrived at.
+  I18N.setLang(next);
+  sayLang(btn, next);
+  doneUid().then(uid => I18N.saveToSupabase(IstRouter.sb, uid, next));
+}
+
+// What it just did, in the language it just did it in. A gesture with no
+// handle and no menu needs to name its own result once: a reader who
+// held the mark by accident would otherwise be left working out what
+// changed, and the two values are a LEANING rather than a switch, so the
+// word for them is i18n.js's own (one source — the petek's preference
+// row prints the same pair).
+function sayLang(btn, value) {
+  const say = document.getElementById('fb-lang-say');
+  if (!say) return;
+  say.textContent = I18N.t('lang.' + value);
+  say.lang = value === 'more_english' ? 'en' : 'tr';
+  say.classList.add('on');
+  clearTimeout(langSayTimer);
+  langSayTimer = setTimeout(() => say.classList.remove('on'), LANG_HOLD_SAY);
+}
+
+// ── Everything the reader can currently see, re-read in place ──
+// Registered against I18N rather than called from the hold, so the
+// petek's own preference row relabels the app exactly as the hold does
+// — one listener, and neither surface has to know what the other has to
+// repaint. The cast is never rebuilt, only its boxes filled again (the
+// same move refreshEditionColumns makes), so nothing on the strip moves
+// under the reader while the words change.
+let _langRelabelWired = false;
+function wireLangRelabel() {
+  if (_langRelabelWired || !window.I18N || !I18N.onChange) return;
+  _langRelabelWired = true;
+  I18N.onChange(() => {
+    refreshAllColumns();
+    buildMap();
+    loadMapStats();
+    relabelGameFrame();
+  });
+}
+
+// Every cached fetch dropped, then every box filled again. A column's
+// cache is keyed by nothing but "already asked", so a language change
+// has to drop all of them: the rows they hold carry the text that was
+// chosen when they were built (newsText picks title_en/body_en, the
+// dates are formatted, the labels are translated), and re-rendering
+// them would print the old language from a fresh render.
+function refreshAllColumns() {
+  etkinlikPromise = null;
+  haberlerPromise = null;
+  dunyaPromise = null;
+  anketPromise = null;
+  gamesStatePromise = null;
+  submitPromise = null;
+  seriesSiblingsCache.clear();
+  // The three stackFetch columns cache independently of whatever their
+  // own fetcher remembers, so nulling only the promise above would
+  // re-render the same rows and look like nothing happened.
+  [loadOlaylarActor, loadAnketActor, loadAnketSonucActor].forEach(f => {
+    if (f && f.reset) f.reset();
+  });
+  (cast || []).forEach(a => {
+    if (!a.def.load) return;
+    try { a.def.load(a.el); } catch (err) { console.error(err); }
+  });
+  refreshDayMeter();
+}
+
+// ── A PAGE STANDING OPEN NEEDS NOTHING, AND THAT IS WORTH STATING ──
+// A story's own body is the most visible thing in the app a flip
+// changes, so the obvious thing to do here is re-render an open page
+// from its box's fresh payload. There is nothing to re-render: one of
+// THE sheet's four ways out is a press outside it, and its backdrop is
+// over the bar (the overlay layer is 500, the two bars 400/401) -- so a
+// press aimed at the logo while a page stands open closes the page
+// before this gesture can begin. The reading the reader had is already
+// gone by the time the language could change under it, and the next
+// opening builds its page from a column that has been re-read.
+//
+// The game overlay is the one surface that is NOT like this, and
+// deliberately: it lifts its own bottom edge to leave the tab bar
+// pressable, because a game is where the reader stays (see THE GAME
+// OVERLAY). So it is the one thing below that has to be told.
+
+// A game is a real page in an iframe over the book (see THE GAME
+// OVERLAY), with its own I18N — same origin, so the flip can simply be
+// told to it. Best-effort: a frame that has not finished loading, or one
+// torn down between the flip and this call, is a game that will read the
+// stored preference on its next open anyway.
+function relabelGameFrame() {
+  const overlay = document.getElementById('fb-game-overlay');
+  const frame = document.getElementById('fb-game-frame');
+  if (!overlay || overlay.hidden || !frame) return;
+  try {
+    const win = frame.contentWindow;
+    if (win && win.I18N && win.I18N.setLang) win.I18N.setLang(I18N.lang);
+  } catch (err) { /* the next open reads the stored preference */ }
+}
+
 // The logo lives on the bottom bar, which is OUTSIDE #ist-content and so
 // survives a virtual navigation -- hence the idempotence guard rather
 // than a fresh binding per mount.
@@ -5424,10 +5742,26 @@ function wireMap() {
     btn.dataset.wired = '1';
     // The logo is a switch, not a door: it opens the petek and it closes
     // it again, which is why it stays lit while the petek is standing.
-    btn.addEventListener('click', () => { petekIsOpen() ? closePetek() : openPetek(); });
+    btn.addEventListener('click', () => {
+      // ...unless the press that ended was the language hold's (see THE
+      // LANGUAGE HOLD above). The flag is cleared by the next pointerdown
+      // as well, so a pointercancel -- which is followed by no click at
+      // all -- cannot leave it standing to swallow the press after it.
+      if (langHoldTook) { langHoldTook = false; return; }
+      petekIsOpen() ? closePetek() : openPetek();
+    });
     btn.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
     });
+    // The hold is bound beside the click rather than instead of it: the
+    // two are one mark, and which of them a press turns out to be is
+    // decided by how long the finger stays on it.
+    btn.addEventListener('pointerdown', onLangDown);
+    btn.addEventListener('pointermove', onLangMove);
+    btn.addEventListener('pointerup', endLangHold);
+    btn.addEventListener('pointercancel', endLangHold);
+    btn.addEventListener('pointerleave', endLangHold);
+    btn.addEventListener('contextmenu', (e) => e.preventDefault());
   }
   // The petek fills the whole band between the two bars, so there is no
   // backdrop left to press -- the way out is the logo, and Escape.

@@ -2028,8 +2028,14 @@
   // Everything printed is already known by the time the page draws —
   // there is no second fetch behind this level.
   const HIVE_PREFS = [
+    // The two language values are named in i18n.js rather than here:
+    // project.html's logo says the same pair back to the reader after a
+    // long press has flipped it, and one word in two places is one word
+    // that drifts. `labelKey` is the only difference from the palette
+    // row below, whose two names are not printed anywhere else.
     { key: 'lang', column: 'language_pref', label: 'profile.langpref',
-      options: [{ value: 'default', label: 'Daha Türkçe' }, { value: 'more_english', label: 'Daha İngilizce' }] },
+      options: [{ value: 'default', labelKey: 'lang.default' },
+                { value: 'more_english', labelKey: 'lang.more_english' }] },
     { key: 'palette', column: 'palette_pref', label: 'profile.colortheme',
       options: [{ value: 'mono', label: 'Siyah-Beyaz' }, { value: 'earth', label: 'Kahverengi' }] },
   ];
@@ -2104,7 +2110,7 @@
       const options = pref.options.map(o => `
         <button type="button" class="ist-hive-pref-opt${o.value === current ? ' ist-hive-pref-on' : ''}"
                 data-pref="${pref.key}" data-value="${o.value}"
-                aria-pressed="${o.value === current ? 'true' : 'false'}">${esc(o.label)}</button>`).join('');
+                aria-pressed="${o.value === current ? 'true' : 'false'}">${esc(o.labelKey ? t(o.labelKey) : o.label)}</button>`).join('');
       return `
         <div class="ist-hive-pref">
           <span class="ist-hive-pref-label">${esc(t(pref.label))}</span>

@@ -47,6 +47,14 @@
     'profile.birthplace':  { default: 'Doğum Yeri',          more_english: 'Birthplace' },
     'profile.membership':  { default: 'Üyelik',              more_english: 'Member Since' },
     'profile.langpref':    { default: 'Dil Tercihi',         more_english: 'Language' },
+    // The two language values, named. One source for them, because they
+    // are printed in two places that must not drift: the petek's own
+    // preference row at level 0, and the word the logo says back to the
+    // reader when a long press has just flipped it (project.html). Both
+    // are a LEANING rather than a hard switch -- 'more_english' is what
+    // the column has always been called -- so the labels say so.
+    'lang.default':        { default: 'Daha Türkçe',           more_english: 'More Turkish' },
+    'lang.more_english':   { default: 'Daha İngilizce',        more_english: 'More English' },
     'profile.colortheme':  { default: 'Renk',                more_english: 'Color' },
     'profile.kefil':       { default: 'KEFİL',               more_english: 'SPONSOR' },
     'profile.account':     { default: 'Hesap',               more_english: 'Account' },
@@ -346,6 +354,32 @@
     return isEnglish() ? 'Better Luck Tomorrow' : 'Bugünlük Bu Kadar';
   }
 
+  // ── The other direction: applied at once, stored behind it ──
+  // The mirror of syncFromSupabase, for a caller that has nowhere of its
+  // own to report a failed write into — the long press on project.html's
+  // logo, which has a logo and no status line. The petek's preference row
+  // keeps its own pessimistic write (profile-card.js's pickHivePref): it
+  // sits beside a message line, so it can afford to wait for the update
+  // to land and say so when it does not, and it saves the palette by the
+  // same path.
+  //
+  // setLang first, deliberately: a member holding the phone is waiting
+  // for the app to change, not for a round trip, and a write that never
+  // lands still leaves this device on the language they asked for. The
+  // next syncFromSupabase is what corrects a device whose write failed,
+  // which is exactly what a signed-out reader gets anyway.
+  async function saveToSupabase(sb, userId, v) {
+    const changed = setLang(v);
+    if (!sb || !userId) return changed;
+    try {
+      await sb.from('profiles').update({ language_pref: currentLang }).eq('id', userId);
+    } catch (e) { /* stays applied locally; the next sync corrects it */ }
+    return changed;
+  }
+
+  // The two values are a pair, so flipping is not a caller's arithmetic.
+  function otherLang() { return isEnglish() ? 'default' : 'more_english'; }
+
   async function syncFromSupabase(sb, userId) {
     if (!sb || !userId) return;
     try {
@@ -400,11 +434,11 @@
   }
 
   global.I18N = {
-    t, setLang, applyToDOM, isEnglish, onChange, offChange,
+    t, setLang, applyToDOM, isEnglish, otherLang, onChange, offChange,
     formatDate, formatTime, formatWeekday, formatCountdown, formatMinutes, formatMemberSince,
     formatNeighborhoodBest,
     formatFoundInGuesses, formatFoundInGuessesFirst, formatTodaysWordPoints, sozcelResultTitle,
-    syncFromSupabase,
+    syncFromSupabase, saveToSupabase,
     escapeHtml, ablative,
     get lang() { return currentLang; },
   };
