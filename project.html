@@ -15,9 +15,9 @@
   <script src="map-ink.js?v=6"></script>
   <script src="palette.js?v=3"></script>
   <link rel="stylesheet" href="palette.css?v=7">
-  <link rel="stylesheet" href="profile-card.css?v=33">
+  <link rel="stylesheet" href="profile-card.css?v=34">
   <script src="avatar.js?v=1" defer></script>
-  <script src="profile-card.js?v=39" defer></script>
+  <script src="profile-card.js?v=40" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <!-- NOT deferred, and every other page that carries it agrees: a
@@ -3652,6 +3652,7 @@ function aim(p, snap) {
     for (const a of cast) a.pos = castTarget;
     paintFrame();
     paintCast();
+    paintBarLevel();
     return;
   }
   ensureCastTick();
@@ -3678,6 +3679,7 @@ function castStep(now) {
   const fp = ease(framePos, castTarget, held ? FRAME_LAG : FRAME_LAG_FREE, dt);
   if (fp !== framePos) { framePos = fp; moving = true; }
   paintFrame();
+  paintBarLevel();
   for (const a of cast) {
     const np = ease(a.pos, castTarget, held ? a.lag : a.lagFree, dt);
     if (np !== a.pos) { a.pos = np; moving = true; }
@@ -3824,6 +3826,38 @@ function paintFrame() {
   if (shown >= 0) imgs[shown].classList.remove('on');
   imgs[i].classList.add('on');
   shown = i;
+}
+
+// ── The bar's second line reads the book's own DEPTH ──
+// The reader's own name used to walk sideways with the lane drag; it now
+// stays dead centre always (see setBarLevelLabel in profile-card.js), and
+// what moves instead is the line under it. TÜRKİYE at the outermost stop,
+// İSTANBUL at the middle one, and -- once ILCE_STOP_ENABLED draws a third
+// -- the reader's own ilçe at the innermost, the same three distances the
+// app map already names. Read off `framePos`, the same continuous number
+// the drawings themselves ease toward, so the label turns over right where
+// the reader would say it did rather than on a whole-frame jump; the
+// halfway point between two stops is the boundary.
+const BAR_LEVEL_TURKIYE = 'TÜRKİYE';
+const BAR_LEVEL_ISTANBUL = 'İSTANBUL';
+let barLevelShown = null;
+
+function paintBarLevel() {
+  if (!window.IstProfileCard || !IstProfileCard.setBarLevelLabel) return;
+  const s0 = STOPS[0], s1 = STOPS[1], s2 = STOPS[2];
+  let label;
+  if (s2 == null || framePos <= (s1 + s2) / 2) {
+    label = framePos <= (s0 + s1) / 2 ? BAR_LEVEL_TURKIYE : BAR_LEVEL_ISTANBUL;
+  } else {
+    // The reader's own ilçe is already sitting on the bar's element,
+    // written there by profile-card.js from the real profile row -- no
+    // second fetch here, just reading the same word back.
+    const me = document.getElementById('ist-pc-me');
+    label = (me && me.dataset.selfMeta) || BAR_LEVEL_ISTANBUL;
+  }
+  if (label === barLevelShown) return;
+  barLevelShown = label;
+  IstProfileCard.setBarLevelLabel(label);
 }
 
 // Aim everything at where the book now is. Nothing paints from `p`
@@ -4046,19 +4080,6 @@ function paintLanes() {
   box.classList.toggle('map-open', lane === LANE_MAP && mid >= 1);
   paintCast();
   paintNav();
-  // Your own name on the top bar walks with the strip: centred on the
-  // middle lane,
-  // ranged against the RIGHT edge on Kütüphane and the left one on
-  // Kahvehane — you turn around to face the way you came, which is also
-  // the rule the three carousel pages' own bar already follows (see
-  // BAR_LAYOUT in profile-card.js: the seat at one edge and you at the
-  // other). Hence the lane read backwards. Painted from the same
-  // continuous number as everything else here rather than switched on
-  // arrival, so it is part of the pull and the release's own ease-out
-  // carries it into place (see setBarSlide in profile-card.js).
-  if (window.IstProfileCard && IstProfileCard.setBarSlide) {
-    IstProfileCard.setBarSlide(LANE_MAP - lanePos);
-  }
 }
 
 // The two words on the bar are set letter by letter, because the light
@@ -4545,8 +4566,9 @@ function unmount() {
   // unmountHivePage in profile-card.js).
   if (window.IstProfileCard && IstProfileCard.unmountHivePage) IstProfileCard.unmountHivePage();
   // The bar outlives this page too (it is outside #ist-content), so the
-  // walked-off name has to be put back in the middle.
-  if (window.IstProfileCard && IstProfileCard.clearBarSlide) IstProfileCard.clearBarSlide();
+  // depth label it was showing has to be handed back to the real district.
+  if (window.IstProfileCard && IstProfileCard.clearBarLevelLabel) IstProfileCard.clearBarLevelLabel();
+  barLevelShown = null;
   lane = LANE_KUTUPHANE; lanePos = LANE_KUTUPHANE;
   atLaneStop = false;
   drag = null; box = null; scrimEl = null; mapLaneEl = null;
