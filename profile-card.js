@@ -2517,17 +2517,19 @@
   }
 
   // ── Arriving on the petek without remounting it ──
-  // The petek is mounted once and then kept: Proje's own ensurePetek
+  // The petek is mounted once and then kept: Proje's own mountPetek
   // refuses to REmount a standing one, because that would pull the
-  // drawing out from under a reader who is already in it. But arriving
-  // on Hane is arriving whether or not anything was rebuilt, and the
-  // reveal belongs to the arrival rather than to the mount -- so the
-  // page that owns the walk (the lane run toward Hane) asks for it here.
-  // A reveal already running is left alone, and a page that isn't there
-  // is not an error: the caller has no way to know the petek's state and
-  // shouldn't have to.
-  // Armed when the walk onto Hane starts; played by playHiveReveal when
-  // it lands (see the beats above).
+  // drawing out from under a reader who is already in it. But arriving on
+  // it is arriving whether or not anything was rebuilt, and the reveal
+  // belongs to the arrival rather than to the mount -- so a page that owns
+  // a walk onto it asks for it here. A reveal already running is left
+  // alone, and a page that isn't there is not an error: the caller has no
+  // way to know the petek's state and shouldn't have to.
+  //
+  // On project.html nothing calls this any more: the petek is behind the
+  // logo there and every OPENING remounts, so the mount's own
+  // hiveRevealFirst is the arrival. anahane.html (a parts-bin page) still
+  // walks onto it as a lane, which is what this is for.
   function revealHivePage() {
     const page = document.getElementById('po-hive-page');
     if (!page || !_hive) return;

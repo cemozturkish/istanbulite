@@ -112,6 +112,12 @@
     // hexagon, so the tour starts there, has them make their avatar one
     // open category at a time, and only then pulls out and says where the
     // others WILL be.
+    //
+    // The petek is behind the LOGO now rather than being the middle lane
+    // (the app map is the middle lane), so the reader opens it themselves
+    // and shuts it themselves -- `toPetek` and `backToMap` -- for the same
+    // reason every lane change here is a real pull: the one door they will
+    // use forever after is taught by being used once.
     // `toNear`/`toAll` are the two level pulls, and their copy is only ever
     // the instruction to pull -- never the description of what is up
     // there, which would be true a beat too early (see runLevelPull).
@@ -120,7 +126,8 @@
     // uses for a lane.
     lanes: {
       tr: {
-        reveal:      'Burası Hane — uygulamanın ortası. Her yere buradan, parmağınla gidiliyor.',
+        reveal:      'Burası ortası — uygulamanın haritası. Nerede olduğunu ve nereye gidebileceğini gösterir. Her yere buradan, parmağınla gidiliyor.',
+        toPetek:      'Ortadaki logoya bas. Petek orada.',
         avatarIntro: 'Öncelikle, senin avatarını yaratalım.',
         pickHair:    'Saçını seç. Beğenince devam et.',
         pickShirt:   'Tişörtünü seç. Beğenince devam et.',
@@ -129,17 +136,19 @@
         near:        'Bu petek. Şu an sadece sen varsın. Biri sana kendi kodunu verdiğinde, yanındaki boş yerlerden birine oturur — gerçek hayatta, yüz yüze.',
         toAll:       'Bir kere daha yukarı kaydır.',
         petekAll:    'Bütün petek bu. Sen sadece kendi altı komşununla değil, koca şehirle aynı ağdasın.',
+        backToMap:   'Peteği kapatmak için aynı logoya tekrar bas. Nerede olursan ol, bir basış uzakta.',
         twoSides:    'İstanbul Avrupa ve Anadolu yakası diye ikiye ayrılır. İstanbulite de öyle — sağda Kahvehane, solda Kütüphane.',
         toKahve:     'Kahvehane sağda. Parmağını sola kaydır.',
-        events:      'Etkinlikler. Bunlar internette değil, dışarıda. Beğendiğin Hane\'de seni bekler.',
+        events:      'Etkinlikler. Bunlar internette değil, dışarıda. Beğendiğin seni bekler.',
         games:       'Üç oyun, her gün yeni. Sırayla açılır.',
-        toKutup:     'Kütüphane en solda. Sağa kaydır, Hane\'den geçip devam et.',
+        toKutup:     'Kütüphane en solda. Sağa kaydır, haritadan geçip devam et.',
         news:        'Haberler. İstanbul, Türkiye ve Dünya — günde bir avuç, bitince biter.',
         anket:       'Anket. Cevabın kendi ilçenin altına yazılır, yani sonuç tek bir yüzde değil — yirmi beş tane.',
-        toHane:      'Hane\'ye dönelim. Sola kaydır.',
+        toHane:      'Haritaya dönelim. Sola kaydır.',
       },
       en: {
-        reveal:      'This is Hane — the middle of the app. Everywhere else is a finger away from here.',
+        reveal:      'This is the middle — the map of the app. It says where you are and where you can go. Everywhere else is a finger away from here.',
+        toPetek:      'Press the logo in the middle. The petek is behind it.',
         avatarIntro: 'First, let\'s create your avatar.',
         pickHair:    'Pick your hair. Continue once you like it.',
         pickShirt:   'Pick your shirt. Continue once you like it.',
@@ -148,14 +157,15 @@
         near:        'This is the petek. Right now it is only you. When somebody gives you their code they take one of the empty places beside you — in person, face to face.',
         toAll:       'Pull up once more.',
         petekAll:    'This is the whole petek. You are not just connected to your own six neighbours — you are on the same network as the whole city.',
+        backToMap:   'Press the same logo again to shut the petek. Wherever you are, it is one press away.',
         twoSides:    'Istanbul splits into a European side and an Anatolian side. Istanbulite splits the same way — Kahvehane on the right, Kütüphane on the left.',
         toKahve:     'Kahvehane is to the right. Pull your finger left.',
-        events:      'Events. These happen outside, not in here. The ones you keep wait for you on Hane.',
+        events:      'Events. These happen outside, not in here. The ones you keep are waiting for you.',
         games:       'Three games, new every day. They unlock in order.',
-        toKutup:     'Kütüphane is all the way left. Pull right, past Hane, and keep going.',
+        toKutup:     'Kütüphane is all the way left. Pull right, past the map, and keep going.',
         news:        'The news. İstanbul, Türkiye and Dünya — a handful a day, and then it is done.',
         anket:       'The poll. Your answer is filed under your own district, so the result is not one percentage — it is twenty-five.',
-        toHane:      'Back to Hane. Pull left.',
+        toHane:      'Back to the map. Pull left.',
       },
     },
     // Printed under the line on a beat that waits for the reader to do
@@ -169,9 +179,16 @@
     // ever increases when the drag overshoots upward). Never "down": that
     // is the physical opposite of the gesture that actually advances it.
     pullUp:      { tr: 'parmağını yukarı kaydır', en: 'pull up' },
+    // The petek is behind a PRESS rather than a pull, so its own two
+    // beats say press rather than borrowing one of the pull prompts.
+    pressLogo:   { tr: 'logoya bas', en: 'press the logo' },
     pullNudge: {
       tr: 'kaydıramıyor musun? devam etmek için dokun',
       en: "can't pull? tap to carry on",
+    },
+    pressNudge: {
+      tr: 'basamıyor musun? devam etmek için dokun',
+      en: "can't press? tap to carry on",
     },
     // The avatar-picking beats no longer advance on an arrow press (the
     // reader may want to browse several before settling) -- this is the
@@ -827,8 +844,10 @@
   const STALL_MS = 12000;
 
   // project.html's lane numbering, mirrored here rather than imported:
-  // 0 Kütüphane (left on screen), 1 Hane (the middle), 2 Kahvehane (right).
-  const LANE_KUTUPHANE = 0, LANE_HANE = 1, LANE_KAHVEHANE = 2;
+  // 0 Kütüphane (left on screen), 1 the app map (the middle), 2 Kahvehane
+  // (right). The petek is not a lane at all any more -- it is behind the
+  // logo, which is why the tour has its own two press beats for it.
+  const LANE_KUTUPHANE = 0, LANE_MAP = 1, LANE_KAHVEHANE = 2;
 
   // The book, when this is running inside project.html. Absent on the
   // parts-bin pages (anahane/kahvehane/kutuphane/mahalle), which no longer
@@ -854,12 +873,15 @@
   // pull beat opens the whole book (`#fb`), because the gesture is a drag on
   // it; the avatar beat opens only the petek (`#fb-petek`), so a stray
   // sideways drag cannot walk the reader off the screen the mascot is
-  // currently talking about.
+  // currently talking about; and the two petek-door beats open the logo
+  // alone (`#fb-logo-btn`), which is the one mark on the compass bar that
+  // answers a press at all.
+  const PASS_SCOPES = { '#fb': 'book', '#fb-petek': 'petek', '#fb-logo-btn': 'logo' };
   let passScope = null;
   function openPassthrough(scope) {
     passScope = scope || '#fb';
     document.body.classList.add('ist-onb-passthru');
-    document.body.dataset.onbPass = passScope === '#fb' ? 'book' : 'petek';
+    document.body.dataset.onbPass = PASS_SCOPES[passScope] || 'book';
   }
   function closePassthrough() {
     passScope = null;
@@ -894,12 +916,20 @@
     // screen they are not on. `pull` is the lane a pull beat waits for;
     // `levelPull` is the same idea for the petek's own vertical gesture.
     const beats = [
-      { lane: LANE_HANE,       target: null,        speech: lines.reveal },
+      { lane: LANE_MAP,        target: null,        speech: lines.reveal },
+      // ── The petek's own door ──
+      // It is the logo, not a lane, so the reader is asked to press it and
+      // the beat waits for it to actually open -- the same rule every lane
+      // pull here follows. Everything between this and `backToMap` happens
+      // inside the petek and asserts no lane at all (`inPetek`), because
+      // asserting one would walk the strip behind a layer the reader is
+      // standing in.
+      { target: '#fb-logo-btn', round: true, speech: lines.toPetek, petek: 'open' },
       // The reader first, the shape second. On day one the petek is one
       // hexagon and six empty sides, so there is nothing true to say about
       // neighbours yet -- but there is always something true to say about
       // the reader, and something for them to DO (see COPY.lanes).
-      { lane: LANE_HANE,       depth: HIVE_SEN, speech: lines.avatarIntro },
+      { inPetek: true,         depth: HIVE_SEN, speech: lines.avatarIntro },
       // One category at a time, and only the ones already open to
       // EVERYONE: AVATAR_HAT_OPTIONS (profile-card.js) carries only 'Yok'
       // today (the Sözcü crown is parked, unbuilt art) and
@@ -909,16 +939,16 @@
       // two beats. `pick: true` lights the pair with a round hole (see
       // paintSpotlight) rather than boxing it, and never advances on a
       // press -- browsing IS the point, see runPick.
-      { lane: LANE_HANE,       depth: HIVE_SEN, target: '#po-hair-prev, #po-hair-next', round: true,
+      { inPetek: true,         depth: HIVE_SEN, target: '#po-hair-prev, #po-hair-next', round: true,
         speech: lines.pickHair, pick: true },
-      { lane: LANE_HANE,       depth: HIVE_SEN, target: '#po-shirt-prev, #po-shirt-next', round: true,
+      { inPetek: true,         depth: HIVE_SEN, target: '#po-shirt-prev, #po-shirt-next', round: true,
         speech: lines.pickShirt, pick: true },
       // `.ist-hive-pick-col`, never `.ist-hive-picker`: the picker's own box is
       // exactly the hexagon (--ist-hive-cell-w/h) and both arrow columns are
       // laid OUTSIDE it (`right: 100%` / `left: 100%`), so a ring measured on
       // the wrapper is a box drawn over the avatar with the arrows outside
       // the hole. Two columns, so two rings -- `all`.
-      { lane: LANE_HANE,       depth: HIVE_SEN, target: '.ist-hive-pick-col', all: true,
+      { inPetek: true,         depth: HIVE_SEN, target: '.ist-hive-pick-col', all: true,
         speech: lines.senDone },
       // Two real pulls out from Sen, one level at a time, each waiting for
       // the actual gesture rather than jumping there -- the reader is
@@ -929,24 +959,27 @@
       // rather than the petek -- and the plain talk beat right after it
       // describes what arriving actually shows: Yanındakiler first (the
       // six touching places, all still empty), then the whole shape.
-      { lane: LANE_HANE,       speech: lines.toNear, levelPull: HIVE_NEAR },
-      { lane: LANE_HANE,       speech: lines.near },
-      { lane: LANE_HANE,       speech: lines.toAll,  levelPull: HIVE_ALL },
-      { lane: LANE_HANE,       speech: lines.petekAll },
-      { lane: LANE_HANE,       speech: lines.twoSides },
-      { lane: LANE_HANE,       speech: lines.toKahve, pull: LANE_KAHVEHANE },
+      { inPetek: true,         speech: lines.toNear, levelPull: HIVE_NEAR },
+      { inPetek: true,         speech: lines.near },
+      { inPetek: true,         speech: lines.toAll,  levelPull: HIVE_ALL },
+      { inPetek: true,         speech: lines.petekAll },
+      // ...and back out through the same door, so the way in and the way
+      // out are learnt as one thing.
+      { target: '#fb-logo-btn', round: true, speech: lines.backToMap, petek: 'close' },
+      { lane: LANE_MAP,        speech: lines.twoSides },
+      { lane: LANE_MAP,        speech: lines.toKahve, pull: LANE_KAHVEHANE },
       // A column is three boxes with no wrapper between them, and the
       // mascot is talking about the column -- so the beat lights all of it.
       { lane: LANE_KAHVEHANE,  target: '.fb-events', all: true, speech: lines.events },
       { lane: LANE_KAHVEHANE,  target: '.fb-oyun',   all: true, speech: lines.games },
       // Two pulls, not one: the strip moves at most one lane per gesture,
-      // so reaching Kütüphane from Kahvehane goes through Hane. That is the
-      // point rather than a cost -- there is no way from the doing to the
-      // reading that does not pass the people.
+      // so reaching Kütüphane from Kahvehane goes through the middle. That
+      // is the point rather than a cost -- there is no way from the doing
+      // to the reading that does not pass the whole shape of the thing.
       { lane: LANE_KAHVEHANE,  speech: lines.toKutup, pull: LANE_KUTUPHANE },
       { lane: LANE_KUTUPHANE,  target: '.fb-haberler', all: true, speech: lines.news },
       { lane: LANE_KUTUPHANE,  target: '.fb-anket',    all: true, speech: lines.anket },
-      { lane: LANE_KUTUPHANE,  speech: lines.toHane, pull: LANE_HANE },
+      { lane: LANE_KUTUPHANE,  speech: lines.toHane, pull: LANE_MAP },
     ];
 
     let idx = 0;
@@ -969,16 +1002,27 @@
       // Same idea for a level pull, aimed at the petek's own depth instead
       // of a lane -- Sen is level 0, so this needs the same `!== undefined`.
       if (b.levelPull !== undefined) { runLevelPull(b); return; }
+      // The petek's own door: a press on the logo rather than a gesture on
+      // the book.
+      if (b.petek !== undefined) { runPetekDoor(b); return; }
 
       // Every other beat is about a screen, so it asserts that screen -- a
       // reader who wandered is put back rather than talked at about a lane
       // they are not standing on. Never on a pull beat: snapping the book
-      // there would fight the very gesture being asked for.
+      // there would fight the very gesture being asked for. And never on a
+      // beat that happens INSIDE the petek: the strip is behind a layer the
+      // reader is standing in, so walking it would be moving a screen they
+      // cannot see for no reason they could name.
       closePassthrough();
       const f = fb();
-      if (f && f.lane && f.lane.at !== b.lane) f.goLane(b.lane);
-      // ...and, on Hane, about a DEPTH of the petek as well.
-      if (b.depth !== undefined) setDepth(b.depth);
+      if (!b.inPetek && b.lane !== undefined && f && f.lane && f.lane.at !== b.lane) f.goLane(b.lane);
+      // A beat inside the petek needs the petek actually standing. It will
+      // be, unless the door beat before it took its own stall escape --
+      // in which case this is what puts the reader where the next line is
+      // about to be true.
+      if (b.inPetek && f && f.openPetek && !f.petekOpen) f.openPetek();
+      // ...and, inside the petek, about a DEPTH of it as well.
+      if (b.depth !== undefined) holdDepth(b.depth);
 
       if (b.pick) { runPick(b); return; }
 
@@ -993,6 +1037,24 @@
       });
       renderPane({ speech: b.speech });
       addHint(COPY.tapToContinue[lang], advance);
+    }
+
+    // ── A depth has to be asserted more than once ──
+    // Opening the petek REMOUNTS it (project.html's openPetek), a mount is
+    // a round trip, and a mount lands at the middle depth by construction
+    // (HIVE_LEVEL_DEFAULT in profile-card.js). So a beat that names a depth
+    // can be answered before the mount it is aiming at even exists, and the
+    // mount then puts the reader back in the middle -- which on the first
+    // avatar beat is the difference between the arrows being on screen and
+    // not. setHivePageLevel is idempotent, so the depth is simply re-said
+    // as things settle; the guard is that the beat asking for it is still
+    // the beat on screen, so this can never fight the next one.
+    function holdDepth(n) {
+      setDepth(n);
+      [120, 300, 600, 900].forEach(ms => setTimeout(() => {
+        const cur = beats[idx];
+        if (cur && cur.depth === n) setDepth(n);
+      }, ms));
     }
 
     // Changing depth rescales the plane, and that is a CSS transition -- so
@@ -1109,9 +1171,50 @@
       }, STALL_MS);
     }
 
+    // ── The petek's door ──
+    // The same shape as a pull beat, aimed at a PRESS instead: the logo is
+    // lit, the logo alone is handed back to the reader, and the beat ends
+    // when the petek has actually opened (or shut). It is the one control
+    // in the whole app that is pressed rather than dragged, so it is worth
+    // the reader doing it once themselves -- the way in and the way out are
+    // the same mark, which is the thing being taught.
+    //
+    // Same escape hatch as every gesture beat: after STALL_MS the prompt
+    // becomes a tap-to-continue and the tour does the press itself, because
+    // the end of the tour is where onboarded_at is written and an account
+    // stuck short of it gets the whole flow again on every launch.
+    function runPetekDoor(b) {
+      const f = fb();
+      const want = b.petek === 'open';
+      if (!f || !f.openPetek) { advance(); return; }
+      const doIt = () => { want ? f.openPetek() : f.closePetek(); };
+      if (!!f.petekOpen === want) { advance(); return; }
+
+      requestAnimationFrame(() => {
+        addSpotlight(document.querySelector(b.target), { round: !!b.round });
+        openPassthrough('#fb-logo-btn');
+      });
+      renderPane({ speech: b.speech, promptText: COPY.pressLogo[lang] });
+
+      const tick = () => {
+        const now = fb();
+        if (!now || !!now.petekOpen === want) { stopLaneWatch(); closePassthrough(); advance(); return; }
+        laneWatch = requestAnimationFrame(tick);
+      };
+      laneWatch = requestAnimationFrame(tick);
+
+      stallTimer = setTimeout(() => {
+        stallTimer = null;
+        renderPane({ speech: b.speech, promptText: COPY.pressNudge[lang] });
+        addHint(COPY.pressNudge[lang], () => {
+          stopLaneWatch(); closePassthrough(); doIt(); advance();
+        });
+      }, STALL_MS);
+    }
+
     function laneNow() {
       const f = fb();
-      return f && f.lane ? f.lane.at : LANE_HANE;
+      return f && f.lane ? f.lane.at : LANE_MAP;
     }
 
     function advance() {

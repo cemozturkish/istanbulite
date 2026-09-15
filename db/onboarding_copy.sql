@@ -26,8 +26,12 @@ create table if not exists public.onboarding_copy (
 );
 
 insert into public.onboarding_copy (key, body_tr, body_en) values
-  ('reveal',      'Burası Hane — uygulamanın ortası. Her yere buradan, parmağınla gidiliyor.',
-                  'This is Hane — the middle of the app. Everywhere else is a finger away from here.'),
+  ('reveal',      'Burası ortası — uygulamanın haritası. Nerede olduğunu ve nereye gidebileceğini gösterir. Her yere buradan, parmağınla gidiliyor.',
+                  'This is the middle — the map of the app. It says where you are and where you can go. Everywhere else is a finger away from here.'),
+  -- The petek is behind the LOGO now rather than being the middle lane, so
+  -- the tour has the reader open that door and shut it again themselves.
+  ('toPetek',     'Ortadaki logoya bas. Petek orada.',
+                  'Press the logo in the middle. The petek is behind it.'),
   ('avatarIntro', 'Öncelikle, senin avatarını yaratalım.',
                   'First, let''s create your avatar.'),
   ('pickHair',    'Saçını seç. Beğenince devam et.',
@@ -44,23 +48,57 @@ insert into public.onboarding_copy (key, body_tr, body_en) values
                   'Pull up once more.'),
   ('petekAll',    'Bütün petek bu. Sen sadece kendi altı komşununla değil, koca şehirle aynı ağdasın.',
                   'This is the whole petek. You are not just connected to your own six neighbours — you are on the same network as the whole city.'),
+  ('backToMap',   'Peteği kapatmak için aynı logoya tekrar bas. Nerede olursan ol, bir basış uzakta.',
+                  'Press the same logo again to shut the petek. Wherever you are, it is one press away.'),
   ('twoSides',    'İstanbul Avrupa ve Anadolu yakası diye ikiye ayrılır. İstanbulite de öyle — sağda Kahvehane, solda Kütüphane.',
                   'Istanbul splits into a European side and an Anatolian side. Istanbulite splits the same way — Kahvehane on the right, Kütüphane on the left.'),
   ('toKahve',     'Kahvehane sağda. Parmağını sola kaydır.',
                   'Kahvehane is to the right. Pull your finger left.'),
-  ('events',      'Etkinlikler. Bunlar internette değil, dışarıda. Beğendiğin Hane''de seni bekler.',
-                  'Events. These happen outside, not in here. The ones you keep wait for you on Hane.'),
+  ('events',      'Etkinlikler. Bunlar internette değil, dışarıda. Beğendiğin seni bekler.',
+                  'Events. These happen outside, not in here. The ones you keep are waiting for you.'),
   ('games',       'Üç oyun, her gün yeni. Sırayla açılır.',
                   'Three games, new every day. They unlock in order.'),
-  ('toKutup',     'Kütüphane en solda. Sağa kaydır, Hane''den geçip devam et.',
-                  'Kütüphane is all the way left. Pull right, past Hane, and keep going.'),
+  ('toKutup',     'Kütüphane en solda. Sağa kaydır, haritadan geçip devam et.',
+                  'Kütüphane is all the way left. Pull right, past the map, and keep going.'),
   ('news',        'Haberler. İstanbul, Türkiye ve Dünya — günde bir avuç, bitince biter.',
                   'The news. İstanbul, Türkiye and Dünya — a handful a day, and then it is done.'),
   ('anket',       'Anket. Cevabın kendi ilçenin altına yazılır, yani sonuç tek bir yüzde değil — yirmi beş tane.',
                   'The poll. Your answer is filed under your own district, so the result is not one percentage — it is twenty-five.'),
-  ('toHane',      'Hane''ye dönelim. Sola kaydır.',
-                  'Back to Hane. Pull left.')
+  ('toHane',      'Haritaya dönelim. Sola kaydır.',
+                  'Back to the map. Pull left.')
 on conflict (key) do nothing;
+
+-- ── Rows seeded before the petek and the app map swapped places ──
+-- Four beats named Hane as the middle screen; the middle screen is the app
+-- map now and the petek is behind the logo, so those lines are simply
+-- untrue on a database seeded earlier. They are corrected HERE rather than
+-- by turning the insert above into an upsert, because an upsert would also
+-- overwrite whatever the admin has since written in admin.html's Users tab.
+-- The match is on the exact old default, so only a row nobody has touched
+-- is rewritten and an edited one is left alone.
+update public.onboarding_copy set
+  body_tr = 'Burası ortası — uygulamanın haritası. Nerede olduğunu ve nereye gidebileceğini gösterir. Her yere buradan, parmağınla gidiliyor.',
+  body_en = 'This is the middle — the map of the app. It says where you are and where you can go. Everywhere else is a finger away from here.'
+where key = 'reveal'
+  and body_tr = 'Burası Hane — uygulamanın ortası. Her yere buradan, parmağınla gidiliyor.';
+
+update public.onboarding_copy set
+  body_tr = 'Etkinlikler. Bunlar internette değil, dışarıda. Beğendiğin seni bekler.',
+  body_en = 'Events. These happen outside, not in here. The ones you keep are waiting for you.'
+where key = 'events'
+  and body_tr = 'Etkinlikler. Bunlar internette değil, dışarıda. Beğendiğin Hane''de seni bekler.';
+
+update public.onboarding_copy set
+  body_tr = 'Kütüphane en solda. Sağa kaydır, haritadan geçip devam et.',
+  body_en = 'Kütüphane is all the way left. Pull right, past the map, and keep going.'
+where key = 'toKutup'
+  and body_tr = 'Kütüphane en solda. Sağa kaydır, Hane''den geçip devam et.';
+
+update public.onboarding_copy set
+  body_tr = 'Haritaya dönelim. Sola kaydır.',
+  body_en = 'Back to the map. Pull left.'
+where key = 'toHane'
+  and body_tr = 'Hane''ye dönelim. Sola kaydır.';
 
 alter table public.onboarding_copy enable row level security;
 
