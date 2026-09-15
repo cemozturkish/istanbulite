@@ -160,7 +160,8 @@ default one.
 ├── game-locks.js         # Per-day game on/off enforcement + the sequence's question gates
 ├── event-interest.js     # "İlgimi çekti": the verdict Kahvehane's event deck records, Hane reads
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
-├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it
+├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it,
+│                         plus sunTimes/isDaytime/edition — which paper is out
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
