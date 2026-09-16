@@ -27,6 +27,8 @@
   <link rel="stylesheet" href="loading-screen.css?v=3">
   <link rel="stylesheet" href="onboarding.css?v=9">
   <script src="onboarding.js?v=6" defer></script>
+  <link rel="stylesheet" href="edition-notice.css?v=1">
+  <script src="edition-notice.js?v=1" defer></script>
 
   <style data-page="project">
     html, body {
@@ -4545,15 +4547,29 @@ async function load() {
 // no session, the admin kill switch, or an account that has already been
 // through it. None of those is a failure the reader should see -- the app
 // behind it is complete either way.
+//
+// The edition notice runs right after, and only when onboarding declined --
+// a brand-new account gets the welcome screen on its first launch, never
+// both screens stacked on top of each other. It is otherwise independent:
+// an onboarded reader gets it every time they open the app in a new
+// edition (see edition-notice.js), which needs no session round trip at
+// all, only the sun.
 async function runOnboarding() {
-  if (!window.IstOnboarding) return;
+  if (!window.IstOnboarding) { showEditionNotice(); return; }
+  let onboardingRan = false;
   try {
     const { data } = await IstRouter.sb.auth.getUser();
     if (!data || !data.user) return;
-    await IstOnboarding.maybeRun({ sb: IstRouter.sb, user: data.user });
+    onboardingRan = await IstOnboarding.maybeRun({ sb: IstRouter.sb, user: data.user });
   } catch (err) {
     console.error('onboarding did not run', err);
+  } finally {
+    if (!onboardingRan) showEditionNotice();
   }
+}
+
+function showEditionNotice() {
+  if (window.IstEditionNotice) IstEditionNotice.show();
 }
 
 async function loadFrames() {
