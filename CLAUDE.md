@@ -1936,7 +1936,7 @@ stays lit while the petek is standing, because it is also the way back out (the 
 Kütüphane's Olaylar box makes). `nav` still takes no pointer events at all — only this one mark
 opts back in, so the drawing under the bar's paper goes on answering a finger that lands beside it.
 
-### Hold the logo and the app changes language — `--fb-hold`
+### Hold the logo and the app changes language — `.fb-hold-frame`
 
 The logo is a switch that opens the petek. **Held down, it is the one other thing it can be without
 becoming a menu**: after half a second the **sea rises inside the mark**, over a second and a half,
@@ -1944,38 +1944,50 @@ and at full the app changes language — wherever the reader is standing, becaus
 standing there too (see "THE TWO BARS ARE OMNIPRESENT"). A language is not a mode with a door, so
 it gets no tile and no settings page: it is one gesture on the thing the app is named after.
 
-**It is the loading screen's own rising sea met a third time, and each of the three fills a
-different part of the same drawing** — which is what keeps the three meanings from being confused.
-The **ring** around the letters is the day (`--fb-day`), the **letters** are the lane wave
-(`--fb-logo-a/-b/-f`), and the mark's own **body** is this. The first two are states the app is
-in; this one only exists while a finger is on it, which is the only reason it may share the mark
-at all. It needs no layer of its own either: the body is already `::after`'s `logo-fill-mask.png`
-silhouette, so the solid body is that layer's background COLOUR and the sea is a background IMAGE
-grown from the bottom by `--fb-hold` — the same one-image, no-repeat, anchored-to-bottom trick the
-day ring makes on `::before`, and under `.fb-logo` either way, so the strokes stand over the water
-exactly as they do in the ten frames.
+**And it is not a computed fill — it is the loading screen's OWN TEN DRAWINGS**
+(`assets/loading/logo-dark-mono-01..10.jpg`), stepped through exactly like a flip book as the
+finger stays down. The three states this one mark carries are kept apart by which PART of the
+drawing they fill: the **ring** around the letters is the day (`--fb-day`), the **letters** are
+the lane wave (`--fb-logo-a/-b/-f`), and the mark's own **body** is this. The first two are states
+the app is *in*; this one only exists while a finger is on it, which is the only reason it may
+share the mark at all.
+
+**`.fb-hold-frame` is a real element, not a pseudo** (a crossfade — or here, a flip — needs
+somewhere to write a changing `background-image`, and the button already spends its one
+`::before`/`::after` pair on the ring and the resting fill). It wears the same
+`logo-fill-mask.png` silhouette as the resting fill, at the same size and position, and sits on
+the **same 1200×400 canvas the ten loading frames themselves are drawn on** — so a frame dropped
+in as its `background-image` lands registered pixel-for-pixel under `.fb-logo`'s own strokes
+above it, no second alignment to keep in step with the first. Because it is the real artwork
+rather than a mixed tone, it reads at its own native black/grey/white regardless of palette — the
+same deliberate palette-independence the curtain itself keeps (see "the loading screen is the
+third ladder"): a splash that is one palette on the way in and another on the way out is two
+different doors.
 
 Seven things about it:
 
-- **The tone is read off those frames rather than picked by eye** — there the ground is 0, the sea
-  125 and the letters 255 — but it sits **higher** up that ladder (76% toward `--fb-mark-on`, not
-  49%) for a reason the curtain does not have: the curtain draws its sea on its own black ground,
-  while this mark hangs BELOW the bar over the page itself. At the measured ratio the full mark
-  came out within a few values of the night paper behind it and the fill read as nothing happening.
-  It is `color-mix`ed off `--navbar-ink` and `--fb-mark-on` rather than being a token, so it
-  follows the earth palette's own brown bar instead of being the one thing on it that ignores it.
-- **A release part way is the water running back out**, fast, and nothing changes. That is also
-  why there is no "are you sure" at the other end: the mark filling to the top IS the confirmation.
+- **A flip, not a crossfade** (`showHoldFrame`) — the same idiom the rest of this file already
+  uses for its own drawings ("a flip book flips"): each step sets `transition: none` and swaps the
+  `background-image` in the same synchronous call, so the frame snaps rather than fades. Ten
+  frames over the fill's own 1.5s duration (`LANG_HOLD_FRAME_MS = LANG_HOLD_FILL / 9`), read off
+  elapsed time on a `requestAnimationFrame` loop rather than counted in steps, so a dropped tick
+  (a busy main thread) is never a frame the reader simply never got — the next one catches
+  straight up to wherever the clock actually is.
+- **A release part way is the water running back out**, fast, and nothing changes — an ordinary
+  opacity fade of the frame layer (`fadeHoldFrame`), not a reverse flip through the frames: what
+  it is fading TO is the resting fill already sitting underneath it (`::after`, unchanged since
+  before this gesture existed), so nothing needs to be un-shown frame by frame. That is also why
+  there is no "are you sure" at the other end: the mark filling to the top IS the confirmation.
 - **A press that got as far as the sea rising is the language's, not the petek's** (`langHoldTook`).
   The click that follows a `pointerup` is the door, and a reader who has just watched the mark fill
   — or watched it drain — did not also ask for it. The flag is cleared by the next `pointerdown` as
   well, so a `pointercancel`, which is followed by no click at all, cannot leave it standing to
   swallow the press after it.
-- **`--fb-hold-ms` is written by the same code that writes `--fb-hold`**, so the duration and the
-  target can never disagree: the rise is a slow even 1.5s (a sea, not an ease) and the run back out
-  is a fast one, and both are the same property moving. A fresh hold sets the pair to `0%`/`0ms`
-  and forces a reflow before it starts, or a hold begun over a half-drained mark would spend its
-  first half second undoing the last press.
+- **The last frame is forced at commit, not trusted to the loop's own last tick.**
+  `requestAnimationFrame` runs on the browser's own refresh cadence and can land a few
+  milliseconds ahead of the `setTimeout` that fires `commitLangHold` at the same `LANG_HOLD_FILL`
+  mark — so `commitLangHold` explicitly shows frame 10 itself before anything else, rather than
+  risking the "ta da" beat catching the mark one frame short of full.
 - **The word it says back is the new language's own, in the new language** (`sayLang`,
   `lang.default` / `lang.more_english` in i18n.js — one source, since the petek's preference row
   prints the same pair). It carries its own `lang` attribute: CSS case folding is locale-aware and
@@ -2794,9 +2806,12 @@ Six things about it:
   screen they are standing on. It is the mall stairway drawn rather than argued, and it is "always
   in the middle" applied to the drawing itself.
 - **Every column is a fixed set of exactly three, and which slot a card lands in is a fact about
-  the card.** Haberler is İSTANBUL/TÜRKİYE/DÜNYA, top to bottom, each box that category's own
-  newest story inside the 72h window; Etkinlikler is BUGÜN/YARIN/EVVELSİ GÜN, each box that
-  Istanbul calendar day's own soonest evening. Oyunlar is Sözcel, Tümcel and Bulmaca and nothing
+  the card.** Haberler is İstanbul/Türkiye/Dünya (`news.istanbul`/`news.turkiye`/`news.dunya` in
+  i18n.js), top to bottom, each box that category's own newest story inside the 72h window;
+  Etkinlikler is Bugün/Yarın/Öbür gün (`events.today`/`events.tomorrow`/`events.dayafter`), each
+  box that Istanbul calendar day's own soonest evening — the third label used to read "Evvelsi
+  gün", which actually means the day BEFORE yesterday, the wrong direction entirely; corrected
+  rather than merely translated when the column was made bilingual. Oyunlar is Sözcel, Tümcel and Bulmaca and nothing
   else, **in that order, top to bottom** — the sequence reads downward the way a list of steps
   does, so 1. Oyun is the box the eye lands on first and 3. Oyun is the one at the dock. The slots
   are numbered from the dock up (`.fb-slot-N`), so the first game stands in the last slot;

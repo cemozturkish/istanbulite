@@ -34,6 +34,19 @@
     'events.verdict.no':   { default: 'İlgimi çekmedi',      more_english: 'Not for me' },
     'home.events.kept':    { default: 'İlgini çekenler',     more_english: 'What caught your eye' },
     'home.events.emptysub':{ default: 'Kahvehane\'de etkinlik destesine göz at.', more_english: 'Flip through the event deck on Kahvehane.' },
+    // Etkinlikler's three fixed day slots (project.html) -- day+0/1/2, top
+    // to bottom on the dock. The Turkish for day+2 used to be "Evvelsi
+    // gün", which actually means the day BEFORE yesterday -- the wrong
+    // direction entirely -- so it is corrected here to "Öbür gün" rather
+    // than just translated for English.
+    'events.today':        { default: 'BUGÜN',                more_english: 'TODAY' },
+    'events.tomorrow':     { default: 'YARIN',                more_english: 'TOMORROW' },
+    'events.dayafter':     { default: 'ÖBÜR GÜN',              more_english: 'THE DAY AFTER' },
+    // Haberler's three fixed category slots (project.html), same object
+    // as a Dünya story's own kicker on the parts-bin pages.
+    'news.istanbul':       { default: 'İSTANBUL',              more_english: 'ISTANBUL' },
+    'news.turkiye':        { default: 'TÜRKİYE',                more_english: 'TURKEY' },
+    'news.dunya':          { default: 'DÜNYA',                  more_english: 'WORLD' },
 
     // profile / settings card
     'profile.customize':   { default: 'Kişiselleştir',       more_english: 'Customize' },

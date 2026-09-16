@@ -1013,34 +1013,20 @@
       background: none;
       border: 0;
       /* ── THE SEA THAT RISES WHEN THE LOGO IS HELD ──
-         The mark fills from the bottom while a finger stays on it, and
-         at full it changes the app's language (see THE LANGUAGE HOLD in
-         the script). It is the loading screen's own rising sea met a
-         third time -- the ring around the letters carries the day
-         (--fb-day), the letters carry the lane wave, and this is the
-         MARK'S OWN BODY filling up, which is exactly the picture those
-         ten JPEGs draw: a grey sea rising inside the silhouette with
-         the white strokes standing over it.
-
-         So the tone is read off the loading screen's own ratio rather
-         than picked by eye: there the ground is 0, the sea 125 and the
-         letters 255, and here the body is --navbar-ink and the strokes
-         are --fb-mark-on. Mixed rather than a token of its own because
-         it has to follow whatever the bar is: the earth palette gives
-         --navbar-ink its own brown (frames.css), and a fixed grey would
-         be the one thing on this bar that ignored it.
-
-         It sits HIGHER up that ladder than the 49% the frames measure,
-         though, and for a reason the curtain does not have: the curtain
-         draws its sea on its own black ground, while this mark hangs
-         BELOW the bar over the page itself (see the note on the button's
-         padding). At the measured ratio the full mark came out within a
-         few values of the night paper behind it and the fill read as
-         nothing happening. Three quarters of the way to the strokes
-         clears the paper in all four states while still leaving the
-         strokes standing over the water, which is the one relationship
-         in those frames that actually has to hold. */
-      --fb-logo-sea: color-mix(in srgb, var(--fb-mark-on) 76%, var(--navbar-ink, #2e2e2e));
+         Held down, the mark fills from the bottom with the loading
+         screen's OWN ten drawings (see THE LANGUAGE HOLD in the script,
+         and `.fb-hold-frame` below) -- not a computed CSS sea, the actual
+         frames, stepped through in real time as the finger stays down.
+         At full it changes the app's language. It is the loading
+         screen's rising sea met a third time on this one mark -- the
+         ring around the letters carries the day (--fb-day), the letters
+         carry the lane wave, and this is the MARK'S OWN BODY filling up.
+         Because it is the real artwork rather than a mixed tone, it
+         reads at its own native black/grey/white regardless of palette
+         -- the same deliberate palette-independence the curtain itself
+         keeps (see "the loading screen is the third ladder" in
+         CLAUDE.md): a splash that is one palette on the way in and
+         another on the way out is two different doors. */
       /* A long press on anything pressable is a callout and a selection
          on iOS, and both would land in the middle of this gesture. */
       -webkit-touch-callout: none;
@@ -1180,38 +1166,56 @@
        cannot get underneath its own parent's background. Tree order puts
        it over the ring and .fb-logo's z-index puts the letters over
        both: contour, fill, letters. */
-    /* ── AND THIS SILHOUETTE IS ALSO WHAT THE HOLD FILLS ──
-       The fill layer is the mark's BODY, so it is already exactly the
-       shape a sea rises inside (see --fb-logo-sea above). It needs no
-       layer of its own: the solid body is the background COLOUR and the
-       sea is a background IMAGE over it, grown from the bottom by
-       --fb-hold -- the same one-image, no-repeat, anchored-to-bottom
-       trick the day ring makes on ::before, for the same reason
-       (background-size is the property that transitions everywhere).
-       Under .fb-logo either way, so the strokes stand over the water
-       exactly as they do in the loading screen's own frames.
-
-       --fb-hold-ms is the duration, written by the same code that writes
-       --fb-hold: the rise is a slow, even 1.5s (a sea, not an ease) and
-       the run-back-out is a fast one, and both are the same property
-       moving. */
+    /* At rest (no hold in progress) this is simply the letter interior's
+       flat colour, unchanged from before THE LANGUAGE HOLD existed --
+       the hold's own layer (`.fb-hold-frame`, right below) sits on top
+       of it and hides it while a press is showing the real frames, and
+       reveals it again the moment that layer fades back out. */
     nav b.fb-logo-btn::after {
       content: '';
       position: absolute; inset: 0 10px 5px; z-index: 0;
-      background-color: var(--navbar-ink, #2e2e2e);
-      background-image: linear-gradient(var(--fb-logo-sea), var(--fb-logo-sea));
-      background-repeat: no-repeat;
-      background-position: bottom;
-      background-size: 100% var(--fb-hold, 0%);
-      transition: background-size var(--fb-hold-ms, 320ms) linear;
+      background: var(--navbar-ink, #2e2e2e);
       -webkit-mask: url('assets/loading/logo-fill-mask.png') 77.4% 44.4% / 104.5% 150.9% no-repeat;
               mask: url('assets/loading/logo-fill-mask.png') 77.4% 44.4% / 104.5% 150.9% no-repeat;
     }
+    /* ── THE HOLD'S OWN LAYER -- THE ACTUAL DRAWINGS, STEPPED THROUGH ──
+       A real element, not a pseudo (a crossfade needs somewhere to write
+       a `background-image` to, and the button already spends its one
+       ::before/::after pair on the ring and the resting fill). It wears
+       the SAME mask as the resting fill -- `logo-fill-mask.png`, at the
+       same size and position -- and sits on the SAME 1200x400 canvas the
+       ten loading frames themselves are drawn on (`logo-dark-mono-*.jpg`
+       are 1200x400, identically), so a frame dropped in here as the
+       `background-image` lands registered pixel-for-pixel under
+       `.fb-logo`'s own strokes above it -- no second alignment to keep
+       in step with the first.
+       Invisible at rest (opacity 0, background-image unset, the resting
+       fill showing through underneath); the script sets the image and
+       fades it in the moment a hold clears the initial delay, then steps
+       the image itself through the ten frames in place as the finger
+       stays down -- a flip, not a crossfade, the same idiom the rest of
+       this file already uses for its drawings ("a flip book flips").
+       z-index sits it between the resting fill (0) and the strokes (1);
+       it has to come BEFORE .fb-logo in the markup for that tie to
+       resolve the right way, since ::after always paints after every
+       real child regardless of z-index ties among equals. */
+    nav b.fb-logo-btn .fb-hold-frame {
+      position: absolute; inset: 0 10px 5px; z-index: 1;
+      background-repeat: no-repeat;
+      background-size: 104.5% 150.9%;
+      background-position: 77.4% 44.4%;
+      -webkit-mask: url('assets/loading/logo-fill-mask.png') 77.4% 44.4% / 104.5% 150.9% no-repeat;
+              mask: url('assets/loading/logo-fill-mask.png') 77.4% 44.4% / 104.5% 150.9% no-repeat;
+      opacity: 0;
+    }
     /* Ta da. The one beat this gesture celebrates itself, and it is the
        same one the day's own full ring gets: a glow, and then the water
-       runs back out while the app re-labels around the reader. */
+       runs back out while the app re-labels around the reader. White
+       rather than a palette token -- the frame it is glowing around is
+       the loading screen's own material, which never tracks the palette
+       either (see the note on the button above). */
     nav b.fb-logo-btn.fb-lang-done {
-      filter: drop-shadow(0 0 9px color-mix(in srgb, var(--fb-logo-sea) 70%, transparent));
+      filter: drop-shadow(0 0 9px rgba(255, 255, 255, 0.75));
     }
     /* The word the flip says back, printed over the logo rather than
        beside it -- this bar has no room for a row, and the mark is where
@@ -1667,7 +1671,7 @@
   <div class="section-rule">
     <header>
       <nav id="fb-nav">
-        <b>Kütüphane</b><b class="fb-logo-btn" id="fb-logo-btn" role="button" tabindex="0" aria-label="Petek"><i class="fb-logo"></i><span class="fb-wm">İstanbulite</span><span class="fb-lang-say" id="fb-lang-say" role="status" aria-live="polite"></span></b><b>Kahvehane</b>
+        <b>Kütüphane</b><b class="fb-logo-btn" id="fb-logo-btn" role="button" tabindex="0" aria-label="Petek"><i class="fb-hold-frame" aria-hidden="true"></i><i class="fb-logo"></i><span class="fb-wm">İstanbulite</span><span class="fb-lang-say" id="fb-lang-say" role="status" aria-live="polite"></span></b><b>Kahvehane</b>
       </nav>
     </header>
   </div>
@@ -2142,14 +2146,24 @@ function stackFetch(fetchRows) {
 }
 
 // ── Kahvehane's lane: one box per DAY, not a feed ──
-// Fixed vertical order top to bottom -- BUGÜN, YARIN, EVVELSİ GÜN -- so
-// the slot a card lands in says WHICH day, never merely how soon.
-// Slots are stacked bottom-up (slot 0 lowest), so day offset 0 is
-// slot 2, offset 1 is slot 1, offset 2 is slot 0. Day boundaries go
-// through IstDate.iso() (CLAUDE.md rule 10) rather than a device-local
-// midnight, then get built as fixed +03:00 instants -- Istanbul carries
-// no DST, so this is exact rather than a guess.
-const ETKINLIK_LABELS = ['BUGÜN', 'YARIN', 'EVVELSİ GÜN']; // [day+0, day+1, day+2]
+// Fixed vertical order top to bottom -- day+0, day+1, day+2 -- so the
+// slot a card lands in says WHICH day, never merely how soon. Slots are
+// stacked bottom-up (slot 0 lowest), so day offset 0 is slot 2, offset 1
+// is slot 1, offset 2 is slot 0. Day boundaries go through IstDate.iso()
+// (CLAUDE.md rule 10) rather than a device-local midnight, then get
+// built as fixed +03:00 instants -- Istanbul carries no DST, so this is
+// exact rather than a guess.
+//
+// A function, not a table: the three words are I18N's own
+// (events.today/tomorrow/dayafter) and have to be re-read on every call,
+// never cached, because a flip has to relabel a column that is already
+// standing (see THE LANGUAGE HOLD). The Turkish for day+2 used to be
+// "Evvelsi gün", which means the day BEFORE yesterday -- corrected to
+// "Öbür gün" in i18n.js rather than merely translated.
+function etkinlikLabels() {
+  const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
+  return [t('events.today'), t('events.tomorrow'), t('events.dayafter')];
+}
 let etkinlikPromise = null;
 async function loadEtkinlikActor(el, slot) {
   if (!etkinlikPromise) {
@@ -2181,7 +2195,7 @@ async function loadEtkinlikActor(el, slot) {
   // a class outlives a re-render.
   fbSetDone(el, false);
   const dayIdx = 2 - slot;
-  const label = ETKINLIK_LABELS[dayIdx];
+  const label = etkinlikLabels()[dayIdx];
   if (failed) {
     el.classList.toggle('fb-empty', slot !== 2);
     el.innerHTML = '<div class="k">' + label + '</div>' +
@@ -2441,7 +2455,14 @@ function paintDayMeter() {
 // (db/breaking_news_v3_edition.sql). A district story (`neighborhood` set,
 // no `category`) is still İstanbul for this column's purposes.
 const HABER_BUCKETS = ['istanbul', 'turkiye', 'dunya']; // [slot 2, slot 1, slot 0]
-const HABER_LABELS = { istanbul: 'İSTANBUL', turkiye: 'TÜRKİYE', dunya: 'DÜNYA' };
+// A function, not a table, for the same reason etkinlikLabels() is: the
+// three words are I18N's own (news.istanbul/turkiye/dunya) and have to
+// be re-read on every call, never cached, so a flip relabels a column
+// that is already standing (see THE LANGUAGE HOLD).
+function haberLabels() {
+  const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
+  return { istanbul: t('news.istanbul'), turkiye: t('news.turkiye'), dunya: t('news.dunya') };
+}
 function newsBucket(n) {
   const c = n.category || n.neighborhood || 'turkiye';
   if (c === 'dunya') return 'dunya';
@@ -2519,7 +2540,7 @@ async function loadHaberlerActorAt(el, slot, depth) {
   fbSetPage(el, null);
   fbSetDone(el, false);
   const bucket = HABER_BUCKETS[2 - slot];
-  const label = HABER_LABELS[bucket];
+  const label = haberLabels()[bucket];
   if (failed) {
     // The message stands once, on the wide column's own İstanbul box --
     // printing it a second time on the narrow column's copy said the
@@ -5644,6 +5665,12 @@ async function loadMapStats() {
 // are states the app is in; this one only exists while a finger is on
 // it, which is the whole reason it may share the mark at all.
 //
+// And it is not a computed fill -- it is the loading screen's OWN TEN
+// DRAWINGS (`assets/loading/logo-dark-mono-01..10.jpg`), stepped through
+// exactly like a flip book as the finger stays down, then run back to
+// nothing on release. `.fb-hold-frame` in the stylesheet is the layer
+// this writes to.
+//
 // A language is not a mode with a door, so it gets no tile and no row on
 // a settings page: it is one gesture on the thing the app is named
 // after. The petek's innermost depth still carries the same preference
@@ -5658,6 +5685,12 @@ const LANG_HOLD_DRAIN = 320;    // how fast it runs back out again
 const LANG_HOLD_TADA = 420;     // how long it stands full before it does
 const LANG_HOLD_SAY = 1600;     // how long the mark says what it just did
 const LANG_HOLD_SLOP = 12;      // px of travel before this is a drag, not a hold
+const LANG_HOLD_FRAME_COUNT = 10;
+// Ten frames over the fill's own duration, so the last one lands exactly
+// on the tick that commits the flip (see commitLangHold) -- there is one
+// number for how long the rise takes, not two that can drift apart.
+const LANG_HOLD_FRAME_MS = LANG_HOLD_FILL / (LANG_HOLD_FRAME_COUNT - 1);
+const langHoldFrameSrc = n => 'assets/loading/logo-dark-mono-' + String(n).padStart(2, '0') + '.jpg';
 
 let langHold = null;
 // Whether the press that is ending got far enough to be about the
@@ -5670,18 +5703,49 @@ let langSayTimer = null;
 function cancelLangHold() {
   if (!langHold) return;
   clearTimeout(langHold.timer);
+  if (langHold.frameLoop) cancelAnimationFrame(langHold.frameLoop);
   langHold = null;
 }
 
-// One place writes the two properties, so the duration and the target
-// can never disagree — and a duration of 0 is how the water is PUT
-// somewhere rather than moved there. A fresh hold has to start from
-// empty, and the last one may have left it anywhere between a committed
-// 100% and a half-drained middle: easing down to zero first would spend
-// the reader's first half second undoing the press before it.
-function setLangFill(btn, pct, ms) {
-  btn.style.setProperty('--fb-hold-ms', ms + 'ms');
-  btn.style.setProperty('--fb-hold', pct + '%');
+// Drops the image in and shows it at once -- no fade, the same flip-book
+// idiom the rest of this file already uses for its own drawings ("a
+// flip book flips"). `transition: none` guards against a leftover fade
+// duration from the PREVIOUS hold's drain still being declared inline.
+function showHoldFrame(btn, n) {
+  const frame = btn.querySelector('.fb-hold-frame');
+  if (!frame) return;
+  frame.style.transition = 'none';
+  frame.style.backgroundImage = "url('" + langHoldFrameSrc(n) + "')";
+  frame.style.opacity = '1';
+}
+
+// The run back to nothing -- an ordinary opacity fade, not a reverse
+// flip through the frames: what it is fading TO is the resting fill
+// already sitting underneath it (::after, unchanged since before this
+// gesture existed), so nothing needs to be un-shown frame by frame.
+function fadeHoldFrame(btn, ms) {
+  const frame = btn.querySelector('.fb-hold-frame');
+  if (!frame) return;
+  frame.style.transition = 'opacity ' + ms + 'ms linear';
+  requestAnimationFrame(() => { frame.style.opacity = '0'; });
+}
+
+// Reads elapsed time back rather than counting steps, so a dropped
+// requestAnimationFrame tick (a busy main thread) is never a frame the
+// reader simply never got -- the next tick catches straight up to
+// wherever the clock actually is.
+function langHoldFrameLoop(startedAt) {
+  if (!langHold || !langHold.filling) return;
+  const elapsed = performance.now() - startedAt;
+  const n = Math.min(LANG_HOLD_FRAME_COUNT,
+    1 + Math.floor(elapsed / LANG_HOLD_FRAME_MS));
+  if (n !== langHold.frameShown) {
+    langHold.frameShown = n;
+    showHoldFrame(langHold.btn, n);
+  }
+  if (elapsed < LANG_HOLD_FILL) {
+    langHold.frameLoop = requestAnimationFrame(() => langHoldFrameLoop(startedAt));
+  }
 }
 
 function onLangDown(e) {
@@ -5693,7 +5757,7 @@ function onLangDown(e) {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   cancelLangHold();
   const btn = e.currentTarget;
-  langHold = { btn, x: e.clientX, y: e.clientY, filling: false, timer: 0 };
+  langHold = { btn, x: e.clientX, y: e.clientY, filling: false, timer: 0, frameShown: 0 };
   langHold.timer = setTimeout(() => startLangFill(), LANG_HOLD_DELAY);
 }
 
@@ -5709,15 +5773,13 @@ function onLangMove(e) {
 
 function startLangFill() {
   if (!langHold) return;
-  const btn = langHold.btn;
   langHold.filling = true;
   // From here on the press is the language's, whatever happens next:
   // the reader has been shown something, so the door must not also open
   // when they let go.
   langHoldTook = true;
-  setLangFill(btn, 0, 0);
-  void btn.offsetWidth;   // commit the empty mark before it starts to fill
-  setLangFill(btn, 100, LANG_HOLD_FILL);
+  const startedAt = performance.now();
+  langHoldFrameLoop(startedAt);
   langHold.timer = setTimeout(() => commitLangHold(), LANG_HOLD_FILL);
 }
 
@@ -5730,7 +5792,7 @@ function endLangHold() {
   // changed and the drawing says so without a word — which is also why
   // there is no confirmation at the other end: the mark filling to the
   // top IS the confirmation.
-  if (filling) setLangFill(btn, 0, LANG_HOLD_DRAIN);
+  if (filling) fadeHoldFrame(btn, LANG_HOLD_DRAIN);
 }
 
 function commitLangHold() {
@@ -5738,7 +5800,13 @@ function commitLangHold() {
   const btn = langHold.btn;
   cancelLangHold();
   langHoldTook = true;
-  if (!window.I18N || !I18N.otherLang) { setLangFill(btn, 0, LANG_HOLD_DRAIN); return; }
+  // Forced to the last frame rather than trusting the loop's own last
+  // tick to have landed exactly here: requestAnimationFrame runs on the
+  // browser's own refresh cadence, and this timer can fire a few
+  // milliseconds ahead of the next one -- the mark has to be standing at
+  // full before it is told the flip is done, not one frame short of it.
+  showHoldFrame(btn, LANG_HOLD_FRAME_COUNT);
+  if (!window.I18N || !I18N.otherLang) { fadeHoldFrame(btn, LANG_HOLD_DRAIN); return; }
   const next = I18N.otherLang();
   // Ta da. The mark stands full and glowing for a beat — the app is
   // re-labelling itself around the reader while it does — and then the
@@ -5746,7 +5814,7 @@ function commitLangHold() {
   btn.classList.add('fb-lang-done');
   setTimeout(() => {
     btn.classList.remove('fb-lang-done');
-    setLangFill(btn, 0, LANG_HOLD_DRAIN);
+    fadeHoldFrame(btn, LANG_HOLD_DRAIN);
   }, LANG_HOLD_TADA);
   // Applied here and now, and NOT behind the uid: doneUid() is a round
   // trip on the first ask, and a reader who has held the mark to the top
