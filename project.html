@@ -154,6 +154,12 @@
          top slot's top edge and the dock line. Stated as the sum the
          slots are already built from rather than as a fourth number. */
       --fb-band-h: calc(3 * var(--fb-box-h) + 2 * var(--fb-box-gap) + var(--fb-kicker-h));
+      /* Oyunlar carries two boxes now, not three (see GAME_DEFS) -- taller
+         ones, so the column still fills exactly the band the three used
+         to: 2 * this + 1 gap == 3 * --fb-box-h + 2 gaps, the same total
+         --fb-band-h is built from. Derived rather than a second literal,
+         so the two stay in step if --fb-box-h or --fb-box-gap ever move. */
+      --fb-oyun-box-h: calc((3 * var(--fb-box-h) + var(--fb-box-gap)) / 2);
       /* Both columns hang from the same line above the tab bar -- the
          phone's stacks grow upward from the thumb (see "The phone's feeds
          hang from the bottom" in CLAUDE.md). */
@@ -217,6 +223,12 @@
     .fb-box.fb-slot-0 { bottom: var(--fb-dock); }
     .fb-box.fb-slot-1 { bottom: calc(var(--fb-dock) + var(--fb-box-h) + var(--fb-box-gap)); }
     .fb-box.fb-slot-2 { bottom: calc(var(--fb-dock) + 2 * (var(--fb-box-h) + var(--fb-box-gap))); }
+    /* Oyunlar overrides both: taller boxes (--fb-oyun-box-h, see above)
+       stacked two deep instead of three, landing on the same top edge
+       the three used to. Cast AFTER the rule above so it wins at equal
+       specificity. */
+    .fb-box.fb-oyun { height: var(--fb-oyun-box-h); }
+    .fb-box.fb-oyun.fb-slot-1 { bottom: calc(var(--fb-dock) + var(--fb-oyun-box-h) + var(--fb-box-gap)); }
     /* A slot with nothing to put in it is drawn as an empty frame --
        the same "nothing here" convention as everywhere else on the site
        (.events-empty, deckFrameHTML): a dashed rectangle marking where
@@ -3153,14 +3165,14 @@ const loadAnketSonucActor = stackFetch(async () => {
 //
 //   Sözcel   a word for tonight        -> sozcel_word_suggestions
 //   Tümcel   a quote for tonight       -> tumcel_quote_suggestions
-//   Bulmaca  nothing to offer          -> it is generated, and says so
 //
 // Both tables are admin-curated by construction: nothing a member writes
-// here reaches another member except by the admin picking it.
+// here reaches another member except by the admin picking it. Bulmaca is
+// not a slot in this column — it stays generated and admin-managed
+// elsewhere, so there is nothing for a member to offer it.
 const SUBMIT_DEFS = [
   { key: 'sozcel', kicker: '1. OYUN', title: 'Sözcel', ask: 'Bu geceye bir kelime öner' },
   { key: 'tumcel', kicker: '2. OYUN', title: 'Tümcel', ask: 'Bu geceye bir alıntı öner' },
-  { key: 'bulmaca', kicker: '3. OYUN', title: 'Bulmaca', ask: null },
 ];
 
 // The night these offers are FOR. By day editionKey() is simply today,
@@ -3291,12 +3303,9 @@ async function loadSubmitActor(el, slot) {
   // The same slot arithmetic the games use: the column reads downward,
   // so the first game stands in the last slot (see gameForSlot).
   const g = SUBMIT_DEFS[SUBMIT_DEFS.length - 1 - slot];
-  // Bulmaca is generated — there is nothing to offer it, and a box that
-  // asks for something it cannot take is worse than one that says so.
-  if (!g.ask) {
+  if (!g) {
     el.classList.add('fb-empty');
-    el.innerHTML = '<div class="k">' + g.kicker + '</div><div class="t">' + g.title + '</div>' +
-                   '<div class="m">Kendi kurulur</div>';
+    el.innerHTML = '';
     return;
   }
   const mine = data.mine[g.key];
@@ -3671,17 +3680,20 @@ function loadKahveNarrow(el, slot) {
 }
 
 // ── Kahvehane's other column: the fixed set of games ──
-// Not a feed -- always these three, in this order -- but a game the
+// Not a feed -- always these two, in this order -- but a game the
 // admin switched off for today (game_day_toggles) is not a step the
 // reader has left to take (see CLAUDE.md), so its own slot goes
 // dashed exactly like an empty feed slot rather than opening a locked
-// page.
+// page. Bulmaca is not a slot here any more -- it stays a real page
+// (bulmaca.html), reachable directly and still run by the admin's
+// on/off board and scoreboard, but this column only carries two boxes
+// now (see .fb-oyun's own height override, sized to fill exactly the
+// room three boxes used to take).
 const GAME_DEFS = [
   { key: 'sozcel', kicker: '1. OYUN', title: 'Sözcel', meta: 'Türkçe Wordle', file: 'sozcel.html' },
   { key: 'tumcel', kicker: '2. OYUN', title: 'Tümcel', meta: 'Cümle bul', file: 'tumcel.html' },
-  { key: 'bulmaca', kicker: '3. OYUN', title: 'Bulmaca', meta: 'Mini bulmaca', file: 'bulmaca.html' },
 ];
-// The sequence reads DOWNWARD: 1. Oyun on top, 3. Oyun at the dock. The
+// The sequence reads DOWNWARD: 1. Oyun on top, 2. Oyun at the dock. The
 // slots are numbered from the dock up (see .fb-slot-N), so the first
 // game stands in the last slot -- the one place that arithmetic is
 // written.
@@ -4158,23 +4170,26 @@ const END0_POSES_R = { 0: { x: 0, opacity: 1 }, 3: { x: 60, opacity: 0 }, 11: { 
 const END23_POSES_L = { 11: { x: -60, opacity: 0 }, 20: { x: -60, opacity: 0 }, 23: { x: 0, opacity: 1 } };
 const END23_POSES_R = { 11: { x: 60, opacity: 0 }, 20: { x: 60, opacity: 0 }, 23: { x: 0, opacity: 1 } };
 
-// One column description in, three stacked actors out (slot 0 at the
-// dock, 1 and 2 above it). `load`/`onpress`, if given, are called with
-// the slot index appended, so one fetch can fill all three boxes and
-// one handler can tell them apart.
+// One column description in, three stacked actors out by default (slot
+// 0 at the dock, 1 and 2 above it) -- or `count` of them, for a column
+// whose fixed set is not three (Oyunlar is two, see the CAST entry
+// below). `load`/`onpress`, if given, are called with the slot index
+// appended, so one fetch can fill every box and one handler can tell
+// them apart.
 //
-// All three share one pose table -- the same x/opacity numbers at the
+// They all share one pose table -- the same x/opacity numbers at the
 // same slide -- so what staggers them is purely how fast each one's
 // `pos` catches up to it (see `ease()`): SLOT_LAG multiplies slot 0's
-// (the dock-most box) lag and lagFree up and slot 2's down, keeping
-// their 3.2:1 ratio intact. Higher lag reaches wherever the target
-// currently is sooner, in EITHER direction, so the same ordering plays
-// both ways: entering, slot 0 is first to arrive; leaving, slot 0 is
-// first to be gone, with 1 and 2 following a beat behind each time.
+// (the dock-most box) lag and lagFree up and the topmost slot's down,
+// keeping their 3.2:1 ratio intact whether there are two slots or
+// three. Higher lag reaches wherever the target currently is sooner, in
+// EITHER direction, so the same ordering plays both ways: entering,
+// slot 0 is first to arrive; leaving, slot 0 is first to be gone, with
+// the rest following a beat behind each time.
 const SLOT_LAG = [1.25, 1, 0.8];
-function stackActors({ idBase, live, lane, col, mirror, cls, poses, lag, lagFree, load, onpress }) {
+function stackActors({ idBase, live, lane, col, mirror, cls, poses, lag, lagFree, load, onpress, count }) {
   const out = [];
-  for (let slot = 0; slot < 3; slot++) {
+  for (let slot = 0; slot < (count || 3); slot++) {
     out.push({
       id: idBase + slot,
       live, lane,
@@ -4199,9 +4214,13 @@ const CAST = [
     idBase: 'etkinlik', live: 11, lane: LANE_KAHVEHANE, col: 'r', mirror: true, cls: 'fb-events',
     poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadEtkinlikActor, onpress: onpressBox,
   }),
+  // Two slots, not three (see GAME_DEFS) -- .fb-oyun's own height
+  // override (--fb-oyun-box-h) grows each box so the column still fills
+  // exactly the band three boxes used to.
   ...stackActors({
     idBase: 'oyun', live: 11, lane: LANE_KAHVEHANE, col: 'l', mirror: true, cls: 'fb-oyun',
     poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadKahveNarrow, onpress: onpressOyun,
+    count: 2,
   }),
 
   // ── Kütüphane's pair: the reading side (Olaylar stands at the
