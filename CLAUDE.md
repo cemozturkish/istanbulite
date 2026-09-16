@@ -2556,7 +2556,19 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   card rather than one more thing crowded into it. The room it takes is stated once
   (`--fb-kicker-h`) and both `--fb-box-gap` and `--fb-band-h` are built from it, or a kicker taller
   than the gap it hangs in would print over the box above it and the page a box grows into would
-  open with the top kicker standing outside its own window. Two consequences, both of which fail
+  open with the top kicker standing outside its own window. **And the gap between two cards is two
+  halves, set against each other**: the air ABOVE a kicker (`--fb-inset * 0.6`, the multiplier
+  inside `--fb-box-gap`) and the air BELOW it (`--fb-box-tag-gap`, between the kicker and the card
+  it names). Above must stay larger than below — that order is the whole of why a kicker reads as a
+  heading over the card under it rather than as a caption under the card over it — but it started
+  at 12.6px against 4px, of which **2px is spent under the border and never seen** (`.fb-box .k` is
+  positioned `bottom: 100% + gap` against the **padding** box, so the air the reader gets is the
+  gap minus the 2px top border), leaving ~16px over the kicker against ~3px under it: the word sat
+  almost on its own frame with a long run of empty paper above it. They are moved **against each
+  other**, ~2px each — so the sum barely changes (26.2px → 26.4px) and only the kicker inside it
+  moves, leaving the slots, `--fb-band-h` and the window a box grows into where they were. Changing
+  one half without the other is what would move them.
+  Two consequences, both of which fail
   silently: `.fb-box` is `overflow: visible` (a clipping box cuts the kicker off entirely), so `.m`
   states its own clamp; and the kicker is left **out** of the press's `translateY(3px)` — it is not
   on the face that sinks, and riding it down would close the gap it hangs in.
