@@ -2089,9 +2089,12 @@ its own split mixes to.
 
 Four things about it:
 
-- **The two Kütüphane columns TRADE PLACES; neither goes away.** "The polls come out" means they
-  take the front page, not that the paper stops carrying news at night — so the wide column leads
-  with the results and the news moves into the narrow one. Nothing is lost at either end of the day.
+- **The wide Kütüphane column is the news, day and night alike, and never trades places.** A
+  reader mid-story at sunset must never have it swapped out from under them for a poll result.
+  What the sun changes is the narrow column alone: it collects votes and shows the news one story
+  deeper by day (see "What each screen carries" below), and once the polls close for the night it
+  prints their own answers instead — "the polls come out" is a night-only thing, asking and
+  answering both, rather than a box that hands the front page back and forth on a timer.
 - **The cast is never rebuilt for an edition.** An actor keeps its slot, its column, its poses and
   its lag; only its `load` branches (`loadKutuphaneWide` / `loadKutuphaneNarrow` / `loadKahveNarrow`).
   A column that rebuilt itself would land its cards a few pixels off the ones beside it and the walk
@@ -2715,7 +2718,7 @@ screen, which is why the pose tables swap along with the columns.
 | Screen | The map(s) on top | Wide column (3 rectangles) | Narrow column (3 rectangles) |
 |---|---|---|---|
 | Türkiye (slide 1) | Türkiye | left — **Hikâyeler**, the stories the map is grouped into | right — **Olaylar** |
-| Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler** (gündüz) / **Anket sonuçları** (gece) | right — **Anket** (gündüz) / **Haberler** (gece) |
+| Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler**, unchanged day and night | right — **Haberler**, one story deeper (gündüz) / **Anket sonuçları** (gece) |
 | the app map (lane 1) | none — the app's own shape, full bleed | — | — |
 | Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (a throw is the RSVP; the kept ones go to the petek) | left — **Oyun önerileri** (gündüz) / **Oyunlar** (gece) |
 | ~~the ilçe (slide 24)~~ *parked* | the ilçe, with the member's own picked out | right — **Yorumlar** | left — **Kahve**, the Kahve Endeksi's rows |
@@ -2740,7 +2743,13 @@ Six things about it:
   the category or the day is known regardless of whether anything is in it — rather than shifting
   the other two up to fill the gap. Olaylar alone stays a genuine feed (the top three ongoing
   olaylar by `sort_order`, whichever those are on a given day) rather than three fixed buckets,
-  because there is no third axis to bucket an olay by.
+  because there is no third axis to bucket an olay by. **By day, Haberler stands in BOTH
+  columns** — same three buckets, same kickers, but the narrow column's box is one story further
+  into that bucket's own stack (`loadHaberlerNarrowActor`, depth 1 of `loadHaberlerActorAt`): the
+  first thing nobody has answered yet in the wide column, the next thing after it in the narrow
+  one. A bucket with nothing past its wide-column story today is dashed in the narrow column
+  rather than printing that same headline a second time — "expand the news" means a category
+  genuinely gets deeper, never that one story gets shown twice.
 - **The bucket is only about the SLOT, never about what the box's own page holds.** Which of
   İSTANBUL/TÜRKİYE/DÜNYA a story stands in is a fact about that one bucket's newest story and
   nothing else — it is not a feed of everything in the category, and it is not the seri (`seri` ≠
