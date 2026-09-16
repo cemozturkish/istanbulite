@@ -64,10 +64,25 @@
     root.id = ROOT_ID;
     root.innerHTML = `
       <div class="ist-edn-msg"></div>
-      <button type="button" class="ist-edn-hint"></button>
+      <div class="ist-edn-hint"></div>
     `;
     document.body.appendChild(root);
     return root;
+  }
+
+  // Types `text` into `el` one letter at a time, the same plain letter-by-
+  // letter reveal onboarding's own welcome screen uses (addMsgTypedOnly in
+  // onboarding.js) — resolves once the whole sentence is on screen.
+  function typeInto(el, text, speed) {
+    return new Promise(resolve => {
+      let i = 0;
+      (function tick() {
+        el.textContent = text.slice(0, i);
+        if (i >= text.length) { resolve(); return; }
+        i++;
+        setTimeout(tick, speed);
+      })();
+    });
   }
 
   // Shows the notice if the reader has not seen this edition yet. Returns
@@ -86,9 +101,11 @@
 
     let root = document.getElementById(ROOT_ID);
     if (!root) root = buildRoot();
-    root.querySelector('.ist-edn-msg').textContent = line;
+    const msg = root.querySelector('.ist-edn-msg');
     const hint = root.querySelector('.ist-edn-hint');
+    msg.textContent = '';
     hint.textContent = COPY.tapHint[l];
+    hint.classList.remove('show');
 
     function dismiss() {
       markSeen(key);
@@ -100,6 +117,10 @@
 
     document.body.classList.add('ist-edn-locked');
     root.classList.add('show');
+    // The hint — and the "tap anywhere" it promises — only appears once the
+    // whole sentence has actually typed out; showing it earlier would be a
+    // hint for a gesture that skips text the reader hasn't read yet.
+    typeInto(msg, line, 28).then(() => hint.classList.add('show'));
     return true;
   }
 
