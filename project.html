@@ -1896,22 +1896,30 @@ const START_LANE = LANE_MAP;
 //
 //   GÜNDÜZ  Kütüphane  wide: the three news buckets; pressing one opens
 //                            it and a THROW answers the story's own poll
-//                      narrow: Anket — the district poll, to vote in
+//                      narrow: the same three categories, one story
+//                              deeper into their own stack -- more news,
+//                              not a vote (see loadHaberlerNarrowActor)
 //           Kahvehane  wide: the three evenings; a throw is the RSVP
 //                      narrow: the three games, COLLECTING -- a word for
 //                              Sözcel, a quote for Tümcel, and Bulmaca
 //                              saying it builds itself
 //
-//   GECE    Kütüphane  wide: ANKET SONUÇLARI — every district, coloured
-//                            by its own split (the reveal)
-//                      narrow: the news, still there, no longer leading
+//   GECE    Kütüphane  wide: the news, unchanged — a story is a story
+//                            whatever the hour
+//                      narrow: ANKET SONUÇLARI — every district,
+//                              coloured by its own split (the reveal)
 //           Kahvehane  wide: the evenings, unchanged — an event you RSVP
 //                            to at 21:00 is the most normal thing here
 //                      narrow: Oyunlar — the three games, playable
 //
-// The two Kütüphane columns TRADE PLACES rather than one of them going
-// away: "the polls come out" means they take the front page, not that
-// the news stops existing. Nothing is lost at either end of the day.
+// Kütüphane's wide column is the news now, day and night alike, and no
+// longer trades places with anything -- a reader mid-story at sunset
+// must never have it swapped out from under them for a poll result. What
+// the sun changes is the NARROW column alone: news one layer deeper by
+// day, the district polls' own answers once they close for the night --
+// "the polls come out" is a night thing through and through, asking and
+// answering both, rather than a box that hands the front page back and
+// forth between two unrelated questions.
 //
 // The games being night-only is a real restriction -- in June that is a
 // window from 20:38 to 05:32, under nine hours -- so it is one flag
@@ -1983,7 +1991,7 @@ function wireEditionReturn() {
 // the cast is not rebuilt, only its boxes are filled again.
 function refreshEditionColumns() {
   anketPromise = null;
-  if (loadAnketActor && loadAnketActor.reset) loadAnketActor.reset();
+  if (loadAnketSonucActor && loadAnketSonucActor.reset) loadAnketSonucActor.reset();
   gamesStatePromise = null;
   submitPromise = null;
   (cast || []).forEach(a => {
@@ -2490,7 +2498,17 @@ function refreshHaberlerColumn() {
   refreshDayMeter();
 }
 
-async function loadHaberlerActor(el, slot) {
+// Wide is depth 0 -- the same box it always was. Narrow (day only, see
+// loadKutuphaneNarrow) is depth 1: the same three categories one story
+// further into their own stack, which is the whole of what "expand the
+// news" means -- not a second feed, the next thing in the category
+// already on screen. A category with nothing past its own primary story
+// today has nothing to be deeper than, so depth 1 goes dashed there
+// rather than printing the same headline the wide column already has.
+function loadHaberlerActor(el, slot) { return loadHaberlerActorAt(el, slot, 0); }
+function loadHaberlerNarrowActor(el, slot) { return loadHaberlerActorAt(el, slot, 1); }
+
+async function loadHaberlerActorAt(el, slot, depth) {
   const { byBucket, editionDate, failed } = await haberlerData();
   if (!el.isConnected) return;
   // Cleared before every render, filled only on the path that actually
@@ -2501,16 +2519,19 @@ async function loadHaberlerActor(el, slot) {
   const bucket = HABER_BUCKETS[2 - slot];
   const label = HABER_LABELS[bucket];
   if (failed) {
-    el.classList.toggle('fb-empty', slot !== 2);
+    // The message stands once, on the wide column's own İstanbul box --
+    // printing it a second time on the narrow column's copy said the
+    // same failure from two directions at once.
+    el.classList.toggle('fb-empty', !(slot === 2 && depth === 0));
     el.innerHTML = '<div class="k">' + label + '</div>' +
-      (slot === 2 ? '<div class="t">Yüklenemedi</div>' : '');
+      (slot === 2 && depth === 0 ? '<div class="t">Yüklenemedi</div>' : '');
     return;
   }
   const arr = byBucket[bucket] || [];
   if (!arr.length) {
     el.classList.add('fb-empty');
     el.innerHTML = '<div class="k">' + label + '</div>' +
-      (slot === 2 && !editionDate ? '<div class="t">Bugün için bir sayı çıkmadı.</div>' : '');
+      (slot === 2 && depth === 0 && !editionDate ? '<div class="t">Bugün için bir sayı çıkmadı.</div>' : '');
     return;
   }
   const uid = await doneUid();
@@ -2520,7 +2541,12 @@ async function loadHaberlerActor(el, slot) {
   // every one of them has been, it settles on the last, the same "a done
   // box stays pressable" rule every other box follows.
   const undealt = arr.filter(n => !newsIsDealt(store, n));
-  const n = undealt[0] || arr[arr.length - 1];
+  const primary = undealt[0] || arr[arr.length - 1];
+  let n = primary;
+  if (depth > 0) {
+    n = undealt.find(x => x !== primary) || arr.find(x => x !== primary);
+    if (!n) { el.classList.add('fb-empty'); el.innerHTML = '<div class="k">' + label + '</div>'; return; }
+  }
   const stackTag = arr.length > 1 ? ' · ' + (arr.indexOf(n) + 1) + '/' + arr.length : '';
   const byline = n.hook_author ? '— ' + n.hook_author : '';
   el.classList.remove('fb-empty');
@@ -2907,36 +2933,18 @@ function anketData() {
 
 // Voting is exactly what changes this column, so it is re-read the
 // moment a vote lands rather than at the next mount -- the same rule
-// refreshOyunColumn follows for a game just played.
+// refreshOyunColumn follows for a game just played. Anket is a night box
+// alone now (loadAnketSonucActor, further down), so that is the one this
+// resets; there is no day-time vote box left to reset beside it.
 function refreshAnketColumn() {
   anketPromise = null;
-  loadAnketActor.reset();
+  if (loadAnketSonucActor && loadAnketSonucActor.reset) loadAnketSonucActor.reset();
   (cast || []).forEach(a => {
     if (!/\bfb-anket\b/.test(a.def.cls) || !a.def.load) return;
     try { a.def.load(a.el); } catch (err) { console.error(err); }
   });
   refreshDayMeter();
 }
-
-// anketData() never rejects -- it reports a failed fetch in its own
-// return value and has already logged it, so there is nothing to catch
-// here and nothing to log twice.
-const loadAnketActor = stackFetch(async () => {
-  const { polls, voted, failed } = await anketData();
-  if (failed) {
-    return { rows: [], failed: true,
-      failedHtml: '<div class="k">Anket</div><div class="t">Yüklenemedi</div>' +
-                  '<div class="m">Bağlantını kontrol et.</div>' };
-  }
-  const rows = polls.map(poll => ({
-    html: '<div class="k">ANKET</div><div class="t">' + esc(anketText(poll, 'question')) + '</div>',
-    page: anketPagePayload(poll),
-    done: voted.has(poll.id),
-  }));
-  return { rows, failed: false,
-    emptyHtml: '<div class="k">Anket</div><div class="t">Şu an anket yok</div>' +
-               '<div class="m">Yakında yeni bir soru gelecek.</div>' };
-});
 
 // The page's body is filled in by `wire`, once its markup is actually in
 // the document (see openFbPage) -- voting has to happen after a fetch and
@@ -3069,17 +3077,17 @@ async function renderAnketResults(body, poll, myChoice) {
 // ══════════════════════════════════════════════════════════════
 // THE NIGHT EDITION — the polls come out
 //
-// After sunset Kütüphane's wide column stops leading with the news and
-// leads with the day's ANSWERS instead: one box per open poll, each
-// printing the city's own split, opening onto the 25 districts each
-// wearing the colour its own split mixes to. The news does not go away
-// -- it trades places with the poll, into the narrow column -- because
-// "the polls come out" means they take the front page, not that the
-// paper stops carrying news at night.
+// After sunset Kütüphane's narrow column stops collecting votes and
+// prints the day's ANSWERS instead: one box per open poll, each printing
+// the city's own split, opening onto the 25 districts each wearing the
+// colour its own split mixes to. The wide column stays the news, exactly
+// as it is by day -- a reader mid-story at sunset must never have it
+// swapped out from under them for a poll result.
 //
-// It is the same neighborhood_polls the day's narrow column votes in, so
-// there is no second table and no second fetch: anketData() already has
-// the polls and the reader's own votes.
+// Voting and reading the result are the same page now (anketPagePayload
+// / wireAnketPage decides which of the two a reader is shown), so there
+// is no day-time vote box left to keep in step -- anketData() is asked
+// once, here, and this box is the whole of Anket's presence on screen.
 const loadAnketSonucActor = stackFetch(async () => {
   const { polls, voted, failed } = await anketData();
   if (failed) {
@@ -3621,11 +3629,18 @@ function renderSubmitForm(body, g, data, prefill, prefillNote) {
 // what keeps the walk between lanes identical at noon and at midnight --
 // a column that rebuilt itself would land its cards a few pixels off the
 // ones beside it and the whole strip would read as reflowing.
+// The wide column is the news, day and night alike -- it no longer
+// trades places with Anket, which now lives in the narrow column alone
+// (see "THE TWO EDITIONS" above).
 function loadKutuphaneWide(el, slot) {
-  return fbEdition === 'gece' ? loadAnketSonucActor(el, slot) : loadHaberlerActor(el, slot);
+  return loadHaberlerActor(el, slot);
 }
+// Narrow: the news one story deeper by day (see loadHaberlerNarrowActor),
+// the poll results by night -- the reader swipes through the news itself
+// now rather than voting beside it, and the vote's own answer waits for
+// the edition it belongs to.
 function loadKutuphaneNarrow(el, slot) {
-  return fbEdition === 'gece' ? loadHaberlerActor(el, slot) : loadAnketActor(el, slot);
+  return fbEdition === 'gece' ? loadAnketSonucActor(el, slot) : loadHaberlerNarrowActor(el, slot);
 }
 function loadKahveNarrow(el, slot) {
   if (!NIGHT_GAMES_ENABLED) return loadOyunActor(el, slot);
@@ -5781,7 +5796,7 @@ function refreshAllColumns() {
   // The three stackFetch columns cache independently of whatever their
   // own fetcher remembers, so nulling only the promise above would
   // re-render the same rows and look like nothing happened.
-  [loadOlaylarActor, loadAnketActor, loadAnketSonucActor].forEach(f => {
+  [loadOlaylarActor, loadAnketSonucActor].forEach(f => {
     if (f && f.reset) f.reset();
   });
   (cast || []).forEach(a => {
