@@ -457,6 +457,16 @@
       text-align: left;
       font-size: 1.15rem;
     }
+    /* Sözcel's own mark stands in for its title text -- same corner, same
+       left ranging, sized off the taller box the two-slot column now
+       gives it rather than the old two-line title's own height. */
+    .fb-oyun .t img {
+      display: block;
+      height: 2.6rem;
+      width: auto;
+      max-width: 100%;
+      object-fit: contain;
+    }
     /* A game whose turn has not come yet. It still names itself and
        still says what is standing in front of it -- a step you can see
        ahead of you is not the same thing as a slot with nothing in it,
@@ -3711,8 +3721,11 @@ function loadKahveNarrow(el, slot) {
 // now (see .fb-oyun's own height override, sized to fill exactly the
 // room three boxes used to take).
 const GAME_DEFS = [
-  { key: 'sozcel', kicker: '1. OYUN', title: 'Sözcel', meta: 'Türkçe Wordle', file: 'sozcel.html' },
-  { key: 'tumcel', kicker: '2. OYUN', title: 'Tümcel', meta: 'Cümle bul', file: 'tumcel.html' },
+  // Sözcel wears its own mark (the same assets/sozcel-logo.png the
+  // desktop game-link tiles use) in place of its plain title; Tümcel has
+  // no logo of its own yet, so it still prints its name as text.
+  { key: 'sozcel', kicker: '1. OYUN', title: 'Sözcel', logo: 'assets/sozcel-logo.png', file: 'sozcel.html' },
+  { key: 'tumcel', kicker: '2. OYUN', title: 'Tümcel', file: 'tumcel.html' },
 ];
 // The sequence reads DOWNWARD: 1. Oyun on top, 2. Oyun at the dock. The
 // slots are numbered from the dock up (see .fb-slot-N), so the first
@@ -3803,8 +3816,15 @@ async function loadOyunActor(el, slot) {
   // come does not, so it does not wear it -- and neither the cursor nor
   // the press effect has a second rule to state (see fbSetPage).
   el.classList.toggle('fb-openable', !blocker);
-  el.innerHTML = '<div class="k">' + g.kicker + '</div><div class="t">' + g.title + '</div>' +
-                 '<div class="m">' + (blocker ? 'Önce ' + blocker.title : g.meta) + '</div>';
+  // The box names its game and nothing about it -- "Türkçe Wordle" told
+  // the reader something they already know once the game has a mark of
+  // its own; the only thing this line still has to say is that another
+  // game is standing in front of this one.
+  const titleHtml = g.logo
+    ? '<img src="' + g.logo + '" alt="' + g.title + '" width="512" height="512" decoding="async">'
+    : g.title;
+  el.innerHTML = '<div class="k">' + g.kicker + '</div><div class="t">' + titleHtml + '</div>' +
+                 (blocker ? '<div class="m">Önce ' + blocker.title + '</div>' : '');
 }
 
 // Playing a game is what unlocks the next one, so the column is re-read
