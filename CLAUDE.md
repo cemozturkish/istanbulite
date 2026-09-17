@@ -1743,7 +1743,7 @@ either bar's height as a number — the same value also reserves the space each 
 bottom so its last row of cards clears the tab bar, and one copy left behind is how the two bars
 end up different heights. The game pages hide the bottom bar outright for their fullscreen board.
 
-**Neither bar is a flat band — both are hexagon shoulders** (`--navbar-top-corner` /
+**Neither bar is a flat band — both are hexagon shoulders** (`--navbar-top-keep` /
 `--navbar-arc` / `--navbar-bevel`, "THE TWO BARS ARE HEXAGON SHOULDERS" in frames.css). Each one's
 inner edge — the profile bar's bottom, the tab bar's top — is the bottom of a **hexagon laid on
 its side** and stretched the width of the screen: a straight diagonal down from each corner,
@@ -1773,18 +1773,29 @@ Five things about it:
   children that must survive the cut: the İstanbulite logo stands clear above the tab bar, and the
   sky chart below hangs outside the profile bar entirely.
 - **Each bar states its own depth, and `--navbar-bevel` is shared.** The profile bar's drop is
-  deep (~69px on a notched phone) and that depth is what the two names are printed in: the bar
+  deep (~65px on a notched phone) and that depth is what the two names are printed in: the bar
   only needs to be tall where the type is, so it gives the corners back to the city and keeps the
   middle. That is also why the names are **smaller** than they were (×0.766) — type sized to fill
   a rectangle runs out to where the rectangle is no longer there. The tab bar's is shallow
   (`--navbar-arc`, 12px): one word at each end and a logo in the middle, all near its floor, and
-  nothing for a deep shoulder to make room for. The profile bar's is stated as its **corner**
-  rather than as the drop, because the corner is the invariant worth holding — that is where the
-  notch and the status-bar glyphs are, and the device's inset is the one thing that can move the
-  shape under us, so a taller notch makes a steeper shoulder rather than a bar that overruns its
-  own arithmetic. `--navbar-bevel` is unitless on purpose: the polygons multiply it by 100%, and
-  the sky chart's marks read the same number back, so the chain and the edge it hangs from can
-  never be two different hexagons.
+  nothing for a deep shoulder to make room for. `--navbar-bevel` is unitless on purpose: the
+  polygons multiply it by 100%, and the sky chart's marks read the same number back, so the chain
+  and the edge it hangs from can never be two different hexagons.
+- **The profile bar's depth is a PERCENTAGE of its own box (`--navbar-top-keep`), and that is a
+  correctness rule rather than a preference.** That bar's height is `env(safe-area-inset-top)`
+  plus `--navbar-h-top`, and while `padding-top: env(…)` resolves correctly, **`env()` inside a
+  custom property does not** on the engine ~90% of readers are on. Stated as a corner *length*
+  with the drop derived from `calc(env(…) + --navbar-h-top) - corner`, that subtraction computed
+  against a notch of **zero**: a 10px drop instead of 69px, so the shoulder flattened to almost
+  nothing on a real phone while measuring perfectly in Chromium, where the same `env()` does
+  resolve in a custom property. A percentage needs no inset at all — `100%` in the clip-path and
+  in the chain's own `top` both resolve against the box the browser has already laid out, and a
+  browser reporting no inset gets a proportionally shallower shoulder rather than a flat band.
+  Nothing about this shape may be re-derived from `env()` in a custom property again.
+  - **And a harness must not fake the inset by declaring that custom property**, which is exactly
+    what hid this: the test page set `--ist-bar-h` by hand, so the one line that breaks on the
+    device was never executed. Leave `env()` where the real page leaves it and override only the
+    plain px token beside it (`--navbar-h-top`) to stand in for a taller or shorter box.
 - **Everything that clears the tab bar clears its CORNERS**, which are `--navbar-arc` higher than
   its middle. `--fb-dock` in project.html adds that token for exactly this reason: the left
   column's own left edge stands at a corner, not at the middle, so measuring its clearance
@@ -1814,11 +1825,15 @@ quick enough that a reader who looks twice in an afternoon sees it move.
 - **Nothing about the chart is measured.** Each mark carries two numbers, written once at build
   time: `--t`, its own fraction of the screen's *width*, and `--s`, the bar's own edge evaluated
   there — 0 at either corner, 1 across the flat, and the straight ramp between, which on the flank
-  is literally `t / --navbar-bevel`. Multiply `--s` by the bar's own `--ist-bar-sag` and you have
-  the exact height of the edge above that mark, at any width and any notch depth, with no resize
-  listener and nothing read back out of layout. The clearance is therefore `--ist-sky-drop` at
-  *every* mark rather than only at the one it was tuned on — which is what lets seven of the
-  fifteen sit on a diagonal and still hang off it evenly.
+  is literally `t / --navbar-bevel`. `--s` then interpolates the mark's own `top` between the two
+  **percentages the clip-path above is cut to**, so the chain hangs off the real edge at any width
+  and any notch depth, with no resize listener and nothing read back out of layout. (`.ist-sky`
+  fills the bar rather than being a zero-height line at its top precisely so those percentages
+  resolve against the bar's real height — a zero-height containing block makes every one of them
+  nothing, which is why the marks used to need a length token, and that token is what collapsed.)
+  The clearance is therefore `--ist-sky-drop` at *every* mark rather than only at the one it was
+  tuned on — which is what lets seven of the fifteen sit on a diagonal and still hang off it
+  evenly.
 - **`--t` is a fraction of the width, not `--screen-inset`.** The edge runs corner to corner, so
   a chain hung on a narrower span would be a *different* hexagon and would climb into the bar at
   the ends. The ends are inset by a few percent of the width instead, far enough that the lit

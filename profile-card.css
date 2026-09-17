@@ -112,18 +112,15 @@
        A straight diagonal down from either screen corner, meeting a flat
        run across the middle (see "THE TWO BARS ARE HEXAGON SHOULDERS" in
        frames.css) — so the bar stays its full height only where the type
-       is actually printed and gives the corners back to the city.
+       is actually printed and gives the corners back to the city. The
+       whole of it is --navbar-top-keep, a share of THIS BOX's own height,
+       and there is deliberately no length token in between: a drop
+       derived from calc(env(…) + …) is the one spelling that measured
+       right here and collapsed on the phone (the note in frames.css has
+       the arithmetic). Whatever height the notch gives this box, the
+       shoulder and the chain below it both read the same 100%.
 
-       The drop is DERIVED, not stated, because the corner is the
-       invariant worth holding: that is where the notch and the
-       status-bar glyphs are, and the device's own inset is the one thing
-       that can move this shape under us. max(0px, ...) so a browser
-       reporting no inset at all (a narrow desktop window) flattens the
-       shoulder rather than asking for a negative one. */
-    --ist-bar-h: calc(env(safe-area-inset-top) + var(--navbar-h-top, 46px));
-    --ist-bar-sag: max(0px, calc(var(--ist-bar-h) - var(--navbar-top-corner, 36px)));
-
-    /* The sky chart's two numbers (see "THE SKY UNDER THE BAR" below).
+       The sky chart's two numbers (see "THE SKY UNDER THE BAR" below).
        The mark scales with the screen because the fifteen of them have
        to sit apart on a 320px phone as readably as on a 430px one:
        4.6vw keeps the ring at a little over two-thirds of the gap
@@ -151,9 +148,11 @@
      down behind its own name.
 
      Six points and nothing to draw: a hexagon is a polygon, so
-     clip-path states it directly, in px down and percent across, and it
-     follows any screen width with the drop staying exactly the number
-     the token says. */
+     clip-path states it directly, and every one of its coordinates is a
+     PERCENTAGE of this layer's own box — across for the bevel, down for
+     the corner. So the shoulder is the same shape at any screen width
+     and at any notch depth, with nothing to resolve but the box the
+     browser has already laid out. */
   #ist-pc-mount::before {
     content: '';
     position: absolute;
@@ -164,10 +163,10 @@
     clip-path: polygon(
       0 0,
       100% 0,
-      100% var(--navbar-top-corner, 36px),
+      100% var(--navbar-top-keep, 34%),
       calc(100% - var(--navbar-bevel, 0.35) * 100%) 100%,
       calc(var(--navbar-bevel, 0.35) * 100%) 100%,
-      0 var(--navbar-top-corner, 36px)
+      0 var(--navbar-top-keep, 34%)
     );
   }
   /* frames.css loads last and gives the mount's child the shared card
@@ -186,14 +185,14 @@
      line, so the avatar starts where KÜTÜPHANE starts and the gear ends
      where KAHVEHANE ends. */
   .ist-pc-row {
-    height: var(--navbar-h-top, 46px);
+    height: var(--navbar-h-top, 40px);
     padding: 0 var(--screen-inset, 18px);
     /* Wide enough that the two people read as two people even when both
        names run long enough to close the gap the slack usually leaves. */
     gap: 14px;
   }
   .ist-pc-loading {
-    height: var(--navbar-h-top, 46px);
+    height: var(--navbar-h-top, 40px);
     padding: 0;
     display: flex;
     align-items: center;
@@ -279,13 +278,13 @@
      written once at build time: --t, its own fraction of the screen's
      WIDTH, and --s, the bar's own edge evaluated there — 0 at either
      corner, 1 across the flat, and the straight ramp between (so it is
-     literally t/bevel on the flank). Multiply --s by the bar's
-     --ist-bar-sag, which the marks inherit from the mount, and you have
-     the exact height of the edge above that mark, at any width and any
-     notch depth, with no resize listener and nothing read back out of
-     layout. The clearance is therefore --ist-sky-drop at every mark
-     rather than only at the one it was tuned on — which is what lets
-     seven of the fifteen sit on a diagonal and still hang off it evenly.
+     literally t/bevel on the flank). --s then interpolates the mark's
+     own `top` between the two percentages the clip-path above is cut
+     to, so the chain hangs off the real edge at any width and any notch
+     depth, with no resize listener and nothing read back out of layout.
+     The clearance is therefore --ist-sky-drop at every mark rather than
+     only at the one it was tuned on — which is what lets seven of the
+     fifteen sit on a diagonal and still hang off it evenly.
 
      That is also why --t is a fraction of the width and not the
      --screen-inset every printed thing on this bar sits on: the edge
@@ -297,11 +296,14 @@
   .ist-sky {
     display: block;
     position: absolute;
-    /* Against the mount's PADDING box, so top: 0 is the top of the bar
-       itself rather than the bottom of the notch's padding — which is
-       what --navbar-top-corner and --ist-bar-sag are both measured from. */
-    top: 0; left: 0; right: 0;
-    height: 0;
+    /* It FILLS the bar rather than being a zero-height line at its top,
+       and that is load-bearing: this is the containing block for every
+       mark, so `100%` in a mark's own `top` is the bar's real height —
+       the same 100% the shoulder above is cut to. A zero-height box
+       would make every percentage nothing, which is why the marks used
+       to need a length token carrying env() (see the mount's own note),
+       and that token is what collapsed on the phone. */
+    inset: 0;
     /* The bar is furniture; this hangs off it over the city. It must
        never take a touch meant for what is underneath. */
     pointer-events: none;
@@ -316,8 +318,12 @@
        CENTRE on the curve, not its corner. */
     margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
     left: calc(var(--t, 0) * 100%);
-    top: calc(var(--navbar-top-corner, 36px)
-              + var(--ist-bar-sag, 0px) * var(--s, 0)
+    /* The bar's own edge at this mark, plus the chain's drop: --s ramps
+       from the corner's share of the box to the whole of it, so this is
+       the same percentage the clip-path above is cut to and the two can
+       never disagree. */
+    top: calc(var(--navbar-top-keep, 34%)
+              + (100% - var(--navbar-top-keep, 34%)) * var(--s, 0)
               + var(--ist-sky-drop));
   }
   /* The ring is the ::before rather than the mark's own border, because
