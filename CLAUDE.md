@@ -1653,6 +1653,16 @@ it:
 three), because it is the same sea in all three places. That is what keeps the drawing, the page it
 lies on and the door into it reading as one sheet.
 
+**And a fourth ladder is `assets/sozcel-logo.png`** (project.html's own Oyunlar column, see its own
+section) — two flat tones, near-black ink on near-white, nothing else. It is deliberately **not**
+built like the avatar's own ladder: an avatar is a stamp that stays light at night on purpose, but
+this mark stands ON the card that names Sözcel, so it reads that card's own two tokens,
+`--lit`/`--ink`, rather than a pair of its own. That is what makes it come out plain black on the
+mono palette (closest to how it was drawn) and in the earth palette's own brown ink on its own warm
+paper — day or night, since `--lit`/`--ink` already carry the theme — without a second PNG per
+palette. Gated on `html.ist-map-ink` exactly like the other three; switched off, the mark stays
+exactly as drawn.
+
 **`?ink=0` turns every ladder off, and `?ink=1` turns them back on** (`KILL_KEY` in map-ink.js,
 remembered in `localStorage` because `index.html` drops the query on its way to `project.html`).
 It exists because this is the one thing on the site that cannot be measured where it is written.
