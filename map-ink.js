@@ -145,6 +145,19 @@
       vars: ['--load-logo', '--load-sea', '--load-ground'],
       red: null,
     },
+    // Sözcel's own mark (assets/sozcel-logo.png): two flat tones on a
+    // transparent canvas, measured the same way -- near-white fill and
+    // near-black ink, nothing else. Unlike the avatar's ladder this one
+    // IS the page's: it reads --lit/--ink, the same pair the card it
+    // stands on is built from (see project.html's own note on it), so
+    // the mark comes out black on mono, brown ink on the earth palette's
+    // own paper, and follows day/night the same way the card does.
+    {
+      id: 'ist-sozcel-ink',
+      tones: [253, 1],
+      vars: ['--lit', '--ink'],
+      red: null,
+    },
   ];
 
   // One entry per 8-bit gray. Not a round number picked for looks: every
