@@ -164,7 +164,8 @@ default one.
 ├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it,
 │                         plus sunTimes/isDaytime/edition — which paper is out —
 │                         gameNight/gameNightSeed/nextGameNight — which NIGHT is being played —
-│                         and skyArc — where the sun or moon is on its crossing right now
+│                         nextEdition — when the next paper goes to press, for the admin's
+│                         own countdown — and skyArc — where the sun or moon is right now
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
@@ -695,6 +696,71 @@ sb.from('articles').delete().eq('id', id)
     renders up to 300 stories, and a select of all of them inside each of them is 90,000 options
     nobody asked to see. Same rule as `ensureCardCountryPicker`. It offers what the list has
     loaded, so reaching an older story means switching to "Tümü" first.
+- **THE PRESS BAR — the deadline, and what is still missing from it.** A desk's first
+  question is never "which section am I in", it is "when does this go out and is it
+  finished". So the band under the masthead answers both, on every section, and never
+  scrolls away: the edition being set, the time left to set it, and one **forme** per thing
+  that edition needs — each pressable, each landing on the section that fixes it.
+  - **The deadline is the SUN, not a timer somebody set.** The app prints two editions a day
+    and sunrise/sunset over İstanbul are when they come out, so the countdown runs on
+    `IstDate.nextEdition()` — the one place that knows which paper is next and when
+    (CLAUDE.md rule 10; never a stored hour, and never a second copy of the sunrise
+    equation in this page). What that buys is a deadline that *moves through the year*:
+    13h39m of daylight to set the evening paper in June, 9h15m in December. It is
+    deliberately **not** `nextGameNight()` generalised — that one is always the next
+    **sunset**, because the games are night-only and a sunrise is nothing to them; this is
+    whichever edge comes first, because both of them put a paper out. The edition and the
+    day it is named for come straight back out of `editionKey()` at that instant rather
+    than being re-derived, so "a night is named for the day it began on" exists once.
+  - **It re-aims itself.** The tick re-asks `nextEdition()` every second rather than holding
+    the instant it started with: an admin leaves this page open for hours, and the moment a
+    paper goes out the bar has to start counting to the next one — and re-run the check,
+    because what the *next* edition needs is a different list.
+  - **THE ONE RULE FOR A FORME: it asks exactly what the reader's own loader asks**, against
+    the same tables with the same filters. A forme that invents a looser question is worse
+    than no forme at all — it is the desk reporting an edition ready that the reader will
+    open and find empty. So Haberler resolves `news_current_edition()` and buckets by
+    `edition_date` + `archived_at is null` exactly as `loadHaberlerActorAt` does (a district
+    story is İstanbul here too); Etkinlikler asks `loadEtkinlikActor`'s own three
+    `+03:00` day ranges; the night's word, puzzle and questions are keyed to the **night**
+    and not the calendar date, which is what `ctx.date` already is for a gece edition.
+    Where project.html's loader is the authority, the comment on the check names it.
+  - **A forme belongs to the editions it is true of and no others** — the games and their
+    questions are the night's, the second news story is the day's (see "What each screen
+    carries"). One that does not apply is drawn **dashed**, the site's own "nothing here"
+    convention, rather than dropped: the bar keeps the same shape on both editions, so an
+    editor learns where to look instead of re-reading it twice a day.
+  - **Four states, and the middle one is the point.** `ok` is set and deliberately quiet — a
+    desk full of ticks should read as nothing left to do, not as a wall of decoration.
+    `miss` is red and means *the reader will meet an empty slot*. `na` is the dashed one
+    above. `warn` is the one worth having: a night whose Sözcel word nobody chose (the
+    server picks one from the pool at play time, so it is not broken) or a front page that
+    is a **holdover from an earlier day** — `news_current_edition` holds the newest edition
+    at or before today, with no timer and no forced rollover, so an editor can go a week
+    without noticing they never set a new one. Only `miss` counts toward the verdict.
+  - **Gece is the lights coming on here too.** The formes and the verdict are **lit
+    surfaces** (see "the lit tier" in frames.css) — not decoration, legibility: after sunset
+    the palette walks `--ink-red` a long way down its own hue so the fire still reads on the
+    night street, which on a small chip leaves the house red a near-black smudge and makes
+    `miss` and `warn` all but indistinguishable. Telling those two apart is this bar's whole
+    job. Each forme re-points `--paper`/`--paper-card`/`--ink-red` at
+    `--lit-hi`/`--lit`/`--lit-red` on itself, so everything inside reads against the paper it
+    is standing on without naming it; by day every one of those is an identity and the desk
+    renders byte for byte as it did. The **countdown digits are left on the street** with the
+    ordinary `--ink-red`: they are type on the bar rather than a lit surface, and `--lit-red`
+    on street paper is the 1.32:1 mistake that token's own note warns about.
+  - **A forme is a door, and it goes through the rail's own button** (`tab.click()`), never
+    the section's loader — so the active mark, the drawer it shuts and the phone it re-aims
+    all happen exactly once, in one place. Adding a forme is adding one entry to
+    `PRESS_FORMES`: the editions it is true of, the section that fixes it, and one check.
+  - **A check that throws says so** ("Bakılamadı") and counts as missing. A query that failed
+    is not an edition that is ready — and a press bar that goes blank because one of seven
+    queries failed is a worse failure than a forme admitting it could not look. The checks
+    run in sequence rather than in parallel, deliberately: they share a context (the night's
+    game toggles every game forme reads, the news fetch the depth forme rides rather than
+    re-fetching, so the two can never count different sets of stories), and the order in
+    `PRESS_FORMES` is what fills it.
+
 - **The phone is the live site, not a picture** (`#prev-frame`): the same origin and therefore
   the same session, drawn at 390×844 and scaled to whatever room the column has, so the page
   inside lays out at the width a real phone reports rather than at the width of a narrow panel.
