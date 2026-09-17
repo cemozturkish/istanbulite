@@ -155,14 +155,16 @@ default one.
 ├── admin.html            # Admin dashboard (admin-only)
 ├── router.js             # Shared shell: single Supabase client, the two tabs + the zoom stack, virtual navigation, clock
 ├── sheet.css/.js         # THE sheet: the one page that rises from the bottom — see "Site-wide defaults"
-├── profile-card.js/.css  # Profile bar (the phone's top bar), avatar, badges — shared across pages
+├── profile-card.js/.css  # Profile bar (the phone's top bar, its sagging edge and the sun/moon
+│                         chart hanging off it), the petek, avatar, badges — shared across pages
 ├── onboarding.js/.css    # New-account onboarding — project.html ONLY (see its own section)
 ├── game-locks.js         # Per-day game on/off enforcement + the sequence's question gates
 ├── event-interest.js     # "İlgimi çekti": the verdict Kahvehane's event deck records, Hane reads
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
 ├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it,
 │                         plus sunTimes/isDaytime/edition — which paper is out —
-│                         and gameNight/gameNightSeed/nextGameNight — which NIGHT is being played
+│                         gameNight/gameNightSeed/nextGameNight — which NIGHT is being played —
+│                         and skyArc — where the sun or moon is on its crossing right now
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
@@ -1741,6 +1743,96 @@ either bar's height as a number — the same value also reserves the space each 
 bottom so its last row of cards clears the tab bar, and one copy left behind is how the two bars
 end up different heights. The game pages hide the bottom bar outright for their fullscreen board.
 
+**Neither bar is a flat band — both sag** (`--navbar-top-corner` / `--navbar-arc`, "THE TWO BARS
+SAG" in frames.css). Each one's inner edge — the profile bar's bottom, the tab bar's top — is a
+**parabola** hanging lowest at the middle of the screen and shallowest at its corners. Both bulge
+the same way, downward, which is what keeps them reading as one movement rather than as a pinch:
+the city between them does not narrow toward the middle, it slides down there.
+
+Four things about it:
+
+- **Each bar states its own depth, because the two are doing different jobs.** The profile bar's
+  sag is deep (~65px on a notched phone) and that depth is what the two names are printed in: the
+  bar only needs to be tall where the type is, so it gives the corners back to the city and keeps
+  the middle. That is also why the names are **smaller** than they were (×0.766) — type sized to
+  fill a rectangle runs out to where the rectangle is no longer there. The tab bar's sag is
+  shallow (`--navbar-arc`, 12px): it carries one word at each end and a logo in the middle, all
+  near its floor, and there is nothing for a deep curve to make room for.
+- **The profile bar's is stated as its CORNER, the tab bar's as the sag itself.** The corner is
+  the invariant worth holding on the top bar: that is where the notch and the status-bar glyphs
+  are, and the device's inset is the one thing that can move the shape under us — so the sag is
+  *derived* (bar height − `--navbar-top-corner`) and a deeper notch makes a deeper curve rather
+  than a bar that overruns its own arithmetic. The tab bar has nothing to subtract from, its
+  height already being the smallest thing it can be.
+- **It is a parabola and not an arc, and the difference is visible.** An ellipse (which
+  `border-radius` would have given for nothing) leaves the corner almost vertically and is two
+  thirds of the way down within a tenth of the screen — a bowl stamped on the bar. A parabola
+  leaves the corner along a near-straight diagonal and rounds off only at the bottom, which is the
+  shape being drawn. Both are one quadratic Bézier in an SVG mask stretched to the screen's width
+  (`preserveAspectRatio="none"`), with the control point at twice the depth because a quadratic
+  passes through half of it at the midpoint. Each bar's ink is a **layer of its own**
+  (`#ist-pc-mount::before`, `.section-rule > header::before`) rather than the bar's own
+  background, because both bars have children that must survive the cut — the İstanbulite logo
+  stands clear above the tab bar, and the sky chart below hangs outside the profile bar entirely.
+- **Everything that clears the tab bar clears its CORNERS**, which are `--navbar-arc` higher than
+  its middle. `--fb-dock` in project.html adds that token for exactly this reason: the left
+  column's own left edge stands at a corner, not at the middle, so measuring its clearance
+  against the middle would put the cards `--navbar-arc` closer to the bar than they have ever
+  been. The compass's three marks were lifted with it (`--fb-mark-foot`), one number because the
+  logo's foot is planted on the same line the two words sit on.
+
+### The sky under the bar — the sun and the moon cross it
+
+A chain of fifteen rings hangs off the profile bar's own sagging edge, and one of them is the
+**sun**. It rises at the left of the screen, crosses, and sets at the right; at sunset the chain
+starts again from the left with the **moon** on it. So the bar says what time it is the way a
+window does — by where the light is — rather than by printing a clock nobody asked for.
+
+It is the same sun the palette and the edition already follow (`IstDate.skyArc`, built on
+`sunTimes`), which is why it is a chart of the real sky over İstanbul and not a fifteen-part
+progress bar: the day arc is short at the solstice and long in June, and a reader can see that.
+Fifteen marks is a mark every ~38 (winter) to ~55 (summer) minutes — slow enough to be ambient,
+quick enough that a reader who looks twice in an afternoon sees it move.
+
+- **`IstDate.skyArc()` is where the arc lives**, because everything about the Istanbul day belongs
+  in `ist-date.js` (convention 10). It returns `edition()`'s own two words rather than a third
+  vocabulary — this is the same sun seen from a different side. A **night spans midnight**, so its
+  two ends come off two different calendar days and which two depends on which side of midnight
+  the caller is standing: before this morning's sunrise the arc began at *yesterday's* sunset;
+  after this evening's it ends at *tomorrow's* sunrise. Real instants throughout, never `now()`.
+- **Nothing about the chart is measured.** Each mark carries two numbers, written once at build
+  time: `--t`, its own fraction of the screen's *width*, and `--s`, the bar's parabola evaluated
+  there — which is just `1 - (2t - 1)²`. Multiply `--s` by the bar's own `--ist-bar-sag` and you
+  have the exact height of the edge above that mark, at any width and any notch depth, with no
+  resize listener and nothing read back out of layout. The clearance is therefore
+  `--ist-sky-drop` at *every* mark rather than only at the one it was tuned on.
+- **`--t` is a fraction of the width, not `--screen-inset`.** The curve runs corner to corner, so
+  a chain hung on a narrower span would be a *different* parabola and would climb into the bar at
+  the ends. The ends are inset by a few percent of the width instead, far enough that the lit
+  mark — half again the size of the others — still clears the screen's edge on the two days it
+  stands at either end.
+- **The lit mark is bigger and its ring is broken** at the top and the bottom: the chain is a
+  track and this is the one link that is open, which reads as a place being passed *through*
+  rather than as one more stop on it. Inside it sits the light — a filled disc by day, the same
+  disc with a circular bite out of its right side by night, which is the whole of a crescent. The
+  bite is a mask rather than a paper-coloured disc laid over it, because what is behind these
+  marks is the city's own drawing and not a flat sheet of paper. The ring is the mark's
+  `::before` and the light its `::after` precisely so the mask that splits the ring cannot cut a
+  wedge through the sun as well.
+- **Marks the light has already passed are deliberately not inked in.** The lit mark says where
+  in the day we are; a filled trail would turn an ambient drawing into a progress bar, which is
+  the one thing this app does not print (see "Anti-screen-time" and the day meter's own note about
+  closure rather than accumulation).
+- **Built by `skyChartHTML()` in profile-card.js, inside the bar's own template.** The row is
+  rebuilt wholesale (`container.innerHTML`), so anything appended beside it is wiped by the next
+  rebuild. It is drawn with the loading state too — it needs nothing from Supabase, and a bar that
+  grows its chain a round trip after it appears reads as the page still assembling itself. One
+  timer for the module (`startSky`), not one per render, plus a `visibilitychange` re-read, since
+  a phone that spent the evening in a pocket does not wake up under the sky it went to sleep
+  under. `#ist-pc-mount > .ist-sky` must stay `overflow: visible`: frames.css clips the mount's
+  children, and a zero-height box whose whole content hangs outside it is the difference between a
+  chart and nothing at all.
+
 ### The two bars are omnipresent — nothing may pass in front of them
 
 The profile bar and the tab bar are the phone's furniture: who is here, and where you can go. No
@@ -1886,6 +1978,12 @@ Kahvehane — and none of them is a link; the `<nav>` takes no pointer events at
 is pressed, because the reader moves the app with their finger and the bar's whole job is to say
 where that has put them. A tab bar answers "where can I go"; this answers "where am I", which is
 the only question left once the swipe is the navigation.
+
+Its top edge sags with the profile bar's (see "The phone's two bars"), and the three marks stand
+`--fb-mark-foot` off its floor — one number, because the logo's foot is planted on the same line
+Kütüphane and Kahvehane's own text sits on and the two must not drift. They sit a little higher
+than they used to: with the edge above them highest at the corners, a word left on the old line
+read as crowded against it at exactly the two places it is nearest.
 
 **The mark you are standing on is the PALE one**, and the two you are not on are the ink. The bar
 is not a menu of places to press: what it says is "the city is over there", so the words still to

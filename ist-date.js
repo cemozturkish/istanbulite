@@ -244,6 +244,53 @@
     return global.I18N ? global.I18N.formatCountdown(hours, minutes, opts) : '';
   }
 
+  // ── WHERE THE LIGHT IS ──
+  // The arc the sky is currently crossing, and how far across it we are:
+  // sunrise → sunset by day, sunset → the next sunrise by night. It is
+  // what the chain of rings under the profile bar prints (see "THE SKY
+  // UNDER THE BAR" in profile-card.css) — the sun climbing out of the
+  // left of the screen and setting off the right, and then the moon
+  // making the same crossing.
+  //
+  // `phase` is edition()'s own two words rather than a third vocabulary:
+  // this is the same sun that decides which paper is out and which way
+  // the palette is turned, seen from a different side.
+  //
+  // A NIGHT SPANS MIDNIGHT, so its two ends come off two different
+  // calendar days and which two depends on which side of midnight the
+  // caller is standing: before this morning's sunrise the arc began at
+  // YESTERDAY's sunset; after this evening's it ends at TOMORROW's
+  // sunrise. Stepping a whole day off an instant that is already deep in
+  // the night lands deep in another night, nowhere near a boundary,
+  // which is the same reason nextGameNight() steps the way it does.
+  //
+  // Real instants throughout — never now(), whose fields read as
+  // Istanbul's wall clock and would offset every subtraction here by the
+  // device's own distance from it.
+  function skyArc(base) {
+    const b = base || new Date();
+    const today = sunTimes(b);
+    let phase, start, end;
+    if (b >= today.sunrise && b < today.sunset) {
+      phase = 'gun'; start = today.sunrise; end = today.sunset;
+    } else if (b < today.sunrise) {
+      phase = 'gece';
+      start = sunTimes(new Date(b.getTime() - 86400000)).sunset;
+      end = today.sunrise;
+    } else {
+      phase = 'gece';
+      start = today.sunset;
+      end = sunTimes(new Date(b.getTime() + 86400000)).sunrise;
+    }
+    const span = end - start;
+    // A span of zero is only reachable well inside the polar circles,
+    // which İstanbul is not — but a t of NaN would place the mark
+    // nowhere at all, and a chart with no light on it says something
+    // false about the sky rather than nothing.
+    const t = span > 0 ? Math.min(1, Math.max(0, (b - start) / span)) : 0;
+    return { phase, start, end, t };
+  }
+
   // ── Two helpers the game-bearing pages each carried their own copy of ──
   // Both are about the Istanbul day, which is this file's whole subject,
   // so they belong here rather than four times over in four <script>
@@ -275,6 +322,6 @@
   }
 
   global.IstDate = { parts, now, iso, daySeed, nextMidnight, parseYMD, untilMidnight,
-                     sunTimes, isDaytime, edition, editionKey,
+                     sunTimes, isDaytime, edition, editionKey, skyArc,
                      gameNight, gameNightSeed, nextGameNight, untilNextNight, TZ };
 })(window);

@@ -5,6 +5,11 @@
 
 #ist-pc-mount { display: none; }
 
+/* The sun/moon chart hanging off the bar's edge is the bar's own
+   furniture, so it lives and dies with it: there is no bar on a desktop
+   window (see "THE TOP BAR" below), and so there is no sky either. */
+.ist-sky { display: none; }
+
 .ist-pc {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
   color: var(--ink);
@@ -98,14 +103,86 @@
        the bar itself, so the row inside keeps the bar's own height instead
        of being stretched by dead space. */
     padding-top: env(safe-area-inset-top);
-    background: var(--navbar-ink);
+    /* The ink is the ::before's, because the ink is a SHAPE — see below. */
+    background: none;
     border: none;
     overflow: visible;
     max-height: none;
+    /* ── THE BAR'S BOTTOM EDGE SAGS ──
+       It hangs lowest at the middle of the screen and rises to
+       --navbar-top-corner at either corner (see "THE TWO BARS SAG" in
+       frames.css), so the bar stays its full height only where the type
+       is actually printed and gives the corners back to the city.
+
+       The sag is DERIVED, not stated, because the corner is the
+       invariant worth holding: that is where the notch and the
+       status-bar glyphs are, and the device's own inset is the one thing
+       that can move this shape under us. max(0px, ...) so a browser
+       reporting no inset at all (a narrow desktop window) flattens the
+       curve rather than asking for a negative one. */
+    --ist-bar-h: calc(env(safe-area-inset-top) + var(--navbar-h-top, 46px));
+    --ist-bar-sag: max(0px, calc(var(--ist-bar-h) - var(--navbar-top-corner, 36px)));
+
+    /* The sky chart's two numbers (see "THE SKY UNDER THE BAR" below).
+       The mark scales with the screen because the fifteen of them have
+       to sit apart on a 320px phone as readably as on a 430px one:
+       4.6vw keeps the ring at a little over two-thirds of the gap
+       between two of them, whatever the width. The drop is how far the
+       chain hangs under the bar's own edge — one number, not a per-mark
+       offset, because the chain FOLLOWS the edge. */
+    --ist-sky-dot: clamp(13px, 4.6vw, 20px);
+    --ist-sky-drop: 12px;
+  }
+  /* ── The ink, and the shape it is cut to ──
+     A layer of its own rather than the mount's own background, because
+     the mount has children that must survive the cut: the row of type
+     sits inside the curve, and the chain of rings below it hangs
+     deliberately OUTSIDE the bar altogether. A mask on the mount would
+     take both with it.
+
+     The curve is a PARABOLA, drawn as a quadratic Bézier in an SVG that
+     is stretched to whatever width the screen is (preserveAspectRatio:
+     none) — not the ellipse border-radius would have given for nothing.
+     The two are not interchangeable at this depth: an ellipse leaves the
+     corner almost vertically and is already two thirds of the way down
+     within a tenth of the screen, which reads as a big oval stamped on
+     the bar. A parabola leaves the corner along a near-straight diagonal
+     and rounds off only at the bottom, which is the shape being drawn —
+     a sag, not a bowl. The control point is at twice the depth because a
+     quadratic passes through half of it at the midpoint.
+
+     Two mask layers, unioned (which is what mask-composite does by
+     default): the rectangle down to --navbar-top-corner, and the sagging
+     lobe hanging below it. The lobe's own strip is exactly --ist-bar-sag
+     tall, so the viewBox's 10 units ARE that sag however deep the notch
+     makes it, and the curve stays the same curve at every device height. */
+  #ist-pc-mount::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--navbar-ink);
+    -webkit-mask-image: linear-gradient(#000 0 0),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cpath d='M0 0H100Q50 20 0 0Z' fill='%23000'/%3E%3C/svg%3E");
+            mask-image: linear-gradient(#000 0 0),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cpath d='M0 0H100Q50 20 0 0Z' fill='%23000'/%3E%3C/svg%3E");
+    -webkit-mask-size: 100% var(--navbar-top-corner, 36px), 100% var(--ist-bar-sag);
+            mask-size: 100% var(--navbar-top-corner, 36px), 100% var(--ist-bar-sag);
+    -webkit-mask-position: top center, bottom center;
+            mask-position: top center, bottom center;
+    -webkit-mask-repeat: no-repeat;
+            mask-repeat: no-repeat;
   }
   /* frames.css loads last and gives the mount's child the shared card
      shadow; on a bar that reads as a dark band smeared over the map. */
   #ist-pc-mount > * { box-shadow: none !important; }
+  /* ...and it clips them, which is right for the row and fatal for the
+     sky: the chain of rings is a zero-height box whose whole content
+     hangs outside it, so a clip is the difference between a chart and
+     nothing at all. Named rather than !important — an id plus a class
+     already outweighs the id plus `*` over in frames.css. */
+  #ist-pc-mount > .ist-sky { overflow: visible; }
 
   /* Bar proportions: the row stands at --navbar-h-top (taller than the tab
      bar at the other edge — it carries a portrait and two lines of type
@@ -151,20 +228,30 @@
   /* One size for both ends — see "THE TOP BAR": neither name reads as the
      junior of the pair, so both grow together. Still small enough that
      two full names fit a 390px phone (the overflow/ellipsis above takes
-     the rare one that doesn't). */
+     the rare one that doesn't).
+
+     ── And the pair is SMALLER than it was (×0.766, 1.28rem → 0.98rem) ──
+     The bar's bottom edge sags now, so the two names are no longer
+     printed across a full-width band: they stand inside the curve, and
+     type sized to fill a rectangle runs out to where that rectangle is
+     no longer there. Smaller type is also what buys the sag its depth,
+     since what the bar is tall FOR is exactly these two lines. The line
+     under each name scales by the same factor and for the same reason as
+     ever -- the name stays the name, and the district stays legibly
+     smaller in the proportion it always was. */
   .ist-pc-name {
-    font-size: 1.28rem;
+    font-size: 0.98rem;
     color: var(--navbar-ink-label-active);
   }
   /* Both lines of type hold their own line: this row carries two people,
      and either one's name or title running long must eat its own words
-     rather than the other person's space. Scaled by the same ≈1.557×
-     as the name above, so it reads exactly as small relative to the
-     name as it always did — just both bigger together. */
+     rather than the other person's space. Scaled by the same ×0.766 as
+     the name above, so it reads exactly as small relative to the name as
+     it always did — just both smaller together. */
   .ist-pc-meta {
     margin-top: 0;
-    font-size: 0.87rem;
-    letter-spacing: 0.8px;
+    font-size: 0.667rem;
+    letter-spacing: 0.6px;
     color: var(--navbar-ink-label);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -175,6 +262,117 @@
      acknowledged by the type brightening rather than by a button lighting
      up under it. */
   .ist-pc-me:active .ist-pc-meta { color: var(--navbar-ink-label-active); }
+
+  /* ── THE SKY UNDER THE BAR ──
+     A chain of rings hanging off the bar's own sagging edge, and one of
+     them is the sun. It rises at the left, crosses to the right, sets —
+     and then the chain starts again at the left with the moon on it. So
+     the bar says what time it is the way a window does, by where the
+     light is, rather than by printing a clock nobody asked for. It is
+     the same sun the palette already follows (IstDate.sunTimes), which
+     is why this is a chart of the real sky over İstanbul and not a
+     fifteen-part progress bar: at the solstice it is short and in June
+     it is long, and the reader can see that.
+
+     Fifteen marks, which at this latitude is a mark every ~55 minutes in
+     summer and every ~38 in winter — slow enough to be ambient, quick
+     enough that a reader who looks twice in an afternoon sees it move.
+
+     ── Nothing here is measured, and that is deliberate ──
+     The marks are placed entirely in calc(). Each carries two numbers,
+     written once at build time: --t, its own fraction of the screen's
+     WIDTH, and --s, the bar's own parabola evaluated there — which is
+     just 1 - (2t - 1)². Multiply --s by the bar's --ist-bar-sag (which
+     the marks inherit from the mount) and you have the exact height of
+     the edge above that mark, at any width and any notch depth, with no
+     resize listener and nothing read back out of layout. The clearance
+     is therefore --ist-sky-drop at every mark rather than only at the
+     one it was tuned on.
+
+     That is also why --t is a fraction of the width and not the
+     --screen-inset every printed thing on this bar sits on: the curve
+     runs corner to corner, so a chain hung on a narrower span would be
+     a DIFFERENT parabola and would climb into the bar at the ends. The
+     ends are inset by a few percent of the width instead — far enough
+     that the LIT mark, which is half again the size of the others, still
+     clears the screen's edge on the two days it stands at either end. */
+  .ist-sky {
+    display: block;
+    position: absolute;
+    /* Against the mount's PADDING box, so top: 0 is the top of the bar
+       itself rather than the bottom of the notch's padding — which is
+       what --navbar-top-corner and --ist-bar-sag are both measured from. */
+    top: 0; left: 0; right: 0;
+    height: 0;
+    /* The bar is furniture; this hangs off it over the city. It must
+       never take a touch meant for what is underneath. */
+    pointer-events: none;
+  }
+  .ist-sky-mark {
+    --d: var(--ist-sky-dot);
+    position: absolute;
+    box-sizing: border-box;
+    width: var(--d);
+    height: var(--d);
+    /* Half its own size back in both axes: left/top place the mark's
+       CENTRE on the curve, not its corner. */
+    margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
+    left: calc(var(--t, 0) * 100%);
+    top: calc(var(--navbar-top-corner, 36px)
+              + var(--ist-bar-sag, 0px) * var(--s, 0)
+              + var(--ist-sky-drop));
+  }
+  /* The ring is the ::before rather than the mark's own border, because
+     the mark on the sun's current place is SPLIT (see below) and the
+     mask that splits it would cut a wedge through anything inside the
+     mark as well — the sun included. Ring on one layer, light on the
+     other, one mask each. */
+  .ist-sky-mark::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--ink);
+    border-radius: 50%;
+  }
+  /* WHERE THE LIGHT IS, NOW. Bigger than the marks it stands among, and
+     its ring is broken at the top and the bottom: the chain is a track
+     and this is the one link that is open, which reads as a place being
+     passed through rather than as one more stop on it. The gaps are
+     narrow (~29° each) on purpose — at 90°, which is what four
+     transparent border-quadrants would give, the ring stops reading as a
+     ring at all. */
+  .ist-sky-mark.ist-sky-now { --d: calc(var(--ist-sky-dot) * 1.36); }
+  .ist-sky-mark.ist-sky-now::before {
+    -webkit-mask-image: conic-gradient(#0000 0 4%, #000 4% 46%,
+                                       #0000 46% 54%, #000 54% 96%, #0000 96%);
+            mask-image: conic-gradient(#0000 0 4%, #000 4% 46%,
+                                       #0000 46% 54%, #000 54% 96%, #0000 96%);
+  }
+  /* ...and inside it, which light it is. By day a filled disc; after
+     sunset the same disc with a bite taken out of its right side, which
+     is the whole of a crescent. Both are --ink: this is drawn on the
+     city's paper, not on the bar. */
+  .ist-sky-mark.ist-sky-gun::after,
+  .ist-sky-mark.ist-sky-gece::after {
+    content: '';
+    position: absolute;
+    /* One size for both, because it is one light: the sun and the moon
+       are the same disc, and only the bite out of the second one tells
+       them apart. Sized off the ring rather than stated, so it stays in
+       proportion as --ist-sky-dot follows the screen. */
+    inset: 26%;
+    background: var(--ink);
+    border-radius: 50%;
+  }
+  /* The moon is that disc with a circular bite taken out of its right
+     side — which is the whole of a crescent, and needs no second shape.
+     A mask rather than a paper-coloured disc laid over it: the bite has
+     to be genuinely transparent, since what is behind these marks is the
+     city's own drawing and not a flat sheet of paper. */
+  .ist-sky-mark.ist-sky-gece::after {
+    -webkit-mask-image: radial-gradient(circle at 128% 50%, #0000 62%, #000 62.5%);
+            mask-image: radial-gradient(circle at 128% 50%, #0000 62%, #000 62.5%);
+  }
 
   /* ── The other end of the bar: the seat ──
      The bar names the two people who matter on the page you are looking
