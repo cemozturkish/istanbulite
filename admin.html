@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#f0f0f0">
   <title>Admin — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="ist-date.js?v=6"></script>
+  <script src="ist-date.js?v=7"></script>
   <script src="map-ink.js?v=6"></script>
   <script src="palette.js?v=3"></script>
   <script src="avatar.js?v=1"></script>
@@ -1572,6 +1572,243 @@
     #prev-show[hidden] { display: none; }
     #prev-show:hover { background: var(--ink); color: var(--paper); }
 
+    /* ══════════════════════════════════════════════════════════════════
+       THE PRESS BAR — the deadline, and what is still missing from it.
+
+       This page is an editorial desk, and an editorial desk's first
+       question is never "which section am I in", it is "when does this
+       go out and is it finished". So the band under the masthead says
+       both, on every section, and never scrolls away: the edition being
+       set, the time left to set it, and one forme per thing that
+       edition needs — each pressable, each landing on the section that
+       fixes it.
+
+       THE DEADLINE IS THE SUN, not a timer somebody set. The app prints
+       two editions a day and sunrise/sunset over Istanbul are when they
+       come out (IstDate.nextEdition), so the countdown is a real
+       astronomical instant that moves through the year — 13h39m of
+       daylight to set the evening paper in June, 9h15m in December —
+       rather than a number in a config. An editor watching it is
+       watching the same clock the reader's app is.
+       ══════════════════════════════════════════════════════════════════ */
+    .press-bar {
+      flex-shrink: 0;
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      background: var(--paper-banner);
+      border-bottom: 3px double var(--ink);
+      padding: 0;
+      min-height: 62px;
+    }
+
+    /* ── Which paper you are setting ── */
+    .press-edition {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 1px;
+      padding: 8px 20px 8px 32px;
+      border-right: 1px solid var(--rule);
+    }
+    .press-kicker {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.55rem;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .press-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 400;
+      letter-spacing: 0.5px;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
+    .press-when {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.7rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    /* ── The countdown ──
+       Tabular numerals, or the whole bar twitches sideways once a second
+       as the digits change width. */
+    .press-clock {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 1px;
+      padding: 8px 22px;
+      border-right: 1px solid var(--rule);
+      text-align: left;
+    }
+    .press-count {
+      font-family: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: 'tnum' 1;
+      font-size: 1.5rem;
+      font-weight: 600;
+      line-height: 1.05;
+      letter-spacing: -0.5px;
+      white-space: nowrap;
+    }
+    /* The last hour is the one an editor actually behaves differently in,
+       so it is the one thing on this bar that changes colour. */
+    .press-bar.press-soon .press-count { color: var(--ink-red); }
+    .press-bar.press-soon .press-clock .press-kicker { color: var(--ink-red); }
+
+    /* ── The formes ──
+       One per thing the next edition needs. A row rather than a grid: how
+       many there are depends on which edition is being set (the games and
+       their questions belong to the night, the second news story to the
+       day), and a fixed grid would leave holes on one of them. */
+    .press-formes {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+    }
+    /* GECE IS THE LIGHTS COMING ON, and a forme is exactly the surface
+       that tier exists for: a thing the editor acts on, standing on the
+       street the bar itself is (see "the lit tier" in frames.css).
+
+       It is not decoration here, it is legibility. After sunset the
+       palette walks --ink-red a long way down its own hue so the fire
+       still reads on the night street -- which leaves the house red on a
+       small chip a near-black smudge, and `miss` and `warn` all but
+       indistinguishable. Telling those two apart is this bar's whole
+       job, so the forme's face is lit paper and its red is --lit-red:
+       the walk undone by exactly as much as the lit paper gives back.
+
+       By day every one of these tokens is an identity -- --lit-hi IS
+       var(--paper), --lit IS var(--paper-card), --lit-red IS
+       var(--ink-red), and --lit-glow is a zero-size transparent shadow --
+       so a daytime desk renders byte for byte as it did before this
+       block existed. Re-pointing the paper tokens rather than naming the
+       lit ones per rule is what lets everything inside (the note, the
+       red, the hover) read against the paper it is actually standing on
+       without any of them knowing about it. */
+    .press-forme {
+      --paper: var(--lit-hi);
+      --paper-card: var(--lit);
+      --ink-red: var(--lit-red);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1px;
+      padding: 5px 10px;
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      color: var(--ink);
+      box-shadow: var(--lit-glow);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .press-forme:hover { background: var(--ink); color: var(--paper); }
+    .press-forme:hover .press-forme-note { color: inherit; }
+    .press-forme-name {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+    }
+    .press-forme-note {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.66rem;
+      color: var(--muted);
+    }
+    /* Something the edition needs and has not got. The house red, and the
+       only loud thing on the bar. */
+    .press-forme.miss {
+      border-color: var(--ink-red);
+      border-left-width: 4px;
+      color: var(--ink-red);
+    }
+    .press-forme.miss .press-forme-note { color: var(--ink-red); }
+    .press-forme.miss:hover { background: var(--ink-red); color: var(--paper); }
+    /* Worth an editor's eye but not broken: a night whose Sozcel word
+       nobody has chosen (the server picks one from the pool at play
+       time), or a news edition that is a holdover from an earlier day.
+       The bar's default weight, with a rule down its edge -- loud enough
+       to stop on, quiet enough not to read as a fault. */
+    .press-forme.warn { border-left-width: 4px; }
+
+    /* Set and ready. Deliberately quiet — a desk full of ticks should
+       read as nothing left to do, not as a wall of decoration. */
+    .press-forme.ok { border-color: var(--rule); }
+    .press-forme.ok .press-forme-name { font-weight: 400; color: var(--muted); }
+    /* Not this edition's problem (the games belong to the night, the
+       second news story to the day). Dashed, the same "nothing here"
+       convention the rest of the site uses for a slot with nothing in it. */
+    .press-forme.na {
+      border-style: dashed;
+      border-color: var(--rule);
+      color: var(--muted);
+      cursor: default;
+    }
+    .press-forme.na:hover { background: var(--paper); color: var(--muted); }
+    /* Asked and not answered yet. */
+    .press-forme.pending { border-color: var(--rule); color: var(--muted); cursor: default; }
+    .press-forme.pending:hover { background: var(--paper); color: var(--muted); }
+
+    /* ── The verdict, and the way to ask again ── */
+    .press-tail {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 32px 8px 16px;
+      border-left: 1px solid var(--rule);
+    }
+    .press-verdict {
+      /* Lit for the same reason a forme is: it is the bar's conclusion,
+         and "N eksik" has to read as red at 3am as it does at noon. */
+      --ink-red: var(--lit-red);
+      background: var(--lit);
+      box-shadow: var(--lit-glow);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      padding: 4px 10px;
+      border: 1px solid currentColor;
+    }
+    .press-verdict.ready { color: var(--ink); }
+    .press-verdict.hold  { color: var(--ink-red); }
+    .press-verdict.pending { color: var(--muted); border-style: dashed; }
+    #press-recheck {
+      background: none;
+      border: 1px solid var(--ink);
+      color: var(--ink);
+      width: 26px;
+      height: 26px;
+      line-height: 1;
+      font-size: 0.85rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    #press-recheck:hover { background: var(--ink); color: var(--paper); }
+    #press-recheck[disabled] { opacity: 0.4; cursor: default; }
+
     /* A narrow desk loses the phone before it loses the work. */
     @media (max-width: 1180px) {
       .admin-preview { display: none; }
@@ -1599,6 +1836,16 @@
       .admin-body { overflow-x: hidden; }
       .panel.md-editor { width: 100%; border-width: 1px; }
       .md-body.cols2 { display: block; }
+
+      /* The bar folds: the two read-outs sit side by side on their own
+         line and the formes -- which are what the bar is actually for --
+         take the full width under them. */
+      .press-bar { flex-wrap: wrap; min-height: 0; }
+      .press-edition { padding: 6px 14px; border-right: 1px solid var(--rule); }
+      .press-clock { padding: 6px 14px; border-right: none; }
+      .press-count { font-size: 1.2rem; }
+      .press-formes { flex-basis: 100%; order: 3; padding: 0 10px 8px; border-top: 1px solid var(--rule); padding-top: 8px; }
+      .press-tail { margin-left: auto; padding: 6px 14px; border-left: none; }
     }
   </style>
   <link rel="stylesheet" href="frames.css?v=14">
@@ -1629,6 +1876,27 @@
       <button id="signout-btn">Sign Out</button>
     </div>
   </header>
+
+  <!-- ── THE PRESS BAR ──
+       The deadline, and what is still missing from it. Always on screen,
+       on every section. See "THE PRESS BAR" in the stylesheet for what it
+       is, and pressCheck() below for what each forme actually asks. -->
+  <div class="press-bar" id="press-bar">
+    <div class="press-edition">
+      <div class="press-kicker">Sıradaki baskı</div>
+      <div class="press-name" id="press-name">—</div>
+      <div class="press-when" id="press-when"></div>
+    </div>
+    <div class="press-clock">
+      <div class="press-kicker">Baskıya kalan</div>
+      <div class="press-count" id="press-count">––:––:––</div>
+    </div>
+    <div class="press-formes" id="press-formes"></div>
+    <div class="press-tail">
+      <span class="press-verdict pending" id="press-verdict">Bakılıyor</span>
+      <button id="press-recheck" title="Yeniden bak" aria-label="Yeniden bak">&#8635;</button>
+    </div>
+  </div>
 
   <div class="admin-shell">
 
@@ -2976,6 +3244,9 @@ function showAdminPanel(user) {
   // on screen, and nothing to show until there is a session to show it to.
   deskFitPhone();
   deskLoadPhone(false);
+  // The deadline, and what is still missing from it. Started here rather
+  // than on load because every forme is a query that needs the session.
+  pressStart();
 }
 
 // ── Login ──
@@ -8584,6 +8855,395 @@ async function deleteNotification(id) {
 }
 
 // ══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+// THE PRESS BAR — the deadline, and what is still missing from it
+//
+// The desk's first question is not "which section am I in", it is "when
+// does this go out and is it finished". So the band under the masthead
+// answers both on every section: the edition being set, the time left to
+// set it, and one forme per thing that edition needs.
+//
+// THE DEADLINE IS THE SUN. IstDate.nextEdition() is the one place that
+// knows which paper is next and when it comes out -- never a timer, never
+// a stored hour, and never a second copy of the sunrise equation here
+// (CLAUDE.md rule 10). What that buys is an honest deadline that moves
+// through the year: 13h39m of daylight to set the evening paper in June,
+// 9h15m in December.
+//
+// THE ONE RULE FOR A FORME: it asks EXACTLY what the reader's own loader
+// asks, against the same tables with the same filters. A forme that
+// invents a looser question is worse than no forme at all -- it is the
+// desk reporting an edition ready that the reader will open and find
+// empty. Where project.html's loader is the authority, the comment on
+// each check names it.
+//
+// A forme belongs to the editions it is true of and no others: the games
+// and their questions are the night's, the second news story is the day's
+// (see "What each screen carries" in CLAUDE.md). One that does not apply
+// is drawn dashed -- the site's own "nothing here" convention -- rather
+// than being dropped, so the bar keeps the same shape on both editions
+// and an editor learns where to look.
+// ═══════════════════════════════════════════════════════════════════════
+
+// The three news buckets, in the reader's own vertical order, and the
+// same bucketing rule loadHaberlerActorAt uses: a district story
+// (`neighborhood` set, no `category`) counts as Istanbul.
+const PRESS_BUCKETS = [
+  { key: 'istanbul', label: 'İST' },
+  { key: 'turkiye',  label: 'TR' },
+  { key: 'dunya',    label: 'DÜNYA' },
+];
+function pressBucketOf(n) {
+  const c = n.category || n.neighborhood || 'turkiye';
+  if (c === 'dunya') return 'dunya';
+  if (c === 'turkiye') return 'turkiye';
+  return 'istanbul';
+}
+
+// A 'YYYY-MM-DD' key offset by whole days. UTC arithmetic for the same
+// reason IstDate.iso() uses it -- a device-local DST jump must never be
+// able to shift the answer onto the wrong day.
+function pressDayISO(ymd, offsetDays) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  if (offsetDays) t.setUTCDate(t.getUTCDate() + Number(offsetDays));
+  return t.toISOString().slice(0, 10);
+}
+
+function pressFmtTime(d) {
+  return new Intl.DateTimeFormat('tr-TR', {
+    timeZone: IstDate.TZ, hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(d);
+}
+function pressFmtDay(d) {
+  return new Intl.DateTimeFormat('tr-TR', {
+    timeZone: IstDate.TZ, day: 'numeric', month: 'long', weekday: 'long',
+  }).format(d);
+}
+
+// ── The formes ──
+// Declarative: which editions it is true of, which section fixes it, and
+// one async check that returns { state, note }. `state` is one of
+//   ok    — set, and quiet
+//   warn  — worth an eye, not broken
+//   miss  — the reader will meet an empty slot
+// A check that throws is caught by the runner and reported as such: a
+// press bar that goes blank because one query failed is a worse failure
+// than a forme that says it could not look.
+const PRESS_FORMES = [
+  {
+    id: 'haberler',
+    name: 'Haberler',
+    tab: 'news',
+    editions: ['gun', 'gece'],
+    // EXACTLY loadHaberlerActorAt's own question: the edition in force on
+    // the day this paper comes out is the newest edition_date at or
+    // before it (news_current_edition), and a story reaches the column
+    // only unarchived and only through that date. Three buckets, three
+    // boxes -- a bucket with nothing in it goes dashed for the reader.
+    async check(ctx) {
+      const { data: editionDate, error: edErr } =
+        await sb.rpc('news_current_edition', { p_today: ctx.date });
+      if (edErr) throw edErr;
+      if (!editionDate) return { state: 'miss', note: 'Sayı çıkmadı' };
+      const { data, error } = await sb.from('breaking_news')
+        .select('category, neighborhood')
+        .eq('edition_date', editionDate)
+        .is('archived_at', null);
+      if (error) throw error;
+      const counts = {};
+      (data || []).forEach(n => {
+        const b = pressBucketOf(n);
+        counts[b] = (counts[b] || 0) + 1;
+      });
+      const empty = PRESS_BUCKETS.filter(b => !counts[b.key]);
+      ctx.newsCounts = counts;          // the depth forme reads this rather than re-fetching
+      ctx.newsEditionDate = editionDate;
+      const held = editionDate !== ctx.date;
+      if (empty.length) {
+        return { state: 'miss', note: empty.map(b => b.label).join(' · ') + ' boş' };
+      }
+      // Every bucket is filled, but on an edition the admin set on an
+      // earlier day -- the reader gets it, and it is not today's paper.
+      if (held) return { state: 'warn', note: editionDate + ' sayısı duruyor' };
+      return { state: 'ok', note: (data || []).length + ' haber' };
+    },
+  },
+  {
+    id: 'derinlik',
+    name: 'İkinci haber',
+    tab: 'news',
+    // The narrow column is the news one story deeper, and it is the DAY
+    // edition's alone -- at night that column prints anket sonuçları
+    // instead (see loadKutuphaneNarrow).
+    editions: ['gun'],
+    async check(ctx) {
+      // Rides the Haberler forme's own fetch: the two must never be able
+      // to count different sets of stories, and this is the cheap way to
+      // guarantee it. It is ordered after Haberler in this table for
+      // exactly that reason.
+      if (!ctx.newsCounts) return { state: 'miss', note: 'Sayı çıkmadı' };
+      const thin = PRESS_BUCKETS.filter(b => (ctx.newsCounts[b.key] || 0) < 2);
+      if (thin.length) {
+        return { state: 'warn', note: thin.map(b => b.label).join(' · ') + ' tek haber' };
+      }
+      return { state: 'ok', note: 'Üç kategori de derin' };
+    },
+  },
+  {
+    id: 'etkinlikler',
+    name: 'Etkinlikler',
+    tab: 'events',
+    editions: ['gun', 'gece'],
+    // loadEtkinlikActor's own three boxes: day+0, +1, +2 as fixed +03:00
+    // instants (Istanbul carries no DST, so this is exact rather than a
+    // guess) -- but counted from the day THIS paper comes out on, not
+    // from now, since that is the day the reader will be reading it.
+    async check(ctx) {
+      const labels = ['Bugün', 'Yarın', 'Öbür gün'];
+      const gaps = [];
+      for (let off = 0; off < 3; off++) {
+        const start = new Date(pressDayISO(ctx.date, off) + 'T00:00:00+03:00').toISOString();
+        const end = new Date(pressDayISO(ctx.date, off + 1) + 'T00:00:00+03:00').toISOString();
+        const { count, error } = await sb.from('events')
+          .select('id', { count: 'exact', head: true })
+          .gte('event_date', start).lt('event_date', end);
+        if (error) throw error;
+        if (!count) gaps.push(labels[off]);
+      }
+      if (gaps.length === 3) return { state: 'miss', note: 'Üç gün de boş' };
+      if (gaps.length) return { state: 'miss', note: gaps.join(' · ') + ' boş' };
+      return { state: 'ok', note: 'Üç gün de dolu' };
+    },
+  },
+  {
+    id: 'sozcel',
+    name: 'Sözcel',
+    tab: 'games',
+    editions: ['gece'],
+    // The word belongs to the NIGHT, never the calendar date
+    // (db/sozcel_used_answers_v7_game_night.sql) -- and ctx.date already
+    // IS that night, because a gece edition is named for the day it began
+    // on, which is exactly what gameNight() returns.
+    async check(ctx) {
+      if (ctx.gamesOff.has('sozcel')) return { state: 'na', note: 'Kapalı' };
+      const { data, error } = await sb.from('sozcel_used_answers')
+        .select('word').eq('used_on', ctx.date).maybeSingle();
+      if (error) throw error;
+      if (data && data.word) return { state: 'ok', note: data.word.toLocaleUpperCase('tr-TR') };
+      // Not a fault: sozcel_daily_word() records the first unused
+      // candidate itself when the night's first player arrives. But an
+      // editor setting this paper should know nobody has chosen it.
+      return { state: 'warn', note: 'Seçilmedi — otomatik' };
+    },
+  },
+  {
+    id: 'tumcel',
+    name: 'Tümcel',
+    tab: 'games',
+    editions: ['gece'],
+    // Nothing auto-picks a Tümcel puzzle. With no row for the night the
+    // page prints "Bugünkü bulmaca henüz hazır değil." and the game
+    // cannot be finished -- which also leaves Bulmaca locked behind it
+    // for the whole night (gameBlocker). A genuinely red forme.
+    async check(ctx) {
+      if (ctx.gamesOff.has('tumcel')) return { state: 'na', note: 'Kapalı' };
+      const { data, error } = await sb.from('tumcel_puzzles')
+        .select('quotes').eq('puzzle_date', ctx.date).maybeSingle();
+      if (error) throw error;
+      if (!data) return { state: 'miss', note: 'Bulmaca yok' };
+      const n = Array.isArray(data.quotes) ? data.quotes.length : 0;
+      if (n < 4) return { state: 'miss', note: n + '/4 alıntı' };
+      return { state: 'ok', note: '4 alıntı' };
+    },
+  },
+  {
+    id: 'sorular',
+    name: 'Sorular',
+    tab: 'games',
+    editions: ['gece'],
+    // One question in each joint of the sequence, and a joint is only a
+    // joint for a game that is actually on -- a game the admin switched
+    // off is not a step anybody has left to take, so it is owed no
+    // question (the same reading game-locks.js and the deck both give).
+    async check(ctx) {
+      const on = ['sozcel', 'tumcel', 'bulmaca'].filter(g => !ctx.gamesOff.has(g));
+      if (!on.length) return { state: 'na', note: 'Oyun yok' };
+      const { data, error } = await sb.from('daily_questions')
+        .select('after_game').eq('question_date', ctx.date);
+      if (error) throw error;
+      const have = new Set((data || []).map(r => r.after_game));
+      const written = on.filter(g => have.has(g)).length;
+      if (written === on.length) return { state: 'ok', note: written + '/' + on.length };
+      return { state: 'miss', note: written + '/' + on.length + ' yazıldı' };
+    },
+  },
+  {
+    id: 'anket',
+    name: 'İlçe anketi',
+    tab: 'district-polls',
+    // Both editions, for two different reasons: by day the narrow column
+    // is collecting votes, by night it prints the split back. Either way
+    // an inactive board is an empty column.
+    editions: ['gun', 'gece'],
+    async check(ctx) {
+      // anketData()'s own question: active polls, newest first, three of
+      // them at most (the column has three boxes).
+      const { data, error } = await sb.from('neighborhood_polls')
+        .select('id').eq('active', true).limit(3);
+      if (error) throw error;
+      const n = (data || []).length;
+      if (!n) return { state: 'miss', note: 'Açık anket yok' };
+      if (n < 3) return { state: 'warn', note: n + '/3 kutu dolu' };
+      return { state: 'ok', note: '3 anket açık' };
+    },
+  },
+];
+
+// ── The clock ──
+// One interval for the page, and it re-asks IstDate.nextEdition() on every
+// tick rather than holding the instant it started with: at the moment a
+// paper goes out the bar has to re-aim itself at the next one, and an
+// admin leaves this page open for hours.
+let pressEdition = null;     // the edition currently being counted down to
+let pressTimer = null;
+
+function pressEditionName(ed) {
+  return ed === 'gun' ? 'Sabah baskısı' : 'Akşam baskısı';
+}
+
+function pressTick() {
+  const next = IstDate.nextEdition();
+  const bar = document.getElementById('press-bar');
+  const countEl = document.getElementById('press-count');
+  if (!bar || !countEl) return;
+
+  // A paper went out while this page stood open: re-label, and ask the
+  // formes again, because what the NEXT edition needs is a different list.
+  if (!pressEdition || pressEdition.at.getTime() !== next.at.getTime()) {
+    pressEdition = next;
+    document.getElementById('press-name').textContent = pressEditionName(next.edition);
+    document.getElementById('press-when').textContent =
+      pressFmtDay(next.at) + ' · ' + pressFmtTime(next.at) +
+      (next.edition === 'gun' ? ' (gün doğumu)' : ' (gün batımı)');
+    pressCheck();
+  }
+
+  const left = Math.max(0, next.at - new Date());
+  const h = Math.floor(left / 3600000);
+  const m = Math.floor((left % 3600000) / 60000);
+  const sec = Math.floor((left % 60000) / 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  countEl.textContent = pad(h) + ':' + pad(m) + ':' + pad(sec);
+  // The last hour is the one an editor behaves differently in.
+  bar.classList.toggle('press-soon', left < 3600000);
+}
+
+// ── The check ──
+// Sequential rather than Promise.all, deliberately: the formes share a
+// context (the game toggles every game forme reads, the news fetch the
+// depth forme rides) and the order in PRESS_FORMES is what fills it.
+// Seven small queries against an admin's own desk is not a budget worth
+// optimising against correctness.
+let pressChecking = false;
+async function pressCheck() {
+  if (pressChecking) return;
+  const wrap = document.getElementById('press-formes');
+  const verdict = document.getElementById('press-verdict');
+  const btn = document.getElementById('press-recheck');
+  if (!wrap || !pressEdition) return;
+  pressChecking = true;
+  if (btn) btn.disabled = true;
+  verdict.className = 'press-verdict pending';
+  verdict.textContent = 'Bakılıyor';
+
+  const ctx = { edition: pressEdition.edition, date: pressEdition.date, gamesOff: new Set() };
+
+  // The night's on/off board, read once for every game forme. Best
+  // effort: a toggles table that cannot be read leaves nothing off,
+  // which is the same fallback gamesStateToday() takes -- reporting
+  // every game off would be a far louder lie than reporting none.
+  if (ctx.edition === 'gece') {
+    try {
+      const { data, error } = await sb.from('game_day_toggles')
+        .select('game').eq('game_date', ctx.date);
+      if (error) throw error;
+      (data || []).forEach(r => ctx.gamesOff.add(r.game));
+    } catch (err) { console.error('[press toggles]', err); }
+  }
+
+  // Draw every forme at once in its pending state, so the bar has its
+  // full width from the first frame and nothing shifts sideways as the
+  // answers land one by one.
+  const applicable = PRESS_FORMES.filter(f => f.editions.indexOf(ctx.edition) !== -1);
+  const shown = PRESS_FORMES.map(f => ({
+    def: f,
+    on: f.editions.indexOf(ctx.edition) !== -1,
+  }));
+  wrap.innerHTML = shown.map(x => `
+    <button class="press-forme ${x.on ? 'pending' : 'na'}" data-forme="${x.def.id}" ${x.on ? '' : 'disabled'}>
+      <span class="press-forme-name">${escapeHtml(x.def.name)}</span>
+      <span class="press-forme-note">${x.on ? '…' : 'Bu baskıda yok'}</span>
+    </button>
+  `).join('');
+
+  let missing = 0;
+  for (const f of applicable) {
+    let res;
+    try {
+      res = await f.check(ctx);
+    } catch (err) {
+      console.error('[press ' + f.id + ']', err);
+      // A query that failed is not an edition that is ready, and it is
+      // not one that is missing something either -- it is a forme that
+      // could not look, and it says so in those words.
+      res = { state: 'miss', note: 'Bakılamadı' };
+    }
+    const el = wrap.querySelector('[data-forme="' + f.id + '"]');
+    if (!el) continue;
+    el.className = 'press-forme ' + res.state;
+    if (res.state === 'na') el.disabled = true;
+    el.querySelector('.press-forme-note').textContent = res.note;
+    if (res.state === 'miss') missing++;
+  }
+
+  verdict.className = 'press-verdict ' + (missing ? 'hold' : 'ready');
+  verdict.textContent = missing
+    ? missing + ' eksik'
+    : 'Baskıya hazır';
+  pressChecking = false;
+  if (btn) btn.disabled = false;
+}
+
+// A forme is a door: press it and you are standing in the section that
+// fixes it. It goes through the rail's own button rather than calling the
+// section's loader directly, so everything a tab press does -- the active
+// mark, the drawer it shuts, the phone it re-aims -- happens exactly once
+// and in one place.
+document.getElementById('press-formes').addEventListener('click', (e) => {
+  const btn = e.target.closest('.press-forme');
+  if (!btn || btn.disabled) return;
+  const def = PRESS_FORMES.find(f => f.id === btn.dataset.forme);
+  if (!def) return;
+  const tab = document.querySelector('.admin-tab[data-tab="' + def.tab + '"]');
+  if (tab) tab.click();
+});
+
+document.getElementById('press-recheck').addEventListener('click', () => pressCheck());
+
+// An editor who has just written the missing thing comes back to this
+// page expecting the bar to know. Re-asking on return is cheap and is
+// the difference between a bar that is trusted and one that is ignored.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && pressEdition) pressCheck();
+});
+
+function pressStart() {
+  if (pressTimer) return;
+  pressTick();                 // paints the bar and fires the first check
+  pressTimer = setInterval(pressTick, 1000);
+}
+
 // THE DESK — the rail, the drawers, and the phone
 //
 // Nothing below owns any data. It rearranges the surface the fourteen

@@ -192,6 +192,48 @@
     return { edition: 'gece', date: isoAt(b, b < sunTimes(b).sunrise ? -1 : 0) };
   }
 
+  // ── WHEN THE NEXT EDITION GOES TO PRESS ──
+  // The app prints two editions a day and the sun sets both deadlines:
+  // the morning paper at sunrise, the evening one at sunset. This is the
+  // instant the NEXT one comes out, which edition it will be, and which
+  // day it is named for -- everything an editor's countdown needs, and
+  // the one place the "next sunrise or next sunset, whichever is sooner"
+  // rule is written.
+  //
+  // It is deliberately NOT nextGameNight() generalised. That one is
+  // always the next SUNSET, because the games are night-only and a
+  // sunrise is nothing to them; this one is whichever of the two edges
+  // comes first, because both of them put a paper out.
+  //
+  // The edition and its date come straight back out of editionKey() at
+  // the instant itself rather than being re-derived here: a night is
+  // named for the day it BEGAN on, and that rule must exist once. No
+  // nudge past the boundary is needed for it to land -- isDaytime() is
+  // `>= sunrise && < sunset`, so the sunrise instant already reads as
+  // 'gun' and the sunset instant already reads as 'gece'.
+  //
+  // Real instants throughout, never now(), whose fields read as
+  // Istanbul's wall clock and would offset every subtraction against it
+  // by the device's own distance from Istanbul.
+  function nextEdition(base) {
+    const b = base || new Date();
+    const today = sunTimes(b);
+    let at;
+    if (b < today.sunrise) {
+      at = today.sunrise;            // still last night's paper; the morning one is next
+    } else if (b < today.sunset) {
+      at = today.sunset;             // the morning paper is out; tonight's is next
+    } else {
+      // Past this evening's sunset, so the next edition is tomorrow
+      // morning's. Stepping a whole day off an instant that is already
+      // evening lands mid-evening again, nowhere near a date boundary --
+      // the same reason nextGameNight() steps the way it does.
+      at = sunTimes(new Date(b.getTime() + 86400000)).sunrise;
+    }
+    const k = editionKey(at);
+    return { edition: k.edition, date: k.date, at };
+  }
+
   // ── WHICH NIGHT'S GAMES ARE THESE ──
   // The games are night-only now, and a night SPANS MIDNIGHT, so every key
   // a night's games write has to be the NIGHT and not the calendar date:
@@ -322,6 +364,6 @@
   }
 
   global.IstDate = { parts, now, iso, daySeed, nextMidnight, parseYMD, untilMidnight,
-                     sunTimes, isDaytime, edition, editionKey, skyArc,
+                     sunTimes, isDaytime, edition, editionKey, nextEdition, skyArc,
                      gameNight, gameNightSeed, nextGameNight, untilNextNight, TZ };
 })(window);
