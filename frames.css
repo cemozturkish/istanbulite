@@ -48,10 +48,12 @@
   --navbar-h: 46px;
   /* The profile bar stands taller than the tab bar it answers to: it
      carries an avatar and two lines of type (name over district), where
-     the tab bar carries one word. It is the height at the MIDDLE of the
-     screen — where the two names are printed and where the bar hangs
-     lowest (see "THE TWO BARS SAG" below). */
-  --navbar-h-top: 46px;
+     the tab bar carries one word. It is the bar's own body, added to the
+     notch's inset by the bar itself — and the two together are the
+     height at the MIDDLE of the screen, where the names are printed and
+     where the bar hangs lowest (see "THE TWO BARS ARE HEXAGON
+     SHOULDERS" below). */
+  --navbar-h-top: 40px;
 
   /* ── THE TWO BARS ARE HEXAGON SHOULDERS ──
      Neither bar is a flat band any more. Each one's inner edge — the
@@ -89,14 +91,30 @@
      middle, all of them near its floor, so there is nothing for a deep
      shoulder to make room for.
 
-     The profile bar's is stated as its CORNER rather than as the drop
-     itself. The corner is the invariant worth holding there: it is where
-     the notch and the status-bar glyphs are, and it is the only part of
-     that shape a device's own inset can change under us. The bar derives
-     its drop from its own height minus this, so a taller notch makes a
-     steeper shoulder rather than a bar that overruns its own
-     arithmetic. */
-  --navbar-top-corner: 36px;
+     ── THE PROFILE BAR'S IS A SHARE OF ITS OWN BOX, NOT A LENGTH ──
+     --navbar-top-keep is how much of that bar is left standing at the
+     screen's corners, as a percentage of the bar's own height.
+
+     That is not a stylistic choice, it is the only spelling that
+     survives a real device. The bar's height is env(safe-area-inset-top)
+     plus --navbar-h-top, and while `padding-top: env(…)` resolves
+     correctly, **env() inside a CUSTOM PROPERTY does not** on the engine
+     ~90% of readers are on (see Vision). Stated as a corner length with
+     the drop derived from `calc(env(…) + --navbar-h-top) - corner`, that
+     subtraction computed against a notch of ZERO — a 10px drop instead
+     of 69px — so the shoulder flattened to almost nothing on the phone
+     while measuring perfectly in Chromium, where env() in a custom
+     property does resolve. A harness that fakes the inset by declaring
+     that custom property itself cannot catch this; only leaving env()
+     where the browser already handles it can.
+
+     A percentage of the box needs no inset at all: 100% in a clip-path
+     and in the chain's own `top` both resolve against the bar's real
+     height, whatever the notch turns out to be, and a browser reporting
+     no inset gets a proportionally shallower shoulder rather than a flat
+     band. Nothing about this shape may be re-derived from env() inside a
+     custom property again. */
+  --navbar-top-keep: 34%;
   /* The tab bar's is the drop itself, not a corner: that bar's height is
      already the smallest thing it can be (see project.html's own
      --navbar-h: 34px), so there is nothing to subtract from. What this
