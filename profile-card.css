@@ -108,18 +108,18 @@
     border: none;
     overflow: visible;
     max-height: none;
-    /* ── THE BAR'S BOTTOM EDGE SAGS ──
-       It hangs lowest at the middle of the screen and rises to
-       --navbar-top-corner at either corner (see "THE TWO BARS SAG" in
-       frames.css), so the bar stays its full height only where the type
+    /* ── THE BAR'S BOTTOM EDGE IS A HEXAGON SHOULDER ──
+       A straight diagonal down from either screen corner, meeting a flat
+       run across the middle (see "THE TWO BARS ARE HEXAGON SHOULDERS" in
+       frames.css) — so the bar stays its full height only where the type
        is actually printed and gives the corners back to the city.
 
-       The sag is DERIVED, not stated, because the corner is the
+       The drop is DERIVED, not stated, because the corner is the
        invariant worth holding: that is where the notch and the
        status-bar glyphs are, and the device's own inset is the one thing
        that can move this shape under us. max(0px, ...) so a browser
        reporting no inset at all (a narrow desktop window) flattens the
-       curve rather than asking for a negative one. */
+       shoulder rather than asking for a negative one. */
     --ist-bar-h: calc(env(safe-area-inset-top) + var(--navbar-h-top, 46px));
     --ist-bar-sag: max(0px, calc(var(--ist-bar-h) - var(--navbar-top-corner, 36px)));
 
@@ -140,22 +140,20 @@
      deliberately OUTSIDE the bar altogether. A mask on the mount would
      take both with it.
 
-     The curve is a PARABOLA, drawn as a quadratic Bézier in an SVG that
-     is stretched to whatever width the screen is (preserveAspectRatio:
-     none) — not the ellipse border-radius would have given for nothing.
-     The two are not interchangeable at this depth: an ellipse leaves the
-     corner almost vertically and is already two thirds of the way down
-     within a tenth of the screen, which reads as a big oval stamped on
-     the bar. A parabola leaves the corner along a near-straight diagonal
-     and rounds off only at the bottom, which is the shape being drawn —
-     a sag, not a bowl. The control point is at twice the depth because a
-     quadratic passes through half of it at the midpoint.
+     The shape is a HEXAGON's bottom and nothing softer: the flanks are
+     dead straight from either corner, and they break into the flat at
+     --navbar-bevel. Measured off the drawing this was traced from, that
+     flank is straight to within a pixel over its whole run — so a curve
+     through the same two extremes is not a near-enough version of it,
+     it is a different shape. An ellipse leaves the corner almost
+     vertically; a parabola rounds the whole flank away. Both read as a
+     bowl stamped on the bar rather than as the app's own hexagon lying
+     down behind its own name.
 
-     Two mask layers, unioned (which is what mask-composite does by
-     default): the rectangle down to --navbar-top-corner, and the sagging
-     lobe hanging below it. The lobe's own strip is exactly --ist-bar-sag
-     tall, so the viewBox's 10 units ARE that sag however deep the notch
-     makes it, and the curve stays the same curve at every device height. */
+     Six points and nothing to draw: a hexagon is a polygon, so
+     clip-path states it directly, in px down and percent across, and it
+     follows any screen width with the drop staying exactly the number
+     the token says. */
   #ist-pc-mount::before {
     content: '';
     position: absolute;
@@ -163,16 +161,14 @@
     z-index: -1;
     pointer-events: none;
     background: var(--navbar-ink);
-    -webkit-mask-image: linear-gradient(#000 0 0),
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cpath d='M0 0H100Q50 20 0 0Z' fill='%23000'/%3E%3C/svg%3E");
-            mask-image: linear-gradient(#000 0 0),
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'%3E%3Cpath d='M0 0H100Q50 20 0 0Z' fill='%23000'/%3E%3C/svg%3E");
-    -webkit-mask-size: 100% var(--navbar-top-corner, 36px), 100% var(--ist-bar-sag);
-            mask-size: 100% var(--navbar-top-corner, 36px), 100% var(--ist-bar-sag);
-    -webkit-mask-position: top center, bottom center;
-            mask-position: top center, bottom center;
-    -webkit-mask-repeat: no-repeat;
-            mask-repeat: no-repeat;
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% var(--navbar-top-corner, 36px),
+      calc(100% - var(--navbar-bevel, 0.35) * 100%) 100%,
+      calc(var(--navbar-bevel, 0.35) * 100%) 100%,
+      0 var(--navbar-top-corner, 36px)
+    );
   }
   /* frames.css loads last and gives the mount's child the shared card
      shadow; on a bar that reads as a dark band smeared over the map. */
@@ -281,18 +277,20 @@
      ── Nothing here is measured, and that is deliberate ──
      The marks are placed entirely in calc(). Each carries two numbers,
      written once at build time: --t, its own fraction of the screen's
-     WIDTH, and --s, the bar's own parabola evaluated there — which is
-     just 1 - (2t - 1)². Multiply --s by the bar's --ist-bar-sag (which
-     the marks inherit from the mount) and you have the exact height of
-     the edge above that mark, at any width and any notch depth, with no
-     resize listener and nothing read back out of layout. The clearance
-     is therefore --ist-sky-drop at every mark rather than only at the
-     one it was tuned on.
+     WIDTH, and --s, the bar's own edge evaluated there — 0 at either
+     corner, 1 across the flat, and the straight ramp between (so it is
+     literally t/bevel on the flank). Multiply --s by the bar's
+     --ist-bar-sag, which the marks inherit from the mount, and you have
+     the exact height of the edge above that mark, at any width and any
+     notch depth, with no resize listener and nothing read back out of
+     layout. The clearance is therefore --ist-sky-drop at every mark
+     rather than only at the one it was tuned on — which is what lets
+     seven of the fifteen sit on a diagonal and still hang off it evenly.
 
      That is also why --t is a fraction of the width and not the
-     --screen-inset every printed thing on this bar sits on: the curve
+     --screen-inset every printed thing on this bar sits on: the edge
      runs corner to corner, so a chain hung on a narrower span would be
-     a DIFFERENT parabola and would climb into the bar at the ends. The
+     a DIFFERENT hexagon and would climb into the bar at the ends. The
      ends are inset by a few percent of the width instead — far enough
      that the LIT mark, which is half again the size of the others, still
      clears the screen's edge on the two days it stands at either end. */
@@ -363,6 +361,36 @@
     inset: 26%;
     background: var(--ink);
     border-radius: 50%;
+  }
+
+  /* ── AND IT LEAVES A TRAIL ──
+     The rings the light has already crossed keep a fading afterimage of
+     it, strongest just behind the sun and gone a few marks back. That
+     is what says which WAY the light is travelling — a lit mark on its
+     own only says where it is, and on a track that reads the same
+     either way round.
+
+     Deliberately a tail that runs out rather than every passed mark
+     inked in. A filled run all the way back to the corner is a progress
+     bar: it invites counting how much of the day is left, which is the
+     one thing this app does not print (see "Anti-screen-time" and the
+     day meter's own note about closure rather than accumulation). A
+     tail says the sun came from over there and nothing else, and how
+     far through the day it is was already said by WHERE it is standing.
+
+     --trail is written per mark by paintSky (1 just behind the light,
+     0 at the end of the tail) and is the only thing that changes on a
+     tick besides which ring is lit. It is a plain number so the fade is
+     one multiplication here rather than fifteen opacities in the JS. */
+  .ist-sky-mark.ist-sky-past::after {
+    content: '';
+    position: absolute;
+    /* A little smaller than the light itself: it is what the light left
+       behind, not another one of it. */
+    inset: 32%;
+    background: var(--ink);
+    border-radius: 50%;
+    opacity: calc(var(--trail, 0) * 0.6);
   }
   /* The moon is that disc with a circular bite taken out of its right
      side — which is the whole of a crescent, and needs no second shape.

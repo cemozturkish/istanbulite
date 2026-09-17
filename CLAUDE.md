@@ -1743,37 +1743,48 @@ either bar's height as a number — the same value also reserves the space each 
 bottom so its last row of cards clears the tab bar, and one copy left behind is how the two bars
 end up different heights. The game pages hide the bottom bar outright for their fullscreen board.
 
-**Neither bar is a flat band — both sag** (`--navbar-top-corner` / `--navbar-arc`, "THE TWO BARS
-SAG" in frames.css). Each one's inner edge — the profile bar's bottom, the tab bar's top — is a
-**parabola** hanging lowest at the middle of the screen and shallowest at its corners. Both bulge
-the same way, downward, which is what keeps them reading as one movement rather than as a pinch:
-the city between them does not narrow toward the middle, it slides down there.
+**Neither bar is a flat band — both are hexagon shoulders** (`--navbar-top-corner` /
+`--navbar-arc` / `--navbar-bevel`, "THE TWO BARS ARE HEXAGON SHOULDERS" in frames.css). Each one's
+inner edge — the profile bar's bottom, the tab bar's top — is the bottom of a **hexagon laid on
+its side** and stretched the width of the screen: a straight diagonal down from each corner,
+meeting a flat run across the middle. Both drop the same way, so the city between them does not
+narrow toward the middle, it slides down there.
 
-Four things about it:
+Five things about it:
 
-- **Each bar states its own depth, because the two are doing different jobs.** The profile bar's
-  sag is deep (~65px on a notched phone) and that depth is what the two names are printed in: the
-  bar only needs to be tall where the type is, so it gives the corners back to the city and keeps
-  the middle. That is also why the names are **smaller** than they were (×0.766) — type sized to
-  fill a rectangle runs out to where the rectangle is no longer there. The tab bar's sag is
-  shallow (`--navbar-arc`, 12px): it carries one word at each end and a logo in the middle, all
-  near its floor, and there is nothing for a deep curve to make room for.
-- **The profile bar's is stated as its CORNER, the tab bar's as the sag itself.** The corner is
-  the invariant worth holding on the top bar: that is where the notch and the status-bar glyphs
-  are, and the device's inset is the one thing that can move the shape under us — so the sag is
-  *derived* (bar height − `--navbar-top-corner`) and a deeper notch makes a deeper curve rather
-  than a bar that overruns its own arithmetic. The tab bar has nothing to subtract from, its
-  height already being the smallest thing it can be.
-- **It is a parabola and not an arc, and the difference is visible.** An ellipse (which
-  `border-radius` would have given for nothing) leaves the corner almost vertically and is two
-  thirds of the way down within a tenth of the screen — a bowl stamped on the bar. A parabola
-  leaves the corner along a near-straight diagonal and rounds off only at the bottom, which is the
-  shape being drawn. Both are one quadratic Bézier in an SVG mask stretched to the screen's width
-  (`preserveAspectRatio="none"`), with the control point at twice the depth because a quadratic
-  passes through half of it at the midpoint. Each bar's ink is a **layer of its own**
-  (`#ist-pc-mount::before`, `.section-rule > header::before`) rather than the bar's own
-  background, because both bars have children that must survive the cut — the İstanbulite logo
-  stands clear above the tab bar, and the sky chart below hangs outside the profile bar entirely.
+- **It is a hexagon because everything else on this site already is** — the petek's cells, the
+  avatar frames, Sözcel's tiles, all cut from the one drawn silhouette ("HEX FRAME" in
+  frames.css). Those are the app's hexagon standing up; this is the same shape lying down, wide
+  enough that only its shoulders and its floor are on screen. The two bars are the only chrome
+  the reader never leaves, so the shape the whole app is built out of is the right thing for them
+  to be made of.
+- **It is emphatically NOT a curve, and that is measurable rather than a preference.** Fitted
+  against the drawing this was traced from, the flank is a straight line to within **0.9px** over
+  its whole run, and it breaks into the flat at 35.2% of the width. An ellipse (which
+  `border-radius` gives for nothing) leaves the corner almost vertically; a parabola rounds the
+  whole flank away. Both were tried, and both read as a bowl stamped on the bar rather than as the
+  app's own hexagon behind its own name. What makes this shape what it is, is precisely that the
+  flanks are dead straight and the break is sharp — anything that rounds either one takes the
+  shape with it.
+- **A hexagon is a polygon, so `clip-path` states it directly** — six points, px down and percent
+  across, following any screen width with the drop staying exactly the number the token says. No
+  SVG, no mask, no Bézier. Each bar's ink is a **layer of its own** (`#ist-pc-mount::before`,
+  `.section-rule > header::before`) rather than the bar's own background, because both bars have
+  children that must survive the cut: the İstanbulite logo stands clear above the tab bar, and the
+  sky chart below hangs outside the profile bar entirely.
+- **Each bar states its own depth, and `--navbar-bevel` is shared.** The profile bar's drop is
+  deep (~69px on a notched phone) and that depth is what the two names are printed in: the bar
+  only needs to be tall where the type is, so it gives the corners back to the city and keeps the
+  middle. That is also why the names are **smaller** than they were (×0.766) — type sized to fill
+  a rectangle runs out to where the rectangle is no longer there. The tab bar's is shallow
+  (`--navbar-arc`, 12px): one word at each end and a logo in the middle, all near its floor, and
+  nothing for a deep shoulder to make room for. The profile bar's is stated as its **corner**
+  rather than as the drop, because the corner is the invariant worth holding — that is where the
+  notch and the status-bar glyphs are, and the device's inset is the one thing that can move the
+  shape under us, so a taller notch makes a steeper shoulder rather than a bar that overruns its
+  own arithmetic. `--navbar-bevel` is unitless on purpose: the polygons multiply it by 100%, and
+  the sky chart's marks read the same number back, so the chain and the edge it hangs from can
+  never be two different hexagons.
 - **Everything that clears the tab bar clears its CORNERS**, which are `--navbar-arc` higher than
   its middle. `--fb-dock` in project.html adds that token for exactly this reason: the left
   column's own left edge stands at a corner, not at the middle, so measuring its clearance
@@ -1801,13 +1812,15 @@ quick enough that a reader who looks twice in an afternoon sees it move.
   the caller is standing: before this morning's sunrise the arc began at *yesterday's* sunset;
   after this evening's it ends at *tomorrow's* sunrise. Real instants throughout, never `now()`.
 - **Nothing about the chart is measured.** Each mark carries two numbers, written once at build
-  time: `--t`, its own fraction of the screen's *width*, and `--s`, the bar's parabola evaluated
-  there — which is just `1 - (2t - 1)²`. Multiply `--s` by the bar's own `--ist-bar-sag` and you
-  have the exact height of the edge above that mark, at any width and any notch depth, with no
-  resize listener and nothing read back out of layout. The clearance is therefore
-  `--ist-sky-drop` at *every* mark rather than only at the one it was tuned on.
-- **`--t` is a fraction of the width, not `--screen-inset`.** The curve runs corner to corner, so
-  a chain hung on a narrower span would be a *different* parabola and would climb into the bar at
+  time: `--t`, its own fraction of the screen's *width*, and `--s`, the bar's own edge evaluated
+  there — 0 at either corner, 1 across the flat, and the straight ramp between, which on the flank
+  is literally `t / --navbar-bevel`. Multiply `--s` by the bar's own `--ist-bar-sag` and you have
+  the exact height of the edge above that mark, at any width and any notch depth, with no resize
+  listener and nothing read back out of layout. The clearance is therefore `--ist-sky-drop` at
+  *every* mark rather than only at the one it was tuned on — which is what lets seven of the
+  fifteen sit on a diagonal and still hang off it evenly.
+- **`--t` is a fraction of the width, not `--screen-inset`.** The edge runs corner to corner, so
+  a chain hung on a narrower span would be a *different* hexagon and would climb into the bar at
   the ends. The ends are inset by a few percent of the width instead, far enough that the lit
   mark — half again the size of the others — still clears the screen's edge on the two days it
   stands at either end.
@@ -1819,10 +1832,16 @@ quick enough that a reader who looks twice in an afternoon sees it move.
   marks is the city's own drawing and not a flat sheet of paper. The ring is the mark's
   `::before` and the light its `::after` precisely so the mask that splits the ring cannot cut a
   wedge through the sun as well.
-- **Marks the light has already passed are deliberately not inked in.** The lit mark says where
-  in the day we are; a filled trail would turn an ambient drawing into a progress bar, which is
-  the one thing this app does not print (see "Anti-screen-time" and the day meter's own note about
-  closure rather than accumulation).
+- **And it leaves a trail.** The rings the light has already crossed keep a fading afterimage of
+  it — strongest just behind the sun, gone five marks back (`--trail`, written per mark by
+  `paintSky`, and the only thing besides the lit ring that a tick changes). That is what says
+  which *way* the light is travelling; a lit mark on its own only says where it is, and on a track
+  that reads the same either way round. Deliberately a tail that runs out rather than every passed
+  mark inked in: a filled run all the way back to the corner is a progress bar, which invites
+  counting how much of the day is left — the one thing this app does not print (see
+  "Anti-screen-time" and the day meter's own note about closure rather than accumulation). The
+  tail says the sun came from over there and nothing else, and how far through the day it is was
+  already said by *where* it is standing.
 - **Built by `skyChartHTML()` in profile-card.js, inside the bar's own template.** The row is
   rebuilt wholesale (`container.innerHTML`), so anything appended beside it is wiped by the next
   rebuild. It is drawn with the loading state too — it needs nothing from Supabase, and a bar that
@@ -1979,7 +1998,8 @@ is pressed, because the reader moves the app with their finger and the bar's who
 where that has put them. A tab bar answers "where can I go"; this answers "where am I", which is
 the only question left once the swipe is the navigation.
 
-Its top edge sags with the profile bar's (see "The phone's two bars"), and the three marks stand
+Its top edge drops with the profile bar's — the same hexagon shoulder (see "The phone's two
+bars") — and the three marks stand
 `--fb-mark-foot` off its floor — one number, because the logo's foot is planted on the same line
 Kütüphane and Kahvehane's own text sits on and the two must not drift. They sit a little higher
 than they used to: with the edge above them highest at the corners, a word left on the old line
