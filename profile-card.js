@@ -226,17 +226,33 @@
   //
   // The two numbers each mark carries are written ONCE, at build time,
   // and never again: --t is where it stands across the screen (0..1) and
-  // --s is the bar's own parabola evaluated there, which is what makes
-  // the chain follow the curve above it without anything being measured.
-  // Only the class on the lit mark is rewritten on a tick.
+  // --s is the bar's own edge evaluated there, which is what makes the
+  // chain follow the shoulder above it without anything being measured.
+  // What a tick rewrites is which ring is lit and how much of the trail
+  // each of the ones behind it still holds.
   // ══════════════════════════════════════════════════════════════
   const SKY_MARKS = 15;
   // How far in from either screen corner the chain starts, as a fraction
-  // of the width. The curve the marks hang off runs corner to corner
-  // (see the CSS), so this has to be a fraction of that same span and
-  // not the bar's --screen-inset -- on a 430px phone the two land within
-  // a few pixels of each other anyway.
+  // of the width. The edge the marks hang off runs corner to corner (see
+  // the CSS), so this has to be a fraction of that same span and not the
+  // bar's --screen-inset -- on a 430px phone the two land within a few
+  // pixels of each other anyway.
   const SKY_EDGE = 0.045;
+  // How many marks back the light's trail still shows. Short on purpose:
+  // it says which way the light is going, never how much of the day is
+  // left (see the trail's own note in profile-card.css).
+  const SKY_TRAIL = 5;
+  // Where the bar's own hexagon breaks from its diagonal into its flat.
+  // Read back off --navbar-bevel rather than restated, so the chain and
+  // the edge it hangs from can never be two different hexagons; the
+  // fallback is frames.css's own value, for a page that somehow has the
+  // module without the stylesheet.
+  function skyBevel() {
+    const raw = getComputedStyle(document.documentElement)
+      .getPropertyValue('--navbar-bevel');
+    const n = parseFloat(raw);
+    return (n > 0 && n < 0.5) ? n : 0.35;
+  }
   // Re-read every four minutes. The chain advances a whole mark every
   // ~38 (winter) to ~55 (summer) minutes, so this is far finer than the
   // chart can show and still costs nothing -- and it is what carries the
@@ -250,15 +266,15 @@
   // (container.innerHTML) and anything appended beside it is wiped by
   // the next rebuild.
   function skyChartHTML() {
+    const bevel = skyBevel();
     let out = '<div class="ist-sky" id="ist-sky" role="img" aria-label="">';
     for (let i = 0; i < SKY_MARKS; i++) {
       const t = SKY_EDGE + (i / (SKY_MARKS - 1)) * (1 - 2 * SKY_EDGE);
-      // u is the mark's place across the screen as -1..1, so s is the
-      // bar's own parabola there: 0 at either corner, 1 at the middle.
-      // Exactly the curve the mask cuts above it, which is what makes
-      // the chain's clearance one number rather than fifteen.
-      const u = 2 * t - 1;
-      const s = 1 - u * u;
+      // s is the bar's own edge at this mark: the straight ramp up the
+      // hexagon's flank, then 1 across its flat. Exactly the polygon the
+      // clip-path cuts above it, which is what makes the chain's
+      // clearance one number rather than fifteen.
+      const s = Math.min(1, Math.min(t, 1 - t) / bevel);
       out += `<i class="ist-sky-mark" style="--t:${t.toFixed(4)};--s:${s.toFixed(4)}"></i>`;
     }
     return out + '</div>';
@@ -285,6 +301,14 @@
       marks[i].classList.toggle('ist-sky-now', on);
       marks[i].classList.toggle('ist-sky-gun', on && arc.phase === 'gun');
       marks[i].classList.toggle('ist-sky-gece', on && arc.phase === 'gece');
+      // The trail: how much of the light this mark is still holding.
+      // 1 for the ring immediately behind it, running out to nothing
+      // SKY_TRAIL marks back, and nothing at all ahead of it.
+      const back = at - i;
+      const trail = back > 0 ? Math.max(0, 1 - (back - 1) / SKY_TRAIL) : 0;
+      marks[i].classList.toggle('ist-sky-past', trail > 0);
+      if (trail > 0) marks[i].style.setProperty('--trail', trail.toFixed(3));
+      else marks[i].style.removeProperty('--trail');
     }
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : '';
     box.setAttribute('aria-label',
