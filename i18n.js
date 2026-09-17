@@ -80,6 +80,12 @@
     'profile.people':      { default: 'kişi',                more_english: 'people' },
     'profile.unnamed':     { default: 'İsimsiz Üye',         more_english: 'Unnamed Member' },
     'profile.toggle':      { default: 'Profil',              more_english: 'Profile' },
+    // The chain of rings under the profile bar (see "THE SKY UNDER THE
+    // BAR" in profile-card.css). A drawing of where the light is, so
+    // what a screen reader is owed is the sentence the drawing makes --
+    // not fifteen rings and a position.
+    'sky.day':             { default: 'Güneş gökyüzünde ilerliyor.', more_english: 'The sun is crossing the sky.' },
+    'sky.night':           { default: 'Ay gökyüzünde ilerliyor.',    more_english: 'The moon is crossing the sky.' },
     'profile.tab.ayarlar': { default: 'Ayarlar',             more_english: 'Settings' },
     'profile.email':        { default: 'E-posta',             more_english: 'Email' },
     'profile.thisweek':     { default: 'Bu Hafta',             more_english: 'This Week' },

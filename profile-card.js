@@ -214,6 +214,102 @@
     me.setAttribute('title', label);
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // THE SKY UNDER THE BAR
+  // ──────────────────────────────────────────────────────────────
+  // A chain of rings hanging off the profile bar's own sagging edge,
+  // with the sun on one of them. It rises at the left of the screen,
+  // crosses, and sets at the right; at sunset the chain starts again
+  // from the left with the moon on it. The geometry is all in
+  // profile-card.css ("THE SKY UNDER THE BAR") -- what is here is which
+  // ring the light is standing on, which is the only thing that moves.
+  //
+  // The two numbers each mark carries are written ONCE, at build time,
+  // and never again: --t is where it stands across the screen (0..1) and
+  // --s is the bar's own parabola evaluated there, which is what makes
+  // the chain follow the curve above it without anything being measured.
+  // Only the class on the lit mark is rewritten on a tick.
+  // ══════════════════════════════════════════════════════════════
+  const SKY_MARKS = 15;
+  // How far in from either screen corner the chain starts, as a fraction
+  // of the width. The curve the marks hang off runs corner to corner
+  // (see the CSS), so this has to be a fraction of that same span and
+  // not the bar's --screen-inset -- on a 430px phone the two land within
+  // a few pixels of each other anyway.
+  const SKY_EDGE = 0.045;
+  // Re-read every four minutes. The chain advances a whole mark every
+  // ~38 (winter) to ~55 (summer) minutes, so this is far finer than the
+  // chart can show and still costs nothing -- and it is what carries the
+  // app across sunset, where the light changes from a sun to a moon and
+  // goes back to the left edge, without the reader reloading anything.
+  const SKY_TICK_MS = 4 * 60 * 1000;
+  let _skyTimer = null;
+
+  // The markup, for renderPage's own template. Built as a string rather
+  // than appended afterwards because the bar's row is rebuilt wholesale
+  // (container.innerHTML) and anything appended beside it is wiped by
+  // the next rebuild.
+  function skyChartHTML() {
+    let out = '<div class="ist-sky" id="ist-sky" role="img" aria-label="">';
+    for (let i = 0; i < SKY_MARKS; i++) {
+      const t = SKY_EDGE + (i / (SKY_MARKS - 1)) * (1 - 2 * SKY_EDGE);
+      // u is the mark's place across the screen as -1..1, so s is the
+      // bar's own parabola there: 0 at either corner, 1 at the middle.
+      // Exactly the curve the mask cuts above it, which is what makes
+      // the chain's clearance one number rather than fifteen.
+      const u = 2 * t - 1;
+      const s = 1 - u * u;
+      out += `<i class="ist-sky-mark" style="--t:${t.toFixed(4)};--s:${s.toFixed(4)}"></i>`;
+    }
+    return out + '</div>';
+  }
+
+  // Which mark the light is on, and whether it is the sun or the moon.
+  // Best-effort in both directions: a page that loaded without
+  // ist-date.js simply has no sky rather than no bar.
+  function paintSky(I18N) {
+    const box = document.getElementById('ist-sky');
+    if (!box) return;
+    const IstDate = global.IstDate;
+    if (!IstDate || !IstDate.skyArc) { box.hidden = true; return; }
+    box.hidden = false;
+    const arc = IstDate.skyArc();
+    // Round rather than floor: the light belongs to the mark it is
+    // NEAREST, so it stands on the first one from the moment it rises
+    // and on the last one until it sets, instead of spending half a mark
+    // at each end on a ring nobody can see it reach.
+    const at = Math.round(arc.t * (SKY_MARKS - 1));
+    const marks = box.children;
+    for (let i = 0; i < marks.length; i++) {
+      const on = i === at;
+      marks[i].classList.toggle('ist-sky-now', on);
+      marks[i].classList.toggle('ist-sky-gun', on && arc.phase === 'gun');
+      marks[i].classList.toggle('ist-sky-gece', on && arc.phase === 'gece');
+    }
+    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : '';
+    box.setAttribute('aria-label',
+      t(arc.phase === 'gun' ? 'sky.day' : 'sky.night') || '');
+  }
+
+  // One timer for the module, not one per render: renderPage runs again
+  // on every re-render of the bar and a fresh interval each time is a
+  // leak that quietly multiplies.
+  function startSky(I18N) {
+    paintSky(I18N);
+    if (_skyTimer) return;
+    _skyTimer = setInterval(() => paintSky(I18N), SKY_TICK_MS);
+    // A phone that spent the evening in a pocket comes back with the
+    // interval having been throttled or stopped outright; the sky it
+    // went to sleep under is not the one it wakes up to.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) paintSky(I18N);
+    });
+    // The one word this drawing says is its label, so a language change
+    // has to re-say it rather than leave it in the language the bar was
+    // built in.
+    if (I18N && I18N.onChange) I18N.onChange(() => paintSky(I18N));
+  }
+
   // Which of the three carousel pages we're on. router.js stamps
   // body.dataset.page on every virtual navigation; on a real page load
   // the filename is the source of truth.
@@ -738,7 +834,14 @@
       const { data: { session } } = await sb.auth.getSession();
       if (!session) return;
       const user = session.user;
-      container.innerHTML = `<div class="ist-pc"><div class="ist-pc-loading"><span>Yükleniyor…</span></div></div>`;
+      // The sky is drawn with the loading state too: it needs nothing
+      // from Supabase (it is the sun over İstanbul, not a fact about
+      // this member), and a bar that grows its own chain of rings a
+      // round trip after it appears reads as the page still assembling
+      // itself.
+      container.innerHTML =
+        `<div class="ist-pc"><div class="ist-pc-loading"><span>Yükleniyor…</span></div></div>${skyChartHTML()}`;
+      startSky(I18N);
       _state = await fetchProfileData(sb, I18N, user);
       _mounted = true;
       // _page rather than `page`: the reader may have swiped on while this
@@ -862,7 +965,13 @@
           </div>
         </div>
       </div>
+      ${skyChartHTML()}
     `;
+
+    // The chain of rings under the bar's edge, with the sun (or the moon)
+    // standing on one of them. Started here rather than at mount(),
+    // because the markup it paints has only just been rebuilt.
+    startSky(I18N);
 
     // The row above was just rebuilt from scratch, which empties the seat
     // slot; the seat's own module knows what belonged there.
