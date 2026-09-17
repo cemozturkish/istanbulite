@@ -3209,9 +3209,19 @@ const loadAnketSonucActor = stackFetch(async () => {
 // not a slot in this column — it stays generated and admin-managed
 // elsewhere, so there is nothing for a member to offer it.
 const SUBMIT_DEFS = [
-  { key: 'sozcel', kicker: '1. OYUN', title: 'Sözcel', ask: 'Bu geceye bir kelime öner' },
+  { key: 'sozcel', kicker: '1. OYUN', title: 'Sözcel', logo: 'assets/sozcel-logo.png', ask: 'Bu geceye bir kelime öner' },
   { key: 'tumcel', kicker: '2. OYUN', title: 'Tümcel', ask: 'Bu geceye bir alıntı öner' },
 ];
+
+// One title, two loaders (loadOyunActor at night, loadSubmitActor by
+// day) -- a game with its own mark (see .fb-oyun .logo) shows it either
+// time, so the box names the same game the same way whichever question
+// it happens to be asking.
+function oyunTitleHtml(g) {
+  return g.logo
+    ? '<div class="logo"><img src="' + g.logo + '" alt="' + g.title + '" width="512" height="512" decoding="async"></div>'
+    : '<div class="t">' + g.title + '</div>';
+}
 
 // The night these offers are FOR. By day editionKey() is simply today,
 // which is the night that begins this evening — the one key both halves
@@ -3356,7 +3366,7 @@ async function loadSubmitActor(el, slot) {
   // An offer already made is this column's "done": the box goes quiet the
   // way a read story does, and stays pressable so it can be withdrawn.
   fbSetDone(el, !!mine);
-  el.innerHTML = '<div class="k">' + g.kicker + '</div><div class="t">' + g.title + '</div>' +
+  el.innerHTML = '<div class="k">' + g.kicker + '</div>' + oyunTitleHtml(g) +
     '<div class="m">' + (mine ? 'Önerdin' : (again ? 'Tekrar mı, başka mı?' : esc(g.ask))) + '</div>';
   fbSetPage(el, submitPagePayload(g, data, mine, again));
 }
@@ -3826,13 +3836,8 @@ async function loadOyunActor(el, slot) {
   // The box names its game and nothing about it -- "Türkçe Wordle" told
   // the reader something they already know once the game has a mark of
   // its own; the only thing this line still has to say is that another
-  // game is standing in front of this one. A logo is not a title ranged
-  // from a corner (see .fb-oyun .logo) -- it stands in its own wrapper,
-  // filling and centred in the box, rather than in .t.
-  const titleHtml = g.logo
-    ? '<div class="logo"><img src="' + g.logo + '" alt="' + g.title + '" width="512" height="512" decoding="async"></div>'
-    : '<div class="t">' + g.title + '</div>';
-  el.innerHTML = '<div class="k">' + g.kicker + '</div>' + titleHtml +
+  // game is standing in front of this one.
+  el.innerHTML = '<div class="k">' + g.kicker + '</div>' + oyunTitleHtml(g) +
                  (blocker ? '<div class="m">Önce ' + blocker.title + '</div>' : '');
 }
 
