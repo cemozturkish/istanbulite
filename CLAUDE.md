@@ -619,58 +619,73 @@ sb.from('articles').delete().eq('id', id)
 
 ### `admin.html` — Admin Dashboard
 - Login restricted to ADMIN_EMAIL
-- **WRITING IS NOT PUBLISHING, and the BASKI board is where the second one happens.**
-  This is the rule the whole portal is now arranged around. A haber, an etkinlik, an anket
-  exists from the moment it is written and reaches nobody; it reaches a reader by being put
-  into an **edition**. `breaking_news` has worked this way since
+- **WRITING IS NOT PUBLISHING, and the BASKI BOARD is the desk's third column.**
+  This is the rule the whole portal is arranged around. A haber, an etkinlik, an anket
+  exists from the moment it is written and reaches nobody; it reaches a reader by being
+  put into an **edition**. `breaking_news` has worked this way since
   `db/breaking_news_v3_edition.sql`; `db/baski_v1.sql` does the same to `events` and
-  `neighborhood_polls`, and the games were already a per-night switch. What was missing was
-  somewhere to see all four at once, in the shape the reader meets them — which is the
-  **Baskı** section, the one the desk opens on.
-  - **It draws the two pages, not a form.** Kütüphane and Kahvehane side by side, each as the
-    phone it is: the map band across the top, then the two columns with one empty rectangle
-    per slot the reader will really meet — wide:narrow at the app's own 3:2, and Kahvehane
-    mirrored, exactly as `.fb-mirror` has it. Beside them stands the **KASA**, the case of
-    loose type, one category at a time. A drop is the only write.
-  - **THE ONE RULE: A SLOT IS NOT A CHOICE.** Which slot a thing lands in is a fact about the
-    THING — a story's own category, an evening's own date, a game's own name — exactly as
-    "What each screen carries" states it. So a drop only ever answers *is this in the baskı*,
-    never *where does it go*, and a slot that cannot take what is being dragged **goes dim**
-    rather than accepting it and quietly rewriting the row. `baskiAccepts()` is the whole of
-    that rule in one place, so the dim during the drag and the refusal on the drop can never
-    disagree. The one exception is **Anket**, whose three boxes are positions rather than
-    buckets (the slot IS the `edition_order`), which is why that column alone takes any poll
-    in any of its three.
-  - **A slot is a STACK.** One baskı can carry three İstanbul stories or three evenings on the
-    same night, and the reader goes through them one at a time in the admin's own
-    `edition_order` — chips carry ▲▼ to move one step, which swaps the pair's orders rather
-    than renumbering the slot.
+  `neighborhood_polls`, and the games were already a per-night switch.
+  - **It is a COLUMN, not a section, and that is the whole design.** A phone showing the
+    live site used to stand in that third column, answering a question nobody was asking —
+    an editor knows what the app looks like. What they do not know, *while they are
+    writing*, is whether the thing in front of them is in the next paper. So the board is
+    up on every section, and **the list in the middle of the desk IS the case of loose
+    type**: you drag a row out of whatever you are looking at and drop it into the paper
+    beside it. There is deliberately no Baskı *section* and no tray of its own — either
+    would put the paper somewhere you have to go to, which is the arrangement this
+    replaced.
+  - **It draws the two pages, not a form.** Kütüphane and Kahvehane side by side, each as
+    the phone it is: the map band across the top, then the two columns with one empty
+    rectangle per slot the reader will really meet — wide:narrow at the app's own 3:2, and
+    Kahvehane mirrored, exactly as `.fb-mirror` has it.
+  - **THE ONE RULE: A SLOT IS NOT A CHOICE.** Which slot a thing lands in is a fact about
+    the THING — a story's own category, an evening's own date, a game's own name — exactly
+    as "What each screen carries" states it. So a drop only ever answers *is this in the
+    baskı*, never *where does it go*, and a slot that cannot take what is being dragged
+    **goes dim** rather than accepting it and quietly rewriting the row. `baskiAccepts()`
+    is the whole of that rule in one place, so the dim during the drag and the refusal on
+    the drop can never disagree. The one exception is **Anket**, whose three boxes are
+    positions rather than buckets (the slot IS the `edition_order`), which is why that
+    column alone takes any poll in any of its three.
+  - **A slot is a STACK.** One baskı can carry three İstanbul stories or three evenings on
+    the same night, and the reader goes through them one at a time in the admin's own
+    `edition_order` — chips carry ▲▼ to move one step.
   - **A GAME IS A SWITCH, and the switch already existed.** Dropping a game onto the board
     DELETES its `game_day_toggles` row and pulling it out writes one, because that table
     records a game that is OFF. Deliberately not a second table with the opposite sense:
-    `game-locks.js` and all three game pages read this one, and inverting it so this screen
-    reads more literally would be re-teaching the whole app a new word for the same fact.
-    A night is named for the day it began on, which is exactly what the baskı date already is,
-    so `game_date == baskiDate` needs no conversion.
-  - **The countdown is the press bar's own clock**, written by the same `pressTick` — one timer
-    for the desk, not one per surface. It is the same deadline said twice and the two must never
-    be able to drift by a second.
-  - **The date is pickable, and setting a paper other than the next one out is said out loud.**
-    Ordinary thing to do; not noticing you are doing it is the mistake, since the three
-    `*_current_edition` resolvers hand the reader the newest edition at or before today.
+    `game-locks.js` and all three game pages read this one. The Oyun section's seven-day
+    calendar is the same switch seen a different way and writes the same table, so both
+    re-read the other after a write. A night is named for the day it began on, which is
+    exactly what the baskı date already is, so `game_date == baskiDate` needs no conversion.
+  - **A row says whether it is in the paper, and the BOARD is what says it**
+    (`baskiWireSources`, `.baski-tag`). The tag is painted onto each list row rather than
+    baked into that list's own markup, because it is a fact about the baskı *currently
+    selected* — a row rendered before the date was changed would otherwise go on saying
+    what was true of the old one. It is also where the refusal is printed ("Kanca yok ·
+    Soru yok"), so the gate the reader's card needs is stated once, in the place
+    `baskiAccepts` enforces it. The news card's own inline edition row is **gone** for the
+    same reason: two controls doing one write is two answers to "how do I publish this".
+  - **The sources are wired by a MutationObserver on the work area**, not by each list
+    calling in — there are six list renderers and the seventh is the one somebody forgets.
+  - **The countdown is the press bar's own clock**, written by the same `pressTick` — one
+    timer for the desk, not one per surface. It is the same deadline said twice.
+  - **The date is pickable, and setting a paper other than the next one out is said out
+    loud.** Ordinary thing to do; not noticing you are doing it is the mistake, since the
+    three `*_current_edition` resolvers hand the reader the newest edition at or before today.
   - **Every write re-reads the whole board.** Nothing is patched optimistically: a curation
     screen that can disagree with the database is the one thing this may never be.
+  - A narrow desk loses the board before it loses the work — the press bar still says what
+    the edition is missing.
 - **THE DESK — three columns, and they never change.** The sections stack down the far
-  **left** as a rail; the **work area** is in the middle; and a **phone** stands on the right with
-  the live site in it. The rail is grouped by **what a thing IS** — Baskı and the six kinds that
-  go into it (Haber · Akış · Olay · Etkinlik · Oyun · Anket · Mektup), then the place-groups that
-  are genuinely about a place (Kütüphane · Kahvehane · Kişiler · Hane). It used to be grouped by
-  WHERE a thing shows up, which is the reader's question rather than the editor's: nobody sits
-  down to change Kütüphane, they sit down to write a haber or to set tonight's paper. The rail used to be a bar across the top that scrolled sideways —
-  fourteen tabs never fit — so the section you wanted was usually off the edge of a bar you had
-  to remember was scrollable. Stacked, they are all readable at once, and the width they cost is
-  width the two-panel body never used. All of it is stated once in the page's own `<style>`
-  ("THE DESK"); nothing here is shared with the site's stylesheets.
+  **left** as a rail; the **work area** is in the middle; and the **baskı board** stands on
+  the right. The rail is grouped by **what a thing IS** — the seven kinds that go into a
+  paper (Haber · Akış · Olay · Etkinlik · Oyun · Anket · Mektup), then the place-groups that
+  are genuinely about a place (Kütüphane · Kahvehane · Kişiler · Hane). It used to be grouped
+  by WHERE a thing shows up, which is the reader's question rather than the editor's: nobody
+  sits down to change Kütüphane, they sit down to write a haber or to set tonight's paper.
+  The rail used to be a bar across the top that scrolled sideways — fourteen tabs never fit.
+  Stacked, they are all readable at once. All of it is stated once in the page's own
+  `<style>` ("THE DESK"); nothing here is shared with the site's stylesheets.
 - **A section is its LIST, and pressing a row opens the thing you pressed.** The editor used to
   be a permanent left-hand column that was a blank form nearly all the time — half a screen
   making room for writing nobody was doing. It is a **drawer** now (`.md-editor`), off-screen

@@ -10,13 +10,15 @@ Istanbulite is, at heart, an events and local-economy app that tries to *reduce*
 
 Nothing a reader sees is there because somebody wrote it. It is there because
 somebody **put it in the baskı** (the edition). Writing and publishing are two
-separate acts, and the second one happens in one place: the **Baskı** board at
-the top of the admin portal, which draws the two pages a reader actually swipes
-between — Kütüphane and Kahvehane — with one empty rectangle per slot the reader
-will really meet, and a case of content beside them to fill those rectangles
-from. The countdown over it is the real deadline: the app prints two editions a
-day and the sun decides when (sunrise and sunset over İstanbul), so the time
-left to set the next one moves through the year.
+separate acts, and the second one is a **column of the admin desk that is always
+up**: the two pages a reader actually swipes between — Kütüphane and Kahvehane —
+drawn on the right of every section, with one empty rectangle per slot the reader
+will really meet. The list you are looking at in the middle is the case of loose
+type: you drag a row out of it and drop it into the paper beside it. (A phone
+showing the live site used to stand in that column. It answered a question nobody
+was asking.) The countdown over it is the real deadline: the app prints two
+editions a day and the sun decides when (sunrise and sunset over İstanbul), so the
+time left to set the next one moves through the year.
 
 An edition is a **date**. "The edition in force" is the newest one at or before
 today, per kind — there is no timer and no forced rollover, so a baskı holds
