@@ -45,6 +45,12 @@
          and stepped back. Full / accent / empty, which is a difference in
          WEIGHT before it is a difference in colour.
 
+         "Empty" is now literal on both surfaces, and the keyboard is where
+         that mattered: its own untried keys are filled with --rule, so an
+         absent key painted --rule was the same object as a letter still to
+         try (see .key.absent). Unfilled on the board and unfilled on the
+         keys, the ladder finally says the same thing in both places.
+
          They are stated as --ink/--ink-red/--muted rather than as fixed
          hexes precisely so they follow the palette: the old values were
          daylight browns and stayed daylight browns on the night paper,
@@ -849,7 +855,10 @@
     }
     .help-body .swatch.correct { background: var(--tile-correct); border-color: var(--tile-correct); }
     .help-body .swatch.present { background: var(--tile-present); border-color: var(--tile-present); }
-    .help-body .swatch.absent { background: var(--paper); border-color: var(--tile-absent-ink); opacity: 0.5; }
+    /* Empty, not paper-coloured: the help sheet stands on --paper-card, so
+       a --paper swatch was a faintly wrong-coloured square where the board
+       now shows nothing at all. */
+    .help-body .swatch.absent { background: transparent; border-color: var(--tile-absent-ink); opacity: 0.5; }
 
     /* The board's own row. It used to pair a vertical attempt list on the
        left with the syllable skeleton on the right; the pips have moved
@@ -972,6 +981,12 @@
       inset: 0;
       z-index: -1;
       pointer-events: none;
+      /* Fades on the same 0.2s the fill and the ink cross on, because a
+         revealed tile changes all three at once (see .letter-box.absent,
+         which is the one state that takes the body away). A wash that
+         vanished in a single frame while the colour crossfaded read as two
+         different things happening to one tile. */
+      transition: opacity 0.2s;
       background:
         linear-gradient(155deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0) 48%),
         linear-gradient(155deg, rgba(0, 0, 0, 0) 54%, rgba(0, 0, 0, 0.2) 100%);
@@ -1004,15 +1019,31 @@
       color: var(--tile-present-ink);
       animation: flip 0.5s ease;
     }
-    /* Not in the word: not filled at all. It keeps its letter readable —
-       the old 0.4 nearly rubbed it out, and a guess you cannot read back
-       is a guess you will make again. */
+    /* Not in the word: not filled at all, and not BODIED either. The fill
+       here was --paper, which is the page's own colour — so the tile was
+       already unfilled in every sense except the two that actually draw a
+       solid object on paper: the lit/shaded wash inside the mask (see THE
+       HEXAGONS HAVE A BODY above) and the drawn ring over it. Those are
+       what left a letter the reader had just ruled out still sitting in a
+       hexagon with a thickness, which is the one thing a ruled-out letter
+       should not have. So the wash goes with the fill and the hexagon goes
+       genuinely see-through; what is left is its outline alone, at the
+       tile's own fade, so the comb keeps its shape and the syllable
+       staircase can still be read off it.
+
+       The letter stays readable — the old 0.4 nearly rubbed it out, and a
+       guess you cannot read back is a guess you will make again.
+
+       `transparent` rather than --paper because this board is also played
+       INSIDE the game sheet (project.html's #fb-game-overlay), where what
+       is behind it is the sheet's own paper and not this page's. */
     .letter-box.absent {
-      background: var(--paper);
+      background: transparent;
       color: var(--tile-absent-ink);
       opacity: 0.55;
       animation: flip 0.5s ease;
     }
+    .letter-box.absent::before { opacity: 0; }
 
     /* Six attempt pips in a horizontal row between the board and the
        keyboard: how many guesses you have left, and nothing else. Empty
@@ -1110,10 +1141,27 @@
     }
     .key.correct { background: var(--tile-correct); color: var(--tile-correct-ink); }
     .key.present { background: var(--tile-present); color: var(--tile-present-ink); }
-    /* Tried-and-gone is information the reader asked for by guessing it —
-       it has to stay legible, so the faded look comes from --tile-absent-ink
-       (already --muted) alone, with no opacity stacked on top of it. */
-    .key.absent { background: var(--rule); color: var(--tile-absent-ink); }
+    /* Tried-and-gone: the key goes EMPTY. --rule is also the fill of every
+       key nobody has pressed yet (see the base .key rule), so a letter the
+       reader had ruled out looked exactly like a letter still to try, and
+       the only thing saying otherwise was the ink on it — which is the one
+       difference a glance at a keyboard does not catch. Unfilled, the
+       keyboard actually empties as the word is narrowed down, and the
+       board's own ladder finally reads on it too: grey is still in play,
+       --ink is placed, the accent is in the word, and paper is gone.
+
+       The drawn ring stays (frames.css puts it on every .key): this is
+       furniture the reader is still pressing, and a keyboard with holes in
+       it reads as broken rather than as narrowed — which is the whole
+       difference from the board, where a tile is a record being read and
+       not a thing being pressed.
+
+       It is information the reader asked for by guessing it, so it has to
+       stay legible: the faded look is still --tile-absent-ink (already
+       --muted) alone, with no opacity stacked on top of it. `.key:hover`
+       cannot put the fill back — it is the same specificity and stands
+       earlier in this file. */
+    .key.absent { background: transparent; color: var(--tile-absent-ink); }
     /* Q/W/X sit in their native-keyboard position but never do anything —
        no valid Turkish word contains them. They are the one state that
        should read as truly inert, so they carry the deepest fade on the
