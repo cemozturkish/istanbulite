@@ -21,31 +21,48 @@
 -- meaning breaking_news already gave the word and which
 -- news_current_edition() already resolves against. The app prints two
 -- editions a day and the press bar counts down to whichever comes next,
--- but what the admin ASSEMBLES is a day's paper: the gündüz/gece split is
+-- but what the admin ASSEMBLES is a day’s paper: the gündüz/gece split is
 -- about which column shows what (see "THE TWO EDITIONS" in CLAUDE.md), not
 -- about two separate piles of content to curate.
 --
 -- "The edition in force" is the NEWEST edition_date at or before the
--- reader's own day — per kind, resolved by its own function below. So a
+-- reader’s own day — per kind, resolved by its own function below. So a
 -- kind nobody has ever curated resolves to null and its column says so,
 -- and a kind curated a week ago goes on holding until the admin sets a
 -- newer one. There is no timer and no forced rollover; that is the same
 -- rule news_current_edition() states and the reason it takes p_today
--- rather than reading the clock itself (the Istanbul date is the client's
--- to compute — CLAUDE.md rule 10 — and the server's timezone is not it).
+-- rather than reading the clock itself (the Istanbul date is the client’s
+-- to compute — CLAUDE.md rule 10 — and the server’s timezone is not it).
 --
 -- Run in Supabase SQL editor. Idempotent.
+--
+-- NO DOLLAR QUOTING IN THIS FILE, AND THAT IS DELIBERATE. The first cut
+-- of it wrote the two functions below with the usual `as $tag$ ... $tag$`
+-- body and the Supabase SQL editor refused the whole script with
+-- "42601: unterminated dollar-quoted string". The SQL was never wrong --
+-- it parses cleanly against the real Postgres grammar -- but the editor
+-- splits a script into statements on the client before sending it, and
+-- its splitter lost track of the quoting and cut a function in half.
+-- Neither of the two functions below needs a dollar-quoted body: a
+-- single-quoted one says the same thing, contains no apostrophe to
+-- escape and no semicolon to be cut at, and works on every Postgres
+-- version. A check constraint that used to be wrapped in a DO block is
+-- two plain ALTERs for the same reason (drop-if-exists then add is
+-- exactly as idempotent as the block was).
+--
+-- The rule for the next migration: if a statement does not genuinely
+-- need a procedural body, do not give it one.
 -- =====================================================================
 
 
 -- ── ETKİNLİK ─────────────────────────────────────────────────────────
--- An event reaches Kahvehane's column only through a baskı. Which of the
+-- An event reaches Kahvehane’s column only through a baskı. Which of the
 -- three slots it lands in is still a fact about the EVENT and not about
--- the edition — day+0 / +1 / +2 counted from the edition's own date, the
+-- the edition — day+0 / +1 / +2 counted from the edition’s own date, the
 -- same bucketing loadEtkinlikActor always did — and `edition_order` is
--- its position inside that one day's stack, ascending, admin-set. So a
+-- its position inside that one day’s stack, ascending, admin-set. So a
 -- baskı can carry three evenings on Saturday and one on Sunday, and the
--- reader goes through Saturday's three one at a time.
+-- reader goes through Saturday’s three one at a time.
 alter table public.events
   add column if not exists edition_date  date,
   add column if not exists edition_order integer not null default 0;
@@ -56,7 +73,7 @@ create index if not exists events_edition_idx
 -- And an evening gets its English half, on the same terms breaking_news
 -- got one (db/breaking_news_v2_bilingual.sql): the Turkish stays required
 -- and is what every reader sees by default; the English is used only
--- where the reader's language_pref is English AND that half was actually
+-- where the reader’s language_pref is English AND that half was actually
 -- written. So an event translated by halves still reads in Turkish
 -- rather than going blank, and every row written before this migration
 -- behaves exactly as it did.
@@ -96,11 +113,7 @@ language sql
 stable
 security definer
 set search_path = public
-as $$
-  select max(edition_date)
-  from public.events
-  where edition_date <= p_today;
-$$;
+as 'select max(edition_date) from public.events where edition_date <= p_today';
 
 grant execute on function public.events_current_edition(date) to authenticated;
 
@@ -110,25 +123,21 @@ language sql
 stable
 security definer
 set search_path = public
-as $$
-  select max(edition_date)
-  from public.neighborhood_polls
-  where edition_date <= p_today;
-$$;
+as 'select max(edition_date) from public.neighborhood_polls where edition_date <= p_today';
 
 grant execute on function public.polls_current_edition(date) to authenticated;
 
 
 -- ── MEKTUP — who a letter is addressed to ────────────────────────────
--- A letter is written by a real person and lands in a member's Posta
--- Kutusu. Until now every letter landed in EVERY member's, which is the
+-- A letter is written by a real person and lands in a member’s Posta
+-- Kutusu. Until now every letter landed in EVERY member’s, which is the
 -- one thing a letter is not: it is addressed. `audience` is the whole of
 -- it —
---   'all'          — everybody, which is what every existing row is and
+--   `all`          — everybody, which is what every existing row is and
 --                    stays (the column defaults to it, so a database
 --                    that has not run this migration and one that has
 --                    behave identically for rows written before it)
---   'neighborhood' — only members whose CURRENT district is one of the
+--   `neighborhood` — only members whose CURRENT district is one of the
 --                    rows in library_letter_neighborhoods below
 --
 -- Deliberately not a general "audience query" with operators: the one
@@ -138,16 +147,14 @@ grant execute on function public.polls_current_edition(date) to authenticated;
 alter table public.library_letters
   add column if not exists audience text not null default 'all';
 
-do $$
-begin
-  alter table public.library_letters
-    drop constraint if exists library_letters_audience_check;
-  alter table public.library_letters
-    add constraint library_letters_audience_check
-    check (audience in ('all', 'neighborhood'));
-end $$;
+alter table public.library_letters
+  drop constraint if exists library_letters_audience_check;
 
--- Which districts an 'neighborhood'-audience letter is addressed to. A
+alter table public.library_letters
+  add constraint library_letters_audience_check
+  check (audience in ('all', 'neighborhood'));
+
+-- Which districts a `neighborhood`-audience letter is addressed to. A
 -- join table rather than an array column so the district is a real
 -- foreign key: a letter addressed to a district that does not exist is a
 -- letter nobody will ever be able to explain.
@@ -162,7 +169,7 @@ create index if not exists library_letter_neighborhoods_nb_idx
 
 alter table public.library_letter_neighborhoods enable row level security;
 
--- Readable by everyone signed in: the reader's own client is what filters
+-- Readable by everyone signed in: the reader’s own client is what filters
 -- their postbox, and knowing that a letter was addressed to Beşiktaş is
 -- not private in the way its CONTENTS would be. (It is the same stance
 -- breaking_news_countries takes — which countries a story is about is
@@ -184,7 +191,7 @@ create policy "letter_nb delete admin"
 
 -- ── BACKFILL — nothing goes dark on the day this runs ────────────────
 -- The gate is the point of this migration, and a gate applied to a live
--- database with nothing behind it is the reader's column going blank
+-- database with nothing behind it is the reader’s column going blank
 -- until somebody notices. So every event that has not already happened,
 -- and every poll still open, is filed into one baskı dated today: the
 -- state the site is already in, written down in the new terms. From the

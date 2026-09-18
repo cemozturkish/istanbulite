@@ -77,6 +77,15 @@ sonraki dosyalar öncekinin tablosunu `alter` eder, tek başına çalışmazlar.
 - **Başına ne yaptığını ve neden yaptığını yazın.** Buradaki dosyalar aynı zamanda
   o kararın gerekçesinin durduğu yer; şemanın nasıl olduğu kadar neden öyle
   olduğu da burada okunuyor.
+- **Gerçekten gerekmiyorsa `$$` kullanmayın.** Supabase SQL editörü scripti
+  istemci tarafında ifadelere böler ve bölücüsü dolar tırnağının izini
+  kaybedebiliyor: `baski_v1`in ilk hâli `42601: unterminated dollar-quoted
+  string` ile reddedildi, hâlbuki SQL doğruydu (editör fonksiyonu ortadan
+  kesmişti). `language sql` bir gövde tek tırnakla da yazılır, bir check
+  constraint de `drop constraint if exists` + `add constraint` ile DO bloğu
+  kadar idempotenttir. Prosedürel gövde gerçekten gerekiyorsa (`plpgsql`)
+  `$$` şart — o zaman da o ifadeyi editörde tek başına çalıştırmaya hazır
+  olun.
 - **Bir aileye ekliyorsanız numarayı sürdürün** (`_v7_...`), yeni bir şeyse düz
   isim verin.
 - **`check_migrations.sql`'e bir satır ekleyin**, yoksa çalıştırılıp
