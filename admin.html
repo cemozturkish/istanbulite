@@ -8546,12 +8546,16 @@ async function loadSozcelSuggestions() {
         ? '<span style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-red);">Seçildi</span>'
         : '<button class="btn btn-primary" data-sw-pick="' + escapeHtml(r.id) + '" ' +
           'data-sw-word="' + escapeHtml(r.word) + '" ' +
-          'data-sw-def="' + escapeHtml(r.definition || '') + '" style="padding:5px 12px;">Seç</button>') +
+          'data-sw-def="' + escapeHtml(r.definition || '') + '" ' +
+          // Who offered it travels with the word: picking a suggestion is
+          // what makes that member the night's Sözcü (see
+          // pickSozcelSuggestion).
+          'data-sw-by="' + escapeHtml(r.suggested_by || '') + '" style="padding:5px 12px;">Seç</button>') +
       '</div>';
   }).join('');
 }
 
-async function pickSozcelSuggestion(id, word, definition) {
+async function pickSozcelSuggestion(id, word, definition, suggestedBy) {
   const sel = document.getElementById('sw-night');
   const status = document.getElementById('sw-status');
   const night = sel ? sel.value : IstDate.iso();
@@ -8568,6 +8572,24 @@ async function pickSozcelSuggestion(id, word, definition) {
     // for a definition rather than for a line of reasoning.
     const row = { used_on: night, word };
     if (definition) row.definition = definition;
+    // AND WHOSE WORD IT IS. Picking a suggestion is the whole of how a
+    // member becomes a night's Sözcü through this route -- the other one
+    // (an assigned Sözcü submitting through sozcel.html's own form) writes
+    // this column itself. Left unwritten, the night had a word nobody was
+    // credited for, and three separate things quietly read as "no Sözcü":
+    // the "Günün Sözcüsü:" line under the board (loadSozcuOfTheDay, whose
+    // :empty rule then hides the line outright), the weekly Sözcü bonus
+    // that pays the word-setter what every solver earned off their word
+    // (scoreboard.js), and the member's own "Sözcü · <gece>" row
+    // (loadMySuggestions). The one thing a picked word is FOR is that it
+    // reaches other members with its author's name on it.
+    //
+    // Guarded like `definition` rather than written unconditionally: a
+    // falsy value here would upsert sozcul_id = null and take the credit
+    // OFF a night that already had one. It cannot normally be missing
+    // (sozcel_word_suggestions.suggested_by is NOT NULL), which is exactly
+    // why a silent wipe would be the hard failure to spot.
+    if (suggestedBy) row.sozcul_id = suggestedBy;
     const { error: wErr } = await sb.from('sozcel_used_answers')
       .upsert([row], { onConflict: 'used_on' });
     if (wErr) throw wErr;
@@ -8609,7 +8631,8 @@ function initSozcelSuggestions() {
   if (list) list.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-sw-pick]');
     if (!btn) return;
-    pickSozcelSuggestion(btn.dataset.swPick, btn.dataset.swWord, btn.dataset.swDef || '');
+    pickSozcelSuggestion(btn.dataset.swPick, btn.dataset.swWord, btn.dataset.swDef || '',
+                         btn.dataset.swBy || '');
   });
   loadSozcelSuggestions();
 }
