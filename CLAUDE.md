@@ -266,7 +266,12 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > oldest first, each optionally carrying its own photo), `breaking_news_countries` (which
 > countries a Dünya story is about, lit on that map when the story opens), and `neighborhood_polls`
 > + `neighborhood_poll_votes` (İlçe Anketleri — district polls whose per-district split is meant to
-> color a future map, see the schema below), and more). When in doubt, read the relevant `db/` file
+> color a future map, see the schema below), `baski_v1` (THE BASKI — `edition_date`/`edition_order`
+> on `events` and `neighborhood_polls`, so an evening and a poll reach the reader only by being
+> curated into an edition, exactly as `breaking_news_v3_edition` already did it for the news; plus
+> `events`' own English half, and `library_letters.audience` + `library_letter_neighborhoods`,
+> which is the first time a letter has been addressed to anyone in particular), and more). When in
+> doubt, read the relevant `db/` file
 > — it is the source of truth.
 
 **Table: `neighborhoods`** — lookup of valid neighborhood IDs.
@@ -614,10 +619,54 @@ sb.from('articles').delete().eq('id', id)
 
 ### `admin.html` — Admin Dashboard
 - Login restricted to ADMIN_EMAIL
+- **WRITING IS NOT PUBLISHING, and the BASKI board is where the second one happens.**
+  This is the rule the whole portal is now arranged around. A haber, an etkinlik, an anket
+  exists from the moment it is written and reaches nobody; it reaches a reader by being put
+  into an **edition**. `breaking_news` has worked this way since
+  `db/breaking_news_v3_edition.sql`; `db/baski_v1.sql` does the same to `events` and
+  `neighborhood_polls`, and the games were already a per-night switch. What was missing was
+  somewhere to see all four at once, in the shape the reader meets them — which is the
+  **Baskı** section, the one the desk opens on.
+  - **It draws the two pages, not a form.** Kütüphane and Kahvehane side by side, each as the
+    phone it is: the map band across the top, then the two columns with one empty rectangle
+    per slot the reader will really meet — wide:narrow at the app's own 3:2, and Kahvehane
+    mirrored, exactly as `.fb-mirror` has it. Beside them stands the **KASA**, the case of
+    loose type, one category at a time. A drop is the only write.
+  - **THE ONE RULE: A SLOT IS NOT A CHOICE.** Which slot a thing lands in is a fact about the
+    THING — a story's own category, an evening's own date, a game's own name — exactly as
+    "What each screen carries" states it. So a drop only ever answers *is this in the baskı*,
+    never *where does it go*, and a slot that cannot take what is being dragged **goes dim**
+    rather than accepting it and quietly rewriting the row. `baskiAccepts()` is the whole of
+    that rule in one place, so the dim during the drag and the refusal on the drop can never
+    disagree. The one exception is **Anket**, whose three boxes are positions rather than
+    buckets (the slot IS the `edition_order`), which is why that column alone takes any poll
+    in any of its three.
+  - **A slot is a STACK.** One baskı can carry three İstanbul stories or three evenings on the
+    same night, and the reader goes through them one at a time in the admin's own
+    `edition_order` — chips carry ▲▼ to move one step, which swaps the pair's orders rather
+    than renumbering the slot.
+  - **A GAME IS A SWITCH, and the switch already existed.** Dropping a game onto the board
+    DELETES its `game_day_toggles` row and pulling it out writes one, because that table
+    records a game that is OFF. Deliberately not a second table with the opposite sense:
+    `game-locks.js` and all three game pages read this one, and inverting it so this screen
+    reads more literally would be re-teaching the whole app a new word for the same fact.
+    A night is named for the day it began on, which is exactly what the baskı date already is,
+    so `game_date == baskiDate` needs no conversion.
+  - **The countdown is the press bar's own clock**, written by the same `pressTick` — one timer
+    for the desk, not one per surface. It is the same deadline said twice and the two must never
+    be able to drift by a second.
+  - **The date is pickable, and setting a paper other than the next one out is said out loud.**
+    Ordinary thing to do; not noticing you are doing it is the mistake, since the three
+    `*_current_edition` resolvers hand the reader the newest edition at or before today.
+  - **Every write re-reads the whole board.** Nothing is patched optimistically: a curation
+    screen that can disagree with the database is the one thing this may never be.
 - **THE DESK — three columns, and they never change.** The sections stack down the far
-  **left** as a rail, grouped by which of the app's places they change (Kütüphane · Kahvehane ·
-  Kişiler · Hane); the **work area** is in the middle; and a **phone** stands on the right with
-  the live site in it. The rail used to be a bar across the top that scrolled sideways —
+  **left** as a rail; the **work area** is in the middle; and a **phone** stands on the right with
+  the live site in it. The rail is grouped by **what a thing IS** — Baskı and the six kinds that
+  go into it (Haber · Akış · Olay · Etkinlik · Oyun · Anket · Mektup), then the place-groups that
+  are genuinely about a place (Kütüphane · Kahvehane · Kişiler · Hane). It used to be grouped by
+  WHERE a thing shows up, which is the reader's question rather than the editor's: nobody sits
+  down to change Kütüphane, they sit down to write a haber or to set tonight's paper. The rail used to be a bar across the top that scrolled sideways —
   fourteen tabs never fit — so the section you wanted was usually off the edge of a bar you had
   to remember was scrollable. Stacked, they are all readable at once, and the width they cost is
   width the two-panel body never used. All of it is stated once in the page's own `<style>`
@@ -761,6 +810,38 @@ sb.from('articles').delete().eq('id', id)
     re-fetching, so the two can never count different sets of stories), and the order in
     `PRESS_FORMES` is what fills it.
 
+- **The six kinds, and what each one is.** They are the rail's first group and the reason it
+  is grouped that way at all:
+  - **HABER** (`breaking_news`) — something that happened. Reaches the reader only through a
+    baskı; its slot is its own category (İstanbul / Türkiye / Dünya). A district story
+    (`neighborhood` set, no `category`) is İstanbul for that purpose.
+  - **AKIŞ** (`breaking_news_series`) — a label laid over separate habers so a developing thing
+    stays traceable through its earlier posts. It changes nothing for the reader yet beyond a
+    story's own Zaman Akışı (`fetchSeriesSiblings`); what it is FOR is that the connection gets
+    recorded at the moment it is spotted rather than re-derived from memory a month later. It
+    used to be folded under **Gelişmiş** at the bottom of the Haber form, which is where a thing
+    goes to be forgotten; it is its own section now.
+  - **OLAY** (`world_events`) — the thing all of them are about, running for years. Several akış
+    belong to one olay. Its own board on Kütüphane (see "OLAYLAR"); not part of the baskı.
+  - **MEKTUP** (`library_letters`) — a letter written by a real person, sitting in the postbox
+    until it is opened. **It is ADDRESSED now** (`audience`, `library_letter_neighborhoods`,
+    `db/baski_v1.sql`): everybody, or only members whose CURRENT district is one of the ticked
+    ones. Until that column every letter landed in every member's postbox, which is the one
+    thing a letter is not. `'all'` is what every letter written before this is and stays, so a
+    database that has not run the migration and one that has behave identically for old rows.
+    A letter addressed to no district at all is refused at the form rather than saved and
+    wondered about.
+  - **ETKİNLİK** (`events`) — something scheduled to happen. Reaches the reader only through a
+    baskı; its slot is its own date.
+  - **OYUN** — a game. No fixed schedule; what is on tonight is dragged in.
+- **Everything is entered and listed in TÜRKÇE | İNGİLİZCE, side by side** (`bilingualHTML`,
+  ".bilingual" in the stylesheet). Stacked, a row with no English half looks exactly like one
+  whose English half is below the fold — which is precisely the question the admin is asking of
+  that row. Side by side, an empty column is empty from across the room. One implementation for
+  every list that carries both halves, never restated per section. `events` grew its own
+  `title_en`/`description_en` for this (`db/baski_v1.sql`), on the same terms
+  `db/breaking_news_v2_bilingual.sql` set: Turkish required and the default, English used only
+  where the reader is in English AND that half was actually written.
 - **The phone is the live site, not a picture** (`#prev-frame`): the same origin and therefore
   the same session, drawn at 390×844 and scaled to whatever room the column has, so the page
   inside lays out at the width a real phone reports rather than at the width of a narrow panel.
@@ -3030,9 +3111,9 @@ Six things about it:
   the card.** Haberler is İstanbul/Türkiye/Dünya (`news.istanbul`/`news.turkiye`/`news.dunya` in
   i18n.js), top to bottom, each box that category's own newest story inside the 72h window;
   Etkinlikler is Bugün/Yarın/Öbür gün (`events.today`/`events.tomorrow`/`events.dayafter`), each
-  box that Istanbul calendar day's own soonest evening — the third label used to read "Evvelsi
-  gün", which actually means the day BEFORE yesterday, the wrong direction entirely; corrected
-  rather than merely translated when the column was made bilingual. Oyunlar is Sözcel, Tümcel and Bulmaca and nothing
+  box that Istanbul calendar day's own evenings **out of the baskı** — the third label used to
+  read "Evvelsi gün", which actually means the day BEFORE yesterday, the wrong direction
+  entirely; corrected rather than merely translated when the column was made bilingual. Oyunlar is Sözcel, Tümcel and Bulmaca and nothing
   else, **in that order, top to bottom** — the sequence reads downward the way a list of steps
   does, so 1. Oyun is the box the eye lands on first and 3. Oyun is the one at the dock. The slots
   are numbered from the dock up (`.fb-slot-N`), so the first game stands in the last slot;
@@ -3041,7 +3122,24 @@ Six things about it:
   the category or the day is known regardless of whether anything is in it — rather than shifting
   the other two up to fill the gap. Olaylar alone stays a genuine feed (the top three ongoing
   olaylar by `sort_order`, whichever those are on a given day) rather than three fixed buckets,
-  because there is no third axis to bucket an olay by. **By day, Haberler stands in BOTH
+  because there is no third axis to bucket an olay by.
+  **AND NONE OF THESE BOXES SHOWS A ROW THAT IS NOT IN THE BASKI** (`db/baski_v1.sql`; see
+  admin.html's own Baskı section). Being in the table is not being on the paper — the rule
+  breaking_news has followed since `db/breaking_news_v3_edition.sql`, now true of the evenings
+  and the polls as well. The edition in force is the newest one at or before today, resolved
+  **per kind** by its own `*_current_edition` function: one `max()` across all three would let
+  a baskı carrying only evenings declare itself the edition for the news too, and empty the
+  news column on a day somebody curated events. Two mechanical notes, both of which fail
+  silently. Which BOX an evening lands in is counted from the READER's own day, not the
+  edition's, so the labels never lie when a baskı has been holding for three days — the admin's
+  own board buckets from the baskı's date instead, which is the same answer on the day that
+  baskı is current, and neither should be "fixed" to match the other. And a **missing** RPC is
+  not a failed fetch: `editionInForce()` reads PostgREST's own error CODE (`PGRST202`, never the
+  message) and treats "this function does not exist" as "this database predates the baskı",
+  falling back to the ungated behaviour — Pages redeploys on push while the SQL is run by hand,
+  so there is always a window in which a strict gate would empty two columns for a reason no
+  reader can see. Every one of these boxes is a STACK, like Haberler's: a baskı can carry three
+  evenings on one night, and answering one stands the next up. **By day, Haberler stands in BOTH
   columns** — same three buckets, same kickers, but the narrow column's box is one story further
   into that bucket's own stack (`loadHaberlerNarrowActor`, depth 1 of `loadHaberlerActorAt`): the
   first thing nobody has answered yet in the wide column, the next thing after it in the narrow

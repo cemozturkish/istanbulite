@@ -2278,26 +2278,109 @@ function etkinlikLabels() {
   const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
   return [t('events.today'), t('events.tomorrow'), t('events.dayafter')];
 }
+// ── THE EDITION IN FORCE, and the day the migration has not been run ──
+// GitHub Pages redeploys the moment a commit lands; db/baski_v1.sql is run
+// by hand in the Supabase editor. So there is always a window — minutes or
+// days — in which this page asks for a function the database does not have
+// yet, and in that window a strict gate empties two of the reader's columns
+// for a reason no reader can see.
+//
+// So a MISSING FUNCTION is not a failed fetch: it means this database
+// predates the baskı, and the honest answer there is the behaviour the
+// column had before it — every row, ungated. Anything else (a network
+// that never answered, a policy that refused) is a real failure and is
+// reported as one. `missing` is the difference.
+//
+// It dispatches on the error CODE, never on the message: PostgREST answers
+// PGRST202 for a function it cannot find, and matching on the English text
+// of a message breaks the first time that text is reworded.
+async function editionInForce(rpcName) {
+  try {
+    const { data, error } = await IstRouter.sb.rpc(rpcName, { p_today: IstDate.iso() });
+    if (error) {
+      if (error.code === 'PGRST202' || error.code === '42883') return { date: null, missing: true };
+      throw error;
+    }
+    return { date: data || null, missing: false };
+  } catch (err) {
+    if (err && (err.code === 'PGRST202' || err.code === '42883')) return { date: null, missing: true };
+    throw err;
+  }
+}
+
+// An evening reaches this column only through a BASKI (db/baski_v1.sql).
+// Being in the events table is not being on the paper -- exactly the rule
+// breaking_news has followed since db/breaking_news_v3_edition.sql, now
+// applied to the other thing an editor schedules. The edition in force is
+// the newest one at or before today (events_current_edition, SECURITY
+// DEFINER): there is no timer and no forced rollover, so a baskı holds
+// until the admin sets a newer one.
+//
+// WHICH BOX an evening lands in is still a fact about the EVENT and not
+// about the edition: day+0/+1/+2 counted from the READER's own day, so
+// the labels never lie even when a baskı has been holding for three days
+// and its own date has drifted behind. (The admin's Baskı board buckets
+// from the baskı's date instead, which is the same answer on the day that
+// baskı is current -- the day it is built for. Do not "fix" either to
+// match the other.) An evening in the edition that falls outside the
+// reader's three days simply is not shown; it has no box to stand in.
+//
+// The bucket is a STACK, like Haberler's: one baskı can carry three
+// evenings on the same night and the reader goes through them in the
+// admin's own edition_order.
 let etkinlikPromise = null;
 async function loadEtkinlikActor(el, slot) {
   if (!etkinlikPromise) {
     etkinlikPromise = (async () => {
       try {
-        const ranges = [0, 1, 2].map(off => ({
-          start: new Date(IstDate.iso(off) + 'T00:00:00+03:00').toISOString(),
-          end: new Date(IstDate.iso(off + 1) + 'T00:00:00+03:00').toISOString(),
-        }));
-        const results = await Promise.all(ranges.map(r => IstRouter.sb.from('events')
-          .select('*').gte('event_date', r.start).lt('event_date', r.end)
-          .order('event_date', { ascending: true }).limit(1)));
-        return { days: results.map(r => (r.error ? null : (r.data || [])[0] || null)), failed: false };
+        const { date: editionDate, missing } = await editionInForce('events_current_edition');
+        if (!missing && !editionDate) return { days: [[], [], []], answered: new Set(), editionDate: null, failed: false };
+        const from = new Date(IstDate.iso(0) + 'T00:00:00+03:00').toISOString();
+        const to = new Date(IstDate.iso(3) + 'T00:00:00+03:00').toISOString();
+        let q = IstRouter.sb.from('events').select('*');
+        if (!missing) q = q.eq('edition_date', editionDate);
+        const { data, error } = await q
+          .gte('event_date', from).lt('event_date', to)
+          .order('edition_order', { ascending: true })
+          .order('event_date', { ascending: true });
+        if (error) throw error;
+        // The three days as exact +03:00 instants -- İstanbul carries no
+        // DST, so this is arithmetic rather than a guess.
+        const bounds = [0, 1, 2, 3].map(off => Date.parse(IstDate.iso(off) + 'T00:00:00+03:00'));
+        const days = [[], [], []];
+        for (const ev of (data || [])) {
+          const t = Date.parse(ev.event_date);
+          for (let i = 0; i < 3; i++) if (t >= bounds[i] && t < bounds[i + 1]) days[i].push(ev);
+        }
+        // Which of them this reader has already answered -- one query
+        // for the whole edition rather than one per box, and
+        // best-effort: a lookup that fails leaves every evening standing
+        // as if unanswered, which is a far smaller lie than an empty
+        // column. event_interest carries BOTH verdicts (a left throw is
+        // a real "no", not the absence of a yes -- see setEventRsvp), so
+        // it is the one table that can say "answered".
+        const answered = new Set();
+        const ids = (data || []).map(e => e.id);
+        if (ids.length) {
+          try {
+            const uid = await doneUid();
+            if (uid) {
+              const { data: verdicts, error: vErr } = await IstRouter.sb
+                .from('event_interest').select('event_id')
+                .eq('user_id', uid).in('event_id', ids);
+              if (vErr) throw vErr;
+              (verdicts || []).forEach(v => answered.add(v.event_id));
+            }
+          } catch (err) { console.error('[proje etkinlik verdict]', err); }
+        }
+        return { days, answered, editionDate: missing ? 'pre-baski' : editionDate, failed: false };
       } catch (err) {
         console.error('[proje etkinlik]', err);
-        return { days: [null, null, null], failed: true };
+        return { days: [[], [], []], answered: new Set(), editionDate: null, failed: true };
       }
     })();
   }
-  const { days, failed } = await etkinlikPromise;
+  const { days, answered, editionDate, failed } = await etkinlikPromise;
   if (!el.isConnected) return;
   // Cleared before every render, filled only on the path that actually
   // has something to open: a box with no payload is not pressable, which
@@ -2316,13 +2399,29 @@ async function loadEtkinlikActor(el, slot) {
       (slot === 2 ? '<div class="t">Yüklenemedi</div>' : '');
     return;
   }
-  const ev = days[dayIdx];
-  if (!ev) { el.classList.add('fb-empty'); el.innerHTML = '<div class="k">' + label + '</div>'; return; }
+  const stack = days[dayIdx] || [];
+  if (!stack.length) {
+    el.classList.add('fb-empty');
+    el.innerHTML = '<div class="k">' + label + '</div>' +
+      // The two empties say different things, and only on the box the
+      // eye lands on first: a baskı with nothing on that evening, and no
+      // baskı at all. Same rule loadHaberlerActorAt follows.
+      (slot === 2 && !editionDate ? '<div class="t">Bugün için bir sayı çıkmadı.</div>' : '');
+    return;
+  }
+  // The evening the reader has not answered yet, and once they have
+  // answered all of them, the last -- the same "a done box stays
+  // pressable" rule the news stack follows. Answering is what stands the
+  // next one up (setEventRsvp -> refreshEtkinlikColumn drops the cached
+  // fetch), which is how a baskı carrying three evenings on one night is
+  // actually got through.
+  const ev = stack.find(e => !answered.has(e.id)) || stack[stack.length - 1];
+  const stackTag = stack.length > 1 ? ' · ' + (stack.indexOf(ev) + 1) + '/' + stack.length : '';
   el.classList.remove('fb-empty');
   const nb = ev.neighborhood ? (NB_NAMES[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
-  el.innerHTML = '<div class="k">' + label + '</div>' +
+  el.innerHTML = '<div class="k">' + label + stackTag + '</div>' +
     '<div class="m">' + esc(eventTimeOnly(ev.event_date)) + '</div>' +
-    '<div class="t">' + esc(ev.title) + ' — ' + esc(nb) + '</div>';
+    '<div class="t">' + esc(newsText(ev, 'title')) + ' — ' + esc(nb) + '</div>';
   // Where the reader already stands on this evening, so the page can say
   // so instead of asking again as if they had never seen it.
   const rsvp = await eventVerdictFor(ev.id);
@@ -2330,9 +2429,13 @@ async function loadEtkinlikActor(el, slot) {
   // What the box only had room to name (see THE BAND PAGE): the evening
   // itself, where it is and what it is -- and the one thing it asks.
   fbSetPage(el, {
-    kicker: label, meta: eventTimeOnly(ev.event_date), title: ev.title,
+    // newsText reads `<field>_en` when the reader is in English and that
+    // half was actually written -- events carry the same pair now
+    // (db/baski_v1.sql), so one helper serves both and an evening
+    // translated by halves still reads in Turkish rather than blank.
+    kicker: label, meta: eventTimeOnly(ev.event_date), title: newsText(ev, 'title'),
     lines: [eventWhenLong(ev.event_date), [nb, ev.location].filter(Boolean).join(' · ')].filter(Boolean),
-    html: fbParas(ev.description || '') +
+    html: fbParas(newsText(ev, 'description') || '') +
       (rsvp === 'yes'
         ? '<div class="fb-throw-q">Gidiyorsun.</div>' + throwFootHTML('Vazgeç', 'Gidiyorum', 'Fikrini değiştirebilirsin.')
         : '<div class="fb-throw-q">Gidiyor musun?</div>' + throwFootHTML('Gitmiyorum', 'Gidiyorum', 'Sola ya da sağa at.')),
@@ -3036,10 +3139,21 @@ function anketData() {
   if (!anketPromise) {
     anketPromise = (async () => {
       try {
-        const { data, error } = await IstRouter.sb.from('neighborhood_polls')
-          .select('id, question_tr, question_en, option_a_tr, option_a_en, option_b_tr, option_b_en, color_a, color_b')
+        // A poll reaches this column only through a BASKI, the same rule
+        // the news and the evenings follow (db/baski_v1.sql). `active`
+        // is a SEPARATE gate and stays one -- a closed poll is closed
+        // whether or not it was ever in a baskı -- so the filter is
+        // both. Order is the admin's own (edition_order), never "newest
+        // first": which of the three boxes a poll stands in is a
+        // decision somebody made, not an accident of when it was typed.
+        const { date: editionDate, missing } = await editionInForce('polls_current_edition');
+        if (!missing && !editionDate) return { polls: [], voted: new Set(), failed: false };
+        let q = IstRouter.sb.from('neighborhood_polls')
+          .select('id, question_tr, question_en, option_a_tr, option_a_en, option_b_tr, option_b_en, color_a, color_b');
+        if (!missing) q = q.eq('edition_date', editionDate);
+        const { data, error } = await q
           .eq('active', true)
-          .order('created_at', { ascending: false })
+          .order(missing ? 'created_at' : 'edition_order', { ascending: !missing })
           .limit(3);
         if (error) throw error;
         const polls = data || [];
@@ -5725,8 +5839,14 @@ async function loadMapStats() {
   // Etkinlikler: what is still to come. A count rather than a fraction --
   // an evening is not content to get through, it is somewhere to be.
   const etkinlik = (async () => {
-    const { data, error } = await sb.from('events')
-      .select('id').gte('event_date', new Date().toISOString());
+    // What the COLUMN shows, which since db/baski_v1.sql is the evenings
+    // in the baskı and not every future row in the table. A square that
+    // counted the table would promise a reader six evenings on a screen
+    // showing none.
+    const { date: editionDate, missing } = await editionInForce('events_current_edition');
+    let q = sb.from('events').select('id').gte('event_date', new Date().toISOString());
+    if (!missing) q = q.eq('edition_date', editionDate || '1970-01-01');
+    const { data, error } = await q;
     if (error) throw error;
     const n = (data || []).length;
     stats.etkinlik = n ? '+' + n : '0';
@@ -5765,7 +5885,15 @@ async function loadMapStats() {
 
   // Anket: how many of the active polls this member has already answered.
   const anket = (async () => {
-    const { data, error } = await sb.from('neighborhood_polls').select('id').eq('active', true);
+    // Same rule: the polls in the baskı AND still open, capped at the
+    // three boxes the column actually has (anketData's own limit), so
+    // the square and the column can never disagree about how many there
+    // are left to answer.
+    const { date: editionDate, missing } = await editionInForce('polls_current_edition');
+    let q = sb.from('neighborhood_polls').select('id').eq('active', true);
+    if (!missing) q = q.eq('edition_date', editionDate || '1970-01-01');
+    const { data, error } = await q
+      .order(missing ? 'created_at' : 'edition_order', { ascending: !missing }).limit(3);
     if (error) throw error;
     const rows = data || [];
     let answered = 0;

@@ -4104,10 +4104,21 @@ let LETTERS_CACHE = null; // null = not fetched yet this session
 // A Set of letter ids, null until fetched.
 let LETTER_READS = null;
 
+// A LETTER IS ADDRESSED (db/baski_v1.sql). Until that migration every
+// letter landed in every member's postbox, which is the one thing a
+// letter is not. `audience` is 'all' (what every letter written before
+// this is, and what the column defaults to) or 'neighborhood', in which
+// case it reaches only members living in one of the districts named in
+// library_letter_neighborhoods.
+//
+// The filter is the CLIENT's, not a policy: a letter's existence is not
+// a secret and RLS still lets anyone signed in read the table. What is
+// being decided here is whose postbox it hangs in, which is a question
+// about this reader's own screen.
 async function loadLetters() {
   if (LETTERS_CACHE) return LETTERS_CACHE;
   const { data, error } = await sb.from('library_letters')
-    .select('*')
+    .select('*, library_letter_neighborhoods(neighborhood)')
     .order('letter_date', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
   if (error) {
@@ -4115,8 +4126,37 @@ async function loadLetters() {
     LETTERS_CACHE = [];
     return LETTERS_CACHE;
   }
-  LETTERS_CACHE = data || [];
+  const mine = await letterReaderDistrict();
+  LETTERS_CACHE = (data || []).filter(l => {
+    if ((l.audience || 'all') !== 'neighborhood') return true;
+    // No district known (the profile fetch failed) means no addressed
+    // letter is shown. Deliberately the quiet way round: showing a
+    // reader somebody else's letter cannot be taken back, and a postbox
+    // one letter short corrects itself on the next load.
+    if (!mine) return false;
+    return (l.library_letter_neighborhoods || []).some(r => r.neighborhood === mine);
+  });
   return LETTERS_CACHE;
+}
+
+// The reader's CURRENT district -- the one they live in now, not the one
+// they were born in: a letter to Beşiktaş is for the people who are
+// there. Cached for the session beside the letters themselves.
+let LETTER_DISTRICT;
+async function letterReaderDistrict() {
+  if (LETTER_DISTRICT !== undefined) return LETTER_DISTRICT;
+  try {
+    const uid = await libGetCurrentUserId();
+    if (!uid) { LETTER_DISTRICT = null; return null; }
+    const { data, error } = await sb.from('profiles')
+      .select('neighborhood').eq('id', uid).maybeSingle();
+    if (error) throw error;
+    LETTER_DISTRICT = (data && data.neighborhood) || null;
+  } catch (err) {
+    console.error('[kutuphane letter district]', err);
+    LETTER_DISTRICT = null;
+  }
+  return LETTER_DISTRICT;
 }
 
 // The member's own read receipts. Fetched once per session and kept in

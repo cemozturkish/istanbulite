@@ -178,7 +178,16 @@ with checks(sira, dosya, aranan, var) as (
 
     -- ── Eylül: eksik ilçeler ──
     (45, 'db/neighborhoods_v2_missing_districts.sql', 'neighborhoods tablosunda 40 satır (39 ilçe + istanbul_disi)',
-         pg_temp.rows_or_missing('public.neighborhoods') >= 40)
+         pg_temp.rows_or_missing('public.neighborhoods') >= 40),
+
+    -- ── Eylül: baskı ──
+    (46, 'db/baski_v1.sql',                           'events/neighborhood_polls edition kolonları + mektup adresi',
+         pg_temp.has_col('events', 'edition_date')
+         and pg_temp.has_col('events', 'title_en')
+         and pg_temp.has_col('neighborhood_polls', 'edition_date')
+         and pg_temp.has_col('library_letters', 'audience')
+         and to_regclass('public.library_letter_neighborhoods') is not null
+         and pg_temp.has_fn('events_current_edition'))
 )
 select
   case when var then '✓ VAR' else '✗ EKSİK' end as durum,

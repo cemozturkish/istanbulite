@@ -43,9 +43,10 @@ kurarken yine de sırayla gerekir.
 | Uygulama ayarları | `onboarding`, `app_settings`, `admin_notifications` → `admin_notification_reads` |
 | İlçeler | `neighborhoods_v2_missing_districts` (kuruluş şeması dışında kalan 14 ilçeyi ekler) |
 | Mahalleler | `mahalles` |
-| Etkinlikler | `events` → `event_rsvps` |
+| Etkinlikler | `events` → `event_rsvps` → **`baski_v1`** |
 | Haberler | `breaking_news` → `breaking_news_sources`, `breaking_news_updates`, `breaking_news_series` → **`breaking_news_series_v2_world_slot`**, `breaking_news_archive`, `breaking_news_polls` → **`breaking_news_polls_v2`**, `breaking_news_countries` |
-| Kütüphane | `library_articles` → `library_articles_v2` → `library_articles_v3` → `library_categories_v4` → `library_shelves_v5` → `library_shelves_v6_unlimited` → `library_articles_v6_image` → `library_articles_v7_inline_images` → **`library_articles_v8_source_nullable`**; ayrıca `library_letters` → `library_letter_reads` |
+| Baskı | **`baski_v1`** — `events`, `neighborhood_polls` ve `library_letters`'ı bir sayıya bağlar; `breaking_news` bunu zaten `breaking_news_v3_edition` ile yapıyordu |
+| Kütüphane | `library_articles` → `library_articles_v2` → `library_articles_v3` → `library_categories_v4` → `library_shelves_v5` → `library_shelves_v6_unlimited` → `library_articles_v6_image` → `library_articles_v7_inline_images` → **`library_articles_v8_source_nullable`**; ayrıca `library_letters` → `library_letter_reads` → **`baski_v1`** |
 | Ülkeler | `country_entries` → `country_entry_events` → `country_stories` (+ `seed/country_entries_seed`, `seed/country_stories_seed`) |
 | Siyasetçiler | `politicians` → **`political_seats_v2_countries`** (+ `seed/istanbul_mayors_import`, `seed/tbmm_28_donem_import`, `seed/politicians_birth_info`, `seed/politicians_dedupe_and_uppercase`, `seed/political_seats_countries_seed`) |
 | TBMM | `tbmm_parties`, `tbmm_seats` |
