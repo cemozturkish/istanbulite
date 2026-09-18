@@ -15,6 +15,17 @@
 // onboarding has declined to run (already onboarded, or no session) — a
 // brand-new account gets the welcome screen, not this one, on its first
 // launch.
+//
+// THE SOUND BELONGS TO THE TAP, and that is a platform rule rather than a
+// preference. This screen opens itself the moment the app does, with no
+// user gesture behind it, and every engine — WKWebView hardest of all —
+// refuses to play audio until there has been one. The dismissing tap IS
+// that gesture, so the crows are what the reader lets the day in WITH
+// rather than what greets them, and they carry over into the app behind
+// the screen for their couple of seconds. Anything that tried to play on
+// arrival would be silently refused on the platform ~90% of readers are
+// on, which is the worst of both: code that looks like it works and a
+// feature nobody ever hears.
 (function (global) {
   const ROOT_ID = 'ist-edn-root';
   // Which edition the reader has already been told about, so a second
@@ -32,6 +43,27 @@
     },
     tapHint: { tr: 'devam etmek için herhangi bir yere dokun', en: 'tap anywhere to continue' },
   };
+
+  // What each edition arrives with. Two entries because a sunrise and a
+  // sunset are not the same moment — today they are one recording of the
+  // same crows, and giving the sunset its own is changing one line here.
+  // A missing file is silence and nothing else (see play()), so the screen
+  // works exactly as it did before a recording is dropped in.
+  const SOUND = {
+    sunrise: 'assets/sound/crows.m4a',
+    sunset: 'assets/sound/crows.m4a',
+  };
+
+  // Every way this can fail — no file there yet, a codec the device will
+  // not take, a play() the engine refuses anyway — is silence, never an
+  // exception thrown into the dismissal. The screen must always close.
+  function play(audio) {
+    if (!audio) return;
+    try {
+      const p = audio.play();
+      if (p && p.catch) p.catch(() => {});
+    } catch (err) { /* ignore */ }
+  }
 
   function lang() {
     return (global.I18N && global.I18N.isEnglish && global.I18N.isEnglish()) ? 'en' : 'tr';
@@ -99,6 +131,13 @@
     const l = lang();
     const line = (rising ? COPY.sunrise : COPY.sunset)[l](t);
 
+    // Armed as the screen goes up so the bytes are in by the time the
+    // reader taps — the tap's own permission to play does not survive a
+    // wait for the network.
+    const crows = new Audio(SOUND[rising ? 'sunrise' : 'sunset']);
+    crows.preload = 'auto';
+    crows.load();
+
     let root = document.getElementById(ROOT_ID);
     if (!root) root = buildRoot();
     const msg = root.querySelector('.ist-edn-msg');
@@ -108,6 +147,10 @@
     hint.classList.remove('show');
 
     function dismiss() {
+      // First thing, and synchronously: play() is allowed only while the
+      // tap that triggered it is being handled, and anything awaited before
+      // it spends that permission.
+      play(crows);
       markSeen(key);
       root.classList.remove('show');
       document.body.classList.remove('ist-edn-locked');
