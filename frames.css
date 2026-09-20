@@ -688,9 +688,16 @@ main,
   mask: var(--hexframe-mask);
 }
 
-/* The drawn stroke, painted over the masked content. Sözcel's keys
-   carry it too (see the .key::after mask-size below) — a key's fill
-   alone left the hexagon reading as a soft blob against the page. */
+/* The drawn stroke, painted over the masked content. This is the SAFE
+   default for every ring except Sözcel's (below): a flat mask + solid
+   color, tinted via --hexframe-stroke so it follows the palette/dark
+   mode. It is what a browser shows before map-ink.js's frame ladder is
+   ready, with ?ink=0 set, or if that module fails to load entirely --
+   html.ist-frame-ink (palette.css, "THE FRAME'S OWN SHADING") swaps it
+   for frame.png's own hand-drawn bevel once the matching filter is
+   actually built, tinted through --hexframe-filter instead. The two
+   custom properties travel together everywhere --hexframe-stroke is
+   set (profile-card.css) for exactly that reason. */
 .hexframe::after,
 .ist-pc-cover-avatar::after,
 .library-card .avatar::after,
@@ -698,7 +705,26 @@ main,
 .poll-voter-avatar::after,
 .ev-attendee-avatar::after,
 .politician-detail-avatar::after,
-.tbmm-detail-avatar::after,
+.tbmm-detail-avatar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  background: var(--hexframe-stroke, var(--ink));
+  -webkit-mask: var(--hexframe-ring);
+  mask: var(--hexframe-ring);
+}
+
+/* Sözcel's board and keyboard (see the .key::after mask-size below, and
+   the stroke-tint rule further down that pins both to pure black) never
+   join the textured ladder above: pinned to #000, frame.png's own two
+   tones (61 and 24 out of 255) would both round to "as black as it
+   gets" once darkened further for the shadow face — there is nothing
+   for a bevel to show on a ring that is already the darkest possible
+   color, so this stays the plain flat mask forever, on every palette
+   and in every theme. A key's fill alone left the hexagon reading as a
+   soft blob against the page, which is why it carries the stroke too. */
 .letter-box::after,
 .key::after {
   content: "";

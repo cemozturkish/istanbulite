@@ -238,6 +238,38 @@ html.ist-map-ink :is(
 }
 
 /* ══════════════════════════════════════════════════════════════
+   THE FRAME'S OWN SHADING READS THE PALETTE TOO
+   ──────────────────────────────────────────────────────────────
+   frame.png's ring is drawn with a lit face and a shadow face, not one
+   flat tone — see map-ink.js's own FRAME_LADDERS section for the full
+   reasoning and the measurement. Gated on its OWN html.ist-frame-ink
+   class, deliberately separate from html.ist-map-ink above: a ring
+   color that fails to resolve must never be able to take the maps and
+   avatars down with it, and the reverse.
+
+   frames.css already draws every one of these rings as a flat mask +
+   solid --hexframe-stroke color — the safe state before this filter is
+   ready, with ?ink=0, or if map-ink.js fails outright. This is what
+   swaps that for the real drawing once its ladder is actually built:
+   the mask comes off (frame.png's own alpha already does that job) and
+   the ring becomes the image itself, tinted through whichever of the
+   six frame ladders --hexframe-filter is currently pointing at. */
+html.ist-frame-ink :is(
+  .hexframe, .ist-pc-cover-avatar, .library-card .avatar, .avatar,
+  .poll-voter-avatar, .ev-attendee-avatar, .politician-detail-avatar,
+  .tbmm-detail-avatar
+)::after {
+  background: none;
+  background-image: url("assets/frame.png");
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  -webkit-mask: none;
+  mask: none;
+  filter: var(--hexframe-filter, url(#ist-frame-ink));
+}
+
+/* ══════════════════════════════════════════════════════════════
    THE LOADING SCREEN READS THE PALETTE — the third ladder
    ──────────────────────────────────────────────────────────────
    The sea rising in the logo (loading-screen.js) is ten JPEG frames and
