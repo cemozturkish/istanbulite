@@ -50,7 +50,7 @@
 //
 // ── Two ladders, one mechanism ──
 // The maps are not the only hand-drawn grays on the site. The avatar
-// family (assets/avatar-*.png, frame-background.png) is the same thing
+// family (assets/avatar-*.png, avatar-background.png) is the same thing
 // again, measured the same way and even cleaner: four flat tones and
 // nothing else — #f9f9f9 the figure's own paper, #dcdbdb the ground it
 // stands on, #5b5b5b the jail stripes, #181818 the ink that draws the

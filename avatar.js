@@ -21,7 +21,7 @@
 (function (global) {
   // All overlays share the hexframe family's uncropped 1024x1536 canvas
   // (see --hexframe-ratio in frames.css) and live flat under assets/,
-  // matching where frame.png/frame-background.png were uploaded — no
+  // matching where frame.png/avatar-background.png are uploaded — no
   // assets/avatar/ subfolder anymore.
   const BASE_URL = 'assets/avatar-base.png';
   const SHIRT_URLS = { black: 'assets/avatar-shirt-black.png' };
