@@ -28,12 +28,13 @@ Six kinds of thing, and they are what the admin rail is now grouped by:
 
 | | What it is | Reaches the reader |
 |---|---|---|
-| **HABER** | Something that happened. Written once, kept forever. | Only through a baskı. Its slot — İstanbul / Türkiye / Dünya — is its own category. Slots stack: one baskı can carry three İstanbul stories and the reader goes through them one at a time. |
+| **HABER** | Something that happened. Written once, kept forever. | Only through a baskı. Its slot — İstanbul / Türkiye / Dünya — is its own category. Slots stack: one baskı can carry three İstanbul stories and the reader goes through them one at a time. A story is **read and thrown away, either direction** — it asks nothing. |
 | **AKIŞ** | A label tying separate habers into one developing thing, read as a timeline. | Nothing yet beyond a story's own Zaman Akışı — it is a grouping recorded when it is noticed, for later. |
 | **OLAY** | An ongoing conflict that has run for years (Rusya–Ukrayna, Gazze). Several akış belong to one olay. | Its own board on Kütüphane, unchanged; not part of the baskı. |
 | **MEKTUP** | A letter written by a real person. Sits in the postbox until it is opened. | Addressed: everybody, or only members living in chosen districts. |
 | **ETKİNLİK** | Something scheduled to happen. | Only through a baskı. Its slot — Bugün / Yarın / Öbür gün — is its own date. Opening one highlights its district; the reader throws left or right to say whether they are going. |
 | **OYUN** | A game. No fixed schedule; the admin decides what is on tonight. | In the baskı or not, per night. |
+| **ANKET** | The city's own question, answered once per member and filed under their district. | Only through a baskı. It is the **one** multiple choice in the app: **by day it asks, by night it prints the answers** — same box, same page. |
 
 **A slot is not a choice.** Which rectangle a thing lands in is a fact about the
 thing — a story's category, an evening's date, a game's name — so dropping only
