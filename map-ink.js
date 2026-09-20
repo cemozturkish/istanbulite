@@ -205,7 +205,15 @@
   // id -> { filter, funcs, flood }
   let built = null;
 
-  // '#rgb' / '#rrggbb' / 'rgb(r, g, b)' -> [r, g, b] in 0..1
+  // '#rgb' / '#rrggbb' / 'rgb(r, g, b)' / 'color(srgb r g b)' -> [r, g, b] in 0..1.
+  // The last form is not decoration: Chromium's computed value for a
+  // color-mix() read back off a real `color` property (see parseColor
+  // below) serializes as `color(srgb 0.53 0.46 0.41)`, never as rgb() --
+  // and unlike rgb()'s 0-255 integers, color()'s components are already
+  // 0-1 floats, so this branch must NOT divide by 255. A regex that only
+  // knew #hex and rgb() rejected every color-mix() token silently, which
+  // is exactly what looked like "nothing changed" after the ladder was
+  // wired up: one failing var aborts the whole frame batch (see refresh).
   function parseColorLiteral(s) {
     if (s[0] === '#') {
       const h = s.slice(1);
@@ -213,6 +221,8 @@
       if (h.length === 6) return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
       return null;
     }
+    const c = s.match(/^color\(\s*srgb(?:-linear)?\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/i);
+    if (c) return [+c[1], +c[2], +c[3]];
     const m = s.match(/rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i);
     return m ? [+m[1] / 255, +m[2] / 255, +m[3] / 255] : null;
   }
