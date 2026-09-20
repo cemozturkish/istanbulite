@@ -2454,26 +2454,46 @@ slide that is the city:
 | | Lane 0 | Lane 1 | Lane 2 |
 |---|---|---|---|
 | | **Kütüphane** | **the app map** | **Kahvehane** |
-| what stands there (gündüz) | Haberler + Anket | where you are in relation to it all | Etkinlikler + Oyun Önerileri |
-| what stands there (gece) | Anket sonuçları + Haberler | where you are in relation to it all | Etkinlikler + Oyunlar |
+| what stands there (gündüz) | Haberler + Anket (soruyor) | where you are in relation to it all | Etkinlikler + Oyun Önerileri |
+| what stands there (gece) | Haberler + Anket (cevaplıyor) | where you are in relation to it all | Etkinlikler + Oyunlar |
 | where the book may go | up, to slide 1 | nowhere | nowhere *(see ILCE_STOP_ENABLED)* |
 
 **THE İSTANBUL LEVEL PRINTS TWO EDITIONS, AND THE SUN DECIDES WHICH**
 (`IstDate.edition()` / `IstDate.editionKey()`, `fbEdition` in project.html). The palette already
 follows the sun over İstanbul, so the app is genuinely light by day and dark by night; this makes
-that more than a colour. From sunrise the paper **asks** — the three news buckets, each opening
-into a page a reader answers by THROWING it, and the three evenings, each thrown into an RSVP.
-From sunset it **answers** — the district polls come out, every one of the 25 wearing the colour
-its own split mixes to.
+that more than a colour. From sunrise the paper **asks** — the district poll in Kütüphane's
+narrow column, and the three evenings on the other lane, each thrown into an RSVP. From sunset it
+**answers** — the same polls print their own split, every one of the 25 districts wearing the
+colour its own mixes to. The news is on both sides of that and is not part of it: a story is read
+and thrown away, never answered.
 
 Four things about it:
 
-- **The wide Kütüphane column is the news, day and night alike, and never trades places.** A
-  reader mid-story at sunset must never have it swapped out from under them for a poll result.
-  What the sun changes is the narrow column alone: it collects votes and shows the news one story
-  deeper by day (see "What each screen carries" below), and once the polls close for the night it
-  prints their own answers instead — "the polls come out" is a night-only thing, asking and
-  answering both, rather than a box that hands the front page back and forth on a timer.
+- **The wide column is the NEWS and the narrow one is the ANKET, in both editions.** A reader
+  mid-story at sunset must never have the news swapped out from under them for a poll result, and
+  the city's own question must not be left with nowhere to be asked until sunset — by which time
+  the day it is asking about is over. So neither column trades places; what the sun changes is
+  what the Anket box *invites*: **from sunrise it asks, from sunset it answers**. It is one box
+  and one page either way (`loadAnketActor`, `anketPagePayload` / `wireAnketPage` already decide
+  per reader whether they are being asked or shown the split), so there is no second version to
+  keep in step — only the meta line and the empty state differ.
+  - **The narrow column used to be the news one story deeper by day**, which put the same object
+    in both columns and had the two of them competing for the same reading. It is gone: there is
+    one depth of the news (`loadHaberlerActor`, no `depth` argument left) and the narrow column is
+    the question.
+- **A HABER IS NOT MULTIPLE CHOICE** (`newsFootHTML`, `wirePageThrow` with no labels). A story is
+  read and then thrown away, **either direction**, and that is the whole of what the gesture
+  means: no buttons, no options, and nothing stamped on the paper as it goes. A story that also
+  asked its own two-option question made a haber and an anket indistinguishable, and made the
+  reader answer something in order to be rid of a paragraph. **The multiple choice is the Anket's
+  alone** — that is the one object on the site whose direction IS an answer, and an evening's RSVP
+  on the other lane is the same gesture with different words.
+  - `breaking_news_polls` is therefore **parked, not deleted**: the table, its rows and its admin
+    editor are untouched behind one `hidden`, the way Makaleler and the neighbourhood comments
+    are, because where a per-story poll belongs (if anywhere) is still open. What was removed is
+    the *reading* of one. The admin's own gate dropped with it — a story needs a hook to run in an
+    edition, and nothing else — and the press bar's "İkinci haber" forme went with the column it
+    was about.
 - **The cast is never rebuilt for an edition.** An actor keeps its slot, its column, its poses and
   its lag; only its `load` branches (`loadKutuphaneWide` / `loadKutuphaneNarrow` / `loadKahveNarrow`).
   A column that rebuilt itself would land its cards a few pixels off the ones beside it and the walk
@@ -3109,7 +3129,7 @@ screen, which is why the pose tables swap along with the columns.
 | Screen | The map(s) on top | Wide column (3 rectangles) | Narrow column (3 rectangles) |
 |---|---|---|---|
 | Türkiye (slide 1) | Türkiye | left — **Hikâyeler**, the stories the map is grouped into | right — **Olaylar** |
-| Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler**, unchanged day and night | right — **Haberler**, one story deeper (gündüz) / **Anket sonuçları** (gece) |
+| Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler**, unchanged day and night | right — **Anket**: the question (gündüz) / its answers (gece) |
 | the app map (lane 1) | none — the app's own shape, full bleed | — | — |
 | Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (a throw is the RSVP; the kept ones go to the petek) | left — **Oyun önerileri** (gündüz) / **Oyunlar** (gece) |
 | ~~the ilçe (slide 24)~~ *parked* | the ilçe, with the member's own picked out | right — **Yorumlar** | left — **Kahve**, the Kahve Endeksi's rows |
@@ -3154,13 +3174,10 @@ Six things about it:
   falling back to the ungated behaviour — Pages redeploys on push while the SQL is run by hand,
   so there is always a window in which a strict gate would empty two columns for a reason no
   reader can see. Every one of these boxes is a STACK, like Haberler's: a baskı can carry three
-  evenings on one night, and answering one stands the next up. **By day, Haberler stands in BOTH
-  columns** — same three buckets, same kickers, but the narrow column's box is one story further
-  into that bucket's own stack (`loadHaberlerNarrowActor`, depth 1 of `loadHaberlerActorAt`): the
-  first thing nobody has answered yet in the wide column, the next thing after it in the narrow
-  one. A bucket with nothing past its wide-column story today is dashed in the narrow column
-  rather than printing that same headline a second time — "expand the news" means a category
-  genuinely gets deeper, never that one story gets shown twice.
+  evenings on one night, and answering one stands the next up. **Haberler stands in the WIDE column and nowhere else.** It used
+  to stand in the narrow one too by day, one story deeper into the same bucket; the narrow column
+  is the Anket now, in both editions (see "THE İSTANBUL LEVEL PRINTS TWO EDITIONS"), so there is
+  one depth of the news and no second reading of a bucket.
 - **The bucket is only about the SLOT, never about what the box's own page holds.** Which of
   İSTANBUL/TÜRKİYE/DÜNYA a story stands in is a fact about that one bucket's newest story and
   nothing else — it is not a feed of everything in the category, and it is not the seri (`seri` ≠
@@ -3202,8 +3219,10 @@ Six things about it:
   the innermost thing is you.** It is a layer over a lane rather than a lane of its own now, so
   while it is standing the book takes no gesture at all and this is the only axis live. See the
   petek's own section for how the pull works.
-- **The daily opinions are the loop between the two sides.** The questions in the joints of the
-  game sequence take a daily opinion from İstanbulites (`daily_questions`, see the schema); the
+- **Asking by day and answering by night is the app's own loop, and Anket is where it is most
+  literal**: the same box, the same page, the city's question in the morning and the city's answer
+  after dark. The questions in the joints of the game sequence are the other half of it
+  (`daily_questions`, see the schema); the
   city rates them; the result is shown back **the next day, at the petek's outermost depth** —
   which is exactly the depth where the reader is standing far enough out to be looking at everybody
   rather than at their own neighbours. It is the app's own formula in one move: people → their

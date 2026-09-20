@@ -4694,7 +4694,16 @@ function renderNewsList() {
             <div class="upd-status status-msg"></div>
           </div>
         </details>
-        <details class="sources-block" data-block-key="news:${n.id}:poll"${blockOpenAttr(`news:${n.id}:poll`)}>
+        <!-- PARKED, not deleted (the same convention Makaleler and the
+             neighbourhood comments follow): a story does not ask a
+             question any more — it is read and thrown away, and the
+             multiple choice is the Anket's (see newsFootHTML in
+             project.html). The table, its rows and this editor are
+             untouched behind one hidden attribute, because where a
+             per-story poll belongs, if anywhere, is an open question.
+             Leaving it reachable would be an editor writing questions
+             no reader will ever be asked. -->
+        <details hidden class="sources-block" data-block-key="news:${n.id}:poll"${blockOpenAttr(`news:${n.id}:poll`)}>
           <summary class="sources-label">Anketler (${polls.length})</summary>
           ${pollsHtml}
           <div class="src-form">
@@ -9322,15 +9331,18 @@ const BASKI_KINDS = {
   haber: {
     async load(date) {
       const { data, error } = await sb.from('breaking_news')
-        .select('id, title, category, neighborhood, hook_tr, edition_date, edition_order, archived_at, breaking_news_polls(id)')
+        .select('id, title, category, neighborhood, hook_tr, edition_date, edition_order, archived_at')
         .is('archived_at', null)
         .order('created_at', { ascending: false })
         .limit(200);
       if (error) throw error;
       return (data || []).map(n => {
+        // A hook is the whole gate now. A story used to need a question
+        // as well, because the reader answered one to be rid of it —
+        // a story is read and thrown away now (see newsFootHTML in
+        // project.html) and the multiple choice is the Anket's alone.
         const warn = [];
         if (!(n.hook_tr && n.hook_tr.trim())) warn.push('Kanca yok');
-        if (!(n.breaking_news_polls || []).length) warn.push('Soru yok');
         return {
           id: n.id, kind: 'haber', title: n.title,
           slot: pressBucketOf(n),
@@ -9876,7 +9888,7 @@ const PRESS_FORMES = [
         counts[b] = (counts[b] || 0) + 1;
       });
       const empty = PRESS_BUCKETS.filter(b => !counts[b.key]);
-      ctx.newsCounts = counts;          // the depth forme reads this rather than re-fetching
+      ctx.newsCounts = counts;
       ctx.newsEditionDate = editionDate;
       const held = editionDate !== ctx.date;
       if (empty.length) {
@@ -9886,27 +9898,6 @@ const PRESS_FORMES = [
       // earlier day -- the reader gets it, and it is not today's paper.
       if (held) return { state: 'warn', note: editionDate + ' sayısı duruyor' };
       return { state: 'ok', note: (data || []).length + ' haber' };
-    },
-  },
-  {
-    id: 'derinlik',
-    name: 'İkinci haber',
-    tab: 'news',
-    // The narrow column is the news one story deeper, and it is the DAY
-    // edition's alone -- at night that column prints anket sonuçları
-    // instead (see loadKutuphaneNarrow).
-    editions: ['gun'],
-    async check(ctx) {
-      // Rides the Haberler forme's own fetch: the two must never be able
-      // to count different sets of stories, and this is the cheap way to
-      // guarantee it. It is ordered after Haberler in this table for
-      // exactly that reason.
-      if (!ctx.newsCounts) return { state: 'miss', note: 'Sayı çıkmadı' };
-      const thin = PRESS_BUCKETS.filter(b => (ctx.newsCounts[b.key] || 0) < 2);
-      if (thin.length) {
-        return { state: 'warn', note: thin.map(b => b.label).join(' · ') + ' tek haber' };
-      }
-      return { state: 'ok', note: 'Üç kategori de derin' };
     },
   },
   {

@@ -2015,10 +2015,11 @@ const START_LANE = LANE_MAP;
 // already asking.
 //
 //   GÜNDÜZ  Kütüphane  wide: the three news buckets; pressing one opens
-//                            it and a THROW answers the story's own poll
-//                      narrow: the same three categories, one story
-//                              deeper into their own stack -- more news,
-//                              not a vote (see loadHaberlerNarrowActor)
+//                            it and a THROW is done with it -- a story is
+//                            read, never answered (see newsFootHTML)
+//                      narrow: the ANKET, ASKING -- the city's own
+//                              question, whose answer is filed under the
+//                              member's district (see loadAnketActor)
 //           Kahvehane  wide: the three evenings; a throw is the RSVP
 //                      narrow: the three games, COLLECTING -- a word for
 //                              Sözcel, a quote for Tümcel, and Bulmaca
@@ -2032,14 +2033,19 @@ const START_LANE = LANE_MAP;
 //                            to at 21:00 is the most normal thing here
 //                      narrow: Oyunlar — the three games, playable
 //
-// Kütüphane's wide column is the news now, day and night alike, and no
-// longer trades places with anything -- a reader mid-story at sunset
-// must never have it swapped out from under them for a poll result. What
-// the sun changes is the NARROW column alone: news one layer deeper by
-// day, the district polls' own answers once they close for the night --
-// "the polls come out" is a night thing through and through, asking and
-// answering both, rather than a box that hands the front page back and
-// forth between two unrelated questions.
+// Kütüphane's wide column is the news, day and night alike, and never
+// trades places with anything -- a reader mid-story at sunset must not
+// have it swapped out from under them for a poll result. The NARROW
+// column is the ANKET, also day and night: the paper asks from sunrise
+// and answers from sunset, which is the whole of the edition's own rule
+// applied to the one column that is a question rather than a reading.
+//
+// The two columns are therefore two different OBJECTS rather than two
+// depths of one: a HABER is read and thrown away, an ANKET is answered.
+// A story that also asked its own two-option question made them
+// indistinguishable, and made a reader answer something in order to be
+// rid of a paragraph -- so a story asks nothing now, and the multiple
+// choice is the Anket's alone.
 //
 // The games being night-only is a real restriction -- in June that is a
 // window from 20:38 to 05:32, under nine hours -- so it is one flag
@@ -2111,7 +2117,7 @@ function wireEditionReturn() {
 // the cast is not rebuilt, only its boxes are filled again.
 function refreshEditionColumns() {
   anketPromise = null;
-  if (loadAnketSonucActor && loadAnketSonucActor.reset) loadAnketSonucActor.reset();
+  if (loadAnketActor && loadAnketActor.reset) loadAnketActor.reset();
   gamesStatePromise = null;
   submitPromise = null;
   (cast || []).forEach(a => {
@@ -2738,17 +2744,13 @@ function refreshHaberlerColumn() {
   refreshDayMeter();
 }
 
-// Wide is depth 0 -- the same box it always was. Narrow (day only, see
-// loadKutuphaneNarrow) is depth 1: the same three categories one story
-// further into their own stack, which is the whole of what "expand the
-// news" means -- not a second feed, the next thing in the category
-// already on screen. A category with nothing past its own primary story
-// today has nothing to be deeper than, so depth 1 goes dashed there
-// rather than printing the same headline the wide column already has.
-function loadHaberlerActor(el, slot) { return loadHaberlerActorAt(el, slot, 0); }
-function loadHaberlerNarrowActor(el, slot) { return loadHaberlerActorAt(el, slot, 1); }
-
-async function loadHaberlerActorAt(el, slot, depth) {
+// The news stands in the WIDE column and nowhere else. It used to stand
+// in the narrow one too by day, one story deeper into the same bucket --
+// which put the same object in both columns and left the city's own
+// question (ANKET) with nowhere to be asked until sunset. The narrow
+// column is the Anket now, in both editions (see loadKutuphaneNarrow),
+// so there is one depth and no second reading of a bucket.
+async function loadHaberlerActor(el, slot) {
   const { byBucket, editionDate, failed } = await haberlerData();
   if (!el.isConnected) return;
   // Cleared before every render, filled only on the path that actually
@@ -2762,16 +2764,16 @@ async function loadHaberlerActorAt(el, slot, depth) {
     // The message stands once, on the wide column's own İstanbul box --
     // printing it a second time on the narrow column's copy said the
     // same failure from two directions at once.
-    el.classList.toggle('fb-empty', !(slot === 2 && depth === 0));
+    el.classList.toggle('fb-empty', slot !== 2);
     el.innerHTML = '<div class="k">' + label + '</div>' +
-      (slot === 2 && depth === 0 ? '<div class="t">Yüklenemedi</div>' : '');
+      (slot === 2 ? '<div class="t">Yüklenemedi</div>' : '');
     return;
   }
   const arr = byBucket[bucket] || [];
   if (!arr.length) {
     el.classList.add('fb-empty');
     el.innerHTML = '<div class="k">' + label + '</div>' +
-      (slot === 2 && depth === 0 && !editionDate ? '<div class="t">Bugün için bir sayı çıkmadı.</div>' : '');
+      (slot === 2 && !editionDate ? '<div class="t">Bugün için bir sayı çıkmadı.</div>' : '');
     return;
   }
   const uid = await doneUid();
@@ -2781,12 +2783,7 @@ async function loadHaberlerActorAt(el, slot, depth) {
   // every one of them has been, it settles on the last, the same "a done
   // box stays pressable" rule every other box follows.
   const undealt = arr.filter(n => !newsIsDealt(store, n));
-  const primary = undealt[0] || arr[arr.length - 1];
-  let n = primary;
-  if (depth > 0) {
-    n = undealt.find(x => x !== primary) || arr.find(x => x !== primary);
-    if (!n) { el.classList.add('fb-empty'); el.innerHTML = '<div class="k">' + label + '</div>'; return; }
-  }
+  const n = undealt[0] || arr[arr.length - 1];
   const stackTag = arr.length > 1 ? ' · ' + (arr.indexOf(n) + 1) + '/' + arr.length : '';
   const byline = n.hook_author ? '— ' + n.hook_author : '';
   el.classList.remove('fb-empty');
@@ -2810,84 +2807,29 @@ async function loadHaberlerActorAt(el, slot, depth) {
     catch (err) { console.error('[proje haber seri]', err); }
   }
   if (!el.isConnected) return;
-  // The story's own question -- every curated story carries one (the
-  // admin's curation panel refuses to add a story to an edition without
-  // one), fetched with the story rather than when the page opens, so the
-  // throw is armed from the page's first frame.
-  const poll = await newsPollFor(n.id);
-  if (!el.isConnected) return;
   fbSetPage(el, {
     kicker: label, meta: newsAge(n.updated_at),
     title: newsText(n, 'title'),
     html: fbParas(newsText(n, 'body')) + (siblings.length ? seriesTimelineHTML(siblings) : '') +
-      (poll ? '<div class="fb-throw-q">' + esc(poll.question) + '</div>' +
-              throwFootHTML(poll.option_b, poll.option_a, 'Sola ya da sağa at.') : ''),
-    wire: poll ? (inner) => wirePageThrow(inner, {
-      // Right is the FIRST option and left the second, the same reading
-      // Kütüphane's own news deck gave the gesture in the parts bin.
-      right: { label: poll.option_a, run: () => voteNewsPoll(poll, 1).then(() => {
-        newsMarkDealt(n).then(refreshHaberlerColumn);
-      }) },
-      left:  { label: poll.option_b, run: () => voteNewsPoll(poll, 2).then(() => {
-        newsMarkDealt(n).then(refreshHaberlerColumn);
-      }) },
-    }) : undefined,
-    // What we hand the reader is not news, it is a POLL -- so the story is
-    // dealt with (and the next one in its stack stands up) at the THROW,
-    // not at the open, the same rule Kütüphane's own news deck always
-    // followed ("a story leaves the deck by being swiped, not by being
-    // opened"). A story with no poll at all (a malformed or pre-edition
-    // row) has nothing to wait on, so it still deals on open -- a box
-    // that could never be dismissed would be worse than a lenient one.
-    onOpen: poll ? undefined : () => {
-      fbSetDone(el, true);
-      newsMarkDealt(n).then(refreshDayMeter);
+      newsFootHTML(),
+    // Either direction means the same thing: done with it. A story is
+    // not a question (see newsFootHTML), so neither side carries a
+    // label and nothing is stamped on the paper as it goes.
+    wire: (inner) => {
+      const deal = () => { newsMarkDealt(n).then(refreshHaberlerColumn); };
+      wirePageThrow(inner, { right: { run: deal }, left: { run: deal } });
     },
+    // A story leaves the deck by being SWIPED, not by being opened --
+    // the rule Kütüphane's own news deck always followed. Opening one
+    // and backing out with the arrow leaves it exactly where it was.
   });
 }
 
-// ── A story's own question (breaking_news_polls) ──
-// The NEWEST poll on this story the reader has not already answered, or
-// null -- a story with nothing left to ask opens and reads exactly as it
-// did before, which is most of them. Best-effort in both directions: a
-// table that is missing, a policy that refuses, or a network that never
-// answers all leave the story readable and unthrowable rather than
-// taking the column down.
-async function newsPollFor(newsId) {
-  try {
-    const sb = IstRouter.sb;
-    const { data: polls, error } = await sb.from('breaking_news_polls')
-      .select('id, question, option_a, option_b')
-      .eq('news_id', newsId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-    if (error) throw error;
-    if (!polls || !polls.length) return null;
-    const uid = await doneUid();
-    if (!uid) return null;
-    const { data: votes, error: vErr } = await sb.from('breaking_news_poll_option_votes')
-      .select('poll_id').eq('user_id', uid).in('poll_id', polls.map(p => p.id));
-    if (vErr) throw vErr;
-    const answered = new Set((votes || []).map(v => v.poll_id));
-    return polls.find(p => !answered.has(p.id)) || null;
-  } catch (err) {
-    console.error('[proje haber anket]', err);
-    return null;
-  }
-}
-
-// `option` is 1 or 2, which is what the column stores. Insert-only by
-// policy: an answer is what you thought when you were asked, so there is
-// nothing here that edits one.
-async function voteNewsPoll(poll, option) {
-  try {
-    const uid = await doneUid();
-    if (!uid) return;
-    const { error } = await IstRouter.sb.from('breaking_news_poll_option_votes')
-      .insert([{ poll_id: poll.id, user_id: uid, option }]);
-    if (error) throw error;
-  } catch (err) { console.error('[proje haber oy]', err); }
-}
+// `breaking_news_polls` is PARKED, not deleted (db/breaking_news_polls.sql
+// and its admin panel are untouched, behind a `hidden`): a story does not
+// ask a question any more -- that is what ANKET is -- but where a
+// per-story poll belongs, if anywhere, is still an open question. Reading
+// one is the whole of what was removed here.
 
 // A seri's earlier posts, newest first -- the same pool and the same cap
 // (`db/breaking_news_series.sql`) the Türkiye stop's own pinned box reads,
@@ -3185,11 +3127,11 @@ function anketData() {
 // Voting is exactly what changes this column, so it is re-read the
 // moment a vote lands rather than at the next mount -- the same rule
 // refreshOyunColumn follows for a game just played. Anket is a night box
-// alone now (loadAnketSonucActor, further down), so that is the one this
+// alone now (loadAnketActor, further down), so that is the one this
 // resets; there is no day-time vote box left to reset beside it.
 function refreshAnketColumn() {
   anketPromise = null;
-  if (loadAnketSonucActor && loadAnketSonucActor.reset) loadAnketSonucActor.reset();
+  if (loadAnketActor && loadAnketActor.reset) loadAnketActor.reset();
   (cast || []).forEach(a => {
     if (!/\bfb-anket\b/.test(a.def.cls) || !a.def.load) return;
     try { a.def.load(a.el); } catch (err) { console.error(err); }
@@ -3339,8 +3281,9 @@ async function renderAnketResults(body, poll, myChoice) {
 // / wireAnketPage decides which of the two a reader is shown), so there
 // is no day-time vote box left to keep in step -- anketData() is asked
 // once, here, and this box is the whole of Anket's presence on screen.
-const loadAnketSonucActor = stackFetch(async () => {
+const loadAnketActor = stackFetch(async () => {
   const { polls, voted, failed } = await anketData();
+  const gece = fbEdition === 'gece';
   if (failed) {
     return { rows: [], failed: true,
       failedHtml: '<div class="k">ANKET</div><div class="t">Yüklenemedi</div>' +
@@ -3350,22 +3293,27 @@ const loadAnketSonucActor = stackFetch(async () => {
   // same row İSTANBUL / "0 dk önce" sits on by day. So both have to stay
   // about that long: "AKŞAM · ANKET" against "Önce sen ne diyorsun?"
   // overran the box and the two printed on top of each other. The edition
-  // needs no naming here anyway -- it is night, the whole app is dark,
-  // and the box says ANKET where a story would say its category.
+  // is not named here either -- the app is light or dark around it, and
+  // the box says ANKET where a story would say its category.
   const rows = polls.map(poll => ({
     html: '<div class="k">ANKET</div>' +
       '<div class="t">' + esc(anketText(poll, 'question')) + '</div>' +
-      '<div class="m">' + (voted.has(poll.id) ? 'İlçelere göre' : 'Oy ver') + '</div>',
-    // The same page the day's own Anket box opens. A reader who never
-    // voted is asked first and sees the result the moment they do --
-    // wireAnketPage already decides which of the two it is, so the night
-    // needs no second version of that question.
+      '<div class="m">' + (voted.has(poll.id)
+        ? (gece ? 'İlçelere göre' : 'Cevabın kayıtlı')
+        : (gece ? 'Oy ver — sonuçlar açık' : 'Oy ver')) + '</div>',
+    // ONE page, whichever half of the day it is opened in: wireAnketPage
+    // asks a reader who has not voted and shows the split to one who
+    // has. What the edition changes is only whether the reader is
+    // expected to be answering or reading -- not a second page to keep
+    // in step with the first.
     page: anketPagePayload(poll),
     done: voted.has(poll.id),
   }));
   return { rows, failed: false,
-    emptyHtml: '<div class="k">ANKET</div><div class="t">Bu gece sonuç yok</div>' +
-               '<div class="m">Gündüz anket açılmamış.</div>' };
+    emptyHtml: '<div class="k">ANKET</div>' +
+      (gece
+        ? '<div class="t">Bu gece sonuç yok</div><div class="m">Gündüz anket açılmamış.</div>'
+        : '<div class="t">Bugün anket yok</div><div class="m">Akşama sonuçlar çıkar.</div>') };
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -3893,12 +3841,20 @@ function renderSubmitForm(body, g, data, prefill, prefillNote) {
 function loadKutuphaneWide(el, slot) {
   return loadHaberlerActor(el, slot);
 }
-// Narrow: the news one story deeper by day (see loadHaberlerNarrowActor),
-// the poll results by night -- the reader swipes through the news itself
-// now rather than voting beside it, and the vote's own answer waits for
-// the edition it belongs to.
+// THE NARROW COLUMN IS THE ANKET, in both editions -- by day the paper
+// ASKS and by night it ANSWERS, which is the edition's own rule
+// (see "THE İSTANBUL LEVEL PRINTS TWO EDITIONS") applied to the one
+// column that is a question rather than a reading. It used to print the
+// news one story deeper by day, which put the same object in both
+// columns and left the city's own question with nowhere to be asked
+// until sunset -- by which time the day it was asking about was over.
+//
+// The BOX is the same box in both; only what it invites changes, and
+// the page behind it already decides per reader whether it is asking or
+// showing (wireAnketPage). The wide column is the news, day and night
+// alike, and never trades places.
 function loadKutuphaneNarrow(el, slot) {
-  return fbEdition === 'gece' ? loadAnketSonucActor(el, slot) : loadHaberlerNarrowActor(el, slot);
+  return loadAnketActor(el, slot);
 }
 function loadKahveNarrow(el, slot) {
   if (!NIGHT_GAMES_ENABLED) return loadOyunActor(el, slot);
@@ -4248,9 +4204,13 @@ function wirePageThrow(inner, opts) {
 
   const setCue = (dx) => {
     if (!cue) return;
+    // A throw with no labels stamps nothing: there is no option being
+    // chosen, so there is no word to print on the paper as it goes.
+    const word = dx > 0 ? opts.right.label : opts.left.label;
+    if (!word) return;
     const w = page.offsetWidth || 1;
     const t = Math.min(1, Math.abs(dx) / (w * THROW_COMMIT));
-    cue.textContent = dx > 0 ? opts.right.label : opts.left.label;
+    cue.textContent = word;
     cue.classList.toggle('on-right', dx > 0);
     cue.style.opacity = String(t);
   };
@@ -4335,16 +4295,32 @@ function wirePageThrow(inner, opts) {
   page.addEventListener('pointercancel', up);
 }
 
-// The two-option foot every throwable page carries: the stamp that
-// appears as the paper moves, and the two buttons that say the same
-// thing for a reader with no finger.
+// Two options, one on each side -- an ANKET or an RSVP, where the
+// direction IS the answer. Pass no labels and it is the other kind of
+// throw: the gesture means "done with this" and nothing else, so there
+// are no buttons to press and no stamp to print (see newsFootHTML).
 function throwFootHTML(leftLabel, rightLabel, note) {
   return '<div class="fb-throw-cue"></div>' +
-    '<div class="fb-throw-row">' +
-      '<button type="button" class="fb-throw-btn" data-throw="left">' + esc(leftLabel) + '</button>' +
-      '<button type="button" class="fb-throw-btn" data-throw="right">' + esc(rightLabel) + '</button>' +
-    '</div>' +
+    (leftLabel && rightLabel
+      ? '<div class="fb-throw-row">' +
+          '<button type="button" class="fb-throw-btn" data-throw="left">' + esc(leftLabel) + '</button>' +
+          '<button type="button" class="fb-throw-btn" data-throw="right">' + esc(rightLabel) + '</button>' +
+        '</div>'
+      : '') +
     (note ? '<div class="fb-throw-note">' + esc(note) + '</div>' : '');
+}
+
+// ── A HABER IS NOT MULTIPLE CHOICE ──
+// A story is read and then thrown away, either direction, and that is
+// the whole of what the gesture means. Asking a question with two
+// answers is what ANKET is for (Kütüphane's narrow column) -- a story
+// that also asked one made the two objects indistinguishable, and made
+// the reader answer something in order to get rid of a paragraph.
+// So: no buttons, no stamp, one line saying the gesture exists. A mouse
+// drags the page itself (wirePageThrow is on pointer events), which is
+// the same desktop path every other throw on the site has.
+function newsFootHTML() {
+  return throwFootHTML(null, null, 'Okudun. Sola ya da sağa at.');
 }
 
 function wireFbPage() {
@@ -6146,7 +6122,7 @@ function refreshAllColumns() {
   // The three stackFetch columns cache independently of whatever their
   // own fetcher remembers, so nulling only the promise above would
   // re-render the same rows and look like nothing happened.
-  [loadOlaylarActor, loadAnketSonucActor].forEach(f => {
+  [loadOlaylarActor, loadAnketActor].forEach(f => {
     if (f && f.reset) f.reset();
   });
   (cast || []).forEach(a => {
