@@ -218,27 +218,45 @@
   }
 
   // Everything the maps and avatars ever declare is a literal hex or
-  // rgb() and parseColorLiteral is all that is needed. The frame ladder
-  // reads tokens like --ist-hive-ring-bonded, which is a color-mix() —
-  // custom properties resolve nested var()s but never evaluate a
-  // function like color-mix() into a literal color, so the raw string
-  // still has "color-mix(...)" in it at this point. Rather than writing
-  // a color-mix parser, hand it to a canvas 2D context: the fillStyle
-  // setter runs the browser's own full <color> grammar and reading it
-  // back always normalizes to something parseColorLiteral already
-  // understands (#rrggbb or rgb()/rgba()), in every engine. Only paid
-  // for the exotic case — anything already literal never reaches it.
+  // rgb(), so parseColorLiteral is all that is needed for them. The
+  // frame ladder reads tokens like --ist-hive-ring-me, which is
+  // `var(--ink)`, and --ist-hive-ring-bonded, which is a color-mix() of
+  // two more vars -- and getComputedStyle().getPropertyValue() on a
+  // CUSTOM property does NOT resolve nested var() references or
+  // evaluate functions like color-mix(): it hands back the text as
+  // specified, `var()` and all. A canvas 2D context's fillStyle parses
+  // the full CSS <color> grammar but has no notion of custom properties
+  // either, so it cannot make sense of that raw text.
+  //
+  // What DOES resolve every var() in the chain, and color-mix() with
+  // it, is the browser's own cascade -- so hand the raw string to a
+  // real CSS property instead of a custom one: assign it to `color` on
+  // a hidden probe element sitting in the document, then read back
+  // getComputedStyle(probe).color, which is always a plain
+  // rgb()/rgba() string in every engine. That is the one thing this
+  // needs to be true, whatever `s` turns out to be.
+  function colorProbe() {
+    if (parseColor._probe) return parseColor._probe;
+    if (!document.body) return null;
+    const d = document.createElement('div');
+    d.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none';
+    document.body.appendChild(d);
+    parseColor._probe = d;
+    return d;
+  }
+
   function parseColor(raw) {
     const s = String(raw || '').trim();
     if (!s) return null;
     const direct = parseColorLiteral(s);
     if (direct) return direct;
     try {
-      if (!parseColor._ctx) parseColor._ctx = document.createElement('canvas').getContext('2d');
-      const ctx = parseColor._ctx;
-      ctx.fillStyle = '#000';
-      ctx.fillStyle = s;
-      return parseColorLiteral(ctx.fillStyle);
+      const probe = colorProbe();
+      if (!probe) return null;
+      probe.style.color = '';
+      probe.style.color = s;
+      if (!probe.style.color) return null; // an invalid value is never assigned
+      return parseColorLiteral(getComputedStyle(probe).color);
     } catch (e) { return null; }
   }
 
