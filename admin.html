@@ -2730,7 +2730,7 @@
 
   </div>
 
-  <!-- ── OYUNLAR TAB (Sözcel + Tümcel + Bulmaca, combined) ── -->
+  <!-- ── OYUNLAR TAB (Sözcel + Tümcel + Çengel/Bulmaca, combined) ── -->
   <div class="admin-body" id="games-tab" style="display:none; grid-template-columns: 1fr; max-width: 900px;">
 
     <div class="panel">
@@ -2760,7 +2760,7 @@
       <div class="games-subnav">
         <button class="games-subtab active" data-subtab="sozcel">Sözcel</button>
         <button class="games-subtab" data-subtab="tumcel">Tümcel</button>
-        <button class="games-subtab" data-subtab="bulmaca">Bulmaca</button>
+        <button class="games-subtab" data-subtab="bulmaca">Çengel</button>
         <button class="games-subtab" data-subtab="sorular">Sorular</button>
       </div>
 
@@ -2934,12 +2934,14 @@
         </div>
       </div>
 
-      <!-- BULMACA -->
+      <!-- BULMACA (Çengel) -->
       <div class="games-subpanel" id="games-bulmaca-panel" style="display:none;">
-        <div class="panel-title">Bulmaca</div>
+        <div class="panel-title">Çengel</div>
         <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-          Bulmaca'nın günlük bilmeceleri otomatik üretilir — buradan manuel içerik girişi yapılmaz.
-          Oyunu belirli bir gün için açıp kapatmak için yukarıdaki Oyun Takvimi'ni kullanın.
+          Çengel'in günlük bilmeceleri otomatik üretilir — buradan manuel içerik girişi yapılmaz.
+          Oyunu belirli bir gün için açıp kapatmak için yukarıdaki Oyun Takvimi'ni kullanın. Sözcel
+          sekmesindeki kelime önerileri (kelime + anlamı) Çengel'in bilmecelerini elle kurarken de
+          kaynak olarak kullanılabilir.
         </p>
       </div>
 
@@ -2947,7 +2949,7 @@
       <div class="games-subpanel" id="games-sorular-panel" style="display:none;">
         <div class="panel-title">Günün Soruları</div>
         <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-          Oyunlar bir sıra: Sözcel → soru → Tümcel → soru → Bulmaca → soru. Buraya girdiğiniz soru,
+          Oyunlar bir sıra: Sözcel → soru → Tümcel → soru → Çengel → soru. Buraya girdiğiniz soru,
           seçtiğiniz oyunun <em>ardından</em> sorulur ve sıradaki oyun o soru cevaplanana kadar kilitli
           kalır. Boş bıraktığınız bir gün/oyun için kilit de yoktur — o gün oyunlar normal açılır.
           Cevaplar üyelerin kendilerinden başka kimseye görünmez; site yalnızca sayıyı gösterir.
@@ -2963,7 +2965,7 @@
             <select id="dq-after-game">
               <option value="sozcel">Sözcel</option>
               <option value="tumcel">Tümcel</option>
-              <option value="bulmaca">Bulmaca</option>
+              <option value="bulmaca">Çengel</option>
             </select>
           </div>
         </div>
@@ -3652,7 +3654,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
   });
 });
 
-// ── Oyunlar tab: sub-nav between Sözcel / Tümcel / Bulmaca ──
+// ── Oyunlar tab: sub-nav between Sözcel / Tümcel / Çengel ──
 document.querySelectorAll('.games-subtab').forEach(btn => {
   btn.addEventListener('click', () => {
     const sub = btn.dataset.subtab;
@@ -8301,7 +8303,7 @@ async function loadDailyQuestions() {
     list.innerHTML = '<div class="empty-state">Henüz soru yok.</div>';
     return;
   }
-  const labels = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Bulmaca' };
+  const labels = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Çengel' };
   list.innerHTML = data.map(q => `
     <div class="article-card" data-id="${q.id}">
       <p>${escapeHtml(q.body_tr)}</p>
@@ -8388,7 +8390,7 @@ async function loadDailyQuestions() {
 const GAME_STATUS_GAMES = [
   { game: 'sozcel', label: 'Sözcel' },
   { game: 'tumcel', label: 'Tümcel' },
-  { game: 'bulmaca', label: 'Bulmaca' },
+  { game: 'bulmaca', label: 'Çengel' },
 ];
 
 function gameStatusDayLabel(iso, offset) {
@@ -8859,7 +8861,7 @@ async function ensureTumcelMembersList() {
 async function loadTumcelSuggestionPickers() {
   const { data: suggestions } = await sb
     .from('tumcel_quote_suggestions')
-    .select('id, body, source, suggested_by, suggested_at')
+    .select('id, body, source, category, suggested_by, suggested_at')
     .eq('status', 'pending')
     .order('suggested_at', { ascending: true });
   _tumcelPendingSuggestions = suggestions || [];
@@ -8874,13 +8876,18 @@ async function loadTumcelSuggestionPickers() {
     (profs || []).forEach(p => { _tumcelProfilesById[p.id] = p; });
   }
 
+  // Same four values tc-color-N's own <option>s use (see
+  // db/tumcel_quote_suggestions_v2_category.sql) -- one vocabulary.
+  const TUMCEL_CATEGORY_LABELS = { cat1: 'Sözlü', cat2: 'Ezgi', cat3: 'Yazılı', cat4: 'Halk Ağzı' };
+
   function label(s) {
     const p = _tumcelProfilesById[s.suggested_by];
     const name = p ? ((`${p.first_name || ''} ${p.last_name || ''}`).trim() || 'İsimsiz') : 'üye';
     const nb = p && p.neighborhood ? (NEIGHBORHOOD_NAMES[p.neighborhood] || p.neighborhood) : '';
     const where = nb ? ` (${nb})` : '';
     const short = s.body.length > 60 ? s.body.slice(0, 60) + '…' : s.body;
-    return `${name}${where}: “${short}” — ${s.source}`;
+    const cat = s.category && TUMCEL_CATEGORY_LABELS[s.category] ? ` · ${TUMCEL_CATEGORY_LABELS[s.category]}` : '';
+    return `${name}${where}: “${short}” — ${s.source}${cat}`;
   }
 
   function memberLabel(p) {
@@ -8916,7 +8923,7 @@ async function loadTumcelSuggestionPickers() {
     const sel = document.getElementById(`tc-pick-${i}`);
     const currentVal = sel.value;
     const suggestionOptions = _tumcelPendingSuggestions.map(s =>
-      `<option value="${s.id}" data-body="${escapeHtml(s.body)}" data-source="${escapeHtml(s.source)}" data-by="${escapeHtml(s.suggested_by)}">${escapeHtml(label(s))}</option>`
+      `<option value="${s.id}" data-body="${escapeHtml(s.body)}" data-source="${escapeHtml(s.source)}" data-by="${escapeHtml(s.suggested_by)}" data-category="${escapeHtml(s.category || '')}">${escapeHtml(label(s))}</option>`
     ).join('');
     const memberOptions = members.map(p =>
       `<option value="member:${p.id}">${escapeHtml(memberLabel(p))}</option>`
@@ -8946,11 +8953,16 @@ function onTumcelPickChange(i) {
   const body = opt.getAttribute('data-body') || '';
   const source = opt.getAttribute('data-source') || '';
   const by = opt.getAttribute('data-by') || '';
+  const category = opt.getAttribute('data-category') || '';
   document.getElementById(`tc-suggestion-id-${i}`).value = id;
   document.getElementById(`tc-tumcul-id-${i}`).value = by;
   if (id) {
     document.getElementById(`tc-source-${i}`).value = source;
     document.getElementById(`tc-fullquote-${i}`).value = body;
+    // What the member said this sentence is -- a starting point for the
+    // color that sorts it into the puzzle, not a lock: the admin can
+    // still change it before saving.
+    if (category) document.getElementById(`tc-color-${i}`).value = category;
     helper.style.display = 'block';
     helper.textContent = '“' + body + '”';
   } else {
@@ -9987,14 +9999,14 @@ const PRESS_FORMES = [
     editions: ['gece'],
     // Nothing auto-picks a Tümcel puzzle. With no row for the night the
     // page prints "Bugünkü bulmaca henüz hazır değil." and the game
-    // cannot be finished -- which also leaves Bulmaca locked behind it
+    // cannot be finished -- which also leaves Çengel locked behind it
     // for the whole night (gameBlocker). A genuinely red forme.
     async check(ctx) {
       if (ctx.gamesOff.has('tumcel')) return { state: 'na', note: 'Kapalı' };
       const { data, error } = await sb.from('tumcel_puzzles')
         .select('quotes').eq('puzzle_date', ctx.date).maybeSingle();
       if (error) throw error;
-      if (!data) return { state: 'miss', note: 'Bulmaca yok' };
+      if (!data) return { state: 'miss', note: 'Çengel yok' };
       const n = Array.isArray(data.quotes) ? data.quotes.length : 0;
       if (n < 4) return { state: 'miss', note: n + '/4 alıntı' };
       return { state: 'ok', note: '4 alıntı' };

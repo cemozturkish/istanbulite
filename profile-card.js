@@ -361,11 +361,11 @@
   // Which Istanbul-local weekdays each game runs on (Monday=0 … Sunday=6),
   // driving the Profil tab's weekly grid. Purely a display concern here —
   // it does not gate access to the game pages (see game-locks.js for the
-  // actual Tümcel-win-unlocks-Bulmaca rule).
+  // actual Tümcel-win-unlocks-Çengel rule).
   const GAME_SCHEDULE = [
     { id: 'sozcel',  label: 'Sözcel',  days: [0, 1, 2, 3, 4, 5, 6] },
     { id: 'tumcel',  label: 'Tümcel',  days: [0, 2, 4, 6] },
-    { id: 'bulmaca', label: 'Bulmaca', days: [1, 3, 5] },
+    { id: 'bulmaca', label: 'Çengel',  days: [1, 3, 5] },
   ];
 
   // Shirt overlays — the base clothing layer (see avatar.js), stacked
@@ -648,7 +648,7 @@
     return `
       <div class="ist-pc-scores">
         <div class="ist-pc-score-card">
-          <div class="ist-pc-score-game">Bulmaca</div>
+          <div class="ist-pc-score-game">Çengel</div>
           <div class="ist-pc-score-value">${scores.bulmacaWins || 0}</div>
           <div class="ist-pc-score-detail">${detail(scores.bulmacaPlayed||0, scores.bulmacaStreak||0)}</div>
         </div>
