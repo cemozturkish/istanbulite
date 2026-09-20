@@ -1,6 +1,6 @@
 // Shared game-lock logic.
 // Add `<script src="game-locks.js"></script>` to any page with a
-// `.game-link[data-game="…"]` nav (sozcel, tumcel, bulmaca, kahvehane).
+// `.game-link[data-game="…"]` nav (sozcel, tumcel, bulmaca/Çengel, kahvehane).
 // Then call `applyGameLocks(sb)` once `sb` is initialised.
 //
 // To gate a new game in the future, extend GATES below — every page that
@@ -9,20 +9,20 @@
 // Rules:
 //   - The three games are a sequence with a question in each joint (see
 //     db/daily_questions.sql): Tümcel is locked until the question that
-//     follows Sözcel has been answered, and Bulmaca until the one that
-//     follows Tümcel has. The card that asks it appears in Kahvehane's
+//     follows Sözcel has been answered, and Çengel (bulmaca) until the one
+//     that follows Tümcel has. The card that asks it appears in Kahvehane's
 //     games column once the game before it has been played, so the
 //     sequence is: play, answer, play, answer, play, answer.
 //     A day with no question in a slot has no gate there — an empty
 //     table has to behave exactly like the site did before it existed,
 //     or a feature with no content takes the app down with it.
-//   - Bulmaca is locked until the user has won Tümcel at least once.
+//   - Çengel (bulmaca) is locked until the user has won Tümcel at least once.
 //   - Any game the admin has switched off for the current Istanbul day
 //     (via admin.html's Oyunlar tab / the game_day_toggles table) is
 //     locked for everyone, regardless of the rules above.
 
 (function () {
-  const GAME_LABELS = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Bulmaca' };
+  const GAME_LABELS = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Çengel' };
   const ALL_GAMES = Object.keys(GAME_LABELS);
   // The admin owns the off-switch, so it isn't pointed at them: switching a
   // game off and then being unable to open it to check what everyone else
@@ -34,7 +34,7 @@
   // gate reads: the question in the joint before `game`.
   const PREV_GAME = { tumcel: 'sozcel', bulmaca: 'tumcel' };
 
-  // A game can carry more than one gate (Bulmaca carries two), so these
+  // A game can carry more than one gate (Çengel carries two), so these
   // are always filtered, never found.
   const GATES = [
     {
@@ -45,12 +45,12 @@
     {
       game: 'bulmaca',
       requires: (s) => questionCleared(s, 'bulmaca'),
-      message: () => "Bulmaca'yı açmak için önce Tümcel'i oynayıp günün sorusunu cevapla.",
+      message: () => "Çengel'i açmak için önce Tümcel'i oynayıp günün sorusunu cevapla.",
     },
     {
       game: 'bulmaca',
       requires: (s) => s.tumcelWon,
-      message: () => "Bulmaca'yı oynayabilmek için önce Tümcel'i kazanman gerekiyor.",
+      message: () => "Çengel'i oynayabilmek için önce Tümcel'i kazanman gerekiyor.",
     },
   ];
 

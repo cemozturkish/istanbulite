@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="palette.css?v=8">
   <link rel="stylesheet" href="profile-card.css?v=39">
   <script src="avatar.js?v=1" defer></script>
-  <script src="profile-card.js?v=43" defer></script>
+  <script src="profile-card.js?v=44" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=5"></script>
@@ -3337,8 +3337,8 @@ const loadAnketActor = stackFetch(async () => {
 // not a slot in this column — it stays generated and admin-managed
 // elsewhere, so there is nothing for a member to offer it.
 const SUBMIT_DEFS = [
-  { key: 'sozcel', kicker: '1. OYUN', title: 'Sözcel', logo: 'assets/sozcel-logo.png', ask: 'Bu geceye bir kelime öner' },
-  { key: 'tumcel', kicker: '2. OYUN', title: 'Tümcel', ask: 'Bu geceye bir alıntı öner' },
+  { key: 'sozcel', kicker: 'SÖZCÜK ÖNER', title: 'Sözcel', logo: 'assets/sozcel-logo.png', ask: 'Bu geceye bir kelime öner' },
+  { key: 'tumcel', kicker: 'CÜMLE ÖNER', title: 'Tümcel', ask: 'Bu geceye bir cümle öner' },
 ];
 
 // One title, two loaders (loadOyunActor at night, loadSubmitActor by
@@ -3505,7 +3505,7 @@ async function loadSubmitActor(el, slot) {
 // without closing the page.
 function submitPagePayload(g, data, mine, again) {
   return {
-    kicker: g.kicker + ' · ÖNERİ',
+    kicker: g.kicker,
     // Sözcel's own box names when the game actually unlocks -- sunset --
     // in the one corner every fb-page already reserves for its meta (see
     // .fb-page-head .m); it ticks live once wired (see
@@ -3749,11 +3749,23 @@ function renderSubmitMade(body, g, mine) {
   });
 }
 
-function renderSubmitForm(body, g, data, prefill, prefillNote) {
+// The same four kinds admin.html's own tc-color-N pickers sort a
+// puzzle's quotes into (Sözlü/Ezgi/Yazılı/Halk Ağzı) — asked of the
+// member at the moment they offer a sentence, so it travels with the
+// suggestion instead of being guessed at twice. One vocabulary, not two
+// (see db/tumcel_quote_suggestions_v2_category.sql).
+const TUMCEL_CATEGORIES = [
+  { value: 'cat1', label: 'Sözlü' },
+  { value: 'cat2', label: 'Ezgi' },
+  { value: 'cat3', label: 'Yazılı' },
+  { value: 'cat4', label: 'Halk Ağzı' },
+];
+
+function renderSubmitForm(body, g, data, prefill, prefillNote, prefillCategory) {
   const isWord = g.key === 'sozcel';
   body.innerHTML =
     '<label class="submit-label" for="submit-in">' +
-      (isWord ? SOZCEL_SYL_MIN + ' ya da ' + SOZCEL_SYL_MAX + ' heceli bir kelime' : 'Alıntı') + '</label>' +
+      (isWord ? SOZCEL_SYL_MIN + ' ya da ' + SOZCEL_SYL_MAX + ' heceli bir kelime' : 'Cümle') + '</label>' +
     (isWord
       ? '<input class="submit-in" id="submit-in" type="text" inputmode="text" autocomplete="off" ' +
         'autocapitalize="off" spellcheck="false" maxlength="16">'
@@ -3768,14 +3780,21 @@ function renderSubmitForm(body, g, data, prefill, prefillNote) {
         '<input class="submit-in" id="submit-note" type="text" maxlength="160">'
       : '<label class="submit-label" for="submit-note">Kimden?</label>' +
         '<input class="submit-in" id="submit-note" type="text" maxlength="120">') +
+    (isWord ? '' :
+      '<label class="submit-label" for="submit-category">Bu cümle nereden geliyor?</label>' +
+      '<select class="submit-in" id="submit-category">' +
+        TUMCEL_CATEGORIES.map(c => '<option value="' + c.value + '">' + c.label + '</option>').join('') +
+      '</select>') +
     '<div class="fb-throw-row"><button type="button" class="fb-throw-btn" id="submit-go">Gönder</button></div>' +
     '<div class="anket-note" id="submit-msg">Bu gece oynanacak oyun için.</div>';
 
   const field = body.querySelector('#submit-in');
   const note = body.querySelector('#submit-note');
+  const category = body.querySelector('#submit-category');
   const go = body.querySelector('#submit-go');
   const msg = body.querySelector('#submit-msg');
   if (!field || !go) return;
+  if (category && prefillCategory) category.value = prefillCategory;
   // Arriving from "başka kelime": the word they are replacing is in the
   // field, because changing one letter of it is the likeliest edit and
   // retyping the whole thing is the likeliest reason not to bother. Its
@@ -3816,7 +3835,8 @@ function renderSubmitForm(body, g, data, prefill, prefillNote) {
       if (!uid) problem = 'Oturum bulunamadı.';
       else {
         const { error } = await IstRouter.sb.from('tumcel_quote_suggestions')
-          .insert([{ body: (field.value || '').trim(), source: extra || '—', suggested_by: uid }]);
+          .insert([{ body: (field.value || '').trim(), source: extra || '—', suggested_by: uid,
+                     category: category ? category.value : null }]);
         if (error) {
           console.error('[proje öneri]', error);
           problem = error.code === '23505' ? 'Bu alıntı zaten önerilmiş.' : 'Gönderilemedi, tekrar dene.';
