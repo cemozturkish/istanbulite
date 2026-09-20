@@ -1827,6 +1827,27 @@ paper — day or night, since `--lit`/`--ink` already carry the theme — withou
 palette. Gated on `html.ist-map-ink` exactly like the other three; switched off, the mark stays
 exactly as drawn.
 
+**And a fifth is `assets/frame.png`'s own ring — except it is six small ladders, not one**
+(`FRAME_LADDERS` in map-ink.js, gated on its own `html.ist-frame-ink` class). The hexagon frame is
+drawn with a lit face and a shadow face, two flat tones exactly like every ladder above — but
+`--hexframe-stroke` (frames.css) is not one color to bind that shading to: it is reassigned per
+hexagon to mean something (the petek's five-tone distance ladder, and red for whoever is named on
+the top bar, see profile-card.css and "The petek" section). A luminance-remap filter has to know
+its colors ahead of time, so there is one small two-tone ladder per distinct ring color the site
+actually uses — `--ink`, `--ink-red`, and the petek's `--ist-hive-ring-me/bonded/other/open` —
+each built from that ONE color alone: itself for the lit face, and that same color darkened by the
+drawing's own ratio (24/61) for the shadow face. `--hexframe-filter` travels alongside
+`--hexframe-stroke` everywhere the latter is set, naming which of the six to use; frames.css falls
+back to the old flat mask + solid color until both are ready. Sözcel's board and keyboard are
+deliberately absent — pinned to `#000`, where "itself" and "darkened further" are both just black,
+so there is nothing for a bevel to show and that ring stays the plain flat mask forever. This
+family is gated separately from the other four (`html.ist-frame-ink`, not `html.ist-map-ink`): a
+ring color that fails to resolve must never be able to take the maps and avatars down with it, and
+the reverse — two independent ladders sharing one mechanism, not one bigger one. It is also the one
+ladder here that needs `--ist-hive-ring-bonded`'s `color-mix()` resolved to a literal color first
+(map-ink.js's `parseColor` does this through an offscreen canvas's `fillStyle`, which understands
+the full CSS `<color>` grammar); every other ladder's tokens were already a literal hex or `rgb()`.
+
 **`?ink=0` turns every ladder off, and `?ink=1` turns them back on** (`KILL_KEY` in map-ink.js,
 remembered in `localStorage` because `index.html` drops the query on its way to `project.html`).
 It exists because this is the one thing on the site that cannot be measured where it is written.

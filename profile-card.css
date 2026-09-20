@@ -867,6 +867,22 @@
    to shrink past legibility, dragged instead (see fitHive). Cell size is
    capped against the viewport height as well as in px: nothing here
    scrolls, ever. */
+/* The petek's five ring tones are declared at :root, not inside
+   .ist-hive-page below where they are actually USED — map-ink.js's frame
+   ladder (palette.css, "THE FRAME'S OWN SHADING") reads them off
+   document.documentElement, which cannot see a custom property scoped to
+   a page that may not even be mounted yet. Hoisting the declaration up
+   changes nothing about how .ist-hive-frame resolves them (inheritance
+   still flows the same values down through .ist-hive-page either way) —
+   it only makes them visible to the filter that recolors the ring. */
+:root {
+  --ist-hive-ring-me: var(--ink);
+  --ist-hive-ring-bonded: #5a5a5a;
+  --ist-hive-ring-bonded: color-mix(in srgb, var(--ink) 62%, var(--paper));
+  --ist-hive-ring-other: var(--muted);
+  --ist-hive-ring-open: var(--hairline);
+  --ist-hive-ring-ghost: var(--rule);
+}
 .ist-hive-page {
   /* Height follows from the drawing's own ratio (frames.css), so the
      width is the only size knob. */
@@ -911,17 +927,14 @@
        5. the field of places nobody stands in yet
 
      Every one of them is the ring of the same drawn hexagon
-     (--hexframe-stroke, see frames.css), so this is a tone ladder and
-     not five different treatments. Level 2 is mixed rather than picked
-     from the palette because nothing between --ink and --muted exists
-     there; the flat value above it is the fallback for a browser without
-     color-mix, and it keeps the ladder monotonic either way. */
-  --ist-hive-ring-me: var(--ink);
-  --ist-hive-ring-bonded: #5a5a5a;
-  --ist-hive-ring-bonded: color-mix(in srgb, var(--ink) 62%, var(--paper));
-  --ist-hive-ring-other: var(--muted);
-  --ist-hive-ring-open: var(--hairline);
-  --ist-hive-ring-ghost: var(--rule);
+     (--hexframe-stroke AND --hexframe-filter, see frames.css and
+     palette.css's "THE FRAME'S OWN SHADING"), so this is a tone ladder
+     and not five different treatments. Level 2 is mixed rather than
+     picked from the palette because nothing between --ink and --muted
+     exists there; the flat value above it is the fallback for a browser
+     without color-mix, and it keeps the ladder monotonic either way.
+     The five tokens themselves are declared at :root now, above this
+     rule — see that declaration for why. */
   /* The track a name gets beside its hexagon, and the air between the
      two. Written against the cell so a name stays the same size relative
      to the face it belongs to at every scale the grid is drawn at. */
@@ -1044,6 +1057,7 @@ button.ist-hive-cell { cursor: pointer; }
 button.ist-hive-cell:hover .ist-hive-slot,
 button.ist-hive-cell:focus-visible .ist-hive-slot {
   --hexframe-stroke: var(--ink);
+  --hexframe-filter: url(#ist-frame-ink);
 }
 /* Hover lifts a free side out of its own tone and into full ink, which
    is the whole hint that it is a place something goes. */
@@ -1102,7 +1116,10 @@ button.ist-hive-cell:focus-visible { outline: none; }
    that takes one — stays inked while it is open, and lifts slightly
    (transform only: nothing about its box changes, so no neighbour ever
    moves). */
-button.ist-hive-cell-open .ist-hive-slot { --hexframe-stroke: var(--ink); }
+button.ist-hive-cell-open .ist-hive-slot {
+  --hexframe-stroke: var(--ink);
+  --hexframe-filter: url(#ist-frame-ink);
+}
 button.ist-hive-cell-open .ist-hive-plus { color: var(--ink); }
 /* The press is the same gesture wherever it happens, so it gives the same
    amount at the same speed: 0.955 over 0.11s, matching Kütüphane's news
@@ -1126,10 +1143,16 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.955); }
    aimed at. */
 .ist-hive-cell:disabled { pointer-events: none; }
 /* 1. You. Nothing else on the page is this dark. */
-.ist-hive-me .ist-hive-frame { --hexframe-stroke: var(--ist-hive-ring-me); }
+.ist-hive-me .ist-hive-frame {
+  --hexframe-stroke: var(--ist-hive-ring-me);
+  --hexframe-filter: url(#ist-frame-hive-me);
+}
 /* 2. The members you are attached to: one step back from you, and still
    clearly in the foreground — these are the six that are yours. */
-.ist-hive-filled.ist-hive-bonded .ist-hive-frame { --hexframe-stroke: var(--ist-hive-ring-bonded); }
+.ist-hive-filled.ist-hive-bonded .ist-hive-frame {
+  --hexframe-stroke: var(--ist-hive-ring-bonded);
+  --hexframe-filter: url(#ist-frame-hive-bonded);
+}
 /* 3. A member you are not attached to — somebody else's neighbour,
    standing on the same petek. Another step back: the grid is one shape
    and hiding part of it would be a lie, but which of it is yours has to
@@ -1137,6 +1160,7 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.955); }
    the edge off the portrait so the two agree. */
 .ist-hive-filled:not(.ist-hive-bonded) .ist-hive-frame {
   --hexframe-stroke: var(--ist-hive-ring-other);
+  --hexframe-filter: url(#ist-frame-hive-other);
   opacity: 0.88;
 }
 /* ── The one who is named on the bar ──
@@ -1151,6 +1175,7 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.955); }
    being said any more. */
 .ist-hive-cell.ist-hive-picked .ist-hive-frame {
   --hexframe-stroke: var(--ink-red, #B93631);
+  --hexframe-filter: url(#ist-frame-red);
   opacity: 1;
 }
 /* The frame fills its cell and takes its height from the drawing's ratio
@@ -1165,10 +1190,14 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.955); }
    fill — so an opening reads as an opening rather than as a member whose
    avatar failed to load. */
 /* 4. A free side of your own hexagon: a place, not a person. */
-.ist-hive-empty .ist-hive-slot { --hexframe-stroke: var(--ist-hive-ring-open); }
+.ist-hive-empty .ist-hive-slot {
+  --hexframe-stroke: var(--ist-hive-ring-open);
+  --hexframe-filter: url(#ist-frame-hive-open);
+}
 .ist-hive-empty .ist-hive-plus { color: var(--ist-hive-ring-open); }
 .ist-hive-slot {
   --hexframe-stroke: var(--ist-hive-ring-open);
+  --hexframe-filter: url(#ist-frame-hive-open);
   background: none;
   /* A column, not a row: what stands in here is either the "+" alone or
      a code with its countdown under it, and the drawn hexagon is at its

@@ -160,6 +160,43 @@
     },
   ];
 
+  // ══════════════════════════════════════════════════════════════
+  // THE FRAME'S OWN SHADING — a ladder per ring color, not one ladder
+  // ──────────────────────────────────────────────────────────────
+  // frame.png is not a flat silhouette: it is drawn with a lit face and
+  // a shadow face, two flat grays (61 and 24 out of 255 — measured the
+  // same way as every ladder above), which is what gives the hexagon its
+  // bevel. Used as a plain CSS mask, none of that ever rendered: a mask
+  // only reads a PNG's alpha, and what actually painted inside it was a
+  // single flat --hexframe-stroke color (frames.css) — the shading was
+  // there in the file and nowhere on screen.
+  //
+  // Putting it back is not one ladder, because --hexframe-stroke is not
+  // one color: it is reassigned per hexagon to mean something — the
+  // petek's five-tone distance ladder (you / bonded / other / an open
+  // seat) and red for whoever is named on the top bar (profile-card.css).
+  // A luminance-remap filter has to know its colors ahead of time, so
+  // there is one small ladder per distinct ring color the site actually
+  // uses, each built from that ONE color: itself for the lit face, and
+  // that same color darkened by the drawing's own ratio (24/61) for the
+  // shadow face. Add a new ring color, add a row here.
+  const FRAME_SHADE = 24 / 61;
+  const FRAME_TONES = [61, 24];
+  const FRAME_LADDERS = [
+    { id: 'ist-frame-ink',         var: '--ink',                  tones: FRAME_TONES, shade: FRAME_SHADE },
+    { id: 'ist-frame-red',         var: '--ink-red',              tones: FRAME_TONES, shade: FRAME_SHADE },
+    { id: 'ist-frame-hive-me',     var: '--ist-hive-ring-me',     tones: FRAME_TONES, shade: FRAME_SHADE },
+    { id: 'ist-frame-hive-bonded', var: '--ist-hive-ring-bonded', tones: FRAME_TONES, shade: FRAME_SHADE },
+    { id: 'ist-frame-hive-other',  var: '--ist-hive-ring-other',  tones: FRAME_TONES, shade: FRAME_SHADE },
+    { id: 'ist-frame-hive-open',   var: '--ist-hive-ring-open',   tones: FRAME_TONES, shade: FRAME_SHADE },
+  ];
+  // Sözcel's board/keyboard are deliberately absent: pinned to #000
+  // (frames.css), where "itself" and "darkened further" are both just
+  // black — there is nothing for a bevel to show, so that ring stays the
+  // plain flat mask forever rather than carrying a filter that would be
+  // a no-op. See frames.css's own note on it.
+  const FRAME_READY_CLASS = 'ist-frame-ink';
+
   // One entry per 8-bit gray. Not a round number picked for looks: every
   // tone above is k/255, so at this size each lands exactly on a sample
   // and no anchor is reached by interpolation.
@@ -169,9 +206,7 @@
   let built = null;
 
   // '#rgb' / '#rrggbb' / 'rgb(r, g, b)' -> [r, g, b] in 0..1
-  function parseColor(raw) {
-    const s = String(raw || '').trim();
-    if (!s) return null;
+  function parseColorLiteral(s) {
     if (s[0] === '#') {
       const h = s.slice(1);
       if (h.length === 3) return [0, 1, 2].map(i => parseInt(h[i] + h[i], 16) / 255);
@@ -180,6 +215,31 @@
     }
     const m = s.match(/rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i);
     return m ? [+m[1] / 255, +m[2] / 255, +m[3] / 255] : null;
+  }
+
+  // Everything the maps and avatars ever declare is a literal hex or
+  // rgb() and parseColorLiteral is all that is needed. The frame ladder
+  // reads tokens like --ist-hive-ring-bonded, which is a color-mix() —
+  // custom properties resolve nested var()s but never evaluate a
+  // function like color-mix() into a literal color, so the raw string
+  // still has "color-mix(...)" in it at this point. Rather than writing
+  // a color-mix parser, hand it to a canvas 2D context: the fillStyle
+  // setter runs the browser's own full <color> grammar and reading it
+  // back always normalizes to something parseColorLiteral already
+  // understands (#rrggbb or rgb()/rgba()), in every engine. Only paid
+  // for the exotic case — anything already literal never reaches it.
+  function parseColor(raw) {
+    const s = String(raw || '').trim();
+    if (!s) return null;
+    const direct = parseColorLiteral(s);
+    if (direct) return direct;
+    try {
+      if (!parseColor._ctx) parseColor._ctx = document.createElement('canvas').getContext('2d');
+      const ctx = parseColor._ctx;
+      ctx.fillStyle = '#000';
+      ctx.fillStyle = s;
+      return parseColorLiteral(ctx.fillStyle);
+    } catch (e) { return null; }
   }
 
   function el(name, attrs) {
@@ -257,7 +317,14 @@
     svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
     const defs = el('defs', {});
     built = {};
+    // Both families share one <defs> -- buildOne() only cares about a
+    // spec's id/tones/red, so a frame ladder (single var + a derived
+    // shadow tone) builds through the exact same machinery as a map or
+    // avatar ladder (several vars, one per tone). Sharing the DOM only
+    // saves an element; it does NOT couple their readiness -- see
+    // refresh() for why those stay two independent gates.
     for (const spec of LADDERS) built[spec.id] = buildOne(spec, defs);
+    for (const spec of FRAME_LADDERS) built[spec.id] = buildOne(spec, defs);
     svg.appendChild(defs);
     document.body.appendChild(svg);
     return true;
@@ -281,37 +348,67 @@
     return out.map(a => a.join(' '));
   }
 
+  function writeLadder(spec, cols, red) {
+    const b = built[spec.id];
+    const t = tables(spec.tones, cols);
+    b.funcs.R.setAttribute('tableValues', t[0]);
+    b.funcs.G.setAttribute('tableValues', t[1]);
+    b.funcs.B.setAttribute('tableValues', t[2]);
+    if (b.flood) b.flood.setAttribute('flood-color', red);
+  }
+
   // Re-reads the tokens and rewrites the lookup. Called by palette.js
   // every time the palette or the sun moves, so a sunset repaints the
   // maps in the same frame it repaints everything else.
   function refresh() {
     try {
-      // Switched off: the ready class is never added, so every drawing
-      // renders exactly as it was drawn -- the same degradation the class
-      // guarantees when this module fails to load at all.
-      if (killed()) { document.documentElement.classList.remove(READY_CLASS); return; }
+      // Switched off: neither ready class is added, so every drawing
+      // renders exactly as it was drawn -- the same degradation both
+      // classes guarantee when this module fails to load at all.
+      if (killed()) {
+        document.documentElement.classList.remove(READY_CLASS);
+        document.documentElement.classList.remove(FRAME_READY_CLASS);
+        return;
+      }
       const cs = getComputedStyle(document.documentElement);
-      const want = [];
+
+      // ── The maps, avatars, loading screen and Sözcel's mark ──
+      // Unchanged: all or nothing across this whole family, so the ready
+      // class can never mean "half of them are painted".
+      const mainWant = [];
+      let mainOk = true;
       for (const spec of LADDERS) {
         const cols = spec.vars.map(v => parseColor(cs.getPropertyValue(v)));
         const red = spec.red ? String(cs.getPropertyValue(spec.red) || '').trim() : '';
-        // No tokens, no filter: a page that never declared a ladder keeps
-        // that family's drawings exactly as they were drawn. All or
-        // nothing across the ladders, so the ready class can never mean
-        // "half of them are painted".
-        if (cols.some(c => !c) || (spec.red && !red)) return;
-        want.push({ spec, cols, red });
+        if (cols.some(c => !c) || (spec.red && !red)) { mainOk = false; break; }
+        mainWant.push({ spec, cols, red });
       }
-      if (!build()) return;
-      for (const { spec, cols, red } of want) {
-        const b = built[spec.id];
-        const t = tables(spec.tones, cols);
-        b.funcs.R.setAttribute('tableValues', t[0]);
-        b.funcs.G.setAttribute('tableValues', t[1]);
-        b.funcs.B.setAttribute('tableValues', t[2]);
-        if (b.flood) b.flood.setAttribute('flood-color', red);
+
+      // ── The frame's own ring colors ──
+      // A SEPARATE gate, on purpose: a color that fails to resolve here
+      // (an engine too old for color-mix and its canvas fallback both,
+      // a page that never declared one of these six vars) must not be
+      // able to take the maps and avatars down with it, and the reverse.
+      // Two independent ladders sharing one mechanism, not one bigger one.
+      const frameWant = [];
+      let frameOk = true;
+      for (const spec of FRAME_LADDERS) {
+        const base = parseColor(cs.getPropertyValue(spec.var));
+        if (!base) { frameOk = false; break; }
+        frameWant.push({ spec, cols: [base, base.map(c => c * spec.shade)], red: '' });
       }
-      document.documentElement.classList.add(READY_CLASS);
+
+      if (!mainOk && !frameOk) return;
+      if (!build()) return; // no body yet -- neither family can be written
+
+      if (mainOk) {
+        for (const { spec, cols, red } of mainWant) writeLadder(spec, cols, red);
+        document.documentElement.classList.add(READY_CLASS);
+      }
+      if (frameOk) {
+        for (const { spec, cols, red } of frameWant) writeLadder(spec, cols, red);
+        document.documentElement.classList.add(FRAME_READY_CLASS);
+      }
     } catch (e) { /* the drawings stay as drawn */ }
   }
 
@@ -329,5 +426,8 @@
     window.addEventListener('load', refresh);
   } catch (e) { /* ignore */ }
 
-  global.IstMapInk = { refresh, READY_CLASS, LADDERS, KILL_KEY };
+  global.IstMapInk = {
+    refresh, READY_CLASS, LADDERS, KILL_KEY,
+    FRAME_READY_CLASS, FRAME_LADDERS,
+  };
 })(window);
