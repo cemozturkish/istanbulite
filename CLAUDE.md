@@ -2263,11 +2263,13 @@ somewhere to write a changing `background-image`, and the button already spends 
 `logo-fill-mask.png` silhouette as the resting fill, at the same size and position, and sits on
 the **same 1200×400 canvas the ten loading frames themselves are drawn on** — so a frame dropped
 in as its `background-image` lands registered pixel-for-pixel under `.fb-logo`'s own strokes
-above it, no second alignment to keep in step with the first. Because it is the real artwork
-rather than a mixed tone, it reads at its own native black/grey/white regardless of palette — the
-same deliberate palette-independence the curtain itself keeps (see "the loading screen is the
-third ladder"): a splash that is one palette on the way in and another on the way out is two
-different doors.
+above it, no second alignment to keep in step with the first. Because it is the real artwork, it
+is filtered through the same ladder the curtain itself is (`#ist-loading-ink` in palette.css, see
+"the loading screen is the third ladder") rather than staying raw grayscale — so it reads the
+earth palette's own sea instead of the frames' drawn gray, exactly as the curtain already does.
+Per **palette** and not per **theme**, same as the curtain: it does not track day/night, only
+which palette the reader is on — a splash that changed with the sun while the door stayed the
+same colour, or the other way round, would be a mismatch between the two.
 
 Seven things about it:
 
