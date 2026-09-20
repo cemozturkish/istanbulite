@@ -1765,7 +1765,7 @@ page it is drawn on in the same frame. The selector list deliberately does not c
 these maps that is not gray.
 
 **And the maps are not the only drawn grays, so there are two ladders** (`LADDERS` in map-ink.js).
-The avatar family — `assets/avatar-*.png` plus `frame-background.png` — is the same measurement
+The avatar family — `assets/avatar-*.png` plus `avatar-background.png` — is the same measurement
 again and even cleaner: four flat tones, already transparent, already registered on the one
 1024×1536 hexframe canvas. `#f9f9f9` the figure's own paper (`--av-paper`), `#dcdbdb` the ground
 behind it (`--av-ground`), `#5b5b5b` the jail stripes (`--av-jail`), `#181818` the ink that draws

@@ -632,16 +632,22 @@ main,
 /* ── HEX FRAME (hand-drawn elongated hexagon) ────────────────── */
 /* The site-wide small-element frame: replaces the old circular
    avatar frames and Sözcel's square tiles/keys with the
-   hand-drawn elongated hexagon (assets/frame.png), used at its
-   EXACT drawn proportions — the shape is never stretched. Two
-   masks cut from the same drawing (same canvas, so they always
-   align pixel-perfect at center/contain):
-   1. assets/frame-fill.png — the full silhouette, masking the
-      element itself, so content is cut to the drawing's own
-      wobbly outline (no polygon approximation);
-   2. assets/frame-ring.png — the drawn stroke only (interior
-      knocked out), painted on top by an ::after overlay, tinted
+   hand-drawn elongated hexagon, used at its EXACT drawn
+   proportions — the shape is never stretched. Two assets from the
+   same canvas (so they always align pixel-perfect at
+   center/contain):
+   1. assets/avatar-background.png — the filled silhouette (a
+      painted background, not just alpha), masking the element
+      itself, so content is cut to the drawing's own wobbly
+      outline (no polygon approximation) — see "the ground behind
+      the figure" below for why it doubles as the background too;
+   2. assets/frame.png — the drawn stroke only (interior fully
+      transparent), painted on top by an ::after overlay, tinted
       via --hexframe-stroke so it follows the palette/dark mode.
+   The two are deliberately not pixel-identical: avatar-background.png
+   sits a little INSIDE frame.png's own stroke on purpose, so the
+   stroke covers the seam between the two (see "Image-bearing
+   avatars" below).
    Avatar boxes adopt the drawing's aspect ratio (height stays,
    width follows) and the avatar art anchors to the BOTTOM of the
    frame; letters in Sözcel tiles/keys stay centered.
@@ -649,12 +655,12 @@ main,
    dedicated class (e.g. admin.html's inline avatar previews). */
 :root {
   /* Shared canvas for the whole hexframe asset family (frame.png,
-     frame-fill.png, frame-ring.png, frame-background.png, avatar-base.png,
-     and every future clothing/hair/hat overlay) — all drawn uncropped at
-     1024×1536 so they stay pixel-registered without per-file crop math. */
+     avatar-background.png, avatar-base.png, and every future
+     clothing/hair/hat overlay) — all drawn uncropped at 1024×1536 so
+     they stay pixel-registered without per-file crop math. */
   --hexframe-ratio: 1024 / 1536;
-  --hexframe-mask: url("assets/frame-fill.png") center / contain no-repeat;
-  --hexframe-ring: url("assets/frame-ring.png") center / contain no-repeat;
+  --hexframe-mask: url("assets/avatar-background.png") center / contain no-repeat;
+  --hexframe-ring: url("assets/frame.png") center / contain no-repeat;
 }
 
 .hexframe,
@@ -729,14 +735,16 @@ main,
   object-position: center bottom !important;
 }
 
-/* Image-bearing avatars: the hand-drawn frame-background.png (same
+/* Image-bearing avatars: the hand-drawn avatar-background.png (same
    uncropped canvas as the frame/avatar art, see --hexframe-ratio above)
    paints behind the avatar/sticker layers, standing in for the old flat
    #f5f5f5 fill — it's inset slightly from the frame's drawn stroke on
    purpose, so the stroke (painted on top via ::after) covers the seam
-   between the two. #f5f5f5 stays as the background-color fallback in
-   case the image fails to load. Initials-only avatars (e.g. the "+N"
-   counters) keep their page-set colors. */
+   between the two. Same file the mask above uses, doing double duty:
+   its alpha is the silhouette, its paint is the ground. #f5f5f5 stays as
+   the background-color fallback in case the image fails to load.
+   Initials-only avatars (e.g. the "+N" counters) keep their page-set
+   colors. */
 .hexframe:has(img),
 .ist-pc-cover-avatar:has(img),
 .library-card .avatar:has(img),
@@ -745,7 +753,7 @@ main,
 .ev-attendee-avatar:has(img),
 .politician-detail-avatar:has(img),
 .tbmm-detail-avatar:has(img) {
-  background: #f5f5f5 url("assets/frame-background.png") center / contain no-repeat !important;
+  background: #f5f5f5 url("assets/avatar-background.png") center / contain no-repeat !important;
 }
 
 /* Sözcel tiles keep their grid-set width and take their height

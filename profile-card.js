@@ -1588,23 +1588,21 @@
   const HIVE_FIELD_MAX = 24;
 
   // The drawn hexagon, as geometry rather than as a picture.
-  // Traced from assets/frame-ring.png -- a 1024x1536 canvas carrying a
-  // 779x1266 silhouette, which is why the <svg> using it carries that
-  // viewBox. Two contours, outer then inner, filled evenodd: the ring
-  // itself as a shape, not a line down the middle of it.
+  // Traced from assets/frame.png -- a 1024x1536 canvas carrying a
+  // ring silhouette roughly 775x1162, which is why the <svg> using it
+  // carries a 1024x1536 viewBox. Two contours, outer then inner, filled
+  // evenodd: the ring itself as a shape, not a line down the middle of it.
   //
   // It is a fill and not a stroke because the drawn ring is not a
-  // constant width -- it runs about 49 units at the top and 56 lower
-  // down. A single stroked centreline reproduced it to only ~87% of its
-  // pixels however the tracing was tuned (the parameters barely moved
-  // the number, which is what showed the model itself was wrong); the
-  // two contours land at 97.6%, the rest being antialiasing. A fill is
-  // also the cheaper of the two to rasterise.
+  // constant width. A single stroked centreline would only approximate
+  // it; two contours (found by tracing the alpha channel's 0.5 level set
+  // and simplifying with Douglas-Peucker) land the outline at ~98% of the
+  // artwork's own pixels, the rest being antialiasing. A fill is also the
+  // cheaper of the two to rasterise.
   //
-  // Re-trace this if frame-ring.png is ever redrawn. Like
-  // --ist-hive-step-x/y in profile-card.css, it is the drawing's number
-  // and not the box's.
-  const HIVE_HEX_PATH = 'M 509 135 L 321 243 L 138 344 L 133 347 L 129 353 L 126 513 L 126 636 L 124 748 L 125 844 L 123 892 L 124 906 L 122 1173 L 129 1180 L 307 1281 L 510 1400 L 513 1400 L 723 1277 L 894 1180 L 901 1173 L 897 528 L 895 390 L 893 351 L 888 346 L 734 261 L 514 135 Z M 506 187 L 494 190 L 484 195 L 377 263 L 218 368 L 205 377 L 193 388 L 180 409 L 175 428 L 174 572 L 174 825 L 176 903 L 177 1102 L 182 1120 L 194 1140 L 210 1154 L 487 1353 L 498 1359 L 506 1361 L 515 1361 L 525 1359 L 543 1348 L 718 1223 L 817 1151 L 827 1142 L 838 1127 L 843 1115 L 846 1100 L 847 886 L 849 794 L 848 428 L 844 412 L 839 401 L 828 386 L 819 378 L 731 319 L 539 195 L 529 190 L 517 187 Z';
+  // Re-trace this if frame.png is ever redrawn. Like --ist-hive-step-x/y
+  // in profile-card.css, it is the drawing's number and not the box's.
+  const HIVE_HEX_PATH = 'M 513 1348 L 507 1348 L 307 1230 L 144 1138 L 127 1128 L 124 1122 L 124 876 L 126 796 L 124 492 L 124 410 L 132 404 L 328 294 L 510 186 L 514 188 L 738 320 L 889 404 L 894 408 L 898 414 L 898 659 L 896 747 L 898 1043 L 898 1125 L 878 1138 L 795 1184 L 622 1284 Z M 516 1311 L 527 1306 L 542 1296 L 710 1176 L 737 1156 L 802 1110 L 828 1087 L 838 1069 L 842 1054 L 844 985 L 842 967 L 844 862 L 844 674 L 842 569 L 844 551 L 842 476 L 834 456 L 815 436 L 541 238 L 519 226 L 505 224 L 495 228 L 483 236 L 376 312 L 281 382 L 220 424 L 194 447 L 184 466 L 180 481 L 178 569 L 178 697 L 178 862 L 180 967 L 178 985 L 180 1060 L 190 1081 L 204 1098 L 249 1132 L 278 1150 L 312 1176 L 480 1296 L 495 1306 L 504 1310 Z';
 
   // How far the field has to reach, in cells, for the honeycomb to run
   // off every edge of the screen rather than stopping in mid-air with
@@ -1892,7 +1890,7 @@
   // reads as the end of the world rather than as the middle of one.
   // ── The empty field is drawn, not masked ──
   // Every other cell on the plane is a .hexframe: two PNG-masked layers
-  // (frame-fill.png through -webkit-mask, then frame-ring.png again on
+  // (avatar-background.png through -webkit-mask, then frame.png again on
   // ::after, see frames.css). That is the right primitive for a cell that
   // holds avatar art -- the mask is what the art is cut out by.
   //
@@ -1907,7 +1905,7 @@
   // draw nothing at all.
   //
   // So a ghost's frame is an <svg> filling HIVE_HEX_PATH instead: no
-  // mask, no ::after. The path is traced from frame-ring.png itself (see
+  // mask, no ::after. The path is traced from frame.png itself (see
   // HIVE_HEX_PATH), so the empty places are the same drawn hexagon as the
   // occupied ones rather than a geometric stand-in -- the frame is
   // hand-drawn, and a machine-perfect polygon beside it reads as a
