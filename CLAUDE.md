@@ -2534,22 +2534,59 @@ sunset the same three boxes, in the same order, ARE those games.
 
 | slot | gündüz | gece |
 |---|---|---|
-| 1. Oyun | a word for tonight → `sozcel_word_suggestions` | Sözcel, playing whichever word was chosen |
-| 2. Oyun | a quote for tonight → `tumcel_quote_suggestions` | Tümcel |
+| 1. Oyun | a word for the pool → `sozcel_word_suggestions` | Sözcel, playing whichever word was chosen |
+| 2. Oyun | a sentence for the pool → `tumcel_quote_suggestions` | Tümcel |
 | 3. Oyun | nothing to offer — it is generated, and says so | Bulmaca |
 
 Nothing a member writes here reaches another member except by the admin picking it (admin.html's
-Oyunlar → Sözcel panel, **Bu Gecenin Kelimesi**). That makes the member who came only for the games
+Oyunlar → Sözcel panel, **Kelime Havuzu**). That makes the member who came only for the games
 put something into the day rather than finding a locked door until sunset — which is the whole
 reason the daytime half of this column is not a scoreboard.
+
+**AN OFFER IS NOT FLEETING — IT GOES INTO A POOL**
+(`db/sozcel_word_suggestions_v2_standing_pool.sql`). What a member writes here is offered to the
+app, not to tonight: it sits in the pool until the admin picks it or until its author takes it
+back, and **nothing else removes it** — not a night going by, not somebody else's word being
+chosen. The first cut of this column had it the other way round (`for_night`, two per-night unique
+constraints, and admin.html marking every other offer for that night `'passed'` the moment one was
+picked), so a member who wrote a word on Tuesday morning had it quietly killed by Tuesday's pick
+and was asked again on Wednesday whether to re-send it. The city was writing into a bucket that was
+emptied every evening. `tumcel_quote_suggestions` has always been a standing pool, so the two
+suggestion tables are now one kind of thing rather than two, and the same rule governs any
+suggestion surface added later.
+
+- **`for_night` survives as a RECORD, not as a deadline.** It is null on a pending row and is
+  written by admin.html **at the moment of picking**, naming the night that word was actually
+  placed on — which is what lets the member's own box say "seçildi — bu gece bu oynanıyor" on the
+  one day it is true. A word of theirs picked for an *earlier* night is not their box's business
+  at all: it has been played, and the pool is open to them again.
+- **Two partial unique indexes, over the live rows only** — one offer per member and one row per
+  word, both `where status = 'pending'`. Partial because a word picked in March must not stop the
+  pool from holding it again (it could never be played twice anyway — `sozcel_used_answers.word`
+  is unique across all days, and the client checks that table before offering), and a member whose
+  word was picked is free to offer another the same minute.
+- **The admin's list IS the pool, oldest first** (`loadSozcelSuggestions`), with how long each
+  offer has been waiting printed on its row. A pool read only from the top starves the offer that
+  has waited longest, which is the same fleeting failure one level out. **Havuzdan çıkar** is the
+  one other way a word leaves: the admin actually saying no to it, written as `'passed'` rather
+  than a delete so the member can tell "not taken" from "still waiting" and the record of who
+  offered what survives. Picking a word for a night touches **only** the row being picked — plus,
+  when a night is being corrected, whatever was picked for that same night before, which stops
+  claiming to be the night's word.
 
 - **`sozcel_word_suggestions` is NOT world-readable, and that is the one place it diverges from
   `tumcel_quote_suggestions`** (which is `using (true)`). A Tümcel suggestion is a quote; a Sözcel
   suggestion is a candidate **answer**, and the admin picks tonight's word out of exactly that
   table — so world-readable, the whole candidate pool and then the answer itself would be sitting
   in a table any signed-in member can select from before the game is played. A member reads their
-  own row and nobody else's; the count the box prints comes from `sozcel_suggestion_count(night)`
+  own row and nobody else's; the count the box prints comes from `sozcel_pool_count()`
   (SECURITY DEFINER, one integer, no words and no identities), the same shape `question_tally` has.
+  It replaced `sozcel_suggestion_count(date)`, which asked about one night and now answers 0 for
+  every night — a **new name** rather than a defaulted argument, since two candidates differing
+  only by a default make a one-argument call ambiguous (42725) rather than resolving, the trap
+  `sozcel_daily_word` already documents. Tümcel's own box prints **its own** table's pending count
+  (an ordinary head query — that table *is* world-readable); it used to print Sözcel's, which was
+  simply the wrong number on the wrong card.
 - **What is asked for is 2 or 3 SYLLABLES and the word's MEANING — never a letter count and never
   "why this word".** Sözcel's board is a syllable staircase that adopts whatever length the
   recorded word has (`WORD_LENGTH = TARGET_WORD.length`), so "5 harfli bir kelime" was asking for a
@@ -2565,43 +2602,36 @@ reason the daytime half of this column is not a scoreboard.
   both sides so that file stays runnable against a fresh database and against one the first cut
   already ran on.
 - **A refusal names the migration that fixes it** (`offerWordError`). Every failure used to print
-  "Gönderilemedi, tekrar dene.", which is actively wrong advice for the two failures that are
-  actually likely — the table is not there, or it is there in its first shape and has no
-  `definition` column — because neither will ever come right by retrying, and a member told to try
-  again keeps trying while nobody finds out. So a permanent failure says so and names
-  `db/sozcel_word_suggestions.sql`; only a genuinely transient one says "tekrar dene". **It
+  "Gönderilemedi, tekrar dene.", which is actively wrong advice for the failures that are actually
+  likely — the table is not there, it is there in its first shape and has no `definition` column,
+  or it is still per-night and its `for_night` is `not null` while this insert deliberately writes
+  no night at all (23502) — because none of them will ever come right by retrying, and a member
+  told to try again keeps trying while nobody finds out. So a permanent failure says so and names
+  the file that fixes it (`db/sozcel_word_suggestions.sql`, or
+  `db/sozcel_word_suggestions_v2_standing_pool.sql` for that last one); only a genuinely transient
+  one says "tekrar dene". **It
   dispatches on the error CODE, never on the message**: PostgREST names the table inside the
   missing-column message *and* Postgres names it inside the RLS one, so any table-shaped pattern
   matches all three and whichever test runs first wins — two different wrong answers came out of
   trying to order those patterns before the codes were used. The message is a fallback only, for an
   error that arrives without a code, narrowest test first.
-- **One offer per member per night**, and two members cannot offer the same word for one night
-  (two unique constraints). It is an offer, not a channel to fill; changing your mind is
-  withdrawing yours (`Vazgeç`, allowed only while `pending`) and making another.
+- **One live offer per member**, standing rather than per night, and two members cannot have the
+  same word standing in the pool. It is an offer, not a channel to fill; changing your mind is
+  withdrawing yours (`Vazgeç`, allowed only while `pending` — the RLS delete policy is the
+  "unless the user revokes" half of the whole arrangement) and making another. The box stays quiet
+  ("Havuzda") for as long as the offer stands, however many nights that is, because "you have
+  already said your piece" does not expire either.
 - **The Turkish lowercase fold is `toLocaleLowerCase('tr-TR')`, never `toLowerCase()`.** In Turkish
   `I`/`ı` and `İ`/`i` are the case pairs, not `I`/`i` — the word lists are lowercase Turkish, so a
   word folded with the invariant rule never matches the pool it is supposed to join.
-- **A word that was not played is asked about again the next morning** (`lastUnpickedWord`,
-  `renderSubmitAgain`): the box says "Tekrar mı, başka mı?" and the page prints the word, that it
-  was not chosen, and **what was played instead** — `sozcel_used_answers` is readable by every
-  member and that word has already been played, so naming it gives nothing away and answers the
-  question the reader would ask next. Two ways on and no third: send the same word again, or write
-  another (the field arrives pre-filled with the old one, since changing a letter is the likeliest
-  edit). Declining is leaving the page — there is no "no thanks", because not offering is what
-  every other morning already looks like and needs no answer.
-  - It is the member's **last** offer and not a queue of them: let one go and offer something else
-    and the chain moves on, rather than nagging about a word they stopped caring about. Only asked
-    on a morning they have not already offered.
-  - **Both paths write through one function** (`offerWord`), so the "has this been played since"
-    check cannot drift between them — a word that went unpicked one night can perfectly well have
-    been taken by somebody else's offer or by the auto-pick since, and `sozcel_used_answers.word`
-    is unique across all days, so it could never be an answer again.
-  - Picking one marks every **other** offer for that night `'passed'` — that is what lets the
-    member's own app tell "not picked" from "not decided yet", since a night left quietly pending
-    forever says neither.
-  - Sözcel only, and not by omission: `tumcel_quote_suggestions` has no `for_night` at all — it is
-    a standing pool that sits until it is used — so an unpicked quote never expires and there is
-    nothing to re-send. Only a per-night offer can be missed.
+- **There is no "tekrar mı, başka mı?" any more, and that is the point.** The box used to ask, on
+  the morning after, whether to re-send a word that went unpicked (`lastUnpickedWord`,
+  `renderSubmitAgain`) — a whole flow that existed only to paper over offers expiring. An offer
+  that never expires needs none of it: the word is still in the pool, the box still says so, and
+  the member is asked nothing. What survives from it is `offerWord` as the one path that writes a
+  word, with its check that the word has not been played in the meantime (`sozcel_used_answers.word`
+  is unique across all days, so a word taken by somebody else's offer or by the auto-pick could
+  never be an answer again).
 
 **And the word now belongs to a NIGHT rather than to a date**
 (`db/sozcel_used_answers_v7_game_night.sql`). v5 resolved it with
@@ -2840,11 +2870,28 @@ rather than mid-slide; the game's back arrow, the backdrop and Escape are all wa
 of the page itself (`unmount()`) has nothing left to slide in front of and skips straight to hidden
 (`closeGameOverlay(true)`).
 
-Visiting one of the three directly still works exactly as before — the
-`<a href="project.html">` fallback is what fires when there is no parent to postMessage — and
-their own bottom-bar link and back arrow still point at `project.html` for that case. Tümcel and
-Bulmaca are tiles too now, the other two slots of Oyunlar beside Sözcel (see "What each screen
-carries" below) — all three open through the same embed.
+**And a game is not a PAGE: visiting one of the three directly is shut.** The embed is the only
+way in, so a top-level hit on `sozcel.html` / `tumcel.html` / `bulmaca.html` is a typed address, a
+stale bookmark or a search result — nothing on the site has linked there since the parts bin was
+demolished. What it used to serve was that bin's own chrome (a masthead, a "‹ Geri" and a column
+of links to the other two games) around a board whose day switches and sequence gates only mean
+anything inside the app: the app's front door standing open round the back. Each page's head
+therefore opens with one line — `if (window.self === window.top) location.replace('project.html')`
+— and the reasoning is written out once, in sozcel.html; the other two point at it.
+
+Three things about that line, each of which fails silently if changed. It is `location.replace`
+and never an assignment to `href`, so the bounce leaves no history entry for the device's own back
+gesture to land back on. It stands **first in the head**, ahead of every shared module, so a
+visitor being bounced is never made to wait on a megabyte of scripts for a page they will not be
+shown. And it is the **same fact** the back arrow further down each page already reads
+(`window.self !== window.top`) — so embedded it is a no-op, which is every real opening, and there
+is one test for "am I the app's game or a stray URL" rather than two that can disagree.
+
+The `<a href="project.html">` fallback on the back arrow and the bottom-bar link stay exactly as
+they were: they are what the markup says before the embed script runs, and a page that has been
+replaced never gets to use them. Tümcel and Bulmaca are tiles too now, the other two slots of
+Oyunlar beside Sözcel (see "What each screen carries" below) — all three open through the same
+embed.
 
 **The first frame is fetched alone, and that is the whole of why the page feels quick.** Every frame
 has to be decoded before the book can reach it — an `<img>` whose bytes are not ready paints

@@ -4,6 +4,31 @@
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/favicon.png">
   <meta charset="UTF-8">
+  <!-- ── A GAME IS NOT A PAGE, AND THIS URL IS NOT A DOOR ──
+       A game is only ever opened inside project.html's own overlay (a real
+       page in an iframe over the flip book, see THE GAME OVERLAY there), and
+       nothing on the site links here any more. So a top-level hit on this URL
+       is a typed address, a stale bookmark or a search result, and what it
+       used to serve them was the parts bin's chrome (a masthead, a "‹ Geri"
+       and a column of links to the other two games) wrapped around a board
+       whose day switches and sequence gates only mean anything inside the
+       app. It is the app's own front door standing open round the back, so it
+       is shut: a top-level load never renders, it is replaced by the app,
+       which is the one place this game exists.
+
+       Two things about it, both of which fail silently if changed. It is
+       `location.replace` and never an assignment to `href`, so the bounce
+       leaves no history entry for the device's own back gesture to land back
+       on. And it stands FIRST in the head, ahead of every shared module
+       below, so a visitor being bounced is never made to wait on a megabyte
+       of scripts for a page they will not be shown.
+
+       Embedded it is a no-op, which is every real opening: `window.self !==
+       window.top` is the same fact the back arrow further down this page
+       already reads to post its close message instead of navigating. -->
+  <script>
+    if (window.self === window.top) location.replace('project.html');
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#f0f0f0">
   <title>Sözcel — istanbulite.net</title>
@@ -16,8 +41,8 @@
   <script src="avatar.js?v=1"></script>
   <link rel="stylesheet" href="palette.css?v=9">
   <script src="game-locks.js?v=3" defer></script>
-  <link rel="stylesheet" href="profile-card.css?v=40">
-  <script src="profile-card.js?v=43" defer></script>
+  <link rel="stylesheet" href="profile-card.css?v=39">
+  <script src="profile-card.js?v=44" defer></script>
   <script src="sheet.js?v=5"></script>
   <link rel="stylesheet" href="sheet.css?v=7">
   <style>
@@ -1987,7 +2012,7 @@
     </div>
     <section class="suggest-section" id="suggest-section">
       <div class="panel-title">Sözcük Öner</div>
-      <div class="suggest-hint">Bekleyen tek bir öneri tutabilirsiniz. Vazgeçip yenisini önerebilirsiniz. Bir sözcüğü başka bir üye önerdiyse aynı sözcük tekrar önerilemez.</div>
+      <div class="suggest-hint">Öneriniz havuzda bekler: seçilene kadar durur, istediğinizde geri alırsınız. Bekleyen tek bir öneri tutabilirsiniz. Bir sözcüğü başka bir üye önerdiyse aynı sözcük tekrar önerilemez.</div>
       <div id="suggest-body"></div>
       <div class="suggest-status" id="suggest-status"></div>
       <div class="my-suggestions" id="my-suggestions"></div>
@@ -2078,8 +2103,8 @@
         </a>
 
         <a href="bulmaca.html" class="game-link" data-game="bulmaca">
-          <div class="game-link-title">Bulmaca</div>
-          <div class="game-link-subtitle">Mini Çapraz Bulmaca</div>
+          <div class="game-link-title">Çengel</div>
+          <div class="game-link-subtitle">Mini Çengel Bulmacası</div>
         </a>
       </div>
     </section>
@@ -6579,7 +6604,7 @@ async function renderSuggestionPanel() {
   } else {
     body.innerHTML = `
       <div class="suggest-form">
-        <input type="text" id="suggest-input" maxlength="12" placeholder="3–12 HARF" autocomplete="off"/>
+        <input type="text" id="suggest-input" maxlength="12" placeholder="3–12 harf" autocomplete="off" autocapitalize="off" spellcheck="false"/>
         <button type="button" id="suggest-btn">Öner</button>
       </div>
     `;
@@ -6613,9 +6638,14 @@ async function submitSuggestion() {
   const input = document.getElementById('suggest-input');
   const btn = document.getElementById('suggest-btn');
   if (!input || !btn) return;
-  const word = input.value.toLocaleUpperCase('tr-TR');
+  // LOWERCASE, the way sozcel_kelime_listesi.txt holds them and the way
+  // project.html's own offer box writes them -- the pool's unique index is
+  // on the word itself, so two spellings of one word are two rows in it.
+  // toLocaleLowerCase('tr-TR') because I/ı and İ/i are the Turkish case
+  // pairs; the invariant fold never matches the pool it is joining.
+  const word = input.value.toLocaleLowerCase('tr-TR');
   setSuggestStatus('', null);
-  if (!/^[A-ZÇĞİÖŞÜ]{3,12}$/.test(word)) {
+  if (!/^[a-zçğıöşü]{3,12}$/.test(word)) {
     setSuggestStatus('Sözcük 3–12 Türkçe harf olmalı.', 'err');
     return;
   }
@@ -6631,17 +6661,22 @@ async function submitSuggestion() {
   btn.disabled = false;
   if (error) {
     if (String(error.code) === '23505' || /duplicate/i.test(error.message || '')) {
-      // Could be the global word-unique index or the one-pending-per-user
-      // index. Check which to give the right message.
-      const { data: existing } = await sb
+      // Could be the live-word index or the one-live-offer-per-member one.
+      // Asked of the caller's OWN rows, because that is all RLS will ever
+      // hand back (the table is not world-readable — see
+      // db/sozcel_word_suggestions.sql): if they already have an offer
+      // standing, that is what refused this one; otherwise the word is in
+      // the pool under somebody else's name, which is all they get to know.
+      const { data: mine } = await sb
         .from('sozcel_word_suggestions')
-        .select('suggested_by')
-        .eq('word', word)
-        .maybeSingle();
-      if (existing && existing.suggested_by && existing.suggested_by !== session.user.id) {
-        setSuggestStatus('Bu sözcüğü başka bir üye zaten önerdi.', 'err');
+        .select('id')
+        .eq('suggested_by', session.user.id)
+        .eq('status', 'pending')
+        .limit(1);
+      if (mine && mine.length) {
+        setSuggestStatus('Havuzda bekleyen bir öneriniz var. Önce vazgeçin.', 'err');
       } else {
-        setSuggestStatus('Bekleyen bir öneriniz zaten var. Önce vazgeçin.', 'err');
+        setSuggestStatus('Bu sözcük havuzda zaten var.', 'err');
       }
     } else {
       setSuggestStatus('Hata: ' + error.message, 'err');

@@ -778,11 +778,12 @@
 
     /* ── Sözcel day-status row ── */
     .sozcel-day-row {
+      position: relative;
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 1fr;
       gap: 10px;
       align-items: start;
-      padding: 12px 14px;
+      padding: 12px 46px 12px 14px;
       border: 1px solid var(--rule);
       background: var(--field-bg);
     }
@@ -839,21 +840,61 @@
       font-style: italic;
       line-height: 1.4;
     }
-    .sozcel-day-row .day-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      align-items: flex-end;
-    }
-    .sozcel-day-row .day-actions button {
-      padding: 4px 10px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      white-space: nowrap;
+    /* The same compact circular "✎" the reader sees at the top of a live
+       Sözcel game (sozcel.html's #sozcu-task-btn, .game-ctrl-btn) — one
+       button per row instead of a full-width "Düzenle", so a week of days
+       reads as seven short cards rather than seven half-empty forms. */
+    .sozcel-edit-icon-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      border-radius: 50%;
       cursor: pointer;
-      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+      padding: 0;
+      line-height: 1;
+      transition: background 0.15s;
     }
+    /* ── Shared word/syllable/meaning editor (sozEditorHTML) — used both
+       to confirm a suggestion for tonight and to correct an already-picked
+       night. Hidden until opened; on a day row it spans the whole row
+       rather than sitting beside the word/meaning reading. */
+    .soz-editor {
+      display: none;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--rule);
+    }
+    .soz-editor.open { display: block; }
+    .sozcel-day-row .soz-editor { grid-column: 1 / -1; }
+    .soz-editor label { margin-top: 0; font-size: 0.72rem; }
+    .soz-editor input, .soz-editor textarea {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.85rem;
+    }
+    .soz-syl-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .soz-word-preview {
+      margin-top: 6px;
+      font-family: ui-monospace, monospace;
+      letter-spacing: 0.14em;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .soz-editor .btn-row { margin-top: 8px; }
 
     /* ── Oyunlar tab: game on/off board + sub-nav between games ── */
     .game-status-group-title {
@@ -2711,7 +2752,7 @@
 
   </div>
 
-  <!-- ── OYUNLAR TAB (Sözcel + Tümcel + Bulmaca, combined) ── -->
+  <!-- ── OYUNLAR TAB (Sözcel + Tümcel + Çengel/Bulmaca, combined) ── -->
   <div class="admin-body" id="games-tab" style="display:none; grid-template-columns: 1fr; max-width: 900px;">
 
     <div class="panel">
@@ -2741,7 +2782,7 @@
       <div class="games-subnav">
         <button class="games-subtab active" data-subtab="sozcel">Sözcel</button>
         <button class="games-subtab" data-subtab="tumcel">Tümcel</button>
-        <button class="games-subtab" data-subtab="bulmaca">Bulmaca</button>
+        <button class="games-subtab" data-subtab="bulmaca">Çengel</button>
         <button class="games-subtab" data-subtab="sorular">Sorular</button>
       </div>
 
@@ -2751,16 +2792,24 @@
              The İstanbul level asks from sunrise and answers from sunset
              (see CLAUDE.md): by day Kahvehane's games column collects a
              word from anyone who wants to offer one, and this is where
-             one of them becomes the night's game. It stands ABOVE the
-             Sözcü assignments because it is the daily job and those are
-             the standing arrangement. -->
+             one of them becomes the night's game. Picking a suggestion IS
+             how a member becomes the night's Sözcü now — there is no
+             separate "assign a Sözcü ahead of time" step any more; the
+             old sozcel_sozcul_assignments flow below it is gone. What
+             stays is the 7-day board underneath, which is now where a
+             night already picked can be corrected directly. -->
         <div style="margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid var(--rule);">
-          <div class="panel-title" style="margin:0 0 14px;">Bu Gecenin Kelimesi</div>
+          <div class="panel-title" style="margin:0 0 14px;">Kelime Havuzu</div>
           <p style="margin-bottom:12px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-            What members offered for a night, newest first. Choosing one writes it as that night's
-            answer — a night is named for the day it BEGINS on, so tonight is today's date even
-            though the game runs past midnight. Only you can read these; the table is deliberately
-            not member-readable, because a suggestion is a candidate answer.
+            THE POOL, oldest offer first — every word a member has offered and not taken back, whatever
+            day they wrote it. A suggestion is not made for a night and does not expire: it waits here
+            until you place it or until its author withdraws it, so picking tonight's word takes one
+            word out of the pool and leaves the rest standing. Choosing one writes it as the selected
+            night's answer AND makes whoever offered it that night's Sözcü — a night is named for the
+            day it BEGINS on, so tonight is today's date even though the game runs past midnight.
+            "Havuzdan çıkar" is the one other way a word leaves: it is how you say no to a word you
+            are never going to play. Only you can read these; the table is deliberately not
+            member-readable, because a suggestion is a candidate answer.
           </p>
           <div class="sozcu-assign-row">
             <div>
@@ -2775,31 +2824,12 @@
           <div class="status-msg" id="sw-status" style="margin-top:8px;"></div>
         </div>
 
-        <div class="panel-title">Sözcel — Sözcü Atamaları</div>
-        <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-          Pick a member to be the Sözcü for an upcoming day. They will enter the word and its
-          dictionary entry on sozcel.html before midnight Istanbul. You can't enter words from here —
-          only assignments and status are managed here.
-        </p>
-
-        <div class="sozcu-assign-row">
-          <div>
-            <label style="margin-top:0;">Gün</label>
-            <select id="sozcu-assign-date"></select>
-          </div>
-          <div>
-            <label style="margin-top:0;">Üye</label>
-            <select id="sozcu-assign-user"><option value="">— Üye yükleniyor —</option></select>
-          </div>
-          <button class="btn btn-primary" id="sozcu-assign-btn" style="padding:9px 14px;white-space:nowrap;">Ata</button>
-        </div>
-        <div class="status-msg" id="sozcu-assign-status" style="margin-top:8px;"></div>
-
         <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--rule);">
           <div class="panel-title" style="margin:0 0 14px;">Sonraki 7 Gün</div>
           <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-            Status of upcoming Sözcel games. Sözcü selection lasts until midnight Istanbul on the
-            day before the game; after that the assignment is locked.
+            Status of the next 7 nights' words. "Düzenle" edits a night's word and meaning
+            directly — including one already picked or already being played — with no deadline,
+            the same admin override sozcel.html's own Sözcü Görevi form uses.
           </p>
           <div id="sozcel-schedule" style="display:flex;flex-direction:column;gap:10px;">
             <div class="empty-state"><span class="spinner"></span></div>
@@ -2930,12 +2960,14 @@
         </div>
       </div>
 
-      <!-- BULMACA -->
+      <!-- BULMACA (Çengel) -->
       <div class="games-subpanel" id="games-bulmaca-panel" style="display:none;">
-        <div class="panel-title">Bulmaca</div>
+        <div class="panel-title">Çengel</div>
         <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-          Bulmaca'nın günlük bilmeceleri otomatik üretilir — buradan manuel içerik girişi yapılmaz.
-          Oyunu belirli bir gün için açıp kapatmak için yukarıdaki Oyun Takvimi'ni kullanın.
+          Çengel'in günlük bilmeceleri otomatik üretilir — buradan manuel içerik girişi yapılmaz.
+          Oyunu belirli bir gün için açıp kapatmak için yukarıdaki Oyun Takvimi'ni kullanın. Sözcel
+          sekmesindeki kelime önerileri (kelime + anlamı) Çengel'in bilmecelerini elle kurarken de
+          kaynak olarak kullanılabilir.
         </p>
       </div>
 
@@ -2943,7 +2975,7 @@
       <div class="games-subpanel" id="games-sorular-panel" style="display:none;">
         <div class="panel-title">Günün Soruları</div>
         <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-          Oyunlar bir sıra: Sözcel → soru → Tümcel → soru → Bulmaca → soru. Buraya girdiğiniz soru,
+          Oyunlar bir sıra: Sözcel → soru → Tümcel → soru → Çengel → soru. Buraya girdiğiniz soru,
           seçtiğiniz oyunun <em>ardından</em> sorulur ve sıradaki oyun o soru cevaplanana kadar kilitli
           kalır. Boş bıraktığınız bir gün/oyun için kilit de yoktur — o gün oyunlar normal açılır.
           Cevaplar üyelerin kendilerinden başka kimseye görünmez; site yalnızca sayıyı gösterir.
@@ -2959,7 +2991,7 @@
             <select id="dq-after-game">
               <option value="sozcel">Sözcel</option>
               <option value="tumcel">Tümcel</option>
-              <option value="bulmaca">Bulmaca</option>
+              <option value="bulmaca">Çengel</option>
             </select>
           </div>
         </div>
@@ -3648,7 +3680,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
   });
 });
 
-// ── Oyunlar tab: sub-nav between Sözcel / Tümcel / Bulmaca ──
+// ── Oyunlar tab: sub-nav between Sözcel / Tümcel / Çengel ──
 document.querySelectorAll('.games-subtab').forEach(btn => {
   btn.addEventListener('click', () => {
     const sub = btn.dataset.subtab;
@@ -8297,7 +8329,7 @@ async function loadDailyQuestions() {
     list.innerHTML = '<div class="empty-state">Henüz soru yok.</div>';
     return;
   }
-  const labels = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Bulmaca' };
+  const labels = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Çengel' };
   list.innerHTML = data.map(q => `
     <div class="article-card" data-id="${q.id}">
       <p>${escapeHtml(q.body_tr)}</p>
@@ -8384,7 +8416,7 @@ async function loadDailyQuestions() {
 const GAME_STATUS_GAMES = [
   { game: 'sozcel', label: 'Sözcel' },
   { game: 'tumcel', label: 'Tümcel' },
-  { game: 'bulmaca', label: 'Bulmaca' },
+  { game: 'bulmaca', label: 'Çengel' },
 ];
 
 function gameStatusDayLabel(iso, offset) {
@@ -8496,6 +8528,104 @@ function swNightOptions() {
   sel.innerHTML = out.join('');
 }
 
+// ── Shared word/syllable/meaning editor ──
+// The live game (sozcel.html) reads sozcel_used_answers.word directly as
+// TARGET_WORD and compares it against turkishUpper()'d guesses — so the
+// word column has to be UPPERCASE Turkish, broken into 2–3 syllables, the
+// same way sozcel.html's own Sözcü Görevi admin form writes it
+// (db/sozcel_used_answers_v6_admin_override.sql). This editor is the ONE
+// place admin.html ever builds that column, used both when picking a
+// suggestion for tonight and when correcting an already-picked night —
+// neither path may write a bare, un-syllabified, case-untouched word.
+function turkishUpper(str) { return (str || '').toLocaleUpperCase('tr-TR'); }
+
+const SOZ_TR_VOWELS = 'AEIİOÖUÜ';
+function sozSyllabifyTr(word) {
+  const isVowel = ch => SOZ_TR_VOWELS.includes(ch);
+  if (!word.split('').some(isVowel)) return [word];
+  const sylls = [];
+  let start = 0;
+  for (let i = 1; i < word.length - 1; i++) {
+    if (!isVowel(word[i]) && isVowel(word[i + 1])) {
+      const chunk = word.slice(start, i);
+      if (chunk.split('').some(isVowel)) { sylls.push(chunk); start = i; }
+    }
+  }
+  sylls.push(word.slice(start));
+  return sylls;
+}
+function sozNormalizeSyllables(word) {
+  let sylls = sozSyllabifyTr(word);
+  if (sylls.length > 3) sylls = [...sylls.slice(0, 2), sylls.slice(2).join('')];
+  if (sylls.length === 1) {
+    const w = sylls[0];
+    const mid = Math.max(1, w.length - Math.ceil(w.length / 2));
+    sylls = [w.slice(0, mid), w.slice(mid)];
+    if (!sylls[1]) sylls = [w.slice(0, -1), w.slice(-1)];
+  }
+  return sylls;
+}
+
+// context: 'pick' (Kelime Havuzu) or 'day' (Sonraki 7 Gün). key is
+// the suggestion id for 'pick', the ISO date for 'day'. by is the
+// suggester's user id, carried through so picking still credits them as
+// Sözcü — see the write side below.
+function sozEditorHTML({ context, key, by, word, syllables, definitionText, confirmLabel }) {
+  const sylls = (syllables && syllables.length >= 2) ? syllables : sozNormalizeSyllables(turkishUpper(word || ''));
+  const s1 = sylls[0] || '', s2 = sylls[1] || '', s3 = sylls[2] || '';
+  return `
+    <div class="soz-editor" data-soz-context="${escapeHtml(context)}" data-soz-key="${escapeHtml(key)}" data-soz-by="${escapeHtml(by || '')}">
+      <label style="margin-top:0;">Kelime — Hecelerine Ayır (2–3 hece)</label>
+      <div class="soz-syl-row">
+        <input type="text" class="soz-syl" data-soz-syl maxlength="10" value="${escapeHtml(s1)}" placeholder="1. hece"/>
+        <input type="text" class="soz-syl" data-soz-syl maxlength="10" value="${escapeHtml(s2)}" placeholder="2. hece"/>
+        <input type="text" class="soz-syl" data-soz-syl maxlength="10" value="${escapeHtml(s3)}" placeholder="3. hece (opsiyonel)"/>
+      </div>
+      <div class="soz-word-preview" data-soz-preview>${escapeHtml(s1 + s2 + s3)}</div>
+      <label>Anlamı</label>
+      <textarea data-soz-def rows="2" placeholder="Sözlük anlamı...">${escapeHtml(definitionText || '')}</textarea>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" data-soz-confirm>${escapeHtml(confirmLabel)}</button>
+        <button type="button" class="btn btn-secondary" data-soz-cancel>İptal</button>
+      </div>
+      <div class="status-msg" data-soz-status></div>
+    </div>
+  `;
+}
+
+// Live uppercase-fold + preview as the admin types a syllable. Delegated
+// on `document` once at load, rather than on whichever list/board happens
+// to render first — the two editor hosts (#sw-list, #sozcel-schedule) are
+// rebuilt independently and in either order, so nothing shorter-lived than
+// the document can be relied on to still be there for both of them.
+document.addEventListener('input', e => {
+  if (!e.target.matches('[data-soz-syl]')) return;
+  e.target.value = turkishUpper(e.target.value).replace(/[^A-ZÇĞİÖŞÜ]/g, '');
+  const editor = e.target.closest('.soz-editor');
+  const preview = editor && editor.querySelector('[data-soz-preview]');
+  if (preview) {
+    preview.textContent = [...editor.querySelectorAll('[data-soz-syl]')].map(i => i.value).join('');
+  }
+});
+
+// Validates and reads one editor. Nothing is placed for a night without
+// passing this — 2–3 Turkish-only syllables and a non-empty meaning are
+// the whole of "hecelerine ayır, anlamını gir" the admin asked for.
+function sozReadEditor(editor) {
+  const parts = [...editor.querySelectorAll('[data-soz-syl]')].map(i => i.value.trim()).filter(Boolean);
+  const def = editor.querySelector('[data-soz-def]').value.trim();
+  const statusEl = editor.querySelector('[data-soz-status]');
+  const fail = (msg) => {
+    if (statusEl) { statusEl.textContent = msg; statusEl.className = 'status-msg err'; }
+    return null;
+  };
+  if (parts.length < 2 || parts.length > 3) return fail('Kelime 2 ile 3 hece arasında olmalı.');
+  if (parts.some(p => !/^[A-ZÇĞİÖŞÜ]+$/.test(p))) return fail('Hecelerde sadece Türkçe harfler kullan.');
+  if (!def) return fail('Anlamı da gir.');
+  if (statusEl) { statusEl.textContent = 'Kaydediliyor…'; statusEl.className = 'status-msg'; }
+  return { word: parts.join(''), syllables: parts, definition: def };
+}
+
 async function loadSozcelSuggestions() {
   const list = document.getElementById('sw-list');
   const sel = document.getElementById('sw-night');
@@ -8507,10 +8637,16 @@ async function loadSozcelSuggestions() {
 
   let rows = [], already = null;
   try {
+    // THE POOL, not one night's bucket. A suggestion is offered to the app
+    // and sits here until it is placed or withdrawn
+    // (db/sozcel_word_suggestions_v2_standing_pool.sql), so the list is
+    // every pending row there is — and OLDEST FIRST, because a pool that is
+    // only ever read from the top starves the offer that has waited longest,
+    // which is the same "fleeting" failure one level up.
     const [sug, used] = await Promise.all([
       sb.from('sozcel_word_suggestions')
         .select('id, word, definition, status, suggested_at, suggested_by')
-        .eq('for_night', night).order('suggested_at', { ascending: false }),
+        .eq('status', 'pending').order('suggested_at', { ascending: true }),
       sb.from('sozcel_used_answers').select('word, sozcul_id').eq('used_on', night).maybeSingle(),
     ]);
     if (sug.error) throw sug.error;
@@ -8536,89 +8672,147 @@ async function loadSozcelSuggestions() {
 
   const head = already
     ? '<div class="status-msg ok" style="margin:0 0 6px;">Bu gecenin kelimesi zaten var: <b>' +
-        escapeHtml(already.word) + '</b> — başka birini seçmek onu değiştirir.</div>'
+        escapeHtml(already.word) + '</b> — havuzdan başka birini seçmek onu değiştirir.</div>'
     : '';
   if (!rows.length) {
-    list.innerHTML = head + '<div class="empty-state">Bu gece için öneri yok.</div>';
+    list.innerHTML = head + '<div class="empty-state">Havuz boş.</div>';
     return;
   }
   list.innerHTML = head + rows.map(r => {
-    const picked = r.status === 'picked';
-    return '<div class="sources-row" style="display:flex;align-items:center;gap:10px;' +
-      'border:1px solid var(--rule);padding:8px 10px;' + (picked ? 'background:var(--paper-card);' : '') + '">' +
+    const editor = sozEditorHTML({
+      context: 'pick', key: r.id, by: r.suggested_by || '',
+      word: r.word, definitionText: r.definition || '', confirmLabel: 'Bu Geceye Koy',
+    });
+    return '<div class="sw-row" style="border:1px solid var(--rule);padding:8px 10px;">' +
+      '<div style="display:flex;align-items:center;gap:10px;">' +
       '<b style="font-family:ui-monospace,monospace;letter-spacing:0.14em;font-size:0.95rem;">' +
         escapeHtml(r.word) + '</b>' +
       '<span style="flex:1;min-width:0;font-size:0.76rem;color:var(--muted);">' +
         escapeHtml(names.get(r.suggested_by) || '—') +
+        // How long it has been waiting. The pool has no deadline, so the
+        // one thing a row cannot say for itself is its age — and age is
+        // exactly what decides whose turn it is.
+        ' · ' + escapeHtml(swWaitedLabel(r.suggested_at)) +
         (r.definition ? ' — ' + escapeHtml(r.definition) : '') + '</span>' +
-      (picked
-        ? '<span style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-red);">Seçildi</span>'
-        : '<button class="btn btn-primary" data-sw-pick="' + escapeHtml(r.id) + '" ' +
-          'data-sw-word="' + escapeHtml(r.word) + '" ' +
-          'data-sw-def="' + escapeHtml(r.definition || '') + '" ' +
-          // Who offered it travels with the word: picking a suggestion is
-          // what makes that member the night's Sözcü (see
-          // pickSozcelSuggestion).
-          'data-sw-by="' + escapeHtml(r.suggested_by || '') + '" style="padding:5px 12px;">Seç</button>') +
+      // The one way a word leaves the pool that is not being played: the
+      // admin saying no to it. Nothing else may remove it — picking
+      // another word no longer passes the rest, which is the whole of
+      // db/sozcel_word_suggestions_v2_standing_pool.sql.
+      '<button class="btn" data-sw-pass="' + escapeHtml(r.id) + '" style="padding:5px 10px;">Havuzdan çıkar</button>' +
+      // Opens the syllable + meaning editor below rather than placing the
+      // word straight away — hecelere ayırmadan ve anlam girilmeden
+      // hiçbir kelime bu geceye konmaz.
+      '<button class="btn btn-primary" data-sw-open="' + escapeHtml(r.id) + '" style="padding:5px 12px;">Seç</button>' +
+      '</div>' + editor +
       '</div>';
   }).join('');
 }
 
-async function pickSozcelSuggestion(id, word, definition, suggestedBy) {
-  const sel = document.getElementById('sw-night');
+// How long an offer has been standing, said the way a person says it.
+// Elapsed time between two real instants (suggested_at is a timestamptz,
+// Date.now() is UTC), never a difference of two formatted calendar dates —
+// so it reads the same on a desk set to any timezone, and there is no
+// Istanbul date to compute here at all (convention 10 is about the other
+// case, a DAY KEY, which this is not). Deliberately coarse: what the admin
+// needs off this line is "this one has been here a while".
+function swWaitedLabel(iso) {
+  const when = iso ? new Date(iso) : null;
+  if (!when || isNaN(when)) return '—';
+  const days = Math.floor((Date.now() - when.getTime()) / 86400000);
+  if (days <= 0) return 'bugün';
+  if (days === 1) return '1 gündür bekliyor';
+  return days + ' gündür bekliyor';
+}
+
+// Havuzdan çıkar: the admin's "no" to a word they are never going to
+// play. It is an UPDATE to 'passed' rather than a delete, so the member's
+// own app can tell "not taken" from "still waiting" — and so the record of
+// who offered what survives.
+async function sozPassSuggestion(id) {
   const status = document.getElementById('sw-status');
+  const { error } = await sb.from('sozcel_word_suggestions')
+    .update({ status: 'passed' }).eq('id', id);
+  if (error) {
+    console.error('[sw pass]', error);
+    if (status) { status.textContent = 'Çıkarılamadı: ' + (error.message || error); status.className = 'status-msg err'; }
+    return;
+  }
+  if (status) { status.textContent = 'Havuzdan çıkarıldı.'; status.className = 'status-msg ok'; }
+  loadSozcelSuggestions();
+}
+
+// Who offered a suggestion travels with it into the editor (data-soz-by) —
+// picking one confirmed is the whole of how a member becomes the night's
+// Sözcü (see sozConfirmPick below).
+async function sozConfirmPick(id, by, editor) {
+  const parsed = sozReadEditor(editor);
+  if (!parsed) return;
+  const sel = document.getElementById('sw-night');
   const night = sel ? sel.value : IstDate.iso();
-  if (!confirm(night + ' gecesinin kelimesi "' + word + '" olsun mu?')) return;
-  if (status) { status.textContent = 'Kaydediliyor…'; status.className = 'status-msg'; }
+  const statusEl = editor.querySelector('[data-soz-status]');
   try {
     // The word row first: if this fails the suggestion must NOT be marked
     // picked, or the list would claim a night has a word it does not.
     // upsert on used_on, because replacing a wrong word is exactly the
-    // case the admin override exists for.
-    // The meaning the member offered the word WITH is what sozcel.html
-    // prints once the round is over, so it travels with the word instead
-    // of stopping at this desk -- which is the whole reason the form asks
-    // for a definition rather than for a line of reasoning.
-    const row = { used_on: night, word };
-    if (definition) row.definition = definition;
+    // case the admin override exists for. word/syllables are the
+    // UPPERCASE, syllable-broken pair sozReadEditor built — the game reads
+    // this column as-is (see turkishUpper() above), so nothing here may
+    // write a bare, un-syllabified string ever again.
+    const row = { used_on: night, word: parsed.word, definition: parsed.definition, syllables: parsed.syllables };
     // AND WHOSE WORD IT IS. Picking a suggestion is the whole of how a
-    // member becomes a night's Sözcü through this route -- the other one
-    // (an assigned Sözcü submitting through sozcel.html's own form) writes
-    // this column itself. Left unwritten, the night had a word nobody was
-    // credited for, and three separate things quietly read as "no Sözcü":
-    // the "Günün Sözcüsü:" line under the board (loadSozcuOfTheDay, whose
-    // :empty rule then hides the line outright), the weekly Sözcü bonus
-    // that pays the word-setter what every solver earned off their word
-    // (scoreboard.js), and the member's own "Sözcü · <gece>" row
-    // (loadMySuggestions). The one thing a picked word is FOR is that it
-    // reaches other members with its author's name on it.
+    // member becomes a night's Sözcü through this route. Left unwritten,
+    // the night had a word nobody was credited for, and three separate
+    // things quietly read as "no Sözcü": the "Günün Sözcüsü:" line under
+    // the board (loadSozcuOfTheDay), the weekly Sözcü bonus that pays the
+    // word-setter what every solver earned off their word (scoreboard.js),
+    // and the member's own "Sözcü · <gece>" row (loadMySuggestions). The
+    // one thing a picked word is FOR is that it reaches other members with
+    // its author's name on it.
     //
-    // Guarded like `definition` rather than written unconditionally: a
-    // falsy value here would upsert sozcul_id = null and take the credit
-    // OFF a night that already had one. It cannot normally be missing
+    // Guarded rather than written unconditionally: a falsy value here
+    // would upsert sozcul_id = null and take the credit OFF a night that
+    // already had one. It cannot normally be missing
     // (sozcel_word_suggestions.suggested_by is NOT NULL), which is exactly
     // why a silent wipe would be the hard failure to spot.
-    if (suggestedBy) row.sozcul_id = suggestedBy;
+    if (by) row.sozcul_id = by;
     const { error: wErr } = await sb.from('sozcel_used_answers')
       .upsert([row], { onConflict: 'used_on' });
     if (wErr) throw wErr;
-    // Everything else offered for this night is PASSED, including whatever
-    // was picked before if this is a correction. Marked rather than left
-    // pending, because "not picked" is then a fact the member's own app
-    // can read off their row -- the next morning it asks them whether to
-    // send the same word again or write another (see lastUnpickedWord in
-    // project.html), and a night that quietly stayed pending forever
-    // would be indistinguishable from one still being decided.
+    // ── AND NOTHING ELSE IS TOUCHED ──
+    // This used to mark every other offer for the night 'passed', which
+    // was the whole of what made a suggestion fleeting: a member who wrote
+    // a word on Tuesday morning had it killed by Tuesday's pick without
+    // anyone ever deciding anything about it. An offer belongs to the POOL
+    // now and leaves it two ways only — being placed (here) or being taken
+    // back by its author (or refused outright with "Havuzdan çıkar", which
+    // is somebody actually saying no to it). Everything else stands and is
+    // still there tomorrow. See
+    // db/sozcel_word_suggestions_v2_standing_pool.sql.
+    //
+    // The ONE row that does move is a previous pick for this same night:
+    // correcting a night means whatever stood there before is not the
+    // night's word any more, so it stops claiming to be one (left alone it
+    // would go on telling its author "bu gece bu oynanıyor" while another
+    // word played). 'passed' rather than back into the pool, because the
+    // pool's two live-row indexes — one offer per member, one row per word
+    // — may well have been filled since by that same member or that same
+    // word, and a correction must not fail on a unique violation.
     await sb.from('sozcel_word_suggestions')
-      .update({ status: 'passed' }).eq('for_night', night).neq('id', id);
+      .update({ status: 'passed' })
+      .eq('for_night', night).eq('status', 'picked').neq('id', id);
+    // for_night is written HERE, at the moment of picking, because that is
+    // the only moment a word has a night: on a pending row it is null. It
+    // is what lets the member's own box say "seçildi — bu gece bu
+    // oynanıyor" on the day it is played (see submitData in project.html).
     const { error: sErr } = await sb.from('sozcel_word_suggestions')
-      .update({ status: 'picked' }).eq('id', id);
+      .update({ status: 'picked', for_night: night }).eq('id', id);
     if (sErr) throw sErr;
-    if (status) { status.textContent = 'Seçildi: ' + word; status.className = 'status-msg ok'; }
+    const swStatus = document.getElementById('sw-status');
+    if (swStatus) { swStatus.textContent = 'Seçildi: ' + parsed.word; swStatus.className = 'status-msg ok'; }
     loadSozcelSuggestions();
   } catch (err) {
     console.error('[sw pick]', err);
-    if (status) { status.textContent = 'Kaydedilemedi: ' + (err.message || err); status.className = 'status-msg err'; }
+    if (statusEl) { statusEl.textContent = 'Kaydedilemedi: ' + (err.message || err); statusEl.className = 'status-msg err'; }
   }
 }
 
@@ -8638,15 +8832,37 @@ function initSozcelSuggestions() {
   // Delegated: the rows are rebuilt on every load, so a listener per
   // button would be re-bound each time and leak the old ones.
   if (list) list.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-sw-pick]');
-    if (!btn) return;
-    pickSozcelSuggestion(btn.dataset.swPick, btn.dataset.swWord, btn.dataset.swDef || '',
-                         btn.dataset.swBy || '');
+    const passBtn = e.target.closest('[data-sw-pass]');
+    if (passBtn) {
+      const word = passBtn.closest('.sw-row').querySelector('b');
+      if (!confirm('"' + (word ? word.textContent : '') + '" havuzdan çıkarılsın mı?')) return;
+      sozPassSuggestion(passBtn.getAttribute('data-sw-pass'));
+      return;
+    }
+    const openBtn = e.target.closest('[data-sw-open]');
+    if (openBtn) {
+      const editor = openBtn.closest('.sw-row').querySelector('.soz-editor');
+      if (editor) editor.classList.toggle('open');
+      return;
+    }
+    const confirmBtn = e.target.closest('[data-soz-confirm]');
+    if (confirmBtn) {
+      const editor = confirmBtn.closest('.soz-editor');
+      if (editor && editor.dataset.sozContext === 'pick') {
+        sozConfirmPick(editor.dataset.sozKey, editor.dataset.sozBy, editor);
+      }
+      return;
+    }
+    const cancelBtn = e.target.closest('[data-soz-cancel]');
+    if (cancelBtn) {
+      const editor = cancelBtn.closest('.soz-editor');
+      if (editor) editor.classList.remove('open');
+    }
   });
   loadSozcelSuggestions();
 }
 
-// ── Sözcel: Sözcü assignment + day status ──
+// ── Sözcel: the 7-day word/status board ──
 function sozcelIstanbulDateISO(offsetDays = 0) {
   return IstDate.iso(offsetDays);
 }
@@ -8656,19 +8872,8 @@ function sozcelFormatLabel(iso, offset) {
   const dt = new Date(Date.UTC(y, m - 1, d));
   const weekday = dt.toLocaleDateString('tr-TR', { weekday: 'long', timeZone: 'UTC' });
   const day = dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', timeZone: 'UTC' });
-  const dayTag = offset === 0 ? ' · Bugün (kilitli)' : offset === 1 ? ' · Yarın' : '';
+  const dayTag = offset === 0 ? ' · Bugün' : offset === 1 ? ' · Yarın' : '';
   return `${weekday.charAt(0).toLocaleUpperCase('tr-TR') + weekday.slice(1)}, ${day}${dayTag}`;
-}
-
-let _sozcuMembersList = null;
-
-async function ensureSozcuMembersList() {
-  if (_sozcuMembersList) return _sozcuMembersList;
-  const { data } = await sb.from('profiles')
-    .select('id, first_name, last_name, neighborhood')
-    .order('first_name', { ascending: true });
-  if (data) _sozcuMembersList = data;
-  return _sozcuMembersList || [];
 }
 
 async function loadSozcelSchedule() {
@@ -8680,11 +8885,8 @@ async function loadSozcelSchedule() {
 
   const dates = Array.from({ length: 7 }, (_, i) => sozcelIstanbulDateISO(i));
 
-  // Fetch words and assignments in parallel
-  const [wordsRes, assignRes] = await Promise.all([
-    sb.from('sozcel_used_answers').select('used_on, word, definition').in('used_on', dates),
-    sb.from('sozcel_sozcul_assignments').select('game_date, user_id').in('game_date', dates),
-  ]);
+  const wordsRes = await sb.from('sozcel_used_answers')
+    .select('used_on, word, definition, syllables, sozcul_id').in('used_on', dates);
 
   if (wordsRes.error) {
     wrap.innerHTML = `<div class="empty-state">Error loading: ${escapeHtml(wordsRes.error.message)}</div>`;
@@ -8696,66 +8898,90 @@ async function loadSozcelSchedule() {
     let dictData = null;
     if (r.definition) {
       try { dictData = JSON.parse(r.definition); } catch (_) {
-        dictData = { defs: [{ text: r.definition }] };
+        dictData = null;
       }
     }
-    byDate[r.used_on] = { word: r.word || '', dictData };
+    byDate[r.used_on] = {
+      word: r.word || '', rawDefinition: r.definition || '', dictData,
+      syllables: r.syllables || null, sozculId: r.sozcul_id || null,
+    };
   });
+  // Kept for sozConfirmDayEdit, which needs the existing structured dict
+  // (if any) to preserve everything beyond the first meaning's text.
+  window._sozcelScheduleByDate = byDate;
 
-  // Resolve assigned user names
-  const assignedUserIds = [...new Set((assignRes.data || []).map(r => r.user_id))];
+  // Resolve the Sözcü's name from sozcel_used_answers.sozcul_id — the only
+  // way a night gets one now is a suggestion being picked (or the admin
+  // editor below naming one), never an advance assignment.
+  const sozcuIds = [...new Set(Object.values(byDate).map(e => e.sozculId).filter(Boolean))];
   let profById = {};
-  if (assignedUserIds.length) {
+  if (sozcuIds.length) {
     const { data: profs } = await sb.from('profiles')
-      .select('id, first_name, last_name').in('id', assignedUserIds);
+      .select('id, first_name, last_name').in('id', sozcuIds);
     (profs || []).forEach(p => { profById[p.id] = p; });
   }
-  const byAssignment = {};
-  (assignRes.data || []).forEach(r => {
-    const p = profById[r.user_id];
-    const name = p ? capitalizeName((`${p.first_name || ''} ${p.last_name || ''}`).trim()) || 'İsimsiz' : r.user_id;
-    byAssignment[r.game_date] = { user_id: r.user_id, name };
+
+  wrap.innerHTML = dates.map((iso, i) => renderSozcelDayRow(iso, i, byDate, profById)).join('');
+
+  wrap.querySelectorAll('[data-sozcu-edit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const editor = wrap.querySelector('.soz-editor[data-soz-context="day"][data-soz-key="' + CSS.escape(btn.dataset.sozcuEdit) + '"]');
+      if (editor) editor.classList.toggle('open');
+    });
   });
-
-  wrap.innerHTML = dates.map((iso, i) => renderSozcelDayRow(iso, i, byDate, byAssignment)).join('');
-
-  wrap.querySelectorAll('[data-sozcu-clear]').forEach(btn => {
-    btn.addEventListener('click', () => sozcuClearAssignment(btn.dataset.sozcuClear));
+  wrap.querySelectorAll('[data-soz-cancel]').forEach(btn => {
+    btn.addEventListener('click', () => btn.closest('.soz-editor').classList.remove('open'));
   });
-
-  // Populate the assignment dropdowns above the schedule
-  populateSozcuAssignmentUI(dates);
+  wrap.querySelectorAll('[data-soz-confirm]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const editor = btn.closest('.soz-editor');
+      if (editor && editor.dataset.sozContext === 'day') sozConfirmDayEdit(editor.dataset.sozKey, editor);
+    });
+  });
 }
 
-function renderSozcelDayRow(iso, offset, byDate, byAssignment) {
-  const wordEntry = byDate[iso];
-  const word = (wordEntry && wordEntry.word) || '';
-  const dictData = (wordEntry && wordEntry.dictData) || null;
-  const assignment = byAssignment[iso];
+// The definition column carries two shapes — plain text (a member's
+// suggestion, picked as-is) or the JSON dict sozcel.html's own Sözcü
+// Görevi editor writes (defs[]/root/rootLang/note/own). A quick edit here
+// only ever touches the word and the first meaning's text, so everything
+// else a richer entry carries (root, ek anlamlar, …) survives untouched.
+function sozcelDictPreview(dictData) {
+  if (!dictData) return '';
+  const defCount = (dictData.defs || []).length;
+  const first = dictData.defs && dictData.defs[0] && dictData.defs[0].text;
+  const noteBit = dictData.note ? `“${dictData.note}” · ` : '';
+  const rootBit = dictData.root ? ` · ${dictData.root}` : '';
+  const more = defCount > 1 ? ` (+${defCount - 1} anlam daha)` : '';
+  if (first) return `${noteBit}${first}${more}${rootBit}`;
+  if (dictData.note) return dictData.note;
+  return '';
+}
+
+function renderSozcelDayRow(iso, offset, byDate, profById) {
+  const entry = byDate[iso] || null;
+  const word = (entry && entry.word) || '';
+  const dictData = (entry && entry.dictData) || null;
   const isToday = offset === 0;
-  // Short dict preview: first definition text, optionally with extra meanings count.
-  let dictPreview = '';
-  if (dictData) {
-    const defCount = (dictData.defs || []).length;
-    const first = dictData.defs && dictData.defs[0] && dictData.defs[0].text;
-    const noteBit = dictData.note ? `“${dictData.note}” · ` : '';
-    const rootBit = dictData.root ? ` · ${dictData.root}` : '';
-    const more = defCount > 1 ? ` (+${defCount - 1} anlam daha)` : '';
-    if (first) dictPreview = `${noteBit}${first}${more}${rootBit}`;
-    else if (dictData.note) dictPreview = dictData.note;
-  }
-  const sozcuTag = assignment
-    ? `<span class="day-tag ok">Sözcü: ${escapeHtml(assignment.name)}</span>`
-    : `<span class="day-tag warn">Sözcü atanmadı</span>`;
+  const dictPreview = sozcelDictPreview(dictData);
+  const sozcuProf = entry && entry.sozculId ? profById[entry.sozculId] : null;
+  const sozcuName = sozcuProf
+    ? (capitalizeName((`${sozcuProf.first_name || ''} ${sozcuProf.last_name || ''}`).trim()) || 'İsimsiz')
+    : null;
+  const sozcuTag = sozcuName
+    ? `<span class="day-tag ok">Sözcü: ${escapeHtml(sozcuName)}</span>`
+    : `<span class="day-tag">Sözcü yok</span>`;
   const wordTag = word
     ? `<span class="day-tag ok">Kelime girildi</span>`
-    : (assignment
-        ? `<span class="day-tag warn">Kelime bekleniyor</span>`
-        : `<span class="day-tag">Henüz kelime yok</span>`);
-  const removeBtn = (assignment && !isToday && !word)
-    ? `<button class="btn-del" data-sozcu-clear="${escapeHtml(iso)}"
-         style="background:var(--ink-red);color:var(--paper);">Kaldır</button>`
-    : '';
+    : `<span class="day-tag">Henüz kelime yok</span>`;
+  // Prefill: the first meaning's text if this is a structured dict entry,
+  // otherwise the raw string as-is (a plain-text suggestion, or nothing).
+  const defPrefill = dictData
+    ? ((dictData.defs && dictData.defs[0] && dictData.defs[0].text) || '')
+    : (entry ? entry.rawDefinition : '');
+  const editor = sozEditorHTML({
+    context: 'day', key: iso, word, syllables: entry && entry.syllables,
+    definitionText: defPrefill, confirmLabel: 'Kaydet',
+  });
   return `
     <div class="sozcel-day-row${isToday ? ' today' : ''}">
       <div class="day-meta">
@@ -8768,82 +8994,45 @@ function renderSozcelDayRow(iso, offset, byDate, byAssignment) {
         ${word ? `<div class="day-word">${escapeHtml(word)}</div>` : ''}
         ${dictPreview ? `<div class="day-dict">${escapeHtml(dictPreview)}</div>` : ''}
       </div>
-      <div class="day-actions">${removeBtn}</div>
+      <div class="day-actions">
+        <button class="btn btn-secondary" data-sozcu-edit="${escapeHtml(iso)}">Düzenle</button>
+      </div>
+      ${editor}
     </div>
   `;
 }
 
-async function populateSozcuAssignmentUI(dates) {
-  // Tomorrow through 6 days from now — today's deadline already passed.
-  const dateSel = document.getElementById('sozcu-assign-date');
-  if (dateSel) {
-    dateSel.innerHTML = dates.slice(1).map(iso => {
-      const [y, m, d] = iso.split('-').map(Number);
-      const dt = new Date(Date.UTC(y, m - 1, d));
-      const label = dt.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
-      return `<option value="${iso}">${escapeHtml(label)} (${iso})</option>`;
-    }).join('');
+// Rewrites the word/syllables/first-meaning for a night without disturbing
+// whatever else a structured dict entry carries (root, kök dili, günün
+// notu, ek anlamlar) — and never touches sozcul_id, so existing Sözcü
+// credit survives a correction untouched.
+async function sozConfirmDayEdit(iso, editor) {
+  const parsed = sozReadEditor(editor);
+  if (!parsed) return;
+  const statusEl = editor.querySelector('[data-soz-status]');
+
+  let definitionValue = parsed.definition;
+  const existing = (window._sozcelScheduleByDate && window._sozcelScheduleByDate[iso]) || null;
+  if (existing && existing.dictData) {
+    const dictData = JSON.parse(JSON.stringify(existing.dictData));
+    if (!Array.isArray(dictData.defs) || !dictData.defs.length) dictData.defs = [{ cls: 'isim', text: '' }];
+    dictData.defs[0] = { ...dictData.defs[0], text: parsed.definition };
+    definitionValue = JSON.stringify(dictData);
   }
 
-  // Populate members dropdown
-  const userSel = document.getElementById('sozcu-assign-user');
-  if (userSel) {
-    userSel.innerHTML = '<option value="">— Sözcü seç —</option>';
-    const members = await ensureSozcuMembersList();
-    members.forEach(p => {
-      const name = capitalizeName((`${p.first_name || ''} ${p.last_name || ''}`).trim()) || 'İsimsiz';
-      const nb = NEIGHBORHOOD_NAMES[p.neighborhood] || '';
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = name + (nb ? ` (${nb})` : '');
-      userSel.appendChild(opt);
-    });
-  }
-}
-
-document.getElementById('sozcu-assign-btn').addEventListener('click', async () => {
-  const date = document.getElementById('sozcu-assign-date').value;
-  const userId = document.getElementById('sozcu-assign-user').value;
-  const statusEl = document.getElementById('sozcu-assign-status');
-  statusEl.textContent = '';
-  statusEl.className = 'status-msg';
-
-  if (!date || !userId) {
-    statusEl.textContent = 'Gün ve üye seçin.';
-    statusEl.className = 'status-msg err';
-    return;
-  }
-
-  const btn = document.getElementById('sozcu-assign-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>';
-
-  const { data: { session } } = await sb.auth.getSession();
-  const assignedBy = session && session.user ? session.user.id : null;
-
-  const { error } = await sb.from('sozcel_sozcul_assignments').upsert(
-    { game_date: date, user_id: userId, assigned_by: assignedBy, assigned_at: new Date().toISOString() },
-    { onConflict: 'game_date' }
-  );
-
-  btn.disabled = false;
-  btn.textContent = 'Ata';
+  // The admin override: upsert sozcel_used_answers with no deadline and no
+  // sozcul match required (db/sozcel_used_answers_v6_admin_override.sql).
+  // sozcul_id is deliberately left out of the payload — see
+  // sozConfirmPick's own note on why an unwritten column, not a written
+  // null, is what keeps existing Sözcü credit from being wiped.
+  const { error } = await sb.from('sozcel_used_answers')
+    .upsert([{ used_on: iso, word: parsed.word, definition: definitionValue, syllables: parsed.syllables }], { onConflict: 'used_on' });
 
   if (error) {
-    statusEl.textContent = 'Hata: ' + error.message;
-    statusEl.className = 'status-msg err';
+    if (statusEl) { statusEl.textContent = 'Kaydedilemedi: ' + error.message; statusEl.className = 'status-msg err'; }
     return;
   }
-  statusEl.textContent = 'Atama kaydedildi.';
-  statusEl.className = 'status-msg ok';
-  setTimeout(() => { statusEl.textContent = ''; }, 2500);
-  loadSozcelSchedule();
-});
-
-async function sozcuClearAssignment(date) {
-  if (!confirm(`${date} tarihli sözcü atamasını kaldır?`)) return;
-  const { error } = await sb.from('sozcel_sozcul_assignments').delete().eq('game_date', date);
-  if (error) { alert('Silinemedi: ' + error.message); return; }
+  if (statusEl) { statusEl.textContent = 'Kaydedildi.'; statusEl.className = 'status-msg ok'; }
   loadSozcelSchedule();
 }
 
@@ -8868,7 +9057,7 @@ async function ensureTumcelMembersList() {
 async function loadTumcelSuggestionPickers() {
   const { data: suggestions } = await sb
     .from('tumcel_quote_suggestions')
-    .select('id, body, source, suggested_by, suggested_at')
+    .select('id, body, source, category, suggested_by, suggested_at')
     .eq('status', 'pending')
     .order('suggested_at', { ascending: true });
   _tumcelPendingSuggestions = suggestions || [];
@@ -8883,13 +9072,18 @@ async function loadTumcelSuggestionPickers() {
     (profs || []).forEach(p => { _tumcelProfilesById[p.id] = p; });
   }
 
+  // Same four values tc-color-N's own <option>s use (see
+  // db/tumcel_quote_suggestions_v2_category.sql) -- one vocabulary.
+  const TUMCEL_CATEGORY_LABELS = { cat1: 'Sözlü', cat2: 'Ezgi', cat3: 'Yazılı', cat4: 'Halk Ağzı' };
+
   function label(s) {
     const p = _tumcelProfilesById[s.suggested_by];
     const name = p ? ((`${p.first_name || ''} ${p.last_name || ''}`).trim() || 'İsimsiz') : 'üye';
     const nb = p && p.neighborhood ? (NEIGHBORHOOD_NAMES[p.neighborhood] || p.neighborhood) : '';
     const where = nb ? ` (${nb})` : '';
     const short = s.body.length > 60 ? s.body.slice(0, 60) + '…' : s.body;
-    return `${name}${where}: “${short}” — ${s.source}`;
+    const cat = s.category && TUMCEL_CATEGORY_LABELS[s.category] ? ` · ${TUMCEL_CATEGORY_LABELS[s.category]}` : '';
+    return `${name}${where}: “${short}” — ${s.source}${cat}`;
   }
 
   function memberLabel(p) {
@@ -8925,7 +9119,7 @@ async function loadTumcelSuggestionPickers() {
     const sel = document.getElementById(`tc-pick-${i}`);
     const currentVal = sel.value;
     const suggestionOptions = _tumcelPendingSuggestions.map(s =>
-      `<option value="${s.id}" data-body="${escapeHtml(s.body)}" data-source="${escapeHtml(s.source)}" data-by="${escapeHtml(s.suggested_by)}">${escapeHtml(label(s))}</option>`
+      `<option value="${s.id}" data-body="${escapeHtml(s.body)}" data-source="${escapeHtml(s.source)}" data-by="${escapeHtml(s.suggested_by)}" data-category="${escapeHtml(s.category || '')}">${escapeHtml(label(s))}</option>`
     ).join('');
     const memberOptions = members.map(p =>
       `<option value="member:${p.id}">${escapeHtml(memberLabel(p))}</option>`
@@ -8955,11 +9149,16 @@ function onTumcelPickChange(i) {
   const body = opt.getAttribute('data-body') || '';
   const source = opt.getAttribute('data-source') || '';
   const by = opt.getAttribute('data-by') || '';
+  const category = opt.getAttribute('data-category') || '';
   document.getElementById(`tc-suggestion-id-${i}`).value = id;
   document.getElementById(`tc-tumcul-id-${i}`).value = by;
   if (id) {
     document.getElementById(`tc-source-${i}`).value = source;
     document.getElementById(`tc-fullquote-${i}`).value = body;
+    // What the member said this sentence is -- a starting point for the
+    // color that sorts it into the puzzle, not a lock: the admin can
+    // still change it before saving.
+    if (category) document.getElementById(`tc-color-${i}`).value = category;
     helper.style.display = 'block';
     helper.textContent = '“' + body + '”';
   } else {
@@ -9996,14 +10195,14 @@ const PRESS_FORMES = [
     editions: ['gece'],
     // Nothing auto-picks a Tümcel puzzle. With no row for the night the
     // page prints "Bugünkü bulmaca henüz hazır değil." and the game
-    // cannot be finished -- which also leaves Bulmaca locked behind it
+    // cannot be finished -- which also leaves Çengel locked behind it
     // for the whole night (gameBlocker). A genuinely red forme.
     async check(ctx) {
       if (ctx.gamesOff.has('tumcel')) return { state: 'na', note: 'Kapalı' };
       const { data, error } = await sb.from('tumcel_puzzles')
         .select('quotes').eq('puzzle_date', ctx.date).maybeSingle();
       if (error) throw error;
-      if (!data) return { state: 'miss', note: 'Bulmaca yok' };
+      if (!data) return { state: 'miss', note: 'Çengel yok' };
       const n = Array.isArray(data.quotes) ? data.quotes.length : 0;
       if (n < 4) return { state: 'miss', note: n + '/4 alıntı' };
       return { state: 'ok', note: '4 alıntı' };
