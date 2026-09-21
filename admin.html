@@ -2799,13 +2799,17 @@
              stays is the 7-day board underneath, which is now where a
              night already picked can be corrected directly. -->
         <div style="margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid var(--rule);">
-          <div class="panel-title" style="margin:0 0 14px;">Bu Gecenin Kelimesi</div>
+          <div class="panel-title" style="margin:0 0 14px;">Kelime Havuzu</div>
           <p style="margin-bottom:12px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-            What members offered for a night, newest first. Choosing one writes it as that night's
-            answer AND makes whoever offered it that night's Sözcü — a night is named for the day
-            it BEGINS on, so tonight is today's date even though the game runs past midnight. Only
-            you can read these; the table is deliberately not member-readable, because a suggestion
-            is a candidate answer.
+            THE POOL, oldest offer first — every word a member has offered and not taken back, whatever
+            day they wrote it. A suggestion is not made for a night and does not expire: it waits here
+            until you place it or until its author withdraws it, so picking tonight's word takes one
+            word out of the pool and leaves the rest standing. Choosing one writes it as the selected
+            night's answer AND makes whoever offered it that night's Sözcü — a night is named for the
+            day it BEGINS on, so tonight is today's date even though the game runs past midnight.
+            "Havuzdan çıkar" is the one other way a word leaves: it is how you say no to a word you
+            are never going to play. Only you can read these; the table is deliberately not
+            member-readable, because a suggestion is a candidate answer.
           </p>
           <div class="sozcu-assign-row">
             <div>
@@ -8562,7 +8566,7 @@ function sozNormalizeSyllables(word) {
   return sylls;
 }
 
-// context: 'pick' (Bu Gecenin Kelimesi) or 'day' (Sonraki 7 Gün). key is
+// context: 'pick' (Kelime Havuzu) or 'day' (Sonraki 7 Gün). key is
 // the suggestion id for 'pick', the ISO date for 'day'. by is the
 // suggester's user id, carried through so picking still credits them as
 // Sözcü — see the write side below.
@@ -8633,10 +8637,16 @@ async function loadSozcelSuggestions() {
 
   let rows = [], already = null;
   try {
+    // THE POOL, not one night's bucket. A suggestion is offered to the app
+    // and sits here until it is placed or withdrawn
+    // (db/sozcel_word_suggestions_v2_standing_pool.sql), so the list is
+    // every pending row there is — and OLDEST FIRST, because a pool that is
+    // only ever read from the top starves the offer that has waited longest,
+    // which is the same "fleeting" failure one level up.
     const [sug, used] = await Promise.all([
       sb.from('sozcel_word_suggestions')
         .select('id, word, definition, status, suggested_at, suggested_by')
-        .eq('for_night', night).order('suggested_at', { ascending: false }),
+        .eq('status', 'pending').order('suggested_at', { ascending: true }),
       sb.from('sozcel_used_answers').select('word, sozcul_id').eq('used_on', night).maybeSingle(),
     ]);
     if (sug.error) throw sug.error;
@@ -8662,35 +8672,73 @@ async function loadSozcelSuggestions() {
 
   const head = already
     ? '<div class="status-msg ok" style="margin:0 0 6px;">Bu gecenin kelimesi zaten var: <b>' +
-        escapeHtml(already.word) + '</b> — başka birini seçmek onu değiştirir.</div>'
+        escapeHtml(already.word) + '</b> — havuzdan başka birini seçmek onu değiştirir.</div>'
     : '';
   if (!rows.length) {
-    list.innerHTML = head + '<div class="empty-state">Bu gece için öneri yok.</div>';
+    list.innerHTML = head + '<div class="empty-state">Havuz boş.</div>';
     return;
   }
   list.innerHTML = head + rows.map(r => {
-    const picked = r.status === 'picked';
-    const editor = picked ? '' : sozEditorHTML({
+    const editor = sozEditorHTML({
       context: 'pick', key: r.id, by: r.suggested_by || '',
       word: r.word, definitionText: r.definition || '', confirmLabel: 'Bu Geceye Koy',
     });
-    return '<div class="sw-row" style="border:1px solid var(--rule);padding:8px 10px;' +
-      (picked ? 'background:var(--paper-card);' : '') + '">' +
+    return '<div class="sw-row" style="border:1px solid var(--rule);padding:8px 10px;">' +
       '<div style="display:flex;align-items:center;gap:10px;">' +
       '<b style="font-family:ui-monospace,monospace;letter-spacing:0.14em;font-size:0.95rem;">' +
         escapeHtml(r.word) + '</b>' +
       '<span style="flex:1;min-width:0;font-size:0.76rem;color:var(--muted);">' +
         escapeHtml(names.get(r.suggested_by) || '—') +
+        // How long it has been waiting. The pool has no deadline, so the
+        // one thing a row cannot say for itself is its age — and age is
+        // exactly what decides whose turn it is.
+        ' · ' + escapeHtml(swWaitedLabel(r.suggested_at)) +
         (r.definition ? ' — ' + escapeHtml(r.definition) : '') + '</span>' +
-      (picked
-        ? '<span style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-red);">Seçildi</span>'
-        // Opens the syllable + meaning editor below rather than placing the
-        // word straight away — hecelere ayırmadan ve anlam girilmeden
-        // hiçbir kelime bu geceye konmaz.
-        : '<button class="btn btn-primary" data-sw-open="' + escapeHtml(r.id) + '" style="padding:5px 12px;">Seç</button>') +
+      // The one way a word leaves the pool that is not being played: the
+      // admin saying no to it. Nothing else may remove it — picking
+      // another word no longer passes the rest, which is the whole of
+      // db/sozcel_word_suggestions_v2_standing_pool.sql.
+      '<button class="btn" data-sw-pass="' + escapeHtml(r.id) + '" style="padding:5px 10px;">Havuzdan çıkar</button>' +
+      // Opens the syllable + meaning editor below rather than placing the
+      // word straight away — hecelere ayırmadan ve anlam girilmeden
+      // hiçbir kelime bu geceye konmaz.
+      '<button class="btn btn-primary" data-sw-open="' + escapeHtml(r.id) + '" style="padding:5px 12px;">Seç</button>' +
       '</div>' + editor +
       '</div>';
   }).join('');
+}
+
+// How long an offer has been standing, said the way a person says it.
+// Elapsed time between two real instants (suggested_at is a timestamptz,
+// Date.now() is UTC), never a difference of two formatted calendar dates —
+// so it reads the same on a desk set to any timezone, and there is no
+// Istanbul date to compute here at all (convention 10 is about the other
+// case, a DAY KEY, which this is not). Deliberately coarse: what the admin
+// needs off this line is "this one has been here a while".
+function swWaitedLabel(iso) {
+  const when = iso ? new Date(iso) : null;
+  if (!when || isNaN(when)) return '—';
+  const days = Math.floor((Date.now() - when.getTime()) / 86400000);
+  if (days <= 0) return 'bugün';
+  if (days === 1) return '1 gündür bekliyor';
+  return days + ' gündür bekliyor';
+}
+
+// Havuzdan çıkar: the admin's "no" to a word they are never going to
+// play. It is an UPDATE to 'passed' rather than a delete, so the member's
+// own app can tell "not taken" from "still waiting" — and so the record of
+// who offered what survives.
+async function sozPassSuggestion(id) {
+  const status = document.getElementById('sw-status');
+  const { error } = await sb.from('sozcel_word_suggestions')
+    .update({ status: 'passed' }).eq('id', id);
+  if (error) {
+    console.error('[sw pass]', error);
+    if (status) { status.textContent = 'Çıkarılamadı: ' + (error.message || error); status.className = 'status-msg err'; }
+    return;
+  }
+  if (status) { status.textContent = 'Havuzdan çıkarıldı.'; status.className = 'status-msg ok'; }
+  loadSozcelSuggestions();
 }
 
 // Who offered a suggestion travels with it into the editor (data-soz-by) —
@@ -8730,17 +8778,34 @@ async function sozConfirmPick(id, by, editor) {
     const { error: wErr } = await sb.from('sozcel_used_answers')
       .upsert([row], { onConflict: 'used_on' });
     if (wErr) throw wErr;
-    // Everything else offered for this night is PASSED, including whatever
-    // was picked before if this is a correction. Marked rather than left
-    // pending, because "not picked" is then a fact the member's own app
-    // can read off their row -- the next morning it asks them whether to
-    // send the same word again or write another (see lastUnpickedWord in
-    // project.html), and a night that quietly stayed pending forever
-    // would be indistinguishable from one still being decided.
+    // ── AND NOTHING ELSE IS TOUCHED ──
+    // This used to mark every other offer for the night 'passed', which
+    // was the whole of what made a suggestion fleeting: a member who wrote
+    // a word on Tuesday morning had it killed by Tuesday's pick without
+    // anyone ever deciding anything about it. An offer belongs to the POOL
+    // now and leaves it two ways only — being placed (here) or being taken
+    // back by its author (or refused outright with "Havuzdan çıkar", which
+    // is somebody actually saying no to it). Everything else stands and is
+    // still there tomorrow. See
+    // db/sozcel_word_suggestions_v2_standing_pool.sql.
+    //
+    // The ONE row that does move is a previous pick for this same night:
+    // correcting a night means whatever stood there before is not the
+    // night's word any more, so it stops claiming to be one (left alone it
+    // would go on telling its author "bu gece bu oynanıyor" while another
+    // word played). 'passed' rather than back into the pool, because the
+    // pool's two live-row indexes — one offer per member, one row per word
+    // — may well have been filled since by that same member or that same
+    // word, and a correction must not fail on a unique violation.
     await sb.from('sozcel_word_suggestions')
-      .update({ status: 'passed' }).eq('for_night', night).neq('id', id);
+      .update({ status: 'passed' })
+      .eq('for_night', night).eq('status', 'picked').neq('id', id);
+    // for_night is written HERE, at the moment of picking, because that is
+    // the only moment a word has a night: on a pending row it is null. It
+    // is what lets the member's own box say "seçildi — bu gece bu
+    // oynanıyor" on the day it is played (see submitData in project.html).
     const { error: sErr } = await sb.from('sozcel_word_suggestions')
-      .update({ status: 'picked' }).eq('id', id);
+      .update({ status: 'picked', for_night: night }).eq('id', id);
     if (sErr) throw sErr;
     const swStatus = document.getElementById('sw-status');
     if (swStatus) { swStatus.textContent = 'Seçildi: ' + parsed.word; swStatus.className = 'status-msg ok'; }
@@ -8767,6 +8832,13 @@ function initSozcelSuggestions() {
   // Delegated: the rows are rebuilt on every load, so a listener per
   // button would be re-bound each time and leak the old ones.
   if (list) list.addEventListener('click', (e) => {
+    const passBtn = e.target.closest('[data-sw-pass]');
+    if (passBtn) {
+      const word = passBtn.closest('.sw-row').querySelector('b');
+      if (!confirm('"' + (word ? word.textContent : '') + '" havuzdan çıkarılsın mı?')) return;
+      sozPassSuggestion(passBtn.getAttribute('data-sw-pass'));
+      return;
+    }
     const openBtn = e.target.closest('[data-sw-open]');
     if (openBtn) {
       const editor = openBtn.closest('.sw-row').querySelector('.soz-editor');

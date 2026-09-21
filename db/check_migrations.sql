@@ -161,6 +161,14 @@ with checks(sira, dosya, aranan, var) as (
          and to_regclass('public.tumcel_quote_suggestions') is not null),
     (38, 'db/quotes.sql',                             'quotes tablosu',
          to_regclass('public.quotes') is not null),
+    (39, 'db/sozcel_word_suggestions.sql (+ v2_standing_pool)',
+         'sozcel_word_suggestions havuzu (for_night opsiyonel)',
+         to_regclass('public.sozcel_word_suggestions') is not null
+         and exists (select 1 from information_schema.columns
+                     where table_schema = 'public'
+                       and table_name = 'sozcel_word_suggestions'
+                       and column_name = 'for_night'
+                       and is_nullable = 'YES')),
 
     -- ── Ağustos 20–21: petek ve oyun soruları ──
     (40, 'db/hive_slots.sql (+ v2, v3)',              'hive_codes tablosu (eski, v5 ile emekli)',

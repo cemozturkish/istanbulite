@@ -3329,16 +3329,26 @@ const loadAnketActor = stackFetch(async () => {
 // only for the games still puts something into the day rather than
 // finding a locked door until sunset.
 //
-//   Sözcel   a word for tonight        -> sozcel_word_suggestions
-//   Tümcel   a quote for tonight       -> tumcel_quote_suggestions
+// ── AN OFFER IS NOT FLEETING ──
+// What a member writes here goes into the POOL, not into tonight. It sits
+// there until the admin picks it or until they take it back, and nothing
+// else removes it — not a night going by, not somebody else's word being
+// chosen for one (db/sozcel_word_suggestions_v2_standing_pool.sql;
+// tumcel_quote_suggestions has always been a standing pool, so the two are
+// one kind of thing now). So the box asks for a word, not for tonight's
+// word: which night a word is played on is the admin's decision at the
+// moment they reach into the pool, not a deadline on the member.
+//
+//   Sözcel   a word for the pool       -> sozcel_word_suggestions
+//   Tümcel   a sentence for the pool   -> tumcel_quote_suggestions
 //
 // Both tables are admin-curated by construction: nothing a member writes
 // here reaches another member except by the admin picking it. Bulmaca is
 // not a slot in this column — it stays generated and admin-managed
 // elsewhere, so there is nothing for a member to offer it.
 const SUBMIT_DEFS = [
-  { key: 'sozcel', kicker: 'SÖZCÜK ÖNER', title: 'Sözcel', logo: 'assets/sozcel-logo.png', ask: 'Bu geceye bir kelime öner' },
-  { key: 'tumcel', kicker: 'CÜMLE ÖNER', title: 'Tümcel', ask: 'Bu geceye bir cümle öner' },
+  { key: 'sozcel', kicker: 'SÖZCÜK ÖNER', title: 'Sözcel', logo: 'assets/sozcel-logo.png', ask: 'Havuza bir kelime öner' },
+  { key: 'tumcel', kicker: 'CÜMLE ÖNER', title: 'Tümcel', ask: 'Havuza bir cümle öner' },
 ];
 
 // One title, two loaders (loadOyunActor at night, loadSubmitActor by
@@ -3351,9 +3361,12 @@ function oyunTitleHtml(g) {
     : '<div class="t">' + g.title + '</div>';
 }
 
-// The night these offers are FOR. By day editionKey() is simply today,
-// which is the night that begins this evening — the one key both halves
-// of it will share once it starts (see ist-date.js).
+// Tonight, as this column's own clock. An offer is not made FOR a night
+// any more (see the pool note above), but two things here still have to
+// know which night it is: the countdown to sunset in the box's corner, and
+// whether a word of this member's is the one being played TONIGHT — the one
+// day their own box gets to say so. By day editionKey() is simply today,
+// which is the night that begins this evening (see ist-date.js).
 function tonightKey() {
   try {
     if (window.IstDate && IstDate.gameNight) return IstDate.gameNight();
@@ -3389,30 +3402,43 @@ function submitData() {
   if (!submitPromise) {
     submitPromise = (async () => {
       const night = tonightKey();
-      const out = { night, mine: {}, count: 0, failed: false };
+      const out = { night, mine: {}, count: {}, failed: false };
       try {
         const uid = await doneUid();
         if (!uid) return out;
         // RLS hands back only the caller's own row (see the migration's
-        // own note on why this table is not world-readable).
-        const [sz, tm, cnt] = await Promise.all([
+        // own note on why this table is not world-readable), so the
+        // member's own offer is read from the table and the size of the
+        // pool comes back as a bare number from an RPC that names nothing
+        // in it. Tümcel's table IS world-readable, so its own count is an
+        // ordinary head query — and it is ITS count rather than Sözcel's,
+        // which is what that box used to print.
+        const [sz, tm, pool, tmCount] = await Promise.all([
           IstRouter.sb.from('sozcel_word_suggestions')
-            .select('id, word, status').eq('for_night', night).eq('suggested_by', uid).maybeSingle(),
+            .select('id, word, status, for_night').eq('suggested_by', uid)
+            .in('status', ['pending', 'picked'])
+            .order('suggested_at', { ascending: false }).limit(1),
           IstRouter.sb.from('tumcel_quote_suggestions')
             .select('id, body, status').eq('suggested_by', uid).eq('status', 'pending').limit(1),
-          IstRouter.sb.rpc('sozcel_suggestion_count', { p_night: night }),
+          IstRouter.sb.rpc('sozcel_pool_count'),
+          IstRouter.sb.from('tumcel_quote_suggestions')
+            .select('id', { count: 'exact', head: true }).eq('status', 'pending'),
         ]);
-        if (sz && sz.data) out.mine.sozcel = sz.data;
+        // ── What counts as "you have already offered" ──
+        // A PENDING row is their standing offer and stays theirs until
+        // they take it back. A PICKED one is only their box's business on
+        // the night it is actually played — that evening the box says so
+        // instead of asking for another word. A word of theirs picked for
+        // an earlier night is neither: it has been played, and the pool is
+        // open to them again (the one-live-offer index says the same).
+        const szRow = ((sz && sz.data) || [])[0];
+        if (szRow && (szRow.status === 'pending' ||
+                      (szRow.status === 'picked' && szRow.for_night === night))) {
+          out.mine.sozcel = szRow;
+        }
         if (tm && tm.data && tm.data.length) out.mine.tumcel = tm.data[0];
-        if (cnt && typeof cnt.data === 'number') out.count = cnt.data;
-        // ── The offer that did not get picked ──
-        // Only asked about when tonight is still empty: a member who has
-        // already offered something is not being asked to offer again.
-        // Sözcel only, and not by omission — a Tümcel suggestion has no
-        // for_night at all (it is a standing pool that sits until it is
-        // used), so an unpicked quote never expires and there is nothing
-        // to re-send. Only a per-night offer can be missed.
-        if (!out.mine.sozcel) out.again = await lastUnpickedWord(uid, night);
+        if (pool && typeof pool.data === 'number') out.count.sozcel = pool.data;
+        if (tmCount && typeof tmCount.count === 'number') out.count.tumcel = tmCount.count;
       } catch (err) {
         console.error('[proje öneri]', err);
         out.failed = true;
@@ -3421,45 +3447,6 @@ function submitData() {
     })();
   }
   return submitPromise;
-}
-
-// ── "You offered this and it wasn't played. Again, or something else?" ──
-// The member's own most recent offer for a night that has already gone
-// by without being picked. Their LAST one and not a queue of them: if
-// they let it go and offer something else, the chain moves on with them
-// rather than nagging about a word they have stopped caring about.
-//
-// The night's actual word is read alongside it, which is worth saying
-// and costs nothing to say: sozcel_used_answers is readable by every
-// signed-in member and that word has already been played, so there is
-// nothing left to give away. "Seçilmedi" alone is a shrug; "seçilmedi,
-// 'çakıl' oynandı" is the answer to the question they would ask next.
-async function lastUnpickedWord(uid, night) {
-  try {
-    const { data, error } = await IstRouter.sb.from('sozcel_word_suggestions')
-      .select('id, word, definition, status, for_night')
-      .eq('suggested_by', uid)
-      .neq('status', 'picked')
-      .lt('for_night', night)
-      .order('for_night', { ascending: false })
-      .limit(1);
-    if (error) throw error;
-    const row = (data || [])[0];
-    if (!row) return null;
-    let played = null;
-    try {
-      const { data: used } = await IstRouter.sb.from('sozcel_used_answers')
-        .select('word').eq('used_on', row.for_night).maybeSingle();
-      if (used) played = used.word;
-    } catch (err) { /* the night may simply have had no game */ }
-    return { word: row.word, definition: row.definition || '', night: row.for_night, played };
-  } catch (err) {
-    // A database without the migration, or a policy that refuses: the box
-    // falls back to an ordinary empty form, which is the state it had
-    // before this existed.
-    console.error('[proje tekrar]', err);
-    return null;
-  }
 }
 
 function refreshSubmitColumn() {
@@ -3485,46 +3472,45 @@ async function loadSubmitActor(el, slot) {
     return;
   }
   const mine = data.mine[g.key];
-  // A word offered and not played is asked about again, once, on the next
-  // morning the member has not already offered something (see
-  // lastUnpickedWord). It is NOT this column's "done" -- the day still
-  // wants an offer from them, and the box says which question it is
-  // asking rather than repeating the standing one.
-  const again = (g.key === 'sozcel' && !mine) ? data.again : null;
   // An offer already made is this column's "done": the box goes quiet the
-  // way a read story does, and stays pressable so it can be withdrawn.
+  // way a read story does, and stays pressable so it can be withdrawn —
+  // which is the only thing that ever takes it back out of the pool. It
+  // stays quiet for as long as the offer stands, however many nights that
+  // is, because "you have already said your piece" does not expire either.
   fbSetDone(el, !!mine);
+  const standing = mine && mine.status === 'picked' ? 'Seçildi' : 'Havuzda';
   el.innerHTML = '<div class="k">' + g.kicker + '</div>' + oyunTitleHtml(g) +
-    '<div class="m">' + (mine ? 'Önerdin' : (again ? 'Tekrar mı, başka mı?' : esc(g.ask))) + '</div>';
-  fbSetPage(el, submitPagePayload(g, data, mine, again));
+    '<div class="m">' + (mine ? standing : esc(g.ask)) + '</div>';
+  fbSetPage(el, submitPagePayload(g, data, mine));
 }
 
 // What an offer box opens: a field, or what you already offered. Built
 // by `wire` rather than statically, for the same reason ANKET's page is
 // — it is stateful, and submitting has to turn the form into a receipt
 // without closing the page.
-function submitPagePayload(g, data, mine, again) {
+function submitPagePayload(g, data, mine) {
+  const waiting = data.count[g.key];
   return {
     kicker: g.kicker,
     // Sözcel's own box names when the game actually unlocks -- sunset --
     // in the one corner every fb-page already reserves for its meta (see
     // .fb-page-head .m); it ticks live once wired (see
     // wireSozcelCountdown), so the render-time value is only the first
-    // paint. The other two games have no such wait, so they keep the
-    // suggestion count that used to stand here.
-    meta: g.key === 'sozcel' ? sozcelCountdownLabel() : (data.count ? data.count + ' öneri' : ''),
+    // paint. The other box has no such wait, so it keeps the count of what
+    // is standing in ITS OWN pool -- it used to print Sözcel's, which was
+    // simply the wrong number on the wrong card.
+    meta: g.key === 'sozcel' ? sozcelCountdownLabel() : (waiting ? waiting + ' öneri' : ''),
     title: g.title,
     html: '<div id="submit-body" class="anket-body">Yükleniyor…</div>',
-    wire: (inner) => wireSubmitPage(inner, g, data, mine, again),
+    wire: (inner) => wireSubmitPage(inner, g, data, mine),
   };
 }
 
-function wireSubmitPage(inner, g, data, mine, again) {
+function wireSubmitPage(inner, g, data, mine) {
   const body = inner.querySelector('#submit-body');
   if (!body) return;
   if (g.key === 'sozcel') wireSozcelCountdown(inner);
-  if (mine) { renderSubmitMade(body, g, mine); return; }
-  if (again) { renderSubmitAgain(body, g, data, again); return; }
+  if (mine) { renderSubmitMade(body, g, data, mine); return; }
   renderSubmitForm(body, g, data);
 }
 
@@ -3598,70 +3584,20 @@ function wireSozcelCountdown(inner) {
   _sozcelCountdownTimer = setInterval(paint, 1000);
 }
 
-// How a past night is named to the reader. Almost always the one before
-// this one, and "dün gece" is what a person says — a raw ISO date reads
-// as a machine quoting a row back at them. Anything older keeps its date,
-// since "5 gün önce" is arithmetic the reader would have to redo.
-function nightWord(key) {
-  if (key === IstDate.iso(-1)) return 'Dün gece';
-  const d = IstDate.parseYMD(key);
-  if (!d) return key + ' için';
-  try {
-    if (window.I18N && I18N.formatDate) return I18N.formatDate(d, { day: 'numeric', month: 'long' }) + ' gecesi';
-  } catch (err) { /* fall through to the key itself */ }
-  return key + ' için';
-}
-
-// The morning after a word was not played. Two ways on and no third:
-// send the same one again, or write another. Declining is simply leaving
-// the page -- there is no "no thanks" button, because not offering is
-// what every other morning already looks like and it needs no answer.
-function renderSubmitAgain(body, g, data, again) {
-  body.innerHTML =
-    '<div class="submit-made">' + esc(again.word) + '</div>' +
-    '<div class="anket-note">' +
-      esc(nightWord(again.night)) + ' önerdin — seçilmedi.' +
-      (again.played ? ' O gece <b>' + esc(again.played) + '</b> oynandı.' : '') +
-    '</div>' +
-    '<div class="fb-throw-row">' +
-      '<button type="button" class="fb-throw-btn" id="submit-other">Başka kelime</button>' +
-      '<button type="button" class="fb-throw-btn" id="submit-again">Tekrar gönder</button>' +
-    '</div>' +
-    '<div class="anket-note" id="submit-msg">Bu gece için tekrar önerebilirsin.</div>';
-
-  const other = body.querySelector('#submit-other');
-  if (other) other.addEventListener('click', () => renderSubmitForm(body, g, data, again.word, again.definition));
-
-  const go = body.querySelector('#submit-again');
-  if (go) go.addEventListener('click', async () => {
-    const msg = body.querySelector('#submit-msg');
-    go.disabled = true;
-    msg.textContent = 'Gönderiliyor…';
-    // Re-checked rather than trusted: a word that went unpicked for one
-    // night can perfectly well have been PLAYED since -- somebody else
-    // offering it, or the auto-pick taking it -- and sozcel_used_answers
-    // .word is unique across all days, so it could never be an answer
-    // again. Better to say so here than to let the admin find out.
-    const err = await offerWord(again.word, again.definition, data.night);
-    if (err) { go.disabled = false; msg.innerHTML = esc(err); return; }
-    refreshSubmitColumn();
-    dismissFbPage();
-  });
-}
-
-// The one path that writes a word, shared by the form and by "tekrar
-// gönder" so the checks cannot drift apart. Returns a message to print,
-// or null when it landed.
-async function offerWord(word, definition, night) {
+// The one path that writes a word into the pool. Returns a message to
+// print, or null when it landed. NO for_night is written: an offer is not
+// made for a night, and that column is the admin's to fill in at the
+// moment they pick it (see the pool note at the top of this section).
+async function offerWord(word, definition) {
   const uid = await doneUid();
   if (!uid) return 'Oturum bulunamadı.';
   try {
     const { data: used } = await IstRouter.sb.from('sozcel_used_answers')
       .select('word').eq('word', word).maybeSingle();
-    if (used) return 'Bu kelime bu arada oynandı — başka bir tane seç.';
+    if (used) return 'Bu kelime zaten oynandı — başka bir tane seç.';
   } catch (err) { /* best effort: the insert is still fenced */ }
   const { error } = await IstRouter.sb.from('sozcel_word_suggestions')
-    .insert([{ for_night: night, word, definition: definition || null, suggested_by: uid }]);
+    .insert([{ word, definition: definition || null, suggested_by: uid }]);
   if (!error) return null;
   console.error('[proje öneri]', error);
   return offerWordError(error);
@@ -3669,7 +3605,7 @@ async function offerWord(word, definition, night) {
 
 // ── What went wrong, said in a way somebody can act on ──
 // Every failure used to print "Gönderilemedi, tekrar dene." — which is
-// actively WRONG advice for the two failures that are actually likely,
+// actively WRONG advice for the failures that are actually likely,
 // because neither of them will ever come right by trying again: the
 // table is not there, or it is there in its first shape and does not
 // have the column this page writes. Both are one unrun migration, and a
@@ -3696,13 +3632,16 @@ function offerWordError(error) {
     'PGRST204': 'stale', '42703': 'stale',
     // The table has never been created.
     'PGRST205': 'missing', '42P01': 'missing',
-    // RLS refused the row. By day for_night is today and the policy's
-    // fence is "not a night already past", so in practice this is a
-    // session the database does not recognise rather than a member
-    // offering too late.
+    // The table is still per-night: for_night is NOT NULL and this insert
+    // deliberately writes no night at all. One unrun migration, and the
+    // only failure here that a member could otherwise hit forever.
+    '23502': 'pernight',
+    // RLS refused the row. The policy's whole fence is now "a member
+    // writes their own row", so in practice this is a session the
+    // database does not recognise.
     '42501': 'rls',
-    // Either this member already offered tonight, or somebody else
-    // already offered this word.
+    // Either this member already has an offer standing in the pool, or
+    // somebody else's standing offer is this very word.
     '23505': 'dupe',
   };
   let kind = Object.prototype.hasOwnProperty.call(BY_CODE, code) ? BY_CODE[code] : null;
@@ -3711,25 +3650,33 @@ function offerWordError(error) {
   if (!kind) {
     const msg = ((error && error.message) || '') + ' ' + ((error && error.details) || '');
     if (/'?definition'? column/i.test(msg)) kind = 'stale';
+    else if (/for_night/i.test(msg)) kind = 'pernight';
     else if (/row-level security/i.test(msg)) kind = 'rls';
     else if (/(could not find the table|relation).*sozcel_word_suggestions/i.test(msg)) kind = 'missing';
   }
   if (kind === 'stale')   return 'Öneri tablosu güncel değil (db/sozcel_word_suggestions.sql).';
+  if (kind === 'pernight') return 'Öneri havuzu kurulu değil (db/sozcel_word_suggestions_v2_standing_pool.sql).';
   if (kind === 'missing') return 'Öneri tablosu kurulu değil (db/sozcel_word_suggestions.sql).';
   if (kind === 'rls')     return 'Bu öneri kaydedilemedi — oturumu kapatıp tekrar açar mısın?';
-  if (kind === 'dupe')    return 'Bu öneri zaten var — ya seninki ya da aynı kelime.';
+  if (kind === 'dupe')    return 'Bu öneri zaten havuzda — ya seninki ya da aynı kelime.';
   return 'Gönderilemedi, tekrar dene.';
 }
 
 // What you offered, and the one thing left to do with it: take it back.
-function renderSubmitMade(body, g, mine) {
+// Which is the whole of the rule — an offer leaves the pool when it is
+// picked or when the member who wrote it takes it back, and there is no
+// third way out. So the note says how long it will wait (as long as it
+// takes) rather than naming a deadline it does not have.
+function renderSubmitMade(body, g, data, mine) {
   const what = g.key === 'sozcel' ? (mine.word || '') : (mine.body || '');
+  const waiting = data && data.count ? data.count[g.key] : 0;
   body.innerHTML =
     '<div class="submit-made">' + esc(what) + '</div>' +
     '<div class="anket-note">' +
       (mine.status === 'picked'
         ? 'Seçildi — bu gece bu oynanıyor.'
-        : 'Gönderildi. Akşam hangisinin oynanacağına yönetici karar veriyor.') +
+        : 'Havuzda bekliyor. Seçilene kadar durur; istersen geri alırsın.' +
+          (waiting > 1 ? ' Şu an havuzda ' + waiting + ' öneri var.' : '')) +
     '</div>' +
     (mine.status === 'picked' ? '' :
       '<div class="fb-throw-row"><button type="button" class="fb-throw-btn" id="submit-undo">Vazgeç</button></div>');
@@ -3761,7 +3708,7 @@ const TUMCEL_CATEGORIES = [
   { value: 'cat4', label: 'Halk Ağzı' },
 ];
 
-function renderSubmitForm(body, g, data, prefill, prefillNote, prefillCategory) {
+function renderSubmitForm(body, g, data) {
   const isWord = g.key === 'sozcel';
   body.innerHTML =
     '<label class="submit-label" for="submit-in">' +
@@ -3786,7 +3733,10 @@ function renderSubmitForm(body, g, data, prefill, prefillNote, prefillCategory) 
         TUMCEL_CATEGORIES.map(c => '<option value="' + c.value + '">' + c.label + '</option>').join('') +
       '</select>') +
     '<div class="fb-throw-row"><button type="button" class="fb-throw-btn" id="submit-go">Gönder</button></div>' +
-    '<div class="anket-note" id="submit-msg">Bu gece oynanacak oyun için.</div>';
+    // Not "bu gece oynanacak oyun için": what is written here goes into
+    // the pool and waits there. Saying which night it is for would be the
+    // one promise this column is not in a position to make.
+    '<div class="anket-note" id="submit-msg">Seçilene kadar havuzda kalır.</div>';
 
   const field = body.querySelector('#submit-in');
   const note = body.querySelector('#submit-note');
@@ -3794,15 +3744,6 @@ function renderSubmitForm(body, g, data, prefill, prefillNote, prefillCategory) 
   const go = body.querySelector('#submit-go');
   const msg = body.querySelector('#submit-msg');
   if (!field || !go) return;
-  if (category && prefillCategory) category.value = prefillCategory;
-  // Arriving from "başka kelime": the word they are replacing is in the
-  // field, because changing one letter of it is the likeliest edit and
-  // retyping the whole thing is the likeliest reason not to bother. Its
-  // meaning comes with it -- a word edited by a letter usually means the
-  // same thing, and a field cleared behind the reader's back reads as
-  // work lost.
-  if (prefill) { field.value = prefill; field.select && setTimeout(() => field.select(), 0); }
-  if (note && prefillNote) note.value = prefillNote;
 
   go.addEventListener('click', async () => {
     // Turkish lowercase: İ/I are not each other's case pair in tr, so
@@ -3829,7 +3770,7 @@ function renderSubmitForm(body, g, data, prefill, prefillNote, prefillCategory) 
     msg.textContent = 'Gönderiliyor…';
     let problem = null;
     if (isWord) {
-      problem = await offerWord(raw, extra, data.night);
+      problem = await offerWord(raw, extra);
     } else {
       const uid = await doneUid();
       if (!uid) problem = 'Oturum bulunamadı.';
