@@ -2845,11 +2845,28 @@ rather than mid-slide; the game's back arrow, the backdrop and Escape are all wa
 of the page itself (`unmount()`) has nothing left to slide in front of and skips straight to hidden
 (`closeGameOverlay(true)`).
 
-Visiting one of the three directly still works exactly as before — the
-`<a href="project.html">` fallback is what fires when there is no parent to postMessage — and
-their own bottom-bar link and back arrow still point at `project.html` for that case. Tümcel and
-Bulmaca are tiles too now, the other two slots of Oyunlar beside Sözcel (see "What each screen
-carries" below) — all three open through the same embed.
+**And a game is not a PAGE: visiting one of the three directly is shut.** The embed is the only
+way in, so a top-level hit on `sozcel.html` / `tumcel.html` / `bulmaca.html` is a typed address, a
+stale bookmark or a search result — nothing on the site has linked there since the parts bin was
+demolished. What it used to serve was that bin's own chrome (a masthead, a "‹ Geri" and a column
+of links to the other two games) around a board whose day switches and sequence gates only mean
+anything inside the app: the app's front door standing open round the back. Each page's head
+therefore opens with one line — `if (window.self === window.top) location.replace('project.html')`
+— and the reasoning is written out once, in sozcel.html; the other two point at it.
+
+Three things about that line, each of which fails silently if changed. It is `location.replace`
+and never an assignment to `href`, so the bounce leaves no history entry for the device's own back
+gesture to land back on. It stands **first in the head**, ahead of every shared module, so a
+visitor being bounced is never made to wait on a megabyte of scripts for a page they will not be
+shown. And it is the **same fact** the back arrow further down each page already reads
+(`window.self !== window.top`) — so embedded it is a no-op, which is every real opening, and there
+is one test for "am I the app's game or a stray URL" rather than two that can disagree.
+
+The `<a href="project.html">` fallback on the back arrow and the bottom-bar link stay exactly as
+they were: they are what the markup says before the embed script runs, and a page that has been
+replaced never gets to use them. Tümcel and Bulmaca are tiles too now, the other two slots of
+Oyunlar beside Sözcel (see "What each screen carries" below) — all three open through the same
+embed.
 
 **The first frame is fetched alone, and that is the whole of why the page feels quick.** Every frame
 has to be decoded before the book can reach it — an `<img>` whose bytes are not ready paints
