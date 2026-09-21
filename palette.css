@@ -241,20 +241,23 @@ html.ist-map-ink :is(
    THE FRAME'S OWN SHADING READS THE PALETTE TOO
    ──────────────────────────────────────────────────────────────
    frame.png's ring is drawn with a lit face and a shadow face, not one
-   flat tone — see map-ink.js's own FRAME_LADDERS section for the full
-   reasoning and the measurement. Gated on its OWN html.ist-frame-ink
-   class, deliberately separate from html.ist-map-ink above: a ring
-   color that fails to resolve must never be able to take the maps and
-   avatars down with it, and the reverse.
+   flat tone — two grays (61 and 24 out of 255, same measurement as
+   every ladder here), which is what gives the hexagon its bevel. Used
+   as a plain CSS mask this never rendered at all: a mask only reads a
+   PNG's alpha, and what actually painted inside it was a single flat
+   --hexframe-stroke color (frames.css) — the shading was in the file
+   and nowhere on screen. `--frame-hi` / `--frame-lo` are what put it
+   back: two ordinary tokens, declared once per palette next to --ink,
+   read by map-ink.js's own ist-frame-ink ladder. Gated on the same
+   html.ist-map-ink class as everything else on this page.
 
-   frames.css already draws every one of these rings as a flat mask +
-   solid --hexframe-stroke color — the safe state before this filter is
-   ready, with ?ink=0, or if map-ink.js fails outright. This is what
-   swaps that for the real drawing once its ladder is actually built:
-   the mask comes off (frame.png's own alpha already does that job) and
-   the ring becomes the image itself, tinted through whichever of the
-   six frame ladders --hexframe-filter is currently pointing at. */
-html.ist-frame-ink :is(
+   frames.css already draws the ring as a flat mask + solid
+   --hexframe-stroke color — the safe state before this filter is
+   ready, with ?ink=0, or if map-ink.js fails outright. This swaps that
+   for the real drawing once the ladder is built: the mask comes off
+   (frame.png's own alpha already does that job) and the ring becomes
+   the image itself, tinted through the two tones below. */
+html.ist-map-ink :is(
   .hexframe, .ist-pc-cover-avatar, .library-card .avatar, .avatar,
   .poll-voter-avatar, .ev-attendee-avatar, .politician-detail-avatar,
   .tbmm-detail-avatar
@@ -266,7 +269,21 @@ html.ist-frame-ink :is(
   background-repeat: no-repeat;
   -webkit-mask: none;
   mask: none;
-  filter: var(--hexframe-filter, url(#ist-frame-ink));
+  filter: url(#ist-frame-ink);
+}
+
+/* The petek's own rings are the one exception: their color CARRIES
+   MEANING (distance from the reader, and red for whoever is named on
+   the top bar — see profile-card.css's five-tone ladder), which a
+   shared bevel would flatten into one look for everybody. They keep
+   the plain flat mask + solid color untouched, at higher specificity
+   than the rule above. */
+html.ist-map-ink .ist-hive-cell :is(.ist-hive-frame, .ist-hive-slot)::after {
+  background: var(--hexframe-stroke, var(--ink));
+  background-image: none;
+  -webkit-mask: var(--hexframe-ring);
+  mask: var(--hexframe-ring);
+  filter: none;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -350,6 +367,13 @@ html.ist-map-ink nav b.fb-logo-btn .fb-hold-frame {
   --col-border:      1px solid var(--rule);
   --danger:          var(--ink-red);
   --field-bg:        #e8d3c8;
+  /* The hexagon frame's own two-tone bevel (map-ink.js's ist-frame-ink
+     ladder): the lit face and the shadow face of frame.png's drawn
+     ring. Earth reads as an actual dark-brown/light-brown pair --
+     --brown-1 and --ink are already exactly that, so this needs no
+     new colors of its own. */
+  --frame-hi:        var(--brown-1);
+  --frame-lo:        var(--ink);
   --hairline:        #c5ad9a;
   --hairline-border: 1px solid var(--whisper);
   --hover:           #d8c0b1;
@@ -386,6 +410,10 @@ html.ist-map-ink nav b.fb-logo-btn .fb-hold-frame {
   /* Core ink & paper */
   --ink:          #000000;
   --ink-deep:     #000000;
+  /* Mono is left as drawn -- frame.png's own two flat grays (61 and 24
+     out of 255), not recolored at all. */
+  --frame-hi:     #3d3d3d;
+  --frame-lo:     #181818;
   --paper:        #ffffff;
   --paper-warm:   #ffffff;
   --paper-card:   #f5f5f5;
