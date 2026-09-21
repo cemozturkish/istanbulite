@@ -181,6 +181,9 @@
          --fb-band-h is built from. Derived rather than a second literal,
          so the two stay in step if --fb-box-h or --fb-box-gap ever move. */
       --fb-oyun-box-h: calc((3 * var(--fb-box-h) + var(--fb-box-gap)) / 2);
+      /* Anket carries two boxes now too (see the CAST entry), the same
+         reduction and the same derivation as Oyunlar's own. */
+      --fb-anket-box-h: var(--fb-oyun-box-h);
       /* Both columns hang from the same line above the tab bar -- the
          phone's stacks grow upward from the thumb (see "The phone's feeds
          hang from the bottom" in CLAUDE.md).
@@ -256,6 +259,9 @@
        specificity. */
     .fb-box.fb-oyun { height: var(--fb-oyun-box-h); }
     .fb-box.fb-oyun.fb-slot-1 { bottom: calc(var(--fb-dock) + var(--fb-oyun-box-h) + var(--fb-box-gap)); }
+    /* Anket overrides the same pair, the same way. */
+    .fb-box.fb-anket { height: var(--fb-anket-box-h); }
+    .fb-box.fb-anket.fb-slot-1 { bottom: calc(var(--fb-dock) + var(--fb-anket-box-h) + var(--fb-box-gap)); }
     /* A slot with nothing to put in it is drawn as an empty frame --
        the same "nothing here" convention as everywhere else on the site
        (.events-empty, deckFrameHTML): a dashed rectangle marking where
@@ -2226,7 +2232,7 @@ function stackFetch(fetchRows) {
   let promise = null;
   const run = function (el, slot) {
     if (!promise) promise = fetchRows();
-    promise.then(({ rows, failed, emptyHtml, failedHtml }) => {
+    promise.then(({ rows, failed, emptyHtml, emptyDashed, failedHtml }) => {
       if (!el.isConnected) return;
       // Cleared before every render, filled only on the path that
       // actually has something to open (see THE BAND PAGE): a message,
@@ -2238,12 +2244,16 @@ function stackFetch(fetchRows) {
       // never landed, a feed with nothing in it, and a feed with fewer
       // than three things are not the same fact -- only the first slot
       // ever carries the message, the rest are simply left dashed.
+      // `emptyDashed` is a fourth nuance a caller can opt into (Anket):
+      // nothing went out at all, which is not a message either, so
+      // every slot goes plain dashed instead of the first one alone
+      // printing a paragraph about why.
       if (failed) {
         if (slot === 0) { el.classList.remove('fb-empty'); el.innerHTML = failedHtml; }
         else { el.classList.add('fb-empty'); el.innerHTML = ''; }
         return;
       }
-      if (!rows.length && slot === 0) {
+      if (!rows.length && slot === 0 && !emptyDashed) {
         el.classList.remove('fb-empty'); el.innerHTML = emptyHtml;
         return;
       }
@@ -2773,9 +2783,11 @@ async function loadHaberlerActor(el, slot) {
   }
   const arr = byBucket[bucket] || [];
   if (!arr.length) {
+    // A dashed slot marks the place; it does not need to say why it is
+    // empty too -- "Bugün için bir sayı çıkmadı." doubled up with the
+    // dashed frame itself, so the kicker alone is left to name the slot.
     el.classList.add('fb-empty');
-    el.innerHTML = '<div class="k">' + label + '</div>' +
-      (slot === 2 && !editionDate ? '<div class="t">Bugün için bir sayı çıkmadı.</div>' : '');
+    el.innerHTML = '<div class="k">' + label + '</div>';
     return;
   }
   const uid = await doneUid();
@@ -3088,8 +3100,10 @@ function anketData() {
         // is a SEPARATE gate and stays one -- a closed poll is closed
         // whether or not it was ever in a baskı -- so the filter is
         // both. Order is the admin's own (edition_order), never "newest
-        // first": which of the three boxes a poll stands in is a
+        // first": which of the two boxes a poll stands in is a
         // decision somebody made, not an accident of when it was typed.
+        // Two boxes, not three (see the CAST entry) -- the same reduction
+        // Kahvehane's own Oyunlar column already made.
         const { date: editionDate, missing } = await editionInForce('polls_current_edition');
         if (!missing && !editionDate) return { polls: [], voted: new Set(), failed: false };
         let q = IstRouter.sb.from('neighborhood_polls')
@@ -3098,7 +3112,7 @@ function anketData() {
         const { data, error } = await q
           .eq('active', true)
           .order(missing ? 'created_at' : 'edition_order', { ascending: !missing })
-          .limit(3);
+          .limit(2);
         if (error) throw error;
         const polls = data || [];
         const voted = new Set();
@@ -3311,11 +3325,11 @@ const loadAnketActor = stackFetch(async () => {
     page: anketPagePayload(poll),
     done: voted.has(poll.id),
   }));
-  return { rows, failed: false,
-    emptyHtml: '<div class="k">ANKET</div>' +
-      (gece
-        ? '<div class="t">Bu gece sonuç yok</div><div class="m">Gündüz anket açılmamış.</div>'
-        : '<div class="t">Bugün anket yok</div><div class="m">Akşama sonuçlar çıkar.</div>') };
+  // No poll went out for the day at all -- not a failure, just nothing
+  // to ask or to answer. That is not a message, it is a dashed slot like
+  // any other empty one (emptyDashed), so both boxes go plain and blank
+  // rather than one of them printing a paragraph about why.
+  return { rows, failed: false, emptyDashed: true };
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -4418,9 +4432,14 @@ const CAST = [
     idBase: 'dunya', live: 0, lane: LANE_KUTUPHANE, col: 'l', cls: 'fb-dunya',
     poses: END0_POSES_L, lag: 0.43, lagFree: 0.135, load: loadDunyaActor, onpress: onpressBox,
   }),
+  // Two slots, not three (see loadAnketActor/anketData) -- .fb-anket's
+  // own height override (--fb-anket-box-h) grows each box so the column
+  // still fills exactly the band three boxes used to, the same move
+  // Kahvehane's Oyunlar column already makes.
   ...stackActors({
     idBase: 'anket', live: 11, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-anket',
     poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadKutuphaneNarrow, onpress: onpressBox,
+    count: 2,
   }),
   // Kahve and Yorumlar stand on the ilçe stop, which is parked (see
   // ILCE_STOP_ENABLED). They are left out entirely rather than merely
@@ -5825,14 +5844,14 @@ async function loadMapStats() {
   // Anket: how many of the active polls this member has already answered.
   const anket = (async () => {
     // Same rule: the polls in the baskı AND still open, capped at the
-    // three boxes the column actually has (anketData's own limit), so
+    // two boxes the column actually has (anketData's own limit), so
     // the square and the column can never disagree about how many there
     // are left to answer.
     const { date: editionDate, missing } = await editionInForce('polls_current_edition');
     let q = sb.from('neighborhood_polls').select('id').eq('active', true);
     if (!missing) q = q.eq('edition_date', editionDate || '1970-01-01');
     const { data, error } = await q
-      .order(missing ? 'created_at' : 'edition_order', { ascending: !missing }).limit(3);
+      .order(missing ? 'created_at' : 'edition_order', { ascending: !missing }).limit(2);
     if (error) throw error;
     const rows = data || [];
     let answered = 0;
