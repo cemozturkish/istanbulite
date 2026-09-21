@@ -158,44 +158,23 @@
       vars: ['--lit', '--ink'],
       red: null,
     },
+    // frame.png's ring: not a flat silhouette, a lit face and a shadow
+    // face -- two flat grays (61 and 24 out of 255), same measurement as
+    // every ladder above. Used as a plain CSS mask this never rendered
+    // (a mask reads only a PNG's alpha, and the ring was painted with a
+    // single flat --hexframe-stroke color instead) -- this ladder is
+    // what puts it back: --frame-hi/--frame-lo are two ordinary tokens,
+    // declared per palette next to --ink, one pair for the light face and
+    // one for the shadow. Sözcel's board and keyboard are pinned to plain
+    // #000 (frames.css) and stay out of this ladder entirely -- see that
+    // file's own note for why a bevel has nothing to show there.
+    {
+      id: 'ist-frame-ink',
+      tones: [61, 24],
+      vars: ['--frame-hi', '--frame-lo'],
+      red: null,
+    },
   ];
-
-  // ══════════════════════════════════════════════════════════════
-  // THE FRAME'S OWN SHADING — a ladder per ring color, not one ladder
-  // ──────────────────────────────────────────────────────────────
-  // frame.png is not a flat silhouette: it is drawn with a lit face and
-  // a shadow face, two flat grays (61 and 24 out of 255 — measured the
-  // same way as every ladder above), which is what gives the hexagon its
-  // bevel. Used as a plain CSS mask, none of that ever rendered: a mask
-  // only reads a PNG's alpha, and what actually painted inside it was a
-  // single flat --hexframe-stroke color (frames.css) — the shading was
-  // there in the file and nowhere on screen.
-  //
-  // Putting it back is not one ladder, because --hexframe-stroke is not
-  // one color: it is reassigned per hexagon to mean something — the
-  // petek's five-tone distance ladder (you / bonded / other / an open
-  // seat) and red for whoever is named on the top bar (profile-card.css).
-  // A luminance-remap filter has to know its colors ahead of time, so
-  // there is one small ladder per distinct ring color the site actually
-  // uses, each built from that ONE color: itself for the lit face, and
-  // that same color darkened by the drawing's own ratio (24/61) for the
-  // shadow face. Add a new ring color, add a row here.
-  const FRAME_SHADE = 24 / 61;
-  const FRAME_TONES = [61, 24];
-  const FRAME_LADDERS = [
-    { id: 'ist-frame-ink',         var: '--ink',                  tones: FRAME_TONES, shade: FRAME_SHADE },
-    { id: 'ist-frame-red',         var: '--ink-red',              tones: FRAME_TONES, shade: FRAME_SHADE },
-    { id: 'ist-frame-hive-me',     var: '--ist-hive-ring-me',     tones: FRAME_TONES, shade: FRAME_SHADE },
-    { id: 'ist-frame-hive-bonded', var: '--ist-hive-ring-bonded', tones: FRAME_TONES, shade: FRAME_SHADE },
-    { id: 'ist-frame-hive-other',  var: '--ist-hive-ring-other',  tones: FRAME_TONES, shade: FRAME_SHADE },
-    { id: 'ist-frame-hive-open',   var: '--ist-hive-ring-open',   tones: FRAME_TONES, shade: FRAME_SHADE },
-  ];
-  // Sözcel's board/keyboard are deliberately absent: pinned to #000
-  // (frames.css), where "itself" and "darkened further" are both just
-  // black — there is nothing for a bevel to show, so that ring stays the
-  // plain flat mask forever rather than carrying a filter that would be
-  // a no-op. See frames.css's own note on it.
-  const FRAME_READY_CLASS = 'ist-frame-ink';
 
   // One entry per 8-bit gray. Not a round number picked for looks: every
   // tone above is k/255, so at this size each lands exactly on a sample
@@ -205,69 +184,18 @@
   // id -> { filter, funcs, flood }
   let built = null;
 
-  // '#rgb' / '#rrggbb' / 'rgb(r, g, b)' / 'color(srgb r g b)' -> [r, g, b] in 0..1.
-  // The last form is not decoration: Chromium's computed value for a
-  // color-mix() read back off a real `color` property (see parseColor
-  // below) serializes as `color(srgb 0.53 0.46 0.41)`, never as rgb() --
-  // and unlike rgb()'s 0-255 integers, color()'s components are already
-  // 0-1 floats, so this branch must NOT divide by 255. A regex that only
-  // knew #hex and rgb() rejected every color-mix() token silently, which
-  // is exactly what looked like "nothing changed" after the ladder was
-  // wired up: one failing var aborts the whole frame batch (see refresh).
-  function parseColorLiteral(s) {
+  // '#rgb' / '#rrggbb' / 'rgb(r, g, b)' -> [r, g, b] in 0..1
+  function parseColor(raw) {
+    const s = String(raw || '').trim();
+    if (!s) return null;
     if (s[0] === '#') {
       const h = s.slice(1);
       if (h.length === 3) return [0, 1, 2].map(i => parseInt(h[i] + h[i], 16) / 255);
       if (h.length === 6) return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
       return null;
     }
-    const c = s.match(/^color\(\s*srgb(?:-linear)?\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/i);
-    if (c) return [+c[1], +c[2], +c[3]];
     const m = s.match(/rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i);
     return m ? [+m[1] / 255, +m[2] / 255, +m[3] / 255] : null;
-  }
-
-  // Everything the maps and avatars ever declare is a literal hex or
-  // rgb(), so parseColorLiteral is all that is needed for them. The
-  // frame ladder reads tokens like --ist-hive-ring-me, which is
-  // `var(--ink)`, and --ist-hive-ring-bonded, which is a color-mix() of
-  // two more vars -- and getComputedStyle().getPropertyValue() on a
-  // CUSTOM property does NOT resolve nested var() references or
-  // evaluate functions like color-mix(): it hands back the text as
-  // specified, `var()` and all. A canvas 2D context's fillStyle parses
-  // the full CSS <color> grammar but has no notion of custom properties
-  // either, so it cannot make sense of that raw text.
-  //
-  // What DOES resolve every var() in the chain, and color-mix() with
-  // it, is the browser's own cascade -- so hand the raw string to a
-  // real CSS property instead of a custom one: assign it to `color` on
-  // a hidden probe element sitting in the document, then read back
-  // getComputedStyle(probe).color, which is always a plain
-  // rgb()/rgba() string in every engine. That is the one thing this
-  // needs to be true, whatever `s` turns out to be.
-  function colorProbe() {
-    if (parseColor._probe) return parseColor._probe;
-    if (!document.body) return null;
-    const d = document.createElement('div');
-    d.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none';
-    document.body.appendChild(d);
-    parseColor._probe = d;
-    return d;
-  }
-
-  function parseColor(raw) {
-    const s = String(raw || '').trim();
-    if (!s) return null;
-    const direct = parseColorLiteral(s);
-    if (direct) return direct;
-    try {
-      const probe = colorProbe();
-      if (!probe) return null;
-      probe.style.color = '';
-      probe.style.color = s;
-      if (!probe.style.color) return null; // an invalid value is never assigned
-      return parseColorLiteral(getComputedStyle(probe).color);
-    } catch (e) { return null; }
   }
 
   function el(name, attrs) {
@@ -345,14 +273,7 @@
     svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
     const defs = el('defs', {});
     built = {};
-    // Both families share one <defs> -- buildOne() only cares about a
-    // spec's id/tones/red, so a frame ladder (single var + a derived
-    // shadow tone) builds through the exact same machinery as a map or
-    // avatar ladder (several vars, one per tone). Sharing the DOM only
-    // saves an element; it does NOT couple their readiness -- see
-    // refresh() for why those stay two independent gates.
     for (const spec of LADDERS) built[spec.id] = buildOne(spec, defs);
-    for (const spec of FRAME_LADDERS) built[spec.id] = buildOne(spec, defs);
     svg.appendChild(defs);
     document.body.appendChild(svg);
     return true;
@@ -376,67 +297,37 @@
     return out.map(a => a.join(' '));
   }
 
-  function writeLadder(spec, cols, red) {
-    const b = built[spec.id];
-    const t = tables(spec.tones, cols);
-    b.funcs.R.setAttribute('tableValues', t[0]);
-    b.funcs.G.setAttribute('tableValues', t[1]);
-    b.funcs.B.setAttribute('tableValues', t[2]);
-    if (b.flood) b.flood.setAttribute('flood-color', red);
-  }
-
   // Re-reads the tokens and rewrites the lookup. Called by palette.js
   // every time the palette or the sun moves, so a sunset repaints the
   // maps in the same frame it repaints everything else.
   function refresh() {
     try {
-      // Switched off: neither ready class is added, so every drawing
-      // renders exactly as it was drawn -- the same degradation both
-      // classes guarantee when this module fails to load at all.
-      if (killed()) {
-        document.documentElement.classList.remove(READY_CLASS);
-        document.documentElement.classList.remove(FRAME_READY_CLASS);
-        return;
-      }
+      // Switched off: the ready class is never added, so every drawing
+      // renders exactly as it was drawn -- the same degradation the class
+      // guarantees when this module fails to load at all.
+      if (killed()) { document.documentElement.classList.remove(READY_CLASS); return; }
       const cs = getComputedStyle(document.documentElement);
-
-      // ── The maps, avatars, loading screen and Sözcel's mark ──
-      // Unchanged: all or nothing across this whole family, so the ready
-      // class can never mean "half of them are painted".
-      const mainWant = [];
-      let mainOk = true;
+      const want = [];
       for (const spec of LADDERS) {
         const cols = spec.vars.map(v => parseColor(cs.getPropertyValue(v)));
         const red = spec.red ? String(cs.getPropertyValue(spec.red) || '').trim() : '';
-        if (cols.some(c => !c) || (spec.red && !red)) { mainOk = false; break; }
-        mainWant.push({ spec, cols, red });
+        // No tokens, no filter: a page that never declared a ladder keeps
+        // that family's drawings exactly as they were drawn. All or
+        // nothing across the ladders, so the ready class can never mean
+        // "half of them are painted".
+        if (cols.some(c => !c) || (spec.red && !red)) return;
+        want.push({ spec, cols, red });
       }
-
-      // ── The frame's own ring colors ──
-      // A SEPARATE gate, on purpose: a color that fails to resolve here
-      // (an engine too old for color-mix and its canvas fallback both,
-      // a page that never declared one of these six vars) must not be
-      // able to take the maps and avatars down with it, and the reverse.
-      // Two independent ladders sharing one mechanism, not one bigger one.
-      const frameWant = [];
-      let frameOk = true;
-      for (const spec of FRAME_LADDERS) {
-        const base = parseColor(cs.getPropertyValue(spec.var));
-        if (!base) { frameOk = false; break; }
-        frameWant.push({ spec, cols: [base, base.map(c => c * spec.shade)], red: '' });
+      if (!build()) return;
+      for (const { spec, cols, red } of want) {
+        const b = built[spec.id];
+        const t = tables(spec.tones, cols);
+        b.funcs.R.setAttribute('tableValues', t[0]);
+        b.funcs.G.setAttribute('tableValues', t[1]);
+        b.funcs.B.setAttribute('tableValues', t[2]);
+        if (b.flood) b.flood.setAttribute('flood-color', red);
       }
-
-      if (!mainOk && !frameOk) return;
-      if (!build()) return; // no body yet -- neither family can be written
-
-      if (mainOk) {
-        for (const { spec, cols, red } of mainWant) writeLadder(spec, cols, red);
-        document.documentElement.classList.add(READY_CLASS);
-      }
-      if (frameOk) {
-        for (const { spec, cols, red } of frameWant) writeLadder(spec, cols, red);
-        document.documentElement.classList.add(FRAME_READY_CLASS);
-      }
+      document.documentElement.classList.add(READY_CLASS);
     } catch (e) { /* the drawings stay as drawn */ }
   }
 
@@ -454,8 +345,5 @@
     window.addEventListener('load', refresh);
   } catch (e) { /* ignore */ }
 
-  global.IstMapInk = {
-    refresh, READY_CLASS, LADDERS, KILL_KEY,
-    FRAME_READY_CLASS, FRAME_LADDERS,
-  };
+  global.IstMapInk = { refresh, READY_CLASS, LADDERS, KILL_KEY };
 })(window);
