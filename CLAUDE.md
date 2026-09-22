@@ -3871,6 +3871,13 @@ unchanged, and only the surface they are opened on moved. What went with the dep
 copy: `hiveSelfHTML`, `wireHiveSelf`, `renderHiveSelf`, `HIVE_PREFS`, `pickHivePref`,
 `hiveAvatarPickerHTML`, the rail, and all of their CSS.
 
+**`wireCopyCode` / `doSignOut` / `doDeleteAccount` are NOT part of that copy**, and cutting them
+out with it is exactly the mistake the note above them warns about: they were declared inside the
+block Sen printed, but the SHEET is what calls them. Taken away, `wireSettingsEvents` threw on
+every open of the profile sheet — so pressing your own name on the bar did nothing at all, with no
+broken-looking screen to point at. They are three functions of their own, beside the things that
+print buttons rather than inside one of them.
+
 **THE DRAWING STANDS ON THE FLOOR OF ITS WINDOW, IT IS NOT CENTRED IN IT** (`fitHive`'s
 `offsetY`). It used to be centred in the band the strip leaves when it is shut, clamped to whatever
 kept an open card off its foot — and the petek is mostly empty paper above the reader, so centring
