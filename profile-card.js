@@ -1583,7 +1583,7 @@
   // How far a finger has to travel before the gesture is a drag rather
   // than a tap.
   const HIVE_GESTURE_SLOP = 8;
-  const HIVE_CARD_GAP = 10;
+  const HIVE_CARD_GAP = 14;
 
   // How far from the reader a cell is standing, in hexagons. This is the
   // level filter, and also what the level-2 wave-in stagger and the
