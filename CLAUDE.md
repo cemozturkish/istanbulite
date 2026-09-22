@@ -1765,7 +1765,7 @@ page it is drawn on in the same frame. The selector list deliberately does not c
 these maps that is not gray.
 
 **And the maps are not the only drawn grays, so there are two ladders** (`LADDERS` in map-ink.js).
-The avatar family — `assets/avatar-*.png` plus `avatar-background.png` — is the same measurement
+The avatar family — `assets/avatar/*.png`, the stacked layers plus `background.png` — is the same measurement
 again and even cleaner: four flat tones, already transparent, already registered on the one
 1024×1536 hexframe canvas. `#f9f9f9` the figure's own paper (`--av-paper`), `#dcdbdb` the ground
 behind it (`--av-ground`), `#5b5b5b` the jail stripes (`--av-jail`), `#181818` the ink that draws
@@ -4151,7 +4151,7 @@ Edit the form submission and Supabase call handlers in `admin.html`.
 
 ## Assets
 
-`assets/` is grouped into subfolders by kind: `assets/avatar/` (layered avatar base + hair overlays, see the Account & User Model section), `assets/mascot/` (onboarding/notification cat mascot), `assets/map/` (Istanbul/Turkey map images and the SVG source of truth). Ungrouped one-offs (favicon, close icon, district stickers, loading screen frames) stay directly in `assets/`.
+`assets/` is grouped into subfolders by kind: `assets/avatar/` (every layer of the stacked avatar — base, shirt, hair, accessory, hat, jail — plus the ground behind the figure; the folder already says "avatar", so the files inside it do not repeat it, and `assets/avatar/README.md` is the list of what is drawn and what is still missing), `assets/mascot/` (onboarding/notification cat mascot), `assets/map/` (Istanbul/Turkey map images and the SVG source of truth), `assets/olaylar/`, `assets/loading/`, `assets/project/`, `assets/sound/`. Ungrouped one-offs (favicon, close icon, district stickers, `frame.png`) stay directly in `assets/`.
 
 | Asset | Path | Notes |
 |-------|------|-------|
