@@ -1776,15 +1776,12 @@
   // caption on the drawing, and nothing about the packing may depend on
   // how long somebody's name happens to be.
   //
-  // Under the name, where the member stands in their own day: how much
-  // of the news is still stacked in their Kütüphane, and how far into
-  // the day's games they have got. This is the app's own formula
-  // (people → their ideas → our opinions on those ideas) written on the
-  // drawing itself — a name says somebody is beside you, these two lines
-  // say they are in the middle of the same day you are, which is the
-  // thing actually worth walking up to them about. It is deliberately
-  // two numbers and no titles: what they are reading is theirs, that
-  // they have three left to read is the city's.
+  // Under the name, where the member stands in their own day — drawn as
+  // the app's own two screens rather than said in words. This is the
+  // app's own formula (people → their ideas → our opinions on those
+  // ideas) written on the drawing itself: a name says somebody is beside
+  // you, this says they are in the middle of the same day you are, which
+  // is the thing actually worth walking up to them about.
   function hiveNameHTML(member, side, status, t) {
     if (!side) return '';
     return `
@@ -1796,29 +1793,82 @@
 
   // Above this the count stops being a number and becomes "a stack" —
   // the deck itself only ever draws three cards, so there is nothing
-  // past the third for the count to be true of anyway.
+  // past the third for the count to be true of anyway. It is also, by
+  // construction, the number of slots a column on either screen has.
   const HIVE_NEWS_MAX = 3;
+  const HIVE_DAY_SLOTS = 3;
+
+  // ── Their day, drawn ──
+  // It used to be two lines of type ("3+ HABER", "0/1 OYUN"), which said
+  // the numbers and nothing about where in the app they stood. Every
+  // screen in this app is the same object — a wider column and a
+  // narrower one, three rectangles each, mirrored between the two lanes
+  // (see "What each screen carries") — so the caption is that shape at
+  // caption size, twice: Kütüphane on the left with its wide Haberler
+  // column ranged outward, Kahvehane on the right with its own wide
+  // column (Etkinlikler) out at ITS edge and the games in the narrow one
+  // beside the channel. A reader who has used the app for a day knows
+  // those two rectangles on sight, and an inked box under somebody's
+  // name is a box they have actually stood in front of.
+  //
+  // INK IS WHAT IS STILL STANDING IN THEIR DAY, never what they have
+  // got through — which is exactly what the two lines said (three
+  // stories stacked, one game left of one) and is the half of it worth
+  // walking over for. An empty outline is a slot with nothing in it, or
+  // nothing this petek can know about.
+  //
+  // The two columns with no ink in them are not a gap in the drawing,
+  // they are the other half of each screen: Anket and Etkinlikler. An
+  // evening is deliberately not completable (an evening is somewhere to
+  // be, not content to get through) and a member's votes are their own
+  // (neighborhood_poll_votes is readable by its own voter alone), so
+  // neither is a number hive_member_status could hand back today. They
+  // are drawn because the shape IS the app's screen and half of one is
+  // not recognisable as it.
+  function hiveDayColHTML(width, standing) {
+    let slots = '';
+    for (let i = 0; i < HIVE_DAY_SLOTS; i++) {
+      // Slots are numbered from the dock up, exactly as the app's own
+      // are (.fb-slot-N in project.html), so what is still standing
+      // fills from the bottom of the column.
+      const on = (HIVE_DAY_SLOTS - i) <= standing;
+      slots += `<span class="ist-hive-day-slot${on ? ' ist-hive-day-on' : ''}"></span>`;
+    }
+    return `<span class="ist-hive-day-col ist-hive-day-${width}">${slots}</span>`;
+  }
 
   function hiveStatHTML(status, t) {
     if (!status) return '';
-    const rows = [];
     const news = Math.max(0, status.news_stacked | 0);
-    // Nothing left to read is not a score of zero, it is an empty deck —
-    // and an empty deck says so on its own page ("Hepsi bu kadar"). On
-    // somebody else's hexagon it is simply not a line.
+    const total = Math.max(0, status.games_total | 0);
+    const played = Math.min(total, Math.max(0, status.games_played | 0));
+    const left = total - played;
+    // Nothing standing is not a score of zero, it is an empty day — and
+    // an empty deck says so on its own page ("Hepsi bu kadar"). On
+    // somebody else's hexagon it is simply not a caption: twelve blank
+    // rectangles under a name say less than nothing.
+    if (!news && !left) return '';
+    // The words the drawing replaced are what a screen reader is given,
+    // and what a pointer gets on hover: the picture is the caption, not
+    // the whole of the fact. The fraction is printed whether or not they
+    // have started (0/3 is the point of it) and disappears only on a day
+    // the admin left with no games at all.
+    const words = [];
     if (news > 0) {
       const n = news > HIVE_NEWS_MAX ? `${HIVE_NEWS_MAX}+` : String(news);
-      rows.push(`<span class="ist-hive-stat">${n} ${esc(t('profile.hive.stat.news'))}</span>`);
+      words.push(`${n} ${t('profile.hive.stat.news')}`);
     }
-    // The fraction is printed whether or not they have started: 0/3 is
-    // the whole point of it — a day with three games in front of it —
-    // and it disappears only on a day the admin left with no games at
-    // all, where there is no sequence for anybody to be inside.
-    if ((status.games_total | 0) > 0) {
-      rows.push(`<span class="ist-hive-stat">${status.games_played | 0}/${status.games_total | 0} ${esc(t('profile.hive.stat.games'))}</span>`);
-    }
-    if (!rows.length) return '';
-    return `<span class="ist-hive-stats">${rows.join('')}</span>`;
+    if (total > 0) words.push(`${played}/${total} ${t('profile.hive.stat.games')}`);
+    const label = esc(words.join(' · '));
+    return `
+      <span class="ist-hive-stats ist-hive-day" role="img" aria-label="${label}" title="${label}">
+        <span class="ist-hive-day-screen">
+          ${hiveDayColHTML('wide', news)}${hiveDayColHTML('narrow', 0)}
+        </span>
+        <span class="ist-hive-day-screen">
+          ${hiveDayColHTML('narrow', left)}${hiveDayColHTML('wide', 0)}
+        </span>
+      </span>`;
   }
 
   // A member on the grid. Pressing one **names them on the bar** — their

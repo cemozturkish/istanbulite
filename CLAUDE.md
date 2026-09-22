@@ -4040,16 +4040,37 @@ when they are tapped (which is where their district is anyway). It is absolutely
 flow — the packing is arithmetic, and nothing about it may shift because somebody's name is long —
 and `fitHive` measures the names when it fits the grid, since they hang outside the plane's own box.
 
-**Under the name is where that member stands in their own day** (`hiveStatHTML`,
-`db/hive_member_status.sql`): how much of the news is still stacked in their Kütüphane
-(`3+ HABER` / `2 HABER` / `1 HABER`, nothing at all when their deck is empty) and how far into the
-day's games they have got (`0/3 OYUN` on a day with three, `0/1` on a day with one). It is the
-app's own formula written on the drawing — a name says somebody is beside you, these two lines say
-they are in the middle of the same day you are, which is the thing worth walking up to them about.
-Deliberately two numbers and no titles: *what* they are reading is theirs, *that* they have three
-left to read is the city's. The fraction prints whether or not they have started (`0/3` is the
-point of it) and disappears only on a day with no games at all; a game the admin switched off is
-on neither side of it, because it is not a step anybody has left to take.
+**Under the name is where that member stands in their own day, and it is DRAWN rather than
+said** (`hiveStatHTML`, `db/hive_member_status.sql`). It used to be two lines of type — `3+ HABER`
+over `0/1 OYUN` — which said the numbers and nothing about where in the app the member was
+standing. Every screen in this app is the same object (a wider column and a narrower one, three
+rectangles each, mirrored between the two lanes — see "What each screen carries"), so the caption
+is that shape at caption size, **twice**: Kütüphane on the left with its wide Haberler column
+ranged outward, Kahvehane on the right with its own wide column out at *its* edge and the games in
+the narrow one beside the channel. A member who has used the app for a day knows those two
+rectangles on sight, and an inked box under somebody's name is a box they have actually stood in
+front of. It is the app's own formula written on the drawing — a name says somebody is beside you,
+this says they are in the middle of the same day you are, which is the thing worth walking up to
+them about.
+
+Four things about it:
+
+- **Ink is what is still STANDING in their day**, never what they have got through — which is
+  exactly what the two lines said (three stories stacked, one game left of one) and is the half
+  worth walking over for. A slot fills from the **dock up**, the way `.fb-slot-N` numbers them.
+- **Nothing standing is not a caption.** An empty day prints no drawing at all, for the same
+  reason the old lines printed nothing: an empty deck is not a score of zero, and twelve blank
+  rectangles under a name say less than nothing.
+- **The two columns that never ink are the other half of each screen**, Anket and Etkinlikler, and
+  they are drawn because the shape IS the app's screen — half of one is not recognisable as it. An
+  evening is deliberately not completable, and a member's votes are their own
+  (`neighborhood_poll_votes` is readable by its own voter alone), so neither is a number
+  `hive_member_status` could hand back today. Giving Anket one is a migration, not a rename.
+- **The words are still there for anyone who cannot see the drawing**: the same `3+ HABER ·
+  0/1 OYUN` the caption used to print is the glyph's `aria-label` and its `title`. The fraction is
+  counted whether or not they have started (`0/3` is the point of it) and disappears only on a day
+  with no games at all; a game the admin switched off is on neither side of it, because it is not
+  a step anybody has left to take.
 
 Both come from one RPC per map, `hive_member_status(p_game_date, p_game_key)` — it takes no member
 list and answers only for the caller's own map, so it is a caption on the petek and not a directory
