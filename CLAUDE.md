@@ -2373,6 +2373,16 @@ arrangement that are now gone:
   is how their profile is opened, so a layer over that bar would take away the second half of its
   own gesture. The petek rests under both bars, like everything else the app draws. The
   `z-index: 610 !important` that used to let the bottom bar through the map's wash is gone with it.
+- **The page-load mount happens at `DOMContentLoaded`, not in `mount()`, and that is not tidiness.**
+  `profile-card.js` is `defer`red while this page's own script is not, so when `mount()` runs at the
+  end of the body `window.IstProfileCard` does not exist yet and `mountPetek()` returns having done
+  nothing — silently, since a module that is not there is the ordinary case on a parts-bin page. So
+  on a real page load the petek was only ever mounted by the **first press of the logo**, and the
+  reader watched the profile fetch and `hive_map()` land from blank paper: empty on the way in,
+  instant every time after, which is exactly how it was reported. A deferred script is guaranteed to
+  have run by `DOMContentLoaded`, so the same call is made again there. It is the same call, so a
+  standing petek is still never remounted, and on a virtual navigation (where the module is long
+  since there) `mount()`'s own call is the one that lands.
 - **The petek is mounted from the start and simply kept shut** (`mountPetek` in project.html,
   `#fb-petek-layer` hidden with `visibility`, never `display`). Two reasons, and the second is the
   one that is easy to miss: `fitHive` has to be able to measure the grid at any moment, and the app

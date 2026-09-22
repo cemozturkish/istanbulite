@@ -5950,6 +5950,18 @@ function mount() {
   // mountPetek): the map's own middle window is a clone of the reader's
   // cell out of it, and fitHive has to be able to measure the grid at
   // any moment.
+  //
+  // ON A REAL PAGE LOAD THIS CALL DOES NOTHING, AND THAT IS NOT A BUG
+  // HERE -- it is the reason for the second call at the bottom of this
+  // file. profile-card.js is `defer`red, so it has not executed when
+  // this page's own script runs at the end of the body: mountPetek
+  // finds no IstProfileCard and returns. Nothing retried, so on a real
+  // load the petek was only ever mounted by the FIRST PRESS of the
+  // logo -- and the reader then watched the profile fetch and
+  // hive_map() land from blank paper, which is why the petek was empty
+  // on the way in and instant every time after. On a virtual
+  // navigation the module is long since there and this is the call
+  // that lands.
   mountPetek();
   // The ring is painted from whatever the last visit worked out before
   // the fetches are asked again, so a swipe back does not empty the sea
@@ -6634,6 +6646,15 @@ if (!window.__istVirtualNavInjecting) {
   mount();
   window.addEventListener('DOMContentLoaded', () => {
     if (window.IstProfileCard) IstProfileCard.mount({ sb: IstRouter.sb, I18N: window.I18N, page: 'project' });
+    // ── The mount the deferred module missed ──
+    // mount() ran while profile-card.js had not executed yet (it is
+    // `defer`, this script is not), so its own mountPetek() was a
+    // no-op. A deferred script is guaranteed to have run by this
+    // event, so this is the first moment the petek CAN be mounted --
+    // and it has to be mounted before it is opened, or the reader
+    // meets blank paper for as long as two round trips take. It is the
+    // same call, so a standing petek is still never remounted.
+    mountPetek();
   });
 }
 
