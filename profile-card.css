@@ -930,6 +930,19 @@
      to the face it belongs to at every scale the grid is drawn at. */
   --ist-hive-name-w: calc(var(--ist-hive-cell-w) * 0.66);
   --ist-hive-name-gap: calc(var(--ist-hive-cell-w) * 0.02);
+  /* The day drawn under a name (see hiveStatHTML): one unit of the
+     app's own five-unit line, three to the wide column and two to the
+     narrow one, so the miniature keeps the 3:2 every screen in the app
+     is built on. Written against the cell like the name above it, with
+     a floor under it — below about 3px a rectangle with a 1px border is
+     no longer a rectangle. Ten units plus the gaps come to ~12u, which
+     is inside the name's own track at every scale the grid is drawn
+     at. */
+  --ist-hive-day-u: max(3px, calc(var(--ist-hive-cell-w) * 0.042));
+  --ist-hive-day-gap: max(1px, calc(var(--ist-hive-day-u) * 0.34));
+  /* The channel between the two screens: wider than the gap inside one,
+     or the four columns read as one screen of four. */
+  --ist-hive-day-channel: calc(var(--ist-hive-day-u) * 1.3);
   /* The paper either side of the grid. */
   --ist-hive-page-pad: 16px;
   /* The page is the petek (see mountHivePage): it fills whatever Hane's
@@ -1231,31 +1244,60 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.955); }
    halves of one hexagon never disagree. */
 .ist-hive-filled:not(.ist-hive-bonded) .ist-hive-name { color: var(--muted); }
 /* ── Where they stand in their own day ──
-   Under the name: how much of the news is still stacked in their
-   Kütüphane, and how far into the day's games they have got (see
-   hiveStatHTML in profile-card.js). Printed as two short lines in the
-   same track as the name and ranged the same way, so the caption reads
-   as one block hanging off the hexagon rather than as a second label
-   somebody added later.
+   Under the name, the app's own two screens at caption size: a wider
+   column and a narrower one each, three rectangles apiece, mirrored
+   between the lanes exactly as .fb-mirror mirrors them — Kütüphane's
+   wide Haberler column at the outer edge on the left, Kahvehane's wide
+   Etkinlikler column at the outer edge on the right, the two narrow
+   ones meeting in the channel. An inked slot is something still
+   standing in that member's day (see hiveStatHTML for which two columns
+   can know that today, and why the other two are drawn anyway).
 
-   Everything here is still out of flow and still pointer-events: none —
-   the packing is arithmetic, and a member with three lines beside them
-   must occupy exactly as much of the plane as one with none. */
+   It is ranged the way the name above it is ranged, so the caption
+   reads as one block hanging off the hexagon rather than as a second
+   label somebody added later. Everything here is still out of flow and
+   still pointer-events: none — the packing is arithmetic, and a member
+   with a busy day must occupy exactly as much of the plane as one with
+   none. */
 .ist-hive-name-label { display: block; }
 .ist-hive-stats {
-  display: block;
-  margin-top: calc(var(--ist-hive-cell-w) * 0.03);
-  /* A step down from the name, and a step back in weight: the name is
-     who they are, this is what they are in the middle of. */
-  font-size: min(0.66rem, calc(var(--ist-hive-cell-w) * 0.085));
-  font-weight: 600;
-  letter-spacing: 0.6px;
-  line-height: 1.25;
+  display: flex;
+  gap: var(--ist-hive-day-channel);
+  margin-top: calc(var(--ist-hive-cell-w) * 0.045);
   color: var(--muted);
 }
-.ist-hive-stat { display: block; white-space: nowrap; }
-/* The lines belong to the member they hang off, so an unattached
-   member's caption sits back with their name rather than out-inking it. */
+/* The names read outward from the middle; so does this. */
+.ist-hive-name-left  .ist-hive-stats { justify-content: flex-end; }
+.ist-hive-name-right .ist-hive-stats { justify-content: flex-start; }
+.ist-hive-day-screen { display: flex; gap: var(--ist-hive-day-gap); }
+.ist-hive-day-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ist-hive-day-gap);
+}
+.ist-hive-day-wide   { width: calc(var(--ist-hive-day-u) * 3); }
+.ist-hive-day-narrow { width: calc(var(--ist-hive-day-u) * 2); }
+/* Both states are the same rectangle in the same ink -- an empty one is
+   drawn as its outline and a standing one is filled -- so the whole
+   caption is one colour and takes the member's own from the rules
+   below, the way the two lines of type it replaced did. */
+.ist-hive-day-slot {
+  display: block;
+  box-sizing: border-box;
+  /* Taller than one unit, so the wide column's slots read as
+     rectangles and the narrow one's as squares -- which is what the two
+     columns look like on a real screen, and the whole of how the
+     miniature is recognisable at this size. */
+  height: calc(var(--ist-hive-day-u) * 1.25);
+  border: 1px solid currentColor;
+  opacity: 0.45;
+}
+.ist-hive-day-on {
+  background: currentColor;
+  opacity: 1;
+}
+/* The drawing belongs to the member it hangs off, so an unattached
+   member's day sits back with their name rather than out-inking it. */
 .ist-hive-filled:not(.ist-hive-bonded) .ist-hive-stats {
   color: color-mix(in srgb, var(--muted) 62%, var(--paper));
 }
