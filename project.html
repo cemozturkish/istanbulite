@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="palette.css?v=10">
   <link rel="stylesheet" href="profile-card.css?v=42">
   <script src="avatar.js?v=2" defer></script>
-  <script src="profile-card.js?v=47" defer></script>
+  <script src="profile-card.js?v=48" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=5"></script>
@@ -4752,6 +4752,9 @@ let box = null;
 // The two layers paintLanes writes to, looked up once rather than
 // every frame (see paintLanes for why they are written at all).
 let scrimEl = null, mapLaneEl = null;
+// How present the petek's lane was at the last paint, and whether it has
+// been fully out of sight since the last landing on it (see paintLanes).
+let petekShown = 1, petekAway = false;
 
 // ── Poses ──
 const POSE0 = { x: 0, y: 0, scale: 1, opacity: 1, rot: 0 };
@@ -5278,6 +5281,21 @@ function paintLanes() {
   const mapEl = mapLaneEl || (mapLaneEl = document.getElementById('fb-map'));
   if (scrim) scrim.style.opacity = (mid * 0.86).toFixed(3);
   if (mapEl) mapEl.style.opacity = Math.max(0, Math.min(1, mid)).toFixed(3);
+  // ── The petek's entrance belongs to the landing, not the fade ──
+  // The lane starting to appear from nothing holds the drawing back
+  // (see holdHivePage in profile-card.js), so the fade-in is of an empty
+  // layer and the reveal on landing is the only entrance; a walk that
+  // falls back before landing puts the drawing back while it is out of
+  // sight. `petekAway` is what tells landLane the reader actually left.
+  if (window.IstProfileCard) {
+    if (mid <= 0) {
+      if (petekShown > 0 && IstProfileCard.releaseHivePage) IstProfileCard.releaseHivePage();
+      petekAway = true;
+    } else if (petekShown <= 0 && mid < 1 && IstProfileCard.holdHivePage) {
+      IstProfileCard.holdHivePage();
+    }
+  }
+  petekShown = mid;
   box.classList.toggle('map-pulling', mid > 0);
   box.classList.toggle('map-open', lane === LANE_MAP && mid >= 1);
   // The logo's glow (body.fb-petek-on in the stylesheet) follows how
@@ -5446,6 +5464,11 @@ function landLane() {
   // it is true of every lane and not just the middle one.
   if (syncEdition()) refreshEditionColumns();
   if (lane !== LANE_MAP) return;
+  // Only a real arrival remounts. A pull that started here and sprang
+  // back never left, and remounting then would replay the entrance over
+  // a drawing that was on screen the whole time.
+  if (!petekAway) return;
+  petekAway = false;
   mountPetek();
 }
 
@@ -5685,6 +5708,7 @@ function mount() {
   // lane and the depth have to agree, or the first pull down is one the
   // lane forbids.
   lane = START_LANE; lanePos = START_LANE; navP = START_LANE;
+  petekShown = 1; petekAway = false;   // the mount below draws it; see paintLanes
   atLaneStop = false;
   // Which paper is out, decided before a single box is filled: buildCast
   // runs the loaders, and they each ask fbEdition. Left unset it is null,
