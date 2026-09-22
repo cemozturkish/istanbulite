@@ -2713,13 +2713,35 @@ whole reason `event_interest` exists. There is no `localStorage` mirror: `event-
 with kahvehane's own events deck, so that table IS the record now rather than a copy of one.
 
 **The district map is not coloured yet, and the list is not a placeholder for it.** Slide 12's
-İstanbul is `assets/map/istanbul-map-mobile.png` — a flat 1080×1920 drawing with **no traced
-overlay**; the only İstanbul tracing that exists is `assets/map/istanbul-map.svg`, whose viewBox is
-the landscape `0 0 5046 2300` frame and whose polygons land nowhere near the portrait artwork.
-(project.html carries no SVG at all.) So `renderAnketResults` prints the 25 districts as rows, each
-already wearing the colour a map would paint it with. Colouring the drawing itself needs an
-`istanbul-map-mobile.svg` — the two PNGs are visibly the same artwork rescaled into a portrait
-canvas, so it is derivable rather than hand-traced, but it is still a pass of its own.
+İstanbul is `assets/map/istanbul-map-mobile.png`, and `renderAnketResults` prints the 25 districts
+as rows, each already wearing the colour a map would paint it with. **project.html still carries no
+SVG at all** — that is what is left to do, and it is a pass of its own.
+
+**The tracing it would need now exists** (`assets/map/istanbul-map-mobile.svg`). The portrait
+drawing is not a redraw: it is the landscape `assets/map/istanbul-map.png` scaled and cropped into
+a 9:16 canvas, so the landscape tracing's polygons are carried over by one affine rather than
+hand-traced a second time. `scripts/derive-mobile-map-svg.py` measures that affine against the
+portrait artwork's own ink and rewrites the file; the SVG is **generated**, so a district's outline
+is fixed in `istanbul-map.svg` and the script re-run, never edited in place. Four things about it:
+
+- **The scale is ANISOTROPIC** (`x*0.426353 - 531.17`, `y*0.417929 + 31.53`; `sy/sx` = 0.980). The
+  portrait canvas is a squeeze, not a plain zoom — fitting one scale to both axes leaves the
+  borders visibly off (mean 0.79px against 0.61px, p90 2.17px against 1.28px). A full
+  six-parameter affine buys almost nothing past that and starts fitting the thickness of the drawn
+  lines, so it is deliberately not used.
+- **It must be drawn `preserveAspectRatio="xMidYMid slice"`**, because the PNG under it is laid in
+  with `cover` (project.html's own `FIT`). That is *not* the `xMidYMin meet` on
+  `kutuphane-map-mobile.svg`, whose map is fitted with `contain` and hung from the top of the
+  screen. Any other pairing mis-aims every region by the amount the two fits disagree.
+- **The crop is the middle of the city, so two shapes are absent from the file entirely** —
+  İstanbul Dışı and Avcılar, both off the portrait frame — rather than present and unreachable.
+  Nine more reach only part way in and are kept whole, clipped by the viewBox exactly as the
+  drawing clips them.
+- **And `cover` takes more off at phone width.** Rendered at 390×844, 30 of the 33 shapes can
+  actually be touched; Küçükçekmece and Arnavutköy fall outside the 9% lost off each side, and
+  Şile is left a sliver. Of the 25 districts proper only Küçükçekmece is lost. That is a fact
+  about the artwork's framing, not about the tracing — a district-coloured map has to say
+  something about the ones the crop does not reach.
 
 Left to right on the screen, exactly as the three tabs stand. A pull right walks the strip right,
 so the reader moves *left* along it — Kahvehane, Hane, Kütüphane — and a pull left walks back. Each
@@ -3520,7 +3542,9 @@ dashed (see the cast rules above) — the boxes are cast, the content behind the
 Yorumlar are no longer cast at all: they stood on the ilçe stop, which is parked (see
 `ILCE_STOP_ENABLED`). **What is still in the parts bin:** the second map on the two lane screens,
 the ilçe's own drawing at slide 24 and everything on that stop, whatever actually fills Hikâyeler,
-and the district-colored map itself that Anket's own data is already shaped to feed.
+and the district-colored map itself that Anket's own data is already shaped to feed — its tracing
+is drawn now (`assets/map/istanbul-map-mobile.svg`, see the İstanbul level's own section), what is
+missing is project.html carrying it and painting the fills.
 
 ### The flip book — `flip.js` + `flip-steps.js`
 
