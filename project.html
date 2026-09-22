@@ -1132,7 +1132,12 @@
        actually got through. Squares because the drawing says squares --
        the same shape the right-hand column of every screen is. */
     .fb-map-stats { flex: none; display: flex; gap: 4px; }
+    /* Each square is its own badge's positioning context now -- what is
+       waiting is a fact about THAT square (that many haber, that many
+       oyun), not about the window holding it, so the count belongs on
+       the button that actually answers it. */
     .fb-map-stat {
+      position: relative;
       flex: 1;
       aspect-ratio: 1;
       border: 1.5px solid currentColor;
@@ -1144,20 +1149,22 @@
       font-variant-numeric: tabular-nums;
       line-height: 1;
     }
-    /* What is waiting there, in the corner a badge goes. */
+    /* What is waiting there, in the corner a badge goes -- of the square
+       it is waiting IN, not of the window around it. */
     .fb-map-badge {
       position: absolute;
       top: 0; right: 0;
-      transform: translate(38%, -38%);
-      min-width: 19px; height: 19px;
-      padding: 0 4px;
+      transform: translate(42%, -42%);
+      min-width: 15px; height: 15px;
+      padding: 0 3px;
       border-radius: 999px;
       background: var(--fb-map-red);
       color: #fff;
-      font-size: 0.6rem;
+      font-size: 0.5rem;
       font-weight: 700;
       display: flex; align-items: center; justify-content: center;
       font-variant-numeric: tabular-nums;
+      line-height: 1;
     }
     /* The day, closed. It stands under the windows rather than over
        them: the squares are what has just been finished, and this is
@@ -6055,7 +6062,7 @@ const MAP_WINDOWS = [
 // because the shape of a screen should not change on the day its numbers
 // arrive.
 let mapStats = null;      // { key: 'a/b' } once loaded
-let mapBadges = null;     // { windowId: n }
+let mapBadges = null;     // { key: n } -- one square's own count, not the window's
 let mapStatsAt = 0;       // when, so coming back a minute later is free
 let traveling = false;
 
@@ -6071,14 +6078,16 @@ function mapWinHTML(w) {
   }
   // `> 0`, not `!= null`: this is a permanent screen now rather than a
   // layer the reader opened, so a red "0" would be sitting on the map all
-  // day saying nothing. Nothing waiting means no badge.
-  const badge = mapBadges && mapBadges[w.id] > 0
-    ? '<span class="fb-map-badge">' + mapBadges[w.id] + '</span>' : '';
-  const stats = (w.stats || []).map(k =>
-    '<span class="fb-map-stat">' + ((mapStats && mapStats[k]) || '–') + '</span>').join('');
+  // day saying nothing. Nothing waiting means no badge -- and it goes on
+  // the square that is actually waiting (3 haber left is the İstanbul
+  // square's own count), never as one number for the whole window.
+  const stats = (w.stats || []).map(k => {
+    const badge = mapBadges && mapBadges[k] > 0
+      ? '<span class="fb-map-badge">' + mapBadges[k] + '</span>' : '';
+    return '<span class="fb-map-stat">' + ((mapStats && mapStats[k]) || '–') + badge + '</span>';
+  }).join('');
   return '<span class="fb-map-name">' + w.name + '</span>' +
-         (stats ? '<span class="fb-map-stats">' + stats + '</span>' : '') +
-         badge;
+         (stats ? '<span class="fb-map-stats">' + stats + '</span>' : '');
 }
 
 function buildMap() {
@@ -6222,10 +6231,9 @@ async function loadMapStats() {
     const dealt = newsDealtStore(uid);
     const done = rows.filter(r => newsIsDealt(dealt, r)).length;
     stats.haber = done + '/' + rows.length;
-    // += rather than =: the anket block below shares this same badge, and
-    // the two run concurrently -- whichever resolves second must not
-    // overwrite what the first one already added.
-    badges.kutuphane = (badges.kutuphane || 0) + (rows.length - done);
+    // Its own square's own badge -- what is left unread in Haberler is
+    // that square's business and nobody else's.
+    badges.haber = rows.length - done;
   })();
 
   // Etkinlikler: what is still to come. A count rather than a fraction --
@@ -6242,7 +6250,7 @@ async function loadMapStats() {
     if (error) throw error;
     const n = (data || []).length;
     stats.etkinlik = n ? '+' + n : '0';
-    badges.kahvehane = (badges.kahvehane || 0) + n;
+    badges.etkinlik = n;
   })();
 
   // Oyunlar: today's sequence. A game the admin switched off is on
@@ -6272,7 +6280,7 @@ async function loadMapStats() {
       played = on.filter(g => done.has(g)).length;
     }
     stats.oyun = played + '/' + on.length;
-    badges.kahvehane = (badges.kahvehane || 0) + (on.length - played);
+    badges.oyun = on.length - played;
   })();
 
   // Anket: how many of the active polls this member has already answered.
@@ -6295,7 +6303,7 @@ async function loadMapStats() {
       answered = (votes || []).length;
     }
     stats.anket = answered + '/' + rows.length;
-    badges.kutuphane = (badges.kutuphane || 0) + (rows.length - answered);
+    badges.anket = rows.length - answered;
   })();
 
   await Promise.allSettled([haber, etkinlik, oyun, anket]);
