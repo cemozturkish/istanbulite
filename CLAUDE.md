@@ -661,9 +661,11 @@ sb.from('articles').delete().eq('id', id)
     (`baskiWireSources`, `.baski-tag`). The tag is painted onto each list row rather than
     baked into that list's own markup, because it is a fact about the baskı *currently
     selected* — a row rendered before the date was changed would otherwise go on saying
-    what was true of the old one. It is also where the refusal is printed ("Kanca yok ·
-    Soru yok"), so the gate the reader's card needs is stated once, in the place
-    `baskiAccepts` enforces it. The news card's own inline edition row is **gone** for the
+    what was true of the old one. It used to print the refusal there too ("Kanca yok ·
+    Soru yok") — **there is no gate left**: a story needed a question, then just a hook,
+    and both are gone, so being written is the whole of being ready and the only thing
+    left to decide is which paper it runs in. `baskiAccepts` still reads `warn`, which
+    every kind hands back and the news now always hands back empty. The news card's own inline edition row is **gone** for the
     same reason: two controls doing one write is two answers to "how do I publish this".
   - **The sources are wired by a MutationObserver on the work area**, not by each list
     calling in — there are six list renderers and the seventh is the one somebody forgets.
@@ -679,7 +681,7 @@ sb.from('articles').delete().eq('id', id)
 - **THE DESK — three columns, and they never change.** The sections stack down the far
   **left** as a rail; the **work area** is in the middle; and the **baskı board** stands on
   the right. The rail is grouped by **what a thing IS** — the seven kinds that go into a
-  paper (Haber · Akış · Olay · Etkinlik · Oyun · Anket · Mektup), then the place-groups that
+  paper (Haber · Olay · Etkinlik · Oyun · Anket · Mektup), then the place-groups that
   are genuinely about a place (Kütüphane · Kahvehane · Kişiler · Hane). It used to be grouped
   by WHERE a thing shows up, which is the reader's question rather than the editor's: nobody
   sits down to change Kütüphane, they sit down to write a haber or to set tonight's paper.
@@ -836,9 +838,21 @@ sb.from('articles').delete().eq('id', id)
     change nothing for the reader beyond a story's own Zaman Akışı (`fetchSeriesSiblings`);
     now a story that belongs to one is thrown **AKIŞTA KAL** (right) or **YETER** (left), and a
     left throw takes every later haber in that seri out of that reader's column for good. That
-    is why writing the seri well matters: it is the unit a reader opts out of. It
-    used to be folded under **Gelişmiş** at the bottom of the Haber form, which is where a thing
-    goes to be forgotten; it is its own section now.
+    is why writing the seri well matters: it is the unit a reader opts out of.
+    - **EVERY HABER IS IN ONE, and a story on its own is an akış of one.** Posting with the
+      akış left blank does not write `series_id = null` any more — it opens an akış under
+      that story's own headline and assigns it, before the story row is written, so a story
+      can never exist without one. Adding a **gelişme** to a story is what makes that akış
+      worth its name; until then it stands alone. The reader's YETER needs something to
+      refuse, and a story with nothing behind it has nothing.
+    - **It is not a section of its own.** It was the rail's second entry, which put the
+      akışlar somewhere an editor had to GO to — and nobody sits down to manage akışlar, they
+      reach for one while writing the haber standing next to it. It is a fold over the
+      Haberler list now (Akışlar), and the story's own form picks from the same set. The
+      **edit** form's blank option is built separately and reads "Akıştan çıkar", because on
+      a story that already has one it can only mean taking it out — the post form's blank
+      means the opposite, and one row borrowed from the other promised the first while doing
+      the second.
   - **OLAY** (`world_events`) — the thing all of them are about, running for years. Several akış
     belong to one olay. Its own board on Kütüphane (see "OLAYLAR"); not part of the baskı.
   - **MEKTUP** (`library_letters`) — a letter written by a real person, sitting in the postbox
@@ -2527,12 +2541,19 @@ Four things about it:
     the paper: "writing is not publishing" is untouched. What the right throw buys is the record,
     which a later haber in the same seri then WEARS on its kicker (`news.akis.in`) — without that
     the gesture would be indistinguishable from doing nothing.
-  - `breaking_news_polls` is therefore **parked, not deleted**: the table, its rows and its admin
-    editor are untouched behind one `hidden`, the way Makaleler and the neighbourhood comments
-    are, because where a per-story poll belongs (if anywhere) is still open. What was removed is
-    the *reading* of one. The admin's own gate dropped with it — a story needs a hook to run in an
-    edition, and nothing else — and the press bar's "İkinci haber" forme went with the column it
-    was about.
+  - `breaking_news_polls` is **parked in the database and gone from the portal**: the table and
+    its rows are untouched (where a per-story poll belongs, if anywhere, is still open), but the
+    admin no longer has anywhere to write one — the form's three fields and the per-card Anketler
+    fold are both removed, along with their handlers. It was hidden behind one `hidden` for a
+    while, which is the site's usual parking convention and was the wrong one here: what was
+    parked was a surface for writing questions no reader would ever be asked. The press bar's
+    "İkinci haber" forme went with the column it was about.
+  - **THE HOOK IS GONE TOO** (`hook_tr` / `hook_en` / `hook_author`). The closed card printed a
+    teaser the admin wrote separately, with its own byline, and the real headline was the reveal.
+    The columns stay on `breaking_news` — dropping them is a migration, not a rename — and
+    nothing reads them: the card front is the headline again (`newsText(n, 'title')`), the meta
+    line is the age alone, and `hookText` is deleted. With the poll, it was the second of the two
+    gates a story had to clear to run in an edition; a story is ready the moment it is written.
 - **THE EDITIONS ACCRETE, AND THE WINDOW IS THREE DAYS WIDE** (`haberlerRows`, `NEWS_WINDOW_DAYS`,
   `db/breaking_news_v4_akis.sql`). A new baskı does **not** replace the one before it: the akşam
   gazetesi stacks on top of the sabah postası, and yesterday's stories are still standing under
