@@ -1,8 +1,8 @@
-// Shared avatar rendering: a fixed bald base (assets/avatar/avatar-base.png)
+// Shared avatar rendering: a fixed bald base (assets/avatar/base.png)
 // with optional transparent overlays stacked on top, in this order: shirt
-// (assets/avatar-shirt-<value>.png), accessory
-// (assets/avatar-accessory-<value>.png), hair (assets/avatar-hair-<value>.png),
-// hat (assets/avatar-hat-<value>.png) — accessory sits *under* hair on
+// (assets/avatar/shirt-<value>.png), accessory
+// (assets/avatar/accessory-<value>.png), hair (assets/avatar/hair-<value>.png),
+// hat (assets/avatar/hat-<value>.png) — accessory sits *under* hair on
 // purpose (glasses temples should disappear behind long hair, not poke
 // through it) — profiles.avatar_shirt / avatar_hair / avatar_hat /
 // avatar_accessory each pick their own overlay independently,
@@ -19,25 +19,30 @@
 // can load just this file instead of all of profile-card.js. profile-card.js
 // itself also uses these constants/helpers for the self-edit picker.
 (function (global) {
-  // All overlays share the hexframe family's uncropped 1024x1536 canvas
-  // (see --hexframe-ratio in frames.css) and live flat under assets/,
-  // matching where frame.png/avatar-background.png are uploaded — no
-  // assets/avatar/ subfolder anymore.
-  const BASE_URL = 'assets/avatar-base.png';
-  const SHIRT_URLS = { black: 'assets/avatar-shirt-black.png' };
-  const HAIR_URLS = { buzz: 'assets/avatar-hair-buzz.png', short: 'assets/avatar-hair-short.png', long: 'assets/avatar-hair-long.png' };
+  // Every layer shares the hexframe family's uncropped 1024x1536 canvas
+  // (see --hexframe-ratio in frames.css) and lives in assets/avatar/,
+  // grouped by kind like assets/map/ and assets/mascot/ — the folder
+  // already says "avatar", so the files inside it do not repeat it
+  // (base.png, hair-long.png, ...). The one avatar-family drawing that is
+  // NOT named here is background.png, the ground behind the figure: it is
+  // painted as the hexframe's own CSS background (palette.css, frames.css)
+  // rather than stacked as an <img>, for the reason map-ink.js's LADDERS
+  // note spells out. See assets/avatar/README.md for the full set.
+  const BASE_URL = 'assets/avatar/base.png';
+  const SHIRT_URLS = { black: 'assets/avatar/shirt-black.png' };
+  const HAIR_URLS = { buzz: 'assets/avatar/hair-buzz.png', short: 'assets/avatar/hair-short.png', long: 'assets/avatar/hair-long.png' };
   // 'crown' (the locked Sözcü reward hat) is parked here too -- see
   // AVATAR_HAT_OPTIONS in profile-card.js for why. Leaving it out of this
   // map means hatUrl('crown') falls through to null (below) and the hat
   // layer is skipped entirely for any row that already has avatar_hat =
   // 'crown' set, rather than rendering a 404'd <img>.
   const HAT_URLS = {};
-  const ACCESSORY_URLS = { glasses: 'assets/avatar-accessory-glasses.png' };
+  const ACCESSORY_URLS = { glasses: 'assets/avatar/accessory-glasses.png' };
   // Not a pickable option -- admin-only, set per-politician (public.
   // politicians.in_jail) from admin.html's Kişiler tab, never something a
   // regular user can put on their own avatar. Always the topmost layer,
   // over hat included, regardless of what else is worn.
-  const JAIL_URL = 'assets/avatar-jail.png';
+  const JAIL_URL = 'assets/avatar/jail.png';
   const SOZCU_REQUIRED_COUNT = 10;
 
   function shirtUrl(shirt) {

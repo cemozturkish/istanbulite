@@ -393,7 +393,7 @@
   // before profiles.avatar_hat existed — see db/avatar_hat.sql).
   const AVATAR_HAT_OPTIONS = [
     { value: null,    label: 'Yok' },
-    // 'crown' is parked, not deleted: assets/avatar-hat-crown.png was
+    // 'crown' is parked, not deleted: assets/avatar/hat-crown.png was
     // never actually drawn, so offering it let a member "unlock" a hat
     // that then rendered as nothing (avatar.js's hat ? <img> : '' quietly
     // skips a hat with no URL). Re-add the option once the art exists —
