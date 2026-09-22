@@ -2795,9 +2795,10 @@ function paintDayMeter() {
 // showing that category's own EDITION: the stories the admin curated for
 // the day, in the admin's own order, not the newest thing posted. Posting
 // a story is not publishing it any more -- a story only reaches this
-// column once it carries a hook, a poll, and an edition_date
-// (db/breaking_news_v3_edition.sql). A district story (`neighborhood` set,
-// no `category`) is still İstanbul for this column's purposes.
+// column once it carries an edition_date (db/breaking_news_v3_edition.sql).
+// It used to need a hook and a poll as well; both are gone, so being
+// written is the whole of being ready. A district story (`neighborhood`
+// set, no `category`) is still İstanbul for this column's purposes.
 const HABER_BUCKETS = ['istanbul', 'turkiye', 'dunya']; // [slot 2, slot 1, slot 0]
 // A function, not a table, for the same reason etkinlikLabels() is: the
 // three words are I18N's own (news.istanbul/turkiye/dunya) and have to
@@ -2886,8 +2887,8 @@ function followedSeries() {
   return followedPromise;
 }
 
-const NEWS_COLS = 'id, title, body, title_en, body_en, hook_tr, hook_en, ' +
-  'hook_author, category, neighborhood, series_id, updated_at, ' +
+const NEWS_COLS = 'id, title, body, title_en, body_en, ' +
+  'category, neighborhood, series_id, updated_at, ' +
   'edition_date, edition_half, edition_order';
 
 // The network half, cached for the life of the mount. Kept apart from
@@ -3053,7 +3054,11 @@ async function loadHaberlerActor(el, slot) {
   // belongs to is the first thing a reader needs off a closed card, and
   // it used to be visible only once the page was open.
   const age = newsDayLabel(n, today);
-  const byline = [n.hook_author ? '— ' + n.hook_author : '', age].filter(Boolean).join(' · ');
+  // The meta line is the age alone now. It used to carry the hook's own
+  // signature beside it, the way Sözcel's word carries its Sözcü -- the
+  // hook is gone (see admin.html's Haber form), and a byline on a story
+  // nobody signed is a name with nothing under it.
+  const byline = age;
   // A seri the reader has already said AKIŞTA KAL to wears it on the
   // kicker. Without this the right throw is a gesture with no visible
   // consequence anywhere in the app -- the whole of what it does is make
@@ -3063,14 +3068,14 @@ async function loadHaberlerActor(el, slot) {
   if (!el.isConnected) return;
   const akisTag = followed ? ' · ' + t('news.akis.in') : '';
   el.classList.remove('fb-empty');
-  // The front of the card is the HOOK, not the headline -- a teaser the
-  // admin (for now; see db/breaking_news_v3_edition.sql) writes on its
-  // own, with its own byline. The real headline and body are the reveal,
-  // printed only once the page is opened. Falling back to the real title
-  // is "no data, no gate": an older row never given a hook still opens.
+  // The front of the card is the HEADLINE. It was the hook for a while --
+  // a teaser written separately, with the real headline held back as the
+  // reveal -- and the hook is gone (see admin.html's Haber form), so the
+  // card says what the story says. The columns are still there and are
+  // simply not read; dropping them is a migration, not a rename.
   el.innerHTML = '<div class="k">' + label + stackTag + akisTag + '</div>' +
     (byline ? '<div class="m">' + esc(byline) + '</div>' : '') +
-    '<div class="t">' + esc(hookText(n) || newsText(n, 'title')) + '</div>';
+    '<div class="t">' + esc(newsText(n, 'title')) + '</div>';
   fbSetDone(el, newsIsDealt(store, n));
   // If this update is itself part of a `seri` (it links back to earlier
   // posts about the same thing), its page carries their Zaman Akışı too,
@@ -3161,17 +3166,6 @@ function newsText(row, field) {
   const en = row[field + '_en'];
   if (window.I18N && I18N.isEnglish() && en && String(en).trim()) return en;
   return row[field];
-}
-
-// The hook's own language choice -- same rule as newsText, kept separate
-// because a hook can exist where the real headline hasn't been written yet
-// (or vice versa on an older, pre-edition row), so the two must not share
-// one fallback chain.
-function hookText(row) {
-  if (!row) return '';
-  const en = row.hook_en;
-  if (window.I18N && I18N.isEnglish() && en && String(en).trim()) return en;
-  return row.hook_tr || '';
 }
 
 function newsAge(iso) {
