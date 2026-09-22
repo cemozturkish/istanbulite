@@ -2477,7 +2477,7 @@ slide that is the city:
 | | **Kütüphane** | **the app map** | **Kahvehane** |
 | what stands there (gündüz) | Haberler + Anket (soruyor) | where you are in relation to it all | Etkinlikler + Oyun Önerileri |
 | what stands there (gece) | Haberler + Anket (cevaplıyor) | where you are in relation to it all | Etkinlikler + Oyunlar |
-| where the book may go | up, to slide 1 | nowhere | nowhere *(see ILCE_STOP_ENABLED)* |
+| where the book may go | nowhere *(see TURKIYE_STOP_ENABLED)* | nowhere | nowhere *(see ILCE_STOP_ENABLED)* |
 
 **THE İSTANBUL LEVEL PRINTS TWO EDITIONS, AND THE SUN DECIDES WHICH**
 (`IstDate.edition()` / `IstDate.editionKey()`, `fbEdition` in project.html). The palette already
@@ -2812,26 +2812,51 @@ vertical already doesn't. The local level is worth drawing when there are enough
 to say anything.
 
 It is parked the way kahvehane.html's comments and Kütüphane's Olaylar column are — one flag, and
-everything it gates is still written: `FRAMES` (24 → 12, so those twelve PNGs are not even fetched
-and the reader's first-open wait is shorter, since the gesture arms only once every frame is in),
-`STOPS` (three → two, which is all `bracket()` reads), `laneStops()`, the app map's `ilce` window
-and the wire drawn to it, and the Kahve/Yorumlar actors. Those last two must be left **out of
-`CAST` entirely** rather than merely going unreached: `expandPoses` fills a table `FRAMES` long, so
-with a twelve-page book nothing in `END23_POSES_*` is ever read and every slide falls back to
-`POSE0` — which is `opacity: 1` at the column's resting place, so both would stand at full strength
-on every screen in the app. A parked actor has to be absent, not idle.
+everything it gates is still written: `FRAMES` (24 → 12), `STOPS`, `laneStops()`, the app map's
+`ilce` window and the wire drawn to it, and the Kahve/Yorumlar actors. Those last two must be left
+**out of `CAST` entirely** rather than merely going unreached: `expandPoses` fills a table `FRAMES`
+long, so with a twelve-page book nothing in `END23_POSES_*` is ever read and every slide falls back
+to `POSE0` — which is `opacity: 1` at the column's resting place, so both would stand at full
+strength on every screen in the app. A parked actor has to be absent, not idle.
+
+**AND THE TÜRKİYE STOP IS PARKED TOO** (`TURKIYE_STOP_ENABLED`, currently `false`). Same flag, the
+other end of the book: slide 1 and the run up to it from slide 12. The app map had said **"Yakında"**
+on its Türkiye window for a while (`locked: true` in `MAP_WINDOWS`) while the *gesture* still walked
+there — so the one screen the app told the reader was not ready was also the one screen a pull up on
+Kütüphane delivered. The map is a map OF the app; the two may not disagree, and the map was the half
+telling the truth. The `locked` flag and this one are that fact said twice, so turning the stop back
+on means dropping both.
+
+With both ends parked **the book has exactly one stop**, and that is what the rest of the release
+logic hears: `bracket()` reads `STOPS` and nothing else, so a release on any lane brackets `[11, 11]`
+and has nowhere to run to. Three things follow, each of which fails silently if forgotten:
+
+- **A stop is NAMED now, never indexed.** Which of the three exist is two flags, so `STOPS[1]` and
+  `STOPS[2]` are no longer İstanbul and the ilçe — they are positions in a list whose length moves.
+  `TURKIYE_SLIDE` / `ISTANBUL_SLIDE` / `ILCE_SLIDE` are what `laneStops`, `paintBarLevel`,
+  `MAP_WINDOWS`, `travelTo` and the cast's own `live` all read. `paintBarLevel` in particular asked
+  for `STOPS[0..2]` by position and would have compared `framePos` against `undefined`.
+- **`FRAMES` is the wrong lever at THIS end of the book.** Parking the ilçe run shortens the array
+  and so stops those PNGs being fetched; parking Türkiye's makes frames 1–11 unreachable at the
+  *start*, where a length cannot express it. So the reachable span is its own pair —
+  `FRAME_FIRST` / `FRAME_LAST`, straight off `STOPS` — and it is what the loader fetches and what
+  `aim`, `show` and `paintFrame` clamp to. `imgs` stays indexed by **absolute slide number**
+  (assigned, never pushed, and sparse below `FRAME_FIRST`), so nothing is renumbered when a run
+  comes back. Measured: the book now fetches **one** drawing on first open instead of twelve.
+- **The Hikâyeler/Olaylar actors leave `CAST` with it.** Unlike Kahve and Yorumlar their `END0`
+  poses *are* inside a twelve-page table and resolve to `opacity: 0`, so nothing would be drawn
+  either way — but their `load` would still run, two queries on every mount for a screen nobody can
+  open. Idle is not parked.
 
 **The lane decides which way the book may move, and that is the point of the divergence rather
 than a rule bolted onto it.** Standing on Kütüphane you are facing *out*, so the only depth you can
-reach is slide 1 — Türkiye. Standing on Kahvehane you are facing *in*, so the only one is slide 24 —
-parked, as above, so for now that lane reaches nothing.
-Standing on the map there is no run at all: the middle is where a direction is chosen, not a depth
-to fall down.
-**So there is no way from Türkiye to the innermost slide that does not pass through the middle** —
-the mall stairway in the smallest form it has had here: you cannot get from the reading to the
-doing without walking past the whole shape of the thing, and the people, whose door stands in the
-middle of it. The vertical drag is clamped to the lane's own run rather than
-springing back from it, because paper that simply does not move says "not this way" more plainly.
+reach is slide 1 — Türkiye; standing on Kahvehane you are facing *in*, so the only one is slide 24.
+Both are parked, so for now **neither lane reaches anything** and the middle never did: the middle is
+where a direction is chosen, not a depth to fall down. The rule is unchanged and worth keeping
+stated, because it is what the two runs come back to: **there is no way from Türkiye to the innermost
+slide that does not pass through the middle** — the mall stairway in the smallest form it has had
+here. The vertical drag is clamped to the lane's own run rather than springing back from it, because
+paper that simply does not move says "not this way" more plainly.
 
 Seven things about it:
 

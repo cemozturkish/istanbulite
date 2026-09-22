@@ -1914,12 +1914,40 @@
 // the book will arm, to reach a screen with nothing on it.
 const ILCE_STOP_ENABLED = false;
 
+// ── THE TÜRKİYE STOP IS PARKED TOO ──
+// Same flag, the other end of the book: slide 1, and the run from
+// slide 12 up to it. The app map has said "Yakında" on its Türkiye
+// window for a while (see MAP_WINDOWS, `locked: true`) while the
+// GESTURE still walked there -- so the one screen the app tells the
+// reader is not ready was also the one screen a pull up on Kütüphane
+// delivered. The map is a map OF the app; the two cannot disagree, and
+// the map was the half telling the truth.
+//
+// So Kütüphane's vertical answers the way Kahvehane's and the middle
+// lane's already do: the paper does not move. Nothing springs back,
+// because nothing ever left.
+//
+// Everything behind it is still written and still gated on this one
+// line -- frame 1's own drawing in OVERRIDE, the Hikâyeler/Olaylar
+// actors and their END0 poses, the app map's window. Turning it back on
+// is flipping this to `true` and dropping `locked` from that window.
+const TURKIYE_STOP_ENABLED = false;
+
+// ── The three stops the book is built out of ──
+// Named rather than indexed, because which of them EXISTS is now two
+// flags: with both runs parked STOPS is a single entry, so `STOPS[1]`
+// and `STOPS[2]` are the wrong way to ask for İstanbul and the ilçe --
+// they were positions in a list whose length is no longer fixed.
+const TURKIYE_SLIDE = 0;
+const ISTANBUL_SLIDE = 11;
+
 // The book is genuinely as long as it is reachable. This is not a clamp
 // over a 24-frame book: FRAMES drives the image array and the loader
 // (see loadFrames), so parking the second run also stops those twelve
 // frames being fetched at all -- and the gesture arms only once every
 // frame is in, so it is the reader's first-open wait that gets shorter.
 const FRAMES = ILCE_STOP_ENABLED ? 24 : 12;
+const ILCE_SLIDE = FRAMES - 1;
 
 // ── What each frame shows ──
 // The first two stops are the real maps -- frame 1 is Türkiye, frame 12
@@ -1971,11 +1999,26 @@ const TRAVEL = TRAVEL_PER_SLIDE * (FRAMES - 1);
 // book is not a landing the gesture has to be told about -- it is just
 // another entry here, which is why the whole of "add a stop" is adding
 // a number to this line.
-// With the ilçe stop parked there are TWO of them, not three, and that
-// is all the rest of the release logic needs to hear: bracket() reads
-// this list and nothing else, so a release on Kahvehane now brackets
+// With both outer stops parked there is ONE of them, and that is all
+// the rest of the release logic needs to hear: bracket() reads this
+// list and nothing else, so a release on any lane now brackets
 // [11, 11] and has nowhere to run to.
-const STOPS = ILCE_STOP_ENABLED ? [0, 11, FRAMES - 1] : [0, 11];
+const STOPS = [
+  ...(TURKIYE_STOP_ENABLED ? [TURKIYE_SLIDE] : []),
+  ISTANBUL_SLIDE,
+  ...(ILCE_STOP_ENABLED ? [ILCE_SLIDE] : []),
+];
+
+// The span of frames the book can actually land on or flip through.
+// This is what the loader fetches and what the drawings are clamped to
+// -- the same rule FRAMES already applies at the END of the book,
+// applied at its start as well: parking Türkiye's run makes frames 1
+// to 11 unreachable, and an unreachable drawing is one the reader waits
+// on before the gesture arms and then never sees. Indices stay absolute
+// (`imgs` is sparse below FRAME_FIRST), so nothing else has to be
+// renumbered when a run comes back.
+const FRAME_FIRST = STOPS[0];
+const FRAME_LAST = STOPS[STOPS.length - 1];
 
 // The two stops a position is between -- the same stop twice when the
 // book is resting on one. This is what makes a release a local
@@ -2012,7 +2055,7 @@ const RUN_FPS = 34;
 // `const` read before its own line is a TDZ error that takes the whole
 // page script with it. See "SLIDE 12 IS THREE SCREENS" further down for
 // what they are.
-const LANE_STOP = 11;       // the lanes are slide 12's, and slide 12's alone
+const LANE_STOP = ISTANBUL_SLIDE;   // the lanes are slide 12's, and slide 12's alone
 const LANE_KUTUPHANE = 0;   // left on the screen: the reading side
 const LANE_MAP = 1;         // the middle: the app map (see THE APP MAP below)
 const LANE_KAHVEHANE = 2;   // right on the screen: the doing side
@@ -2022,8 +2065,9 @@ const LANES = 3;
 // The middle stop and the middle lane: the app map, on slide 12. Not
 // slide 1 -- the app's own rule is that you always enter in the MIDDLE
 // and swipe out from there, so the book opens on the shape of the whole
-// thing and Türkiye is one pull away rather than the doorstep. The petek
-// is one press of the logo away from it, wherever the reader is standing.
+// thing. The petek is one press of the logo away from it, wherever the
+// reader is standing. With both runs parked this is also the only stop
+// there is, so the book opens where it stays until one comes back.
 const START_SLIDE = LANE_STOP;
 const START_LANE = LANE_MAP;
 
@@ -4623,14 +4667,14 @@ const CAST = [
   // (see .fb-mirror). Each still parks off its OWN side of the screen,
   // which is why the two pose tables swap with the two columns.
   ...stackActors({
-    idBase: 'etkinlik', live: 11, lane: LANE_KAHVEHANE, col: 'r', mirror: true, cls: 'fb-events',
+    idBase: 'etkinlik', live: ISTANBUL_SLIDE, lane: LANE_KAHVEHANE, col: 'r', mirror: true, cls: 'fb-events',
     poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadEtkinlikActor, onpress: onpressBox,
   }),
   // Two slots, not three (see GAME_DEFS) -- .fb-oyun's own height
   // override (--fb-oyun-box-h) grows each box so the column still fills
   // exactly the band three boxes used to.
   ...stackActors({
-    idBase: 'oyun', live: 11, lane: LANE_KAHVEHANE, col: 'l', mirror: true, cls: 'fb-oyun',
+    idBase: 'oyun', live: ISTANBUL_SLIDE, lane: LANE_KAHVEHANE, col: 'l', mirror: true, cls: 'fb-oyun',
     poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadKahveNarrow, onpress: onpressOyun,
     count: 2,
   }),
@@ -4639,31 +4683,37 @@ const CAST = [
   // Türkiye stop's right column, parked for now -- see
   // OLAYLAR_COLUMN_ENABLED above; Anket is its own pair further down) ──
   ...stackActors({
-    idBase: 'haber', live: 11, lane: LANE_KUTUPHANE, col: 'l', cls: 'fb-haberler',
+    idBase: 'haber', live: ISTANBUL_SLIDE, lane: LANE_KUTUPHANE, col: 'l', cls: 'fb-haberler',
     poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadKutuphaneWide, onpress: onpressBox,
   }),
-  ...stackActors({
-    idBase: 'olay', live: 0, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-olaylar',
-    poses: END0_POSES_R, lag: 0.43, lagFree: 0.135,
-    load: OLAYLAR_COLUMN_ENABLED ? loadOlaylarActor : (el) => placeholderBox(el, 'Olaylar'),
-    onpress: OLAYLAR_COLUMN_ENABLED ? onpressBox : undefined,
-  }),
 
-  // ── Türkiye (slide 1) and the ilçe (slide 24): the left column now
-  // carries three admin-pinned series (see loadDunyaActor above) in
-  // place of the Hikâyeler placeholder. Kahve and Yorumlar are still in
-  // the parts bin (see CLAUDE.md), so their boxes stay dashed
-  // placeholders naming their own slot. ──
-  ...stackActors({
-    idBase: 'dunya', live: 0, lane: LANE_KUTUPHANE, col: 'l', cls: 'fb-dunya',
-    poses: END0_POSES_L, lag: 0.43, lagFree: 0.135, load: loadDunyaActor, onpress: onpressBox,
-  }),
+  // ── Türkiye (slide 1): Olaylar in the right column, the admin-pinned
+  // series in the left. Both stand on a stop no gesture reaches while
+  // TURKIYE_STOP_ENABLED is false, so both are left out ENTIRELY rather
+  // than merely going unreached -- the same rule Kahve and Yorumlar
+  // follow below. Unlike those two their END0 poses are inside a
+  // twelve-page table and would resolve to `opacity: 0`, so nothing
+  // would be drawn either way; what would still run is their `load` --
+  // two queries on every mount, for a screen nobody can open. Idle is
+  // not parked. ──
+  ...(TURKIYE_STOP_ENABLED ? [
+    ...stackActors({
+      idBase: 'olay', live: TURKIYE_SLIDE, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-olaylar',
+      poses: END0_POSES_R, lag: 0.43, lagFree: 0.135,
+      load: OLAYLAR_COLUMN_ENABLED ? loadOlaylarActor : (el) => placeholderBox(el, 'Olaylar'),
+      onpress: OLAYLAR_COLUMN_ENABLED ? onpressBox : undefined,
+    }),
+    ...stackActors({
+      idBase: 'dunya', live: TURKIYE_SLIDE, lane: LANE_KUTUPHANE, col: 'l', cls: 'fb-dunya',
+      poses: END0_POSES_L, lag: 0.43, lagFree: 0.135, load: loadDunyaActor, onpress: onpressBox,
+    }),
+  ] : []),
   // Two slots, not three (see loadAnketActor/anketData) -- .fb-anket's
   // own height override (--fb-anket-box-h) grows each box so the column
   // still fills exactly the band three boxes used to, the same move
   // Kahvehane's Oyunlar column already makes.
   ...stackActors({
-    idBase: 'anket', live: 11, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-anket',
+    idBase: 'anket', live: ISTANBUL_SLIDE, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-anket',
     poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadKutuphaneNarrow, onpress: onpressBox,
     count: 2,
   }),
@@ -4676,11 +4726,11 @@ const CAST = [
   // every screen in the app. A parked actor has to be absent, not idle.
   ...(ILCE_STOP_ENABLED ? [
     ...stackActors({
-      idBase: 'kahve', live: 23, lane: LANE_KAHVEHANE, col: 'l', mirror: true, cls: 'fb-kahve',
+      idBase: 'kahve', live: ILCE_SLIDE, lane: LANE_KAHVEHANE, col: 'l', mirror: true, cls: 'fb-kahve',
       poses: END23_POSES_L, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Kahve'),
     }),
     ...stackActors({
-      idBase: 'yorum', live: 23, lane: LANE_KAHVEHANE, col: 'r', mirror: true, cls: 'fb-yorum',
+      idBase: 'yorum', live: ILCE_SLIDE, lane: LANE_KAHVEHANE, col: 'r', mirror: true, cls: 'fb-yorum',
       poses: END23_POSES_R, lag: 0.43, lagFree: 0.135, load: (el) => placeholderBox(el, 'Yorumlar'),
     }),
   ] : []),
@@ -4826,7 +4876,7 @@ function ensureCastTick() {
 // Where the book is; the drawings and the actors will each get there in
 // their own time.
 function aim(p, snap) {
-  castTarget = Math.max(0, Math.min(FRAMES - 1, p));
+  castTarget = Math.max(FRAME_FIRST, Math.min(FRAME_LAST, p));
   if (snap) {
     stopCastTick();
     framePos = castTarget;
@@ -5002,7 +5052,7 @@ function armCast() {
 // flip book flips, and blending two drawings makes a third nobody drew.
 function paintFrame() {
   if (!imgs.length) return;
-  const i = Math.max(0, Math.min(FRAMES - 1, Math.round(framePos)));
+  const i = Math.max(FRAME_FIRST, Math.min(FRAME_LAST, Math.round(framePos)));
   if (i === shown) return;
   if (shown >= 0) imgs[shown].classList.remove('on');
   imgs[i].classList.add('on');
@@ -5025,10 +5075,12 @@ let barLevelShown = null;
 
 function paintBarLevel() {
   if (!window.IstProfileCard || !IstProfileCard.setBarLevelLabel) return;
-  const s0 = STOPS[0], s1 = STOPS[1], s2 = STOPS[2];
+  // Named stops rather than list positions: which of the three exist is
+  // two flags now, and a parked one is a level the book can never be at.
   let label;
-  if (s2 == null || framePos <= (s1 + s2) / 2) {
-    label = framePos <= (s0 + s1) / 2 ? BAR_LEVEL_TURKIYE : BAR_LEVEL_ISTANBUL;
+  if (!ILCE_STOP_ENABLED || framePos <= (ISTANBUL_SLIDE + ILCE_SLIDE) / 2) {
+    label = (TURKIYE_STOP_ENABLED && framePos <= (TURKIYE_SLIDE + ISTANBUL_SLIDE) / 2)
+      ? BAR_LEVEL_TURKIYE : BAR_LEVEL_ISTANBUL;
   } else {
     // The reader's own ilçe is already sitting on the bar's element,
     // written there by profile-card.js from the real profile row -- no
@@ -5044,7 +5096,7 @@ function paintBarLevel() {
 // Aim everything at where the book now is. Nothing paints from `p`
 // directly any more: the drawings and the actors each ease toward it.
 function show(p, snap) {
-  aim(Math.max(0, Math.min(FRAMES - 1, p)), snap);
+  aim(Math.max(FRAME_FIRST, Math.min(FRAME_LAST, p)), snap);
 }
 
 // ── Loading ──
@@ -5116,11 +5168,14 @@ async function loadFrames() {
   if (!box) return;
   ready = false;
   imgs = [];
-  for (let i = 0; i < FRAMES; i++) {
+  // FRAME_FIRST..FRAME_LAST, not 0..FRAMES: a parked run's drawings are
+  // not fetched at all, and the array stays indexed by absolute slide
+  // number so nothing downstream has to renumber.
+  for (let i = FRAME_FIRST; i <= FRAME_LAST; i++) {
     const img = new Image();
     img.decoding = 'async';
     img.alt = '';
-    imgs.push(img);
+    imgs[i] = img;   // assigned, never pushed: the index IS the slide number
   }
   const decode = (img) => (img.decode ? img.decode().catch(() => {}) : Promise.resolve());
 
@@ -5146,9 +5201,9 @@ async function loadFrames() {
   // parallel is right for it), decoded one at a time (simultaneous
   // decodes of a 1080x1920 image allocate ~8 MB of surface each, and
   // the book is two dozen of them).
-  for (let i = 0; i < FRAMES; i++) if (i !== first) imgs[i].src = SRC(i);
+  for (let i = FRAME_FIRST; i <= FRAME_LAST; i++) if (i !== first) imgs[i].src = SRC(i);
 
-  for (let i = 0; i < FRAMES; i++) {
+  for (let i = FRAME_FIRST; i <= FRAME_LAST; i++) {
     if (i === first) continue;
     await decode(imgs[i]);
     if (!box || !box.isConnected) return;
@@ -5391,14 +5446,13 @@ function lanePullable(dx) {
 // slide 1 to slide 12, Kahvehane's is slide 12 to slide 24, and the map
 // in the middle has none at all -- it is where a direction is chosen,
 // not a depth to fall down.
+// A parked run answers the way the middle lane always has: both ends
+// the same stop, which the drag clamps to and the release resolves to
+// without moving. Nothing springs back, because nothing ever left.
 function laneStops() {
-  if (lane === LANE_KUTUPHANE) return [STOPS[0], STOPS[1]];
-  // Kahvehane's run is parked (see ILCE_STOP_ENABLED), so it answers the
-  // way the middle lane always has: both ends the same stop, which the
-  // drag clamps to and the release resolves to without moving. Nothing
-  // springs back, because nothing ever left.
-  if (lane === LANE_KAHVEHANE && ILCE_STOP_ENABLED) return [STOPS[1], STOPS[2]];
-  return [STOPS[1], STOPS[1]];
+  if (lane === LANE_KUTUPHANE && TURKIYE_STOP_ENABLED) return [TURKIYE_SLIDE, ISTANBUL_SLIDE];
+  if (lane === LANE_KAHVEHANE && ILCE_STOP_ENABLED) return [ISTANBUL_SLIDE, ILCE_SLIDE];
+  return [ISTANBUL_SLIDE, ISTANBUL_SLIDE];
 }
 
 // The release: carry on from where the finger left off. Timed rather
@@ -5829,16 +5883,21 @@ const MAP_WINDOWS = [
   // would be the one thing this layer must never be: a picture of a
   // place that is not there. It comes back with ILCE_STOP_ENABLED, along
   // with the wire drawn to it in the markup above.
-  ...(ILCE_STOP_ENABLED ? [{ id: 'ilce', cell: 'r1c3', lane: LANE_KAHVEHANE, slide: STOPS[2],
+  ...(ILCE_STOP_ENABLED ? [{ id: 'ilce', cell: 'r1c3', lane: LANE_KAHVEHANE, slide: ILCE_SLIDE,
     name: 'İlçen', stats: ['kahve', 'yorum'] }] : []),
-  { id: 'kutuphane', cell: 'r2c1', lane: LANE_KUTUPHANE, slide: STOPS[1],
+  { id: 'kutuphane', cell: 'r2c1', lane: LANE_KUTUPHANE, slide: ISTANBUL_SLIDE,
     name: 'Kütüphane', stats: ['haber', 'anket'] },
-  { id: 'kahvehane', cell: 'r2c3', lane: LANE_KAHVEHANE, slide: STOPS[1],
+  { id: 'kahvehane', cell: 'r2c3', lane: LANE_KAHVEHANE, slide: ISTANBUL_SLIDE,
     name: 'Kahvehane', stats: ['etkinlik', 'oyun'] },
   // Türkiye is parked, not deleted -- locked and honestly labelled
   // "Yakında" rather than silently doing nothing on a press, the same
   // rule a locked game tile already follows ("Önce Sözcel"). No `lane`/
   // `slide` at all: a locked window is never walked to.
+  //
+  // This `locked` and TURKIYE_STOP_ENABLED are one fact said twice, and
+  // for a while they disagreed: the window said "Yakında" while a pull
+  // up on Kütüphane still walked there. Turning the stop back on means
+  // dropping this line as well.
   { id: 'turkiye', cell: 'r3c1', name: 'Türkiye', locked: true },
 ];
 
@@ -5978,7 +6037,7 @@ function travelTo(w) {
   const step = () => {
     // The lanes can only be walked from the middle depth, so a window on
     // another lane is reached by coming back to slide 12 first.
-    if (off(at, STOPS[1]) && lane !== w.lane) { runTo(STOPS[1], step); return; }
+    if (off(at, ISTANBUL_SLIDE) && lane !== w.lane) { runTo(ISTANBUL_SLIDE, step); return; }
     if (lane !== w.lane) { runLane(lane + (w.lane > lane ? 1 : -1), step); return; }
     if (off(at, w.slide)) { runTo(w.slide, step); return; }
     traveling = false;
@@ -6449,8 +6508,8 @@ window.__fb = {
     // A slide off the middle stop can only be reached from one lane, so
     // arriving there by hand has to leave the reader on it -- otherwise
     // the handle can put the book somewhere its own lane forbids.
-    if (at < STOPS[1]) { lane = LANE_KUTUPHANE; setLanePos(lane, true); }
-    else if (at > STOPS[1]) { lane = LANE_KAHVEHANE; setLanePos(lane, true); }
+    if (at < ISTANBUL_SLIDE) { lane = LANE_KUTUPHANE; setLanePos(lane, true); }
+    else if (at > ISTANBUL_SLIDE) { lane = LANE_KAHVEHANE; setLanePos(lane, true); }
     show(at, snap !== false); armCast();
   },
   show, armCast,
