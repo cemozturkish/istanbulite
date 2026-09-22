@@ -1563,13 +1563,6 @@
   const HIVE_GESTURE_SLOP = 8;
   // The air between the drawing and the block under it on level 0.
   const HIVE_SELF_GAP = 14;
-  // Level 0's own extra breathing room above its resting centre: the
-  // block below the hexagon lost its name line (the top bar already
-  // carries it whenever this depth is on screen), so the hexagon alone
-  // would drift down toward the middle of the window without this --
-  // pulled up a further fixed amount rather than left to fall out of a
-  // now-shorter reserve.
-  const HIVE_SELF_LIFT = 22;
   // The paper left between the foot of the drawing and a card standing
   // open in the strip below it (see fitHive's offsetY).
   const HIVE_CARD_GAP = 10;
@@ -1796,7 +1789,13 @@
   // past the third for the count to be true of anyway. It is also, by
   // construction, the number of slots a column on either screen has.
   const HIVE_NEWS_MAX = 3;
-  const HIVE_DAY_SLOTS = 3;
+  // How many slots each column of a screen actually has: three in the
+  // wide one, TWO in the narrow one -- Oyunlar is Sözcel and Tümcel and
+  // Anket is two positions (see stackActors' own `count` in
+  // project.html). The caption is a picture of the real screen, so it
+  // is counted the same way; a third box in the narrow column would be
+  // a picture of a screen nobody has.
+  const HIVE_DAY_SLOTS = { wide: 3, narrow: 2 };
 
   // ── Their day, drawn ──
   // It used to be two lines of type ("3+ HABER", "0/1 OYUN"), which said
@@ -1810,6 +1809,13 @@
   // beside the channel. A reader who has used the app for a day knows
   // those two rectangles on sight, and an inked box under somebody's
   // name is a box they have actually stood in front of.
+  //
+  // THREE RECTANGLES AND TWO SQUARES, because that is what the screens
+  // are. Both columns stand the same height, so the narrow one's two
+  // boxes are each as tall as one and a half of the wide one's -- which
+  // at two units across comes out square. The shapes are measured off
+  // the real thing rather than chosen, and they are the whole of what
+  // makes the miniature readable at this size.
   //
   // INK IS WHAT IS STILL STANDING IN THEIR DAY, never what they have
   // got through — which is exactly what the two lines said (three
@@ -1826,12 +1832,13 @@
   // are drawn because the shape IS the app's screen and half of one is
   // not recognisable as it.
   function hiveDayColHTML(width, standing) {
+    const n = HIVE_DAY_SLOTS[width];
     let slots = '';
-    for (let i = 0; i < HIVE_DAY_SLOTS; i++) {
+    for (let i = 0; i < n; i++) {
       // Slots are numbered from the dock up, exactly as the app's own
       // are (.fb-slot-N in project.html), so what is still standing
       // fills from the bottom of the column.
-      const on = (HIVE_DAY_SLOTS - i) <= standing;
+      const on = (n - i) <= standing;
       slots += `<span class="ist-hive-day-slot${on ? ' ist-hive-day-on' : ''}"></span>`;
     }
     return `<span class="ist-hive-day-col ist-hive-day-${width}">${slots}</span>`;
@@ -2708,22 +2715,19 @@
     // On a phone the foot of this band carries Hane's events strip, laid
     // over the drawing rather than standing in a row of its own (see
     // .col-left in anahane.html), and a card opened in it grows upward.
-    // That room is reserved here, so the drawing is fitted AND centred
-    // in what is left above it: an open card can then never come up over
-    // the people, whatever size the honeycomb happens to be drawn at on
-    // this screen. It replaces a flat lift, which was a guess at one
-    // screen's fit and stopped clearing the card the moment the drawing
-    // resolved a little larger than the screen it was guessed on.
-    // Two numbers, and they do different jobs. The OPEN one is what the
-    // drawing has to be small enough to clear -- a card grows upward out
-    // of the strip and must never come up over the people. The RESTING
-    // one is where the drawing actually stands the rest of the time,
-    // which is nearly always: centred in the band the strip leaves when
-    // it is shut. Fitting to the first and centring on the second is
-    // what keeps the petek low on the page without ever letting an open
-    // card reach it (see the clamp under `scale`).
+    // That room is reserved here, so the drawing is fitted to what is
+    // left above it AND stands on top of it: an open card can never come
+    // up over the people, whatever size the honeycomb happens to be
+    // drawn at on this screen. It replaces a flat lift, which was a
+    // guess at one screen's fit and stopped clearing the card the moment
+    // the drawing resolved a little larger than the screen it was
+    // guessed on. It is the OPEN height that is reserved, since that is
+    // the one the drawing has to clear; the resting height
+    // (--ist-hive-reserve-rest) was what the old centred pose was taken
+    // against and is not read any more -- the petek stands on the floor
+    // of the band now rather than being centred in what the shut strip
+    // leaves (see offsetY).
     const openReserve = hiveBandReserve('--ist-hive-reserve');
-    const restReserve = hiveBandReserve('--ist-hive-reserve-rest');
     const reserve = Math.max(selfReserve, openReserve);
     const vhFull = view.clientHeight;
     const vh = vhFull - reserve;
@@ -2828,12 +2832,21 @@
     // foot of the drawing would meet a card standing open (the strip's
     // opened height, plus a little paper). The first is where the petek
     // wants to be; the second is the promise that nothing lands on it.
-    const restY = level === 0
-      ? -(Math.max(selfReserve, restReserve) / 2 + HIVE_SELF_LIFT)
-      : -Math.max(selfReserve, restReserve) / 2;
     const belowMe = (maxB - cy) * scale;
-    const clearY = (vhFull - reserve - HIVE_CARD_GAP) - vhFull / 2 - belowMe;
-    const offsetY = Math.min(restY, clearY);
+    // ── The petek stands at the FOOT of its window ──
+    // It used to be centred in the band the strip leaves when it is
+    // shut, clamped to whatever kept an open card off it. A drawing
+    // that is mostly empty paper above the reader, centred, put the
+    // people in the middle of the screen with a screenful of nothing
+    // over them; standing the whole shape on the floor of the band puts
+    // it where a thumb is, under the reading. So the clamp IS the
+    // resting place now: the foot of the drawing comes to rest exactly
+    // on top of whatever the page has reserved at the bottom of the
+    // window (Hane's events strip, level 0's own block), with a card's
+    // gap of paper between. The reader is still the fixed point
+    // horizontally and still the point everything is scaled about; only
+    // the line they stand on has moved.
+    const offsetY = (vhFull - reserve - HIVE_CARD_GAP) - vhFull / 2 - belowMe;
     // ── Level 0's block sits right under the hexagon, not at the foot of
     // the window ──
     // The window spans the whole band between the two bars, and centring

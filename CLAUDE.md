@@ -3918,13 +3918,17 @@ paper. The whole block is laid *over* the foot of the window rather than taking 
 window never changes size between depths; `fitHive` reserves the height it measures and centres the
 reader in what is left.
 
-**And the hexagon itself sits a fixed amount higher than that centring alone would put it**
-(`HIVE_SELF_LIFT`, 22px, folded into `fitHive`'s `restY` at level 0 only). Dropping the name line
-shortened the block below the hexagon, and centring in less reserved room alone would have let the
-hexagon drift back down toward the middle of the window — the opposite of what losing a line of
-text should read as. The lift is a fixed offset rather than a fraction of anything, so it survives
-the reserve changing again later (a longer preference list, a second line of district text) without
-silently growing or shrinking with it.
+**THE DRAWING STANDS ON THE FLOOR OF ITS WINDOW, IT IS NOT CENTRED IN IT** (`fitHive`'s
+`offsetY`). It used to be centred in the band the strip leaves when it is shut, clamped to whatever
+kept an open card off its foot — and the petek is mostly empty paper above the reader, so centring
+it put the people in the middle of the screen with a screenful of nothing over them. The clamp IS
+the resting place now: the foot of the drawing comes to rest exactly on top of whatever the page
+has reserved at the bottom of the window (Hane's events strip, level 0's own block), with
+`HIVE_CARD_GAP` of paper between. The promise that an open card can never come up over the people
+is unchanged — it is the same line, read as the place to stand rather than as a limit. The reader
+is still the fixed point horizontally and still the point the whole plane is scaled about; only
+the line they stand on has moved. `HIVE_SELF_LIFT` and `--ist-hive-reserve-rest` were both taken
+against the old centred pose and are gone with it.
 
 **The petek takes the band, and the events take what is left.** On a phone Hane's hero is not the
 map's square: the other two pages' hero is a drawing of a fixed size and gets a square, while this
@@ -3934,13 +3938,11 @@ under it on any night with nothing on. So row 1 is `minmax(0, 1fr)` — whatever
 
 **And the events do not take room from it at all: they are laid OVER its foot** (`--hane-events-h`
 on `#main-site`, `grid-area: hero` + `align-self: end` on `.col-left`). The petek gets the whole
-band between the two bars — and the drawing is **fitted** to clear the strip's *opened* height and
-**stands** centred in what its *resting* height leaves (`--ist-hive-reserve` /
-`--ist-hive-reserve-rest`, handed to `fitHive` as Hane's own two strip heights, so there is one set
-of numbers and not two that can drift). Two different jobs: the fit is the promise that **a card
-opening can never come up over the people**, on any screen; the resting centre is where the petek
-actually stands, which is nearly all the time. Where centring it that low would put its foot under
-an open card, `fitHive` lifts it exactly that far and no further. It is the same move level 0's own
+band between the two bars — and the drawing is **fitted** to clear the strip's *opened* height
+(`--ist-hive-reserve`, handed to `fitHive` as Hane's own strip height) and then **stands on top of
+it**, rather than being centred in what is left. That is the promise that **a card opening can
+never come up over the people**, on any screen, and it is now also where the petek simply lives
+(see the drawing's own note above). It is the same move level 0's own
 block makes inside the drawing. A column with a grid row of its own made the reader's
 position a function of how tall it was: it stood the drawing above the middle of the screen by half
 the strip, and every kept card, every empty night, every card opened moved them again.
@@ -3973,11 +3975,11 @@ into the petek something is stays legible before a word is read. Level 2 is `col
 the palette has nothing between `--ink` and `--muted`; the flat value declared above it is the
 fallback, and the ladder stays monotonic either way.
 
-**The reader's own avatar is the page's exact centre, on every device.** The window fills the whole
-of `.ist-hive-page` — Hane's middle cell, the hero square on a phone and the middle column on a
-desktop — and the dock is laid *over* its foot rather than taking height from it: a dock that took
-room would move the middle of the window off the middle of the page, and the one fixed point of
-this drawing is the person holding the phone. Around them the grid draws a **transparent field of
+**The reader's own avatar is the page's exact centre across, and its foot down the page.** The
+window fills the whole of `.ist-hive-page` — Hane's middle cell, the hero square on a phone and the
+middle column on a desktop — and the dock is laid *over* its foot rather than taking height from
+it: a dock that took room would move the drawing's own floor off the floor of the page, and the one
+fixed point of this drawing is the person holding the phone. Around them the grid draws a **transparent field of
 further empty cells** (`hiveGhostCellHTML`) so the honeycomb reads as something that continues;
 those are drawing, not interface — the only openings that do anything are the six sides of the
 reader's own hexagon, because those are the only seats that are theirs to give.
@@ -4055,6 +4057,12 @@ them about.
 
 Four things about it:
 
+- **Three rectangles and TWO squares**, because that is what those columns really carry
+  (`HIVE_DAY_SLOTS`): the wide one has three boxes, the narrow one two (Oyunlar is Sözcel and
+  Tümcel, Anket is two positions). Both columns stand the same height on a real screen, so the
+  narrow one's boxes are each half again as tall — which at two units across comes out square. The
+  shapes are measured off the real thing rather than chosen, and a third box drawn in a narrow
+  column would be a picture of a screen nobody has.
 - **Ink is what is still STANDING in their day**, never what they have got through — which is
   exactly what the two lines said (three stories stacked, one game left of one) and is the half
   worth walking over for. A slot fills from the **dock up**, the way `.fb-slot-N` numbers them.
