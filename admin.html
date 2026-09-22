@@ -1861,6 +1861,12 @@
     .baski-datebox { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
     .baski-datebox input { margin: 0; flex: 1; min-width: 0; padding: 5px 8px; font-size: 0.8rem; }
     .baski-datebox .btn { padding: 5px 9px; font-size: 0.66rem; white-space: nowrap; }
+    /* The two halves of one day. A pair of buttons rather than a select:
+       there are exactly two and the one you are setting has to be
+       readable from across the desk, which a collapsed select is not. */
+    .baski-halfbox { display: flex; gap: 6px; margin-top: 6px; }
+    .baski-halfbox .btn { flex: 1; padding: 5px 9px; font-size: 0.66rem; white-space: nowrap; }
+    .baski-halfbox .btn.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
     /* Setting a paper other than the one going out next is an ordinary
        thing to do; not noticing you are doing it is the mistake. */
     .baski-ahead {
@@ -3504,6 +3510,10 @@
       <div class="baski-datebox">
         <input type="date" id="baski-date"/>
         <button class="btn btn-secondary" id="baski-today-btn">Sıradaki</button>
+      </div>
+      <div class="baski-halfbox">
+        <button class="btn btn-secondary" id="baski-half-gun" data-half="gun">Sabah postası</button>
+        <button class="btn btn-secondary" id="baski-half-gece" data-half="gece">Akşam gazetesi</button>
       </div>
       <div class="baski-ahead" id="baski-ahead" hidden></div>
     </div>
@@ -9482,11 +9492,19 @@ async function deleteNotification(id) {
 // comment on the kind names it.
 // ══════════════════════════════════════════════════════════════════════
 
-// Which baskı is being set. A date, never a (date, gündüz/gece) pair —
-// see db/baski_v1.sql for why. Null until the first paint resolves it
-// against IstDate, the only clock allowed to answer "what day is it in
-// İstanbul" (CLAUDE.md rule 10).
+// Which baskı is being set: a date AND a half — the sabah postası and
+// the akşam gazetesi are two papers now, not one pile with two deadlines
+// (db/breaking_news_v4_akis.sql). The half applies to the NEWS alone.
+// Etkinlik and Anket are still keyed by their date only (db/baski_v1.sql
+// is unchanged) and a game is a switch on the night it is played, so
+// those three kinds ignore it — which is why it is threaded through as
+// an argument rather than read out of this global inside each one.
+//
+// Both are null until the first paint resolves them against IstDate, the
+// only clock allowed to answer "what day is it in İstanbul" and "which
+// paper is next" (CLAUDE.md rule 10).
 let baskiDate = null;
+let baskiHalf = null;
 let baskiLoadSeq = 0;
 let baskiItems = { haber: [], etkinlik: [], anket: [], oyun: [] };
 let baskiFailed = {};
@@ -9551,9 +9569,9 @@ const BASKI_KINDS = {
   // restated here because a drop is now the other way to schedule a
   // story and the two must refuse the same rows.
   haber: {
-    async load(date) {
+    async load(date, half) {
       const { data, error } = await sb.from('breaking_news')
-        .select('id, title, category, neighborhood, hook_tr, edition_date, edition_order, archived_at')
+        .select('id, title, category, neighborhood, hook_tr, edition_date, edition_half, edition_order, archived_at')
         .is('archived_at', null)
         .order('created_at', { ascending: false })
         .limit(200);
@@ -9568,14 +9586,20 @@ const BASKI_KINDS = {
         return {
           id: n.id, kind: 'haber', title: n.title,
           slot: pressBucketOf(n),
-          inEdition: n.edition_date === date,
-          otherEdition: n.edition_date && n.edition_date !== date ? n.edition_date : null,
+          // A story is in THIS paper only if both the day and the half
+          // match. A row written before db/breaking_news_v4_akis.sql has
+          // no half at all and reads as the morning paper, which is the
+          // reading that changes nothing about where it already stood.
+          inEdition: n.edition_date === date && (n.edition_half || 'gun') === half,
+          otherEdition: n.edition_date && !(n.edition_date === date && (n.edition_half || 'gun') === half)
+            ? n.edition_date + ' · ' + baskiHalfName(n.edition_half || 'gun')
+            : null,
           order: n.edition_order ?? 0, warn,
         };
       });
     },
-    place: (item, date, order) => sb.from('breaking_news')
-      .update({ edition_date: date, edition_order: order }).eq('id', item.id),
+    place: (item, date, order, half) => sb.from('breaking_news')
+      .update({ edition_date: date, edition_half: half, edition_order: order }).eq('id', item.id),
     pull: (item) => sb.from('breaking_news')
       .update({ edition_date: null, edition_order: 0 }).eq('id', item.id),
     setOrder: (item, order) => sb.from('breaking_news')
@@ -9720,13 +9744,18 @@ async function baskiRefresh() {
   // The baskı being set is the one going out next. nextEdition() is the
   // only thing that knows which that is (CLAUDE.md rule 10) and it
   // already names the day a night belongs to.
-  if (!baskiDate) baskiDate = IstDate.nextEdition().date;
+  if (!baskiDate) {
+    const next = IstDate.nextEdition();
+    baskiDate = next.date;
+    baskiHalf = next.edition;
+  }
   dateInput.value = baskiDate;
+  baskiPaintHalf();
   baskiPaintHead();
 
   const seq = ++baskiLoadSeq;
   const results = await Promise.all(BASKI_KIND_ORDER.map(async (k) => {
-    try { return { k, items: await BASKI_KINDS[k].load(baskiDate), failed: false }; }
+    try { return { k, items: await BASKI_KINDS[k].load(baskiDate, baskiHalf), failed: false }; }
     catch (err) { console.error('[baski ' + k + ']', err); return { k, items: [], failed: true }; }
   }));
   if (seq !== baskiLoadSeq) return;       // a date change overtook this fetch
@@ -9739,6 +9768,15 @@ async function baskiRefresh() {
   });
   baskiRenderPages();
   baskiWireSources();
+}
+
+// Which of the two halves is being set, inked on its own button. Called
+// from baskiRefresh rather than from the click handler, so the board and
+// the buttons can never disagree about which paper is open.
+function baskiPaintHalf() {
+  document.querySelectorAll('.baski-halfbox .btn').forEach(b => {
+    b.classList.toggle('on', b.dataset.half === baskiHalf);
+  });
 }
 
 function baskiPaintHead() {
@@ -9755,8 +9793,14 @@ function baskiPaintHead() {
   // *_current_edition resolvers hand the reader the NEWEST edition at or
   // before today, so a future date is invisible until that day comes and
   // a past one is either live or already superseded.
-  const ahead = baskiDate > next.date;
-  const behind = baskiDate < next.date;
+  // The two papers of one day are ordered too: the morning one comes out
+  // before the evening one, so "am I setting a paper other than the next
+  // one out" is a comparison on the pair, not on the date alone.
+  const rank = (d, h) => d + (h === 'gece' ? '1' : '0');
+  const here = rank(baskiDate, baskiHalf);
+  const there = rank(next.date, next.edition);
+  const ahead = here > there;
+  const behind = here < there;
   aheadEl.hidden = !(ahead || behind);
   aheadEl.textContent = ahead
     ? 'İleri tarihli baskı — o gün gelene kadar okuyucuya çıkmaz.'
@@ -9956,7 +10000,7 @@ function baskiPlace(item, slotId) {
     ? (baskiItems[item.kind] || []).filter(i => i.inEdition)
     : baskiStack(item.kind, slotId || item.slot);
   const order = stack.length ? Math.max(...stack.map(i => i.order)) + 1 : 0;
-  return baskiWrite(() => def.place(item, baskiDate, order), 'Baskıya koyma');
+  return baskiWrite(() => def.place(item, baskiDate, order, baskiHalf), 'Baskıya koyma');
 }
 
 function baskiPull(item) {
@@ -9990,8 +10034,21 @@ document.getElementById('baski-date').addEventListener('change', (e) => {
   baskiRefresh();
 });
 document.getElementById('baski-today-btn').addEventListener('click', () => {
-  baskiDate = IstDate.nextEdition().date;
+  const next = IstDate.nextEdition();
+  baskiDate = next.date;
+  baskiHalf = next.edition;
   baskiRefresh();
+});
+// Switching halves is switching PAPERS, so it reloads the board exactly
+// as changing the date does -- the rows a slot holds are different, and
+// a board that kept the old ones would be the one thing this may never
+// be (see "Every write re-reads the whole board").
+document.querySelectorAll('.baski-halfbox .btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (baskiHalf === btn.dataset.half) return;
+    baskiHalf = btn.dataset.half;
+    baskiRefresh();
+  });
 });
 
 // Re-stamp the sources whenever a list in the middle re-renders. Debounced
@@ -10089,37 +10146,50 @@ const PRESS_FORMES = [
     name: 'Haberler',
     tab: 'news',
     editions: ['gun', 'gece'],
-    // EXACTLY loadHaberlerActorAt's own question: the edition in force on
-    // the day this paper comes out is the newest edition_date at or
-    // before it (news_current_edition), and a story reaches the column
-    // only unarchived and only through that date. Three buckets, three
-    // boxes -- a bucket with nothing in it goes dashed for the reader.
+    // EXACTLY haberlerRows()' own question (project.html), because a
+    // forme that asks a looser one reports an edition ready that the
+    // reader will open and find empty.
+    //
+    // What changed with db/breaking_news_v4_akis.sql: the reader's column
+    // is no longer ONE edition, it is a three-day WINDOW of them that
+    // accretes -- so a bucket is only really empty if nothing has stood
+    // in it across all three days, and `news_current_edition` is no
+    // longer the question to ask. The old "holdover" warn went with it:
+    // there is no holdover any more, a story simply ages out.
     async check(ctx) {
-      const { data: editionDate, error: edErr } =
-        await sb.rpc('news_current_edition', { p_today: ctx.date });
-      if (edErr) throw edErr;
-      if (!editionDate) return { state: 'miss', note: 'Sayı çıkmadı' };
-      const { data, error } = await sb.from('breaking_news')
-        .select('category, neighborhood')
-        .eq('edition_date', editionDate)
+      const floor = pressDayShift(ctx.date, -2);
+      let q = sb.from('breaking_news')
+        .select('category, neighborhood, edition_date, edition_half')
+        .gte('edition_date', floor)
+        .lte('edition_date', ctx.date)
         .is('archived_at', null);
+      // The akşam gazetesi has not gone out while the morning paper is
+      // the one in force -- the same gate the reader's own fetch applies.
+      if (ctx.edition === 'gun') {
+        q = q.or('edition_date.lt.' + ctx.date + ',edition_half.eq.gun');
+      }
+      const { data, error } = await q;
       if (error) throw error;
+      const rows = data || [];
+      if (!rows.length) return { state: 'miss', note: 'Üç gündür sayı yok' };
       const counts = {};
-      (data || []).forEach(n => {
+      rows.forEach(n => {
         const b = pressBucketOf(n);
         counts[b] = (counts[b] || 0) + 1;
       });
-      const empty = PRESS_BUCKETS.filter(b => !counts[b.key]);
       ctx.newsCounts = counts;
-      ctx.newsEditionDate = editionDate;
-      const held = editionDate !== ctx.date;
+      const empty = PRESS_BUCKETS.filter(b => !counts[b.key]);
       if (empty.length) {
         return { state: 'miss', note: empty.map(b => b.label).join(' · ') + ' boş' };
       }
-      // Every bucket is filled, but on an edition the admin set on an
-      // earlier day -- the reader gets it, and it is not today's paper.
-      if (held) return { state: 'warn', note: editionDate + ' sayısı duruyor' };
-      return { state: 'ok', note: (data || []).length + ' haber' };
+      // Every bucket has something in it, but none of it is THIS paper's:
+      // the reader is being handed yesterday's window and nothing new.
+      // Not a miss -- their column is full -- but it is the one thing an
+      // editor about to miss a deadline needs told.
+      const fresh = rows.filter(n =>
+        n.edition_date === ctx.date && (n.edition_half || 'gun') === ctx.edition).length;
+      if (!fresh) return { state: 'warn', note: 'Bu sayıya haber konmadı' };
+      return { state: 'ok', note: fresh + ' yeni · ' + rows.length + ' okunabilir' };
     },
   },
   {
@@ -10268,6 +10338,23 @@ let pressTimer = null;
 
 function pressEditionName(ed) {
   return ed === 'gun' ? 'Sabah baskısı' : 'Akşam baskısı';
+}
+
+// The same two papers as the reader meets them. Kept beside
+// pressEditionName so the vocabulary for 'gun'/'gece' lives in one place
+// on this desk, and never becomes a third pair of words for one sun.
+// Day arithmetic on an edition key, in UTC, never through a formatted
+// string (CLAUDE.md rule 10) -- the same helper project.html's own
+// editionDayShift is, because the window the forme checks has to be the
+// window the reader is served.
+function pressDayShift(isoDay, days) {
+  const d = new Date(isoDay + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function baskiHalfName(half) {
+  return half === 'gece' ? 'Akşam gazetesi' : 'Sabah postası';
 }
 
 function pressTick() {

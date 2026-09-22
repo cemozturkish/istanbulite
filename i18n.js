@@ -48,6 +48,25 @@
     'news.turkiye':        { default: 'TÜRKİYE',                more_english: 'TURKEY' },
     'news.dunya':          { default: 'DÜNYA',                  more_english: 'WORLD' },
 
+    // ── THE AGE OF A STORY ──
+    // The window the news column is cut to is exactly three edition-days
+    // wide, so there are exactly three things a story's age can say.
+    // Past 'evvelsi gün' it is not old, it is GONE (see haberlerData).
+    'news.age.min':        { default: 'dk önce',                more_english: 'min ago' },
+    'news.age.hour':       { default: 'saat önce',              more_english: 'h ago' },
+    'news.age.today':      { default: 'bugün',                  more_english: 'today' },
+    'news.age.yesterday':  { default: 'dün',                    more_english: 'yesterday' },
+    'news.age.dayback':    { default: 'evvelsi gün',            more_english: 'two days ago' },
+
+    // ── THE AKIŞ ──
+    // The two words a story carries ONLY when it belongs to a seri, i.e.
+    // only when there is genuinely something to go on receiving.
+    'news.akis.stay':      { default: 'AKIŞTA KAL',             more_english: 'KEEP ME POSTED' },
+    'news.akis.enough':    { default: 'YETER',                  more_english: 'ENOUGH' },
+    'news.akis.note':      { default: 'Bu bir akışın parçası. Sağa at, gelişmeleri almaya devam et; sola at, bu akış bir daha karşına çıkmasın.',
+                             more_english: 'This is part of a running story. Throw right to keep getting it; throw left and this story stops reaching you.' },
+    'news.akis.in':        { default: 'AKIŞTA',                 more_english: 'FOLLOWING' },
+
     // profile / settings card
     'profile.customize':   { default: 'Kişiselleştir',       more_english: 'Customize' },
     'profile.save':        { default: 'Kaydet',              more_english: 'Save' },
