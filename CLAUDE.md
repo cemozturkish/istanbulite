@@ -347,12 +347,11 @@ behind Kütüphane's ANKET box (`db/neighborhood_polls.sql`).
   Beşiktaş answered, how Üsküdar answered.
 - `neighborhood_polls`: `id`, `question_tr`/`question_en`, `option_a_tr`/`option_a_en`,
   `option_b_tr`/`option_b_en`, `color_a`/`color_b` (hex, defaulted to the site's own red and ink),
-  `active`. The two colors are what a future district-colored map would mix between for a district
-  by that district's own a/b split, the way a live election map does — there is no such map drawn
-  yet (project.html's İstanbul at slide 12 is still a flat painted frame, not a traced one a fill
-  can be set on; see "The zoom is DRAWN, not computed"), so `renderAnketResults` in project.html
-  prints the same split as a plain list, each district's row already wearing the color a map would
-  paint it with.
+  `active`. The two colors are what the district-colored map mixes between for a district by that
+  district's own a/b split, the way a live election map does — `renderAnketResults` in project.html
+  computes that mix once and uses it twice: on the shape, through the traced overlay
+  (`assets/map/istanbul-map-mobile.svg`, `paintDistrictMap`), and on that district's own row in the
+  list under it.
 - `neighborhood_poll_votes`: `(poll_id, user_id)` PK, `neighborhood` (the voter's own district AT
   THE TIME they voted, not looked up later), `choice` (`a`/`b`). **Insert-only**, same reasoning as
   `question_answers`: an answer is what you thought when you were asked. The insert's `with check`
@@ -2761,12 +2760,34 @@ collapse the *record*. A left throw is a real "no" rather than the absence of a 
 whole reason `event_interest` exists. There is no `localStorage` mirror: `event-interest.js` left
 with kahvehane's own events deck, so that table IS the record now rather than a copy of one.
 
-**The district map is not coloured yet, and the list is not a placeholder for it.** Slide 12's
-İstanbul is `assets/map/istanbul-map-mobile.png`, and `renderAnketResults` prints the 25 districts
-as rows, each already wearing the colour a map would paint it with. **project.html still carries no
-SVG at all** — that is what is left to do, and it is a pass of its own.
+**THE DISTRICT MAP IS COLOURED, AND IT IS THE ANKET'S** (`paintDistrictMap` /
+`clearDistrictMap`, `.fb-districts`). `renderAnketResults` has always printed the 25 districts as
+rows, each wearing the colour a map would paint it with; the map is now that same colour on the
+shape itself, on the drawing the reader is already looking at. The mix is computed **once** per
+district and used for both, so the row and the shape can never disagree, and a district with no
+votes is given no fill at all — the way its row says "Oy yok" rather than picking a colour out of
+the air.
 
-**The tracing it would need now exists** (`assets/map/istanbul-map-mobile.svg`). The portrait
+Four things about it:
+
+- **It answers no press.** The layer is `pointer-events: none`: a district tap would be a second
+  question laid over the one this map exists to answer, and where it would lead is not decided.
+  The fill is the whole of it.
+- **It belongs to the open PAGE, not to the screen.** The paint goes up with the result and
+  `closeFbPage` / `snapFbPageShut` take it down, so the city is only ever wearing a poll while
+  that poll is being read.
+- **It is appended AFTER the frames rather than given a z-index over them.** The frames are
+  `z-index: auto` and land in the same painting pass, so tree order is what decides — and
+  `loadFrames` appends them on every mount, which is why `paintDistrictMap` re-`appendChild`s the
+  layer (that MOVES it) and `unmount` drops the handle. Everything above it carries a real
+  z-index — the cast (1), the middle lane's wash (2), the app map (3) — so it stays under all
+  three however it got there, and walking to the map lane quiets the districts along with the
+  drawing they are on.
+- **The file is parsed as XML, never `innerHTML`'d into an SVG element** — the same reason
+  map-ink.js builds its filter with DOM calls. A fetch that fails clears its own promise so a
+  later opening retries, and leaves the reader the list, which is the whole result either way.
+
+**The tracing under it** (`assets/map/istanbul-map-mobile.svg`). The portrait
 drawing is not a redraw: it is the landscape `assets/map/istanbul-map.png` scaled and cropped into
 a 9:16 canvas, so the landscape tracing's polygons are carried over by one affine rather than
 hand-traced a second time. `scripts/derive-mobile-map-svg.py` measures that affine against the
@@ -3394,10 +3415,9 @@ Six things about it:
   worth a column of its own rather than folding into `daily_questions` is what the answer is FOR:
   every vote is filed under the member's own district, so the result is not one percentage but 25
   of them. That per-district split (`neighborhood_poll_results()`) is meant to color the districts
-  on a future map the way a live election map does, mixing the poll's own `color_a`/`color_b` by
-  each district's own split — there is no such map drawn yet (see "The zoom is DRAWN, not
-  computed"), so for now `renderAnketResults` prints the same numbers as a plain list, each row
-  already wearing the color a map would paint it with. Curated from admin.html's own "İlçe
+  on the map the way a live election map does, mixing the poll's own `color_a`/`color_b` by each
+  district's own split. That map is drawn (`paintDistrictMap`), and `renderAnketResults` prints the
+  same numbers as a list under it — one mix per district, used in both places. Curated from admin.html's own "İlçe
   Anketleri" tab, kept apart from the per-story "Anketler" the Haberler tab already has (those are
   a story's own reaction, `breaking_news_polls`, not a district's).
 - **Fikirler is decided in shape and not in content.** The tile has its place on Kütüphane; what
@@ -3616,9 +3636,8 @@ dashed (see the cast rules above) — the boxes are cast, the content behind the
 Yorumlar are no longer cast at all: they stood on the ilçe stop, which is parked (see
 `ILCE_STOP_ENABLED`). **What is still in the parts bin:** the second map on the two lane screens,
 the ilçe's own drawing at slide 24 and everything on that stop, whatever actually fills Hikâyeler,
-and the district-colored map itself that Anket's own data is already shaped to feed — its tracing
-is drawn now (`assets/map/istanbul-map-mobile.svg`, see the İstanbul level's own section), what is
-missing is project.html carrying it and painting the fills.
+and whatever a district tap should eventually DO — the map itself is drawn and coloured now (the
+Anket's per-district split paints it; see the İstanbul level's own section), but it takes no press.
 
 ### The flip book — `flip.js` + `flip-steps.js`
 
