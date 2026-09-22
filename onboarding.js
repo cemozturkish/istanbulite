@@ -127,15 +127,14 @@
     lanes: {
       tr: {
         reveal:      'Burası ortası — uygulamanın haritası. Nerede olduğunu ve nereye gidebileceğini gösterir. Her yere buradan, parmağınla gidiliyor.',
+        toSen:        'Yukarıda, çubuğun üstündeki kendi adına bas.',
+        senClose:     'Kapat, peteğe bakalım.',
         toPetek:      'Ortadaki logoya bas. Petek orada.',
         avatarIntro: 'Öncelikle, senin avatarını yaratalım.',
         pickHair:    'Saçını seç. Beğenince devam et.',
         pickShirt:   'Tişörtünü seç. Beğenince devam et.',
         senDone:     'Geri kalanı — şapkalar, rozetler — dışarıda kazanılır. Satın alınamaz.',
-        toNear:      'Şimdi yukarı kaydır.',
         near:        'Bu petek. Şu an sadece sen varsın. Biri sana kendi kodunu verdiğinde, yanındaki boş yerlerden birine oturur — gerçek hayatta, yüz yüze.',
-        toAll:       'Bir kere daha yukarı kaydır.',
-        petekAll:    'Bütün petek bu. Sen sadece kendi altı komşununla değil, koca şehirle aynı ağdasın.',
         backToMap:   'Peteği kapatmak için aynı logoya tekrar bas. Nerede olursan ol, bir basış uzakta.',
         twoSides:    'İstanbul Avrupa ve Anadolu yakası diye ikiye ayrılır. İstanbulite de öyle — sağda Kahvehane, solda Kütüphane.',
         toKahve:     'Kahvehane sağda. Parmağını sola kaydır.',
@@ -148,15 +147,14 @@
       },
       en: {
         reveal:      'This is the middle — the map of the app. It says where you are and where you can go. Everywhere else is a finger away from here.',
+        toSen:        'Press your own name, up on the bar.',
+        senClose:     'Close it — let us look at the petek.',
         toPetek:      'Press the logo in the middle. The petek is behind it.',
         avatarIntro: 'First, let\'s create your avatar.',
         pickHair:    'Pick your hair. Continue once you like it.',
         pickShirt:   'Pick your shirt. Continue once you like it.',
         senDone:     'The rest of it — hats, badges — is earned outside. It cannot be bought.',
-        toNear:      'Now pull up.',
         near:        'This is the petek. Right now it is only you. When somebody gives you their code they take one of the empty places beside you — in person, face to face.',
-        toAll:       'Pull up once more.',
-        petekAll:    'This is the whole petek. You are not just connected to your own six neighbours — you are on the same network as the whole city.',
         backToMap:   'Press the same logo again to shut the petek. Wherever you are, it is one press away.',
         twoSides:    'Istanbul splits into a European side and an Anatolian side. Istanbulite splits the same way — Kahvehane on the right, Kütüphane on the left.',
         toKahve:     'Kahvehane is to the right. Pull your finger left.',
@@ -876,7 +874,14 @@
   // currently talking about; and the two petek-door beats open the logo
   // alone (`#fb-logo-btn`), which is the one mark on the compass bar that
   // answers a press at all.
-  const PASS_SCOPES = { '#fb': 'book', '#fb-petek': 'petek', '#fb-logo-btn': 'logo' };
+  const PASS_SCOPES = {
+    '#fb': 'book', '#fb-petek': 'petek', '#fb-logo-btn': 'logo',
+    // Sen is the profile sheet now (see PROFILE_SECTIONS in
+    // profile-card.js), opened by pressing your own name on the top bar
+    // -- so the tour needs those two the way it needs the logo: the one
+    // mark that opens it, and the sheet itself once it is open.
+    '#ist-pc-me': 'me', '#profile-overlay': 'sheet',
+  };
   let passScope = null;
   function openPassthrough(scope) {
     passScope = scope || '#fb';
@@ -899,22 +904,10 @@
     enterSpotlightMode();
     const lines = laneCopy(lang);
 
-    // The petek's own depths (HIVE_LEVELS in profile-card.js): 0 is Sen --
-    // the reader's own hexagon with the avatar arrows on it -- 1 is
-    // Yanındakiler, the six touching places -- and 2 is the whole shape.
-    // Driven through IstProfileCard.setHivePageLevel, which is that
-    // module's own documented handle and no-ops when no petek is standing,
-    // exactly as fb() does for the book.
-    const HIVE_SEN = 0, HIVE_NEAR = 1, HIVE_ALL = 2;
-    function setDepth(n) {
-      const pc = global.IstProfileCard;
-      if (pc && pc.setHivePageLevel) pc.setHivePageLevel(n);
-    }
-
     // `lane` is the lane the beat belongs to and is asserted before it runs,
     // so a reader who wandered is put back rather than talked at about a
     // screen they are not on. `pull` is the lane a pull beat waits for;
-    // `levelPull` is the same idea for the petek's own vertical gesture.
+    // `petek` / `sheet` are the two doors the reader opens themselves.
     const beats = [
       { lane: LANE_MAP,        target: null,        speech: lines.reveal },
       // ── The petek's own door ──
@@ -924,12 +917,20 @@
       // inside the petek and asserts no lane at all (`inPetek`), because
       // asserting one would walk the strip behind a layer the reader is
       // standing in.
-      { target: '#fb-logo-btn', round: true, speech: lines.toPetek, petek: 'open' },
+      // ── SEN: your own name, up on the bar ──
+      // The petek's innermost depth was the reader themselves -- the
+      // avatar arrows, the preferences, the way out -- and it is the
+      // profile sheet now (see the ONE DEPTH note in profile-card.js).
+      // So the tour teaches the door it actually has: press your own
+      // name. Same rule as the logo below it -- the reader opens it and
+      // shuts it themselves, because that is the press they will make
+      // forever after.
+      { target: '#ist-pc-me', round: true, speech: lines.toSen, sheet: 'open' },
       // The reader first, the shape second. On day one the petek is one
       // hexagon and six empty sides, so there is nothing true to say about
       // neighbours yet -- but there is always something true to say about
       // the reader, and something for them to DO (see COPY.lanes).
-      { inPetek: true,         depth: HIVE_SEN, speech: lines.avatarIntro },
+      { inSheet: true, speech: lines.avatarIntro },
       // One category at a time, and only the ones already open to
       // EVERYONE: AVATAR_HAT_OPTIONS (profile-card.js) carries only 'Yok'
       // today (the Sözcü crown is parked, unbuilt art) and
@@ -939,33 +940,33 @@
       // two beats. `pick: true` lights the pair with a round hole (see
       // paintSpotlight) rather than boxing it, and never advances on a
       // press -- browsing IS the point, see runPick.
-      { inPetek: true,         depth: HIVE_SEN, target: '#po-hair-prev, #po-hair-next', round: true,
+      //
+      // The ids are unchanged: the arrows the petek's own depth carried
+      // were always the sheet's own markup and the sheet's own four
+      // wire*Carousel handlers, which is exactly why this beat needed
+      // re-pointing rather than rewriting. The sheet opens already
+      // customizing (`sen` in PROFILE_SECTIONS), so they are on screen
+      // from the beat's first frame.
+      { inSheet: true, target: '#po-hair-prev, #po-hair-next', round: true,
         speech: lines.pickHair, pick: true },
-      { inPetek: true,         depth: HIVE_SEN, target: '#po-shirt-prev, #po-shirt-next', round: true,
+      { inSheet: true, target: '#po-shirt-prev, #po-shirt-next', round: true,
         speech: lines.pickShirt, pick: true },
-      // `.ist-hive-pick-col`, never `.ist-hive-picker`: the picker's own box is
-      // exactly the hexagon (--ist-hive-cell-w/h) and both arrow columns are
-      // laid OUTSIDE it (`right: 100%` / `left: 100%`), so a ring measured on
-      // the wrapper is a box drawn over the avatar with the arrows outside
-      // the hole. Two columns, so two rings -- `all`.
-      { inPetek: true,         depth: HIVE_SEN, target: '.ist-hive-pick-col', all: true,
-        speech: lines.senDone },
-      // Two real pulls out from Sen, one level at a time, each waiting for
-      // the actual gesture rather than jumping there -- the reader is
-      // taught the gesture by making it, the same rule the lane pulls
-      // already follow. Each pull beat asks ONLY for the pull -- what is
-      // actually up there is a beat too early to say true things about,
-      // exactly the reasoning that opened this whole tour on the reader
-      // rather than the petek -- and the plain talk beat right after it
-      // describes what arriving actually shows: Yanındakiler first (the
-      // six touching places, all still empty), then the whole shape.
-      { inPetek: true,         speech: lines.toNear, levelPull: HIVE_NEAR },
+      // Both arrow columns, so two rings -- `all`.
+      { inSheet: true, target: '.ist-pc-cover-pick-col', all: true, speech: lines.senDone },
+      { target: '#profile-overlay .ist-sheet-close', round: true,
+        speech: lines.senClose, sheet: 'close' },
+      // ── The petek's own door ──
+      // It is the logo, not a lane, so the reader is asked to press it and
+      // the beat waits for it to actually open -- the same rule every lane
+      // pull here follows. Everything between this and `backToMap` happens
+      // inside the petek and asserts no lane at all (`inPetek`), because
+      // asserting one would walk the strip behind a layer the reader is
+      // standing in.
+      { target: '#fb-logo-btn', round: true, speech: lines.toPetek, petek: 'open' },
+      // One depth, so one beat: the shape is what it is the moment it
+      // opens. The two pulls that used to walk out of Sen and on to the
+      // whole petek are gone with the depths themselves.
       { inPetek: true,         speech: lines.near },
-      { inPetek: true,         speech: lines.toAll,  levelPull: HIVE_ALL },
-      { inPetek: true,         speech: lines.petekAll },
-      // ...and back out through the same door, so the way in and the way
-      // out are learnt as one thing.
-      { target: '#fb-logo-btn', round: true, speech: lines.backToMap, petek: 'close' },
       { lane: LANE_MAP,        speech: lines.twoSides },
       { lane: LANE_MAP,        speech: lines.toKahve, pull: LANE_KAHVEHANE },
       // A column is three boxes with no wrapper between them, and the
@@ -999,12 +1000,11 @@
       // `=== undefined`, never `!b.pull`: Kütüphane is lane 0, so a falsy
       // test reads the one pull beat that aims at it as a talk beat.
       if (b.pull !== undefined) { runPull(b); return; }
-      // Same idea for a level pull, aimed at the petek's own depth instead
-      // of a lane -- Sen is level 0, so this needs the same `!== undefined`.
-      if (b.levelPull !== undefined) { runLevelPull(b); return; }
       // The petek's own door: a press on the logo rather than a gesture on
-      // the book.
+      // the book. Sen's door is the same kind of thing one bar up -- your
+      // own name, which opens the profile sheet.
       if (b.petek !== undefined) { runPetekDoor(b); return; }
+      if (b.sheet !== undefined) { runSheetDoor(b); return; }
 
       // Every other beat is about a screen, so it asserts that screen -- a
       // reader who wandered is put back rather than talked at about a lane
@@ -1021,8 +1021,9 @@
       // in which case this is what puts the reader where the next line is
       // about to be true.
       if (b.inPetek && f && f.openPetek && !f.petekOpen) f.openPetek();
-      // ...and, inside the petek, about a DEPTH of it as well.
-      if (b.depth !== undefined) holdDepth(b.depth);
+      // The same, for a beat that happens inside the profile sheet: the
+      // door beat before it may have taken its own stall escape.
+      if (b.inSheet && !sheetOpen()) openSheet();
 
       if (b.pick) { runPick(b); return; }
 
@@ -1032,35 +1033,72 @@
       requestAnimationFrame(() => {
         if (!b.target) { addSpotlight(null); return; }
         addSpotlight(b.all ? document.querySelectorAll(b.target)
-                           : document.querySelector(b.target));
-        if (b.depth !== undefined) settleSpotlight();
+                           : document.querySelector(b.target),
+                     { round: !!b.round });
+        // The sheet is still sliding up for the first half-second of the
+        // beats inside it, so a rect taken on the next frame is where the
+        // arrows were on the way. The paint is idempotent, so it is
+        // simply re-taken as they settle.
+        if (b.inSheet) settleSpotlight();
       });
       renderPane({ speech: b.speech });
       addHint(COPY.tapToContinue[lang], advance);
     }
 
-    // ── A depth has to be asserted more than once ──
-    // Opening the petek REMOUNTS it (project.html's openPetek), a mount is
-    // a round trip, and a mount lands at the middle depth by construction
-    // (HIVE_LEVEL_DEFAULT in profile-card.js). So a beat that names a depth
-    // can be answered before the mount it is aiming at even exists, and the
-    // mount then puts the reader back in the middle -- which on the first
-    // avatar beat is the difference between the arrows being on screen and
-    // not. setHivePageLevel is idempotent, so the depth is simply re-said
-    // as things settle; the guard is that the beat asking for it is still
-    // the beat on screen, so this can never fight the next one.
-    function holdDepth(n) {
-      setDepth(n);
-      [120, 300, 600, 900].forEach(ms => setTimeout(() => {
-        const cur = beats[idx];
-        if (cur && cur.depth === n) setDepth(n);
-      }, ms));
+    // ── Sen's own door ──
+    // The profile sheet, opened by pressing your own name on the top bar
+    // (#ist-pc-me, see profile-card.js). It is THE sheet like everything
+    // else that rises over a page, so "is it open" is one class on its
+    // overlay and closing it is its own close button -- there is no
+    // handle to reach for and nothing here that knows how the sheet
+    // works.
+    function sheetOpen() {
+      const ov = document.getElementById('profile-overlay');
+      return !!ov && !ov.hidden;
+    }
+    function openSheet() {
+      const me = document.getElementById('ist-pc-me');
+      if (me) me.click();
+    }
+    function closeSheet() {
+      const btn = document.querySelector('#profile-overlay .ist-sheet-close');
+      if (btn) btn.click();
+    }
+    function runSheetDoor(b) {
+      const want = b.sheet === 'open';
+      // No bar, no sheet: nothing to teach and nothing to wait for.
+      if (!document.getElementById('ist-pc-me')) { advance(); return; }
+      if (sheetOpen() === want) { advance(); return; }
+
+      requestAnimationFrame(() => {
+        addSpotlight(document.querySelector(b.target), { round: !!b.round });
+        openPassthrough(want ? '#ist-pc-me' : '#profile-overlay');
+      });
+      renderPane({ speech: b.speech, promptText: COPY.pressLogo[lang] });
+
+      const tick = () => {
+        if (sheetOpen() === want) { stopLaneWatch(); closePassthrough(); advance(); return; }
+        laneWatch = requestAnimationFrame(tick);
+      };
+      laneWatch = requestAnimationFrame(tick);
+
+      // The same floor every gesture beat has: a reader who cannot make
+      // the press still reaches the end, which is where onboarded_at is
+      // written.
+      stallTimer = setTimeout(() => {
+        stallTimer = null;
+        renderPane({ speech: b.speech, promptText: COPY.pressNudge[lang] });
+        addHint(COPY.pressNudge[lang], () => {
+          stopLaneWatch(); closePassthrough();
+          want ? openSheet() : closeSheet();
+          advance();
+        });
+      }, STALL_MS);
     }
 
-    // Changing depth rescales the plane, and that is a CSS transition -- so
-    // the arrows go on moving for a few hundred ms after setDepth returns,
-    // and a rect taken on the next frame is where they were on the way. The
-    // paint is idempotent, so it is simply re-taken as they settle.
+    // Anything that is still moving when a beat lands -- the sheet
+    // sliding up under the arrows it is about to light -- gets its rect
+    // re-taken as it settles. The paint is idempotent.
     function settleSpotlight() {
       [0, 140, 300, 460].forEach(ms => setTimeout(() => {
         if (litTargets.length) paintSpotlight();
@@ -1076,16 +1114,16 @@
     // unlike a gesture, a button press needs no accessibility fallback,
     // and a reader who does not want to browse can press it immediately.
     function runPick(b) {
-      // The depth change rescales the plane and the arrows arrive with it,
-      // so the rect is taken a frame later and re-taken as they settle.
+      // The sheet is still sliding up under the arrows, so the rect is
+      // taken a frame later and re-taken as it settles.
       requestAnimationFrame(() => {
         addSpotlight(document.querySelectorAll(b.target), { round: !!b.round });
         settleSpotlight();
         // Passthrough so the reader can actually reach the arrows -- the
         // firewall's lock is pointer-events:none on everything outside
-        // the onboarding otherwise. Scoped to the petek alone, same as
+        // the onboarding otherwise. Scoped to the sheet alone, same as
         // every other beat that hands part of the page back.
-        openPassthrough('#fb-petek');
+        openPassthrough(b.inSheet ? '#profile-overlay' : '#fb-petek');
       });
       renderPane({
         speech: b.speech,
@@ -1133,43 +1171,6 @@
       }, STALL_MS);
     }
 
-    // A level-pull beat: the same shape as a lane pull, aimed at the
-    // petek's own vertical gesture instead of the book's horizontal one --
-    // dim stays, the petek goes live, and reaching the named depth is the
-    // advance. Unlike a lane's `pos`, a hive level has no separate tween
-    // value to wait for: `setHiveLevel` (profile-card.js) writes
-    // `state.hiveLevel` the instant the drag is released, and what follows
-    // is only the plane's own CSS transition -- so reading
-    // `hivePageLevel()` back is enough, with no settling check needed.
-    function runLevelPull(b) {
-      const pc = global.IstProfileCard;
-      // No petek standing (a parts-bin page, or a mount that never
-      // landed): nothing to pull, so this beat has nothing to ask for.
-      if (!pc || !pc.hivePageLevel || pc.hivePageLevel() == null) { advance(); return; }
-
-      openPassthrough('#fb-petek');
-      // Nothing on the page is "lit" during a pull -- the thing being
-      // pointed at is the gesture, not an element.
-      clearSpotlight();
-      if (spotlightEl) spotlightEl.classList.add('show');
-      renderPane({ speech: b.speech, promptText: COPY.pullUp[lang] });
-
-      const tick = () => {
-        if (pc.hivePageLevel() === b.levelPull) { stopLaneWatch(); closePassthrough(); advance(); return; }
-        laneWatch = requestAnimationFrame(tick);
-      };
-      laneWatch = requestAnimationFrame(tick);
-
-      // Same escape hatch as every other beat that waits on a real
-      // gesture: the next beat still asserts the lane it needs, and the
-      // level a reader is standing at is never wrong, only possibly not
-      // where this beat wanted them yet.
-      stallTimer = setTimeout(() => {
-        stallTimer = null;
-        renderPane({ speech: b.speech, promptText: COPY.pullNudge[lang] });
-        addHint(COPY.pullNudge[lang], () => { stopLaneWatch(); closePassthrough(); advance(); });
-      }, STALL_MS);
-    }
 
     // ── The petek's door ──
     // The same shape as a pull beat, aimed at a PRESS instead: the logo is

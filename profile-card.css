@@ -1026,7 +1026,7 @@
    are excluded, or a ring past the reader's own would be forced briefly
    visible by these rules' specificity and snap back out when the
    classes come off. Names are excluded at the outermost depth, where
-   they are not drawn at all (see .ist-hive-level-2 above). */
+   they are not drawn at all. */
 /* The frame the hold lands in: no transition at all, so the petek is
    held back at once rather than fading out of view first (see
    armHiveReveal). Taken off again on the very next frame. */
@@ -1034,7 +1034,7 @@
 .ist-hive-page.ist-hive-reveal.ist-hive-reveal-arm .ist-hive-name { transition: none; }
 .ist-hive-page.ist-hive-reveal.ist-hive-reveal-0 .ist-hive-cell[data-ring="0"]:not(.ist-hive-away) { opacity: 1; }
 .ist-hive-page.ist-hive-reveal.ist-hive-reveal-1 .ist-hive-cell:not(.ist-hive-away) { opacity: 1; }
-.ist-hive-page.ist-hive-reveal.ist-hive-reveal-2:not(.ist-hive-level-2) .ist-hive-name { opacity: 1; }
+.ist-hive-page.ist-hive-reveal.ist-hive-reveal-2 .ist-hive-name { opacity: 1; }
 .ist-hive-pannable { cursor: grab; touch-action: none; }
 .ist-hive-pannable:active { cursor: grabbing; }
 /* The drawing itself. Hung off the middle of the window by the caller's
@@ -1417,40 +1417,22 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.955); }
 .ist-hive-cell { transition: opacity 320ms ease; }
 .ist-hive-away { opacity: 0; pointer-events: none; }
 .ist-hive-name, .ist-hive-plus { transition: opacity 260ms ease; }
-/* Names belong to the depths where a person is a person. At the
-   outermost one the whole shape is on the page and a name beside every
-   hexagon would be the only thing on it — there the drawing says it. */
-.ist-hive-level-2 .ist-hive-name { opacity: 0; }
-/* And the "+" belongs to the level where a seat can actually be handed
-   out. Below it the openings are drawing (the cells are disabled too,
-   see applyHiveLevel) — an empty place is left empty and says nothing. */
-.ist-hive-page:not(.ist-hive-level-2) .ist-hive-plus { opacity: 0; }
+/* The names and the "+" both belong to the one depth there is: a
+   neighbour is named, and a free side of your own hexagon is a seat you
+   can hand out (see the ONE DEPTH note in profile-card.js — the whole
+   shape, which hid the names and was the only depth that showed the
+   "+", is parked, and the seats came here with it). Nothing hides
+   either of them any more; the rules that did are gone.
 
-/* Ring-1 is "the people around the petek": leaving level 1 for level 0
-   they don't just fade like everything further out does — they slide
-   toward the side they are actually standing on, left or right of the
-   reader (data-side, set alongside data-ring in hiveGridHTML), and slide
-   back in from there returning to level 1. Combined with the opacity
-   fade above, never instead of it. Scoped to ring 1 only — .ist-hive-away
-   never lands on a ring-1 cell at any other level change (see
-   applyHiveLevel), and ghosts/deeper rings never carry data-side at all. */
+   Ring-1 is "the people around the petek": a cell that falls past the
+   ceiling doesn't just fade like everything further out does — it
+   slides toward the side it is actually standing on, left or right of
+   the reader (data-side, set alongside data-ring in hiveGridHTML).
+   Combined with the opacity fade above, never instead of it. Scoped to
+   ring 1 only — ghosts and deeper rings never carry data-side at all. */
 .ist-hive-cell[data-ring="1"] { transition: opacity 320ms ease, transform 320ms ease; }
 .ist-hive-cell[data-ring="1"][data-side="left"].ist-hive-away  { transform: translateX(calc(var(--ist-hive-cell-w) * -0.45)); }
 .ist-hive-cell[data-ring="1"][data-side="right"].ist-hive-away { transform: translateX(calc(var(--ist-hive-cell-w) * 0.45)); }
-
-/* Entering the outermost depth specifically staggers each cell's own
-   fade-in by its ring (--ring, set alongside data-ring in hiveGridHTML)
-   so the shape draws itself outward from the reader instead of arriving
-   all at once (see hiveWaveIn). Any other transition — 0<->1, or leaving
-   level 2 — keeps the plain fade every level change has always had;
-   this class is only ever on for the run of one transition. */
-.ist-hive-page.ist-hive-wave-in .ist-hive-cell {
-  /* Capped: the field reaches past the edges of the screen now, so an
-     uncapped stagger would still be drawing paper nobody is looking at
-     half a second after the shape itself had arrived. */
-  transition-delay: calc(var(--ring, 0) * 45ms); /* fallback: no min() on times */
-  transition-delay: min(calc(var(--ring, 0) * 45ms), 620ms);
-}
 
 /* ── The verdict, on the hexagon it belongs to ──
    Yes/no from the reader's own neighbours, for exactly the kept event
@@ -1515,235 +1497,9 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.955); }
   z-index: 5;
 }
 
-/* The avatar arrows standing on your own hexagon's coordinates (see
-   hiveAvatarPickerHTML). display:none away from level 0 rather than
-   faded, so the arrows are out of the tab order at the depths that don't
-   offer them — and so fitHive can tell they are not on the paper. */
-.ist-hive-picker {
-  position: absolute;
-  width: var(--ist-hive-cell-w);
-  /* The frame's own height, so `top: 50%` on the columns centres them on
-     the hexagon rather than on a box collapsed to its contents. */
-  height: var(--ist-hive-cell-h);
-  pointer-events: none;
-}
-.ist-hive-page:not(.ist-hive-level-0) .ist-hive-picker { display: none; }
-.ist-hive-pick-col {
-  pointer-events: auto;
-  gap: 6px;
-}
-/* Drawn small because the plane they stand on is scaled up at this level
-   (see HIVE_LEVEL_ZOOM): at the sheet's own 18px they would come out as
-   the biggest thing on the page and out-shout the hexagon they belong
-   to. */
-.ist-hive-pick-col .ist-pc-cover-pick-arrow { width: 12px; height: 12px; }
-.ist-hive-pick-col .ist-pc-cover-pick-arrow svg { width: 7px; height: 7px; }
-.ist-pc-cover-pick-prev.ist-hive-pick-col { margin-right: 7px; }
-.ist-pc-cover-pick-next.ist-hive-pick-col { margin-left: 7px; }
-
-/* ── Level 0: what is yours to change ──
-   Laid over the window rather than taking room from it, so the window
-   itself never changes size between depths; fitHive reserves the height
-   it measures here and centres the reader in what is left. Its `top` is
-   set live by fitHive, right under the fitted hexagon (and its avatar
-   arrows) — never `bottom: 0`, which stranded it at the foot of the whole
-   band instead of under the avatar it belongs to. */
-.ist-hive-self {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  z-index: 4;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding-bottom: 4px;
-  text-align: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 260ms ease;
-}
-.ist-hive-level-0 .ist-hive-self { opacity: 1; pointer-events: auto; }
-.ist-hive-self-meta,
-.ist-hive-self-since {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--muted);
-  line-height: 1.2;
-}
-/* ── Your three preferences, printed rather than opened ──
-   A label and its two options, and pressing an option IS the change: it
-   saves itself, the way the avatar arrows above already did. There is no
-   Kaydet on this page and nothing rises over it. */
-.ist-hive-prefs {
-  margin-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  width: 100%;
-  max-width: 280px;
-}
-.ist-hive-pref {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-.ist-hive-pref-label {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--muted);
-  white-space: nowrap;
-}
-/* One box split in two, not two buttons: which of the pair you are on is
-   the whole information, and a gap between them would say they are
-   separate choices. */
-.ist-hive-pref-seg {
-  display: flex;
-  border: 1px solid var(--hairline);
-}
-.ist-hive-pref-opt {
-  padding: 4px 9px;
-  border: none;
-  background: none;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  color: var(--muted);
-  white-space: nowrap;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background 180ms ease, color 180ms ease;
-}
-.ist-hive-pref-opt + .ist-hive-pref-opt { border-left: 1px solid var(--hairline); }
-.ist-hive-pref-opt:hover { color: var(--ink); }
-.ist-hive-pref-on { background: var(--ink); color: var(--paper); }
-.ist-hive-pref-on:hover { color: var(--paper); }
-/* ── Your account, on the depth that IS you ──
-   Sen already prints what is yours to change; this is the rest of it —
-   the code you hand somebody, the way out, and the way out for good.
-   Separated from the preferences by a rule rather than a heading: a
-   heading is a whole row of type, and every row here comes out of the
-   hexagon above it (fitHive reserves what this block measures). */
-.ist-hive-account {
-  margin-top: 9px;
-  padding-top: 8px;
-  border-top: 1px solid var(--hairline);
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  width: 100%;
-  max-width: 280px;
-}
-/* The code sits on the preferences' own row shape — label left, control
-   right — so it reads as one more line of the same list rather than as a
-   new kind of thing. */
-.ist-hive-code-val {
-  border: 1px solid var(--hairline);
-  background: none;
-  padding: 3px 9px;
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
-  font-size: 0.66rem;
-  font-weight: 600;
-  letter-spacing: 1.2px;
-  color: var(--ink);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background 180ms ease, color 180ms ease;
-}
-.ist-hive-code-val:hover { background: var(--ink); color: var(--paper); }
-/* The two ways out, on one line. Çıkış Yap is ordinary and Hesabımı Sil
-   is not, so only one of them is ever inked — but both stay plain text
-   on paper, because a filled button here would be the loudest thing on
-   a depth whose whole subject is the reader's own hexagon. */
-.ist-hive-acts {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-.ist-hive-act {
-  border: none;
-  background: none;
-  padding: 2px 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--muted);
-  white-space: nowrap;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: color 180ms ease;
-}
-.ist-hive-act:hover { color: var(--ink); }
-/* --ink-red, not --accent: --accent is a dark brown/grey, so the
-   destructive action came out as the HEAVIEST thing in the block, which
-   says "press me" rather than "careful". Red is the same weight as its
-   neighbour and reads as a warning instead of as a primary. It cannot be
-   confused with the petek's other red either — a red ring means "this is
-   the member named on the bar", and that only ever happens at the
-   outermost depth, where this block is not drawn at all. */
-.ist-hive-act-danger { color: var(--ink-red); }
-.ist-hive-act-danger:hover { color: var(--ink-red); text-decoration: underline; }
-.ist-hive-act:disabled { opacity: 0.5; cursor: default; }
-
-/* Only ever carries what went wrong; empty the rest of the time. */
-.ist-hive-self-msg {
-  margin-top: 4px;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-  font-size: 0.62rem;
-  color: var(--accent);
-}
-.ist-hive-self-msg:empty { display: none; }
-
-/* ── The rail ──
-   Three marks down the outer edge: how many depths there are, and which
-   one you are standing at. The swipe is the gesture — this is how anyone
-   finds out there is one, and it takes a press too, because a control
-   that only announces is a decoration. */
-.ist-hive-rail {
-  position: absolute;
-  right: 2px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 6px 4px;
-}
-.ist-hive-rail-dot {
-  width: 7px;
-  height: 7px;
-  padding: 0;
-  border: 1px solid var(--muted);
-  border-radius: 50%;
-  background: none;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background 220ms ease, border-color 220ms ease, transform 220ms ease;
-}
-.ist-hive-rail-dot:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
-.ist-hive-rail-on {
-  border-color: var(--ink);
-  background: var(--ink);
-  transform: scale(1.25);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .ist-hive-plane, .ist-hive-cell, .ist-hive-name,
-  .ist-hive-plus, .ist-hive-self, .ist-hive-rail-dot { transition: none; }
-  .ist-hive-page.ist-hive-wave-in .ist-hive-cell { transition-delay: 0s; }
+  .ist-hive-plus { transition: none; }
   /* .ist-hive-reveal sets its own transition (not just a delay, see
      above), so it needs its own override here rather than inheriting
      the plain .ist-hive-cell reset two lines up -- same specificity,
@@ -1959,30 +1715,6 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.955); }
        page than the one on #main-site above it and quietly win. Nothing
        set, nothing reserved (fitHive's own fallback is 0). */
   }
-  /* ── The outermost depth runs off the screen ──
-     Every other depth is drawn *into* the window the page has (see
-     fitHive): the reader's six neighbours fit it, and clipping what
-     doesn't is right. The outermost depth is the whole shape and the
-     field around it, which by definition does not fit — and a honeycomb
-     that stops in mid-air with bare paper past it reads as the end of
-     the world rather than as the middle of one. So at that depth alone
-     the clip is lifted and the drawing runs to all four edges of the
-     screen, under the events column and past the tab bar. Nothing about
-     the fit changes: the window is still exactly what it was, so the
-     drawing is scaled the same and the reader stays dead centre of it.
-     #main-site's own overflow is what stops it at the screen's edge. */
-  html.ist-hive-all .ist-hive { overflow: visible; }
-  /* Level 0's block and the rail on a phone: the same objects, sized for
-     the band the petek is drawn in. */
-  .ist-hive-self-meta, .ist-hive-self-since { font-size: 0.64rem; }
-  .ist-hive-prefs { margin-top: 7px; gap: 4px; }
-  .ist-hive-pref-opt { padding: 3px 7px; font-size: 0.58rem; }
-  /* Every pixel this block takes is one fitHive takes off the hexagon,
-     so on the band a phone draws the petek in it is tighter still. */
-  .ist-hive-account { margin-top: 6px; padding-top: 6px; gap: 5px; }
-  .ist-hive-code-val { padding: 2px 7px; font-size: 0.6rem; letter-spacing: 1px; }
-  .ist-hive-act { font-size: 0.56rem; }
-  .ist-hive-rail { right: 0; gap: 8px; }
   .ist-pc-weekgrid { margin-bottom: 0; }
   .ist-pc-daycell { max-width: 16px; }
   .ist-pc-weekgrid-row { margin-bottom: 1px; gap: 3px; }
