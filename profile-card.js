@@ -2318,8 +2318,9 @@
   const HIVE_REVEAL_BEAT = 150;   // you -> the ring touching you
   const HIVE_REVEAL_BEAT_2 = 300; // the ring -> their names
   const HIVE_REVEAL_HOLD = 1600;  // an armed reveal nobody played is played anyway
+  const HIVE_WALK_HOLD = 6000;    // the same, for a hold a lane walk owns (holdHivePage)
 
-  function armHiveReveal(state, page) {
+  function armHiveReveal(state, page, holdMs) {
     if (!page || page.classList.contains('ist-hive-reveal')) return;
     // ── The hold is SNAPPED, never transitioned into ──
     // The cells are standing at full strength when a reveal is armed, so
@@ -2340,8 +2341,50 @@
     clearTimeout(state.hiveRevealHoldTimer);
     // A reveal that was armed and never played would hold the petek
     // hidden for good -- an interrupted walk must not cost the reader
-    // the drawing.
-    state.hiveRevealHoldTimer = setTimeout(() => playHiveReveal(), HIVE_REVEAL_HOLD);
+    // the drawing. A caller that holds it for the length of a walk
+    // (holdHivePage) owns the release and passes a much longer fallback:
+    // the usual one running out under a slow drag would play the reveal
+    // half way through the fade-in, and the landing's own reveal would
+    // then play it a second time.
+    state.hiveRevealHoldTimer = setTimeout(() => playHiveReveal(), holdMs || HIVE_REVEAL_HOLD);
+  }
+
+  function clearHiveReveal(state, page) {
+    clearTimeout(state.hiveRevealHoldTimer);
+    clearTimeout(state.hiveRevealTimer);
+    (state.hiveRevealTimers || []).forEach(clearTimeout);
+    state.hiveRevealTimers = [];
+    page.classList.remove('ist-hive-reveal', 'ist-hive-reveal-arm',
+                          'ist-hive-reveal-0', 'ist-hive-reveal-1',
+                          'ist-hive-reveal-2');
+  }
+
+  // ── Held for the length of a walk onto the petek ──
+  // Proje's middle lane fades the petek in as the reader walks onto it
+  // and remounts it on landing, and the remount plays the reveal. Without
+  // a hold the cells stood at full strength for the whole fade-in (they
+  // were left that way by the last reveal) and were then snapped out and
+  // revealed again: the grid showed itself, vanished to the reader's own
+  // hexagon, and came back -- the entrance played twice. So the walk
+  // holds the drawing back the moment the lane starts to appear, and the
+  // landing's reveal is the only one. Whatever was left of a previous
+  // reveal is cleared first, since a walk back inside its tail would
+  // otherwise find the class on and hold nothing.
+  function holdHivePage() {
+    const page = document.getElementById('po-hive-page');
+    if (!page || !_hive) return;
+    if (page.classList.contains('ist-hive-waiting')) return;
+    clearHiveReveal(_hive, page);
+    armHiveReveal(_hive, page, HIVE_WALK_HOLD);
+  }
+
+  // The walk was abandoned before it landed: put the drawing back. Only
+  // ever called with the lane out of sight, so nothing is seen to snap.
+  function releaseHivePage() {
+    const page = document.getElementById('po-hive-page');
+    if (!page || !_hive) return;
+    if (_hive.hiveRevealPlayed) return;
+    clearHiveReveal(_hive, page);
   }
 
   function playHiveReveal() {
@@ -3890,6 +3933,8 @@
     unmountHivePage,
     revealHivePage,
     playHiveReveal,
+    holdHivePage,
+    releaseHivePage,
     paintHiveEventMarks,
     clearHiveEventMarks,
     initMemberSheet,
