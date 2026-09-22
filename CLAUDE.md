@@ -831,9 +831,12 @@ sb.from('articles').delete().eq('id', id)
     baskı; its slot is its own category (İstanbul / Türkiye / Dünya). A district story
     (`neighborhood` set, no `category`) is İstanbul for that purpose.
   - **AKIŞ** (`breaking_news_series`) — a label laid over separate habers so a developing thing
-    stays traceable through its earlier posts. It changes nothing for the reader yet beyond a
-    story's own Zaman Akışı (`fetchSeriesSiblings`); what it is FOR is that the connection gets
-    recorded at the moment it is spotted rather than re-derived from memory a month later. It
+    stays traceable through its earlier posts, and **the one thing on the site a reader can
+    subscribe to or refuse** (`news_series_verdict`, `db/breaking_news_v4_akis.sql`). It used to
+    change nothing for the reader beyond a story's own Zaman Akışı (`fetchSeriesSiblings`);
+    now a story that belongs to one is thrown **AKIŞTA KAL** (right) or **YETER** (left), and a
+    left throw takes every later haber in that seri out of that reader's column for good. That
+    is why writing the seri well matters: it is the unit a reader opts out of. It
     used to be folded under **Gelişmiş** at the bottom of the Haber form, which is where a thing
     goes to be forgotten; it is its own section now.
   - **OLAY** (`world_events`) — the thing all of them are about, running for years. Several akış
@@ -2506,12 +2509,58 @@ Four things about it:
   reader answer something in order to be rid of a paragraph. **The multiple choice is the Anket's
   alone** — that is the one object on the site whose direction IS an answer, and an evening's RSVP
   on the other lane is the same gesture with different words.
+  - **AN AKIŞ IS NOT A QUESTION, WHICH IS WHY IT SURVIVES THIS RULE** (`newsFootHTML(inSeries)`).
+    A story that belongs to a `breaking_news_series` carries two words — **AKIŞTA KAL** and
+    **YETER** — and they are not an opinion about the story. They are about the **app**: YETER is
+    not a view on Gazze, it is the reader telling İstanbulite to stop handing them this one
+    running thing. The banned object was a story asking a question *about itself* in order to be
+    got rid of; this is the reader answering a question about what they will go on being sent,
+    which is the one question a feed owes its reader. A preference you cannot express is what
+    makes an app feel like it is happening TO you.
+  - **A story with NO seri carries nothing, and that is load-bearing rather than tidy.** AKIŞTA
+    KAL on a one-off haber would promise a channel that does not exist, so a story outside a seri
+    throws both ways as "done", unlabelled and unstamped, exactly as every story did before. The
+    stamp appearing at all is therefore itself the signal that there is something to stay in.
+  - **The right throw writes, but it delivers nothing — and it must not.** Following is the
+    default, so the only verdict that changes what a reader is shown is the left one. There is
+    deliberately no mechanism by which a followed story reaches somebody the admin did not put on
+    the paper: "writing is not publishing" is untouched. What the right throw buys is the record,
+    which a later haber in the same seri then WEARS on its kicker (`news.akis.in`) — without that
+    the gesture would be indistinguishable from doing nothing.
   - `breaking_news_polls` is therefore **parked, not deleted**: the table, its rows and its admin
     editor are untouched behind one `hidden`, the way Makaleler and the neighbourhood comments
     are, because where a per-story poll belongs (if anywhere) is still open. What was removed is
     the *reading* of one. The admin's own gate dropped with it — a story needs a hook to run in an
     edition, and nothing else — and the press bar's "İkinci haber" forme went with the column it
     was about.
+- **THE EDITIONS ACCRETE, AND THE WINDOW IS THREE DAYS WIDE** (`haberlerRows`, `NEWS_WINDOW_DAYS`,
+  `db/breaking_news_v4_akis.sql`). A new baskı does **not** replace the one before it: the akşam
+  gazetesi stacks on top of the sabah postası, and yesterday's stories are still standing under
+  both of them if the reader never threw them away. Exactly two things take a story out of the
+  column — the reader throwing it, or it ageing past the third day — and nothing in between.
+  - **The three age labels and the window are ONE fact.** `bugün` (in hours) / `dün` /
+    `evvelsi gün` is the whole of what a story's age can say, because anything older is not in the
+    column at all (`newsDayLabel`). The day bucket comes off `edition_date` and the hours off the
+    row's own clock; a story dated today whose `updated_at` has run past a day falls back to
+    saying `bugün` rather than printing a number that contradicts its own label.
+  - **`news_current_edition` is no longer what the reader asks**, and is deliberately left in
+    place for the admin. There is no "holdover" any more — the concept it existed to express (the
+    newest edition at or before today, held indefinitely) is gone, because a story now ages out on
+    its own. The press bar's Haberler forme was rewritten to ask the window's question instead,
+    per the forme rule: a bucket is empty only if nothing stood in it across all three days, and
+    the old holdover `warn` became "Bu sayıya haber konmadı".
+  - **THE DAY HAS TWO PAPERS, AND THE EDITION KEY ALREADY KNEW IT** (`edition_half`). `edition_date`
+    was a bare date, so everything curated for the evening was already standing in the reader's
+    column at breakfast. The half uses `ist-date.js`'s **own** two words (`'gun'` / `'gece'`, from
+    `editionKey()`) rather than a third vocabulary for one sun — which also means a night is named
+    for the day it BEGAN on here too. Before sunset only today's `gun` half has gone out; after it,
+    both halves of today have, so the reader's fetch adds nothing beyond its date ceiling. A row
+    written before the migration reads as `'gun'`, which is where it already stood.
+  - **The half is the NEWS's alone.** Etkinlik and Anket are still keyed by date (`db/baski_v1.sql`
+    is unchanged) and a game is a switch on the night it is played, so the admin board threads it
+    through as an argument rather than reading a global inside each kind. On the desk it is a pair
+    of buttons under the date — two papers, both readable from across the room, which a collapsed
+    select is not — and switching one reloads the whole board, because it is a different paper.
 - **The cast is never rebuilt for an edition.** An actor keeps its slot, its column, its poses and
   its lag; only its `load` branches (`loadKutuphaneWide` / `loadKutuphaneNarrow` / `loadKahveNarrow`).
   A column that rebuilt itself would land its cards a few pixels off the ones beside it and the walk

@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=7"></script>
   <script src="router.js?v=15"></script>
-  <script src="i18n.js?v=21"></script>
+  <script src="i18n.js?v=22"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=3"></script>
   <link rel="stylesheet" href="palette.css?v=10">
@@ -2718,45 +2718,184 @@ function newsBucket(n) {
   if (c === 'turkiye') return 'turkiye';
   return 'istanbul';
 }
-let haberlerPromise = null;
-// One fetch, shared by the three boxes AND by the day meter -- the meter
-// must never be able to count a different set of stories than the column
-// is printing. `byBucket[b]` is now a STACK (admin's own edition_order),
-// not a single row -- some days one category carries seven stories and
-// another carries one, and the slot is the same either way.
-function haberlerData() {
-  if (!haberlerPromise) {
-    haberlerPromise = (async () => {
+// ── THE EDITIONS ACCRETE, AND THE WINDOW IS THREE DAYS WIDE ──
+// A new edition does not REPLACE the one before it: the akşam gazetesi
+// stacks on top of the sabah postası, and yesterday's stories are still
+// standing under both of them if the reader never threw them away. What
+// takes a story out of the column is one of exactly two things -- the
+// reader throwing it, or it ageing past the third day. Nothing else, and
+// no timer in between.
+//
+// Which is why the three age labels and this window are ONE fact stated
+// once: bugün / dün / evvelsi gün is the whole of what a story's age can
+// say, because a story that could say anything older is not in the
+// column at all (see newsDayLabel).
+const NEWS_WINDOW_DAYS = 3;
+
+// Day arithmetic on an edition key, in UTC, never through a formatted
+// string (CLAUDE.md rule 10). The input is always an ISO day IstDate
+// itself produced, so this is arithmetic on a key rather than a parse of
+// somebody's locale.
+function editionDayShift(isoDay, days) {
+  const d = new Date(isoDay + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+// The akışlar this reader has said YETER to. Cached on its own, apart
+// from the stories themselves, so a throw can drop it and have the
+// column re-filter on the spot without going back for the news.
+//
+// A database that has never run db/breaking_news_v4_akis.sql answers an
+// error here and gets an empty set -- which is exactly the behaviour the
+// column had before akış existed. No data, no gate.
+let mutedPromise = null;
+function mutedSeries() {
+  if (!mutedPromise) {
+    mutedPromise = (async () => {
+      const uid = await doneUid();
+      if (!uid) return new Set();
       try {
-        // "Today's edition" is the newest one that has actually gone out
-        // (news_current_edition, SECURITY DEFINER) -- never a future one
-        // the admin is still assembling, and never rolled by a timer: it
-        // holds until the admin sets a newer edition_date, whenever that
-        // is. IstDate.iso() (never a parsed locale string, CLAUDE.md rule 10).
-        const today = IstDate.iso();
-        const { data: editionDate, error: edErr } = await IstRouter.sb
-          .rpc('news_current_edition', { p_today: today });
-        if (edErr) throw edErr;
-        if (!editionDate) return { byBucket: {}, editionDate: null, failed: false };
-        const { data, error } = await IstRouter.sb.from('breaking_news')
-          .select('id, title, body, title_en, body_en, hook_tr, hook_en, hook_author, category, neighborhood, series_id, updated_at, edition_order')
-          .eq('edition_date', editionDate)
-          .is('archived_at', null)
-          .order('edition_order', { ascending: true });
+        const { data, error } = await IstRouter.sb.from('news_series_verdict')
+          .select('series_id').eq('user_id', uid).eq('follow', false);
         if (error) throw error;
-        const byBucket = {};
-        for (const n of (data || [])) {
-          const b = newsBucket(n);
-          (byBucket[b] || (byBucket[b] = [])).push(n);
-        }
-        return { byBucket, editionDate, failed: false };
+        return new Set((data || []).map(r => r.series_id));
       } catch (err) {
-        console.error('[proje haberler]', err);
-        return { byBucket: {}, editionDate: null, failed: true };
+        console.error('[proje akış]', err);
+        return new Set();
       }
     })();
   }
-  return haberlerPromise;
+  return mutedPromise;
+}
+
+// The akışlar this reader has said AKIŞTA KAL to. Nothing is filtered on
+// it -- following is the default, so it changes no story's visibility.
+// It is read purely so a later haber in the seri can WEAR the fact
+// (news.akis.in), which is what makes the right throw visible at all
+// rather than a gesture that appears to do nothing.
+let followedPromise = null;
+function followedSeries() {
+  if (!followedPromise) {
+    followedPromise = (async () => {
+      const uid = await doneUid();
+      if (!uid) return new Set();
+      try {
+        const { data, error } = await IstRouter.sb.from('news_series_verdict')
+          .select('series_id').eq('user_id', uid).eq('follow', true);
+        if (error) throw error;
+        return new Set((data || []).map(r => r.series_id));
+      } catch (err) { return new Set(); }
+    })();
+  }
+  return followedPromise;
+}
+
+const NEWS_COLS = 'id, title, body, title_en, body_en, hook_tr, hook_en, ' +
+  'hook_author, category, neighborhood, series_id, updated_at, ' +
+  'edition_date, edition_half, edition_order';
+
+// The network half, cached for the life of the mount. Kept apart from
+// haberlerData() below so that recording a verdict re-filters the column
+// without re-fetching it -- a throw must not cost a round trip.
+let haberlerFetch = null;
+function haberlerRows() {
+  if (!haberlerFetch) {
+    haberlerFetch = (async () => {
+      // The edition key, not the calendar date: a night is named for the
+      // day it BEGAN on, so a reader holding the akşam gazetesi at 01:00
+      // is still holding TODAY's paper and must not be told it is "dün".
+      const key = IstDate.editionKey();
+      const today = key.date;
+      const floor = editionDayShift(today, -(NEWS_WINDOW_DAYS - 1));
+
+      const build = (withHalf) => {
+        let q = IstRouter.sb.from('breaking_news')
+          .select(withHalf ? NEWS_COLS : NEWS_COLS.replace(', edition_half', ''))
+          .gte('edition_date', floor)
+          .lte('edition_date', today)
+          .is('archived_at', null);
+        // The akşam gazetesi must not leak into the morning. Before
+        // sunset only today's SABAH half has gone out; after it, both
+        // halves of today have, so the plain date ceiling above is
+        // already the whole rule and nothing more is added.
+        if (withHalf && key.edition === 'gun') {
+          q = q.or('edition_date.lt.' + today + ',edition_half.eq.gun');
+        }
+        return q;
+      };
+
+      let { data, error } = await build(true);
+      // 42703 = undefined_column: this database predates
+      // db/breaking_news_v4_akis.sql. Pages redeploys on push while the
+      // SQL is run by hand, so there is always a window in which the new
+      // code is live against the old schema -- and a news column emptied
+      // by a missing column is a failure no reader can make sense of.
+      // Falling back means one edition a day, exactly as before.
+      if (error && error.code === '42703') {
+        ({ data, error } = await build(false));
+      }
+      if (error) throw error;
+      return { rows: data || [], today };
+    })();
+  }
+  return haberlerFetch;
+}
+
+// One derivation, shared by the three boxes AND by the day meter -- the
+// meter must never be able to count a different set of stories than the
+// column is printing. `byBucket[b]` is a STACK (newest edition first,
+// then the admin's own edition_order), not a single row -- some days one
+// category carries seven stories and another carries one, and the slot is
+// the same either way.
+async function haberlerData() {
+  try {
+    const [{ rows, today }, muted] = await Promise.all([haberlerRows(), mutedSeries()]);
+    // A muted akış is gone in BOTH directions -- the story that was
+    // thrown left and every later one in the same seri. Filtering the
+    // whole seri and filtering "everything after" are the same set here,
+    // since the one that was thrown is already dealt with anyway.
+    const live = rows.filter(n => !(n.series_id && muted.has(n.series_id)));
+    // Newest paper on top: the day descending, then the evening half
+    // above the morning one of that same day, then the admin's own order
+    // within a half. The half cannot be sorted alphabetically -- 'gece'
+    // sorts BEFORE 'gun', which is the wrong way round -- so it is
+    // ranked explicitly.
+    const halfRank = (n) => (n.edition_half === 'gece' ? 1 : 0);
+    live.sort((a, b) =>
+      (a.edition_date < b.edition_date ? 1 : a.edition_date > b.edition_date ? -1 : 0) ||
+      (halfRank(b) - halfRank(a)) ||
+      ((a.edition_order || 0) - (b.edition_order || 0)));
+    const byBucket = {};
+    for (const n of live) {
+      const b = newsBucket(n);
+      (byBucket[b] || (byBucket[b] = [])).push(n);
+    }
+    return { byBucket, today, failed: false };
+  } catch (err) {
+    console.error('[proje haberler]', err);
+    return { byBucket: {}, today: null, failed: true };
+  }
+}
+
+// A story's age, and the window is cut to exactly the three things it can
+// say. Today's paper is the only one that counts in hours -- below it the
+// day IS the answer, and a reader does not need "37 saat önce" when the
+// word "dün" is both shorter and what they would have said themselves.
+function newsDayLabel(n, today) {
+  const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
+  if (!n.edition_date || !today) return newsAge(n.updated_at);
+  if (n.edition_date === editionDayShift(today, -1)) return t('news.age.yesterday');
+  if (n.edition_date !== today) return t('news.age.dayback');
+  // Today's own paper, in hours off the story's own clock. An hours
+  // figure that has run past a day means the row was edited into today's
+  // edition long after it was written -- the DAY is still true, so it
+  // falls back to saying that rather than printing a number that
+  // contradicts the label above it.
+  const mins = Math.max(0, Math.round((Date.now() - new Date(n.updated_at).getTime()) / 60000));
+  if (mins < 60) return mins + ' ' + t('news.age.min');
+  const hrs = Math.round(mins / 60);
+  return hrs < 24 ? hrs + ' ' + t('news.age.hour') : t('news.age.today');
 }
 
 // A vote just answered is what lets the next story in the stack stand up
@@ -2777,7 +2916,7 @@ function refreshHaberlerColumn() {
 // column is the Anket now, in both editions (see loadKutuphaneNarrow),
 // so there is one depth and no second reading of a bucket.
 async function loadHaberlerActor(el, slot) {
-  const { byBucket, editionDate, failed } = await haberlerData();
+  const { byBucket, today, failed } = await haberlerData();
   if (!el.isConnected) return;
   // Cleared before every render, filled only on the path that actually
   // has something to open: a box with no payload is not pressable, which
@@ -2813,14 +2952,28 @@ async function loadHaberlerActor(el, slot) {
   const undealt = arr.filter(n => !newsIsDealt(store, n));
   const n = undealt[0] || arr[arr.length - 1];
   const stackTag = arr.length > 1 ? ' · ' + (arr.indexOf(n) + 1) + '/' + arr.length : '';
-  const byline = n.hook_author ? '— ' + n.hook_author : '';
+  const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
+  // The age stands on the card's own meta line beside the byline, because
+  // the window is three days wide now: which of the three days a story
+  // belongs to is the first thing a reader needs off a closed card, and
+  // it used to be visible only once the page was open.
+  const age = newsDayLabel(n, today);
+  const byline = [n.hook_author ? '— ' + n.hook_author : '', age].filter(Boolean).join(' · ');
+  // A seri the reader has already said AKIŞTA KAL to wears it on the
+  // kicker. Without this the right throw is a gesture with no visible
+  // consequence anywhere in the app -- the whole of what it does is make
+  // sure later habers keep arriving, which looks exactly like doing
+  // nothing until one of them arrives wearing this.
+  const followed = n.series_id ? (await followedSeries()).has(n.series_id) : false;
+  if (!el.isConnected) return;
+  const akisTag = followed ? ' · ' + t('news.akis.in') : '';
   el.classList.remove('fb-empty');
   // The front of the card is the HOOK, not the headline -- a teaser the
   // admin (for now; see db/breaking_news_v3_edition.sql) writes on its
   // own, with its own byline. The real headline and body are the reveal,
   // printed only once the page is opened. Falling back to the real title
   // is "no data, no gate": an older row never given a hook still opens.
-  el.innerHTML = '<div class="k">' + label + stackTag + '</div>' +
+  el.innerHTML = '<div class="k">' + label + stackTag + akisTag + '</div>' +
     (byline ? '<div class="m">' + esc(byline) + '</div>' : '') +
     '<div class="t">' + esc(hookText(n) || newsText(n, 'title')) + '</div>';
   fbSetDone(el, newsIsDealt(store, n));
@@ -2836,16 +2989,27 @@ async function loadHaberlerActor(el, slot) {
   }
   if (!el.isConnected) return;
   fbSetPage(el, {
-    kicker: label, meta: newsAge(n.updated_at),
+    kicker: label + akisTag, meta: age,
     title: newsText(n, 'title'),
     html: fbParas(newsText(n, 'body')) + (siblings.length ? seriesTimelineHTML(siblings) : '') +
-      newsFootHTML(),
-    // Either direction means the same thing: done with it. A story is
-    // not a question (see newsFootHTML), so neither side carries a
-    // label and nothing is stamped on the paper as it goes.
+      newsFootHTML(!!n.series_id),
+    // A story with no seri is thrown away either direction and that is
+    // the whole of it -- no labels, nothing stamped (see newsFootHTML).
+    // A story that IS part of an akış carries two words, and they are
+    // not a question about the story: they are the reader saying whether
+    // the app may go on handing them this one thing. See the AKIŞ note
+    // above newsFootHTML for why that survives "a haber is not multiple
+    // choice".
     wire: (inner) => {
-      const deal = () => { newsMarkDealt(n).then(refreshHaberlerColumn); };
-      wirePageThrow(inner, { right: { run: deal }, left: { run: deal } });
+      const deal = (follow) => () => {
+        newsMarkDealt(n)
+          .then(() => n.series_id != null ? setSeriesVerdict(n.series_id, follow) : null)
+          .then(refreshHaberlerColumn);
+      };
+      wirePageThrow(inner, n.series_id
+        ? { right: { label: t('news.akis.stay'),   run: deal(true) },
+            left:  { label: t('news.akis.enough'), run: deal(false) } }
+        : { right: { run: deal(null) }, left: { run: deal(null) } });
     },
     // A story leaves the deck by being SWIPED, not by being opened --
     // the rule Kütüphane's own news deck always followed. Opening one
@@ -4301,17 +4465,65 @@ function throwFootHTML(leftLabel, rightLabel, note) {
     (note ? '<div class="fb-throw-note">' + esc(note) + '</div>' : '');
 }
 
-// ── A HABER IS NOT MULTIPLE CHOICE ──
+// ── A HABER IS NOT MULTIPLE CHOICE -- AND AN AKIŞ IS NOT A QUESTION ──
 // A story is read and then thrown away, either direction, and that is
 // the whole of what the gesture means. Asking a question with two
 // answers is what ANKET is for (Kütüphane's narrow column) -- a story
 // that also asked one made the two objects indistinguishable, and made
-// the reader answer something in order to get rid of a paragraph.
-// So: no buttons, no stamp, one line saying the gesture exists. A mouse
-// drags the page itself (wirePageThrow is on pointer events), which is
-// the same desktop path every other throw on the site has.
-function newsFootHTML() {
-  return throwFootHTML(null, null, 'Okudun. Sola ya da sağa at.');
+// the reader answer something in order to get rid of a paragraph. That
+// rule is unchanged and `breaking_news_polls` stays parked.
+//
+// What a story in a SERI carries is a different object, and the
+// distinction is the whole of why it is allowed: the two words are not
+// about the story, they are about the APP. YETER is not an opinion on
+// Gazze, it is a reader telling İstanbulite to stop handing them this
+// one running thing -- and a preference you cannot express is the kind
+// of thing that makes an app feel like it is happening TO you. It is
+// also the first time breaking_news_series does anything for a reader
+// (see db/breaking_news_v4_akis.sql).
+//
+// A story with NO seri carries nothing, and that is load-bearing rather
+// than tidy: AKIŞTA KAL on a one-off haber would promise a channel that
+// does not exist. No akış, no words, exactly as before.
+//
+// A mouse drags the page itself (wirePageThrow is on pointer events),
+// which is the same desktop path every other throw on the site has; the
+// two buttons throwFootHTML prints beside it are the floor for a reader
+// with no finger.
+function newsFootHTML(inSeries) {
+  const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
+  return inSeries
+    ? throwFootHTML(t('news.akis.enough'), t('news.akis.stay'), t('news.akis.note'))
+    : throwFootHTML(null, null, 'Okudun. Sola ya da sağa at.');
+}
+
+// The reader's verdict on one akış. Upserted rather than inserted: this
+// is a standing preference, not a record of what somebody thought at the
+// moment they were asked (see the migration's own note on why it
+// diverges from question_answers there).
+//
+// Both caches are dropped rather than patched, so the next render asks
+// the database what it actually holds -- the same rule admin.html's
+// baskı board follows. Only the VERDICT caches go; haberlerRows() is
+// left alone precisely so a throw never costs a round trip for the news
+// itself.
+async function setSeriesVerdict(seriesId, follow) {
+  if (!seriesId || follow == null) return;
+  const uid = await doneUid();
+  if (!uid) return;
+  try {
+    const { error } = await IstRouter.sb.from('news_series_verdict').upsert(
+      { user_id: uid, series_id: seriesId, follow: follow },
+      { onConflict: 'user_id,series_id' });
+    if (error) throw error;
+  } catch (err) {
+    // A database without the migration simply keeps handing the reader
+    // every haber, which is what it did before akış existed.
+    console.error('[proje akış verdict]', err);
+    return;
+  }
+  mutedPromise = null;
+  followedPromise = null;
 }
 
 function wireFbPage() {
@@ -6109,7 +6321,7 @@ function wireLangRelabel() {
 // them would print the old language from a fresh render.
 function refreshAllColumns() {
   etkinlikPromise = null;
-  haberlerPromise = null;
+  haberlerFetch = null;
   dunyaPromise = null;
   anketPromise = null;
   gamesStatePromise = null;
