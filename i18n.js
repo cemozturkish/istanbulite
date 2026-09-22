@@ -107,6 +107,11 @@
     'sky.night':           { default: 'Ay gökyüzünde ilerliyor.',    more_english: 'The moon is crossing the sky.' },
     'profile.tab.ayarlar': { default: 'Ayarlar',             more_english: 'Settings' },
     'profile.email':        { default: 'E-posta',             more_english: 'Email' },
+    // The sheet prints this row whenever a phone is on the profile. It
+    // had no key while the account block was only ever on a parts-bin
+    // page -- `t('profile.phone') || 'Telefon'` never reached its own
+    // fallback, since t() hands back the key itself rather than nothing.
+    'profile.phone':        { default: 'Telefon',             more_english: 'Phone' },
     'profile.thisweek':     { default: 'Bu Hafta',             more_english: 'This Week' },
     // The petek — the shared grid opened from Anahane's map: your own
     // hexagon, its free sides, and everybody standing around you (see

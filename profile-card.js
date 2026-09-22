@@ -1767,6 +1767,60 @@
   // *inside* the frame (the seat's code, your own code field), so no
   // neighbour ever moves.
 
+  // ── The three account actions, one implementation ──
+  // They were printed in two places while the petek had a Sen depth of
+  // its own; that depth is the profile sheet now (see the ONE DEPTH
+  // note), so the sheet's account block is the one surface that carries
+  // them — and it is the surface a member actually reaches, since
+  // `project` is the app and pressing your own name on the bar is what
+  // opens it.
+  //
+  // They stay three functions of their own rather than being typed out
+  // inside the block that prints the buttons. Deleting the petek's copy
+  // of Sen took these with it, and the sheet — the surviving caller —
+  // threw on every open with nothing but a dead press to show for it.
+  // Each takes the elements it acts on rather than looking them up, which
+  // is what let the two surfaces carry different ids while they existed
+  // and is what will let a second one exist again without a rename.
+  function wireCopyCode(btn, state) {
+    if (!btn) return;
+    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
+    btn.addEventListener('click', () => {
+      navigator.clipboard?.writeText(state.profile?.referral_code || '');
+      const orig = btn.textContent;
+      btn.textContent = t('profile.copied');
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    });
+  }
+
+  async function doSignOut(sb) {
+    await sb.auth.signOut();
+    window.location.href = 'index.html';
+  }
+
+  // Deleting the auth.users row — and, by cascade, profiles and
+  // everything FK'd to it — runs entirely inside Postgres via the
+  // public.delete_own_account() SECURITY DEFINER function (see
+  // db/delete_own_account.sql): it executes with the function owner's
+  // privileges, so no service role key ever needs to reach client code or
+  // a separately-deployed Edge Function.
+  async function doDeleteAccount(state, btn, msgEl) {
+    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
+    if (!confirm(t('profile.deleteaccount.confirm'))) return;
+    btn.disabled = true;
+    const orig = btn.textContent;
+    btn.textContent = t('profile.deleteaccount.deleting');
+    const { error } = await state.sb.rpc('delete_own_account');
+    if (error) {
+      btn.disabled = false;
+      btn.textContent = orig;
+      if (msgEl) msgEl.textContent = t('profile.deleteaccount.error');
+      return;
+    }
+    await state.sb.auth.signOut();
+    window.location.href = 'index.html';
+  }
+
   // ── The name beside a hexagon ──
   // A member is named in the paper *outside* their own frame, on
   // whichever side of the reader they are standing: everyone to the left
