@@ -607,10 +607,9 @@ sb.from('articles').delete().eq('id', id)
   pruning against it wiped every verdict the member had
 - On a phone the petek stands in the hero square the map used to hold and the events hang from the
   bottom of the band below it, so the hero line is exactly where it is on the other two pages
-- **The petek has three depths and the reader pulls up and down through them** — you alone at the
-  innermost, the six places touching you in the middle, the whole shape at the outermost, where the
-  seats can actually be handed out. One drawing zoomed, not three pages; see the petek's own section
-  under Site-wide defaults
+- **The petek has ONE depth** — you and the six places touching you, with the seats live on it.
+  The three it used to have are gone: Sen is the profile sheet now (pressing your own name on the
+  top bar) and the whole shape is parked. See the petek's own section under Site-wide defaults
 - The personal layer lives here: the user's own profile, avatar, home identity. Opening your
   profile card on this page shows the cover alone — the petek is the page, not a block inside your
   account, and what is yours to change is printed on the petek's innermost depth
@@ -3414,21 +3413,18 @@ Six things about it:
   mirrored one. The other columns are feeds whose headline is the thing itself and reads from the
   top; this one is a fixed set of three read by their names, and a name standing on the floor of
   its box is on the same line in all three however long the line above it runs.
-- **The petek's own vertical axis is its three depths, and there is nothing new above or below
-  it.** Up/out is level 2 (the whole petek), the reader arrives at level 1 (Yanındakiler), down/in
-  is level 0 (Sen — the hexagon with the avatar arrows on it and name, district and the three
-  preferences under it). It reads the same way the book does — up is out, down is in — which is
-  what makes the two axes one grammar: **the outermost thing on this side is the whole city, and
-  the innermost thing is you.** It is a layer over a lane rather than a lane of its own now, so
-  while it is standing the book takes no gesture at all and this is the only axis live. See the
-  petek's own section for how the pull works.
+- **The petek has no axis of its own any more.** It had three depths — Sen, Yanındakiler, the
+  whole shape — pulled through vertically; there is one depth now (you and the six touching you),
+  Sen is the profile sheet behind your own name on the top bar, and the whole shape is parked. It
+  is still a layer over a lane rather than a lane of its own, so while it is standing the book
+  takes no gesture at all; what a vertical drag on it does is pan the drawing. See the petek's own
+  section.
 - **Asking by day and answering by night is the app's own loop, and Anket is where it is most
   literal**: the same box, the same page, the city's question in the morning and the city's answer
   after dark. The questions in the joints of the game sequence are the other half of it
   (`daily_questions`, see the schema); the
-  city rates them; the result is shown back **the next day, at the petek's outermost depth** —
-  which is exactly the depth where the reader is standing far enough out to be looking at everybody
-  rather than at their own neighbours. It is the app's own formula in one move: people → their
+  city rates them; where the result is shown back is an open question again — it used to be the
+  petek's outermost depth, which is parked. It is the app's own formula either way: people → their
   ideas → our opinions on those ideas.
 - **Two columns, not a menu.** A screen with six unrelated tiles is a launcher, and a launcher is a
   shortcut past everything — the one thing the arrangement exists to prevent.
@@ -3468,11 +3464,12 @@ preference.** A brand-new account's petek is one hexagon with six empty sides: n
 them a code yet, because they signed up a minute ago. So any line like "those are the Istanbulites
 right next to you" is false for *every* reader who will ever see this — it is only ever read once,
 on day one, which is precisely the day it cannot be true. What IS true on day one is the reader's
-own hexagon. So the tour stands them at the petek's innermost depth (**Sen**, level 0), has them
-actually **make their avatar** one category at a time, says the rest of it is earned outside and
-cannot be bought, and only *then* pulls out — one real level at a time — to the whole shape, where
-it says where the others **will** be rather than pretending they are already there. The same test
-applies to any beat added later: read it as somebody whose account is sixty seconds old.
+own hexagon. So the tour has them press their own name on the top bar, which is **Sen** (the
+profile sheet — see the petek's own section for where that depth went), has them actually **make
+their avatar** one category at a time, says the rest of it is earned outside and cannot be bought,
+and only *then* opens the petek, where it says where the others **will** be rather than pretending
+they are already there. The same test applies to any beat added later: read it as somebody whose
+account is sixty seconds old.
 
 **Only the categories already open to EVERYONE get a beat.** `AVATAR_HAT_OPTIONS` (profile-card.js)
 carries only `'Yok'` today (the Sözcü crown is parked, unbuilt art) and
@@ -3499,13 +3496,14 @@ It used to hop anahane → kahvehane → sozcel → kutuphane → anahane by *na
 place in `sessionStorage` between the pages and lighting each one's nav link to hand over. Those
 pages are the parts bin now (see the router's own section) and nothing links to them, so that whole
 leg went with them. What replaced it is the three lanes of slide 12, walked with the same sideways
-pull the reader will use forever after, PLUS the petek's own vertical pull, walked the same way:
-Sen → Yanındakiler → the whole shape is two real upward drags, not a jump, for the same reason a
-lane change is a real sideways one. Reaching Kütüphane from Kahvehane is deliberately two pulls,
-because the strip moves one lane per gesture and the way between them is through the middle.
+pull the reader will use forever after, PLUS the app's **two doors**, opened and shut by the
+reader themselves: their own name on the top bar (Sen, the profile sheet) and the logo (the
+petek). The petek's own vertical pulls went with its depths. Reaching Kütüphane from Kahvehane is
+deliberately two pulls, because the strip moves one lane per gesture and the way between them is
+through the middle.
 
-**And the reader opens the petek's own door themselves, both ways** (`toPetek` / `backToMap`,
-`runPetekDoor`). The petek is behind the logo rather than being a lane, so the tour lights that one
+**And the reader opens both doors themselves** (`runSheetDoor` for Sen — your own name on the bar,
+waiting on the sheet actually being open — and `runPetekDoor` for the petek). The petek is behind the logo rather than being a lane, so the tour lights that one
 mark, hands it back with a passthrough scoped to `#fb-logo-btn` alone, and waits for the petek to
 actually open — then, after the whole shape, waits for the reader to press it again and shut it.
 It is the same rule every lane pull here follows: the one door they will use forever after is
@@ -3514,37 +3512,25 @@ learning. Everything between those two beats carries `inPetek: true` rather than
 asserting a lane there would walk the strip behind a layer the reader is standing in.
 
 A beat is one of five things: it **talks** (tap anywhere), it asks for a **pull** and waits for the
-reader to arrive on a lane, a **levelPull** and waits for them to reach a depth of the petek, a
-**petek** door press and waits for it to open or shut, or it is a **pick** (see above). Depth is driven through
-`IstProfileCard.setHivePageLevel`/`hivePageLevel()`, that module's own handle (it is exactly what
-pressing a rail mark does, and no-ops when no petek is standing), the same way the book is driven
-through `window.__fb`. A `levelPull` beat (`runLevelPull`) is the vertical mirror of a lane `pull`
-(`runPull`): the same scoped passthrough (`#fb-petek`), the same "nothing is lit, the gesture is the
-point" dim, the same `STALL_MS` tap-to-carry-on escape hatch — the one difference is that a hive
-level has no separate tween value to wait for the way a lane's `pos` does (`setHiveLevel` in
-profile-card.js writes `state.hiveLevel` the instant a drag is released), so `runLevelPull` only
-ever has to read `hivePageLevel()` back. **The gesture is always UP, never down**: going from Sen
-toward the whole shape is *outward*, and per `wireHiveGestures` (profile-card.js), the level only
-increases when the drag overshoots upward — so `COPY.pullUp` is the only vertical prompt this tour
-ever shows.
+reader to arrive on a lane, a **sheet** door press (Sen), a **petek** door press, or it is a
+**pick** (see above). The two door beats are one shape: light the one mark that opens it, hand
+back exactly that mark through a scoped passthrough, and wait for the thing itself to say it is
+open — `f.petekOpen` for the petek, and for the sheet its own overlay not being `hidden`, since it
+is THE sheet like everything else and there is no handle to reach for. Both carry the same
+`STALL_MS` escape: a reader who cannot make the press is taken through anyway, because the end is
+where `onboarded_at` is written.
 
-**A depth has to be asserted more than once** (`holdDepth`). Opening the petek REMOUNTS it
-(project.html's `openPetek`), a mount is a round trip, and a mount lands at the middle depth by
-construction (`HIVE_LEVEL_DEFAULT`) — so a beat that names a depth can be answered before the mount
-it is aiming at even exists, and the mount then puts the reader back in the middle. On the first
-avatar beat that is the difference between the arrows being on screen and not.
-`setHivePageLevel` is idempotent, so the depth is simply re-said as things settle (0/120/300/600/900ms),
-guarded on the beat asking for it still being the beat on screen so it can never fight the next one.
-It is the same "re-take it as it settles" rule `settleSpotlight` already follows for the ring.
+**A door beat asks ONLY for the press — describing what is behind it is a plain talk beat straight
+after it, never the same beat.** Combining the two used to say "this is the petek" a beat before it
+was true, which is the same mistake that opened this whole tour on the reader instead of the petek
+in the first place. So `toPetek` carries only the instruction to press and `near` — a plain talk
+beat, arriving once it is open — is where "Bu petek..." actually gets said. It is the identical
+order `toKahve` → `events` already uses for a lane: name the direction, then, once arrived, say
+what is actually there.
 
-**A levelPull beat asks ONLY for the pull — describing what is up there is a plain talk beat
-straight after it, never the same beat.** Combining the two used to say "this is the petek" while
-the reader was still standing on Sen, a beat before it was true — the exact mistake that opened this
-whole tour on the reader instead of the petek in the first place. So `toNear` (a `levelPull` to
-Yanındakiler) carries only the instruction to pull, and `near` — a plain talk beat, arriving right
-after it — is where "Bu petek..." actually gets said; `toAll`/`petekAll` repeat the same pair for
-the whole shape. It is the identical order `toKahve` → `events` already uses for a lane: name the
-direction, then, once arrived, say what is actually there.
+**The spotlight is re-taken as the sheet settles** (`settleSpotlight`, on any `inSheet` beat): the
+sheet is still sliding up for the first half-second, so a rect measured on the next frame is where
+the arrows were on the way. The paint is idempotent, so it is simply taken again.
 
 **After the whole shape, one line ties it to the city it is standing on**: just as Istanbul itself
 splits into a European side and an Anatolian one, Istanbulite splits into Kütüphane and Kahvehane —
@@ -3580,7 +3566,8 @@ Six things about it, each of which fails silently if forgotten:
   `body.ist-onb-passthru` in onboarding.css and `isPassthrough()` in onboarding.js.
   **And it is scoped**, which is what keeps each beat to its own question: a lane `pull` beat opens
   the whole book (`#fb`, since the gesture is a drag on it), an avatar `pick` beat or a petek
-  `levelPull` beat opens `#fb-petek` alone, and a `petek` door beat opens `#fb-logo-btn` alone —
+  `pick` beat opens `#profile-overlay` alone, a `sheet` door beat `#ist-pc-me` alone and a
+  `petek` door beat `#fb-logo-btn` alone —
   so a stray sideways drag cannot walk the reader off the screen the mascot is currently talking
   about. `data-onb-pass` on the body (`book` / `petek` / `logo`, from `PASS_SCOPES`) is which of
   the three is open. The logo needs a scope of its own because it lives on a `<nav>` that takes no
@@ -3616,7 +3603,7 @@ Six things about it, each of which fails silently if forgotten:
     columns are laid *outside* it at `right: 100%` / `left: 100%`, so a hole measured on the wrapper
     is a box cut over the reader's own avatar with the arrows left outside it.
 - **A beat that adds no hint takes the last one down.** `addHint` sets `tapAdvanceFn`, so a pull,
-  levelPull, or pick beat inheriting the previous beat's hint inherited a live "tap anywhere to
+  door, or pick beat inheriting the previous beat's hint inherited a live "tap anywhere to
   continue" as well — the reader could tap straight past the gesture just asked for, and the
   instruction panel said one thing while the button over the tab bar said another. Every beat
   clears it; only the ones that add one have one.
@@ -3637,8 +3624,9 @@ Six things about it, each of which fails silently if forgotten:
   to `+60px` on the same base for the same reason — just far enough to clear the pill in turn,
   which also means it sits a little lower on the screen than the cast standing above it (the
   petek's hexagons on Hane), instead of crowding the two together.
-- **No beat that waits on a GESTURE can dead-end.** After `STALL_MS` a pull or levelPull beat's
-  prompt becomes a tap-to-continue and the tour carries on without the gesture. A reader who cannot
+- **No beat that waits on a GESTURE or a PRESS can dead-end.** After `STALL_MS` a pull or door
+  beat's prompt becomes a tap-to-continue and the tour carries on without it, doing the press
+  itself. A reader who cannot
   swipe — a trackpad, an assistive pointer, a phone that ate the touch — must still reach the end,
   because the end is where `onboarded_at` is written and an account stuck short of it is an account
   that gets the whole flow again on every launch. A pick beat needs no such fallback at all: its
@@ -3651,7 +3639,7 @@ real one on the page the member actually opens.
 
 **What of this is already standing in `project.html`:** Etkinlikler and Oyunlar (all three games)
 on Kahvehane, Haberler and Anket on Kütüphane, Olaylar at the Türkiye stop, the app map as the
-middle lane, the petek and its three depths behind the logo, and the Türkiye map as slide 1's
+middle lane, the petek behind the logo, and the Türkiye map as slide 1's
 drawing. Hikâyeler has its boxes too, standing
 dashed (see the cast rules above) — the boxes are cast, the content behind them is not. Kahve and
 Yorumlar are no longer cast at all: they stood on the ilçe stop, which is parked (see
@@ -3812,12 +3800,11 @@ reachable again, and the two share one implementation precisely so that day need
 
 The petek (`hiveGridHTML`) is **one shared honeycomb**, drawn from where the reader is standing in
 it: their own cover frame in the middle, everybody else on their map placed exactly where they
-actually are around it, and — at its outermost depth — a "+" on each free side of their own
-hexagon. It is not six slots of your own — see the schema section above for what that means and why.
+actually are around it, and a "+" on each free side of their own hexagon. It is not six slots of your own — see the schema section above for what that means and why.
 
 **In the app as shipped it is what the İstanbulite LOGO opens** — see "The petek is behind the
 logo, and the app map is the middle lane" under project.html. Everything in this section is about
-the object itself (the grid, the three depths, the codes, the names, the fit) and is true wherever
+the object itself (the grid, the codes, the names, the fit) and is true wherever
 it is mounted; what follows immediately below describes the arrangement on `anahane.html`, which is
 a parts-bin page.
 
@@ -3837,93 +3824,59 @@ which swaps `#ist-content` and takes the previous mount with it — and every mo
 `hive_map()`, because somebody else's attachment may have carried this whole petek somewhere since
 it was last drawn.
 
-**The petek has three depths, and the reader pulls up and down through them**
-(`HIVE_LEVELS` in profile-card.js). It is one drawing zoomed, not three pages: what changes is how
-far out the reader is standing in the same honeycomb, which is the whole difference between a level
-and a tab. A level is simply the **ring** — hex distance from the reader — a cell is allowed to
-stand at, so changing level is one comparison per cell and never a re-render: the cells further out
-fade, the plane rescales about the reader, and both transitions are the stylesheet's.
+**THE PETEK HAS ONE DEPTH.** It used to have three, pulled through with a finger — you alone
+(Sen), you and the six touching you, and the whole shape — and the depths are gone. The two that
+left went in different directions, and neither is a loss:
 
-| Level | What is drawn | Names | The seats |
-|---|---|---|---|
-| 0 — Sen | your own hexagon alone, large, with what is yours to change under it | — | inert |
-| 1 — Yanındakiler | you and the six places touching you; an empty one stays empty | printed | inert |
-| 2 — Petek | all of it: their neighbours, the field around it, everything | none | live |
+- **Sen is the PROFILE SHEET now**, opened by pressing your own name on the top bar (`project` in
+  `PROFILE_SECTIONS`). That is where the avatar carousel, the three preferences, the kefil code,
+  Çıkış Yap and Hesabımı Sil already live — a depth of a drawing that was really a settings page
+  is a settings page. It opens **already customizing** (`sen` in `PROFILE_SECTIONS`, read by
+  `openProfileOverlay`), because the depth it replaced had the arrows standing on the hexagon with
+  nothing to press first. It also carries the account's read-only half, which Sen had deliberately
+  left in the sheet — there is no second surface left for that to be left in.
+- **The whole shape is PARKED** until it is worth drawing again.
 
-Four things about it:
+What stands in Hane is the middle one and nothing else: you, the six places touching you, and
+their names. **The seats came back with it** — offering a free side and claiming a code belonged
+to the outermost depth alone, and that depth is parked, so they are live on the one depth there
+is. Anything else would leave the app with no way to attach one member to another, which is the
+whole growth model.
 
-- **The exchange belongs to the outermost level alone.** Offering a seat and taking one are how the
-  petek is *built*, and building it is a thing you do to the whole shape — so the "+" appears, and
-  the hexagons answer a press, only where the whole shape is on screen. Below that level the seats
-  are drawing: the cells are `disabled`, not merely stripped of their "+", because a hexagon that
-  answers a press by doing nothing is worse than one that plainly does not answer. Stepping away
-  from that level folds any open seat back rather than leaving a live code burning on a hexagon
-  nobody can see.
-- **Names are the middle level's, and only ring 1 is ever named.** Level 0 has nobody else on it
-  and level 2 hides names outright (at the size the whole shape is drawn at, the names would be the
-  only thing on the page, and the shape is what that level is for) — so the middle level is the only
-  depth that prints one, and at that depth everything past the first ring is not drawn. A neighbour
-  can therefore never go unnamed because of somebody the reader cannot currently see, which is
-  exactly what the old "is the cell outside them free?" rule did once levels existed.
-- **The reader arrives at the middle depth, every time**, including after a swipe away and back —
-  the same rule the three carousel pages follow (see "Always in the middle").
-- **The pull is the gesture; the rail is how anyone finds out.** Drag and level-change are one
-  handler: the drawing follows the finger while there is drawing left to reach, and once the finger
-  runs *past* the end of it — or there was never anywhere to go, which is every level but the
-  outermost — the same pull changes the level. A pull up is a scroll down, and down the levels is
-  outward. Three marks down the outer edge say how many depths there are and which one you are
-  standing at, and each takes a press. Horizontal pulls are left to the carousel underneath
-  (`router.js` already ignores anything vertical-dominant).
+The ring a cell may stand at is therefore a **constant** (`HIVE_RING_CEILING`) rather than a
+level: you (0) and the six touching you (1). The page carries no level class, nothing changes
+depth, and a drag on the drawing is a pan and only a pan — a pull past the end of it used to
+change depth and now springs back.
 
-**Level 0 is where the reader is personalized, and it carries the controls rather than a way to
-reach them.** There is no Kişiselleştir button and nothing rises over the page: the avatar arrows
-stand on the reader's own hexagon (`hiveAvatarPickerHTML` — the profile sheet's own markup, ids and
-four `wire*Carousel` functions, reused unchanged), and their district, member-since and three
-preferences (dil, renk, görünüm) are printed under it. **Not their name** — the top bar already
-carries it whenever this depth is on screen (you, at your own end of the row; see "The phone's two
-bars"), and printing it a second time under the hexagon said the same word from two directions at
-once. `hiveSelfHTML` simply never renders it. **Every control commits itself**, the way the
-avatar arrows already did — so there is no Kaydet here either, and nothing to confirm.
+Three things about it:
 
-**And the account's ACTIONS are here too, under a rule**: the reader's kefil code (which is its own
-copy button — a label, a value and a third control is three things on a row with room for two), Çıkış
-Yap, and Hesabımı Sil. They used to live in the profile sheet's account block, which is Kütüphane's
-— and Kütüphane is in the parts bin, so in the app as actually shipped there was **no way to log
-out, no way to delete an account, and no way for a member to find their own kefil code** after
-onboarding showed it once. The first two are an App Store requirement (5.1.1(v)) and the third is
-the entire growth model. Sen is the right home for them on the merits as well: this depth is the
-reader, and these are the reader's.
+- **The seats are live, and the names are printed.** Both used to be conditional on a depth — the
+  "+" appeared only on the outermost one, the names only on the middle one — and with one depth
+  both conditions are simply gone, in the JS (`applyHiveLevel` disables only what stands past the
+  ceiling) and in the CSS (the two rules that hid them are deleted). A cell further out than the
+  ceiling is still `disabled` rather than merely stripped of its "+": a hexagon that answers a
+  press by doing nothing is worse than one that plainly does not answer.
+- **A neighbour can never go unnamed.** Everything past ring 1 is not drawn, so the old "is the
+  cell outside them free?" rule has nothing left to refuse a name for.
+- **A vertical pull is the drawing's own pan and nothing else.** Horizontal pulls are left to
+  whatever is underneath (`router.js` already ignores anything vertical-dominant).
 
-What stays in the sheet is the account's **read-only half** — e-posta, telefon, the kefil chain, who
-you have sponsored. The line is not personalization-vs-account any more, it is **what you DO vs what
-is on record about you**: nothing on this page scrolls, and `fitHive` reserves whatever this block
-measures, so every row added here is taken out of the reader's own hexagon (the account block costs
-~52px on a phone). A record to look up does not earn that; a way out does.
-
-The three behaviours are one implementation — `wireCopyCode`, `doSignOut`, `doDeleteAccount` in
-profile-card.js — called by both surfaces. The **ids deliberately differ** (`po-hive-copy` /
-`po-hive-signout` / `po-hive-delete` against the sheet's `po-copy` / `po-signout` /
-`po-delete-account`): router.js keeps one document across the whole app, and a duplicate id leaves
-whichever rendered second silently wiring the other one's button. Hesabımı Sil is `--ink-red` and
-not `--accent` — `--accent` is a dark brown/grey, so the destructive action came out as the heaviest
-thing in the block, which says "press me" rather than "careful". It cannot collide with the petek's
-other red either: a red ring means "this is the member named on the bar", and that only happens at
-the outermost depth, where this block is not drawn at all.
-
-Two mechanical notes: the arrow block is a node of its own
-standing on the me cell's coordinates, because the me cell is a `<button>` and a button inside a
-button is not something the parser keeps; and it is `display: none` away from level 0 rather than
-faded, both to keep the arrows out of the tab order and so `fitHive` can tell they are not on the
-paper. The whole block is laid *over* the foot of the window rather than taking room from it, so the
-window never changes size between depths; `fitHive` reserves the height it measures and centres the
-reader in what is left.
+**What Sen carried, and why moving it was a re-point rather than a rewrite.** The innermost depth
+printed the avatar arrows on the reader's own hexagon (`hiveAvatarPickerHTML` — which was always
+the profile sheet's own markup, its own ids and its own four `wire*Carousel` functions), their
+district and member-since, the three preferences (dil, renk, görünüm), their kefil code, Çıkış Yap
+and Hesabımı Sil. Every one of those is in the sheet, most of them because they were always also
+there — which is why the onboarding tour's avatar beats still name `#po-hair-prev` and friends,
+unchanged, and only the surface they are opened on moved. What went with the depth is the second
+copy: `hiveSelfHTML`, `wireHiveSelf`, `renderHiveSelf`, `HIVE_PREFS`, `pickHivePref`,
+`hiveAvatarPickerHTML`, the rail, and all of their CSS.
 
 **THE DRAWING STANDS ON THE FLOOR OF ITS WINDOW, IT IS NOT CENTRED IN IT** (`fitHive`'s
 `offsetY`). It used to be centred in the band the strip leaves when it is shut, clamped to whatever
 kept an open card off its foot — and the petek is mostly empty paper above the reader, so centring
 it put the people in the middle of the screen with a screenful of nothing over them. The clamp IS
 the resting place now: the foot of the drawing comes to rest exactly on top of whatever the page
-has reserved at the bottom of the window (Hane's events strip, level 0's own block), with
+has reserved at the bottom of the window (Hane's events strip), with
 `HIVE_CARD_GAP` of paper between. The promise that an open card can never come up over the people
 is unchanged — it is the same line, read as the place to stand rather than as a limit. The reader
 is still the fixed point horizontally and still the point the whole plane is scaled about; only
@@ -3942,8 +3895,7 @@ band between the two bars — and the drawing is **fitted** to clear the strip's
 (`--ist-hive-reserve`, handed to `fitHive` as Hane's own strip height) and then **stands on top of
 it**, rather than being centred in what is left. That is the promise that **a card opening can
 never come up over the people**, on any screen, and it is now also where the petek simply lives
-(see the drawing's own note above). It is the same move level 0's own
-block makes inside the drawing. A column with a grid row of its own made the reader's
+(see the drawing's own note above). A column with a grid row of its own made the reader's
 position a function of how tall it was: it stood the drawing above the middle of the screen by half
 the strip, and every kept card, every empty night, every card opened moved them again.
 
@@ -3984,20 +3936,12 @@ further empty cells** (`hiveGhostCellHTML`) so the honeycomb reads as something 
 those are drawing, not interface — the only openings that do anything are the six sides of the
 reader's own hexagon, because those are the only seats that are theirs to give.
 
-**And at the outermost depth that field runs off every edge of the screen.** A honeycomb is a shape
-that continues, so a comb that stops in mid-air with bare paper past it reads as the end of the
-world rather than as the middle of one. Two things make it reach: the field is laid out as the
-**rectangle the screen actually is** (`hiveFieldReach`) rather than as rings around the reader —
-rings that reach the top of a phone reach only half as far across it at that height, so the corners
-came out bare — and at that depth alone the **clip is lifted** (`html.ist-hive-all`, set by
-`applyHiveLevel`; `.ist-hive` in profile-card.css and `main` / `.petek-page` in anahane.html), so
-the drawing runs under the events column and past the tab bar to the screen's own edges. Nothing
-about the fit changes with it: the window fitHive measures is exactly what it was, so the drawing
-is scaled the same and the reader stays dead centre — only the clip is different. Nothing is left
-out of the field for a name, either: a name is printed in the cell just outside its member, which
-is always at ring 2 and therefore never drawn at the middle depth (the only depth that prints
-names), so skipping it punched a hole in the comb beside every neighbour at exactly the depth the
-shape itself is for.
+**The field that runs off every edge of the screen went with the whole shape.** It was that
+depth's own (`html.ist-hive-all` lifted the clip so the comb ran under the events column and past
+the tab bar), and with one depth the drawing is fitted into the window and clipped by it again.
+`hiveFieldReach` — the field laid out as the rectangle the screen actually is rather than as rings
+around the reader, so the corners do not come out bare — is still what draws it, and is what the
+whole shape will want back when it is unparked.
 
 **The window is the room the page has; the petek is not.** What changes as members are added is the *drawing*, never the page: `fitHive` scales the grid
 into the window and, once it would have to shrink past legibility (`HIVE_MIN_SCALE`), leaves it
@@ -4076,9 +4020,28 @@ Four things about it:
   `hive_member_status` could hand back today. Giving Anket one is a migration, not a rename.
 - **The words are still there for anyone who cannot see the drawing**: the same `3+ HABER ·
   0/1 OYUN` the caption used to print is the glyph's `aria-label` and its `title`. The fraction is
-  counted whether or not they have started (`0/3` is the point of it) and disappears only on a day
-  with no games at all; a game the admin switched off is on neither side of it, because it is not
-  a step anybody has left to take.
+  counted whether or not they have started (`0/2` is the point of it) and disappears only on a
+  night with no games at all; a game the admin switched off is on neither side of it, because it
+  is not a step anybody has left to take.
+- **IT IS THE NIGHT'S, AND ONLY THE NIGHT'S.** Three things had to be true for the games half to
+  mean anything, and none of them was:
+  - **Keyed to the night** (`IstDate.gameNight()` / `gameNightSeed()`), never to the calendar
+    date. It asked with today's date, so at midnight every caption on the petek started counting
+    against a night nobody was playing — the same bug `db/sozcel_used_answers_v7_game_night.sql`
+    and its own follow-up fixed one layer in.
+  - **Counted against the games the app actually casts**
+    (`db/hive_member_status_v2_games.sql`). v1 hardcoded `('sozcel','tumcel','bulmaca')` and
+    `3 - off`; `GAME_DEFS` is two games, and the caption draws that column as two squares — so a
+    neighbour reported three games left into a two-slot column. The list is the CALLER's now
+    (`HIVE_GAMES` in profile-card.js, which has to agree with `GAME_DEFS`), because which games
+    are cast tonight is a property of the app and a copy of it kept server-side is a copy that
+    drifts. The v1 signature is deliberately left in place and the client falls back to it on
+    `PGRST202`, since Pages redeploys on push while the SQL is run by hand.
+  - **Inked only after sunset** (`hiveGamesTonight`). From sunrise that column is *Oyun
+    önerileri*, and what a member has or has not offered is their own
+    (`sozcel_word_suggestions` is not world-readable) — so by day it inks nothing, exactly like
+    Anket and Etkinlikler, rather than inking last night's leftovers against a box that is not a
+    game.
 
 Both come from one RPC per map, `hive_member_status(p_game_date, p_game_key)` — it takes no member
 list and answers only for the caller's own map, so it is a caption on the petek and not a directory
@@ -4109,8 +4072,7 @@ neighbour ever moves — what changes happens *inside* the drawing (`.ist-hive-c
 ring and lifts it slightly via `transform`).
 
 **Pressing a member names them on the bar, and pressing the bar opens them** (`pickHiveMember`,
-`setBarMember`). At the outermost depth — the only one where the seats are live and the only one
-that prints no names — a press turns that hexagon **red** and puts the member's name at the top of
+`setBarMember`). A press turns that hexagon **red** and puts the member's name at the top of
 the screen, in the place the reader's own name stands; pressing that name opens their profile, the
 same member sheet every `.author-link` on the site opens. Pressing the hexagon again puts your own
 name back, the way every other hexagon on this page is its own close button.
@@ -4131,11 +4093,12 @@ another page (`router.js` calls `clearBarMember` beside `clearSeat`), a fresh mo
 called from anahane's own `unmount`). Two things about the petek outlive the swapped `#ist-content`,
 and both of them showed up as the same bug — swipe away, swipe back, and the kept-events column and
 the captions under everybody's names were gone. The **depth classes are on `<html>`**
-(`ist-hive-mid` / `ist-hive-offmid` / `ist-hive-all`, `paintHiveDepthClasses`), which is deliberate —
-anahane's CSS is what hides the events column away from the middle depth — but left behind at level 0
-or 2 they hide that column on the way back in, for the length of the next mount's round trip and for
-good if that mount takes an early return; so the unmount clears them and the mount asserts the middle
-depth **before** its first `await`, not after. And **every in-flight fetch checks itself against
+(`ist-hive-mid` / `ist-hive-offmid`, `paintHiveDepthClasses`), which is deliberate — anahane's CSS
+is what hid the events column away from the middle depth. With one depth they say only whether a
+petek is standing at all, and `ist-hive-offmid` is kept and never set precisely because the rule
+that quiets the column is written on the OFF state: a class that never lands has to leave the
+column READABLE. The unmount still clears them and the mount still sets them **before** its first
+`await`, not after. And **every in-flight fetch checks itself against
 `_hive`** before drawing (`loadHive`, `reloadHiveMap`, `loadHiveStatus`, `offerHiveSlot`,
 `claimHiveSlot`, plus a `_hiveMountSeq` on the mount itself): they all draw by id into whatever
 `#po-hive-mount` currently is, so a call started on the last visit and answered on this one painted

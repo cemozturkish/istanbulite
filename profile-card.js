@@ -55,8 +55,18 @@
     // The innermost zoom level. Cover only, like Hane: the week's games
     // belong to İstanbul's own level and the account to Türkiye's.
     mahalle:   { hive: false, week: false, account: false, settings: false },
-    // The sandbox tab: cover only, like Hane.
-    project:   { hive: false, week: false, account: false, settings: false },
+    // ── project is SEN ──
+    // The app, and the one page a member actually reaches. Pressing your
+    // own name on the top bar is where the petek's innermost depth went
+    // when the depths were dropped (see the ONE DEPTH note), so this
+    // sheet carries what that depth carried: the avatar arrows (the
+    // cover's own, so it opens ready to change rather than behind a
+    // Kişiselleştir press -- see `sen` in openProfileOverlay), the three
+    // preferences, the kefil code, Çıkış Yap and Hesabımı Sil. It also
+    // carries the account's read-only half, which Sen deliberately left
+    // in the sheet -- there is no longer a second surface for it to be
+    // left in.
+    project:   { hive: false, week: false, account: true, settings: true, sen: true },
   };
   const DEFAULT_PAGE = 'anahane';
 
@@ -1096,7 +1106,11 @@
     // switches it into the editable avatar-arrows + sliders mode (see
     // settingsPageHTML/coverHTML), Kaydet saves and the page reload resets
     // this back to false on its own.
-    _ov.customizing = false;
+    //
+    // Except where this sheet IS Sen (`sen` in PROFILE_SECTIONS): the
+    // depth it replaced had the arrows standing on the hexagon with
+    // nothing to press first, so it opens ready to change.
+    _ov.customizing = !!sectionsFor(_ov.page).sen;
     renderOverlayBody();
     document.getElementById('profile-overlay-body').scrollTop = 0;
     IstSheet.open('profile-overlay');
@@ -1168,14 +1182,14 @@
     // starts a second one while the first is still inside its await, and
     // the loser must not carry on drawing into the winner's page.
     const seq = ++_hiveMountSeq;
-    host.innerHTML = `<div class="ist-hive-page ist-hive-level-${HIVE_LEVEL_DEFAULT}" id="po-hive-page">${hiveMountHTML()}</div>`;
+    host.innerHTML = `<div class="ist-hive-page" id="po-hive-page">${hiveMountHTML()}</div>`;
     // The reader arrives at the middle depth, so the classes that say so
     // are set now rather than after the await below. They live on <html>
     // and outlive this page (anahane.html's events column is hidden by
     // ist-hive-offmid): left over from the depth the reader was standing
     // at when they swiped away, they hide that column for the whole of
     // the round trip -- and for good if this mount takes an early return.
-    paintHiveDepthClasses(HIVE_LEVEL_DEFAULT);
+    paintHiveDepthClasses(true);
     const st = await ensureProfileState(sb, I18N);
     // The page can be swapped out from under the fetch (a swipe away
     // while it is in flight), and then there is nothing to draw into --
@@ -1187,7 +1201,7 @@
     // follow (see "Always in the middle" in CLAUDE.md).
     _hive = Object.assign({}, st, {
       sb, I18N, hiveOpen: null, hiveLoaded: false, hiveSelected: null,
-      hivePan: { x: 0, y: 0 }, hiveLevel: HIVE_LEVEL_DEFAULT,
+      hivePan: { x: 0, y: 0 },
       // ── The map this page was standing on last time ──
       // Every entry re-fetches it (somebody else's attachment may have
       // carried the whole petek somewhere), but the fetch takes a beat
@@ -1206,14 +1220,11 @@
     // even drawn.
     clearBarMember();
     _hive.hiveDisplayName = `${_hive.profile?.first_name || ''} ${_hive.profile?.last_name || ''}`.trim() || _hive.user.email;
-    // Level 0's block and the rail are the page's furniture rather than
-    // the drawing's: they are built once, here, so a re-render of the
-    // grid never rebuilds them and the gestures wired to the page below
-    // stay bound to nodes that are still there.
-    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
+    // The page carries the drawing and nothing else now: the block that
+    // used to stand under it is the profile sheet's (see the ONE DEPTH
+    // note), and the rail that said which of three depths you were at
+    // has nothing left to count.
     const page = document.getElementById('po-hive-page');
-    page.insertAdjacentHTML('beforeend', hiveSelfHTML(_hive) + hiveRailHTML(t));
-    wireHiveSelf(_hive);
     // A first load has no last time to start from: rather than draw the
     // wrong shape and correct it, the drawing is held back until the map
     // lands (a beat, and blank paper is not a lie). Cleared by loadHive
@@ -1248,7 +1259,7 @@
   function unmountHivePage() {
     if (_hive && _hive.hiveBoxObserver) { _hive.hiveBoxObserver.disconnect(); _hive.hiveBoxObserver = null; }
     _hive = null;
-    paintHiveDepthClasses(null);
+    paintHiveDepthClasses(false);
   }
 
   // The window onto the grid is the page now, so it changes size with the
@@ -1540,31 +1551,38 @@
   // allowed to stand at, so changing level is one comparison per cell and
   // never a re-render: cells fade, the plane rescales, and both
   // transitions are the stylesheet's.
-  const HIVE_LEVELS = 3;
-  // The outermost level, where the whole map is drawn and the seats can
-  // actually be handed out.
-  const HIVE_LEVEL_ALL = HIVE_LEVELS - 1;
-  // Where the reader arrives: the middle one, the way they arrive on the
-  // middle page (see "Always in the middle" in CLAUDE.md).
-  const HIVE_LEVEL_DEFAULT = 1;
-  // How far each level lets the drawing grow. fitHive still shrinks below
-  // these to fit the window for levels 0/1 — this is a ceiling, not a
-  // size. Level 2 is fixed at it instead (see fitHive): the outermost
-  // level draws every hexagon at the SAME size the middle depth does,
-  // rather than shrinking the whole shape down to show all of it.
-  // Level 0 shares its window with the avatar arrows beside the hexagon
-  // and the three preferences under it, so it is drawn a step smaller
-  // than a hexagon alone would allow.
-  const HIVE_LEVEL_ZOOM = [2.2, 1.5, 1.5];
-  // How far a finger has to travel *past the end of the drawing* before
-  // the level changes under it, and how far it has to travel at all
-  // before the gesture is one rather than a tap.
-  const HIVE_LEVEL_SWIPE = 56;
+  // ── ONE DEPTH ──
+  // The petek used to have three, pulled through with a finger: you
+  // alone (Sen), you and the six touching you, and the whole shape. The
+  // depths are gone, and the two that left went in different directions.
+  //
+  //   * **Sen is the profile sheet now**, opened by pressing your own
+  //     name on the top bar -- which is where the avatar carousel, the
+  //     three preferences, the kefil code and the way out already live
+  //     (see PROFILE_SECTIONS). A depth of the drawing that was really a
+  //     settings page is a settings page.
+  //   * **The whole shape is parked** until it is worth drawing again.
+  //
+  // What stands in Hane is the middle one and nothing else: you, the six
+  // places touching you, and their names.
+  //
+  // THE SEATS CAME BACK WITH IT. Offering a free side and claiming a
+  // code belonged to the outermost depth alone, and that depth is
+  // parked -- so they live on the one depth there is, or the app would
+  // have no way left to attach one member to another, which is the whole
+  // growth model (see db/hive_slot_codes_v5.sql).
+  //
+  // So the ring a cell may stand at is a CONSTANT rather than a level:
+  // you (0) and the six touching you (1). The page carries no level
+  // class at all any more -- there is one depth, so nothing is keyed to
+  // which one it is.
+  const HIVE_RING_CEILING = 1;
+  // How far the drawing may grow. fitHive still shrinks below this to
+  // fit the window; it is a ceiling, not a size.
+  const HIVE_ZOOM = 1.5;
+  // How far a finger has to travel before the gesture is a drag rather
+  // than a tap.
   const HIVE_GESTURE_SLOP = 8;
-  // The air between the drawing and the block under it on level 0.
-  const HIVE_SELF_GAP = 14;
-  // The paper left between the foot of the drawing and a card standing
-  // open in the strip below it (see fitHive's offsetY).
   const HIVE_CARD_GAP = 10;
 
   // How far from the reader a cell is standing, in hexagons. This is the
@@ -1721,10 +1739,6 @@
     return h > 0 ? h : 0;
   }
 
-  function hiveLevel(state) {
-    const lvl = state && state.hiveLevel;
-    return (typeof lvl === 'number') ? lvl : HIVE_LEVEL_DEFAULT;
-  }
 
   function hiveMemberName(member) {
     return capitalizeName(`${member.first_name || ''} ${member.last_name || ''}`.trim()) || 'İsimsiz Üye';
@@ -1844,10 +1858,21 @@
     return `<span class="ist-hive-day-col ist-hive-day-${width}">${slots}</span>`;
   }
 
+  // Are the games on at all right now? They are night-only
+  // (NIGHT_GAMES_ENABLED in project.html): from sunrise that column is
+  // Oyun önerileri, where what a member has or has not offered is their
+  // own (sozcel_word_suggestions is not world-readable) and is not a
+  // number this petek can know. So by day the games column inks
+  // nothing, exactly like Anket and Etkinlikler -- rather than inking
+  // last night's leftovers against a box that is not a game.
+  function hiveGamesTonight() {
+    return !IstDate.edition || IstDate.edition() === 'gece';
+  }
+
   function hiveStatHTML(status, t) {
     if (!status) return '';
     const news = Math.max(0, status.news_stacked | 0);
-    const total = Math.max(0, status.games_total | 0);
+    const total = hiveGamesTonight() ? Math.max(0, status.games_total | 0) : 0;
     const played = Math.min(total, Math.max(0, status.games_played | 0));
     const left = total - played;
     // Nothing standing is not a score of zero, it is an empty day — and
@@ -1859,7 +1884,7 @@
     // and what a pointer gets on hover: the picture is the caption, not
     // the whole of the fact. The fraction is printed whether or not they
     // have started (0/3 is the point of it) and disappears only on a day
-    // the admin left with no games at all.
+    // the admin left with no games at all (`0/2` on an ordinary night).
     const words = [];
     if (news > 0) {
       const n = news > HIVE_NEWS_MAX ? `${HIVE_NEWS_MAX}+` : String(news);
@@ -2018,35 +2043,6 @@
     `;
   }
 
-  // ── Changing your own avatar, at the depth that is about you ──
-  // Two columns of four arrows flanking your own hexagon — hat, hair,
-  // accessory, shirt, top to bottom, all the same size so no category
-  // reads as more primary than another. It is the same markup, the same
-  // ids and the same four `wire*Carousel` functions the profile sheet's
-  // customizing mode uses: one implementation of picking an avatar, in
-  // two places that show it.
-  //
-  // A separate node standing on the me cell's own coordinates rather than
-  // markup inside it, because the me cell is a <button> and a button
-  // inside a button is not a thing the parser will keep. It carries the
-  // cell's height so `top: 50%` centres the columns on the frame, and it
-  // is drawn only at level 0 (see profile-card.css) — a press changes
-  // your avatar there and then, and saves itself, so there is nothing to
-  // open and nothing to confirm.
-  function hiveAvatarPickerHTML(meta) {
-    const row = (id, dir, label) =>
-      `<button type="button" class="ist-pc-cover-pick-arrow" id="po-${id}-${dir}" aria-label="${esc(label)}">`
-      + `${dir === 'prev' ? ARROW_ICON_LEFT : ARROW_ICON_RIGHT}</button>`;
-    const col = (dir) => `
-      <div class="ist-pc-cover-pick-col ist-hive-pick-col ist-pc-cover-pick-${dir === 'prev' ? 'prev' : 'next'}">
-        ${row('hat', dir, dir === 'prev' ? 'Önceki şapka' : 'Sonraki şapka')}
-        ${row('hair', dir, dir === 'prev' ? 'Önceki saç' : 'Sonraki saç')}
-        ${row('accessory', dir, dir === 'prev' ? 'Önceki aksesuar' : 'Sonraki aksesuar')}
-        ${row('shirt', dir, dir === 'prev' ? 'Önceki tişört' : 'Sonraki tişört')}
-      </div>`;
-    return `<div class="ist-hive-picker" ${meta}>${col('prev')}${col('next')}</div>`;
-  }
-
   // ── The grid ──
   // Everyone on the caller's map, the six free sides of the caller's own
   // hexagon (the only seats they can offer — somebody else's free sides
@@ -2125,21 +2121,20 @@
     const html = items.map(item => {
       const p = hivePos(item.q, item.r, minX, minY);
       // Where it stands on the plane, and how far out it stands from the
-      // reader — the second is the whole of the level filter, so it is
-      // written into the cell rather than recomputed from a coordinate
-      // the DOM never carried. --ring mirrors data-ring as a CSS custom
-      // property (calc() can't read a data-* attribute) for the level-2
-      // wave-in stagger (see hiveWaveIn/.ist-hive-wave-in).
+      // reader — the second is the whole of what decides whether a cell
+      // is drawn (see HIVE_RING_CEILING), so it is written into the cell
+      // rather than recomputed from a coordinate the DOM never carried.
+      // --ring mirrors data-ring as a CSS custom property, since calc()
+      // cannot read a data-* attribute.
       const ring = hiveRing(item.q, item.r);
       // Which side of the reader a ring-1 cell stands on: used for the
-      // name (member cells only, see nameSide below) and, since leaving
-      // level 1 for level 0 slides a ring-1 hexagon instead of just
-      // fading it (see .ist-hive-away[data-side] in profile-card.css),
-      // for the cell's own transform direction too.
+      // name (member cells only, see nameSide below) and for the
+      // direction a cell standing past the ceiling slides away in (see
+      // .ist-hive-away[data-side] in profile-card.css).
       const side = (item.q + item.r / 2) < 0 ? 'left' : 'right';
       const meta = `style="left: calc(var(--ist-hive-step-x) * ${p.x}); top: calc(var(--ist-hive-step-y) * ${p.y}); --ring: ${ring};" `
         + `data-ring="${ring}"` + (ring === 1 ? ` data-side="${side}"` : '');
-      if (item.kind === 'me') return hiveMeCellHTML(opts, meta, open, t) + hiveAvatarPickerHTML(meta);
+      if (item.kind === 'me') return hiveMeCellHTML(opts, meta, open, t);
       if (item.kind === 'member') {
         // Named only if they are touching the reader — see nameCells above.
         const nameSide = ring === 1 ? side : null;
@@ -2181,243 +2176,6 @@
     return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
   }
 
-  // ── The rail ──
-  // Three marks down the outer edge saying how many depths there are and
-  // which one the reader is standing at. A swipe is the gesture; this is
-  // how anyone finds out there is one, and it takes a press too, because
-  // a control that only announces is a decoration.
-  function hiveRailHTML(t) {
-    const labels = [
-      t('profile.hive.level.self'),
-      t('profile.hive.level.near'),
-      t('profile.hive.level.all'),
-    ];
-    const dots = labels.map((label, i) => `
-      <button type="button" class="ist-hive-rail-dot" data-level="${i}"
-              title="${esc(label)}" aria-label="${esc(label)}"></button>`).join('');
-    return `<div class="ist-hive-rail" id="po-hive-rail">${dots}</div>`;
-  }
-
-  // ── Level 0: you, and what is yours to change ──
-  // The innermost depth is the one place on this page that is about the
-  // reader rather than about the shape they are standing in, so it is the
-  // one place that carries words about them — and it carries the controls
-  // themselves, not a way to reach them. There is no Kişiselleştir button
-  // and nothing rises over the page: the arrows are on your hexagon (see
-  // hiveAvatarPickerHTML) and your three preferences are printed under
-  // your name, each one committing itself the moment it is pressed, the
-  // way the avatar arrows already did. Nothing here opens and nothing
-  // closes, which is the whole rule this page is built on.
-  //
-  // What is *not* here is the account — email, kefil, referral code,
-  // signing out. Those are not personalization; they stay on Kütüphane's
-  // profile page, where the account block lives (see PROFILE_SECTIONS).
-  //
-  // Everything printed is already known by the time the page draws —
-  // there is no second fetch behind this level.
-  const HIVE_PREFS = [
-    // The two language values are named in i18n.js rather than here:
-    // project.html's logo says the same pair back to the reader after a
-    // long press has flipped it, and one word in two places is one word
-    // that drifts. `labelKey` is the only difference from the palette
-    // row below, whose two names are not printed anywhere else.
-    { key: 'lang', column: 'language_pref', label: 'profile.langpref',
-      options: [{ value: 'default', labelKey: 'lang.default' },
-                { value: 'more_english', labelKey: 'lang.more_english' }] },
-    { key: 'palette', column: 'palette_pref', label: 'profile.colortheme',
-      options: [{ value: 'mono', label: 'Siyah-Beyaz' }, { value: 'earth', label: 'Kahverengi' }] },
-  ];
-
-  function hivePrefValue(state, pref) {
-    const raw = state.profile ? state.profile[pref.column] : null;
-    if (pref.key === 'lang') return normalizeLang(raw);
-    return normalizePalette(raw);
-  }
-
-  // ── The three account actions, one implementation ──
-  // They are printed in two places now: the profile sheet's account block
-  // (Kütüphane's, see PROFILE_SECTIONS) and the petek's innermost depth,
-  // Sen — which is the only one of the two a member can actually reach,
-  // since project.html is the app and its sheet carries the cover alone.
-  // The behaviour lives here rather than being typed out beside each set
-  // of buttons, or the two drift and the one nobody is looking at is the
-  // one that rots.
-  //
-  // Each takes the elements it acts on rather than looking them up,
-  // because the two surfaces deliberately carry DIFFERENT ids: one
-  // document holds both (router.js keeps a single document across the
-  // whole app), and a duplicate id would leave whichever rendered second
-  // silently wiring the other one's button.
-  function wireCopyCode(btn, state) {
-    if (!btn) return;
-    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
-    btn.addEventListener('click', () => {
-      navigator.clipboard?.writeText(state.profile?.referral_code || '');
-      const orig = btn.textContent;
-      btn.textContent = t('profile.copied');
-      setTimeout(() => { btn.textContent = orig; }, 1500);
-    });
-  }
-
-  async function doSignOut(sb) {
-    await sb.auth.signOut();
-    window.location.href = 'index.html';
-  }
-
-  // Deleting the auth.users row — and, by cascade, profiles and
-  // everything FK'd to it — runs entirely inside Postgres via the
-  // public.delete_own_account() SECURITY DEFINER function (see
-  // db/delete_own_account.sql): it executes with the function owner's
-  // privileges, so no service role key ever needs to reach client code or
-  // a separately-deployed Edge Function.
-  async function doDeleteAccount(state, btn, msgEl) {
-    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
-    if (!confirm(t('profile.deleteaccount.confirm'))) return;
-    btn.disabled = true;
-    const orig = btn.textContent;
-    btn.textContent = t('profile.deleteaccount.deleting');
-    const { error } = await state.sb.rpc('delete_own_account');
-    if (error) {
-      btn.disabled = false;
-      btn.textContent = orig;
-      if (msgEl) msgEl.textContent = t('profile.deleteaccount.error');
-      return;
-    }
-    await state.sb.auth.signOut();
-    window.location.href = 'index.html';
-  }
-
-  function hiveSelfHTML(state) {
-    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
-    const district = state.profile && state.profile.neighborhood
-      ? (NB_NAMES[state.profile.neighborhood] || state.profile.neighborhood) : '';
-    const since = (state.I18N && state.I18N.formatMemberSince && state.profile && state.profile.joined_at)
-      ? state.I18N.formatMemberSince(state.profile.joined_at) : '';
-    const prefs = HIVE_PREFS.map(pref => {
-      const current = hivePrefValue(state, pref);
-      const options = pref.options.map(o => `
-        <button type="button" class="ist-hive-pref-opt${o.value === current ? ' ist-hive-pref-on' : ''}"
-                data-pref="${pref.key}" data-value="${o.value}"
-                aria-pressed="${o.value === current ? 'true' : 'false'}">${esc(o.labelKey ? t(o.labelKey) : o.label)}</button>`).join('');
-      return `
-        <div class="ist-hive-pref">
-          <span class="ist-hive-pref-label">${esc(t(pref.label))}</span>
-          <span class="ist-hive-pref-seg" role="group" aria-label="${esc(t(pref.label))}">${options}</span>
-        </div>`;
-    }).join('');
-    // ── Your account, on the depth that IS you ──
-    // Sen is where what is yours to change is printed, and these are the
-    // rest of it: the code you hand to somebody so they can stand next to
-    // you, the way out, and the way out for good. They used to live in
-    // the profile sheet's account block, which is Kütüphane's — a page in
-    // the parts bin that nothing links to, so in the app as shipped there
-    // was no logout, no account deletion and no way for a member to find
-    // their own kefil code after onboarding had shown it once.
-    //
-    // The code is its OWN copy button rather than carrying one beside it.
-    // A label, a value and a third control is three things on a row that
-    // has room for two, and the value is what you want to press anyway —
-    // so pressing it copies it and says so in its own place.
-    //
-    // Nothing on this page scrolls (see mountHivePage), and fitHive
-    // reserves whatever this block measures — so every row added here is
-    // taken out of the reader's own hexagon. That is the whole reason the
-    // account's READ-ONLY half (e-posta, telefon, the kefil chain, who
-    // you have sponsored) is deliberately not here: it is a record to be
-    // looked up, not a thing to be done, and it stays in the sheet.
-    const referralCode = state.profile && state.profile.referral_code
-      ? state.profile.referral_code : '';
-    const account = `
-      <div class="ist-hive-account">
-        ${referralCode ? `
-        <div class="ist-hive-pref ist-hive-code">
-          <span class="ist-hive-pref-label">${esc(t('profile.referralcode'))}</span>
-          <button type="button" class="ist-hive-code-val" id="po-hive-copy"
-                  aria-label="${esc(t('profile.referralcode'))}">${esc(referralCode)}</button>
-        </div>` : ''}
-        <div class="ist-hive-acts">
-          <button type="button" class="ist-hive-act" id="po-hive-signout">${esc(t('profile.signout'))}</button>
-          <button type="button" class="ist-hive-act ist-hive-act-danger" id="po-hive-delete">${esc(t('profile.deleteaccount'))}</button>
-        </div>
-      </div>`;
-    // No name here: the top bar already carries it (you, at your own end
-    // of the row) whenever this depth is on screen, and printing it twice
-    // said the same word from two directions at once. District and
-    // member-since stay -- the bar's own name line has no room for those.
-    return `
-      <div class="ist-hive-self" id="po-hive-self">
-        <div class="ist-hive-self-meta">${esc(district)}</div>
-        ${since ? `<div class="ist-hive-self-since">${esc(since)}</div>` : ''}
-        <div class="ist-hive-prefs">${prefs}</div>
-        ${account}
-        <div class="ist-hive-self-msg" id="po-hive-self-msg" role="status" aria-live="polite"></div>
-      </div>
-    `;
-  }
-
-  // A preference commits itself. There is no Kaydet on this page for the
-  // same reason there is no Kişiselleştir: what a press does, it does —
-  // exactly like the avatar arrows beside the hexagon above it. Whatever
-  // can be applied without a reload is applied here and now (the palette
-  // repaints, the language re-labels the site); the appearance is stored
-  // the same way the profile sheet stores it.
-  async function pickHivePref(state, key, value) {
-    const pref = HIVE_PREFS.find(p => p.key === key);
-    if (!pref || hivePrefValue(state, pref) === value) return;
-    const msg = document.getElementById('po-hive-self-msg');
-    const { data, error } = await state.sb.from('profiles')
-      .update({ [pref.column]: value }).eq('id', state.user.id).select('id');
-    if (error || !data || data.length === 0) {
-      if (msg) msg.textContent = (error && error.message) || 'Kaydedilemedi.';
-      return;
-    }
-    if (msg) msg.textContent = '';
-    state.profile = Object.assign({}, state.profile, { [pref.column]: value });
-    if (key === 'palette' && global.Palette) global.Palette.setPalette(value);
-    if (key === 'lang' && state.I18N && state.I18N.setLang) state.I18N.setLang(value);
-    // The block is rebuilt rather than patched: a language change rewrites
-    // every label on it, and the marks have to agree with what was just
-    // saved either way.
-    renderHiveSelf(state);
-  }
-
-  function wireHiveSelf(state) {
-    document.querySelectorAll('#po-hive-self .ist-hive-pref-opt').forEach(btn => {
-      btn.addEventListener('click', () => pickHivePref(state, btn.dataset.pref, btn.dataset.value));
-    });
-    // The three account actions, shared with the profile sheet's own
-    // block. The status line they report into is the one this depth
-    // already has for a failed preference save -- a second one would be
-    // another row out of the hexagon for a message that is almost never
-    // on screen.
-    wireCopyCode(document.getElementById('po-hive-copy'), state);
-    const signout = document.getElementById('po-hive-signout');
-    if (signout) signout.addEventListener('click', () => doSignOut(state.sb));
-    const del = document.getElementById('po-hive-delete');
-    if (del) del.addEventListener('click',
-      () => doDeleteAccount(state, del, document.getElementById('po-hive-self-msg')));
-  }
-
-  // Level 0's block, re-rendered in place. It is the page's furniture
-  // rather than the drawing's, so it never goes through renderHive — and
-  // it is wired here rather than at mount, since a re-render replaces
-  // every control on it.
-  function renderHiveSelf(state) {
-    const host = document.getElementById('po-hive-self');
-    if (!host) return;
-    host.outerHTML = hiveSelfHTML(state);
-    wireHiveSelf(state);
-    // Its height is what fitHive leaves the drawing at level 0, and a
-    // language change can move it by a line.
-    fitHive(state);
-  }
-
-  // Puts the page into the level it is at: which cells are drawn (a cell
-  // may stand no further out than the level, and the outermost level lets
-  // the whole map through), which of them answer a press, and which mark
-  // on the rail is lit. It never rebuilds anything — the drawing is one
-  // set of nodes at every depth, so a level change is a fade and a
-  // rescale rather than a re-render.
   // ── What the current depth says on <html> ──
   // Three classes, written on the root rather than on the page, because
   // what reacts to them is not this file's: the kept-events column
@@ -2450,96 +2208,40 @@
   // virtual navigation -- so the mount sets them up front and the
   // unmount clears them, neither of which has a state to read a level
   // off. That is why this is a function of a level and not of a state.
-  function paintHiveDepthClasses(level) {
+  function paintHiveDepthClasses(standing) {
     const root = document.documentElement;
-    root.classList.toggle('ist-hive-mid', level === HIVE_LEVEL_DEFAULT);
-    root.classList.toggle('ist-hive-offmid', level != null && level !== HIVE_LEVEL_DEFAULT);
-    root.classList.toggle('ist-hive-all', level === HIVE_LEVEL_ALL);
+    // With one depth these say only whether a petek is standing at all:
+    // mid while it is, neither while it is not. `ist-hive-offmid` is
+    // kept and never set -- anahane.html quiets its events column on
+    // that class precisely so a class that never lands leaves the
+    // column READABLE (see the note that follows), and a rule written
+    // the other way round would blank it for good now that nothing
+    // ever sets it. `ist-hive-all` was the whole shape's and is parked
+    // with it.
+    root.classList.toggle('ist-hive-mid', !!standing);
+    root.classList.remove('ist-hive-offmid');
+    root.classList.remove('ist-hive-all');
   }
 
+  // Puts the page into the one depth there is: which cells are drawn
+  // (a cell may stand no further out than HIVE_RING_CEILING) and which
+  // of them answer a press. It never rebuilds anything -- the drawing
+  // is one set of nodes, and this is a fade rather than a re-render.
+  //
+  // THE SEATS ARE LIVE HERE. They used to be the outermost depth's
+  // alone, and below it every cell was `disabled` -- a hexagon that
+  // answers a press by doing nothing being worse than one that plainly
+  // does not answer. That depth is parked, so the rule is simply gone:
+  // the only cells that do not answer are the ones standing further out
+  // than the drawing reaches.
   function applyHiveLevel(state) {
-    const level = hiveLevel(state);
-    const page = document.getElementById('po-hive-page');
-    if (page) {
-      for (let i = 0; i < HIVE_LEVELS; i++) page.classList.toggle(`ist-hive-level-${i}`, i === level);
-    }
-    paintHiveDepthClasses(level);
     const mount = document.getElementById('po-hive-mount');
     if (mount) mount.querySelectorAll('.ist-hive-cell').forEach(cell => {
       const ring = parseInt(cell.dataset.ring, 10) || 0;
-      const away = level < HIVE_LEVEL_ALL && ring > level;
+      const away = ring > HIVE_RING_CEILING;
       cell.classList.toggle('ist-hive-away', away);
-      // The exchange — offering a seat, taking one — belongs to the
-      // outermost level alone. Below it the seats are drawing rather than
-      // interface, so they are disabled outright and not merely stripped
-      // of their "+": a hexagon that answers a press by doing nothing is
-      // worse than one that plainly does not answer.
-      if (cell.tagName === 'BUTTON') cell.disabled = away || level < HIVE_LEVEL_ALL;
+      if (cell.tagName === 'BUTTON') cell.disabled = away;
     });
-    const rail = document.getElementById('po-hive-rail');
-    if (rail) rail.querySelectorAll('.ist-hive-rail-dot').forEach(dot => {
-      const on = parseInt(dot.dataset.level, 10) === level;
-      dot.classList.toggle('ist-hive-rail-on', on);
-      dot.setAttribute('aria-current', on ? 'true' : 'false');
-    });
-  }
-
-  // Moving between depths. The pan is dropped on the way — it belongs to
-  // the level it was dragged at, and arriving at a new depth already
-  // shoved off to one side is not arriving in the middle.
-  function setHiveLevel(state, next) {
-    const level = Math.max(0, Math.min(HIVE_LEVELS - 1, next));
-    if (level === hiveLevel(state)) return;
-    state.hiveLevel = level;
-    state.hivePan = { x: 0, y: 0 };
-    // A code on offer belongs to the level the seats are on: stepping
-    // away from that level folds the seat back rather than leaving a live
-    // code burning on a hexagon nobody can see any more. A member picked
-    // out of the petek is the same: their name is on the bar because the
-    // reader is standing in front of their hexagon, and at another depth
-    // they are not.
-    const dropped = level !== HIVE_LEVEL_ALL && (state.hiveOpen || state.hiveSelected);
-    if (dropped) {
-      const mount = document.getElementById('po-hive-mount');
-      const openCell = mount ? mount.querySelector('.ist-hive-cell-open') : null;
-      state.hiveSelected = null;
-      clearBarMember();
-      // At most one hexagon was open and at most one was red, so those
-      // are the only two things on the plane that have to be redrawn --
-      // the level's own work (applyHiveLevel/fitHive) happens below
-      // exactly as it does when nothing was dropped. hiveWaveIn is still
-      // deliberately skipped on this path, as it always was.
-      setHiveOpen(state, null, openCell);
-      paintHivePicked(state);
-      applyHiveLevel(state);
-      fitHive(state);
-      return;
-    }
-    applyHiveLevel(state);
-    fitHive(state);
-    // Entering the outermost depth specifically staggers the reveal (see
-    // hiveWaveIn) — the middle depth is already half of what's on screen
-    // arriving from level 0, and staggering an already-familiar shape
-    // reads as lag, not a reveal.
-    if (level === HIVE_LEVEL_ALL) hiveWaveIn(state);
-  }
-
-  // Entering the outermost depth reveals nearest-first, outward (see
-  // .ist-hive-wave-in in profile-card.css, keyed off each cell's --ring)
-  // instead of every hexagon arriving at once. The class only stays on
-  // for the run of this one transition — anything the reader does after
-  // it (levels 0↔1, or leaving 2 again) keeps the plain fade every level
-  // change has always had.
-  function hiveWaveIn(state) {
-    const page = document.getElementById('po-hive-page');
-    if (!page) return;
-    page.classList.add('ist-hive-wave-in');
-    clearTimeout(state.hiveWaveTimer);
-    // The stagger is capped in the stylesheet (the field now reaches
-    // past the screen, and a delay that grew with it would leave the
-    // outer paper still arriving long after the shape had), so the class
-    // comes off after that cap plus the transition itself.
-    state.hiveWaveTimer = setTimeout(() => page.classList.remove('ist-hive-wave-in'), 1600);
   }
 
   // ── The petek arrives in three beats ──
@@ -2702,15 +2404,7 @@
     const me = plane.querySelector('.ist-hive-me');
     if (!me) return;
 
-    const level = hiveLevel(state);
     const vw = view.clientWidth;
-    // Level 0 prints what is yours to change under your own hexagon, and
-    // that block is laid *over* the window rather than taking room from
-    // it (see .ist-hive-self in profile-card.css) — so what the drawing
-    // may use is what is left above it, and the reader's own frame is
-    // centred in that rather than behind the words.
-    const selfEl = document.getElementById('po-hive-self');
-    const selfReserve = (level === 0 && selfEl) ? selfEl.offsetHeight + HIVE_SELF_GAP : 0;
     // ── And the room the page keeps at the foot of the window ──
     // On a phone the foot of this band carries Hane's events strip, laid
     // over the drawing rather than standing in a row of its own (see
@@ -2728,7 +2422,7 @@
     // of the band now rather than being centred in what the shut strip
     // leaves (see offsetY).
     const openReserve = hiveBandReserve('--ist-hive-reserve');
-    const reserve = Math.max(selfReserve, openReserve);
+    const reserve = openReserve;
     const vhFull = view.clientHeight;
     const vh = vhFull - reserve;
     // The grid is drawn before the page is unhidden, so the first
@@ -2760,14 +2454,10 @@
     // hangs outside the plane's box, and the outermost one is exactly
     // what a window fitted to the cells alone would clip.
     //
-    // The outermost level measures the MIDDLE depth's own box instead of
-    // its own: ringCeiling is HIVE_LEVEL_DEFAULT whenever level is the
-    // outermost, not the level itself. Filtered by each cell's own
-    // data-ring rather than .ist-hive-away, because .ist-hive-away is
-    // never set on anything at the outermost level (see applyHiveLevel) —
-    // it can't tell "the six touching the reader" apart from the whole
-    // filled field the way a plain ring comparison can.
-    const ringCeiling = level === HIVE_LEVEL_ALL ? HIVE_LEVEL_DEFAULT : level;
+    // Filtered by each cell's own data-ring rather than by
+    // .ist-hive-away: a plain ring comparison is what tells "the six
+    // touching the reader" apart from the whole transparent field drawn
+    // around them, and the field is most of the nodes on the plane.
     let minL = cx, maxR = cx, minT = cy, maxB = cy;
     // Whatever hangs outside a cell's own box on this level and still has
     // to be on the paper: a member's name, and the avatar arrows at the
@@ -2776,18 +2466,14 @@
     // ink: fit the wider of the two, and leave a breath after it —
     // anything whose far edge lands exactly on the window's edge reads
     // as clipped rather than fitted.
-    const outriders = (cell) => {
-      const found = [...cell.querySelectorAll('.ist-hive-name')];
-      if (level === 0) found.push(...cell.querySelectorAll('.ist-hive-pick-col'));
-      return found;
-    };
-    // ringCeiling caps this at 7 cells even at the outermost level (the
+    const outriders = (cell) => [...cell.querySelectorAll('.ist-hive-name')];
+    // The ceiling caps this at 7 cells (the
     // ghost field's hundreds of cells all sit well past it), so this
     // never becomes the offsetLeft/offsetTop reflow storm a real
     // "measure the whole filled field" pass would be.
     plane.querySelectorAll('.ist-hive-cell, .ist-hive-picker').forEach(cell => {
       const ring = parseInt(cell.dataset.ring, 10) || 0;
-      if (ring > ringCeiling) return;
+      if (ring > HIVE_RING_CEILING) return;
       // A box with no size reports its offsets as zero — measured, it
       // would drag the required box out to the plane's own origin and
       // shrink the drawing to fit something nobody can see.
@@ -2821,7 +2507,7 @@
     // itself, which the middle depth often can't reach at all (six
     // names routinely leave a phone clamped well under 1.5x) and the
     // outermost level has to match rather than re-decide on its own.
-    const scale = Math.max(HIVE_MIN_SCALE, Math.min(HIVE_LEVEL_ZOOM[ringCeiling] || 1, vw / reqW, vh / reqH));
+    const scale = Math.max(HIVE_MIN_SCALE, Math.min(HIVE_ZOOM, vw / reqW, vh / reqH));
 
     // Scaling about the caller's own cell and then hanging that point off
     // the middle of the window keeps them in the middle at any scale —
@@ -2842,21 +2528,11 @@
     // it where a thumb is, under the reading. So the clamp IS the
     // resting place now: the foot of the drawing comes to rest exactly
     // on top of whatever the page has reserved at the bottom of the
-    // window (Hane's events strip, level 0's own block), with a card's
+    // window (Hane's events strip), with a card's
     // gap of paper between. The reader is still the fixed point
     // horizontally and still the point everything is scaled about; only
     // the line they stand on has moved.
     const offsetY = (vhFull - reserve - HIVE_CARD_GAP) - vhFull / 2 - belowMe;
-    // ── Level 0's block sits right under the hexagon, not at the foot of
-    // the window ──
-    // The window spans the whole band between the two bars, and centring
-    // the hexagon in that leaves a wide, empty middle on any screen taller
-    // than a hexagon plus its block — a bottom-pinned block then reads as
-    // stranded at the very foot of the screen instead of belonging to the
-    // avatar above it. So at level 0 the block's own top is set from where
-    // the fitted hexagon (and its avatar arrows, already in belowMe) actually
-    // ends, the same arithmetic clearY already uses.
-    if (level === 0 && selfEl) selfEl.style.top = `${vhFull / 2 + offsetY + belowMe + HIVE_SELF_GAP}px`;
     state.hiveFit = { scale, cx, cy, vw, vh, reqW, reqH, offsetY, vwFull: view.clientWidth, vhFull: view.clientHeight };
     plane.style.transformOrigin = `${cx}px ${cy}px`;
     // ── A fresh plane is placed, not animated into place ──
@@ -2891,7 +2567,7 @@
     // it even though it always overflows by design (see the scale
     // comment above) — it is meant to be looked at, filled edge to edge
     // and cut off at them, not dragged around inside.
-    const pannable = level !== HIVE_LEVEL_ALL && ((reqW * scale > vw + 1) || (reqH * scale > vh + 1));
+    const pannable = (reqW * scale > vw + 1) || (reqH * scale > vh + 1);
     view.classList.toggle('ist-hive-pannable', pannable);
     if (!pannable && (pan.x || pan.y)) {
       state.hivePan = { x: 0, y: 0 };
@@ -3035,14 +2711,41 @@
   // has been run the function isn't there, and the petek must still draw
   // — a member simply goes uncaptioned, which is exactly how the page
   // read before this existed.
+  // The games the app is actually casting tonight, which is the list
+  // the RPC counts against (db/hive_member_status_v2_games.sql). It has
+  // to agree with GAME_DEFS in project.html -- that is the column the
+  // caption is a picture of -- and it is passed rather than hardcoded
+  // server-side precisely because the old hardcoded copy drifted: the
+  // database went on counting Bulmaca long after the column stopped
+  // casting it, and reported three games into a two-slot column.
+  const HIVE_GAMES = ['sozcel', 'tumcel'];
+
   async function loadHiveStatus(state) {
     try {
-      const iso = IstDate.iso();
-      const [y, m, d] = iso.split('-').map(Number);
-      const { data, error } = await state.sb.rpc('hive_member_status', {
-        p_game_date: iso,
-        p_game_key: `${y}-${m}-${d}`,
+      // ── Keyed to the NIGHT, not to the calendar date ──
+      // Everything about a night's games is (see CLAUDE.md's own rule):
+      // game_day_toggles.game_date is the padded ISO night and
+      // game_results.date the unpadded seed for the same night. Asked
+      // with today's calendar date instead, every caption on the petek
+      // went wrong at midnight -- the half of the night after it counted
+      // against a night nobody was playing.
+      const night = IstDate.gameNight ? IstDate.gameNight() : IstDate.iso();
+      const seed = IstDate.gameNightSeed
+        ? IstDate.gameNightSeed()
+        : night.split('-').map(Number).join('-');
+      let { data, error } = await state.sb.rpc('hive_member_status', {
+        p_game_date: night, p_game_key: seed, p_games: HIVE_GAMES,
       });
+      // A database that has only ever run v1 has no three-argument
+      // function to call, and PostgREST says so in a CODE rather than in
+      // a message. Falling back keeps every caption on a petek whose SQL
+      // has not been run by hand yet -- the games half is simply counted
+      // against that version's own hardcoded list.
+      if (error && error.code === 'PGRST202') {
+        ({ data, error } = await state.sb.rpc('hive_member_status', {
+          p_game_date: night, p_game_key: seed,
+        }));
+      }
       if (error || !data) return;
       if (state !== _hive) return;
       const status = new Map(data.map(r => [String(r.member_id), r]));
@@ -3082,12 +2785,6 @@
     const plane = () => document.getElementById('po-hive-plane');
     const slack = () => {
       const fit = state.hiveFit || { scale: 1, reqW: 0, reqH: 0, vw: 0, vh: 0 };
-      // The outermost level never has room to give (see fitHive's
-      // pannable comment) -- a drag there is either a level-swipe or
-      // nothing, never a pan.
-      if (hiveLevel(state) === HIVE_LEVEL_ALL) {
-        return { x: 0, y: 0, offsetY: fit.offsetY || 0, scale: fit.scale };
-      }
       return {
         x: Math.max(0, (fit.reqW * fit.scale - fit.vw) / 2),
         y: Math.max(0, (fit.reqH * fit.scale - fit.vh) / 2),
@@ -3097,9 +2794,6 @@
     };
 
     page.addEventListener('pointerdown', (e) => {
-      // The rail and the block under level 0 are controls of their own;
-      // a press on either is not a pull on the drawing.
-      if (e.target.closest('.ist-hive-rail') || e.target.closest('.ist-hive-self')) return;
       state.hiveSwiped = false;
       g = {
         id: e.pointerId, x: e.clientX, y: e.clientY,
@@ -3111,8 +2805,9 @@
         // hexagon left shrunken behind whatever the press opened is
         // exactly the kind of thing nobody can take back.
         //
-        // Only what can be pressed presses: a cell the level has closed
-        // is `disabled` and a ghost is not a control, and both are
+        // Only what can be pressed presses: a cell standing further out
+        // than the drawing reaches is `disabled` and a ghost is not a
+        // control, and both are
         // pointer-events: none, so neither is ever the target here.
         pressed: e.target.closest('.ist-hive-cell'),
       };
@@ -3171,14 +2866,10 @@
       // Released: the hexagon springs back to its own size, on the
       // frame's own transition.
       if (gesture.pressed) gesture.pressed.classList.remove('ist-hive-cell-pressing');
-      if (gesture.axis === 'y' && Math.abs(gesture.over) > HIVE_LEVEL_SWIPE) {
-        setHiveLevel(state, hiveLevel(state) + (gesture.over < 0 ? 1 : -1));
-        return;
-      }
-      // Either it was a drag inside the drawing (fitHive puts the
-      // transition back and leaves the pan where the finger left it) or
-      // it was a pull that didn't reach the next level, which springs
-      // back the same way.
+      // A drag inside the drawing: fitHive puts the transition back and
+      // leaves the pan where the finger left it. A pull PAST the end of
+      // the drawing used to change depth; with one depth there is
+      // nowhere for it to go, so it springs back the same way.
       fitHive(state);
     };
     ['pointerup', 'pointercancel'].forEach(ev => page.addEventListener(ev, settle));
@@ -3192,22 +2883,6 @@
       e.preventDefault();
     }, true);
 
-    // The same move for a mouse. Rate-limited rather than accumulated: a
-    // trackpad sends a long tail of small deltas after the hand has left
-    // it, and a level per delta would fall straight through all three.
-    page.addEventListener('wheel', (e) => {
-      if (Math.abs(e.deltaY) < 8 || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
-      const now = Date.now();
-      if (now - (state.hiveWheelAt || 0) < 500) return;
-      state.hiveWheelAt = now;
-      setHiveLevel(state, hiveLevel(state) + (e.deltaY > 0 ? 1 : -1));
-    }, { passive: true });
-
-    // The rail: three marks, and each of them goes to its own depth.
-    const rail = document.getElementById('po-hive-rail');
-    if (rail) rail.querySelectorAll('.ist-hive-rail-dot').forEach(dot => {
-      dot.addEventListener('click', () => setHiveLevel(state, parseInt(dot.dataset.level, 10)));
-    });
 
   }
 
@@ -4159,14 +3834,6 @@
     closeProfileOverlay,
     mountHivePage,
     unmountHivePage,
-    // ── Driving the petek's depth from outside ──
-    // The onboarding tour walks the reader through the three depths and
-    // has to be able to stand them on one. It is exactly what pressing a
-    // rail mark does -- the same setHiveLevel, with the module's own
-    // state -- rather than a second way in, and it no-ops when the petek
-    // is not standing (nothing is mounted, or the reader is elsewhere).
-    setHivePageLevel(n) { if (_hive) setHiveLevel(_hive, n); },
-    hivePageLevel() { return _hive ? hiveLevel(_hive) : null; },
     revealHivePage,
     playHiveReveal,
     paintHiveEventMarks,
