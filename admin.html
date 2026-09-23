@@ -4806,7 +4806,7 @@ document.getElementById('news-list').addEventListener('click', function(e) {
   else if (act === 'unarchive-news') archiveBreakingNews(btn.dataset.id, false);
   else if (act === 'del-src') deleteSource(btn.dataset.id);
   else if (act === 'add-src') addSource(btn);
-  else if (act === 'del-update') deleteNewsUpdate(btn.dataset.id);
+  else if (act === 'del-update') deleteNewsUpdate(btn.dataset.id, card ? card.dataset.id : null);
   else if (act === 'add-update') addNewsUpdate(btn);
   else if (act === 'edit-news') showNewsEditForm(card);
   else if (act === 'cancel-edit') hideNewsEditForm(card);
@@ -5200,10 +5200,20 @@ async function seedNewsTimeline(newsId) {
 // own rule). So anything that changes what is in a timeline has to re-derive
 // it, or a story goes on showing a headline that now lives somewhere else.
 //
-// `updated_at` is deliberately NOT bumped here: that column is what puts a
-// story back on top of every reader's deck, and re-filing is a correction to
-// the record rather than a development in the story. The one caller that
+// `updated_at` is not bumped FORWARD here: that column is what puts a story
+// back on top of every reader's deck, and re-filing is a correction to the
+// record rather than a development in the story. The one caller that
 // genuinely is a development bumps it itself.
+//
+// It IS pulled BACK here, though, when it has to be: `updated_at` can only
+// mean "this is genuinely how fresh the story is" if it never outlives the
+// content that earned it. A gelişme moved in bumps it forward at the time;
+// if that same gelişme is later moved out again (or deleted), the head
+// reverts to something older but nothing else ever tells updated_at to
+// follow it back down — so the card goes on claiming a freshness no entry
+// underneath it can account for. Clamping it to the resolved head's own
+// created_at whenever that head is older than the stored value is what
+// keeps the two honest with each other.
 // Returns the head it applied, or null when the story has no timeline left.
 async function resyncNewsHead(newsId) {
   const { data, error } = await sb.from('breaking_news_updates')
@@ -5211,10 +5221,16 @@ async function resyncNewsHead(newsId) {
     .eq('news_id', newsId).order('created_at', { ascending: false }).limit(1);
   if (error || !data || !data.length) return null;
   const u = data[0];
-  await sb.from('breaking_news').update({
+  const patch = {
     title: u.title, body: u.body || null,
     title_en: u.title_en || null, body_en: u.body_en || null,
-  }).eq('id', newsId);
+  };
+  const { data: cur } = await sb.from('breaking_news')
+    .select('updated_at').eq('id', newsId).single();
+  if (cur && new Date(u.created_at) < new Date(cur.updated_at)) {
+    patch.updated_at = u.created_at;
+  }
+  await sb.from('breaking_news').update(patch).eq('id', newsId);
   return u;
 }
 
@@ -5368,10 +5384,13 @@ function moveFormHTML(attr, id, selfOption) {
     </div>`;
 }
 
-async function deleteNewsUpdate(id) {
+async function deleteNewsUpdate(id, newsId) {
   if (!confirm('Bu gelişmeyi sil?')) return;
   const { error } = await sb.from('breaking_news_updates').delete().eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
+  // What's left behind may have been the story's own headline — same rule
+  // every other timeline-changing action follows.
+  if (newsId) await resyncNewsHead(newsId);
   loadBreakingNews();
 }
 
