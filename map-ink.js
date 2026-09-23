@@ -152,24 +152,20 @@
     // stands on is built from (see project.html's own note on it), so
     // the mark comes out black on mono, brown ink on the earth palette's
     // own paper, and follows day/night the same way the card does.
+    // Sözcel's and Çengel's own marks (assets/sozcel-logo.png,
+    // assets/cengel-logo.png) are drawn the same way -- bold bubble
+    // letters, a near-white FILL and a near-black OUTLINE, both on a
+    // transparent canvas -- measured the same way and sharing one
+    // ladder. The fill reads --lit, the same token the card standing
+    // under it is built from, so by day it all but disappears into the
+    // card and only the outline (--ink) reads; after sunset the card is
+    // walked a step darker than the fill (see :root[data-theme="dark"]
+    // .fb-box:has(.logo) in project.html) so the fill itself comes up as
+    // a lit sign standing on a quieter face.
     {
       id: 'ist-sozcel-ink',
       tones: [253, 1],
       vars: ['--lit', '--ink'],
-      red: null,
-    },
-    // Çengel's own mark (assets/cengel-logo.png): drawn the other way
-    // round from Sözcel's -- transparent canvas, a near-white FILL and a
-    // near-black OUTLINE, so there is no "paper" tone here to fade into
-    // the card the way Sözcel's white background does. Both tones read
-    // the same token instead: the fill and its outline come out one flat
-    // --ink silhouette, following the card's own ink exactly like every
-    // other flat mark on the site (see the maps' and the avatar's own
-    // ladders above).
-    {
-      id: 'ist-cengel-ink',
-      tones: [254, 0],
-      vars: ['--ink', '--ink'],
       red: null,
     },
     // frame.png's ring: not a flat silhouette, a lit face and a shadow
