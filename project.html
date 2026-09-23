@@ -225,7 +225,7 @@
          top slot's top edge and the dock line. Stated as the sum the
          slots are already built from rather than as a fourth number. */
       --fb-band-h: calc(3 * var(--fb-box-h) + 2 * var(--fb-box-gap) + var(--fb-kicker-h));
-      /* Oyunlar carries two boxes now, not three (see GAME_DEFS) -- taller
+      /* Oyunlar carries two boxes now, not three (see GAME_SLOT_COUNT) -- taller
          ones, so the column still fills exactly the band the three used
          to: 2 * this + 1 gap == 3 * --fb-box-h + 2 gaps, the same total
          --fb-band-h is built from. Derived rather than a second literal,
@@ -2552,13 +2552,14 @@ async function refreshDayMeter() {
 
   try {
     const state = await gamesStateToday();
-    for (const g of GAME_DEFS) {
-      // A game the admin switched off is not a step anybody has left to
-      // take, so it is on neither side of the fraction -- the same
-      // reading hive_member_status and the app map's square give it.
-      if (state.off.has(g.key)) continue;
+    for (const key of state.lineup) {
+      // An empty slot, or a game the admin switched off, is not a step
+      // anybody has left to take, so it is on neither side of the
+      // fraction -- the same reading hive_member_status and the app
+      // map's square give it.
+      if (!key || state.off.has(key)) continue;
       total++;
-      if (state.played.has(g.key)) done++;
+      if (state.played.has(key)) done++;
     }
   } catch (err) { console.error('[proje gün]', err); }
 
@@ -3639,7 +3640,7 @@ async function loadSubmitActor(el, slot) {
   fbSetDone(el, false);
   el.classList.remove('fb-empty');
   // The same slot arithmetic the games use: the column reads downward,
-  // so the first game stands in the last slot (see gameForSlot).
+  // so the first game stands in the last slot (see lineupIndexForSlot).
   const g = SUBMIT_DEFS[SUBMIT_DEFS.length - 1 - slot];
   if (!g) {
     el.classList.add('fb-empty');
@@ -3999,28 +4000,30 @@ function loadKahveNarrow(el, slot) {
   return fbEdition === 'gece' ? loadOyunActor(el, slot) : loadSubmitActor(el, slot);
 }
 
-// ── Kahvehane's other column: the fixed set of games ──
-// Not a feed -- always these two, in this order -- but a game the
-// admin switched off for today (game_day_toggles) is not a step the
-// reader has left to take (see CLAUDE.md), so its own slot goes
-// dashed exactly like an empty feed slot rather than opening a locked
-// page. Bulmaca is not a slot here any more -- it stays a real page
-// (bulmaca.html), reachable directly and still run by the admin's
-// on/off board and scoreboard, but this column only carries two boxes
-// now (see .fb-oyun's own height override, sized to fill exactly the
-// room three boxes used to take).
-const GAME_DEFS = [
+// ── Kahvehane's other column: two game SLOTS ──
+// A slot is not a game (db/game_night_slots.sql): the column has two
+// boxes, 1. Oyun and 2. Oyun, and which game stands in each is the
+// admin's choice per night -- any of the three, one game per slot. A
+// night the admin never set falls back to GAME_DEFAULT_LINEUP, which is
+// what every night showed before the slots existed and must match
+// admin.html's own copy. A slot left empty, or holding a game the admin
+// switched off (game_day_toggles), goes dashed exactly like an empty
+// feed slot rather than opening a locked page.
+const GAME_CATALOG = {
   // Sözcel wears its own mark (the same assets/sozcel-logo.png the
-  // desktop game-link tiles use) in place of its plain title; Tümcel has
-  // no logo of its own yet, so it still prints its name as text.
-  { key: 'sozcel', kicker: '1. OYUN', title: 'Sözcel', logo: 'assets/sozcel-logo.png', file: 'sozcel.html' },
-  { key: 'tumcel', kicker: '2. OYUN', title: 'Tümcel', file: 'tumcel.html' },
-];
+  // desktop game-link tiles use) in place of its plain title; the other
+  // two have no logo of their own yet, so they print their name as text.
+  sozcel:  { key: 'sozcel',  title: 'Sözcel', logo: 'assets/sozcel-logo.png', file: 'sozcel.html' },
+  tumcel:  { key: 'tumcel',  title: 'Tümcel', file: 'tumcel.html' },
+  bulmaca: { key: 'bulmaca', title: 'Çengel', file: 'bulmaca.html' },
+};
+const GAME_SLOT_COUNT = 2;
+const GAME_DEFAULT_LINEUP = ['sozcel', 'tumcel'];
 // The sequence reads DOWNWARD: 1. Oyun on top, 2. Oyun at the dock. The
-// slots are numbered from the dock up (see .fb-slot-N), so the first
-// game stands in the last slot -- the one place that arithmetic is
-// written.
-function gameForSlot(slot) { return GAME_DEFS[GAME_DEFS.length - 1 - slot]; }
+// actor slots are numbered from the dock up (see .fb-slot-N), so the
+// first position stands in the last slot -- the one place that
+// arithmetic is written.
+function lineupIndexForSlot(slot) { return GAME_SLOT_COUNT - 1 - slot; }
 
 // Today's state for the whole column, fetched once and shared by all
 // three boxes: which games the admin has switched off, and which the
@@ -4031,9 +4034,25 @@ let gamesStatePromise = null;
 function gamesStateToday() {
   if (gamesStatePromise) return gamesStatePromise;
   gamesStatePromise = (async () => {
-    const state = { off: new Set(), played: new Set() };
+    const state = { off: new Set(), played: new Set(), lineup: GAME_DEFAULT_LINEUP.slice() };
     const sb = window.IstRouter && IstRouter.sb;
     if (!sb) return state;
+    // Which game stands in which slot tonight. A night with no rows (or a
+    // database that predates the table) keeps the default lineup.
+    try {
+      const { data, error } = await sb.from('game_night_slots')
+        .select('slot, game').eq('game_date', IstDate.gameNight());
+      if (error) throw error;
+      if (data && data.length) {
+        const lineup = Array(GAME_SLOT_COUNT).fill(null);
+        data.forEach(r => {
+          if (r.slot >= 0 && r.slot < GAME_SLOT_COUNT && GAME_CATALOG[r.game]) lineup[r.slot] = r.game;
+        });
+        state.lineup = lineup;
+      }
+    } catch (err) {
+      console.error('[proje oyun yuva]', err);
+    }
     // Two different date SHAPES, deliberately: game_day_toggles is keyed
     // by the padded ISO key and game_results by the unpadded seed. Both
     // name the same thing — the NIGHT being played, which spans midnight,
@@ -4072,22 +4091,25 @@ function gamesStateToday() {
 async function loadOyunActor(el, slot) {
   const state = await gamesStateToday();
   if (!el.isConnected) return;
-  const idx = GAME_DEFS.length - 1 - slot;
-  const g = GAME_DEFS[idx];
+  const idx = lineupIndexForSlot(slot);
+  const kicker = (idx + 1) + '. OYUN';
+  const g = GAME_CATALOG[state.lineup[idx]];
   fbSetDone(el, false);
-  if (state.off.has(g.key)) {
+  if (!g || state.off.has(g.key)) {
+    delete el.dataset.game;
     el.classList.add('fb-empty'); el.classList.remove('fb-openable');
-    el.innerHTML = '<div class="k">' + g.kicker + '</div>'; return;
+    el.innerHTML = '<div class="k">' + kicker + '</div>'; return;
   }
+  el.dataset.game = g.key;
   el.classList.remove('fb-empty');
   // PLAYED means finished (attempts >= 1), the same reading the app map's
   // own square uses -- the two have to agree or a game opens looking
   // unplayed while the map already counted it done.
   fbSetDone(el, state.played.has(g.key));
-  // Sözcel and Tümcel are independent -- either can be played first, so
-  // the box always answers a press once it is on today.
+  // The games are independent -- any can be played first, so the box
+  // always answers a press once it is on today.
   el.classList.add('fb-openable');
-  el.innerHTML = '<div class="k">' + g.kicker + '</div>' + oyunTitleHtml(g);
+  el.innerHTML = '<div class="k">' + kicker + '</div>' + oyunTitleHtml(g);
 }
 
 // The column is re-read the moment a game is closed rather than at the
@@ -4113,7 +4135,9 @@ function onpressOyun(e, slot) {
   // this the daytime boxes looked pressable, set `_fbPage`, and did
   // nothing at all when pressed.
   if (NIGHT_GAMES_ENABLED && fbEdition !== 'gece') { onpressBox(e); return; }
-  openGameOverlay(gameForSlot(slot).file);
+  // The game is the one loadOyunActor stood in this slot tonight.
+  const g = GAME_CATALOG[el.dataset.game];
+  if (g) openGameOverlay(g.file);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -4588,7 +4612,7 @@ const CAST = [
     idBase: 'etkinlik', live: ISTANBUL_SLIDE, lane: LANE_KAHVEHANE, col: 'r', mirror: true, cls: 'fb-events',
     poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadEtkinlikActor, onpress: onpressBox,
   }),
-  // Two slots, not three (see GAME_DEFS) -- .fb-oyun's own height
+  // Two slots, not three (see GAME_SLOT_COUNT) -- .fb-oyun's own height
   // override (--fb-oyun-box-h) grows each box so the column still fills
   // exactly the band three boxes used to.
   ...stackActors({
