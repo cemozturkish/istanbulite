@@ -994,6 +994,81 @@
       border-color: var(--ink);
     }
 
+    /* ── ÇENGEL — the hand-drawn grid editor ── */
+    .bz-dims { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+    .bz-dims > div { display: flex; flex-direction: column; }
+    .bz-dims input[type="number"] { width: 70px; }
+    .bz-grid-wrap { overflow-x: auto; margin-bottom: 16px; }
+    .bz-grid {
+      display: inline-flex;
+      flex-direction: column;
+      border: 2px solid var(--ink);
+      width: fit-content;
+    }
+    .bz-row { display: flex; }
+    .bz-cell {
+      position: relative;
+      width: 34px;
+      height: 34px;
+      box-sizing: border-box;
+      border: 1px solid var(--rule);
+      background: var(--paper-card);
+      flex-shrink: 0;
+    }
+    .bz-cell.bz-block {
+      background: var(--ink);
+      cursor: pointer;
+    }
+    .bz-num {
+      position: absolute;
+      top: 1px;
+      left: 2px;
+      font-size: 0.5rem;
+      color: var(--accent);
+      line-height: 1;
+      pointer-events: none;
+    }
+    .bz-letter {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: transparent;
+      text-align: center;
+      text-transform: uppercase;
+      font-weight: 700;
+      font-size: 0.85rem;
+      padding: 0;
+      box-sizing: border-box;
+      color: var(--ink);
+    }
+    .bz-letter:focus { outline: 1px solid var(--accent); }
+    .bz-blockbtn {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 10px;
+      height: 10px;
+      background: var(--muted);
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      opacity: 0.35;
+    }
+    .bz-blockbtn:hover { opacity: 0.9; }
+    .bz-clue-groups { display: flex; flex-direction: column; gap: 18px; }
+    .bz-clue-group-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .bz-clue-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+    .bz-clue-row .bz-clue-label { font-size: 0.72rem; font-weight: 700; min-width: 60px; padding-top: 8px; color: var(--muted); }
+    .bz-clue-row textarea { flex: 1; }
+
     /* ── MOBILE RESPONSIVE ── */
     @media (max-width: 768px) {
       html, body {
@@ -2953,13 +3028,54 @@
 
       <!-- BULMACA (Çengel) -->
       <div class="games-subpanel" id="games-bulmaca-panel" style="display:none;">
-        <div class="panel-title">Çengel</div>
-        <p style="font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-          Çengel'in günlük bilmeceleri otomatik üretilir — buradan manuel içerik girişi yapılmaz.
-          Oyunu belirli bir gün için açıp kapatmak için yukarıdaki Oyun Takvimi'ni kullanın. Sözcel
-          sekmesindeki kelime önerileri (kelime + anlamı) Çengel'in bilmecelerini elle kurarken de
-          kaynak olarak kullanılabilir.
+        <div class="panel-title" id="bz-form-mode-label">Yeni Çengel Bulmacası</div>
+        <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
+          Izgarayı hücre hücre kendiniz kurun: bir hücreye tıklayınca açık/kapalı (siyah kare) olarak
+          değişir, açık bir hücreye harf yazabilirsiniz. Sistem yatay/dikey kelimelerin numaralarını
+          ızgaradan kendisi çıkarır — siz yalnızca ipuçlarını yazarsınız. Oyunu belirli bir gün için
+          açıp kapatmak için yukarıdaki Oyun Takvimi'ni kullanın; bir gece için bulmaca girilmezse o
+          gece Çengel'in içeriği boş kalır.
         </p>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
+          <div style="flex:1;min-width:150px;">
+            <label style="margin-top:0;">Gece (tarih)</label>
+            <input type="date" id="bz-date">
+          </div>
+        </div>
+        <input type="hidden" id="bz-editing-date">
+
+        <div class="bz-dims">
+          <div>
+            <label style="margin-top:0;">Satır</label>
+            <input type="number" id="bz-rows" min="3" max="12" value="5">
+          </div>
+          <div>
+            <label style="margin-top:0;">Sütun</label>
+            <input type="number" id="bz-cols" min="3" max="12" value="5">
+          </div>
+          <button class="btn" id="bz-resize-btn" type="button" style="padding:9px 14px;white-space:nowrap;">Izgarayı Uygula</button>
+        </div>
+
+        <div class="bz-grid-wrap">
+          <div class="bz-grid" id="bz-grid"></div>
+        </div>
+
+        <div class="panel-title" style="margin:18px 0 10px;font-size:0.85rem;">İpuçları</div>
+        <div class="bz-clue-groups" id="bz-clues"></div>
+
+        <div class="btn-row" style="margin-top:24px;">
+          <button class="btn btn-primary" id="bz-submit-btn">Bulmacayı Kaydet</button>
+          <button class="btn btn-secondary" id="bz-cancel-btn" style="display:none;">İptal</button>
+        </div>
+        <div class="status-msg" id="bz-form-status"></div>
+
+        <div style="margin-top:24px;">
+          <div class="panel-title" style="margin:0 0 14px;">Mevcut Bulmacalar</div>
+          <div class="articles-list" id="bz-list">
+            <div class="empty-state"><span class="spinner"></span></div>
+          </div>
+        </div>
       </div>
 
       <!-- SORULAR — the question between two games (db/daily_questions.sql) -->
@@ -3658,7 +3774,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'worldevents') loadWorldEventsTab();
     if (tab === 'news') { loadSeries(); loadBreakingNews(); }
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
-    if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); initSozcelSuggestions(); }
+    if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); initSozcelSuggestions(); loadBulmacaPuzzles(); }
     if (tab === 'quotes') loadQuotesList();
     if (tab === 'district-polls') loadDistrictPollsList();
     if (tab === 'kahve') loadCoffeeList();
@@ -9249,6 +9365,353 @@ async function deleteTumcelPuzzle(date) {
 }
 
 // ══════════════════════════════════════════
+// Çengel (Bulmaca) — the hand-drawn grid editor
+// db/bulmaca_puzzles.sql. A night's puzzle is keyed by `puzzle_date`,
+// the same way tumcel_puzzles is: bulmaca.html reads it off
+// IstDate.gameNightSeed(). The admin shapes the grid cell by cell
+// (block/open) and types the letters; the numbering (and therefore
+// which clue belongs to which word) is derived from the grid rather
+// than entered by hand, so it can never drift from what the grid
+// actually draws.
+// ══════════════════════════════════════════
+
+function bzBlankGrid(rows, cols) {
+  return Array.from({ length: rows }, () => Array.from({ length: cols }, () => ''));
+}
+
+const bzState = { rows: 5, cols: 5, grid: bzBlankGrid(5, 5), clueMap: {} };
+
+// Resizing keeps whatever overlaps the old grid (top-left aligned), so
+// growing or shrinking mid-edit doesn't throw away work already done.
+function bzResizeGrid(rows, cols) {
+  const old = bzState.grid;
+  const grid = [];
+  for (let r = 0; r < rows; r++) {
+    const row = [];
+    for (let c = 0; c < cols; c++) {
+      row.push(old[r] && old[r][c] !== undefined ? old[r][c] : '');
+    }
+    grid.push(row);
+  }
+  bzState.rows = rows;
+  bzState.cols = cols;
+  bzState.grid = grid;
+}
+
+// Standard crossword numbering: a cell opens a numbered entry when it
+// starts a run of 2+ open cells across or down (blocked square or the
+// grid edge behind it). One number can open both an across and a down
+// entry at once, exactly as a real crossword's does.
+function bzComputeEntries() {
+  const { grid, rows, cols } = bzState;
+  const across = [], down = [];
+  let num = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] === null) continue;
+      const startsAcross = (c === 0 || grid[r][c - 1] === null) && (c + 1 < cols && grid[r][c + 1] !== null);
+      const startsDown = (r === 0 || grid[r - 1][c] === null) && (r + 1 < rows && grid[r + 1][c] !== null);
+      if (!startsAcross && !startsDown) continue;
+      num++;
+      if (startsAcross) {
+        let len = 0, cc = c;
+        while (cc < cols && grid[r][cc] !== null) { len++; cc++; }
+        across.push({ num, row: r, col: c, len });
+      }
+      if (startsDown) {
+        let len = 0, rr = r;
+        while (rr < rows && grid[rr][c] !== null) { len++; rr++; }
+        down.push({ num, row: r, col: c, len });
+      }
+    }
+  }
+  return { across, down };
+}
+
+function bzRenderGrid() {
+  const { grid, rows, cols } = bzState;
+  const { across, down } = bzComputeEntries();
+  const numAt = {};
+  across.forEach(e => { numAt[e.row + ':' + e.col] = e.num; });
+  down.forEach(e => { numAt[e.row + ':' + e.col] = e.num; });
+
+  const wrap = document.getElementById('bz-grid');
+  wrap.innerHTML = '';
+  for (let r = 0; r < rows; r++) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'bz-row';
+    for (let c = 0; c < cols; c++) {
+      const cellEl = document.createElement('div');
+      const blocked = grid[r][c] === null;
+      cellEl.className = 'bz-cell' + (blocked ? ' bz-block' : '');
+      cellEl.dataset.r = r;
+      cellEl.dataset.c = c;
+      if (blocked) {
+        cellEl.title = 'Açmak için tıklayın';
+      } else {
+        const n = numAt[r + ':' + c];
+        if (n) {
+          const numEl = document.createElement('span');
+          numEl.className = 'bz-num';
+          numEl.textContent = n;
+          cellEl.appendChild(numEl);
+        }
+        const input = document.createElement('input');
+        input.className = 'bz-letter';
+        input.maxLength = 1;
+        input.value = grid[r][c] || '';
+        input.dataset.r = r;
+        input.dataset.c = c;
+        cellEl.appendChild(input);
+
+        const blockBtn = document.createElement('button');
+        blockBtn.type = 'button';
+        blockBtn.className = 'bz-blockbtn';
+        blockBtn.title = 'Kapat';
+        blockBtn.dataset.r = r;
+        blockBtn.dataset.c = c;
+        cellEl.appendChild(blockBtn);
+      }
+      rowEl.appendChild(cellEl);
+    }
+    wrap.appendChild(rowEl);
+  }
+}
+
+// Clue text is kept by direction+row+col rather than by number, so it
+// survives a grid edit that shifts every number after it -- only a
+// change to where a word itself starts should ever lose its clue.
+function bzRenderClues() {
+  const { across, down } = bzComputeEntries();
+  const container = document.getElementById('bz-clues');
+  if (!across.length && !down.length) {
+    container.innerHTML = '<div class="empty-state">Bu ızgarada henüz kelime yok — hücreleri açın.</div>';
+    return;
+  }
+  const group = (title, dir, entries) => {
+    if (!entries.length) return '';
+    const rows = entries.map(e => {
+      const key = dir + ':' + e.row + ':' + e.col;
+      const val = bzState.clueMap[key] || '';
+      return `
+        <div class="bz-clue-row">
+          <span class="bz-clue-label">${e.num}. (${e.len})</span>
+          <textarea rows="1" data-bz-clue="${key}" placeholder="İpucu...">${escapeHtml(val)}</textarea>
+        </div>
+      `;
+    }).join('');
+    return `<div class="bz-clue-group"><div class="bz-clue-group-title">${title}</div>${rows}</div>`;
+  };
+  container.innerHTML = group('Yatay', 'a', across) + group('Dikey', 'd', down);
+}
+
+document.getElementById('bz-grid').addEventListener('click', (e) => {
+  const blockBtn = e.target.closest('.bz-blockbtn');
+  if (blockBtn) {
+    bzState.grid[+blockBtn.dataset.r][+blockBtn.dataset.c] = null;
+    bzRenderGrid();
+    bzRenderClues();
+    return;
+  }
+  const blockedCell = e.target.closest('.bz-cell.bz-block');
+  if (blockedCell) {
+    bzState.grid[+blockedCell.dataset.r][+blockedCell.dataset.c] = '';
+    bzRenderGrid();
+    bzRenderClues();
+  }
+});
+
+document.getElementById('bz-grid').addEventListener('input', (e) => {
+  if (!e.target.classList.contains('bz-letter')) return;
+  const r = +e.target.dataset.r, c = +e.target.dataset.c;
+  // Turkish letters only, uppercased with the Turkish fold (İ/i, I/ı
+  // are not the invariant-locale pairs -- see CLAUDE.md coding
+  // conventions), and only the last character typed survives a paste.
+  let v = (e.target.value || '').slice(-1).toLocaleUpperCase('tr-TR');
+  if (v && !/[A-ZÇĞİÖŞÜ]/.test(v)) v = '';
+  e.target.value = v;
+  bzState.grid[r][c] = v;
+});
+
+document.getElementById('bz-clues').addEventListener('input', (e) => {
+  const key = e.target.dataset.bzClue;
+  if (!key) return;
+  bzState.clueMap[key] = e.target.value;
+});
+
+document.getElementById('bz-resize-btn').addEventListener('click', () => {
+  const rows = Math.max(3, Math.min(12, parseInt(document.getElementById('bz-rows').value, 10) || 5));
+  const cols = Math.max(3, Math.min(12, parseInt(document.getElementById('bz-cols').value, 10) || 5));
+  document.getElementById('bz-rows').value = rows;
+  document.getElementById('bz-cols').value = cols;
+  bzResizeGrid(rows, cols);
+  bzRenderGrid();
+  bzRenderClues();
+});
+
+function resetBulmacaForm() {
+  document.getElementById('bz-date').value = '';
+  document.getElementById('bz-editing-date').value = '';
+  document.getElementById('bz-rows').value = 5;
+  document.getElementById('bz-cols').value = 5;
+  bzState.rows = 5;
+  bzState.cols = 5;
+  bzState.grid = bzBlankGrid(5, 5);
+  bzState.clueMap = {};
+  bzRenderGrid();
+  bzRenderClues();
+  document.getElementById('bz-form-mode-label').textContent = 'Yeni Çengel Bulmacası';
+  document.getElementById('bz-cancel-btn').style.display = 'none';
+  document.getElementById('bz-submit-btn').textContent = 'Bulmacayı Kaydet';
+}
+
+function fillBulmacaForm(puzzle) {
+  document.getElementById('bz-date').value = puzzle.puzzle_date;
+  document.getElementById('bz-editing-date').value = puzzle.puzzle_date;
+  bzState.rows = puzzle.rows;
+  bzState.cols = puzzle.cols;
+  bzState.grid = (puzzle.grid || []).map(row => row.map(cell => cell === null ? null : (cell || '')));
+  bzState.clueMap = {};
+  (puzzle.clues?.across || []).forEach(e => { bzState.clueMap['a:' + e.row + ':' + e.col] = e.clue || ''; });
+  (puzzle.clues?.down || []).forEach(e => { bzState.clueMap['d:' + e.row + ':' + e.col] = e.clue || ''; });
+  document.getElementById('bz-rows').value = bzState.rows;
+  document.getElementById('bz-cols').value = bzState.cols;
+  bzRenderGrid();
+  bzRenderClues();
+  document.getElementById('bz-form-mode-label').textContent = 'Çengel Bulmacasını Düzenle';
+  document.getElementById('bz-cancel-btn').style.display = 'inline-block';
+  document.getElementById('bz-submit-btn').textContent = 'Güncelle';
+  document.querySelector('#games-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.getElementById('bz-cancel-btn').addEventListener('click', resetBulmacaForm);
+
+document.getElementById('bz-submit-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('bz-form-status');
+  const btn = document.getElementById('bz-submit-btn');
+  const dateVal = document.getElementById('bz-date').value;
+  const editingDate = document.getElementById('bz-editing-date').value;
+
+  if (!dateVal) {
+    statusEl.textContent = 'Tarih seçin.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  const { grid, rows, cols } = bzState;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] !== null && !grid[r][c]) {
+        statusEl.textContent = 'Açık bıraktığınız her hücreye bir harf girin.';
+        statusEl.className = 'status-msg err';
+        return;
+      }
+    }
+  }
+
+  const { across, down } = bzComputeEntries();
+  if (!across.length && !down.length) {
+    statusEl.textContent = 'Izgarada en az bir kelime olmalı.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  const withClues = (dir, entries) => entries.map(e => ({
+    ...e,
+    clue: (bzState.clueMap[dir + ':' + e.row + ':' + e.col] || '').trim()
+  }));
+  const acrossWithClues = withClues('a', across);
+  const downWithClues = withClues('d', down);
+  if ([...acrossWithClues, ...downWithClues].some(e => !e.clue)) {
+    statusEl.textContent = 'Her kelimenin bir ipucu olmalı.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+
+  const payload = { rows, cols, grid, clues: { across: acrossWithClues, down: downWithClues } };
+
+  statusEl.textContent = '';
+  statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  let result;
+  if (editingDate && editingDate !== dateVal) {
+    await sb.from('bulmaca_puzzles').delete().eq('puzzle_date', editingDate);
+    result = await sb.from('bulmaca_puzzles').insert([{ puzzle_date: dateVal, ...payload }]);
+  } else if (editingDate) {
+    result = await sb.from('bulmaca_puzzles').update(payload).eq('puzzle_date', editingDate);
+  } else {
+    result = await sb.from('bulmaca_puzzles').insert([{ puzzle_date: dateVal, ...payload }]);
+  }
+
+  btn.textContent = editingDate ? 'Güncelle' : 'Bulmacayı Kaydet';
+
+  if (result.error) {
+    statusEl.textContent = result.error.message;
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  statusEl.textContent = editingDate ? 'Güncellendi!' : 'Kaydedildi!';
+  statusEl.className = 'status-msg ok';
+  resetBulmacaForm();
+  loadBulmacaPuzzles();
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+async function loadBulmacaPuzzles() {
+  const listEl = document.getElementById('bz-list');
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const { data, error } = await sb
+    .from('bulmaca_puzzles')
+    .select('puzzle_date, rows, cols, clues')
+    .order('puzzle_date', { ascending: false })
+    .limit(20);
+  if (error) { listEl.innerHTML = '<div class="empty-state">Yüklenemedi: ' + escapeHtml(error.message) + '</div>'; return; }
+  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">Henüz bulmaca eklenmemiş.</div>'; return; }
+
+  listEl.innerHTML = data.map(p => {
+    const across = Array.isArray(p.clues?.across) ? p.clues.across.length : 0;
+    const down = Array.isArray(p.clues?.down) ? p.clues.down.length : 0;
+    return `
+      <div class="article-card">
+        <div class="a-neighborhood">${escapeHtml(p.puzzle_date)}</div>
+        <h4 style="font-size:0.8rem;line-height:1.4;">${p.rows}×${p.cols} — ${across} yatay, ${down} dikey</h4>
+        <div class="card-actions">
+          <button class="btn-edit" data-bz-edit="${escapeHtml(p.puzzle_date)}">Edit</button>
+          <button class="btn-del"  data-bz-del="${escapeHtml(p.puzzle_date)}">Delete</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('[data-bz-edit]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const { data: full, error: fullErr } = await sb
+        .from('bulmaca_puzzles')
+        .select('*')
+        .eq('puzzle_date', btn.dataset.bzEdit)
+        .maybeSingle();
+      if (fullErr || !full) { alert('Yüklenemedi: ' + (fullErr ? fullErr.message : '')); return; }
+      fillBulmacaForm(full);
+    });
+  });
+  listEl.querySelectorAll('[data-bz-del]').forEach(btn => {
+    btn.addEventListener('click', () => deleteBulmacaPuzzle(btn.dataset.bzDel));
+  });
+}
+
+async function deleteBulmacaPuzzle(date) {
+  if (!confirm(`${date} tarihli bulmacayı sil? Bu işlem geri alınamaz.`)) return;
+  const { error } = await sb.from('bulmaca_puzzles').delete().eq('puzzle_date', date);
+  if (error) { alert('Silinemedi: ' + error.message); return; }
+  loadBulmacaPuzzles();
+}
+
+// Paint the blank starting grid once at parse time, same as the rest
+// of this block runs at parse time against DOM already on the page.
+bzRenderGrid();
+bzRenderClues();
+
+// ══════════════════════════════════════════
 // Notifications tab
 // ══════════════════════════════════════════
 async function loadNotifications() {
@@ -10161,6 +10624,26 @@ const PRESS_FORMES = [
       const n = Array.isArray(data.quotes) ? data.quotes.length : 0;
       if (n < 4) return { state: 'miss', note: n + '/4 alıntı' };
       return { state: 'ok', note: '4 alıntı' };
+    },
+  },
+  {
+    id: 'bulmaca',
+    name: 'Çengel',
+    tab: 'games',
+    editions: ['gece'],
+    // Çengel's puzzles used to be generated, so this forme did not exist
+    // -- there was nothing to check. Now the admin draws the grid by
+    // hand (db/bulmaca_puzzles.sql), so a night with no row for it is a
+    // genuinely empty game, exactly like Tümcel above.
+    async check(ctx) {
+      if (ctx.gamesOff.has('bulmaca')) return { state: 'na', note: 'Kapalı' };
+      const { data, error } = await sb.from('bulmaca_puzzles')
+        .select('clues').eq('puzzle_date', ctx.date).maybeSingle();
+      if (error) throw error;
+      if (!data) return { state: 'miss', note: 'Çengel yok' };
+      const across = Array.isArray(data.clues?.across) ? data.clues.across.length : 0;
+      const down = Array.isArray(data.clues?.down) ? data.clues.down.length : 0;
+      return { state: 'ok', note: (across + down) + ' ipucu' };
     },
   },
   {
