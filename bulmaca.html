@@ -220,12 +220,75 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
       padding: 10px 16px;
-      overflow-y: auto;
+      overflow: hidden;
       min-height: 0;
       gap: 8px;
       flex: 1;
+    }
+
+    /* The grid, the buttons and the clues scroll; the keyboard under them
+       is the page's fixed furniture and never scrolls away. */
+    .play-scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ── The keyboard: Sözcel's, key for key ──
+       The grid cells are not inputs, so a phone never raises its own
+       keyboard for them; this is the one it gets instead. Same Turkish Q
+       layout, same hexagon keys (the .key mask and ring come from
+       frames.css), sized by layoutKeyboard() the way sozcel.html's
+       layoutGame() sizes its own. */
+    .keyboard {
+      display: flex;
+      flex-direction: column;
+      gap: var(--kb-row-gap, 5px);
+      max-width: 100%;
+      flex-shrink: 0;
+      --kb-key-wide: calc(var(--kb-key, 30px) * 1.5 + var(--kb-gap, 3px) * 0.5);
+    }
+    .keyboard:empty { display: none; }
+    .keyboard-row {
+      display: flex;
+      gap: var(--kb-gap, 3px);
+      justify-content: center;
+    }
+    .key {
+      flex: 0 0 var(--kb-key, 30px);
+      width: var(--kb-key, 30px);
+      padding: 0;
+      background: var(--rule);
+      /* A <button> with no color of its own takes the platform's default
+         tint (iOS Safari's blue); say the ink outright. */
+      color: var(--ink);
+      border: none;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: var(--kb-font, 15px);
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: background 0.2s;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+    .key.wide {
+      flex-basis: var(--kb-key-wide);
+      width: var(--kb-key-wide);
+      font-size: var(--kb-font-wide, 11px);
+    }
+    /* Q/W/X keep their place on the Turkish layout but never type. */
+    .key:disabled, .key.key-disabled {
+      opacity: 0.2;
+      cursor: default;
     }
 
     .crossword-grid {
@@ -725,20 +788,21 @@
         min-height: 0;
         width: 100%;
         height: 100dvh;
-        overflow-y: auto;
-        overflow-x: hidden;
+        /* The panel scrolls inside itself (.play-scroll) so the
+           keyboard can stay put at the foot of the screen. */
+        overflow: hidden;
         display: flex;
         flex-direction: column;
-        -webkit-overflow-scrolling: touch;
       }
       .game-panel {
-        padding: 60px 12px 24px 12px;
-        gap: 18px;
+        padding: 60px 12px calc(10px + env(safe-area-inset-bottom)) 12px;
+        gap: 10px;
         display: flex;
         flex-direction: column;
         align-items: center;
         flex: 1;
       }
+      .play-scroll { gap: 18px; }
       .crossword-grid {
         max-width: min(62vh, 92vw);
         gap: 4px;
@@ -841,15 +905,19 @@
         });
       }
     </script>
-    <section class="game-panel">
-      <div class="crossword-grid" id="crossword-grid"></div>
-      <div class="controls">
-        <button class="btn btn-primary" id="check-btn">Kontrol Et</button>
-        <button class="btn btn-primary" id="clear-btn">Temizle</button>
+    <section class="game-panel" id="game-panel">
+      <!-- Everything above the keyboard scrolls; the keyboard does not. -->
+      <div class="play-scroll">
+        <div class="crossword-grid" id="crossword-grid"></div>
+        <div class="controls">
+          <button class="btn btn-primary" id="check-btn">Kontrol Et</button>
+          <button class="btn btn-primary" id="clear-btn">Temizle</button>
+        </div>
+        <div class="game-message" id="game-message"></div>
+        <div class="reset-info" id="reset-info"></div>
+        <div class="clues-wrap" id="clues-container"></div>
       </div>
-      <div class="game-message" id="game-message"></div>
-      <div class="reset-info" id="reset-info"></div>
-      <div class="clues-wrap" id="clues-container"></div>
+      <div class="keyboard" id="keyboard"></div>
     </section>
   </main>
 
@@ -1080,17 +1148,127 @@ function updateCell(letter) {
   }
 }
 
-document.addEventListener('keydown', (e) => {
-  if (!activeCell || gameCompleted) return;
+// ── Keyboard ──
+// Sözcel's own layout (see KEYBOARD_LAYOUT in sozcel.html): the Turkish Q
+// keyboard, Q/W/X in place but disabled, GİR and ← as the two wide keys.
+// GİR is "Kontrol Et" here -- a crossword has nothing else to submit.
+const KEYBOARD_LAYOUT = [
+  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Ğ', 'Ü'],
+  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ş', 'İ'],
+  ['GİR', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'Ö', 'Ç', '←']
+];
+const WIDE_KEYS = new Set(['GİR', '←']);
+const DISABLED_KEYS = new Set(['Q', 'W', 'X']);
 
-  if (e.key.length === 1 && e.key.match(/[a-zçğıöşüA-ZÇĞİÖŞÜ]/)) {
-    updateCell(e.key.toUpperCase());
-    moveToNext();
-    markAsPlayed();
+function initKeyboard() {
+  const keyboard = document.getElementById('keyboard');
+  if (!keyboard || keyboard.childElementCount) return;
+  KEYBOARD_LAYOUT.forEach(row => {
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'keyboard-row';
+    row.forEach(key => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const disabled = DISABLED_KEYS.has(key);
+      btn.className = 'key' + (WIDE_KEYS.has(key) ? ' wide' : '') + (disabled ? ' key-disabled' : '');
+      btn.textContent = key;
+      if (disabled) btn.disabled = true;
+      else btn.addEventListener('click', () => handleKey(key));
+      rowDiv.appendChild(btn);
+    });
+    keyboard.appendChild(rowDiv);
+  });
+  layoutKeyboard();
+  if (window.ResizeObserver) {
+    new ResizeObserver(layoutKeyboard).observe(document.getElementById('game-panel'));
+  } else {
+    window.addEventListener('resize', layoutKeyboard);
+  }
+}
+
+// One key width for all three rows, the widest that fits twelve across,
+// capped at a thumb -- the same arithmetic as sozcel.html's layoutGame().
+// KEY_ASPECT is the drawn hexagon's own ratio, so it fills its key.
+const KEY_ASPECT = (0.8242 / 0.7618) * (1536 / 1024);
+const KEY_MAX_W = 38;
+const KEY_MIN_W = 16;
+const KB_GAP = 3;
+const KB_ROW_GAP = 5;
+let _lastKeyW = 0;
+function layoutKeyboard() {
+  const panel = document.getElementById('game-panel');
+  const kb = document.getElementById('keyboard');
+  if (!panel || !kb) return;
+  const cs = getComputedStyle(panel);
+  const innerW = panel.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  if (!(innerW > 0)) return;
+  const keyW = Math.max(KEY_MIN_W, Math.min(KEY_MAX_W, Math.floor((innerW - 11 * KB_GAP) / 12)));
+  // Writing nothing when nothing changed keeps the ResizeObserver quiet.
+  if (keyW === _lastKeyW) return;
+  _lastKeyW = keyW;
+  kb.style.setProperty('--kb-key', keyW + 'px');
+  kb.style.setProperty('--kb-key-h', Math.round(keyW * KEY_ASPECT) + 'px');
+  kb.style.setProperty('--kb-gap', KB_GAP + 'px');
+  kb.style.setProperty('--kb-row-gap', KB_ROW_GAP + 'px');
+  kb.style.setProperty('--kb-font', Math.max(11, Math.round(keyW * 0.55)) + 'px');
+  kb.style.setProperty('--kb-font-wide', Math.max(9, Math.round(keyW * 0.40)) + 'px');
+}
+
+// The first open square, for a letter typed before any square was pressed.
+function firstOpenCell() {
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) if (PUZZLE[r][c] !== null) return { row: r, col: c };
+  }
+  return null;
+}
+
+function moveToPrev() {
+  if (!activeCell) return false;
+  let { row, col } = activeCell;
+  do {
+    col--;
+    if (col < 0) { col = COLS - 1; row--; }
+    if (row < 0) return false;
+  } while (PUZZLE[row][col] === null);
+  selectCell(row, col);
+  return true;
+}
+
+// Both keyboards -- the on-screen one and a physical one -- come here.
+function handleKey(key) {
+  if (!PUZZLE || gameCompleted) return;
+  if (key === 'GİR') { document.getElementById('check-btn').click(); return; }
+  if (!activeCell) {
+    const first = firstOpenCell();
+    if (!first) return;
+    selectCell(first.row, first.col);
+    if (key === '←') return;
+  }
+  if (key === '←') {
+    // Clear this square; if it was already empty, step back and clear that.
+    const { row, col } = activeCell;
+    if (!userAnswers[row][col] && moveToPrev()) updateCell('');
+    else updateCell('');
     saveState();
-  } else if (e.key === 'Backspace') {
-    updateCell('');
-    saveState();
+    return;
+  }
+  updateCell(key);
+  moveToNext();
+  markAsPlayed();
+  saveState();
+}
+
+// Physical keyboard. Turkish case pairs are I/ı and İ/i, so the fold is
+// tr-TR's, never the invariant toUpperCase() (which turns i into I).
+document.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === 'Backspace') { handleKey('←'); return; }
+  // A focused button already answers Enter with its own click.
+  if (e.key === 'Enter') { if (!e.target.closest('button')) handleKey('GİR'); return; }
+  if (e.key.length === 1 && /[a-zçğıöşüA-ZÇĞİÖŞÜ]/.test(e.key)) {
+    const upper = e.key.toLocaleUpperCase('tr-TR');
+    if (DISABLED_KEYS.has(upper)) return;
+    handleKey(upper);
   }
 });
 
@@ -1435,6 +1613,7 @@ async function markPlayedGames() {
   initFromPuzzle(puzzle);
   createGrid();
   renderClues();
+  initKeyboard();
   await restoreState();
   renderStats();
   loadScoreboard();
