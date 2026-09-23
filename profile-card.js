@@ -1074,7 +1074,7 @@
   function ensureProfileOverlay() {
     if (document.getElementById('profile-overlay')) return;
     const el = document.createElement('div');
-    el.className = 'ist-sheet-overlay profile-overlay';
+    el.className = 'ist-sheet-overlay ist-sheet-under-bars profile-overlay';
     el.id = 'profile-overlay';
     el.hidden = true;
     el.innerHTML = `
@@ -1292,7 +1292,7 @@
   function ensureMemberSheet() {
     if (document.getElementById('member-sheet')) return;
     const el = document.createElement('div');
-    el.className = 'ist-sheet-overlay';
+    el.className = 'ist-sheet-overlay ist-sheet-under-bars';
     el.id = 'member-sheet';
     // Created up front and left in the DOM for the rest of the session:
     // a virtual navigation (see router.js) disables the page's own
