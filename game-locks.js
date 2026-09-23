@@ -3,75 +3,31 @@
 // `.game-link[data-game="…"]` nav (sozcel, tumcel, bulmaca/Çengel, kahvehane).
 // Then call `applyGameLocks(sb)` once `sb` is initialised.
 //
-// To gate a new game in the future, extend GATES below — every page that
-// includes this script picks up the new rule automatically.
-//
 // Rules:
-//   - The three games are a sequence with a question in each joint (see
-//     db/daily_questions.sql): Tümcel is locked until the question that
-//     follows Sözcel has been answered, and Çengel (bulmaca) until the one
-//     that follows Tümcel has. The card that asks it appears in Kahvehane's
-//     games column once the game before it has been played, so the
-//     sequence is: play, answer, play, answer, play, answer.
-//     A day with no question in a slot has no gate there — an empty
-//     table has to behave exactly like the site did before it existed,
-//     or a feature with no content takes the app down with it.
-//   - Çengel (bulmaca) is locked until the user has won Tümcel at least once.
+//   - Sözcel, Tümcel and Çengel are independent: any of the three can be
+//     played in any order. There used to be a sequence here (a question in
+//     each joint, and a win-gate on Çengel) — both are gone, and nothing
+//     replaced them.
 //   - Any game the admin has switched off for the current Istanbul day
 //     (via admin.html's Oyunlar tab / the game_day_toggles table) is
-//     locked for everyone, regardless of the rules above.
+//     locked for everyone.
 
 (function () {
   const GAME_LABELS = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Çengel' };
   const ALL_GAMES = Object.keys(GAME_LABELS);
   // The admin owns the off-switch, so it isn't pointed at them: switching a
   // game off and then being unable to open it to check what everyone else
-  // can't see makes the switch unusable. The win-gates below still apply to
-  // everyone — those are the game's own progression, not an admin control.
+  // can't see makes the switch unusable.
   const ADMIN_EMAIL = 'cemwozturk@gmail.com';
-
-  // Which game each one follows in the sequence. Also what the question
-  // gate reads: the question in the joint before `game`.
-  const PREV_GAME = { tumcel: 'sozcel', bulmaca: 'tumcel' };
-
-  // A game can carry more than one gate (Çengel carries two), so these
-  // are always filtered, never found.
-  const GATES = [
-    {
-      game: 'tumcel',
-      requires: (s) => questionCleared(s, 'tumcel'),
-      message: () => "Tümcel'i açmak için önce Sözcel'i oynayıp günün sorusunu cevapla.",
-    },
-    {
-      game: 'bulmaca',
-      requires: (s) => questionCleared(s, 'bulmaca'),
-      message: () => "Çengel'i açmak için önce Tümcel'i oynayıp günün sorusunu cevapla.",
-    },
-    {
-      game: 'bulmaca',
-      requires: (s) => s.tumcelWon,
-      message: () => "Çengel'i oynayabilmek için önce Tümcel'i kazanman gerekiyor.",
-    },
-  ];
-
-  // True when nothing is standing between the reader and `game`: either
-  // there is no question in the joint before it today, or they have
-  // already answered it.
-  function questionCleared(s, game) {
-    const prev = PREV_GAME[game];
-    const qid = prev && s.questions ? s.questions[prev] : null;
-    return !qid || (s.answered && s.answered.has(qid));
-  }
 
   function offMessage(game) {
     return `Bugün ${GAME_LABELS[game] || game} yok!`;
   }
 
-  // The NIGHT these gates are about, not the calendar date. The games are
-  // night-only and a night spans midnight, so a key that rolled over at
-  // 00:00 switched a game the admin had turned off back on, and re-locked
-  // Tümcel behind a question the reader had already answered, half way
-  // through the night they were playing. See ist-date.js.
+  // The NIGHT the off-switch is about, not the calendar date. The games
+  // are night-only and a night spans midnight, so a key that rolled over
+  // at 00:00 would switch a game the admin had turned off back on half
+  // way through the night it was played. See ist-date.js.
   function gameNightKey() {
     return IstDate.gameNight();
   }
@@ -185,20 +141,17 @@
 
     // Resolved before the bounce below, because whether the off-switch
     // applies depends on who is asking.
-    let userId = null;
     let isAdmin = false;
     try {
       const { data } = await sb.auth.getSession();
       const user = data && data.session && data.session.user ? data.session.user : null;
-      userId = user ? user.id : null;
       isAdmin = !!(user && user.email === ADMIN_EMAIL);
     } catch (_) {}
 
-    // Bounce direct/bookmark loads of the game the user is currently on if
-    // it's off today, or if it's a win-gated game they haven't unlocked.
-    // The active link tells us which page we're on. Sending them back to
-    // kahvehane both surfaces the lock state and prevents the game UI from
-    // writing game_results.
+    // Bounce a direct/bookmark load of the game the user is currently on
+    // if it's off today. The active link tells us which page we're on.
+    // Sending them back to kahvehane both surfaces the lock state and
+    // prevents the game UI from writing game_results.
     const activeLink = document.querySelector('.game-link.active[data-game]');
     if (activeLink) {
       const g = activeLink.dataset.game;
@@ -209,53 +162,6 @@
           showToast(`${offMessage(g)} Yönetici olarak açık.`);
         } else {
           try { sessionStorage.setItem('game_lock_bounce_msg', offMessage(g)); } catch (_) {}
-          window.location.replace('kahvehane.html');
-          return true;
-        }
-      }
-    }
-
-    const stats = { tumcelWon: false, questions: {}, answered: new Set() };
-    // Today's questions, and which of them this member has answered.
-    // Best-effort on purpose: before db/daily_questions.sql has been run
-    // the tables aren't there, and the games must still open.
-    try {
-      const { data, error } = await sb
-        .from('daily_questions')
-        .select('id, after_game')
-        .eq('question_date', gameNightKey());
-      if (!error && data) data.forEach(q => { stats.questions[q.after_game] = q.id; });
-    } catch (_) {}
-    const qIds = Object.values(stats.questions);
-    if (userId && qIds.length) {
-      try {
-        const { data, error } = await sb
-          .from('question_answers')
-          .select('question_id')
-          .eq('user_id', userId)
-          .in('question_id', qIds);
-        if (!error && data) data.forEach(r => stats.answered.add(r.question_id));
-      } catch (_) {}
-    }
-
-    if (userId) {
-      try {
-        const { data, error } = await sb
-          .from('game_results')
-          .select('game, won')
-          .eq('user_id', userId)
-          .eq('game', 'tumcel')
-          .eq('won', true);
-        if (!error && data) {
-          stats.tumcelWon = data.length > 0;
-        }
-      } catch (_) {}
-
-      if (activeLink) {
-        const g = activeLink.dataset.game;
-        const gate = GATES.filter(x => x.game === g).find(x => !x.requires(stats));
-        if (gate) {
-          try { sessionStorage.setItem('game_lock_bounce_msg', gate.message(stats)); } catch (_) {}
           window.location.replace('kahvehane.html');
           return true;
         }
@@ -283,12 +189,7 @@
         return;
       }
       if (isAdmin) link.removeAttribute('title');
-      const gate = GATES.filter(x => x.game === g).find(x => !x.requires(stats));
-      if (gate) {
-        lockLink(link, gate.message(stats));
-      } else {
-        unlockLink(link);
-      }
+      unlockLink(link);
     });
   }
 
@@ -315,12 +216,10 @@
 
   // Pre-lock every game-link as soon as the DOM is ready, regardless of user
   // state. applyGameLocks will unlock the ones that turn out to be playable
-  // once the DB roundtrip completes. This closes the window where the page
-  // was rendered, the script tag had loaded, but applyGameLocks hadn't yet
-  // resolved — clicking a gated link in that window otherwise sneaks past
-  // the gate entirely. All three games can end up locked now (admin
-  // off-switch applies to any of them, not just the win-gated ones), so all
-  // are pre-locked, not just the ones in GATES.
+  // once the DB roundtrip completes (i.e. not switched off today). This
+  // closes the window where the page was rendered, the script tag had
+  // loaded, but applyGameLocks hadn't yet resolved — clicking a link the
+  // admin had just switched off in that window otherwise sneaks past it.
   // ...unless the round trip already came back. A page whose session
   // restores from cache can finish applyGameLocks *before* this event
   // fires -- the answer is in, and pre-locking on top of it would leave

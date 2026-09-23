@@ -227,19 +227,13 @@
     // Short form for the corner button on Kahvehane -- the heading inside
     // the sheet still prints the full 'Haftanın Skor Tahtası'.
     'games.scoreboardbox': { default: 'Skor Tahtası', more_english: 'Scoreboard' },
-    // The question standing between two games (see db/daily_questions.sql
-    // and the question card in kahvehane.html).
-    // Where in the day's sequence a game card stands -- its kicker in the
-    // deck, the way a news card is kickered with its category.
+    // Which game a tile is -- its kicker on Kahvehane's static picker and
+    // in project.html's Oyunlar column, the way a news card is kickered
+    // with its category. Plain step numbers now, not a gate: the games
+    // are independent (see game-locks.js).
     'games.step1':      { default: '1. OYUN',                 more_english: 'GAME 1' },
     'games.step2':      { default: '2. OYUN',                 more_english: 'GAME 2' },
     'games.step3':      { default: '3. OYUN',                 more_english: 'GAME 3' },
-    'games.q.kicker':   { default: 'GÜNÜN SORUSU',            more_english: "TODAY'S QUESTION" },
-    'games.q.hint':     { default: 'Kaydır ya da seç',        more_english: 'Swipe or pick' },
-    'games.q.tallyone': { default: 'kişi seninle aynı fikirde', more_english: 'others answered the same' },
-    'games.q.failed':   { default: 'Olmadı, tekrar dene.',    more_english: "That didn't work, try again." },
-    'games.q.deckdone':    { default: 'Hepsi bu kadar.',       more_english: "That's all of it." },
-    'games.q.deckdonesub': { default: 'Dışarısı seni bekliyor.', more_english: 'Outside is waiting.' },
     'games.todayneighborhoods': { default: 'Günün Mahalleleri',   more_english: "Today's Neighborhoods" },
     'games.congrats': { default: 'Tebrikler!', more_english: 'Congratulations!' },
     'games.share':     { default: 'Paylaş',     more_english: 'Share' },

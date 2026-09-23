@@ -177,8 +177,13 @@ with checks(sira, dosya, aranan, var) as (
          to_regclass('public.hive_cells') is not null
          and to_regclass('public.hive_bonds') is not null
          and pg_temp.has_fn('hive_map')),
-    (42, 'db/daily_questions.sql',                    'daily_questions + question_tally()',
-         to_regclass('public.daily_questions') is not null and pg_temp.has_fn('question_tally')),
+    -- db/daily_questions.sql (the question between two games, and the
+    -- lock that came with it) was run, then reversed: superseded by
+    -- db/daily_questions_v2_drop.sql, which is what #47 below checks.
+    (42, 'db/daily_questions_v2_drop.sql',            'daily_questions + question_answers + question_tally() kaldırıldı mı',
+         to_regclass('public.daily_questions') is null
+         and to_regclass('public.question_answers') is null
+         and not pg_temp.has_fn('question_tally')),
     (43, 'db/hive_slot_codes_v5.sql',                 'hive_slot_offers + hive_claim_slot()',
          to_regclass('public.hive_slot_offers') is not null and pg_temp.has_fn('hive_claim_slot')),
     (44, 'db/onboarding_copy.sql',                    'onboarding_copy tablosunda satır',
