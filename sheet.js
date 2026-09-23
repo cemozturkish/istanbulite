@@ -52,6 +52,22 @@
     hides.delete(overlay);
   }
 
+  // The lowest thing the profile bar hangs over the page: its own box, or
+  // the sky chain under its sagging edge (profile-card.js's skyChartHTML),
+  // whichever reaches further down. The chain is the bar's -- a sheet that
+  // rested on the box alone came up over the sun, the middle of the chain
+  // hanging lowest exactly where the sheet is widest. Null with no bar.
+  function barFloor() {
+    const card = document.getElementById('ist-pc-mount');
+    if (!card || !card.offsetHeight) return null;
+    let bottom = card.getBoundingClientRect().bottom;
+    card.querySelectorAll('.ist-sky-mark').forEach(m => {
+      const r = m.getBoundingClientRect();
+      if (r.height) bottom = Math.max(bottom, r.bottom);
+    });
+    return bottom;
+  }
+
   // Sets --ist-sheet-top, which sheet.css's phone rules read.
   function position(target) {
     const overlay = el(target);
@@ -61,9 +77,8 @@
       return;
     }
     const framePad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-pad')) || 10;
-    const card = document.getElementById('ist-pc-mount');
-    const cardBottom = card ? card.getBoundingClientRect().bottom : 0;
-    overlay.style.setProperty('--ist-sheet-top', `${Math.max(cardBottom, 0) + framePad}px`);
+    const floor = barFloor();
+    overlay.style.setProperty('--ist-sheet-top', `${Math.max(floor || 0, 0) + framePad}px`);
   }
 
   // ── Keeping the map lit under a dim sheet ──
@@ -392,8 +407,8 @@
   function topClamp() {
     const padVal = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--frame-pad'));
     const pad = isNaN(padVal) ? 10 : padVal;
-    const card = document.getElementById('ist-pc-mount');
-    const bottom = card && card.offsetHeight ? card.getBoundingClientRect().bottom : pad + 60;
+    const floor = barFloor();
+    const bottom = floor != null ? floor : pad + 60;
     return Math.max(pad, bottom + pad);
   }
 
