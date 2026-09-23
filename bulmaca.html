@@ -227,18 +227,73 @@
       flex: 1;
     }
 
-    /* The grid, the buttons and the clues scroll; the keyboard under them
-       is the page's fixed furniture and never scrolls away. */
-    .play-scroll {
+    /* Nothing on this page scrolls: the grid is sized by layoutBoard() to
+       whatever the keyboard, the definition bar and the buttons leave, so
+       the whole game is one screen. */
+    .play-area {
       flex: 1 1 auto;
       min-height: 0;
       width: 100%;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 8px;
+    }
+
+    /* The highlighted word's definition, with a step either way through
+       the clue list. */
+    .clue-bar {
+      display: flex;
+      align-items: stretch;
+      width: 100%;
+      max-width: 460px;
+      flex-shrink: 0;
+      background: var(--paper-card);
+      border: 2px solid var(--ink);
+      border-left: 5px solid var(--ink-red);
+      /* A fixed height, so a one-line definition and a two-line one leave
+         the grid above exactly where it was. */
+      height: 72px;
+      box-sizing: border-box;
+    }
+    .clue-bar[hidden] { display: none; }
+    .clue-bar-text {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 3px 6px;
+      cursor: pointer;
+    }
+    .clue-bar-k {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--ink-red);
+    }
+    .clue-bar-t {
+      font-size: 0.95rem;
+      line-height: 1.3;
+      /* Two lines at most: the bar is a fixed height so the grid above it
+         never moves when the definition changes. */
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .clue-nav {
+      flex: 0 0 36px;
+      border: none;
+      background: transparent;
+      color: var(--ink);
+      font-size: 1.6rem;
+      line-height: 1;
+      cursor: pointer;
+      touch-action: manipulation;
     }
 
     /* ── The keyboard: Sözcel's, key for key ──
@@ -295,8 +350,8 @@
       display: grid;
       grid-template-columns: repeat(5, 1fr);
       gap: 2px;
-      max-width: 220px;
-      width: 100%;
+      /* layoutBoard() sets the real width; this is only the first paint. */
+      width: min(100%, 220px);
       flex-shrink: 0;
     }
 
@@ -307,7 +362,7 @@
       align-items: center;
       justify-content: center;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
-      font-size: clamp(0.8rem, 2.5vh, 1.2rem);
+      font-size: var(--cell-font, clamp(0.8rem, 2.5vh, 1.2rem));
       font-weight: 700;
       text-transform: uppercase;
       background: var(--paper);
@@ -323,6 +378,10 @@
       cursor: default;
     }
 
+    /* The word the reader is in, and the square the next letter lands in. */
+    .crossword-cell.in-word {
+      background: var(--paper-dark);
+    }
     .crossword-cell.active {
       background: var(--brown-1);
     }
@@ -379,6 +438,9 @@
       color: var(--muted);
       font-style: italic;
       flex-shrink: 0;
+      /* Reserved even while empty, so the countdown appearing after a win
+         does not take room the grid was already sized into. */
+      min-height: 1.3em;
     }
 
     .clues-wrap {
@@ -788,34 +850,34 @@
         min-height: 0;
         width: 100%;
         height: 100dvh;
-        /* The panel scrolls inside itself (.play-scroll) so the
-           keyboard can stay put at the foot of the screen. */
+        /* Nothing scrolls: the grid is sized to what the keyboard and the
+           definition bar leave (layoutBoard). */
         overflow: hidden;
         display: flex;
         flex-direction: column;
       }
       .game-panel {
-        padding: 60px 12px calc(10px + env(safe-area-inset-bottom)) 12px;
+        /* Just clear of the floating back arrow, so the grid sits high. */
+        padding: 52px 12px calc(10px + env(safe-area-inset-bottom)) 12px;
         gap: 10px;
         display: flex;
         flex-direction: column;
         align-items: center;
         flex: 1;
       }
-      .play-scroll { gap: 18px; }
+      .play-area { gap: 8px; }
       .crossword-grid {
-        max-width: min(62vh, 92vw);
-        gap: 4px;
+        gap: 3px;
       }
       .crossword-cell {
-        border-width: 2.5px;
-        font-size: clamp(1.4rem, 4.2vh, 2.2rem);
+        border-width: 2px;
+        font-size: var(--cell-font, clamp(1.4rem, 4.2vh, 2.2rem));
       }
-      .cell-number { font-size: 13px; top: 2px; left: 3px; }
-      .controls { gap: 12px; }
+      .cell-number { font-size: var(--cell-num-font, 11px); top: 1px; left: 3px; }
+      .controls { gap: 10px; }
       .btn {
-        padding: 13px 22px;
-        font-size: 15px;
+        padding: 9px 18px;
+        font-size: 13px;
         letter-spacing: 0.5px;
         border-radius: 5px;
       }
@@ -907,15 +969,25 @@
     </script>
     <section class="game-panel" id="game-panel">
       <!-- Everything above the keyboard scrolls; the keyboard does not. -->
-      <div class="play-scroll">
+      <div class="play-area" id="play-area">
         <div class="crossword-grid" id="crossword-grid"></div>
+        <!-- One definition at a time: the highlighted word's. A 12×12 grid
+             has far more clues than the room between the grid and the
+             keyboard, and a list there would have to scroll. -->
+        <div class="clue-bar" id="clue-bar" hidden>
+          <button type="button" class="clue-nav" id="clue-prev" aria-label="Önceki">&#8249;</button>
+          <div class="clue-bar-text" id="clue-bar-text">
+            <span class="clue-bar-k" id="clue-bar-k"></span>
+            <span class="clue-bar-t" id="clue-bar-t"></span>
+          </div>
+          <button type="button" class="clue-nav" id="clue-next" aria-label="Sonraki">&#8250;</button>
+        </div>
         <div class="controls">
           <button class="btn btn-primary" id="check-btn">Kontrol Et</button>
           <button class="btn btn-primary" id="clear-btn">Temizle</button>
         </div>
         <div class="game-message" id="game-message"></div>
         <div class="reset-info" id="reset-info"></div>
-        <div class="clues-wrap" id="clues-container"></div>
       </div>
       <div class="keyboard" id="keyboard"></div>
     </section>
@@ -1118,7 +1190,7 @@ function createGrid() {
           cell.appendChild(num);
         }
 
-        cell.onclick = () => selectCell(row, col);
+        cell.onclick = () => selectCell(row, col, { tap: true });
       }
 
       grid.appendChild(cell);
@@ -1126,11 +1198,92 @@ function createGrid() {
   }
 }
 
-function selectCell(row, col) {
-  document.querySelectorAll('.crossword-cell').forEach(c => c.classList.remove('active'));
+// ── The word the reader is in ──
+// A square belongs to at most one across and one down entry. Pressing a
+// square highlights its word; pressing the same square again switches to
+// its other word, when it has one. Typing runs along that word.
+let activeDir = 'across';
+
+function wordsAt(row, col) {
+  return {
+    across: (CLUES.across || []).find(e => e.row === row && col >= e.col && col < e.col + e.len) || null,
+    down: (CLUES.down || []).find(e => e.col === col && row >= e.row && row < e.row + e.len) || null,
+  };
+}
+
+function wordCells(e, dir) {
+  return Array.from({ length: e.len }, (_, i) =>
+    dir === 'across' ? { row: e.row, col: e.col + i } : { row: e.row + i, col: e.col });
+}
+
+function activeWord() {
+  if (!activeCell) return null;
+  const e = wordsAt(activeCell.row, activeCell.col)[activeDir];
+  return e ? { e, dir: activeDir } : null;
+}
+
+// opts.tap: a press on the grid (a second press on the same square flips
+// the word); opts.dir: the word to land in, when the caller knows it.
+function selectCell(row, col, opts = {}) {
+  const w = wordsAt(row, col);
+  const same = activeCell && activeCell.row === row && activeCell.col === col;
+  if (opts.dir) activeDir = opts.dir;
+  else if (same && opts.tap) {
+    const other = activeDir === 'across' ? 'down' : 'across';
+    if (w[other]) activeDir = other;
+  }
+  if (!w[activeDir]) activeDir = w.across ? 'across' : (w.down ? 'down' : activeDir);
   activeCell = { row, col };
+  paintSelection();
+}
+
+function paintSelection() {
   const cells = document.querySelectorAll('.crossword-cell');
-  cells[row * COLS + col].classList.add('active');
+  cells.forEach(c => c.classList.remove('active', 'in-word'));
+  if (!activeCell) { renderClueBar(); return; }
+  const aw = activeWord();
+  if (aw) wordCells(aw.e, aw.dir).forEach(p => cells[p.row * COLS + p.col].classList.add('in-word'));
+  cells[activeCell.row * COLS + activeCell.col].classList.add('active');
+  renderClueBar();
+}
+
+// Every entry in reading order: across first, then down, each by number.
+function allEntries() {
+  const by = (a, b) => a.num - b.num;
+  return [
+    ...(CLUES.across || []).slice().sort(by).map(e => ({ e, dir: 'across' })),
+    ...(CLUES.down || []).slice().sort(by).map(e => ({ e, dir: 'down' })),
+  ];
+}
+
+// Step to the neighbouring entry and land on its first empty square
+// (or its first square, if the word is already full).
+function stepWord(delta) {
+  const list = allEntries();
+  if (!list.length) return;
+  const aw = activeWord();
+  let i = aw ? list.findIndex(x => x.e === aw.e && x.dir === aw.dir) : -1;
+  i = (i + delta + list.length) % list.length;
+  const { e, dir } = list[i];
+  const cells = wordCells(e, dir);
+  const target = cells.find(p => !userAnswers[p.row][p.col]) || cells[0];
+  selectCell(target.row, target.col, { dir });
+}
+
+function renderClueBar() {
+  const bar = document.getElementById('clue-bar');
+  if (!bar) return;
+  const aw = activeWord();
+  bar.hidden = false;
+  const k = document.getElementById('clue-bar-k');
+  const t = document.getElementById('clue-bar-t');
+  if (!aw) {
+    k.textContent = '';
+    t.textContent = 'Bir kutuya dokun.';
+    return;
+  }
+  k.textContent = aw.e.num + ' ' + (aw.dir === 'across' ? 'Yatay' : 'Dikey');
+  t.textContent = aw.e.clue || '';
 }
 
 function updateCell(letter) {
@@ -1178,11 +1331,11 @@ function initKeyboard() {
     });
     keyboard.appendChild(rowDiv);
   });
-  layoutKeyboard();
+  layoutGame();
   if (window.ResizeObserver) {
-    new ResizeObserver(layoutKeyboard).observe(document.getElementById('game-panel'));
+    new ResizeObserver(layoutGame).observe(document.getElementById('game-panel'));
   } else {
-    window.addEventListener('resize', layoutKeyboard);
+    window.addEventListener('resize', layoutGame);
   }
 }
 
@@ -1214,23 +1367,59 @@ function layoutKeyboard() {
   kb.style.setProperty('--kb-font-wide', Math.max(9, Math.round(keyW * 0.40)) + 'px');
 }
 
-// The first open square, for a letter typed before any square was pressed.
+// The keyboard first, then the grid gets whatever is left of the play
+// area once the definition bar, the message lines and the buttons have
+// taken theirs -- so nothing on the page ever has to scroll.
+function layoutGame() {
+  layoutKeyboard();
+  layoutBoard();
+}
+
+let _lastCell = 0;
+function layoutBoard() {
+  const area = document.getElementById('play-area');
+  const grid = document.getElementById('crossword-grid');
+  if (!area || !grid || !PUZZLE) return;
+  const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
+  const areaGap = parseFloat(getComputedStyle(area).rowGap) || 0;
+  let others = 0, n = 0;
+  for (const el of area.children) {
+    if (el === grid || el.hidden || getComputedStyle(el).display === 'none') continue;
+    others += el.offsetHeight;
+    n++;
+  }
+  const availH = area.clientHeight - others - areaGap * n;
+  const availW = area.clientWidth;
+  const cell = Math.floor(Math.min(
+    (availW - gap * (COLS - 1)) / COLS,
+    (availH - gap * (ROWS - 1)) / ROWS,
+    64));
+  if (!(cell > 0) || cell === _lastCell) return;
+  _lastCell = cell;
+  grid.style.width = (cell * COLS + gap * (COLS - 1)) + 'px';
+  grid.style.setProperty('--cell-font', Math.round(cell * 0.5) + 'px');
+  grid.style.setProperty('--cell-num-font', Math.max(8, Math.round(cell * 0.2)) + 'px');
+}
+
+// The first word's first square, for a letter typed before any square
+// was pressed.
 function firstOpenCell() {
+  const first = allEntries()[0];
+  if (first) { activeDir = first.dir; return { row: first.e.row, col: first.e.col }; }
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) if (PUZZLE[r][c] !== null) return { row: r, col: c };
   }
   return null;
 }
 
+// One square back along the word; false at its first square.
 function moveToPrev() {
-  if (!activeCell) return false;
-  let { row, col } = activeCell;
-  do {
-    col--;
-    if (col < 0) { col = COLS - 1; row--; }
-    if (row < 0) return false;
-  } while (PUZZLE[row][col] === null);
-  selectCell(row, col);
+  const aw = activeWord();
+  if (!aw) return false;
+  const cells = wordCells(aw.e, aw.dir);
+  const i = cells.findIndex(p => p.row === activeCell.row && p.col === activeCell.col);
+  if (i <= 0) return false;
+  selectCell(cells[i - 1].row, cells[i - 1].col, { dir: aw.dir });
   return true;
 }
 
@@ -1293,36 +1482,25 @@ async function markAsPlayed() {
   } catch (e) { console.error('[bulmaca markAsPlayed]', e); }
 }
 
+// One square on along the word; from its last square, on to the next word.
 function moveToNext() {
-  if (!activeCell) return;
-  let { row, col } = activeCell;
-
-  col++;
-  if (col >= COLS) { col = 0; row++; }
-
-  if (row < ROWS) {
-    while (PUZZLE[row][col] === null) {
-      col++;
-      if (col >= COLS) { col = 0; row++; }
-      if (row >= ROWS) return;
-    }
-    selectCell(row, col);
-  }
+  const aw = activeWord();
+  if (!aw) return;
+  const cells = wordCells(aw.e, aw.dir);
+  const i = cells.findIndex(p => p.row === activeCell.row && p.col === activeCell.col);
+  if (i >= 0 && i < cells.length - 1) selectCell(cells[i + 1].row, cells[i + 1].col, { dir: aw.dir });
+  else stepWord(1);
 }
 
-// Render clues
-function renderClues() {
-  const container = document.getElementById('clues-container');
-  let html = '<h3>Yatay</h3><div class="clue-list">';
-  CLUES.across.forEach(c => {
-    html += `<div class="clue"><span class="clue-number">${c.num}.</span><span>${c.clue}</span></div>`;
+// The definition bar's own controls.
+function wireClueBar() {
+  document.getElementById('clue-prev').addEventListener('click', () => stepWord(-1));
+  document.getElementById('clue-next').addEventListener('click', () => stepWord(1));
+  // Pressing the definition itself flips to the square's other word, the
+  // same as pressing the square again.
+  document.getElementById('clue-bar-text').addEventListener('click', () => {
+    if (activeCell) selectCell(activeCell.row, activeCell.col, { tap: true });
   });
-  html += '</div><h3>Dikey</h3><div class="clue-list">';
-  CLUES.down.forEach(c => {
-    html += `<div class="clue"><span class="clue-number">${c.num}.</span><span>${c.clue}</span></div>`;
-  });
-  html += '</div>';
-  container.innerHTML = html;
 }
 
 // Save/restore state
@@ -1598,7 +1776,6 @@ async function markPlayedGames() {
     // No admin-drawn puzzle for tonight -- same failure Tümcel already
     // reports for the same reason (nothing auto-picks either any more).
     document.getElementById('crossword-grid').innerHTML = '';
-    document.getElementById('clues-container').innerHTML = '';
     const msgEl = document.getElementById('game-message');
     msgEl.textContent = 'Bugünkü bulmaca henüz hazır değil.';
     msgEl.style.color = 'var(--muted)';
@@ -1612,9 +1789,16 @@ async function markPlayedGames() {
 
   initFromPuzzle(puzzle);
   createGrid();
-  renderClues();
+  wireClueBar();
+  renderClueBar();
   initKeyboard();
   await restoreState();
+  // Start in the first word, so the bar has a definition from the outset.
+  if (!gameCompleted && !activeCell) {
+    const first = firstOpenCell();
+    if (first) selectCell(first.row, first.col, { dir: activeDir });
+  }
+  layoutGame();
   renderStats();
   loadScoreboard();
   markPlayedGames();
