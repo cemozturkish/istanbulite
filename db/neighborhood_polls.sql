@@ -2,9 +2,8 @@
 -- İlçe Anketleri — district polls behind Kütüphane's ANKET box.
 --
 -- A question with two options, answered once per member. What makes this
--- different from daily_questions (the joints between the three games) and
--- breaking_news_polls (a reaction to one story) is what the answer is
--- FOR: every vote is filed under the member's own district, so the result
+-- different from breaking_news_polls (a reaction to one story) is what
+-- the answer is FOR: every vote is filed under the member's own district, so the result
 -- is not one citywide percentage but 25 of them — how Beşiktaş answered,
 -- how Üsküdar answered. That per-district split is meant to color the
 -- districts on the Istanbul map, the way a live election map does: mix
@@ -22,12 +21,11 @@
 --                               tab.
 --   neighborhood_poll_votes  — one row per member per poll, filed under
 --                               the district they lived in when they
---                               voted. Insert-only, like question_answers:
---                               an answer is what you thought when you
---                               were asked, not a preference you keep
---                               updating.
+--                               voted. Insert-only: an answer is what you
+--                               thought when you were asked, not a
+--                               preference you keep updating.
 --
--- PRIVACY. Same stance as daily_questions: a member reads only their own
+-- PRIVACY. A member reads only their own
 -- vote (and the admin reads all of them), never another member's by name.
 -- The per-district breakdown a future map or this poll's own result view
 -- needs comes from neighborhood_poll_results(), a SECURITY DEFINER
@@ -60,9 +58,8 @@ create index if not exists neighborhood_polls_active_idx
 create table if not exists public.neighborhood_poll_votes (
   poll_id      uuid        not null references public.neighborhood_polls(id) on delete cascade,
   user_id      uuid        not null references public.profiles(id) on delete cascade,
-  -- Filed under the district the member was in when they voted, which is
-  -- the whole point of this table over question_answers: this is what a
-  -- future map colors by.
+  -- Filed under the district the member was in when they voted -- this is
+  -- what a future map colors by.
   neighborhood text        not null references public.neighborhoods(id),
   choice       text        not null,
   created_at   timestamptz not null default now(),
@@ -100,9 +97,9 @@ create policy "neighborhood_poll_votes read own"
   to authenticated
   using (user_id = auth.uid() or public.is_admin());
 
--- Voting is an insert and nothing else -- deliberately no UPDATE policy,
--- matching question_answers: a vote is what you thought when you were
--- asked. The neighborhood has to match the caller's OWN profile row, not
+-- Voting is an insert and nothing else -- deliberately no UPDATE policy:
+-- a vote is what you thought when you were asked. The neighborhood has to
+-- match the caller's OWN profile row, not
 -- whatever the client sends, since a false district would quietly corrupt
 -- the very map this data exists to color.
 drop policy if exists "neighborhood_poll_votes insert own" on public.neighborhood_poll_votes;
