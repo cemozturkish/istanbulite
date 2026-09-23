@@ -255,7 +255,9 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > `game_results`, avatar item columns, `profile_badges` (cover badges), `politicians` +
 > `political_seats` (one seat per district, the two fixed national/city ones, and one per country
 > on Kütüphane's map — `db/political_seats_countries_seed.sql` fills that last set), TBMM
-> seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `coffee_prices`
+> seats/parties, `mahalles`, `admin_notifications`, Sözcel sözcü assignments, `tumcel_puzzles`,
+> `bulmaca_puzzles` (Çengel's admin-drawn grid + clues, one row per night — see the admin.html
+> Oyunlar → Çengel section above), `coffee_prices`
 > (the Kahve Endeksi — v3 adds the opening-hours and scheduled-discount columns that make it
 > live), `coffee_comments` (what members say about a venue), `countries` + `country_entries`
 > + `country_entry_events` + `country_stories` + `country_story_countries` (what a country on
@@ -1369,6 +1371,21 @@ coordinates that say where each paper hangs.
 ### `bulmaca.html` — Crossword
 - Fully functional interactive crossword puzzle
 - CSS-based grid, JavaScript game mechanics
+- **The night's puzzle is admin-drawn, not generated.** It used to be a hardcoded pool of
+  seven grids in this file's own `PUZZLES` array, picked by a seeded random over the
+  night's key — there is no pool any more. `bulmaca_puzzles` (`db/bulmaca_puzzles.sql`)
+  holds one row per `puzzle_date`, built cell by cell in admin.html's Oyunlar → Çengel
+  panel: the admin toggles each square open/blocked and types its letter, and the
+  across/down numbering is derived from that grid rather than entered by hand, so the
+  admin's clue list and the numbers this page paints into the cells can never disagree —
+  the row stores each entry's `num`/`row`/`col` exactly as the editor computed them, and
+  `createGrid()` here reads them back rather than recomputing. The row is read by
+  `puzzle_date` off `IstDate.gameNightSeed()`, the same way `tumcel_puzzles` already is. A
+  night with no row for it is a genuinely empty game — the page prints "Bugünkü bulmaca
+  henüz hazır değil." and disables the board, the same failure Tümcel already shows for
+  the same reason. The grid size is no longer fixed at 5×5: `ROWS`/`COLS` come off the
+  row's own `rows`/`cols` columns, so an admin-drawn puzzle can be any size the editor
+  allows (3–12 per side)
 
 ### `sozcel.html` — Word Game
 - Turkish Wordle variant
@@ -2578,7 +2595,7 @@ sunset the same three boxes, in the same order, ARE those games.
 |---|---|---|
 | 1. Oyun | a word for the pool → `sozcel_word_suggestions` | Sözcel, playing whichever word was chosen |
 | 2. Oyun | a sentence for the pool → `tumcel_quote_suggestions` | Tümcel |
-| 3. Oyun | nothing to offer — it is generated, and says so | Bulmaca |
+| 3. Oyun | nothing to offer — its grid is admin-drawn, not a member pool | Bulmaca |
 
 Nothing a member writes here reaches another member except by the admin picking it (admin.html's
 Oyunlar → Sözcel panel, **Kelime Havuzu**). That makes the member who came only for the games
