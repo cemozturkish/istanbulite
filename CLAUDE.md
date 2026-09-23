@@ -634,12 +634,18 @@ sb.from('articles').delete().eq('id', id)
   - **A slot is a STACK.** One baskı can carry three İstanbul stories or three evenings on
     the same night, and the reader goes through them one at a time in the admin's own
     `edition_order` — chips carry ▲▼ to move one step.
-  - **A GAME IS A SWITCH, and the switch already existed.** Dropping a game onto the board
-    DELETES its `game_day_toggles` row and pulling it out writes one, because that table
-    records a game that is OFF. Deliberately not a second table with the opposite sense:
-    `game-locks.js` and all three game pages read this one. The Oyun section's seven-day
+  - **A SLOT IS NOT A GAME** (`db/game_night_slots.sql`). The Oyunlar column has **two
+    slots** (1. Oyun / 2. Oyun) and either takes **any** of the three games, one game per
+    slot — so at most two games are on on any night. The lineup is its own table
+    (`game_night_slots`, `(game_date, slot)` PK, both rows always written, `game` nullable);
+    a night with no rows falls back to Sözcel / Tümcel (`GAME_DEFAULT_LINEUP`, in admin.html
+    and project.html alike). `writeGameLineup` then brings `game_day_toggles` in line —
+    a game in a slot has no toggle row, every other game gets one — because
+    `game-locks.js` and all three game pages read only the toggles. The Oyun column is the
+    one `slotted` kind in `baskiAccepts`: any game, into an EMPTY slot. The Oyun section's seven-day
     calendar is the same switch seen a different way and writes the same table, so both
-    re-read the other after a write. A night is named for the day it began on, which is
+    re-read the other after a write (turning a game on there puts it in the first free
+    slot, and refuses when both are full). A night is named for the day it began on, which is
     exactly what the baskı date already is, so `game_date == baskiDate` needs no conversion.
   - **A row says whether it is in the paper, and the BOARD is what says it**
     (`baskiWireSources`, `.baski-tag`). The tag is painted onto each list row rather than
@@ -3342,11 +3348,11 @@ Six things about it:
   Etkinlikler is Bugün/Yarın/Öbür gün (`events.today`/`events.tomorrow`/`events.dayafter`), each
   box that Istanbul calendar day's own evenings **out of the baskı** — the third label used to
   read "Evvelsi gün", which actually means the day BEFORE yesterday, the wrong direction
-  entirely; corrected rather than merely translated when the column was made bilingual. Oyunlar is Sözcel, Tümcel and Bulmaca and nothing
-  else, **in that order, top to bottom** — the sequence reads downward the way a list of steps
-  does, so 1. Oyun is the box the eye lands on first and 3. Oyun is the one at the dock. The slots
-  are numbered from the dock up (`.fb-slot-N`), so the first game stands in the last slot;
-  `gameForSlot()` is the one place that arithmetic is written. A bucket with nothing in it (no story in that category today, no evening that day, a game
+  entirely; corrected rather than merely translated when the column was made bilingual. Oyunlar is **two slots, and a slot is not a game**: which game stands in
+  1. Oyun and which in 2. Oyun is the admin's per-night lineup (`game_night_slots`, any of
+  Sözcel / Tümcel / Çengel, defaulting to Sözcel / Tümcel), read **top to bottom**. The slots
+  are numbered from the dock up (`.fb-slot-N`), so the first position stands in the last slot;
+  `lineupIndexForSlot()` is the one place that arithmetic is written. A bucket with nothing in it (no story in that category today, no evening that day, a game
   switched off via `game_day_toggles`) goes dashed in its own slot, still carrying its own kicker —
   the category or the day is known regardless of whether anything is in it — rather than shifting
   the other two up to fill the gap. Olaylar alone stays a genuine feed (the top three ongoing

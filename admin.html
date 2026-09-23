@@ -2827,18 +2827,21 @@
            The seven-day board below is the same switch seen as a
            calendar; this is it seen as the baskı, which is the one view
            that matches every other kind on this desk. Both write
-           game_day_toggles, so they can never disagree. -->
+           the night's lineup (game_night_slots) and keep game_day_toggles
+           in line with it, so they can never disagree. -->
       <div class="panel-title">Bu Gecenin Oyunları</div>
       <p style="margin-bottom:10px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-        Sağdaki baskıya sürükleyin. Baskıda olan oyun o gece oynanır.
+        Sağdaki baskıya sürükleyin. İki oyun yuvası var ve her yuvaya istediğiniz
+        oyun konabilir; yuvada olan oyun o gece oynanır, olmayan kapalıdır.
       </p>
       <div class="articles-list" id="games-drag-list" style="margin-bottom:22px;"></div>
 
       <!-- Per-day on/off switch, shared by all three games -->
       <div class="panel-title">Oyun Takvimi — Açık / Kapalı</div>
       <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-        Bir oyunu belirli bir gün için kapatın. O gün oyuna girmeye çalışan üyeler
-        "Bugün &lt;Oyun&gt; yok!" uyarısını görür; oyun kartı da kilitli görünür.
+        Açık = o gecenin iki yuvasından birinde. Bir oyunu açmak onu ilk boş yuvaya
+        koyar; iki yuva doluysa önce birini kapatın. Kapalı oyuna girmeye çalışan
+        üyeler "Bugün &lt;Oyun&gt; yok!" uyarısını görür.
       </p>
       <div id="game-status-board" style="display:flex;flex-direction:column;gap:16px;">
         <div class="empty-state"><span class="spinner"></span></div>
@@ -8241,6 +8244,84 @@ const GAME_STATUS_GAMES = [
   { game: 'bulmaca', label: 'Çengel' },
 ];
 
+// ── A night's lineup: which game stands in which of the two slots ──
+// db/game_night_slots.sql. A slot is not a game: Kahvehane's Oyunlar
+// column has two boxes and any game can stand in either, so on any night
+// at most two of the three are on. A night with no rows falls back to
+// GAME_DEFAULT_LINEUP — what every night showed before the table existed —
+// and must match project.html's own copy of it.
+const GAME_SLOT_COUNT = 2;
+const GAME_DEFAULT_LINEUP = ['sozcel', 'tumcel'];
+
+// The lineup per date, as arrays of GAME_SLOT_COUNT (game key or null).
+// A game the admin switched off in game_day_toggles is taken out of its
+// slot, the same reading project.html gives it.
+async function gameLineups(dates) {
+  const [slots, toggles] = await Promise.all([
+    sb.from('game_night_slots').select('game_date, slot, game').in('game_date', dates),
+    sb.from('game_day_toggles').select('game, game_date').in('game_date', dates),
+  ]);
+  if (toggles.error) throw toggles.error;
+  // A missing table is a database that predates the slots: every night
+  // simply reads as the default lineup, and the first write says why.
+  if (slots.error) console.error('[game_night_slots]', slots.error);
+  const out = {};
+  dates.forEach(d => {
+    const off = new Set((toggles.data || []).filter(r => r.game_date === d).map(r => r.game));
+    const rows = slots.error ? [] : (slots.data || []).filter(r => r.game_date === d);
+    let lineup;
+    if (rows.length) {
+      lineup = Array(GAME_SLOT_COUNT).fill(null);
+      rows.forEach(r => { if (r.slot >= 0 && r.slot < GAME_SLOT_COUNT) lineup[r.slot] = r.game || null; });
+    } else {
+      lineup = GAME_DEFAULT_LINEUP.slice();
+    }
+    out[d] = lineup.map(g => (g && !off.has(g) ? g : null));
+  });
+  return out;
+}
+
+async function gameLineup(date) {
+  return (await gameLineups([date]))[date];
+}
+
+// Writes the whole lineup for one night, then brings game_day_toggles in
+// line with it: every game in a slot is on, every other game is off — so
+// game-locks.js and the game pages, which read only the toggles, agree
+// with what the app's column shows.
+async function writeGameLineup(date, lineup) {
+  const tableHint = (err) => {
+    if (err && (err.code === 'PGRST205' || err.code === '42P01')) {
+      return { error: new Error('game_night_slots tablosu yok — db/game_night_slots.sql çalıştırılmalı') };
+    }
+    return { error: err };
+  };
+  // Delete then insert rather than upsert: moving a game from one slot to
+  // the other would trip unique (game_date, game) half way through.
+  let r = await sb.from('game_night_slots').delete().eq('game_date', date);
+  if (r.error) return tableHint(r.error);
+  r = await sb.from('game_night_slots').insert(
+    lineup.map((g, i) => ({ game_date: date, slot: i, game: g || null })));
+  if (r.error) return tableHint(r.error);
+
+  const on = lineup.filter(Boolean);
+  const offGames = GAME_STATUS_GAMES.map(g => g.game).filter(g => on.indexOf(g) === -1);
+  if (on.length) {
+    r = await sb.from('game_day_toggles').delete().eq('game_date', date).in('game', on);
+    if (r.error) return r;
+  }
+  if (offGames.length) {
+    const { data: { session } } = await sb.auth.getSession();
+    const by = session && session.user ? session.user.id : null;
+    const at = new Date().toISOString();
+    r = await sb.from('game_day_toggles').upsert(
+      offGames.map(game => ({ game, game_date: date, disabled_by: by, disabled_at: at })),
+      { onConflict: 'game,game_date' });
+    if (r.error) return r;
+  }
+  return { error: null };
+}
+
 function gameStatusDayLabel(iso, offset) {
   const [y, m, d] = iso.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
@@ -8271,29 +8352,27 @@ async function loadGameStatusBoard() {
   wrap.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
 
   const dates = Array.from({ length: 7 }, (_, i) => sozcelIstanbulDateISO(i));
-  const { data, error } = await sb
-    .from('game_day_toggles')
-    .select('game, game_date')
-    .in('game_date', dates);
-
-  if (error) {
+  let lineups;
+  try {
+    lineups = await gameLineups(dates);
+  } catch (error) {
     wrap.innerHTML = `<div class="empty-state">Error loading: ${escapeHtml(error.message)}</div>`;
     return;
   }
 
-  const offSet = new Set((data || []).map(r => `${r.game}_${r.game_date}`));
-
+  // On = standing in one of that night's two slots.
   wrap.innerHTML = GAME_STATUS_GAMES.map(({ game, label }) => `
     <div class="game-status-group">
       <div class="game-status-group-title">${escapeHtml(label)}</div>
       <div class="game-status-days">
         ${dates.map((iso, i) => {
-          const isOff = offSet.has(`${game}_${iso}`);
+          const idx = lineups[iso].indexOf(game);
+          const isOff = idx < 0;
           return `
             <button type="button" class="game-status-day-btn ${isOff ? 'off' : 'on'}${i === 0 ? ' today' : ''}"
                     data-game="${escapeHtml(game)}" data-date="${escapeHtml(iso)}" data-off="${isOff ? '1' : '0'}">
               <span class="gsd-label">${escapeHtml(gameStatusDayLabel(iso, i))}</span>
-              <span class="gsd-state">${isOff ? 'Kapalı' : 'Açık'}</span>
+              <span class="gsd-state">${isOff ? 'Kapalı' : (idx + 1) + '. yuva'}</span>
             </button>
           `;
         }).join('')}
@@ -8306,19 +8385,23 @@ async function loadGameStatusBoard() {
   });
 }
 
+// The calendar writes the same lineup the board does: turning a game on
+// puts it in the first free slot, turning it off empties its slot.
 async function toggleGameDay(game, date, currentlyOff) {
+  let lineup;
+  try { lineup = await gameLineup(date); }
+  catch (err) { alert('Hata: ' + err.message); return; }
   if (currentlyOff) {
-    const { error } = await sb.from('game_day_toggles').delete().eq('game', game).eq('game_date', date);
-    if (error) { alert('Hata: ' + error.message); return; }
+    const free = lineup.indexOf(null);
+    if (free < 0) { alert('O gecenin iki yuvası da dolu — önce bir oyunu kapatın.'); return; }
+    lineup[free] = game;
   } else {
-    const { data: { session } } = await sb.auth.getSession();
-    const disabledBy = session && session.user ? session.user.id : null;
-    const { error } = await sb.from('game_day_toggles')
-      .upsert({ game, game_date: date, disabled_by: disabledBy, disabled_at: new Date().toISOString() }, { onConflict: 'game,game_date' });
-    if (error) { alert('Hata: ' + error.message); return; }
+    lineup = lineup.map(g => (g === game ? null : g));
   }
+  const { error } = await writeGameLineup(date, lineup);
+  if (error) { alert('Hata: ' + error.message); return; }
   loadGameStatusBoard();
-  // Two views of one table (this calendar and the board's Oyunlar
+  // Two views of one lineup (this calendar and the board's Oyunlar
   // column): whichever is written, both are re-read.
   baskiRefresh();
 }
@@ -9707,11 +9790,12 @@ const BASKI_PAGES = [
   {
     id: 'kahvehane', name: 'Kahvehane', mirror: true, foot: ['', 'KAHVE'],
     cols: [
-      { kind: 'oyun', title: 'Oyunlar', note: 'Dar sütun — gece. Sıra sabit.',
+      // Two SLOTS, and a slot is not a game (db/game_night_slots.sql):
+      // either one takes any of the three games, one game per slot.
+      { kind: 'oyun', title: 'Oyunlar', note: 'Dar sütun — gece. İki yuva, her yuvaya herhangi bir oyun.',
         slots: [
-          { id: 'sozcel',  label: '1. Oyun' },
-          { id: 'tumcel',  label: '2. Oyun' },
-          { id: 'bulmaca', label: '3. Oyun' },
+          { id: 'g0', label: '1. Oyun' },
+          { id: 'g1', label: '2. Oyun' },
         ] },
       { kind: 'etkinlik', title: 'Etkinlikler', note: 'Geniş sütun — kutu: etkinliğin tarihi.',
         slots: [
@@ -9840,37 +9924,38 @@ const BASKI_KINDS = {
       .update({ edition_order: order }).eq('id', item.id),
   },
 
-  // A game is not a row to be scheduled, it is a switch — and the switch
-  // already existed. `game_day_toggles` records a game that is OFF, so
-  // dropping one onto the board DELETES its row and pulling it out writes
-  // one. Deliberately not a second table with the opposite sense:
-  // game-locks.js and all three game pages read this one, and inverting
-  // it so this board reads more literally would be re-teaching the whole
-  // app a new word for the same fact.
+  // A game stands in one of the night's two SLOTS (db/game_night_slots.sql).
+  // A slot is not a game: either slot takes any of the three, one game per
+  // slot, so at most two games are on on any night. writeGameLineup keeps
+  // game_day_toggles — which game-locks.js and the game pages read — in
+  // line with it: a game in a slot is on, every other game is off.
   //
   // A night is named for the day it began on, which is exactly what the
   // baskı date already is, so game_date == baskiDate needs no conversion.
   oyun: {
     onOff: true,
+    slotted: true,
     async load(date) {
-      const { data, error } = await sb.from('game_day_toggles')
-        .select('game').eq('game_date', date);
-      if (error) throw error;
-      const off = new Set((data || []).map(r => r.game));
-      return GAME_STATUS_GAMES.map(g => ({
-        id: g.game, kind: 'oyun', title: g.label, slot: g.game,
-        inEdition: !off.has(g.game), otherEdition: null, order: 0, warn: [],
-      }));
+      const lineup = await gameLineup(date);
+      return GAME_STATUS_GAMES.map(g => {
+        const idx = lineup.indexOf(g.game);
+        return {
+          id: g.game, kind: 'oyun', title: g.label,
+          slot: idx >= 0 ? 'g' + idx : null,
+          inEdition: idx >= 0, otherEdition: null, order: 0, warn: [],
+        };
+      });
     },
-    place: (item) => sb.from('game_day_toggles')
-      .delete().eq('game', item.id).eq('game_date', baskiDate),
-    async pull(item) {
-      const { data: { session } } = await sb.auth.getSession();
-      return sb.from('game_day_toggles').upsert({
-        game: item.id, game_date: baskiDate,
-        disabled_by: session && session.user ? session.user.id : null,
-        disabled_at: new Date().toISOString(),
-      }, { onConflict: 'game,game_date' });
+    async place(item, date, order, half, slotId) {
+      const idx = Number(String(slotId || '').replace(/^g/, ''));
+      if (!(idx >= 0 && idx < GAME_SLOT_COUNT)) return { error: new Error('Geçersiz yuva') };
+      const lineup = (await gameLineup(date)).map(g => (g === item.id ? null : g));
+      lineup[idx] = item.id;
+      return writeGameLineup(date, lineup);
+    },
+    async pull(item, date) {
+      const lineup = (await gameLineup(date)).map(g => (g === item.id ? null : g));
+      return writeGameLineup(date, lineup);
     },
     setOrder: () => Promise.resolve({ error: null }),
   },
@@ -10033,6 +10118,8 @@ function baskiAccepts(kind, slotId, item) {
   if (item.inEdition) return false;
   if (item.warn.length) return false;
   if (BASKI_KINDS[kind].positional) return true;   // any of the two positions
+  // A slot of a slotted kind takes any item, one at a time.
+  if (BASKI_KINDS[kind].slotted) return baskiStack(kind, slotId).length === 0;
   return item.slot === slotId;
 }
 
@@ -10164,7 +10251,7 @@ function baskiPlace(item, slotId) {
     ? (baskiItems[item.kind] || []).filter(i => i.inEdition)
     : baskiStack(item.kind, slotId || item.slot);
   const order = stack.length ? Math.max(...stack.map(i => i.order)) + 1 : 0;
-  return baskiWrite(() => def.place(item, baskiDate, order, baskiHalf), 'Baskıya koyma');
+  return baskiWrite(() => def.place(item, baskiDate, order, baskiHalf, slotId), 'Baskıya koyma');
 }
 
 function baskiPull(item) {
@@ -10411,7 +10498,7 @@ const PRESS_FORMES = [
     // IS that night, because a gece edition is named for the day it began
     // on, which is exactly what gameNight() returns.
     async check(ctx) {
-      if (ctx.gamesOff.has('sozcel')) return { state: 'na', note: 'Kapalı' };
+      if (ctx.gamesOff.has('sozcel')) return { state: 'na', note: 'Yuvada değil' };
       const { data, error } = await sb.from('sozcel_used_answers')
         .select('word').eq('used_on', ctx.date).maybeSingle();
       if (error) throw error;
@@ -10431,14 +10518,31 @@ const PRESS_FORMES = [
     // page prints "Bugünkü bulmaca henüz hazır değil." and the game
     // cannot be finished. A genuinely red forme.
     async check(ctx) {
-      if (ctx.gamesOff.has('tumcel')) return { state: 'na', note: 'Kapalı' };
+      if (ctx.gamesOff.has('tumcel')) return { state: 'na', note: 'Yuvada değil' };
       const { data, error } = await sb.from('tumcel_puzzles')
         .select('quotes').eq('puzzle_date', ctx.date).maybeSingle();
       if (error) throw error;
-      if (!data) return { state: 'miss', note: 'Çengel yok' };
+      if (!data) return { state: 'miss', note: 'Bulmaca yok' };
       const n = Array.isArray(data.quotes) ? data.quotes.length : 0;
       if (n < 4) return { state: 'miss', note: n + '/4 alıntı' };
       return { state: 'ok', note: '4 alıntı' };
+    },
+  },
+  {
+    id: 'bulmaca',
+    name: 'Çengel',
+    tab: 'games',
+    editions: ['gece'],
+    // Admin-drawn, one row per night (db/bulmaca_puzzles.sql). With no
+    // row the page prints "Bugünkü bulmaca henüz hazır değil." -- red,
+    // but only on a night Çengel actually stands in a slot.
+    async check(ctx) {
+      if (ctx.gamesOff.has('bulmaca')) return { state: 'na', note: 'Yuvada değil' };
+      const { data, error } = await sb.from('bulmaca_puzzles')
+        .select('puzzle_date').eq('puzzle_date', ctx.date).maybeSingle();
+      if (error) throw error;
+      if (!data) return { state: 'miss', note: 'Çengel çizilmedi' };
+      return { state: 'ok', note: 'Hazır' };
     },
   },
   {
@@ -10557,12 +10661,12 @@ async function pressCheck() {
   // effort: a toggles table that cannot be read leaves nothing off,
   // which is the same fallback gamesStateToday() takes -- reporting
   // every game off would be a far louder lie than reporting none.
+  // A game is off unless it stands in one of the night's two slots
+  // (db/game_night_slots.sql) -- the same lineup the reader's column reads.
   if (ctx.edition === 'gece') {
     try {
-      const { data, error } = await sb.from('game_day_toggles')
-        .select('game').eq('game_date', ctx.date);
-      if (error) throw error;
-      (data || []).forEach(r => ctx.gamesOff.add(r.game));
+      const lineup = await gameLineup(ctx.date);
+      GAME_STATUS_GAMES.forEach(g => { if (lineup.indexOf(g.game) < 0) ctx.gamesOff.add(g.game); });
     } catch (err) { console.error('[press toggles]', err); }
   }
 

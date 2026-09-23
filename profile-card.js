@@ -2809,13 +2809,21 @@
   // — a member simply goes uncaptioned, which is exactly how the page
   // read before this existed.
   // The games the app is actually casting tonight, which is the list
-  // the RPC counts against (db/hive_member_status_v2_games.sql). It has
-  // to agree with GAME_DEFS in project.html -- that is the column the
-  // caption is a picture of -- and it is passed rather than hardcoded
-  // server-side precisely because the old hardcoded copy drifted: the
-  // database went on counting Bulmaca long after the column stopped
-  // casting it, and reported three games into a two-slot column.
+  // the RPC counts against (db/hive_member_status_v2_games.sql). It is
+  // the night's own lineup -- whichever games the admin stood in the
+  // Oyunlar column's two slots (db/game_night_slots.sql) -- falling back
+  // to the default the column itself falls back to (GAME_DEFAULT_LINEUP
+  // in project.html). It is passed rather than hardcoded server-side
+  // precisely because a hardcoded copy drifts.
   const HIVE_GAMES = ['sozcel', 'tumcel'];
+  async function hiveGamesFor(sb, night) {
+    try {
+      const { data, error } = await sb.from('game_night_slots')
+        .select('game').eq('game_date', night);
+      if (error || !data || !data.length) return HIVE_GAMES;
+      return data.map(r => r.game).filter(Boolean);
+    } catch (e) { return HIVE_GAMES; }
+  }
 
   async function loadHiveStatus(state) {
     try {
@@ -2831,7 +2839,7 @@
         ? IstDate.gameNightSeed()
         : night.split('-').map(Number).join('-');
       let { data, error } = await state.sb.rpc('hive_member_status', {
-        p_game_date: night, p_game_key: seed, p_games: HIVE_GAMES,
+        p_game_date: night, p_game_key: seed, p_games: await hiveGamesFor(state.sb, night),
       });
       // A database that has only ever run v1 has no three-argument
       // function to call, and PostgREST says so in a CODE rather than in
