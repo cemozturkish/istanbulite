@@ -9412,11 +9412,16 @@ const BASKI_PAGES = [
       // stack, so there is nothing to drag), by night it is the polls.
       // Said here rather than left for an editor to rediscover when the
       // box they filled does not appear at noon.
+      // Two slots, not three (see loadAnketActor's own `.limit(2)` in
+      // project.html, and its CAST entry's `count: 2`) — the same
+      // reduction Kahvehane's Oyunlar column would have made if it had
+      // one, and the board's second rule: it asks exactly what the
+      // reader's own loader asks, so a third box here would be a slot
+      // the reader can never actually meet.
       { kind: 'anket', title: 'Anket', note: 'Dar sütun — gece anket, gündüz 2. haber.',
         slots: [
           { id: 'a0', label: '1.' },
           { id: 'a1', label: '2.' },
-          { id: 'a2', label: '3.' },
         ] },
     ],
   },
@@ -9527,10 +9532,10 @@ const BASKI_KINDS = {
   },
 
   // The one column whose slots are POSITIONS rather than buckets: the
-  // reader's three anket boxes are the edition's three polls in order, so
-  // every anket slot accepts every poll. `active` is a separate gate and
-  // stays one — a closed poll is closed whether or not it was ever in a
-  // baskı — so an inactive poll refuses the drop.
+  // reader's two anket boxes are the edition's first two polls in order,
+  // so every anket slot accepts every poll. `active` is a separate gate
+  // and stays one — a closed poll is closed whether or not it was ever
+  // in a baskı — so an inactive poll refuses the drop.
   anket: {
     positional: true,
     async load(date) {
@@ -9600,7 +9605,7 @@ function baskiStampPositions(kind, items) {
   if (!BASKI_KINDS[kind].positional) return;
   items.forEach(i => { if (i.inEdition) i.slot = null; });
   items.filter(i => i.inEdition).sort((a, b) => a.order - b.order)
-    .forEach((i, idx) => { i.slot = idx < 3 ? 'a' + idx : 'over'; });
+    .forEach((i, idx) => { i.slot = idx < 2 ? 'a' + idx : 'over'; });
 }
 
 // What stands in one slot, in the order the reader will meet it.
@@ -9748,7 +9753,7 @@ function baskiAccepts(kind, slotId, item) {
   if (!item || item.kind !== kind) return false;
   if (item.inEdition) return false;
   if (item.warn.length) return false;
-  if (BASKI_KINDS[kind].positional) return true;   // any of the three positions
+  if (BASKI_KINDS[kind].positional) return true;   // any of the two positions
   return item.slot === slotId;
 }
 
