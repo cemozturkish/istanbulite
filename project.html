@@ -380,6 +380,27 @@
       transition: height 0.1s ease-out;
     }
     .fb-box.fb-mirror:not(.fb-empty)::after { left: auto; right: 0; }
+    /* Oyunlar's flag runs along the TOP edge instead of down the side --
+       the two boxes here are a fixed pair (which game stands in 1./2.
+       Oyun), not a feed the reader scans top to bottom the way Haberler
+       or Etkinlikler are, so the category rule reads better as a
+       nameplate over the game's own title than as a stripe down the
+       box's inside edge. Same two pseudo-elements, same colours, just
+       turned 90°: the cap now grows left-to-right instead of top-down. */
+    .fb-box.fb-oyun.fb-mirror:not(.fb-empty)::before,
+    .fb-box.fb-oyun:not(.fb-empty)::before {
+      top: 0; left: 0; right: 0; bottom: auto;
+      width: auto; height: 4px;
+    }
+    .fb-box.fb-oyun.fb-mirror:not(.fb-empty)::after,
+    .fb-box.fb-oyun:not(.fb-empty)::after {
+      top: 0; left: 0; right: auto; bottom: auto;
+      width: 0; height: 4px;
+      transition: width 0.1s ease-out;
+    }
+    .fb-actor.fb-pressing.fb-oyun:not(.fb-empty)::after {
+      width: 100%; height: 4px;
+    }
     /* Only a box that answers a press says so under a cursor -- one class,
        set by whichever loader knows (fbSetPage, loadOyunActor). A dashed
        slot, a placeholder and a game whose turn has not come are all
@@ -537,7 +558,7 @@
       height: 100%;
       object-fit: contain;
     }
-    /* ── The mark reads the palette, drawn or not ──
+    /* ── The marks read the palette, drawn or not ──
        assets/sozcel-logo.png is drawn flat, black ink on white, the same
        two-tone stamp the maps and the avatar are (see map-ink.js): so
        rather than a second PNG per palette, `ist-sozcel-ink` (map-ink.js)
@@ -549,9 +570,18 @@
        html.ist-map-ink exactly like those two, so `?ink=0` or a filter
        that failed to build leaves the mark exactly as drawn rather than
        vanishing (a `filter: url()` to nothing is, per spec, an element
-       that does not render). */
-    html.ist-map-ink .fb-oyun .logo img {
+       that does not render).
+       assets/cengel-logo.png is drawn the other way round -- transparent
+       canvas, white fill, black outline -- so it reads a ladder of its
+       own (`ist-cengel-ink`) that folds both tones to one flat --ink
+       silhouette rather than fading a paper tone into the card. Scoped
+       by which mark it is (.logo-sozcel / .logo-bulmaca, see
+       oyunTitleHtml), since the two ladders are not interchangeable. */
+    html.ist-map-ink .fb-oyun .logo-sozcel img {
       filter: url(#ist-sozcel-ink);
+    }
+    html.ist-map-ink .fb-oyun .logo-bulmaca img {
+      filter: url(#ist-cengel-ink);
     }
     /* ── The electric sign, at night only ──
        By day the mark is flat ink like everything else on the card; after
@@ -594,8 +624,13 @@
        Higher specificity than either rule above (see html.ist-map-ink
        and :root[data-theme="dark"] separately), so it wins whenever
        both conditions hold. */
-    html.ist-map-ink:root[data-theme="dark"] .fb-oyun .logo img {
+    html.ist-map-ink:root[data-theme="dark"] .fb-oyun .logo-sozcel img {
       filter: url(#ist-sozcel-ink)
+              drop-shadow(0 0 5px var(--lit-sign, rgba(255, 205, 130, 0.9)))
+              drop-shadow(0 0 16px var(--lit-sign-far, rgba(255, 160, 80, 0.55)));
+    }
+    html.ist-map-ink:root[data-theme="dark"] .fb-oyun .logo-bulmaca img {
+      filter: url(#ist-cengel-ink)
               drop-shadow(0 0 5px var(--lit-sign, rgba(255, 205, 130, 0.9)))
               drop-shadow(0 0 16px var(--lit-sign-far, rgba(255, 160, 80, 0.55)));
     }
@@ -3532,8 +3567,12 @@ const SUBMIT_DEFS = [
 // time, so the box names the same game the same way whichever question
 // it happens to be asking.
 function oyunTitleHtml(g) {
+  // The class names which mark it is -- see .logo-sozcel / .logo-bulmaca
+  // in the stylesheet -- because the two marks are drawn the opposite
+  // way round (Sözcel's ink is black-on-white, Çengel's is white-on-
+  // transparent) and so read the palette through two different ladders.
   return g.logo
-    ? '<div class="logo"><img src="' + g.logo + '" alt="' + g.title + '" width="512" height="512" decoding="async"></div>'
+    ? '<div class="logo logo-' + g.key + '"><img src="' + g.logo + '" alt="' + g.title + '" width="512" height="512" decoding="async"></div>'
     : '<div class="t">' + g.title + '</div>';
 }
 
@@ -4010,15 +4049,22 @@ function loadKahveNarrow(el, slot) {
 // switched off (game_day_toggles), goes dashed exactly like an empty
 // feed slot rather than opening a locked page.
 const GAME_CATALOG = {
-  // Sözcel wears its own mark (the same assets/sozcel-logo.png the
-  // desktop game-link tiles use) in place of its plain title; the other
-  // two have no logo of their own yet, so they print their name as text.
+  // Sözcel and Çengel both wear their own mark (the same
+  // assets/sozcel-logo.png the desktop game-link tiles use, and
+  // assets/cengel-logo.png) in place of a plain title -- see
+  // oyunTitleHtml and .logo-sozcel / .logo-bulmaca for how the two are
+  // told apart, since they read the palette through different ladders
+  // (map-ink.js). Tümcel has no mark of its own yet, so it prints its
+  // name as text.
   sozcel:  { key: 'sozcel',  title: 'Sözcel', logo: 'assets/sozcel-logo.png', file: 'sozcel.html' },
   tumcel:  { key: 'tumcel',  title: 'Tümcel', file: 'tumcel.html' },
-  bulmaca: { key: 'bulmaca', title: 'Çengel', file: 'bulmaca.html' },
+  bulmaca: { key: 'bulmaca', title: 'Çengel', logo: 'assets/cengel-logo.png', file: 'bulmaca.html' },
 };
 const GAME_SLOT_COUNT = 2;
 const GAME_DEFAULT_LINEUP = ['sozcel', 'tumcel'];
+// Spelled out rather than "1./2." -- the kicker names the games' own
+// order in the lineup, not a numbered list item.
+const GAME_ORDINALS = ['BİRİNCİ', 'İKİNCİ'];
 // The sequence reads DOWNWARD: 1. Oyun on top, 2. Oyun at the dock. The
 // actor slots are numbered from the dock up (see .fb-slot-N), so the
 // first position stands in the last slot -- the one place that
@@ -4092,7 +4138,7 @@ async function loadOyunActor(el, slot) {
   const state = await gamesStateToday();
   if (!el.isConnected) return;
   const idx = lineupIndexForSlot(slot);
-  const kicker = (idx + 1) + '. OYUN';
+  const kicker = (GAME_ORDINALS[idx] || (idx + 1) + '.') + ' OYUN';
   const g = GAME_CATALOG[state.lineup[idx]];
   fbSetDone(el, false);
   if (!g || state.off.has(g.key)) {
