@@ -593,27 +593,6 @@
               drop-shadow(0 0 5px var(--lit-sign, rgba(255, 205, 130, 0.9)))
               drop-shadow(0 0 16px var(--lit-sign-far, rgba(255, 160, 80, 0.55)));
     }
-    /* A game whose turn has not come yet. It still names itself and
-       still says what is standing in front of it -- a step you can see
-       ahead of you is not the same thing as a slot with nothing in it,
-       which is why this is not .fb-empty. Colour only, never opacity:
-       an actor's opacity is its pose (see CAST), and a rule here would
-       be overwritten by it on the next frame. */
-    .fb-box.fb-locked {
-      color: var(--muted);
-      border-color: var(--muted, #9a9a9a);
-      cursor: default;
-      /* And its light is off. Redeclaring the token rather than the
-         background takes the spill with the paper in one line, and
-         never fights the press's own box-shadow on specificity -- see
-         frames.css. By day both tokens already mean "not a light", so
-         this says nothing at noon. */
-      --lit: var(--paper-card, #ddc4b5);
-      --lit-glow: 0 0 0 0 rgba(0, 0, 0, 0);
-    }
-    .fb-box.fb-locked .k { color: var(--muted); }
-    .fb-box.fb-locked:not(.fb-empty)::before { background: var(--muted, #9a9a9a); }
-
     /* ── A box the reader has already dealt with ──
        The story that has been read, the game that has been played, the
        poll that has been answered. Two things at once, and they are one
@@ -625,35 +604,31 @@
        by the kicker), so what it actually means is "this is a filled
        card", which is exactly what stops being true.
 
-       It reads next to .fb-locked above without colliding, and not by
-       luck: gameBlocker only ever locks a game that has an earlier
-       unplayed one in front of it, and that earlier game is itself
-       always open -- so the Oyunlar column is always
-       [done...][open][locked...] and the two greys can never stand
-       side by side. Every other column has no locked state at all.
-       What the reader is left looking at is a column gone quiet with
-       the one thing they can actually do still in full ink.
+       There is no `.fb-locked` state any more -- Oyunlar used to be the
+       one column that had one (a game whose turn had not come yet), but
+       Sözcel and Tümcel are independent now, so a game not switched off
+       is always open whether or not the other has been played. No
+       column has a locked state at all any more.
 
        Colour only, never opacity -- an actor's opacity is its pose (see
-       CAST) and would be overwritten on the next frame, the same reason
-       .fb-locked states it that way. A done box is still pressable: a
-       story can be read twice, and .fb-openable is untouched here.
+       CAST) and would be overwritten on the next frame. A done box is
+       still pressable: a story can be read twice, and .fb-openable is
+       untouched here.
 
        And the PAPER goes 20% translucent with it, so the card starts to
        sink back into the page rather than only changing colour on it.
        It is the box's own background that thins, never `opacity`:
        paintCast() writes the actor's inline opacity on every frame of
-       the flip, so a rule here would be overwritten a frame later --
-       the same trap .fb-locked's own note is about. A background is
-       nothing the tick touches. */
+       the flip, so a rule here would be overwritten a frame later. A
+       background is nothing the tick touches. */
     .fb-box.fb-done:not(.fb-empty) {
       color: var(--muted);
       border-color: var(--muted, #9a9a9a);
       background: color-mix(in srgb, var(--paper-card, #ddc4b5) 80%, transparent);
       /* The light goes out with it -- the shop you have already been to,
-         closed for the night. Same one-line form .fb-locked above uses,
-         and the reason the background here can go on naming --paper-card:
-         that is what --lit means once it is switched off. */
+         closed for the night. The reason the background here can go on
+         naming --paper-card: that is what --lit means once it is
+         switched off. */
       --lit: var(--paper-card, #ddc4b5);
       --lit-glow: 0 0 0 0 rgba(0, 0, 0, 0);
     }
@@ -822,7 +797,9 @@
       -webkit-user-select: none; user-select: none;
     }
     nav b {
-      flex: 1;
+      flex: 1 1 0;
+      min-width: 0;
+      white-space: nowrap;
       display: flex; align-items: flex-end;
       padding-bottom: var(--fb-mark-foot, 9px);
       font-size: 13px; letter-spacing: 0.5px;
@@ -1077,8 +1054,14 @@
     nav b.fb-logo-btn .fb-logo {
       /* Big enough that the bulk of it stands clear above the header,
          not just a sliver breaking the line. Ratio stays the ink's own
-         (4.33:1) so it grows without distorting. */
-      width: 208px; height: 48px;
+         (4.33:1) so it grows without distorting.
+         But never wider than the room the two words leave it: at a fixed
+         208px the row came to ~420px on every phone, so on anything
+         narrower than that Kahvehane was pushed off the right edge. The
+         210px is the two words (~87px each at 13px) plus the button's own
+         padding and a little air either side. */
+      width: clamp(96px, calc(100vw - 2 * var(--screen-inset, 18px) - 210px), 208px);
+      height: auto; aspect-ratio: 208 / 48;
       /* Above the ring the button paints under it (see the note there) --
          the letters are the last thing drawn, on every day. */
       position: relative; z-index: 1;
@@ -3647,7 +3630,7 @@ async function loadSubmitActor(el, slot) {
   if (!el.isConnected) return;
   fbSetPage(el, null);
   fbSetDone(el, false);
-  el.classList.remove('fb-locked', 'fb-empty');
+  el.classList.remove('fb-empty');
   // The same slot arithmetic the games use: the column reads downward,
   // so the first game stands in the last slot (see gameForSlot).
   const g = SUBMIT_DEFS[SUBMIT_DEFS.length - 1 - slot];
@@ -4079,54 +4062,29 @@ function gamesStateToday() {
   return gamesStatePromise;
 }
 
-// What is standing in front of this game: the first game before it in
-// the sequence that is on today and has not been finished. A game the
-// admin switched off is not a step anybody has left to take, so it
-// blocks nothing -- the same reading Kahvehane's deck gives it, where an
-// off game simply leaves the sequence.
-function gameBlocker(state, idx) {
-  for (let i = 0; i < idx; i++) {
-    const p = GAME_DEFS[i];
-    if (!state.off.has(p.key) && !state.played.has(p.key)) return p;
-  }
-  return null;
-}
-
 async function loadOyunActor(el, slot) {
   const state = await gamesStateToday();
   if (!el.isConnected) return;
   const idx = GAME_DEFS.length - 1 - slot;
   const g = GAME_DEFS[idx];
-  el.classList.remove('fb-locked');
   fbSetDone(el, false);
   if (state.off.has(g.key)) {
     el.classList.add('fb-empty'); el.classList.remove('fb-openable');
     el.innerHTML = '<div class="k">' + g.kicker + '</div>'; return;
   }
   el.classList.remove('fb-empty');
-  // PLAYED means finished (attempts >= 1), the same reading the lock
-  // below and the app map's own square use -- all three have to agree or
-  // a game opens the next one while still saying it has not been played.
+  // PLAYED means finished (attempts >= 1), the same reading the app map's
+  // own square uses -- the two have to agree or a game opens looking
+  // unplayed while the map already counted it done.
   fbSetDone(el, state.played.has(g.key));
-  const blocker = gameBlocker(state, idx);
-  if (blocker) el.classList.add('fb-locked');
-  // The same class every other column's boxes carry, and it means the
-  // same thing here: this box answers a press. A game whose turn has not
-  // come does not, so it does not wear it -- and neither the cursor nor
-  // the press effect has a second rule to state (see fbSetPage).
-  el.classList.toggle('fb-openable', !blocker);
-  // The box names its game and nothing about it -- "Türkçe Wordle" told
-  // the reader something they already know once the game has a mark of
-  // its own; the only thing this line still has to say is that another
-  // game is standing in front of this one.
-  el.innerHTML = '<div class="k">' + g.kicker + '</div>' + oyunTitleHtml(g) +
-                 (blocker ? '<div class="m">Önce ' + blocker.title + '</div>' : '');
+  // Sözcel and Tümcel are independent -- either can be played first, so
+  // the box always answers a press once it is on today.
+  el.classList.add('fb-openable');
+  el.innerHTML = '<div class="k">' + g.kicker + '</div>' + oyunTitleHtml(g);
 }
 
-// Playing a game is what unlocks the next one, so the column is re-read
-// the moment one is closed rather than at the next mount -- otherwise a
-// reader who has just finished Sözcel is looking at a Tümcel that is
-// still holding them off.
+// The column is re-read the moment a game is closed rather than at the
+// next mount, so its .fb-done mark and the day meter catch up right away.
 function refreshOyunColumn() {
   gamesStatePromise = null;
   (cast || []).forEach(a => {
@@ -4139,7 +4097,7 @@ function refreshOyunColumn() {
 
 function onpressOyun(e, slot) {
   const el = e.currentTarget;
-  if (el.classList.contains('fb-empty') || el.classList.contains('fb-locked')) return;
+  if (el.classList.contains('fb-empty')) return;
   // ── The press handler belongs to the ACTOR, not to the edition ──
   // This column is two different things across the day, so the one
   // handler both of them carry has to route: by night a press opens the
@@ -4497,7 +4455,7 @@ function newsFootHTML(inSeries) {
 // The reader's verdict on one akış. Upserted rather than inserted: this
 // is a standing preference, not a record of what somebody thought at the
 // moment they were asked (see the migration's own note on why it
-// diverges from question_answers there).
+// diverges from neighborhood_poll_votes there).
 //
 // Both caches are dropped rather than patched, so the next render asks
 // the database what it actually holds -- the same rule admin.html's

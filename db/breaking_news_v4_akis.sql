@@ -82,9 +82,9 @@ create table if not exists public.news_series_verdict (
 
 alter table public.news_series_verdict enable row level security;
 
--- Deliberately NOT insert-only, unlike question_answers and
--- neighborhood_poll_votes. Those record what somebody THOUGHT when they
--- were asked, and a row that can be rewritten later is not that. This is
+-- Deliberately NOT insert-only, unlike neighborhood_poll_votes. That
+-- records what somebody THOUGHT when they were asked, and a row that can
+-- be rewritten later is not that. This is
 -- not an opinion — it is a standing preference about what the app may go
 -- on handing them, and a preference you cannot change is a trap. So the
 -- verdict is upserted, and throwing a later haber in the same seri the
@@ -108,8 +108,8 @@ create policy "own verdict delete" on public.news_series_verdict
 
 -- A member reads their OWN rows and nobody else's -- and there is no
 -- admin policy here at all, which is the one place this table diverges
--- from question_answers (author + admin). A mute list is not an opinion
--- somebody offered, it is the record of what a member refuses to hear
+-- from neighborhood_poll_votes (voter + admin). A mute list is not an
+-- opinion somebody offered, it is the record of what a member refuses to hear
 -- about, and that is precisely the kind of thing this app promises not
 -- to keep on anybody (see "No DMs -- ever" in CLAUDE.md: it does not
 -- need to interpret your data or use it against your future endeavors).

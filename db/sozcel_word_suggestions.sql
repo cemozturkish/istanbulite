@@ -79,7 +79,7 @@ alter table public.sozcel_word_suggestions enable row level security;
 -- pool — and after the pick, the answer itself — is sitting in a table
 -- any signed-in member can select from before the game has been played.
 -- So a member reads their own row and nobody else's, which is the same
--- stance question_answers and neighborhood_poll_votes take, here for
+-- stance neighborhood_poll_votes takes, here for
 -- game integrity rather than for privacy.
 drop policy if exists "sozcel_word_suggestions read own or admin"
   on public.sozcel_word_suggestions;
@@ -129,8 +129,8 @@ create policy "sozcel_word_suggestions update admin"
 -- ── How many the city offered, without naming any of them ──
 -- The box wants to say "43 kelime önerildi" — a fact about the city that
 -- every member may know — while the words themselves stay unreadable by
--- the policy above. Same shape as question_tally(): SECURITY DEFINER, one
--- integer, no identities and no content.
+-- the policy above. Same shape as neighborhood_poll_results(): SECURITY
+-- DEFINER, counts back, no identities and no content.
 create or replace function public.sozcel_suggestion_count(p_night date)
 returns integer
 language sql

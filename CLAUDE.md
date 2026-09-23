@@ -158,7 +158,7 @@ default one.
 ├── profile-card.js/.css  # Profile bar (the phone's top bar, its sagging edge and the sun/moon
 │                         chart hanging off it), the petek, avatar, badges — shared across pages
 ├── onboarding.js/.css    # New-account onboarding — project.html ONLY (see its own section)
-├── game-locks.js         # Per-day game on/off enforcement + the sequence's question gates
+├── game-locks.js         # Per-day game on/off enforcement (games are otherwise independent)
 ├── event-interest.js     # "İlgimi çekti": the verdict Kahvehane's event deck records, Hane reads
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
 ├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it,
@@ -318,35 +318,18 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 - Read by `game-locks.js` on every game page (and Kahvehane) to lock the game's nav card and, if a user hits the game page directly, bounce them to Kahvehane with "Bugün `<Oyun>` yok!".
 - RLS: authenticated users SELECT all; admin-only INSERT/UPDATE/DELETE.
 
-**Tables: `daily_questions` + `question_answers`** — the question between two games
-(`db/daily_questions.sql`).
-- The three games are a **sequence with a question in each joint**: play Sözcel, answer a
-  question, play Tümcel, answer another, play Bulmaca, answer the last. The questions are the
-  point of the sequence rather than a garnish on it — they are how the site learns what its
-  members actually think, from people who are already here rather than from a survey nobody opens.
-- `daily_questions`: `id`, `question_date`, `after_game` (`sozcel`/`tumcel`/`bulmaca` — the game it
-  is asked *after*, which is its position in the sequence), the body and two options in TR and
-  optional EN. Unique `(question_date, after_game)`: three slots a day, one question each.
-- `question_answers`: `(question_id, user_id)` PK, `choice` (`a`/`b`). **Insert-only** — there is
-  deliberately no UPDATE policy: an answer is what you thought when you were asked, and a row that
-  can be rewritten later is not that.
-- RLS: questions readable by everyone signed in, writable by the admin alone. An answer is
-  readable by **its own author and the admin**, and by nobody else; there is no policy that lets
-  one member read another's. The count the card prints back comes from `question_tally(question_id)`
-  (SECURITY DEFINER, two integers, no identities) — Kütüphane's news polls show who voted, these do
-  not, because a poll about a news story is a public opinion and these are closer to the member.
-- **No data, no gate.** Every lock the client applies is conditional on a question existing for that
-  day (`GATES` in `game-locks.js`): a day the admin left empty behaves exactly as the site did
-  before this file existed. A feature that locks the app when its content table is empty is a
-  feature that takes the app down.
-- Curated from admin.html's Oyunlar tab → **Sorular** panel (date × game, both languages).
-
 **Tables: `neighborhood_polls` + `neighborhood_poll_votes`** — İlçe Anketleri, the district polls
-behind Kütüphane's ANKET box (`db/neighborhood_polls.sql`).
-- What makes this a different object from `daily_questions` (a citywide opinion) and
-  `breaking_news_polls` (a reaction to one story) is what the answer is FOR: every vote is filed
-  under the member's own district, so the result is not one percentage but 25 of them — how
-  Beşiktaş answered, how Üsküdar answered.
+behind Kütüphane's ANKET box (`db/neighborhood_polls.sql`). This is the site's one standing
+opinion mechanism now: there used to be a second one — a `daily_questions`/`question_answers`
+question asked in each joint of the game sequence, with Tümcel and Bulmaca locked until the
+reader answered the one before them — and it is gone (`db/daily_questions.sql` is no longer
+used; the tables are dropped by `db/daily_questions_v2_drop.sql`). Sözcel, Tümcel and Çengel are
+independent now — any of the three can be played in any order, and the only lock left on any of
+them is the admin's per-day off-switch (`game_day_toggles`, above). Anything the site wants to
+ask its members, it asks through Anket.
+- What makes this a different object from `breaking_news_polls` (a reaction to one story) is what
+  the answer is FOR: every vote is filed under the member's own district, so the result is not one
+  percentage but 25 of them — how Beşiktaş answered, how Üsküdar answered.
 - `neighborhood_polls`: `id`, `question_tr`/`question_en`, `option_a_tr`/`option_a_en`,
   `option_b_tr`/`option_b_en`, `color_a`/`color_b` (hex, defaulted to the site's own red and ink),
   `active`. The two colors are what the district-colored map mixes between for a district by that
@@ -355,13 +338,14 @@ behind Kütüphane's ANKET box (`db/neighborhood_polls.sql`).
   (`assets/map/istanbul-map-mobile.svg`, `paintDistrictMap`), and on that district's own row in the
   list under it.
 - `neighborhood_poll_votes`: `(poll_id, user_id)` PK, `neighborhood` (the voter's own district AT
-  THE TIME they voted, not looked up later), `choice` (`a`/`b`). **Insert-only**, same reasoning as
-  `question_answers`: an answer is what you thought when you were asked. The insert's `with check`
-  cross-references the caller's own `profiles.neighborhood` rather than trusting whatever the
-  client sends, since a false district would quietly corrupt the very data a map exists to color.
+  THE TIME they voted, not looked up later), `choice` (`a`/`b`). **Insert-only** — deliberately no
+  UPDATE policy: an answer is what you thought when you were asked, and a row that can be rewritten
+  later is not that. The insert's `with check` cross-references the caller's own
+  `profiles.neighborhood` rather than trusting whatever the client sends, since a false district
+  would quietly corrupt the very data a map exists to color.
 - RLS: polls readable by everyone signed in, writable by the admin alone. A vote is readable by
-  **its own voter and the admin**, and by nobody else — same privacy stance as `question_answers`.
-  The per-district breakdown a result view or a future map needs comes from
+  **its own voter and the admin**, and by nobody else. The per-district breakdown a result view
+  or a future map needs comes from
   `neighborhood_poll_results(poll_id)` (SECURITY DEFINER, one row per district — every district,
   even one with no votes yet — with `a_count`/`b_count` and no identities).
 - Curated from admin.html's **İlçe Anketleri** tab (kept apart from the per-story "Anketler" panel
@@ -373,7 +357,7 @@ behind Kütüphane's ANKET box (`db/neighborhood_polls.sql`).
 - **The word is server-authoritative.** Clients never write today's row; they call `public.sozcel_daily_word(candidates text[])`, which resolves the Istanbul date server-side, returns the day's word if it has one, and otherwise records the first unused candidate — atomically, so simultaneous first-players of the day converge on one word (`db/sozcel_used_answers_v5_server_pick.sql`). The client's candidate list is only a proposal.
 - This exists because the pick used to be client-side: the answer's index was `hash(date) % pool.length`, so two clients whose snapshot of the used rows differed by a single row computed different words, and whoever lost the insert race kept playing their own word anyway. Never reintroduce a client-side fallback pick — a locally-invented word looks normal while being a puzzle nobody else is playing, and its result lands on the shared scoreboard.
 - RLS: authenticated users SELECT all; direct INSERT only for an assigned Sözcü's *own* row before its deadline (midnight Istanbul at the start of `used_on`), matching the UPDATE policy; DELETE admin-only.
-- **The admin is never locked out** (`db/sozcel_used_answers_v6_admin_override.sql`): admin INSERT/UPDATE policies sit alongside the Sözcü ones, with no `sozcul_id` match and no deadline, because a word that is wrong *on the day it is being played* is exactly the case that has to be fixable and the one moment every other policy refuses. The admin reaches it through the same Sözcü Görevi form on `sozcel.html` — the button opens a day picker instead of an assignment, and saving preserves whoever the row already belonged to, so correcting a day never takes it over. `game-locks.js` matches: the admin isn't bounced off a game they switched off for the day (they own the switch), though the win-gates still apply to everyone since those are the game's own progression.
+- **The admin is never locked out** (`db/sozcel_used_answers_v6_admin_override.sql`): admin INSERT/UPDATE policies sit alongside the Sözcü ones, with no `sozcul_id` match and no deadline, because a word that is wrong *on the day it is being played* is exactly the case that has to be fixable and the one moment every other policy refuses. The admin reaches it through the same Sözcü Görevi form on `sozcel.html` — the button opens a day picker instead of an assignment, and saving preserves whoever the row already belonged to, so correcting a day never takes it over. `game-locks.js` matches: the admin isn't bounced off a game they switched off for the day (they own the switch) — that off-switch is the only lock left on any game, since Sözcel, Tümcel and Çengel are otherwise independent.
 
 **Tables: `hive_slot_offers` + `hive_cells` + `hive_bonds`** — the petek, which is Anahane itself
 (`db/hive_lattice_v4.sql` for the grid, `db/hive_slot_codes_v5.sql` for the codes; together they
@@ -904,12 +888,11 @@ sb.from('articles').delete().eq('id', id)
 - **Oyunlar tab** combines all three games' admin panels in one place: a shared per-day
   on/off board (next 7 days × Sözcel/Tümcel/Bulmaca, backed by `game_day_toggles`) at the
   top, then sub-nav pills to switch between each game's own management panel (Sözcel sözcü
-  assignments, Tümcel puzzle editor, **Çengel's own hand-drawn grid editor** — the admin
-  toggles each cell open/blocked and types its letter, the numbering is derived from the
-  grid rather than entered by hand, and the resulting across/down clue list is filled in
-  and saved per night (`bulmaca_puzzles`, see `db/bulmaca_puzzles.sql`) — and **Sorular**,
-  where the question that follows each game on a given day is written in both languages —
-  see `daily_questions` in the schema above). Toggling a game off
+  assignments, Tümcel puzzle editor, Bulmaca which has no manual content — puzzles are
+  generated, so its panel is just a pointer back to the on/off board). There used to be a
+  **Sorular** panel here too, for the question asked between two games — that whole
+  mechanism is gone; anything the site wants to ask its members goes through Anket
+  (`neighborhood_polls`) now, curated from the İlçe Anketleri tab. Toggling a game off
   for a day locks it site-wide for that day (enforced by `game-locks.js`, see Database Schema above and Assets/coding conventions below).
 
 ### `kahvehane.html` — Coffeehouse (RIGHT page, zoom IN — the local, interactive side)
@@ -917,15 +900,16 @@ sb.from('articles').delete().eq('id', id)
 - **Two buttons stand in the two top corners** (`.corner-boxes`), the same pair Kütüphane's
   Makaleler/Posta Kutusu boxes are: the **Kahve Endeksi** on the left (`#coffee-box`, see below)
   and the week's **Skor Tahtası** on the right (`#scoreboard-box`)
-- **The band under the map is TWO decks**: the city's events in its bottom-left corner
-  (`#events-deck`), the day's games in its bottom-right one (`#game-deck`). On a phone `#main-site`
-  is two equal columns in row 2 — `.col-left` holds the events (the mayor's card and the parked
-  comments inside it stay hidden), `.col-right` the games — and each deck fills its own half, so
-  the channel between them is exactly the distance each keeps from its own outer screen edge
-  (`--deck-inset` / `--deck-channel-pad`, stated once on `#main-site` because the two halves have
-  to agree or the channel is off-centre). That is why the decks stretch rather than sizing to their
-  own cards, as the games deck did while it *was* the whole band: two content-width decks leave a
-  gap whose width is decided by whichever card carries the longest word
+- **The band under the map holds the events deck and the game picker**: the city's events in its
+  bottom-left corner (`#events-deck`), the day's three games in its bottom-right one
+  (`#game-picker`). On a phone `#main-site` is two equal columns in row 2 — `.col-left` holds the
+  events (the mayor's card and the parked comments inside it stay hidden), `.col-right` the games.
+  The games used to be a deck here too — the three games with a question in each joint, one card
+  in front of you at a time — but that whole sequence is gone: **Sözcel, Tümcel and Çengel are
+  independent now**, playable in any order, with the only lock left on any of them being the
+  admin's per-day off-switch (`game_day_toggles`, `game-locks.js`). What stands in the corner is
+  the same static three-tile picker the desktop layout always used (`.game-link` × 3, kickered
+  1./2./3. OYUN as plain step numbers, not a gate)
 - The **neighborhood comments are parked**, not deleted: their column belongs to the index and
   where the comments belong is still an open question, so the feed, its composer and everything
   driving them stay exactly as they are behind `const COMMENTS_ENABLED = false` plus `hidden` on
@@ -936,36 +920,14 @@ sb.from('articles').delete().eq('id', id)
   - Tümcel: Turkish quote-fragment Connections (replaced Bağlantılar)
   - Bulmaca: Turkish crossword
 - The games change every day; scores and scoreboards are tracked (`game_results`)
-- **The three games are a sequence with a question in each joint, and on a phone that sequence is
-  a DECK** — the same object Kütüphane's news is, in the same terms (`#game-deck`, `buildGameDeck`;
-  `daily_questions`, see the schema above). One card is in front of you at a time: play the game on
-  top, come back, the question that follows it is standing there, throw it left or right and the
-  next game is already behind it. The depth is `nth-child` and nothing else, so dealing the front
-  card is *removing the node* — the ones behind transition forward on their own. A game played
-  today and a question already answered are simply not in the deck; when nothing is left it says
-  "Hepsi bu kadar. / Dışarısı seni bekliyor.", the same bottom Kütüphane's deck has
-- **And a game card is a news card**, printed on the same paper in the same band: a kicker saying
-  where in the day's sequence it stands (1./2./3. OYUN, `games.step1-3`), the game's name as the
-  headline, what it is under that — the type sizes are `.article`'s own. Three squares side by
-  side said nothing about order; a stack of cards in order says it without a word. The deck sits
-  in the band's **bottom-right corner** — down against the tab bar like every other phone stack
-  (`margin-top: auto`), and filling its own half of the band (`align-self: stretch`; see the two
-  decks' channel above for why it no longer keeps the cards' own width). A game already played today is inked over the way a story you have dealt
-  with is gone — *played* meaning finished (`attempts >= 1`), never merely opened: a game left
-  half-done stays on top of the deck, marked, because it is exactly what the reader still has in
-  front of them. Sözcel's
-  A game the admin has switched **off** for the day (`game_day_toggles`) is not in the deck at
-  all — it is not a step the reader has left to take, and a card that can never be dealt is a deck
-  that can never be emptied. So a day whose only game is Sözcel ends on "Hepsi bu kadar." the
-  moment Sözcel is done, exactly as Kütüphane's news deck does. **An emptied deck's dashed frame
-  takes the band's own width** rather than its text's: a box whose width is decided by a line of
-  type lands on a fractional pixel, and WebKit drops the LEFT edge of a dashed border sitting on
-  one — the frame printed with three sides and no visible reason for the fourth to be missing.
-  Stretching it (`:has(> .deck-done:only-child)`) puts both edges back on whole pixels, and is the
-  right picture anyway, since that is the width the same frame has always had on Kütüphane. The admin keeps theirs, the same
-  way their nav link stays open (`IstGameLocks.offGamesToday`, game-locks.js). Sözcel's
-  wordmark is a tile's way of saying its name — in the deck it says it in the headline like every
-  other card. The desktop three-square tiles are untouched
+- **The three games are independent — Sözcel, Tümcel and Çengel can be played in any order.**
+  There used to be a sequence here (a question in each joint, `daily_questions`/`question_answers`,
+  with Tümcel and Çengel locked until the one before them was answered) and, on a phone, a DECK
+  that dealt the games and their questions as cards. Both are gone. The only lock left on any game
+  is the admin's per-day off-switch (`game_day_toggles`) — a game switched off is not a step the
+  reader has left to take, so its tile is locked exactly as before, and `IstGameLocks.offGamesToday`
+  (`game-locks.js`) is still how a page checks that. The three tiles print `games.step1-3` as plain
+  step numbers (1./2./3. OYUN) — they say where each game sits, not an order the reader is held to
 - **The events are a deck in the other corner** (`#events-deck`, `loadKahveEvents`,
   `event-interest.js`) — the same object as the games beside it and as Kütüphane's news, in the
   same terms: cards laid on top of each other, only the front one live, the depth `nth-child` and
@@ -2677,7 +2639,8 @@ suggestion surface added later.
   table — so world-readable, the whole candidate pool and then the answer itself would be sitting
   in a table any signed-in member can select from before the game is played. A member reads their
   own row and nobody else's; the count the box prints comes from `sozcel_pool_count()`
-  (SECURITY DEFINER, one integer, no words and no identities), the same shape `question_tally` has.
+  (SECURITY DEFINER, one integer, no words and no identities) — the same shape
+  `neighborhood_poll_results()` keeps for a vote: a count back, never who cast it.
   It replaced `sozcel_suggestion_count(date)`, which asked about one night and now answers 0 for
   every night — a **new name** rather than a defaulted argument, since two candidates differing
   only by a default make a one-argument call ambiguous (42725) rather than resolving, the trap
@@ -2742,11 +2705,11 @@ the caller is playing, and sozcel.html passes `IstDate.gameNight()` (`sozcelGame
 page on the calendar date, which is the same bug one layer out: at midnight the save key rolled, so
 the board blanked under a reader who was still playing and handed them back the word they had
 already solved; a second `game_results` row for the same word landed on the shared scoreboard; the
-admin's own off-switch turned a game back on; Tümcel re-locked behind a question already answered;
+admin's own off-switch turned a game back on;
 and the page promised "Yeni sözcük 1 saat 49 dakika sonra" some four hours before the word actually
 changed. **The rule is: anything about a night's games is keyed to the NIGHT, and the only clock
 that ends one is the sun.** `IstDate.gameNight()` is that key as padded ISO (`used_on`,
-`game_day_toggles.game_date`, `daily_questions.question_date`), `IstDate.gameNightSeed()` is the
+`game_day_toggles.game_date`), `IstDate.gameNightSeed()` is the
 same night in the unpadded `YYYY-M-D` shape `game_results.date`, `game_state.date` and every
 per-day `localStorage` key are written in — two functions rather than one with a format argument,
 because those shapes address different columns and must never be swapped. Both are
@@ -3218,15 +3181,15 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
   `paintCast()` writes the actor's inline opacity on every frame of the flip, so an opacity rule
   here is overwritten a frame later, the same trap `.fb-locked`'s own note is about. A background is
   nothing the tick touches. A done box stays pressable: a story can be read twice.
-  - **It cannot be confused with `.fb-locked`, and not by luck.** `gameBlocker` only ever locks a
-    game with an earlier unplayed one in front of it, and that earlier game is itself always open —
-    so the Oyunlar column is always `[done…][open][locked…]` and the two greys can never stand side
-    by side. Every other column has no locked state at all. What the reader is left looking at is a
-    column gone quiet with the one thing they can actually do still in full ink.
+  - **It cannot be confused with `.fb-locked`, and not by luck.** Oyunlar no longer has a locked
+    state at all — Sözcel and Tümcel are independent, so a game not switched off for the day is
+    always open, whether or not the other one has been played. No column has a locked state any
+    more; what the reader is left looking at is a column gone quiet with the one thing they can
+    actually do still in full ink.
   - **What counts as done, per column:** a **story** the moment its page is *opened* (a wrong
     "unread" is worse than a lenient "read"; it is marked on the way IN so the card has already gone
     quiet when the page folds back into it), a **game** at `attempts >= 1` (finished, never merely
-    opened — the same reading the lock and the app map's square use, and the three must agree), an
+    opened — the same reading the app map's square uses, and the two must agree), an
     **anket** once voted. **Etkinlikler is deliberately not completable** — an evening is somewhere
     to be, not content to get through — and a pinned Dünya seri is a running timeline rather than
     one thing to finish.
@@ -3424,20 +3387,17 @@ Six things about it:
   same cap (9, one seat for the fresh post and eight for its history) and the same `archived_at`
   filter the pinned box reads, cached per `series_id` so two boxes opening onto the same seri never
   fetch it twice.
-- **And the sequence is a gate: you cannot skip ahead.** Tümcel stays shut until Sözcel has been
-  played and Bulmaca until Tümcel has (`gameBlocker` in project.html). A locked box is **not**
-  `.fb-empty` — it still names its game and says what is standing in front of it ("Önce Sözcel"),
-  because a step you can see ahead of you is a different thing from a slot with nothing in it. It
-  goes muted in the ink, the red category rule included, and **never in opacity**: an actor's
-  opacity is its pose, and a rule here would be overwritten on the next frame. *Played* means
-  FINISHED (`attempts >= 1` in `game_results`), never merely opened — every game writes an
-  `attempts: 0` row on the reader's first interaction, so counting rows would open the next game
-  from under one still being played. It is the same rule Kahvehane's own deck and the app map's
-  square use, and the three must agree. A game the admin switched **off** for the day blocks
-  nothing: it is not a step anybody has left to take, so it leaves the sequence rather than
-  standing in the middle of it holding the rest shut. The column is re-read the moment a game is
-  closed (`refreshOyunColumn`, from `closeGameOverlay`) rather than at the next mount — finishing
-  Sözcel and finding Tümcel still locked is the whole of what that costs.
+- **There is no gate any more: Sözcel and Tümcel are independent, playable in either order.**
+  There used to be one (`gameBlocker` in project.html, Tümcel shut until Sözcel had been played) —
+  it is gone, along with the question that used to sit in the joint between them. The only reason
+  a box is locked now is the admin switching that game **off** for the day
+  (`game_day_toggles`) — that box goes `.fb-empty` rather than naming a blocker, because it is not
+  a step anybody has left to take. *Played* means FINISHED (`attempts >= 1` in `game_results`),
+  never merely opened — every game writes an `attempts: 0` row on the reader's first interaction,
+  so counting rows would mark a game done while it is still being played. It is the same rule
+  Kahvehane's own tiles and the app map's square use, and all three must agree. The column is
+  re-read the moment a game is closed (`refreshOyunColumn`, from `closeGameOverlay`) rather than
+  at the next mount, so its `.fb-done` mark and the day meter catch up immediately.
 - **The games column names its game in the bottom-left corner**, on every lane, including the
   mirrored one. The other columns are feeds whose headline is the thing itself and reads from the
   top; this one is a fixed set of three read by their names, and a name standing on the floor of
@@ -3450,16 +3410,14 @@ Six things about it:
   section.
 - **Asking by day and answering by night is the app's own loop, and Anket is where it is most
   literal**: the same box, the same page, the city's question in the morning and the city's answer
-  after dark. The questions in the joints of the game sequence are the other half of it
-  (`daily_questions`, see the schema); the
-  city rates them; where the result is shown back is an open question again — it used to be the
-  petek's outermost depth, which is parked. It is the app's own formula either way: people → their
-  ideas → our opinions on those ideas.
+  after dark. There used to be a second question mechanism, one in each joint of the game
+  sequence (`daily_questions`) — it is gone, and Anket is now the whole of what the app asks its
+  members. It is the app's own formula: people → their ideas → our opinions on those ideas.
 - **Two columns, not a menu.** A screen with six unrelated tiles is a launcher, and a launcher is a
   shortcut past everything — the one thing the arrangement exists to prevent.
 - **Anket is a district poll, not a citywide one** (`db/neighborhood_polls.sql`) — what makes it
-  worth a column of its own rather than folding into `daily_questions` is what the answer is FOR:
-  every vote is filed under the member's own district, so the result is not one percentage but 25
+  its own object rather than a plain city-wide question is what the answer is FOR: every vote is
+  filed under the member's own district, so the result is not one percentage but 25
   of them. That per-district split (`neighborhood_poll_results()`) is meant to color the districts
   on the map the way a live election map does, mixing the poll's own `color_a`/`color_b` by each
   district's own split. That map is drawn (`paintDistrictMap`), and `renderAnketResults` prints the
@@ -3571,7 +3529,7 @@ it is walked.
 admin.html's Users tab). `laneCopy(lang)` lays one row per key — `body_tr`/`body_en` — over
 `COPY.lanes[lang]` key for key; an empty field or a table that has never been migrated both fall
 back to the hardcoded default rather than showing a blank bubble, the same "no data, no gate" rule
-`daily_questions` follows. The fetch happens once, in `maybeRun`, so a beat added later needs a row
+`game_day_toggles` follows (an empty table locks nothing). The fetch happens once, in `maybeRun`, so a beat added later needs a row
 here too (seeded with its own current hardcoded text) or it simply shows that hardcoded text
 forever — which is correct, not a bug, since the row is only ever a widening of what is already
 there.
