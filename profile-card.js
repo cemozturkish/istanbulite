@@ -1114,7 +1114,36 @@
     renderOverlayBody();
     document.getElementById('profile-overlay-body').scrollTop = 0;
     IstSheet.open('profile-overlay');
+    // open() has unhidden it and set its top, so it can be measured now.
+    fitOverlayType();
   }
+
+  // ── The page fits, on every phone ──
+  // This sheet does not scroll (see .profile-overlay-body): its type is
+  // stated against one unit, --po-u, which follows the screen's WIDTH
+  // (profile-card.css). A width says nothing about the height left between
+  // the sky chain and the tab bar, though -- and a short phone, or Safari
+  // with its toolbar up, left the last button (Hesabımı Sil) standing
+  // behind the tab bar, where nothing could press it. So once the page is
+  // laid out, the unit is stepped down until the whole of it fits: every
+  // line shrinks together, never one block on its own. Past PO_U_MIN it
+  // stops and the body's own overflow is the safety valve.
+  const PO_U_MIN = 13;
+  function fitOverlayType() {
+    const ov = document.getElementById('profile-overlay');
+    const body = document.getElementById('profile-overlay-body');
+    if (!ov || !body || ov.hidden) return;
+    ov.style.removeProperty('--po-u');
+    if (!window.matchMedia('(max-width: 768px)').matches || !body.clientHeight) return;
+    const probe = body.querySelector('.ist-pc-cover-name');
+    let u = probe ? parseFloat(getComputedStyle(probe).fontSize) / 1.05 : 0;
+    if (!u) return;
+    while (body.scrollHeight > body.clientHeight + 1 && u > PO_U_MIN) {
+      u = Math.max(PO_U_MIN, u - 0.5);
+      ov.style.setProperty('--po-u', u + 'px');
+    }
+  }
+  window.addEventListener('resize', () => fitOverlayType());
 
   function closeProfileOverlay() {
     IstSheet.close('profile-overlay');
@@ -1132,6 +1161,7 @@
     const show = sectionsFor(_ov.page);
     body.classList.toggle('profile-overlay-centred', !show.week && !show.account && !show.settings);
     wireSettingsEvents(_ov);
+    fitOverlayType();
   }
 
   // ── THE PETEK PAGE ──
