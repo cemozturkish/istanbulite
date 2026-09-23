@@ -2006,9 +2006,11 @@
       <button type="button" class="ist-hive-cell ${cls}" ${meta}
               data-member-id="${esc(member.member_id)}" aria-pressed="${picked ? 'true' : 'false'}"
               title="${esc(name)}" aria-label="${esc(name)}">
-        <div class="ist-pc-cover-avatar ist-hive-frame">
-          ${coverBadgesHTML(member)}
-          <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
+        <div class="ist-hive-glow">
+          <div class="ist-pc-cover-avatar ist-hive-frame">
+            ${coverBadgesHTML(member)}
+            <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
+          </div>
         </div>
         ${hiveNameHTML(member, nameSide, status, t)}
       </button>
@@ -2113,15 +2115,17 @@
     return `
       <button type="button" class="ist-hive-cell ist-hive-me${isOpen ? ' ist-hive-cell-open' : ''}" ${meta}
               data-me="1" aria-expanded="${isOpen ? 'true' : 'false'}" title="${esc(displayName)}">
-        <div class="ist-pc-cover-avatar ist-hive-frame">
-          ${coverBadgesHTML(profile)}
-          <!-- The art is its own layer inside the frame because the avatar
-               carousels replace its whole innerHTML on every arrow press
-               (see wireHairCarousel and friends, which this page reuses
-               unchanged at level 0) — sharing a parent with the badges
-               would wipe them. -->
-          <div class="ist-pc-cover-art" id="po-avatar-preview">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>
-          ${claim}
+        <div class="ist-hive-glow">
+          <div class="ist-pc-cover-avatar ist-hive-frame">
+            ${coverBadgesHTML(profile)}
+            <!-- The art is its own layer inside the frame because the avatar
+                 carousels replace its whole innerHTML on every arrow press
+                 (see wireHairCarousel and friends, which this page reuses
+                 unchanged at level 0) — sharing a parent with the badges
+                 would wipe them. -->
+            <div class="ist-pc-cover-art" id="po-avatar-preview">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>
+            ${claim}
+          </div>
         </div>
       </button>
     `;
