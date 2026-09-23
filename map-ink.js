@@ -158,6 +158,20 @@
       vars: ['--lit', '--ink'],
       red: null,
     },
+    // Çengel's own mark (assets/cengel-logo.png): drawn the other way
+    // round from Sözcel's -- transparent canvas, a near-white FILL and a
+    // near-black OUTLINE, so there is no "paper" tone here to fade into
+    // the card the way Sözcel's white background does. Both tones read
+    // the same token instead: the fill and its outline come out one flat
+    // --ink silhouette, following the card's own ink exactly like every
+    // other flat mark on the site (see the maps' and the avatar's own
+    // ladders above).
+    {
+      id: 'ist-cengel-ink',
+      tones: [254, 0],
+      vars: ['--ink', '--ink'],
+      red: null,
+    },
     // frame.png's ring: not a flat silhouette, a lit face and a shadow
     // face -- two flat grays (61 and 24 out of 255), same measurement as
     // every ladder above. Used as a plain CSS mask this never rendered
