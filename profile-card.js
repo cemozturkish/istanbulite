@@ -1583,7 +1583,7 @@
   // How far a finger has to travel before the gesture is a drag rather
   // than a tap.
   const HIVE_GESTURE_SLOP = 8;
-  const HIVE_CARD_GAP = 26;
+  const HIVE_CARD_GAP = 38;
 
   // How far from the reader a cell is standing, in hexagons. This is the
   // level filter, and also what the level-2 wave-in stagger and the
@@ -2315,8 +2315,8 @@
   // The two gaps are not the same length: the reader's own hexagon is one
   // shape and the ring is six, so waiting as long for the ring as for the
   // names reads as a pause rather than as a beat.
-  const HIVE_REVEAL_BEAT = 150;   // you -> the ring touching you
-  const HIVE_REVEAL_BEAT_2 = 300; // the ring -> their names
+  const HIVE_REVEAL_BEAT = 80;    // you -> the ring touching you
+  const HIVE_REVEAL_BEAT_2 = 160; // the ring -> their names
   const HIVE_REVEAL_HOLD = 1600;  // an armed reveal nobody played is played anyway
   const HIVE_WALK_HOLD = 6000;    // the same, for a hold a lane walk owns (holdHivePage)
 
