@@ -119,10 +119,13 @@
     });
 
     let resolved = false;
+    let finished = false;
+    let fallbackTimer = null;
     let currentFrame = 1;
     const startTime = performance.now();
 
     function tick(now) {
+      if (finished) return;
       const elapsed = now - startTime;
       const timeFrame = Math.floor(elapsed / FRAME_MS) + 1;
       const cap = resolved ? FRAME_COUNT : FRAME_COUNT - 1;
@@ -135,17 +138,37 @@
       }
 
       if (resolved && elapsed >= MIN_MS && currentFrame >= FRAME_COUNT) {
-        overlay.classList.add('loading-overlay-hide');
-        overlay.addEventListener('transitionend', () => overlay.remove(), { once: true });
-        onFinish();
+        finish();
         return;
       }
       requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
 
-    return function resolve() { resolved = true; };
+    function finish() {
+      if (finished) return;
+      finished = true;
+      clearTimeout(fallbackTimer);
+      overlay.classList.add('loading-overlay-hide');
+      const removal = setTimeout(() => overlay.remove(), 600);
+      overlay.addEventListener('transitionend', (event) => {
+        if (event.target !== overlay) return;
+        clearTimeout(removal);
+        overlay.remove();
+      });
+      onFinish();
+    }
+
+    return function resolve() {
+      if (resolved) return;
+      resolved = true;
+      // Decorative frames must never hold up resolved auth/content work.
+      // A failed or stalled image can leave the contiguous frame sequence
+      // incomplete forever; reveal using the last available frame instead.
+      fallbackTimer = setTimeout(finish, Math.max(3000, MIN_MS - (performance.now() - startTime)));
+    };
   }
 
   global.LoadingScreen = { start };
 })(window);
+
