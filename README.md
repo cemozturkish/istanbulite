@@ -88,3 +88,10 @@ Or `npm run cap:open` to also relaunch Xcode.
 - `scripts/sync-web.js` — copies site files into `www/`, excluding dev tooling, `db/`, and docs.
 - `capacitor.config.json` — app ID, display name, and `webDir` (`www`).
 - `ios/` — the generated native Xcode project. Committed to source control (standard for Capacitor apps) except for `Pods/`, build output, and other machine-generated artifacts (see `ios/.gitignore`).
+
+
+## Reliability checks
+
+Run `npm test` with Node.js 18 or newer. These dependency-free checks cover loading fallbacks, account-scoped game storage, game closure, picker retries, script syntax, and shared asset versions. They use mocked browser/database objects; device and authenticated integration testing remain separate.
+
+Game saves now carry the member ID in their local-storage key. Existing unowned local saves are ignored; authenticated remote progress is still restored when available.

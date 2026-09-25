@@ -34,6 +34,7 @@
   <title>Sözcel — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=7"></script>
+  <script src="game-storage.js?v=1"></script>
   <script src="i18n.js?v=23"></script>
   <script src="scoreboard.js?v=1"></script>
   <script src="map-ink.js?v=10"></script>
@@ -2172,6 +2173,7 @@ const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const gameStorage = IstGameStorage.create(sb);
 // Same client-side admin check the rest of the site uses (kahvehane,
 // kutuphane, profile-card). It only decides what UI to offer — the actual
 // permission is public.is_admin() in the RLS policies, which this can't
@@ -2218,7 +2220,7 @@ const neighborhoodNames = {
 // ── Record game result to Supabase ──
 async function recordGameResult(game, date, attempts, won, neighborhood, guesses) {
   try {
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await gameStorage.session();
     if (!session) return;
     const { error } = await sb.from('game_results').insert([{
       user_id: session.user.id,
@@ -4253,7 +4255,7 @@ async function saveState() {
   // board saved against a different word for the same date is recognisable
   // as stale instead of being replayed against the wrong answer.
   const state = { currentRow, currentGuess, gameOver, guesses: submittedGuesses.slice(), word: TARGET_WORD };
-  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  await gameStorage.set(SAVE_KEY, JSON.stringify(state));
   // Mirror to Supabase so the board syncs across devices. Awaited by callers
   // that follow it with a win/loss popup so a mobile tab closed right after
   // finishing doesn't cut off the upsert before it reaches Supabase — the
@@ -4262,11 +4264,10 @@ async function saveState() {
   await saveStateRemote(state);
 }
 
-// Upsert the board state to Supabase. Fire-and-forget; localStorage remains
-// the synchronous source of truth on this device.
+// Mirror this member’s board to Supabase after caching it locally.
 async function saveStateRemote(state) {
   try {
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await gameStorage.session();
     if (!session) return;
     const { error } = await sb.from('game_state').upsert({
       user_id: session.user.id,
@@ -4280,12 +4281,12 @@ async function saveStateRemote(state) {
 }
 
 async function restoreState() {
-  let raw = localStorage.getItem(SAVE_KEY);
+  let raw = await gameStorage.get(SAVE_KEY);
   if (!raw) {
     // No local progress — pull from Supabase in case the user played on
     // another device today.
     try {
-      const { data: { session } } = await sb.auth.getSession();
+      const { data: { session } } = await gameStorage.session();
       if (session) {
         const { data } = await sb.from('game_state')
           .select('state')
@@ -4295,7 +4296,7 @@ async function restoreState() {
           .maybeSingle();
         if (data && data.state) {
           raw = JSON.stringify(data.state);
-          localStorage.setItem(SAVE_KEY, raw);
+          await gameStorage.set(SAVE_KEY, raw);
         }
       }
     } catch (e) { console.error('[sozcel restoreState remote]', e); }
@@ -4313,7 +4314,7 @@ async function restoreState() {
     // before `word` was stamped have no way to be checked and are
     // restored as before.)
     if (state.word && state.word !== TARGET_WORD) {
-      localStorage.removeItem(SAVE_KEY);
+      await gameStorage.remove(SAVE_KEY);
       return false;
     }
 
@@ -4941,23 +4942,30 @@ function rejectGuess(message) {
 
 // Record an "in progress" game_results row on first interaction so Kahvehane
 // can show the game as played even when the user doesn't finish it today.
+let markingPlayed = false;
 async function markAsPlayed() {
-  const flagKey = 'sozcel_started_' + dailySeed;
-  if (localStorage.getItem(flagKey)) return;
-  localStorage.setItem(flagKey, '1');
+  if (markingPlayed) return;
+  markingPlayed = true;
   try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) return;
-    const { error } = await sb.from('game_results').insert([{
-      user_id: session.user.id,
-      game: 'sozcel',
-      date: dailySeed,
-      attempts: 0,
-      won: false,
-      neighborhood: userNeighborhood
-    }]);
-    if (error) console.error('[sozcel markAsPlayed]', error);
-  } catch (e) { console.error('[sozcel markAsPlayed]', e); }
+    const flagKey = 'sozcel_started_' + dailySeed;
+    if (await gameStorage.get(flagKey)) return;
+    await gameStorage.set(flagKey, '1');
+    try {
+      const { data: { session } } = await gameStorage.session();
+      if (!session) return;
+      const { error } = await sb.from('game_results').insert([{
+        user_id: session.user.id,
+        game: 'sozcel',
+        date: dailySeed,
+        attempts: 0,
+        won: false,
+        neighborhood: userNeighborhood
+      }]);
+      if (error) console.error('[sozcel markAsPlayed]', error);
+    } catch (e) { console.error('[sozcel markAsPlayed]', e); }
+  } finally {
+    markingPlayed = false;
+  }
 }
 
 function updateDisplay() {
@@ -5597,10 +5605,10 @@ async function markPlayedGames() {
     bulmaca: 'bulmaca_started_' + today
   };
   for (const [g, key] of Object.entries(localFlags)) {
-    if (localStorage.getItem(key)) started.add(g);
+    if (await gameStorage.get(key)) started.add(g);
   }
   try {
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await gameStorage.session();
     if (session) {
       const { data, error } = await sb.from('game_results')
         .select('game, attempts').eq('user_id', session.user.id).eq('date', today);
@@ -6740,3 +6748,4 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
 </script>
 </body>
 </html>
+

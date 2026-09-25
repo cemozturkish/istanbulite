@@ -51,6 +51,7 @@
           <option value="" disabled selected>${t('Seç…', 'Choose…')}</option>
           ${mahalles.map((m) => `<option value="${m.id}">${m.name_tr}</option>`).join('')}
         </select>
+        <p id="ist-mp-error" role="alert" hidden></p>
         <div class="ist-mp-actions">
           <button type="button" id="ist-mp-later" class="ist-mp-btn-ghost">${t('Sonra', 'Later')}</button>
           <button type="button" id="ist-mp-save" class="ist-mp-btn" disabled>${t('Kaydet', 'Save')}</button>
@@ -72,16 +73,29 @@
     });
 
     saveBtn.addEventListener('click', async () => {
-      if (!select.value) return;
+      if (!select.value || saveBtn.disabled) return;
+      const errorEl = overlay.querySelector('#ist-mp-error');
+      errorEl.hidden = true;
       saveBtn.disabled = true;
+      select.disabled = true;
+      laterBtn.disabled = true;
       const savingLabel = t('Kaydediliyor…', 'Saving…');
       saveBtn.textContent = savingLabel;
       try {
-        await sb.from('profiles').update({ mahalle: select.value }).eq('id', user.id);
+        const { data, error } = await sb.from('profiles').update({ mahalle: select.value })
+          .eq('id', user.id).select('id').single();
+        if (error || !data) throw error || new Error('Profile was not updated');
+        close();
       } catch (e) {
         console.error('mahalle picker save failed', e);
+        errorEl.textContent = t('Kaydedilemedi. Lütfen tekrar deneyin.', 'Could not save. Please try again.');
+        errorEl.hidden = false;
+      } finally {
+        select.disabled = false;
+        laterBtn.disabled = false;
+        saveBtn.disabled = !select.value;
+        saveBtn.textContent = t('Kaydet', 'Save');
       }
-      close();
     });
 
     function close() {
@@ -92,3 +106,4 @@
 
   global.MahallePicker = { maybeRun };
 })(window);
+

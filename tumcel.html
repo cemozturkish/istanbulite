@@ -17,6 +17,7 @@
   <title>Tümcel — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=7"></script>
+  <script src="game-storage.js?v=1"></script>
   <script src="i18n.js?v=23"></script>
   <script src="scoreboard.js?v=1"></script>
   <script src="map-ink.js?v=10"></script>
@@ -1155,6 +1156,7 @@ const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const gameStorage = IstGameStorage.create(sb);
 
 let userNeighborhood = '';
 const neighborhoodNames = {
@@ -1189,7 +1191,7 @@ const neighborhoodNames = {
 
 async function recordGameResult(game, date, attempts, won, neighborhood) {
   try {
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await gameStorage.session();
     if (!session) return;
     await sb.from('game_results').insert([{
       user_id: session.user.id,
@@ -1329,22 +1331,29 @@ function toggleFragment(frag) {
   markAsPlayed();
 }
 
+let markingPlayed = false;
 async function markAsPlayed() {
-  const flagKey = 'tumcel_started_' + dailySeed;
-  if (localStorage.getItem(flagKey)) return;
-  localStorage.setItem(flagKey, '1');
+  if (markingPlayed) return;
+  markingPlayed = true;
   try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) return;
-    await sb.from('game_results').insert([{
-      user_id: session.user.id,
-      game: 'tumcel',
-      date: dailySeed,
-      attempts: 0,
-      won: false,
-      neighborhood: userNeighborhood
-    }]);
-  } catch (e) {}
+    const flagKey = 'tumcel_started_' + dailySeed;
+    if (await gameStorage.get(flagKey)) return;
+    await gameStorage.set(flagKey, '1');
+    try {
+      const { data: { session } } = await gameStorage.session();
+      if (!session) return;
+      await sb.from('game_results').insert([{
+        user_id: session.user.id,
+        game: 'tumcel',
+        date: dailySeed,
+        attempts: 0,
+        won: false,
+        neighborhood: userNeighborhood
+      }]);
+    } catch (e) {}
+  } finally {
+    markingPlayed = false;
+  }
 }
 
 // ── Check guess ──
@@ -1500,7 +1509,7 @@ async function saveState() {
     guessedCombos,
     fragmentOrder: allFragments.map(f => ({ quoteIndex: f.quoteIndex, fragIndex: f.fragIndex }))
   };
-  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  await gameStorage.set(SAVE_KEY, JSON.stringify(state));
   // Awaited by the win/loss branches in checkGuess() so a tab closed right
   // after finishing doesn't cut the upsert off before it reaches Supabase.
   await saveStateRemote(state);
@@ -1508,7 +1517,7 @@ async function saveState() {
 
 async function saveStateRemote(state) {
   try {
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await gameStorage.session();
     if (!session) return;
     await sb.from('game_state').upsert({
       user_id: session.user.id,
@@ -1522,10 +1531,10 @@ async function saveStateRemote(state) {
 
 async function restoreState() {
   if (!todaysPuzzle) return false;
-  let raw = localStorage.getItem(SAVE_KEY);
+  let raw = await gameStorage.get(SAVE_KEY);
   if (!raw) {
     try {
-      const { data: { session } } = await sb.auth.getSession();
+      const { data: { session } } = await gameStorage.session();
       if (session) {
         const { data } = await sb.from('game_state')
           .select('state')
@@ -1535,7 +1544,7 @@ async function restoreState() {
           .maybeSingle();
         if (data?.state) {
           raw = JSON.stringify(data.state);
-          localStorage.setItem(SAVE_KEY, raw);
+          await gameStorage.set(SAVE_KEY, raw);
         }
       }
     } catch (e) {}
@@ -1710,10 +1719,10 @@ async function markPlayedGames() {
     bulmaca: 'bulmaca_started_' + today
   };
   for (const [g, key] of Object.entries(localFlags)) {
-    if (localStorage.getItem(key)) started.add(g);
+    if (await gameStorage.get(key)) started.add(g);
   }
   try {
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await gameStorage.session();
     if (session) {
       const { data, error } = await sb.from('game_results')
         .select('game, attempts').eq('user_id', session.user.id).eq('date', today);
@@ -1978,3 +1987,4 @@ async function loadMyTumceHistory() {
 </script>
 </body>
 </html>
+
