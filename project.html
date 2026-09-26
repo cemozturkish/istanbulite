@@ -563,6 +563,27 @@
        corner inside it. */
     .fb-box.fb-mirror .k { left: auto; right: 0; }
     .fb-box.fb-mirror .m { right: auto; left: var(--fb-box-pad-x); }
+    /* Haberler: the category (İSTANBUL/TÜRKİYE/DÜNYA) reads on the same
+       top line as the age, INSIDE the card, rather than floating above
+       it -- a two-corner dateline. The age keeps its own .m rule and its
+       own muted color untouched; only the category ever carries the
+       accent red. Same top offset as .m, so the two line up exactly --
+       .fb-box-tag-size/-lh were built for this (see the tokens above). */
+    .fb-haberler .k {
+      position: absolute;
+      bottom: auto; top: var(--fb-box-pad-y);
+      left: var(--fb-box-pad-x); right: auto;
+      /* Leaves room for the age on the other end so a long akış/stack
+         tag truncates instead of running under it -- the exact overlap
+         the outside-kicker move once existed to avoid. */
+      max-width: calc(100% - 2 * var(--fb-box-pad-x) - 64px);
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    /* Oyunlar's kicker names the SLOT ("1. OYUN" / "2. OYUN"), not a
+       category tied to whichever edge the column sits at -- it stays
+       ranged to the block's own left edge even though the column is
+       otherwise mirrored (see .fb-box.fb-mirror .k above). */
+    .fb-box.fb-oyun.fb-mirror .k { left: 0; right: auto; }
     /* Clears the pinned date in the corner above it -- the box's own top
        padding only clears that tag, not a second line under it. Two
        lines, not one -- the box grew 40% taller for exactly this -- and
@@ -2442,9 +2463,14 @@ async function loadEtkinlikActor(el, slot) {
   const stackTag = stack.length > 1 ? ' · ' + (stack.indexOf(ev) + 1) + '/' + stack.length : '';
   el.classList.remove('fb-empty');
   const nb = ev.neighborhood ? (NB_NAMES[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
+  // The closed face names the district, on the left where Haberler's own
+  // category reads -- and stops naming the hour: that stood here as the
+  // .m corner, and it is on the opened page already (fbSetPage below
+  // carries it as both `meta` and the first `lines` entry), so the card
+  // asked twice for the one thing the page already says once opened.
   el.innerHTML = '<div class="k">' + label + stackTag + '</div>' +
-    '<div class="m">' + esc(eventTimeOnly(ev.event_date)) + '</div>' +
-    '<div class="t">' + esc(newsText(ev, 'title')) + ' — ' + esc(nb) + '</div>';
+    '<div class="m">' + esc(nb) + '</div>' +
+    '<div class="t">' + esc(newsText(ev, 'title')) + '</div>';
   // Where the reader already stands on this evening, so the page can say
   // so instead of asking again as if they had never seen it.
   const rsvp = await eventVerdictFor(ev.id);
