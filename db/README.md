@@ -102,3 +102,10 @@ sonraki dosyalar öncekinin tablosunu `alter` eder, tek başına çalışmazlar.
 **Önce SQL dosyasını Supabase SQL editöründe çalıştırın, sonra ilgili admin.html değişikliğini yayınlayın.** Eski yönetici ekranı bu migrasyondan sonra çalışmaya devam eder. Migrasyon olmadan yeni ekranda bu iki kayıt işlemi hata gösterir; eski çok adımlı kayda geri dönmez. `check_migrations.sql` yeni işlevleri denetler.
 
 SQL testleri, çekirdek şema bu depoda olmadığından küçük bir test şeması üzerinde çalışır; canlı veritabanına bağlanmaz. Test komutu `scripts/check-admin-transactions.cjs` başında açıklanır.
+
+
+## Baskı migrasyonu ve ilk yayın
+
+`baski_v1.sql` yalnızca şemayı kurar; etkinlik ve anketlere otomatik baskı tarihi atamaz. Mevcut baskı tarihleri ve taslakların boş (`NULL`) tarihleri korunur. Dosyayı yeniden çalıştırmak yayından kaldırılmış içerikleri tekrar yayınlamaz.
+
+İlk kurulumda, okuyucu tarafında baskı filtresini devreye almadan önce yönetici Baskı ekranından yayınlanacak etkinlik ve anketleri seçip ilk baskıyı kaydedin. Bu adım yapılmazsa bu sütunlar boş kalabilir. Daha önce kurulmuş veritabanlarında bu düzeltme için SQL çalıştırmanız gerekmez; değişiklik gelecekteki tekrar çalıştırmaları güvenli kılar. Eski sürümün yanlışlıkla yayınladığı içerikler varsa yönetici ekranından kontrol edip baskıdan çıkarın.
