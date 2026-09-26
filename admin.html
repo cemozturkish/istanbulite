@@ -8290,36 +8290,15 @@ async function gameLineup(date) {
 // game-locks.js and the game pages, which read only the toggles, agree
 // with what the app's column shows.
 async function writeGameLineup(date, lineup) {
-  const tableHint = (err) => {
-    if (err && (err.code === 'PGRST205' || err.code === '42P01')) {
-      return { error: new Error('game_night_slots tablosu yok — db/game_night_slots.sql çalıştırılmalı') };
-    }
-    return { error: err };
-  };
-  // Delete then insert rather than upsert: moving a game from one slot to
-  // the other would trip unique (game_date, game) half way through.
-  let r = await sb.from('game_night_slots').delete().eq('game_date', date);
-  if (r.error) return tableHint(r.error);
-  r = await sb.from('game_night_slots').insert(
-    lineup.map((g, i) => ({ game_date: date, slot: i, game: g || null })));
-  if (r.error) return tableHint(r.error);
+  const { error } = await sb.rpc('admin_set_game_lineup', { p_date: date, p_lineup: lineup });
+  return { error: adminGameSaveError(error) };
+}
 
-  const on = lineup.filter(Boolean);
-  const offGames = GAME_STATUS_GAMES.map(g => g.game).filter(g => on.indexOf(g) === -1);
-  if (on.length) {
-    r = await sb.from('game_day_toggles').delete().eq('game_date', date).in('game', on);
-    if (r.error) return r;
+function adminGameSaveError(error) {
+  if (error && (error.code === 'PGRST202' || error.code === '42883')) {
+    return new Error('Kaydetme işlevi hazır değil. Önce db/admin_game_transactions.sql çalıştırılmalı.');
   }
-  if (offGames.length) {
-    const { data: { session } } = await sb.auth.getSession();
-    const by = session && session.user ? session.user.id : null;
-    const at = new Date().toISOString();
-    r = await sb.from('game_day_toggles').upsert(
-      offGames.map(game => ({ game, game_date: date, disabled_by: by, disabled_at: at })),
-      { onConflict: 'game,game_date' });
-    if (r.error) return r;
-  }
-  return { error: null };
+  return error;
 }
 
 function gameStatusDayLabel(iso, offset) {
@@ -8646,9 +8625,8 @@ async function sozPassSuggestion(id) {
   loadSozcelSuggestions();
 }
 
-// Who offered a suggestion travels with it into the editor (data-soz-by) —
-// picking one confirmed is the whole of how a member becomes the night's
-// Sözcü (see sozConfirmPick below).
+// The suggestion ID identifies the pick; the database resolves its author
+// from the locked row rather than trusting the editor's author metadata.
 async function sozConfirmPick(id, by, editor) {
   const parsed = sozReadEditor(editor);
   if (!parsed) return;
@@ -8656,62 +8634,13 @@ async function sozConfirmPick(id, by, editor) {
   const night = sel ? sel.value : IstDate.iso();
   const statusEl = editor.querySelector('[data-soz-status]');
   try {
-    // The word row first: if this fails the suggestion must NOT be marked
-    // picked, or the list would claim a night has a word it does not.
-    // upsert on used_on, because replacing a wrong word is exactly the
-    // case the admin override exists for. word/syllables are the
-    // UPPERCASE, syllable-broken pair sozReadEditor built — the game reads
-    // this column as-is (see turkishUpper() above), so nothing here may
-    // write a bare, un-syllabified string ever again.
-    const row = { used_on: night, word: parsed.word, definition: parsed.definition, syllables: parsed.syllables };
-    // AND WHOSE WORD IT IS. Picking a suggestion is the whole of how a
-    // member becomes a night's Sözcü through this route. Left unwritten,
-    // the night had a word nobody was credited for, and three separate
-    // things quietly read as "no Sözcü": the "Günün Sözcüsü:" line under
-    // the board (loadSozcuOfTheDay), the weekly Sözcü bonus that pays the
-    // word-setter what every solver earned off their word (scoreboard.js),
-    // and the member's own "Sözcü · <gece>" row (loadMySuggestions). The
-    // one thing a picked word is FOR is that it reaches other members with
-    // its author's name on it.
-    //
-    // Guarded rather than written unconditionally: a falsy value here
-    // would upsert sozcul_id = null and take the credit OFF a night that
-    // already had one. It cannot normally be missing
-    // (sozcel_word_suggestions.suggested_by is NOT NULL), which is exactly
-    // why a silent wipe would be the hard failure to spot.
-    if (by) row.sozcul_id = by;
-    const { error: wErr } = await sb.from('sozcel_used_answers')
-      .upsert([row], { onConflict: 'used_on' });
-    if (wErr) throw wErr;
-    // ── AND NOTHING ELSE IS TOUCHED ──
-    // This used to mark every other offer for the night 'passed', which
-    // was the whole of what made a suggestion fleeting: a member who wrote
-    // a word on Tuesday morning had it killed by Tuesday's pick without
-    // anyone ever deciding anything about it. An offer belongs to the POOL
-    // now and leaves it two ways only — being placed (here) or being taken
-    // back by its author (or refused outright with "Havuzdan çıkar", which
-    // is somebody actually saying no to it). Everything else stands and is
-    // still there tomorrow. See
-    // db/sozcel_word_suggestions_v2_standing_pool.sql.
-    //
-    // The ONE row that does move is a previous pick for this same night:
-    // correcting a night means whatever stood there before is not the
-    // night's word any more, so it stops claiming to be one (left alone it
-    // would go on telling its author "bu gece bu oynanıyor" while another
-    // word played). 'passed' rather than back into the pool, because the
-    // pool's two live-row indexes — one offer per member, one row per word
-    // — may well have been filled since by that same member or that same
-    // word, and a correction must not fail on a unique violation.
-    await sb.from('sozcel_word_suggestions')
-      .update({ status: 'passed' })
-      .eq('for_night', night).eq('status', 'picked').neq('id', id);
-    // for_night is written HERE, at the moment of picking, because that is
-    // the only moment a word has a night: on a pending row it is null. It
-    // is what lets the member's own box say "seçildi — bu gece bu
-    // oynanıyor" on the day it is played (see submitData in project.html).
-    const { error: sErr } = await sb.from('sozcel_word_suggestions')
-      .update({ status: 'picked', for_night: night }).eq('id', id);
-    if (sErr) throw sErr;
+    // The database locks the suggestion, credits its author, and commits
+    // the word and all affected statuses together. No partial saves.
+    const { error } = await sb.rpc('admin_pick_sozcel_suggestion', {
+      p_id: id, p_night: night, p_word: parsed.word,
+      p_definition: parsed.definition, p_syllables: parsed.syllables,
+    });
+    if (error) throw adminGameSaveError(error);
     const swStatus = document.getElementById('sw-status');
     if (swStatus) { swStatus.textContent = 'Seçildi: ' + parsed.word; swStatus.className = 'status-msg ok'; }
     loadSozcelSuggestions();
@@ -11036,3 +10965,4 @@ checkAdmin();
 </script>
 </body>
 </html>
+
