@@ -1774,6 +1774,16 @@ behind it (`--av-ground`), `#5b5b5b` the jail stripes (`--av-jail`), `#181818` t
 the outline, the hair, the glasses and the shirt alike (`--av-ink`). Adding a third drawn family is
 a row in that table.
 
+**Nobody is bare-chested, so the shirt is the one layer with no "none"**
+(`DEFAULT_SHIRT` in avatar.js). Hair can be kel and a hat can be absent, but a member with no
+shirt recorded is not making a choice — they are a row that predates the choice existing. So
+`shirtUrl()` falls back to white rather than to null, and the picker offers Beyaz and Siyah and
+nothing else. Beyaz is stored as **`null`**, which is the whole reason this needed no migration and
+has no window: every member and every politician already in the database is dressed the moment it
+ships, a fresh signup is dressed before `handle_new_user` writes anything to that column, and the
+picker never has to write `'white'` (so it does not wait on `db/avatar_shirt_v2_white.sql` either).
+An explicit `'white'` row is still honoured and still lands on the Beyaz option.
+
 Four things about that second ladder:
 
 - **It does not follow the theme the way the page does, and that is measured rather than

@@ -6,9 +6,10 @@
 // purpose (glasses temples should disappear behind long hair, not poke
 // through it) — profiles.avatar_shirt / avatar_hair / avatar_hat /
 // avatar_accessory each pick their own overlay independently,
-// so any combination can be worn together, and all four default to null/none
-// (the plain bare-chested/bald look). 'black' is the one shirt option so
-// far, fully open to everyone — no lock, just like the hair options. The
+// so any combination can be worn together. Hair, hat and accessory default
+// to null/none (the plain bald look); the SHIRT does not — see
+// DEFAULT_SHIRT below. Both shirts are fully open to everyone — no lock,
+// just like the hair options. The
 // locked Sözcü reward is the 'crown' hat (previously a single full-image
 // override via profiles.avatar_url — that column is no longer written, but
 // html() still honors it if set, as a fallback for any row a migration
@@ -48,8 +49,27 @@
   const JAIL_URL = 'assets/avatar/jail.png';
   const SOZCU_REQUIRED_COUNT = 10;
 
+  // NOBODY IS BARE-CHESTED BY DEFAULT, AND THAT IS WHY null MEANS WHITE.
+  // The shirt is the one layer of the four with no "none": hair can be kel
+  // and a hat can be absent, but a member with no shirt recorded is not
+  // making a choice, they are a row that predates the choice existing.
+  //
+  // Reading null as the default shirt rather than as bare does the whole
+  // job with no migration and no window: every member and every politician
+  // already in the database is dressed the moment this ships, and a fresh
+  // signup is dressed before `handle_new_user` has written anything to this
+  // column. A backfill plus a column default would reach the same place,
+  // but only once the SQL had actually been run by hand — and GitHub Pages
+  // redeploys on push, so there is always a gap in which every reader would
+  // be looking at a stripped city.
+  //
+  // It also means the picker never has to WRITE 'white': choosing it stores
+  // null, so this does not wait on db/avatar_shirt_v2_white.sql either. An
+  // explicit 'white' is still honoured, since rows may carry one.
+  const DEFAULT_SHIRT = 'white';
+
   function shirtUrl(shirt) {
-    return SHIRT_URLS[shirt] || null;
+    return SHIRT_URLS[shirt] || SHIRT_URLS[DEFAULT_SHIRT] || null;
   }
 
   function hairUrl(hair) {
@@ -102,6 +122,7 @@
 
   global.IstAvatar = {
     BASE_URL, SHIRT_URLS, HAIR_URLS, HAT_URLS, ACCESSORY_URLS, JAIL_URL, SOZCU_REQUIRED_COUNT,
+    DEFAULT_SHIRT,
     shirtUrl, hairUrl, hatUrl, accessoryUrl, html,
   };
 })(window);
