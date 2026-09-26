@@ -189,27 +189,8 @@ create policy "letter_nb delete admin"
   using ((auth.jwt() ->> 'email') = 'cemwozturk@gmail.com');
 
 
--- ── BACKFILL — nothing goes dark on the day this runs ────────────────
--- The gate is the point of this migration, and a gate applied to a live
--- database with nothing behind it is the reader’s column going blank
--- until somebody notices. So every event that has not already happened,
--- and every poll still open, is filed into one baskı dated today: the
--- state the site is already in, written down in the new terms. From the
--- next baskı on it is all curation.
---
--- `where edition_date is null` is what makes it idempotent AND safe to
--- re-run later — a row the admin has since pulled out of a baskı by hand
--- has a null date again, and re-running this would quietly put it back.
--- It will not: current_date moves, and a second run files it into a NEW
--- baskı rather than the one it was pulled from. That is a real edge and
--- the reason this block is at the bottom, by itself, where it can be
--- commented out before a re-run.
-update public.events
-   set edition_date = current_date
- where edition_date is null
-   and event_date >= (current_date::timestamptz);
-
-update public.neighborhood_polls
-   set edition_date = current_date
- where edition_date is null
-   and active;
+-- Publication is an editorial action, not a schema migration.
+-- Leave existing edition dates unchanged, including NULL (unpublished).
+-- On a first installation, curate the initial event/poll edition in the
+-- admin Baskı screen before enabling the reader's edition-based columns.
+-- See db/README.md. Re-running this file must never publish content.
