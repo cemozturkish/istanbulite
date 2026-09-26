@@ -3534,12 +3534,22 @@ function hiveDistrictGray(count) {
   return `color-mix(in srgb, var(--map-ink) ${pct}%, var(--map-sea) ${100 - pct}%)`;
 }
 
+// Whether Anket's own result page currently owns the shared layer (see
+// renderAnketResults). The ambient repaint below must stand down while
+// this is true: the layer is the SAME node either way, so an ambient
+// refresh landing mid-read (hive_map or hive_member_status resolving
+// while the reader is looking at a poll split) would overwrite the
+// poll's own colours with the petek's, leaving the wrong result on
+// screen until the page is closed and reopened.
+let anketDistrictMapOpen = false;
+
 // Anket's own fills take the layer over while its page is open (see
 // renderAnketResults); this is the layer's resting state everywhere
 // else, repainted every time the petek says something changed and
 // every time a page that isn't Anket's own gives the layer back (see
 // closeFbPage / snapFbPageShut below).
 function refreshHiveDistrictMap() {
+  if (anketDistrictMapOpen) return;
   const info = window.IstProfileCard && IstProfileCard.hiveDistricts && IstProfileCard.hiveDistricts();
   if (!info) return;
   const fills = {};
@@ -3719,6 +3729,11 @@ async function renderAnketResults(body, poll, myChoice) {
     if (!t) continue;
     fills[r.neighborhood] = anketMixColor(poll.color_a, poll.color_b, (r.a_count || 0) / t);
   }
+  // Claims the layer before painting it: the ambient repaint
+  // (refreshHiveDistrictMap) checks this flag and stands down while it
+  // is true, so a hive fetch resolving mid-read can never overwrite
+  // this poll's own colours out from under the reader.
+  anketDistrictMapOpen = true;
   paintDistrictMap(fills);
   const districtsHtml = rows
     .map(r => ({
@@ -4645,6 +4660,9 @@ function closeFbPage() {
   // resting state everywhere else on slide 12 (see refreshHiveDistrictMap),
   // so a page that borrowed it (Anket's own results) hands it straight
   // back rather than leaving the districts blank until the next update.
+  // The flag has to clear BEFORE the repaint, or the ambient refresh
+  // still reads Anket as owning the layer and does nothing.
+  anketDistrictMapOpen = false;
   refreshHiveDistrictMap();
   if (fbPageGrows()) IstSheet.grow({ page, inner, origin: _fbOrigin, dir: 'out' });
   IstSheet.close(overlay, () => {
@@ -4672,6 +4690,7 @@ function snapFbPageShut() {
   if (!overlay || !inner || overlay.hidden) return;
   stopSozcelCountdown();
   clearDistrictMap();
+  anketDistrictMapOpen = false;
   refreshHiveDistrictMap();
   IstSheet.cancelGrow(page);
   page.querySelectorAll(':scope > .fb-throw-cue').forEach(n => n.remove());
@@ -5545,6 +5564,15 @@ async function loadFrames() {
   }
   ready = true;
   armCast();
+  // The district layer (see paintDistrictMap) relies on tree order to
+  // stay under these frames -- it is only ever appended AFTER whatever
+  // is already in #fb at the moment it paints. If the petek's ambient
+  // fetch (hive_map / hive_member_status) resolves and paints before
+  // every frame above has actually landed, later frames appended here
+  // land after it and bury it for the rest of this visit, since nothing
+  // else ever re-touches the DOM order. Re-asserting it here, once
+  // every frame is truly in, is what keeps that race from mattering.
+  if (districtLayer && districtLayer.isConnected) box.appendChild(districtLayer);
 }
 
 // ── The gesture ──
