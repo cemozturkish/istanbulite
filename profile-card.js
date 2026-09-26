@@ -379,17 +379,29 @@
   ];
 
   // Shirt overlays — the base clothing layer (see avatar.js), stacked
-  // directly on the bald base before hair/hat/accessory. Defaults to null
-  // (the plain bare look), same as hair/hat/accessory. Both shirts are
-  // fully open to everyone — no lock, just like the hair options.
-  // Unlike hair, a new shirt value needs a MIGRATION as well as a row
-  // here: profiles.avatar_shirt carries a check constraint naming every
-  // allowed value, so an option added here alone is offered in the picker
-  // and then refused on save (db/avatar_shirt_v2_white.sql).
+  // directly on the bald base before hair/hat/accessory. Both are fully
+  // open to everyone — no lock, just like the hair options.
+  //
+  // THERE IS NO "YOK" HERE, and that is the point rather than an omission:
+  // nobody is bare-chested on this site. Hair has a kel and a hat has an
+  // absence because those are real ways to look; a missing shirt is not a
+  // style, it is a member the app never dressed.
+  //
+  // Beyaz is `null` rather than `'white'` because null IS the default shirt
+  // (avatar.js's DEFAULT_SHIRT) — so a member who has never touched this
+  // picker already reads as white, switching back from black writes the
+  // default rather than a second spelling of it, and this list needs no
+  // migration to be usable. An explicit 'white' row still lands on this
+  // option: shirtOptionIndex falls back to index 0 for any value not named
+  // here, and index 0 renders white either way.
+  //
+  // A THIRD shirt would need a migration as well as a row here:
+  // profiles.avatar_shirt carries a check constraint naming every allowed
+  // value, so an option added here alone is offered in the picker and then
+  // refused on save (db/avatar_shirt_v2_white.sql).
   const AVATAR_SHIRT_OPTIONS = [
-    { value: null,    label: 'Yok' },
+    { value: null,    label: 'Beyaz Tişört' },
     { value: 'black', label: 'Siyah Tişört' },
-    { value: 'white', label: 'Beyaz Tişört' },
   ];
 
   // Hair overlays for the layered avatar (bald base + optional transparent
@@ -3751,7 +3763,10 @@
 
   // Wires the shirt row's prev/next arrows — never locked (unlike hat/
   // accessory), just a plain immediate-pick toggle between the default
-  // 'black' and 'Yok' (bare).
+  // white (stored as null) and 'black'. Two options, so either arrow is
+  // the same toggle; the pair is kept rather than collapsed to one button
+  // because every other category on this cover is a prev/next pair and a
+  // third shirt would make it one again.
   function wireShirtCarousel(state) {
     const prevBtn = document.getElementById('po-shirt-prev');
     const nextBtn = document.getElementById('po-shirt-next');

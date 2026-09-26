@@ -40,8 +40,8 @@ Two more things, both of which fail silently:
 |---|---|---|
 | `base.png` | the bald, bare figure every avatar starts from | **uploaded** |
 | `background.png` | the flat ground behind the figure — painted as the hexframe's own CSS background (palette.css / frames.css), not stacked as an `<img>` | **uploaded** |
+| `shirt-white.png` | Beyaz Tişört — **the default**, worn by anyone who has not chosen otherwise | **uploaded** |
 | `shirt-black.png` | Siyah Tişört | **uploaded** |
-| `shirt-white.png` | Beyaz Tişört | **uploaded** |
 | `hair-buzz.png` | Çok kısa saç | **uploaded** |
 | `hair-short.png` | Kısa saç | **uploaded** |
 | `hair-long.png` | Uzun saç | **uploaded** |
@@ -58,6 +58,15 @@ both of those back is the rest of it.
 Until a file lands, its option is simply skipped: `hairUrl()` and friends
 return null for anything not in their map, so a missing overlay is a layer
 that is not drawn rather than a 404'd `<img>`.
+
+**The shirt is the exception, and `shirt-white.png` must therefore always
+exist.** Nobody on this site is bare-chested: `shirtUrl()` falls back to
+`DEFAULT_SHIRT` rather than to null, so a member with nothing recorded — an
+account that predates the choice, or one created a second ago — is dressed
+in white. The picker offers Beyaz and Siyah and no third way, and Beyaz is
+stored as `null`, which is what lets every existing row read as dressed
+with no backfill. Delete or rename that one file and every avatar on the
+site loses its shirt at once.
 
 **On the greys, measured rather than assumed.** The set as drawn uses a
 body around `#bdbcbc`, outlines around `#494848`, hair and the black shirt
