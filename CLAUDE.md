@@ -3256,7 +3256,13 @@ belongs to (`live`), and a pose per slide. Three rules make them work:
     opened — the same reading the app map's square uses, and the two must agree), an
     **anket** once voted. **Etkinlikler is deliberately not completable** — an evening is somewhere
     to be, not content to get through — and a pinned Dünya seri is a running timeline rather than
-    one thing to finish.
+    one thing to finish. An evening the reader has **answered** still goes quiet on its box,
+    but it counts for nothing on the day's meter.
+  - **An answered box wears its answer as a STAMP** (`.fb-stamp`, the third argument of
+    `fbSetDone`): the same red stamp the page wore while it was being thrown, left on the quieted
+    card — GİDİYORUM / GİTMİYORUM on an evening (`event_interest.verdict`), AKIŞTA KAL / YETER on
+    a story in a seri, OKUNDU on any other thrown story. Uppercased in JS, never by CSS: the
+    document is `lang="tr"`, so `text-transform` prints English "going" as "GOİNG".
   - **No new storage.** The three facts already existed: `dunya_dealt_<uid>` in `localStorage`
     mirrored server-side as `news_dealt` (which is what lets a neighbour's petek caption say how
     deep their deck is), `game_results`, and `neighborhood_poll_votes`. `newsDealtStore` /
