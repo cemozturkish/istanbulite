@@ -2812,56 +2812,41 @@ collapse the *record*. A left throw is a real "no" rather than the absence of a 
 whole reason `event_interest` exists. There is no `localStorage` mirror: `event-interest.js` left
 with kahvehane's own events deck, so that table IS the record now rather than a copy of one.
 
-**THE DISTRICT MAP IS COLOURED** (`paintDistrictMap` / `clearDistrictMap`, `.fb-districts`). It
-started as the Anket's alone: `renderAnketResults` has always printed the 25 districts as rows,
-each wearing the colour a map would paint it with, and the map carries that same colour on the
+**THE DISTRICT MAP IS COLOURED, AND IT IS THE ANKET'S** (`paintDistrictMap` /
+`clearDistrictMap`, `.fb-districts`). `renderAnketResults` has always printed the 25 districts as
+rows, each wearing the colour a map would paint it with; the map is now that same colour on the
 shape itself, on the drawing the reader is already looking at. The mix is computed **once** per
 district and used for both, so the row and the shape can never disagree, and a district with no
 votes is given no fill at all — the way its row says "Oy yok" rather than picking a colour out of
 the air.
 
-**It has a second, resting fill now, and it is the petek's** (`refreshHiveDistrictMap`, wired to
-`IstProfileCard`'s `'ist-hive-updated'` event, dispatched from `renderHive`). The layer is never
-truly blank any more: the reader's own district wears `--fb-map-red` — this file's own alias for
-the site's one red (`var(--ink-red, ...)`, the same logo the petek button already burns), never
-`--map-red`, since that token walks its own hue on mono-night and would read as a different red
-from every other one on the site — and every
-district a member actually touching them on the grid (ring 1, up to six) lives in wears a gray
-that gets darker the more of those six live there
-(`color-mix(in srgb, var(--map-ink) N%, var(--map-sea) (100-N)%)`, `HIVE_DISTRICT_GRAY_PCT`
-indexed 1–6). Anket's own fills still take the layer over while its result page is open; closing
-any page hands it back to this resting layer (`closeFbPage` / `snapFbPageShut` both call
-`refreshHiveDistrictMap()` right after `clearDistrictMap()`) rather than leaving it dark. Two
-things this makes true that were not before: the layer is quiet rather than truly absent even
-with nothing open, and it is a fact about **whoever is signed in**, not about the open page —
-`IstProfileCard.hiveDistricts()` reads no member list and answers only for the caller's own map,
-the same fence `hive_member_status` stands behind.
-
-Five things about it:
+Four things about it:
 
 - **It answers no press.** The layer is `pointer-events: none`: a district tap would be a second
   question laid over the one this map exists to answer, and where it would lead is not decided.
   The fill is the whole of it.
-- **The Anket half belongs to the open PAGE, not to the screen.** The paint goes up with the
-  result and `closeFbPage` / `snapFbPageShut` take it down — the petek's own resting fill is what
-  takes its place, never a blank layer.
-- **The petek's own half belongs to whoever is signed in, and repaints on its own schedule.** It
-  is not re-derived from a page opening or closing; it repaints whenever the petek says the map
-  (who is touching the reader, and where they live) may have changed — a fresh mount, `hive_map()`
-  landing, a slot claimed — and it needs the petek mounted at all to have anything to read, which
-  `mountPetek()` already does from `DOMContentLoaded` regardless of whether the petek is ever
-  opened (see "The petek is behind the logo" below).
+- **It belongs to the open PAGE, not to the screen.** The paint goes up with the result and
+  `closeFbPage` / `snapFbPageShut` take it down, so the city is only ever wearing a poll while
+  that poll is being read.
 - **It is appended AFTER the frames rather than given a z-index over them.** The frames are
   `z-index: auto` and land in the same painting pass, so tree order is what decides — and
   `loadFrames` appends them on every mount, which is why `paintDistrictMap` re-`appendChild`s the
   layer (that MOVES it) and `unmount` drops the handle. Everything above it carries a real
   z-index — the cast (1), the middle lane's wash (2), the app map (3) — so it stays under all
   three however it got there, and walking to the map lane quiets the districts along with the
-  drawing they are on — which is deliberate for the petek's own resting fill too: it stays a quiet
-  fact under the app map, never a second, louder map.
+  drawing they are on.
 - **The file is parsed as XML, never `innerHTML`'d into an SVG element** — the same reason
   map-ink.js builds its filter with DOM calls. A fetch that fails clears its own promise so a
   later opening retries, and leaves the reader the list, which is the whole result either way.
+
+**Tried and abandoned: a resting fill under the map, coloured by who is on the reader's petek**
+(the own district in red, ring-1 neighbours' districts in gray). The fill sat on the traced SVG
+polygons (`assets/map/istanbul-map-mobile.svg`), while the drawn borders — including the 3D
+"kenar" extrusion — are baked into the map's own PNG underneath; the two never register closely
+enough, and the fill visibly spills past or falls short of the ink around it. Fixing that needs
+the fill itself redrawn to the artwork's actual edges, not a code change, so it was dropped rather
+than shipped looking wrong. `paintDistrictMap`/`clearDistrictMap` and the Anket behaviour above
+are unaffected.
 
 **The tracing under it** (`assets/map/istanbul-map-mobile.svg`). The portrait
 drawing is not a redraw: it is the landscape `assets/map/istanbul-map.png` scaled and cropped into
