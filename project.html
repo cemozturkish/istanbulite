@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="palette.css?v=12">
   <link rel="stylesheet" href="profile-card.css?v=49">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=55" defer></script>
+  <script src="profile-card.js?v=56" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -585,21 +585,13 @@
       text-transform: uppercase;
     }
     /* Nothing is pinned inside the box's own top corner for Haberler any
-       more, so the title rests on the box's own floor, ranged from its
-       left edge -- the same corner Oyunlar's own name already stands in
-       -- rather than sitting wherever the block's leftover height
-       happens to centre it. Written against .fb-box itself too (not
-       just .fb-haberler), which is what actually outranks the base
-       .fb-box .t rule below it -- two classes on the SAME element beat
-       the descendant .fb-box .t on specificity, so this wins regardless
-       of which one comes first in the sheet. */
-    .fb-box.fb-haberler .t {
-      position: absolute;
-      left: var(--fb-box-pad-x); right: var(--fb-box-pad-x);
-      bottom: var(--fb-box-pad-y);
-      margin-top: 0;
-      text-align: left;
-    }
+       more, so the title hugs the box's own top-left rather than sitting
+       wherever the block's leftover height happens to centre it. Written
+       against .fb-box itself too (not just .fb-haberler), which is what
+       actually outranks the base .fb-box .t rule below it -- two classes
+       on the SAME element beat the descendant .fb-box .t on specificity,
+       so this wins regardless of which one comes first in the sheet. */
+    .fb-box.fb-haberler .t { margin-top: 0; font-size: var(--fb-title-size-haberler, 0.82rem); }
     /* Etkinlikler: the district joins the day-bucket outside the box the
        same way, on the OTHER end of that line -- day-bucket stays where
        the mirror already puts it (top-right, outside), and the district
@@ -616,18 +608,9 @@
       text-transform: uppercase;
     }
     /* Same specificity fix as Haberler's above -- .fb-box.fb-events, not
-       just .fb-events, so the bottom-anchor wins over the base
-       .fb-box .t rule regardless of source order. Left even though the
-       column is mirrored: the title reads from the same corner
-       Haberler's does rather than trading places with the mirror's own
-       text-align, the way Oyunlar's own name already stays put. */
-    .fb-box.fb-events .t {
-      position: absolute;
-      left: var(--fb-box-pad-x); right: var(--fb-box-pad-x);
-      bottom: var(--fb-box-pad-y);
-      margin-top: 0;
-      text-align: left;
-    }
+       just .fb-events, so the top-hug wins over the base .fb-box .t
+       rule regardless of source order. */
+    .fb-box.fb-events .t { margin-top: 0; font-size: var(--fb-title-size-etkinlikler, 0.82rem); }
     /* Oyunlar's kicker names the SLOT ("1. OYUN" / "2. OYUN"), not a
        category tied to whichever edge the column sits at -- it stays
        ranged to the block's own left edge even though the column is
@@ -647,6 +630,17 @@
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
       overflow: hidden; text-overflow: clip;
     }
+    /* Anket's own box is --fb-anket-box-h tall (see above) -- roughly
+       1.66x the standard --fb-box-h -- but the 2-line clamp above was
+       tuned for the short box, so a question longer than two lines was
+       cut short with "..." while most of the tall box's own paper sat
+       empty underneath it. Six lines is what the tall box's content
+       height actually holds at this font-size/line-height, so the
+       question gets the room the box was already giving it. */
+    .fb-box.fb-anket .t {
+      -webkit-line-clamp: 6;
+      font-size: var(--fb-title-size-anket, 0.82rem);
+    }
     /* The games column names its game in the BOTTOM-LEFT corner, on
        every lane. The other columns are feeds whose headline is the
        thing itself and reads from the top; this one is a fixed set of
@@ -661,7 +655,7 @@
       bottom: var(--fb-box-pad-y);
       margin-top: 0;
       text-align: left;
-      font-size: 1.15rem;
+      font-size: var(--fb-title-size-oyunlar, 1.15rem);
     }
     /* Sözcel's own mark stands in for its title text -- not ranged like
        a title at all, since the mark already reads as a whole thing
@@ -3839,7 +3833,7 @@ const loadAnketActor = stackFetch(async () => {
     html: '<div class="k">ANKET</div>' +
       '<div class="t">' + esc(anketText(poll, 'question')) + '</div>' +
       '<div class="m">' + (voted.has(poll.id)
-        ? (gece ? 'İlçelere göre' : 'Cevabın kayıtlı')
+        ? (gece ? '' : 'Cevabın kayıtlı')
         : (gece ? 'Oy ver — sonuçlar açık' : 'Oy ver')) + '</div>',
     // ONE page, whichever half of the day it is opened in: wireAnketPage
     // asks a reader who has not voted and shows the split to one who
@@ -6180,6 +6174,7 @@ function mount() {
   // not wait on the network (see an actor's own load).
   paintDayMeter();
   refreshDayMeter();
+  loadCardTitleFontSizes();
 }
 function unmount() {
   stopAnim();
@@ -6497,6 +6492,29 @@ function sayLang(btn, value) {
 // same move refreshEditionColumns makes), so nothing on the strip moves
 // under the reader while the words change.
 let _langRelabelWired = false;
+// ── The card headline's own punto, admin-editable ──
+// db/card_title_font_sizes.sql: one row per kind of card this page casts
+// (Haberler / Etkinlikler / Anket / Oyunlar), curated from admin.html.
+// Read once and written onto :root as --fb-title-size-<kind>, which every
+// card's own CSS already falls back from to its hardcoded rem size (see
+// .fb-box.fb-haberler .t and friends above) -- so a database with no rows,
+// or a fetch that fails, renders exactly as it did before this existed.
+// Fetched fresh every mount (an admin edit while the app is open should
+// not need a reload) but never awaited: the book must not wait on the
+// network, same as every other actor's own load.
+function loadCardTitleFontSizes() {
+  const sb = window.IstRouter && IstRouter.sb;
+  if (!sb) return;
+  sb.from('card_title_font_sizes').select('kind, size_px').then(({ data, error }) => {
+    if (error || !data) return;
+    const root = document.documentElement.style;
+    data.forEach(row => {
+      if (!row || !row.kind || row.size_px == null) return;
+      root.setProperty('--fb-title-size-' + row.kind, row.size_px + 'px');
+    });
+  });
+}
+
 function wireLangRelabel() {
   if (_langRelabelWired || !window.I18N || !I18N.onChange) return;
   _langRelabelWired = true;
