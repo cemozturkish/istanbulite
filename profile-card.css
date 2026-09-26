@@ -128,6 +128,19 @@
        chain hangs under the bar's own edge — one number, not a per-mark
        offset, because the chain FOLLOWS the edge. */
     --ist-sky-dot: clamp(13px, 4.6vw, 20px);
+    /* ── IN THE APP, THE SHOULDER RISES NO HIGHER THAN THE NAMES ──
+       The corners used to stand at --navbar-top-keep alone (34% of the
+       bar), which on a notched phone is up inside the status bar: the
+       flanks ran steeply from there down past the names. They stop at
+       the top of the names now -- the notch, where the row of type
+       begins (padding-top above), plus this: the distance from the top
+       of the row to the top of the ink of a capital with its dots
+       (the Ö in ÖZTÜRK), since the name block is docked to the row's
+       top. A plain px on purpose; env() is written into the clip-path
+       and the chain's own `top` directly, never into a custom property
+       (see frames.css). --navbar-top-keep stays as the floor, so a
+       screen with no inset keeps the shoulder it always had. */
+    --ist-pc-name-top: 1px;
     --ist-sky-drop: 15px;
   }
   /* ── The ink, and the shape it is cut to ──
@@ -167,6 +180,20 @@
       calc(100% - var(--navbar-bevel, 0.35) * 100%) 100%,
       calc(var(--navbar-bevel, 0.35) * 100%) 100%,
       0 var(--navbar-top-keep, 34%)
+    );
+  }
+  /* In the app the corners stop at the top of the names instead (see
+     --ist-pc-name-top above). The website keeps the share-of-the-box
+     shoulder: its bar is laid out under Safari's own chrome, and the
+     app is where this was tuned and measured. */
+  html.ist-native #ist-pc-mount::before {
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% max(var(--navbar-top-keep, 34%), calc(env(safe-area-inset-top) + var(--ist-pc-name-top, 1px))),
+      calc(100% - var(--navbar-bevel, 0.35) * 100%) 100%,
+      calc(var(--navbar-bevel, 0.35) * 100%) 100%,
+      0 max(var(--navbar-top-keep, 34%), calc(env(safe-area-inset-top) + var(--ist-pc-name-top, 1px)))
     );
   }
   /* frames.css loads last and gives the mount's child the shared card
@@ -324,6 +351,12 @@
        never disagree. */
     top: calc(var(--navbar-top-keep, 34%)
               + (100% - var(--navbar-top-keep, 34%)) * var(--s, 0)
+              + var(--ist-sky-drop));
+  }
+  /* The chain hangs off whichever edge is drawn -- the app's own. */
+  html.ist-native .ist-sky-mark {
+    top: calc(max(var(--navbar-top-keep, 34%), calc(env(safe-area-inset-top) + var(--ist-pc-name-top, 1px)))
+              + (100% - max(var(--navbar-top-keep, 34%), calc(env(safe-area-inset-top) + var(--ist-pc-name-top, 1px)))) * var(--s, 0)
               + var(--ist-sky-drop));
   }
   /* The ring is the ::before rather than the mark's own border, because
