@@ -1392,7 +1392,6 @@ const CLUE_BAR_MIN = 72;
 const CLUE_BAR_MAX = 168;
 
 let _lastCell = 0;
-let _lastClueBarH = 0;
 function layoutBoard() {
   const area = document.getElementById('play-area');
   const grid = document.getElementById('crossword-grid');
@@ -1438,10 +1437,15 @@ function layoutBoard() {
     const gridH = usedCell > 0 ? usedCell * ROWS + gap * (ROWS - 1) : 0;
     const leftover = Math.max(0, availH - gridH);
     const barH = Math.min(CLUE_BAR_MAX, CLUE_BAR_MIN + leftover);
-    if (barH !== _lastClueBarH) {
-      _lastClueBarH = barH;
-      bar.style.setProperty('--clue-bar-h', barH + 'px');
-    }
+    // Always write it, unguarded by a "did this change" cache: the bar was
+    // just reset to CLUE_BAR_MIN above for measurement, so the DOM is never
+    // actually sitting at whatever barH we last computed the way the
+    // grid's own _lastCell cache assumes for its inline styles. Skipping
+    // this write whenever barH happened to match an earlier call's result
+    // left the bar stuck at its floor the moment a later, still-generous
+    // layout recomputed the same grown height a taller one had already
+    // reached.
+    bar.style.setProperty('--clue-bar-h', barH + 'px');
   }
 }
 
