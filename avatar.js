@@ -29,7 +29,10 @@
   // rather than stacked as an <img>, for the reason map-ink.js's LADDERS
   // note spells out. See assets/avatar/README.md for the full set.
   const BASE_URL = 'assets/avatar/base.png';
-  const SHIRT_URLS = { black: 'assets/avatar/shirt-black.png' };
+  const SHIRT_URLS = {
+    black: 'assets/avatar/shirt-black.png',
+    white: 'assets/avatar/shirt-white.png',
+  };
   const HAIR_URLS = { buzz: 'assets/avatar/hair-buzz.png', short: 'assets/avatar/hair-short.png', long: 'assets/avatar/hair-long.png' };
   // 'crown' (the locked Sözcü reward hat) is parked here too -- see
   // AVATAR_HAT_OPTIONS in profile-card.js for why. Leaving it out of this
