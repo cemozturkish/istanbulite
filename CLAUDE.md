@@ -2803,7 +2803,10 @@ the air.
 
 **It has a second, resting fill now, and it is the petek's** (`refreshHiveDistrictMap`, wired to
 `IstProfileCard`'s `'ist-hive-updated'` event, dispatched from `renderHive`). The layer is never
-truly blank any more: the reader's own district wears `--map-red`, the site's one red, and every
+truly blank any more: the reader's own district wears `--fb-map-red` — this file's own alias for
+the site's one red (`var(--ink-red, ...)`, the same logo the petek button already burns), never
+`--map-red`, since that token walks its own hue on mono-night and would read as a different red
+from every other one on the site — and every
 district a member actually touching them on the grid (ring 1, up to six) lives in wears a gray
 that gets darker the more of those six live there
 (`color-mix(in srgb, var(--map-ink) N%, var(--map-sea) (100-N)%)`, `HIVE_DISTRICT_GRAY_PCT`
