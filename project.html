@@ -15,7 +15,7 @@
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <link rel="stylesheet" href="palette.css?v=12">
-  <link rel="stylesheet" href="profile-card.css?v=48">
+  <link rel="stylesheet" href="profile-card.css?v=49">
   <script src="avatar.js?v=5" defer></script>
   <script src="profile-card.js?v=55" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
@@ -3507,6 +3507,50 @@ function clearDistrictMap() {
   if (districtLayer) districtLayer.classList.remove('on');
 }
 
+// ══════════════════════════════════════════════════════════════
+// THE PETEK'S OWN DISTRICTS, PAINTED — the same layer, coloured by who
+// is actually standing next to the reader
+//
+// The same .fb-districts layer Anket's own result page paints (see
+// paintDistrictMap above) sits under the app map on slide 12 whether or
+// not any page is open, so it can carry two more facts than only an
+// Anket result: the reader's own district in the site's one red, and
+// every district a member touching them on the grid (ring 1, up to
+// six) actually lives in, in a gray that gets darker the more of those
+// six live there. It stays exactly where it already was -- quiet,
+// underneath the app map's own opaque wash while standing on that
+// lane -- rather than becoming a second, louder map. profile-card.js
+// knows none of this -- it only counts (IstProfileCard.hiveDistricts())
+// and says when the count may have changed ('ist-hive-updated',
+// dispatched from renderHive).
+//
+// The own-district colour ALWAYS wins over a neighbour count for the
+// same district: the reader's own home is a fact about them, not about
+// how many of their six neighbours happen to share it.
+const HIVE_DISTRICT_GRAY_PCT = [0, 22, 36, 50, 64, 78, 92]; // index = headcount, 1..6
+
+function hiveDistrictGray(count) {
+  const pct = HIVE_DISTRICT_GRAY_PCT[Math.max(1, Math.min(6, count | 0))];
+  return `color-mix(in srgb, var(--map-ink) ${pct}%, var(--map-sea) ${100 - pct}%)`;
+}
+
+// Anket's own fills take the layer over while its page is open (see
+// renderAnketResults); this is the layer's resting state everywhere
+// else, repainted every time the petek says something changed and
+// every time a page that isn't Anket's own gives the layer back (see
+// closeFbPage / snapFbPageShut below).
+function refreshHiveDistrictMap() {
+  const info = window.IstProfileCard && IstProfileCard.hiveDistricts && IstProfileCard.hiveDistricts();
+  if (!info) return;
+  const fills = {};
+  Object.keys(info.counts || {}).forEach(nb => {
+    fills[nb] = hiveDistrictGray(info.counts[nb]);
+  });
+  if (info.own) fills[info.own] = 'var(--map-red)';
+  paintDistrictMap(fills);
+}
+document.addEventListener('ist-hive-updated', refreshHiveDistrictMap);
+
 // One fetch, shared by the three boxes and by the day meter -- and it
 // carries the reader's own votes, because "answered" is what makes an
 // anket box done and the meter must count the same set the column shows.
@@ -4597,6 +4641,11 @@ function closeFbPage() {
   // The districts are the open page's, not the screen's -- they go out
   // with it (see paintDistrictMap). Harmless when nothing painted them.
   clearDistrictMap();
+  // The layer isn't the page's to leave dark, though: it is the petek's
+  // resting state everywhere else on slide 12 (see refreshHiveDistrictMap),
+  // so a page that borrowed it (Anket's own results) hands it straight
+  // back rather than leaving the districts blank until the next update.
+  refreshHiveDistrictMap();
   if (fbPageGrows()) IstSheet.grow({ page, inner, origin: _fbOrigin, dir: 'out' });
   IstSheet.close(overlay, () => {
     inner.innerHTML = '';
@@ -4623,6 +4672,7 @@ function snapFbPageShut() {
   if (!overlay || !inner || overlay.hidden) return;
   stopSozcelCountdown();
   clearDistrictMap();
+  refreshHiveDistrictMap();
   IstSheet.cancelGrow(page);
   page.querySelectorAll(':scope > .fb-throw-cue').forEach(n => n.remove());
   page.style.transform = ''; page.style.opacity = ''; page.style.transition = '';
