@@ -253,11 +253,15 @@
       border: 2px solid var(--ink);
       border-left: 5px solid var(--ink-red);
       /* A fixed height, so a short definition and a long one leave the
-         grid above exactly where it was. Taller than the clue itself
-         usually needs, because the grid is capped by its own width on a
-         narrow puzzle and never claims this room -- otherwise it sits
-         empty between the buttons and the keyboard. */
-      height: 168px;
+         grid above exactly where it was. --clue-bar-h is written by
+         layoutBoard(): the grid claims what it needs first, and this
+         only grows into whatever is genuinely left over (the fallback
+         here is what it grows FROM, never a size layoutBoard has to
+         fight for room with). Overflow is clipped at the box, not just
+         at the line-clamp, so a short viewport can never make this spill
+         over the controls or the keyboard below it. */
+      height: var(--clue-bar-h, 72px);
+      overflow: hidden;
       box-sizing: border-box;
     }
     .clue-bar[hidden] { display: none; }
@@ -281,8 +285,10 @@
     .clue-bar-t {
       font-size: 1.05rem;
       line-height: 1.35;
-      /* Six lines at most: the bar is a fixed height so the grid above it
-         never moves when the definition changes. */
+      /* Six lines at most -- the real limit on a short bar is the box's
+         own overflow:hidden above, which clips cleanly (no ellipsis)
+         well short of six lines whenever --clue-bar-h is near its
+         minimum. */
       display: -webkit-box;
       -webkit-line-clamp: 6;
       -webkit-box-orient: vertical;
@@ -1380,11 +1386,25 @@ function layoutGame() {
   layoutBoard();
 }
 
+// The clue bar's floor and ceiling. It never claims a pixel the grid
+// needs -- see layoutBoard()'s own note.
+const CLUE_BAR_MIN = 72;
+const CLUE_BAR_MAX = 168;
+
 let _lastCell = 0;
+let _lastClueBarH = 0;
 function layoutBoard() {
   const area = document.getElementById('play-area');
   const grid = document.getElementById('crossword-grid');
+  const bar = document.getElementById('clue-bar');
   if (!area || !grid || !PUZZLE) return;
+
+  // Pin the bar to its floor before measuring "others", so the grid is
+  // always sized as if the bar were as small as it can be -- the grid
+  // gets first claim on the room, and the bar only ever grows into
+  // whatever is genuinely left over, below.
+  if (bar) bar.style.setProperty('--clue-bar-h', CLUE_BAR_MIN + 'px');
+
   const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
   const areaGap = parseFloat(getComputedStyle(area).rowGap) || 0;
   let others = 0, n = 0;
@@ -1399,11 +1419,30 @@ function layoutBoard() {
     (availW - gap * (COLS - 1)) / COLS,
     (availH - gap * (ROWS - 1)) / ROWS,
     64));
-  if (!(cell > 0) || cell === _lastCell) return;
-  _lastCell = cell;
-  grid.style.width = (cell * COLS + gap * (COLS - 1)) + 'px';
-  grid.style.setProperty('--cell-font', Math.round(cell * 0.5) + 'px');
-  grid.style.setProperty('--cell-num-font', Math.max(8, Math.round(cell * 0.2)) + 'px');
+
+  if (cell > 0 && cell !== _lastCell) {
+    _lastCell = cell;
+    grid.style.width = (cell * COLS + gap * (COLS - 1)) + 'px';
+    grid.style.setProperty('--cell-font', Math.round(cell * 0.5) + 'px');
+    grid.style.setProperty('--cell-num-font', Math.max(8, Math.round(cell * 0.2)) + 'px');
+  }
+
+  // Whatever the grid did not need out of its own height budget is the
+  // bar's to grow into, capped at CLUE_BAR_MAX -- on a short viewport
+  // (a small `area`, or the extra height project.html's sheet iframe
+  // loses to the profile/tab bars) that leftover is 0 or near it, and
+  // the bar simply stays at its floor rather than eating room the grid
+  // or the controls below it need.
+  if (bar) {
+    const usedCell = cell > 0 ? cell : _lastCell;
+    const gridH = usedCell > 0 ? usedCell * ROWS + gap * (ROWS - 1) : 0;
+    const leftover = Math.max(0, availH - gridH);
+    const barH = Math.min(CLUE_BAR_MAX, CLUE_BAR_MIN + leftover);
+    if (barH !== _lastClueBarH) {
+      _lastClueBarH = barH;
+      bar.style.setProperty('--clue-bar-h', barH + 'px');
+    }
+  }
 }
 
 // The first word's first square, for a letter typed before any square
