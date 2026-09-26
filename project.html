@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=7"></script>
   <script src="router.js?v=15"></script>
-  <script src="i18n.js?v=24"></script>
+  <script src="i18n.js?v=25"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <link rel="stylesheet" href="palette.css?v=12">
@@ -769,6 +769,29 @@
       --lit-glow: 0 0 0 0 rgba(0, 0, 0, 0);
     }
     .fb-box.fb-done:not(.fb-empty) .k { color: var(--muted); }
+    /* ── THE STAMP ON A BOX ALREADY ANSWERED ──
+       What the reader threw, left printed on the card it came out of:
+       the same stamp the page wore while it was being thrown (see
+       .fb-throw-cue), now resting on the quieted box. The box going
+       quiet says "done"; the stamp says WHAT was answered, so an
+       evening you are going to and one you are not do not look alike.
+       Full red on purpose -- it is the one thing left inked on the box. */
+    .fb-box .fb-stamp {
+      position: absolute;
+      top: 55%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-7deg);
+      padding: 2px 8px;
+      border: 2px solid var(--ink-red, #B93631);
+      color: var(--ink-red, #B93631);
+      background: color-mix(in srgb, var(--paper-card, #ddc4b5) 70%, transparent);
+      font-size: 0.72rem; font-weight: 900;
+      letter-spacing: 0.06em; line-height: 1.2;
+      white-space: nowrap; max-width: 92%;
+      overflow: hidden; text-overflow: ellipsis;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .fb-box.fb-mirror .fb-stamp { transform: translate(-50%, -50%) rotate(7deg); }
     .fb-box.fb-done:not(.fb-empty)::before {
       width: 1px;
       background: var(--muted, #9a9a9a);
@@ -2504,7 +2527,7 @@ async function loadEtkinlikActor(el, slot) {
     etkinlikPromise = (async () => {
       try {
         const { date: editionDate, missing } = await editionInForce('events_current_edition');
-        if (!missing && !editionDate) return { days: [[], [], []], answered: new Set(), editionDate: null, failed: false };
+        if (!missing && !editionDate) return { days: [[], [], []], answered: new Map(), editionDate: null, failed: false };
         const from = new Date(IstDate.iso(0) + 'T00:00:00+03:00').toISOString();
         const to = new Date(IstDate.iso(3) + 'T00:00:00+03:00').toISOString();
         let q = IstRouter.sb.from('events').select('*');
@@ -2543,24 +2566,26 @@ async function loadEtkinlikActor(el, slot) {
         // column. event_interest carries BOTH verdicts (a left throw is
         // a real "no", not the absence of a yes -- see setEventRsvp), so
         // it is the one table that can say "answered".
-        const answered = new Set();
+        // event_id -> 'yes' | 'no': a Map rather than a Set, because the
+        // box stamps WHICH answer was given once it is answered.
+        const answered = new Map();
         const ids = (data || []).map(e => e.id);
         if (ids.length) {
           try {
             const uid = await doneUid();
             if (uid) {
               const { data: verdicts, error: vErr } = await IstRouter.sb
-                .from('event_interest').select('event_id')
+                .from('event_interest').select('event_id, verdict')
                 .eq('user_id', uid).in('event_id', ids);
               if (vErr) throw vErr;
-              (verdicts || []).forEach(v => answered.add(v.event_id));
+              (verdicts || []).forEach(v => answered.set(v.event_id, v.verdict));
             }
           } catch (err) { console.error('[proje etkinlik verdict]', err); }
         }
         return { days, answered, editionDate: missing ? 'pre-baski' : editionDate, failed: false };
       } catch (err) {
         console.error('[proje etkinlik]', err);
-        return { days: [[], [], []], answered: new Set(), editionDate: null, failed: true };
+        return { days: [[], [], []], answered: new Map(), editionDate: null, failed: true };
       }
     })();
   }
@@ -2570,10 +2595,11 @@ async function loadEtkinlikActor(el, slot) {
   // has something to open: a box with no payload is not pressable, which
   // is the truth about a dashed slot or a fetch that failed.
   fbSetPage(el, null);
-  // An evening is never "done". It is somewhere to be, not content to
-  // get through -- so Etkinlikler is deliberately outside the day's
-  // meter as well (see refreshDayMeter). Cleared all the same, because
-  // a class outlives a re-render.
+  // An evening still counts for nothing on the day's meter (see
+  // refreshDayMeter) -- it is somewhere to be, not content to get
+  // through. But an evening the reader has ANSWERED goes quiet and wears
+  // their answer (set below); cleared first, because a class outlives a
+  // re-render.
   fbSetDone(el, false);
   const dayIdx = 2 - slot;
   const label = etkinlikLabels()[dayIdx];
@@ -2611,6 +2637,10 @@ async function loadEtkinlikActor(el, slot) {
   el.innerHTML = '<div class="k">' + label + stackTag + '</div>' +
     '<div class="m">' + esc(nb) + '</div>' +
     '<div class="t">' + esc(newsText(ev, 'title')) + '</div>';
+  // Answered: the box goes quiet and is stamped with the answer, the
+  // way the page was while it was being thrown.
+  const verdict = answered.get(ev.id);
+  if (verdict) fbSetDone(el, true, tEv(verdict === 'yes' ? 'events.going' : 'events.notgoing'));
   // Where the reader already stands on this evening, so the page can say
   // so instead of asking again as if they had never seen it.
   const rsvp = await eventVerdictFor(ev.id);
@@ -2806,8 +2836,21 @@ async function newsMarkDealt(row) {
 // One setter, so "is done" and "looks done" cannot drift apart -- the
 // same reason fbSetPage is one function. A done box stays pressable:
 // a story can be read twice.
-function fbSetDone(el, done) {
-  if (el) el.classList.toggle('fb-done', !!done);
+//
+// `stamp` is the answer the reader gave, printed on the quieted box
+// (.fb-stamp). Uppercased here rather than by CSS: the document is
+// lang="tr", so text-transform would print English "going" as "GOİNG".
+function fbSetDone(el, done, stamp) {
+  if (!el) return;
+  el.classList.toggle('fb-done', !!done);
+  el.querySelectorAll(':scope > .fb-stamp').forEach(n => n.remove());
+  if (done && stamp) {
+    const en = !!(window.I18N && I18N.isEnglish && I18N.isEnglish());
+    const st = document.createElement('div');
+    st.className = 'fb-stamp';
+    st.textContent = en ? String(stamp).toUpperCase() : String(stamp).toLocaleUpperCase('tr-TR');
+    el.appendChild(st);
+  }
 }
 
 // ── The day's own denominator ──
@@ -3157,7 +3200,16 @@ async function loadHaberlerActor(el, slot) {
   el.innerHTML = '<div class="k">' + label + stackTag + akisTag + '</div>' +
     (byline ? '<div class="m">' + esc(byline) + '</div>' : '') +
     '<div class="t">' + esc(newsText(n, 'title')) + '</div>';
-  fbSetDone(el, newsIsDealt(store, n));
+  // A story already thrown is quiet, and stamped with what the throw
+  // said: AKIŞTA KAL / YETER for a story in a seri, OKUNDU otherwise.
+  const dealt = newsIsDealt(store, n);
+  let newsStamp = t('news.read');
+  if (dealt && n.series_id) {
+    if (followed) newsStamp = t('news.akis.stay');
+    else if ((await mutedSeries()).has(n.series_id)) newsStamp = t('news.akis.enough');
+    if (!el.isConnected) return;
+  }
+  fbSetDone(el, dealt, newsStamp);
   // If this update is itself part of a `seri` (it links back to earlier
   // posts about the same thing), its page carries their Zaman Akışı too,
   // so pressing a fresh gelişme still hands the reader the story it grew

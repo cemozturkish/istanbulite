@@ -71,6 +71,7 @@
     'news.akis.enough':    { default: 'YETER',                  more_english: 'ENOUGH' },
     'news.akis.note':      { default: 'Bu bir akışın parçası. Sağa at, gelişmeleri almaya devam et; sola at, bu akış bir daha karşına çıkmasın.',
                              more_english: 'This is part of a running story. Throw right to keep getting it; throw left and this story stops reaching you.' },
+    'news.read':           { default: 'OKUNDU',                 more_english: 'READ' },
     'news.akis.in':        { default: 'AKIŞTA',                 more_english: 'FOLLOWING' },
 
     // profile / settings card
