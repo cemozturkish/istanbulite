@@ -2808,41 +2808,6 @@
     applyHiveLevel(state);
     fitHive(state);
     wireHiveEvents(state);
-    // Every render is a point where the map (who is touching the reader,
-    // and where they live) may have changed — a fresh mount, the map
-    // landing, a slot claimed. project.html's own district-coloured map
-    // has no reach into this module's state, so it is told rather than
-    // asked: a plain DOM event, the same idiom the rest of the site uses
-    // for a module telling the page something changed without knowing
-    // who is listening.
-    document.dispatchEvent(new CustomEvent('ist-hive-updated'));
-  }
-
-  // ── Which districts are "ours" ──
-  // The reader's own district, and the districts of the (up to six)
-  // members actually touching them on the grid right now — the same
-  // ring-1 set hiveNameHTML already names beside each hexagon. This
-  // module only counts; it knows nothing about maps or SVGs. Read by
-  // project.html's own district-coloured map (see refreshHiveDistrictMap
-  // there) after every 'ist-hive-updated'.
-  function hiveDistrictFills(state) {
-    if (!state) return null;
-    const cells = (state.hive && state.hive.cells) || [];
-    const counts = {};
-    cells.forEach(c => {
-      if (!c || !c.neighborhood) return;
-      if (hiveRing(c.q, c.r) !== 1) return;
-      counts[c.neighborhood] = (counts[c.neighborhood] || 0) + 1;
-    });
-    return { own: (state.profile && state.profile.neighborhood) || null, counts };
-  }
-
-  // The public read of the above: whatever the petek currently has
-  // mounted, or null before anything has loaded. Takes no argument —
-  // like hive_member_status itself, it can only ever answer for the
-  // caller's own map.
-  function hiveDistricts() {
-    return hiveDistrictFills(_hive);
   }
 
   // Both calls are best-effort: before db/hive_lattice_v4.sql has been
@@ -4043,7 +4008,6 @@
     closeProfileOverlay,
     mountHivePage,
     unmountHivePage,
-    hiveDistricts,
     revealHivePage,
     playHiveReveal,
     holdHivePage,
