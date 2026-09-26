@@ -42,6 +42,12 @@
     'events.today':        { default: 'BUGÜN',                more_english: 'TODAY' },
     'events.tomorrow':     { default: 'YARIN',                more_english: 'TOMORROW' },
     'events.dayafter':     { default: 'ÖBÜR GÜN',              more_english: 'THE DAY AFTER' },
+    // The event page's own floor and head (project.html, loadEtkinlikActor).
+    'events.going':        { default: 'Gidiyorum',            more_english: "I'm going" },
+    'events.notgoing':     { default: 'Gitmiyorum',           more_english: 'Not going' },
+    'events.changed':      { default: 'Vazgeç',               more_english: 'Changed my mind' },
+    'events.youregoing':   { default: 'Gidiyorsun ✓',         more_english: "You're going ✓" },
+    'events.kefil':        { default: 'ETKİNLİK KEFİLİ',      more_english: 'EVENT SPONSOR' },
     // Haberler's three fixed category slots (project.html), same object
     // as a Dünya story's own kicker on the parts-bin pages.
     'news.istanbul':       { default: 'İSTANBUL',              more_english: 'ISTANBUL' },
@@ -93,6 +99,7 @@
     'profile.referralcode':{ default: 'Kefalet Kodu',        more_english: 'Sponsor Code' },
     'profile.sponsoredcount':{ default: 'Kefil Olduğu',      more_english: 'Vouched For' },
     'profile.sozcucount': { default: 'Sözcü Olduğu',       more_english: 'Sözcü Picks' },
+    'profile.eventkefilcount': { default: 'Etkinlik Kefili',  more_english: 'Events Sponsored' },
     'profile.times':       { default: 'kez',                 more_english: 'times' },
     'profile.copy':        { default: 'Kopyala',             more_english: 'Copy' },
     'profile.copied':      { default: 'Kopyalandı',          more_english: 'Copied' },

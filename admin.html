@@ -2793,6 +2793,11 @@
         <option value="">— City-wide —</option>
       </select>
 
+      <label>Etkinlik Kefili (optional — the member who vouches for this event)</label>
+      <select id="ev-kefil">
+        <option value="">— Kefil yok —</option>
+      </select>
+
       <label>Açıklama (TR)</label>
       <textarea id="ev-description" placeholder="Kısa bir açıklama..."></textarea>
 
@@ -3722,7 +3727,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'countries') loadCountriesTab();
     if (tab === 'worldevents') loadWorldEventsTab();
     if (tab === 'news') { loadSeries(); loadBreakingNews(); }
-    if (tab === 'events') { loadEventsNeighborhoods(); loadEventsList(); }
+    if (tab === 'events') { loadEventsNeighborhoods(); loadEventKefilOptions(); loadEventsList(); }
     if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); initSozcelSuggestions(); loadBulmacaPuzzles(); }
     if (tab === 'quotes') loadQuotesList();
     if (tab === 'district-polls') loadDistrictPollsList();
@@ -5801,6 +5806,35 @@ async function loadEventsNeighborhoods() {
     sel.appendChild(opt);
   });
   evNeighborhoodsLoaded = true;
+  loadEventKefilOptions();
+}
+
+// ── ETKİNLİK KEFİLİ ──
+// Every member, as "Ad Soyad — İlçe", for the event's kefil picker
+// (events.kefil_id, db/events_kefil.sql). Kept in a map as well so the
+// list can print who vouches for each event without a second fetch.
+const evKefilNames = {};
+async function loadEventKefilOptions() {
+  const sel = document.getElementById('ev-kefil');
+  if (!sel || sel.dataset.loaded) return;
+  const { data, error } = await sb.from('profiles')
+    .select('id, first_name, last_name, neighborhood')
+    .order('first_name', { ascending: true });
+  if (error || !data) return;
+  sel.dataset.loaded = '1';
+  const keep = sel.value;
+  data.forEach(p => {
+    const name = `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'İsimsiz Üye';
+    const nb = NEIGHBORHOOD_NAMES[p.neighborhood] || p.neighborhood || '';
+    evKefilNames[p.id] = nb ? `${name} — ${nb}` : name;
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = evKefilNames[p.id];
+    sel.appendChild(opt);
+  });
+  sel.value = keep;
+  // The list may have rendered before the names arrived.
+  if (document.getElementById('events-list')) loadEventsList();
 }
 
 function formatEventDt(iso) {
@@ -5822,7 +5856,8 @@ async function loadEventsList() {
   listEl.innerHTML = data.map(ev => {
     const past = new Date(ev.event_date).getTime() < now;
     const nbLabel = NEIGHBORHOOD_NAMES[ev.neighborhood] || (ev.neighborhood ? ev.neighborhood : 'İstanbul');
-    const meta = [nbLabel, ev.location].filter(Boolean).join(' · ');
+    const kefil = ev.kefil_id ? ('Kefil: ' + (evKefilNames[ev.kefil_id] || '…')) : '';
+    const meta = [nbLabel, ev.location, kefil].filter(Boolean).join(' · ');
     return `
       <div class="article-card" data-id="${ev.id}" data-baski-kind="etkinlik" data-baski-id="${ev.id}" style="${past ? 'opacity:0.5;' : ''}">
         <div class="a-neighborhood baski-tag-host">${escapeHtml(formatEventDt(ev.event_date))}${past ? ' · GEÇMİŞ' : ''}</div>
@@ -5859,6 +5894,7 @@ function editEvent(ev) {
     : '';
   document.getElementById('ev-location').value = ev.location || '';
   document.getElementById('ev-neighborhood').value = ev.neighborhood || '';
+  document.getElementById('ev-kefil').value = ev.kefil_id || '';
   document.getElementById('ev-description').value = ev.description || '';
   document.getElementById('ev-description-en').value = ev.description_en || '';
   document.getElementById('ev-submit-btn').textContent = 'Update Event';
@@ -5874,6 +5910,7 @@ function resetEventForm() {
   document.getElementById('ev-date').value = '';
   document.getElementById('ev-location').value = '';
   document.getElementById('ev-neighborhood').value = '';
+  document.getElementById('ev-kefil').value = '';
   document.getElementById('ev-description').value = '';
   document.getElementById('ev-description-en').value = '';
   document.getElementById('ev-submit-btn').textContent = 'Add Event';
@@ -5889,6 +5926,7 @@ document.getElementById('ev-submit-btn').addEventListener('click', async () => {
   const dateVal = document.getElementById('ev-date').value;
   const location = document.getElementById('ev-location').value.trim() || null;
   const neighborhood = document.getElementById('ev-neighborhood').value || null;
+  const kefil_id = document.getElementById('ev-kefil').value || null;
   const description = document.getElementById('ev-description').value.trim() || null;
   const title_en = document.getElementById('ev-title-en').value.trim() || null;
   const description_en = document.getElementById('ev-description-en').value.trim() || null;
@@ -5907,15 +5945,20 @@ document.getElementById('ev-submit-btn').addEventListener('click', async () => {
 
   let result;
   if (editingId) {
-    result = await sb.from('events').update({ title, title_en, event_date, location, neighborhood, description, description_en }).eq('id', editingId);
+    result = await sb.from('events').update({ title, title_en, event_date, location, neighborhood, kefil_id, description, description_en }).eq('id', editingId);
   } else {
-    result = await sb.from('events').insert([{ title, title_en, event_date, location, neighborhood, description, description_en }]);
+    result = await sb.from('events').insert([{ title, title_en, event_date, location, neighborhood, kefil_id, description, description_en }]);
   }
 
   btn.textContent = editingId ? 'Update Event' : 'Add Event';
 
   if (result.error) {
-    statusEl.textContent = result.error.message;
+    // A database that has not run the kefil migration yet names the
+    // missing column -- say which file fixes it rather than just echoing.
+    const e = result.error;
+    statusEl.textContent = (e.code === 'PGRST204' || e.code === '42703' || /kefil_id/.test(e.message || ''))
+      ? 'events.kefil_id yok — önce db/events_kefil.sql çalıştırın.'
+      : e.message;
     statusEl.className = 'status-msg err';
     return;
   }

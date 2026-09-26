@@ -203,7 +203,9 @@ with checks(sira, dosya, aranan, var) as (
          and pg_temp.has_fn('events_current_edition')),
     (47, 'db/admin_game_transactions.sql', 'Atomik yönetici oyun kayıtları',
          to_regprocedure('public.admin_set_game_lineup(date,text[])') is not null
-         and to_regprocedure('public.admin_pick_sozcel_suggestion(uuid,date,text,text,text[])') is not null)
+         and to_regprocedure('public.admin_pick_sozcel_suggestion(uuid,date,text,text,text[])') is not null),
+    (48, 'db/events_kefil.sql',                       'events.kefil_id (etkinlik kefili)',
+         pg_temp.has_col('events', 'kefil_id'))
 )
 select
   case when var then '✓ VAR' else '✗ EKSİK' end as durum,
