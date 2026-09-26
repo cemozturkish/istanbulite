@@ -2793,29 +2793,50 @@ collapse the *record*. A left throw is a real "no" rather than the absence of a 
 whole reason `event_interest` exists. There is no `localStorage` mirror: `event-interest.js` left
 with kahvehane's own events deck, so that table IS the record now rather than a copy of one.
 
-**THE DISTRICT MAP IS COLOURED, AND IT IS THE ANKET'S** (`paintDistrictMap` /
-`clearDistrictMap`, `.fb-districts`). `renderAnketResults` has always printed the 25 districts as
-rows, each wearing the colour a map would paint it with; the map is now that same colour on the
+**THE DISTRICT MAP IS COLOURED** (`paintDistrictMap` / `clearDistrictMap`, `.fb-districts`). It
+started as the Anket's alone: `renderAnketResults` has always printed the 25 districts as rows,
+each wearing the colour a map would paint it with, and the map carries that same colour on the
 shape itself, on the drawing the reader is already looking at. The mix is computed **once** per
 district and used for both, so the row and the shape can never disagree, and a district with no
 votes is given no fill at all — the way its row says "Oy yok" rather than picking a colour out of
 the air.
 
-Four things about it:
+**It has a second, resting fill now, and it is the petek's** (`refreshHiveDistrictMap`, wired to
+`IstProfileCard`'s `'ist-hive-updated'` event, dispatched from `renderHive`). The layer is never
+truly blank any more: the reader's own district wears `--map-red`, the site's one red, and every
+district a member actually touching them on the grid (ring 1, up to six) lives in wears a gray
+that gets darker the more of those six live there
+(`color-mix(in srgb, var(--map-ink) N%, var(--map-sea) (100-N)%)`, `HIVE_DISTRICT_GRAY_PCT`
+indexed 1–6). Anket's own fills still take the layer over while its result page is open; closing
+any page hands it back to this resting layer (`closeFbPage` / `snapFbPageShut` both call
+`refreshHiveDistrictMap()` right after `clearDistrictMap()`) rather than leaving it dark. Two
+things this makes true that were not before: the layer is quiet rather than truly absent even
+with nothing open, and it is a fact about **whoever is signed in**, not about the open page —
+`IstProfileCard.hiveDistricts()` reads no member list and answers only for the caller's own map,
+the same fence `hive_member_status` stands behind.
+
+Five things about it:
 
 - **It answers no press.** The layer is `pointer-events: none`: a district tap would be a second
   question laid over the one this map exists to answer, and where it would lead is not decided.
   The fill is the whole of it.
-- **It belongs to the open PAGE, not to the screen.** The paint goes up with the result and
-  `closeFbPage` / `snapFbPageShut` take it down, so the city is only ever wearing a poll while
-  that poll is being read.
+- **The Anket half belongs to the open PAGE, not to the screen.** The paint goes up with the
+  result and `closeFbPage` / `snapFbPageShut` take it down — the petek's own resting fill is what
+  takes its place, never a blank layer.
+- **The petek's own half belongs to whoever is signed in, and repaints on its own schedule.** It
+  is not re-derived from a page opening or closing; it repaints whenever the petek says the map
+  (who is touching the reader, and where they live) may have changed — a fresh mount, `hive_map()`
+  landing, a slot claimed — and it needs the petek mounted at all to have anything to read, which
+  `mountPetek()` already does from `DOMContentLoaded` regardless of whether the petek is ever
+  opened (see "The petek is behind the logo" below).
 - **It is appended AFTER the frames rather than given a z-index over them.** The frames are
   `z-index: auto` and land in the same painting pass, so tree order is what decides — and
   `loadFrames` appends them on every mount, which is why `paintDistrictMap` re-`appendChild`s the
   layer (that MOVES it) and `unmount` drops the handle. Everything above it carries a real
   z-index — the cast (1), the middle lane's wash (2), the app map (3) — so it stays under all
   three however it got there, and walking to the map lane quiets the districts along with the
-  drawing they are on.
+  drawing they are on — which is deliberate for the petek's own resting fill too: it stays a quiet
+  fact under the app map, never a second, louder map.
 - **The file is parsed as XML, never `innerHTML`'d into an SVG element** — the same reason
   map-ink.js builds its filter with DOM calls. A fetch that fails clears its own promise so a
   later opening retries, and leaves the reader the list, which is the whole result either way.
@@ -4022,12 +4043,20 @@ Four things about it:
   narrow one's boxes are each half again as tall — which at two units across comes out square. The
   shapes are measured off the real thing rather than chosen, and a third box drawn in a narrow
   column would be a picture of a screen nobody has.
-- **Ink is what is still STANDING in their day**, never what they have got through — which is
-  exactly what the two lines said (three stories stacked, one game left of one) and is the half
-  worth walking over for. A slot fills from the **dock up**, the way `.fb-slot-N` numbers them.
-- **Nothing standing is not a caption.** An empty day prints no drawing at all, for the same
-  reason the old lines printed nothing: an empty deck is not a score of zero, and twelve blank
-  rectangles under a name say less than nothing.
+- **THREE STATES, not one.** A slot is blank when there is nothing there (or nothing this petek
+  can know about), **dark gray** while it is still standing — there, but not yet interacted with —
+  and the site's one **red** once it has been (`db/hive_member_status_v3_done.sql` added
+  `news_done` alongside `news_stacked`; the games half already had both halves, `games_played`
+  against `games_total`). It used to draw only the gray half ("ink is what is still standing,
+  never what they have got through"), on the reasoning that a done slot and an empty one were the
+  same blank outline anyway — they no longer are, because a neighbour's hexagon is exactly where
+  "have they actually engaged with this" is worth reading at a glance. Both counts fill from the
+  **dock up**, the way `.fb-slot-N` numbers them, done first — the same rising-from-the-bottom
+  reading the day meter's own sea uses — so what is done is the foundation and what is still
+  standing stacks above it.
+- **Nothing standing and nothing done is not a caption.** An empty day prints no drawing at all,
+  for the same reason the old lines printed nothing: an empty deck is not a score of zero, and
+  twelve blank rectangles under a name say less than nothing.
 - **The two columns that never ink are the other half of each screen**, Anket and Etkinlikler, and
   they are drawn because the shape IS the app's screen — half of one is not recognisable as it. An
   evening is deliberately not completable, and a member's votes are their own
