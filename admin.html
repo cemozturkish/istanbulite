@@ -336,7 +336,7 @@
     }
     label:first-of-type { margin-top: 0; }
 
-    select, input[type="text"], input[type="email"], input[type="tel"], input[type="password"], input[type="date"], input[type="datetime-local"], input[type="time"], textarea {
+    select, input[type="text"], input[type="email"], input[type="tel"], input[type="password"], input[type="date"], input[type="datetime-local"], input[type="time"], input[type="number"], textarea {
       width: 100%;
       padding: 9px 12px;
       border: 1px solid var(--rule);
@@ -3501,6 +3501,13 @@
       </div>
       <div id="onboarding-copy-list"></div>
 
+      <div class="panel-title" style="margin-top:22px;">Kart Başlık Puntosu</div>
+      <div class="setting-row-sub" style="margin-bottom:10px;">
+        Uygulamadaki kartların (Haberler, Etkinlikler, Anket, Oyunlar) başlık yazısının boyutu,
+        piksel cinsinden. Her biri ayrı — Oyunlar'ın kendi punto varsayılanı zaten farklı.
+      </div>
+      <div id="card-font-list"></div>
+
       <div class="panel-title" style="margin-top:22px;">Create User Account</div>
 
       <label>First Name</label>
@@ -3736,7 +3743,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'politicians') loadPoliticiansTab();
     if (tab === 'tbmm') loadTBMMTab();
     if (tab === 'notifications') loadNotifications();
-    if (tab === 'users') { loadUsersList(); loadOnboardingToggle(); loadOnboardingCopy(); }
+    if (tab === 'users') { loadUsersList(); loadOnboardingToggle(); loadOnboardingCopy(); loadCardFontSizes(); }
     // The rail's follow-through: shut whatever drawer stood on the section
     // being left, and aim the phone at the page this section changes.
     deskOnTab(btn);
@@ -5752,6 +5759,73 @@ async function saveOnboardingCopyRow(rowEl) {
     status.textContent = 'Hata: ' + error.message;
     return;
   }
+  status.className = 'oc-status ok';
+  status.textContent = 'Kaydedildi';
+  setTimeout(() => { status.textContent = ''; status.className = 'oc-status'; }, 1600);
+}
+
+// ══════════════════════════════════════════
+// Users tab — card headline font size (card_title_font_sizes)
+// ══════════════════════════════════════════
+// One row per kind of card project.html casts (see CLAUDE.md, "What each
+// screen carries"): Haberler, Etkinlikler, Anket, Oyunlar. project.html
+// reads this same table on every mount and writes each size onto :root
+// as --fb-title-size-<kind> — so a size typed here reaches the app
+// without a deploy, and the label/default pairs below have to stay the
+// same kinds and the same fallback sizes the card CSS itself falls back
+// to (see .fb-box.fb-haberler .t and friends in project.html).
+const CARD_FONT_KINDS = [
+  { kind: 'haberler',    label: 'Haberler',    def: 13.12 },
+  { kind: 'etkinlikler', label: 'Etkinlikler', def: 13.12 },
+  { kind: 'anket',       label: 'Anket',       def: 13.12 },
+  { kind: 'oyunlar',     label: 'Oyunlar',     def: 18.4 },
+];
+
+async function loadCardFontSizes() {
+  const list = document.getElementById('card-font-list');
+  if (!list) return;
+  const { data, error } = await sb.from('card_title_font_sizes').select('kind, size_px');
+  if (error) { list.innerHTML = '<div class="oc-status err">Yüklenemedi: ' + escapeHtml(error.message) + '</div>'; return; }
+  const byKind = {};
+  (data || []).forEach(r => { byKind[r.kind] = r; });
+  list.innerHTML = CARD_FONT_KINDS.map(k => {
+    const row = byKind[k.kind];
+    const size = row && row.size_px != null ? row.size_px : k.def;
+    return `
+      <div class="oc-row" data-kind="${k.kind}">
+        <div class="oc-row-label">${escapeHtml(k.label)}</div>
+        <label>Punto (px)</label>
+        <input type="number" class="cf-size" step="0.1" min="6" max="48" value="${size}"/>
+        <div class="oc-row-actions">
+          <button type="button" class="btn btn-primary cf-save">Kaydet</button>
+          <span class="oc-status"></span>
+        </div>
+      </div>`;
+  }).join('');
+  list.querySelectorAll('.cf-save').forEach(btn => {
+    btn.addEventListener('click', () => saveCardFontRow(btn.closest('.oc-row')));
+  });
+}
+
+async function saveCardFontRow(rowEl) {
+  const kind = rowEl.dataset.kind;
+  const def = (CARD_FONT_KINDS.find(k => k.kind === kind) || {}).def;
+  const input = rowEl.querySelector('.cf-size');
+  const raw = parseFloat(input.value);
+  const size = isFinite(raw) && raw > 0 ? raw : def;
+  const status = rowEl.querySelector('.oc-status');
+  status.className = 'oc-status';
+  status.textContent = 'Kaydediliyor…';
+  const { data: { session } } = await sb.auth.getSession();
+  const updatedBy = session && session.user ? session.user.id : null;
+  const { error } = await sb.from('card_title_font_sizes')
+    .upsert({ kind, size_px: size, updated_by: updatedBy, updated_at: new Date().toISOString() }, { onConflict: 'kind' });
+  if (error) {
+    status.className = 'oc-status err';
+    status.textContent = 'Hata: ' + error.message;
+    return;
+  }
+  input.value = size;
   status.className = 'oc-status ok';
   status.textContent = 'Kaydedildi';
   setTimeout(() => { status.textContent = ''; status.className = 'oc-status'; }, 1600);
