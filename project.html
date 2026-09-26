@@ -1621,7 +1621,7 @@
        body does. */
     .fb-page-foot {
       flex: none;
-      padding: 11px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+      padding: 11px 12px;
       border-top: 2px solid var(--ink);
       background: var(--paper-card);
     }
@@ -1669,7 +1669,8 @@
     }
     /* A foot that is only the two buttons: no question over them and no
        note under them, so they are the first thing in the floor. */
-    .fb-throw-cue + .fb-throw-row { margin-top: 0; }
+    .fb-throw-cue + .fb-throw-row,
+    .fb-page-foot > .fb-throw-row:first-child { margin-top: 0; }
     .fb-throw-btn.fb-throw-on { background: var(--ink); color: var(--paper); }
     .fb-throw-btn {
       flex: 1 1 0;
@@ -1766,6 +1767,17 @@
       color: var(--muted);
     }
     .fb-page-sub b { color: var(--ink); font-weight: 800; }
+    .fb-kefil-link {
+      padding: 0; border: 0; background: none;
+      font: inherit; letter-spacing: inherit; text-transform: inherit;
+      font-weight: 800; color: var(--ink);
+      text-decoration: underline; text-underline-offset: 2px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    /* The member sheet is one step under the bars (399); over an open
+       page it has to stand above the page's own layer (500) and the bar
+       lifted over it (510), or pressing the kefil opens it behind. */
+    body.fb-page-on #member-sheet { z-index: 520; }
     .fb-page-meta { color: var(--muted); font-size: 0.78rem; line-height: 1.45; margin-bottom: 9px; }
     .fb-page-body p { margin: 0 0 9px; font-size: 0.85rem; line-height: 1.5; }
     .fb-page-body p:last-child { margin-bottom: 0; }
@@ -2350,7 +2362,13 @@ function eventKefilHTML(k) {
   const nb = k.neighborhood ? (NB_NAMES[k.neighborhood] || k.neighborhood) : '';
   const who = nb ? (en ? name + ' from ' + nb : trFrom(nb) + ' ' + name) : name;
   const up = en ? who.toUpperCase() : who.toLocaleUpperCase('tr-TR');
-  return esc(t('events.kefil')) + ': <b>' + esc(up) + '</b>';
+  // A .kefil-link: profile-card.js's member sheet listens for exactly
+  // this class on the document, so pressing the name opens that member's
+  // profile the way a kefil name does anywhere else on the site.
+  return esc(t('events.kefil')) + ': ' +
+    (k.id
+      ? '<button type="button" class="kefil-link fb-kefil-link" data-user-id="' + esc(k.id) + '">' + esc(up) + '</button>'
+      : '<b>' + esc(up) + '</b>');
 }
 
 // ── Filling a 3-box stack from one fetch ──
@@ -2605,11 +2623,11 @@ async function loadEtkinlikActor(el, slot) {
     // (db/baski_v1.sql), so one helper serves both and an evening
     // translated by halves still reads in Turkish rather than blank.
     //
-    // The top line is WHERE (the district, and the venue) against WHEN
+    // The top line is WHERE (the district alone) against WHEN
     // (day and hour), so neither is repeated in the reading: the body is
     // the description and nothing else. The headline and the kefil are
     // anchored under it (see fbPageHTML).
-    kicker: [nb, ev.location].filter(Boolean).join(' · '),
+    kicker: nb,
     meta: eventWhenHead(ev.event_date),
     title: newsText(ev, 'title'),
     sub: eventKefilHTML(ev._kefil),
@@ -3151,8 +3169,13 @@ async function loadHaberlerActor(el, slot) {
     catch (err) { console.error('[proje haber seri]', err); }
   }
   if (!el.isConnected) return;
+  // Like an evening's page, a story's top line names WHERE: the district
+  // when the story is about one, its category otherwise.
+  const where = n.neighborhood
+    ? (NB_NAMES[n.neighborhood] || n.neighborhood).toLocaleUpperCase('tr-TR')
+    : label;
   fbSetPage(el, {
-    kicker: label + akisTag, meta: age,
+    kicker: where + akisTag, meta: age,
     title: newsText(n, 'title'),
     html: fbParas(newsText(n, 'body')) + (siblings.length ? seriesTimelineHTML(siblings) : ''),
     // YETER/AKIŞTA KAL is a fixed floor, not the last thing the reading
@@ -4886,9 +4909,12 @@ function throwFootHTML(leftLabel, rightLabel, note, on) {
 // with no finger.
 function newsFootHTML(inSeries) {
   const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
+  // No note under the buttons and no floor at all on a story outside a
+  // seri: the throw is taught by the stamp, and a line saying "throw it"
+  // was costing the reading a whole strip of the page.
   return inSeries
-    ? throwFootHTML(t('news.akis.enough'), t('news.akis.stay'), t('news.akis.note'))
-    : throwFootHTML(null, null, 'Okudun. Sola ya da sağa at.');
+    ? throwFootHTML(t('news.akis.enough'), t('news.akis.stay'), null)
+    : '';
 }
 
 // The reader's verdict on one akış. Upserted rather than inserted: this
