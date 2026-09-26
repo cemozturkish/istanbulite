@@ -368,15 +368,19 @@
   function normalizeLang(v)    { return v === 'more_english' ? 'more_english' : 'default'; }
   function normalizePalette(v) { return v === 'earth' ? 'earth' : 'mono'; }
 
-  // Which Istanbul-local weekdays each game runs on (Monday=0 … Sunday=6),
-  // driving the Profil tab's weekly grid. Purely a display concern here —
-  // it does not gate access to the game pages (see game-locks.js for the
-  // actual Tümcel-win-unlocks-Çengel rule).
-  const GAME_SCHEDULE = [
-    { id: 'sozcel',  label: 'Sözcel',  days: [0, 1, 2, 3, 4, 5, 6] },
-    { id: 'tumcel',  label: 'Tümcel',  days: [0, 2, 4, 6] },
-    { id: 'bulmaca', label: 'Çengel',  days: [1, 3, 5] },
-  ];
+  // The three games the weekly grid can ever show a row for. Which of them
+  // actually ran on a given NIGHT is not a fixed weekday pattern — it is
+  // the admin's own per-night lineup (game_night_slots) minus whatever they
+  // switched off (game_day_toggles), exactly as project.html's Oyunlar
+  // column reads it. See getWeekGameStatus / GAME_DEFAULT_LINEUP below.
+  const GAME_LABELS = {
+    sozcel:  'Sözcel',
+    tumcel:  'Tümcel',
+    bulmaca: 'Çengel',
+  };
+  // Mirrors project.html's own GAME_DEFAULT_LINEUP and admin.html's copy —
+  // what a night with no game_night_slots rows falls back to.
+  const GAME_DEFAULT_LINEUP = ['sozcel', 'tumcel'];
 
   // Shirt overlays — the base clothing layer (see avatar.js), stacked
   // directly on the bald base before hair/hat/accessory. Both are fully
@@ -737,15 +741,28 @@
   // reduces them to per (game, date) played/won flags for the weekly grid,
   // plus which of those days they were the assigned Sözcü (Sözcel's daily
   // word-of-day solver) — rendered as a distinct color in weekGridHTML
-  // rather than the usual win/played states.
+  // rather than the usual win/played states. Also fetches which games
+  // actually ran each of those nights (game_night_slots, defaulting to
+  // GAME_DEFAULT_LINEUP for a night the admin never set) minus whichever
+  // the admin switched off (game_day_toggles), so the grid shows the real
+  // nights rather than an assumed weekday rotation.
   async function getWeekGameStatus(sb, userId) {
     const dateKeys = weekDatesIst();
     const isoDateKeys = weekDatesIstISO();
-    const empty = { dateKeys, played: new Set(), won: new Set(), sozcuDates: new Set() };
+    const nightGames = {};
+    dateKeys.forEach(k => { nightGames[k] = new Set(GAME_DEFAULT_LINEUP); });
+    const empty = { dateKeys, played: new Set(), won: new Set(), sozcuDates: new Set(), nightGames };
     try {
-      const [{ data, error }, { data: sozcuData, error: sozcuError }] = await Promise.all([
+      const [
+        { data, error },
+        { data: sozcuData, error: sozcuError },
+        { data: slotsData, error: slotsError },
+        { data: toggleData, error: toggleError },
+      ] = await Promise.all([
         sb.from('game_results').select('game, date, won').eq('user_id', userId).in('date', dateKeys),
         sb.from('sozcel_sozcul_assignments').select('game_date').eq('user_id', userId).in('game_date', isoDateKeys),
+        sb.from('game_night_slots').select('game_date, slot, game').in('game_date', isoDateKeys),
+        sb.from('game_day_toggles').select('game, game_date').in('game_date', isoDateKeys),
       ]);
       if (error) throw error;
       (data || []).forEach(r => {
@@ -759,6 +776,32 @@
           if (idx !== -1) empty.sozcuDates.add(dateKeys[idx]);
         });
       }
+      // A night that HAS rows in game_night_slots is fully described by
+      // them (up to two games, one per slot) — the default lineup no
+      // longer applies to it.
+      if (!slotsError) {
+        const nightsSet = new Set();
+        (slotsData || []).forEach(r => {
+          const idx = isoDateKeys.indexOf(r.game_date);
+          if (idx === -1) return;
+          nightsSet.add(idx);
+        });
+        nightsSet.forEach(idx => { nightGames[dateKeys[idx]] = new Set(); });
+        (slotsData || []).forEach(r => {
+          const idx = isoDateKeys.indexOf(r.game_date);
+          if (idx === -1) return;
+          nightGames[dateKeys[idx]].add(r.game);
+        });
+      }
+      // A game switched off for the night was not actually offered, so it
+      // drops out of that night's set regardless of where it came from.
+      if (!toggleError) {
+        (toggleData || []).forEach(r => {
+          const idx = isoDateKeys.indexOf(r.game_date);
+          if (idx === -1) return;
+          nightGames[dateKeys[idx]].delete(r.game);
+        });
+      }
       return empty;
     } catch (e) {
       return empty;
@@ -767,7 +810,9 @@
 
   // Renders the 3-game × 7-day grid: white = day hasn't arrived yet, grey =
   // arrived but not played, yellow = played without winning, green = won.
-  // Days outside a given game's own schedule (GAME_SCHEDULE) render as a
+  // A night that didn't actually carry a given game (status.nightGames,
+  // built from the admin's own game_night_slots lineup and
+  // game_day_toggles off-switch — see getWeekGameStatus) renders as a
   // muted dashed cell instead of a color, since the game has nothing to
   // show there.
   function weekGridHTML(status, I18N) {
@@ -787,29 +832,31 @@
       </div>
     `;
 
-    const rows = GAME_SCHEDULE.map(game => {
+    const rows = Object.keys(GAME_LABELS).map(gameId => {
+      const label = GAME_LABELS[gameId];
       const cells = status.dateKeys.map((dateKey, i) => {
         let state, title;
-        if (!game.days.includes(i)) {
+        const onThatNight = status.nightGames && status.nightGames[dateKey] && status.nightGames[dateKey].has(gameId);
+        if (!onThatNight) {
           state = 'inactive';
-          title = `${game.label} — ${dayNames[i]}`;
+          title = `${label} — ${dayNames[i]}`;
         } else if (i > todayIdx) {
           state = 'future';
-          title = `${game.label} — ${dayNames[i]}`;
-        } else if (game.id === 'sozcel' && status.sozcuDates && status.sozcuDates.has(dateKey)) {
+          title = `${label} — ${dayNames[i]}`;
+        } else if (gameId === 'sozcel' && status.sozcuDates && status.sozcuDates.has(dateKey)) {
           state = 'sozcu';
-          title = `${game.label} — ${dayNames[i]}: Sözcü`;
+          title = `${label} — ${dayNames[i]}: Sözcü`;
         } else {
-          const k = game.id + '|' + dateKey;
-          if (status.won.has(k)) { state = 'win'; title = `${game.label} — ${dayNames[i]}: kazandı`; }
-          else if (status.played.has(k)) { state = 'played'; title = `${game.label} — ${dayNames[i]}: oynadı, kazanamadı`; }
-          else { state = 'none'; title = `${game.label} — ${dayNames[i]}: oynamadı`; }
+          const k = gameId + '|' + dateKey;
+          if (status.won.has(k)) { state = 'win'; title = `${label} — ${dayNames[i]}: kazandı`; }
+          else if (status.played.has(k)) { state = 'played'; title = `${label} — ${dayNames[i]}: oynadı, kazanamadı`; }
+          else { state = 'none'; title = `${label} — ${dayNames[i]}: oynamadı`; }
         }
         return `<span class="ist-pc-daycell ist-pc-daycell-${state}" title="${esc(title)}"></span>`;
       }).join('');
       return `
         <div class="ist-pc-weekgrid-row">
-          <span class="ist-pc-weekgrid-label">${esc(game.label)}</span>
+          <span class="ist-pc-weekgrid-label">${esc(label)}</span>
           <div class="ist-pc-weekgrid-cells">${cells}</div>
         </div>
       `;
