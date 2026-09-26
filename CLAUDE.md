@@ -3634,28 +3634,20 @@ Six things about it, each of which fails silently if forgotten:
   absolute` with `z-index: 1` and so is its own stacking context, so a box inside it never rises
   above a dim at 99989 however large a z-index it is given; and `position: relative` on a
   `.fb-box` would move it, since the book positions those absolutely. So nothing is added to the
-  app's DOM at all — the holes are cut with one `fill-rule: evenodd` clip-path, the same idiom
-  `IstSheet.lightTheMap` uses on the map's tint. The rects are measured, so they are re-measured
-  on resize, and again as a depth change's own transition settles.
-  - **It has to be `path()`, never `polygon()`.** A CSS `polygon()` is ONE closed ring, so listing
-    the viewport's corners and then a hole's runs a continuous edge from the last hole corner back
-    to the first outer corner, and evenodd carves a **diagonal wedge** out of the dim that has
-    nothing to do with either shape. Only `path()` can carry more than one subpath. It hit-tests
-    correctly either way, which is exactly what makes it survive a test that asks
-    `elementFromPoint` — sampling the painted pixels is what catches it.
-  - **A hole can be ROUND, and that is what a pick beat actually asks for.** A rectangular hole
-    around a small arrow reads as "this is boxed," not "this is glowing" — so `addSpotlight`'s
-    second argument (`{ round: true }`) cuts a circle instead, generously padded
-    (`spotlightRoundPad`, 14px) so it reads as a soft glow around the icon rather than a tight dot.
-    `path()` has no circle primitive, so `paintSpotlight`'s `circle()` helper draws one as two
-    half-circle arcs closing back on each other. Each avatar pick beat (`pickHair`, `pickShirt`)
-    lights its own pair of arrows this way (`#po-hair-prev, #po-hair-next`, etc.) — two independent
-    round holes, since the two arrows sit either side of the avatar rather than inside one wrapper.
-    The closing `senDone` beat still lights the whole `.ist-hive-pick-col` (two of them, one per
-    side) with the ordinary rectangular hole, purely to talk about the column with nothing left to
-    press — the picker's own box is exactly the hexagon (`--ist-hive-cell-w/h`) and both arrow
-    columns are laid *outside* it at `right: 100%` / `left: 100%`, so a hole measured on the wrapper
-    is a box cut over the reader's own avatar with the arrows left outside it.
+  app's DOM at all — the holes are cut out of the dim with a mask (an SVG data URI in viewport
+  pixels, `paintSpotlight`). The rects are measured, so they are re-measured on resize, and again
+  as a depth change's own transition settles.
+  - **The hole is the thing's own box, snug (4px), and never a circle.** Round holes were tried for
+    the small arrows and were a mess: a circle sized off a wide element (your own name on the bar)
+    is a disc across half the screen, lighting paper nobody was talking about. What has been
+    introduced is lit as itself; everything not yet introduced stays dim.
+  - **The holes are a UNION, which is why it is a mask and not an evenodd clip-path.** evenodd
+    flips back to dim wherever two holes overlap — the avatar arrows inside the arrow column they
+    belong to came out as dark patches inside the lit area. The mask's inner `<mask>` punches every
+    hole to transparent however many overlap. `IstSheet.lightTheMap` keeps evenodd because its
+    districts never overlap; this spotlight's targets do.
+  - Holes are hit-testable as part of the dim now (a clip-path hole was not). Every beat whose lit
+    thing must be pressed opens a passthrough, which already takes the dim's hit-testing away.
 - **A beat that adds no hint takes the last one down.** `addHint` sets `tapAdvanceFn`, so a pull,
   door, or pick beat inheriting the previous beat's hint inherited a live "tap anywhere to
   continue" as well — the reader could tap straight past the gesture just asked for, and the
