@@ -3538,7 +3538,7 @@ is adding a beat the same way, once it is genuinely open.
 `act` beat that ended the moment either arrow was pressed once — which was exactly wrong for a
 choice with more than one real option, since a reader who wanted to look through all four hairstyles
 was thrown past the beat by their very first tap. `pick: true` (`runPick`) lights the pair with a
-**round** hole (see the spotlight's own note below) and hands the reader a real **CONTINUE** button
+snug hole around each arrow itself (see the spotlight's own note below) and hands the reader a real **CONTINUE** button
 (`renderPane`'s own `actionLabel`, `COPY.continueLabel`) instead of the usual tap-anywhere hint —
 pressing an arrow only ever runs the real app's own carousel handler (unchanged, still committing
 each pick immediately), and the beat waits exactly as long as the reader wants to keep looking. This
