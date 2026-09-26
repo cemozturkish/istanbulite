@@ -380,12 +380,16 @@
 
   // Shirt overlays — the base clothing layer (see avatar.js), stacked
   // directly on the bald base before hair/hat/accessory. Defaults to null
-  // (the plain bare look), same as hair/hat/accessory. 'black' is the one
-  // shirt color so far, fully open to everyone — no lock, just like the
-  // hair options.
+  // (the plain bare look), same as hair/hat/accessory. Both shirts are
+  // fully open to everyone — no lock, just like the hair options.
+  // Unlike hair, a new shirt value needs a MIGRATION as well as a row
+  // here: profiles.avatar_shirt carries a check constraint naming every
+  // allowed value, so an option added here alone is offered in the picker
+  // and then refused on save (db/avatar_shirt_v2_white.sql).
   const AVATAR_SHIRT_OPTIONS = [
     { value: null,    label: 'Yok' },
     { value: 'black', label: 'Siyah Tişört' },
+    { value: 'white', label: 'Beyaz Tişört' },
   ];
 
   // Hair overlays for the layered avatar (bald base + optional transparent

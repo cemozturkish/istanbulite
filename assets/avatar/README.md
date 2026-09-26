@@ -40,10 +40,11 @@ Two more things, both of which fail silently:
 |---|---|---|
 | `base.png` | the bald, bare figure every avatar starts from | **uploaded** |
 | `background.png` | the flat ground behind the figure — painted as the hexframe's own CSS background (palette.css / frames.css), not stacked as an `<img>` | **uploaded** |
-| `shirt-black.png` | Siyah Tişört — the one shirt so far, open to everyone | missing |
-| `hair-buzz.png` | Çok kısa saç | missing |
-| `hair-short.png` | Kısa saç | missing |
-| `hair-long.png` | Uzun saç | missing |
+| `shirt-black.png` | Siyah Tişört | **uploaded** |
+| `shirt-white.png` | Beyaz Tişört | **uploaded** |
+| `hair-buzz.png` | Çok kısa saç | **uploaded** |
+| `hair-short.png` | Kısa saç | **uploaded** |
+| `hair-long.png` | Uzun saç | **uploaded** |
 | `accessory-glasses.png` | Gözlük — drawn to sit *under* long hair | missing |
 | `jail.png` | the stripes, admin-only: `politicians.in_jail`, never something a member can wear | missing |
 | `hat-crown.png` | Sözcü Tacı, the earned reward hat | missing, and **parked** |
@@ -58,6 +59,20 @@ Until a file lands, its option is simply skipped: `hairUrl()` and friends
 return null for anything not in their map, so a missing overlay is a layer
 that is not drawn rather than a 404'd `<img>`.
 
+**On the greys, measured rather than assumed.** The set as drawn uses a
+body around `#bdbcbc`, outlines around `#494848`, hair and the black shirt
+around `#303030`, the white shirt around `#cac9c9`, and `background.png`'s
+flat `#dcdbdb`. Only the last of those sits exactly on a ladder anchor, so
+the other tones are reached by interpolation — and that is fine in
+practice: the filter preserves the drawing's own relationships almost
+unchanged (the white shirt is 1.147:1 off the skin as drawn and 1.10–1.15:1
+after the filter, in every palette and both themes). The shirt reads by its
+collar line rather than by its tone, which is what a white t-shirt on pale
+paper has to do. Re-anchoring the ladder to these exact tones was
+considered and is not needed; if a future drawing does land somewhere the
+ramp handles badly, `?ink=0` renders the set exactly as drawn and is the
+A/B to judge it against.
+
 ## Adding a layer
 
 1. Draw it on the 1024 × 1536 canvas, in the four tones above.
@@ -68,6 +83,13 @@ that is not drawn rather than a 404'd `<img>`.
 4. Add it to the matching `AVATAR_*_OPTIONS` table in `profile-card.js`
    with its Turkish label, and to `PP_AVATAR_*_OPTIONS` in `admin.html`
    so the Kişiler tab can dress a politician in it too.
+5. **A new SHIRT also needs a migration**, and it is the one step that
+   fails at the database rather than quietly: `profiles.avatar_shirt`
+   carries a check constraint naming every allowed value, so a shirt
+   added to the lists alone is offered in the picker and then refused on
+   save. See `db/avatar_shirt_v2_white.sql`. Hair, hats and accessories
+   have no such constraint and need no migration.
+6. Bump `avatar.js?v=` in every page (CLAUDE.md convention 13).
 
 Nothing that a member can put on their own avatar may ever be bought: the
 items are earned by going outside (see "Trust and the earned avatar" in
