@@ -34,7 +34,17 @@
     black: 'assets/avatar/shirt-black.png',
     white: 'assets/avatar/shirt-white.png',
   };
-  const HAIR_URLS = { buzz: 'assets/avatar/hair-buzz.png', short: 'assets/avatar/hair-short.png', long: 'assets/avatar/hair-long.png' };
+  // Three lengths and one texture. 'curly-long' rather than 'curly' so a
+  // curly short can be drawn later without renaming this one -- see
+  // db/avatar_hair_v3_curly_long.sql, which is also the migration a new
+  // hair value needs (avatar_hair carries a check constraint, exactly
+  // like the other three avatar columns).
+  const HAIR_URLS = {
+    buzz: 'assets/avatar/hair-buzz.png',
+    short: 'assets/avatar/hair-short.png',
+    long: 'assets/avatar/hair-long.png',
+    'curly-long': 'assets/avatar/hair-curly-long.png',
+  };
   // 'crown' (the locked Sözcü reward hat) is parked here too -- see
   // AVATAR_HAT_OPTIONS in profile-card.js for why. Leaving it out of this
   // map means hatUrl('crown') falls through to null (below) and the hat
