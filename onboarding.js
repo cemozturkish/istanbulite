@@ -1,6 +1,6 @@
 // Onboarding flow for brand-new accounts.
 // Runs on first login: locks the page behind a full-screen overlay, then
-// welcome → language → palette → the lane tour → kefil code →
+// welcome → the language hold → palette → the lane tour → kefil code →
 // profile prompt, and writes onboarded_at, language_pref, palette_pref and
 // mascot to profiles at the end.
 //
@@ -23,9 +23,10 @@
   const STATE_KEY = 'istanbulite_onboarding';
 
   // ── Copy ──
-  // English is fixed for the first 2 screens (welcome + language pick).
-  // After language is chosen, remaining beats branch into TR or EN, then
-  // again into cat (mono/edgy) or dog (earth/warm) voice.
+  // English is fixed for the welcome screens. The reader is then taught
+  // the language hold (hold the logo on the bottom bar) rather than asked
+  // to pick from a menu, and every beat after that branches into TR or EN
+  // by whichever way they left it leaning.
   const COPY = {
     welcome: {
       lead: 'Welcome to ISTANBULITE!',
@@ -34,8 +35,9 @@
       // appears below it; the tap-to-continue hint only shows after it's
       // ticked, blocking advance until the user consents.
       // Page 2 (pageBreak): Turglish sentence (hover for "Turkish + English"),
-      // then the language pitch (instant lead + typed body), then a
-      // "tap to choose your preference" hint that slowly reveals the picker.
+      // then the language pitch, which ends on the instruction to HOLD THE
+      // LOGO -- `holdLesson` starts that beat the moment the line is typed
+      // (see stepLanguageHold), with no extra tap in between.
       lines: [
         {
           instant: '<em class="kefil-name">{KEFIL}</em> told us great things about you.',
@@ -50,24 +52,35 @@
           instant: 'Istanbulite is by default in <span class="ist-onb-turglish" data-tip="Turkish + English">Turglish</span>.',
         },
         {
-          instant: 'But you can choose to have a preference:',
-          typed:   'You can see things mostly in Turkish, or mostly in English, but never not both. Things will always be in both languages.',
-          speed: 14,
-          nextHint: 'tap to choose your preference',
+          instant: 'Things will always be in both languages — but they can lean Turkish, or lean English.',
+          typed:   'Hold the İstanbulite logo at the bottom of the screen to switch between them.',
+          speed: 18,
+          holdLesson: true,
         },
       ],
       tapHint: 'tap anywhere to continue',
       tcLabel: 'I agree to the terms and conditions.',
     },
-    languageScreen: {
-      // `body` is unused (the picker is inline on the welcome screen and
-      // needs no lead paragraph); `choices` is what renderLanguageChoicesInline
-      // reads.
-      body: 'ISTANBULITE is, by default, in Turglish. Before we get started, we would like to ask your preference. You can choose to have most things in Turkish, or most things in English — but never not both.',
-      choices: [
-        { value: 'default',      label: 'TÜRKÇE AĞIRLIKLI', sub: 'Turkish-heavy' },
-        { value: 'more_english', label: 'ENGLISH-HEAVY',    sub: 'İngilizce ağırlıklı' },
-      ],
+    // ── The language hold ──
+    // There is no language menu any more: the app changes language by
+    // holding the logo (THE LANGUAGE HOLD in project.html), so that is what
+    // the reader is taught, by doing it once. `cue` is printed under the
+    // instruction until they do (English, like the rest of the welcome);
+    // `done` is said AFTER the flip, in the language it just arrived at --
+    // and said again, the other way, if they hold it a second time.
+    langHold: {
+      cue:   'hold the logo',
+      nudge: "can't hold? tap to carry on",
+      done: {
+        tr: {
+          instant: 'İşte bu — artık Türkçe ağırlıklı.',
+          typed:   'Nerede olursan ol, logoyu basılı tutarak istediğin zaman değiştirebilirsin. Geri almak için bir daha basılı tut.',
+        },
+        en: {
+          instant: 'That is it — it leans English now.',
+          typed:   'Wherever you are, hold the logo to switch whenever you like. Hold it again to switch back.',
+        },
+      },
     },
     paletteScreen: {
       tr: {
@@ -350,6 +363,9 @@
       document.body.appendChild(hint);
     }
     hint.textContent = text;
+    // The pill is uppercased by CSS and the document is lang="tr", so an
+    // English line folds "continue" to "CONTİNUE" unless it says otherwise.
+    hint.lang = lang === 'tr' ? 'tr' : 'en';
     setTimeout(() => hint.classList.add('show'), 250);
 
     function fire() {
@@ -425,7 +441,7 @@
   // ── Steps ──
   function show() {
     root.classList.add('show');
-    document.body.classList.add('ist-onb-locked');
+    document.body.classList.add('ist-onb-locked', 'ist-onb-modal');
     installFirewall();
     focusFirst();
   }
@@ -444,7 +460,7 @@
   }
   function hide() {
     root.classList.remove('show');
-    document.body.classList.remove('ist-onb-locked');
+    document.body.classList.remove('ist-onb-locked', 'ist-onb-modal', 'ist-onb-lang');
     removeFirewall();
     clearSpotlight();
     hidePane();
@@ -486,18 +502,21 @@
       if (item && typeof item === 'object' && item.tcCheckbox) {
         renderTCCheckbox(() => {
           if (idx < w.lines.length) addHint(w.tapHint, advance);
-          else addHint(w.tapHint, () => slowRevealLanguagePicker());
+          else addHint(w.tapHint, stepLanguageHold);
         });
         return;
       }
+      // The line that says "hold the logo" hands straight over to the beat
+      // that waits for it -- a tap in between would be a tap on nothing.
+      if (item && typeof item === 'object' && item.holdLesson) {
+        stepLanguageHold();
+        return;
+      }
       if (idx < w.lines.length) {
-        // Per-item override (e.g. last Page-2 line uses "tap to choose...").
         const hintText = (item && typeof item === 'object' && item.nextHint) || w.tapHint;
         addHint(hintText, advance);
       } else {
-        // After the last line, a final tap slowly reveals the picker.
-        const hintText = (item && typeof item === 'object' && item.nextHint) || w.tapHint;
-        addHint(hintText, () => slowRevealLanguagePicker());
+        addHint(w.tapHint, stepLanguageHold);
       }
     }
   }
@@ -526,28 +545,71 @@
     focusFirst();
   }
 
-  // Slow reveal: clears the welcome content's hint, then renders the
-  // language picker with a per-button rise animation (CSS-driven).
-  function slowRevealLanguagePicker() {
-    renderLanguageChoicesInline({ slow: true });
+  // ── The language hold ──
+  // Teaches the one way the app changes language (THE LANGUAGE HOLD in
+  // project.html) by having the reader do it: the bottom bar is standing
+  // over the welcome screen with nothing on it but the logo (see
+  // body.ist-onb-modal in onboarding.css), the logo alone is handed back
+  // (the same scoped passthrough the petek's door beat uses), and the
+  // beat moves on only once the flip has actually happened. The hold
+  // itself is project.html's own, untouched -- all it needs from here is
+  // body.ist-onb-lang, which is what tells it the tour is not arguing
+  // with it this time.
+  //
+  // A second hold flips it back and the line after it is said again the
+  // other way, so the reader can leave it leaning whichever way they like
+  // before they tap on. And like every gesture beat it cannot dead-end:
+  // after STALL_MS a reader who cannot hold is let through anyway.
+  function stepLanguageHold() {
+    const logo = document.getElementById('fb-logo-btn');
+    const i18n = global.I18N;
+    // No bar or no I18N (a page without the compass): nothing to teach.
+    if (!logo || !i18n || !i18n.onChange) { syncLangFromI18N(); stepPalette(); return; }
+
+    const L = COPY.langHold;
+    const stage = document.getElementById('ist-onb-stage');
+    const cue = document.createElement('div');
+    cue.className = 'ist-onb-holdcue';
+    cue.textContent = L.cue;
+    stage.appendChild(cue);
+    requestAnimationFrame(() => cue.classList.add('show'));
+
+    document.body.classList.add('ist-onb-lang');
+    openPassthrough('#fb-logo-btn');
+
+    let seq = 0;
+    let stall = setTimeout(() => {
+      stall = null;
+      addHint(L.nudge, done);
+    }, STALL_MS);
+
+    async function onFlip() {
+      const my = ++seq;
+      if (stall) { clearTimeout(stall); stall = null; }
+      syncLangFromI18N();
+      clearStage();
+      const d = L.done[lang];
+      await addMsgTyped({ instant: d.instant, typed: d.typed }, 18);
+      // A second flip while this was still typing owns the stage now.
+      if (my !== seq) return;
+      addHint(COPY.tapToContinue[lang], done);
+    }
+    i18n.onChange(onFlip);
+
+    function done() {
+      if (stall) { clearTimeout(stall); stall = null; }
+      i18n.offChange && i18n.offChange(onFlip);
+      document.body.classList.remove('ist-onb-lang');
+      closePassthrough();
+      syncLangFromI18N();
+      stepPalette();
+    }
   }
 
-  // Inline language picker: appended to the welcome stage right after the
-  // last typed line. Picking + confirming advances to the palette screen.
-  // `slow: true` adds a per-button rise animation for a softer entrance.
-  function renderLanguageChoicesInline(opts) {
-    const s = COPY.languageScreen;
-    let selected = null;
-    const onPick = (c) => {
-      selected = c;
-      lang = c.value === 'more_english' ? 'en' : 'tr';
-    };
-    const onConfirm = () => {
-      if (!selected) return;
-      if (global.I18N && I18N.setLang) I18N.setLang(selected.value);
-      stepPalette();
-    };
-    addChoices(s.choices, onPick, onConfirm, c => `<div>${c.label}</div><small>${c.sub}</small>`, opts && opts.slow);
+  // The tour's own two-way `lang` read back off I18N, which is the one
+  // source of truth for which way the app leans.
+  function syncLangFromI18N() {
+    if (global.I18N && I18N.isEnglish) lang = I18N.isEnglish() ? 'en' : 'tr';
   }
 
   async function stepPalette() {
@@ -814,12 +876,14 @@
   function enterSpotlightMode() {
     ensureSpotlightDOM();
     root.classList.remove('show');
+    document.body.classList.remove('ist-onb-modal');
     document.body.classList.add('ist-onb-spot');
   }
   function exitSpotlightMode() {
     clearSpotlight();
     hidePane();
     root.classList.add('show');
+    document.body.classList.add('ist-onb-modal');
     document.body.classList.remove('ist-onb-spot');
   }
 

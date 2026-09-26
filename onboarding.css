@@ -12,7 +12,7 @@
      dead gap down to the hint pill. The bottom padding outweighs the top on
      purpose, so the centred stack sits a little above true middle -- clear
      of the hint pill rather than crowding it -- and a page that grows past
-     the screen (more lines, the T&C checkbox, the language picker) simply
+     the screen (more lines, the T&C checkbox, the palette picker) simply
      scrolls, per overflow-y below, instead of being yanked back to a fixed
      top. */
   justify-content: center;
@@ -78,6 +78,55 @@ body.ist-onb-locked[data-onb-pass="me"] #ist-pc-me * { pointer-events: auto !imp
 body.ist-onb-locked[data-onb-pass="sheet"] #profile-overlay,
 body.ist-onb-locked[data-onb-pass="sheet"] #profile-overlay * { pointer-events: auto !important; }
 body.ist-onb-locked.ist-onb-passthru #ist-onb-spotlight { pointer-events: none !important; }
+
+/* ── The bottom bar stands over the welcome screens, logo alone ──
+   While the fullscreen modal is up (body.ist-onb-modal -- the welcome,
+   the palette and the two closing screens, never the spotlight tour,
+   which has the real bar under its dim) the compass bar is lifted over
+   the modal root (99999) and under the hint pill (100001), and the two
+   words either side of the logo are hidden. `visibility`, not
+   `display`: the words are the two flex halves that keep the logo in
+   the middle of the bar.
+
+   It is there because the language is taught on it: the app changes
+   language by HOLDING the logo (see stepLanguageHold), so the reader has
+   to be able to see the one mark they are about to be asked to hold, on
+   the bar it will always be on. Kütüphane and Kahvehane mean nothing yet
+   -- the tour names them when it walks there. */
+body.ist-onb-modal .section-rule { z-index: auto !important; }
+body.ist-onb-modal .section-rule > header { z-index: 100000 !important; }
+body.ist-onb-modal #fb-nav > b:not(.fb-logo-btn) { visibility: hidden; }
+
+/* The lesson itself: the logo breathes until it is held, the same slow
+   pulse a lit country wears on Kütüphane -- "this one, now" -- and stops
+   the moment the hold's own ta-da glow takes over. */
+@keyframes ist-onb-logo-breathe {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0)); }
+  50%      { filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.7)); }
+}
+body.ist-onb-lang #fb-logo-btn:not(.fb-lang-done) {
+  animation: ist-onb-logo-breathe 1.9s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  body.ist-onb-lang #fb-logo-btn:not(.fb-lang-done) {
+    animation: none;
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.6));
+  }
+}
+/* Printed under the instruction until the hold lands. Not a button and
+   not the tap-anywhere hint: nothing here advances on a tap. */
+.ist-onb-holdcue {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--ist-onb-muted, #867264);
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+.ist-onb-holdcue::after { content: ' ↓'; }
+.ist-onb-holdcue.show { opacity: 1; }
 
 /* Per-palette tokens applied to the onboarding root only. The 4 modes
    come from data-palette × data-theme (see frames.css: data-theme is
@@ -191,7 +240,7 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
 }
 .ist-onb-tc-label { padding-bottom: 1px; }
 
-/* Slow rise-in for the language picker choices + Confirm button.
+/* Slow rise-in for the palette picker choices + Confirm button.
    `slow` adds the keyframe; each choice + the confirm button rise in turn. */
 @keyframes ist-onb-rise {
   from { opacity: 0; transform: translateY(10px); }
@@ -286,7 +335,7 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
 #ist-onb-stage { position: relative; z-index: 2; pointer-events: none; }
 #ist-onb-stage > * { pointer-events: auto; }
 
-/* Choice screen (language + palette) */
+/* Choice screen (palette) */
 .ist-onb-choices {
   display: grid;
   grid-template-columns: 1fr 1fr;
