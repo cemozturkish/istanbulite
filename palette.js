@@ -76,18 +76,27 @@
     apply();
   }
 
-  // Mirrors --page-bg (frames.css, varies by palette + light/dark theme)
-  // onto <meta name="theme-color">, so the iOS/Android status bar and
-  // Safari's surrounding chrome match the page instead of defaulting to
-  // black in dark mode. frames.css loads after this script, so the very
-  // first call (before its rules exist) is a no-op -- window's load event
-  // below re-fires it once styles are in.
+  // Mirrors a token from frames.css onto <meta name="theme-color">, so the
+  // iOS/Android status bar and Safari's surrounding chrome match the page
+  // instead of defaulting to black in dark mode. frames.css loads after
+  // this script, so the very first call (before its rules exist) is a
+  // no-op -- window's load event below re-fires it once styles are in.
+  //
+  // Which token depends on what actually sits at the screen's edge. A page
+  // carrying the fixed bottom tab bar (`.section-rule`, every carousel and
+  // game page) has that bar's own dark --navbar-ink running edge to edge,
+  // top and bottom -- so Safari's own toolbar, which sits flush against
+  // the bottom of it, has to match --navbar-ink or the seam between the
+  // app's own bar and the browser's shows as two different colors. A page
+  // with no bottom bar (index.html's login gate, gizlilik.html) has only
+  // its own paper at the edge, so it still reads --page-bg.
   function syncThemeColor() {
     try {
       const meta = document.querySelector('meta[name="theme-color"]');
       if (!meta) return;
+      const token = document.querySelector('.section-rule') ? '--navbar-ink' : '--page-bg';
       const bg = getComputedStyle(document.documentElement)
-        .getPropertyValue('--page-bg').trim();
+        .getPropertyValue(token).trim();
       if (bg) meta.setAttribute('content', bg);
     } catch (e) { /* ignore */ }
   }
