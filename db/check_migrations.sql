@@ -200,7 +200,10 @@ with checks(sira, dosya, aranan, var) as (
          and pg_temp.has_col('neighborhood_polls', 'edition_date')
          and pg_temp.has_col('library_letters', 'audience')
          and to_regclass('public.library_letter_neighborhoods') is not null
-         and pg_temp.has_fn('events_current_edition'))
+         and pg_temp.has_fn('events_current_edition')),
+    (47, 'db/admin_game_transactions.sql', 'Atomik yönetici oyun kayıtları',
+         to_regprocedure('public.admin_set_game_lineup(date,text[])') is not null
+         and to_regprocedure('public.admin_pick_sozcel_suggestion(uuid,date,text,text,text[])') is not null)
 )
 select
   case when var then '✓ VAR' else '✗ EKSİK' end as durum,
@@ -208,3 +211,4 @@ select
   aranan
 from checks
 order by var, sira;
+

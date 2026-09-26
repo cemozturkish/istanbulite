@@ -93,3 +93,12 @@ sonraki dosyalar öncekinin tablosunu `alter` eder, tek başına çalışmazlar.
   çalıştırılmadığı bir daha anlaşılmaz.
 - RLS'i kapatmayın, servis anahtarını istemciye koymayın (bkz. CLAUDE.md →
   Security Notes).
+
+
+## Atomik yönetici oyun kayıtları
+
+`admin_game_transactions.sql`, oyun sıralamasını ve aç/kapat durumunu tek işlemde; seçilen kelimeyi ve öneri durumlarını tek işlemde kaydeder. Önce `game_night_slots`, `game_day_toggles`, `sozcel_used_answers` ailesi (v6/v7 dahil), `sozcel_word_suggestions_v2_standing_pool` uygulanmış olmalı.
+
+**Önce SQL dosyasını Supabase SQL editöründe çalıştırın, sonra ilgili admin.html değişikliğini yayınlayın.** Eski yönetici ekranı bu migrasyondan sonra çalışmaya devam eder. Migrasyon olmadan yeni ekranda bu iki kayıt işlemi hata gösterir; eski çok adımlı kayda geri dönmez. `check_migrations.sql` yeni işlevleri denetler.
+
+SQL testleri, çekirdek şema bu depoda olmadığından küçük bir test şeması üzerinde çalışır; canlı veritabanına bağlanmaz. Test komutu `scripts/check-admin-transactions.cjs` başında açıklanır.
