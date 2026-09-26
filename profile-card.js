@@ -407,10 +407,11 @@
   // Hair overlays for the layered avatar (bald base + optional transparent
   // hair PNG on top — see avatar.js). `null` is kel (bald, no overlay).
   const AVATAR_HAIR_OPTIONS = [
-    { value: null,    label: 'Kel' },
-    { value: 'buzz',  label: 'Çok kısa saç' },
-    { value: 'short', label: 'Kısa saç' },
-    { value: 'long',  label: 'Uzun saç' },
+    { value: null,        label: 'Kel' },
+    { value: 'buzz',      label: 'Çok kısa saç' },
+    { value: 'short',     label: 'Kısa saç' },
+    { value: 'long',      label: 'Uzun saç' },
+    { value: 'curly-long', label: 'Kıvırcık uzun saç' },
   ];
 
   // Hat overlays — a second, independent layer stacked on top of hair (see

@@ -45,7 +45,8 @@ Two more things, both of which fail silently:
 | `hair-buzz.png` | Çok kısa saç | **uploaded** |
 | `hair-short.png` | Kısa saç | **uploaded** |
 | `hair-long.png` | Uzun saç | **uploaded** |
-| `accessory-glasses.png` | Gözlük — drawn to sit *under* long hair | missing |
+| `hair-curly-long.png` | Kıvırcık uzun saç — the first TEXTURE, see below | **uploaded** |
+| `accessory-glasses.png` | Gözlük — drawn to sit *under* long hair | **uploaded**, still locked |
 | `jail.png` | the stripes, admin-only: `politicians.in_jail`, never something a member can wear | missing |
 | `hat-crown.png` | Sözcü Tacı, the earned reward hat | missing, and **parked** |
 
@@ -81,6 +82,14 @@ paper has to do. Re-anchoring the ladder to these exact tones was
 considered and is not needed; if a future drawing does land somewhere the
 ramp handles badly, `?ink=0` renders the set exactly as drawn and is the
 A/B to judge it against.
+
+**Hair is a length ladder plus a texture, and the naming carries that.**
+`buzz` / `short` / `long` are one axis; `curly-long` is the first value on
+a second. It is not called `curly` so that a curly short can be drawn
+later without renaming it — a rename here is a migration *and* a backfill
+of every member row already holding the old value. `long` stays unmarked
+rather than becoming `straight-long` for symmetry, for the same reason
+read backwards: renaming it would rewrite live rows and buy nothing.
 
 ## Adding a layer
 
