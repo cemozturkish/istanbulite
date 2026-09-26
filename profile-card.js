@@ -1932,11 +1932,20 @@
   // the real thing rather than chosen, and they are the whole of what
   // makes the miniature readable at this size.
   //
-  // INK IS WHAT IS STILL STANDING IN THEIR DAY, never what they have
-  // got through — which is exactly what the two lines said (three
-  // stories stacked, one game left of one) and is the half of it worth
-  // walking over for. An empty outline is a slot with nothing in it, or
-  // nothing this petek can know about.
+  // THREE STATES, not two: a slot is blank when there is nothing there
+  // (or nothing this petek can know about), DARK GRAY while it is still
+  // standing — there but not yet interacted with — and RED once it has
+  // been. It used to draw only the gray half, on the reasoning that
+  // "ink is what is still standing, never what they have got through" —
+  // but a neighbour's hexagon is exactly where "have they actually
+  // engaged with this" is worth reading at a glance, and a done slot
+  // and an empty one used to be the same blank outline.
+  //
+  // Filled from the bottom of the column, done first, so it reads the
+  // same way the day meter's own rising sea does (see "Gece is the
+  // lights coming ON" / the day meter in CLAUDE.md): what is DONE is
+  // the foundation, and what is still standing stacks above it. Past
+  // both counts, whatever room is left in the column stays blank.
   //
   // The two columns with no ink in them are not a gap in the drawing,
   // they are the other half of each screen: Anket and Etkinlikler. An
@@ -1946,15 +1955,20 @@
   // neither is a number hive_member_status could hand back today. They
   // are drawn because the shape IS the app's screen and half of one is
   // not recognisable as it.
-  function hiveDayColHTML(width, standing) {
+  function hiveDayColHTML(width, done, standing) {
     const n = HIVE_DAY_SLOTS[width];
+    const doneN = Math.max(0, Math.min(n, done | 0));
+    const standingN = Math.max(0, Math.min(n - doneN, standing | 0));
     let slots = '';
     for (let i = 0; i < n; i++) {
       // Slots are numbered from the dock up, exactly as the app's own
-      // are (.fb-slot-N in project.html), so what is still standing
-      // fills from the bottom of the column.
-      const on = (n - i) <= standing;
-      slots += `<span class="ist-hive-day-slot${on ? ' ist-hive-day-on' : ''}"></span>`;
+      // are (.fb-slot-N in project.html), so both counts fill from the
+      // bottom of the column.
+      const fromBottom = n - i;
+      let cls = '';
+      if (fromBottom <= doneN) cls = ' ist-hive-day-done';
+      else if (fromBottom <= doneN + standingN) cls = ' ist-hive-day-standing';
+      slots += `<span class="ist-hive-day-slot${cls}"></span>`;
     }
     return `<span class="ist-hive-day-col ist-hive-day-${width}">${slots}</span>`;
   }
@@ -1971,23 +1985,25 @@
 
   function hiveStatHTML(status, t) {
     if (!status) return '';
-    const news = Math.max(0, status.news_stacked | 0);
+    const newsLeft = Math.max(0, status.news_stacked | 0);
+    const newsDone = Math.max(0, status.news_done | 0);
     const total = hiveGamesTonight() ? Math.max(0, status.games_total | 0) : 0;
     const played = Math.min(total, Math.max(0, status.games_played | 0));
     const left = total - played;
-    // Nothing standing is not a score of zero, it is an empty day — and
-    // an empty deck says so on its own page ("Hepsi bu kadar"). On
-    // somebody else's hexagon it is simply not a caption: twelve blank
-    // rectangles under a name say less than nothing.
-    if (!news && !left) return '';
+    // Nothing standing and nothing done is not a score of zero, it is
+    // an empty day — and an empty deck says so on its own page ("Hepsi
+    // bu kadar"). On somebody else's hexagon it is simply not a
+    // caption: twelve blank rectangles under a name say less than
+    // nothing.
+    if (!newsLeft && !newsDone && !left && !played) return '';
     // The words the drawing replaced are what a screen reader is given,
     // and what a pointer gets on hover: the picture is the caption, not
     // the whole of the fact. The fraction is printed whether or not they
     // have started (0/3 is the point of it) and disappears only on a day
     // the admin left with no games at all (`0/2` on an ordinary night).
     const words = [];
-    if (news > 0) {
-      const n = news > HIVE_NEWS_MAX ? `${HIVE_NEWS_MAX}+` : String(news);
+    if (newsLeft > 0 || newsDone > 0) {
+      const n = newsLeft > HIVE_NEWS_MAX ? `${HIVE_NEWS_MAX}+` : String(newsLeft);
       words.push(`${n} ${t('profile.hive.stat.news')}`);
     }
     if (total > 0) words.push(`${played}/${total} ${t('profile.hive.stat.games')}`);
@@ -1995,10 +2011,10 @@
     return `
       <span class="ist-hive-stats ist-hive-day" role="img" aria-label="${label}" title="${label}">
         <span class="ist-hive-day-screen">
-          ${hiveDayColHTML('wide', news)}${hiveDayColHTML('narrow', 0)}
+          ${hiveDayColHTML('wide', newsDone, newsLeft)}${hiveDayColHTML('narrow', 0, 0)}
         </span>
         <span class="ist-hive-day-screen">
-          ${hiveDayColHTML('narrow', left)}${hiveDayColHTML('wide', 0)}
+          ${hiveDayColHTML('narrow', played, left)}${hiveDayColHTML('wide', 0, 0)}
         </span>
       </span>`;
   }
@@ -2792,6 +2808,41 @@
     applyHiveLevel(state);
     fitHive(state);
     wireHiveEvents(state);
+    // Every render is a point where the map (who is touching the reader,
+    // and where they live) may have changed — a fresh mount, the map
+    // landing, a slot claimed. project.html's own district-coloured map
+    // has no reach into this module's state, so it is told rather than
+    // asked: a plain DOM event, the same idiom the rest of the site uses
+    // for a module telling the page something changed without knowing
+    // who is listening.
+    document.dispatchEvent(new CustomEvent('ist-hive-updated'));
+  }
+
+  // ── Which districts are "ours" ──
+  // The reader's own district, and the districts of the (up to six)
+  // members actually touching them on the grid right now — the same
+  // ring-1 set hiveNameHTML already names beside each hexagon. This
+  // module only counts; it knows nothing about maps or SVGs. Read by
+  // project.html's own district-coloured map (see refreshHiveDistrictMap
+  // there) after every 'ist-hive-updated'.
+  function hiveDistrictFills(state) {
+    if (!state) return null;
+    const cells = (state.hive && state.hive.cells) || [];
+    const counts = {};
+    cells.forEach(c => {
+      if (!c || !c.neighborhood) return;
+      if (hiveRing(c.q, c.r) !== 1) return;
+      counts[c.neighborhood] = (counts[c.neighborhood] || 0) + 1;
+    });
+    return { own: (state.profile && state.profile.neighborhood) || null, counts };
+  }
+
+  // The public read of the above: whatever the petek currently has
+  // mounted, or null before anything has loaded. Takes no argument —
+  // like hive_member_status itself, it can only ever answer for the
+  // caller's own map.
+  function hiveDistricts() {
+    return hiveDistrictFills(_hive);
   }
 
   // Both calls are best-effort: before db/hive_lattice_v4.sql has been
@@ -3992,6 +4043,7 @@
     closeProfileOverlay,
     mountHivePage,
     unmountHivePage,
+    hiveDistricts,
     revealHivePage,
     playHiveReveal,
     holdHivePage,
