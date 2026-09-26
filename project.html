@@ -261,8 +261,10 @@
          value to the page it sits on read as the same paper rather than
          a card lying on it. The mix is relative to whichever --lit/--ink
          pair is live, so it still tracks day/night and both palettes
-         instead of a fixed shade of its own. */
-      background: color-mix(in srgb, var(--lit, #ddc4b5) 90%, var(--ink) 10%);
+         instead of a fixed shade of its own. (Was 10% -- too dark;
+         backed off to 4%, just enough of a step for the card to read
+         as lying on the page.) */
+      background: color-mix(in srgb, var(--lit, #ddc4b5) 96%, var(--ink) 4%);
       border: 2px solid var(--ink);
       font: inherit;
       color: var(--ink);
@@ -1520,13 +1522,19 @@
     }
 
     /* ── THE THROW ──
-       What an opened page ASKS, and the two ways to answer it. The
-       question stands on its own rule at the foot of the reading, so it
-       is the last thing in the column rather than a panel over it. */
-    .fb-throw-q {
-      margin-top: 14px;
-      padding-top: 11px;
+       What an opened page ASKS, and the two ways to answer it. It used
+       to stand on its own rule at the foot of the READING -- the last
+       thing the scroller printed, so a long enough body could push it
+       out of sight below the fold. It is a floor of the SCREEN now (see
+       .fb-page-foot): always the last thing on the page, whatever the
+       body does. */
+    .fb-page-foot {
+      flex: none;
+      padding: 11px 12px calc(12px + env(safe-area-inset-bottom, 0px));
       border-top: 2px solid var(--ink);
+      background: var(--paper-card);
+    }
+    .fb-throw-q {
       font-weight: 800;
       font-size: 0.95rem;
       line-height: 1.3;
@@ -2441,10 +2449,12 @@ async function loadEtkinlikActor(el, slot) {
     // translated by halves still reads in Turkish rather than blank.
     kicker: label, meta: eventTimeOnly(ev.event_date), title: newsText(ev, 'title'),
     lines: [eventWhenLong(ev.event_date), [nb, ev.location].filter(Boolean).join(' · ')].filter(Boolean),
-    html: fbParas(newsText(ev, 'description') || '') +
-      (rsvp === 'yes'
-        ? '<div class="fb-throw-q">Gidiyorsun.</div>' + throwFootHTML('Vazgeç', 'Gidiyorum', 'Fikrini değiştirebilirsin.')
-        : '<div class="fb-throw-q">Gidiyor musun?</div>' + throwFootHTML('Gitmiyorum', 'Gidiyorum', 'Sola ya da sağa at.')),
+    html: fbParas(newsText(ev, 'description') || ''),
+    // Gidiyorum/Gitmiyorum is a fixed floor, not the last thing the
+    // reading scrolls past -- see .fb-page-foot.
+    foot: rsvp === 'yes'
+      ? '<div class="fb-throw-q">Gidiyorsun.</div>' + throwFootHTML('Vazgeç', 'Gidiyorum', 'Fikrini değiştirebilirsin.')
+      : '<div class="fb-throw-q">Gidiyor musun?</div>' + throwFootHTML('Gitmiyorum', 'Gidiyorum', 'Sola ya da sağa at.'),
     wire: (inner) => wirePageThrow(inner, {
       right: { label: 'Gidiyorum', run: () => setEventRsvp(ev, true) },
       left:  { label: rsvp === 'yes' ? 'Vazgeç' : 'Gitmiyorum', run: () => setEventRsvp(ev, false) },
@@ -2971,8 +2981,10 @@ async function loadHaberlerActor(el, slot) {
   fbSetPage(el, {
     kicker: label + akisTag, meta: age,
     title: newsText(n, 'title'),
-    html: fbParas(newsText(n, 'body')) + (siblings.length ? seriesTimelineHTML(siblings) : '') +
-      newsFootHTML(!!n.series_id),
+    html: fbParas(newsText(n, 'body')) + (siblings.length ? seriesTimelineHTML(siblings) : ''),
+    // YETER/AKIŞTA KAL is a fixed floor, not the last thing the reading
+    // scrolls past -- see .fb-page-foot.
+    foot: newsFootHTML(!!n.series_id),
     // A story with no seri is thrown away either direction and that is
     // the whole of it -- no labels, nothing stamped (see newsFootHTML).
     // A story that IS part of an akış carries two words, and they are
@@ -4287,7 +4299,13 @@ function fbPageHTML(p) {
       // else still just writes body/lines, so this is the one place the
       // two kinds of page diverge.
       (p.html || (p.body ? fbParas(p.body) : '')) +
-    '</div>';
+    '</div>' +
+    // A verdict the reader is asked to give -- YETER/AKIŞTA KAL, an
+    // event's Gidiyorum/Gitmiyorum -- is a floor, not the last line of
+    // the reading: it stands outside the scroller, pinned to the bottom
+    // of the screen, so it never scrolls away underneath a long enough
+    // body. Optional: most pages have nothing to ask and carry no foot.
+    (p.foot ? '<div class="fb-page-foot">' + p.foot + '</div>' : '');
 }
 
 // What a box opens into, set by its loader as it renders. One setter
