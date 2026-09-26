@@ -560,6 +560,17 @@ sb.from('articles').delete().eq('id', id)
   pressed; both RPCs answer only for the caller's own map and only for the events it names, the
   same fence `hive_member_status` stands behind. The ring is deliberately left alone: red on a
   hexagon's ring already means "this is the one named on the bar"
+- **The event page itself (project.html, `loadEtkinlikActor`)**: the top line is WHERE (district
+  · venue, in red) against WHEN (day and hour), both larger than a card's corners; the headline
+  is **anchored** (`.fb-page-top`, between the head and the scroller, on every band page) with the
+  **ETKİNLİK KEFİLİ** line under it; the body is the description and nothing else; the floor is
+  the two buttons alone (`events.going` / `events.notgoing` / `events.changed`), no question and no
+  note. Opening it paints the event's district red on the map (`paintDistrictMap`), taken down with
+  the page. **Etkinlik kefili** (`events.kefil_id`, `db/events_kefil.sql`) is the member who
+  vouches for an evening, assigned by the admin in the Etkinlikler form and printed as
+  "ETKİNLİK KEFİLİ: BAKIRKÖY'DEN CEM" (`trFrom` builds the Turkish ablative; English reads
+  "CEM FROM BAKIRKÖY"). It is counted on the member's own profile ("Etkinlik Kefili"), beside the
+  people they vouched for — later, ratings from the people who went can hang off it.
 - **Set like Kahvehane's own event cards** — the kicker, the title, the meta and the page's whole
   type scale are that page's numbers (`.ev-card` / `.event-page-*` in kahvehane.html), not a second
   set: it is the same object on both pages, and what the reader threw right over there is what
@@ -2346,12 +2357,16 @@ iframe (same origin, its own `I18N`). Every cached fetch is dropped first: those
 by nothing but "already asked", and the rows in them carry the text that was chosen when they were
 built, so re-rendering without dropping them prints the old language from a fresh render.
 
-**A page standing open needs nothing, and that is worth stating** because the opposite looks
-obvious. One of THE sheet's four ways out is a press outside it, and its backdrop is over the bar
-(the overlay layer is 500, the two bars 400/401) — so a press aimed at the logo while a page stands
-open closes the page before the gesture can begin. The game overlay is the one surface that is not
-like this, and deliberately: it lifts its own bottom edge to leave the tab bar pressable, because a
-game is where the reader stays.
+**A page standing open is re-read in the new language, and the logo can be held over it.** Seeing
+the thing in front of you in the other language is the point of the gesture, so an open band page
+must not be the one place it cannot be made. The page's backdrop is the overlay layer (500) and
+the bars sit at 400/401, so while a page is open `body.fb-page-on` lifts the bottom bar to 510 —
+with the bar's own paper `pointer-events: none` and only the logo opted back in, so a press beside
+the logo still falls through to the backdrop and closes the page as before. A plain **tap** on the
+logo with a page open closes the page (what a press there always did) rather than opening the petek
+over it. After a flip, `refreshAllColumns()` resolves once every box has been re-read and
+`rerenderFbPage()` rebuilds the open page from its box's fresh payload in place — no grow, no
+history entry, no `onOpen`, scroll position kept.
 
 ### The petek is behind the logo, and the app map is the middle lane
 

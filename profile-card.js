@@ -936,10 +936,14 @@
   async function fetchProfileData(sb, I18N, user) {
     const today = istanbulTodayISO();
 
-    const [{ data: profile }, { data: sponsoredRows }, { count: sozcuCount }] = await Promise.all([
+    const [{ data: profile }, { data: sponsoredRows }, { count: sozcuCount }, { count: eventKefilCount }] = await Promise.all([
       sb.from('profiles').select('*').eq('id', user.id).single(),
       sb.from('profiles').select('id, first_name, last_name, neighborhood, joined_at').eq('referred_by', user.id).order('joined_at', { ascending: true }),
       sb.from('sozcel_sozcul_assignments').select('*', { count: 'exact', head: true }).eq('user_id', user.id).lte('game_date', today),
+      // How many events this member is ETKİNLİK KEFİLİ of (events.kefil_id,
+      // db/events_kefil.sql) -- counted beside the people they vouched
+      // for. A database without the column answers an error, read as 0.
+      sb.from('events').select('id', { count: 'exact', head: true }).eq('kefil_id', user.id),
     ]);
     const sponsoredList = sponsoredRows || [];
     const kefaletCount = sponsoredList.length;
@@ -965,6 +969,7 @@
 
     return {
       sb, I18N, user, profile, kefaletCount, sponsoredList, sozcuCount, kefilOfUser,
+      eventKefilCount: eventKefilCount || 0,
       avatarUrl: profile?.avatar_url || null,
       avatarHair: profile?.avatar_hair || null,
       avatarHat: profile?.avatar_hat || null,
@@ -1044,6 +1049,7 @@
       openProfileOverlay({
         sb: state.sb, I18N, user, profile,
         sozcuCount, kefaletCount, sponsoredList, kefilOfUser,
+        eventKefilCount: state.eventKefilCount || 0,
         // Which blocks this profile page shows is the page's call, not
         // this card's (see PROFILE_SECTIONS). Read live rather than closed
         // over: the row outlives a navigation now (see setPage), so the
@@ -3564,6 +3570,10 @@
           </div>` : ''}
           ${sponsoredListHTML(sponsoredList, t)}
           <div class="ist-pc-info-row">
+            <div class="ist-pc-info-label">${esc(t('profile.eventkefilcount'))}</div>
+            <div class="ist-pc-info-value">${state.eventKefilCount ?? 0} ${esc(t('profile.times'))}</div>
+          </div>
+          <div class="ist-pc-info-row">
             <div class="ist-pc-info-label">${esc(t('profile.sozcucount'))}</div>
             <div class="ist-pc-info-value">${sozcuCount ?? 0} ${esc(t('profile.times'))}</div>
           </div>
@@ -4010,6 +4020,7 @@
         openProfileOverlay({
           sb, I18N, user, profile, page: opts.page || currentPageSlug(),
           sozcuCount, kefaletCount, sponsoredList, kefilOfUser,
+          eventKefilCount: state.eventKefilCount || 0,
           avatarUrl: state.avatarUrl,
           avatarHair: state.avatarHair,
           avatarHat: state.avatarHat,

@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=7"></script>
   <script src="router.js?v=15"></script>
-  <script src="i18n.js?v=23"></script>
+  <script src="i18n.js?v=24"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <link rel="stylesheet" href="palette.css?v=12">
@@ -1481,6 +1481,17 @@
        Every number here is the band's own (see the html block above),
        so the window opens exactly on the boxes' edges by construction
        rather than by two sets of numbers agreeing. */
+    /* ── THE BAR STAYS OVER AN OPEN PAGE ──
+       The page's backdrop is the overlay layer (500) and the bars sit at
+       400/401 under it, so with a page open the logo could not be held.
+       Holding the logo to change language is the app's own gesture and
+       it must work wherever the reader is standing -- above all over an
+       event or a story they want to read in the other language. The page
+       itself stands above the dock, so nothing of it is covered. */
+    body.fb-page-on .section-rule > header { z-index: 510 !important; pointer-events: none; }
+    /* Only the logo takes the press; the bar's own paper lets it through
+       to the backdrop underneath, which closes the page as before. */
+    body.fb-page-on nav b.fb-logo-btn { pointer-events: auto; }
     .fb-page {
       /* frames.css states .ist-sheet's chrome with !important -- rightly,
          since every sheet on the site wears one frame. Three of its
@@ -1561,14 +1572,21 @@
       padding: 8px 12px;
       border-bottom: 1px solid var(--ink);
     }
+    /* Bigger than the closed card's corners: on the card they share a
+       box with a headline, here they are the page's whole top line and
+       were being read at a squint. */
     .fb-page-head .k {
-      font-size: var(--fb-box-tag-size); line-height: var(--fb-box-tag-lh);
-      letter-spacing: 0.14em; text-transform: uppercase;
+      min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-size: 0.8rem; line-height: 1.2; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase;
       color: var(--ink-red, #B93631);
     }
     .fb-page-head .m {
       margin-left: auto;
-      font-size: var(--fb-box-tag-size); line-height: var(--fb-box-tag-lh);
+      flex: none;
+      white-space: nowrap;
+      font-size: 0.8rem; line-height: 1.2; font-weight: 600;
       color: var(--muted);
     }
     /* The hand-drawn arrow the game pages and Kütüphane's own story
@@ -1649,6 +1667,10 @@
       gap: 9px;
       margin-top: 12px;
     }
+    /* A foot that is only the two buttons: no question over them and no
+       note under them, so they are the first thing in the floor. */
+    .fb-throw-cue + .fb-throw-row { margin-top: 0; }
+    .fb-throw-btn.fb-throw-on { background: var(--ink); color: var(--paper); }
     .fb-throw-btn {
       flex: 1 1 0;
       min-width: 0;
@@ -1724,7 +1746,26 @@
       letter-spacing: 0.14em;
       overflow-wrap: anywhere;
     }
-    .fb-page-title { margin: 0 0 6px; font-size: 1.15rem; line-height: 1.2; }
+    /* The anchored headline (see fbPageHTML): never inside the scroller,
+       so it cannot scroll away over a long body. */
+    .fb-page-top {
+      flex: none;
+      padding: 11px 12px 9px;
+      /* A hairline, so the reading scrolling up under the anchored name
+         reads as going UNDER it rather than as two lines colliding. */
+      border-bottom: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    }
+    .fb-page-top + .fb-page-body { padding-top: 9px; }
+    .fb-page-title { margin: 0; font-size: 1.15rem; line-height: 1.2; }
+    .fb-page-sub {
+      margin-top: 5px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .fb-page-sub b { color: var(--ink); font-weight: 800; }
     .fb-page-meta { color: var(--muted); font-size: 0.78rem; line-height: 1.45; margin-bottom: 9px; }
     .fb-page-body p { margin: 0 0 9px; font-size: 0.85rem; line-height: 1.5; }
     .fb-page-body p:last-child { margin-bottom: 0; }
@@ -2274,13 +2315,42 @@ function eventTimeOnly(iso) {
     { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-// The whole stamp, for the page the card opens into: there the day is no
-// longer said by which box the reader pressed, so it has to be printed.
-function eventWhenLong(iso) {
-  return new Date(iso).toLocaleString('tr-TR', {
-    timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long',
-    weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false,
-  });
+// The event page's own top line: the day AND the hour, short enough to
+// share one line with the district, in the reader's language.
+function eventWhenHead(iso) {
+  const en = !!(window.I18N && I18N.isEnglish && I18N.isEnglish());
+  const loc = en ? 'en-GB' : 'tr-TR';
+  const d = new Date(iso);
+  const day = d.toLocaleDateString(loc,
+    { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'short', weekday: 'short' });
+  return day + ' · ' + eventTimeOnly(iso);
+}
+
+// Turkish ablative -- "Bakırköy" -> "Bakırköy'den", "Beşiktaş" ->
+// "Beşiktaş'tan". Vowel harmony off the last vowel, and the d hardens to
+// t after a voiceless consonant (the fıstıkçı şahap letters).
+function trFrom(word) {
+  const w = String(word || '');
+  const lower = w.toLocaleLowerCase('tr-TR');
+  const vowels = lower.match(/[aeıioöuü]/g);
+  const last = vowels ? vowels[vowels.length - 1] : 'e';
+  const back = 'aıou'.includes(last);
+  const hard = /[fstkçşhp]$/.test(lower);
+  return w + "'" + (hard ? 't' : 'd') + (back ? 'an' : 'en');
+}
+
+// ETKİNLİK KEFİLİ: BAKIRKÖY'DEN CEM -- the member who vouches for an
+// evening (events.kefil_id, db/events_kefil.sql), named the way the app
+// names anybody: by where they are from. English turns it round.
+function eventKefilHTML(k) {
+  if (!k) return '';
+  const t = (key) => (window.I18N && I18N.t) ? I18N.t(key) : key;
+  const en = !!(window.I18N && I18N.isEnglish && I18N.isEnglish());
+  const name = (k.first_name || '').trim() || '—';
+  const nb = k.neighborhood ? (NB_NAMES[k.neighborhood] || k.neighborhood) : '';
+  const who = nb ? (en ? name + ' from ' + nb : trFrom(nb) + ' ' + name) : name;
+  const up = en ? who.toUpperCase() : who.toLocaleUpperCase('tr-TR');
+  return esc(t('events.kefil')) + ': <b>' + esc(up) + '</b>';
 }
 
 // ── Filling a 3-box stack from one fetch ──
@@ -2429,6 +2499,20 @@ async function loadEtkinlikActor(el, slot) {
         // The three days as exact +03:00 instants -- İstanbul carries no
         // DST, so this is arithmetic rather than a guess.
         const bounds = [0, 1, 2, 3].map(off => Date.parse(IstDate.iso(off) + 'T00:00:00+03:00'));
+        // Each evening's ETKİNLİK KEFİLİ, in one query for the whole
+        // edition. Best-effort: a database without events.kefil_id simply
+        // has no ids here, and a lookup that fails leaves the line off.
+        const kefilIds = [...new Set((data || []).map(e => e.kefil_id).filter(Boolean))];
+        if (kefilIds.length) {
+          try {
+            const { data: ks, error: kErr } = await IstRouter.sb.from('profiles')
+              .select('id, first_name, neighborhood').in('id', kefilIds);
+            if (kErr) throw kErr;
+            const byId = {};
+            (ks || []).forEach(k => { byId[k.id] = k; });
+            (data || []).forEach(e => { e._kefil = byId[e.kefil_id] || null; });
+          } catch (err) { console.error('[proje etkinlik kefil]', err); }
+        }
         const days = [[], [], []];
         for (const ev of (data || [])) {
           const t = Date.parse(ev.event_date);
@@ -2520,18 +2604,32 @@ async function loadEtkinlikActor(el, slot) {
     // half was actually written -- events carry the same pair now
     // (db/baski_v1.sql), so one helper serves both and an evening
     // translated by halves still reads in Turkish rather than blank.
-    kicker: label, meta: eventTimeOnly(ev.event_date), title: newsText(ev, 'title'),
-    lines: [eventWhenLong(ev.event_date), [nb, ev.location].filter(Boolean).join(' · ')].filter(Boolean),
+    //
+    // The top line is WHERE (the district, and the venue) against WHEN
+    // (day and hour), so neither is repeated in the reading: the body is
+    // the description and nothing else. The headline and the kefil are
+    // anchored under it (see fbPageHTML).
+    kicker: [nb, ev.location].filter(Boolean).join(' · '),
+    meta: eventWhenHead(ev.event_date),
+    title: newsText(ev, 'title'),
+    sub: eventKefilHTML(ev._kefil),
     html: fbParas(newsText(ev, 'description') || ''),
-    // Gidiyorum/Gitmiyorum is a fixed floor, not the last thing the
-    // reading scrolls past -- see .fb-page-foot.
+    // Just the two buttons: no question over them and no note under them.
+    // The buttons ARE the question, and the throw is taught by the stamp.
     foot: rsvp === 'yes'
-      ? '<div class="fb-throw-q">Gidiyorsun.</div>' + throwFootHTML('Vazgeç', 'Gidiyorum', 'Fikrini değiştirebilirsin.')
-      : '<div class="fb-throw-q">Gidiyor musun?</div>' + throwFootHTML('Gitmiyorum', 'Gidiyorum', 'Sola ya da sağa at.'),
-    wire: (inner) => wirePageThrow(inner, {
-      right: { label: 'Gidiyorum', run: () => setEventRsvp(ev, true) },
-      left:  { label: rsvp === 'yes' ? 'Vazgeç' : 'Gitmiyorum', run: () => setEventRsvp(ev, false) },
-    }),
+      ? throwFootHTML(tEv('events.changed'), tEv('events.youregoing'), null, 'right')
+      : throwFootHTML(tEv('events.notgoing'), tEv('events.going'), null),
+    wire: (inner) => {
+      wirePageThrow(inner, {
+        right: { label: tEv('events.going'), run: () => setEventRsvp(ev, true) },
+        left:  { label: rsvp === 'yes' ? tEv('events.changed') : tEv('events.notgoing'), run: () => setEventRsvp(ev, false) },
+      });
+      // Where it is, on the drawing above: the district goes red while
+      // its evening is open, and closeFbPage takes it down with the page.
+      if (ev.neighborhood) {
+        paintDistrictMap({ [ev.neighborhood]: 'var(--ink-red, #B93631)' });
+      }
+    },
   });
 }
 
@@ -2544,6 +2642,8 @@ async function loadEtkinlikActor(el, slot) {
 // gesture must not collapse the record. A left throw is a real "no"
 // rather than the absence of a yes, which is the whole reason
 // event_interest exists (db/hive_event_interest.sql).
+function tEv(k) { return (window.I18N && I18N.t) ? I18N.t(k) : k; }
+
 async function eventVerdictFor(eventId) {
   try {
     const uid = await doneUid();
@@ -3374,6 +3474,10 @@ async function paintDistrictMap(fills) {
   const svg = await loadDistrictSvg();
   const fb = document.getElementById('fb');
   if (!svg || !fb) return;
+  // The paint belongs to the open page: one closed while the tracing
+  // was still being fetched must not light the city afterwards.
+  const pageOverlay = document.getElementById('fb-page-overlay');
+  if (pageOverlay && pageOverlay.hidden) return;
   if (!districtLayer || !districtLayer.isConnected) {
     districtLayer = document.importNode(svg, true);
     districtLayer.setAttribute('class', 'fb-districts');
@@ -4406,8 +4510,16 @@ function fbPageHTML(p) {
       '<div class="k">' + esc(p.kicker || '') + '</div>' +
       (p.meta ? '<div class="m">' + esc(p.meta) + '</div>' : '') +
     '</div>' +
-    '<div class="fb-page-body">' +
+    // The headline is ANCHORED: it stands between the head and the
+    // scroller rather than inside it, so a long body scrolls under it and
+    // the reader never loses the name of the thing they are reading.
+    // p.sub is one short line that belongs with the name (an event's
+    // ETKİNLİK KEFİLİ) and is anchored with it.
+    '<div class="fb-page-top">' +
       '<h2 class="fb-page-title">' + esc(p.title || '') + '</h2>' +
+      (p.sub ? '<div class="fb-page-sub">' + p.sub + '</div>' : '') +
+    '</div>' +
+    '<div class="fb-page-body">' +
       (p.lines && p.lines.length
         ? '<div class="fb-page-meta">' + p.lines.map(esc).join('<br>') + '</div>' : '') +
       // ANKET's page carries live vote buttons rather than plain text --
@@ -4461,7 +4573,22 @@ function openFbPage(payload, origin) {
   page.classList.toggle('fb-mirror',
     !!(origin && origin.classList.contains('fb-mirror')));
   IstSheet.open(overlay);
+  // Lifts the bottom bar over the sheet's backdrop, so the logo -- and
+  // with it the language hold -- still answers while a page is open.
+  document.body.classList.add('fb-page-on');
   if (fbPageGrows()) IstSheet.grow({ page, inner, origin: _fbOrigin, dir: 'in' });
+  wireFbPageInner(payload, inner);
+  // Opening IS the deal for a box that can be dealt with (see the news
+  // loader's own onOpen). Every other box simply has no onOpen, exactly
+  // as it has no wire.
+  if (payload && payload.onOpen) { try { payload.onOpen(); } catch (err) { console.error(err); } }
+  try { history.pushState({ fbPage: 1 }, ''); _fbPushed = true; } catch (err) {}
+}
+
+// The back arrow and the payload's own wire, for a page whose markup is
+// already in the document -- shared by the first opening and by a
+// language flip re-rendering the page in place (rerenderFbPage).
+function wireFbPageInner(payload, inner) {
   const back = document.getElementById('fb-page-back');
   if (back) back.addEventListener('click', () => dismissFbPage());
   // ANKET's page is stateful (vote, then show the result), which a static
@@ -4469,11 +4596,29 @@ function openFbPage(payload, origin) {
   // its own listeners once its markup is actually in the document. Every
   // other box simply has no wire.
   if (payload && payload.wire) { try { payload.wire(inner); } catch (err) { console.error(err); } }
-  // Opening IS the deal for a box that can be dealt with (see the news
-  // loader's own onOpen). Every other box simply has no onOpen, exactly
-  // as it has no wire.
-  if (payload && payload.onOpen) { try { payload.onOpen(); } catch (err) { console.error(err); } }
-  try { history.pushState({ fbPage: 1 }, ''); _fbPushed = true; } catch (err) {}
+}
+
+// ── A PAGE STANDING OPEN IS RE-READ IN THE NEW LANGUAGE ──
+// The whole point of holding the logo is seeing the same thing in the
+// other language, so the page the reader is standing in has to change
+// with it. Its box has just been re-read (refreshAllColumns) and carries
+// a fresh payload; the page is rebuilt from that in place -- no grow, no
+// history entry, no onOpen (it was already opened once).
+function rerenderFbPage() {
+  const overlay = document.getElementById('fb-page-overlay');
+  const page = document.getElementById('fb-page');
+  const inner = document.getElementById('fb-page-inner');
+  if (!overlay || overlay.hidden || !page || !inner) return;
+  const payload = _fbOrigin && _fbOrigin._fbPage;
+  if (!payload) return;
+  const body = inner.querySelector('.fb-page-body');
+  const scroll = body ? body.scrollTop : 0;
+  stopSozcelCountdown();
+  page.querySelectorAll(':scope > .fb-throw-cue').forEach(n => n.remove());
+  inner.innerHTML = fbPageHTML(payload);
+  wireFbPageInner(payload, inner);
+  const nb = inner.querySelector('.fb-page-body');
+  if (nb) nb.scrollTop = scroll;
 }
 
 // Every way out that is the READER leaving goes through here, so the
@@ -4509,9 +4654,11 @@ function closeFbPage() {
     // page that opens here.
     page.querySelectorAll(':scope > .fb-throw-cue').forEach(n => n.remove());
     page.style.transform = ''; page.style.opacity = ''; page.style.transition = '';
+    if (page._throwAbort) { page._throwAbort.abort(); page._throwAbort = null; }
     IstSheet.cancelGrow(page);
     _fbOrigin = null;
   });
+  document.body.classList.remove('fb-page-on');
 }
 
 // Gone this frame, with no fold-back: for a teardown of the page itself,
@@ -4535,6 +4682,8 @@ function snapFbPageShut() {
   overlay.hidden = true;
   IstSheet.syncDim();
   inner.innerHTML = '';
+  if (page._throwAbort) { page._throwAbort.abort(); page._throwAbort = null; }
+  document.body.classList.remove('fb-page-on');
   _fbOrigin = null;
   _fbPushed = false;
 }
@@ -4572,6 +4721,13 @@ function wirePageThrow(inner, opts) {
   page.querySelectorAll(':scope > .fb-throw-cue').forEach(n => n.remove());
   const cue = inner.querySelector('.fb-throw-cue');
   if (cue) page.appendChild(cue);
+  // The pointer listeners live on #fb-page, which outlives every page
+  // opened on it -- so the last page's set is torn down here, or a throw
+  // on this page would also run every earlier page's answer.
+  if (page._throwAbort) page._throwAbort.abort();
+  const ac = new AbortController();
+  page._throwAbort = ac;
+  const sig = { signal: ac.signal };
   let drag = null;
   let spent = false;
 
@@ -4662,22 +4818,23 @@ function wirePageThrow(inner, opts) {
     } else settle();
   };
 
-  page.addEventListener('pointerdown', down);
-  page.addEventListener('pointermove', move);
-  page.addEventListener('pointerup', up);
-  page.addEventListener('pointercancel', up);
+  page.addEventListener('pointerdown', down, sig);
+  page.addEventListener('pointermove', move, sig);
+  page.addEventListener('pointerup', up, sig);
+  page.addEventListener('pointercancel', up, sig);
 }
 
 // Two options, one on each side -- an ANKET or an RSVP, where the
 // direction IS the answer. Pass no labels and it is the other kind of
 // throw: the gesture means "done with this" and nothing else, so there
 // are no buttons to press and no stamp to print (see newsFootHTML).
-function throwFootHTML(leftLabel, rightLabel, note) {
+// `on` names the side that is already the reader's answer, inked.
+function throwFootHTML(leftLabel, rightLabel, note, on) {
   return '<div class="fb-throw-cue"></div>' +
     (leftLabel && rightLabel
       ? '<div class="fb-throw-row">' +
-          '<button type="button" class="fb-throw-btn" data-throw="left">' + esc(leftLabel) + '</button>' +
-          '<button type="button" class="fb-throw-btn" data-throw="right">' + esc(rightLabel) + '</button>' +
+          '<button type="button" class="fb-throw-btn' + (on === 'left' ? ' fb-throw-on' : '') + '" data-throw="left">' + esc(leftLabel) + '</button>' +
+          '<button type="button" class="fb-throw-btn' + (on === 'right' ? ' fb-throw-on' : '') + '" data-throw="right">' + esc(rightLabel) + '</button>' +
         '</div>'
       : '') +
     (note ? '<div class="fb-throw-note">' + esc(note) + '</div>' : '');
@@ -6299,7 +6456,7 @@ function wireLangRelabel() {
   if (_langRelabelWired || !window.I18N || !I18N.onChange) return;
   _langRelabelWired = true;
   I18N.onChange(() => {
-    refreshAllColumns();
+    refreshAllColumns().then(rerenderFbPage);
     relabelGameFrame();
   });
 }
@@ -6324,28 +6481,23 @@ function refreshAllColumns() {
   [loadOlaylarActor, loadAnketActor].forEach(f => {
     if (f && f.reset) f.reset();
   });
+  const loads = [];
   (cast || []).forEach(a => {
     if (!a.def.load) return;
-    try { a.def.load(a.el); } catch (err) { console.error(err); }
+    try { loads.push(a.def.load(a.el)); } catch (err) { console.error(err); }
   });
   refreshDayMeter();
+  return Promise.allSettled(loads);
 }
 
-// ── A PAGE STANDING OPEN NEEDS NOTHING, AND THAT IS WORTH STATING ──
-// A story's own body is the most visible thing in the app a flip
-// changes, so the obvious thing to do here is re-render an open page
-// from its box's fresh payload. There is nothing to re-render: one of
-// THE sheet's four ways out is a press outside it, and its backdrop is
-// over the bar (the overlay layer is 500, the two bars 400/401) -- so a
-// press aimed at the logo while a page stands open closes the page
-// before this gesture can begin. The reading the reader had is already
-// gone by the time the language could change under it, and the next
-// opening builds its page from a column that has been re-read.
+// A page standing open is re-read too (rerenderFbPage above): the bar is
+// lifted over its backdrop while it is open (body.fb-page-on), so the
+// logo can be held with an evening or a story in front of the reader,
+// and seeing that same page in the other language is the point of it.
 //
-// The game overlay is the one surface that is NOT like this, and
-// deliberately: it lifts its own bottom edge to leave the tab bar
-// pressable, because a game is where the reader stays (see THE GAME
-// OVERLAY). So it is the one thing below that has to be told.
+// The game overlay lifts its own bottom edge to leave the tab bar
+// pressable (see THE GAME OVERLAY) and is an iframe with its own I18N,
+// so it is told separately.
 
 // A game is a real page in an iframe over the book (see THE GAME
 // OVERLAY), with its own I18N — same origin, so the flip can simply be
@@ -6379,6 +6531,10 @@ function wireMap() {
       // as well, so a pointercancel -- which is followed by no click at
       // all -- cannot leave it standing to swallow the press after it.
       if (langHoldTook) { langHoldTook = false; return; }
+      // With a page open the bar stands over its backdrop, so a plain
+      // tap here is what a press outside the page always was: close it.
+      const pageOv = document.getElementById('fb-page-overlay');
+      if (pageOv && !pageOv.hidden) { dismissFbPage(); return; }
       petekIsOpen() ? closePetek() : openPetek();
     });
     btn.addEventListener('keydown', (e) => {
