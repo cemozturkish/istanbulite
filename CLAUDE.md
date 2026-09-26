@@ -2592,10 +2592,15 @@ Four things about it:
   the back half of every winter night under the wrong day, and two readers on the same night would
   be holding different editions depending on which side of midnight they opened the app.
 
-**The games are night-only, behind one flag** (`NIGHT_GAMES_ENABLED`) — and by day that column is
-where the city WRITES them. It is the edition's own rule applied to the one column that is not
-reading at all: from sunrise the three boxes collect what the night's games will be made of, and at
-sunset the same three boxes, in the same order, ARE those games.
+**Whether the games are night-only lives behind one flag** (`NIGHT_GAMES_ENABLED`, currently
+`false`) — set true, that column becomes what this section describes: by day the three boxes
+collect what the night's games will be made of (the offer/suggestion boxes below), and at sunset
+the same three boxes, in the same order, ARE those games. **With the flag off, as it is now, the
+games stand in their column and are playable around the clock** — the offer boxes never show, and
+`onpressOyun` always opens the game rather than routing a daytime press to an offer page. What does
+not change either way is *which* word/puzzle a game plays: that is still keyed to the game **night**
+(`IstDate.gameNight()` / `gameNightSeed()`, which rotates at sunset, see "AND THE WORD NOW BELONGS
+TO A NIGHT" below) — so the content still changes at sunset, it is simply no longer gated behind it.
 
 | slot | gündüz | gece |
 |---|---|---|

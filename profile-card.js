@@ -1942,15 +1942,14 @@
     return `<span class="ist-hive-day-col ist-hive-day-${width}">${slots}</span>`;
   }
 
-  // Are the games on at all right now? They are night-only
-  // (NIGHT_GAMES_ENABLED in project.html): from sunrise that column is
-  // Oyun önerileri, where what a member has or has not offered is their
-  // own (sozcel_word_suggestions is not world-readable) and is not a
-  // number this petek can know. So by day the games column inks
-  // nothing, exactly like Anket and Etkinlikler -- rather than inking
-  // last night's leftovers against a box that is not a game.
+  // Are the games on at all right now? NIGHT_GAMES_ENABLED in
+  // project.html is false, so the games column is playable around the
+  // clock -- only the night's word/puzzle rotates at sunset, the column
+  // itself never swaps for the offer boxes. So the petek inks this
+  // column at any hour; the flag flipping back on is what would make
+  // this ask IstDate.edition() again.
   function hiveGamesTonight() {
-    return !IstDate.edition || IstDate.edition() === 'gece';
+    return true;
   }
 
   function hiveStatHTML(status, t) {
