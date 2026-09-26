@@ -239,7 +239,7 @@
   let root;            // DOM root for fullscreen modal phases
   let spotlightEl;     // The persistent dim overlay
   let pane;            // The mascot pane (corner bubble)
-  let litTargets = []; // { el, round }[] -- every element lit so far, and the shape of its hole
+  let litTargets = []; // { el }[] -- every element lit so far
   let firewallInstalled = false;
   // When set, a click anywhere on the page (outside the pane / interactive
   // target) advances the tour. Cleared after firing once.
@@ -675,75 +675,78 @@
   //
   // The rects are measured, so they are re-measured on resize and again as a
   // depth change's own transition settles.
-  function spotlightPad() { return 6; }
-  // A ROUND hole reads as the control GLOWING, a rectangular one reads as
-  // it being boxed -- see the avatar-picking beats (pickHair/pickShirt),
-  // which light one small arrow at a time and want to say "this" without
-  // drawing a square around it the way a whole-column beat's box does.
-  // Rounder and roomier than the square pad, since a tight circle around
-  // a 12px icon would read as a dot rather than a glow.
-  function spotlightRoundPad() { return 14; }
+  function spotlightPad() { return 4; }
 
-  // ONE path with real subpaths: the viewport, then one per hole, evenodd.
+  // The holes are the lit elements' own boxes, snug (spotlightPad), and
+  // they are cut as a UNION: a thing lit twice, or two lit things that
+  // overlap (the avatar arrows inside the arrow column they belong to),
+  // is simply lit. That is why this is a mask and no longer an evenodd
+  // clip-path -- evenodd flips back to dim wherever two holes overlap,
+  // which printed the overlaps as dark patches inside the lit area. And
+  // there are no round holes any more: a circle sized off a wide element
+  // (your own name on the bar) is a disc across half the screen, and it
+  // lit paper nobody was talking about. The thing itself is the highlight.
   //
-  // It must be `path()` and never `polygon()`, and that is not a style
-  // preference -- `polygon()` is a single closed ring, so listing the outer
-  // rect's corners and then a hole's runs one continuous edge from the last
-  // hole corner back to the first outer corner, and evenodd carves a
-  // DIAGONAL WEDGE out of the dim that has nothing to do with either. It
-  // hit-tests correctly, which is what made it look fine in a test that only
-  // asked `elementFromPoint`; sampling the painted pixels is what shows it.
-  // Only `path()` can express more than one subpath.
-  //
-  // The element is `position: fixed; inset: 0`, so viewport coordinates are
-  // its own. A browser without `path()` support keeps a plain dim: no hole is
-  // a worse spotlight, a wrong hole is a broken page.
+  // The mask is one SVG drawn in viewport pixels -- the element is
+  // `position: fixed; inset: 0`, so viewport coordinates are its own --
+  // with an inner <mask> doing the punching, so the image's ALPHA is the
+  // dim (mask-image's default mode for an image) and every hole is
+  // transparent however many of them overlap. Painted with DOM-free
+  // string building and set as a data URI; a browser without mask-image
+  // keeps a plain dim: no hole is a worse spotlight, a wrong hole is a
+  // broken page.
   const CAN_CUT = !window.CSS || !CSS.supports
-    || CSS.supports('clip-path', 'path("M0 0H1V1H0Z")');
+    || CSS.supports('mask-image', 'none') || CSS.supports('-webkit-mask-image', 'none');
+
+  function setSpotlightMask(v) {
+    spotlightEl.style.maskImage = v;
+    spotlightEl.style.webkitMaskImage = v;
+    const size = v ? '100% 100%' : '';
+    spotlightEl.style.maskSize = size;
+    spotlightEl.style.webkitMaskSize = size;
+    const rep = v ? 'no-repeat' : '';
+    spotlightEl.style.maskRepeat = rep;
+    spotlightEl.style.webkitMaskRepeat = rep;
+  }
 
   function paintSpotlight() {
     if (!spotlightEl || !CAN_CUT) return;
     const rects = litTargets
-      .map(t => ({ r: t.el.getBoundingClientRect(), round: t.round }))
-      .filter(t => t.r.width > 0 && t.r.height > 0);
+      .map(t => t.el.getBoundingClientRect())
+      .filter(r => r.width > 0 && r.height > 0);
 
-    if (!rects.length) { spotlightEl.style.clipPath = ''; return; }
+    if (!rects.length) { setSpotlightMask(''); return; }
 
     const pad = spotlightPad();
-    const roundPad = spotlightRoundPad();
     const n = (v) => v.toFixed(1);
-    const box = (l, t, r, b) => `M${n(l)} ${n(t)}H${n(r)}V${n(b)}H${n(l)}Z`;
-    // Two half-circle arcs closing back on themselves -- path() has no
-    // dedicated circle command, only arcs.
-    const circle = (cx, cy, radius) =>
-      `M${n(cx - radius)} ${n(cy)}A${n(radius)} ${n(radius)} 0 1 0 ${n(cx + radius)} ${n(cy)}`
-      + `A${n(radius)} ${n(radius)} 0 1 0 ${n(cx - radius)} ${n(cy)}Z`;
     const W = window.innerWidth, H = window.innerHeight;
-    const holes = rects.map(({ r, round }) => round
-      ? circle(r.left + r.width / 2, r.top + r.height / 2, Math.max(r.width, r.height) / 2 + roundPad)
-      : box(r.left - pad, r.top - pad, r.right + pad, r.bottom + pad));
-    const d = [box(0, 0, W, H)].concat(holes).join(' ');
-    spotlightEl.style.clipPath = `path(evenodd, "${d}")`;
+    const holes = rects.map(r =>
+      `<rect x="${n(r.left - pad)}" y="${n(r.top - pad)}" width="${n(r.width + pad * 2)}" height="${n(r.height + pad * 2)}" fill="black"/>`
+    ).join('');
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`
+      + `<defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}">`
+      + `<rect width="${W}" height="${H}" fill="white"/>${holes}</mask></defs>`
+      + `<rect width="${W}" height="${H}" fill="black" mask="url(#m)"/></svg>`;
+    setSpotlightMask(`url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
   }
 
   // Light one element or several (a column of cast boxes is three boxes and
   // no wrapper, and a beat talks about the column). Everything lit before
-  // stays lit; passing nothing lights nothing, which is a beat speaking
-  // generally rather than pointing. `opts.round` cuts a circular hole
-  // instead of the default rectangular one (see paintSpotlight).
-  function addSpotlight(target, opts) {
+  // stays lit -- what has been introduced stays at full strength, what has
+  // not stays dim; passing nothing lights nothing, which is a beat speaking
+  // generally rather than pointing.
+  function addSpotlight(target) {
     spotlightEl.classList.add('show');
-    const round = !!(opts && opts.round);
     const els = !target ? []
       : (target.length !== undefined && !target.nodeType ? Array.from(target) : [target]);
-    els.forEach(el => { if (el && !litTargets.some(t => t.el === el)) litTargets.push({ el, round }); });
+    els.forEach(el => { if (el && !litTargets.some(t => t.el === el)) litTargets.push({ el }); });
     paintSpotlight();
   }
 
   function clearSpotlight() {
     litTargets = [];
     if (spotlightEl) {
-      spotlightEl.style.clipPath = '';
+      setSpotlightMask('');
       spotlightEl.classList.remove('show');
     }
   }
@@ -989,7 +992,7 @@
       // name. Same rule as the logo below it -- the reader opens it and
       // shuts it themselves, because that is the press they will make
       // forever after.
-      { target: '#ist-pc-me', round: true, speech: lines.toSen, sheet: 'open' },
+      { target: '#ist-pc-me', speech: lines.toSen, sheet: 'open' },
       // The reader first, the shape second. On day one the petek is one
       // hexagon and six empty sides, so there is nothing true to say about
       // neighbours yet -- but there is always something true to say about
@@ -1001,9 +1004,9 @@
       // AVATAR_ACCESSORY_OPTIONS's one alternative (glasses) is
       // unconditionally `locked: true` -- neither has a second OPEN choice
       // to hand a reader on day one. Hair and shirt do, so those are the
-      // two beats. `pick: true` lights the pair with a round hole (see
-      // paintSpotlight) rather than boxing it, and never advances on a
-      // press -- browsing IS the point, see runPick.
+      // two beats. `pick: true` lights the pair itself (see
+      // paintSpotlight) and never advances on a press -- browsing IS the
+      // point, see runPick.
       //
       // The ids are unchanged: the arrows the petek's own depth carried
       // were always the sheet's own markup and the sheet's own four
@@ -1011,13 +1014,13 @@
       // re-pointing rather than rewriting. The sheet opens already
       // customizing (`sen` in PROFILE_SECTIONS), so they are on screen
       // from the beat's first frame.
-      { inSheet: true, target: '#po-hair-prev, #po-hair-next', round: true,
+      { inSheet: true, target: '#po-hair-prev, #po-hair-next',
         speech: lines.pickHair, pick: true },
-      { inSheet: true, target: '#po-shirt-prev, #po-shirt-next', round: true,
+      { inSheet: true, target: '#po-shirt-prev, #po-shirt-next',
         speech: lines.pickShirt, pick: true },
       // Both arrow columns, so two rings -- `all`.
       { inSheet: true, target: '.ist-pc-cover-pick-col', all: true, speech: lines.senDone },
-      { target: '#profile-overlay .ist-sheet-close', round: true,
+      { target: '#profile-overlay .ist-sheet-close',
         speech: lines.senClose, sheet: 'close' },
       // ── The petek's own door ──
       // It is the logo, not a lane, so the reader is asked to press it and
@@ -1026,7 +1029,7 @@
       // inside the petek and asserts no lane at all (`inPetek`), because
       // asserting one would walk the strip behind a layer the reader is
       // standing in.
-      { target: '#fb-logo-btn', round: true, speech: lines.toPetek, petek: 'open' },
+      { target: '#fb-logo-btn', speech: lines.toPetek, petek: 'open' },
       // One depth, so one beat: the shape is what it is the moment it
       // opens. The two pulls that used to walk out of Sen and on to the
       // whole petek are gone with the depths themselves.
@@ -1097,8 +1100,7 @@
       requestAnimationFrame(() => {
         if (!b.target) { addSpotlight(null); return; }
         addSpotlight(b.all ? document.querySelectorAll(b.target)
-                           : document.querySelector(b.target),
-                     { round: !!b.round });
+                           : document.querySelector(b.target));
         // The sheet is still sliding up for the first half-second of the
         // beats inside it, so a rect taken on the next frame is where the
         // arrows were on the way. The paint is idempotent, so it is
@@ -1135,7 +1137,7 @@
       if (sheetOpen() === want) { advance(); return; }
 
       requestAnimationFrame(() => {
-        addSpotlight(document.querySelector(b.target), { round: !!b.round });
+        addSpotlight(document.querySelector(b.target));
         openPassthrough(want ? '#ist-pc-me' : '#profile-overlay');
       });
       renderPane({ speech: b.speech, promptText: COPY.pressLogo[lang] });
@@ -1181,7 +1183,7 @@
       // The sheet is still sliding up under the arrows, so the rect is
       // taken a frame later and re-taken as it settles.
       requestAnimationFrame(() => {
-        addSpotlight(document.querySelectorAll(b.target), { round: !!b.round });
+        addSpotlight(document.querySelectorAll(b.target));
         settleSpotlight();
         // Passthrough so the reader can actually reach the arrows -- the
         // firewall's lock is pointer-events:none on everything outside
@@ -1256,7 +1258,7 @@
       if (!!f.petekOpen === want) { advance(); return; }
 
       requestAnimationFrame(() => {
-        addSpotlight(document.querySelector(b.target), { round: !!b.round });
+        addSpotlight(document.querySelector(b.target));
         openPassthrough('#fb-logo-btn');
       });
       renderPane({ speech: b.speech, promptText: COPY.pressLogo[lang] });
