@@ -560,8 +560,9 @@ sb.from('articles').delete().eq('id', id)
   pressed; both RPCs answer only for the caller's own map and only for the events it names, the
   same fence `hive_member_status` stands behind. The ring is deliberately left alone: red on a
   hexagon's ring already means "this is the one named on the bar"
-- **The event page itself (project.html, `loadEtkinlikActor`)**: the top line is WHERE (district
-  · venue, in red) against WHEN (day and hour), both larger than a card's corners; the headline
+- **The event page itself (project.html, `loadEtkinlikActor`)**: the top line is WHERE (the
+  district alone, in red — a story's page does the same, naming its district when it has one)
+  against WHEN (day and hour), both larger than a card's corners; the headline
   is **anchored** (`.fb-page-top`, between the head and the scroller, on every band page) with the
   **ETKİNLİK KEFİLİ** line under it; the body is the description and nothing else; the floor is
   the two buttons alone (`events.going` / `events.notgoing` / `events.changed`), no question and no
@@ -569,7 +570,10 @@ sb.from('articles').delete().eq('id', id)
   the page. **Etkinlik kefili** (`events.kefil_id`, `db/events_kefil.sql`) is the member who
   vouches for an evening, assigned by the admin in the Etkinlikler form and printed as
   "ETKİNLİK KEFİLİ: BAKIRKÖY'DEN CEM" (`trFrom` builds the Turkish ablative; English reads
-  "CEM FROM BAKIRKÖY"). It is counted on the member's own profile ("Etkinlik Kefili"), beside the
+  "CEM FROM BAKIRKÖY"); the name is a `.kefil-link`, so pressing it opens that member's sheet
+  (lifted over the open page by `body.fb-page-on #member-sheet`). The floor carries the buttons
+  alone with the same air above and below them, and a story outside a seri has no floor at all.
+  It is counted on the member's own profile ("Etkinlik Kefili"), beside the
   people they vouched for — later, ratings from the people who went can hang off it.
 - **Set like Kahvehane's own event cards** — the kicker, the title, the meta and the page's whole
   type scale are that page's numbers (`.ev-card` / `.event-page-*` in kahvehane.html), not a second
