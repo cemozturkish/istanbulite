@@ -270,8 +270,12 @@
       min-width: 0;
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      padding: 3px 6px;
+      /* Flush to the top, not centered -- the bar's height now varies a
+         lot (72px to 320px, see CLUE_BAR_MAX), and a short clue centered
+         in a tall bar reads as the kicker floating in empty space rather
+         than as a card with room to spare. */
+      justify-content: flex-start;
+      padding: 8px 6px 4px;
       cursor: pointer;
     }
     .clue-bar-k {
@@ -285,12 +289,13 @@
     .clue-bar-t {
       font-size: 1.05rem;
       line-height: 1.35;
-      /* Six lines at most -- the real limit on a short bar is the box's
-         own overflow:hidden above, which clips cleanly (no ellipsis)
-         well short of six lines whenever --clue-bar-h is near its
+      /* Twelve lines at most -- enough room for CLUE_BAR_MAX's tallest
+         bar. The real limit on a short bar is the box's own
+         overflow:hidden above, which clips cleanly (no ellipsis) well
+         short of twelve lines whenever --clue-bar-h is near its
          minimum. */
       display: -webkit-box;
-      -webkit-line-clamp: 6;
+      -webkit-line-clamp: 12;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
@@ -1386,10 +1391,14 @@ function layoutGame() {
   layoutBoard();
 }
 
-// The clue bar's floor and ceiling. It never claims a pixel the grid
-// needs -- see layoutBoard()'s own note.
+// The clue bar's floor, and a ceiling generous enough that it is never
+// actually the thing stopping the bar from taking all the room the grid
+// genuinely doesn't need -- a lower cap here just relocates the wasted
+// space from "inside the box" to "below the box", which is the exact
+// complaint this whole thing exists to fix. It never claims a pixel the
+// grid needs -- see layoutBoard()'s own note.
 const CLUE_BAR_MIN = 72;
-const CLUE_BAR_MAX = 168;
+const CLUE_BAR_MAX = 320;
 
 let _lastCell = 0;
 function layoutBoard() {
