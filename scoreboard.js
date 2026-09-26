@@ -68,6 +68,38 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
+  // Fetch every page by a unique key, even when the API caps responses
+  // below our requested size. A short page is not proof of exhaustion.
+  async function readPages(query, key) {
+    key = key || 'id';
+    const rows = [];
+    let cursor = null;
+    for (;;) {
+      let page = query().order(key, { ascending: true }).limit(250);
+      if (cursor !== null) page = page.gt(key, cursor);
+      const { data, error } = await page;
+      if (error) throw error;
+      if (!data || data.length === 0) return rows;
+      const next = data[data.length - 1][key];
+      if (next == null || (cursor !== null && next <= cursor)) {
+        throw new Error('Scoreboard pagination did not advance');
+      }
+      rows.push(...data);
+      cursor = next;
+    }
+  }
+
+  // Explicit dates avoid lexical comparisons on historical Y-M-D text.
+  // Include both spellings for older/imported rows, but never future days.
+  function weekDates(cutoff) {
+    const today = global.IstDate.now();
+    const dates = [];
+    for (const d = new Date(cutoff); d <= today; d.setDate(d.getDate() + 1)) {
+      dates.push(isoOf(d));
+    }
+    return dates;
+  }
+
   // ── The ranked board, as data ──
   // Returns { rows, error }. rows is at most TOP_N of
   // { uid, score, neighborhood, name }, already sorted. An empty week is
@@ -85,25 +117,23 @@
     const game = opts.game || 'sozcel';
     const parseYMD = global.IstDate.parseYMD;
 
+    const cutoff = weekCutoff();
+    const dates = weekDates(cutoff);
+    const keys = [...new Set(dates.flatMap(d => [d, d.split('-').map(Number).join('-')]))];
     let results;
     try {
-      const { data, error } = await sb
+      results = await readPages(() => sb
         .from('game_results')
-        .select('user_id, neighborhood, date, won, attempts, created_at')
+        .select('id, user_id, neighborhood, date, won, attempts, created_at')
         .eq('game', game)
-        .gte('attempts', 1);
-      if (error) throw error;
-      results = data;
+        .in('date', keys)
+        .gte('attempts', 1));
     } catch (e) {
       return { rows: null, error: e };
     }
-    if (!results || results.length === 0) return { rows: [], error: null };
-
-    const cutoff = weekCutoff();
-    const weeklyAll = results.filter(r => {
-      const d = parseYMD(r.date);
-      return d && d >= cutoff;
-    });
+    if (results.length === 0) return { rows: [], error: null };
+    // A padded and unpadded date represent the same player/day.
+    const weeklyAll = results.map(r => ({ ...r, date: isoOf(parseYMD(r.date)) }));
 
     // Find the first winner per date, both Istanbul-wide and per-district
     // (earliest created_at among won=true rows). Always computed from the
@@ -169,36 +199,39 @@
     // enjoy pays off on the same weekly board as playing does. Skipped for
     // the per-neighborhood filtered view -- that list is about who solved
     // the puzzle from that neighborhood, not who set the word.
-    if (!neighborhoodFilter) {
+    if (!neighborhoodFilter && game === 'sozcel') {
       try {
-        const { data: sozcuRows } = await sb
+        const sozcuRows = await readPages(() => sb
           .from('sozcel_used_answers')
           .select('used_on, sozcul_id')
-          .gte('used_on', isoOf(cutoff));
+          .in('used_on', dates), 'used_on');
         const sozcuByDay = new Map();
         (sozcuRows || []).forEach(r => {
           const d = parseYMD(r.used_on);
           if (d && r.sozcul_id) sozcuByDay.set(d.getTime(), r.sozcul_id);
         });
         if (sozcuByDay.size > 0) {
-          const creditedPlayerDay = new Set();
+          const creditedPlayerDay = new Map();
           inScope.forEach(r => {
-            if (!r.user_id) return;
+            if (!r.user_id || !r.won) return;
             const d = parseYMD(r.date);
             if (!d) return;
             const sozcuId = sozcuByDay.get(d.getTime());
             if (!sozcuId || sozcuId === r.user_id) return;
             const dedupKey = r.user_id + '|' + d.getTime();
-            if (creditedPlayerDay.has(dedupKey)) return;
-            creditedPlayerDay.add(dedupKey);
-            const bonus = sozcuPoints(r.attempts, r.won);
-            if (bonus <= 0) return;
+            const existing = creditedPlayerDay.get(dedupKey);
+            if (!existing || gamePoints(r.attempts, true) > gamePoints(existing.attempts, true)) {
+              creditedPlayerDay.set(dedupKey, { sozcuId, attempts: r.attempts });
+            }
+          });
+          creditedPlayerDay.forEach(({ sozcuId, attempts }) => {
+            const bonus = sozcuPoints(attempts, true);
             const prev = scores.get(sozcuId) || { score: 0, neighborhood: null, lastDate: null };
             prev.score += bonus;
             scores.set(sozcuId, prev);
           });
         }
-      } catch (e) { /* Sözcü bonus is best-effort */ }
+      } catch (e) { return { rows: null, error: e }; }
     }
 
     // Resolve display names from the profiles table.
@@ -206,17 +239,18 @@
     const nameMap = new Map();
     const nbFallbackMap = new Map();
     try {
-      if (userIds.length > 0) {
-        const { data: profs } = await sb
+      for (let offset = 0; offset < userIds.length; offset += 100) {
+        const batch = userIds.slice(offset, offset + 100);
+        const profs = await readPages(() => sb
           .from('profiles')
           .select('id, first_name, neighborhood')
-          .in('id', userIds);
+          .in('id', batch));
         (profs || []).forEach(p => {
           if (p.first_name) nameMap.set(p.id, p.first_name.toLocaleUpperCase('tr-TR'));
           if (p.neighborhood) nbFallbackMap.set(p.id, p.neighborhood);
         });
       }
-    } catch (e) { /* name lookup is best-effort */ }
+    } catch (e) { return { rows: null, error: e }; }
 
     const rows = Array.from(scores.entries())
       .map(([uid, v]) => ({
@@ -264,3 +298,4 @@
   global.IstScoreboard = { weekly, rowsHTML, weekCutoff, gamePoints, firstSolverBonus, sozcuPoints,
                            TOP_N, ISTANBUL_FIRST_BONUS, NEIGHBORHOOD_FIRST_BONUS };
 })(window);
+
