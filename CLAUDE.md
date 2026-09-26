@@ -2348,9 +2348,9 @@ Seven things about it:
   behind it (its own `setLang` is then a no-op).
 - **Keyboard and screen readers still get the petek, and the language a different way.** Enter and
   Space are the door; the same preference is a pair of buttons at the petek's innermost depth (Sen).
-  This is the shortcut for a thumb, not the only route. It also stands down entirely while the
-  onboarding tour is running (`ist-onb-locked`), which drives this same mark and has a language
-  step of its own.
+  This is the shortcut for a thumb, not the only route. It stands down while the onboarding tour is
+  running (`ist-onb-locked`), which drives this same mark — except on the tour's own language beat
+  (`ist-onb-lang`), which exists to teach it.
 
 **What a flip repaints is registered against `I18N.onChange`, not called from the hold**
 (`wireLangRelabel`), so the petek's own preference row relabels the app by exactly the same path
@@ -3487,9 +3487,21 @@ Six things about it:
 
 A brand-new account is walked through the app once, on `project.html` and nowhere else, and
 `profiles.onboarded_at` is what says it has happened. Welcome (the kefil line, and the T&C tick
-that gates going further) → language → palette → **the lane tour** → the member's own kefil code →
-finish, which writes `onboarded_at`, `language_pref`, `palette_pref` and `mascot` in one update.
-The admin's kill switch is `app_settings.onboarding_enabled` (missing row = on).
+that gates going further) → **the language hold** → palette → **the lane tour** → the member's own
+kefil code → finish, which writes `onboarded_at`, `language_pref`, `palette_pref` and `mascot` in one
+update. The admin's kill switch is `app_settings.onboarding_enabled` (missing row = on).
+
+**Language is taught, not asked** (`stepLanguageHold`). There is no language menu: the app changes
+language by holding the logo (see "Hold the logo and the app changes language"), so that is what the
+welcome ends on. While the fullscreen modal is up (`body.ist-onb-modal` — the welcome, palette and
+closing screens, never the spotlight tour) the bottom bar is lifted over it **with the logo alone** —
+Kütüphane and Kahvehane are `visibility: hidden` so the logo stays centred, and they mean nothing
+yet anyway. The beat hands back the logo through the `logo` passthrough and sets
+`body.ist-onb-lang`, which is the one exception to the hold standing down while the tour is locked
+(`onLangDown` in project.html); a plain tap on the logo does nothing during it rather than opening
+the petek behind the welcome. It advances on `I18N.onChange`, says what happened in the language it
+just arrived at, and a second hold flips it back and says it again the other way. After `STALL_MS`
+a reader who cannot hold is let through.
 
 **One voice, and no mascot.** Every line used to branch into a sarcastic cat and an excitable dog
 on top of the TR/EN branch — four versions of each to keep true and in step, so a correction to one
