@@ -88,6 +88,28 @@ someone about it, which is the whole point of the app being on the other side of
 
 The zoom levels tell one story: mahalle → Istanbul → Türkiye, with the user standing in the middle.
 
+### Sunrise renews Kütüphane, sunset renews Kahvehane
+
+The two sides of the app do not share a day. **Kütüphane is the reading side, and its paper comes
+out with the light**: the news and the city's own question (Anket) are renewed at sunrise and stand
+until the next one. **Kahvehane is the doing side, and its paper comes out as the lamps go on**: the
+evenings and the night's games are renewed at sunset and stand until the next one. You read the
+paper over breakfast next to the word you were playing at midnight; you go out in the evening
+knowing what this morning's paper said.
+
+So the reader is always half way through both, and **nothing ever renews the whole app at once** —
+the sun turns one side's page at a time. That is "always in the middle" said with the sun: there is
+no instant at which the whole city resets under the reader, and there is always one side of the
+app that is fresh and one that is still being lived.
+
+Each side's day is named for the day it BEGAN on (`IstDate.kutuphaneDay()` /
+`IstDate.kahvehaneDay()`): a Kütüphane day named D runs sunrise D → sunrise D+1, a Kahvehane day
+named D runs sunset D → sunset D+1. Between a sunrise and the sunset after it the two differ by one
+— Kütüphane is today's, Kahvehane is still last night's. Anything that belongs to one side is keyed
+to that side's day and to nothing else — never the calendar date, and never a second half of the
+same day. The first launch after each edge says which side just turned
+(`edition-notice.js`: "Güneş bugün İstanbul'da 06:58'de doğdu. Kütüphane yenilendi.").
+
 ### No DMs — ever
 
 Users can never directly message each other. This is a permanent, foundational decision, not a
@@ -162,10 +184,12 @@ default one.
 ├── event-interest.js     # "İlgimi çekti": the verdict Kahvehane's event deck records, Hane reads
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
 ├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it,
-│                         plus sunTimes/isDaytime/edition — which paper is out —
+│                         plus sunTimes/isDaytime/edition — which half of the sky it is —
+│                         kutuphaneDay/kahvehaneDay — which day each SIDE is holding
+│                         (sunrise renews Kütüphane, sunset renews Kahvehane) —
 │                         gameNight/gameNightSeed/nextGameNight — which NIGHT is being played —
-│                         nextEdition — when the next paper goes to press, for the admin's
-│                         own countdown — and skyArc — where the sun or moon is right now
+│                         nextEdition — which side goes to press next and when, for the
+│                         admin's own countdown — and skyArc — where the sun or moon is now
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
@@ -676,9 +700,17 @@ sb.from('articles').delete().eq('id', id)
     calling in — there are six list renderers and the seventh is the one somebody forgets.
   - **The countdown is the press bar's own clock**, written by the same `pressTick` — one
     timer for the desk, not one per surface. It is the same deadline said twice.
+  - **One date names both pages, and each page says when it goes out.** The paper dated D is
+    Kütüphane from sunrise on D and Kahvehane from sunset on D (see "Sunrise renews Kütüphane,
+    sunset renews Kahvehane"), so there is no half to pick — there used to be, a pair of
+    Sabah postası / Akşam gazetesi buttons under the date, and it went with the news's evening
+    half. What each page's heading carries instead is its own press time and where it stands
+    (`baskiPageWhenHTML`): *yayında*, *sıradaki*, *ileride* or *geçti* — by day, today's
+    Kütüphane is out and today's Kahvehane is next.
   - **The date is pickable, and setting a paper other than the next one out is said out
     loud.** Ordinary thing to do; not noticing you are doing it is the mistake, since the
-    three `*_current_edition` resolvers hand the reader the newest edition at or before today.
+    three `*_current_edition` resolvers hand the reader the newest edition at or before that
+    side's own day.
   - **Every write re-reads the whole board.** Nothing is patched optimistically: a curation
     screen that can disagree with the database is the one thing this may never be.
   - A narrow desk loses the board before it loses the work — the press bar still says what
@@ -772,17 +804,18 @@ sb.from('articles').delete().eq('id', id)
   finished". So the band under the masthead answers both, on every section, and never
   scrolls away: the edition being set, the time left to set it, and one **forme** per thing
   that edition needs — each pressable, each landing on the section that fixes it.
-  - **The deadline is the SUN, not a timer somebody set.** The app prints two editions a day
-    and sunrise/sunset over İstanbul are when they come out, so the countdown runs on
-    `IstDate.nextEdition()` — the one place that knows which paper is next and when
-    (CLAUDE.md rule 10; never a stored hour, and never a second copy of the sunrise
-    equation in this page). What that buys is a deadline that *moves through the year*:
-    13h39m of daylight to set the evening paper in June, 9h15m in December. It is
-    deliberately **not** `nextGameNight()` generalised — that one is always the next
-    **sunset**, because the games are night-only and a sunrise is nothing to them; this is
-    whichever edge comes first, because both of them put a paper out. The edition and the
-    day it is named for come straight back out of `editionKey()` at that instant rather
-    than being re-derived, so "a night is named for the day it began on" exists once.
+  - **The deadline is the SUN, not a timer somebody set.** Sunrise renews Kütüphane and
+    sunset renews Kahvehane, so there are two press times a day, one per side, and the
+    countdown runs on `IstDate.nextEdition()` — the one place that knows which side goes out
+    next and when (CLAUDE.md rule 10; never a stored hour, and never a second copy of the
+    sunrise equation in this page). The bar names the SIDE (`pressEditionName`: Kütüphane /
+    Kahvehane), because which page's slots are due is what an editor acts on. What the sun
+    buys is a deadline that *moves through the year*: 13h39m of daylight to set Kahvehane in
+    June, 9h15m in December. It is deliberately **not** `nextGameNight()` generalised — that
+    one is always the next **sunset**, because the games are Kahvehane's and a sunrise renews
+    nothing of theirs; this is whichever edge comes first. The date comes straight back out
+    of `editionKey()` at that instant, and it is exactly the day of the side that renews
+    there (`kutuphaneDay` at a sunrise, `kahvehaneDay` at a sunset).
   - **It re-aims itself.** The tick re-asks `nextEdition()` every second rather than holding
     the instant it started with: an admin leaves this page open for hours, and the moment a
     paper goes out the bar has to start counting to the next one — and re-run the check,
@@ -794,13 +827,15 @@ sb.from('articles').delete().eq('id', id)
     `edition_date` + `archived_at is null` exactly as `loadHaberlerActorAt` does (a district
     story is İstanbul here too); Etkinlikler asks `loadEtkinlikActor`'s own three
     `+03:00` day ranges; the night's word, puzzle and questions are keyed to the **night**
-    and not the calendar date, which is what `ctx.date` already is for a gece edition.
+    and not the calendar date, which is what `ctx.date` already is at a sunset.
     Where project.html's loader is the authority, the comment on the check names it.
-  - **A forme belongs to the editions it is true of and no others** — the games and their
-    questions are the night's, the second news story is the day's (see "What each screen
-    carries"). One that does not apply is drawn **dashed**, the site's own "nothing here"
-    convention, rather than dropped: the bar keeps the same shape on both editions, so an
-    editor learns where to look instead of re-reading it twice a day.
+  - **A forme belongs to ONE side's paper** — Haberler and İlçe anketi are Kütüphane's and go
+    out at sunrise (`editions: ['gun']`), Etkinlikler and the three games are Kahvehane's and
+    go out at sunset (`['gece']`), and the bar is ordered by side. One whose side is not the
+    one going to press next is drawn **dashed**, the site's own "nothing here" convention,
+    and says when it goes instead ("Gün doğumunda" / "Gün batımında", `pressEditionWhen`)
+    rather than being dropped: the bar keeps the same shape all day, so an editor learns
+    where to look instead of re-reading it twice a day.
   - **Four states, and the middle one is the point.** `ok` is set and deliberately quiet — a
     desk full of ticks should read as nothing left to do, not as a wall of decoration.
     `miss` is red and means *the reader will meet an empty slot*. `na` is the dashed one
@@ -2513,29 +2548,35 @@ slide that is the city:
 | | Lane 0 | Lane 1 | Lane 2 |
 |---|---|---|---|
 | | **Kütüphane** | **the app map** | **Kahvehane** |
-| what stands there (gündüz) | Haberler + Anket (soruyor) | where you are in relation to it all | Etkinlikler + Oyun Önerileri |
-| what stands there (gece) | Haberler + Anket (cevaplıyor) | where you are in relation to it all | Etkinlikler + Oyunlar |
+| what stands there | Haberler + Anket | where you are in relation to it all | Etkinlikler + Oyunlar |
+| renewed at | **sunrise** (`kutuphaneDay`) | — | **sunset** (`kahvehaneDay`) |
 | where the book may go | nowhere *(see TURKIYE_STOP_ENABLED)* | nowhere | nowhere *(see ILCE_STOP_ENABLED)* |
 
-**THE İSTANBUL LEVEL PRINTS TWO EDITIONS, AND THE SUN DECIDES WHICH**
-(`IstDate.edition()` / `IstDate.editionKey()`, `fbEdition` in project.html). The palette already
-follows the sun over İstanbul, so the app is genuinely light by day and dark by night; this makes
-that more than a colour. From sunrise the paper **asks** — the district poll in Kütüphane's
-narrow column, and the three evenings on the other lane, each thrown into an RSVP. From sunset it
-**answers** — the same polls print their own split, every one of the 25 districts wearing the
-colour its own mixes to. The news is on both sides of that and is not part of it: a story is read
-and thrown away, never answered.
+**SUNRISE RENEWS KÜTÜPHANE, SUNSET RENEWS KAHVEHANE** (`IstDate.kutuphaneDay()` /
+`IstDate.kahvehaneDay()`, `syncEdition` / `heldDay` in project.html; see the Vision section of the
+same name). The palette already follows the sun over İstanbul, so the app is genuinely light by
+day and dark by night; this makes the sun more than a colour — each side of the strip has its own
+day, and the sun turns one side's page at a time. Kütüphane's news and anket are asked for with
+the Kütüphane day (`haberlerRows`, `polls_current_edition`), Kahvehane's evenings and games with
+the Kahvehane day (`events_current_edition`, `gameNight()`), and nothing on this level is keyed to
+the calendar date any more.
+
+It replaced **two editions of one paper**, and the old shape is worth knowing because it is the
+thing not to rebuild: a morning and an evening half of the news (`edition_half`), an Anket that
+"asked" by day and "answered" by night (only its meta line ever differed — the page decides per
+reader, whatever the hour), events and polls whose edition rolled at **midnight** (their resolvers
+were asked with `IstDate.iso()`), and a games key that, while the games ran around the clock,
+actually turned at **sunrise** while every "new word in…" countdown on the site counted to sunset.
+Each column had its own clock; now each SIDE has one. `fbEdition` ('gun'/'gece') survives only as
+the half of the sky — the `data-ist-edition` attribute and the night-only games flag read it — and
+decides no content.
 
 Four things about it:
 
-- **The wide column is the NEWS and the narrow one is the ANKET, in both editions.** A reader
-  mid-story at sunset must never have the news swapped out from under them for a poll result, and
-  the city's own question must not be left with nowhere to be asked until sunset — by which time
-  the day it is asking about is over. So neither column trades places; what the sun changes is
-  what the Anket box *invites*: **from sunrise it asks, from sunset it answers**. It is one box
-  and one page either way (`loadAnketActor`, `anketPagePayload` / `wireAnketPage` already decide
-  per reader whether they are being asked or shown the split), so there is no second version to
-  keep in step — only the meta line and the empty state differ.
+- **The wide column is the NEWS and the narrow one is the ANKET, all day.** Neither trades places
+  with anything. The Anket is one box and one page (`loadAnketActor`, `anketPagePayload` /
+  `wireAnketPage` decide per reader whether they are being asked or shown the split), out at
+  sunrise with the news and standing a whole day to be answered in.
   - **The narrow column used to be the news one story deeper by day**, which put the same object
     in both columns and had the two of them competing for the same reading. It is gone: there is
     one depth of the news (`loadHaberlerActor`, no `depth` argument left) and the narrow column is
@@ -2579,9 +2620,10 @@ Four things about it:
     line is the age alone, and `hookText` is deleted. With the poll, it was the second of the two
     gates a story had to clear to run in an edition; a story is ready the moment it is written.
 - **THE EDITIONS ACCRETE, AND THE WINDOW IS THREE DAYS WIDE** (`haberlerRows`, `NEWS_WINDOW_DAYS`,
-  `db/breaking_news_v4_akis.sql`). A new baskı does **not** replace the one before it: the akşam
-  gazetesi stacks on top of the sabah postası, and yesterday's stories are still standing under
-  both of them if the reader never threw them away. Exactly two things take a story out of the
+  `db/breaking_news_v4_akis.sql`). A new baskı does **not** replace the one before it: this
+  morning's paper stacks on top of yesterday's, and yesterday's stories are still standing under
+  it if the reader never threw them away. The window's ceiling is the **Kütüphane day**, so at
+  01:00 the reader is still holding yesterday morning's paper and its stories still say `bugün`. Exactly two things take a story out of the
   column — the reader throwing it, or it ageing past the third day — and nothing in between.
   - **The three age labels and the window are ONE fact.** `bugün` (in hours) / `dün` /
     `evvelsi gün` is the whole of what a story's age can say, because anything older is not in the
@@ -2594,32 +2636,33 @@ Four things about it:
     its own. The press bar's Haberler forme was rewritten to ask the window's question instead,
     per the forme rule: a bucket is empty only if nothing stood in it across all three days, and
     the old holdover `warn` became "Bu sayıya haber konmadı".
-  - **THE DAY HAS TWO PAPERS, AND THE EDITION KEY ALREADY KNEW IT** (`edition_half`). `edition_date`
-    was a bare date, so everything curated for the evening was already standing in the reader's
-    column at breakfast. The half uses `ist-date.js`'s **own** two words (`'gun'` / `'gece'`, from
-    `editionKey()`) rather than a third vocabulary for one sun — which also means a night is named
-    for the day it BEGAN on here too. Before sunset only today's `gun` half has gone out; after it,
-    both halves of today have, so the reader's fetch adds nothing beyond its date ceiling. A row
-    written before the migration reads as `'gun'`, which is where it already stood.
-  - **The half is the NEWS's alone.** Etkinlik and Anket are still keyed by date (`db/baski_v1.sql`
-    is unchanged) and a game is a switch on the night it is played, so the admin board threads it
-    through as an argument rather than reading a global inside each kind. On the desk it is a pair
-    of buttons under the date — two papers, both readable from across the room, which a collapsed
-    select is not — and switching one reloads the whole board, because it is a different paper.
-- **The cast is never rebuilt for an edition.** An actor keeps its slot, its column, its poses and
-  its lag; only its `load` branches (`loadKutuphaneWide` / `loadKutuphaneNarrow` / `loadKahveNarrow`).
+  - **THE NEWS HAS ONE PAPER A DAY, AND IT GOES OUT WHOLE AT SUNRISE.** There used to be two
+    (`edition_half`, `db/breaking_news_v4_akis.sql`): a sabah postası and an akşam gazetesi, the
+    evening half held back until sunset. The news is Kütüphane's and Kütüphane renews once a day,
+    so the half is gone from the reader (`NEWS_COLS` does not ask for it) and from the desk (the
+    pair of buttons under the baskı date went with it). The column stays on `breaking_news` —
+    dropping it is a migration, not a rename — and a row an older desk filed under `'gece'` simply
+    comes out with the rest of its day's paper. The desk still **writes** `'gun'` when it places a
+    story, only so an app still holding the old two-half reader (a cached page) reads it the same.
+- **The cast is never rebuilt when a side renews.** An actor keeps its slot, its column, its poses and
+  its lag; only its boxes are filled again (`refreshEditionColumns`), and only on the side that
+  renewed — a sunrise re-reads Haberler and Anket and leaves the evenings and the games exactly
+  where they are; a sunset does the opposite.
   A column that rebuilt itself would land its cards a few pixels off the ones beside it and the walk
   between lanes would read as the page reflowing.
-- **The edition turns on ARRIVAL, never on a timer** (`syncEdition`). The theme flips live on
-  palette.js's own 60s tick, and that is right for colour — a page going dark around you is the room
-  going dark. It is exactly wrong for CONTENT: a reader half way through a story at 20:38 in June
-  must not have it replaced by a poll result. So it is re-read at a fresh `mount()`, at `landLane()`
-  when they walk onto a lane, and on `visibilitychange` when the app comes back with **nothing
-  open** — refused outright, not deferred, while a page or a game is up or a gesture is in flight.
-- **A night SPANS MIDNIGHT, so it is named for the day it began on** (`IstDate.editionKey`). In
-  December the evening edition runs 17:37 to 08:22; keying it on today's calendar date would file
-  the back half of every winter night under the wrong day, and two readers on the same night would
-  be holding different editions depending on which side of midnight they opened the app.
+- **A side renews on ARRIVAL, never on a timer** (`syncEdition`, `heldDay`). The theme flips live
+  on palette.js's own 60s tick, and that is right for colour — a page going dark around you is the
+  room going dark. It is exactly wrong for CONTENT: a reader half way through a story at sunrise
+  must not have it replaced by the new paper, and one mid-game at sunset must not have the board
+  swapped. So each side's day is re-read at a fresh `mount()`, at `landLane()` when they walk onto
+  a lane, and on `visibilitychange` when the app comes back with **nothing open** — refused
+  outright, not deferred, while a page or a game is up or a gesture is in flight. And every fetch
+  asks `heldDay(side)` — the day the reader last ARRIVED at — never the clock, so a column re-read
+  for some other reason (a vote, a throw, a language flip) cannot quietly renew a side first.
+- **A day is named for the edge it BEGAN on** (`kutuphaneDay` / `kahvehaneDay`). In December a
+  Kahvehane night runs from 17:37 on through the next day; keying it on the calendar date would
+  file its back half under the wrong day, and two readers on the same night would be holding
+  different papers depending on which side of midnight they opened the app.
 
 **Whether the games are night-only lives behind one flag** (`NIGHT_GAMES_ENABLED`, currently
 `false`) — set true, that column becomes what this section describes: by day the three boxes
@@ -2627,9 +2670,14 @@ collect what the night's games will be made of (the offer/suggestion boxes below
 the same three boxes, in the same order, ARE those games. **With the flag off, as it is now, the
 games stand in their column and are playable around the clock** — the offer boxes never show, and
 `onpressOyun` always opens the game rather than routing a daytime press to an offer page. What does
-not change either way is *which* word/puzzle a game plays: that is still keyed to the game **night**
-(`IstDate.gameNight()` / `gameNightSeed()`, which rotates at sunset, see "AND THE WORD NOW BELONGS
-TO A NIGHT" below) — so the content still changes at sunset, it is simply no longer gated behind it.
+not change either way is *which* word/puzzle a game plays: the games are Kahvehane's, so they are
+keyed to the **Kahvehane day** (`IstDate.gameNight()` / `gameNightSeed()` are `kahvehaneDay()`,
+see "AND THE WORD NOW BELONGS TO A NIGHT" below) and the content changes at sunset — at noon the
+reader is still playing last night's word. (`gameNight()` used to be `editionKey().date`, which
+agrees at night and not by day: from sunrise it was already today, so with the games open around
+the clock the word really turned at sunrise while every countdown said sunset.) The offer boxes'
+own "tonight" (`tonightKey`) is deliberately `editionKey().date` instead — they stand only by day,
+and the night they mean is the one that begins this evening.
 
 | slot | gündüz | gece |
 |---|---|---|
@@ -2753,8 +2801,11 @@ that ends one is the sun.** `IstDate.gameNight()` is that key as padded ISO (`us
 same night in the unpadded `YYYY-M-D` shape `game_results.date`, `game_state.date` and every
 per-day `localStorage` key are written in — two functions rather than one with a format argument,
 because those shapes address different columns and must never be swapped. Both are
-`editionKey().date` underneath, so a night is named for the day it began on and the weekly grid in
-`profile-card.js` still lands it on the right square with no change at all.
+`kahvehaneDay()` underneath — the games are Kahvehane's, and sunset renews Kahvehane — so a night
+is named for the day it began on, runs on through the next day until the following sunset, and the
+weekly grid in `profile-card.js` still lands it on the right square with no change at all. (They
+were `editionKey().date`, which is the same key at night but already TODAY from sunrise: with the
+games open around the clock, the word turned at sunrise while this very countdown said sunset.)
 
 **A "new puzzle in…" countdown therefore counts to the next SUNSET**, not to midnight
 (`IstDate.nextGameNight()` / `untilNextNight()`, which the three game pages and project.html's own
@@ -3378,9 +3429,9 @@ screen, which is why the pose tables swap along with the columns.
 | Screen | The map(s) on top | Wide column (3 rectangles) | Narrow column (3 rectangles) |
 |---|---|---|---|
 | Türkiye (slide 1) | Türkiye | left — **Hikâyeler**, the stories the map is grouped into | right — **Olaylar** |
-| Kütüphane (lane 0) | İstanbul · the ilçe | left — **Haberler**, unchanged day and night | right — **Anket**: the question (gündüz) / its answers (gece) |
+| Kütüphane (lane 0) — renewed at sunrise | İstanbul · the ilçe | left — **Haberler** | right — **Anket**: the question, and its split once answered |
 | the app map (lane 1) | none — the app's own shape, full bleed | — | — |
-| Kahvehane (lane 2) | İstanbul · the ilçe | right — **Etkinlikler** (a throw is the RSVP; the kept ones go to the petek) | left — **Oyun önerileri** (gündüz) / **Oyunlar** (gece) |
+| Kahvehane (lane 2) — renewed at sunset | İstanbul · the ilçe | right — **Etkinlikler** (a throw is the RSVP; the kept ones go to the petek) | left — **Oyunlar** (**Oyun önerileri** by day only if `NIGHT_GAMES_ENABLED`) |
 | ~~the ilçe (slide 24)~~ *parked* | the ilçe, with the member's own picked out | right — **Yorumlar** | left — **Kahve**, the Kahve Endeksi's rows |
 | the **petek** | — *not a lane: the logo opens it over whichever lane you are on* | — | — |
 
@@ -3410,7 +3461,9 @@ Six things about it:
   **AND NONE OF THESE BOXES SHOWS A ROW THAT IS NOT IN THE BASKI** (`db/baski_v1.sql`; see
   admin.html's own Baskı section). Being in the table is not being on the paper — the rule
   breaking_news has followed since `db/breaking_news_v3_edition.sql`, now true of the evenings
-  and the polls as well. The edition in force is the newest one at or before today, resolved
+  and the polls as well. The edition in force is the newest one at or before **that kind's own
+  side's day** — the Kütüphane day for a poll, the Kahvehane day for an evening, so the polls come
+  out at sunrise and the evenings at sunset (`editionInForce(rpc, heldDay(side))`) — resolved
   **per kind** by its own `*_current_edition` function: one `max()` across all three would let
   a baskı carrying only evenings declare itself the edition for the news too, and empty the
   news column on a day somebody curated events. Two mechanical notes, both of which fail
@@ -3425,7 +3478,7 @@ Six things about it:
   reader can see. Every one of these boxes is a STACK, like Haberler's: a baskı can carry three
   evenings on one night, and answering one stands the next up. **Haberler stands in the WIDE column and nowhere else.** It used
   to stand in the narrow one too by day, one story deeper into the same bucket; the narrow column
-  is the Anket now, in both editions (see "THE İSTANBUL LEVEL PRINTS TWO EDITIONS"), so there is
+  is the Anket now, all day (see "SUNRISE RENEWS KÜTÜPHANE, SUNSET RENEWS KAHVEHANE"), so there is
   one depth of the news and no second reading of a bucket.
 - **The bucket is only about the SLOT, never about what the box's own page holds.** Which of
   İSTANBUL/TÜRKİYE/DÜNYA a story stands in is a fact about that one bucket's newest story and
@@ -3463,9 +3516,9 @@ Six things about it:
   is still a layer over a lane rather than a lane of its own, so while it is standing the book
   takes no gesture at all; what a vertical drag on it does is pan the drawing. See the petek's own
   section.
-- **Asking by day and answering by night is the app's own loop, and Anket is where it is most
-  literal**: the same box, the same page, the city's question in the morning and the city's answer
-  after dark. There used to be a second question mechanism, one in each joint of the game
+- **Asking and answering is the app's own loop, and Anket is where it is most literal**: the same
+  box, the same page, the city's question out with the morning paper and the city's split waiting
+  behind it for whoever has answered. There used to be a second question mechanism, one in each joint of the game
   sequence (`daily_questions`) — it is gone, and Anket is now the whole of what the app asks its
   members. It is the app's own formula: people → their ideas → our opinions on those ideas.
 - **Two columns, not a menu.** A screen with six unrelated tiles is a launcher, and a launcher is a
@@ -4098,11 +4151,13 @@ Four things about it:
     are cast tonight is a property of the app and a copy of it kept server-side is a copy that
     drifts. The v1 signature is deliberately left in place and the client falls back to it on
     `PGRST202`, since Pages redeploys on push while the SQL is run by hand.
-  - **Inked only after sunset** (`hiveGamesTonight`). From sunrise that column is *Oyun
-    önerileri*, and what a member has or has not offered is their own
-    (`sozcel_word_suggestions` is not world-readable) — so by day it inks nothing, exactly like
-    Anket and Etkinlikler, rather than inking last night's leftovers against a box that is not a
-    game.
+  - **Inked at any hour while the games are** (`hiveGamesTonight`, which answers `true` while
+    `NIGHT_GAMES_ENABLED` is off). Keyed to the Kahvehane day like everything else about the
+    games, so at noon a neighbour's squares are last night's games — the ones still being played —
+    and they turn over at sunset with the word. With the flag back on, from sunrise that column
+    would be *Oyun önerileri*, and what a member has or has not offered is their own
+    (`sozcel_word_suggestions` is not world-readable) — so by day it would ink nothing, exactly
+    like Anket and Etkinlikler.
 
 Both come from one RPC per map, `hive_member_status(p_game_date, p_game_key)` — it takes no member
 list and answers only for the caller's own map, so it is a caption on the petek and not a directory
