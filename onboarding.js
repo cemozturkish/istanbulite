@@ -214,9 +214,9 @@
   // without the migration behaves exactly as it did before this existed.
   let dbLaneCopy = null;
   let root;            // DOM root for fullscreen modal phases
-  let spotlightEl;     // The persistent dim overlay
+  let spotlightEl;     // The transparent tap-catcher over the page (see #ist-onb-spotlight)
   let pane;            // The mascot pane (corner bubble)
-  let litTargets = []; // { el }[] -- every element lit so far
+  let focused = [];    // the elements the current beat is pointing at (.ist-onb-focus)
   let firewallInstalled = false;
   // When set, a click anywhere on the page (outside the pane / interactive
   // target) advances the tour. Cleared after firing once.
@@ -384,7 +384,7 @@
   // ── Steps ──
   function show() {
     root.classList.add('show');
-    document.body.classList.add('ist-onb-locked', 'ist-onb-modal', 'ist-onb-bare-l', 'ist-onb-bare-r');
+    document.body.classList.add('ist-onb-locked', 'ist-onb-modal', 'ist-onb-reveal');
     installFirewall();
     focusFirst();
   }
@@ -403,7 +403,10 @@
   }
   function hide() {
     root.classList.remove('show');
-    document.body.classList.remove('ist-onb-locked', 'ist-onb-modal', 'ist-onb-lang', 'ist-onb-bare-l', 'ist-onb-bare-r');
+    document.body.classList.remove('ist-onb-locked', 'ist-onb-modal', 'ist-onb-lang', 'ist-onb-reveal');
+    Array.from(document.body.classList)
+      .filter(c => c.indexOf('ist-onb-show-') === 0)
+      .forEach(c => document.body.classList.remove(c));
     removeFirewall();
     clearSpotlight();
     hidePane();
@@ -565,10 +568,6 @@
       spotlightEl = document.createElement('div');
       spotlightEl.id = 'ist-onb-spotlight';
       document.body.appendChild(spotlightEl);
-      // The holes are measured, so a screen that changes size has to be
-      // re-measured or they sit where the boxes used to be. Cheap: it only
-      // ever runs while something is actually lit.
-      window.addEventListener('resize', () => { if (litTargets.length) paintSpotlight(); });
     }
     if (!pane) {
       pane = document.createElement('div');
@@ -578,100 +577,44 @@
     pane.setAttribute('data-palette', currentPalette());
   }
 
-  // ── The spotlight ──
-  // The dim is a PUNCHED SHEET, and the hole is the whole of the highlight.
-  // There is no ring: a rectangle drawn around a control is a second object
-  // competing with it, and the thing being pointed at is already the only
-  // thing on the screen at full strength. Everything else going quiet says
-  // "this one" more plainly than an outline around it does.
+  // ── What the reader can see: one thing at a time ──
+  // The tour does not dim the app and cut holes in the dim any more. A
+  // hole is a rectangle, and a rectangle cut around a name on a hexagon
+  // bar, or around a card, lights the paper around the thing as well as
+  // the thing -- a lit box is a second object competing with the one it
+  // points at. And a dim is still see-through: the petek, the map and
+  // the columns all stood there, quieted but plainly visible, before a
+  // word had been said about any of them.
   //
-  // It is punched rather than lifted because a lift cannot work on the app:
-  // project.html's cast lives in .fb-cast, which is `position: absolute` with
-  // `z-index: 1` and therefore its own stacking context, so a box inside it
-  // can never rise above a dim at 99989 however large a z-index it is given.
-  // (And `position: relative` on a .fb-box, which the book positions
-  // absolutely, would move it.) So nothing is added to the app's DOM at all.
+  // So it works the other way round. While the tour runs
+  // (body.ist-onb-reveal) everything it has not introduced yet is simply
+  // NOT THERE (`visibility: hidden`, so nothing re-lays-out when it
+  // arrives), and each beat brings its part in (`show`, see revealPart).
+  // What the beat is pointing at right now glows -- the element itself,
+  // through a filter on its own painted pixels (.ist-onb-focus), so a
+  // name glows as letters and a card as a card, never as a box around
+  // either. What has been introduced stays in the app at full strength;
+  // only the thing being talked about glows.
   //
-  // The rects are measured, so they are re-measured on resize and again as a
-  // depth change's own transition settles.
-  function spotlightPad() { return 4; }
-
-  // The holes are the lit elements' own boxes, snug (spotlightPad), and
-  // they are cut as a UNION: a thing lit twice, or two lit things that
-  // overlap (the avatar arrows inside the arrow column they belong to),
-  // is simply lit. That is why this is a mask and no longer an evenodd
-  // clip-path -- evenodd flips back to dim wherever two holes overlap,
-  // which printed the overlaps as dark patches inside the lit area. And
-  // there are no round holes any more: a circle sized off a wide element
-  // (your own name on the bar) is a disc across half the screen, and it
-  // lit paper nobody was talking about. The thing itself is the highlight.
-  //
-  // The mask is one SVG drawn in viewport pixels -- the element is
-  // `position: fixed; inset: 0`, so viewport coordinates are its own --
-  // with an inner <mask> doing the punching, so the image's ALPHA is the
-  // dim (mask-image's default mode for an image) and every hole is
-  // transparent however many of them overlap. Painted with DOM-free
-  // string building and set as a data URI; a browser without mask-image
-  // keeps a plain dim: no hole is a worse spotlight, a wrong hole is a
-  // broken page.
-  const CAN_CUT = !window.CSS || !CSS.supports
-    || CSS.supports('mask-image', 'none') || CSS.supports('-webkit-mask-image', 'none');
-
-  function setSpotlightMask(v) {
-    spotlightEl.style.maskImage = v;
-    spotlightEl.style.webkitMaskImage = v;
-    const size = v ? '100% 100%' : '';
-    spotlightEl.style.maskSize = size;
-    spotlightEl.style.webkitMaskSize = size;
-    const rep = v ? 'no-repeat' : '';
-    spotlightEl.style.maskRepeat = rep;
-    spotlightEl.style.webkitMaskRepeat = rep;
+  // #ist-onb-spotlight survives as a transparent layer over the page: it
+  // is the tap target the tap-anywhere firewall relies on (see its CSS).
+  function revealPart(part) {
+    document.body.classList.add('ist-onb-show-' + part);
   }
-
-  function paintSpotlight() {
-    if (!spotlightEl || !CAN_CUT) return;
-    const rects = litTargets
-      // A cast box on a lane the reader has walked off is still in the DOM,
-      // faded to nothing (paintCast): no hole for it, or the lane that
-      // arrives in its place would show through where it used to stand.
-      .filter(t => { try { return parseFloat(getComputedStyle(t.el).opacity) > 0.05; } catch (e) { return true; } })
-      .map(t => t.el.getBoundingClientRect())
-      .filter(r => r.width > 0 && r.height > 0);
-
-    if (!rects.length) { setSpotlightMask(''); return; }
-
-    const pad = spotlightPad();
-    const n = (v) => v.toFixed(1);
-    const W = window.innerWidth, H = window.innerHeight;
-    const holes = rects.map(r =>
-      `<rect x="${n(r.left - pad)}" y="${n(r.top - pad)}" width="${n(r.width + pad * 2)}" height="${n(r.height + pad * 2)}" fill="black"/>`
-    ).join('');
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`
-      + `<defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}">`
-      + `<rect width="${W}" height="${H}" fill="white"/>${holes}</mask></defs>`
-      + `<rect width="${W}" height="${H}" fill="black" mask="url(#m)"/></svg>`;
-    setSpotlightMask(`url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
-  }
-
-  // Light one element or several (a column of cast boxes is three boxes and
-  // no wrapper, and a beat talks about the column). Everything lit before
-  // stays lit -- what has been introduced stays at full strength, what has
-  // not stays dim; passing nothing lights nothing, which is a beat speaking
-  // generally rather than pointing.
-  function addSpotlight(target) {
+  function setFocus(target) {
+    clearFocus();
     spotlightEl.classList.add('show');
     const els = !target ? []
       : (target.length !== undefined && !target.nodeType ? Array.from(target) : [target]);
-    els.forEach(el => { if (el && !litTargets.some(t => t.el === el)) litTargets.push({ el }); });
-    paintSpotlight();
+    els.forEach(el => { if (el) { el.classList.add('ist-onb-focus'); focused.push(el); } });
   }
-
+  function clearFocus() {
+    focused.forEach(el => el.classList.remove('ist-onb-focus'));
+    focused = [];
+  }
   function clearSpotlight() {
-    litTargets = [];
-    if (spotlightEl) {
-      setSpotlightMask('');
-      spotlightEl.classList.remove('show');
-    }
+    clearFocus();
+    if (spotlightEl) spotlightEl.classList.remove('show');
   }
 
   // Block clicks/swipes/wheel/keyboard on the rest of the page during the
@@ -943,24 +886,27 @@
       { target: '#profile-overlay .ist-sheet-close', speech: lines.closeSheet, sheet: 'close' },
       // ── 2. The sky under the bar ──
       // The sun/moon chain is the app's clock: each edge of the day renews
-      // one side (see "SUNRISE RENEWS KÜTÜPHANE" in project.html). Lit mark
-      // by mark, since the chain's own box is the whole bar.
-      { lane: LANE_MAP, target: '#ist-sky .ist-sky-mark', all: true, speech: lines.sky },
+      // one side (see "SUNRISE RENEWS KÜTÜPHANE" in project.html). It is
+      // not on the bar until this beat: the bar is the reader's name and
+      // nothing else until then.
+      { lane: LANE_MAP, show: ['sky'], target: '#ist-sky', speech: lines.sky },
       // ── 3. Kütüphane, renewed at sunrise ──
-      // `unbare` is the moment a word comes back onto the bottom bar -- each
-      // on the beat that first names it as a place, Kütüphane here and
-      // Kahvehane on the way there.
-      { lane: LANE_MAP, target: '#fb-nav > b:first-child', unbare: 'l',
+      // A word comes onto the bottom bar on the beat that first names it
+      // as a place -- Kütüphane here, Kahvehane on the way there. The map
+      // and the column arrive with the reader, on the lane itself.
+      { lane: LANE_MAP, show: ['nav-l'], target: '#fb-nav > b:first-child',
         speech: lines.sunrise, pull: LANE_KUTUPHANE },
-      { lane: LANE_KUTUPHANE, open: '.fb-haberler', speech: lines.newsOpen, none: lines.newsNone },
+      { lane: LANE_KUTUPHANE, show: ['map', 'news'], open: '.fb-haberler',
+        speech: lines.newsOpen, none: lines.newsNone },
       { lane: LANE_KUTUPHANE, throw: true, speech: lines.newsThrow },
       // ── 4. Kahvehane, renewed at sunset ──
       // Two pulls, not one: the strip moves at most one lane per gesture,
       // so the way from the reading to the doing is through the middle.
-      { lane: LANE_KUTUPHANE, target: '#fb-nav > b:last-child', unbare: 'r', speech: lines.toKahvehane,
-        pull: LANE_KAHVEHANE },
+      { lane: LANE_KUTUPHANE, show: ['nav-r'], target: '#fb-nav > b:last-child',
+        speech: lines.toKahvehane, pull: LANE_KAHVEHANE },
       { lane: LANE_KAHVEHANE, target: '#fb-nav > b:last-child', speech: lines.sunset },
-      { lane: LANE_KAHVEHANE, open: '.fb-events', speech: lines.eventOpen, none: lines.eventNone },
+      { lane: LANE_KAHVEHANE, show: ['events'], open: '.fb-events',
+        speech: lines.eventOpen, none: lines.eventNone },
       { lane: LANE_KAHVEHANE, throw: true, speech: lines.eventThrow },
     ];
 
@@ -980,9 +926,9 @@
 
       // `=== undefined`, never `!b.pull`: Kütüphane is lane 0, so a falsy
       // test reads the one pull beat that aims at it as a talk beat.
-      // The bottom bar's two words come back the moment the tour first
-      // names one of them as a place (see body.ist-onb-bare).
-      if (b.unbare) document.body.classList.remove('ist-onb-bare-' + b.unbare);
+      // Whatever this beat introduces arrives now, before anything is
+      // pointed at (see revealPart).
+      (b.show || []).forEach(revealPart);
       if (b.pull !== undefined) { runPull(b); return; }
       if (b.open !== undefined) { runOpen(b); return; }
       if (b.throw) { runThrow(b); return; }
@@ -1017,14 +963,9 @@
       // for a beat after a lane change, so the spotlight is taken on the
       // next frame rather than now.
       requestAnimationFrame(() => {
-        if (!b.target) { addSpotlight(null); return; }
-        addSpotlight(b.all ? document.querySelectorAll(b.target)
+        if (!b.target) { setFocus(null); return; }
+        setFocus(b.all ? document.querySelectorAll(b.target)
                            : document.querySelector(b.target));
-        // The sheet is still sliding up for the first half-second of the
-        // beats inside it, so a rect taken on the next frame is where the
-        // arrows were on the way. The paint is idempotent, so it is
-        // simply re-taken as they settle.
-        if (b.inSheet) settleSpotlight();
       });
       renderPane({ speech: b.speech });
       addHint(COPY.tapToContinue[lang], advance);
@@ -1054,7 +995,7 @@
       if (sheetOpen() === want) { advance(); return; }
 
       requestAnimationFrame(() => {
-        addSpotlight(document.querySelector(b.target));
+        setFocus(document.querySelector(b.target));
         openPassthrough(want ? '#ist-pc-me' : '#profile-overlay');
       });
       renderPane({ speech: b.speech, promptText: (want ? COPY.pressName : COPY.pressClose)[lang] });
@@ -1080,15 +1021,6 @@
       }, STALL_MS);
     }
 
-    // Anything that is still moving when a beat lands -- the sheet
-    // sliding up under the arrows it is about to light -- gets its rect
-    // re-taken as it settles. The paint is idempotent.
-    function settleSpotlight() {
-      [0, 140, 300, 460].forEach(ms => setTimeout(() => {
-        if (litTargets.length) paintSpotlight();
-      }, ms));
-    }
-
     // A pick beat: browsing an avatar category is not itself an answer, so
     // a press on one of its arrows only ever changes the preview (the real
     // app's own carousel handler does that, untouched) -- what advances
@@ -1101,8 +1033,7 @@
       // The sheet is still sliding up under the arrows, so the rect is
       // taken a frame later and re-taken as it settles.
       requestAnimationFrame(() => {
-        addSpotlight(document.querySelectorAll(b.target));
-        settleSpotlight();
+        setFocus(document.querySelectorAll(b.target));
         // Passthrough so the reader can actually reach the arrows -- the
         // firewall's lock is pointer-events:none on everything outside
         // the onboarding otherwise. Scoped to the sheet alone, same as
@@ -1121,7 +1052,7 @@
       openPassthrough('#fb');
       // A pull points at the gesture, so it lights nothing new -- except
       // the word on the bottom bar naming where it goes, when it has one.
-      requestAnimationFrame(() => addSpotlight(b.target ? document.querySelector(b.target) : null));
+      requestAnimationFrame(() => setFocus(b.target ? document.querySelector(b.target) : null));
       renderPane({
         speech: b.speech,
         // Pulling RIGHT walks the strip right, which moves the reader
@@ -1175,7 +1106,7 @@
       if (!!f.petekOpen === want) { advance(); return; }
 
       requestAnimationFrame(() => {
-        addSpotlight(document.querySelector(b.target));
+        setFocus(document.querySelector(b.target));
         openPassthrough('#fb-logo-btn');
       });
       renderPane({ speech: b.speech, promptText: COPY.pressLogo[lang] });
@@ -1216,7 +1147,7 @@
       if (!f || !f.columnSettled || has()) { runOpenNow(b); return; }
       const at = idx;
       let done = false;
-      requestAnimationFrame(() => addSpotlight(document.querySelectorAll(b.open)));
+      requestAnimationFrame(() => setFocus(document.querySelectorAll(b.open)));
       renderPane({ speech: b.speech, top: true });
       stallTimer = setTimeout(() => {
         stallTimer = null;
@@ -1244,7 +1175,7 @@
         : Array.from(document.querySelectorAll(b.open + '.fb-openable'));
       if (!f || !boxes.length) {
         idx++;   // the throw beat has nothing to throw
-        requestAnimationFrame(() => addSpotlight(document.querySelectorAll(b.open)));
+        requestAnimationFrame(() => setFocus(document.querySelectorAll(b.open)));
         // Nothing is asked of the finger here, so the line goes back to its
         // usual place at the bottom.
         renderPane({ speech: b.none || b.speech });
@@ -1253,7 +1184,7 @@
       }
       if (f.pageOpen) { advance(); return; }
       requestAnimationFrame(() => {
-        addSpotlight(boxes);
+        setFocus(boxes);
         openPassthrough(b.open);
       });
       renderPane({ speech: b.speech, promptText: COPY.pressBox[lang], top: true });
@@ -1285,8 +1216,7 @@
       if (!f || !f.pageOpen) { idx -= 2; advance(); return; }
       const start = f.throws;
       requestAnimationFrame(() => {
-        addSpotlight(document.getElementById('fb-page'));
-        settleSpotlight();   // the page is still growing out of its box
+        setFocus(document.getElementById('fb-page'));
         openPassthrough('#fb-page-overlay');
       });
       renderPane({ speech: b.speech, promptText: COPY.throwIt[lang], top: true });
@@ -1327,6 +1257,9 @@
         stopLaneWatch();
         closePassthrough();
         exitSpotlightMode();
+        // The walk is over: the whole app is there now, the parts nobody
+        // was talked through included.
+        document.body.classList.remove('ist-onb-reveal');
         stepKefilShare();
       } else {
         runBeat();

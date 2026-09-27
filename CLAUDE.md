@@ -3556,9 +3556,15 @@ profile sheet), and `mascot` is derived from that.
 4. **Kahvehane, renewed at sunset** — pull there (two pulls, through the map), press an evening,
    throw it: here the direction is the RSVP.
 
-**Both bars stand over the welcome, and the bottom one is the logo alone until each word is a
-place.** `body.ist-onb-bare-l` / `-r` hide Kütüphane and Kahvehane (`visibility`, so the logo
-stays centred); a beat's `unbare: 'l' | 'r'` brings each back on the beat that first names it.
+**Things are introduced one at a time, and what has not been introduced is not there.** While the
+tour runs (`body.ist-onb-reveal`) every part it has not reached yet is `visibility: hidden` — so
+nothing re-lays-out when it arrives — and a beat's `show: [...]` brings its parts in
+(`body.ist-onb-show-<part>`: `nav-l`, `nav-r`, `sky`, `map`, `news`, `events`). The first screen is
+the two bars with the reader's name and the logo, and nothing else; the sky arrives on its own
+beat, the map and the news column arrive with the reader on Kütüphane, and the parts the tour never
+introduces (the middle lane's petek, the seat, the other columns) stay out until the walk ends and
+the class goes. A dim was tried first and is the wrong tool: see-through is still *there*, and the
+petek and the map stood behind every early beat before a word had been said about them.
 
 **An `open` beat waits for `__fb.pageOpen`, and a `throw` beat waits for `__fb.throws` to move**
 (`_fbThrows` in project.html, bumped by `wirePageThrow`'s commit) — never for the page merely
@@ -3715,28 +3721,17 @@ Six things about it, each of which fails silently if forgotten:
   about. `data-onb-pass` on the body (`book` / `petek` / `logo`, from `PASS_SCOPES`) is which of
   the three is open. The logo needs a scope of its own because it lives on a `<nav>` that takes no
   pointer events at all and opts that one mark back in (project.html).
-- **The dim is a punched sheet, and the hole IS the highlight.** Nothing is drawn around a lit
-  control: a rectangle around it is a second object competing with the thing it is pointing at,
-  and what is being pointed at is already the only thing on screen at full strength. Everything
-  else going quiet says "this one" more plainly than an outline does.
-  It is punched rather than lifted because a lift cannot work here: `.fb-cast` is `position:
-  absolute` with `z-index: 1` and so is its own stacking context, so a box inside it never rises
-  above a dim at 99989 however large a z-index it is given; and `position: relative` on a
-  `.fb-box` would move it, since the book positions those absolutely. So nothing is added to the
-  app's DOM at all — the holes are cut out of the dim with a mask (an SVG data URI in viewport
-  pixels, `paintSpotlight`). The rects are measured, so they are re-measured on resize, and again
-  as a depth change's own transition settles.
-  - **The hole is the thing's own box, snug (4px), and never a circle.** Round holes were tried for
-    the small arrows and were a mess: a circle sized off a wide element (your own name on the bar)
-    is a disc across half the screen, lighting paper nobody was talking about. What has been
-    introduced is lit as itself; everything not yet introduced stays dim.
-  - **The holes are a UNION, which is why it is a mask and not an evenodd clip-path.** evenodd
-    flips back to dim wherever two holes overlap — the avatar arrows inside the arrow column they
-    belong to came out as dark patches inside the lit area. The mask's inner `<mask>` punches every
-    hole to transparent however many overlap. `IstSheet.lightTheMap` keeps evenodd because its
-    districts never overlap; this spotlight's targets do.
-  - Holes are hit-testable as part of the dim now (a clip-path hole was not). Every beat whose lit
-    thing must be pressed opens a passthrough, which already takes the dim's hit-testing away.
+- **The thing itself is the highlight — never a box around it** (`setFocus`, `.ist-onb-focus`).
+  What the current beat points at pulses in the house red through a `filter: drop-shadow` on its
+  own painted pixels, so a name glows as letters, the sky as its rings and a card as a card. Two
+  shapes were tried before and both lit the paper around the thing as well as the thing: holes
+  cut in a dim (round ones became a disc across half the screen off a wide name; rectangles showed
+  the bar's hexagon corners and the page behind a name), then a union mask of snug rectangles.
+  `filter`, never `transform`: the cast writes its own transform every frame and the bar runs a
+  FLIP of its own. `#ist-onb-spotlight` stays as a **transparent** layer over the page because it
+  is the tap target the tap-anywhere firewall relies on; every beat whose target must be pressed
+  opens a passthrough, which takes that layer's hit-testing away. The prompt under the instruction
+  stands on its own paper chip, since there is no wash under it any more to count on.
 - **A beat that adds no hint takes the last one down.** `addHint` sets `tapAdvanceFn`, so a pull,
   door, or pick beat inheriting the previous beat's hint inherited a live "tap anywhere to
   continue" as well — the reader could tap straight past the gesture just asked for, and the
