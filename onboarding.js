@@ -1201,13 +1201,53 @@
     // that column alone back to the reader, and ends when a page is open.
     // A column with nothing in it today says how it WOULD work (`none`) and
     // the throw beat after it is skipped -- there is no page to throw.
+    // The column's own loads are not awaited by the book (it must never
+    // wait on the network), so a box with no page when this beat starts
+    // may simply not have heard back yet. On a slow connection that read
+    // as "nothing today" and skipped the throw lesson for good. So the
+    // beat waits for the column's loads to settle (__fb.columnSettled)
+    // before deciding the column is empty. A request that never answers
+    // must not hold the reader either: after STALL_MS the usual
+    // tap-to-carry-on appears, and only THAT (the reader choosing to move
+    // on) takes the no-content path while the rows are still unknown.
     function runOpen(b) {
       const f = fb();
-      const boxes = Array.from(document.querySelectorAll(b.open + '.fb-openable'));
+      const has = () => document.querySelector(b.open + '.fb-openable');
+      if (!f || !f.columnSettled || has()) { runOpenNow(b); return; }
+      const at = idx;
+      let done = false;
+      requestAnimationFrame(() => addSpotlight(document.querySelectorAll(b.open)));
+      renderPane({ speech: b.speech, top: true });
+      stallTimer = setTimeout(() => {
+        stallTimer = null;
+        if (done || idx !== at) return;
+        renderPane({ speech: b.speech, promptText: COPY.pressNudge[lang], top: true });
+        addHint(COPY.pressNudge[lang], () => {
+          if (done || idx !== at) return;
+          done = true;
+          runOpenNow(b, true);
+        });
+      }, STALL_MS);
+      f.columnSettled(b.open).then(() => {
+        if (done || idx !== at) return;
+        done = true;
+        if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
+        clearHint();
+        runOpenNow(b);
+      });
+    }
+    // `giveUp`: the reader tapped past a column still loading -- treat it
+    // as having nothing to open rather than waiting any longer.
+    function runOpenNow(b, giveUp) {
+      const f = fb();
+      const boxes = giveUp ? []
+        : Array.from(document.querySelectorAll(b.open + '.fb-openable'));
       if (!f || !boxes.length) {
         idx++;   // the throw beat has nothing to throw
         requestAnimationFrame(() => addSpotlight(document.querySelectorAll(b.open)));
-        renderPane({ speech: b.none || b.speech, top: true });
+        // Nothing is asked of the finger here, so the line goes back to its
+        // usual place at the bottom.
+        renderPane({ speech: b.none || b.speech });
         addHint(COPY.tapToContinue[lang], advance);
         return;
       }

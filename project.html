@@ -26,7 +26,7 @@
   <script src="loading-screen.js?v=5"></script>
   <link rel="stylesheet" href="loading-screen.css?v=3">
   <link rel="stylesheet" href="onboarding.css?v=12">
-  <script src="onboarding.js?v=10" defer></script>
+  <script src="onboarding.js?v=11" defer></script>
   <link rel="stylesheet" href="edition-notice.css?v=2">
   <script src="edition-notice.js?v=4" defer></script>
 
@@ -2334,7 +2334,7 @@ function refreshEditionColumns(changed) {
   const rx = new RegExp('\\b(' + re.join('|') + ')\\b');
   (cast || []).forEach(a => {
     if (!a.def.load || !rx.test(a.def.cls)) return;
-    try { a.def.load(a.el); } catch (err) { console.error(err); }
+    runActorLoad(a.def.load, a.el);
   });
   refreshDayMeter();
 }
@@ -2815,7 +2815,7 @@ function refreshEtkinlikColumn() {
   etkinlikPromise = null;
   (cast || []).forEach(a => {
     if (!/\bfb-events\b/.test(a.def.cls) || !a.def.load) return;
-    try { a.def.load(a.el); } catch (err) { console.error(err); }
+    runActorLoad(a.def.load, a.el);
   });
 }
 
@@ -3176,7 +3176,7 @@ function newsDayLabel(n, today) {
 function refreshHaberlerColumn() {
   (cast || []).forEach(a => {
     if (!/\bfb-haberler\b|\bfb-anket\b/.test(a.def.cls) || !a.def.load) return;
-    try { a.def.load(a.el); } catch (err) { console.error(err); }
+    runActorLoad(a.def.load, a.el);
   });
   refreshDayMeter();
 }
@@ -3697,7 +3697,7 @@ function refreshAnketColumn() {
   if (loadAnketActor && loadAnketActor.reset) loadAnketActor.reset();
   (cast || []).forEach(a => {
     if (!/\bfb-anket\b/.test(a.def.cls) || !a.def.load) return;
-    try { a.def.load(a.el); } catch (err) { console.error(err); }
+    runActorLoad(a.def.load, a.el);
   });
   refreshDayMeter();
 }
@@ -4026,7 +4026,7 @@ function refreshSubmitColumn() {
   submitPromise = null;
   (cast || []).forEach(a => {
     if (!/\bfb-oyun\b/.test(a.def.cls) || !a.def.load) return;
-    try { a.def.load(a.el); } catch (err) { console.error(err); }
+    runActorLoad(a.def.load, a.el);
   });
 }
 
@@ -4520,7 +4520,7 @@ function refreshOyunColumn() {
   gamesStatePromise = null;
   (cast || []).forEach(a => {
     if (!/\bfb-oyun\b/.test(a.def.cls) || !a.def.load) return;
-    try { a.def.load(a.el); } catch (err) { console.error(err); }
+    runActorLoad(a.def.load, a.el);
   });
   // A game just finished is also a step off the day's own meter.
   refreshDayMeter();
@@ -4634,6 +4634,33 @@ function fbSetPage(el, page) {
   if (!el) return;
   el._fbPage = page || null;
   el.classList.toggle('fb-openable', !!page);
+}
+
+// Every actor load goes through here, so the box remembers the request
+// that is filling it (`_fbLoading`). Nothing on the book waits on it --
+// the book must never wait on the network -- but something that has to
+// tell "this column is empty today" apart from "this column's rows have
+// not landed yet" can (the onboarding tour's open beats, through
+// __fb.columnSettled). A box with no page before its load settles is
+// not an empty box, it is a box still being filled.
+function runActorLoad(load, el) {
+  let p = null;
+  try { p = load(el); } catch (err) { console.error(err); }
+  el._fbLoading = Promise.resolve(p).catch(() => {});
+  return p;
+}
+
+// Resolves once every box matching `sel` has finished the load currently
+// filling it. A refresh can start a newer load while an older one is
+// being waited on (a language flip, a sunrise), so it re-checks and waits
+// on the newer one rather than answering for rows that are already stale.
+async function columnSettled(sel) {
+  for (let i = 0; i < 5; i++) {
+    const els = Array.from(document.querySelectorAll(sel));
+    const ps = els.map(e => e._fbLoading);
+    await Promise.all(ps.map(q => q || Promise.resolve()));
+    if (els.every((e, k) => e._fbLoading === ps[k])) return;
+  }
 }
 
 // The one press handler every openable column shares.
@@ -5268,7 +5295,7 @@ function buildCast() {
     // Fetched once per mount, after the element exists, and never
     // awaited by anything: an actor whose rows have not landed yet is
     // still an actor, and the book must not wait on the network.
-    if (def.load) { try { def.load(el); } catch (e) { console.error(e); } }
+    if (def.load) runActorLoad(def.load, el);
     // `laneP` starts already AT the current lane, not at 0 -- a fresh
     // mount has nothing to catch up on, so there is nothing to animate.
     return { def, el, poses: expandPoses(def.poses || {}), pos: 0, laneP: lanePos,
@@ -6597,7 +6624,7 @@ function refreshAllColumns() {
   const loads = [];
   (cast || []).forEach(a => {
     if (!a.def.load) return;
-    try { loads.push(a.def.load(a.el)); } catch (err) { console.error(err); }
+    loads.push(runActorLoad(a.def.load, a.el));
   });
   refreshDayMeter();
   return Promise.allSettled(loads);
@@ -6744,6 +6771,7 @@ window.__fb = {
   // A box's page, for the tour's open-then-throw beats (see _fbThrows).
   get pageOpen() { const o = document.getElementById('fb-page-overlay'); return !!o && !o.hidden; },
   get throws() { return _fbThrows; },
+  columnSettled,
   openPetek, closePetek,
   // Put the reader on a lane as if they had pulled there and let go.
   goLane(n, snap) {

@@ -3564,7 +3564,12 @@ stays centred); a beat's `unbare: 'l' | 'r'` brings each back on the beat that f
 (`_fbThrows` in project.html, bumped by `wirePageThrow`'s commit) — never for the page merely
 shutting, because the arrow shuts it too and that is not the gesture being taught. A reader who
 closes it the other way is walked back to the open beat. A column with nothing openable today says
-how it *would* work (`none`) and skips its throw beat. Both beats say their line from the **top**
+how it *would* work (`none`) and skips its throw beat — **but only once its loads have settled**
+(`__fb.columnSettled`). The book never awaits an actor's load, so a box with no page when the beat
+starts may just not have heard back yet; deciding "empty" then skipped the throw lesson on any slow
+connection. Every actor load goes through `runActorLoad`, which leaves the request on the box
+(`_fbLoading`) for exactly this; a request that never answers still gives way to the usual
+`STALL_MS` tap-to-carry-on, and only the reader choosing it takes the no-content path. Both beats say their line from the **top**
 of the screen (`renderPane({ top })`, `.ist-onb-pane-top`): the pane's resting place at the bottom
 is exactly where the bottom card and the page it grows into stand, and a pane over the thing the
 reader is asked to press is a beat nobody can finish.
