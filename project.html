@@ -2418,7 +2418,10 @@ function stackFetch(fetchRows) {
   let promise = null;
   const run = function (el, slot) {
     if (!promise) promise = fetchRows();
-    promise.then(({ rows, failed, emptyHtml, emptyDashed, failedHtml }) => {
+    // Returned, so a caller waiting on the column (refreshAllColumns ->
+    // rerenderFbPage after a language flip) waits for the box to be
+    // re-rendered and its payload replaced, not merely for the call.
+    return promise.then(({ rows, failed, emptyHtml, emptyDashed, failedHtml }) => {
       if (!el.isConnected) return;
       // Cleared before every render, filled only on the path that
       // actually has something to open (see THE BAND PAGE): a message,
@@ -4946,7 +4949,13 @@ function wireFbPage() {
   const backdrop = document.getElementById('fb-page-backdrop');
   if (backdrop) backdrop.addEventListener('click', () => dismissFbPage());
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && IstSheet.isOpen('fb-page-overlay')) dismissFbPage();
+    if (e.key !== 'Escape' || !IstSheet.isOpen('fb-page-overlay')) return;
+    // Escape closes the topmost layer only. A member sheet opened from
+    // the page (the kefil's name) has its own Escape listener, and this
+    // one firing too took the page down with it.
+    const member = document.getElementById('member-sheet');
+    if (member && !member.hidden) return;
+    dismissFbPage();
   });
   // The device's own back. The entry is already off the stack by the
   // time this runs, so this closes and never calls history again.
