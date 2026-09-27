@@ -2664,9 +2664,12 @@ Four things about it:
     pressed after sunset, would open tonight's puzzle (or tonight's lock) under last night's name
     — and closing a game re-read the game boxes alone onto tonight while the evenings beside them
     stayed on last night's paper. So every door into or out of a game — a tile press
-    (`onpressOyun`), a game closing (`refreshOyunColumn`) and a language flip
-    (`refreshAllColumns`) — first runs `syncKahvehaneForGames()`, which renews whatever has turned,
-    **the whole of Kahvehane at once**. If it renewed, the press opens nothing: the reader is
+    (`onpressOyun`) and a game closing (`refreshOyunColumn`) — first runs
+    `syncKahvehaneForGames()`, which renews whatever has turned, **the whole of Kahvehane at
+    once**. A language flip (`refreshAllColumns`) is **not** an arrival and never advances the
+    Kütüphane day: it can be made with a story open, and `rerenderFbPage` rebuilds that page from
+    its box's fresh payload, so a renewed Kütüphane would swap the article being read for this
+    morning's story. It advances only the held Kahvehane day, and only while no page is open. If it renewed, the press opens nothing: the reader is
     shown the tile that is really there now and presses that. `gamesStateToday` itself reads
     `heldDay('kahvehane')`, never the clock, like every other column.
 - **A day is named for the edge it BEGAN on** (`kutuphaneDay` / `kahvehaneDay`). In December a

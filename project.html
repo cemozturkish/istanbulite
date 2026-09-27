@@ -6722,11 +6722,22 @@ function wireLangRelabel() {
 // dates are formatted, the labels are translated), and re-rendering
 // them would print the old language from a fresh render.
 function refreshAllColumns() {
-  // Every column is about to be re-read anyway, so both sides are brought
-  // to the clock first: a re-read on a stale held day would re-render
-  // the evenings on last night's paper while the games (whose pages run
-  // on the live clock) had already moved on.
-  syncEdition();
+  // A language flip is not an ARRIVAL, so it renews nothing on its own --
+  // it may be made with a story standing open (the logo is lifted over the
+  // page for exactly that), and rerenderFbPage rebuilds that page from its
+  // box's fresh payload: advancing the Kütüphane day here would swap the
+  // article being read for this morning's story in the same slot. The
+  // held Kütüphane day is therefore never touched on this path.
+  //
+  // Kahvehane is the one side that may move, because its games run on the
+  // live clock (see syncKahvehaneForGames) and re-reading the game boxes
+  // on a stale day while the iframe has moved on is the mismatch that
+  // exception exists for. It moves only with NO page open, so an evening
+  // being read is never swapped either; with one open, the next game
+  // press syncs the side instead. The whole side moves together, evenings
+  // and games, because every column is re-read below.
+  const pageOverlay = document.getElementById('fb-page-overlay');
+  if (!pageOverlay || pageOverlay.hidden) fbSideDay.kahvehane = sideDay('kahvehane');
   etkinlikPromise = null;
   haberlerFetch = null;
   dunyaPromise = null;
