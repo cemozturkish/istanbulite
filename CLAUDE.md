@@ -2659,6 +2659,16 @@ Four things about it:
   outright, not deferred, while a page or a game is up or a gesture is in flight. And every fetch
   asks `heldDay(side)` — the day the reader last ARRIVED at — never the clock, so a column re-read
   for some other reason (a vote, a throw, a language flip) cannot quietly renew a side first.
+  - **The games are the one exception, because they cannot be held.** A game page runs in an
+    iframe on the live clock (`IstDate.gameNight()`), so a tile drawn from last night's lineup,
+    pressed after sunset, would open tonight's puzzle (or tonight's lock) under last night's name
+    — and closing a game re-read the game boxes alone onto tonight while the evenings beside them
+    stayed on last night's paper. So every door into or out of a game — a tile press
+    (`onpressOyun`), a game closing (`refreshOyunColumn`) and a language flip
+    (`refreshAllColumns`) — first runs `syncKahvehaneForGames()`, which renews whatever has turned,
+    **the whole of Kahvehane at once**. If it renewed, the press opens nothing: the reader is
+    shown the tile that is really there now and presses that. `gamesStateToday` itself reads
+    `heldDay('kahvehane')`, never the clock, like every other column.
 - **A day is named for the edge it BEGAN on** (`kutuphaneDay` / `kahvehaneDay`). In December a
   Kahvehane night runs from 17:37 on through the next day; keying it on the calendar date would
   file its back half under the wrong day, and two readers on the same night would be holding
