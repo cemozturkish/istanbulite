@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=8"></script>
   <script src="router.js?v=15"></script>
-  <script src="i18n.js?v=25"></script>
+  <script src="i18n.js?v=26"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <link rel="stylesheet" href="palette.css?v=12">
@@ -1816,12 +1816,40 @@
     .fb-page-body p { margin: 0 0 9px; font-size: 0.85rem; line-height: 1.5; }
     .fb-page-body p:last-child { margin-bottom: 0; }
 
-    /* The heading over a seri's earlier posts, printed under a fresh
-       gelişme's own paragraphs -- the same small-caps label kutuphane.html's
-       sidebar prints before a Zaman Akışı, so it reads as one convention. */
-    .fb-page-divider {
-      font-size: 0.6rem; letter-spacing: 0.14em; color: var(--muted);
-      margin: 14px 0 8px; text-transform: uppercase;
+    /* A story's ZAMAN AKIŞI: everything that happened before the headline
+       the page is standing on -- its own gelişmeler (breaking_news_updates)
+       and the other habers of its akış -- newest first, down one red rail
+       with a tick at each moment. The same track kutuphane.html's news page
+       printed (.article .timeline-*), so a story reads as the same object it
+       was there. The rail is each item's own left border, so it runs
+       unbroken from the first moment to the last; the first item drops its
+       top padding so the rail starts at the first tick, not above it. */
+    .fb-timeline {
+      margin-top: 14px; padding-top: 12px;
+      border-top: 1px dashed var(--rule);
+    }
+    /* Uppercased in JS, never here: the document is lang="tr", so CSS
+       folds English "Timeline" to "TİMELİNE" (see newsTimelineHTML). */
+    .fb-timeline-label {
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 0.2em;
+      color: var(--ink-red);
+      margin-bottom: 10px;
+    }
+    .fb-timeline-item { border-left: 2px solid var(--ink-red); padding: 10px 0; }
+    .fb-timeline-item:first-child { padding-top: 0; }
+    .fb-timeline-item:last-child { padding-bottom: 0; }
+    .fb-timeline-date {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 3px; font-size: 0.78rem; color: var(--muted);
+    }
+    .fb-timeline-date::before {
+      content: ''; flex: 0 0 12px; height: 2px; background: var(--ink-red);
+    }
+    .fb-timeline-title {
+      margin-left: 24px; font-size: 0.9rem; font-weight: 700; line-height: 1.3;
+    }
+    .fb-page-body .fb-timeline-item p {
+      margin: 3px 0 0 24px; font-size: 0.82rem; line-height: 1.45;
     }
     /* The three fixed conflicts' own page: a plain news timeline, newest
        first -- unlike an olay's chapters (oldest first, a shape read like
@@ -2320,6 +2348,7 @@ function refreshEditionColumns(changed) {
   const re = [];
   if (changed.kutuphane) {
     haberlerFetch = null;
+    seriesSiblingsCache.clear();
     anketPromise = null;
     if (loadAnketActor && loadAnketActor.reset) loadAnketActor.reset();
     re.push('fb-haberler', 'fb-anket');
@@ -3089,9 +3118,17 @@ function followedSeries() {
 // "SUNRISE RENEWS KÜTÜPHANE" above). The column stays on breaking_news --
 // dropping it is a migration, not a rename -- and a row an older desk
 // filed under 'gece' simply comes out with the rest of its day's paper.
+//
+// A story's own gelişmeler ride along with it, the way admin.html's list
+// already embeds them: the Zaman Akışı is the point of a developing
+// story's page, and fetching it separately when the box opens would put a
+// round trip between the reader and the thing they pressed. It used to be
+// left out entirely, so every gelişme written from the portal went into a
+// table nothing in the app ever read.
 const NEWS_COLS = 'id, title, body, title_en, body_en, ' +
   'category, neighborhood, series_id, updated_at, ' +
-  'edition_date, edition_order';
+  'edition_date, edition_order, ' +
+  'breaking_news_updates(id, title, body, title_en, body_en, created_at)';
 
 // The network half, cached for the life of the mount. Kept apart from
 // haberlerData() below so that recording a verdict re-filters the column
@@ -3262,11 +3299,11 @@ async function loadHaberlerActor(el, slot) {
     if (!el.isConnected) return;
   }
   fbSetDone(el, dealt, newsStamp);
-  // If this update is itself part of a `seri` (it links back to earlier
-  // posts about the same thing), its page carries their Zaman Akışı too,
-  // so pressing a fresh gelişme still hands the reader the story it grew
-  // out of instead of stranding them on one paragraph with no way to the
-  // rest of it.
+  // The page carries the story's Zaman Akışı: its own gelişmeler, and --
+  // if it is part of a `seri` (it links back to earlier posts about the
+  // same thing) -- those posts too, so pressing a fresh gelişme still
+  // hands the reader the story it grew out of instead of stranding them
+  // on one paragraph with no way to the rest of it.
   let siblings = [];
   if (n.series_id) {
     try { siblings = await fetchSeriesSiblings(n.series_id, n.id); }
@@ -3281,7 +3318,7 @@ async function loadHaberlerActor(el, slot) {
   fbSetPage(el, {
     kicker: where + akisTag, meta: age,
     title: newsText(n, 'title'),
-    html: fbParas(newsText(n, 'body')) + (siblings.length ? seriesTimelineHTML(siblings) : ''),
+    html: fbParas(newsText(n, 'body')) + newsTimelineHTML(newsTimelineItems(n, siblings)),
     // YETER/AKIŞTA KAL is a fixed floor, not the last thing the reading
     // scrolls past -- see .fb-page-foot.
     foot: newsFootHTML(!!n.series_id),
@@ -3322,7 +3359,7 @@ async function loadHaberlerActor(el, slot) {
 const seriesSiblingsCache = new Map();
 function fetchSeriesSiblings(seriesId, selfId) {
   if (!seriesSiblingsCache.has(seriesId)) {
-    seriesSiblingsCache.set(seriesId, (async () => {
+    const p = (async () => {
       const { data, error } = await IstRouter.sb.from('breaking_news')
         .select('id, title, body, title_en, body_en, series_id, updated_at')
         .eq('series_id', seriesId)
@@ -3331,23 +3368,60 @@ function fetchSeriesSiblings(seriesId, selfId) {
         .limit(9);
       if (error) throw error;
       return data || [];
-    })());
+    })();
+    // A failed fetch is a network blip, not a seri with no history --
+    // cached, it would leave every page in that seri without its Zaman
+    // Akışı for the rest of the session.
+    p.catch(() => seriesSiblingsCache.delete(seriesId));
+    seriesSiblingsCache.set(seriesId, p);
   }
   return seriesSiblingsCache.get(seriesId).then(rows => rows.filter(r => r.id !== selfId));
 }
 
-// The seri's earlier posts, printed under the fresh one exactly the way
-// the Dünya box's own timeline reads (newest of the rest first) -- one
-// heading borrowed from the same "Zaman Akışı" label kutuphane.html's
-// sidebar carries, so the two objects read as one convention.
-function seriesTimelineHTML(items) {
-  return '<div class="fb-page-divider">Zaman Akışı</div>' +
-    items.map(it =>
-      '<div class="fb-dunya-moment">' +
-        '<div class="fb-dunya-moment-date">' + esc(newsAge(it.updated_at)) + '</div>' +
-        '<div class="fb-dunya-moment-title">' + esc(newsText(it, 'title')) + '</div>' +
-        (newsText(it, 'body') ? '<p>' + esc(newsText(it, 'body')) + '</p>' : '') +
-      '</div>').join('');
+// Everything that happened before the headline the page is standing on,
+// newest first: the story's own gelişmeler and the other habers of its
+// seri, on one timeline, because to the reader they are one thing -- how
+// this story got here.
+//
+// The NEWEST gelişme is dropped, always: it IS the headline. admin.html
+// keeps the two in step (addNewsUpdate writes the latest entry onto the
+// story, resyncNewsHead and saveNewsUpdateEdit re-derive it), and editing
+// the story's own headline is a correction to that same entry -- so
+// printing it again under itself would only ever say the same thing
+// twice. A story nobody has added a gelişme to has no entries at all, and
+// its headline is simply its original post.
+function newsTimelineItems(n, siblings) {
+  const updates = (n.breaking_news_updates || []).slice()
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(1);
+  const items = updates.map(u => ({ at: u.created_at, row: u }))
+    .concat((siblings || []).map(s => ({ at: s.updated_at, row: s })));
+  items.sort((a, b) => new Date(b.at) - new Date(a.at));
+  return items;
+}
+
+// The Zaman Akışı itself: a red rail with a tick at each moment, its age
+// beside the tick, the headline and the paragraph under it (see
+// .fb-timeline). Nothing at all when there is nothing before the
+// headline -- an empty heading is a promise with nothing under it.
+function newsTimelineHTML(items) {
+  if (!items.length) return '';
+  const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
+  const english = !!(window.I18N && I18N.isEnglish && I18N.isEnglish());
+  const label = english ? t('news.timeline').toUpperCase()
+                        : t('news.timeline').toLocaleUpperCase('tr-TR');
+  return '<div class="fb-timeline">' +
+    '<div class="fb-timeline-label">' + esc(label) + '</div>' +
+    '<div class="fb-timeline-track">' +
+    items.map(it => {
+      const body = newsText(it.row, 'body');
+      return '<div class="fb-timeline-item">' +
+        '<div class="fb-timeline-date">' + esc(newsAge(it.at)) + '</div>' +
+        '<div class="fb-timeline-title">' + esc(newsText(it.row, 'title')) + '</div>' +
+        (body ? '<p>' + esc(body).replace(/\n/g, '<br>') + '</p>' : '') +
+      '</div>';
+    }).join('') +
+    '</div></div>';
 }
 
 // A story is entered in both languages (db/breaking_news_v2_bilingual.sql);
@@ -3360,12 +3434,21 @@ function newsText(row, field) {
   return row[field];
 }
 
+// How long ago, in the reader's language. A Zaman Akışı reaches back
+// weeks and months (the gelişmeler behind a running story), so past a
+// month it counts months and past a year years -- "400 gün önce" is a
+// number nobody reads.
 function newsAge(iso) {
+  const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
   const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (mins < 60) return mins + ' dk önce';
+  if (mins < 60) return mins + ' ' + t('news.age.min');
   const hrs = Math.round(mins / 60);
-  if (hrs < 24) return hrs + ' saat önce';
-  return Math.round(hrs / 24) + ' gün önce';
+  if (hrs < 24) return hrs + ' ' + t('news.age.hour');
+  const days = Math.round(hrs / 24);
+  if (days < 30) return days + ' ' + t('news.age.days');
+  const months = Math.round(days / 30.44);
+  if (months < 12) return months + ' ' + t('news.age.months');
+  return Math.max(1, Math.round(days / 365.25)) + ' ' + t('news.age.years');
 }
 
 // ── Türkiye stop, left column: three ADMIN-PINNED series, not a feed ──

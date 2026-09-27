@@ -3487,14 +3487,27 @@ Six things about it:
   entry's or an olay's own Zaman Akışı). But if the story filling a bucket is itself a `seri`'s own
   gelişme — a fresh post linking back to earlier ones about the same developing thing that have
   since aged out of the 72h window — pressing it opens its earlier siblings too
-  (`fetchSeriesSiblings`, `seriesTimelineHTML` in project.html), printed under its own paragraphs
-  as a "Zaman Akışı" exactly the way the Türkiye stop's pinned Dünya box already prints a seri's
-  history. Otherwise a member reading the newest update of something they were never shown the
+  (`fetchSeriesSiblings` in project.html), printed under its own paragraphs in its "Zaman Akışı".
+  Otherwise a member reading the newest update of something they were never shown the
   start of has nowhere in the app to find it: the seri only otherwise surfaces if the admin has
   also pinned it to one of the three Türkiye-stop slots, which most series never are. Same pool,
   same cap (9, one seat for the fresh post and eight for its history) and the same `archived_at`
   filter the pinned box reads, cached per `series_id` so two boxes opening onto the same seri never
   fetch it twice.
+- **A story's page carries its Zaman Akışı, and its own gelişmeler are the heart of it**
+  (`newsTimelineItems` / `newsTimelineHTML`, `.fb-timeline` in project.html). What the portal's
+  "+ Gelişme Ekle" writes is a `breaking_news_updates` row, and for a while nothing in the app read
+  that table at all — every gelişme went somewhere no reader could reach. They now ride along with
+  the column's own fetch (embedded in `NEWS_COLS`, the way admin.html's list embeds them) and are
+  merged with the seri's other habers into one timeline, newest first, down the red rail with a
+  tick at each moment that Kütüphane's news page printed. **The newest gelişme is always dropped**:
+  it IS the headline (addNewsUpdate / resyncNewsHead / saveNewsUpdateEdit keep the two in step),
+  so printing it under itself would say the same thing twice. The label is uppercased in JS, not
+  CSS — `lang="tr"` folds "Timeline" to "TİMELİNE".
+  - **The portal's gelişme date field means "now" unless it is touched** (`addNewsUpdate`). It is
+    prefilled when the list is DRAWN, to the minute, while a story's `created_at` carries seconds —
+    so taken literally it dated a gelişme before the entry it followed, the backdating rule filed
+    it as history, and the headline never moved.
 - **There is no gate any more: Sözcel and Tümcel are independent, playable in either order.**
   There used to be one (`gameBlocker` in project.html, Tümcel shut until Sözcel had been played) —
   it is gone, along with the question that used to sit in the joint between them. The only reason
