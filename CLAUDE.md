@@ -3553,16 +3553,47 @@ Six things about it:
 
 A brand-new account is walked through the app once, on `project.html` and nowhere else, and
 `profiles.onboarded_at` is what says it has happened. Welcome (the kefil line, and the T&C tick
-that gates going further) → **the language hold** → palette → **the lane tour** → the member's own
-kefil code → finish, which writes `onboarded_at`, `language_pref`, `palette_pref` and `mascot` in one
-update. The admin's kill switch is `app_settings.onboarding_enabled` (missing row = on).
+that gates going further) → **the language hold** → **the tour** → the member's own kefil code →
+finish, which writes `onboarded_at`, `language_pref` and `mascot` in one update. The admin's kill
+switch is `app_settings.onboarding_enabled` (missing row = on). **The palette is not asked any
+more**: the reader keeps whatever palette.js already has them on (it stays changeable from the
+profile sheet), and `mascot` is derived from that.
+
+**The tour is four things, each taught by being done once**, in this order:
+1. **The top bar** — press your own name (Sen, the profile sheet), style the avatar one open
+   category at a time, close the sheet yourself.
+2. **The sky** — the sun/moon chain hanging off that bar is the app's clock: each edge of the day
+   renews one side (see "SUNRISE RENEWS KÜTÜPHANE" in project.html).
+3. **Kütüphane, renewed at sunrise** — pull there, press a story (an `open` beat), throw it left or
+   right (a `throw` beat).
+4. **Kahvehane, renewed at sunset** — pull there (two pulls, through the map), press an evening,
+   throw it: here the direction is the RSVP.
+
+**Both bars stand over the welcome, and the bottom one is the logo alone until each word is a
+place.** `body.ist-onb-bare-l` / `-r` hide Kütüphane and Kahvehane (`visibility`, so the logo
+stays centred); a beat's `unbare: 'l' | 'r'` brings each back on the beat that first names it.
+
+**An `open` beat waits for `__fb.pageOpen`, and a `throw` beat waits for `__fb.throws` to move**
+(`_fbThrows` in project.html, bumped by `wirePageThrow`'s commit) — never for the page merely
+shutting, because the arrow shuts it too and that is not the gesture being taught. A reader who
+closes it the other way is walked back to the open beat. A column with nothing openable today says
+how it *would* work (`none`) and skips its throw beat. Both beats say their line from the **top**
+of the screen (`renderPane({ top })`, `.ist-onb-pane-top`): the pane's resting place at the bottom
+is exactly where the bottom card and the page it grows into stand, and a pane over the thing the
+reader is asked to press is a beat nobody can finish.
+
+**A press the tour makes FOR the reader goes through `pressThrough`.** The firewall is a
+capture-phase click listener on `document`, so a synthetic `.click()` on the app — a stall escape
+doing the press itself, a beat re-opening the sheet it needs — is swallowed like any other click
+unless it is let through for that one call.
 
 **Language is taught, not asked** (`stepLanguageHold`). There is no language menu: the app changes
 language by holding the logo (see "Hold the logo and the app changes language"), so that is what the
 welcome ends on. While the fullscreen modal is up (`body.ist-onb-modal` — the welcome, palette and
 closing screens, never the spotlight tour) the bottom bar is lifted over it **with the logo alone** —
 Kütüphane and Kahvehane are `visibility: hidden` so the logo stays centred, and they mean nothing
-yet anyway. The beat hands back the logo through the `logo` passthrough and sets
+yet anyway. The profile bar is lifted over the welcome too, so the reader meets the app between its two real
+bars from the first screen. The beat hands back the logo through the `logo` passthrough and sets
 `body.ist-onb-lang`, which is the one exception to the hold standing down while the tour is locked
 (`onLangDown` in project.html); a plain tap on the logo does nothing during it rather than opening
 the petek behind the welcome. It advances on `I18N.onChange`, says what happened in the language it

@@ -1,8 +1,8 @@
 // Onboarding flow for brand-new accounts.
 // Runs on first login: locks the page behind a full-screen overlay, then
-// welcome → the language hold → palette → the lane tour → kefil code →
-// profile prompt, and writes onboarded_at, language_pref, palette_pref and
-// mascot to profiles at the end.
+// welcome → the language hold → the tour (the top bar and the avatar, the
+// sky, Kütüphane, Kahvehane) → kefil code → profile prompt, and writes
+// onboarded_at, language_pref and mascot to profiles at the end.
 //
 // It runs in ONE page, because the app is one page (project.html). The tour
 // used to walk anahane → kahvehane → sozcel → kutuphane → anahane by
@@ -82,101 +82,66 @@
         },
       },
     },
-    paletteScreen: {
-      tr: {
-        // A: instant "Harika!", B: typed explanation.
-        instant: 'Harika!',
-        typed:   'Uygulamanın renklerini de seçebilirsin. Bu ayarları istediğin zaman değiştirebilirsin.',
-        choices: [
-          { value: 'mono',  mascot: 'cat', label: 'SİYAH & BEYAZ' },
-          { value: 'earth', mascot: 'dog', label: 'TOPRAK TONLARI' },
-        ],
-      },
-      en: {
-        instant: 'Great!',
-        typed:   'You can also choose the colors in which your application comes. You can always change these settings whenever you want.',
-        choices: [
-          { value: 'mono',  mascot: 'cat', label: 'BLACK & WHITE' },
-          { value: 'earth', mascot: 'dog', label: 'EARTHY TONES' },
-        ],
-      },
-    },
-    // ── The lane tour ──
-    // The app is project.html now: three lanes on one slide, walked by a
-    // sideways pull (see CLAUDE.md, "Slide 12 is three screens"). Each beat
-    // either talks (tap anywhere), asks for the real pull and waits for the
-    // reader to arrive, or asks them to actually change something.
+    // ── The tour ──
+    // One plain voice, TR/EN. The order is the reader's first walk through
+    // the app, each step taught by being done once:
+    //   the top bar  -- press your own name, style your avatar, close it;
+    //   the sky      -- the sun and the moon crossing under the bar, and
+    //                   what each edge of the day renews;
+    //   Kütüphane    -- renewed at sunrise; pull there, open a story, throw it;
+    //   Kahvehane    -- renewed at sunset; pull there, open an evening, throw it.
+    // (The language hold comes before all of this, on the welcome screen --
+    // see stepLanguageHold.)
     //
-    // ONE VOICE, plain and clear. It used to branch into a sarcastic cat and
-    // an excitable dog on top of the TR/EN branch -- four versions of every
-    // line to keep true and in step, so a correction to one of them silently
-    // left three behind. The first run through an app is not the place for a
-    // character: the reader is trying to find out what this is.
+    // It OPENS ON THE READER THEMSELVES, because a brand-new account's
+    // petek is one hexagon and six empty sides: nobody has handed them a
+    // code yet, so nothing true can be said about neighbours on day one.
+    // What IS true on day one is their own hexagon, so they make their
+    // avatar first.
     //
-    // It OPENS ON THE READER THEMSELVES -- the petek's innermost depth, where
-    // the avatar arrows are -- and only then pulls out to the shape, one
-    // level at a time (Sen -> Yanındakiler -> the whole petek), each a real
-    // pull rather than a jump. A brand new account's petek is one hexagon
-    // and six empty sides: nobody has handed them a code yet, because they
-    // signed up thirty seconds ago. So the petek cannot be the first thing
-    // pointed at, and nothing here may say "these are the people next to
-    // you" -- for every reader seeing this for the first time, that
-    // sentence is false. What IS true on day one is the reader's own
-    // hexagon, so the tour starts there, has them make their avatar one
-    // open category at a time, and only then pulls out and says where the
-    // others WILL be.
+    // A DOOR/OPEN beat's copy is only ever the instruction -- never the
+    // description of what is behind it, which would be true a beat too
+    // early. The description is a plain talk beat straight after arrival.
     //
-    // The petek is behind the LOGO now rather than being the middle lane
-    // (the app map is the middle lane), so the reader opens it themselves
-    // and shuts it themselves -- `toPetek` and `backToMap` -- for the same
-    // reason every lane change here is a real pull: the one door they will
-    // use forever after is taught by being used once.
-    // `toNear`/`toAll` are the two level pulls, and their copy is only ever
-    // the instruction to pull -- never the description of what is up
-    // there, which would be true a beat too early (see runLevelPull).
-    // `near`/`petekAll` carry that description and run as plain talk beats
-    // straight AFTER arrival, the same order toKahve -> events already
-    // uses for a lane.
+    // Keys whose MEANING changed were given new names rather than reused:
+    // an admin-saved override (db/onboarding_copy.sql) for an old key would
+    // otherwise say the old thing on the new beat.
     lanes: {
       tr: {
-        reveal:      'Burası ortası — uygulamanın haritası. Nerede olduğunu ve nereye gidebileceğini gösterir. Her yere buradan, parmağınla gidiliyor.',
-        toSen:        'Yukarıda, çubuğun üstündeki kendi adına bas.',
-        senClose:     'Kapat, peteğe bakalım.',
-        toPetek:      'Ortadaki logoya bas. Petek orada.',
-        avatarIntro: 'Öncelikle, senin avatarını yaratalım.',
+        toSen:       'Yukarıda, çubuğun üstündeki kendi adına bas.',
+        avatarIntro: 'Burası sensin. Önce avatarını yaratalım.',
         pickHair:    'Saçını seç. Beğenince devam et.',
         pickShirt:   'Tişörtünü seç. Beğenince devam et.',
         senDone:     'Geri kalanı — şapkalar, rozetler — dışarıda kazanılır. Satın alınamaz.',
-        near:        'Bu petek. Şu an sadece sen varsın. Biri sana kendi kodunu verdiğinde, yanındaki boş yerlerden birine oturur — gerçek hayatta, yüz yüze.',
-        backToMap:   'Peteği kapatmak için aynı logoya tekrar bas. Nerede olursan ol, bir basış uzakta.',
-        twoSides:    'İstanbul Avrupa ve Anadolu yakası diye ikiye ayrılır. İstanbulite de öyle — sağda Kahvehane, solda Kütüphane.',
-        toKahve:     'Kahvehane sağda. Parmağını sola kaydır.',
-        events:      'Etkinlikler. Bunlar internette değil, dışarıda. Beğendiğin seni bekler.',
-        games:       'Üç oyun, her gün yeni. Sırayla açılır.',
-        toKutup:     'Kütüphane en solda. Sağa kaydır, haritadan geçip devam et.',
-        news:        'Haberler. İstanbul, Türkiye ve Dünya — günde bir avuç, bitince biter.',
-        anket:       'Anket. Cevabın kendi ilçenin altına yazılır, yani sonuç tek bir yüzde değil — yirmi beş tane.',
-        toHane:      'Haritaya dönelim. Sola kaydır.',
+        closeSheet:  'Tamam. Şimdi kapat.',
+        sky:         'Adının altındaki zincir İstanbul’un gökyüzü: güneş soldan doğar, sağdan batar; gece ay geçer. Uygulama da onunla döner.',
+        sunrise:     'Güneş doğunca Kütüphane yenilenir — günün haberleri, günün sorusu. Kütüphane solda: oraya geçelim.',
+        newsOpen:    'Bunlar bugünün haberleri. Birine bas.',
+        newsThrow:   'Okuyunca işin bitti: sağa ya da sola fırlat, gitsin. Bir habere hep böyle veda edersin.',
+        newsNone:    'Bugün henüz haber yok. Olduğunda, birine basıp okursun; bitince sağa ya da sola fırlatırsın.',
+        toKahvehane: 'Şimdi Kahvehane. En sağda — haritadan geçip devam et.',
+        sunset:      'Güneş batınca da Kahvehane yenilenir — bu akşamın etkinlikleri, bu gecenin oyunları.',
+        eventOpen:   'Bunlar dışarıda olan şeyler. Birine bas.',
+        eventThrow:  'Aynı hareket, ama burada yönün bir cevap: sağa fırlatırsan gidiyorsun, sola fırlatırsan gitmiyorsun.',
+        eventNone:   'Bugün henüz etkinlik yok. Olduğunda, birine basıp açarsın: sağa fırlatmak “gidiyorum”, sola fırlatmak “gitmiyorum” demek.',
       },
       en: {
-        reveal:      'This is the middle — the map of the app. It says where you are and where you can go. Everywhere else is a finger away from here.',
-        toSen:        'Press your own name, up on the bar.',
-        senClose:     'Close it — let us look at the petek.',
-        toPetek:      'Press the logo in the middle. The petek is behind it.',
-        avatarIntro: 'First, let\'s create your avatar.',
+        toSen:       'Press your own name, up on the bar.',
+        avatarIntro: 'This is you. First, let’s create your avatar.',
         pickHair:    'Pick your hair. Continue once you like it.',
         pickShirt:   'Pick your shirt. Continue once you like it.',
         senDone:     'The rest of it — hats, badges — is earned outside. It cannot be bought.',
-        near:        'This is the petek. Right now it is only you. When somebody gives you their code they take one of the empty places beside you — in person, face to face.',
-        backToMap:   'Press the same logo again to shut the petek. Wherever you are, it is one press away.',
-        twoSides:    'Istanbul splits into a European side and an Anatolian side. Istanbulite splits the same way — Kahvehane on the right, Kütüphane on the left.',
-        toKahve:     'Kahvehane is to the right. Pull your finger left.',
-        events:      'Events. These happen outside, not in here. The ones you keep are waiting for you.',
-        games:       'Three games, new every day. They unlock in order.',
-        toKutup:     'Kütüphane is all the way left. Pull right, past the map, and keep going.',
-        news:        'The news. İstanbul, Türkiye and Dünya — a handful a day, and then it is done.',
-        anket:       'The poll. Your answer is filed under your own district, so the result is not one percentage — it is twenty-five.',
-        toHane:      'Back to the map. Pull left.',
+        closeSheet:  'Good. Now close it.',
+        sky:         'The chain under your name is the sky over İstanbul: the sun rises on the left and sets on the right, and at night the moon crosses. The app turns with it.',
+        sunrise:     'When the sun rises, Kütüphane renews — the day’s news, the day’s question. Kütüphane is on the left: let’s go there.',
+        newsOpen:    'These are today’s stories. Press one.',
+        newsThrow:   'Once you have read it, you are done with it: throw it left or right and it is gone. That is how you let go of every story.',
+        newsNone:    'No stories yet today. When there are, you press one to read it and throw it left or right when you are done.',
+        toKahvehane: 'Now Kahvehane. It is all the way right — past the map, and keep going.',
+        sunset:      'And when the sun sets, Kahvehane renews — tonight’s evenings and tonight’s games.',
+        eventOpen:   'These are things happening outside. Press one.',
+        eventThrow:  'The same throw, but here the direction is your answer: throw it right if you are going, left if you are not.',
+        eventNone:   'No evenings yet today. When there are, you press one to open it: throwing it right says you are going, left says you are not.',
       },
     },
     // Printed under the line on a beat that waits for the reader to do
@@ -190,6 +155,16 @@
     // ever increases when the drag overshoots upward). Never "down": that
     // is the physical opposite of the gesture that actually advances it.
     pullUp:      { tr: 'parmağını yukarı kaydır', en: 'pull up' },
+    // The two press prompts the sheet's own door beats print, and the two
+    // the open/throw beats print (see runOpen / runThrow).
+    pressName:   { tr: 'adına bas', en: 'press your name' },
+    pressClose:  { tr: 'kapat', en: 'close it' },
+    pressBox:    { tr: 'birine bas', en: 'press one' },
+    throwIt:     { tr: 'sağa ya da sola fırlat', en: 'throw it left or right' },
+    throwNudge: {
+      tr: 'fırlatamıyor musun? devam etmek için dokun',
+      en: "can't throw? tap to carry on",
+    },
     // The petek is behind a PRESS rather than a pull, so its own two
     // beats say press rather than borrowing one of the pull prompts.
     pressLogo:   { tr: 'logoya bas', en: 'press the logo' },
@@ -214,7 +189,6 @@
       en: 'That is all of it. Outside is waiting for you.',
     },
     finishLabel: { tr: 'BİTİR', en: 'FINISH' },
-    confirmLabel: { tr: 'ONAYLA', en: 'CONFIRM' },
     tapToContinue: { tr: 'devam etmek için herhangi bir yere dokun', en: 'tap anywhere to continue' },
     copy: { tr: 'KOPYALA', en: 'COPY' },
     copied: { tr: 'KOPYALANDI', en: 'COPIED' },
@@ -222,14 +196,17 @@
 
   // ── State ──
   let sb, user, kefilName, referralCode, homeNb;
-  let lang = 'en';     // 'en' or 'tr' for mascot-led beats
-  let palette = null;  // 'mono' | 'earth'
+  let lang = 'en';     // 'en' or 'tr' once the language hold has been taught
+  // The palette is no longer asked: the reader keeps whichever the app is
+  // already on (palette.js), and it stays changeable from the profile sheet.
+  function currentPalette() {
+    return document.documentElement.getAttribute('data-palette') === 'earth' ? 'earth' : 'mono';
+  }
   // Not chosen and never shown: the onboarding has no mascot any more. It is
   // still DERIVED from the palette and written to profiles.mascot at the end,
   // because admin-notification.js reads that column for its own bubble and an
   // unset one would quietly change that feature. Bringing a mascot back here
   // is putting the picture back, not re-adding the data.
-  let mascot = null;   // 'cat' | 'dog', implied by the palette
   // Admin-editable overrides for COPY.lanes, keyed the same way
   // (db/onboarding_copy.sql; edited from admin.html's Users tab). null
   // until fetched, {} if the table is empty or missing -- either way
@@ -404,44 +381,10 @@
     try { sessionStorage.removeItem(STATE_KEY); } catch (e) { /* ignore */ }
   }
 
-  // Render a row of choice buttons + a Confirm button below.
-  // onPick(choice) fires every time a choice is tapped; onConfirm() fires
-  // when the user taps the confirm button (only enabled after a pick).
-  function addChoices(choices, onPick, onConfirm, renderInner, slow) {
-    const stage = document.getElementById('ist-onb-stage');
-    const wrap = document.createElement('div');
-    wrap.className = 'ist-onb-choices' + (slow ? ' slow' : '');
-    const btns = [];
-    choices.forEach(c => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ist-onb-choice';
-      btn.innerHTML = renderInner(c);
-      btn.addEventListener('click', () => {
-        btns.forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
-        onPick(c);
-        confirmBtn.disabled = false;
-      });
-      btns.push(btn);
-      wrap.appendChild(btn);
-    });
-    stage.appendChild(wrap);
-
-    const confirmBtn = document.createElement('button');
-    confirmBtn.type = 'button';
-    confirmBtn.className = 'ist-onb-btn' + (slow ? ' slow' : '');
-    // Use the language-appropriate label; default to English before lang is set.
-    confirmBtn.textContent = COPY.confirmLabel[lang] || COPY.confirmLabel.en;
-    confirmBtn.disabled = true;
-    confirmBtn.addEventListener('click', onConfirm);
-    stage.appendChild(confirmBtn);
-  }
-
   // ── Steps ──
   function show() {
     root.classList.add('show');
-    document.body.classList.add('ist-onb-locked', 'ist-onb-modal');
+    document.body.classList.add('ist-onb-locked', 'ist-onb-modal', 'ist-onb-bare-l', 'ist-onb-bare-r');
     installFirewall();
     focusFirst();
   }
@@ -460,7 +403,7 @@
   }
   function hide() {
     root.classList.remove('show');
-    document.body.classList.remove('ist-onb-locked', 'ist-onb-modal', 'ist-onb-lang');
+    document.body.classList.remove('ist-onb-locked', 'ist-onb-modal', 'ist-onb-lang', 'ist-onb-bare-l', 'ist-onb-bare-r');
     removeFirewall();
     clearSpotlight();
     hidePane();
@@ -564,7 +507,7 @@
     const logo = document.getElementById('fb-logo-btn');
     const i18n = global.I18N;
     // No bar or no I18N (a page without the compass): nothing to teach.
-    if (!logo || !i18n || !i18n.onChange) { syncLangFromI18N(); stepPalette(); return; }
+    if (!logo || !i18n || !i18n.onChange) { syncLangFromI18N(); stepTour(); return; }
 
     const L = COPY.langHold;
     const stage = document.getElementById('ist-onb-stage');
@@ -602,7 +545,7 @@
       document.body.classList.remove('ist-onb-lang');
       closePassthrough();
       syncLangFromI18N();
-      stepPalette();
+      stepTour();
     }
   }
 
@@ -610,30 +553,6 @@
   // source of truth for which way the app leans.
   function syncLangFromI18N() {
     if (global.I18N && I18N.isEnglish) lang = I18N.isEnglish() ? 'en' : 'tr';
-  }
-
-  async function stepPalette() {
-    clearStage();
-    const s = COPY.paletteScreen[lang];
-    // A (instant) + B (typed). After the line finishes typing, the palette
-    // choices fade in (slow rise-in, same animation as the language picker).
-    await addMsgTyped({ instant: s.instant, typed: s.typed }, 22);
-    let selected = null;
-    const onPick = (c) => {
-      selected = c;
-      // Preview the palette live as the user picks.
-      root.setAttribute('data-palette', c.value);
-    };
-    const onConfirm = () => {
-      if (!selected) return;
-      palette = selected.value;
-      mascot = selected.mascot;
-      stepTour();
-    };
-    addChoices(s.choices, onPick, onConfirm, c => `
-      <div class="ist-onb-swatch ${c.value}"><span></span><span></span><span></span></div>
-      <div>${c.label}</div>
-    `, true);
   }
 
   // ───── Phase 2: spotlight-driven tour ─────
@@ -656,7 +575,7 @@
       pane.id = 'ist-onb-pane';
       document.body.appendChild(pane);
     }
-    pane.setAttribute('data-palette', palette || 'mono');
+    pane.setAttribute('data-palette', currentPalette());
   }
 
   // ── The spotlight ──
@@ -712,6 +631,10 @@
   function paintSpotlight() {
     if (!spotlightEl || !CAN_CUT) return;
     const rects = litTargets
+      // A cast box on a lane the reader has walked off is still in the DOM,
+      // faded to nothing (paintCast): no hole for it, or the lane that
+      // arrives in its place would show through where it used to stand.
+      .filter(t => { try { return parseFloat(getComputedStyle(t.el).opacity) > 0.05; } catch (e) { return true; } })
       .map(t => t.el.getBoundingClientRect())
       .filter(r => r.width > 0 && r.height > 0);
 
@@ -772,7 +695,18 @@
     if (!passScope) return false;
     return !!(target && target.closest && target.closest(passScope));
   }
+  // A press the TOUR makes on the reader's behalf (a stall escape doing the
+  // press itself, a beat re-opening the sheet it needs). The firewall is a
+  // capture listener on document, so a synthetic .click() on the app is
+  // swallowed like any other unless it is let through for that one call.
+  let firewallBypass = false;
+  function pressThrough(el) {
+    if (!el) return;
+    firewallBypass = true;
+    try { el.click(); } finally { firewallBypass = false; }
+  }
   function gestureFirewall(e) {
+    if (firewallBypass) return;
     if (isInsideOnboarding(e.target)) return;
     if (isPassthrough(e.target)) return;
     if (typeof e.preventDefault === 'function' && e.cancelable) e.preventDefault();
@@ -844,8 +778,17 @@
     firewallInstalled = false;
   }
 
-  function renderPane({ speech, actionLabel, onAction, promptText }) {
+  function renderPane({ speech, actionLabel, onAction, promptText, top }) {
     pane.innerHTML = '';
+    // The open/throw beats hand the reader the cast boxes and the page they
+    // grow into, which stand exactly where the pane rests at the bottom --
+    // so those beats say their line from the top of the screen instead,
+    // over the map, where nothing is being asked of the finger.
+    pane.classList.toggle('ist-onb-pane-top', !!top);
+    // The prompt is uppercased by CSS and the document is lang="tr", so an
+    // English "pull right" folds to "PULL RİGHT" unless the pane says
+    // which language it is in.
+    pane.lang = lang === 'tr' ? 'tr' : 'en';
     const bubble = document.createElement('div');
     bubble.className = 'ist-onb-bubble';
     bubble.innerHTML = speech;
@@ -948,6 +891,10 @@
     // -- so the tour needs those two the way it needs the logo: the one
     // mark that opens it, and the sheet itself once it is open.
     '#ist-pc-me': 'me', '#profile-overlay': 'sheet',
+    // The open/throw beats: one column's boxes (not the whole book, or a
+    // stray sideways drag would walk the reader off the lane being talked
+    // about), and then the page that box grew into.
+    '.fb-haberler': 'news', '.fb-events': 'events', '#fb-page-overlay': 'page',
   };
   let passScope = null;
   function openPassthrough(scope) {
@@ -974,80 +921,47 @@
     // `lane` is the lane the beat belongs to and is asserted before it runs,
     // so a reader who wandered is put back rather than talked at about a
     // screen they are not on. `pull` is the lane a pull beat waits for;
-    // `petek` / `sheet` are the two doors the reader opens themselves.
+    // `sheet` is the door the reader opens themselves; `open` names a column
+    // whose box the reader presses, and `throw` waits for the page that box
+    // opened to be thrown away (see runOpen / runThrow).
     const beats = [
-      { lane: LANE_MAP,        target: null,        speech: lines.reveal },
-      // ── The petek's own door ──
-      // It is the logo, not a lane, so the reader is asked to press it and
-      // the beat waits for it to actually open -- the same rule every lane
-      // pull here follows. Everything between this and `backToMap` happens
-      // inside the petek and asserts no lane at all (`inPetek`), because
-      // asserting one would walk the strip behind a layer the reader is
-      // standing in.
-      // ── SEN: your own name, up on the bar ──
-      // The petek's innermost depth was the reader themselves -- the
-      // avatar arrows, the preferences, the way out -- and it is the
-      // profile sheet now (see the ONE DEPTH note in profile-card.js).
-      // So the tour teaches the door it actually has: press your own
-      // name. Same rule as the logo below it -- the reader opens it and
-      // shuts it themselves, because that is the press they will make
-      // forever after.
+      // ── 1. The top bar: your own name is your own profile ──
+      // The reader opens it and shuts it themselves, because that is the
+      // press they will make forever after.
       { target: '#ist-pc-me', speech: lines.toSen, sheet: 'open' },
-      // The reader first, the shape second. On day one the petek is one
-      // hexagon and six empty sides, so there is nothing true to say about
-      // neighbours yet -- but there is always something true to say about
-      // the reader, and something for them to DO (see COPY.lanes).
       { inSheet: true, speech: lines.avatarIntro },
       // One category at a time, and only the ones already open to
-      // EVERYONE: AVATAR_HAT_OPTIONS (profile-card.js) carries only 'Yok'
-      // today (the Sözcü crown is parked, unbuilt art) and
-      // AVATAR_ACCESSORY_OPTIONS's one alternative (glasses) is
-      // unconditionally `locked: true` -- neither has a second OPEN choice
-      // to hand a reader on day one. Hair and shirt do, so those are the
-      // two beats. `pick: true` lights the pair itself (see
-      // paintSpotlight) and never advances on a press -- browsing IS the
-      // point, see runPick.
-      //
-      // The ids are unchanged: the arrows the petek's own depth carried
-      // were always the sheet's own markup and the sheet's own four
-      // wire*Carousel handlers, which is exactly why this beat needed
-      // re-pointing rather than rewriting. The sheet opens already
-      // customizing (`sen` in PROFILE_SECTIONS), so they are on screen
-      // from the beat's first frame.
+      // EVERYONE: hats carry only 'Yok' today and the one accessory is
+      // locked, so neither has a second OPEN choice to hand a reader on day
+      // one. `pick: true` never advances on an arrow press -- browsing IS
+      // the point, see runPick.
       { inSheet: true, target: '#po-hair-prev, #po-hair-next',
         speech: lines.pickHair, pick: true },
       { inSheet: true, target: '#po-shirt-prev, #po-shirt-next',
         speech: lines.pickShirt, pick: true },
-      // Both arrow columns, so two rings -- `all`.
       { inSheet: true, target: '.ist-pc-cover-pick-col', all: true, speech: lines.senDone },
-      { target: '#profile-overlay .ist-sheet-close',
-        speech: lines.senClose, sheet: 'close' },
-      // ── The petek's own door ──
-      // It is the logo, not a lane, so the reader is asked to press it and
-      // the beat waits for it to actually open -- the same rule every lane
-      // pull here follows. Everything between this and `backToMap` happens
-      // inside the petek and asserts no lane at all (`inPetek`), because
-      // asserting one would walk the strip behind a layer the reader is
-      // standing in.
-      { target: '#fb-logo-btn', speech: lines.toPetek, petek: 'open' },
-      // One depth, so one beat: the shape is what it is the moment it
-      // opens. The two pulls that used to walk out of Sen and on to the
-      // whole petek are gone with the depths themselves.
-      { inPetek: true,         speech: lines.near },
-      { lane: LANE_MAP,        speech: lines.twoSides },
-      { lane: LANE_MAP,        speech: lines.toKahve, pull: LANE_KAHVEHANE },
-      // A column is three boxes with no wrapper between them, and the
-      // mascot is talking about the column -- so the beat lights all of it.
-      { lane: LANE_KAHVEHANE,  target: '.fb-events', all: true, speech: lines.events },
-      { lane: LANE_KAHVEHANE,  target: '.fb-oyun',   all: true, speech: lines.games },
+      { target: '#profile-overlay .ist-sheet-close', speech: lines.closeSheet, sheet: 'close' },
+      // ── 2. The sky under the bar ──
+      // The sun/moon chain is the app's clock: each edge of the day renews
+      // one side (see "SUNRISE RENEWS KÜTÜPHANE" in project.html). Lit mark
+      // by mark, since the chain's own box is the whole bar.
+      { lane: LANE_MAP, target: '#ist-sky .ist-sky-mark', all: true, speech: lines.sky },
+      // ── 3. Kütüphane, renewed at sunrise ──
+      // `unbare` is the moment a word comes back onto the bottom bar -- each
+      // on the beat that first names it as a place, Kütüphane here and
+      // Kahvehane on the way there.
+      { lane: LANE_MAP, target: '#fb-nav > b:first-child', unbare: 'l',
+        speech: lines.sunrise, pull: LANE_KUTUPHANE },
+      { lane: LANE_KUTUPHANE, open: '.fb-haberler', speech: lines.newsOpen, none: lines.newsNone },
+      { lane: LANE_KUTUPHANE, throw: true, speech: lines.newsThrow },
+      // ── 4. Kahvehane, renewed at sunset ──
       // Two pulls, not one: the strip moves at most one lane per gesture,
-      // so reaching Kütüphane from Kahvehane goes through the middle. That
-      // is the point rather than a cost -- there is no way from the doing
-      // to the reading that does not pass the whole shape of the thing.
-      { lane: LANE_KAHVEHANE,  speech: lines.toKutup, pull: LANE_KUTUPHANE },
-      { lane: LANE_KUTUPHANE,  target: '.fb-haberler', all: true, speech: lines.news },
-      { lane: LANE_KUTUPHANE,  target: '.fb-anket',    all: true, speech: lines.anket },
-      { lane: LANE_KUTUPHANE,  speech: lines.toHane, pull: LANE_MAP },
+      // so the way from the reading to the doing is through the middle.
+      { lane: LANE_KUTUPHANE, target: '#fb-nav > b:last-child', unbare: 'r', speech: lines.toKahvehane,
+        pull: LANE_KAHVEHANE },
+      { lane: LANE_KAHVEHANE, target: '#fb-nav > b:last-child', speech: lines.sunset },
+      { lane: LANE_KAHVEHANE, open: '.fb-events', speech: lines.eventOpen, none: lines.eventNone },
+      { lane: LANE_KAHVEHANE, throw: true, speech: lines.eventThrow },
     ];
 
     let idx = 0;
@@ -1066,7 +980,12 @@
 
       // `=== undefined`, never `!b.pull`: Kütüphane is lane 0, so a falsy
       // test reads the one pull beat that aims at it as a talk beat.
+      // The bottom bar's two words come back the moment the tour first
+      // names one of them as a place (see body.ist-onb-bare).
+      if (b.unbare) document.body.classList.remove('ist-onb-bare-' + b.unbare);
       if (b.pull !== undefined) { runPull(b); return; }
+      if (b.open !== undefined) { runOpen(b); return; }
+      if (b.throw) { runThrow(b); return; }
       // The petek's own door: a press on the logo rather than a gesture on
       // the book. Sen's door is the same kind of thing one bar up -- your
       // own name, which opens the profile sheet.
@@ -1123,12 +1042,10 @@
       return !!ov && !ov.hidden;
     }
     function openSheet() {
-      const me = document.getElementById('ist-pc-me');
-      if (me) me.click();
+      pressThrough(document.getElementById('ist-pc-me'));
     }
     function closeSheet() {
-      const btn = document.querySelector('#profile-overlay .ist-sheet-close');
-      if (btn) btn.click();
+      pressThrough(document.querySelector('#profile-overlay .ist-sheet-close'));
     }
     function runSheetDoor(b) {
       const want = b.sheet === 'open';
@@ -1140,7 +1057,7 @@
         addSpotlight(document.querySelector(b.target));
         openPassthrough(want ? '#ist-pc-me' : '#profile-overlay');
       });
-      renderPane({ speech: b.speech, promptText: COPY.pressLogo[lang] });
+      renderPane({ speech: b.speech, promptText: (want ? COPY.pressName : COPY.pressClose)[lang] });
 
       const tick = () => {
         if (sheetOpen() === want) { stopLaneWatch(); closePassthrough(); advance(); return; }
@@ -1155,8 +1072,9 @@
         stallTimer = null;
         renderPane({ speech: b.speech, promptText: COPY.pressNudge[lang] });
         addHint(COPY.pressNudge[lang], () => {
-          stopLaneWatch(); closePassthrough();
+          stopLaneWatch();
           want ? openSheet() : closeSheet();
+          closePassthrough();
           advance();
         });
       }, STALL_MS);
@@ -1201,10 +1119,9 @@
     // A pull beat: dim stays, the book goes live, and arrival is the advance.
     function runPull(b) {
       openPassthrough('#fb');
-      // Nothing on the page is "lit" during a pull -- the thing being
-      // pointed at is the gesture, not an element.
-      clearSpotlight();
-      if (spotlightEl) spotlightEl.classList.add('show');
+      // A pull points at the gesture, so it lights nothing new -- except
+      // the word on the bottom bar naming where it goes, when it has one.
+      requestAnimationFrame(() => addSpotlight(b.target ? document.querySelector(b.target) : null));
       renderPane({
         speech: b.speech,
         // Pulling RIGHT walks the strip right, which moves the reader
@@ -1279,6 +1196,86 @@
       }, STALL_MS);
     }
 
+    // ── An open beat: press one of a column's boxes ──
+    // Lights the column's boxes that actually have a page behind them, hands
+    // that column alone back to the reader, and ends when a page is open.
+    // A column with nothing in it today says how it WOULD work (`none`) and
+    // the throw beat after it is skipped -- there is no page to throw.
+    function runOpen(b) {
+      const f = fb();
+      const boxes = Array.from(document.querySelectorAll(b.open + '.fb-openable'));
+      if (!f || !boxes.length) {
+        idx++;   // the throw beat has nothing to throw
+        requestAnimationFrame(() => addSpotlight(document.querySelectorAll(b.open)));
+        renderPane({ speech: b.none || b.speech, top: true });
+        addHint(COPY.tapToContinue[lang], advance);
+        return;
+      }
+      if (f.pageOpen) { advance(); return; }
+      requestAnimationFrame(() => {
+        addSpotlight(boxes);
+        openPassthrough(b.open);
+      });
+      renderPane({ speech: b.speech, promptText: COPY.pressBox[lang], top: true });
+      const tick = () => {
+        const now = fb();
+        if (now && now.pageOpen) { stopLaneWatch(); closePassthrough(); advance(); return; }
+        laneWatch = requestAnimationFrame(tick);
+      };
+      laneWatch = requestAnimationFrame(tick);
+      stallTimer = setTimeout(() => {
+        stallTimer = null;
+        renderPane({ speech: b.speech, promptText: COPY.pressNudge[lang], top: true });
+        addHint(COPY.pressNudge[lang], () => {
+          stopLaneWatch();
+          pressThrough(boxes[0]);
+          closePassthrough();
+          advance();
+        });
+      }, STALL_MS);
+    }
+
+    // ── A throw beat: the open page is thrown left or right ──
+    // Waits on __fb.throws rather than on the page shutting: the arrow shuts
+    // it too, and that is not the gesture being taught. A reader who closes
+    // it the other way is walked back one beat to open it again.
+    function runThrow(b) {
+      const f = fb();
+      // Back to the open beat before it (advance adds the one back).
+      if (!f || !f.pageOpen) { idx -= 2; advance(); return; }
+      const start = f.throws;
+      requestAnimationFrame(() => {
+        addSpotlight(document.getElementById('fb-page'));
+        settleSpotlight();   // the page is still growing out of its box
+        openPassthrough('#fb-page-overlay');
+      });
+      renderPane({ speech: b.speech, promptText: COPY.throwIt[lang], top: true });
+      const tick = () => {
+        const now = fb();
+        if (!now) { stopLaneWatch(); closePassthrough(); advance(); return; }
+        if (now.throws > start) {
+          stopLaneWatch(); closePassthrough();
+          // Advance once the page has flown off, so the next beat's light
+          // lands on the column rather than on a page mid-flight.
+          setTimeout(advance, 420);
+          return;
+        }
+        if (!now.pageOpen) { stopLaneWatch(); closePassthrough(); idx -= 2; advance(); return; }
+        laneWatch = requestAnimationFrame(tick);
+      };
+      laneWatch = requestAnimationFrame(tick);
+      stallTimer = setTimeout(() => {
+        stallTimer = null;
+        renderPane({ speech: b.speech, promptText: COPY.throwNudge[lang], top: true });
+        addHint(COPY.throwNudge[lang], () => {
+          stopLaneWatch();
+          pressThrough(document.getElementById('fb-page-back'));
+          closePassthrough();
+          setTimeout(advance, 420);
+        });
+      }, STALL_MS);
+    }
+
     function laneNow() {
       const f = fb();
       return f && f.lane ? f.lane.at : LANE_MAP;
@@ -1339,8 +1336,7 @@
       await sb.from('profiles').update({
         onboarded_at: new Date().toISOString(),
         language_pref: lang === 'en' ? 'more_english' : 'default',
-        palette_pref: palette,
-        mascot: mascot,
+        mascot: currentPalette() === 'earth' ? 'dog' : 'cat',
       }).eq('id', user.id);
     } catch (e) {
       console.error('onboarding finish failed', e);
@@ -1352,7 +1348,7 @@
   function buildRoot() {
     root = document.createElement('div');
     root.id = ROOT_ID;
-    root.setAttribute('data-palette', 'mono');
+    root.setAttribute('data-palette', currentPalette());
     root.innerHTML = `
       <div class="ist-onb-tap-zone"></div>
       <div id="ist-onb-stage"></div>
