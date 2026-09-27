@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#f0f0f0">
   <title>Admin — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="ist-date.js?v=7"></script>
+  <script src="ist-date.js?v=8"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <script src="avatar.js?v=5"></script>
@@ -1576,13 +1576,14 @@
        edition needs — each pressable, each landing on the section that
        fixes it.
 
-       THE DEADLINE IS THE SUN, not a timer somebody set. The app prints
-       two editions a day and sunrise/sunset over Istanbul are when they
-       come out (IstDate.nextEdition), so the countdown is a real
-       astronomical instant that moves through the year — 13h39m of
-       daylight to set the evening paper in June, 9h15m in December —
-       rather than a number in a config. An editor watching it is
-       watching the same clock the reader's app is.
+       THE DEADLINE IS THE SUN, not a timer somebody set. Sunrise
+       renews Kütüphane and sunset renews Kahvehane, so each side has
+       its own press time and the bar counts down to whichever comes
+       first (IstDate.nextEdition) — a real astronomical instant that
+       moves through the year, 13h39m of daylight to set Kahvehane in
+       June, 9h15m in December — rather than a number in a config. An
+       editor watching it is watching the same clock the reader's app
+       is.
        ══════════════════════════════════════════════════════════════════ */
     .press-bar {
       flex-shrink: 0;
@@ -1936,12 +1937,6 @@
     .baski-datebox { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
     .baski-datebox input { margin: 0; flex: 1; min-width: 0; padding: 5px 8px; font-size: 0.8rem; }
     .baski-datebox .btn { padding: 5px 9px; font-size: 0.66rem; white-space: nowrap; }
-    /* The two halves of one day. A pair of buttons rather than a select:
-       there are exactly two and the one you are setting has to be
-       readable from across the desk, which a collapsed select is not. */
-    .baski-halfbox { display: flex; gap: 6px; margin-top: 6px; }
-    .baski-halfbox .btn { flex: 1; padding: 5px 9px; font-size: 0.66rem; white-space: nowrap; }
-    .baski-halfbox .btn.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
     /* Setting a paper other than the one going out next is an ordinary
        thing to do; not noticing you are doing it is the mistake. */
     .baski-ahead {
@@ -1970,6 +1965,20 @@
       border-bottom: 1px solid var(--ink);
       background: var(--paper-banner);
     }
+    /* Each page's own press time, under its name: the two pages of one
+       date do not come out together any more — Kütüphane at that day's
+       sunrise, Kahvehane at its sunset — so the board says which is
+       which, and whether that page is already out, next, or further off. */
+    .baski-page-when {
+      display: block;
+      margin-top: 2px;
+      font-weight: 400;
+      letter-spacing: 0.6px;
+      text-transform: none;
+      font-size: 0.62rem;
+      color: var(--muted);
+    }
+    .baski-page-when b { color: var(--ink-red); font-weight: 700; }
     /* The screen is printed in the INK, not on the paper: what is being
        looked at is a phone standing in a lit room, and the slots are the
        only things on it giving light. It is also what the drawing this
@@ -3572,10 +3581,6 @@
       <div class="baski-datebox">
         <input type="date" id="baski-date"/>
         <button class="btn btn-secondary" id="baski-today-btn">Sıradaki</button>
-      </div>
-      <div class="baski-halfbox">
-        <button class="btn btn-secondary" id="baski-half-gun" data-half="gun">Sabah postası</button>
-        <button class="btn btn-secondary" id="baski-half-gece" data-half="gece">Akşam gazetesi</button>
       </div>
       <div class="baski-ahead" id="baski-ahead" hidden></div>
     </div>
@@ -9817,19 +9822,18 @@ async function deleteNotification(id) {
 // comment on the kind names it.
 // ══════════════════════════════════════════════════════════════════════
 
-// Which baskı is being set: a date AND a half — the sabah postası and
-// the akşam gazetesi are two papers now, not one pile with two deadlines
-// (db/breaking_news_v4_akis.sql). The half applies to the NEWS alone.
-// Etkinlik and Anket are still keyed by their date only (db/baski_v1.sql
-// is unchanged) and a game is a switch on the night it is played, so
-// those three kinds ignore it — which is why it is threaded through as
-// an argument rather than read out of this global inside each one.
+// Which baskı is being set: a DATE, and it names both pages. SUNRISE
+// RENEWS KÜTÜPHANE AND SUNSET RENEWS KAHVEHANE, so the paper dated D is
+// Kütüphane from sunrise on D and Kahvehane from sunset on D — two press
+// times, one date, and no half to pick. (There used to be one: a morning
+// and an evening half of the NEWS, db/breaking_news_v4_akis.sql. The
+// news is Kütüphane's and Kütüphane renews once a day, so it went, and
+// with it the pair of buttons under the date.)
 //
-// Both are null until the first paint resolves them against IstDate, the
-// only clock allowed to answer "what day is it in İstanbul" and "which
-// paper is next" (CLAUDE.md rule 10).
+// Null until the first paint resolves it against IstDate, the only clock
+// allowed to answer "what day is it in İstanbul" and "which paper is
+// next" (CLAUDE.md rule 10).
 let baskiDate = null;
-let baskiHalf = null;
 let baskiLoadSeq = 0;
 let baskiItems = { haber: [], etkinlik: [], anket: [], oyun: [] };
 let baskiFailed = {};
@@ -9845,25 +9849,22 @@ const BASKI_PAGES = [
   {
     id: 'kutuphane', name: 'Kütüphane', mirror: false, foot: ['KÜTÜP', ''],
     cols: [
-      { kind: 'haber', title: 'Haberler', note: 'Geniş sütun — gündüz de gece de.',
+      { kind: 'haber', title: 'Haberler', note: 'Geniş sütun — gün doğumunda çıkar.',
         slots: [
           { id: 'istanbul', label: 'İstanbul' },
           { id: 'turkiye',  label: 'Türkiye'  },
           { id: 'dunya',    label: 'Dünya'    },
         ] },
-      // The narrow column is two different things by the clock, and only
-      // one of them is curated: by day it is the news one story deeper
-      // (loadHaberlerNarrowActor — derived from the wide column's own
-      // stack, so there is nothing to drag), by night it is the polls.
-      // Said here rather than left for an editor to rediscover when the
-      // box they filled does not appear at noon.
+      // The narrow column is the Anket, day and night, and it comes out
+      // with the news at sunrise (polls_current_edition is asked with
+      // the Kütüphane day, see anketData in project.html).
       // Two slots, not three (see loadAnketActor's own `.limit(2)` in
       // project.html, and its CAST entry's `count: 2`) — the same
       // reduction Kahvehane's Oyunlar column would have made if it had
       // one, and the board's second rule: it asks exactly what the
       // reader's own loader asks, so a third box here would be a slot
       // the reader can never actually meet.
-      { kind: 'anket', title: 'Anket', note: 'Dar sütun — gece anket, gündüz 2. haber.',
+      { kind: 'anket', title: 'Anket', note: 'Dar sütun — gün doğumunda çıkar.',
         slots: [
           { id: 'a0', label: '1.' },
           { id: 'a1', label: '2.' },
@@ -9875,12 +9876,12 @@ const BASKI_PAGES = [
     cols: [
       // Two SLOTS, and a slot is not a game (db/game_night_slots.sql):
       // either one takes any of the three games, one game per slot.
-      { kind: 'oyun', title: 'Oyunlar', note: 'Dar sütun — gece. İki yuva, her yuvaya herhangi bir oyun.',
+      { kind: 'oyun', title: 'Oyunlar', note: 'Dar sütun — gün batımında çıkar. İki yuva, her yuvaya herhangi bir oyun.',
         slots: [
           { id: 'g0', label: '1. Oyun' },
           { id: 'g1', label: '2. Oyun' },
         ] },
-      { kind: 'etkinlik', title: 'Etkinlikler', note: 'Geniş sütun — kutu: etkinliğin tarihi.',
+      { kind: 'etkinlik', title: 'Etkinlikler', note: 'Geniş sütun — gün batımında çıkar; kutu: etkinliğin tarihi.',
         slots: [
           { id: 'd0', label: 'Bugün'    },
           { id: 'd1', label: 'Yarın'    },
@@ -9900,9 +9901,9 @@ const BASKI_KINDS = {
   // a story is ready the moment it is written, and the only question
   // left is which paper it runs in.
   haber: {
-    async load(date, half) {
+    async load(date) {
       const { data, error } = await sb.from('breaking_news')
-        .select('id, title, category, neighborhood, edition_date, edition_half, edition_order, archived_at')
+        .select('id, title, category, neighborhood, edition_date, edition_order, archived_at')
         .is('archived_at', null)
         .order('created_at', { ascending: false })
         .limit(200);
@@ -9917,20 +9918,21 @@ const BASKI_KINDS = {
         return {
           id: n.id, kind: 'haber', title: n.title,
           slot: pressBucketOf(n),
-          // A story is in THIS paper only if both the day and the half
-          // match. A row written before db/breaking_news_v4_akis.sql has
-          // no half at all and reads as the morning paper, which is the
-          // reading that changes nothing about where it already stood.
-          inEdition: n.edition_date === date && (n.edition_half || 'gun') === half,
-          otherEdition: n.edition_date && !(n.edition_date === date && (n.edition_half || 'gun') === half)
-            ? n.edition_date + ' · ' + baskiHalfName(n.edition_half || 'gun')
-            : null,
+          // A story is in THIS paper if its day matches. Whatever half an
+          // older desk filed it under, it comes out at that day's sunrise
+          // with the rest of Kütüphane (see NEWS_COLS in project.html).
+          inEdition: n.edition_date === date,
+          otherEdition: n.edition_date && n.edition_date !== date ? n.edition_date : null,
           order: n.edition_order ?? 0, warn,
         };
       });
     },
-    place: (item, date, order, half) => sb.from('breaking_news')
-      .update({ edition_date: date, edition_half: half, edition_order: order }).eq('id', item.id),
+    // edition_half is still WRITTEN, as 'gun', though nothing new reads
+    // it: an app still holding the old two-half reader (a cached page, for
+    // the ten minutes Pages keeps one) holds a 'gece' row back until
+    // sunset, so a story placed now reads the same to both.
+    place: (item, date, order) => sb.from('breaking_news')
+      .update({ edition_date: date, edition_half: 'gun', edition_order: order }).eq('id', item.id),
     pull: (item) => sb.from('breaking_news')
       .update({ edition_date: null, edition_order: 0 }).eq('id', item.id),
     setOrder: (item, order) => sb.from('breaking_news')
@@ -10029,7 +10031,7 @@ const BASKI_KINDS = {
         };
       });
     },
-    async place(item, date, order, half, slotId) {
+    async place(item, date, order, slotId) {
       const idx = Number(String(slotId || '').replace(/^g/, ''));
       if (!(idx >= 0 && idx < GAME_SLOT_COUNT)) return { error: new Error('Geçersiz yuva') };
       const lineup = (await gameLineup(date)).map(g => (g === item.id ? null : g));
@@ -10074,20 +10076,17 @@ async function baskiRefresh() {
   const dateInput = document.getElementById('baski-date');
   if (!dateInput) return;
   // The baskı being set is the one going out next. nextEdition() is the
-  // only thing that knows which that is (CLAUDE.md rule 10) and it
-  // already names the day a night belongs to.
-  if (!baskiDate) {
-    const next = IstDate.nextEdition();
-    baskiDate = next.date;
-    baskiHalf = next.edition;
-  }
+  // only thing that knows which that is (CLAUDE.md rule 10), and its date
+  // is always a day one of the two pages is next out on: by day it is
+  // today (Kütüphane's is out, Kahvehane's comes at sunset), by night it
+  // is tomorrow (Kütüphane's comes at sunrise).
+  if (!baskiDate) baskiDate = IstDate.nextEdition().date;
   dateInput.value = baskiDate;
-  baskiPaintHalf();
   baskiPaintHead();
 
   const seq = ++baskiLoadSeq;
   const results = await Promise.all(BASKI_KIND_ORDER.map(async (k) => {
-    try { return { k, items: await BASKI_KINDS[k].load(baskiDate, baskiHalf), failed: false }; }
+    try { return { k, items: await BASKI_KINDS[k].load(baskiDate), failed: false }; }
     catch (err) { console.error('[baski ' + k + ']', err); return { k, items: [], failed: true }; }
   }));
   if (seq !== baskiLoadSeq) return;       // a date change overtook this fetch
@@ -10102,15 +10101,6 @@ async function baskiRefresh() {
   baskiWireSources();
 }
 
-// Which of the two halves is being set, inked on its own button. Called
-// from baskiRefresh rather than from the click handler, so the board and
-// the buttons can never disagree about which paper is open.
-function baskiPaintHalf() {
-  document.querySelectorAll('.baski-halfbox .btn').forEach(b => {
-    b.classList.toggle('on', b.dataset.half === baskiHalf);
-  });
-}
-
 function baskiPaintHead() {
   const next = IstDate.nextEdition();
   const whenEl = document.getElementById('baski-when');
@@ -10123,20 +10113,52 @@ function baskiPaintHead() {
   // Setting a paper other than the next one out is ordinary; not
   // noticing you are doing it is the mistake. The three
   // *_current_edition resolvers hand the reader the NEWEST edition at or
-  // before today, so a future date is invisible until that day comes and
-  // a past one is either live or already superseded.
-  // The two papers of one day are ordered too: the morning one comes out
-  // before the evening one, so "am I setting a paper other than the next
-  // one out" is a comparison on the pair, not on the date alone.
-  const rank = (d, h) => d + (h === 'gece' ? '1' : '0');
-  const here = rank(baskiDate, baskiHalf);
-  const there = rank(next.date, next.edition);
-  const ahead = here > there;
-  const behind = here < there;
+  // before that side's own day, so a future date is invisible until its
+  // sun comes up (or goes down), and a past one is either still standing
+  // on one side or already superseded on both.
+  const live = baskiSideState('kutuphane', baskiDate) === 'live' ||
+               baskiSideState('kahvehane', baskiDate) === 'live';
+  const ahead = baskiDate > next.date;
+  const behind = baskiDate < next.date;
   aheadEl.hidden = !(ahead || behind);
   aheadEl.textContent = ahead
     ? 'İleri tarihli baskı — o gün gelene kadar okuyucuya çıkmaz.'
-    : (behind ? 'Geçmiş bir baskı. Bugünkü sayı bu değilse okuyucu görmez.' : '');
+    : (behind
+      ? (live ? 'Bu sayı şu an yayında — okuyucu değişikliği bir sonraki gelişinde görür.'
+              : 'Geçmiş bir baskı. Bugünkü sayı bu değilse okuyucu görmez.')
+      : '');
+}
+
+// Where one page of a given date stands against the reader's own clock:
+// already superseded ('behind'), the one out now ('live'), or not out
+// yet ('ahead'). The two pages of one date are rarely in the same state:
+// between a sunrise and the sunset after it, today's Kütüphane is out
+// and today's Kahvehane is not.
+function baskiSideState(side, date) {
+  const held = side === 'kutuphane' ? IstDate.kutuphaneDay() : IstDate.kahvehaneDay();
+  return date > held ? 'ahead' : (date < held ? 'behind' : 'live');
+}
+
+// The instant a page of `date` goes out: that day's sunrise for
+// Kütüphane, its sunset for Kahvehane. Asked at noon +03:00 so the sun
+// equation is handed the right İstanbul day whatever the device's zone.
+function baskiSideAt(side, date) {
+  const sun = IstDate.sunTimes(new Date(date + 'T12:00:00+03:00'));
+  return side === 'kutuphane' ? sun.sunrise : sun.sunset;
+}
+
+// The line under each page's name: its own press time, and where that
+// page stands -- out now, next, further off, or gone.
+function baskiPageWhenHTML(side) {
+  const at = baskiSideAt(side, baskiDate);
+  const state = baskiSideState(side, baskiDate);
+  const next = IstDate.nextEdition();
+  const word = state === 'live' ? 'yayında'
+    : (state === 'behind' ? 'geçti'
+      : (next.side === side && next.date === baskiDate ? 'sıradaki' : 'ileride'));
+  return '<span class="baski-page-when">' +
+    (side === 'kutuphane' ? 'gün doğumu ' : 'gün batımı ') + escapeHtml(pressFmtTime(at)) +
+    ' · ' + (state === 'live' ? '<b>' + word + '</b>' : word) + '</span>';
 }
 
 // ── Render ──
@@ -10145,7 +10167,7 @@ function baskiRenderPages() {
   if (!wrap) return;
   wrap.innerHTML = BASKI_PAGES.map(pg => `
     <div class="baski-page">
-      <h3>${escapeHtml(pg.name)}</h3>
+      <h3>${escapeHtml(pg.name)}${baskiPageWhenHTML(pg.id)}</h3>
       <div class="baski-screen${pg.mirror ? ' mirror' : ''}">
         <div class="baski-maps"><div class="baski-map"></div><div class="baski-map"></div></div>
         ${pg.cols.map(col => `
@@ -10334,7 +10356,7 @@ function baskiPlace(item, slotId) {
     ? (baskiItems[item.kind] || []).filter(i => i.inEdition)
     : baskiStack(item.kind, slotId || item.slot);
   const order = stack.length ? Math.max(...stack.map(i => i.order)) + 1 : 0;
-  return baskiWrite(() => def.place(item, baskiDate, order, baskiHalf, slotId), 'Baskıya koyma');
+  return baskiWrite(() => def.place(item, baskiDate, order, slotId), 'Baskıya koyma');
 }
 
 function baskiPull(item) {
@@ -10368,21 +10390,8 @@ document.getElementById('baski-date').addEventListener('change', (e) => {
   baskiRefresh();
 });
 document.getElementById('baski-today-btn').addEventListener('click', () => {
-  const next = IstDate.nextEdition();
-  baskiDate = next.date;
-  baskiHalf = next.edition;
+  baskiDate = IstDate.nextEdition().date;
   baskiRefresh();
-});
-// Switching halves is switching PAPERS, so it reloads the board exactly
-// as changing the date does -- the rows a slot holds are different, and
-// a board that kept the old ones would be the one thing this may never
-// be (see "Every write re-reads the whole board").
-document.querySelectorAll('.baski-halfbox .btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if (baskiHalf === btn.dataset.half) return;
-    baskiHalf = btn.dataset.half;
-    baskiRefresh();
-  });
 });
 
 // Re-stamp the sources whenever a list in the middle re-renders. Debounced
@@ -10407,12 +10416,13 @@ function baskiWatchSources() {
 // answers both on every section: the edition being set, the time left to
 // set it, and one forme per thing that edition needs.
 //
-// THE DEADLINE IS THE SUN. IstDate.nextEdition() is the one place that
-// knows which paper is next and when it comes out -- never a timer, never
-// a stored hour, and never a second copy of the sunrise equation here
-// (CLAUDE.md rule 10). What that buys is an honest deadline that moves
-// through the year: 13h39m of daylight to set the evening paper in June,
-// 9h15m in December.
+// THE DEADLINE IS THE SUN. Sunrise renews Kütüphane and sunset renews
+// Kahvehane, so there are two press times a day, one per side, and
+// IstDate.nextEdition() is the one place that knows which of them is next
+// and when -- never a timer, never a stored hour, and never a second copy
+// of the sunrise equation here (CLAUDE.md rule 10). What that buys is an
+// honest deadline that moves through the year: 13h39m of daylight to set
+// Kahvehane in June, 9h15m in December.
 //
 // THE ONE RULE FOR A FORME: it asks EXACTLY what the reader's own loader
 // asks, against the same tables with the same filters. A forme that
@@ -10421,12 +10431,12 @@ function baskiWatchSources() {
 // empty. Where project.html's loader is the authority, the comment on
 // each check names it.
 //
-// A forme belongs to the editions it is true of and no others: the games
-// and their questions are the night's, the second news story is the day's
-// (see "What each screen carries" in CLAUDE.md). One that does not apply
-// is drawn dashed -- the site's own "nothing here" convention -- rather
-// than being dropped, so the bar keeps the same shape on both editions
-// and an editor learns where to look.
+// A forme belongs to ONE side's paper: the news and the anket are
+// Kütüphane's and go out at sunrise ('gun'), the evenings and the games
+// are Kahvehane's and go out at sunset ('gece'). One whose side is not
+// the one going to press next is drawn dashed -- the site's own "nothing
+// here" convention -- and says when it goes instead of being dropped, so
+// the bar keeps the same shape all day and an editor learns where to look.
 // ═══════════════════════════════════════════════════════════════════════
 
 // The three news buckets, in the reader's own vertical order, and the
@@ -10479,7 +10489,8 @@ const PRESS_FORMES = [
     id: 'haberler',
     name: 'Haberler',
     tab: 'news',
-    editions: ['gun', 'gece'],
+    // Kütüphane's: the day's paper goes out whole at sunrise.
+    editions: ['gun'],
     // EXACTLY haberlerRows()' own question (project.html), because a
     // forme that asks a looser one reports an edition ready that the
     // reader will open and find empty.
@@ -10491,18 +10502,14 @@ const PRESS_FORMES = [
     // longer the question to ask. The old "holdover" warn went with it:
     // there is no holdover any more, a story simply ages out.
     async check(ctx) {
+      // ctx.date is the Kütüphane day this sunrise opens -- the very
+      // `today` haberlerRows() will be asked with once it is out.
       const floor = pressDayShift(ctx.date, -2);
-      let q = sb.from('breaking_news')
-        .select('category, neighborhood, edition_date, edition_half')
+      const { data, error } = await sb.from('breaking_news')
+        .select('category, neighborhood, edition_date')
         .gte('edition_date', floor)
         .lte('edition_date', ctx.date)
         .is('archived_at', null);
-      // The akşam gazetesi has not gone out while the morning paper is
-      // the one in force -- the same gate the reader's own fetch applies.
-      if (ctx.edition === 'gun') {
-        q = q.or('edition_date.lt.' + ctx.date + ',edition_half.eq.gun');
-      }
-      const { data, error } = await q;
       if (error) throw error;
       const rows = data || [];
       if (!rows.length) return { state: 'miss', note: 'Üç gündür sayı yok' };
@@ -10520,10 +10527,36 @@ const PRESS_FORMES = [
       // the reader is being handed yesterday's window and nothing new.
       // Not a miss -- their column is full -- but it is the one thing an
       // editor about to miss a deadline needs told.
-      const fresh = rows.filter(n =>
-        n.edition_date === ctx.date && (n.edition_half || 'gun') === ctx.edition).length;
+      const fresh = rows.filter(n => n.edition_date === ctx.date).length;
       if (!fresh) return { state: 'warn', note: 'Bu sayıya haber konmadı' };
       return { state: 'ok', note: fresh + ' yeni · ' + rows.length + ' okunabilir' };
+    },
+  },
+  {
+    id: 'anket',
+    name: 'İlçe anketi',
+    tab: 'district-polls',
+    // Kütüphane's, so it goes out at sunrise with the news: the column
+    // asks all day and shows its split to whoever has answered. An
+    // inactive board is an empty column either way.
+    editions: ['gun'],
+    async check(ctx) {
+      // anketData()'s own question, and both halves of it: in the baskı
+      // (db/baski_v1.sql) AND still open. `active` was the whole gate
+      // before the baskı existed; counting it alone now would report a
+      // full board over an empty column.
+      const { data: editionDate, error: edErr } =
+        await sb.rpc('polls_current_edition', { p_today: ctx.date });
+      if (edErr) throw edErr;
+      if (!editionDate) return { state: 'miss', note: 'Sayı çıkmadı' };
+      const { data, error } = await sb.from('neighborhood_polls')
+        .select('id').eq('edition_date', editionDate).eq('active', true).limit(3);
+      if (error) throw error;
+      const n = (data || []).length;
+      if (!n) return { state: 'miss', note: 'Baskıda anket yok' };
+      if (editionDate !== ctx.date) return { state: 'warn', note: editionDate + ' sayısı duruyor' };
+      if (n < 3) return { state: 'warn', note: n + '/3 kutu dolu' };
+      return { state: 'ok', note: '3 anket' };
     },
   },
   {
@@ -10533,11 +10566,14 @@ const PRESS_FORMES = [
     // column and is already up on every section, so a forme has nothing
     // to navigate to but the case of type it is short of.
     tab: 'events',
-    editions: ['gun', 'gece'],
+    // Kahvehane's: a new baskı of evenings goes out at sunset.
+    editions: ['gece'],
     // loadEtkinlikActor's own three boxes: day+0, +1, +2 as fixed +03:00
     // instants (Istanbul carries no DST, so this is exact rather than a
     // guess) -- counted from the day THIS paper comes out on, since that
-    // is the day the reader will be reading it.
+    // is the day the reader will be reading it. ctx.date is the
+    // Kahvehane day this sunset opens, which is what the reader's own
+    // events_current_edition call will be asked with.
     //
     // AND ONLY WHAT IS IN THE BASKI. Since db/baski_v1.sql an evening in
     // the table is not an evening on the paper, so counting the table
@@ -10578,8 +10614,8 @@ const PRESS_FORMES = [
     editions: ['gece'],
     // The word belongs to the NIGHT, never the calendar date
     // (db/sozcel_used_answers_v7_game_night.sql) -- and ctx.date already
-    // IS that night, because a gece edition is named for the day it began
-    // on, which is exactly what gameNight() returns.
+    // IS that night: a sunset opens the Kahvehane day of that date, which
+    // is exactly what gameNight() returns from then until the next one.
     async check(ctx) {
       if (ctx.gamesOff.has('sozcel')) return { state: 'na', note: 'Yuvada değil' };
       const { data, error } = await sb.from('sozcel_used_answers')
@@ -10628,33 +10664,6 @@ const PRESS_FORMES = [
       return { state: 'ok', note: 'Hazır' };
     },
   },
-  {
-    id: 'anket',
-    name: 'İlçe anketi',
-    tab: 'district-polls',
-    // Both editions, for two different reasons: by day the narrow column
-    // is collecting votes, by night it prints the split back. Either way
-    // an inactive board is an empty column.
-    editions: ['gun', 'gece'],
-    async check(ctx) {
-      // anketData()'s own question, and both halves of it: in the baskı
-      // (db/baski_v1.sql) AND still open. `active` was the whole gate
-      // before the baskı existed; counting it alone now would report a
-      // full board over an empty column.
-      const { data: editionDate, error: edErr } =
-        await sb.rpc('polls_current_edition', { p_today: ctx.date });
-      if (edErr) throw edErr;
-      if (!editionDate) return { state: 'miss', note: 'Sayı çıkmadı' };
-      const { data, error } = await sb.from('neighborhood_polls')
-        .select('id').eq('edition_date', editionDate).eq('active', true).limit(3);
-      if (error) throw error;
-      const n = (data || []).length;
-      if (!n) return { state: 'miss', note: 'Baskıda anket yok' };
-      if (editionDate !== ctx.date) return { state: 'warn', note: editionDate + ' sayısı duruyor' };
-      if (n < 3) return { state: 'warn', note: n + '/3 kutu dolu' };
-      return { state: 'ok', note: '3 anket' };
-    },
-  },
 ];
 
 // ── The clock ──
@@ -10665,13 +10674,18 @@ const PRESS_FORMES = [
 let pressEdition = null;     // the edition currently being counted down to
 let pressTimer = null;
 
+// A press time is one SIDE going out: a sunrise is Kütüphane, a sunset is
+// Kahvehane. Named for the side rather than "sabah/akşam" because that is
+// what an editor has to act on -- which page's slots are due.
 function pressEditionName(ed) {
-  return ed === 'gun' ? 'Sabah baskısı' : 'Akşam baskısı';
+  return ed === 'gun' ? 'Kütüphane' : 'Kahvehane';
 }
 
-// The same two papers as the reader meets them. Kept beside
-// pressEditionName so the vocabulary for 'gun'/'gece' lives in one place
-// on this desk, and never becomes a third pair of words for one sun.
+// What a dashed forme says instead of a check: when its own side goes.
+function pressEditionWhen(ed) {
+  return ed === 'gun' ? 'Gün doğumunda' : 'Gün batımında';
+}
+
 // Day arithmetic on an edition key, in UTC, never through a formatted
 // string (CLAUDE.md rule 10) -- the same helper project.html's own
 // editionDayShift is, because the window the forme checks has to be the
@@ -10680,10 +10694,6 @@ function pressDayShift(isoDay, days) {
   const d = new Date(isoDay + 'T00:00:00Z');
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
-}
-
-function baskiHalfName(half) {
-  return half === 'gece' ? 'Akşam gazetesi' : 'Sabah postası';
 }
 
 function pressTick() {
@@ -10695,6 +10705,11 @@ function pressTick() {
   // A paper went out while this page stood open: re-label, and ask the
   // formes again, because what the NEXT edition needs is a different list.
   if (!pressEdition || pressEdition.at.getTime() !== next.at.getTime()) {
+    // The board's own page headings say which side is out and which is
+    // next, so a sun crossing while the desk stands open re-labels them
+    // too -- from the rows already loaded, nothing is re-fetched. Not on
+    // the very first tick: the board has not loaded anything yet.
+    if (pressEdition && baskiDate) { baskiPaintHead(); baskiRenderPages(); }
     pressEdition = next;
     document.getElementById('press-name').textContent = pressEditionName(next.edition);
     document.getElementById('press-when').textContent =
@@ -10764,7 +10779,7 @@ async function pressCheck() {
   wrap.innerHTML = shown.map(x => `
     <button class="press-forme ${x.on ? 'pending' : 'na'}" data-forme="${x.def.id}" ${x.on ? '' : 'disabled'}>
       <span class="press-forme-name">${escapeHtml(x.def.name)}</span>
-      <span class="press-forme-note">${x.on ? '…' : 'Bu baskıda yok'}</span>
+      <span class="press-forme-note">${x.on ? '…' : pressEditionWhen(x.def.editions[0])}</span>
     </button>
   `).join('');
 

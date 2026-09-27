@@ -9,7 +9,7 @@
   <title>Proje — istanbulite.net</title>
   <script src="safe-area-ready.js?v=2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="ist-date.js?v=7"></script>
+  <script src="ist-date.js?v=8"></script>
   <script src="router.js?v=15"></script>
   <script src="i18n.js?v=25"></script>
   <script src="map-ink.js?v=10"></script>
@@ -28,7 +28,7 @@
   <link rel="stylesheet" href="onboarding.css?v=11">
   <script src="onboarding.js?v=9" defer></script>
   <link rel="stylesheet" href="edition-notice.css?v=2">
-  <script src="edition-notice.js?v=3" defer></script>
+  <script src="edition-notice.js?v=4" defer></script>
 
   <style data-page="project">
     html, body {
@@ -2165,56 +2165,63 @@ const START_SLIDE = LANE_STOP;
 const START_LANE = LANE_MAP;
 
 // ══════════════════════════════════════════════════════════════
-// THE TWO EDITIONS — the sun decides which paper is out
+// SUNRISE RENEWS KÜTÜPHANE, SUNSET RENEWS KAHVEHANE
 //
 // The palette already follows the sun over İstanbul (IstDate.isDaytime,
 // read by palette.js), so the app is genuinely light by day and dark by
-// night. This makes that more than a colour: the İstanbul level prints
-// two editions, and which one is out is the same question the theme is
-// already asking.
+// night. This makes the sun more than a colour: each side of the app
+// has its own day, and the sun turns one side's page at a time.
 //
-//   GÜNDÜZ  Kütüphane  wide: the three news buckets; pressing one opens
-//                            it and a THROW is done with it -- a story is
-//                            read, never answered (see newsFootHTML)
-//                      narrow: the ANKET, ASKING -- the city's own
-//                              question, whose answer is filed under the
-//                              member's district (see loadAnketActor)
-//           Kahvehane  wide: the three evenings; a throw is the RSVP
-//                      narrow: the three games, COLLECTING -- a word for
-//                              Sözcel, a quote for Tümcel, and Bulmaca
-//                              saying it builds itself
+//   SUNRISE   Kütüphane renews -- the reading side. The day's news
+//             (three buckets, a story read and thrown away, see
+//             newsFootHTML) and the city's own question (ANKET, whose
+//             answer is filed under the member's district) come out with
+//             the light and stand until the next sunrise.
+//                                  (IstDate.kutuphaneDay)
 //
-//   GECE    Kütüphane  wide: the news, unchanged — a story is a story
-//                            whatever the hour
-//                      narrow: ANKET SONUÇLARI — every district,
-//                              coloured by its own split (the reveal)
-//           Kahvehane  wide: the evenings, unchanged — an event you RSVP
-//                            to at 21:00 is the most normal thing here
-//                      narrow: Oyunlar — the three games, playable
+//   SUNSET    Kahvehane renews -- the doing side. The evenings (a throw
+//             is the RSVP) and the night's games come out as the lamps go
+//             on and stand until the next sunset.
+//                                  (IstDate.kahvehaneDay / gameNight)
 //
-// Kütüphane's wide column is the news, day and night alike, and never
-// trades places with anything -- a reader mid-story at sunset must not
-// have it swapped out from under them for a poll result. The NARROW
-// column is the ANKET, also day and night: the paper asks from sunrise
-// and answers from sunset, which is the whole of the edition's own rule
-// applied to the one column that is a question rather than a reading.
+// So the reader is always half way through both. In the morning the left
+// side is new and the right is last night's still being lived -- you read
+// the paper over breakfast next to the word you were playing at midnight;
+// in the evening the right side is new and the left is this morning's
+// still being read. Nothing ever renews both at once, which is the app's
+// own "always in the middle" said with the sun: there is no instant at
+// which the whole city resets under the reader.
 //
-// The two columns are therefore two different OBJECTS rather than two
-// depths of one: a HABER is read and thrown away, an ANKET is answered.
-// A story that also asked its own two-option question made them
-// indistinguishable, and made a reader answer something in order to be
-// rid of a paragraph -- so a story asks nothing now, and the multiple
-// choice is the Anket's alone.
+// There used to be two editions of ONE paper instead -- a morning half
+// and an evening half of the news (edition_half), an anket that asked by
+// day and "answered" by night, events and polls that rolled at MIDNIGHT,
+// and a games key that, while the games ran around the clock, turned at
+// sunrise while every countdown on the site said sunset. Each column had
+// its own clock; now each SIDE has one.
 //
-// The games being night-only is a real restriction -- in June that is a
-// window from 20:38 to 05:32, under nine hours -- so it is one flag
-// rather than a rule spread through the column. Set it false and the
-// games stand in their column around the clock, with the scoreboard
-// reached the way it always was.
+// Kütüphane's wide column is the news and the narrow one is the ANKET,
+// and neither trades places with anything. The two are different
+// OBJECTS rather than two depths of one: a HABER is read and thrown away,
+// an ANKET is answered. A story that also asked its own two-option
+// question made them indistinguishable -- so a story asks nothing, and
+// the multiple choice is the Anket's alone.
+//
+// The games being night-only is a separate, real restriction -- in June
+// that is a window from 20:38 to 05:32, under nine hours -- so it is one
+// flag rather than a rule spread through the column. Off (as it is), the
+// games stand in their column around the clock and simply RENEW at
+// sunset with the rest of Kahvehane.
 const NIGHT_GAMES_ENABLED = false;
 
-// 'gun' | 'gece'. Null until the first sync, which is mount().
+// 'gun' | 'gece' -- which half of the sky the reader is under. Since each
+// side renews on its own edge this no longer decides any content: it is
+// what the stylesheet reads (data-ist-edition) and what the night-only
+// games would read if NIGHT_GAMES_ENABLED came back. Null until the first
+// sync, which is mount().
 let fbEdition = null;
+// The day each side is holding, as the reader last ARRIVED at it --
+// 'YYYY-MM-DD', the key every edition_date / game_date is written in.
+let fbSideDay = { kutuphane: null, kahvehane: null };
 
 function readEdition() {
   try {
@@ -2226,31 +2233,62 @@ function readEdition() {
   return 'gun';
 }
 
-// ── THE EDITION TURNS ON ARRIVAL, NEVER UNDER THE READER'S HANDS ──
+// The day a side's columns are SHOWING -- what the reader last arrived
+// at, never the clock. Every fetch goes through this rather than asking
+// IstDate itself, so a column re-read for any other reason (a vote, a
+// throw, a language flip) re-reads the paper the reader is holding and
+// cannot quietly renew a side before the reader has arrived at it.
+function heldDay(side) {
+  return fbSideDay[side] || sideDay(side);
+}
+
+// The day a side is holding. A clock that cannot be reached falls back
+// to the calendar date for both -- a paper a few hours early or late,
+// which is a far smaller lie than an empty column.
+function sideDay(side) {
+  try {
+    if (side === 'kutuphane' && IstDate.kutuphaneDay) return IstDate.kutuphaneDay();
+    if (side === 'kahvehane' && IstDate.kahvehaneDay) return IstDate.kahvehaneDay();
+  } catch (err) { console.error('[proje baski]', err); }
+  return IstDate.iso();
+}
+
+// ── A SIDE RENEWS ON ARRIVAL, NEVER UNDER THE READER'S HANDS ──
 // The theme flips live, on palette.js's own 60s timer, and that is right
 // for colour: a page going dark around you is the room going dark. It is
-// exactly wrong for CONTENT. A reader half way through a story at 20:38
-// in June must not have it replaced by a poll result, so nothing here is
-// on a timer -- the edition is re-read when the reader ARRIVES (a fresh
+// exactly wrong for CONTENT. A reader half way through a story at sunrise
+// must not have it replaced by the new paper, and one mid-game at sunset
+// must not have the board swapped for tomorrow's -- so nothing here is on
+// a timer. Each side's day is re-read when the reader ARRIVES (a fresh
 // mount, a lane they have just walked onto, the app coming back from the
 // background with nothing open) and held otherwise.
-// Answers whether it actually changed, so the caller only re-renders
-// when there is something to re-render.
+//
+// Answers WHICH sides actually changed -- { kutuphane, kahvehane }, or
+// null when neither did -- so the caller only re-reads the columns whose
+// paper is new. A sunrise re-reads Kütüphane and leaves the evenings and
+// the games exactly where they are; a sunset does the opposite.
 function syncEdition(force) {
-  const next = readEdition();
-  if (!force && next === fbEdition) return false;
-  fbEdition = next;
-  // The stylesheet gets to know too: a night column and a day column are
-  // the same box with different content, but a kicker or a rule may want
-  // to say which paper this is.
+  const ed = readEdition();
+  const next = { kutuphane: sideDay('kutuphane'), kahvehane: sideDay('kahvehane') };
+  const changed = {
+    kutuphane: force || next.kutuphane !== fbSideDay.kutuphane,
+    kahvehane: force || next.kahvehane !== fbSideDay.kahvehane,
+    // Only the night-only games care which half of the sky it is.
+    sky: force || ed !== fbEdition,
+  };
+  fbEdition = ed;
+  fbSideDay = next;
+  // The stylesheet gets to know too: a kicker or a rule may want to say
+  // which half of the day this is.
   document.documentElement.setAttribute('data-ist-edition', fbEdition);
-  return true;
+  if (!changed.kutuphane && !changed.kahvehane && !(changed.sky && NIGHT_GAMES_ENABLED)) return null;
+  return changed;
 }
 
 // ── The third arrival: the app coming back from the background ──
-// Most readers cross a sunset with the app shut rather than by walking a
-// lane, so without this the edition would only ever turn on a cold
-// start. It is still an ARRIVAL and not a timer: the turn is refused
+// Most readers cross a sunrise or a sunset with the app shut rather than
+// by walking a lane, so without this a side would only ever renew on a
+// cold start. It is still an ARRIVAL and not a timer: the turn is refused
 // outright while a page is open, because that is precisely the reader
 // holding the paper (see syncEdition), and while a finger is down or the
 // book is in flight, because a column rebuilt mid-gesture is the strip
@@ -2267,21 +2305,35 @@ function wireEditionReturn() {
     const game = document.getElementById('fb-game-overlay');
     if (game && !game.hidden) return;
     if (drag || anim || laneRun) return;
-    if (syncEdition()) refreshEditionColumns();
+    refreshEditionColumns(syncEdition());
   });
 }
 
-// Every actor whose content is decided by the edition, re-read in place.
-// The same move refreshOyunColumn and refreshAnketColumn already make --
-// the cast is not rebuilt, only its boxes are filled again.
-function refreshEditionColumns() {
-  anketPromise = null;
-  if (loadAnketActor && loadAnketActor.reset) loadAnketActor.reset();
-  gamesStatePromise = null;
-  submitPromise = null;
+// The columns of whichever side renewed, re-read in place: every cached
+// fetch that side's boxes read is dropped first -- a cache is keyed by
+// nothing but "already asked", so re-rendering without dropping it prints
+// the old paper from a fresh render. The same move refreshOyunColumn and
+// refreshAnketColumn already make: the cast is not rebuilt, only its
+// boxes filled again.
+function refreshEditionColumns(changed) {
+  if (!changed) return;
+  const re = [];
+  if (changed.kutuphane) {
+    haberlerFetch = null;
+    anketPromise = null;
+    if (loadAnketActor && loadAnketActor.reset) loadAnketActor.reset();
+    re.push('fb-haberler', 'fb-anket');
+  }
+  if (changed.kahvehane || (changed.sky && NIGHT_GAMES_ENABLED)) {
+    if (changed.kahvehane) { etkinlikPromise = null; re.push('fb-events'); }
+    gamesStatePromise = null;
+    submitPromise = null;
+    re.push('fb-oyun');
+  }
+  if (!re.length) return;
+  const rx = new RegExp('\\b(' + re.join('|') + ')\\b');
   (cast || []).forEach(a => {
-    if (!a.def.load) return;
-    if (!/\bfb-haberler\b|\bfb-anket\b|\bfb-oyun\b/.test(a.def.cls)) return;
+    if (!a.def.load || !rx.test(a.def.cls)) return;
     try { a.def.load(a.el); } catch (err) { console.error(err); }
   });
   refreshDayMeter();
@@ -2501,9 +2553,14 @@ function etkinlikLabels() {
 // It dispatches on the error CODE, never on the message: PostgREST answers
 // PGRST202 for a function it cannot find, and matching on the English text
 // of a message breaks the first time that text is reworded.
-async function editionInForce(rpcName) {
+// `day` is the side's own day, never the calendar date: a poll is
+// Kütüphane's and comes out at sunrise, an evening is Kahvehane's and
+// comes out at sunset (see "SUNRISE RENEWS KÜTÜPHANE" above). Asked with
+// IstDate.iso() -- as it used to be -- both rolled at midnight instead,
+// in the middle of a night nobody was reading them in.
+async function editionInForce(rpcName, day) {
   try {
-    const { data, error } = await IstRouter.sb.rpc(rpcName, { p_today: IstDate.iso() });
+    const { data, error } = await IstRouter.sb.rpc(rpcName, { p_today: day });
     if (error) {
       if (error.code === 'PGRST202' || error.code === '42883') return { date: null, missing: true };
       throw error;
@@ -2519,9 +2576,10 @@ async function editionInForce(rpcName) {
 // Being in the events table is not being on the paper -- exactly the rule
 // breaking_news has followed since db/breaking_news_v3_edition.sql, now
 // applied to the other thing an editor schedules. The edition in force is
-// the newest one at or before today (events_current_edition, SECURITY
-// DEFINER): there is no timer and no forced rollover, so a baskı holds
-// until the admin sets a newer one.
+// the newest one at or before the KAHVEHANE day (events_current_edition,
+// SECURITY DEFINER): an evening is Kahvehane's, so a new baskı of them
+// comes out at sunset, and otherwise it holds until the admin sets a
+// newer one.
 //
 // WHICH BOX an evening lands in is still a fact about the EVENT and not
 // about the edition: day+0/+1/+2 counted from the READER's own day, so
@@ -2540,7 +2598,7 @@ async function loadEtkinlikActor(el, slot) {
   if (!etkinlikPromise) {
     etkinlikPromise = (async () => {
       try {
-        const { date: editionDate, missing } = await editionInForce('events_current_edition');
+        const { date: editionDate, missing } = await editionInForce('events_current_edition', heldDay('kahvehane'));
         if (!missing && !editionDate) return { days: [[], [], []], answered: new Map(), editionDate: null, failed: false };
         const from = new Date(IstDate.iso(0) + 'T00:00:00+03:00').toISOString();
         const to = new Date(IstDate.iso(3) + 'T00:00:00+03:00').toISOString();
@@ -2953,9 +3011,9 @@ function newsBucket(n) {
   return 'istanbul';
 }
 // ── THE EDITIONS ACCRETE, AND THE WINDOW IS THREE DAYS WIDE ──
-// A new edition does not REPLACE the one before it: the akşam gazetesi
-// stacks on top of the sabah postası, and yesterday's stories are still
-// standing under both of them if the reader never threw them away. What
+// A new edition does not REPLACE the one before it: this morning's paper
+// stacks on top of yesterday's, and yesterday's stories are still
+// standing under it if the reader never threw them away. What
 // takes a story out of the column is one of exactly two things -- the
 // reader throwing it, or it ageing past the third day. Nothing else, and
 // no timer in between.
@@ -3025,9 +3083,15 @@ function followedSeries() {
   return followedPromise;
 }
 
+// edition_half is deliberately not asked for. The news is KÜTÜPHANE's,
+// and Kütüphane renews once a day, at sunrise: a day's paper goes out
+// whole, so there is no evening half left to hold back until sunset (see
+// "SUNRISE RENEWS KÜTÜPHANE" above). The column stays on breaking_news --
+// dropping it is a migration, not a rename -- and a row an older desk
+// filed under 'gece' simply comes out with the rest of its day's paper.
 const NEWS_COLS = 'id, title, body, title_en, body_en, ' +
   'category, neighborhood, series_id, updated_at, ' +
-  'edition_date, edition_half, edition_order';
+  'edition_date, edition_order';
 
 // The network half, cached for the life of the mount. Kept apart from
 // haberlerData() below so that recording a verdict re-filters the column
@@ -3036,39 +3100,18 @@ let haberlerFetch = null;
 function haberlerRows() {
   if (!haberlerFetch) {
     haberlerFetch = (async () => {
-      // The edition key, not the calendar date: a night is named for the
-      // day it BEGAN on, so a reader holding the akşam gazetesi at 01:00
-      // is still holding TODAY's paper and must not be told it is "dün".
-      const key = IstDate.editionKey();
-      const today = key.date;
+      // The KÜTÜPHANE day, not the calendar date: the paper comes out at
+      // sunrise and is named for that day, so a reader holding it at
+      // 01:00 is still holding yesterday morning's paper -- the next one
+      // is not out until the sun is -- and must not be told its stories
+      // are "dün". heldDay, never the clock: see its own note.
+      const today = heldDay('kutuphane');
       const floor = editionDayShift(today, -(NEWS_WINDOW_DAYS - 1));
-
-      const build = (withHalf) => {
-        let q = IstRouter.sb.from('breaking_news')
-          .select(withHalf ? NEWS_COLS : NEWS_COLS.replace(', edition_half', ''))
-          .gte('edition_date', floor)
-          .lte('edition_date', today)
-          .is('archived_at', null);
-        // The akşam gazetesi must not leak into the morning. Before
-        // sunset only today's SABAH half has gone out; after it, both
-        // halves of today have, so the plain date ceiling above is
-        // already the whole rule and nothing more is added.
-        if (withHalf && key.edition === 'gun') {
-          q = q.or('edition_date.lt.' + today + ',edition_half.eq.gun');
-        }
-        return q;
-      };
-
-      let { data, error } = await build(true);
-      // 42703 = undefined_column: this database predates
-      // db/breaking_news_v4_akis.sql. Pages redeploys on push while the
-      // SQL is run by hand, so there is always a window in which the new
-      // code is live against the old schema -- and a news column emptied
-      // by a missing column is a failure no reader can make sense of.
-      // Falling back means one edition a day, exactly as before.
-      if (error && error.code === '42703') {
-        ({ data, error } = await build(false));
-      }
+      const { data, error } = await IstRouter.sb.from('breaking_news')
+        .select(NEWS_COLS)
+        .gte('edition_date', floor)
+        .lte('edition_date', today)
+        .is('archived_at', null);
       if (error) throw error;
       return { rows: data || [], today };
     })();
@@ -3090,15 +3133,10 @@ async function haberlerData() {
     // whole seri and filtering "everything after" are the same set here,
     // since the one that was thrown is already dealt with anyway.
     const live = rows.filter(n => !(n.series_id && muted.has(n.series_id)));
-    // Newest paper on top: the day descending, then the evening half
-    // above the morning one of that same day, then the admin's own order
-    // within a half. The half cannot be sorted alphabetically -- 'gece'
-    // sorts BEFORE 'gun', which is the wrong way round -- so it is
-    // ranked explicitly.
-    const halfRank = (n) => (n.edition_half === 'gece' ? 1 : 0);
+    // Newest paper on top: the day descending, then the admin's own
+    // order within that day's paper.
     live.sort((a, b) =>
       (a.edition_date < b.edition_date ? 1 : a.edition_date > b.edition_date ? -1 : 0) ||
-      (halfRank(b) - halfRank(a)) ||
       ((a.edition_order || 0) - (b.edition_order || 0)));
     const byBucket = {};
     for (const n of live) {
@@ -3613,7 +3651,7 @@ function anketData() {
         // decision somebody made, not an accident of when it was typed.
         // Two boxes, not three (see the CAST entry) -- the same reduction
         // Kahvehane's own Oyunlar column already made.
-        const { date: editionDate, missing } = await editionInForce('polls_current_edition');
+        const { date: editionDate, missing } = await editionInForce('polls_current_edition', heldDay('kutuphane'));
         if (!missing && !editionDate) return { polls: [], voted: new Set(), failed: false };
         let q = IstRouter.sb.from('neighborhood_polls')
           .select('id, question_tr, question_en, option_a_tr, option_a_en, option_b_tr, option_b_en, color_a, color_b');
@@ -3807,20 +3845,17 @@ async function renderAnketResults(body, poll, myChoice) {
 // ══════════════════════════════════════════════════════════════
 // THE NIGHT EDITION — the polls come out
 //
-// After sunset Kütüphane's narrow column stops collecting votes and
-// prints the day's ANSWERS instead: one box per open poll, each printing
-// the city's own split, opening onto the 25 districts each wearing the
-// colour its own split mixes to. The wide column stays the news, exactly
-// as it is by day -- a reader mid-story at sunset must never have it
-// swapped out from under them for a poll result.
-//
-// Voting and reading the result are the same page now (anketPagePayload
-// / wireAnketPage decides which of the two a reader is shown), so there
-// is no day-time vote box left to keep in step -- anketData() is asked
-// once, here, and this box is the whole of Anket's presence on screen.
+// Kütüphane's narrow column: one box per poll in the paper, each opening
+// onto the question for a reader who has not voted and onto the 25
+// districts each wearing the colour its own split mixes to for one who
+// has. It is Kütüphane's, so it renews at SUNRISE with the news and holds
+// until the next one -- a whole day to be asked in. It used to ask by day
+// and "answer" by night, but the page never cared which half it was
+// opened in (wireAnketPage decides per reader, whatever the hour), so the
+// only thing the night ever changed was the line under the question; a
+// side renews on its own edge and nowhere else.
 const loadAnketActor = stackFetch(async () => {
   const { polls, voted, failed } = await anketData();
-  const gece = fbEdition === 'gece';
   if (failed) {
     return { rows: [], failed: true,
       failedHtml: '<div class="k">ANKET</div><div class="t">Yüklenemedi</div>' +
@@ -3835,14 +3870,9 @@ const loadAnketActor = stackFetch(async () => {
   const rows = polls.map(poll => ({
     html: '<div class="k">ANKET</div>' +
       '<div class="t">' + esc(anketText(poll, 'question')) + '</div>' +
-      '<div class="m">' + (voted.has(poll.id)
-        ? (gece ? '' : 'Cevabın kayıtlı')
-        : (gece ? 'Oy ver — sonuçlar açık' : 'Oy ver')) + '</div>',
-    // ONE page, whichever half of the day it is opened in: wireAnketPage
-    // asks a reader who has not voted and shows the split to one who
-    // has. What the edition changes is only whether the reader is
-    // expected to be answering or reading -- not a second page to keep
-    // in step with the first.
+      '<div class="m">' + (voted.has(poll.id) ? 'Cevabın kayıtlı' : 'Oy ver') + '</div>',
+    // ONE page, whatever the hour: wireAnketPage asks a reader who has
+    // not voted and shows the split to one who has.
     page: anketPagePayload(poll),
     done: voted.has(poll.id),
   }));
@@ -3905,11 +3935,14 @@ function oyunTitleHtml(g) {
 // any more (see the pool note above), but two things here still have to
 // know which night it is: the countdown to sunset in the box's corner, and
 // whether a word of this member's is the one being played TONIGHT — the one
-// day their own box gets to say so. By day editionKey() is simply today,
-// which is the night that begins this evening (see ist-date.js).
+// day their own box gets to say so. These boxes only stand by day, while
+// the night-only games are shut (NIGHT_GAMES_ENABLED), so "tonight" is the
+// night that BEGINS this evening: editionKey()'s date, which by day is
+// simply today. Deliberately not gameNight(): that is the Kahvehane day
+// being PLAYED, which from sunrise to sunset is still last night's.
 function tonightKey() {
   try {
-    if (window.IstDate && IstDate.gameNight) return IstDate.gameNight();
+    if (window.IstDate && IstDate.editionKey) return IstDate.editionKey().date;
   } catch (err) { console.error('[proje gece]', err); }
   return IstDate.iso();
 }
@@ -5889,7 +5922,7 @@ function landLane() {
   // are about to be looked at for the first time. Never on a timer --
   // see syncEdition for why. Checked before the lane test below, because
   // it is true of every lane and not just the middle one.
-  if (syncEdition()) refreshEditionColumns();
+  refreshEditionColumns(syncEdition());
   if (lane !== LANE_MAP) return;
   // Only a real arrival remounts. A pull that started here and sprang
   // back never left, and remounting then would replay the entrance over
@@ -6137,10 +6170,10 @@ function mount() {
   lane = START_LANE; lanePos = START_LANE; navP = START_LANE;
   petekShown = 1; petekAway = false;   // the mount below draws it; see paintLanes
   atLaneStop = false;
-  // Which paper is out, decided before a single box is filled: buildCast
-  // runs the loaders, and they each ask fbEdition. Left unset it is null,
-  // which every loader reads as the day edition -- so the app would show
-  // the morning paper at midnight and nothing would throw.
+  // Which paper each side is holding, decided before a single box is
+  // filled: buildCast runs the loaders, and they ask fbSideDay (through
+  // their fetches) and fbEdition. The result is dropped rather than
+  // refreshed on -- nothing has been cast yet for it to re-read.
   syncEdition(true);
   wireEditionReturn();
   buildCast();

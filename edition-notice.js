@@ -1,7 +1,14 @@
 // The edition notice — a one-line screen the reader gets the first time
 // they open the app since the sun last rose or set over Istanbul: "the sun
-// set in Istanbul today at 19:42." / "the sun rose... at 06:58." Tap
-// anywhere to continue. That is the whole of it.
+// rose over Istanbul today at 06:58. Kütüphane has been renewed." / "the
+// sun set... at 19:42. Kahvehane has been renewed." Tap anywhere to
+// continue. That is the whole of it.
+//
+// The second sentence is the reason the first one is worth saying.
+// SUNRISE RENEWS KÜTÜPHANE AND SUNSET RENEWS KAHVEHANE (see ist-date.js),
+// so each edge of the day turns exactly one side's page, and this is the
+// one place the reader is told which -- the sun is not a clock to them
+// until it is shown to be doing something.
 //
 // It is the same object onboarding's own welcome screen is (full-screen,
 // centered, tap-anywhere) but it says one sentence instead of holding a
@@ -32,14 +39,30 @@
   // launch inside the same day/night says nothing.
   const SEEN_KEY = 'istanbulite_edition_seen';
 
+  // The Turkish locative after a clock time follows the LAST WORD SPOKEN,
+  // not the last digit written: "19:42" is read "on dokuz kırk iki", so it
+  // is 19:42'de; "07:03" ends on üç, so 07:03'te; "18:30" on otuz, so
+  // 18:30'da; and on the hour the minutes are not said at all, so 07:00 is
+  // yedi'de. It used to be 'te on every time, which is right for three
+  // minutes in ten. Vowel harmony and the hardened t after ç/ş/t/k are
+  // baked into the two tables rather than derived -- there are only
+  // fifteen number words that can end a time.
+  const LOC_UNITS = ['da', 'de', 'de', 'te', 'te', 'te', 'da', 'de', 'de', 'da']; // sıfır, bir … dokuz
+  const LOC_TENS = ['da', 'da', 'de', 'da', 'ta', 'de'];                          // (sıfır), on, yirmi, otuz, kırk, elli
+  function trAt(t) {
+    const [h, m] = String(t).split(':').map(Number);
+    const n = m || h || 0;
+    return n % 10 ? LOC_UNITS[n % 10] : LOC_TENS[Math.floor(n / 10)];
+  }
+
   const COPY = {
     sunrise: {
-      tr: (t) => `Güneş bugün İstanbul'da ${t}'te doğdu.`,
-      en: (t) => `The sun rose over Istanbul today at ${t}.`,
+      tr: (t) => `Güneş bugün İstanbul'da ${t}'${trAt(t)} doğdu. Kütüphane yenilendi.`,
+      en: (t) => `The sun rose over Istanbul today at ${t}. Kütüphane has been renewed.`,
     },
     sunset: {
-      tr: (t) => `Güneş bugün İstanbul'da ${t}'te battı.`,
-      en: (t) => `The sun set over Istanbul today at ${t}.`,
+      tr: (t) => `Güneş bugün İstanbul'da ${t}'${trAt(t)} battı. Kahvehane yenilendi.`,
+      en: (t) => `The sun set over Istanbul today at ${t}. Kahvehane has been renewed.`,
     },
     tapHint: { tr: 'devam etmek için herhangi bir yere dokun', en: 'tap anywhere to continue' },
   };

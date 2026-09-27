@@ -192,6 +192,39 @@
     return { edition: 'gece', date: isoAt(b, b < sunTimes(b).sunrise ? -1 : 0) };
   }
 
+  // ── SUNRISE RENEWS KÜTÜPHANE, SUNSET RENEWS KAHVEHANE ──
+  // The two sides of the app do not share a day. Kütüphane is the reading
+  // side -- the news and the city's own question -- and its paper comes
+  // out with the light: a Kütüphane day runs from one sunrise to the next.
+  // Kahvehane is the doing side -- the evenings and the games -- and its
+  // paper comes out as the lamps go on: a Kahvehane day runs from one
+  // sunset to the next. So the app is always half way through both, and
+  // the sun turns one page at a time: at sunrise the left side is new and
+  // the right is last night's still being lived; at sunset the right side
+  // is new and the left is this morning's still being read.
+  //
+  // Each is named for the day it BEGAN on, the same rule editionKey()
+  // states for a night, so a Kütüphane day named D runs sunrise D ->
+  // sunrise D+1 and a Kahvehane day named D runs sunset D -> sunset D+1.
+  // Both are the 'YYYY-MM-DD' shape every edition_date / game_date column
+  // is written in.
+
+  // The Kütüphane day is exactly editionKey()'s date -- a day edition is
+  // today, and a night edition is the day whose sunrise it followed -- so
+  // it is that, not a second derivation of it.
+  function kutuphaneDay(base) { return editionKey(base).date; }
+
+  // The Kahvehane day: today from this evening's sunset on, yesterday
+  // until then. Past midnight and before sunrise, "today's sunset" is
+  // tonight's, still ahead, so it is yesterday -- the night that began
+  // yesterday evening -- which is the key editionKey() gives a night too.
+  // The two only differ by day: from sunrise to sunset, Kütüphane has
+  // already moved on to today and Kahvehane is still last night's.
+  function kahvehaneDay(base) {
+    const b = base || new Date();
+    return isoAt(b, b >= sunTimes(b).sunset ? 0 : -1);
+  }
+
   // ── WHEN THE NEXT EDITION GOES TO PRESS ──
   // The app prints two editions a day and the sun sets both deadlines:
   // the morning paper at sunrise, the evening one at sunset. This is the
@@ -201,9 +234,9 @@
   // rule is written.
   //
   // It is deliberately NOT nextGameNight() generalised. That one is
-  // always the next SUNSET, because the games are night-only and a
-  // sunrise is nothing to them; this one is whichever of the two edges
-  // comes first, because both of them put a paper out.
+  // always the next SUNSET, because the games are Kahvehane's and a
+  // sunrise renews nothing of theirs; this one is whichever of the two
+  // edges comes first, because each of them puts one side's paper out.
   //
   // The edition and its date come straight back out of editionKey() at
   // the instant itself rather than being re-derived here: a night is
@@ -231,23 +264,36 @@
       at = sunTimes(new Date(b.getTime() + 86400000)).sunrise;
     }
     const k = editionKey(at);
-    return { edition: k.edition, date: k.date, at };
+    // A sunrise is Kütüphane going to press and a sunset is Kahvehane, so
+    // the edition also names the SIDE being renewed -- and the date is
+    // that side's own day at the instant it renews (kutuphaneDay at a
+    // sunrise, kahvehaneDay at a sunset: both are the day it happens on).
+    return { edition: k.edition, side: k.edition === 'gun' ? 'kutuphane' : 'kahvehane',
+             date: k.date, at };
   }
 
   // ── WHICH NIGHT'S GAMES ARE THESE ──
-  // The games are night-only now, and a night SPANS MIDNIGHT, so every key
-  // a night's games write has to be the NIGHT and not the calendar date:
-  // the word's used_on, the game_results row, the saved board, the admin's
-  // own on/off switch, the question in each joint of the sequence. Keyed on
-  // the date, a member playing at 23:50 and the same member at 00:10 are
-  // two different players of two different days -- the board blanks under
-  // them, the word they already solved comes back, and a second result
-  // lands on the shared scoreboard.
+  // The games are Kahvehane's, so they renew when Kahvehane does: at
+  // SUNSET. A night's word and puzzle are played from that sunset through
+  // the next day until the following one, and every key a night's games
+  // write has to be that Kahvehane day and never the calendar date: the
+  // word's used_on, the game_results row, the saved board, the admin's own
+  // on/off switch and the night's lineup. Keyed on the date, a member
+  // playing at 23:50 and the same member at 00:10 are two different
+  // players of two different days -- the board blanks under them, the word
+  // they already solved comes back, and a second result lands on the
+  // shared scoreboard.
+  //
+  // It used to be editionKey().date, which agrees with this at night and
+  // not by day: from sunrise it was already TODAY, so while the games were
+  // playable around the clock the word actually turned at sunrise, while
+  // every "new word in..." countdown on the site counted to sunset. Keyed
+  // to the Kahvehane day, the word turns at the moment the countdown says.
   //
   // db/sozcel_used_answers_v7_game_night.sql moved the WORD to this key.
   // These two are the same key in the two shapes the rest of the tables are
   // written in, so nothing else is left on the old footing.
-  function gameNight(base) { return editionKey(base).date; }   // 'YYYY-MM-DD'
+  function gameNight(base) { return kahvehaneDay(base); }   // 'YYYY-MM-DD'
 
   // The same night unpadded ('YYYY-M-D') -- the historical shape of
   // game_results.date, game_state.date and every per-day localStorage key.
@@ -259,9 +305,10 @@
   }
 
   // The instant the NEXT night's games open: the first sunset strictly
-  // after `base`. That is the moment gameNight() changes, so it is what a
-  // "new puzzle in…" countdown is actually counting down to -- midnight is
-  // the middle of a night, not the end of one.
+  // after `base`. That is the moment gameNight() -- and kahvehaneDay() --
+  // changes, so it is what a "new puzzle in…" countdown is actually
+  // counting down to -- midnight is the middle of a night, not the end of
+  // one.
   //
   // Real instants throughout, never now()'s wall-clock-shifted Date: these
   // are compared against each other, and mixing the two silently offsets
@@ -274,6 +321,15 @@
     // whole day off an instant that is already evening lands mid-evening
     // again, nowhere near a date boundary.
     return sunTimes(new Date(b.getTime() + 86400000)).sunset;
+  }
+
+  // The instant Kütüphane next renews: the first sunrise strictly after
+  // `base`, the other half of nextGameNight(). Stepped the same way.
+  function nextSunrise(base) {
+    const b = base || new Date();
+    const today = sunTimes(b).sunrise;
+    if (today > b) return today;
+    return sunTimes(new Date(b.getTime() + 86400000)).sunrise;
   }
 
   // How long until then, already worded. Same shape as untilMidnight()
@@ -365,5 +421,6 @@
 
   global.IstDate = { parts, now, iso, daySeed, nextMidnight, parseYMD, untilMidnight,
                      sunTimes, isDaytime, edition, editionKey, nextEdition, skyArc,
+                     kutuphaneDay, kahvehaneDay, nextSunrise,
                      gameNight, gameNightSeed, nextGameNight, untilNextNight, TZ };
 })(window);
