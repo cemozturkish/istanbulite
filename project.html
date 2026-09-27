@@ -2368,6 +2368,19 @@ function refreshEditionColumns(changed) {
   refreshDayMeter();
 }
 
+// The one exception to "renew on arrival": the games. Their pages run in
+// an iframe on the live clock (IstDate.gameNight), which the shell cannot
+// hold, so every door into or out of a game re-reads the sides first and
+// renews whatever has turned -- the whole of Kahvehane at once, never the
+// game boxes alone. Answers whether Kahvehane renewed, in which case the
+// caller's own refresh or open has already been superseded.
+function syncKahvehaneForGames() {
+  const changed = syncEdition();
+  if (!changed) return false;
+  refreshEditionColumns(changed);
+  return !!changed.kahvehane;
+}
+
 // ══════════════════════════════════════════════════════════════
 // THE CAST
 //
@@ -4520,13 +4533,20 @@ function gamesStateToday() {
   if (gamesStatePromise) return gamesStatePromise;
   gamesStatePromise = (async () => {
     const state = { off: new Set(), played: new Set(), lineup: GAME_DEFAULT_LINEUP.slice() };
+    // The HELD Kahvehane day, never the live clock -- the same rule every
+    // other column on this side follows (see heldDay), so the games can
+    // never show a different night from the evenings beside them. The
+    // game pages themselves read the live clock, which is why every door
+    // into a game syncs the side first (syncKahvehaneForGames).
+    const night = heldDay('kahvehane');
+    const nightSeed = night.split('-').map(Number).join('-');
     const sb = window.IstRouter && IstRouter.sb;
     if (!sb) return state;
     // Which game stands in which slot tonight. A night with no rows (or a
     // database that predates the table) keeps the default lineup.
     try {
       const { data, error } = await sb.from('game_night_slots')
-        .select('slot, game').eq('game_date', IstDate.gameNight());
+        .select('slot, game').eq('game_date', night);
       if (error) throw error;
       if (data && data.length) {
         const lineup = Array(GAME_SLOT_COUNT).fill(null);
@@ -4545,7 +4565,7 @@ function gamesStateToday() {
     // through ist-date.js, never a parsed locale string (CLAUDE.md rule 10).
     try {
       const { data, error } = await sb.from('game_day_toggles')
-        .select('game').eq('game_date', IstDate.gameNight());
+        .select('game').eq('game_date', night);
       if (error) throw error;
       (data || []).forEach(r => state.off.add(r.game));
     } catch (err) {
@@ -4556,7 +4576,7 @@ function gamesStateToday() {
     if (uid) {
       try {
         const { data, error } = await sb.from('game_results')
-          .select('game, attempts').eq('user_id', uid).eq('date', IstDate.gameNightSeed());
+          .select('game, attempts').eq('user_id', uid).eq('date', nightSeed);
         if (error) throw error;
         // PLAYED means FINISHED, not opened. Every game writes an
         // attempts:0 row on the reader's first interaction, so counting
@@ -4600,6 +4620,11 @@ async function loadOyunActor(el, slot) {
 // The column is re-read the moment a game is closed rather than at the
 // next mount, so its .fb-done mark and the day meter catch up right away.
 function refreshOyunColumn() {
+  // A game can be open across a sunset. If Kahvehane renewed while it
+  // was, the whole side is re-read together -- the evenings with the
+  // games -- rather than the game boxes alone moving to tonight while the
+  // evenings beside them stay on last night's paper.
+  if (syncKahvehaneForGames()) return;
   gamesStatePromise = null;
   (cast || []).forEach(a => {
     if (!/\bfb-oyun\b/.test(a.def.cls) || !a.def.load) return;
@@ -4620,6 +4645,12 @@ function onpressOyun(e, slot) {
   // this the daytime boxes looked pressable, set `_fbPage`, and did
   // nothing at all when pressed.
   if (NIGHT_GAMES_ENABLED && fbEdition !== 'gece') { onpressBox(e); return; }
+  // The game page reads the LIVE clock, the tile the held one. If a
+  // sunset has come between the two, the tile is last night's lineup and
+  // opening it would hand over tonight's puzzle (or tonight's lock) under
+  // last night's name -- so the press renews the side instead, and the
+  // reader presses the tile that is really there now.
+  if (syncKahvehaneForGames()) return;
   // The game is the one loadOyunActor stood in this slot tonight.
   const g = GAME_CATALOG[el.dataset.game];
   if (g) openGameOverlay(g.file);
@@ -6664,6 +6695,11 @@ function wireLangRelabel() {
 // dates are formatted, the labels are translated), and re-rendering
 // them would print the old language from a fresh render.
 function refreshAllColumns() {
+  // Every column is about to be re-read anyway, so both sides are brought
+  // to the clock first: a re-read on a stale held day would re-render
+  // the evenings on last night's paper while the games (whose pages run
+  // on the live clock) had already moved on.
+  syncEdition();
   etkinlikPromise = null;
   haberlerFetch = null;
   dunyaPromise = null;
