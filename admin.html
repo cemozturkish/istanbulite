@@ -5171,7 +5171,17 @@ async function addNewsUpdate(btn) {
   const body = bodyEl.value.trim();
   const titleEn = titleEnEl.value.trim();
   const bodyEn = bodyEnEl.value.trim();
-  const createdAt = dateEl.value ? new Date(dateEl.value).toISOString() : new Date().toISOString();
+  // The date field is prefilled with the time the list was DRAWN, not the
+  // time the gelişme is saved -- and only to the minute, while the story's
+  // own created_at carries seconds. Taken at face value, a gelişme typed
+  // into a list drawn in the same minute the story was posted (or just
+  // left open a while) came out dated BEFORE the entry it follows: the
+  // backdating rule below filed it as history, the headline never moved,
+  // and it landed under the story where the reader never saw it. So a
+  // field the admin has not touched means "now"; only a date they
+  // actually picked is used as written.
+  const touched = dateEl.value && dateEl.value !== dateEl.defaultValue;
+  const createdAt = touched ? new Date(dateEl.value).toISOString() : new Date().toISOString();
 
   statusEl.textContent = '';
   statusEl.className = 'upd-status status-msg';
@@ -5230,7 +5240,8 @@ async function addNewsUpdate(btn) {
   bodyEl.value = '';
   titleEnEl.value = '';
   bodyEnEl.value = '';
-  dateEl.value = nowLocalDatetimeValue();
+  // Both halves, so the field goes back to reading as untouched ("now").
+  dateEl.defaultValue = dateEl.value = nowLocalDatetimeValue();
   btn.textContent = '✓ Eklendi';
   statusEl.textContent = '';
   setTimeout(() => loadBreakingNews(), 500);

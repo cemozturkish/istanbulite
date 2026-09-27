@@ -63,6 +63,12 @@
     'news.age.today':      { default: 'bugün',                  more_english: 'today' },
     'news.age.yesterday':  { default: 'dün',                    more_english: 'yesterday' },
     'news.age.dayback':    { default: 'evvelsi gün',            more_english: 'two days ago' },
+    // A Zaman Akışı is not cut to the window -- a running story's
+    // gelişmeler reach back weeks -- so its moments count further.
+    'news.age.days':       { default: 'gün önce',               more_english: 'd ago' },
+    'news.age.months':     { default: 'ay önce',                more_english: 'mo ago' },
+    'news.age.years':      { default: 'yıl önce',               more_english: 'y ago' },
+    'news.timeline':       { default: 'Zaman Akışı',            more_english: 'Timeline' },
 
     // ── THE AKIŞ ──
     // The two words a story carries ONLY when it belongs to a seri, i.e.
