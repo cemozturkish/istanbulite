@@ -103,12 +103,50 @@ body.ist-onb-locked.ist-onb-passthru #ist-onb-spotlight { pointer-events: none !
 body.ist-onb-modal .section-rule { z-index: auto !important; }
 body.ist-onb-modal .section-rule > header,
 body.ist-onb-modal #ist-pc-mount { z-index: 100000 !important; }
-/* The two words stay off the bar until the tour first names each as a
-   place (`unbare` in onboarding.js: Kütüphane at sunrise, Kahvehane on the
-   way there) -- through the welcome, the language hold, the avatar and the
-   sky, the bar is the logo alone. */
-body.ist-onb-bare-l #fb-nav > b:first-child,
-body.ist-onb-bare-r #fb-nav > b:last-child { visibility: hidden; }
+/* ── One thing at a time ──
+   While the tour runs (body.ist-onb-reveal) everything it has not
+   introduced yet is simply not there, and each beat's `show` brings its
+   part in (body.ist-onb-show-<part>, see revealPart in onboarding.js).
+   `visibility`, never `display`: nothing may re-lay-out when a part
+   arrives, and the two words either side of the logo are the flex halves
+   that keep it in the middle of the bar. The whole app comes back when the
+   walk ends (the class goes).
+     nav-l / nav-r  the bottom bar's two words
+     sky            the sun/moon chain under the top bar
+     map            the drawing the lanes stand on
+     news / events  the one column each side is introduced by
+   Never introduced by the tour, so hidden for all of it: the middle lane
+   (the petek and its wash), the seat end of the top bar, and every other
+   column. */
+body.ist-onb-reveal:not(.ist-onb-show-nav-l) #fb-nav > b:first-child,
+body.ist-onb-reveal:not(.ist-onb-show-nav-r) #fb-nav > b:last-child,
+body.ist-onb-reveal:not(.ist-onb-show-sky) #ist-sky,
+body.ist-onb-reveal:not(.ist-onb-show-map) #fb > img,
+body.ist-onb-reveal:not(.ist-onb-show-map) #fb > .fb-districts,
+body.ist-onb-reveal:not(.ist-onb-show-news) .fb-actor.fb-haberler,
+body.ist-onb-reveal:not(.ist-onb-show-events) .fb-actor.fb-events,
+body.ist-onb-reveal .fb-actor:not(.fb-haberler):not(.fb-events),
+body.ist-onb-reveal #fb-scrim,
+body.ist-onb-reveal #fb-map,
+body.ist-onb-reveal #ist-pc-seat { visibility: hidden !important; }
+
+/* What the current beat is pointing at glows -- the thing itself, its own
+   painted pixels through a filter, so a name glows as letters and a card
+   as a card rather than as a lit box around either. The house red reads
+   on the charcoal bars and on the paper alike. `filter` and never
+   `transform`: the cast writes its own transform every frame, and the bar
+   runs a FLIP of its own. */
+@keyframes ist-onb-focus {
+  0%, 100% { filter: drop-shadow(0 0 1px var(--ink-red, #ba433f)); }
+  50%      { filter: drop-shadow(0 0 7px var(--ink-red, #ba433f)) drop-shadow(0 0 2px var(--ink-red, #ba433f)); }
+}
+.ist-onb-focus { animation: ist-onb-focus 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .ist-onb-focus {
+    animation: none;
+    filter: drop-shadow(0 0 5px var(--ink-red, #ba433f));
+  }
+}
 
 /* The lesson itself: the logo breathes until it is held, the same slow
    pulse a lit country wears on Kütüphane -- "this one, now" -- and stops
@@ -476,10 +514,9 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
   }
 }
 
-/* ───────── Spotlight tour (Phase 2) ─────────
-   A persistent dim over the page with a hole cut in it for each area the
-   mascot has introduced -- everything lit stays lit for the rest of the
-   tour, and the rings over the holes are drawn separately (see below). */
+/* ───────── The tour (Phase 2) ─────────
+   The page with everything not yet introduced hidden (body.ist-onb-reveal,
+   above), a transparent tap-catcher over it, and the instruction panel. */
 
 #ist-onb-spotlight {
   position: fixed;
@@ -494,7 +531,10 @@ html[data-theme="dark"] #ist-onb-root[data-palette="mono"] {
   pointer-events: auto;
   cursor: pointer;
   z-index: 99989;
-  background: rgba(0, 0, 0, 0.62);
+  /* Transparent: it is the tap target, not a dim. What has not been
+     introduced is hidden outright (body.ist-onb-reveal above), so there
+     is nothing left for a wash to quiet. */
+  background: transparent;
   display: none;
 }
 #ist-onb-spotlight.show { display: block; }
@@ -577,11 +617,14 @@ html[data-theme="dark"] #ist-onb-pane[data-palette="mono"] {
   font-weight: 600;
   letter-spacing: 2px;
   text-transform: uppercase;
-  /* Printed on the dim, not on paper: the palette's own ink (#111 on mono
-     by day) was dark type on a dark wash and all but unreadable. */
-  color: #fff;
-  opacity: 0.85;
-  padding: 6px 0;
+  /* On a chip of its own paper: it stands over the app itself (the map,
+     the cards), with no wash under it, so it cannot count on either being
+     light or dark. */
+  color: var(--ink);
+  background: var(--paper-card, #ddc4b5);
+  border: 2px solid var(--ink);
+  align-self: flex-start;
+  padding: 5px 10px;
 }
 #ist-onb-pane .ist-onb-btn {
   background: var(--ist-onb-ink);
