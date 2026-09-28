@@ -358,14 +358,14 @@
     return PROFILE_SECTIONS[page] || PROFILE_SECTIONS[DEFAULT_PAGE];
   }
 
-  // Two-option toggles. Legacy `more_turkish` and `system` values are
-  // remapped via normalize* below to their nearest neighbour.
-  // palette_pref reuses the column written by onboarding.js: 'mono' = siyah-beyaz, 'earth' = kahverengi.
-  const LANG_VALUES    = ['more_english', 'default'];   // 0: Daha İngilizce, 1: Daha Türkçe
+  // Two-option toggle. Legacy `system` values are remapped via normalize*
+  // below to their nearest neighbour. palette_pref reuses the column
+  // written by onboarding.js: 'mono' = siyah-beyaz, 'earth' = kahverengi.
+  // Language is no longer set from this page — see "Hold the logo and the
+  // app changes language" in project.html.
   const PALETTE_VALUES = ['mono', 'earth'];             // 0: Siyah-Beyaz,    1: Kahverengi
   const ADMIN_EMAIL = 'cemwozturk@gmail.com';
 
-  function normalizeLang(v)    { return v === 'more_english' ? 'more_english' : 'default'; }
   function normalizePalette(v) { return v === 'earth' ? 'earth' : 'mono'; }
 
   // The three games the weekly grid can ever show a row for. Which of them
@@ -3531,9 +3531,7 @@
     const dogumYeri = profile?.birth_place || '';
     const phone = profile?.phone || '';
     const referralCode = profile?.referral_code || '';
-    const languagePref = normalizeLang(profile?.language_pref);
     const palettePref = normalizePalette(profile?.palette_pref);
-    const langLabel = LANG_VALUES.indexOf(languagePref) === 1 ? 'Daha Türkçe' : 'Daha İngilizce';
     const paletteLabel = PALETTE_VALUES.indexOf(palettePref) === 1 ? 'Kahverengi' : 'Siyah-Beyaz';
 
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
@@ -3603,14 +3601,6 @@
           <div class="ist-pc-section-title">${esc(t('profile.tab.ayarlar'))}</div>
           ${customizing ? `
           <div class="ist-pc-field">
-            <div class="ist-pc-label">${esc(t('profile.langpref'))}</div>
-            <input class="ist-pc-slider" id="po-language" type="range" min="0" max="1" step="1" value="${LANG_VALUES.indexOf(languagePref)}">
-            <div class="ist-pc-ticks" id="po-language-ticks">
-              <span data-idx="0">Daha İngilizce</span>
-              <span data-idx="1">Daha Türkçe</span>
-            </div>
-          </div>
-          <div class="ist-pc-field">
             <div class="ist-pc-label">${esc(t('profile.colortheme'))}</div>
             <input class="ist-pc-slider" id="po-palette" type="range" min="0" max="1" step="1" value="${PALETTE_VALUES.indexOf(palettePref)}">
             <div class="ist-pc-ticks" id="po-palette-ticks">
@@ -3619,10 +3609,6 @@
             </div>
           </div>
           ` : `
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.langpref'))}</div>
-            <div class="ist-pc-info-value">${esc(langLabel)}</div>
-          </div>
           <div class="ist-pc-info-row">
             <div class="ist-pc-info-label">${esc(t('profile.colortheme'))}</div>
             <div class="ist-pc-info-value">${esc(paletteLabel)}</div>
@@ -3678,7 +3664,6 @@
     // wireCopyCode/doSignOut/doDeleteAccount above for why the behaviour
     // is shared and the ids are not.
     wireCopyCode(document.getElementById('po-copy'), state);
-    syncTicks('po-language', 'po-language-ticks');
     syncTicks('po-palette', 'po-palette-ticks');
     const signoutBtn = document.getElementById('po-signout');
     if (signoutBtn) signoutBtn.addEventListener('click', () => doSignOut(sb));
@@ -3687,28 +3672,27 @@
       () => doDeleteAccount(state, deleteBtn, document.getElementById('po-save-msg')));
   }
 
-  // Saves the settings page's only editable fields — language/palette/
-  // appearance. Ad/Soyad/Yaşadığı İlçe are read-only for now (see the
-  // comment above the info rows in settingsPageHTML), so there's nothing
-  // else to send.
+  // Saves the settings page's only editable field — palette/appearance.
+  // Language is set by holding the logo (see "Hold the logo and the app
+  // changes language" in project.html), not from this page. Ad/Soyad/
+  // Yaşadığı İlçe are read-only for now (see the comment above the info
+  // rows in settingsPageHTML), so there's nothing else to send.
   async function saveSettings(state) {
     const { sb, I18N, user } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const msgEl = document.getElementById('po-save-msg');
     const btn = document.getElementById('po-save');
-    // The sliders only exist on the page that renders the settings block
+    // The slider only exists on the page that renders the settings block
     // (see PROFILE_SECTIONS) -- elsewhere Kaydet is saving avatar picks
-    // alone, so each preference keeps whatever is already stored.
+    // alone, so the preference keeps whatever is already stored.
     const sliderValue = (id, values, fallback) => {
       const el = document.getElementById(id);
       if (!el) return fallback;
       return values[parseInt(el.value, 10)] || values[0];
     };
-    const newLang = sliderValue('po-language', LANG_VALUES, normalizeLang(state.profile?.language_pref));
     const newPalette = sliderValue('po-palette', PALETTE_VALUES, normalizePalette(state.profile?.palette_pref));
 
     const payload = {
-      language_pref: newLang,
       palette_pref: newPalette,
     };
 
