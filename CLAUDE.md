@@ -159,7 +159,10 @@ is the main target: every change must feel smooth in the app first, then in mobi
 desktop. The two runtimes already have divergent code paths where needed (e.g. `router.js` uses
 in-document virtual navigation inside Capacitor vs. cross-document View Transitions on the web) —
 keeping the app buttery is worth that duplication. Desktop is the third-priority layout, not the
-default one.
+default one — and it is not a layout of its own at all: on a desktop the app is the **phone,
+standing in a phone-shaped window** in the middle of the screen (`masaustu.html`, see its own
+section under project.html). Never write desktop CSS for project.html; there is no desktop window
+for it to apply to.
 
 ---
 
@@ -171,6 +174,7 @@ default one.
 ├── kahvehane.html        # İSTANBULITE tab, MIDDLE zoom: İstanbul — district map, games hub, scoreboards, events
 ├── mahalle.html          # İSTANBULITE tab, INNERMOST zoom: the reader's own ilçe and its mahalles
 ├── project.html          # PROJE tab: the flip book on its own, as a rig — 12 numbered frames, nothing else
+├── masaustu.html         # DESKTOP: project.html in a phone-shaped window on a desk (see its own section)
 ├── sozcel.html           # Turkish Wordle-style daily word game
 ├── tumcel.html           # Turkish quote-fragment Connections-style daily game (replaced Bağlantılar)
 ├── bulmaca.html          # Turkish daily mini crossword
@@ -533,7 +537,10 @@ sb.from('articles').delete().eq('id', id)
 ### `index.html` — Login Gate
 - Login / kefil-code signup screen only — no content of its own anymore
 - Once a session exists (or right after sign-in), redirects to `project.html` — the flip book,
-  which is the app (it used to be `anahane.html`)
+  which is the app (it used to be `anahane.html`). On a desktop, project.html sends itself on to
+  `masaustu.html`, the phone-shaped window it is shown through there
+- It is the one page that is never framed on a desktop: it is laid out for any window, so signing
+  out inside the desk's window hands it the whole tab (see `masaustu.html`)
 
 ### `anahane.html` — Hane (MIDDLE page, home)
 - The entry point and anchor of the three-page carousel — the user always starts here
@@ -2318,6 +2325,73 @@ one thing that comes off it. It opens **the petek**, and it is a switch rather t
 stays lit while the petek is standing, because it is also the way back out (the same move
 Kütüphane's Olaylar box makes). `nav` still takes no pointer events at all — only this one mark
 opts back in, so the drawing under the bar's paper goes on answering a finger that lands beside it.
+
+### On a desktop, the app stands in a phone-shaped window — `masaustu.html`
+
+project.html is a phone. Everything in it is measured off a phone's window — the hero is a 100vw
+square, the drawings are 9:16 and laid in with `cover`, the columns are cut from the window's
+width — and the shared rules for all of it live inside `max-width: 768px` in frames.css,
+profile-card.css and sheet.css. A desktop window got none of that: no top bar at all (it is
+phone-only CSS), cards stretched across the screen, the map cropped to a sliver of the Bosphorus,
+a game sheet running down over the tab bar. That is the phone layout pulled apart, not a layout.
+
+So a desktop reader is **not given a second layout. They are given the phone**: `masaustu.html`
+holds project.html in an iframe the shape of the phone it is drawn for — the screen's height up to
+932px, the width following at 430:932, never wider than 430 and never narrower than 320 — standing
+in the middle of the screen. An iframe is a real window of that width, so every media query, every
+`vw` and every `innerWidth` inside it reads exactly what it reads on the device, and nothing in the
+app is restated for it. Never write desktop CSS for project.html instead; there is no desktop
+window for it to apply to.
+
+Seven things about it, most of which fail silently:
+
+- **Who is sent there is a question about the POINTER, never the window's width.** The first
+  script in project.html's head: top-level, not Capacitor, `(hover: hover) and (pointer: fine)` →
+  `location.replace('masaustu.html' + search + hash)`. A width test there reads every iPhone as a
+  desktop: a mobile browser lays a page out **980px wide until the viewport tag is parsed**, and
+  that script runs before it (measured in a 390px phone emulation: `min-width: 769px` matched at
+  that point). Touch tablets keep the window they always had. Inside the desk's own window, and in
+  admin.html's preview phone, the page is framed already and the check never runs.
+- **The two pages' queries are the same string, character for character**, or a window would be
+  sent back and forth between them — and `sessionStorage['ist_masa_back']` is the second half of
+  that promise: masaustu.html leaves it when it sends a window back (a phone that followed a shared
+  link, Capacitor, or itself framed), and project.html consumes it and renders as it is, once. The
+  page is also excluded from the iOS bundle (`scripts/sync-web.js`); nothing in the app can reach it.
+- **The desk wears the bars' own ink, read off the app** (`--navbar-ink` from the frame's root, and
+  the two label inks for the arrows), re-read whenever palette.js rewrites `data-palette` /
+  `data-theme` on the app's `<html>` — so the two bars run on into the desk at every palette and
+  every half of the sky, and the city reads as a lit window in a dark desk rather than a picture of
+  a phone laid on one.
+- **And it goes quiet with the app.** A page opening tints the whole phone except its bottom bar,
+  which is lifted over the tint because the logo stays live (`body.fb-page-on`). The desk follows
+  the app's own `html.ist-dim-on` with the app's own `--ist-sheet-dim-ink` on the same 0.55s curve,
+  down to the line the bottom bar's **corners** stand on — its ink is a `::before` that stands
+  `--navbar-arc` above the bar's own box, so that is what is measured — and the bar runs on across
+  the desk undimmed below it. Left undimmed, the window's top bar turned into a darker box against
+  the desk the moment anything opened.
+- **Whole pixels, size and place** (`round()`): a window standing a quarter-pixel down the screen is
+  one whose every line of type is drawn between two rows of pixels.
+- **A desktop reader has no finger, so the strip has three other ways across**: the ←/→ keys, the
+  trackpad's own two-finger sideways swipe, and a hand-drawn arrow either side of the window. All
+  three go through one function, `stepLane()` in project.html (with `canStepLane()` beside it, both
+  on `window.__fb`), which makes exactly the move a released pull makes — one lane, through
+  `runLane`, so the middle is still crossed on the way from one side to the other — and refuses
+  whenever the strip is not what the reader is looking at: the book off its stop, a page, a game or
+  a sheet standing over it (`.ist-sheet-overlay.open`), the sunrise/sunset notice, and the
+  onboarding tour on any beat but a pull (`data-onb-pass="book"`). A held key is one step (auto-repeat
+  is ignored); a swipe's whole wheel stream — momentum included — is one step, summed until it is
+  48px sideways and sideways beats vertical by 1.5×, then spent until it has been quiet for 220ms;
+  a pinch (`ctrlKey`) never counts. The arrows ask `canStepLane` four times a second and are
+  `visibility: hidden` when it says no, which also takes them out of the tab order: an arrow that
+  does nothing when pressed is worse than no arrow. A swipe or a key that lands on the desk rather
+  than in the window is handed to the same two functions.
+- **The keyboard belongs to the app.** The desk hands focus to the window when it loads and after
+  any press on the desk; a game takes focus when its page has loaded (desktop only — on a phone
+  nothing is focused that the reader did not touch) and gives it back to the book when its sheet
+  closes, because Sözcel and Çengel read the physical keyboard and a key goes to whichever document
+  has focus. And **anything the window navigates to that is not project.html takes the whole tab** —
+  signing out or deleting the account sends the app to index.html, a page laid out for any window,
+  so it is never left standing in a phone on a desk (checked on the iframe's `load`).
 
 ### Hold the logo and the app changes language — `.fb-hold-frame`
 
