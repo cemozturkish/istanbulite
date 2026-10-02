@@ -893,6 +893,7 @@
   // `_resizeListener` is tracked so unmount() can remove it instead of
   // leaking one more registration per mount() call.
   let _mounted = false;
+  let _mounting = false;   // a doMount is fetching (see mount)
   let _state = null;
   let _resizeListener = null;
   // The page the bar is currently standing over — read when you press
@@ -911,6 +912,11 @@
     // Already mounted this session (e.g. a router re-invoking mount on a
     // virtual navigation) — just re-render for the new page, no re-fetch.
     if (_mounted) { setPage(page); return; }
+    // A mount already fetching: _page above is all the second call adds.
+    // project.html can ask twice on one load (its registered mount() on a
+    // virtual entry, its DOMContentLoaded on a real one), and two fetches
+    // would race to build the same row.
+    if (_mounting) return;
 
     // Only show on mobile — bail early on desktop to save Supabase calls.
     // Unless the page carries the bar at EVERY width: project.html is the
@@ -930,10 +936,20 @@
       window.addEventListener('resize', _resizeListener);
       return;
     }
+    // A desktop that started on a parts-bin page bailed above and is still
+    // waiting for a phone-sized window; a page that carries the bar at
+    // every width mounts it now, so that wait is over.
+    if (_resizeListener) {
+      window.removeEventListener('resize', _resizeListener);
+      _resizeListener = null;
+    }
     doMount();
 
     async function doMount() {
-      const { data: { session } } = await sb.auth.getSession();
+      _mounting = true;
+      let session = null;
+      try { ({ data: { session } } = await sb.auth.getSession()); }
+      finally { if (!session) _mounting = false; }
       if (!session) return;
       const user = session.user;
       // The sky is drawn with the loading state too: it needs nothing
@@ -944,7 +960,8 @@
       container.innerHTML =
         `<div class="ist-pc"><div class="ist-pc-loading"><span>Yükleniyor…</span></div></div>${skyChartHTML()}`;
       startSky(I18N);
-      _state = await fetchProfileData(sb, I18N, user);
+      try { _state = await fetchProfileData(sb, I18N, user); }
+      finally { _mounting = false; }
       _mounted = true;
       // _page rather than `page`: the reader may have swiped on while this
       // fetch was in flight, and the row has to arrive standing over the
