@@ -4,51 +4,6 @@
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/favicon.png">
   <meta charset="UTF-8">
-  <!-- ── ON A DESKTOP, THIS PAGE IS SHOWN THROUGH A PHONE-SHAPED WINDOW ──
-       Everything below is a phone: measured off a phone's window and, in
-       the shared stylesheets, written inside `max-width: 768px`. A desktop
-       window is none of that, and what it got was the phone layout pulled
-       apart -- no top bar at all, cards stretched across the screen, the
-       9:16 drawings cropped to a sliver. So a desktop window is sent to
-       masaustu.html, which stands this same page in the middle of the
-       screen inside an iframe the shape of a phone: a real window of that
-       width, so every rule here reads exactly what it reads on the device.
-       See that page for the desk around it.
-
-       Four things about the line below, each of which fails silently if
-       changed. It stands FIRST in the head, ahead of every shared module, so
-       a desktop visitor is never made to wait on a megabyte of scripts for a
-       page this window will not show -- the game pages' own bounce makes the
-       same argument. It is `location.replace`, so the bounce leaves no
-       history entry for Back to land on. It only ever runs at the TOP:
-       inside the desk's window (or admin.html's preview phone) this page is
-       framed already, and the native app is never a desk at all.
-
-       And it asks what the reader is HOLDING -- a mouse or a trackpad, a
-       pointer that hovers -- never how wide the window is. Up here, ahead of
-       the viewport tag, a phone's window is not its own width yet: mobile
-       browsers lay a page out 980px wide until that tag is parsed, so any
-       width test this early reads every iPhone as a desktop. The input
-       device is the same answer before the tag as after it, and it is the
-       question actually being asked: a touch screen is a phone (or a tablet,
-       which keeps the window it always had), and the desk is for the reader
-       with no finger on the glass.
-
-       The query is masaustu.html's own, character for character -- a window
-       the two disagreed about would be sent back and forth between them. The
-       session flag is the second half of that promise: masaustu.html leaves
-       it when it sends a window back here, and this page then renders as it
-       is, once, rather than returning the favour. -->
-  <script>
-    (function () {
-      var back = false;
-      try { back = sessionStorage.getItem('ist_masa_back') === '1'; sessionStorage.removeItem('ist_masa_back'); } catch (e) { /* no storage: the query alone keeps them apart */ }
-      if (back || window.self !== window.top || window.Capacitor || !window.matchMedia) return;
-      if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
-        location.replace('masaustu.html' + location.search + location.hash);
-      }
-    })();
-  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#2e2e2e">
   <title>Proje — istanbulite.net</title>
@@ -60,9 +15,10 @@
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <link rel="stylesheet" href="palette.css?v=12">
-  <link rel="stylesheet" href="profile-card.css?v=49">
+  <link rel="stylesheet" href="profile-card.css?v=50">
+  <link rel="stylesheet" href="profile-bar.css?v=1">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=56" defer></script>
+  <script src="profile-card.js?v=57" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -71,7 +27,7 @@
   <script src="loading-screen.js?v=5"></script>
   <link rel="stylesheet" href="loading-screen.css?v=3">
   <link rel="stylesheet" href="onboarding.css?v=13">
-  <script src="onboarding.js?v=12" defer></script>
+  <script src="onboarding.js?v=13" defer></script>
   <link rel="stylesheet" href="edition-notice.css?v=2">
   <script src="edition-notice.js?v=4" defer></script>
 
@@ -608,6 +564,12 @@
          ellipsis, the same reason .t does. */
       max-width: calc(100% - 2 * var(--fb-box-pad-x));
       white-space: nowrap; overflow: hidden; text-overflow: clip;
+      /* Cut SIDEWAYS only. The line is one em tall (--fb-box-tag-lh) and
+         a capital's diacritic stands above it, so clipping both axes cut
+         the dots off ÖNCE -- the dateline on every story -- and printed
+         "0 DK ONCE". One declaration, so a browser that does not know
+         `clip` drops it whole and keeps the line above. */
+      overflow: clip visible;
     }
     /* Mirrored, both swap sides with the column: the kicker's line above
        the box ranges from its right edge, and the date takes the top-left
@@ -1970,6 +1932,269 @@
                              - var(--ist-under-bars-lift, 0px));
       }
     }
+
+    /* ══════════════════════════════════════════════════════════════
+       THE DESKTOP: ALL THREE AT ONCE
+       ══════════════════════════════════════════════════════════════
+       Above 768px every shared stylesheet stops being a phone's, so this
+       page stops being one too. A phone is one lane wide and WALKS the
+       strip; a desktop window is wide enough to stand the three lanes
+       side by side, and that is the whole of its layout:
+
+         Kütüphane's two columns at the left edge, Kahvehane's at the
+         right, the reader's own petek in the middle -- under the
+         LANDSCAPE drawing of İstanbul (DESK_MAP in the script) across
+         the top, which hangs Europe over the reading side, Anatolia over
+         the doing side, and the Bosphorus over the reader between them.
+
+       Nothing is restated for it. A side is the phone's own band -- the
+       same two columns at the same 3:2, the same three slots hung from
+       the same dock line, the same kickers outside the same cards -- and
+       is stood in place by four lane classes (fb-lane-N, from
+       stackActors); the band page grows out of its card into its OWN
+       side's band, exactly as it grows into the lane on a phone; the
+       petek fits itself into the middle column the way it fits itself
+       into any window (fitHive measures the box it is given); and the
+       two bars are the phone's bars, the top one carried here by
+       profile-bar.css linked with no media query.
+
+       What the script changes for it is only what a lane MEANS (see THE
+       DESKTOP there): nothing fades for being a lane away, every box is
+       live, and the strip takes no sideways pull. */
+    @media (min-width: 769px) {
+      html {
+        /* The screen's edge to a side's outer column. The bottom bar's two
+           words are printed on the same line, so each names the side it
+           stands under. */
+        --dk-edge: clamp(18px, 2.4vw, 48px);
+        /* One side: its two columns and the gap between them. A phone's
+           whole band at the narrowest, wider on a bigger screen, and
+           never so wide that a headline runs out of reading length. */
+        --dk-side-w: clamp(280px, 29vw, 540px);
+        /* Between a side and the petek's column. */
+        --dk-mid-gap: clamp(16px, 2.2vw, 44px);
+        /* The two columns are cut from the SIDE rather than from the
+           screen: the same five units, three to the wide column and two
+           to the narrow, with the gap between them the one inset. */
+        --fb-inset: clamp(12px, 1vw, 18px);
+        --fb-unit: calc((var(--dk-side-w) - var(--fb-inset)) / 5);
+        /* The boxes grow with the window's height, so the stacks stand as
+           tall against a big screen as they do against a phone -- floored
+           so a short window (a laptop with its toolbars, a landscape
+           tablet) still fits two lines of headline in each. */
+        --fb-box-h: clamp(58px, 10.5vh, 120px);
+        /* Between the map's foot and the kickers over the top row. */
+        --dk-band-gap: clamp(14px, 2.4vh, 28px);
+        /* ── The maps at the top, three columns under them ──
+           Every screen in the app is that one template (see "What each
+           screen carries" in CLAUDE.md), and a desktop is the same
+           template three columns wide: the drawing is the hero across the
+           whole top, and the band under it -- the two sides and the petek
+           between them -- stands on paper, hung from the same dock line a
+           phone's columns hang from. This is where the hero ends. */
+        --dk-hero-h: calc(100% - var(--fb-dock) - var(--fb-band-h) - var(--dk-band-gap));
+      }
+      /* ── Whole pixels ──
+         The numbers above are fractions of the window, so on most screens
+         a card's edge lands part way through a pixel. The card is a
+         composited layer (paintCast writes its transform every frame) and
+         the page it opens into is not, and the two round a fractional edge
+         differently: with a story open, a pixel of the card's foot showed
+         under the page's own. Snapping the geometry to whole pixels puts
+         both edges on the same pixel by construction. The unit is rounded
+         DOWN and the side rebuilt from it, so the two columns and the gap
+         between them still add up to the side exactly; the kicker's room
+         and the gap are rounded too, so the upper two rows' edges are
+         whole pixels as well. The box and the gap go to an EVEN number of
+         pixels, because Oyunlar's and Anket's two boxes split three rows
+         and a gap in half (--fb-oyun-box-h): half of an odd number is the
+         same half-pixel edge again, and it peeked out from under the page
+         exactly as the card's foot did. Inside @supports, because a custom property
+         is only tokens: where round() is unknown it would still be
+         accepted here, and then every rule that USES it would be invalid
+         at computed-value time -- the whole geometry gone, rather than
+         falling back to the lines above. */
+      @supports (width: round(1.5px, 1px)) {
+        html {
+          --dk-edge: round(clamp(18px, 2.4vw, 48px), 1px);
+          --fb-inset: round(clamp(12px, 1vw, 18px), 1px);
+          --fb-unit: round(down, calc((clamp(280px, 29vw, 540px) - var(--fb-inset)) / 5), 1px);
+          --dk-side-w: calc(5 * var(--fb-unit) + var(--fb-inset));
+          --fb-box-h: round(clamp(58px, 10.5vh, 120px), 2px);
+          --dk-mid-gap: round(clamp(16px, 2.2vw, 44px), 1px);
+          --fb-kicker-h: round(calc(var(--fb-kicker-size) * var(--fb-box-tag-lh) + var(--fb-box-tag-gap)), 1px);
+          --fb-box-gap: round(calc(var(--fb-inset) * 0.6 + var(--fb-kicker-h)), 2px);
+        }
+      }
+      /* ── Type, read from arm's length ──
+         A phone is read in the hand; a desktop from half a metre further
+         off, across cards half as wide again. Every size on this page is
+         set in rem -- the kickers, the headlines, the page a card opens
+         into, the names on the bar -- so the whole scale steps up together
+         from the root rather than one rule at a time, and stays in the
+         proportions the phone set. Pixel geometry (the bars, the boxes'
+         own heights) is left exactly where it is. */
+      html { font-size: clamp(16px, calc(9px + 0.55vw), 19px); }
+      /* Nothing on this page scrolls; the book is fixed to the window. The
+         frame ring frames.css gives a desktop page would only make the
+         document a few pixels taller than the window it is fixed to. */
+      html, body { overflow: hidden; }
+      body, #main-site { padding-bottom: 0 !important; }
+
+      /* ── The two sides ──
+         Kütüphane, the reading side: its wide column (Haberler) on the
+         screen's left edge and its narrow one (Anket) inboard of it, the
+         heavy column nearer the edge exactly as on the phone. */
+      .fb-box.fb-lane-0.fb-col-l { left: var(--dk-edge); right: auto; }
+      .fb-box.fb-lane-0.fb-col-r { left: calc(var(--dk-edge) + var(--fb-col-l-w) + var(--fb-inset)); right: auto; }
+      /* Kahvehane, the doing side, its mirror (.fb-mirror already swaps
+         the two widths and the ranging): Etkinlikler on the right edge,
+         Oyunlar inboard of it. */
+      .fb-box.fb-lane-2.fb-col-r { right: var(--dk-edge); left: auto; }
+      .fb-box.fb-lane-2.fb-col-l { right: calc(var(--dk-edge) + var(--fb-col-l-w) + var(--fb-inset)); left: auto; }
+      /* A pointer can say "this answers" before it presses, which a thumb
+         never can: the card's red flag widens under it. Not a lift -- the
+         actor's own transform is the cast's to write every frame (see
+         paintCast) -- and not the press itself, which a mouse still
+         makes the same way a finger does (.fb-pressing). */
+      @media (hover: hover) {
+        .fb-actor.live.fb-openable:not(.fb-empty):hover::before { width: 7px; }
+      }
+
+      /* ── A box opens into its OWN side's band ──
+         The page a card grows into is that side's two columns, edge to
+         edge, on the same dock line and to the same height -- the rect
+         the lane's six boxes stand in on a phone, standing where they
+         stand here. openFbPage already marks a page that came out of a
+         Kahvehane card (.fb-mirror), which is the whole of which side it
+         belongs to. */
+      .fb-page { left: var(--dk-edge); right: auto; width: var(--dk-side-w); }
+      .fb-page.fb-mirror { left: auto; right: var(--dk-edge); }
+
+      /* ── The hero: the drawing across the top ──
+         The landscape İstanbul, laid in with the same `cover` as a phone's
+         drawing but into the hero's box rather than the whole window, and
+         faded into the paper at its foot -- the coast runs to the bottom
+         edge of the drawing, and a hard cut through it reads as torn. The
+         district tracing stands in exactly the same box with the same
+         fade, or every district steps off its coastline (see
+         .fb-districts). Restated for the app's own runtime too, whose
+         phone framing (html.ist-native) would otherwise win on
+         specificity. */
+      /* It runs the full width of the screen, and it is the drawing's
+         SOUTHERN coast that is anchored -- to the hero's foot, so the band
+         under it reads as the Marmara the city stands on -- with whatever
+         does not fit running on up under the top bar. The box is the
+         drawing's own shape (5046:2300) whenever that is taller than the
+         hero, so `cover` crops nothing and the tracing over it is
+         registered by construction; only a hero taller than the drawing
+         (a tall, narrow window) falls back to cropping the sides. */
+      .fb > img,
+      .fb-districts,
+      html.ist-native .fb > img,
+      html.ist-native .fb-districts {
+        top: auto;
+        bottom: calc(var(--fb-dock) + var(--fb-band-h) + var(--dk-band-gap));
+        height: max(var(--dk-hero-h), calc(100vw * 2300 / 5046));
+        -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 96px), transparent);
+                mask-image: linear-gradient(to bottom, #000 calc(100% - 96px), transparent);
+      }
+
+      /* ── The petek's column ──
+         The middle of the band, between the two sides: the same height as
+         their columns and on the same dock line, so the reader's own
+         honeycomb stands in the row with the paper and the evening rather
+         than towering over them. fitHive fits the drawing to whatever box
+         it is given and stands it on that box's floor. */
+      #fb-map {
+        top: auto;
+        bottom: var(--fb-dock);
+        height: calc(var(--fb-band-h) + var(--dk-band-gap));
+        left: calc(var(--dk-edge) + var(--dk-side-w) + var(--dk-mid-gap));
+        right: calc(var(--dk-edge) + var(--dk-side-w) + var(--dk-mid-gap));
+      }
+      /* The wash a phone lays over the drawing under its petek has nothing
+         to quiet here: the petek stands on the band's paper, not on the
+         map. */
+      .fb-scrim { display: none; }
+      /* ── The app's own dock line ──
+         The app is universal, and an iPad (or a phone held sideways) is
+         wider than this query's line. There the dock token leaves out the
+         home indicator's inset -- env() does not resolve inside a custom
+         property on WebKit -- and the boxes add it themselves
+         (html.ist-native .fb-box.fb-slot-N); everything here that stands
+         on their line has to add it too, or the petek and the hero stand
+         an inset lower than the cards beside them. */
+      html.ist-native .fb > img,
+      html.ist-native .fb-districts {
+        bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + var(--fb-band-h) + var(--dk-band-gap));
+      }
+      html.ist-native #fb-map { bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom)); }
+
+      /* ── The onboarding tour speaks from the middle ──
+         Its pane's own desktop place is the bottom-right corner, which on
+         this layout is where Kahvehane's own cards stand -- the very
+         things a later beat asks the reader to press. Here it stands in
+         the petek's column instead, between the two sides it is talking
+         about (the petek itself is not introduced by the tour, so the
+         column is empty while it runs), clear of the hint pill under it.
+         The open/throw beats still lift it to the top (onboarding.css). */
+      #ist-onb-pane {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        bottom: calc(var(--fb-dock) + 56px);
+        width: max-content;
+        max-width: min(440px, calc(100vw - 2 * (var(--dk-edge) + var(--dk-side-w) + var(--dk-mid-gap))));
+        align-items: center;
+      }
+      /* The app's dock line again (see above). Never the top-anchored
+         pane: this selector outranks its `bottom: auto`, and a pane given
+         both a top and a bottom is stretched between them. */
+      html.ist-native #ist-onb-pane:not(.ist-onb-pane-top) {
+        bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + 56px);
+      }
+      /* ...except while the profile sheet is up (the avatar beats): THE
+         sheet stands in the middle of a desktop window too, so the pane
+         steps out to its right, into the room the sheet leaves. */
+      body:has(#profile-overlay.open) #ist-onb-pane {
+        left: auto;
+        right: var(--dk-edge);
+        transform: none;
+        max-width: calc((100vw - min(680px, 86vw)) / 2 - 2 * var(--dk-edge));
+        align-items: flex-end;
+      }
+
+      /* ── The bottom bar ──
+         Its two words stand on the sides' own edge line, each under the
+         side it names. The shoulder and the stacking frames.css gives
+         the bar on a phone are stated for this page here: the phone's
+         geometry is written in the bar's own box and the screen's width,
+         so it is the same hexagon at any width. */
+      nav { padding: 0 var(--dk-edge); }
+      .section-rule > header {
+        border: none !important;
+        box-shadow: none !important;
+        background: none !important;
+      }
+      .section-rule > header::before {
+        content: '';
+        position: absolute;
+        left: 0; right: 0; bottom: 0;
+        top: calc(-1 * var(--navbar-arc, 12px));
+        z-index: -1;
+        pointer-events: none;
+        background: var(--navbar-ink);
+        clip-path: polygon(
+          0 0,
+          calc(var(--navbar-bevel, 0.35) * 100%) var(--navbar-arc, 12px),
+          calc(100% - var(--navbar-bevel, 0.35) * 100%) var(--navbar-arc, 12px),
+          100% 0,
+          100% 100%,
+          0 100%
+        );
+      }
+    }
   </style>
 </head>
 <body data-page="project">
@@ -2133,7 +2358,11 @@ const OVERRIDE = {
   10: 'assets/map/istanbul-map-mobile11.png',    // 1080 x 1920
   11: 'assets/map/istanbul-map-mobile.png',      // 1080 x 1920
 };
-const SRC = i => OVERRIDE[i] || ('assets/project/' + String(i + 1).padStart(2, '0') + '.png');
+// On a desktop the İstanbul stop is the landscape drawing (see THE
+// DESKTOP); `wide` is read at call time, never here, since this runs
+// before it is declared.
+const SRC = i => (wide && i === ISTANBUL_SLIDE ? DESK_MAP : null) ||
+  OVERRIDE[i] || ('assets/project/' + String(i + 1).padStart(2, '0') + '.png');
 
 // How a frame is laid into the screen. `cover` fills it and crops what
 // does not fit; `contain` shows the whole picture and leaves paper
@@ -2225,6 +2454,44 @@ const LANE_KUTUPHANE = 0;   // left on the screen: the reading side
 const LANE_MAP = 1;         // the middle: the petek's own screen (see goHome)
 const LANE_KAHVEHANE = 2;   // right on the screen: the doing side
 const LANES = 3;
+
+// ══════════════════════════════════════════════════════════════
+// THE DESKTOP: ALL THREE AT ONCE
+//
+// A phone is one lane wide, so the strip is WALKED: Kütüphane, the
+// petek, Kahvehane, one screen at a time. A desktop window is wide
+// enough to stand all three side by side, and that is the whole of its
+// layout -- not the phone stretched across the glass, and not a phone
+// in a frame. Kütüphane's two columns at the left edge, Kahvehane's at
+// the right, the reader's own petek in the middle, all of it under the
+// LANDSCAPE drawing of İstanbul (DESK_MAP) across the top of the
+// window: Europe over the reading side, Anatolia over the doing side,
+// and the Bosphorus over the reader standing between them. "Always in
+// the middle", drawn rather than walked.
+//
+// What changes in here is only what a lane MEANS. Nothing fades for
+// being a lane away and every box is live wherever the reader stands
+// (paintCast / armCast), the strip takes no sideways pull
+// (lanePullable), and the reader stands in the middle lane for good,
+// which is what the compass, the logo's glow and the petek already
+// read. The cast, its loaders, its pages, the petek and the two bars
+// are the phone's own and untouched; where each one STANDS is the
+// stylesheet's (see THE DESKTOP in the <style> block).
+//
+// The switch is the width every shared stylesheet already splits on:
+// at 768px and under their rules are a phone's, and above it they are
+// not, so above it this page lays itself out as a desktop. Read live
+// -- a window can be dragged across it -- and only ever from this
+// script, which runs after the viewport tag: before that tag a phone's
+// window is 980px wide and would read as a desktop.
+// ══════════════════════════════════════════════════════════════
+const WIDE_MQ = '(min-width: 769px)';
+// The İstanbul stop's drawing on a desktop: the landscape original the
+// portrait one was cropped from, in the same frame its traced districts
+// are (DISTRICT_SVG_DESK).
+const DESK_MAP = 'assets/map/istanbul-map.png';
+let wide = false;
+function readWide() { return !!(window.matchMedia && window.matchMedia(WIDE_MQ).matches); }
 
 // ── Where the reader comes in ──
 // The middle stop and the middle lane: the petek's own screen, on slide
@@ -2371,15 +2638,26 @@ let _editionReturnWired = false;
 function wireEditionReturn() {
   if (_editionReturnWired) return;
   _editionReturnWired = true;
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) return;
+  const arrive = () => {
     const overlay = document.getElementById('fb-page-overlay');
     if (overlay && !overlay.hidden) return;
     const game = document.getElementById('fb-game-overlay');
     if (game && !game.hidden) return;
     if (drag || anim || laneRun) return;
     refreshEditionColumns(syncEdition());
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    arrive();
   });
+  // ── ...and on a desktop, the window coming back to the front ──
+  // A desktop has no lane to walk onto (THE DESKTOP: both sides are
+  // always standing), so the phone's commonest arrival never happens --
+  // and a tab left showing in a window behind another one is never
+  // HIDDEN, so the visibility return above never fires for it either.
+  // The reader bringing the window back to the front is the same moment:
+  // they are arriving at the paper, not holding it.
+  window.addEventListener('focus', () => { if (wide) arrive(); });
 }
 
 // The columns of whichever side renewed, re-read in place: every cached
@@ -3705,7 +3983,14 @@ function anketMixColor(colorA, colorB, fracA) {
 // of the one this map exists to answer, and where it would lead is not
 // decided; the fill is the whole of it for now.
 const DISTRICT_SVG_URL = 'assets/map/istanbul-map-mobile.svg';
+// The desktop's drawing is the landscape original (DESK_MAP), and so is
+// its tracing: istanbul-map.svg is the source the portrait one is
+// generated from, in the landscape PNG's own 5046x2300 frame. Laid in
+// the same way (`slice`, the SVG spelling of the frame's `cover`), so it
+// lands on the drawing by construction on either.
+const DISTRICT_SVG_DESK = 'assets/map/istanbul-map.svg';
 let districtSvgPromise = null;
+let districtSvgUrl = null;
 let districtLayer = null;
 
 // Fetched once and parsed as XML -- never innerHTML'd into an SVG
@@ -3713,10 +3998,18 @@ let districtLayer = null;
 // reason map-ink.js builds its filter with DOM calls). A failure clears
 // the promise so a later opening can try again rather than being stuck
 // with a rejection: a map that does not arrive leaves the list, which
-// is the whole result either way.
+// is the whole result either way. Once per DRAWING: a window dragged
+// across the desktop line asks for the other tracing, and the layer
+// built off the old one is dropped with it.
 function loadDistrictSvg() {
+  const url = wide ? DISTRICT_SVG_DESK : DISTRICT_SVG_URL;
+  if (districtSvgUrl !== url) {
+    districtSvgPromise = null;
+    districtSvgUrl = url;
+    if (districtLayer) { districtLayer.remove(); districtLayer = null; }
+  }
   if (!districtSvgPromise) {
-    districtSvgPromise = fetch(DISTRICT_SVG_URL)
+    districtSvgPromise = fetch(url)
       .then(r => (r.ok ? r.text() : Promise.reject(new Error('HTTP ' + r.status))))
       .then(txt => {
         const el = new DOMParser().parseFromString(txt, 'image/svg+xml').documentElement;
@@ -5253,7 +5546,10 @@ function stackActors({ idBase, live, lane, col, mirror, cls, poses, lag, lagFree
     out.push({
       id: idBase + slot,
       live, lane,
-      cls: cls + ' fb-box fb-col-' + col + (mirror ? ' fb-mirror' : '') + ' fb-slot-' + slot,
+      // fb-lane-N says which lane a box belongs to, for the one layout
+      // where that is a place on the screen rather than a screen of its
+      // own: the desktop's, which stands all three side by side.
+      cls: cls + ' fb-box fb-lane-' + lane + ' fb-col-' + col + (mirror ? ' fb-mirror' : '') + ' fb-slot-' + slot,
       lag: lag * SLOT_LAG[slot], lagFree: lagFree * SLOT_LAG[slot],
       html: '',
       load: load ? (el) => load(el, slot) : undefined,
@@ -5581,7 +5877,9 @@ function paintCast() {
     // castStep()), which is what makes a column's three boxes enter and
     // leave a lane in the same staggered order they already enter and
     // leave a slide.
-    const d = Math.max(-1, Math.min(1, a.laneP - a.def.lane));
+    // On a desktop every lane is on the screen at once (THE DESKTOP), so
+    // no actor is ever a lane away.
+    const d = wide ? 0 : Math.max(-1, Math.min(1, a.laneP - a.def.lane));
     const x = lerp(A.x, B.x, t);
     a.el.style.transform = 'translate3d(' + x + '%,' + y + '%,0) scale(' + sc + ')' +
                            (rot ? ' rotate(' + rot + 'deg)' : '');
@@ -5638,9 +5936,11 @@ function armCast() {
     // actor belongs to one of them. `a.laneP`, not `lanePos` -- a box
     // still catching up to its own lane (see paintCast()) is still
     // fading in, whatever the strip itself has already reached.
+    // ...unless every lane is on the screen at once (THE DESKTOP), where
+    // a box answers wherever the reader is "standing".
     a.el.classList.toggle('live', settled &&
       Math.abs(a.pos - a.def.live) < LIVE_EPS &&
-      Math.abs(a.laneP - a.def.lane) < LIVE_EPS);
+      (wide || Math.abs(a.laneP - a.def.lane) < LIVE_EPS));
   }
   // Where the BOOK is, which is a different question from whether the
   // cast is live: a finger on the glass makes nothing live, but it does
@@ -5931,7 +6231,11 @@ function paintLanes() {
   // same picture now costs nothing but a composite.
   const scrim = scrimEl || (scrimEl = document.getElementById('fb-scrim'));
   const mapEl = mapLaneEl || (mapLaneEl = document.getElementById('fb-map'));
-  if (scrim) scrim.style.opacity = (mid * 0.86).toFixed(3);
+  // On a desktop the wash is the stylesheet's, not the lane's: the petek
+  // stands on the band's paper rather than over the drawing, so there is
+  // nothing for it to quiet and the stylesheet takes it away (see THE
+  // DESKTOP there) -- an inline opacity would be a number for a phone.
+  if (scrim) scrim.style.opacity = wide ? '' : (mid * 0.86).toFixed(3);
   if (mapEl) mapEl.style.opacity = Math.max(0, Math.min(1, mid)).toFixed(3);
   // ── The petek's entrance belongs to the landing, not the fade ──
   // The lane starting to appear from nothing holds the drawing back
@@ -6063,7 +6367,9 @@ function setLanePos(p, snap) {
 // lanes open": it is the direction as well, so a pull off the end of
 // the strip is nobody's and falls through to whatever is underneath.
 function lanePullable(dx) {
-  if (!atLaneStop) return false;
+  // A desktop has no strip to walk: all three lanes are already standing
+  // side by side (THE DESKTOP), so a sideways drag is nobody's.
+  if (wide || !atLaneStop) return false;
   // Right walks the strip right, so the reader moves toward lane 0.
   return dx > 0 ? lane > 0 : lane < LANES - 1;
 }
@@ -6345,112 +6651,61 @@ function onUp() {
   runTo((at - lo) / (hi - lo) >= TIP ? hi : lo);
 }
 
-// ══════════════════════════════════════════════════════════════
-// A LANE STEP WITHOUT A FINGER
-//
-// The strip is walked with a sideways pull, and a desktop reader has no
-// finger to pull with. A mouse can drag it (the pointer events above take
-// a mouse as readily as a thumb), but nobody thinks to drag a page with a
-// mouse. So the three things a desktop reader WOULD try are answered as
-// the same move: the arrow keys, the trackpad's own two-finger swipe, and
-// -- on masaustu.html -- the hand-drawn arrows either side of the phone.
-// All three come through stepLane, so all three are refused by the same
-// rules, and the arrows on the desk ask canStepLane before they show.
-//
-// It is the swipe's own move, not a shortcut past it: one lane per step,
-// run by runLane exactly as a released pull is, so the reader still
-// crosses the middle on the way from one side to the other.
-//
-// Refused whenever the strip is not what the reader is looking at: the
-// book off its stop or mid-run, a page, a game or a sheet standing over
-// it (each is an .ist-sheet-overlay, .open while it is up), the sunrise /
-// sunset notice, and the onboarding tour -- unless the tour is on a beat
-// that has handed the book back to be pulled (data-onb-pass="book"),
-// which is exactly when a step is the answer it is waiting for.
-// ══════════════════════════════════════════════════════════════
-function laneStepBlocked() {
-  if (!box || !ready || !atLaneStop || drag || anim || traveling) return true;
-  if (document.querySelector('.ist-sheet-overlay.open')) return true;
-  const b = document.body;
-  if (b.classList.contains('ist-edn-locked')) return true;
-  if (b.classList.contains('ist-onb-locked') && b.dataset.onbPass !== 'book') return true;
-  return false;
+// ── Crossing the desktop line ──
+// A window dragged across WIDE_MQ changes everything the stylesheet
+// cannot change on its own (see THE DESKTOP): which lane the reader
+// stands on, which drawing the İstanbul stop is, and -- through
+// loadDistrictSvg, which asks `wide` itself -- which tracing the
+// districts are painted on. Wired once per document, like the logo.
+let _wideWired = false;
+function wireWide() {
+  if (_wideWired || !window.matchMedia) return;
+  _wideWired = true;
+  const mq = window.matchMedia(WIDE_MQ);
+  const onChange = () => applyWide();
+  if (mq.addEventListener) mq.addEventListener('change', onChange);
+  else if (mq.addListener) mq.addListener(onChange);
 }
-function canStepLane(dir) {
-  if (laneStepBlocked()) return false;
-  const to = lane + (dir < 0 ? -1 : 1);
-  return to >= 0 && to < LANES;
-}
-function stepLane(dir) {
-  if (!canStepLane(dir)) return false;
-  runLane(lane + (dir < 0 ? -1 : 1));
-  // A released pull reaches runLane with the cast already inert (the
-  // press did that); a step has had no press, so it says so itself --
-  // laneRun is set by now, and a box must not be pressable mid-walk.
+function applyWide() {
+  const was = wide;
+  wide = readWide();
+  if (was === wide || !box) return;
+  // Into a desktop, the reader is standing in the middle of all three:
+  // a walk that was in flight is dropped where it is rather than run
+  // out, since there is no strip left for it to land on. Out of one,
+  // they are still in the middle -- the petek, the screen every other
+  // one is walked to from.
+  if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
+  lane = LANE_MAP;
+  setLanePos(LANE_MAP, true);
+  for (const a of cast) a.laneP = LANE_MAP;
+  // The districts belong to an open page; whichever tracing they were
+  // painted on, the next paint asks for the right one.
+  clearDistrictMap();
+  swapStopDrawing();
   armCast();
-  return true;
+  paintLanes();
 }
-
-// ── The keys ──
-// Left is Kütüphane's way and right is Kahvehane's, as they stand on the
-// screen. A held key is one step, not a run: the auto-repeat would walk
-// the reader straight past the middle. Anything typing keeps its keys.
-function onLaneKey(e) {
-  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-  if (e.repeat || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-  const t = e.target;
-  if (t && (t.isContentEditable || (t.closest && t.closest('input, textarea, select')))) return;
-  if (stepLane(e.key === 'ArrowLeft' ? -1 : 1)) e.preventDefault();
-}
-
-// ── The trackpad ──
-// A two-finger swipe arrives as a stream of wheel events, and the stream
-// keeps coming after the fingers lift (the momentum). The whole stream is
-// ONE gesture, so it is ONE step: the deltas are summed until they say
-// clearly enough which way and that it is sideways, the step is taken, and
-// nothing more is taken until the stream has gone quiet for
-// LANE_WHEEL_IDLE_MS. A vertical scroll -- a story's own body, a mouse
-// wheel -- never gets as far as stepping, because sideways has to win by
-// a margin. Passive: it never needs to cancel anything, since nothing at
-// the document's level scrolls sideways, and the browser's own
-// swipe-to-go-back is already held off by overscroll-behavior-x
-// (frames.css).
-const LANE_WHEEL_STEP_PX = 48;
-const LANE_WHEEL_IDLE_MS = 220;
-let laneWheelX = 0, laneWheelY = 0, laneWheelSpent = false, laneWheelIdle = null;
-function laneWheel(e) {
-  // A pinch arrives as a wheel with ctrlKey held: the browser's zoom, never
-  // a lane, and none of its deltas belong in the sum below.
-  if (e.ctrlKey) return;
-  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerWidth : 1;
-  laneWheelX += e.deltaX * unit;
-  laneWheelY += e.deltaY * unit;
-  clearTimeout(laneWheelIdle);
-  laneWheelIdle = setTimeout(() => {
-    laneWheelX = 0; laneWheelY = 0; laneWheelSpent = false;
-  }, LANE_WHEEL_IDLE_MS);
-  if (laneWheelSpent) return;
-  if (Math.abs(laneWheelX) < LANE_WHEEL_STEP_PX) return;
-  if (Math.abs(laneWheelX) < Math.abs(laneWheelY) * 1.5) return;
-  // Spent whether or not the step was taken: a swipe that arrived while a
-  // page was open must not walk the strip the moment the page is shut by
-  // its own momentum still coming in.
-  laneWheelSpent = true;
-  // Fingers moving left scroll right (a positive deltaX, with natural
-  // scrolling or without), which brings in what is to the right -- the
-  // same direction a thumb pulling left walks the strip.
-  stepLane(laneWheelX > 0 ? 1 : -1);
-}
-
-// Body-level and idempotent, like the logo's own wiring: the keys and the
-// wheel are the document's, and a remount must not bind them twice. Both
-// handlers ask laneStepBlocked first, which reads `box` -- so after an
-// unmount they simply answer nothing.
-function wireLaneKeys() {
-  if (document.body.dataset.fbLaneKeys) return;
-  document.body.dataset.fbLaneKeys = '1';
-  document.addEventListener('keydown', onLaneKey);
-  document.addEventListener('wheel', laneWheel, { passive: true });
+// The İstanbul drawing for the other side of the line, swapped in only
+// once it has decoded: an <img> whose src changes goes blank until its
+// new bytes are ready, and a city that flickers out under a resize is
+// worse than one a beat late. It takes the old frame's place in the box,
+// so the district tracing (appended after the frames) stays after it.
+function swapStopDrawing() {
+  const old = imgs[ISTANBUL_SLIDE];
+  const src = SRC(ISTANBUL_SLIDE);
+  if (!old || old.getAttribute('src') === src) return;   // not loaded yet: loadFrames reads SRC itself
+  const img = new Image();
+  img.decoding = 'async';
+  img.alt = '';
+  img.src = src;
+  (img.decode ? img.decode().catch(() => {}) : Promise.resolve()).then(() => {
+    // Superseded: another crossing (or a remount) has moved on since.
+    if (imgs[ISTANBUL_SLIDE] !== old || SRC(ISTANBUL_SLIDE) !== src) return;
+    if (old.classList.contains('on')) img.classList.add('on');
+    if (old.parentNode) old.replaceWith(img);
+    imgs[ISTANBUL_SLIDE] = img;
+  });
 }
 
 // ── The page lifecycle router.js drives ──
@@ -6470,6 +6725,11 @@ function mount() {
   lane = START_LANE; lanePos = START_LANE; navP = START_LANE;
   petekShown = 1; petekAway = false;   // the mount below draws it; see paintLanes
   atLaneStop = false;
+  // A desktop or a phone, read before anything is cast or fetched: it
+  // decides which drawing the İstanbul stop is (SRC) and whether a lane
+  // away is a lane faded (paintCast). See THE DESKTOP.
+  wide = readWide();
+  wireWide();
   // Which paper each side is holding, decided before a single box is
   // filled: buildCast runs the loaders, and they ask fbSideDay (through
   // their fetches) and fbEdition. The result is dropped rather than
@@ -6499,9 +6759,6 @@ function mount() {
   wireMap();
   wireGameOverlay();
   wireFbPage();
-  // The strip without a finger: the arrow keys and the trackpad's swipe
-  // (see A LANE STEP WITHOUT A FINGER).
-  wireLaneKeys();
   // What a language change has to repaint on this page. Registered
   // against I18N, so the petek's own preference row and the logo's hold
   // relabel the app by exactly the same path.
@@ -6568,14 +6825,14 @@ function openGameOverlay(href) {
   if (!layer || !frame) return;
   frame.src = href;
   IstSheet.open(layer);
-  // ── A desktop reader types the word ──
+  // ── A reader at a keyboard types the word ──
   // Sözcel and Çengel both take the physical keyboard, but a key goes to
   // whichever document has focus, and opening the sheet leaves it on the
   // book behind it -- so the first letters typed went nowhere until the
-  // reader clicked into the board. Handed to the game once it is in.
-  // Only where there is a pointer that hovers (masaustu.html's own
-  // question): on a phone the keyboard is the one drawn on the board, and
-  // nothing should be focused that the reader did not touch.
+  // reader clicked into the board. Handed to the game once it is in, and
+  // only where there is a pointer that hovers: on a phone the keyboard is
+  // the one drawn on the board, and nothing should be focused that the
+  // reader did not touch.
   if (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
     const take = () => {
       if (!IstSheet.isOpen(layer) || frame.src === 'about:blank') return;
@@ -6590,8 +6847,7 @@ function closeGameOverlay(immediate) {
   const frame = document.getElementById('fb-game-frame');
   if (!layer || layer.hidden) return;
   // The keyboard comes back to the book with the sheet: left on a frame
-  // that is about to be emptied, Escape and the arrow keys would be
-  // talking to a blank page.
+  // that is about to be emptied, Escape would be talking to a blank page.
   if (frame && document.activeElement === frame) frame.blur();
   // Unloads the game rather than leaving it running behind the layer, so
   // the next open is a fresh start rather than wherever it was left --
@@ -7022,7 +7278,9 @@ if (!window.__istVirtualNavInjecting) {
   if (window.LoadingScreen) resolveLoading = LoadingScreen.start(() => {}, { force: true });
   mount();
   window.addEventListener('DOMContentLoaded', () => {
-    if (window.IstProfileCard) IstProfileCard.mount({ sb: IstRouter.sb, I18N: window.I18N, page: 'project' });
+    // `everyWidth`: the desktop layout carries the bar too (see THE
+    // DESKTOP), so it is mounted on a wide window as well as a phone.
+    if (window.IstProfileCard) IstProfileCard.mount({ sb: IstRouter.sb, I18N: window.I18N, page: 'project', everyWidth: true });
     // Another member's profile: one sheet for the whole site (see
     // openMemberSheet in profile-card.js). Without this the petek's own
     // press-a-hexagon-then-press-the-bar path silently does nothing --
@@ -7080,19 +7338,19 @@ window.__fb = {
   columnSettled,
   openPetek, closePetek,
   // Put the reader on a lane as if they had pulled there and let go.
+  // On a desktop there is nowhere to put them: every lane is already on
+  // the screen and the reader stands in the middle of it (THE DESKTOP).
   goLane(n, snap) {
+    if (wide) return;
     if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
     if (snap === false) { runLane(n); return; }
     lane = Math.max(0, Math.min(LANES - 1, n)); setLanePos(lane, true); armCast();
   },
-  pullLane(p) { setLanePos(p); },
-  // ── The desk's way across the strip ──
-  // masaustu.html's arrows and its own keys and wheel, which land outside
-  // this document. Unlike goLane these are the READER's moves, so they go
-  // through the same refusals the keys and the trackpad do here (see A
-  // LANE STEP WITHOUT A FINGER): one lane at a time, nothing open over
-  // the strip, and the tour's say on when a step is allowed.
-  stepLane, canStepLane, laneWheel,
+  pullLane(p) { if (!wide) setLanePos(p); },
+  // Whether the page is laid out as a desktop -- all three lanes at
+  // once, with no strip to walk (see THE DESKTOP). The onboarding tour
+  // reads it to stop asking for pulls nobody could make.
+  get wide() { return wide; },
 };
 })();
 </script>

@@ -32,10 +32,6 @@ const EXCLUDE = new Set([
   // admin.html), which is where it is actually used; shipping it inside the
   // App Store bundle only adds weight to every member's download.
   'admin.html',
-  // The desktop's phone-shaped window around project.html. The app is never
-  // a desktop -- project.html's own bounce returns early under Capacitor --
-  // so nothing in the bundle could ever reach it.
-  'masaustu.html',
 ]);
 
 function copyRecursive(src, dest) {

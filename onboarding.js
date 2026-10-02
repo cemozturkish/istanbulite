@@ -929,7 +929,15 @@
       // Whatever this beat introduces arrives now, before anything is
       // pointed at (see revealPart).
       (b.show || []).forEach(revealPart);
-      if (b.pull !== undefined) { runPull(b); return; }
+      // ── On a desktop a pull beat is SAID, not asked ──
+      // project.html lays a desktop window out with all three lanes
+      // standing side by side (its "THE DESKTOP"), so there is no strip to
+      // pull and no lane to arrive on: waiting for one would only ever end
+      // in the stall escape. The line is still true -- Kütüphane IS on the
+      // left -- so it is spoken over the word it points at, as the talk
+      // beat it has become, and the tap is the advance.
+      const wideBook = !!(fb() && fb().wide);
+      if (b.pull !== undefined && !wideBook) { runPull(b); return; }
       if (b.open !== undefined) { runOpen(b); return; }
       if (b.throw) { runThrow(b); return; }
       // The petek's own door: a press on the logo rather than a gesture on
