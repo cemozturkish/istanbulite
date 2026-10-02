@@ -159,10 +159,9 @@ is the main target: every change must feel smooth in the app first, then in mobi
 desktop. The two runtimes already have divergent code paths where needed (e.g. `router.js` uses
 in-document virtual navigation inside Capacitor vs. cross-document View Transitions on the web) —
 keeping the app buttery is worth that duplication. Desktop is the third-priority layout, not the
-default one — and it is not a layout of its own at all: on a desktop the app is the **phone,
-standing in a phone-shaped window** in the middle of the screen (`masaustu.html`, see its own
-section under project.html). Never write desktop CSS for project.html; there is no desktop window
-for it to apply to.
+default one — but it IS a layout, not the phone stretched across the glass: above 768px
+`project.html` stands its three lanes side by side (see "The desktop — all three lanes at once"
+under project.html).
 
 ---
 
@@ -174,15 +173,15 @@ for it to apply to.
 ├── kahvehane.html        # İSTANBULITE tab, MIDDLE zoom: İstanbul — district map, games hub, scoreboards, events
 ├── mahalle.html          # İSTANBULITE tab, INNERMOST zoom: the reader's own ilçe and its mahalles
 ├── project.html          # PROJE tab: the flip book on its own, as a rig — 12 numbered frames, nothing else
-├── masaustu.html         # DESKTOP: project.html in a phone-shaped window on a desk (see its own section)
 ├── sozcel.html           # Turkish Wordle-style daily word game
 ├── tumcel.html           # Turkish quote-fragment Connections-style daily game (replaced Bağlantılar)
 ├── bulmaca.html          # Turkish daily mini crossword
 ├── admin.html            # Admin dashboard (admin-only)
 ├── router.js             # Shared shell: single Supabase client, the two tabs + the zoom stack, virtual navigation, clock
 ├── sheet.css/.js         # THE sheet: the one page that rises from the bottom — see "Site-wide defaults"
-├── profile-card.js/.css  # Profile bar (the phone's top bar, its sagging edge and the sun/moon
-│                         chart hanging off it), the petek, avatar, badges — shared across pages
+├── profile-card.js/.css  # Profile bar, the petek, avatar, badges — shared across pages
+├── profile-bar.css       # THE TOP BAR's own styles (its sagging edge, the sun/moon chart hanging
+│                         off it) — each page's <link media> says which widths get the bar
 ├── onboarding.js/.css    # New-account onboarding — project.html ONLY (see its own section)
 ├── game-locks.js         # Per-day game on/off enforcement (games are otherwise independent)
 ├── event-interest.js     # "İlgimi çekti": the verdict Kahvehane's event deck records, Hane reads
@@ -537,10 +536,7 @@ sb.from('articles').delete().eq('id', id)
 ### `index.html` — Login Gate
 - Login / kefil-code signup screen only — no content of its own anymore
 - Once a session exists (or right after sign-in), redirects to `project.html` — the flip book,
-  which is the app (it used to be `anahane.html`). On a desktop, project.html sends itself on to
-  `masaustu.html`, the phone-shaped window it is shown through there
-- It is the one page that is never framed on a desktop: it is laid out for any window, so signing
-  out inside the desk's window hands it the whole tab (see `masaustu.html`)
+  which is the app (it used to be `anahane.html`)
 
 ### `anahane.html` — Hane (MIDDLE page, home)
 - The entry point and anchor of the three-page carousel — the user always starts here
@@ -1994,7 +1990,7 @@ of type against the tab bar's one word. Heights and colors are the
 palette-independent between light and dark, with one exception: the earth (kahverengi) palette
 overrides `--navbar-ink` to its own dark brown `--ink` instead of charcoal, via
 `:root[data-palette="earth"]`, mirroring the same specificity trick the mono block uses. The top bar is one
-implementation in profile-card.css ("THE TOP BAR"); the bottom bar's colors live in frames.css
+implementation in profile-bar.css ("THE TOP BAR"); the bottom bar's colors live in frames.css
 ("MOBILE FIXED BOTTOM NAV") while each page still positions its own `<header>`. Never write
 either bar's height as a number — the same value also reserves the space each page leaves at the
 bottom so its last row of cards clears the tab bar, and one copy left behind is how the two bars
@@ -2325,73 +2321,6 @@ one thing that comes off it. It opens **the petek**, and it is a switch rather t
 stays lit while the petek is standing, because it is also the way back out (the same move
 Kütüphane's Olaylar box makes). `nav` still takes no pointer events at all — only this one mark
 opts back in, so the drawing under the bar's paper goes on answering a finger that lands beside it.
-
-### On a desktop, the app stands in a phone-shaped window — `masaustu.html`
-
-project.html is a phone. Everything in it is measured off a phone's window — the hero is a 100vw
-square, the drawings are 9:16 and laid in with `cover`, the columns are cut from the window's
-width — and the shared rules for all of it live inside `max-width: 768px` in frames.css,
-profile-card.css and sheet.css. A desktop window got none of that: no top bar at all (it is
-phone-only CSS), cards stretched across the screen, the map cropped to a sliver of the Bosphorus,
-a game sheet running down over the tab bar. That is the phone layout pulled apart, not a layout.
-
-So a desktop reader is **not given a second layout. They are given the phone**: `masaustu.html`
-holds project.html in an iframe the shape of the phone it is drawn for — the screen's height up to
-932px, the width following at 430:932, never wider than 430 and never narrower than 320 — standing
-in the middle of the screen. An iframe is a real window of that width, so every media query, every
-`vw` and every `innerWidth` inside it reads exactly what it reads on the device, and nothing in the
-app is restated for it. Never write desktop CSS for project.html instead; there is no desktop
-window for it to apply to.
-
-Seven things about it, most of which fail silently:
-
-- **Who is sent there is a question about the POINTER, never the window's width.** The first
-  script in project.html's head: top-level, not Capacitor, `(hover: hover) and (pointer: fine)` →
-  `location.replace('masaustu.html' + search + hash)`. A width test there reads every iPhone as a
-  desktop: a mobile browser lays a page out **980px wide until the viewport tag is parsed**, and
-  that script runs before it (measured in a 390px phone emulation: `min-width: 769px` matched at
-  that point). Touch tablets keep the window they always had. Inside the desk's own window, and in
-  admin.html's preview phone, the page is framed already and the check never runs.
-- **The two pages' queries are the same string, character for character**, or a window would be
-  sent back and forth between them — and `sessionStorage['ist_masa_back']` is the second half of
-  that promise: masaustu.html leaves it when it sends a window back (a phone that followed a shared
-  link, Capacitor, or itself framed), and project.html consumes it and renders as it is, once. The
-  page is also excluded from the iOS bundle (`scripts/sync-web.js`); nothing in the app can reach it.
-- **The desk wears the bars' own ink, read off the app** (`--navbar-ink` from the frame's root, and
-  the two label inks for the arrows), re-read whenever palette.js rewrites `data-palette` /
-  `data-theme` on the app's `<html>` — so the two bars run on into the desk at every palette and
-  every half of the sky, and the city reads as a lit window in a dark desk rather than a picture of
-  a phone laid on one.
-- **And it goes quiet with the app.** A page opening tints the whole phone except its bottom bar,
-  which is lifted over the tint because the logo stays live (`body.fb-page-on`). The desk follows
-  the app's own `html.ist-dim-on` with the app's own `--ist-sheet-dim-ink` on the same 0.55s curve,
-  down to the line the bottom bar's **corners** stand on — its ink is a `::before` that stands
-  `--navbar-arc` above the bar's own box, so that is what is measured — and the bar runs on across
-  the desk undimmed below it. Left undimmed, the window's top bar turned into a darker box against
-  the desk the moment anything opened.
-- **Whole pixels, size and place** (`round()`): a window standing a quarter-pixel down the screen is
-  one whose every line of type is drawn between two rows of pixels.
-- **A desktop reader has no finger, so the strip has three other ways across**: the ←/→ keys, the
-  trackpad's own two-finger sideways swipe, and a hand-drawn arrow either side of the window. All
-  three go through one function, `stepLane()` in project.html (with `canStepLane()` beside it, both
-  on `window.__fb`), which makes exactly the move a released pull makes — one lane, through
-  `runLane`, so the middle is still crossed on the way from one side to the other — and refuses
-  whenever the strip is not what the reader is looking at: the book off its stop, a page, a game or
-  a sheet standing over it (`.ist-sheet-overlay.open`), the sunrise/sunset notice, and the
-  onboarding tour on any beat but a pull (`data-onb-pass="book"`). A held key is one step (auto-repeat
-  is ignored); a swipe's whole wheel stream — momentum included — is one step, summed until it is
-  48px sideways and sideways beats vertical by 1.5×, then spent until it has been quiet for 220ms;
-  a pinch (`ctrlKey`) never counts. The arrows ask `canStepLane` four times a second and are
-  `visibility: hidden` when it says no, which also takes them out of the tab order: an arrow that
-  does nothing when pressed is worse than no arrow. A swipe or a key that lands on the desk rather
-  than in the window is handed to the same two functions.
-- **The keyboard belongs to the app.** The desk hands focus to the window when it loads and after
-  any press on the desk; a game takes focus when its page has loaded (desktop only — on a phone
-  nothing is focused that the reader did not touch) and gives it back to the book when its sheet
-  closes, because Sözcel and Çengel read the physical keyboard and a key goes to whichever document
-  has focus. And **anything the window navigates to that is not project.html takes the whole tab** —
-  signing out or deleting the account sends the app to index.html, a page laid out for any window,
-  so it is never left standing in a phone on a desk (checked on the iframe's `load`).
 
 ### Hold the logo and the app changes language — `.fb-hold-frame`
 
@@ -3636,6 +3565,91 @@ Six things about it:
   fills it is parked until it is worth building, the way Makaleler and the neighbourhood comments
   are parked rather than deleted.
 
+### The desktop — all three lanes at once (`WIDE_MQ`)
+
+**Above 768px `project.html` is not a phone, and does not pretend to be one.** A phone is one lane
+wide, so the strip is *walked*: Kütüphane, the petek, Kahvehane, one screen at a time. A desktop
+window is wide enough to stand all three side by side, so it does: Kütüphane's two columns at the
+left edge, Kahvehane's at the right (mirrored exactly as on a phone, the heavy column outward),
+the reader's own petek in the middle column between them, and across the top of the window the
+**landscape** İstanbul (`assets/map/istanbul-map.png`, `DESK_MAP`) — Europe over the reading
+side, Anatolia over the doing side, the Bosphorus over the reader. "Always in the middle", drawn
+rather than walked; and the same template every screen already is (the maps on top, the columns
+under them), three columns wide.
+
+It replaced a first attempt that showed the phone app inside a phone-shaped window on a desktop.
+That is the thing not to rebuild: a desktop is a layout, not a device to imitate.
+
+Eight things about it:
+
+- **The switch is the width every shared stylesheet already splits on** — `WIDE_MQ`,
+  `(min-width: 769px)`; at 768 and under, frames.css, sheet.css and profile-bar.css are a phone's.
+  It is read with `matchMedia`, **live** — a window dragged across the line re-lays itself
+  (`applyWide`), swapping the İstanbul drawing only once the new one has decoded
+  (`swapStopDrawing`, the "`<img>` goes blank" trap `home-map.js` documents) and the district
+  tracing with it — and **only from the page's body script**: before the viewport tag is parsed
+  a phone's layout viewport is 980px wide and would read as a desktop. The app is universal, so an
+  iPad, or a phone held sideways, is past this line too and gets this layout.
+- **What the script changes is only what a lane MEANS** (`wide`): `paintCast` never fades an actor
+  for being a lane away, `armCast` makes every box live wherever the reader stands,
+  `lanePullable` refuses every sideways drag, `__fb.goLane` / `pullLane` do nothing, and the reader
+  stands in the middle lane for good — which is what the compass, the logo's glow and the petek
+  already read. The cast, its loaders, its pages, the petek and both bars are the phone's own.
+- **Where each thing STANDS is the stylesheet's** — "THE DESKTOP" at the end of project.html's own
+  `<style>`, all of it inside `@media (min-width: 769px)`. Four lane classes (`fb-lane-N`, written
+  by `stackActors`) place the two sides; the band page grows out of its card into **its own
+  side's** band (`.fb-mirror` already says a page came out of a Kahvehane card); the petek's box
+  (`#fb-map`) is the middle of the band, and `fitHive` fits it there the way it fits any window;
+  the wash under it (`.fb-scrim`) has nothing to quiet and is gone. A side is the phone's own band
+  — the same 3:2, slots, dock line and kickers — cut from `--dk-side-w` rather than the screen.
+- **The hero is anchored by its southern coast.** The landscape drawing runs the full width and
+  its foot sits on the hero's foot, so the band under it reads as the Marmara the city stands on,
+  with whatever does not fit running up under the top bar; its box is the drawing's own 5046:2300
+  shape whenever that is taller than the hero, so `cover` crops nothing. **The district tracing is
+  `istanbul-map.svg`** (`DISTRICT_SVG_DESK`) — the landscape source the portrait one is generated
+  from, in that PNG's own frame — laid into exactly the same box with the same fade, which is what
+  keeps the Anket's coloured districts on their coastlines.
+- **Whole pixels, by `round()`.** The geometry is fractions of the window, and an edge part way
+  through a pixel is rasterised one way by a box (a composited layer — `paintCast` writes its
+  transform every frame) and another by the page that grows over it: with a story open, a pixel of
+  the card's foot showed under the page's own. So the tokens are rounded, the box height and the
+  gap to an **even** number, because Oyunlar's and Anket's two boxes split three rows and a gap in
+  half. Always inside `@supports (width: round(1.5px, 1px))`, never bare: an unregistered custom
+  property is only tokens, so where `round()` is unknown it is accepted anyway and every rule that
+  uses it is then invalid at computed-value time — the whole layout gone rather than falling back.
+- **The top bar is carried at every width, and that is what the profile-bar.css split is.** The
+  bar used to be the `@media (max-width: 768px)` half of profile-card.css. It is its own file,
+  linked right after profile-card.css, and **the `<link>` says which windows get it**:
+  `media="(max-width: 768px)"` on every parts-bin and game page (exactly as before), no media
+  query on project.html — with `IstProfileCard.mount({ everyWidth: true })` as the script's half of
+  the same decision. Without it a desktop reader had no way to reach their own profile, and the
+  petek's press-a-hexagon-then-press-the-bar works there for the same reason. The bottom bar's
+  hexagon shoulder, which frames.css states for phones only, is restated for this page.
+- **Type steps up from the root** (`html { font-size: clamp(16px, 9px + 0.55vw, 19px) }`). Every
+  size on the page is set in rem, so the whole scale grows together and keeps the phone's
+  proportions, while the pixel geometry (the bars, the box heights) stays where it is.
+- **A desktop never arrives on a lane, so the window coming back is the arrival.** A side renews
+  on arrival (`landLane`, see "A side renews on ARRIVAL"), and a desktop has no lane to walk onto;
+  a tab left in a window behind another is never *hidden* either, so `visibilitychange` alone
+  would never fire. The window coming back to the front (`focus`) is the same moment and runs the
+  same check (`wireEditionReturn`).
+
+Three smaller things only a desktop needs. The **onboarding tour** speaks its lane pulls rather
+than asking for them (`runBeat` reads `__fb.wide` — there is no strip to pull, and waiting would
+only ever end in the stall escape), and its pane stands in the petek's column, or beside THE sheet
+while the sheet is up. A **game** takes keyboard focus once its iframe has loaded, on a pointer
+that hovers, so the physical keyboard types the word with no click into the board first. And
+`fitHive` fits to the window **less** `HIVE_CARD_GAP`, the gap the drawing's foot stands above:
+fitted to the whole window and then lifted by it, a drawing bound by height ran off its own top by
+exactly that much — invisible on a phone, where the width binds first, and half a row on the
+desktop's short band.
+
+**In the app (`html.ist-native`) the dock token leaves out the home indicator's inset**, and the
+boxes add it themselves (`env()` does not resolve inside a custom property on WebKit) — so
+everything this layout stands on that line (the hero, the petek's box, the tour's pane) restates
+its `bottom` for the app with the inset added. Phones are untouched: every rule of this is inside
+the desktop query or behind `wide`.
+
 ### Onboarding — `onboarding.js` + `.css`
 
 A brand-new account is walked through the app once, on `project.html` and nowhere else, and
@@ -4329,9 +4343,11 @@ the whole of what a press changes on it is the one ring going red, which is the 
 page and is therefore unmistakably about the name that has just appeared at the other end of the
 screen (a short red rule under that name says so from its end). The bar needed no new gesture for
 the second step — *press a person, read about them* is what that bar has always done; it is simply
-aimed at somebody else. And it is why the intermediate step is skipped on **desktop**, where there
-is no bar at all (see `mount`): the press opens the profile straight away rather than turning a
-hexagon red and leading nowhere.
+aimed at somebody else. And it is why the intermediate step is skipped on a window with **no bar
+at all** — a parts-bin page on a desktop (see `mount`): the press opens the profile straight away
+rather than turning a hexagon red and leading nowhere. `project.html` carries the bar at every
+width (see "The desktop — all three lanes at once"), so there both steps happen on a desktop
+too.
 
 The name is cleared by anything that means the reader has left them: another depth (`setHiveLevel`),
 another page (`router.js` calls `clearBarMember` beside `clearSeat`), a fresh mount of Hane.
@@ -4405,7 +4421,7 @@ It is **not desktop-only**, and must not be made desktop-only again: the phone i
 of users are on (see Vision), and hiding it there hid the app's whole political layer from almost
 everyone. On a phone the card as a card *is* hidden — there is no room for a second card beside a
 full-bleed map — and the seat moves into **one end of the profile bar** instead (`#ist-pc-seat`,
-"THE TOP BAR" in profile-card.css), with you at the other: the left end on Kütüphane, the right end
+"THE TOP BAR" in profile-bar.css), with you at the other: the left end on Kütüphane, the right end
 on Kahvehane (see the bar's own section for why it changes ends, and what moves when it does).
 `render()` paints both surfaces at once and wires the same detail sheet to each; it is painted in
 the bar's own classes (`.ist-pc-id` / `.ist-pc-name` / `.ist-pc-meta`), so there is one type

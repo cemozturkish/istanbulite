@@ -913,7 +913,11 @@
     if (_mounted) { setPage(page); return; }
 
     // Only show on mobile — bail early on desktop to save Supabase calls.
-    if (window.innerWidth > 768) {
+    // Unless the page carries the bar at EVERY width: project.html is the
+    // app, its desktop layout wears the same bar a phone does (it links
+    // profile-bar.css with no media query), and a desktop with no bar
+    // has no way to reach its own profile at all.
+    if (!opts.everyWidth && window.innerWidth > 768) {
       let resolved = false;
       _resizeListener = () => {
         if (!resolved && window.innerWidth <= 768) {
@@ -2576,7 +2580,8 @@
   function pickHiveMember(state, id) {
     const cells = (state.hive && state.hive.cells) || [];
     const member = cells.find(c => String(c.member_id) === id) || null;
-    // Desktop has no top bar at all (see mount) — there is nowhere to put
+    // A window with no top bar (a parts-bin page on a desktop, see mount;
+    // project.html carries the bar at every width) has nowhere to put
     // their name, so the press does the second step's work straight away
     // rather than turning a hexagon red and leading nowhere. One press
     // instead of two, because the step in between has no home here.
@@ -2723,7 +2728,13 @@
     // itself, which the middle depth often can't reach at all (six
     // names routinely leave a phone clamped well under 1.5x) and the
     // outermost level has to match rather than re-decide on its own.
-    const scale = Math.max(HIVE_MIN_SCALE, Math.min(HIVE_ZOOM, vw / reqW, vh / reqH));
+    // The height it is fitted to is the window LESS the gap the drawing's
+    // foot stands above (HIVE_CARD_GAP, see offsetY below): fitted to the
+    // whole window and then lifted by that gap, a drawing bound by height
+    // ran off the top by exactly that much -- invisible on a phone, where
+    // the width binds first, and the top row clipped in half on a short
+    // window like the desktop's band.
+    const scale = Math.max(HIVE_MIN_SCALE, Math.min(HIVE_ZOOM, vw / reqW, (vh - HIVE_CARD_GAP) / reqH));
 
     // Scaling about the caller's own cell and then hanging that point off
     // the middle of the window keeps them in the middle at any scale —
