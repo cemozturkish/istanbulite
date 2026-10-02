@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="profile-card.css?v=50">
   <link rel="stylesheet" href="profile-bar.css?v=1">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=57" defer></script>
+  <script src="profile-card.js?v=58" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -6753,7 +6753,21 @@ function mount() {
   } else {
     load();
   }
-  if (window.IstProfileCard) IstProfileCard.setPage('project');
+  // ── The top bar at every width, for as long as this page stands ──
+  // A virtual navigation swaps only #ist-content, the inline
+  // style[data-page] and the scripts -- never a <link> -- so the bar's
+  // stylesheet is whichever <link> the document was first loaded with.
+  // That is the phone-only one when the reader came in on a parts-bin
+  // page, and this page's every-width one when they came in here and then
+  // walked off it. So the width is this page's to set on arrival and give
+  // back on the way out (unmount), not the loaded document's.
+  scopeBarSheet(true);
+  // And the bar itself is mounted here as well as at DOMContentLoaded:
+  // a virtual entry never fires that event, and the parts-bin page it came
+  // from bailed on a desktop. On a real load the module is still deferred
+  // at this point and the DOMContentLoaded call is the one that lands;
+  // mounted already, this is only the page change.
+  if (window.IstProfileCard) IstProfileCard.mount({ sb: IstRouter.sb, I18N: window.I18N, page: 'project', everyWidth: true });
   // The map is one of the lanes and leaves with the content; the game
   // overlay lives at body level. Both wirings are idempotent either way.
   wireMap();
@@ -6778,7 +6792,16 @@ function mount() {
   refreshDayMeter();
   loadCardTitleFontSizes();
 }
+// The every-width bar is this page's (see mount): on, the bar stylesheet
+// applies at any width; off, it is back to the phone-only scope every
+// other page links it with. Found by href, since the <link> is whichever
+// page the document was loaded as.
+function scopeBarSheet(everyWidth) {
+  const link = document.querySelector('link[rel="stylesheet"][href^="profile-bar.css"]');
+  if (link) link.media = everyWidth ? 'all' : '(max-width: 768px)';
+}
 function unmount() {
+  scopeBarSheet(false);
   stopAnim();
   // The petek leaves with the content, but the body class that lights
   // the logo does not -- and the logo is on the bar, which outlives this

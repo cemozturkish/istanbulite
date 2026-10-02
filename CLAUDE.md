@@ -3625,6 +3625,14 @@ Eight things about it:
   the same decision. Without it a desktop reader had no way to reach their own profile, and the
   petek's press-a-hexagon-then-press-the-bar works there for the same reason. The bottom bar's
   hexagon shoulder, which frames.css states for phones only, is restated for this page.
+  - **Both halves belong to the page's lifecycle, not to the loaded document.** A virtual
+    navigation swaps scripts and `style[data-page]` but never a `<link>`, and never fires
+    `DOMContentLoaded`. So `mount()` sets the bar stylesheet's `media` to `all`
+    (`scopeBarSheet`) and `unmount()` puts it back to `(max-width: 768px)` — or a desktop that
+    left project.html kept a phone bar over every other page — and `mount()` also calls
+    `IstProfileCard.mount({ everyWidth: true })`, since a desktop that came in on a parts-bin
+    page had bailed and the `DOMContentLoaded` call never runs. That mount is guarded against
+    a second call while the first is still fetching (`_mounting`).
 - **Type steps up from the root** (`html { font-size: clamp(16px, 9px + 0.55vw, 19px) }`). Every
   size on the page is set in rem, so the whole scale grows together and keeps the phone's
   proportions, while the pixel geometry (the bars, the box heights) stays where it is.
