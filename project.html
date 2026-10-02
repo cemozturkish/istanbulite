@@ -4,6 +4,51 @@
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/favicon.png">
   <meta charset="UTF-8">
+  <!-- ── ON A DESKTOP, THIS PAGE IS SHOWN THROUGH A PHONE-SHAPED WINDOW ──
+       Everything below is a phone: measured off a phone's window and, in
+       the shared stylesheets, written inside `max-width: 768px`. A desktop
+       window is none of that, and what it got was the phone layout pulled
+       apart -- no top bar at all, cards stretched across the screen, the
+       9:16 drawings cropped to a sliver. So a desktop window is sent to
+       masaustu.html, which stands this same page in the middle of the
+       screen inside an iframe the shape of a phone: a real window of that
+       width, so every rule here reads exactly what it reads on the device.
+       See that page for the desk around it.
+
+       Four things about the line below, each of which fails silently if
+       changed. It stands FIRST in the head, ahead of every shared module, so
+       a desktop visitor is never made to wait on a megabyte of scripts for a
+       page this window will not show -- the game pages' own bounce makes the
+       same argument. It is `location.replace`, so the bounce leaves no
+       history entry for Back to land on. It only ever runs at the TOP:
+       inside the desk's window (or admin.html's preview phone) this page is
+       framed already, and the native app is never a desk at all.
+
+       And it asks what the reader is HOLDING -- a mouse or a trackpad, a
+       pointer that hovers -- never how wide the window is. Up here, ahead of
+       the viewport tag, a phone's window is not its own width yet: mobile
+       browsers lay a page out 980px wide until that tag is parsed, so any
+       width test this early reads every iPhone as a desktop. The input
+       device is the same answer before the tag as after it, and it is the
+       question actually being asked: a touch screen is a phone (or a tablet,
+       which keeps the window it always had), and the desk is for the reader
+       with no finger on the glass.
+
+       The query is masaustu.html's own, character for character -- a window
+       the two disagreed about would be sent back and forth between them. The
+       session flag is the second half of that promise: masaustu.html leaves
+       it when it sends a window back here, and this page then renders as it
+       is, once, rather than returning the favour. -->
+  <script>
+    (function () {
+      var back = false;
+      try { back = sessionStorage.getItem('ist_masa_back') === '1'; sessionStorage.removeItem('ist_masa_back'); } catch (e) { /* no storage: the query alone keeps them apart */ }
+      if (back || window.self !== window.top || window.Capacitor || !window.matchMedia) return;
+      if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+        location.replace('masaustu.html' + location.search + location.hash);
+      }
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#2e2e2e">
   <title>Proje — istanbulite.net</title>
@@ -6300,6 +6345,114 @@ function onUp() {
   runTo((at - lo) / (hi - lo) >= TIP ? hi : lo);
 }
 
+// ══════════════════════════════════════════════════════════════
+// A LANE STEP WITHOUT A FINGER
+//
+// The strip is walked with a sideways pull, and a desktop reader has no
+// finger to pull with. A mouse can drag it (the pointer events above take
+// a mouse as readily as a thumb), but nobody thinks to drag a page with a
+// mouse. So the three things a desktop reader WOULD try are answered as
+// the same move: the arrow keys, the trackpad's own two-finger swipe, and
+// -- on masaustu.html -- the hand-drawn arrows either side of the phone.
+// All three come through stepLane, so all three are refused by the same
+// rules, and the arrows on the desk ask canStepLane before they show.
+//
+// It is the swipe's own move, not a shortcut past it: one lane per step,
+// run by runLane exactly as a released pull is, so the reader still
+// crosses the middle on the way from one side to the other.
+//
+// Refused whenever the strip is not what the reader is looking at: the
+// book off its stop or mid-run, a page, a game or a sheet standing over
+// it (each is an .ist-sheet-overlay, .open while it is up), the sunrise /
+// sunset notice, and the onboarding tour -- unless the tour is on a beat
+// that has handed the book back to be pulled (data-onb-pass="book"),
+// which is exactly when a step is the answer it is waiting for.
+// ══════════════════════════════════════════════════════════════
+function laneStepBlocked() {
+  if (!box || !ready || !atLaneStop || drag || anim || traveling) return true;
+  if (document.querySelector('.ist-sheet-overlay.open')) return true;
+  const b = document.body;
+  if (b.classList.contains('ist-edn-locked')) return true;
+  if (b.classList.contains('ist-onb-locked') && b.dataset.onbPass !== 'book') return true;
+  return false;
+}
+function canStepLane(dir) {
+  if (laneStepBlocked()) return false;
+  const to = lane + (dir < 0 ? -1 : 1);
+  return to >= 0 && to < LANES;
+}
+function stepLane(dir) {
+  if (!canStepLane(dir)) return false;
+  runLane(lane + (dir < 0 ? -1 : 1));
+  // A released pull reaches runLane with the cast already inert (the
+  // press did that); a step has had no press, so it says so itself --
+  // laneRun is set by now, and a box must not be pressable mid-walk.
+  armCast();
+  return true;
+}
+
+// ── The keys ──
+// Left is Kütüphane's way and right is Kahvehane's, as they stand on the
+// screen. A held key is one step, not a run: the auto-repeat would walk
+// the reader straight past the middle. Anything typing keeps its keys.
+function onLaneKey(e) {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  if (e.repeat || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+  const t = e.target;
+  if (t && (t.isContentEditable || (t.closest && t.closest('input, textarea, select')))) return;
+  if (stepLane(e.key === 'ArrowLeft' ? -1 : 1)) e.preventDefault();
+}
+
+// ── The trackpad ──
+// A two-finger swipe arrives as a stream of wheel events, and the stream
+// keeps coming after the fingers lift (the momentum). The whole stream is
+// ONE gesture, so it is ONE step: the deltas are summed until they say
+// clearly enough which way and that it is sideways, the step is taken, and
+// nothing more is taken until the stream has gone quiet for
+// LANE_WHEEL_IDLE_MS. A vertical scroll -- a story's own body, a mouse
+// wheel -- never gets as far as stepping, because sideways has to win by
+// a margin. Passive: it never needs to cancel anything, since nothing at
+// the document's level scrolls sideways, and the browser's own
+// swipe-to-go-back is already held off by overscroll-behavior-x
+// (frames.css).
+const LANE_WHEEL_STEP_PX = 48;
+const LANE_WHEEL_IDLE_MS = 220;
+let laneWheelX = 0, laneWheelY = 0, laneWheelSpent = false, laneWheelIdle = null;
+function laneWheel(e) {
+  // A pinch arrives as a wheel with ctrlKey held: the browser's zoom, never
+  // a lane, and none of its deltas belong in the sum below.
+  if (e.ctrlKey) return;
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerWidth : 1;
+  laneWheelX += e.deltaX * unit;
+  laneWheelY += e.deltaY * unit;
+  clearTimeout(laneWheelIdle);
+  laneWheelIdle = setTimeout(() => {
+    laneWheelX = 0; laneWheelY = 0; laneWheelSpent = false;
+  }, LANE_WHEEL_IDLE_MS);
+  if (laneWheelSpent) return;
+  if (Math.abs(laneWheelX) < LANE_WHEEL_STEP_PX) return;
+  if (Math.abs(laneWheelX) < Math.abs(laneWheelY) * 1.5) return;
+  // Spent whether or not the step was taken: a swipe that arrived while a
+  // page was open must not walk the strip the moment the page is shut by
+  // its own momentum still coming in.
+  laneWheelSpent = true;
+  // Fingers moving left scroll right (a positive deltaX, with natural
+  // scrolling or without), which brings in what is to the right -- the
+  // same direction a thumb pulling left walks the strip.
+  stepLane(laneWheelX > 0 ? 1 : -1);
+}
+
+// Body-level and idempotent, like the logo's own wiring: the keys and the
+// wheel are the document's, and a remount must not bind them twice. Both
+// handlers ask laneStepBlocked first, which reads `box` -- so after an
+// unmount they simply answer nothing.
+function wireLaneKeys() {
+  if (document.body.dataset.fbLaneKeys) return;
+  document.body.dataset.fbLaneKeys = '1';
+  document.addEventListener('keydown', onLaneKey);
+  document.addEventListener('wheel', laneWheel, { passive: true });
+}
+
 // ── The page lifecycle router.js drives ──
 // Bound to the box rather than to the document, so the listeners leave
 // with the page when #ist-content is swapped (see CLAUDE.md: "A page
@@ -6346,6 +6499,9 @@ function mount() {
   wireMap();
   wireGameOverlay();
   wireFbPage();
+  // The strip without a finger: the arrow keys and the trackpad's swipe
+  // (see A LANE STEP WITHOUT A FINGER).
+  wireLaneKeys();
   // What a language change has to repaint on this page. Registered
   // against I18N, so the petek's own preference row and the logo's hold
   // relabel the app by exactly the same path.
@@ -6412,11 +6568,31 @@ function openGameOverlay(href) {
   if (!layer || !frame) return;
   frame.src = href;
   IstSheet.open(layer);
+  // ── A desktop reader types the word ──
+  // Sözcel and Çengel both take the physical keyboard, but a key goes to
+  // whichever document has focus, and opening the sheet leaves it on the
+  // book behind it -- so the first letters typed went nowhere until the
+  // reader clicked into the board. Handed to the game once it is in.
+  // Only where there is a pointer that hovers (masaustu.html's own
+  // question): on a phone the keyboard is the one drawn on the board, and
+  // nothing should be focused that the reader did not touch.
+  if (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    const take = () => {
+      if (!IstSheet.isOpen(layer) || frame.src === 'about:blank') return;
+      frame.removeEventListener('load', take);
+      frame.focus();
+    };
+    frame.addEventListener('load', take);
+  }
 }
 function closeGameOverlay(immediate) {
   const layer = document.getElementById('fb-game-overlay');
   const frame = document.getElementById('fb-game-frame');
   if (!layer || layer.hidden) return;
+  // The keyboard comes back to the book with the sheet: left on a frame
+  // that is about to be emptied, Escape and the arrow keys would be
+  // talking to a blank page.
+  if (frame && document.activeElement === frame) frame.blur();
   // Unloads the game rather than leaving it running behind the layer, so
   // the next open is a fresh start rather than wherever it was left --
   // and only once the sheet is off-screen, never mid-slide (which is
@@ -6910,6 +7086,13 @@ window.__fb = {
     lane = Math.max(0, Math.min(LANES - 1, n)); setLanePos(lane, true); armCast();
   },
   pullLane(p) { setLanePos(p); },
+  // ── The desk's way across the strip ──
+  // masaustu.html's arrows and its own keys and wheel, which land outside
+  // this document. Unlike goLane these are the READER's moves, so they go
+  // through the same refusals the keys and the trackpad do here (see A
+  // LANE STEP WITHOUT A FINGER): one lane at a time, nothing open over
+  // the strip, and the tour's say on when a step is allowed.
+  stepLane, canStepLane, laneWheel,
 };
 })();
 </script>
