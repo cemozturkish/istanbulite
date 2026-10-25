@@ -130,6 +130,7 @@
         homeNone:    'Bu hafta henüz etkinlik yok. Olduğunda burada nokta olarak çıkar; basınca açılır.',
         homeAnswer:  'Gidiyor musun? Birine bas. Peteğindekiler cevabını görür.',
         homePetek:   'Burası peteğin. Bir +’ya bas, çıkan kodu yanındakine söyle: senin yanına gelir. Bir etkinliği açınca kimin gittiğini burada görürsün.',
+        homePlan:    'Bir yere gidiyorsan buradan söyle: ne, nerede, ne zaman. Yalnızca peteğinde sana bağlı olanlar haritasında görür.',
         homeGames:   'Bugünün oyunları en altta. Hepsi her gece yarısı yenilenir.',
         eventOpen:   'Bunlar dışarıda olan şeyler. Birine bas.',
         eventThrow:  'Aynı hareket, ama burada yönün bir cevap: sağa fırlatırsan gidiyorsun, sola fırlatırsan gitmiyorsun.',
@@ -155,6 +156,7 @@
         homeNone:    'No evenings this week yet. When there are, they appear here as dots, and pressing one opens it.',
         homeAnswer:  'Are you going? Press one. The people on your petek see your answer.',
         homePetek:   'This is your petek. Press a + and read the code out to the person beside you: they land next to you. When you open an evening, this is where you see who is going.',
+        homePlan:    'Going somewhere? Say so here: what, where, when. Only the people attached to you on your petek see it on their map.',
         homeGames:   'Today’s games are at the bottom. Everything renews every midnight.',
         eventOpen:   'These are things happening outside. Press one.',
         eventThrow:  'The same throw, but here the direction is your answer: throw it right if you are going, left if you are not.',
@@ -923,6 +925,8 @@
           until: (f) => f.homeAnswers > 0, escape: () => {} },
         { show: ['petek'], target: '#fb-petek', speech: lines.homePetek, top: true,
           pre: (f) => f.closeHomeCard && f.closeHomeCard() },
+        { show: ['plan'], target: '#fb-planbtn', speech: lines.homePlan, top: true,
+          skip: (f) => !f.homePlansOpen },
         { show: ['games'], target: '#fb-home-games', speech: lines.homeGames, top: true },
       ] : [
       // ── 2 and 3. The two sides ──
@@ -960,6 +964,11 @@
 
     function runBeat() {
       const b = beats[idx];
+      // A beat about something that may not be on this screen today (the
+      // plan button stands only once the database has plans) is decided
+      // when it comes round, not when the list was built: the fetch that
+      // says so lands after the tour has started.
+      if (b && b.skip && fb() && b.skip(fb())) { advance(); return; }
       stopLaneWatch();
       // The last beat's hint is still on the page, and still live: addHint
       // sets tapAdvanceFn, so a pull or act beat that adds no hint of its own

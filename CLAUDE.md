@@ -33,8 +33,10 @@ in mind.
 | **The petek's day glyph** | `HIVE_DAY_GLYPH = false` in `profile-card.js` | A neighbour's caption is their district, not the two-screen glyph, and nothing asks `hive_member_status`. |
 | **Friends' districts lit** | `FRIEND_DISTRICTS_LIT = true` in `project.html` | ON, and the one to switch off if it looks wrong on a phone: it is the resting fill CLAUDE.md records as "tried and abandoned" for misregistration, brought back behind its own switch. |
 
-Still to come: members' own plans ("I'll be here, this day, this time"), shown only to their
-petek — a database change (`events.created_by` + `audience`) plus a form.
+**Members' own plans** ("I'll be here, this day, this time") are built and gated on the database,
+not on a flag: until `db/events_v2_plans.sql` has been run, the plan fetch answers an error, the
+"+ BİR YERE GİDİYORUM" button stays hidden and the home screen is exactly what it was without them.
+See "Plans" under "The home screen".
 
 ---
 
@@ -328,7 +330,10 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > on `events` and `neighborhood_polls`, so an evening and a poll reach the reader only by being
 > curated into an edition, exactly as `breaking_news_v3_edition` already did it for the news; plus
 > `events`' own English half, and `library_letters.audience` + `library_letter_neighborhoods`,
-> which is the first time a letter has been addressed to anyone in particular), and more). When in
+> which is the first time a letter has been addressed to anyone in particular), `events_v2_plans`
+> (members' own plans — `events.audience` / `created_by` and `event_readable()`, which lets a
+> `'petek'` row be read only by its creator and the members attached to them; see "Plans" under
+> the home screen), and more). When in
 > doubt, read the relevant `db/` file
 > — it is the source of truth.
 
@@ -2239,6 +2244,67 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
   re-reads them when that side's day turns (midnight, see "Launch state"), and a language flip
   re-reads both.
 
+#### Plans — a member saying where they will be (`db/events_v2_plans.sql`)
+
+A plan is "I'll be at this place, this day, this time", put up by a member and shown **only to the
+members attached to them on the petek**. It is the events app at its smallest: one person going
+out, and the people who know them finding out.
+
+- **It is a row in `events`, not a table of its own**, so the card, the RSVP and the petek's
+  guest-list colours work on it unchanged. `audience` says which kind a row is: `'city'` (the
+  default — every row before the migration, the admin's evenings, curated through a baskı) or
+  `'petek'` (a member's plan, never in a baskı: the check constraint keeps its `edition_date` null,
+  so `events_current_edition()` never sees one). `created_by` is the member.
+- **Who reads a plan is one function, `public.event_readable(audience, created_by)`**, used by
+  the events SELECT policy: the creator, and anybody with a row in `hive_bonds` with them.
+  **Attached, not adjacent** — two members can stand next to each other on the grid without a bond
+  (a third member's attachment put them there), and saying where you will be is personal: the fence
+  is the people you actually handed a code to. The **admin reads none through the client** (no
+  `is_admin()` clause) — a plan is as close to private speech as the site has (see "No DMs —
+  ever"). `event_rsvps` and `event_interest` are readable and writable only where the event is, and
+  `hive_event_rsvp_status` / `hive_event_interest_status` are redefined to answer only for events
+  the caller can read.
+- **A plan's kefil is its creator, said by `created_by` — `kefil_id` stays null.** `kefil_id` is
+  the admin-assigned voucher for a city evening and is counted on a profile as "Etkinlik Kefili";
+  a member's own plans must not inflate that. The client reads `created_by` wherever it needs the
+  name, and hands it to `paintHiveEventStates` as the kefil.
+- **What a member may write is fenced in the INSERT policy**, and the form asks exactly that: a
+  petek row, theirs, no kefil, no edition, a district, a 1–80 character title (place ≤ 80), dated
+  from today's İstanbul midnight to seven days on (the days the map shows), and at most
+  **five standing at once** (`PLAN_MAX`). They may **delete** their own plan (GERİ AL, which asks
+  once) and nothing else: there is no member UPDATE policy, and the only thing anybody else can do
+  with a plan is say whether they are going. No edits, no comments, still no DMs. RSVPs and verdicts
+  cascade with the row.
+- **It leaves at the midnight after its day** only because the home screen never asks for anything
+  older than today — nothing deletes it.
+- **On the map a plan is a red HEXAGON** (`.fb-pldot`) where a city evening is a circle: the
+  petek's own shape, because that is where it came from. Filled for today, outlined for later, a
+  number for several; off the drawing it is an edge tag with a small hexagon. A district carrying
+  both kinds stands them side by side. Markers are keyed by kind AND district (`data-k` /
+  `data-d`, `homeOpen.kind`), and `openHomeCard(kind, d, id)` can open on a given plan.
+- **The card** prints the creator as "KEFİL: BEŞİKTAŞ'TAN AYŞE · PETEĞİNDEN" for a friend's plan
+  (`eventKefilHTML(k, 'plan.kefil')`), and "SENİN PLANIN · PETEĞİN GÖRÜYOR" with a single GERİ AL
+  on the reader's own — the creator does not RSVP to their own plan; their hexagon is painted as
+  its kefil.
+- **+ BİR YERE GİDİYORUM** (`#fb-planbtn`) stands under the petek, above the games (in the games'
+  column on a desktop), and only once `homeData.plansOpen`: `.fb-plans-on` on the book takes the
+  same room off the petek's window in the same frame. It opens **THE sheet** (`#fb-plan-overlay`,
+  under the bars): what (`title`), where (district select of all 39, fetched from `neighborhoods`
+  — `nbName()` uses the same names everywhere on this screen — plus an optional place,
+  `location`), when (the seven days the map shows as chips, then a time), and how many people will
+  see it (`homeAttached`, the `bonded` cells of the reader's own map — exactly who
+  `event_readable()` lets in). What is half-typed survives a close (`planDraft`). On success the
+  sheet goes, the markers are re-read (`refreshHomeDots`) and the new plan's card opens on the map.
+  A refusal is worded off the error CODE (`planErrorText`).
+- **The document is `lang="tr"`, so the card, the button and the form carry their own `lang`**
+  — CSS uppercases by the element's language, and an English "Take it back" would otherwise print
+  "TAKE İT BACK". (The city card's buttons had the same bug and are fixed by the same line.)
+- **Plans are kept out of every city list by name** (`audience !== 'petek'`): the home screen's
+  `homeCityEvents`, the parked `loadEtkinlikActor`, and admin.html's event list and baskı board
+  (whose loader selects `*` rather than a column list, so naming `audience` cannot fail on a
+  database without the migration). An admin who is also a member sees their own petek's plans on
+  the home screen like anybody else, and never on the desk.
+
 ### `project.html` — the flip book, which is the app
 
 **It started as a rig and it is the app now.** `index.html` sends a signed-in member straight
@@ -3709,10 +3775,13 @@ profile sheet), and `mascot` is derived from that.
 
 **On the one-screen home (`__fb.homeScreen`) there are no lanes to pull to**, so after the top bar
 the tour walks the screen instead, each part arriving on the beat that names it
-(`show: ['dots' | 'petek' | 'games']`): the dots → press one (a `wait` beat, `runWait`, waiting on
-`__fb.homeCardOpen`, stall escape `openFirstHomeEvent`) → answer it (waits on `__fb.homeAnswers`)
-→ the petek and how its seats work (the card is closed first) → the games and the midnight
-renewal. A week with no evenings says `homeNone` and skips the answer beat. The `home` passthrough
+(`show: ['dots' | 'petek' | 'plan' | 'games']`): the dots → press one (a `wait` beat, `runWait`,
+waiting on `__fb.homeCardOpen`, stall escape `openFirstHomeEvent`) → answer it (waits on
+`__fb.homeAnswers`) → the petek and how its seats work (the card is closed first) → the plan
+button (`homePlan`) → the games and the midnight renewal. The plan beat carries
+`skip: (f) => !f.homePlansOpen`, decided when the beat comes round rather than when the list is
+built (`runBeat` checks `b.skip`), because whether plans are open is a fetch that lands after the
+tour has started; a database without the migration simply never hears it. A week with no evenings says `homeNone` and skips the answer beat. The `home` passthrough
 scope hands back the layer's own parts, never the layer itself.
 
 **Things are introduced one at a time, and what has not been introduced is not there.** While the

@@ -205,7 +205,15 @@ with checks(sira, dosya, aranan, var) as (
          to_regprocedure('public.admin_set_game_lineup(date,text[])') is not null
          and to_regprocedure('public.admin_pick_sozcel_suggestion(uuid,date,text,text,text[])') is not null),
     (48, 'db/events_kefil.sql',                       'events.kefil_id (etkinlik kefili)',
-         pg_temp.has_col('events', 'kefil_id'))
+         pg_temp.has_col('events', 'kefil_id')),
+    (49, 'db/hive_event_interest.sql + hive_event_rsvp.sql', 'peteğin etkinlik misafir listesi',
+         to_regclass('public.event_interest') is not null
+         and pg_temp.has_fn('hive_event_interest_status')
+         and pg_temp.has_fn('hive_event_rsvp_status')),
+    (50, 'db/events_v2_plans.sql',                    'üyelerin planları (events.audience / created_by)',
+         pg_temp.has_col('events', 'audience')
+         and pg_temp.has_col('events', 'created_by')
+         and pg_temp.has_fn('event_readable'))
 )
 select
   case when var then '✓ VAR' else '✗ EKSİK' end as durum,
