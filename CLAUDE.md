@@ -2275,6 +2275,13 @@ out, and the people who know them finding out.
   once) and nothing else: there is no member UPDATE policy, and the only thing anybody else can do
   with a plan is say whether they are going. No edits, no comments, still no DMs. RSVPs and verdicts
   cascade with the row.
+- **The admin's three write policies stop at `audience = 'city'`**, restated by the same
+  migration. Policies are permissive and OR together, so the creator-only rule holds only if
+  nothing else grants a write on a plan — and the admin is a member too: attached to a plan's
+  creator they can read it, and the old email-only UPDATE/DELETE policies then let them rewrite it
+  or flip it to `'city'`, publishing a few people's evening to everybody. The admin's own plans go
+  through the member policies like anybody's; moderating somebody else's is for the Supabase
+  dashboard, not the app.
 - **It leaves at the midnight after its day** only because the home screen never asks for anything
   older than today — nothing deletes it.
 - **On the map a plan is a red HEXAGON** (`.fb-pldot`) where a city evening is a circle: the
@@ -2293,7 +2300,13 @@ out, and the people who know them finding out.
   — `nbName()` uses the same names everywhere on this screen — plus an optional place,
   `location`), when (the seven days the map shows as chips, then a time), and how many people will
   see it (`homeAttached`, the `bonded` cells of the reader's own map — exactly who
-  `event_readable()` lets in). What is half-typed survives a close (`planDraft`). On success the
+  `event_readable()` lets in).
+- **A bond made on the petek re-reads the plans** (`homeBondKey` in `homeFriendsFromMap`): who
+  may see whose plans IS the attachments, so a code claimed in front of the reader has to bring
+  the new neighbour's plans in at once. Compared against the last map seen, so a remount that
+  announces the same map costs nothing; `hiveMapCells().loaded` (and `loaded: true` on every
+  `ist-hive-map` event) is what tells "no map yet" from "attached to nobody", which the cells alone
+  cannot. What is half-typed survives a close (`planDraft`). On success the
   sheet goes, the markers are re-read (`refreshHomeDots`) and the new plan's card opens on the map.
   A refusal is worded off the error CODE (`planErrorText`).
 - **The document is `lang="tr"`, so the card, the button and the form carry their own `lang`**

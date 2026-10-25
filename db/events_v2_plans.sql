@@ -148,6 +148,37 @@ create policy "events delete own plan"
   to authenticated
   using (audience = 'petek' and created_by = auth.uid());
 
+-- ── And the admin's own write policies stop at the city ──────────────
+-- Policies are permissive: they OR together, so the creator-only rule
+-- above holds only if nothing else grants a write on a plan. The admin's
+-- three from db/events.sql checked the email and nothing else, and the
+-- admin is a member too -- attached to a plan's creator, they can READ
+-- that plan (event_readable), and an UPDATE or DELETE reaches every row
+-- the reader can see. So unfenced, the admin could rewrite another
+-- member's plan, or flip its audience to 'city' and publish a few
+-- people's evening to the whole site. Restated here with the same email
+-- check, limited to city rows on both sides of the write. The admin's
+-- OWN plans go through the member policies above like anybody's.
+-- Moderating a member's plan is for the Supabase dashboard, not the app.
+drop policy if exists "events insert admin" on public.events;
+create policy "events insert admin"
+  on public.events for insert
+  to authenticated
+  with check ((auth.jwt() ->> 'email') = 'cemwozturk@gmail.com' and audience = 'city');
+
+drop policy if exists "events update admin" on public.events;
+create policy "events update admin"
+  on public.events for update
+  to authenticated
+  using      ((auth.jwt() ->> 'email') = 'cemwozturk@gmail.com' and audience = 'city')
+  with check ((auth.jwt() ->> 'email') = 'cemwozturk@gmail.com' and audience = 'city');
+
+drop policy if exists "events delete admin" on public.events;
+create policy "events delete admin"
+  on public.events for delete
+  to authenticated
+  using ((auth.jwt() ->> 'email') = 'cemwozturk@gmail.com' and audience = 'city');
+
 
 -- ── Answering: only what you can see ─────────────────────────────────
 -- An RSVP or a verdict on an event is now readable and writable only

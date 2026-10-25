@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="profile-card.css?v=51">
   <link rel="stylesheet" href="profile-bar.css?v=2">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=60" defer></script>
+  <script src="profile-card.js?v=61" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -3776,6 +3776,7 @@ let homeFriendFills = {};       // neighborhood -> fill, from the petek's map
 let homeEventDistrict = null;   // the open evening's district, painted red
 let homeMeNb = null;            // the reader's own district, off the petek's map
 let homeAttached = 0;           // how many members are attached to the reader
+let homeBondKey = null;         // who they are, as last seen -- see homeFriendsFromMap
 
 // ── A MEMBER'S PLAN (db/events_v2_plans.sql) ──
 // "I'll be here, this day, this time": a row in `events` with audience
@@ -3999,7 +4000,20 @@ function homeFriendsFromMap(detail) {
   // exactly who event_readable() lets read it -- not everybody standing
   // next to them on the grid.
   if (detail && detail.meNb) homeMeNb = detail.meNb;
-  homeAttached = cells.filter(c => c && c.bonded).length;
+  const bonded = cells.filter(c => c && c.bonded);
+  homeAttached = bonded.length;
+  // And WHOSE plans the reader may see is those same attachments, so a
+  // bond made since the plans were read (a code claimed on the petek in
+  // front of them) has to bring the new neighbour's plans in now, not on
+  // the next reload. Compared against the last map seen rather than on
+  // every announcement: a remount of the petek announces the same map
+  // again. A handle with no map yet (loaded false) says nothing either way.
+  if (!detail || detail.loaded !== false) {
+    const key = bonded.map(c => String(c.member_id)).sort().join(',');
+    const was = homeBondKey;
+    homeBondKey = key;
+    if (was !== null && key !== was) refreshHomeDots();
+  }
   paintHomeDistricts();
 }
 
@@ -8299,7 +8313,7 @@ function unmount() {
   // mount painting into a node that is no longer on the page. The parsed
   // SVG itself is kept: it is the same file either way.
   districtLayer = null;
-  homeOpen = null; homeEventDistrict = null;
+  homeOpen = null; homeEventDistrict = null; homeBondKey = null;
   if (window.IstProfileCard && IstProfileCard.clearHiveEventStates) IstProfileCard.clearHiveEventStates();
   // The plan form is body-level THE sheet: nothing left to slide in front
   // of, so it goes at once -- keeping what was typed, as a close does.

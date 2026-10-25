@@ -2795,7 +2795,7 @@
     // them), so where the reader lives comes from their own profile.
     const meNb = state && state.profile ? state.profile.neighborhood || null : null;
     try {
-      document.dispatchEvent(new CustomEvent('ist-hive-map', { detail: { cells, me, meNb } }));
+      document.dispatchEvent(new CustomEvent('ist-hive-map', { detail: { cells, me, meNb, loaded: true } }));
     } catch (e) {}
   }
   function hiveMapCells() {
@@ -2804,6 +2804,10 @@
       cells: (_hiveMap && _hiveMap.cells) || [],
       me: st && st.user ? st.user.id : null,
       meNb: st && st.profile ? st.profile.neighborhood || null : null,
+      // Whether a map has landed at all: no cells can mean "not fetched
+      // yet" or "attached to nobody", and a reader of this cannot tell
+      // which from the cells alone.
+      loaded: !!_hiveMap,
     };
   }
 
