@@ -86,10 +86,10 @@
     // One plain voice, TR/EN. The order is the reader's first walk through
     // the app, each step taught by being done once:
     //   the top bar  -- press your own name, style your avatar, close it;
-    //   the sky      -- the sun and the moon crossing under the bar, and
-    //                   what each edge of the day renews;
-    //   Kütüphane    -- renewed at sunrise; pull there, open a story, throw it;
-    //   Kahvehane    -- renewed at sunset; pull there, open an evening, throw it.
+    //   Kütüphane    -- pull there, open a story, throw it (only while the
+    //                   news is on: project.html's NEWS_ENABLED);
+    //   Kahvehane    -- pull there, open an evening, throw it.
+    // The sky beat (the sun/moon chain under the bar) went with the chain.
     // (The language hold comes before all of this, on the welcome screen --
     // see stepLanguageHold.)
     //
@@ -114,13 +114,14 @@
         pickShirt:   'Tişörtünü seç. Beğenince devam et.',
         senDone:     'Geri kalanı — şapkalar, rozetler — dışarıda kazanılır. Satın alınamaz.',
         closeSheet:  'Tamam. Şimdi kapat.',
-        sky:         'Adının altındaki zincir İstanbul’un gökyüzü: güneş soldan doğar, sağdan batar; gece ay geçer. Uygulama da onunla döner.',
         sunrise:     'Güneş doğunca Kütüphane yenilenir — günün haberleri, günün sorusu. Kütüphane solda: oraya geçelim.',
         newsOpen:    'Bunlar bugünün haberleri. Birine bas.',
         newsThrow:   'Okuyunca işin bitti: sağa ya da sola fırlat, gitsin. Bir habere hep böyle veda edersin.',
         newsNone:    'Bugün henüz haber yok. Olduğunda, birine basıp okursun; bitince sağa ya da sola fırlatırsın.',
         toKahvehane: 'Şimdi Kahvehane. En sağda — haritadan geçip devam et.',
         sunset:      'Güneş batınca da Kahvehane yenilenir — bu akşamın etkinlikleri, bu gecenin oyunları.',
+        toKahvehaneMid: 'Şimdi Kahvehane: etkinlikler ve oyunlar. Sağda — oraya geçelim.',
+        midnight:    'Burası her gece yarısı yenilenir: bugünün etkinlikleri, bugünün oyunları.',
         eventOpen:   'Bunlar dışarıda olan şeyler. Birine bas.',
         eventThrow:  'Aynı hareket, ama burada yönün bir cevap: sağa fırlatırsan gidiyorsun, sola fırlatırsan gitmiyorsun.',
         eventNone:   'Bugün henüz etkinlik yok. Olduğunda, birine basıp açarsın: sağa fırlatmak “gidiyorum”, sola fırlatmak “gitmiyorum” demek.',
@@ -132,13 +133,14 @@
         pickShirt:   'Pick your shirt. Continue once you like it.',
         senDone:     'The rest of it — hats, badges — is earned outside. It cannot be bought.',
         closeSheet:  'Good. Now close it.',
-        sky:         'The chain under your name is the sky over İstanbul: the sun rises on the left and sets on the right, and at night the moon crosses. The app turns with it.',
         sunrise:     'When the sun rises, Kütüphane renews — the day’s news, the day’s question. Kütüphane is on the left: let’s go there.',
         newsOpen:    'These are today’s stories. Press one.',
         newsThrow:   'Once you have read it, you are done with it: throw it left or right and it is gone. That is how you let go of every story.',
         newsNone:    'No stories yet today. When there are, you press one to read it and throw it left or right when you are done.',
         toKahvehane: 'Now Kahvehane. It is all the way right — past the map, and keep going.',
         sunset:      'And when the sun sets, Kahvehane renews — tonight’s evenings and tonight’s games.',
+        toKahvehaneMid: 'Now Kahvehane: the evenings and the games. It is on the right — let’s go there.',
+        midnight:    'This side renews every midnight: today’s evenings, today’s games.',
         eventOpen:   'These are things happening outside. Press one.',
         eventThrow:  'The same throw, but here the direction is your answer: throw it right if you are going, left if you are not.',
         eventNone:   'No evenings yet today. When there are, you press one to open it: throwing it right says you are going, left says you are not.',
@@ -860,6 +862,9 @@
 
     enterSpotlightMode();
     const lines = laneCopy(lang);
+    // Whether Kütüphane's news is cast at all (project.html's NEWS_ENABLED).
+    // Missing from an older project.html means it was always on.
+    const newsOn = fb().newsEnabled !== false;
 
     // `lane` is the lane the beat belongs to and is asserted before it runs,
     // so a reader who wandered is put back rather than talked at about a
@@ -884,27 +889,30 @@
         speech: lines.pickShirt, pick: true },
       { inSheet: true, target: '.ist-pc-cover-pick-col', all: true, speech: lines.senDone },
       { target: '#profile-overlay .ist-sheet-close', speech: lines.closeSheet, sheet: 'close' },
-      // ── 2. The sky under the bar ──
-      // The sun/moon chain is the app's clock: each edge of the day renews
-      // one side (see "SUNRISE RENEWS KÜTÜPHANE" in project.html). It is
-      // not on the bar until this beat: the bar is the reader's name and
-      // nothing else until then.
-      { lane: LANE_MAP, show: ['sky'], target: '#ist-sky', speech: lines.sky },
-      // ── 3. Kütüphane, renewed at sunrise ──
+      // ── 2 and 3. The two sides ──
       // A word comes onto the bottom bar on the beat that first names it
-      // as a place -- Kütüphane here, Kahvehane on the way there. The map
-      // and the column arrive with the reader, on the lane itself.
-      { lane: LANE_MAP, show: ['nav-l'], target: '#fb-nav > b:first-child',
-        speech: lines.sunrise, pull: LANE_KUTUPHANE },
-      { lane: LANE_KUTUPHANE, show: ['map', 'news'], open: '.fb-haberler',
-        speech: lines.newsOpen, none: lines.newsNone },
-      { lane: LANE_KUTUPHANE, throw: true, speech: lines.newsThrow },
-      // ── 4. Kahvehane, renewed at sunset ──
-      // Two pulls, not one: the strip moves at most one lane per gesture,
-      // so the way from the reading to the doing is through the middle.
-      { lane: LANE_KUTUPHANE, show: ['nav-r'], target: '#fb-nav > b:last-child',
-        speech: lines.toKahvehane, pull: LANE_KAHVEHANE },
-      { lane: LANE_KAHVEHANE, target: '#fb-nav > b:last-child', speech: lines.sunset },
+      // as a place. The map and the column arrive with the reader, on the
+      // lane itself.
+      ...(newsOn ? [
+        // Kütüphane first, then two pulls to Kahvehane: the strip moves at
+        // most one lane per gesture, so the way across is through the
+        // middle. (These lines still speak of the sun -- they belong to the
+        // split IstDate.CONTENT_FOLLOWS_SUN parks, and come back with it.)
+        { lane: LANE_MAP, show: ['nav-l'], target: '#fb-nav > b:first-child',
+          speech: lines.sunrise, pull: LANE_KUTUPHANE },
+        { lane: LANE_KUTUPHANE, show: ['map', 'news'], open: '.fb-haberler',
+          speech: lines.newsOpen, none: lines.newsNone },
+        { lane: LANE_KUTUPHANE, throw: true, speech: lines.newsThrow },
+        { lane: LANE_KUTUPHANE, show: ['nav-r'], target: '#fb-nav > b:last-child',
+          speech: lines.toKahvehane, pull: LANE_KAHVEHANE },
+        { lane: LANE_KAHVEHANE, target: '#fb-nav > b:last-child', speech: lines.sunset },
+      ] : [
+        // The news is parked, so Kütüphane is not a place the reader can
+        // go: one pull from the middle, and the day it renews on.
+        { lane: LANE_MAP, show: ['nav-r'], target: '#fb-nav > b:last-child',
+          speech: lines.toKahvehaneMid, pull: LANE_KAHVEHANE },
+        { lane: LANE_KAHVEHANE, show: ['map'], target: '#fb-nav > b:last-child', speech: lines.midnight },
+      ]),
       { lane: LANE_KAHVEHANE, show: ['events'], open: '.fb-events',
         speech: lines.eventOpen, none: lines.eventNone },
       { lane: LANE_KAHVEHANE, throw: true, speech: lines.eventThrow },

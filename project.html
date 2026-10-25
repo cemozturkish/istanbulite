@@ -9,25 +9,25 @@
   <title>Proje — istanbulite.net</title>
   <script src="safe-area-ready.js?v=2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="ist-date.js?v=8"></script>
+  <script src="ist-date.js?v=9"></script>
   <script src="router.js?v=15"></script>
-  <script src="i18n.js?v=26"></script>
+  <script src="i18n.js?v=27"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <link rel="stylesheet" href="palette.css?v=12">
   <link rel="stylesheet" href="profile-card.css?v=50">
-  <link rel="stylesheet" href="profile-bar.css?v=1">
+  <link rel="stylesheet" href="profile-bar.css?v=2">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=58" defer></script>
+  <script src="profile-card.js?v=59" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
   <link rel="stylesheet" href="sheet.css?v=9">
-  <link rel="stylesheet" href="frames.css?v=20">
+  <link rel="stylesheet" href="frames.css?v=21">
   <script src="loading-screen.js?v=5"></script>
   <link rel="stylesheet" href="loading-screen.css?v=3">
-  <link rel="stylesheet" href="onboarding.css?v=13">
-  <script src="onboarding.js?v=13" defer></script>
+  <link rel="stylesheet" href="onboarding.css?v=14">
+  <script src="onboarding.js?v=14" defer></script>
   <link rel="stylesheet" href="edition-notice.css?v=2">
   <script src="edition-notice.js?v=4" defer></script>
 
@@ -947,6 +947,10 @@
          highest. */
       --fb-mark-foot: 9px;
     }
+    /* The KÜTÜPHANE word, while the news is parked (NEWS_ENABLED).
+       visibility rather than display: the two words are the flex halves
+       that keep the logo in the middle of the bar. */
+    #fb-nav.fb-news-parked > b:first-child { visibility: hidden; }
     header {
       position: fixed;
       bottom: 0; left: 0; right: 0;
@@ -2455,6 +2459,21 @@ const LANE_MAP = 1;         // the middle: the petek's own screen (see goHome)
 const LANE_KAHVEHANE = 2;   // right on the screen: the doing side
 const LANES = 3;
 
+// ── THE NEWS IS PARKED ──
+// For the launch the app is the petek, the games and the evenings. The
+// news (Haberler) and the Anket beside it are parked the way the ilçe and
+// Türkiye stops are: one flag, everything it gates still written. Off, the
+// two Kütüphane columns are left out of CAST entirely (absent, not idle --
+// see ILCE_STOP_ENABLED), the strip stops at the middle lane so there is
+// no empty screen to the left of it, the bar's KÜTÜPHANE word is hidden
+// with the place it named, and the day meter stops counting stories and
+// polls nobody can reach. The admin desk still writes them; admin.html's
+// PRESS_PARKED keeps its press bar from reporting them missing.
+const NEWS_ENABLED = false;
+// The leftmost lane a reader may stand on, which is what every clamp and
+// every "is there anywhere to pull to" below reads instead of 0.
+const LANE_MIN = NEWS_ENABLED ? LANE_KUTUPHANE : LANE_MAP;
+
 // ══════════════════════════════════════════════════════════════
 // THE DESKTOP: ALL THREE AT ONCE
 //
@@ -3300,7 +3319,8 @@ async function refreshDayMeter() {
   const uid = await doneUid();
   let done = 0, total = 0;
 
-  try {
+  // Parked columns are not steps anybody has left to take (NEWS_ENABLED).
+  if (NEWS_ENABLED) try {
     const { byBucket, failed } = await haberlerData();
     if (!failed) {
       const store = newsDealtStore(uid);
@@ -3326,7 +3346,7 @@ async function refreshDayMeter() {
     }
   } catch (err) { console.error('[proje gün]', err); }
 
-  try {
+  if (NEWS_ENABLED) try {
     const { polls, voted, failed } = await anketData();
     if (!failed) {
       for (const p of polls) { total++; if (voted.has(p.id)) done++; }
@@ -5582,10 +5602,10 @@ const CAST = [
   // ── Kütüphane's pair: the reading side (Olaylar stands at the
   // Türkiye stop's right column, parked for now -- see
   // OLAYLAR_COLUMN_ENABLED above; Anket is its own pair further down) ──
-  ...stackActors({
+  ...(NEWS_ENABLED ? stackActors({
     idBase: 'haber', live: ISTANBUL_SLIDE, lane: LANE_KUTUPHANE, col: 'l', cls: 'fb-haberler',
     poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadKutuphaneWide, onpress: onpressBox,
-  }),
+  }) : []),
 
   // ── Türkiye (slide 1): Olaylar in the right column, the admin-pinned
   // series in the left. Both stand on a stop no gesture reaches while
@@ -5612,11 +5632,11 @@ const CAST = [
   // own height override (--fb-anket-box-h) grows each box so the column
   // still fills exactly the band three boxes used to, the same move
   // Kahvehane's Oyunlar column already makes.
-  ...stackActors({
+  ...(NEWS_ENABLED ? stackActors({
     idBase: 'anket', live: ISTANBUL_SLIDE, lane: LANE_KUTUPHANE, col: 'r', cls: 'fb-anket',
     poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadKutuphaneNarrow, onpress: onpressBox,
     count: 2,
-  }),
+  }) : []),
   // Kahve and Yorumlar stand on the ilçe stop, which is parked (see
   // ILCE_STOP_ENABLED). They are left out entirely rather than merely
   // going unreached, because expandPoses fills a table FRAMES long: with
@@ -6068,6 +6088,10 @@ async function runOnboarding() {
 }
 
 function showEditionNotice() {
+  // Parked with the sun (IstDate.CONTENT_FOLLOWS_SUN): the notice's whole
+  // sentence is which side a sunrise or a sunset just renewed, and with
+  // one content day turning at midnight neither of them renews anything.
+  if (!(window.IstDate && IstDate.CONTENT_FOLLOWS_SUN)) return;
   if (window.IstEditionNotice) IstEditionNotice.show();
 }
 
@@ -6350,7 +6374,7 @@ function paintNav() {
 
 
 function setLanePos(p, snap) {
-  lanePos = Math.max(0, Math.min(LANES - 1, p));
+  lanePos = Math.max(LANE_MIN, Math.min(LANES - 1, p));
   // A programmatic placement (a fresh mount, the app map's own walk)
   // puts the wave where the lane is rather than sending it across: a
   // page that opens on Hane must not deal itself an entrance.
@@ -6370,8 +6394,9 @@ function lanePullable(dx) {
   // A desktop has no strip to walk: all three lanes are already standing
   // side by side (THE DESKTOP), so a sideways drag is nobody's.
   if (wide || !atLaneStop) return false;
-  // Right walks the strip right, so the reader moves toward lane 0.
-  return dx > 0 ? lane > 0 : lane < LANES - 1;
+  // Right walks the strip right, so the reader moves toward lane 0 --
+  // or toward LANE_MIN, while the news is parked.
+  return dx > 0 ? lane > LANE_MIN : lane < LANES - 1;
 }
 
 // ── What the lane lets the book reach ──
@@ -6393,7 +6418,7 @@ function laneStops() {
 // this is a wash and a fade, which have no pages in them.
 function runLane(to, done) {
   if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
-  lane = Math.max(0, Math.min(LANES - 1, to));
+  lane = Math.max(LANE_MIN, Math.min(LANES - 1, to));
   const from = lanePos;
   const dist = Math.abs(lane - from);
   if (dist < 0.001) { setLanePos(lane); armCast(); landLane(); if (done) done(); return; }
@@ -6724,6 +6749,11 @@ function mount() {
   // lane forbids.
   lane = START_LANE; lanePos = START_LANE; navP = START_LANE;
   petekShown = 1; petekAway = false;   // the mount below draws it; see paintLanes
+  // The bar's KÜTÜPHANE word names a place the strip no longer reaches
+  // while the news is parked (NEWS_ENABLED), so it goes with it. The bar
+  // lives outside #ist-content, hence a class rather than markup.
+  const navEl = document.getElementById('fb-nav');
+  if (navEl) navEl.classList.toggle('fb-news-parked', !NEWS_ENABLED);
   atLaneStop = false;
   // A desktop or a phone, read before anything is cast or fetched: it
   // decides which drawing the İstanbul stop is (SRC) and whether a lane
@@ -7367,8 +7397,11 @@ window.__fb = {
     if (wide) return;
     if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
     if (snap === false) { runLane(n); return; }
-    lane = Math.max(0, Math.min(LANES - 1, n)); setLanePos(lane, true); armCast();
+    lane = Math.max(LANE_MIN, Math.min(LANES - 1, n)); setLanePos(lane, true); armCast();
   },
+  // Whether Kütüphane's news is cast (NEWS_ENABLED); the onboarding tour
+  // skips its Kütüphane beats when it is not.
+  newsEnabled: NEWS_ENABLED,
   pullLane(p) { if (!wide) setLanePos(p); },
   // Whether the page is laid out as a desktop -- all three lanes at
   // once, with no strip to walk (see THE DESKTOP). The onboarding tour
