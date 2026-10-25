@@ -1836,12 +1836,28 @@
   // ideas) written on the drawing itself: a name says somebody is beside
   // you, this says they are in the middle of the same day you are, which
   // is the thing actually worth walking up to them about.
+  // ── THE DAY GLYPH IS PARKED ──
+  // For the launch a neighbour's caption is where they live, not where
+  // they stand in their day: the home screen draws the petek as the guest
+  // list of whatever evening is open, and a second set of marks under
+  // every name (the glyph below, with its news half) would be two
+  // languages on one drawing. Off, the caption is the district, nothing
+  // asks hive_member_status, and the glyph is still written for when it
+  // comes back.
+  const HIVE_DAY_GLYPH = false;
+
   function hiveNameHTML(member, side, status, t) {
     if (!side) return '';
+    const sub = HIVE_DAY_GLYPH
+      ? hiveStatHTML(status, t)
+      : `<span class="ist-hive-name-sub">${esc(hiveMemberDistrict(member))}</span>`;
+    // .ist-hive-name-ev stays empty until an evening is open; then it
+    // carries where this member stands on it (see applyHiveEventStates)
+    // and the district steps aside for it.
     return `
       <span class="ist-hive-name ist-hive-name-${side}">
         <span class="ist-hive-name-label">${esc(hiveMemberName(member))}</span>
-        ${hiveStatHTML(status, t)}
+        ${sub}<span class="ist-hive-name-ev"></span>
       </span>`;
   }
 
@@ -2761,6 +2777,34 @@
     applyHiveLevel(state);
     fitHive(state);
     wireHiveEvents(state);
+    // A render rebuilds every cell, so an evening's guest list painted on
+    // the old ones has to be put back on the new ones.
+    applyHiveEventStates();
+  }
+
+  // ── The map has landed ──
+  // The page under the petek may want to know where everybody on it
+  // lives (project.html lights its friends' districts on the map), and it
+  // must not reach into this module's state for it. So every time a map
+  // arrives it is announced, and hiveMapCells() answers for one that
+  // arrived before the page was listening.
+  function announceHiveMap(state) {
+    const cells = (state && state.hive && state.hive.cells) || [];
+    const me = state && state.user ? state.user.id : null;
+    // hive_map() leaves the caller out (it is everybody else, relative to
+    // them), so where the reader lives comes from their own profile.
+    const meNb = state && state.profile ? state.profile.neighborhood || null : null;
+    try {
+      document.dispatchEvent(new CustomEvent('ist-hive-map', { detail: { cells, me, meNb } }));
+    } catch (e) {}
+  }
+  function hiveMapCells() {
+    const st = _hive || null;
+    return {
+      cells: (_hiveMap && _hiveMap.cells) || [],
+      me: st && st.user ? st.user.id : null,
+      meNb: st && st.profile ? st.profile.neighborhood || null : null,
+    };
   }
 
   // Both calls are best-effort: before db/hive_lattice_v4.sql has been
@@ -2804,6 +2848,7 @@
     // The drawing does not wait for it: the grid is the page, and where
     // everybody stands in their day is a caption on it. It lands on its
     // own and re-renders (see loadHiveStatus).
+    announceHiveMap(state);
     loadHiveStatus(state);
   }
 
@@ -2812,6 +2857,13 @@
     if (state !== _hive) return;
     state.hive = Object.assign({}, state.hive, { cells: data || [] });
     _hiveMap = state.hive;
+    announceHiveMap(state);
+    // With the day glyph parked nothing comes back to re-render the new
+    // cells (loadHiveStatus used to), so this does.
+    if (!HIVE_DAY_GLYPH) {
+      if (document.getElementById('po-hive-mount')) renderHive(state);
+      return;
+    }
     loadHiveStatus(state);
   }
 
@@ -2845,6 +2897,8 @@
   }
 
   async function loadHiveStatus(state) {
+    // Nothing reads the status while the glyph is parked.
+    if (!HIVE_DAY_GLYPH) return;
     try {
       // ── Keyed to the NIGHT, not to the calendar date ──
       // Everything about a night's games is (see CLAUDE.md's own rule):
@@ -3068,6 +3122,102 @@
     going.forEach(row => {
       const cell = hiveCellFor(row.member_id);
       if (cell) cell.classList.add('ist-hive-cell-rsvp');
+    });
+  }
+
+  // ── An evening's guest list, on the hexagons ──
+  // The home screen's own reading of an open evening (project.html), and
+  // a different object from the marks above: those are two small badges
+  // for anahane's kept-events column; this recolours each hexagon by
+  // where that member stands on the ONE evening that is open --
+  //   kefil  whoever put it up (events.kefil_id): red ring, a glow, a tag
+  //   go     going (event_rsvps): red ring
+  //   no     said no (event_interest 'no'): faded
+  //   none   hasn't answered: a plain gray ring
+  // and prints the same word under their name in place of the district.
+  // The reader's own hexagon comes from what the page already knows
+  // (opts.mine), because both RPCs answer only for everybody else.
+  //
+  // Kept in the module and re-applied after every renderHive, since a
+  // press on a hexagon or a map that reloads rebuilds every cell. Same
+  // best-effort convention as the marks above: without the RPCs the
+  // kefil and the reader still paint, everyone else reads "no answer".
+  let _hiveEv = null;
+
+  async function paintHiveEventStates(sb, eventId, opts) {
+    const o = opts || {};
+    const token = {};
+    _hiveEv = { eventId, kefilId: o.kefilId || null, mine: o.mine || null, states: new Map(), token };
+    applyHiveEventStates();
+    const ask = (fn) => sb.rpc(fn, { p_event_ids: [eventId] })
+      .then(r => (r && !r.error && r.data) ? r.data : [])
+      .catch(() => []);
+    let verdicts = [], going = [];
+    try {
+      [verdicts, going] = await Promise.all([
+        ask('hive_event_interest_status'),
+        ask('hive_event_rsvp_status'),
+      ]);
+    } catch (e) { return; }
+    if (!_hiveEv || _hiveEv.token !== token) return;   // closed or replaced meanwhile
+    verdicts.forEach(row => { if (row.verdict === 'no') _hiveEv.states.set(String(row.member_id), 'no'); });
+    // Going wins over a stale "no": the RSVP is the later, louder fact.
+    going.forEach(row => _hiveEv.states.set(String(row.member_id), 'go'));
+    applyHiveEventStates();
+  }
+
+  // The reader answered: their own hexagon follows at once.
+  function setHiveEventMine(mine) {
+    if (!_hiveEv) return;
+    _hiveEv.mine = mine || null;
+    applyHiveEventStates();
+  }
+
+  function clearHiveEventStates() {
+    _hiveEv = null;
+    applyHiveEventStates();
+  }
+
+  const HIVE_EV_LABELS = {
+    kefil: ['hive.ev.kefil', 'Kefil'],
+    go:    ['hive.ev.go', 'Gidiyor ✓'],
+    no:    ['hive.ev.no', 'Gitmiyor'],
+    none:  ['hive.ev.none', 'Cevap yok'],
+  };
+  function hiveEvLabel(st) {
+    const [key, fallback] = HIVE_EV_LABELS[st] || ['', ''];
+    const I18N = (_hive && _hive.I18N) || global.I18N;
+    const v = I18N && I18N.t ? I18N.t(key) : '';
+    return v && v !== key ? v : fallback;
+  }
+
+  function applyHiveEventStates() {
+    const mount = document.getElementById('po-hive-mount');
+    if (!mount) return;
+    const page = document.getElementById('po-hive-page');
+    if (page) page.classList.toggle('ist-hive-ev-on', !!_hiveEv);
+    const meId = _hive && _hive.user ? String(_hive.user.id) : null;
+    mount.querySelectorAll('.ist-hive-cell[data-member-id], .ist-hive-cell[data-me]').forEach(cell => {
+      let st = null;
+      if (_hiveEv) {
+        const id = cell.dataset.me ? meId : String(cell.dataset.memberId || '');
+        if (id && _hiveEv.kefilId && id === String(_hiveEv.kefilId)) st = 'kefil';
+        else if (cell.dataset.me) st = _hiveEv.mine || 'none';
+        else st = _hiveEv.states.get(id) || 'none';
+      }
+      if (st) cell.dataset.ev = st; else delete cell.dataset.ev;
+      const ev = cell.querySelector('.ist-hive-name-ev');
+      if (ev) ev.textContent = st ? hiveEvLabel(st) : '';
+      let pill = cell.querySelector('.ist-hive-kefil-pill');
+      if (st === 'kefil') {
+        if (!pill) {
+          pill = document.createElement('span');
+          pill.className = 'ist-hive-kefil-pill';
+          pill.setAttribute('aria-hidden', 'true');
+          cell.appendChild(pill);
+        }
+        pill.textContent = hiveEvLabel('kefil');
+      } else if (pill) pill.remove();
     });
   }
 
@@ -3956,6 +4106,10 @@
     releaseHivePage,
     paintHiveEventMarks,
     clearHiveEventMarks,
+    paintHiveEventStates,
+    setHiveEventMine,
+    clearHiveEventStates,
+    hiveMapCells,
     initMemberSheet,
     openMemberSheet,
     closeMemberSheet,
