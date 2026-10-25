@@ -18,12 +18,12 @@
   <link rel="stylesheet" href="profile-card.css?v=51">
   <link rel="stylesheet" href="profile-bar.css?v=2">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=61" defer></script>
+  <script src="profile-card.js?v=62" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
   <link rel="stylesheet" href="sheet.css?v=9">
-  <link rel="stylesheet" href="frames.css?v=21">
+  <link rel="stylesheet" href="frames.css?v=22">
   <script src="loading-screen.js?v=5"></script>
   <link rel="stylesheet" href="loading-screen.css?v=3">
   <link rel="stylesheet" href="onboarding.css?v=16">
@@ -926,6 +926,10 @@
       .fb.fb-home-on #fb-map {
         top: calc(49% + 2px);
         bottom: calc(var(--fb-dock) + 64px + 12px);
+        /* Nothing rises from under the petek here -- the games stand
+           still below it -- so it does not keep Hane's 38px for a card
+           opening upward (HIVE_CARD_GAP, profile-card.js). */
+        --ist-hive-foot-gap: 6px;
       }
       html.ist-native .fb.fb-home-on #fb-map {
         top: calc(env(safe-area-inset-top) - var(--fb-map-lift) + 0.49 * (100% - env(safe-area-inset-top) + var(--fb-map-lift)) + 2px);
@@ -3941,6 +3945,48 @@ function homeMine(eventId) {
   return homeData.answered.get(eventId) === 'no' ? 'no' : null;
 }
 
+// ── The petek's window starts where the LAND ends, not at a line ──
+// The CSS starts it at 49% of the drawing (.fb.fb-home-on #fb-map), which
+// is where the land ends at the screen's EDGES. Across the middle the
+// coast is far higher -- the Bosphorus opens into the Marmara there -- so
+// a window starting at 49% left a band of empty sea over a petek fitted
+// to the height that was left. The coast is a V, and so is a honeycomb
+// standing on its foot (its top row is its narrowest), so the window
+// starts under the coast across the MIDDLE of the screen instead, and
+// fitHive fills what that gives it.
+//
+// HOME_COAST is the drawing's own measurement, not a guess: the lowest
+// row of ink (land, outline or 3D edge) in each 20px column of
+// istanbul-map-mobile.png's 1080x1920 canvas. Re-measure it if that file
+// is redrawn. It is mapped through the drawing's real place on the
+// screen (object-fit: cover, centred), so the app's notch-shifted box and
+// Safari's shorter one each get the line their own drawing has.
+const HOME_COAST = [885,895,896,891,885,878,857,826,828,827,812,796,792,770,763,750,731,731,725,718,712,706,620,607,594,678,738,751,777,780,780,774,778,782,787,793,803,821,838,856,873,891,908,913,910,909,918,927,936,936,935,939,938,945];
+const HOME_COAST_COL = 20;
+const HOME_COAST_SPAN = 0.5;   // the middle half of the screen
+const HOME_COAST_AIR = 8;      // paper between the coast and the window
+function placeHomePetek() {
+  const mapEl = document.getElementById('fb-map');
+  if (!HOME_SCREEN || !box || !mapEl) return;
+  // A desktop stands the petek in its own middle column (THE DESKTOP).
+  if (wide) { mapEl.style.top = ''; return; }
+  const img = imgs[ISTANBUL_SLIDE];
+  // Until the drawing is in, the CSS line holds; the measurement belongs
+  // to the phone's own drawing and to nothing else.
+  if (!img || !img.isConnected || !/istanbul-map-mobile/.test(img.currentSrc || img.src)) return;
+  const r = img.getBoundingClientRect();
+  const b = box.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const k = Math.max(r.width / 1080, r.height / 1920);
+  const ox = r.left + (r.width - 1080 * k) / 2;
+  const oy = r.top + (r.height - 1920 * k) / 2;
+  const c0 = Math.max(0, Math.floor((b.left + b.width * (0.5 - HOME_COAST_SPAN / 2) - ox) / k / HOME_COAST_COL));
+  const c1 = Math.min(HOME_COAST.length - 1, Math.floor((b.left + b.width * (0.5 + HOME_COAST_SPAN / 2) - ox) / k / HOME_COAST_COL));
+  let coast = 0;
+  for (let c = c0; c <= c1; c++) coast = Math.max(coast, HOME_COAST[c]);
+  mapEl.style.top = Math.round(oy + coast * k + HOME_COAST_AIR - b.top) + 'px';
+}
+
 // ── The tracing, laid in whether or not anything is painted on it ──
 // The dots are placed off its shapes, so it has to be in the book even on
 // a day with nothing lit. Same layer paintDistrictMap paints, built the
@@ -4641,11 +4687,12 @@ function wireHome() {
     let t = null;
     window.addEventListener('resize', () => {
       clearTimeout(t);
-      t = setTimeout(() => { if (box && HOME_SCREEN) { renderHomeDots(); placeHomeCard(); } }, 150);
+      t = setTimeout(() => { if (box && HOME_SCREEN) { placeHomePetek(); renderHomeDots(); placeHomeCard(); } }, 150);
     });
   }
   // A map that landed before this page was listening.
   if (window.IstProfileCard && IstProfileCard.hiveMapCells) homeFriendsFromMap(IstProfileCard.hiveMapCells());
+  placeHomePetek();
   renderHomeDots();
   renderHomeGames();
 }
@@ -7503,7 +7550,7 @@ async function load() {
   try { await loadFrames(); } finally { resolveLoading(); }
   // The frames were appended after the tracing; put it back on top of
   // them so the home screen's lit districts are not under the drawing.
-  if (HOME_SCREEN && box) paintHomeDistricts();
+  if (HOME_SCREEN && box) { paintHomeDistricts(); placeHomePetek(); renderHomeDots(); }
   // A brand-new account is walked through the app once, HERE and nowhere
   // else -- this is the only page a member can reach. It goes last on
   // purpose: the tour asks the reader for real pulls and watches the book
@@ -8170,6 +8217,10 @@ function applyWide() {
   swapStopDrawing();
   armCast();
   paintLanes();
+  // The petek's window is a phone's measurement; a desktop drops it, and
+  // the phone's drawing is not back until swapStopDrawing has decoded it
+  // (which calls this again).
+  placeHomePetek();
 }
 // The İstanbul drawing for the other side of the line, swapped in only
 // once it has decoded: an <img> whose src changes goes blank until its
@@ -8190,6 +8241,8 @@ function swapStopDrawing() {
     if (old.classList.contains('on')) img.classList.add('on');
     if (old.parentNode) old.replaceWith(img);
     imgs[ISTANBUL_SLIDE] = img;
+    // Back on a phone, the petek's window is measured off this drawing.
+    if (HOME_SCREEN) { placeHomePetek(); renderHomeDots(); }
   });
 }
 
@@ -8244,7 +8297,7 @@ function mount() {
     imgs.forEach(i => { i.classList.remove('on'); box.appendChild(i); });
     shown = -1; at = START_SLIDE; show(at, true); armCast();
     resolveLoading();
-    if (HOME_SCREEN) paintHomeDistricts();
+    if (HOME_SCREEN) { paintHomeDistricts(); placeHomePetek(); renderHomeDots(); }
   } else {
     load();
   }

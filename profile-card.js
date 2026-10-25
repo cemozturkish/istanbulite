@@ -1712,6 +1712,16 @@
   // profile-card.css) because it is the phone's number, and MEASURED
   // rather than read: the value is a min() of a viewport unit and a cap,
   // which getPropertyValue hands back as its own unresolved text.
+  // The paper the drawing's foot stands above. HIVE_CARD_GAP is Hane's:
+  // the gap a card opening upward out of the events strip needs. A page
+  // with nothing rising from under the petek says so with
+  // --ist-hive-foot-gap on the window (project.html's home screen, where
+  // the games stand still below it), and gets that room back.
+  function hiveFootGap(view) {
+    const v = parseFloat(getComputedStyle(view).getPropertyValue('--ist-hive-foot-gap'));
+    return Number.isFinite(v) && v >= 0 ? v : HIVE_CARD_GAP;
+  }
+
   function hiveBandReserve(varName) {
     if (_hiveMeasure[varName] != null) return _hiveMeasure[varName];
     const h = measureHiveBandReserve(varName);
@@ -2639,7 +2649,8 @@
     // ran off the top by exactly that much -- invisible on a phone, where
     // the width binds first, and the top row clipped in half on a short
     // window like the desktop's band.
-    const scale = Math.max(HIVE_MIN_SCALE, Math.min(HIVE_ZOOM, vw / reqW, (vh - HIVE_CARD_GAP) / reqH));
+    const gap = hiveFootGap(view);
+    const scale = Math.max(HIVE_MIN_SCALE, Math.min(HIVE_ZOOM, vw / reqW, (vh - gap) / reqH));
 
     // Scaling about the caller's own cell and then hanging that point off
     // the middle of the window keeps them in the middle at any scale —
@@ -2664,7 +2675,7 @@
     // gap of paper between. The reader is still the fixed point
     // horizontally and still the point everything is scaled about; only
     // the line they stand on has moved.
-    const offsetY = (vhFull - reserve - HIVE_CARD_GAP) - vhFull / 2 - belowMe;
+    const offsetY = (vhFull - reserve - gap) - vhFull / 2 - belowMe;
     state.hiveFit = { scale, cx, cy, vw, vh, reqW, reqH, offsetY, vwFull: view.clientWidth, vhFull: view.clientHeight };
     plane.style.transformOrigin = `${cx}px ${cy}px`;
     // ── A fresh plane is placed, not animated into place ──
