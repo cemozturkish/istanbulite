@@ -2331,9 +2331,12 @@ out, and the people who know them finding out.
   dashboard, not the app.
 - **It leaves at the midnight after its day** only because the home screen never asks for anything
   older than today — nothing deletes it.
-- **On the map a plan is a red HEXAGON** (`.fb-pldot`) where a city evening is a circle: the
-  petek's own shape, because that is where it came from. Filled for today, outlined for later, a
-  number for several; off the drawing it is an edge tag with a small hexagon. A district carrying
+- **On the map a plan is a SOLID RED DOT** (`.fb-pldot`) where a city evening is a dot with paper
+  in it (a red ring, or red with a paper rim): no paper at all is what says it came from somebody
+  you know. It was a hexagon, the petek's own shape, and read as a second icon set on the map
+  rather than as a dot. Today's carries a soft red halo, later is the dot alone, several is a
+  bigger dot with the number in it; off the drawing it is an edge tag with a small solid dot (full
+  red today, paler later). A district carrying
   both kinds stands them side by side. Markers are keyed by kind AND district (`data-k` /
   `data-d`, `homeOpen.kind`), and `openHomeCard(kind, d, id)` can open on a given plan.
 - **The card** prints the creator as "KEFİL: BEŞİKTAŞ'TAN AYŞE · PETEĞİNDEN" for a friend's plan
