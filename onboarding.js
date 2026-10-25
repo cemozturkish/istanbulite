@@ -90,6 +90,9 @@
     //                   news is on: project.html's NEWS_ENABLED);
     //   Kahvehane    -- pull there, open an evening, throw it.
     // The sky beat (the sun/moon chain under the bar) went with the chain.
+    // On the one-screen home (project.html's HOME_SCREEN) there are no lanes
+    // to pull to, so after the top bar the tour walks the screen instead:
+    // the dots, a card opened and answered, the petek, the games.
     // (The language hold comes before all of this, on the welcome screen --
     // see stepLanguageHold.)
     //
@@ -122,6 +125,13 @@
         sunset:      'Güneş batınca da Kahvehane yenilenir — bu akşamın etkinlikleri, bu gecenin oyunları.',
         toKahvehaneMid: 'Şimdi Kahvehane: etkinlikler ve oyunlar. Sağda — oraya geçelim.',
         midnight:    'Burası her gece yarısı yenilenir: bugünün etkinlikleri, bugünün oyunları.',
+        homeDots:    'Haritadaki noktalar bu haftanın etkinlikleri. Dolu olan bugün, halka olan haftanın geri kalanı.',
+        homeOpen:    'Birine bas: ne, ne zaman, kim gidiyor.',
+        homeNone:    'Bu hafta henüz etkinlik yok. Olduğunda burada nokta olarak çıkar; basınca açılır.',
+        homeAnswer:  'Gidiyor musun? Birine bas. Peteğindekiler cevabını görür.',
+        homePetek:   'Burası peteğin. Bir +’ya bas, çıkan kodu yanındakine söyle: senin yanına gelir. Bir etkinliği açınca kimin gittiğini burada görürsün.',
+        homePlan:    'Bir yere gidiyorsan buradan söyle: ne, nerede, ne zaman. Yalnızca peteğinde sana bağlı olanlar haritasında görür.',
+        homeGames:   'Bugünün oyunları en altta. Hepsi her gece yarısı yenilenir.',
         eventOpen:   'Bunlar dışarıda olan şeyler. Birine bas.',
         eventThrow:  'Aynı hareket, ama burada yönün bir cevap: sağa fırlatırsan gidiyorsun, sola fırlatırsan gitmiyorsun.',
         eventNone:   'Bugün henüz etkinlik yok. Olduğunda, birine basıp açarsın: sağa fırlatmak “gidiyorum”, sola fırlatmak “gitmiyorum” demek.',
@@ -141,6 +151,13 @@
         sunset:      'And when the sun sets, Kahvehane renews — tonight’s evenings and tonight’s games.',
         toKahvehaneMid: 'Now Kahvehane: the evenings and the games. It is on the right — let’s go there.',
         midnight:    'This side renews every midnight: today’s evenings, today’s games.',
+        homeDots:    'The dots on the map are this week’s evenings. A filled one is today; a ring is later this week.',
+        homeOpen:    'Press one: what, when, who is going.',
+        homeNone:    'No evenings this week yet. When there are, they appear here as dots, and pressing one opens it.',
+        homeAnswer:  'Are you going? Press one. The people on your petek see your answer.',
+        homePetek:   'This is your petek. Press a + and read the code out to the person beside you: they land next to you. When you open an evening, this is where you see who is going.',
+        homePlan:    'Going somewhere? Say so here: what, where, when. Only the people attached to you on your petek see it on their map.',
+        homeGames:   'Today’s games are at the bottom. Everything renews every midnight.',
         eventOpen:   'These are things happening outside. Press one.',
         eventThrow:  'The same throw, but here the direction is your answer: throw it right if you are going, left if you are not.',
         eventNone:   'No evenings yet today. When there are, you press one to open it: throwing it right says you are going, left says you are not.',
@@ -840,6 +857,8 @@
     // stray sideways drag would walk the reader off the lane being talked
     // about), and then the page that box grew into.
     '.fb-haberler': 'news', '.fb-events': 'events', '#fb-page-overlay': 'page',
+    // The one-screen home: its dots, the card one opens, its games.
+    '#fb-home': 'home',
   };
   let passScope = null;
   function openPassthrough(scope) {
@@ -865,6 +884,8 @@
     // Whether Kütüphane's news is cast at all (project.html's NEWS_ENABLED).
     // Missing from an older project.html means it was always on.
     const newsOn = fb().newsEnabled !== false;
+    // The one-screen home (project.html's HOME_SCREEN): no lanes at all.
+    const homeOn = !!fb().homeScreen;
 
     // `lane` is the lane the beat belongs to and is asserted before it runs,
     // so a reader who wandered is put back rather than talked at about a
@@ -889,6 +910,25 @@
         speech: lines.pickShirt, pick: true },
       { inSheet: true, target: '.ist-pc-cover-pick-col', all: true, speech: lines.senDone },
       { target: '#profile-overlay .ist-sheet-close', speech: lines.closeSheet, sheet: 'close' },
+      // ── 2. The home screen, walked rather than pulled ──
+      // Each part arrives on the beat that names it. A `wait` beat hands
+      // the reader the home layer and waits for the thing itself to have
+      // happened (see runWait).
+      ...(homeOn ? [
+        { lane: LANE_MAP, show: ['map', 'dots'], target: '#fb-home-dots [data-d]', all: true,
+          speech: lines.homeDots },
+        { wait: true, show: ['map', 'dots'], target: '#fb-home-dots [data-d]', all: true,
+          pass: '#fb-home', speech: lines.homeOpen, none: lines.homeNone,
+          empty: (f) => !f.homeHasEvents, until: (f) => f.homeCardOpen,
+          escape: (f) => f.openFirstHomeEvent() },
+        { wait: true, target: '#fb-evcard', pass: '#fb-home', speech: lines.homeAnswer,
+          until: (f) => f.homeAnswers > 0, escape: () => {} },
+        { show: ['petek'], target: '#fb-petek', speech: lines.homePetek, top: true,
+          pre: (f) => f.closeHomeCard && f.closeHomeCard() },
+        { show: ['plan'], target: '#fb-planbtn', speech: lines.homePlan, top: true,
+          skip: (f) => !f.homePlansOpen },
+        { show: ['games'], target: '#fb-home-games', speech: lines.homeGames, top: true },
+      ] : [
       // ── 2 and 3. The two sides ──
       // A word comes onto the bottom bar on the beat that first names it
       // as a place. The map and the column arrive with the reader, on the
@@ -916,6 +956,7 @@
       { lane: LANE_KAHVEHANE, show: ['events'], open: '.fb-events',
         speech: lines.eventOpen, none: lines.eventNone },
       { lane: LANE_KAHVEHANE, throw: true, speech: lines.eventThrow },
+      ]),
     ];
 
     let idx = 0;
@@ -923,6 +964,11 @@
 
     function runBeat() {
       const b = beats[idx];
+      // A beat about something that may not be on this screen today (the
+      // plan button stands only once the database has plans) is decided
+      // when it comes round, not when the list was built: the fetch that
+      // says so lands after the tour has started.
+      if (b && b.skip && fb() && b.skip(fb())) { advance(); return; }
       stopLaneWatch();
       // The last beat's hint is still on the page, and still live: addHint
       // sets tapAdvanceFn, so a pull or act beat that adds no hint of its own
@@ -945,7 +991,9 @@
       // left -- so it is spoken over the word it points at, as the talk
       // beat it has become, and the tap is the advance.
       const wideBook = !!(fb() && fb().wide);
+      if (b.pre && fb()) b.pre(fb());
       if (b.pull !== undefined && !wideBook) { runPull(b); return; }
+      if (b.wait) { runWait(b); return; }
       if (b.open !== undefined) { runOpen(b); return; }
       if (b.throw) { runThrow(b); return; }
       // The petek's own door: a press on the logo rather than a gesture on
@@ -983,8 +1031,53 @@
         setFocus(b.all ? document.querySelectorAll(b.target)
                            : document.querySelector(b.target));
       });
-      renderPane({ speech: b.speech });
+      renderPane({ speech: b.speech, top: !!b.top });
       addHint(COPY.tapToContinue[lang], advance);
+    }
+
+    // ── A wait beat: the reader does the thing on the home screen ──
+    // The same shape as Sen's own door below: light the thing, hand the
+    // home layer back through a scoped passthrough, and advance the moment
+    // `until` says it has happened. `empty` answers whether there is
+    // anything to do at all (a week with no evenings): then the `none`
+    // line is said as a talk beat and the next beat, which would be about
+    // the card that cannot open, is skipped. The stall escape does the
+    // thing itself (`escape`), so a reader who cannot press still reaches
+    // the end, where onboarded_at is written.
+    function runWait(b) {
+      const f = fb();
+      if (!f) { advance(); return; }
+      if (b.empty && b.empty(f)) {
+        idx++;
+        requestAnimationFrame(() => setFocus(b.all ? document.querySelectorAll(b.target) : document.querySelector(b.target)));
+        renderPane({ speech: b.none || b.speech });
+        addHint(COPY.tapToContinue[lang], advance);
+        return;
+      }
+      if (b.until(f)) { advance(); return; }
+      requestAnimationFrame(() => {
+        setFocus(b.all ? document.querySelectorAll(b.target) : document.querySelector(b.target));
+        openPassthrough(b.pass);
+      });
+      renderPane({ speech: b.speech, promptText: COPY.pressBox[lang], top: !!b.top });
+      const tick = () => {
+        const now = fb();
+        if (now && b.until(now)) { stopLaneWatch(); closePassthrough(); advance(); return; }
+        laneWatch = requestAnimationFrame(tick);
+      };
+      laneWatch = requestAnimationFrame(tick);
+      stallTimer = setTimeout(() => {
+        stallTimer = null;
+        renderPane({ speech: b.speech, promptText: COPY.pressNudge[lang], top: !!b.top });
+        addHint(COPY.pressNudge[lang], () => {
+          stopLaneWatch();
+          const now = fb();
+          if (now && b.escape) firewallBypass = true;
+          try { if (now && b.escape) b.escape(now); } finally { firewallBypass = false; }
+          closePassthrough();
+          advance();
+        });
+      }, STALL_MS);
     }
 
     // ── Sen's own door ──

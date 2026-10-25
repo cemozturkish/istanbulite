@@ -5729,6 +5729,27 @@ const ONBOARDING_COPY_KEYS = [
   { key: "sunset", label: "Gün batımı — Kahvehane (haberler kapalıyken söylenmez)",
     tr: "Güneş batınca da Kahvehane yenilenir — bu akşamın etkinlikleri, bu gecenin oyunları.",
     en: "And when the sun sets, Kahvehane renews — tonight’s evenings and tonight’s games." },
+  { key: "homeDots", label: "Ana ekran — haritadaki noktalar",
+    tr: "Haritadaki noktalar bu haftanın etkinlikleri. Dolu olan bugün, halka olan haftanın geri kalanı.",
+    en: "The dots on the map are this week’s evenings. A filled one is today; a ring is later this week." },
+  { key: "homeOpen", label: "Ana ekran — bir noktaya bas",
+    tr: "Birine bas: ne, ne zaman, kim gidiyor.",
+    en: "Press one: what, when, who is going." },
+  { key: "homeNone", label: "Ana ekran — bu hafta etkinlik yoksa",
+    tr: "Bu hafta henüz etkinlik yok. Olduğunda burada nokta olarak çıkar; basınca açılır.",
+    en: "No evenings this week yet. When there are, they appear here as dots, and pressing one opens it." },
+  { key: "homeAnswer", label: "Ana ekran — gidiyor musun",
+    tr: "Gidiyor musun? Birine bas. Peteğindekiler cevabını görür.",
+    en: "Are you going? Press one. The people on your petek see your answer." },
+  { key: "homePetek", label: "Ana ekran — petek",
+    tr: "Burası peteğin. Bir +’ya bas, çıkan kodu yanındakine söyle: senin yanına gelir. Bir etkinliği açınca kimin gittiğini burada görürsün.",
+    en: "This is your petek. Press a + and read the code out to the person beside you: they land next to you. When you open an evening, this is where you see who is going." },
+  { key: "homePlan", label: "Ana ekran — bir yere gidiyorum (planlar açıksa)",
+    tr: "Bir yere gidiyorsan buradan söyle: ne, nerede, ne zaman. Yalnızca peteğinde sana bağlı olanlar haritasında görür.",
+    en: "Going somewhere? Say so here: what, where, when. Only the people attached to you on your petek see it on their map." },
+  { key: "homeGames", label: "Ana ekran — oyunlar",
+    tr: "Bugünün oyunları en altta. Hepsi her gece yarısı yenilenir.",
+    en: "Today’s games are at the bottom. Everything renews every midnight." },
   { key: "eventOpen", label: "Kahvehane — bir etkinliğe bas",
     tr: "Bunlar dışarıda olan şeyler. Birine bas.",
     en: "These are things happening outside. Press one." },
@@ -5965,10 +5986,15 @@ function formatEventDt(iso) {
 async function loadEventsList() {
   const listEl = document.getElementById('events-list');
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
-  const { data, error } = await sb.from('events')
+  const { data: rows, error } = await sb.from('events')
     .select('*').order('event_date', { ascending: true });
   if (error) { listEl.innerHTML = '<div class="empty-state">Error: ' + escapeHtml(error.message) + '</div>'; return; }
-  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">No events yet.</div>'; return; }
+  // A member's own plan (audience 'petek', db/events_v2_plans.sql) is not
+  // the desk's: it never goes through a baskı and the admin reads none
+  // through the client. An admin who is also a member still sees their
+  // own petek's plans, so they are left out of the desk by name.
+  const data = (rows || []).filter(ev => ev.audience !== 'petek');
+  if (!data.length) { listEl.innerHTML = '<div class="empty-state">No events yet.</div>'; return; }
 
   const now = Date.now();
   listEl.innerHTML = data.map(ev => {
@@ -9968,8 +9994,11 @@ const BASKI_KINDS = {
   etkinlik: {
     async load(date) {
       const from = new Date(pressDayISO(date, -1) + 'T00:00:00+03:00').toISOString();
+      // '*' rather than a column list: `audience` (db/events_v2_plans.sql)
+      // is needed to leave members' plans out, and naming it would fail on
+      // a database that has not run that migration yet.
       const { data, error } = await sb.from('events')
-        .select('id, title, event_date, edition_date, edition_order')
+        .select('*')
         .gte('event_date', from)
         .order('event_date', { ascending: true })
         .limit(200);
@@ -9979,7 +10008,8 @@ const BASKI_KINDS = {
       // arithmetic rather than a guess.
       const bounds = [0, 1, 2, 3].map(off =>
         Date.parse(pressDayISO(date, off) + 'T00:00:00+03:00'));
-      return (data || []).map(ev => {
+      // A member's plan is not loose type for the paper (see loadEventsList).
+      return (data || []).filter(ev => ev.audience !== 'petek').map(ev => {
         const t = Date.parse(ev.event_date);
         let slot = null;
         for (let i = 0; i < 3; i++) if (t >= bounds[i] && t < bounds[i + 1]) slot = 'd' + i;
