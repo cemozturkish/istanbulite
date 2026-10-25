@@ -2250,6 +2250,13 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
     drawing would stand unlifted, so asking twice gives the same answer. The app's own variant
     adds it on top of `--fb-map-lift`. Measured on 393×760: 65px hexagons → 82px; 375×667:
     48 → 63.
+  - **The names are set larger here than on Hane** (`.fb.fb-home-on .ist-hive-name`): 0.15 of a
+    cell with no rem cap, in a track 0.8 of a cell wide, against profile-card.css's 0.105 capped at
+    0.8rem in 0.66 — that came out at ~8px on a phone once the plane was fitted; this is ~12px. A
+    name is `width: max-content` up to the track, because `fitHive` fits to the names' own boxes
+    and a fixed track charged every short name the room of the longest one; two-word names break
+    onto two lines. The cost is a few pixels of hexagon on tall phones, where the names now bind
+    the width (393×852: 96 → 90).
   - **And the drawing's foot keeps 6px of paper, not 38** (`--ist-hive-foot-gap` on the window,
     read by `hiveFootGap` in profile-card.js). `HIVE_CARD_GAP` is Hane's room for a card opening
     upward out of the events strip; nothing rises from under the petek here.
