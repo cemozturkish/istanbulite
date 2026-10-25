@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="profile-card.css?v=51">
   <link rel="stylesheet" href="profile-bar.css?v=2">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=62" defer></script>
+  <script src="profile-card.js?v=63" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -923,6 +923,17 @@
     }
     .fb-home[hidden] { display: none; }
     @media (max-width: 768px) {
+      /* The drawing rides up into the paper over its own land, the
+         tracing with it, by however much placeHomePetek works out the top
+         of this screen's drawing is empty sea under the bar. Moved by its
+         top and not by a transform: the dots are placed off the tracing's
+         getScreenCTM(), which every engine agrees on for a box's position. */
+      .fb.fb-home-on > img,
+      .fb.fb-home-on .fb-districts { top: calc(-1 * var(--fb-home-lift, 0px)); }
+      html.ist-native .fb.fb-home-on > img,
+      html.ist-native .fb.fb-home-on .fb-districts {
+        top: calc(env(safe-area-inset-top) - var(--fb-map-lift) - var(--fb-home-lift, 0px));
+      }
       .fb.fb-home-on #fb-map {
         top: calc(49% + 2px);
         bottom: calc(var(--fb-dock) + 64px + 12px);
@@ -1310,14 +1321,17 @@
       pointer-events: auto;
     }
     html.ist-native .fb-home-games { bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom)); }
+    /* A game is its NAME over its state, and nothing else: the marks
+       (Sözcel's, Çengel's) went, so the two buttons read as one pair the
+       way Tümcel's always did -- a word you press, not a logo beside one. */
     .fb-gbtn {
       position: relative;
       display: grid;
-      grid-template-columns: auto 1fr;
+      grid-template-columns: 1fr;
       grid-template-rows: 1fr auto;
       align-items: center;
       gap: 2px 10px;
-      padding: 6px 10px 6px 14px;
+      padding: 6px 10px 6px 16px;
       box-sizing: border-box;
       background: var(--lit-hi, #fff);
       color: var(--ink);
@@ -1337,8 +1351,7 @@
       background: var(--ink-red, #B93631);
     }
     .fb-gbtn:active { border-bottom-width: 2px; transform: translateY(3px); }
-    .fb-gbtn .logo { grid-row: 1 / span 2; width: 40px; height: 40px; object-fit: contain; }
-    .fb-gbtn .nm { font-size: 1rem; font-weight: 900; line-height: 1; align-self: end; }
+    .fb-gbtn .nm { font-size: 1.15rem; font-weight: 900; line-height: 1; align-self: end; }
     .fb-gbtn .st {
       justify-self: start;
       font-size: 0.6rem;
@@ -1348,18 +1361,12 @@
       background: var(--ink);
       color: var(--lit-hi, #fff);
     }
-    /* A game with no mark of its own (Tümcel) is its name over its state. */
-    .fb-gbtn.nologo { grid-template-columns: 1fr; padding-left: 16px; }
-    .fb-gbtn.nologo .nm { font-size: 1.15rem; }
     .fb-gbtn.done { border-color: var(--muted); color: var(--muted); }
     .fb-gbtn.done::before { width: 1px; }
     .fb-gbtn.done .st { background: none; padding: 3px 0; color: var(--ink-red, #B93631); }
     .fb-gbtn.off { border-style: dashed; border-bottom-width: 2px; cursor: default; color: var(--muted); }
     .fb-gbtn.off::before { display: none; }
     .fb-gbtn.off .st { background: none; padding: 3px 0; color: var(--muted); }
-    /* The two marks read the palette the way Oyunlar's own tiles do. */
-    html.ist-map-ink .fb-gbtn .logo-sozcel,
-    html.ist-map-ink .fb-gbtn .logo-bulmaca { filter: url(#ist-sozcel-ink); }
     /* A desktop keeps its own petek column (THE DESKTOP); the games stand
        where Kahvehane's column stood, at the right of the band. After the
        rules above, which it has to outrank at the same specificity. */
@@ -3952,24 +3959,81 @@ function homeMine(eventId) {
 // a window starting at 49% left a band of empty sea over a petek fitted
 // to the height that was left. The coast is a V, and so is a honeycomb
 // standing on its foot (its top row is its narrowest), so the window
-// starts under the coast across the MIDDLE of the screen instead, and
-// fitHive fills what that gives it.
+// starts as high as the drawing it holds can go without any hexagon or
+// name touching the land above it, and fitHive fills what that gives it.
 //
 // HOME_COAST is the drawing's own measurement, not a guess: the lowest
 // row of ink (land, outline or 3D edge) in each 20px column of
-// istanbul-map-mobile.png's 1080x1920 canvas. Re-measure it if that file
-// is redrawn. It is mapped through the drawing's real place on the
-// screen (object-fit: cover, centred), so the app's notch-shifted box and
-// Safari's shorter one each get the line their own drawing has.
+// istanbul-map-mobile.png's 1080x1920 canvas. HOME_LAND_TOP is the same
+// measurement the other way up -- the highest row of ink -- which is what
+// says how far the drawing can be lifted. Re-measure both if that file is
+// redrawn. Both are mapped through the drawing's real place on the screen
+// (object-fit: cover, centred), so the app's notch-shifted box and
+// Safari's shorter one each get the lines their own drawing has.
 const HOME_COAST = [885,895,896,891,885,878,857,826,828,827,812,796,792,770,763,750,731,731,725,718,712,706,620,607,594,678,738,751,777,780,780,774,778,782,787,793,803,821,838,856,873,891,908,913,910,909,918,927,936,936,935,939,938,945];
+const HOME_LAND_TOP = [178,191,196,201,205,210,212,212,211,211,211,213,215,217,219,221,225,230,231,219,205,205,208,210,213,216,221,226,315,304,296,267,244,233,229,227,226,225,223,211,201,202,205,206,208,211,213,213,212,213,211,197,197,198];
 const HOME_COAST_COL = 20;
-const HOME_COAST_SPAN = 0.5;   // the middle half of the screen
-const HOME_COAST_AIR = 8;      // paper between the coast and the window
+const HOME_COAST_SPAN = 0.5;   // before the petek is drawn: the middle half
+const HOME_COAST_AIR = 8;      // paper between the coast and the petek
+const HOME_LIFT_AIR = 10;      // paper between the top bar and the land
+// The drawn hexagon inside a cell's box (assets/frame.png, 1024x1536,
+// the outline HIVE_HEX_PATH in profile-card.js is traced from): its top
+// point, the row its two upper corners stand on, and its width.
+const HEX_TIP = 186 / 1536, HEX_SHOULDER = 404 / 1536, HEX_WIDTH = 774 / 1024;
+
+// ── The petek's own outline, in units of the reader's own cell ──
+// Measured off the drawing as fitHive left it, relative to the reader's
+// centre and divided by their cell's drawn width. The plane is scaled as
+// one piece (names included -- their type is sized off the unscaled cell),
+// so these numbers do not change with the fit, and the window can be
+// worked out for any size before fitHive draws it there.
+function homePetekShape() {
+  const mapEl = document.getElementById('fb-map');
+  const me = mapEl && mapEl.querySelector('.ist-hive-me');
+  if (!me) return null;
+  const mr = me.getBoundingClientRect();
+  if (!mr.width) return null;
+  const u = mr.width, mx = mr.left + u / 2, my = mr.top + mr.height / 2;
+  const parts = [];
+  let top = 0, bottom = 0, left = 0, right = 0;
+  mapEl.querySelectorAll('.ist-hive-cell').forEach(c => {
+    if ((parseInt(c.dataset.ring, 10) || 0) > 1) return;
+    const r = c.getBoundingClientRect();
+    if (!r.width) return;
+    top = Math.min(top, (r.top - my) / u);
+    bottom = Math.max(bottom, (r.bottom - my) / u);
+    left = Math.min(left, (r.left - mx) / u);
+    right = Math.max(right, (r.right - mx) / u);
+    // A hexagon's roof: a point in the middle, sloping to two corners.
+    parts.push({ cx: (r.left + r.width / 2 - mx) / u, half: r.width * HEX_WIDTH / 2 / u,
+                 tip: (r.top + r.height * HEX_TIP - my) / u, shoulder: (r.top + r.height * HEX_SHOULDER - my) / u });
+    c.querySelectorAll('.ist-hive-name').forEach(n => {
+      const nr = n.getBoundingClientRect();
+      if (!nr.width) return;
+      left = Math.min(left, (nr.left - mx) / u);
+      right = Math.max(right, (nr.right - mx) / u);
+      // A name's roof is flat.
+      const t = (nr.top - my) / u;
+      parts.push({ cx: (nr.left + nr.width / 2 - mx) / u, half: nr.width / 2 / u, tip: t, shoulder: t });
+    });
+  });
+  if (!parts.length) return null;
+  return {
+    parts, mx, u,
+    // How far the foot of the lowest cell is below the reader's centre.
+    below: bottom,
+    tall: 2 * Math.max(-top, bottom),           // fitHive's own reqH
+    wide: 2 * Math.max(-left, right),           // ... and roughly its reqW
+    // How far fitHive will grow it: HIVE_ZOOM (1.5) of the cell's own size.
+    most: me.offsetWidth * 1.5,
+  };
+}
+
 function placeHomePetek() {
   const mapEl = document.getElementById('fb-map');
   if (!HOME_SCREEN || !box || !mapEl) return;
   // A desktop stands the petek in its own middle column (THE DESKTOP).
-  if (wide) { mapEl.style.top = ''; return; }
+  if (wide) { setHomeLift(0); mapEl.style.top = ''; return; }
   const img = imgs[ISTANBUL_SLIDE];
   // Until the drawing is in, the CSS line holds; the measurement belongs
   // to the phone's own drawing and to nothing else.
@@ -3979,12 +4043,97 @@ function placeHomePetek() {
   if (!r.width || !r.height) return;
   const k = Math.max(r.width / 1080, r.height / 1920);
   const ox = r.left + (r.width - 1080 * k) / 2;
-  const oy = r.top + (r.height - 1920 * k) / 2;
-  const c0 = Math.max(0, Math.floor((b.left + b.width * (0.5 - HOME_COAST_SPAN / 2) - ox) / k / HOME_COAST_COL));
-  const c1 = Math.min(HOME_COAST.length - 1, Math.floor((b.left + b.width * (0.5 + HOME_COAST_SPAN / 2) - ox) / k / HOME_COAST_COL));
-  let coast = 0;
-  for (let c = c0; c <= c1; c++) coast = Math.max(coast, HOME_COAST[c]);
-  mapEl.style.top = Math.round(oy + coast * k + HOME_COAST_AIR - b.top) + 'px';
+  const col = (x) => Math.floor((x - ox) / k / HOME_COAST_COL);
+  const cols = (x0, x1) => [Math.max(0, col(x0)), Math.min(HOME_COAST.length - 1, col(x1))];
+
+  // ── 1. The drawing is lifted into the paper over its land ──
+  // Cover lays the drawing in from the top of the screen, and the top of
+  // the drawing is sea: a band of nothing under the top bar. So the
+  // drawing rides up until its highest land on this screen stands just
+  // under the bar. The tracing rides with it (the same --fb-home-lift on
+  // both), and the dots follow the tracing. Worked out from where the
+  // drawing would stand unlifted, so asking twice gives the same answer.
+  const bar = document.getElementById('ist-pc-mount');
+  const barBottom = bar ? bar.getBoundingClientRect().bottom : 0;
+  const oy0 = r.top + homeLift() + (r.height - 1920 * k) / 2;
+  let land = 1920;
+  const [l0, l1] = cols(b.left, b.right - 1);
+  for (let c = l0; c <= l1; c++) land = Math.min(land, HOME_LAND_TOP[c]);
+  const lift = bar ? Math.max(0, Math.round(oy0 + land * k - barBottom - HOME_LIFT_AIR)) : 0;
+  setHomeLift(lift);
+  const oy = oy0 - lift;
+  // The lowest land over a stretch of the screen, in screen pixels.
+  const coast = (x0, x1) => {
+    const [c0, c1] = cols(x0, x1);
+    let m = 0;
+    for (let c = c0; c <= c1; c++) m = Math.max(m, HOME_COAST[c]);
+    return oy + m * k;
+  };
+
+  // ── 2. The window: as high as the petek's own outline allows ──
+  const view = document.getElementById('po-hive-view') || mapEl;
+  const vr = view.getBoundingClientRect();
+  const shape = homePetekShape();
+  // Where the drawing stands: fitHive puts the foot of its lowest cell on
+  // the view's floor less the gap it keeps there (--ist-hive-foot-gap,
+  // 6px here; Hane's reserve is not set on this page), whatever size it
+  // draws -- so the floor does not move when the window's top does.
+  // Read off the view and never off the cells: a refit of a plane already
+  // on screen animates its transform for 520ms, and the event that called
+  // this fires at the START of that, with the cells still where the last
+  // fit left them. The outline is safe to read mid-flight (the plane is
+  // one uniform scale at every instant); its position is not.
+  const footGap = parseFloat(getComputedStyle(view).getPropertyValue('--ist-hive-foot-gap'));
+  const floor = vr.bottom - (Number.isFinite(footGap) && footGap >= 0 ? footGap : 38);
+  let viewTop;
+  if (!shape) {
+    // Nothing drawn yet: under the coast across the middle half, which
+    // holds any honeycomb the window could be fitted with.
+    const cx = b.left + b.width / 2;
+    viewTop = coast(cx - b.width * HOME_COAST_SPAN / 2, cx + b.width * HOME_COAST_SPAN / 2) + HOME_COAST_AIR;
+  } else {
+    // At a cell width w the petek stands on its floor, so every part of
+    // it is at a known place; it fits if no part's roof comes within
+    // HOME_COAST_AIR of the land over it, column by column. A bigger
+    // petek is taller AND wider, so "fits" only ever turns false as w
+    // grows -- the largest w that fits is found by halving.
+    const fits = (w) => {
+      const cy = floor - shape.below * w;
+      return shape.parts.every(p => {
+        const pcx = shape.mx + p.cx * w, half = p.half * w;
+        const [c0, c1] = cols(pcx - half, pcx + half);
+        for (let c = c0; c <= c1; c++) {
+          // The roof's highest point inside this column of the drawing.
+          const cl = ox + c * HOME_COAST_COL * k, cr = cl + HOME_COAST_COL * k;
+          const near = Math.min(Math.max(pcx, cl), cr);
+          const slope = half ? Math.min(1, Math.abs(near - pcx) / half) : 0;
+          const roof = cy + (p.tip + (p.shoulder - p.tip) * slope) * w;
+          if (roof < oy + HOME_COAST[c] * k + HOME_COAST_AIR) return false;
+        }
+        return true;
+      });
+    };
+    // Never above the bar, never wider than the window, never past the
+    // size fitHive would stop at anyway.
+    let hi = Math.min((floor - barBottom) / shape.tall, vr.width / shape.wide, shape.most);
+    let lo = 0;
+    if (fits(hi)) lo = hi;
+    else for (let i = 0; i < 18; i++) { const m = (lo + hi) / 2; if (fits(m)) lo = m; else hi = m; }
+    viewTop = floor - shape.tall * lo;
+  }
+  // The window is the petek's box less whatever it is inset by.
+  const next = Math.round(mapEl.getBoundingClientRect().top - b.top + (viewTop - vr.top));
+  if (Math.abs((parseFloat(mapEl.style.top) || -1e9) - next) >= 1) mapEl.style.top = next + 'px';
+}
+
+// The lift is one custom property on the book, read by the drawing and
+// the tracing alike (see .fb.fb-home-on > img). Written only when it
+// moves: it is inherited by everything in the book, the petek included.
+function homeLift() { return box ? (parseFloat(box.style.getPropertyValue('--fb-home-lift')) || 0) : 0; }
+function setHomeLift(px) {
+  if (!box || homeLift() === px) return;
+  if (px) box.style.setProperty('--fb-home-lift', px + 'px');
+  else box.style.removeProperty('--fb-home-lift');
 }
 
 // ── The tracing, laid in whether or not anything is painted on it ──
@@ -4636,8 +4785,7 @@ async function renderHomeGames() {
         '<span class="st">' + esc(t('home.off')) + '</span></div>';
     }
     const done = state.played.has(g.key);
-    return '<button type="button" class="fb-gbtn' + (done ? ' done' : '') + (g.logo ? '' : ' nologo') + '" data-game="' + g.key + '">' +
-      (g.logo ? '<img class="logo logo-' + g.key + '" src="' + g.logo + '" alt="" width="512" height="512" decoding="async">' : '') +
+    return '<button type="button" class="fb-gbtn' + (done ? ' done' : '') + '" data-game="' + g.key + '">' +
       '<span class="nm">' + esc(g.title) + '</span>' +
       '<span class="st">' + esc(t(done ? 'home.played' : 'home.play')) + '</span></button>';
   }).join('');
@@ -4684,6 +4832,10 @@ function wireHome() {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && homeOpen) closeHomeCard(); });
     // The petek says where its people live whenever its map lands.
     document.addEventListener('ist-hive-map', (e) => { if (box) homeFriendsFromMap(e.detail); });
+    // And every time it is fitted, its window is re-cut to its outline.
+    // Converges in one step: the outline is the same at any size, so the
+    // second fit asks for the window the first one already has.
+    document.addEventListener('ist-hive-fit', () => { if (box && HOME_SCREEN) placeHomePetek(); });
     let t = null;
     window.addEventListener('resize', () => {
       clearTimeout(t);

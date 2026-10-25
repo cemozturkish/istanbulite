@@ -2724,6 +2724,11 @@
       plane.style.transition = '';
     }
     watchHiveBox(state);
+    // Said out loud, for a page that shapes the WINDOW around the drawing
+    // (project.html's home screen starts it under the coast, and needs the
+    // drawing's own outline to know how high that can be). Only ever says
+    // a fit happened; the page decides whether that moves anything.
+    document.dispatchEvent(new CustomEvent('ist-hive-fit'));
   }
 
   // ── Being told the window has a size, instead of asking every frame ──
