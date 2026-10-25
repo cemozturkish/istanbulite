@@ -209,10 +209,37 @@
   // Both are the 'YYYY-MM-DD' shape every edition_date / game_date column
   // is written in.
 
+  // ── THE SUN IS PARKED FOR CONTENT ──
+  // Everything above and below about sunrise renewing Kütüphane and sunset
+  // renewing Kahvehane is still written, and stands behind this one flag.
+  // With it off, both sides' day IS the İstanbul calendar day: the games,
+  // the evenings, the petek's captions and every key they write turn over
+  // at midnight, like any daily game, and nothing turns at a sunrise or a
+  // sunset. The COLOURS still follow the sun -- palette.js asks isDaytime()
+  // directly and never reads this -- so the app still goes dark at dusk;
+  // only the content stopped waiting for it.
+  //
+  // It is parked rather than deleted because every caller already asks the
+  // right question ("which day is this side holding?", "when does the next
+  // night's game open?"), so the answer can change here and nowhere else:
+  // flipping this back on restores the split without touching a page.
+  const CONTENT_FOLLOWS_SUN = false;
+
+  // The instant the İstanbul calendar day after `base` begins -- a real
+  // instant, unlike nextMidnight()'s wall-clock-shifted Date, so it can be
+  // compared against new Date(). İstanbul has been +03:00 all year since
+  // 2016, so the offset is arithmetic rather than a guess.
+  function nextMidnightAt(base) {
+    return new Date(isoAt(base || new Date(), 1) + 'T00:00:00+03:00');
+  }
+
   // The Kütüphane day is exactly editionKey()'s date -- a day edition is
   // today, and a night edition is the day whose sunrise it followed -- so
   // it is that, not a second derivation of it.
-  function kutuphaneDay(base) { return editionKey(base).date; }
+  function kutuphaneDay(base) {
+    if (!CONTENT_FOLLOWS_SUN) return isoAt(base || new Date(), 0);
+    return editionKey(base).date;
+  }
 
   // The Kahvehane day: today from this evening's sunset on, yesterday
   // until then. Past midnight and before sunrise, "today's sunset" is
@@ -222,6 +249,7 @@
   // already moved on to today and Kahvehane is still last night's.
   function kahvehaneDay(base) {
     const b = base || new Date();
+    if (!CONTENT_FOLLOWS_SUN) return isoAt(b, 0);
     return isoAt(b, b >= sunTimes(b).sunset ? 0 : -1);
   }
 
@@ -250,6 +278,13 @@
   // by the device's own distance from Istanbul.
   function nextEdition(base) {
     const b = base || new Date();
+    // With the sun parked for content there is one paper a day and it goes
+    // out at midnight, both sides at once: edition 'gunluk', side 'both'.
+    // The date is the day that midnight begins.
+    if (!CONTENT_FOLLOWS_SUN) {
+      const at = nextMidnightAt(b);
+      return { edition: 'gunluk', side: 'both', date: isoAt(at, 0), at };
+    }
     const today = sunTimes(b);
     let at;
     if (b < today.sunrise) {
@@ -315,6 +350,9 @@
   // the answer by the device's own distance from Istanbul.
   function nextGameNight(base) {
     const b = base || new Date();
+    // One content day: the next game opens at midnight (see
+    // CONTENT_FOLLOWS_SUN), which is what every countdown then says.
+    if (!CONTENT_FOLLOWS_SUN) return nextMidnightAt(b);
     const tonight = sunTimes(b).sunset;
     if (tonight > b) return tonight;
     // Past this evening's sunset, so the next one is tomorrow's. Stepping a
@@ -327,6 +365,7 @@
   // `base`, the other half of nextGameNight(). Stepped the same way.
   function nextSunrise(base) {
     const b = base || new Date();
+    if (!CONTENT_FOLLOWS_SUN) return nextMidnightAt(b);
     const today = sunTimes(b).sunrise;
     if (today > b) return today;
     return sunTimes(new Date(b.getTime() + 86400000)).sunrise;
@@ -421,6 +460,7 @@
 
   global.IstDate = { parts, now, iso, daySeed, nextMidnight, parseYMD, untilMidnight,
                      sunTimes, isDaytime, edition, editionKey, nextEdition, skyArc,
-                     kutuphaneDay, kahvehaneDay, nextSunrise,
+                     kutuphaneDay, kahvehaneDay, nextSunrise, nextMidnightAt,
+                     CONTENT_FOLLOWS_SUN,
                      gameNight, gameNightSeed, nextGameNight, untilNextNight, TZ };
 })(window);

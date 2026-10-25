@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#f0f0f0">
   <title>Admin — istanbulite.net</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="ist-date.js?v=8"></script>
+  <script src="ist-date.js?v=9"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <script src="avatar.js?v=5"></script>
@@ -2175,7 +2175,7 @@
       .press-tail { margin-left: auto; padding: 6px 14px; border-left: none; }
     }
   </style>
-  <link rel="stylesheet" href="frames.css?v=20">
+  <link rel="stylesheet" href="frames.css?v=21">
 </head>
 <body>
 
@@ -5683,7 +5683,9 @@ document.getElementById('onboarding-toggle-btn').addEventListener('click', async
 // onboarding.js exactly, in the order the tour actually says them --
 // so a row here with no saved override still shows the admin the real
 // current text rather than a blank field. Adding a beat there means
-// adding a row here.
+// adding a row here. The rows marked "haberler kapalıyken söylenmez" are
+// the Kütüphane path, which the tour skips while project.html's
+// NEWS_ENABLED is off.
 const ONBOARDING_COPY_KEYS = [
   { key: "toSen", label: "Üst çubuk — adına bas",
     tr: "Yukarıda, çubuğun üstündeki kendi adına bas.",
@@ -5703,25 +5705,28 @@ const ONBOARDING_COPY_KEYS = [
   { key: "closeSheet", label: "Profili kapat",
     tr: "Tamam. Şimdi kapat.",
     en: "Good. Now close it." },
-  { key: "sky", label: "Gökyüzü — güneş ve ay",
-    tr: "Adının altındaki zincir İstanbul’un gökyüzü: güneş soldan doğar, sağdan batar; gece ay geçer. Uygulama da onunla döner.",
-    en: "The chain under your name is the sky over İstanbul: the sun rises on the left and sets on the right, and at night the moon crosses. The app turns with it." },
-  { key: "sunrise", label: "Gün doğumu — Kütüphane'ye kaydır",
+  { key: "toKahvehaneMid", label: "Ortadan Kahvehane'ye kaydır",
+    tr: "Şimdi Kahvehane: etkinlikler ve oyunlar. Sağda — oraya geçelim.",
+    en: "Now Kahvehane: the evenings and the games. It is on the right — let’s go there." },
+  { key: "midnight", label: "Kahvehane — gece yarısı yenilenir",
+    tr: "Burası her gece yarısı yenilenir: bugünün etkinlikleri, bugünün oyunları.",
+    en: "This side renews every midnight: today’s evenings, today’s games." },
+  { key: "sunrise", label: "Gün doğumu — Kütüphane'ye kaydır (haberler kapalıyken söylenmez)",
     tr: "Güneş doğunca Kütüphane yenilenir — günün haberleri, günün sorusu. Kütüphane solda: oraya geçelim.",
     en: "When the sun rises, Kütüphane renews — the day’s news, the day’s question. Kütüphane is on the left: let’s go there." },
-  { key: "newsOpen", label: "Kütüphane — bir habere bas",
+  { key: "newsOpen", label: "Kütüphane — bir habere bas (haberler kapalıyken söylenmez)",
     tr: "Bunlar bugünün haberleri. Birine bas.",
     en: "These are today’s stories. Press one." },
-  { key: "newsThrow", label: "Kütüphane — haberi fırlat",
+  { key: "newsThrow", label: "Kütüphane — haberi fırlat (haberler kapalıyken söylenmez)",
     tr: "Okuyunca işin bitti: sağa ya da sola fırlat, gitsin. Bir habere hep böyle veda edersin.",
     en: "Once you have read it, you are done with it: throw it left or right and it is gone. That is how you let go of every story." },
-  { key: "newsNone", label: "Kütüphane — bugün haber yoksa",
+  { key: "newsNone", label: "Kütüphane — bugün haber yoksa (haberler kapalıyken söylenmez)",
     tr: "Bugün henüz haber yok. Olduğunda, birine basıp okursun; bitince sağa ya da sola fırlatırsın.",
     en: "No stories yet today. When there are, you press one to read it and throw it left or right when you are done." },
-  { key: "toKahvehane", label: "Kahvehane'ye kaydır",
+  { key: "toKahvehane", label: "Kahvehane'ye kaydır (haberler kapalıyken söylenmez)",
     tr: "Şimdi Kahvehane. En sağda — haritadan geçip devam et.",
     en: "Now Kahvehane. It is all the way right — past the map, and keep going." },
-  { key: "sunset", label: "Gün batımı — Kahvehane",
+  { key: "sunset", label: "Gün batımı — Kahvehane (haberler kapalıyken söylenmez)",
     tr: "Güneş batınca da Kahvehane yenilenir — bu akşamın etkinlikleri, bu gecenin oyunları.",
     en: "And when the sun sets, Kahvehane renews — tonight’s evenings and tonight’s games." },
   { key: "eventOpen", label: "Kahvehane — bir etkinliğe bas",
@@ -10159,6 +10164,9 @@ function baskiSideState(side, date) {
 // Kütüphane, its sunset for Kahvehane. Asked at noon +03:00 so the sun
 // equation is handed the right İstanbul day whatever the device's zone.
 function baskiSideAt(side, date) {
+  // One content day (IstDate.CONTENT_FOLLOWS_SUN off): both pages of a
+  // date go out together at the midnight that date begins.
+  if (!IstDate.CONTENT_FOLLOWS_SUN) return new Date(date + 'T00:00:00+03:00');
   const sun = IstDate.sunTimes(new Date(date + 'T12:00:00+03:00'));
   return side === 'kutuphane' ? sun.sunrise : sun.sunset;
 }
@@ -10171,9 +10179,11 @@ function baskiPageWhenHTML(side) {
   const next = IstDate.nextEdition();
   const word = state === 'live' ? 'yayında'
     : (state === 'behind' ? 'geçti'
-      : (next.side === side && next.date === baskiDate ? 'sıradaki' : 'ileride'));
+      : ((next.side === side || next.side === 'both') && next.date === baskiDate ? 'sıradaki' : 'ileride'));
+  const edge = !IstDate.CONTENT_FOLLOWS_SUN ? 'gece yarısı '
+    : (side === 'kutuphane' ? 'gün doğumu ' : 'gün batımı ');
   return '<span class="baski-page-when">' +
-    (side === 'kutuphane' ? 'gün doğumu ' : 'gün batımı ') + escapeHtml(pressFmtTime(at)) +
+    edge + escapeHtml(pressFmtTime(at)) +
     ' · ' + (state === 'live' ? '<b>' + word + '</b>' : word) + '</span>';
 }
 
@@ -10694,8 +10704,23 @@ let pressTimer = null;
 // Kahvehane. Named for the side rather than "sabah/akşam" because that is
 // what an editor has to act on -- which page's slots are due.
 function pressEditionName(ed) {
+  // 'gunluk' is the one paper a day that goes out at midnight, both sides
+  // at once, while the sun is parked for content (IstDate.nextEdition).
+  if (ed === 'gunluk') return 'Günün sayısı';
   return ed === 'gun' ? 'Kütüphane' : 'Kahvehane';
 }
+
+// Whether a forme is part of the edition being counted down to. A 'gunluk'
+// edition carries both sides, so every forme is.
+function pressFormeApplies(f, ed) {
+  return ed === 'gunluk' || f.editions.indexOf(ed) !== -1;
+}
+
+// Formes for columns the reader no longer meets. The news and the Anket are
+// parked in project.html (NEWS_ENABLED), so a red Haberler forme would be
+// the desk reporting a slot nobody will ever see empty. Their sections and
+// the baskı board still work -- writing for later is fine.
+const PRESS_PARKED = new Set(['haberler', 'anket']);
 
 // What a dashed forme says instead of a check: when its own side goes.
 function pressEditionWhen(ed) {
@@ -10730,7 +10755,8 @@ function pressTick() {
     document.getElementById('press-name').textContent = pressEditionName(next.edition);
     document.getElementById('press-when').textContent =
       pressFmtDay(next.at) + ' · ' + pressFmtTime(next.at) +
-      (next.edition === 'gun' ? ' (gün doğumu)' : ' (gün batımı)');
+      (next.edition === 'gunluk' ? ' (gece yarısı)'
+        : (next.edition === 'gun' ? ' (gün doğumu)' : ' (gün batımı)'));
     pressCheck();
   }
 
@@ -10777,7 +10803,7 @@ async function pressCheck() {
   // every game off would be a far louder lie than reporting none.
   // A game is off unless it stands in one of the night's two slots
   // (db/game_night_slots.sql) -- the same lineup the reader's column reads.
-  if (ctx.edition === 'gece') {
+  if (ctx.edition !== 'gun') {
     try {
       const lineup = await gameLineup(ctx.date);
       GAME_STATUS_GAMES.forEach(g => { if (lineup.indexOf(g.game) < 0) ctx.gamesOff.add(g.game); });
@@ -10787,10 +10813,11 @@ async function pressCheck() {
   // Draw every forme at once in its pending state, so the bar has its
   // full width from the first frame and nothing shifts sideways as the
   // answers land one by one.
-  const applicable = PRESS_FORMES.filter(f => f.editions.indexOf(ctx.edition) !== -1);
-  const shown = PRESS_FORMES.map(f => ({
+  const formes = PRESS_FORMES.filter(f => !PRESS_PARKED.has(f.id));
+  const applicable = formes.filter(f => pressFormeApplies(f, ctx.edition));
+  const shown = formes.map(f => ({
     def: f,
-    on: f.editions.indexOf(ctx.edition) !== -1,
+    on: pressFormeApplies(f, ctx.edition),
   }));
   wrap.innerHTML = shown.map(x => `
     <button class="press-forme ${x.on ? 'pending' : 'na'}" data-forme="${x.def.id}" ${x.on ? '' : 'disabled'}>

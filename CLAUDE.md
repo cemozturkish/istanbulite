@@ -15,6 +15,27 @@ This file provides context for AI assistants working in this repository.
 
 ---
 
+## Launch state — what is parked right now
+
+For the first launch the app is about four things: **signing up, filling the petek, the daily
+games, and RSVPing to evenings.** Several things the rest of this file describes are switched off
+for it. Each is parked the house way: one flag or one pair of values, with everything it gates
+still written, so turning it back on is a one-line change. Read the sections below with this list
+in mind.
+
+| What | Switch | What "off" means |
+|---|---|---|
+| **Content follows the sun** | `CONTENT_FOLLOWS_SUN = false` in `ist-date.js` | `kutuphaneDay()`, `kahvehaneDay()`, `gameNight()`/`gameNightSeed()` are all the İstanbul **calendar day**; every game, evening and caption turns over at **midnight**. `nextGameNight()`/`nextSunrise()` return the next midnight (so every "new word in…" countdown counts to it), and `nextEdition()` returns one `'gunluk'` edition with `side: 'both'` at midnight. **The palette still follows the sun** — `palette.js` reads `isDaytime()` directly and never this flag. The edition notice ("Güneş bugün… doğdu") does not show. |
+| **The news and the Anket** | `NEWS_ENABLED = false` in `project.html` | The Haberler and Anket actors are left out of `CAST` (absent, not idle). The strip stops at the middle lane (`LANE_MIN`), the bar's KÜTÜPHANE word is hidden (`#fb-nav.fb-news-parked`), the day meter stops counting them, and the onboarding tour skips its Kütüphane beats (`__fb.newsEnabled`). In `admin.html`, `PRESS_PARKED` drops their formes from the press bar; the sections and the baskı board still work. |
+| **The bars' hexagon shoulders** | `--navbar-top-keep: 100%` and `--navbar-arc: 0px` in `frames.css` | Both bars are plain straight bands. The polygons are unchanged; the shoulder is `34%` / `12px`. Every "clear the raised corners" allowance goes to zero with `--navbar-arc`. |
+| **The sun meter** | *(removed, not parked)* | The ring chain under the top bar (`skyChartHTML`, `startSky`, `.ist-sky`) and its tour beat are deleted. The sections describing it are history. |
+
+The direction after this is a single home screen (the map with the week's evenings and petek
+members' own plans on it, the petek under it as the guest list, the two games at the bottom). That
+is not built yet; when it is, this table changes.
+
+---
+
 ## Vision & Product Philosophy
 
 This section is the source of truth for **why** the app is shaped the way it is. When a product,
@@ -89,6 +110,10 @@ someone about it, which is the whole point of the app being on the other side of
 The zoom levels tell one story: mahalle → Istanbul → Türkiye, with the user standing in the middle.
 
 ### Sunrise renews Kütüphane, sunset renews Kahvehane
+
+> **Parked for launch** (`CONTENT_FOLLOWS_SUN = false` in `ist-date.js`, see "Launch state"): all
+> content currently turns over at midnight, and only the colours follow the sun. What follows is
+> the design the flag restores.
 
 The two sides of the app do not share a day. **Kütüphane is the reading side, and its paper comes
 out with the light**: the news and the city's own question (Anket) are renewed at sunrise and stand
@@ -180,8 +205,8 @@ under project.html).
 ├── router.js             # Shared shell: single Supabase client, the two tabs + the zoom stack, virtual navigation, clock
 ├── sheet.css/.js         # THE sheet: the one page that rises from the bottom — see "Site-wide defaults"
 ├── profile-card.js/.css  # Profile bar, the petek, avatar, badges — shared across pages
-├── profile-bar.css       # THE TOP BAR's own styles (its sagging edge, the sun/moon chart hanging
-│                         off it) — each page's <link media> says which widths get the bar
+├── profile-bar.css       # THE TOP BAR's own styles — each page's <link media> says which widths
+│                         get the bar
 ├── onboarding.js/.css    # New-account onboarding — project.html ONLY (see its own section)
 ├── game-locks.js         # Per-day game on/off enforcement (games are otherwise independent)
 ├── event-interest.js     # "İlgimi çekti": the verdict Kahvehane's event deck records, Hane reads
@@ -192,7 +217,9 @@ under project.html).
 │                         (sunrise renews Kütüphane, sunset renews Kahvehane) —
 │                         gameNight/gameNightSeed/nextGameNight — which NIGHT is being played —
 │                         nextEdition — which side goes to press next and when, for the
-│                         admin's own countdown — and skyArc — where the sun or moon is now
+│                         admin's own countdown — and skyArc — where the sun or moon is now.
+│                         CONTENT_FOLLOWS_SUN (off for launch) parks every sun-keyed day above
+│                         onto the calendar day; see "Launch state" 
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
@@ -802,6 +829,11 @@ sb.from('articles').delete().eq('id', id)
     renders up to 300 stories, and a select of all of them inside each of them is 90,000 options
     nobody asked to see. Same rule as `ensureCardCountryPicker`. It offers what the list has
     loaded, so reaching an older story means switching to "Tümü" first.
+- **Launch state:** with `CONTENT_FOLLOWS_SUN` off, `IstDate.nextEdition()` names one
+  `'gunluk'` edition at midnight carrying both sides, so the bar reads "Günün sayısı · … ·
+  00:00 (gece yarısı)", every forme applies (`pressFormeApplies`), and the baskı board's two
+  pages both say "gece yarısı 00:00". `PRESS_PARKED` drops the Haberler and İlçe anketi formes
+  while the news is parked. What follows describes the sun-driven press times the flag restores.
 - **THE PRESS BAR — the deadline, and what is still missing from it.** A desk's first
   question is never "which section am I in", it is "when does this go out and is it
   finished". So the band under the masthead answers both, on every section, and never
@@ -1958,6 +1990,10 @@ in `ios/App/App/Info.plist` for that same prompt.
 
 ### The phone's two bars — `#ist-pc-mount` (top) and `.section-rule > header` (bottom)
 
+> **Launch state:** both bars are currently **straight** (the shoulders are parked in
+> `frames.css`, see "Launch state"), and the bottom bar's KÜTÜPHANE word is hidden while the news
+> is parked. Everything below about the hexagon shoulder describes what the two values restore.
+
 A phone shows the city between two fixed charcoal bars: **who is here** at the top (the profile
 bar) and **where you can go** at the bottom (Kütüphane / Hane / Kahvehane). The top bar carries two
 people, facing outward from the middle: **you** (your name over your district) and **whoever holds
@@ -2056,69 +2092,12 @@ Five things about it:
   been. The compass's three marks were lifted with it (`--fb-mark-foot`), one number because the
   logo's foot is planted on the same line the two words sit on.
 
-### The sky under the bar — the sun and the moon cross it
+### The sky under the bar — removed
 
-A chain of fifteen rings hangs off the profile bar's own sagging edge, and one of them is the
-**sun**. It rises at the left of the screen, crosses, and sets at the right; at sunset the chain
-starts again from the left with the **moon** on it. So the bar says what time it is the way a
-window does — by where the light is — rather than by printing a clock nobody asked for.
-
-It is the same sun the palette and the edition already follow (`IstDate.skyArc`, built on
-`sunTimes`), which is why it is a chart of the real sky over İstanbul and not a fifteen-part
-progress bar: the day arc is short at the solstice and long in June, and a reader can see that.
-Fifteen marks is a mark every ~38 (winter) to ~55 (summer) minutes — slow enough to be ambient,
-quick enough that a reader who looks twice in an afternoon sees it move.
-
-- **`IstDate.skyArc()` is where the arc lives**, because everything about the Istanbul day belongs
-  in `ist-date.js` (convention 10). It returns `edition()`'s own two words rather than a third
-  vocabulary — this is the same sun seen from a different side. A **night spans midnight**, so its
-  two ends come off two different calendar days and which two depends on which side of midnight
-  the caller is standing: before this morning's sunrise the arc began at *yesterday's* sunset;
-  after this evening's it ends at *tomorrow's* sunrise. Real instants throughout, never `now()`.
-- **Nothing about the chart is measured.** Each mark carries two numbers, written once at build
-  time: `--t`, its own fraction of the screen's *width*, and `--s`, the bar's own edge evaluated
-  there — 0 at either corner, 1 across the flat, and the straight ramp between, which on the flank
-  is literally `t / --navbar-bevel`. `--s` then interpolates the mark's own `top` between the two
-  **percentages the clip-path above is cut to**, so the chain hangs off the real edge at any width
-  and any notch depth, with no resize listener and nothing read back out of layout. (`.ist-sky`
-  fills the bar rather than being a zero-height line at its top precisely so those percentages
-  resolve against the bar's real height — a zero-height containing block makes every one of them
-  nothing, which is why the marks used to need a length token, and that token is what collapsed.)
-  The clearance is therefore `--ist-sky-drop` at *every* mark rather than only at the one it was
-  tuned on — which is what lets seven of the fifteen sit on a diagonal and still hang off it
-  evenly.
-- **`--t` is a fraction of the width, not `--screen-inset`.** The edge runs corner to corner, so
-  a chain hung on a narrower span would be a *different* hexagon and would climb into the bar at
-  the ends. The ends are inset by a few percent of the width instead, far enough that the lit
-  mark — half again the size of the others — still clears the screen's edge on the two days it
-  stands at either end.
-- **The lit mark is bigger and its ring is broken** at the top and the bottom: the chain is a
-  track and this is the one link that is open, which reads as a place being passed *through*
-  rather than as one more stop on it. Inside it sits the light — a filled disc by day, the same
-  disc with a circular bite out of its right side by night, which is the whole of a crescent. The
-  bite is a mask rather than a paper-coloured disc laid over it, because what is behind these
-  marks is the city's own drawing and not a flat sheet of paper. The ring is the mark's
-  `::before` and the light its `::after` precisely so the mask that splits the ring cannot cut a
-  wedge through the sun as well.
-- **And it leaves a trail.** The rings the light has already crossed keep a fading afterimage of
-  it — strongest just behind the sun, gone five marks back (`--trail`, written per mark by
-  `paintSky`, and the only thing besides the lit ring that a tick changes). That is what says
-  which *way* the light is travelling; a lit mark on its own only says where it is, and on a track
-  that reads the same either way round. Deliberately a tail that runs out rather than every passed
-  mark inked in: a filled run all the way back to the corner is a progress bar, which invites
-  counting how much of the day is left — the one thing this app does not print (see
-  "Anti-screen-time" and the day meter's own note about closure rather than accumulation). The
-  tail says the sun came from over there and nothing else, and how far through the day it is was
-  already said by *where* it is standing.
-- **Built by `skyChartHTML()` in profile-card.js, inside the bar's own template.** The row is
-  rebuilt wholesale (`container.innerHTML`), so anything appended beside it is wiped by the next
-  rebuild. It is drawn with the loading state too — it needs nothing from Supabase, and a bar that
-  grows its chain a round trip after it appears reads as the page still assembling itself. One
-  timer for the module (`startSky`), not one per render, plus a `visibilitychange` re-read, since
-  a phone that spent the evening in a pocket does not wake up under the sky it went to sleep
-  under. `#ist-pc-mount > .ist-sky` must stay `overflow: visible`: frames.css clips the mount's
-  children, and a zero-height box whose whole content hangs outside it is the difference between a
-  chart and nothing at all.
+There used to be a chain of fifteen rings hanging under the profile bar with the sun (by day) or the
+moon (by night) on one of them, driven by `IstDate.skyArc()`. It was removed for the launch, along
+with its onboarding beat and its `sky.*` strings. `skyArc()` is still in `ist-date.js`; nothing
+draws it.
 
 ### The two bars are omnipresent — nothing may pass in front of them
 
@@ -3668,15 +3647,16 @@ switch is `app_settings.onboarding_enabled` (missing row = on). **The palette is
 more**: the reader keeps whatever palette.js already has them on (it stays changeable from the
 profile sheet), and `mascot` is derived from that.
 
-**The tour is four things, each taught by being done once**, in this order:
+**The tour is three things, each taught by being done once**, in this order:
 1. **The top bar** — press your own name (Sen, the profile sheet), style the avatar one open
    category at a time, close the sheet yourself.
-2. **The sky** — the sun/moon chain hanging off that bar is the app's clock: each edge of the day
-   renews one side (see "SUNRISE RENEWS KÜTÜPHANE" in project.html).
-3. **Kütüphane, renewed at sunrise** — pull there, press a story (an `open` beat), throw it left or
-   right (a `throw` beat).
-4. **Kahvehane, renewed at sunset** — pull there (two pulls, through the map), press an evening,
-   throw it: here the direction is the RSVP.
+2. **Kütüphane** — pull there, press a story (an `open` beat), throw it left or right (a `throw`
+   beat). **Skipped while the news is parked** (`__fb.newsEnabled`, see "Launch state"): the tour
+   then makes one pull from the middle to Kahvehane (`toKahvehaneMid`) and says it renews at
+   midnight (`midnight`), instead of the two pulls and the sunrise/sunset lines.
+3. **Kahvehane** — pull there, press an evening, throw it: here the direction is the RSVP.
+
+(There was a sky beat between 1 and 2; it went with the sun meter.)
 
 **Things are introduced one at a time, and what has not been introduced is not there.** While the
 tour runs (`body.ist-onb-reveal`) every part it has not reached yet is `visibility: hidden` — so

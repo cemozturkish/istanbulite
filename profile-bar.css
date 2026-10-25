@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   profile-bar.css — THE TOP BAR: who is here, and the sky under it.
+   profile-bar.css — THE TOP BAR: who is here.
 
    It used to be the phone-only half of profile-card.css, wrapped in
    `@media (max-width: 768px)`. It is its own file now so that WHICH
@@ -16,9 +16,8 @@
                                                 and the bar is part of it
 
    One implementation, two scopes, and nothing restated -- the desktop
-   app wears the same bar, the same hexagon shoulder and the same sky
-   chain a phone does, all of it already written in percentages of the
-   bar's own box and the screen's width.
+   app wears the same bar a phone does, all of it already written in
+   percentages of the bar's own box and the screen's width.
 
    Link it RIGHT AFTER profile-card.css. The rules below share the
    card's own specificity and must come after them (see the note at the
@@ -67,16 +66,8 @@
      derived from calc(env(…) + …) is the one spelling that measured
      right here and collapsed on the phone (the note in frames.css has
      the arithmetic). Whatever height the notch gives this box, the
-     shoulder and the chain below it both read the same 100%.
-
-     The sky chart's two numbers (see "THE SKY UNDER THE BAR" below).
-     The mark scales with the screen because the fifteen of them have
-     to sit apart on a 320px phone as readably as on a 430px one:
-     4.6vw keeps the ring at a little over two-thirds of the gap
-     between two of them, whatever the width. The drop is how far the
-     chain hangs under the bar's own edge — one number, not a per-mark
-     offset, because the chain FOLLOWS the edge. */
-  --ist-sky-dot: clamp(13px, 4.6vw, 20px);
+     shoulder reads the same 100%. (For the launch the shoulder is
+     parked flat -- see "THE BARS ARE STRAIGHT" in frames.css.) */
   /* ── IN THE APP, THE SHOULDER RISES NO HIGHER THAN THE NAMES ──
      The corners used to stand at --navbar-top-keep alone (34% of the
      bar), which on a notched phone is up inside the status bar: the
@@ -90,7 +81,6 @@
      (see frames.css). --navbar-top-keep stays as the floor, so a
      screen with no inset keeps the shoulder it always had. */
   --ist-pc-name-top: 1px;
-  --ist-sky-drop: 15px;
 }
 /* ── The ink, and the shape it is cut to ──
    A layer of its own rather than the mount's own background, because
@@ -148,12 +138,6 @@ html.ist-native #ist-pc-mount::before {
 /* frames.css loads last and gives the mount's child the shared card
    shadow; on a bar that reads as a dark band smeared over the map. */
 #ist-pc-mount > * { box-shadow: none !important; }
-/* ...and it clips them, which is right for the row and fatal for the
-   sky: the chain of rings is a zero-height box whose whole content
-   hangs outside it, so a clip is the difference between a chart and
-   nothing at all. Named rather than !important — an id plus a class
-   already outweighs the id plus `*` over in frames.css. */
-#ist-pc-mount > .ist-sky { overflow: visible; }
 
 /* Bar proportions: the row stands at --navbar-h-top (taller than the tab
    bar at the other edge — it carries a portrait and two lines of type
@@ -233,151 +217,6 @@ html.ist-native #ist-pc-mount::before {
    acknowledged by the type brightening rather than by a button lighting
    up under it. */
 .ist-pc-me:active .ist-pc-meta { color: var(--navbar-ink-label-active); }
-
-/* ── THE SKY UNDER THE BAR ──
-   A chain of rings hanging off the bar's own sagging edge, and one of
-   them is the sun. It rises at the left, crosses to the right, sets —
-   and then the chain starts again at the left with the moon on it. So
-   the bar says what time it is the way a window does, by where the
-   light is, rather than by printing a clock nobody asked for. It is
-   the same sun the palette already follows (IstDate.sunTimes), which
-   is why this is a chart of the real sky over İstanbul and not a
-   fifteen-part progress bar: at the solstice it is short and in June
-   it is long, and the reader can see that.
-
-   Fifteen marks, which at this latitude is a mark every ~55 minutes in
-   summer and every ~38 in winter — slow enough to be ambient, quick
-   enough that a reader who looks twice in an afternoon sees it move.
-
-   ── Nothing here is measured, and that is deliberate ──
-   The marks are placed entirely in calc(). Each carries two numbers,
-   written once at build time: --t, its own fraction of the screen's
-   WIDTH, and --s, the bar's own edge evaluated there — 0 at either
-   corner, 1 across the flat, and the straight ramp between (so it is
-   literally t/bevel on the flank). --s then interpolates the mark's
-   own `top` between the two percentages the clip-path above is cut
-   to, so the chain hangs off the real edge at any width and any notch
-   depth, with no resize listener and nothing read back out of layout.
-   The clearance is therefore --ist-sky-drop at every mark rather than
-   only at the one it was tuned on — which is what lets seven of the
-   fifteen sit on a diagonal and still hang off it evenly.
-
-   That is also why --t is a fraction of the width and not the
-   --screen-inset every printed thing on this bar sits on: the edge
-   runs corner to corner, so a chain hung on a narrower span would be
-   a DIFFERENT hexagon and would climb into the bar at the ends. The
-   ends are inset by a few percent of the width instead — far enough
-   that the LIT mark, which is half again the size of the others, still
-   clears the screen's edge on the two days it stands at either end. */
-.ist-sky {
-  display: block;
-  position: absolute;
-  /* It FILLS the bar rather than being a zero-height line at its top,
-     and that is load-bearing: this is the containing block for every
-     mark, so `100%` in a mark's own `top` is the bar's real height —
-     the same 100% the shoulder above is cut to. A zero-height box
-     would make every percentage nothing, which is why the marks used
-     to need a length token carrying env() (see the mount's own note),
-     and that token is what collapsed on the phone. */
-  inset: 0;
-  /* The bar is furniture; this hangs off it over the city. It must
-     never take a touch meant for what is underneath. */
-  pointer-events: none;
-}
-.ist-sky-mark {
-  --d: var(--ist-sky-dot);
-  position: absolute;
-  box-sizing: border-box;
-  width: var(--d);
-  height: var(--d);
-  /* Half its own size back in both axes: left/top place the mark's
-     CENTRE on the curve, not its corner. */
-  margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
-  left: calc(var(--t, 0) * 100%);
-  /* The bar's own edge at this mark, plus the chain's drop: --s ramps
-     from the corner's share of the box to the whole of it, so this is
-     the same percentage the clip-path above is cut to and the two can
-     never disagree. */
-  top: calc(var(--navbar-top-keep, 34%)
-            + (100% - var(--navbar-top-keep, 34%)) * var(--s, 0)
-            + var(--ist-sky-drop));
-}
-/* The chain hangs off whichever edge is drawn -- the app's own. */
-html.ist-native .ist-sky-mark {
-  top: calc(max(var(--navbar-top-keep, 34%), calc(env(safe-area-inset-top) + var(--ist-pc-name-top, 1px)))
-            + (100% - max(var(--navbar-top-keep, 34%), calc(env(safe-area-inset-top) + var(--ist-pc-name-top, 1px)))) * var(--s, 0)
-            + var(--ist-sky-drop));
-}
-/* The ring is the ::before rather than the mark's own border, because
-   the mark on the sun's current place is SPLIT (see below) and the
-   mask that splits it would cut a wedge through anything inside the
-   mark as well — the sun included. Ring on one layer, light on the
-   other, one mask each. */
-.ist-sky-mark::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border: 2px solid var(--ink);
-  border-radius: 50%;
-}
-/* WHERE THE LIGHT IS, NOW. Bigger than the marks it stands among, with
-   a whole ring — solid, the same as every other mark's, just larger —
-   so this one reads as the biggest stop on the track rather than as a
-   gap in it. */
-.ist-sky-mark.ist-sky-now { --d: calc(var(--ist-sky-dot) * 1.36); }
-/* ...and inside it, which light it is, filling the ring rather than
-   sitting small inside it. By day a filled disc; after sunset the
-   same disc with a bite taken out of its right side, which is the
-   whole of a crescent. Both are --ink: this is drawn on the city's
-   paper, not on the bar. Inset by the ring's own border width so the
-   disc's edge meets the ring's inner edge exactly. */
-.ist-sky-mark.ist-sky-gun::after,
-.ist-sky-mark.ist-sky-gece::after {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  background: var(--ink);
-  border-radius: 50%;
-}
-
-/* ── AND IT LEAVES A TRAIL ──
-   The rings the light has already crossed keep a fading afterimage of
-   it, strongest just behind the sun and gone a few marks back. That
-   is what says which WAY the light is travelling — a lit mark on its
-   own only says where it is, and on a track that reads the same
-   either way round.
-
-   Deliberately a tail that runs out rather than every passed mark
-   inked in. A filled run all the way back to the corner is a progress
-   bar: it invites counting how much of the day is left, which is the
-   one thing this app does not print (see "Anti-screen-time" and the
-   day meter's own note about closure rather than accumulation). A
-   tail says the sun came from over there and nothing else, and how
-   far through the day it is was already said by WHERE it is standing.
-
-   --trail is written per mark by paintSky (1 just behind the light,
-   0 at the end of the tail) and is the only thing that changes on a
-   tick besides which ring is lit. It is a plain number so the fade is
-   one multiplication here rather than fifteen opacities in the JS. */
-.ist-sky-mark.ist-sky-past::after {
-  content: '';
-  position: absolute;
-  /* Fills its own ring exactly like the light itself, only faded: it
-     is the same light seen fainter, not a smaller mark. */
-  inset: 2px;
-  background: var(--ink);
-  border-radius: 50%;
-  opacity: calc(var(--trail, 0) * 0.6);
-}
-/* The moon is that disc with a circular bite taken out of its right
-   side — which is the whole of a crescent, and needs no second shape.
-   A mask rather than a paper-coloured disc laid over it: the bite has
-   to be genuinely transparent, since what is behind these marks is the
-   city's own drawing and not a flat sheet of paper. */
-.ist-sky-mark.ist-sky-gece::after {
-  -webkit-mask-image: radial-gradient(circle at 128% 50%, #0000 62%, #000 62.5%);
-          mask-image: radial-gradient(circle at 128% 50%, #0000 62%, #000 62.5%);
-}
 
 /* ── The other end of the bar: the seat ──
    The bar names the two people who matter on the page you are looking
