@@ -2092,6 +2092,14 @@ Five things about it:
     what hid this: the test page set `--ist-bar-h` by hand, so the one line that breaks on the
     device was never executed. Leave `env()` where the real page leaves it and override only the
     plain px token beside it (`--navbar-h-top`) to stand in for a taller or shorter box.
+- **But the bottom bar's own box is inked too** (`.section-rule > header`, frames.css), in the
+  same `--navbar-ink`, and that is for Safari rather than for the page. Safari 26 on iOS tints the
+  strip under its floating toolbar from the `background-color` of the fixed element at the bottom
+  edge of the page; a bar whose ink lived only on `::before` read as transparent, and the toolbar
+  came up in the page's pale paper under a charcoal bar. It changes nothing on screen — the
+  header's box lies wholly inside the `::before`'s ink in every state of the shoulder, which only
+  reaches above it — and a harness confirms the bar strip pixel-identical. The top bar needs no
+  such thing: Safari samples the top of the page's pixels instead.
 - **Everything that clears the tab bar clears its CORNERS**, which are `--navbar-arc` higher than
   its middle. `--fb-dock` in project.html adds that token for exactly this reason: the left
   column's own left edge stands at a corner, not at the middle, so measuring its clearance
@@ -2208,6 +2216,19 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
   notch less `--fb-map-lift`, like `.fb > img`) and ends above the games.
 - **The petek is that window's** and `fitHive` does the rest: it scales into whatever box it has
   and stands on its floor, which is what made the hexagons smaller without touching the petek.
+- **On a phone the window starts under the COAST, not at 49%** (`placeHomePetek`, `HOME_COAST`).
+  49% is where the land ends at the screen's edges; across the middle the coast is far higher,
+  because the Bosphorus opens into the Marmara there, so a 49% window left a band of empty sea over
+  a petek fitted to what was left — measured, a 48px hexagon on a 393×760 Safari page. The coast is
+  a V and so is a honeycomb standing on its foot (its top row is its narrowest), so the window
+  starts 8px under the lowest ink across the middle half of the screen, and the same page draws
+  65px hexagons. `HOME_COAST` is that ink measured off `istanbul-map-mobile.png` itself (the lowest
+  non-sea row in each 20px column of its 1080×1920 canvas — re-measure it if the file is redrawn),
+  mapped through the drawing's real `cover` box so the app and Safari each get their own line. The
+  CSS 49% is the fallback until the drawing is in, and a desktop drops the inline top.
+  - **And the drawing's foot keeps 6px of paper, not 38** (`--ist-hive-foot-gap` on the window,
+    read by `hiveFootGap` in profile-card.js). `HIVE_CARD_GAP` is Hane's room for a card opening
+    upward out of the events strip; nothing rises from under the petek here.
   On the day the games are done, the closing line takes a strip at the foot of the window and the
   petek refits above it.
 - **The week's evenings are DOTS** (`renderHomeDots`), from the baskı in force
