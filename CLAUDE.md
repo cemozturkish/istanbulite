@@ -2221,11 +2221,29 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
   because the Bosphorus opens into the Marmara there, so a 49% window left a band of empty sea over
   a petek fitted to what was left — measured, a 48px hexagon on a 393×760 Safari page. The coast is
   a V and so is a honeycomb standing on its foot (its top row is its narrowest), so the window
-  starts 8px under the lowest ink across the middle half of the screen, and the same page draws
-  65px hexagons. `HOME_COAST` is that ink measured off `istanbul-map-mobile.png` itself (the lowest
-  non-sea row in each 20px column of its 1080×1920 canvas — re-measure it if the file is redrawn),
-  mapped through the drawing's real `cover` box so the app and Safari each get their own line. The
-  CSS 49% is the fallback until the drawing is in, and a desktop drops the inline top.
+  starts as high as **the petek's own outline** allows: every hexagon's roof (a point sloping to
+  two corners, `HEX_TIP` / `HEX_SHOULDER` off `assets/frame.png`) and every name's top must stand
+  `HOME_COAST_AIR` (8px) under the land above it, column by column. `homePetekShape()` measures that
+  outline off the drawing as `fitHive` left it, in units of the reader's own cell — the plane is
+  scaled as one piece, so the numbers are the same at any size — and `placeHomePetek` halves its
+  way to the largest cell that fits, then cuts the window to exactly that. `HOME_COAST` is the
+  lowest non-sea row in each 20px column of `istanbul-map-mobile.png`'s 1080×1920 canvas
+  (re-measure it if the file is redrawn), mapped through the drawing's real `cover` box so the app
+  and Safari each get their own line. Before a petek is drawn the window starts under the coast
+  across the middle half; the CSS 49% is the fallback until the drawing is in, and a desktop drops
+  the inline top.
+  - **It re-cuts on every fit** (`ist-hive-fit`, dispatched at the end of `fitHive`). It converges
+    in one step: the outline is size-free, so the second fit asks for the window the first one
+    already has, and the top is only written when it moves by a pixel.
+  - **And the drawing is LIFTED into the paper over its land** (`--fb-home-lift` on the book,
+    `HOME_LAND_TOP` — the same measurement the other way up, the highest ink per column). `cover`
+    lays the drawing in from the top of the screen and the top of the drawing is empty sea, so the
+    drawing and the tracing ride up together until the highest land on this screen stands
+    `HOME_LIFT_AIR` (10px) under the top bar. Moved by `top`, never a transform, because the dots
+    are placed through the tracing's `getScreenCTM()`. The lift is worked out from where the
+    drawing would stand unlifted, so asking twice gives the same answer. The app's own variant
+    adds it on top of `--fb-map-lift`. Measured on 393×760: 65px hexagons → 82px; 375×667:
+    48 → 63.
   - **And the drawing's foot keeps 6px of paper, not 38** (`--ist-hive-foot-gap` on the window,
     read by `hiveFootGap` in profile-card.js). `HIVE_CARD_GAP` is Hane's room for a card opening
     upward out of the events strip; nothing rises from under the petek here.
@@ -2258,7 +2276,9 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
   tracing in the book and after the frames even with nothing painted, because the dots are placed
   off it.
 - **Today's two games are buttons at the foot** (`renderHomeGames`, off `gamesStateToday()`): the
-  reader's own state only (OYNA / BİTTİ ✓ / Bugün yok), never anybody else's score. A press syncs
+  reader's own state only (OYNA / BİTTİ ✓ / Bugün yok), never anybody else's score. A button is
+  the game's NAME over its state and nothing else — no Sözcel or Çengel mark beside it, so the
+  pair reads as two words the way Tümcel's always did. A press syncs
   the day first (`syncKahvehaneForGames`) and opens the existing game sheet; closing it re-renders
   the buttons. On a desktop they stand where Kahvehane's column stood.
 - **Renewal**: the evenings and the games are the Kahvehane side's, so `refreshEditionColumns`
