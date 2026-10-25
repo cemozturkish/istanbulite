@@ -4020,10 +4020,7 @@ function homePetekShape() {
   if (!parts.length) return null;
   return {
     parts, mx, u,
-    // Where the drawing stands: the foot of its lowest cell. fitHive puts
-    // it on the window's floor whatever size it draws, so this does not
-    // move when the window's top does.
-    floor: my + bottom * u,
+    // How far the foot of the lowest cell is below the reader's centre.
     below: bottom,
     tall: 2 * Math.max(-top, bottom),           // fitHive's own reqH
     wide: 2 * Math.max(-left, right),           // ... and roughly its reqW
@@ -4077,6 +4074,17 @@ function placeHomePetek() {
   const view = document.getElementById('po-hive-view') || mapEl;
   const vr = view.getBoundingClientRect();
   const shape = homePetekShape();
+  // Where the drawing stands: fitHive puts the foot of its lowest cell on
+  // the view's floor less the gap it keeps there (--ist-hive-foot-gap,
+  // 6px here; Hane's reserve is not set on this page), whatever size it
+  // draws -- so the floor does not move when the window's top does.
+  // Read off the view and never off the cells: a refit of a plane already
+  // on screen animates its transform for 520ms, and the event that called
+  // this fires at the START of that, with the cells still where the last
+  // fit left them. The outline is safe to read mid-flight (the plane is
+  // one uniform scale at every instant); its position is not.
+  const footGap = parseFloat(getComputedStyle(view).getPropertyValue('--ist-hive-foot-gap'));
+  const floor = vr.bottom - (Number.isFinite(footGap) && footGap >= 0 ? footGap : 38);
   let viewTop;
   if (!shape) {
     // Nothing drawn yet: under the coast across the middle half, which
@@ -4090,7 +4098,7 @@ function placeHomePetek() {
     // petek is taller AND wider, so "fits" only ever turns false as w
     // grows -- the largest w that fits is found by halving.
     const fits = (w) => {
-      const cy = shape.floor - shape.below * w;
+      const cy = floor - shape.below * w;
       return shape.parts.every(p => {
         const pcx = shape.mx + p.cx * w, half = p.half * w;
         const [c0, c1] = cols(pcx - half, pcx + half);
@@ -4107,11 +4115,11 @@ function placeHomePetek() {
     };
     // Never above the bar, never wider than the window, never past the
     // size fitHive would stop at anyway.
-    let hi = Math.min((shape.floor - barBottom) / shape.tall, vr.width / shape.wide, shape.most);
+    let hi = Math.min((floor - barBottom) / shape.tall, vr.width / shape.wide, shape.most);
     let lo = 0;
     if (fits(hi)) lo = hi;
     else for (let i = 0; i < 18; i++) { const m = (lo + hi) / 2; if (fits(m)) lo = m; else hi = m; }
-    viewTop = shape.floor - shape.tall * lo;
+    viewTop = floor - shape.tall * lo;
   }
   // The window is the petek's box less whatever it is inset by.
   const next = Math.round(mapEl.getBoundingClientRect().top - b.top + (viewTop - vr.top));

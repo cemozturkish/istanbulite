@@ -2235,6 +2235,12 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
   - **It re-cuts on every fit** (`ist-hive-fit`, dispatched at the end of `fitHive`). It converges
     in one step: the outline is size-free, so the second fit asks for the window the first one
     already has, and the top is only written when it moves by a pixel.
+  - **The floor is read off the VIEW, never off the cells** (its bottom less
+    `--ist-hive-foot-gap`). A refit of a plane already on screen animates its transform for
+    520ms and the event fires at the start of that, so the cells are still where the last fit
+    left them: the outline is safe to read mid-flight (one uniform scale at every instant), its
+    position is not. Read off the cells, the window drifted a few pixels on every box change
+    (the plan button arriving, the closing line) and could cut a hexagon into the coast.
   - **And the drawing is LIFTED into the paper over its land** (`--fb-home-lift` on the book,
     `HOME_LAND_TOP` — the same measurement the other way up, the highest ink per column). `cover`
     lays the drawing in from the top of the screen and the top of the drawing is empty sea, so the
