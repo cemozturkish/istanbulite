@@ -48,6 +48,20 @@
     'events.changed':      { default: 'Vazgeç',               more_english: 'Changed my mind' },
     'events.youregoing':   { default: 'Gidiyorsun ✓',         more_english: "You're going ✓" },
     'events.kefil':        { default: 'ETKİNLİK KEFİLİ',      more_english: 'EVENT SPONSOR' },
+    // The home screen (project.html): the week's evenings on the map, and
+    // the petek as the open evening's guest list (profile-card.js,
+    // applyHiveEventStates).
+    'home.games':          { default: 'BUGÜNÜN OYUNLARI',     more_english: "TODAY'S GAMES" },
+    'home.play':           { default: 'OYNA',                 more_english: 'PLAY' },
+    'home.played':         { default: 'BİTTİ ✓',              more_english: 'DONE ✓' },
+    'home.off':            { default: 'Bugün yok',            more_english: 'Not today' },
+    'home.today':          { default: 'BUGÜN',                more_english: 'TODAY' },
+    'home.week':           { default: 'BU HAFTA',             more_english: 'THIS WEEK' },
+    'home.noevents':       { default: 'Bu hafta haritada etkinlik yok.', more_english: 'No evenings on the map this week.' },
+    'hive.ev.kefil':       { default: 'Kefil',                more_english: 'Host' },
+    'hive.ev.go':          { default: 'Gidiyor ✓',            more_english: 'Going ✓' },
+    'hive.ev.no':          { default: 'Gitmiyor',             more_english: 'Not going' },
+    'hive.ev.none':        { default: 'Cevap yok',            more_english: 'No answer' },
     // Haberler's three fixed category slots (project.html), same object
     // as a Dünya story's own kicker on the parts-bin pages.
     'news.istanbul':       { default: 'İSTANBUL',              more_english: 'ISTANBUL' },

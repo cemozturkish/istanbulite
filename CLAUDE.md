@@ -29,10 +29,12 @@ in mind.
 | **The news and the Anket** | `NEWS_ENABLED = false` in `project.html` | The Haberler and Anket actors are left out of `CAST` (absent, not idle). The strip stops at the middle lane (`LANE_MIN`), the bar's KÜTÜPHANE word is hidden (`#fb-nav.fb-news-parked`), the day meter stops counting them, and the onboarding tour skips its Kütüphane beats (`__fb.newsEnabled`). In `admin.html`, `PRESS_PARKED` drops their formes from the press bar; the sections and the baskı board still work. |
 | **The bars' hexagon shoulders** | `--navbar-top-keep: 100%` and `--navbar-arc: 0px` in `frames.css` | Both bars are plain straight bands. The polygons are unchanged; the shoulder is `34%` / `12px`. Every "clear the raised corners" allowance goes to zero with `--navbar-arc`. |
 | **The sun meter** | *(removed, not parked)* | The ring chain under the top bar (`skyChartHTML`, `startSky`, `.ist-sky`) and its tour beat are deleted. The sections describing it are history. |
+| **The three-lane strip** | `HOME_SCREEN = true` in `project.html` | The app is ONE screen — see "The home screen" under project.html. The Kahvehane columns are left out of `CAST`, `LANE_MAX` caps the strip at the middle (with `LANE_MIN`, nothing to walk to either side), the wash over the map is off, the book's own drag bails (`onDown`), and both bottom-bar words are hidden (`#fb-nav.fb-home-nav`). |
+| **The petek's day glyph** | `HIVE_DAY_GLYPH = false` in `profile-card.js` | A neighbour's caption is their district, not the two-screen glyph, and nothing asks `hive_member_status`. |
+| **Friends' districts lit** | `FRIEND_DISTRICTS_LIT = true` in `project.html` | ON, and the one to switch off if it looks wrong on a phone: it is the resting fill CLAUDE.md records as "tried and abandoned" for misregistration, brought back behind its own switch. |
 
-The direction after this is a single home screen (the map with the week's evenings and petek
-members' own plans on it, the petek under it as the guest list, the two games at the bottom). That
-is not built yet; when it is, this table changes.
+Still to come: members' own plans ("I'll be here, this day, this time"), shown only to their
+petek — a database change (`events.created_by` + `audience`) plus a form.
 
 ---
 
@@ -2190,6 +2192,53 @@ Five things about it:
   news deck and Kahvehane's two decks do not, so a vertical swipe over them zooms. Hane is not in
   the stack at all, so its vertical pull still belongs to the petek.
 
+### The home screen — `project.html` (`HOME_SCREEN`)
+
+The launch app is one screen, laid on the book's own İstanbul drawing (slide 12, the middle lane):
+
+- **The map stands at full strength.** The drawing is laid in with `cover`, which on every phone
+  is bound by height, and its drawn land ends at **49%** of the drawing's height (measured off
+  `istanbul-map-mobile.png`). So "under the land" is a share of the book's box with nothing
+  measured: `.fb.fb-home-on #fb-map` starts there (the app's own variant starts the share at the
+  notch less `--fb-map-lift`, like `.fb > img`) and ends above the games.
+- **The petek is that window's** and `fitHive` does the rest: it scales into whatever box it has
+  and stands on its floor, which is what made the hexagons smaller without touching the petek.
+  On the day the games are done, the closing line takes a strip at the foot of the window and the
+  petek refits above it.
+- **The week's evenings are DOTS** (`renderHomeDots`), from the baskı in force
+  (`editionInForce('events_current_edition', …)`, today + `HOME_DAYS`). One dot per district,
+  placed at the area centroid of the district's largest traced shape, through the tracing's own
+  `getScreenCTM()` — so a dot is where the drawing is at any width, phone or desktop. Filled red is
+  today, a red ring is later, a number is several. A district the drawing does not reach at this
+  width (or the seven it never draws, `HOME_UNDRAWN_SIDE`) is an **edge tag** ("← BAKIRKÖY").
+  Dots don't need the tracing to register with the drawing the way a fill does.
+- **A dot opens a CARD pinned to it** (`renderHomeCard`, `placeHomeCard`): district · when, title,
+  description (clamped), the ETKİNLİK KEFİLİ line, and GİDİYORUM / GİTMİYORUM, which write through
+  the same `setEventRsvp` the column used (both `event_rsvps` and `event_interest`). Above the dot
+  when there is room under the top bar, else beside it on a wide screen, else below. Several
+  evenings in one district page with ‹ ›. The same dot, the ×, Escape or a press on the bare map
+  closes it; a press on the petek does not — looking at who is going is what it is for.
+- **While a card is open the petek is its guest list**
+  (`IstProfileCard.paintHiveEventStates`, `data-ev` on each cell): **kefil** (red ring, glow,
+  KEFİL tag — `events.kefil_id`), **go** (red ring — `hive_event_rsvp_status`), **no** (faded —
+  `hive_event_interest_status` 'no'), **none** (gray ring). The word under the name says the same.
+  The reader's own hexagon comes from the page (`setHiveEventMine`), since both RPCs answer only
+  for everybody else. Kept in the module and re-applied after every `renderHive`. The tapped
+  district goes red on the map.
+- **Friends' districts are lit at rest** (`FRIEND_DISTRICTS_LIT`): the petek announces every map
+  it lands (`ist-hive-map` event / `hiveMapCells()`), ring-1 neighbours' districts go light gray
+  and the reader's own (from their profile — `hive_map()` leaves the caller out) darker.
+  `paintHomeDistricts` merges that with the open evening's red; `ensureDistrictLayer` keeps the
+  tracing in the book and after the frames even with nothing painted, because the dots are placed
+  off it.
+- **Today's two games are buttons at the foot** (`renderHomeGames`, off `gamesStateToday()`): the
+  reader's own state only (OYNA / BİTTİ ✓ / Bugün yok), never anybody else's score. A press syncs
+  the day first (`syncKahvehaneForGames`) and opens the existing game sheet; closing it re-renders
+  the buttons. On a desktop they stand where Kahvehane's column stood.
+- **Renewal**: the evenings and the games are the Kahvehane side's, so `refreshEditionColumns`
+  re-reads them when that side's day turns (midnight, see "Launch state"), and a language flip
+  re-reads both.
+
 ### `project.html` — the flip book, which is the app
 
 **It started as a rig and it is the app now.** `index.html` sends a signed-in member straight
@@ -3657,6 +3706,14 @@ profile sheet), and `mascot` is derived from that.
 3. **Kahvehane** — pull there, press an evening, throw it: here the direction is the RSVP.
 
 (There was a sky beat between 1 and 2; it went with the sun meter.)
+
+**On the one-screen home (`__fb.homeScreen`) there are no lanes to pull to**, so after the top bar
+the tour walks the screen instead, each part arriving on the beat that names it
+(`show: ['dots' | 'petek' | 'games']`): the dots → press one (a `wait` beat, `runWait`, waiting on
+`__fb.homeCardOpen`, stall escape `openFirstHomeEvent`) → answer it (waits on `__fb.homeAnswers`)
+→ the petek and how its seats work (the card is closed first) → the games and the midnight
+renewal. A week with no evenings says `homeNone` and skips the answer beat. The `home` passthrough
+scope hands back the layer's own parts, never the layer itself.
 
 **Things are introduced one at a time, and what has not been introduced is not there.** While the
 tour runs (`body.ist-onb-reveal`) every part it has not reached yet is `visibility: hidden` — so

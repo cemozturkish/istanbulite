@@ -11,14 +11,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=9"></script>
   <script src="router.js?v=15"></script>
-  <script src="i18n.js?v=27"></script>
+  <script src="i18n.js?v=28"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <link rel="stylesheet" href="palette.css?v=12">
-  <link rel="stylesheet" href="profile-card.css?v=50">
+  <link rel="stylesheet" href="profile-card.css?v=51">
   <link rel="stylesheet" href="profile-bar.css?v=2">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=59" defer></script>
+  <script src="profile-card.js?v=60" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -26,8 +26,8 @@
   <link rel="stylesheet" href="frames.css?v=21">
   <script src="loading-screen.js?v=5"></script>
   <link rel="stylesheet" href="loading-screen.css?v=3">
-  <link rel="stylesheet" href="onboarding.css?v=14">
-  <script src="onboarding.js?v=14" defer></script>
+  <link rel="stylesheet" href="onboarding.css?v=15">
+  <script src="onboarding.js?v=15" defer></script>
   <link rel="stylesheet" href="edition-notice.css?v=2">
   <script src="edition-notice.js?v=4" defer></script>
 
@@ -894,6 +894,289 @@
       overflow: hidden;
     }
 
+
+    /* ══════════════════════════════════════════════════════════════
+       THE HOME SCREEN (HOME_SCREEN in the script)
+       ══════════════════════════════════════════════════════════════
+       One screen. The map stands at full strength from the top bar down
+       to where its drawn land ends; the petek takes the paper under the
+       land; today's two games stand on the dock line at the foot. The
+       week's evenings are dots on the map itself, and a dot opens a card
+       pinned to it.
+
+       The petek's window is #fb-map, moved: its top is where the drawn
+       land ends and its bottom is the top of the games. The land ends at
+       49% of the drawing's height (measured off istanbul-map-mobile.png:
+       the last row of ink is 936 of 1920 within the middle 82% a phone
+       shows), and the drawing is laid into the whole book with `cover`
+       -- which on every phone is bound by HEIGHT -- so "under the land"
+       is a share of the box with no measuring. In the app the drawing's
+       box starts at the notch less --fb-map-lift (see html.ist-native
+       .fb > img), so the same share is taken of that box instead. */
+    .fb-home {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      --fb-home-games-h: 64px;
+      --fb-home-gap: 12px;
+    }
+    .fb-home[hidden] { display: none; }
+    @media (max-width: 768px) {
+      .fb.fb-home-on #fb-map {
+        top: calc(49% + 2px);
+        bottom: calc(var(--fb-dock) + 64px + 12px);
+      }
+      html.ist-native .fb.fb-home-on #fb-map {
+        top: calc(env(safe-area-inset-top) - var(--fb-map-lift) + 0.49 * (100% - env(safe-area-inset-top) + var(--fb-map-lift)) + 2px);
+        bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + 64px + 12px);
+      }
+    }
+    /* The petek stands on the floor of that window (fitHive), so the gap
+       it keeps above its own foot is all the air the games need. On the
+       day the games are all done, the closing line takes a strip at the
+       foot of the window and the petek refits above it (its box observer
+       re-fits on the change) rather than having the line printed over its
+       bottom row. */
+    .fb.fb-home-on #fb-map:has(> .fb-map-done:not([hidden])) > .fb-petek { bottom: 52px; }
+    .fb.fb-home-on .fb-map-done { padding-bottom: 4px; }
+
+    /* ── A dot: the evenings in one district ──
+       Filled red is today, a red ring is later this week, and a number
+       is how many there are when one district has several. Drawn at 14px
+       with a finger-sized press area round it (::before). */
+    .fb-evdot {
+      position: absolute;
+      width: 16px; height: 16px;
+      margin: -8px 0 0 -8px;
+      padding: 0;
+      border-radius: 50%;
+      box-sizing: border-box;
+      border: 3px solid var(--ink-red, #B93631);
+      background: var(--lit-hi, #fff);
+      color: #fff;
+      font: 800 8px/1 -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      pointer-events: auto;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+      transition: transform 0.18s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .fb-evdot::before {
+      content: '';
+      position: absolute;
+      inset: -14px;
+      border-radius: 50%;
+    }
+    .fb-evdot.t {
+      background: var(--ink-red, #B93631);
+      border-color: var(--lit-hi, #fff);
+      box-shadow: 0 0 0 2px var(--ink-red, #B93631), 0 1px 3px rgba(0, 0, 0, 0.35);
+    }
+    .fb-evdot.n { width: 20px; height: 20px; margin: -10px 0 0 -10px; }
+    .fb-evdot:not(.t).n { color: var(--ink-red, #B93631); }
+    .fb-evdot.on {
+      transform: scale(1.25);
+      box-shadow: 0 0 0 2px var(--ink-red, #B93631), 0 0 0 9px color-mix(in srgb, var(--ink-red, #B93631) 22%, transparent);
+    }
+    .fb-evdot.dim, .fb-evedge.dim { opacity: 0.3; }
+    /* An evening in a district the drawing does not reach at this width:
+       a tag on the edge it lies past. */
+    .fb-evedge {
+      position: absolute;
+      padding: 4px 7px;
+      margin-top: -11px;
+      border: 0;
+      background: var(--ink);
+      color: var(--paper);
+      font: 800 9px/1.2 -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: opacity 0.2s ease;
+    }
+    .fb-evedge-l { left: 0; }
+    .fb-evedge-r { right: 0; }
+    .fb-evedge i {
+      display: inline-block;
+      width: 7px; height: 7px;
+      margin: 0 0 0 5px;
+      border-radius: 50%;
+      border: 2px solid var(--ink-red, #B93631);
+      box-sizing: border-box;
+      vertical-align: -1px;
+    }
+    .fb-evedge.t i { background: var(--ink-red, #B93631); }
+    .fb-evedge-r i { margin: 0 5px 0 0; }
+
+    /* ── The card a dot opens ──
+       The app's own card (the .fb-box idiom: lit paper, a 2px ink rule,
+       a chunky foot, the red rail) pinned to its dot by a short tail. */
+    .fb-evcard {
+      position: absolute;
+      width: min(300px, calc(100% - 2 * var(--fb-inset, 16px)));
+      box-sizing: border-box;
+      padding: 10px 14px 12px 16px;
+      background: var(--lit-hi, #fff);
+      color: var(--ink);
+      border: 2px solid var(--ink);
+      border-bottom-width: 5px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+      display: grid;
+      gap: 7px;
+      pointer-events: auto;
+      z-index: 2;
+    }
+    .fb-evcard[hidden] { display: none; }
+    .fb-evcard::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 4px;
+      background: var(--ink-red, #B93631);
+    }
+    .fb-evcard-tail {
+      position: absolute;
+      width: 12px; height: 12px;
+      background: var(--lit-hi, #fff);
+      border: 2px solid var(--ink);
+      transform: rotate(45deg);
+    }
+    .fb-evcard-tail.dn { bottom: -9px; border-top: 0; border-left: 0; }
+    .fb-evcard-tail.up { top: -8px; border-bottom: 0; border-right: 0; }
+    .fb-evcard-tail.lt { left: -8px; border-top: 0; border-right: 0; }
+    .fb-evcard-tail.rt { right: -9px; border-bottom: 0; border-left: 0; }
+    .fb-evcard-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding-right: 18px;
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink-red, #B93631);
+    }
+    .fb-evcard-top .w { color: var(--ink); white-space: nowrap; }
+    .fb-evcard-t { font-size: 1rem; font-weight: 800; line-height: 1.2; }
+    .fb-evcard-b {
+      font-size: 0.8rem;
+      line-height: 1.4;
+      color: var(--muted);
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .fb-evcard-kef {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .fb-evcard-kef .fb-kefil-link { color: var(--ink-red, #B93631); }
+    .fb-evcard-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+    .fb-evcard-btns button {
+      padding: 9px 0 8px;
+      border: 2px solid var(--ink);
+      background: transparent;
+      color: var(--ink);
+      font-family: inherit; font-size: 0.66rem; font-weight: 800; line-height: 1;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .fb-evcard-btns button.on { background: var(--ink); color: var(--lit-hi, #fff); }
+    .fb-evcard-pager {
+      display: flex; align-items: center; justify-content: center; gap: 14px;
+      font-size: 0.7rem; font-weight: 700; color: var(--muted);
+    }
+    .fb-evcard-pager button, .fb-evcard-x {
+      border: 0; background: none; color: var(--ink); cursor: pointer;
+      font-family: inherit; font-size: 1rem; font-weight: 700; line-height: 1; padding: 2px 6px;
+    }
+    .fb-evcard-x { position: absolute; top: 4px; right: 4px; font-size: 1.1rem; color: var(--muted); }
+
+    /* ── Today's games, on the dock line ── */
+    .fb-home-games {
+      position: absolute;
+      left: var(--fb-inset, 16px);
+      right: var(--fb-inset, 16px);
+      bottom: var(--fb-dock);
+      height: var(--fb-home-games-h);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--fb-inset, 16px);
+      pointer-events: auto;
+    }
+    html.ist-native .fb-home-games { bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom)); }
+    .fb-gbtn {
+      position: relative;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      grid-template-rows: 1fr auto;
+      align-items: center;
+      gap: 2px 10px;
+      padding: 6px 10px 6px 14px;
+      box-sizing: border-box;
+      background: var(--lit-hi, #fff);
+      color: var(--ink);
+      border: 2px solid var(--ink);
+      border-bottom-width: 5px;
+      text-align: left;
+      font: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: border-bottom-width 0.1s ease, transform 0.1s ease;
+    }
+    .fb-gbtn::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 4px;
+      background: var(--ink-red, #B93631);
+    }
+    .fb-gbtn:active { border-bottom-width: 2px; transform: translateY(3px); }
+    .fb-gbtn .logo { grid-row: 1 / span 2; width: 40px; height: 40px; object-fit: contain; }
+    .fb-gbtn .nm { font-size: 1rem; font-weight: 900; line-height: 1; align-self: end; }
+    .fb-gbtn .st {
+      justify-self: start;
+      font-size: 0.6rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      padding: 3px 8px;
+      background: var(--ink);
+      color: var(--lit-hi, #fff);
+    }
+    /* A game with no mark of its own (Tümcel) is its name over its state. */
+    .fb-gbtn.nologo { grid-template-columns: 1fr; padding-left: 16px; }
+    .fb-gbtn.nologo .nm { font-size: 1.15rem; }
+    .fb-gbtn.done { border-color: var(--muted); color: var(--muted); }
+    .fb-gbtn.done::before { width: 1px; }
+    .fb-gbtn.done .st { background: none; padding: 3px 0; color: var(--ink-red, #B93631); }
+    .fb-gbtn.off { border-style: dashed; border-bottom-width: 2px; cursor: default; color: var(--muted); }
+    .fb-gbtn.off::before { display: none; }
+    .fb-gbtn.off .st { background: none; padding: 3px 0; color: var(--muted); }
+    /* The two marks read the palette the way Oyunlar's own tiles do. */
+    html.ist-map-ink .fb-gbtn .logo-sozcel,
+    html.ist-map-ink .fb-gbtn .logo-bulmaca { filter: url(#ist-sozcel-ink); }
+    /* A desktop keeps its own petek column (THE DESKTOP); the games stand
+       where Kahvehane's column stood, at the right of the band. After the
+       rules above, which it has to outrank at the same specificity. */
+    @media (min-width: 769px) {
+      .fb-home-games {
+        left: auto;
+        right: var(--dk-edge, 32px);
+        width: var(--dk-side-w, 360px);
+      }
+    }
+
     /* ── The bottom bar is a COMPASS, not a tab bar ──
        Three marks -- Kütüphane, the İstanbulite wordmark, Kahvehane --
        and none of them is a link. Nothing on this bar is pressed: the
@@ -951,6 +1234,9 @@
        visibility rather than display: the two words are the flex halves
        that keep the logo in the middle of the bar. */
     #fb-nav.fb-news-parked > b:first-child { visibility: hidden; }
+    /* And both words on the one-screen home (HOME_SCREEN): the logo is
+       the bar's only mark. */
+    #fb-nav.fb-home-nav > b:not(.fb-logo-btn) { visibility: hidden; }
     header {
       position: fixed;
       bottom: 0; left: 0; right: 0;
@@ -2248,6 +2534,16 @@
           <div class="fb-petek" id="fb-petek"></div>
           <p class="fb-map-done" id="fb-map-done" hidden>Bugünlük bu kadar.<br>Dışarısı seni bekliyor.</p>
         </div>
+
+        <!-- ── THE HOME SCREEN (HOME_SCREEN) ──
+             Laid over the map: the week's evenings as dots in their
+             districts, the card one of them opens, and today's games at
+             the foot. Built by the script; empty and hidden off it. -->
+        <div class="fb-home" id="fb-home" hidden>
+          <div class="fb-home-dots" id="fb-home-dots"></div>
+          <div class="fb-evcard" id="fb-evcard" role="dialog" aria-live="polite" hidden></div>
+          <div class="fb-home-games" id="fb-home-games"></div>
+        </div>
       </div>
     </main>
   </div>
@@ -2470,9 +2766,32 @@ const LANES = 3;
 // polls nobody can reach. The admin desk still writes them; admin.html's
 // PRESS_PARKED keeps its press bar from reporting them missing.
 const NEWS_ENABLED = false;
-// The leftmost lane a reader may stand on, which is what every clamp and
-// every "is there anywhere to pull to" below reads instead of 0.
-const LANE_MIN = NEWS_ENABLED ? LANE_KUTUPHANE : LANE_MAP;
+
+// ── THE HOME SCREEN ──
+// For the launch the app is ONE screen: the map at full strength with the
+// week's evenings on it as dots, the petek under the land as the guest
+// list of whichever evening is open, and today's two games as buttons at
+// the bottom. No swipe. On, the Kahvehane lane is gone too (its two
+// columns are left out of CAST and the strip stops at the middle from
+// both sides), the wash over the map is off, and the book takes no drag
+// at all -- there is nowhere for it to go. Off, the three-lane strip is
+// back exactly as it was. See THE HOME SCREEN further down for the parts.
+const HOME_SCREEN = true;
+// The districts the reader's petek neighbours live in, lit on the map at
+// rest. A resting fill under the petek was tried once and pulled because
+// the traced SVG and the drawn borders do not line up exactly (CLAUDE.md,
+// "Tried and abandoned"); this is the same fill the event page has always
+// used, behind its own switch so it can go again if it looks wrong on a
+// phone.
+const FRIEND_DISTRICTS_LIT = true;
+// How far ahead the map shows evenings, in Istanbul days counting today.
+const HOME_DAYS = 7;
+
+// The leftmost and rightmost lanes a reader may stand on, which is what
+// every clamp and every "is there anywhere to pull to" below reads
+// instead of 0 and LANES - 1.
+const LANE_MIN = (NEWS_ENABLED && !HOME_SCREEN) ? LANE_KUTUPHANE : LANE_MAP;
+const LANE_MAX = HOME_SCREEN ? LANE_MAP : LANES - 1;
 
 // ══════════════════════════════════════════════════════════════
 // THE DESKTOP: ALL THREE AT ONCE
@@ -2687,6 +3006,8 @@ function wireEditionReturn() {
 // boxes filled again.
 function refreshEditionColumns(changed) {
   if (!changed) return;
+  // The home screen's evenings and games are the Kahvehane side's.
+  if (HOME_SCREEN && changed.kahvehane) refreshHome();
   const re = [];
   if (changed.kutuphane) {
     haberlerFetch = null;
@@ -3201,6 +3522,485 @@ function refreshEtkinlikColumn() {
     if (!/\bfb-events\b/.test(a.def.cls) || !a.def.load) return;
     runActorLoad(a.def.load, a.el);
   });
+}
+
+// ══════════════════════════════════════════════════════════════
+// THE HOME SCREEN (HOME_SCREEN)
+//
+// One screen, and four parts laid on the book's own drawing:
+//
+//   * THE WEEK'S EVENINGS ARE DOTS ON THE MAP, one per district: filled
+//     red for today, a red ring for later in HOME_DAYS, a number when one
+//     district has several. A district the drawing does not reach at this
+//     width gets a tag on the edge it lies past instead.
+//   * A DOT OPENS A CARD PINNED TO IT: where, when, what, its kefil, and
+//     the RSVP. While it is open the district is red on the map and the
+//     petek is that evening's guest list (IstProfileCard.
+//     paintHiveEventStates: kefil, going, not going, no answer). Pressing
+//     a hexagon still names that member on the bar, and leaves the card
+//     open -- looking at who is going is what the card is for.
+//   * THE PETEK'S NEIGHBOURS' DISTRICTS ARE LIT at rest
+//     (FRIEND_DISTRICTS_LIT), off the map the petek announces.
+//   * TODAY'S TWO GAMES are buttons at the foot, carrying the reader's
+//     own state only. No scores of anybody else's anywhere on the map.
+//
+// It reads the same edition, the same RSVP tables and the same game
+// state the Kahvehane columns did -- editionInForce, setEventRsvp,
+// gamesStateToday -- so nothing here is a second source of truth.
+// ══════════════════════════════════════════════════════════════
+
+// Districts no tracing draws at all, and which edge of the city they lie
+// past. Everything else is placed off the tracing itself.
+const HOME_UNDRAWN_SIDE = {
+  avcilar: 'l', beylikduzu: 'l', buyukcekmece: 'l', catalca: 'l',
+  esenyurt: 'l', silivri: 'l', adalar: 'r',
+};
+// How far a dot keeps from the screen's side before it is an edge tag.
+const HOME_DOT_EDGE = 12;
+const HOME_RED = 'var(--ink-red, #B93631)';
+const HOME_FILL_HOME = 'color-mix(in srgb, var(--ink) 38%, transparent)';
+const HOME_FILL_FRIEND = 'color-mix(in srgb, var(--ink) 20%, transparent)';
+
+let homeEventsPromise = null;
+let homeData = { events: [], going: new Set(), answered: new Map(), failed: false };
+let homeOpen = null;            // { district, list, idx } while a card stands open
+let homeFriendFills = {};       // neighborhood -> fill, from the petek's map
+let homeEventDistrict = null;   // the open evening's district, painted red
+
+// The İstanbul calendar day an evening falls on, as 'YYYY-MM-DD' --
+// through ist-date.js, never a parsed locale string (CLAUDE.md rule 10).
+function homeEventDay(ev) {
+  const t = new Date(ev.event_date);
+  // One unparseable row must not take every other dot down with it.
+  if (isNaN(t.getTime())) return '';
+  const p = IstDate.parts(t);
+  return p.year + '-' + String(p.month).padStart(2, '0') + '-' + String(p.day).padStart(2, '0');
+}
+
+// The week's evenings in the baskı in force, with each one's kefil and
+// where the reader already stands on them. One fetch, shared by the dots,
+// the card and the tour; dropped when the side renews or the language
+// changes.
+function homeEventsData() {
+  if (homeEventsPromise) return homeEventsPromise;
+  homeEventsPromise = (async () => {
+    const out = { events: [], going: new Set(), answered: new Map(), failed: false };
+    try {
+      const { date: editionDate, missing } = await editionInForce('events_current_edition', heldDay('kahvehane'));
+      if (!missing && !editionDate) return out;
+      const from = new Date(IstDate.iso(0) + 'T00:00:00+03:00').toISOString();
+      const to = new Date(IstDate.iso(HOME_DAYS) + 'T00:00:00+03:00').toISOString();
+      let q = IstRouter.sb.from('events').select('*');
+      if (!missing) q = q.eq('edition_date', editionDate);
+      const { data, error } = await q
+        .gte('event_date', from).lt('event_date', to)
+        .order('event_date', { ascending: true })
+        .order('edition_order', { ascending: true });
+      if (error) throw error;
+      out.events = data || [];
+      // Each evening's kefil, in one query (see loadEtkinlikActor).
+      const kefilIds = [...new Set(out.events.map(e => e.kefil_id).filter(Boolean))];
+      if (kefilIds.length) {
+        try {
+          const { data: ks, error: kErr } = await IstRouter.sb.from('profiles')
+            .select('id, first_name, neighborhood').in('id', kefilIds);
+          if (kErr) throw kErr;
+          const byId = {};
+          (ks || []).forEach(k => { byId[k.id] = k; });
+          out.events.forEach(e => { e._kefil = byId[e.kefil_id] || null; });
+        } catch (err) { console.error('[proje ev kefil]', err); }
+      }
+      // Where the reader stands on each: going (event_rsvps) wins over a
+      // verdict (event_interest), the same reading the petek gives
+      // everybody else. Best-effort both ways.
+      const ids = out.events.map(e => e.id);
+      const uid = ids.length ? await doneUid() : null;
+      if (uid) {
+        try {
+          const { data: vs, error: vErr } = await IstRouter.sb.from('event_interest')
+            .select('event_id, verdict').eq('user_id', uid).in('event_id', ids);
+          if (vErr) throw vErr;
+          (vs || []).forEach(v => out.answered.set(v.event_id, v.verdict));
+        } catch (err) { console.error('[proje ev verdict]', err); }
+        try {
+          const { data: rs, error: rErr } = await IstRouter.sb.from('event_rsvps')
+            .select('event_id').eq('user_id', uid).in('event_id', ids);
+          if (rErr) throw rErr;
+          (rs || []).forEach(r => out.going.add(r.event_id));
+        } catch (err) { console.error('[proje ev rsvp]', err); }
+      }
+    } catch (err) {
+      console.error('[proje ev]', err);
+      out.failed = true;
+    }
+    return out;
+  })();
+  return homeEventsPromise;
+}
+
+// 'go' | 'no' | null -- where the reader stands on one evening.
+function homeMine(eventId) {
+  if (homeData.going.has(eventId)) return 'go';
+  return homeData.answered.get(eventId) === 'no' ? 'no' : null;
+}
+
+// ── The tracing, laid in whether or not anything is painted on it ──
+// The dots are placed off its shapes, so it has to be in the book even on
+// a day with nothing lit. Same layer paintDistrictMap paints, built the
+// same way.
+async function ensureDistrictLayer() {
+  const svg = await loadDistrictSvg();
+  const fb = document.getElementById('fb');
+  if (!svg || !fb) return null;
+  if (!districtLayer || !districtLayer.isConnected) {
+    districtLayer = document.importNode(svg, true);
+    districtLayer.setAttribute('class', 'fb-districts');
+    districtLayer.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+    districtLayer.removeAttribute('width');
+    districtLayer.removeAttribute('height');
+  }
+  // appendChild MOVES it, which is the point: it has to stay after the
+  // frames, and loadFrames appends those on every mount (see
+  // paintDistrictMap).
+  fb.appendChild(districtLayer);
+  return districtLayer;
+}
+
+// The resting map: the petek's districts, and the open evening's in red
+// over them. Lit only while there is something to light.
+async function paintHomeDistricts() {
+  if (!HOME_SCREEN) return;
+  const layer = await ensureDistrictLayer();
+  if (!layer) return;
+  const fills = Object.assign({}, FRIEND_DISTRICTS_LIT ? homeFriendFills : {});
+  if (homeEventDistrict) fills[homeEventDistrict] = HOME_RED;
+  layer.querySelectorAll('polygon, path').forEach(el => {
+    el.style.fill = fills[districtKeyOf(el)] || '';
+  });
+  const any = Object.keys(fills).length > 0;
+  requestAnimationFrame(() => { if (districtLayer) districtLayer.classList.toggle('on', any); });
+}
+
+// Who is on the reader's petek, as districts: their own darker, the six
+// touching them lighter. Ring 1 only -- the hexagons actually drawn.
+function homeFriendsFromMap(detail) {
+  const fills = {};
+  const cells = (detail && detail.cells) || [];
+  const me = detail && detail.me ? String(detail.me) : null;
+  cells.forEach(c => {
+    if (!c || !c.neighborhood) return;
+    if (me && String(c.member_id) === me) return;   // hive_map leaves the caller out anyway
+    const ring = (Math.abs(c.q) + Math.abs(c.r) + Math.abs(c.q + c.r)) / 2;
+    if (ring < 1 || ring > 1) return;
+    fills[c.neighborhood] = HOME_FILL_FRIEND;
+  });
+  // The reader's own district, from their profile: darker, and over a
+  // neighbour who lives there too.
+  if (detail && detail.meNb) fills[detail.meNb] = HOME_FILL_HOME;
+  homeFriendFills = fills;
+  paintHomeDistricts();
+}
+
+// Where a district stands on the screen, relative to the book: the area
+// centroid of its largest shape, taken through the tracing's own matrix
+// so it is exactly where the drawing is. Null for a district the tracing
+// does not have.
+function homeDistrictPoint(d, boxRect) {
+  if (!districtLayer) return null;
+  let best = null, bestArea = 0;
+  districtLayer.querySelectorAll('polygon, path').forEach(el => {
+    if (districtKeyOf(el) !== d || !el.points) return;
+    const pts = el.points;
+    let a = 0, cx = 0, cy = 0;
+    for (let i = 0; i < pts.numberOfItems; i++) {
+      const p = pts.getItem(i), q = pts.getItem((i + 1) % pts.numberOfItems);
+      const cross = p.x * q.y - q.x * p.y;
+      a += cross; cx += (p.x + q.x) * cross; cy += (p.y + q.y) * cross;
+    }
+    if (Math.abs(a) > bestArea) {
+      bestArea = Math.abs(a);
+      best = { el, x: cx / (3 * a), y: cy / (3 * a) };
+    }
+  });
+  if (!best) return null;
+  const m = best.el.getScreenCTM();
+  if (!m) return null;
+  return {
+    x: m.a * best.x + m.c * best.y + m.e - boxRect.left,
+    y: m.b * best.x + m.d * best.y + m.f - boxRect.top,
+  };
+}
+
+// ── The dots ──
+async function renderHomeDots() {
+  const layer = document.getElementById('fb-home-dots');
+  if (!layer || !box) return;
+  const [data] = await Promise.all([homeEventsData(), ensureDistrictLayer()]);
+  if (!layer.isConnected) return;
+  homeData = data;
+  const groups = new Map();
+  data.events.forEach(ev => {
+    const d = ev.neighborhood || 'istanbul';
+    if (!groups.has(d)) groups.set(d, []);
+    groups.get(d).push(ev);
+  });
+  const rect = box.getBoundingClientRect();
+  const bar = document.getElementById('ist-pc-mount');
+  const top = bar ? Math.max(0, bar.getBoundingClientRect().bottom - rect.top) : 0;
+  const mapEl = document.getElementById('fb-map');
+  // Edge tags stand in the drawn part of the screen, above the petek.
+  const floor = mapEl ? mapEl.getBoundingClientRect().top - rect.top : rect.height * 0.45;
+  const today = IstDate.iso(0);
+  const dots = [], edges = [];
+  groups.forEach((list, d) => {
+    const isToday = list.some(ev => homeEventDay(ev) === today);
+    const n = list.length;
+    const nb = d === 'istanbul' ? 'İstanbul' : (NB_NAMES[d] || d);
+    const pt = d === 'istanbul' ? null : homeDistrictPoint(d, rect);
+    const onScreen = pt && pt.x >= HOME_DOT_EDGE && pt.x <= rect.width - HOME_DOT_EDGE &&
+      pt.y >= top + HOME_DOT_EDGE && pt.y <= rect.height - HOME_DOT_EDGE;
+    if (onScreen) {
+      dots.push('<button type="button" class="fb-evdot' + (isToday ? ' t' : '') + (n > 1 ? ' n' : '') +
+        '" data-d="' + esc(d) + '" style="left:' + pt.x.toFixed(1) + 'px;top:' + pt.y.toFixed(1) + 'px"' +
+        ' aria-label="' + esc(nb + ' · ' + n) + '">' + (n > 1 ? n : '') + '</button>');
+    } else {
+      const side = pt ? (pt.x < rect.width / 2 ? 'l' : 'r') : (HOME_UNDRAWN_SIDE[d] || 'l');
+      const y = pt ? Math.min(Math.max(pt.y, top + 24), floor - 16) : null;
+      edges.push({ d, nb, side, y, isToday, n });
+    }
+  });
+  // Edge tags: at their own height where the tracing has one, the rest
+  // stacked under them, and never on top of each other.
+  ['l', 'r'].forEach(side => {
+    const mine = edges.filter(e => e.side === side);
+    let next = top + 28;
+    mine.sort((a, b) => (a.y == null ? 1e9 : a.y) - (b.y == null ? 1e9 : b.y));
+    mine.forEach(e => {
+      e.y = Math.max(e.y == null ? next : e.y, next);
+      next = e.y + 24;
+    });
+  });
+  const tag = (e) => '<button type="button" class="fb-evedge fb-evedge-' + e.side + (e.isToday ? ' t' : '') +
+    '" data-d="' + esc(e.d) + '" style="top:' + e.y.toFixed(1) + 'px">' +
+    (e.side === 'l' ? '← ' + esc(e.nb) + (e.n > 1 ? ' · ' + e.n : '') + '<i></i>'
+                    : '<i></i>' + esc(e.nb) + (e.n > 1 ? ' · ' + e.n : '') + ' →') + '</button>';
+  layer.innerHTML = dots.join('') + edges.map(tag).join('');
+  markHomeDots();
+  // The open card's evening may have moved with a refresh; follow it.
+  if (homeOpen) {
+    const list = groups.get(homeOpen.district);
+    if (!list) closeHomeCard();
+    else { homeOpen.list = list; homeOpen.idx = Math.min(homeOpen.idx, list.length - 1); renderHomeCard(false); }
+  }
+}
+
+function markHomeDots() {
+  document.querySelectorAll('#fb-home-dots [data-d]').forEach(el => {
+    const on = !!homeOpen && el.dataset.d === homeOpen.district;
+    el.classList.toggle('on', on);
+    el.classList.toggle('dim', !!homeOpen && !on);
+  });
+}
+
+// ── The card ──
+function openHomeCard(d) {
+  const list = (homeData.events || []).filter(ev => (ev.neighborhood || 'istanbul') === d);
+  if (!list.length) return;
+  // The same dot again is the way back out, like every hexagon.
+  if (homeOpen && homeOpen.district === d) { closeHomeCard(); return; }
+  homeOpen = { district: d, list, idx: 0 };
+  renderHomeCard(true);
+}
+
+function closeHomeCard() {
+  const card = document.getElementById('fb-evcard');
+  if (card) { card.hidden = true; card.innerHTML = ''; }
+  homeOpen = null;
+  homeEventDistrict = null;
+  paintHomeDistricts();
+  if (window.IstProfileCard && IstProfileCard.clearHiveEventStates) IstProfileCard.clearHiveEventStates();
+  markHomeDots();
+}
+
+// `paint` repaints the district and asks the petek for the guest list --
+// true when the evening on the card is a different one, false when only
+// the reader's own answer changed.
+function renderHomeCard(paint) {
+  const card = document.getElementById('fb-evcard');
+  if (!card || !homeOpen) return;
+  const { list, idx, district } = homeOpen;
+  const ev = list[idx];
+  const mine = homeMine(ev.id);
+  const nb = ev.neighborhood ? (NB_NAMES[ev.neighborhood] || ev.neighborhood) : 'İstanbul';
+  const desc = newsText(ev, 'description') || '';
+  card.innerHTML =
+    '<div class="fb-evcard-top"><span class="d">' + esc(nb) + '</span><span class="w">' + esc(eventWhenHead(ev.event_date)) + '</span></div>' +
+    '<div class="fb-evcard-t">' + esc(newsText(ev, 'title')) + '</div>' +
+    (desc ? '<div class="fb-evcard-b">' + esc(desc) + '</div>' : '') +
+    (ev._kefil ? '<div class="fb-evcard-kef">' + eventKefilHTML(ev._kefil) + '</div>' : '') +
+    '<div class="fb-evcard-btns">' +
+      '<button type="button" data-rsvp="yes" class="' + (mine === 'go' ? 'on' : '') + '">' +
+        esc(tEv(mine === 'go' ? 'events.youregoing' : 'events.going')) + '</button>' +
+      '<button type="button" data-rsvp="no" class="' + (mine === 'no' ? 'on' : '') + '">' +
+        esc(tEv('events.notgoing')) + '</button>' +
+    '</div>' +
+    (list.length > 1
+      ? '<div class="fb-evcard-pager"><button type="button" data-step="-1" aria-label="‹">‹</button><span>' +
+        (idx + 1) + ' / ' + list.length + '</span><button type="button" data-step="1" aria-label="›">›</button></div>'
+      : '') +
+    '<button type="button" class="fb-evcard-x" aria-label="✕">×</button>' +
+    '<span class="fb-evcard-tail"></span>';
+  card.hidden = false;
+  placeHomeCard();
+  card.querySelectorAll('[data-rsvp]').forEach(b => b.addEventListener('click', () => {
+    answerHomeEvent(ev, b.dataset.rsvp === 'yes');
+  }));
+  card.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
+    homeOpen.idx = (homeOpen.idx + Number(b.dataset.step) + list.length) % list.length;
+    renderHomeCard(true);
+  }));
+  const x = card.querySelector('.fb-evcard-x');
+  if (x) x.addEventListener('click', closeHomeCard);
+  if (paint) {
+    homeEventDistrict = ev.neighborhood || null;
+    paintHomeDistricts();
+    if (window.IstProfileCard && IstProfileCard.paintHiveEventStates) {
+      IstProfileCard.paintHiveEventStates(IstRouter.sb, ev.id, { mine, kefilId: ev.kefil_id || null });
+    }
+  }
+  markHomeDots();
+}
+
+// Pinned to its dot: above it when there is room under the top bar,
+// below it otherwise, never off either side of the screen.
+function placeHomeCard() {
+  const card = document.getElementById('fb-evcard');
+  if (!card || !homeOpen || !box) return;
+  const dot = document.querySelector('#fb-home-dots [data-d="' + CSS.escape(homeOpen.district) + '"]');
+  const rect = box.getBoundingClientRect();
+  const bar = document.getElementById('ist-pc-mount');
+  const top = bar ? Math.max(0, bar.getBoundingClientRect().bottom - rect.top) : 0;
+  const inset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fb-inset')) || 16;
+  let x = rect.width / 2, y = top + 40;
+  if (dot) {
+    const r = dot.getBoundingClientRect();
+    x = r.left + r.width / 2 - rect.left;
+    y = r.top + r.height / 2 - rect.top;
+  }
+  const w = card.offsetWidth, h = card.offsetHeight;
+  const tail = card.querySelector('.fb-evcard-tail');
+  // Above the dot when there is room under the top bar. Otherwise, where
+  // the screen is wide enough, beside it -- so it never comes down over
+  // the petek it is reading out -- and only failing both, below it.
+  const above = y - h - 18 >= top + 6;
+  const besideRight = x + 22 + w <= rect.width - inset;
+  const besideLeft = x - 22 - w >= inset;
+  if (!above && (besideRight || besideLeft)) {
+    const left = besideRight ? x + 22 : x - 22 - w;
+    const cardTop = Math.min(Math.max(y - h / 2, top + 6), rect.height - h - inset);
+    card.style.left = left.toFixed(1) + 'px';
+    card.style.top = cardTop.toFixed(1) + 'px';
+    if (tail) {
+      tail.className = 'fb-evcard-tail ' + (besideRight ? 'lt' : 'rt');
+      tail.style.left = '';
+      tail.style.top = Math.min(Math.max(y - cardTop - 6, 10), h - 22).toFixed(1) + 'px';
+    }
+    return;
+  }
+  const left = Math.min(Math.max(x - w / 2, inset), rect.width - inset - w);
+  const cardTop = above ? y - h - 18 : y + 18;
+  card.style.left = left.toFixed(1) + 'px';
+  card.style.top = Math.max(top + 6, cardTop).toFixed(1) + 'px';
+  if (tail) {
+    tail.className = 'fb-evcard-tail ' + (above ? 'dn' : 'up');
+    tail.style.top = '';
+    tail.style.left = Math.min(Math.max(x - left - 6, 10), w - 22).toFixed(1) + 'px';
+  }
+}
+
+async function answerHomeEvent(ev, going) {
+  // The card, the reader's own hexagon and the record move together; the
+  // write follows, and setEventRsvp is the same one the column used.
+  if (going) { homeData.going.add(ev.id); homeData.answered.set(ev.id, 'yes'); }
+  else { homeData.going.delete(ev.id); homeData.answered.set(ev.id, 'no'); }
+  if (window.IstProfileCard && IstProfileCard.setHiveEventMine) IstProfileCard.setHiveEventMine(going ? 'go' : 'no');
+  _homeAnswers++;
+  renderHomeCard(false);
+  await setEventRsvp(ev, going);
+}
+// How many answers the reader has given on this page, for the tour.
+let _homeAnswers = 0;
+
+// ── Today's games ──
+async function renderHomeGames() {
+  const bar = document.getElementById('fb-home-games');
+  if (!bar) return;
+  const state = await gamesStateToday();
+  if (!bar.isConnected) return;
+  const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
+  bar.innerHTML = state.lineup.slice(0, GAME_SLOT_COUNT).map(key => {
+    const g = GAME_CATALOG[key];
+    if (!g || state.off.has(g.key)) {
+      return '<div class="fb-gbtn off"><span class="nm">' + (g ? esc(g.title) : '—') + '</span>' +
+        '<span class="st">' + esc(t('home.off')) + '</span></div>';
+    }
+    const done = state.played.has(g.key);
+    return '<button type="button" class="fb-gbtn' + (done ? ' done' : '') + (g.logo ? '' : ' nologo') + '" data-game="' + g.key + '">' +
+      (g.logo ? '<img class="logo logo-' + g.key + '" src="' + g.logo + '" alt="" width="512" height="512" decoding="async">' : '') +
+      '<span class="nm">' + esc(g.title) + '</span>' +
+      '<span class="st">' + esc(t(done ? 'home.played' : 'home.play')) + '</span></button>';
+  }).join('');
+}
+
+function refreshHome() {
+  if (!HOME_SCREEN) return;
+  homeEventsPromise = null;
+  renderHomeDots();
+  renderHomeGames();
+}
+
+// Once per mount: the layer, its presses, and what it listens for.
+function wireHome() {
+  const home = document.getElementById('fb-home');
+  if (!box || !home) return;
+  box.classList.toggle('fb-home-on', HOME_SCREEN);
+  home.hidden = !HOME_SCREEN;
+  if (!HOME_SCREEN) return;
+  home.addEventListener('click', (e) => {
+    const dot = e.target.closest && e.target.closest('[data-d]');
+    if (dot && dot.closest('#fb-home-dots')) { openHomeCard(dot.dataset.d); return; }
+    const game = e.target.closest && e.target.closest('.fb-gbtn[data-game]');
+    if (game) {
+      // The game page reads the live clock; renew first if the day has
+      // turned under the tile, and let the reader press what is there now.
+      if (syncKahvehaneForGames()) return;
+      const g = GAME_CATALOG[game.dataset.game];
+      if (g) openGameOverlay(g.file);
+    }
+  });
+  // A press on the map itself (not the card, a dot, the petek or the
+  // games) puts the card away. The petek keeps it open on purpose:
+  // pressing a hexagon to see who that is is what the guest list is for.
+  box.addEventListener('pointerdown', (e) => {
+    if (!homeOpen) return;
+    if (e.target.closest && e.target.closest('#fb-evcard, #fb-home-dots [data-d], #fb-petek, #fb-home-games')) return;
+    closeHomeCard();
+  });
+  if (!document.body.dataset.fbHomeWired) {
+    document.body.dataset.fbHomeWired = '1';
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && homeOpen) closeHomeCard(); });
+    // The petek says where its people live whenever its map lands.
+    document.addEventListener('ist-hive-map', (e) => { if (box) homeFriendsFromMap(e.detail); });
+    let t = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(t);
+      t = setTimeout(() => { if (box && HOME_SCREEN) { renderHomeDots(); placeHomeCard(); } }, 150);
+    });
+  }
+  // A map that landed before this page was listening.
+  if (window.IstProfileCard && IstProfileCard.hiveMapCells) homeFriendsFromMap(IstProfileCard.hiveMapCells());
+  renderHomeDots();
+  renderHomeGames();
 }
 
 // ── Kütüphane's lane: one box per CATEGORY, not a feed ──
@@ -4988,6 +5788,7 @@ function refreshOyunColumn() {
     if (!/\bfb-oyun\b/.test(a.def.cls) || !a.def.load) return;
     runActorLoad(a.def.load, a.el);
   });
+  if (HOME_SCREEN) renderHomeGames();
   // A game just finished is also a step off the day's own meter.
   refreshDayMeter();
 }
@@ -5586,18 +6387,20 @@ const CAST = [
   // Etkinlikler is on the right and Oyunlar, the short one, on the left
   // (see .fb-mirror). Each still parks off its OWN side of the screen,
   // which is why the two pose tables swap with the two columns.
-  ...stackActors({
+  // Left out entirely on the home screen (HOME_SCREEN): the evenings are
+  // dots on the map and the games are buttons at its foot.
+  ...(HOME_SCREEN ? [] : stackActors({
     idBase: 'etkinlik', live: ISTANBUL_SLIDE, lane: LANE_KAHVEHANE, col: 'r', mirror: true, cls: 'fb-events',
     poses: MID_POSES_R, lag: 0.43, lagFree: 0.135, load: loadEtkinlikActor, onpress: onpressBox,
-  }),
+  })),
   // Two slots, not three (see GAME_SLOT_COUNT) -- .fb-oyun's own height
   // override (--fb-oyun-box-h) grows each box so the column still fills
   // exactly the band three boxes used to.
-  ...stackActors({
+  ...(HOME_SCREEN ? [] : stackActors({
     idBase: 'oyun', live: ISTANBUL_SLIDE, lane: LANE_KAHVEHANE, col: 'l', mirror: true, cls: 'fb-oyun',
     poses: MID_POSES_L, lag: 0.43, lagFree: 0.135, load: loadKahveNarrow, onpress: onpressOyun,
     count: 2,
-  }),
+  })),
 
   // ── Kütüphane's pair: the reading side (Olaylar stands at the
   // Türkiye stop's right column, parked for now -- see
@@ -6051,6 +6854,9 @@ async function load() {
   // the loading screen is let go. Nothing else can lift it, so an early
   // return here would leave the reader looking at black paper for good.
   try { await loadFrames(); } finally { resolveLoading(); }
+  // The frames were appended after the tracing; put it back on top of
+  // them so the home screen's lit districts are not under the drawing.
+  if (HOME_SCREEN && box) paintHomeDistricts();
   // A brand-new account is walked through the app once, HERE and nowhere
   // else -- this is the only page a member can reach. It goes last on
   // purpose: the tour asks the reader for real pulls and watches the book
@@ -6259,7 +7065,10 @@ function paintLanes() {
   // stands on the band's paper rather than over the drawing, so there is
   // nothing for it to quiet and the stylesheet takes it away (see THE
   // DESKTOP there) -- an inline opacity would be a number for a phone.
-  if (scrim) scrim.style.opacity = wide ? '' : (mid * 0.86).toFixed(3);
+  // On the home screen the map is the screen and stands at full strength;
+  // the petek sits on the paper under the land, so there is nothing to
+  // quiet (HOME_SCREEN).
+  if (scrim) scrim.style.opacity = (wide || HOME_SCREEN) ? '0' : (mid * 0.86).toFixed(3);
   if (mapEl) mapEl.style.opacity = Math.max(0, Math.min(1, mid)).toFixed(3);
   // ── The petek's entrance belongs to the landing, not the fade ──
   // The lane starting to appear from nothing holds the drawing back
@@ -6374,7 +7183,7 @@ function paintNav() {
 
 
 function setLanePos(p, snap) {
-  lanePos = Math.max(LANE_MIN, Math.min(LANES - 1, p));
+  lanePos = Math.max(LANE_MIN, Math.min(LANE_MAX, p));
   // A programmatic placement (a fresh mount, the app map's own walk)
   // puts the wave where the lane is rather than sending it across: a
   // page that opens on Hane must not deal itself an entrance.
@@ -6396,7 +7205,7 @@ function lanePullable(dx) {
   if (wide || !atLaneStop) return false;
   // Right walks the strip right, so the reader moves toward lane 0 --
   // or toward LANE_MIN, while the news is parked.
-  return dx > 0 ? lane > LANE_MIN : lane < LANES - 1;
+  return dx > 0 ? lane > LANE_MIN : lane < LANE_MAX;
 }
 
 // ── What the lane lets the book reach ──
@@ -6418,7 +7227,7 @@ function laneStops() {
 // this is a wash and a fade, which have no pages in them.
 function runLane(to, done) {
   if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
-  lane = Math.max(LANE_MIN, Math.min(LANES - 1, to));
+  lane = Math.max(LANE_MIN, Math.min(LANE_MAX, to));
   const from = lanePos;
   const dist = Math.abs(lane - from);
   if (dist < 0.001) { setLanePos(lane); armCast(); landLane(); if (done) done(); return; }
@@ -6507,6 +7316,10 @@ function closePetek() {
 
 function onDown(e) {
   if (!ready) return;
+  // One screen (HOME_SCREEN): no lanes to walk and no stop to run to, so
+  // the book has no gesture of its own. Bailing rather than tracking also
+  // keeps it from capturing a press meant for a dot, the card or a game.
+  if (HOME_SCREEN) return;
   // A press that lands on a live actor is that actor's, not the book's.
   // Without this the book swallows its own buttons: the drag handler
   // takes pointer capture on the way down, which re-targets the eventual
@@ -6753,7 +7566,11 @@ function mount() {
   // while the news is parked (NEWS_ENABLED), so it goes with it. The bar
   // lives outside #ist-content, hence a class rather than markup.
   const navEl = document.getElementById('fb-nav');
-  if (navEl) navEl.classList.toggle('fb-news-parked', !NEWS_ENABLED);
+  if (navEl) {
+    navEl.classList.toggle('fb-news-parked', !NEWS_ENABLED);
+    // One screen: neither word names a place the reader can go.
+    navEl.classList.toggle('fb-home-nav', HOME_SCREEN);
+  }
   atLaneStop = false;
   // A desktop or a phone, read before anything is cast or fetched: it
   // decides which drawing the İstanbul stop is (SRC) and whether a lane
@@ -6780,6 +7597,7 @@ function mount() {
     imgs.forEach(i => { i.classList.remove('on'); box.appendChild(i); });
     shown = -1; at = START_SLIDE; show(at, true); armCast();
     resolveLoading();
+    if (HOME_SCREEN) paintHomeDistricts();
   } else {
     load();
   }
@@ -6814,6 +7632,9 @@ function mount() {
   // awaited: the book must not wait on the network (see an actor's own
   // load).
   mountPetek();
+  // The one screen's own parts: the evenings on the map, the card, the
+  // games (THE HOME SCREEN). Never awaited, like everything here.
+  wireHome();
   // The ring is painted from whatever the last visit worked out before
   // the fetches are asked again, so a swipe back does not empty the sea
   // for a round trip and then refill it. Never awaited: the book must
@@ -6845,6 +7666,8 @@ function unmount() {
   // mount painting into a node that is no longer on the page. The parsed
   // SVG itself is kept: it is the same file either way.
   districtLayer = null;
+  homeOpen = null; homeEventDistrict = null;
+  if (window.IstProfileCard && IstProfileCard.clearHiveEventStates) IstProfileCard.clearHiveEventStates();
   traveling = false;
   if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
   // The petek leaves two things behind it that live OUTSIDE this page --
@@ -7241,6 +8064,9 @@ function refreshAllColumns() {
     if (!a.def.load) return;
     loads.push(runActorLoad(a.def.load, a.el));
   });
+  // The home screen re-reads its own evenings and games in the new
+  // language; an open card follows (renderHomeDots re-renders it).
+  if (HOME_SCREEN) { homeEventsPromise = null; loads.push(renderHomeDots(), renderHomeGames()); }
   refreshDayMeter();
   return Promise.allSettled(loads);
 }
@@ -7397,11 +8223,23 @@ window.__fb = {
     if (wide) return;
     if (laneRun) { cancelAnimationFrame(laneRun); laneRun = null; }
     if (snap === false) { runLane(n); return; }
-    lane = Math.max(LANE_MIN, Math.min(LANES - 1, n)); setLanePos(lane, true); armCast();
+    lane = Math.max(LANE_MIN, Math.min(LANE_MAX, n)); setLanePos(lane, true); armCast();
   },
   // Whether Kütüphane's news is cast (NEWS_ENABLED); the onboarding tour
   // skips its Kütüphane beats when it is not.
   newsEnabled: NEWS_ENABLED,
+  // The one-screen home (HOME_SCREEN), for the tour: whether it is on,
+  // whether an evening's card is open, how many answers have been given,
+  // and a way to open the first dot for a reader who cannot press one.
+  homeScreen: HOME_SCREEN,
+  get homeCardOpen() { return !!homeOpen; },
+  get homeAnswers() { return _homeAnswers; },
+  get homeHasEvents() { return !!document.querySelector('#fb-home-dots [data-d]'); },
+  openFirstHomeEvent() {
+    const d = document.querySelector('#fb-home-dots [data-d]');
+    if (d && !homeOpen) openHomeCard(d.dataset.d);
+  },
+  closeHomeCard() { if (homeOpen) closeHomeCard(); },
   pullLane(p) { if (!wide) setLanePos(p); },
   // Whether the page is laid out as a desktop -- all three lanes at
   // once, with no strip to walk (see THE DESKTOP). The onboarding tour
