@@ -11,14 +11,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=9"></script>
   <script src="router.js?v=15"></script>
-  <script src="i18n.js?v=29"></script>
+  <script src="i18n.js?v=30"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <link rel="stylesheet" href="palette.css?v=12">
   <link rel="stylesheet" href="profile-card.css?v=54">
   <link rel="stylesheet" href="profile-bar.css?v=2">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=66" defer></script>
+  <script src="profile-card.js?v=67" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -27,7 +27,7 @@
   <script src="loading-screen.js?v=5"></script>
   <link rel="stylesheet" href="loading-screen.css?v=3">
   <link rel="stylesheet" href="onboarding.css?v=16">
-  <script src="onboarding.js?v=16" defer></script>
+  <script src="onboarding.js?v=17" defer></script>
   <link rel="stylesheet" href="edition-notice.css?v=2">
   <script src="edition-notice.js?v=4" defer></script>
 
@@ -1045,6 +1045,30 @@
       vertical-align: -1px;
     }
     .fb-evedge.t i { background: var(--ink-red, #B93631); }
+    /* The tag for a member's district the drawing does not reach: said,
+       not pressed -- the member is the thing that was pressed. */
+    .fb-evedge.fb-picktag { pointer-events: none; cursor: default; background: var(--ink-red, #B93631); color: #fff; }
+
+    /* ── Red districts (paintHomeDistricts) ──
+       A district with something on this week is red and pressable; the
+       one in focus (the open evening, or where the member named on the bar
+       lives) is solid red and breathes, the way a story's countries do on
+       Kütüphane, and the rest step back while it does. */
+    .fb.fb-home-on .fb-districts .fb-dist-ev { pointer-events: auto; cursor: pointer; }
+    /* The districts' red is the MAP's, not the street's. After sunset the
+       palette walks --ink-red a long way down for the night paper, which
+       on the night land (itself a step darker) leaves a red district all
+       but the colour of the ones around it -- and telling them apart is
+       the whole job. So at night it is the drawing's own night red, the
+       same lift the lit tier gives a card (frames.css). */
+    .fb { --fb-home-red: var(--ink-red, #B93631); }
+    :root[data-theme="dark"] .fb { --fb-home-red: #C43D38; }
+    :root[data-palette="earth"][data-theme="dark"] .fb { --fb-home-red: #c2541f; }
+    .fb-districts polygon, .fb-districts path { transition: fill 0.45s ease, fill-opacity 0.3s ease; }
+    .fb-districts.fb-dist-focusing .fb-dist-ev:not(.fb-dist-focus) { fill-opacity: 0.38; }
+    .fb-districts .fb-dist-focus { animation: fb-dist-breathe 1.9s ease-in-out infinite; }
+    @keyframes fb-dist-breathe { 0%, 100% { fill-opacity: 1; } 50% { fill-opacity: 0.62; } }
+    @media (prefers-reduced-motion: reduce) { .fb-districts .fb-dist-focus { animation: none; } }
     .fb-evedge-r i { margin: 0 5px 0 0; }
 
     /* ── The card a dot opens ──
@@ -1362,6 +1386,76 @@
     }
     .fb-plan-go:active { border-bottom-width: 2px; transform: translateY(3px); }
     .fb-plan-go:disabled { opacity: 0.45; cursor: default; transform: none; border-bottom-width: 5px; }
+    /* The form's way back to the week it was opened from. */
+    .fb-plan-back {
+      justify-self: start;
+      margin: -4px 0 2px;
+      padding: 4px 0;
+      border: 0;
+      background: none;
+      color: var(--muted);
+      font-family: inherit; font-size: 0.72rem; font-weight: 800;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    /* ── BU HAFTAM ──
+       The week the plan button opens: one section per day that has
+       something in it, one row per evening, the hour on the left in the
+       same type the card's corner uses, and what the reader is to it on
+       the right. The rows are the app's own box (2px ink, chunky foot),
+       because each one is pressed: an evening opens on the map, a plan of
+       the reader's own opens for editing. */
+    .fb-week-sub { margin: -4px 0 8px; font-size: 0.85rem; line-height: 1.4; color: var(--muted); }
+    .fb-week-day { display: grid; gap: 8px; margin-top: 10px; }
+    .fb-week-dh {
+      margin: 0;
+      font-size: 0.66rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--muted);
+    }
+    .fb-week-day.t .fb-week-dh { color: var(--ink-red, #B93631); }
+    .fb-week-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px 9px 16px;
+      background: var(--lit-hi, #fff);
+      color: var(--ink);
+      border: 2px solid var(--ink);
+      border-bottom-width: 5px;
+      text-align: left;
+      font: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: border-bottom-width 0.1s ease, transform 0.1s ease;
+    }
+    .fb-week-row::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 4px;
+      background: var(--ink-red, #B93631);
+    }
+    .fb-week-row:active { border-bottom-width: 2px; transform: translateY(3px); }
+    .fb-week-tm { font-size: 1rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .fb-week-tx { min-width: 0; display: grid; gap: 2px; }
+    .fb-week-tx b { font-size: 0.92rem; font-weight: 800; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fb-week-tx i { font-style: normal; font-size: 0.72rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fb-week-st {
+      display: grid; justify-items: end; gap: 3px;
+      font-size: 0.6rem; font-weight: 800; letter-spacing: 0.12em;
+      color: var(--ink-red, #B93631);
+    }
+    .fb-week-st em { font-style: normal; color: var(--ink); letter-spacing: 0.08em; text-transform: uppercase; }
+    .fb-week-row.own .fb-week-st { color: var(--ink); }
+    .fb-week-empty {
+      margin: 6px 0 4px;
+      padding: 16px;
+      border: 2px dashed var(--muted);
+      font-size: 0.85rem; line-height: 1.45; color: var(--muted);
+    }
 
     /* ── Today's games, on the dock line ── */
     .fb-home-games {
@@ -2842,7 +2936,9 @@
 
 <!-- ── A PLAN: + BİR YERE GİDİYORUM ──
      THE sheet, under the bars like the profile sheet. What, where, when;
-     openPlanForm fills the body each time it opens. -->
+     The plan button opens the reader's WEEK in it (renderPlanWeek); the
+     form (openPlanForm, new or editing) swaps in and out of the same
+     body. -->
 <div class="ist-sheet-overlay ist-sheet-under-bars" id="fb-plan-overlay" hidden>
   <div class="ist-sheet-backdrop" id="fb-plan-backdrop"></div>
   <div class="ist-sheet fb-plan-sheet">
@@ -3840,15 +3936,17 @@ const HOME_UNDRAWN_SIDE = {
 };
 // How far a dot keeps from the screen's side before it is an edge tag.
 const HOME_DOT_EDGE = 12;
-const HOME_RED = 'var(--ink-red, #B93631)';
+const HOME_RED = 'var(--fb-home-red, var(--ink-red, #B93631))';
 const HOME_FILL_HOME = 'color-mix(in srgb, var(--ink) 38%, transparent)';
 const HOME_FILL_FRIEND = 'color-mix(in srgb, var(--ink) 20%, transparent)';
+const HOME_FILL_EVENT = 'color-mix(in srgb, var(--fb-home-red, var(--ink-red, #B93631)) 78%, transparent)';
 
 let homeEventsPromise = null;
 let homeData = { events: [], plans: [], plansOpen: false, uid: null, going: new Set(), answered: new Map(), failed: false };
 let homeOpen = null;            // { kind, district, list, idx } while a card stands open
 let homeFriendFills = {};       // neighborhood -> fill, from the petek's map
 let homeEventDistrict = null;   // the open evening's district, painted red
+let homePickDistrict = null;    // the district of the member named on the bar
 let homeMeNb = null;            // the reader's own district, off the petek's map
 let homeAttached = 0;           // how many members are attached to the reader
 let homeBondKey = null;         // who they are, as last seen -- see homeFriendsFromMap
@@ -4224,19 +4322,75 @@ async function ensureDistrictLayer() {
   return districtLayer;
 }
 
-// The resting map: the petek's districts, and the open evening's in red
-// over them. Lit only while there is something to light.
+// ── The resting map ──
+// Three layers of fill, each over the one before:
+//   * the petek's districts, gray (FRIEND_DISTRICTS_LIT);
+//   * EVERY DISTRICT WITH SOMETHING ON THIS WEEK, red -- a city evening or
+//     a plan the reader can see. The dots still say today/later, whose and
+//     how many; the district says "there is somewhere to go here" from
+//     across the room, and it is the bigger thing to press (a press on a
+//     red district opens its card, the same as its dot);
+//   * THE FOCUS, solid red and breathing: the open evening's district and
+//     the district of the member named on the bar (a hexagon pressed on
+//     the petek). While anything is in focus the other red districts step
+//     back, so the one being talked about is the one that reads.
+// Lit only while there is something to light.
+function homeEventDistricts() {
+  const out = new Set();
+  (homeData.events || []).concat(homeData.plans || []).forEach(ev => {
+    if (ev.neighborhood) out.add(ev.neighborhood);
+  });
+  return out;
+}
 async function paintHomeDistricts() {
   if (!HOME_SCREEN) return;
   const layer = await ensureDistrictLayer();
   if (!layer) return;
   const fills = Object.assign({}, FRIEND_DISTRICTS_LIT ? homeFriendFills : {});
-  if (homeEventDistrict) fills[homeEventDistrict] = HOME_RED;
+  const evs = homeEventDistricts();
+  evs.forEach(d => { fills[d] = HOME_FILL_EVENT; });
+  const focus = new Set([homeEventDistrict, homePickDistrict].filter(Boolean));
+  focus.forEach(d => { fills[d] = HOME_RED; });
   layer.querySelectorAll('polygon, path').forEach(el => {
-    el.style.fill = fills[districtKeyOf(el)] || '';
+    const k = districtKeyOf(el);
+    el.style.fill = fills[k] || '';
+    el.classList.toggle('fb-dist-ev', evs.has(k));
+    el.classList.toggle('fb-dist-focus', focus.has(k));
   });
+  layer.classList.toggle('fb-dist-focusing', focus.size > 0);
   const any = Object.keys(fills).length > 0;
   requestAnimationFrame(() => { if (districtLayer) districtLayer.classList.toggle('on', any); });
+}
+
+// The member named on the bar lives somewhere, and that somewhere is lit
+// (profile-card.js announces every name it puts up or takes down). A
+// district the drawing does not reach at this width gets a tag on the edge
+// it lies past instead, the same way an evening there does.
+function homePickFrom(detail) {
+  homePickDistrict = (detail && detail.neighborhood) || null;
+  paintHomeDistricts();
+  renderHomePickTag();
+}
+function renderHomePickTag() {
+  const layer = document.getElementById('fb-home-dots');
+  if (!layer || !box) return;
+  let tag = document.getElementById('fb-home-picktag');
+  const d = homePickDistrict;
+  const rect = box.getBoundingClientRect();
+  const pt = d ? homeDistrictPoint(d, rect) : null;
+  const onScreen = pt && pt.x >= HOME_DOT_EDGE && pt.x <= rect.width - HOME_DOT_EDGE;
+  if (!d || onScreen) { if (tag) tag.remove(); return; }
+  if (!tag) {
+    tag = document.createElement('span');
+    tag.id = 'fb-home-picktag';
+    layer.appendChild(tag);
+  }
+  const side = pt ? (pt.x < rect.width / 2 ? 'l' : 'r') : (HOME_UNDRAWN_SIDE[d] || 'l');
+  const bar = document.getElementById('ist-pc-mount');
+  const top = bar ? Math.max(0, bar.getBoundingClientRect().bottom - rect.top) : 0;
+  tag.className = 'fb-evedge fb-evedge-' + side + ' fb-picktag';
+  tag.style.top = (top + 28).toFixed(1) + 'px';
+  tag.textContent = side === 'l' ? '← ' + nbName(d) : nbName(d) + ' →';
 }
 
 // Who is on the reader's petek, as districts: their own darker, the six
@@ -4382,6 +4536,10 @@ async function renderHomeDots() {
   };
   layer.innerHTML = dots.join('') + edges.map(tag).join('');
   markHomeDots();
+  // The districts follow the week's rows, and the tag for a member's
+  // undrawn district went with the markers it was standing among.
+  paintHomeDistricts();
+  renderHomePickTag();
   renderPlanButton();
   // The open card's evening may have moved with a refresh; follow it --
   // by id, since a plan put up or taken back reorders its district's list.
@@ -4452,8 +4610,9 @@ function renderHomeCard(paint) {
                 : eventKefilHTML(ev._kefil, 'plan.kefil') + ' · ' + esc(tEv('plan.frompetek')))
     : eventKefilHTML(ev._kefil);
   // The creator cannot say whether they are going to their own plan --
-  // they said so by putting it up. What they can do is take it back, and
-  // that asks once before it does.
+  // they said so by putting it up. What they can do is change it
+  // (db/events_v3_plan_edit.sql) or take it back, and taking it back asks
+  // once before it does.
   const btns = ev._plan && ev._mine
     ? (homeOpen.confirm
       ? '<div class="fb-evcard-ask">' + esc(tEv('plan.takeback.sure')) + '</div>' +
@@ -4461,7 +4620,8 @@ function renderHomeCard(paint) {
           '<button type="button" data-plan="drop" class="on">' + esc(tEv('plan.yes')) + '</button>' +
           '<button type="button" data-plan="keep">' + esc(tEv('plan.cancel')) + '</button>' +
         '</div>'
-      : '<div class="fb-evcard-btns one">' +
+      : '<div class="fb-evcard-btns">' +
+          '<button type="button" data-plan="edit">' + esc(tEv('plan.edit')) + '</button>' +
           '<button type="button" data-plan="ask">' + esc(tEv('plan.takeback')) + '</button>' +
         '</div>')
     : '<div class="fb-evcard-btns">' +
@@ -4494,6 +4654,7 @@ function renderHomeCard(paint) {
   card.querySelectorAll('[data-plan]').forEach(b => b.addEventListener('click', () => {
     const what = b.dataset.plan;
     if (what === 'drop') { takeBackPlan(ev); return; }
+    if (what === 'edit') { openPlanForm(ev); return; }
     homeOpen.confirm = what === 'ask';
     renderHomeCard(false);
   }));
@@ -4663,21 +4824,125 @@ function planWhoLine() {
   return esc(tEv('plan.who')).replace('{n}', '<b>' + n + '</b>');
 }
 
-function openPlanForm() {
+// ── BU HAFTAM: what the plan button opens ──
+// The button used to open the form straight away. It opens the reader's
+// WEEK now: every evening they have said they are going to (a city
+// evening or a plan from their petek) and every plan of their own, day by
+// day across the seven days the map shows, with the way to write a new
+// plan at the foot. One sheet, two views -- this list and the form -- so
+// "+ Yeni plan" and "Düzenle" swap the body in place and "‹ Bu haftam"
+// swaps it back, rather than stacking a second sheet over the first.
+//
+// Read off homeData, which already carries the week's rows, the reader's
+// own RSVPs (going) and which plans are theirs (_mine): nothing here is a
+// second fetch, so the list and the map can never disagree.
+let planEditing = null;   // the reader's own plan the form is editing, or null
+let planFrom = null;      // 'week' when the form was opened from the list
+function planWeekRows() {
+  const all = (homeData.events || []).concat(homeData.plans || []);
+  return all
+    .filter(ev => (ev._plan && ev._mine) || homeData.going.has(ev.id))
+    .sort((a, b) => new Date(a.event_date) - new Date(b.event_date));
+}
+function planWeekDayHead(k) {
+  const loc = planEnglish() ? 'en-GB' : 'tr-TR';
+  const noon = new Date(IstDate.iso(k) + 'T12:00:00+03:00');
+  const date = noon.toLocaleDateString(loc, { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long' });
+  return planDayLabel(k) + ' · ' + date;
+}
+function renderPlanWeek() {
+  const body = document.getElementById('fb-plan-body');
+  if (!body) return;
+  planEditing = null;
+  const rows = planWeekRows();
+  const mineCount = homeMyPlanCount();
+  const full = mineCount >= PLAN_MAX;
+  let html = '';
+  for (let k = 0; k < HOME_DAYS; k++) {
+    const day = IstDate.iso(k);
+    const today = rows.filter(ev => homeEventDay(ev) === day);
+    if (!today.length) continue;
+    html += '<section class="fb-week-day' + (k === 0 ? ' t' : '') + '">' +
+      '<h3 class="fb-week-dh">' + esc(planWeekDayHead(k)) + '</h3>' +
+      today.map(ev => {
+        const own = ev._plan && ev._mine;
+        const where = nbName(ev.neighborhood) + (ev._plan && ev.location ? ' · ' + ev.location : '');
+        const title = ev._plan ? ev.title : newsText(ev, 'title');
+        const tag = own ? tEv('plan.week.mine') : tEv('plan.week.going');
+        return '<button type="button" class="fb-week-row' + (own ? ' own' : '') + '"' +
+          ' data-act="' + (own ? 'edit' : 'show') + '" data-id="' + esc(ev.id) + '"' +
+          ' data-k="' + (ev._plan ? 'p' : 'c') + '" data-d="' + esc(ev.neighborhood || 'istanbul') + '">' +
+          '<span class="fb-week-tm">' + esc(eventTimeOnly(ev.event_date)) + '</span>' +
+          '<span class="fb-week-tx"><b>' + esc(title) + '</b><i>' + esc(where) + '</i></span>' +
+          '<span class="fb-week-st">' + esc(tag) + (own ? '<em>' + esc(tEv('plan.edit')) + ' ›</em>' : '') + '</span>' +
+        '</button>';
+      }).join('') +
+    '</section>';
+  }
+  body.innerHTML =
+    '<div class="fb-plan fb-week" lang="' + (planEnglish() ? 'en' : 'tr') + '">' +
+      '<h2 class="fb-plan-h">' + esc(tEv('plan.week.title')) + '</h2>' +
+      '<p class="fb-week-sub">' + esc(tEv('plan.week.sub')) + '</p>' +
+      (html || '<p class="fb-week-empty">' + esc(tEv('plan.week.empty')) + '</p>') +
+      '<button type="button" class="fb-plan-go" id="fb-week-new"' + (full ? ' disabled' : '') + '>' +
+        esc(tEv('plan.week.new')) + '</button>' +
+      '<p class="fb-plan-who">' + esc(tEv(full ? 'plan.err.full' : 'plan.week.count')).replace('{n}', '<b>' + mineCount + '</b>') + '</p>' +
+    '</div>';
+  body.scrollTop = 0;
+  const sheetBody = body.closest('.ist-sheet-body') || body;
+  sheetBody.scrollTop = 0;
+  body.querySelectorAll('.fb-week-row').forEach(row => row.addEventListener('click', () => {
+    const pool = row.dataset.k === 'p' ? (homeData.plans || []) : (homeData.events || []);
+    const ev = pool.find(e => String(e.id) === row.dataset.id);
+    if (!ev) return;
+    if (row.dataset.act === 'edit') { openPlanForm(ev, 'week'); return; }
+    // Somebody else's evening: put the sheet away and show it where it is.
+    closePlanForm();
+    openHomeCard(row.dataset.k, row.dataset.d, ev.id);
+  }));
+  const go = body.querySelector('#fb-week-new');
+  if (go) go.addEventListener('click', () => openPlanForm(null, 'week'));
+}
+function openPlanWeek() {
+  const overlay = document.getElementById('fb-plan-overlay');
+  if (!overlay || !homeData.plansOpen) return;
+  if (homeOpen) closeHomeCard();
+  renderPlanWeek();
+  if (overlay.hidden || !overlay.classList.contains('open')) IstSheet.open(overlay);
+}
+
+// ── The form: what, where, when -- new, or the reader's own plan ──
+// `ev` is a plan of the reader's own to edit (db/events_v3_plan_edit.sql),
+// or null for a new one. `from` is 'week' when the list opened it, which
+// is where a saved edit goes back to and what "‹ Bu haftam" returns to.
+function openPlanForm(ev, from) {
   const overlay = document.getElementById('fb-plan-overlay');
   const body = document.getElementById('fb-plan-body');
   if (!overlay || !body || !homeData.plansOpen) return;
   if (homeOpen) closeHomeCard();
-  const d = planDraft || {};
+  const editing = ev && ev._plan && ev._mine ? ev : null;
+  planEditing = editing;
+  planFrom = from || null;
+  // An edit starts from the plan as it stands; a new plan from whatever
+  // was half-typed last time.
+  let d = planDraft || {};
+  if (editing) {
+    const dayIso = homeEventDay(editing);
+    let k = 0;
+    for (let i = 0; i < HOME_DAYS; i++) if (IstDate.iso(i) === dayIso) k = i;
+    d = { what: editing.title || '', nb: editing.neighborhood, place: editing.location || '',
+          day: k, time: eventTimeOnly(editing.event_date) };
+  }
   const day = Number.isInteger(d.day) ? Math.min(d.day, HOME_DAYS - 1) : 0;
   const nb = d.nb || homeMeNb || 'kadikoy';
-  const full = homeMyPlanCount() >= PLAN_MAX;
+  const full = !editing && homeMyPlanCount() >= PLAN_MAX;
   const days = Array.from({ length: HOME_DAYS }, (_, k) =>
     '<button type="button" role="radio" aria-checked="' + (k === day) + '" data-day="' + k + '"' +
     (k === day ? ' class="on"' : '') + '>' + esc(planDayLabel(k)) + '</button>').join('');
   body.innerHTML =
     '<form class="fb-plan" id="fb-plan-form" novalidate lang="' + (planEnglish() ? 'en' : 'tr') + '">' +
-      '<h2 class="fb-plan-h">' + esc(tEv('plan.title')) + '</h2>' +
+      '<button type="button" class="fb-plan-back" id="fb-plan-back">' + esc(tEv('plan.back')) + '</button>' +
+      '<h2 class="fb-plan-h">' + esc(tEv(editing ? 'plan.edit.title' : 'plan.title')) + '</h2>' +
       '<label class="fb-plan-lab" for="fb-plan-what">' + esc(tEv('plan.what')) + '</label>' +
       '<input class="fb-plan-fld" id="fb-plan-what" maxlength="80" autocomplete="off" enterkeyhint="next"' +
         ' placeholder="' + esc(tEv('plan.what.ph')) + '" value="' + esc(d.what || '') + '">' +
@@ -4694,13 +4959,19 @@ function openPlanForm() {
         '<input class="fb-plan-fld fb-plan-time" id="fb-plan-time" type="time" step="300" required' +
           ' aria-label="' + esc(tEv('plan.time')) + '" value="' + esc(d.time || planDefaultTime(day)) + '">' +
       '</div>' +
-      '<p class="fb-plan-who">' + planWhoLine() + '</p>' +
+      '<p class="fb-plan-who">' + (editing ? esc(tEv('plan.edit.moved')) : planWhoLine()) + '</p>' +
       '<p class="fb-plan-err" id="fb-plan-err" role="alert"' + (full ? '' : ' hidden') + '>' +
         (full ? esc(tEv('plan.err.full')) : '') + '</p>' +
       '<button type="submit" class="fb-plan-go" id="fb-plan-go"' + (full ? ' disabled' : '') + '>' +
-        esc(tEv('plan.send')) + '</button>' +
+        esc(tEv(editing ? 'plan.save' : 'plan.send')) + '</button>' +
     '</form>';
+  const sheetBody = body.closest('.ist-sheet-body') || body;
+  sheetBody.scrollTop = 0;
   const form = body.querySelector('#fb-plan-form');
+  form.querySelector('#fb-plan-back').addEventListener('click', () => {
+    if (!planEditing) { const draft = readPlanForm(); if (draft) planDraft = draft; }
+    renderPlanWeek();
+  });
   form.querySelectorAll('[data-day]').forEach(b => b.addEventListener('click', () => {
     form.querySelectorAll('[data-day]').forEach(o => {
       const on = o === b;
@@ -4726,7 +4997,7 @@ function openPlanForm() {
       sel.innerHTML = planDistrictOptions(names, keep);
     });
   }
-  IstSheet.open(overlay);
+  if (overlay.hidden || !overlay.classList.contains('open')) IstSheet.open(overlay);
   // A keyboard is a choice on a phone, so nothing is focused there; on a
   // desktop the first field takes the typing at once.
   if (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
@@ -4752,18 +5023,27 @@ function readPlanForm() {
 function closePlanForm() {
   const overlay = document.getElementById('fb-plan-overlay');
   if (!overlay || overlay.hidden) return;
-  const draft = readPlanForm();
-  if (draft) planDraft = draft;
+  // Only a NEW plan's typing is kept: an edit always starts again from
+  // the plan as it stands.
+  if (!planEditing) {
+    const draft = readPlanForm();
+    if (draft) planDraft = draft;
+  }
+  planEditing = null;
   const active = document.activeElement;
   if (active && overlay.contains(active)) active.blur();
   IstSheet.close(overlay);
 }
 
 // A refusal says what to do about it. Dispatched on the error CODE,
-// never the message (see offerWordError for why).
+// never the message (see offerWordError for why). An edit that came back
+// with no row is a database without db/events_v3_plan_edit.sql: with no
+// update policy, RLS filters the row out and Postgres answers "0 rows
+// updated", not an error.
 function planErrorText(err) {
   const code = err && err.code;
-  if (code === '42501') return tEv(homeMyPlanCount() >= PLAN_MAX ? 'plan.err.full' : 'plan.err.rls');
+  if (code === 'PLAN_NO_ROW') return tEv('plan.err.edit.missing');
+  if (code === '42501') return tEv(!planEditing && homeMyPlanCount() >= PLAN_MAX ? 'plan.err.full' : 'plan.err.rls');
   if (code === 'PGRST204' || code === '42703') return tEv('plan.err.missing');
   return tEv('plan.err');
 }
@@ -4774,6 +5054,7 @@ async function submitPlan(e) {
   const errEl = document.getElementById('fb-plan-err');
   const go = document.getElementById('fb-plan-go');
   if (!form || !go || go.disabled) return;
+  const editing = planEditing;
   const say = (key, raw) => {
     if (!errEl) return;
     errEl.textContent = raw || tEv(key);
@@ -4788,39 +5069,50 @@ async function submitPlan(e) {
   const at = new Date(IstDate.iso(v.day) + 'T' + time + ':00+03:00');
   if (isNaN(at.getTime())) { say('plan.err.time'); return; }
   if (at.getTime() < Date.now() - 60000) { say('plan.err.past'); return; }
-  if (homeMyPlanCount() >= PLAN_MAX) { say('plan.err.full'); return; }
+  if (!editing && homeMyPlanCount() >= PLAN_MAX) { say('plan.err.full'); return; }
   const uid = await doneUid();
   if (!uid) { say('plan.err'); return; }
   if (errEl) errEl.hidden = true;
   go.disabled = true;
-  go.textContent = tEv('plan.sending');
-  let id = null;
+  go.textContent = tEv(editing ? 'plan.saving' : 'plan.sending');
+  const row = {
+    title: what,
+    neighborhood: v.nb,
+    location: v.place.trim() || null,
+    event_date: at.toISOString(),
+  };
+  let id = editing ? editing.id : null;
   try {
-    const { data, error } = await IstRouter.sb.from('events').insert([{
-      title: what,
-      neighborhood: v.nb,
-      location: v.place.trim() || null,
-      event_date: at.toISOString(),
-      audience: 'petek',
-      created_by: uid,
-    }]).select('id').single();
-    if (error) throw error;
-    id = data && data.id;
+    if (editing) {
+      const { data, error } = await IstRouter.sb.from('events').update(row)
+        .eq('id', editing.id).select('id');
+      if (error) throw error;
+      if (!data || !data.length) throw { code: 'PLAN_NO_ROW' };
+    } else {
+      const { data, error } = await IstRouter.sb.from('events').insert([Object.assign(row, {
+        audience: 'petek',
+        created_by: uid,
+      })]).select('id').single();
+      if (error) throw error;
+      id = data && data.id;
+    }
   } catch (err) {
     console.error('[proje plan]', err);
     go.disabled = false;
-    go.textContent = tEv('plan.send');
+    go.textContent = tEv(editing ? 'plan.save' : 'plan.send');
     say(null, planErrorText(err));
     return;
   }
-  // Up. The draft is spent, the sheet goes, and the reader is shown their
-  // plan where their petek will see it: on the map, its card open, their
-  // own hexagon glowing as its kefil.
-  planDraft = null;
+  // Saved. An edit made from the list goes back to the list, which now
+  // says the new hour; anything else puts the sheet away and shows the
+  // plan where the petek will see it: on the map, its card open, the
+  // reader's own hexagon glowing as its kefil.
+  planEditing = null;
+  if (!editing) { planDraft = null; _homePlansMade++; }
+  await refreshHomeDots();
+  if (editing && planFrom === 'week') { renderPlanWeek(); return; }
   const overlay = document.getElementById('fb-plan-overlay');
   if (overlay) IstSheet.close(overlay);
-  _homePlansMade++;
-  await refreshHomeDots();
   if (id) openHomeCard('p', v.nb, id);
 }
 // How many plans the reader has put up on this page, for the tour.
@@ -4873,10 +5165,19 @@ function wireHome() {
   home.hidden = !HOME_SCREEN;
   if (!HOME_SCREEN) return;
   wirePlanForm();
+  // A red district is the bigger target for the same card its dot opens:
+  // the city's evening first where a district has both kinds.
+  box.addEventListener('click', (e) => {
+    const el = e.target.closest && e.target.closest('.fb-districts .fb-dist-ev');
+    if (!el) return;
+    const d = districtKeyOf(el);
+    const hasCity = (homeData.events || []).some(ev => ev.neighborhood === d);
+    openHomeCard(hasCity ? 'c' : 'p', d);
+  });
   home.addEventListener('click', (e) => {
     const dot = e.target.closest && e.target.closest('[data-d]');
     if (dot && dot.closest('#fb-home-dots')) { openHomeCard(dot.dataset.k || 'c', dot.dataset.d); return; }
-    if (e.target.closest && e.target.closest('#fb-planbtn')) { openPlanForm(); return; }
+    if (e.target.closest && e.target.closest('#fb-planbtn')) { openPlanWeek(); return; }
     const game = e.target.closest && e.target.closest('.fb-gbtn[data-game]');
     if (game) {
       // The game page reads the live clock; renew first if the day has
@@ -4891,7 +5192,7 @@ function wireHome() {
   // pressing a hexagon to see who that is is what the guest list is for.
   box.addEventListener('pointerdown', (e) => {
     if (!homeOpen) return;
-    if (e.target.closest && e.target.closest('#fb-evcard, #fb-home-dots [data-d], #fb-petek, #fb-home-games, #fb-planbtn')) return;
+    if (e.target.closest && e.target.closest('#fb-evcard, #fb-home-dots [data-d], #fb-petek, #fb-home-games, #fb-planbtn, .fb-districts .fb-dist-ev')) return;
     closeHomeCard();
   });
   if (!document.body.dataset.fbHomeWired) {
@@ -4899,6 +5200,8 @@ function wireHome() {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && homeOpen) closeHomeCard(); });
     // The petek says where its people live whenever its map lands.
     document.addEventListener('ist-hive-map', (e) => { if (box) homeFriendsFromMap(e.detail); });
+    // And whoever is named on the bar lights where they live.
+    document.addEventListener('ist-hive-pick', (e) => { if (box) homePickFrom(e.detail); });
     // And every time it is fitted, its window is re-cut to its outline.
     // Converges in one step: the outline is the same at any size, so the
     // second fit asks for the window the first one already has.

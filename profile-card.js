@@ -191,6 +191,12 @@
       meta: hiveMemberDistrict(member) || '—',
     } : null;
     paintBarMe();
+    // Said out loud for whoever draws the city: project.html's home screen
+    // lights the district a named member lives in, and puts it out again
+    // when the name comes down (every clear goes through here).
+    document.dispatchEvent(new CustomEvent('ist-hive-pick', {
+      detail: member ? { id: String(member.member_id), neighborhood: member.neighborhood || null } : null,
+    }));
   }
 
   function clearBarMember() {

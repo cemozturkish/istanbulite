@@ -330,7 +330,7 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > on `events` and `neighborhood_polls`, so an evening and a poll reach the reader only by being
 > curated into an edition, exactly as `breaking_news_v3_edition` already did it for the news; plus
 > `events`' own English half, and `library_letters.audience` + `library_letter_neighborhoods`,
-> which is the first time a letter has been addressed to anyone in particular), `events_v2_plans`
+> which is the first time a letter has been addressed to anyone in particular), `events_v2_plans` + `events_v3_plan_edit`
 > (members' own plans — `events.audience` / `created_by` and `event_readable()`, which lets a
 > `'petek'` row be read only by its creator and the members attached to them; see "Plans" under
 > the home screen), and more). When in
@@ -2285,9 +2285,25 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
 - **Friends' districts are lit at rest** (`FRIEND_DISTRICTS_LIT`): the petek announces every map
   it lands (`ist-hive-map` event / `hiveMapCells()`), ring-1 neighbours' districts go light gray
   and the reader's own (from their profile — `hive_map()` leaves the caller out) darker.
-  `paintHomeDistricts` merges that with the open evening's red; `ensureDistrictLayer` keeps the
+  `paintHomeDistricts` merges that with the red below; `ensureDistrictLayer` keeps the
   tracing in the book and after the frames even with nothing painted, because the dots are placed
   off it.
+- **Every district with something on this week is RED** (`homeEventDistricts`, `HOME_FILL_EVENT`),
+  a city evening or a plan the reader can see, painted over the gray. The dots still say
+  today/later, whose and how many; the district says "there is somewhere to go here" and is the
+  bigger target: a press on a red district (`.fb-dist-ev`, the one pressable part of the tracing)
+  opens the same card as its dot, the city's evening first where a district has both kinds.
+- **The FOCUS is solid red and breathes** (`.fb-dist-focus`, the same 1.9s pulse a story's
+  countries have on Kütüphane), and the other red districts step back to 38% while there is one.
+  Two things put a district in focus: the open evening's (`homeEventDistrict`), and **the district
+  of the member named on the bar** (`homePickDistrict`) — pressing a hexagon lights where that
+  person lives. `setBarMember` in profile-card.js announces every name it puts up or takes down
+  (`ist-hive-pick`, carrying the member's `neighborhood`), and every clear goes through it, so the
+  map can never keep lighting someone who has left the bar. A district the drawing does not reach
+  gets a red edge tag instead (`renderHomePickTag`), said rather than pressed.
+- **The districts' red is the MAP's at night** (`--fb-home-red` on `.fb`): after sunset
+  `--ink-red` is walked down for the night paper and on the night land a red district was all but
+  the colour of the ones around it, so the fill takes the drawing's own night red instead.
 - **Today's two games are buttons at the foot** (`renderHomeGames`, off `gamesStateToday()`): the
   reader's own state only (OYNA / BİTTİ ✓ / Bugün yok), never anybody else's score. A button is
   the game's NAME over its state and nothing else — no Sözcel or Çengel mark beside it, so the
@@ -2326,9 +2342,15 @@ out, and the people who know them finding out.
   petek row, theirs, no kefil, no edition, a district, a 1–80 character title (place ≤ 80), dated
   from today's İstanbul midnight to seven days on (the days the map shows), and at most
   **five standing at once** (`PLAN_MAX`). They may **delete** their own plan (GERİ AL, which asks
-  once) and nothing else: there is no member UPDATE policy, and the only thing anybody else can do
-  with a plan is say whether they are going. No edits, no comments, still no DMs. RSVPs and verdicts
-  cascade with the row.
+  once) and **edit** it (DÜZENLE, `db/events_v3_plan_edit.sql`): the UPDATE policy restates the
+  insert's fence on the new row and requires the old one to be the caller's own petek row, so an
+  edit can never turn a plan into a city evening or hand it to somebody else. **A plan that moves
+  asks again**: changing its day, time or district clears every answer on it (a SECURITY DEFINER
+  trigger, `plan_moved_clear_answers`, since the creator holds no write on other members'
+  answers); a new title or place name in the same district at the same hour keeps them. The only
+  thing anybody else can do with a plan is say whether they are going. No comments, still no DMs.
+  RSVPs and verdicts cascade with the row. A database without the v3 migration answers an edit
+  with zero rows rather than an error (`PLAN_NO_ROW` → `plan.err.edit.missing`).
 - **The admin's three write policies stop at `audience = 'city'`**, restated by the same
   migration. Policies are permissive and OR together, so the creator-only rule holds only if
   nothing else grants a write on a plan — and the admin is a member too: attached to a plan's
@@ -2347,13 +2369,19 @@ out, and the people who know them finding out.
   both kinds stands them side by side. Markers are keyed by kind AND district (`data-k` /
   `data-d`, `homeOpen.kind`), and `openHomeCard(kind, d, id)` can open on a given plan.
 - **The card** prints the creator as "KEFİL: BEŞİKTAŞ'TAN AYŞE · PETEĞİNDEN" for a friend's plan
-  (`eventKefilHTML(k, 'plan.kefil')`), and "SENİN PLANIN · PETEĞİN GÖRÜYOR" with a single GERİ AL
-  on the reader's own — the creator does not RSVP to their own plan; their hexagon is painted as
-  its kefil.
+  (`eventKefilHTML(k, 'plan.kefil')`), and "SENİN PLANIN · PETEĞİN GÖRÜYOR" with DÜZENLE and
+  GERİ AL on the reader's own — the creator does not RSVP to their own plan; their hexagon is
+  painted as its kefil.
 - **+ BİR YERE GİDİYORUM** (`#fb-planbtn`) stands under the petek, above the games (in the games'
   column on a desktop), and only once `homeData.plansOpen`: `.fb-plans-on` on the book takes the
-  same room off the petek's window in the same frame. It opens **THE sheet** (`#fb-plan-overlay`,
-  under the bars): what (`title`), where (district select of all 39, fetched from `neighborhoods`
+  same room off the petek's window in the same frame. It opens **the reader's WEEK** in THE sheet
+  (`#fb-plan-overlay`, under the bars, `renderPlanWeek`): every evening they said they are going to
+  (`homeData.going`, city or a friend's plan) and every plan of their own, day by day across the
+  seven days the map shows, read off `homeData` so the list and the map can never disagree. A
+  friend's or city row puts the sheet away and opens that card on the map; a row of their own
+  opens the form to edit it; "+ Yeni plan" opens it blank. The form swaps into the same body
+  (`openPlanForm(ev, from)`) with "‹ Bu haftam" to go back, and a saved edit made from the list
+  returns to the list. The form asks what (`title`), where (district select of all 39, fetched from `neighborhoods`
   — `nbName()` uses the same names everywhere on this screen — plus an optional place,
   `location`), when (the seven days the map shows as chips, then a time), and how many people will
   see it (`homeAttached`, the `bonded` cells of the reader's own map — exactly who
