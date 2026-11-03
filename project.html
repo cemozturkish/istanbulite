@@ -15,10 +15,10 @@
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <link rel="stylesheet" href="palette.css?v=12">
-  <link rel="stylesheet" href="profile-card.css?v=51">
+  <link rel="stylesheet" href="profile-card.css?v=52">
   <link rel="stylesheet" href="profile-bar.css?v=2">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=63" defer></script>
+  <script src="profile-card.js?v=64" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -1230,6 +1230,45 @@
       html.ist-native .fb.fb-home-on.fb-plans-on #fb-map {
         bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + 64px + 12px + 46px);
       }
+    }
+
+    /* ── THE WHOLE PETEK, behind the logo (setHiveWhole) ──
+       Pressing the logo opens the petek's whole shape: its window takes
+       the entire band between the two bars, and everything else on the
+       screen -- the map, the dots, the plan button, the games -- goes
+       quiet under a wash of the page's own paper. The petek stands over
+       that wash at full strength. Pressing the logo again (or Escape, or
+       the wash itself) puts the screen back exactly as it was. The bars
+       are not washed: pressing a hexagon names that member on the top
+       bar, and the logo is the way back out.
+       Written after every other #fb-map rule (and with `html` in front,
+       to outrank the app's and the desktop's own) so it wins at every
+       width without !important; placeHomePetek's inline top is cleared
+       while it is on. */
+    .fb-whole-scrim {
+      position: absolute;
+      inset: 0;
+      z-index: 5;            /* over the home layer (4), under the petek (6) */
+      background: var(--paper);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.32s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .fb.fb-whole-on .fb-whole-scrim { opacity: 0.86; pointer-events: auto; }
+    html .fb.fb-home-on.fb-whole-on #fb-map {
+      top: calc(env(safe-area-inset-top) + var(--navbar-h-top, 40px));
+      bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px));
+      left: 0; right: 0;
+      height: auto;
+      z-index: 6;
+    }
+    /* The closing line belongs to the resting screen. */
+    .fb.fb-whole-on .fb-map-done { display: none; }
+    .fb.fb-home-on.fb-whole-on #fb-map:has(> .fb-map-done:not([hidden])) > .fb-petek,
+    .fb.fb-whole-on #fb-map > .fb-petek { bottom: 0; }
+    @media (prefers-reduced-motion: reduce) {
+      .fb-whole-scrim { transition: none; }
     }
 
     /* ── The form a plan is written in ──
@@ -2765,6 +2804,8 @@
           <button type="button" class="fb-planbtn" id="fb-planbtn" hidden></button>
           <div class="fb-home-games" id="fb-home-games"></div>
         </div>
+        <!-- ── THE WHOLE PETEK'S WASH ── (see setHiveWhole) -->
+        <div class="fb-whole-scrim" id="fb-whole-scrim" aria-hidden="true"></div>
       </div>
     </main>
   </div>
@@ -4050,6 +4091,8 @@ function homePetekShape() {
 function placeHomePetek() {
   const mapEl = document.getElementById('fb-map');
   if (!HOME_SCREEN || !box || !mapEl) return;
+  // The whole petek takes the band from the stylesheet; nothing to cut.
+  if (hiveWhole) { if (mapEl.style.top) mapEl.style.top = ''; return; }
   // A desktop stands the petek in its own middle column (THE DESKTOP).
   if (wide) { setHomeLift(0); mapEl.style.top = ''; return; }
   const img = imgs[ISTANBUL_SLIDE];
@@ -8168,11 +8211,34 @@ function mountPetek() {
   } catch (err) { console.error('[proje petek]', err); }
 }
 
-function openPetek() { petekFlag = true; goHome(); }
+// ── THE LOGO OPENS THE WHOLE PETEK ──
+// The six-around-you petek is the home screen itself, so the logo no
+// longer has anywhere to walk the reader to. What it opens instead is the
+// petek's whole shape -- the depth that used to be one pull down from the
+// middle: everybody on the reader's map and the field of empty places
+// around it, in a window as big as the band between the two bars, with
+// everything else washed out under it. Pressed again, the screen goes
+// back to exactly what it was. The drawing's half is profile-card.js's
+// (IstProfileCard.setHiveWhole); the window and the wash are this page's.
+let hiveWhole = false;
+function setHiveWhole(on) {
+  on = !!on;
+  if (on === hiveWhole) return;
+  hiveWhole = on;
+  // Whatever card stood open is about the screen being washed out.
+  if (on && homeOpen) closeHomeCard();
+  const mapEl = document.getElementById('fb-map');
+  if (on && mapEl) mapEl.style.top = '';
+  if (box) box.classList.toggle('fb-whole-on', on);
+  if (window.IstProfileCard && IstProfileCard.setHiveWhole) IstProfileCard.setHiveWhole(on);
+}
+
+function openPetek() { petekFlag = true; goHome(); setHiveWhole(true); }
 
 function closePetek() {
   petekFlag = false;
   goHome();
+  setHiveWhole(false);
   // A member named on the top bar is named BY the petek (see
   // pickHiveMember in profile-card.js) -- left on it, the bar would go on
   // naming a hexagon that is no longer on the screen.
@@ -8529,6 +8595,8 @@ function unmount() {
   // the logo does not -- and the logo is on the bar, which outlives this
   // page. The game overlay is body-level outright.
   petekFlag = false;
+  hiveWhole = false;
+  if (window.IstProfileCard && IstProfileCard.setHiveWhole) IstProfileCard.setHiveWhole(false);
   document.body.classList.remove('fb-petek-on');
   closeGameOverlay(true);
   snapFbPageShut();
@@ -9018,8 +9086,14 @@ function wireMap() {
     btn.addEventListener('pointerleave', endLangHold);
     btn.addEventListener('contextmenu', (e) => e.preventDefault());
   }
-  // Kept for onboarding's own bookkeeping (see petekFlag); the petek
-  // itself has nowhere left to go on Escape any more.
+  // A press on the wash is a press outside the whole petek: back out.
+  // The wash is inside #ist-content, so it is bound again on every mount.
+  const scrim = document.getElementById('fb-whole-scrim');
+  if (scrim && !scrim.dataset.wired) {
+    scrim.dataset.wired = '1';
+    scrim.addEventListener('click', () => { if (petekIsOpen()) closePetek(); });
+  }
+  // Escape closes the whole petek, the same as a second press on the logo.
   if (!document.body.dataset.fbPetekEsc) {
     document.body.dataset.fbPetekEsc = '1';
     document.addEventListener('keydown', (e) => {
