@@ -1966,17 +1966,59 @@
   // comes back.
   const HIVE_DAY_GLYPH = false;
 
+  // ── A word that does not fit is set SMALLER, never cut and never given room ──
+  // Each word of a name stands in its own box (.ist-hive-w), so it can be
+  // measured and, if it is wider than the name's track, set in a smaller
+  // size of its own (fitHiveWords). The track and the petek stay exactly
+  // the size they were: a long surname is the one word that gets quieter.
+  // It used to be `overflow-wrap: anywhere`, which printed KURTULUŞ as
+  // KURTULU / Ş.
+  function hiveWordsHTML(text) {
+    return String(text || '').split(/\s+/).filter(Boolean)
+      .map(w => `<span class="ist-hive-w">${esc(w)}</span>`).join(' ');
+  }
+
+  // Shrinks every word wider than its name's track to exactly fit it. In
+  // em, against the name's own size, so the answer holds at any scale the
+  // plane is drawn at (the plane is one transform; layout px are untouched
+  // by it). Three passes -- reset, read, write -- so the whole petek costs
+  // one layout, not one per word.
+  function fitHiveWords(root) {
+    const words = [...root.querySelectorAll('.ist-hive-name .ist-hive-w')];
+    if (!words.length) return;
+    words.forEach(w => { w.style.fontSize = ''; w.style.letterSpacing = ''; });
+    const fits = words.map(w => {
+      const track = w.closest('.ist-hive-name').clientWidth;
+      const width = w.offsetWidth;
+      if (!(track > 0) || width <= track) return null;
+      // A hair under the exact ratio: a word landing exactly on the edge
+      // reads as clipped.
+      const k = (track / width) * 0.97;
+      // letter-spacing is stated in px, so it does not shrink with the font
+      // on its own -- left alone, a 17-letter surname came out ~5px over.
+      // Scaled by the same factor, the whole word is exactly k as wide.
+      const ls = parseFloat(getComputedStyle(w).letterSpacing) || 0;
+      return { k, ls: ls * k };
+    });
+    words.forEach((w, i) => {
+      const f = fits[i];
+      if (!f) return;
+      w.style.fontSize = f.k.toFixed(3) + 'em';
+      w.style.letterSpacing = f.ls.toFixed(3) + 'px';
+    });
+  }
+
   function hiveNameHTML(member, side, status, t) {
     if (!side) return '';
     const sub = HIVE_DAY_GLYPH
       ? hiveStatHTML(status, t)
-      : `<span class="ist-hive-name-sub">${esc(hiveMemberDistrict(member))}</span>`;
+      : `<span class="ist-hive-name-sub">${hiveWordsHTML(hiveMemberDistrict(member))}</span>`;
     // .ist-hive-name-ev stays empty until an evening is open; then it
     // carries where this member stands on it (see applyHiveEventStates)
     // and the district steps aside for it.
     return `
       <span class="ist-hive-name ist-hive-name-${side}">
-        <span class="ist-hive-name-label">${esc(hiveMemberName(member))}</span>
+        <span class="ist-hive-name-label">${hiveWordsHTML(hiveMemberName(member))}</span>
         ${sub}<span class="ist-hive-name-ev"></span>
       </span>`;
   }
@@ -2708,6 +2750,9 @@
 
     const cx = me.offsetLeft + me.offsetWidth / 2;
     const cy = me.offsetTop + me.offsetHeight / 2;
+    // Before the names are measured below, so they are measured at the
+    // size they will actually be drawn at.
+    fitHiveWords(plane);
 
     // What has to fit is what is actually *drawn* at this level, not the
     // plane's own box: the plane is sized for the whole map at every
