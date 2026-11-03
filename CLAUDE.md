@@ -2627,6 +2627,21 @@ history entry, no `onOpen`, scroll position kept.
 >   reason, because `.ist-hive-pannable` flips one on the view above it. Together they took the
 >   press frame's style work from ~540ms to ~36ms at 4× CPU throttle. The field is also built
 >   for the scale the petek stands at (`hiveFieldScale`), not the smallest it could ever be.
+>
+> - **On a phone the map PARTS instead of washing out** ("THE TWO SHORES" in project.html's
+>   stylesheet). The drawing is laid twice (`ensureHomeShores`; the copy is never in `imgs`),
+>   each masked to one shore by `assets/map/istanbul-map-mobile-west.png` / `-east.png` — cut
+>   down the middle of the Bosphorus and across the open water by
+>   `scripts/make-home-map-sides.py`, re-run if the drawing is redrawn. With the whole petek up
+>   (`.fb-home-apart`, set and cleared with the wash) Avrupa yakası leaves to the left and Anadolu
+>   yakası to the right, each district's tracing (`markShores`, `EAST_SHORE`) and each dot and
+>   tag with its own shore, while the plan button and the games drop under the bottom bar. They
+>   come back on a delay timed to the field's inward fade, with a small overshoot. Masks rather
+>   than a clip-path because `mask-size: cover` centred is exactly `object-fit: cover`. The tracing
+>   moves in its own SVG user units (`--fb-shore-u`, `shoresPx`) and the HTML pieces by
+>   `--fb-shore-px`: one length on one curve, so a district never leaves its coast mid-flight.
+>   The wash stays as the press target but is clear on a phone, since nothing is left under it.
+>   A desktop keeps the wash.
 
 **These two swapped places.** The petek used to be the middle lane of slide 12 and the app map
 used to be a layer the logo opened over whatever screen the reader was standing on. The reasoning

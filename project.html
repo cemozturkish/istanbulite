@@ -1300,6 +1300,87 @@
       .fb-whole-scrim { transition: none; }
     }
 
+    /* ── THE TWO SHORES (phones) ──
+       On a phone the map does not wash out under the whole petek: it
+       PARTS. The drawing is laid twice, each copy masked to one shore
+       (assets/map/istanbul-map-mobile-west/-east.png, cut down the middle
+       of the Bosphorus by scripts/make-home-map-sides.py), and while the
+       whole petek is up (.fb-home-apart, set with the wash in setHiveWhole)
+       Avrupa yakası goes off to the left and Anadolu yakası off to the
+       right, each district's tracing and each dot and tag with its own
+       shore; the plan button and the games drop under the bottom bar. The
+       petek itself does not move -- that is main's pin, untouched.
+       Coming back they wait for the field to clear (it fades inward over
+       620ms, see .ist-hive-whole-out) and arrive with a small overshoot.
+
+       Two masks rather than a clip-path because `mask-size: cover`
+       centred on the element is exactly `object-fit: cover`, so the masks
+       register with the drawing at every screen size with no arithmetic.
+       The tracing moves per district (`transform`, in the SVG's own user
+       units, --fb-shore-u, set by shoresPx) and everything HTML moves by
+       --fb-shore-px: the same length on the same curve, so a district and
+       its dot never part company mid-flight. `translate`, never
+       `transform`, on the HTML pieces: the buttons' own press and a dot's
+       .on are transforms. The wash stays as the thing a press outside
+       lands on, but has nothing left to quiet, so it is clear. */
+    .fb > img.fb-shore-e { display: none; }
+    @media (max-width: 768px) {
+      .fb.fb-home-on > img.fb-shore-e { display: block; }
+      .fb.fb-home-on > img.fb-shore-w {
+        -webkit-mask: url('assets/map/istanbul-map-mobile-west.png') center / cover no-repeat;
+                mask: url('assets/map/istanbul-map-mobile-west.png') center / cover no-repeat;
+      }
+      .fb.fb-home-on > img.fb-shore-e {
+        -webkit-mask: url('assets/map/istanbul-map-mobile-east.png') center / cover no-repeat;
+                mask: url('assets/map/istanbul-map-mobile-east.png') center / cover no-repeat;
+      }
+      .fb.fb-home-on .fb-whole-scrim { background: transparent; }
+      /* Home: they come back, after the field has gone. */
+      .fb.fb-home-on > img.fb-shore-w,
+      .fb.fb-home-on > img.fb-shore-e,
+      .fb.fb-home-on #fb-home-dots > .fb-shore-w,
+      .fb.fb-home-on #fb-home-dots > .fb-shore-e {
+        transition: translate 0.6s cubic-bezier(0.3, 1.2, 0.5, 1) 0.24s;
+      }
+      .fb.fb-home-on .fb-districts :is(polygon, path) {
+        transition: fill 0.45s ease, fill-opacity 0.3s ease,
+                    transform 0.6s cubic-bezier(0.3, 1.2, 0.5, 1) 0.24s;
+      }
+      .fb.fb-home-on .fb-planbtn {
+        transition: translate 0.56s cubic-bezier(0.3, 1.3, 0.5, 1) 0.32s,
+                    border-bottom-width 0.1s ease, transform 0.1s ease;
+      }
+      .fb.fb-home-on .fb-home-games { transition: translate 0.56s cubic-bezier(0.3, 1.3, 0.5, 1) 0.38s; }
+      /* The whole petek: they leave at once, and fast. */
+      .fb.fb-home-apart > img.fb-shore-w,
+      .fb.fb-home-apart #fb-home-dots > .fb-shore-w {
+        translate: calc(-1 * var(--fb-shore-px, 72vw)) 0;
+        transition: translate 0.34s cubic-bezier(0.6, 0, 0.85, 0.3);
+      }
+      .fb.fb-home-apart > img.fb-shore-e,
+      .fb.fb-home-apart #fb-home-dots > .fb-shore-e {
+        translate: var(--fb-shore-px, 72vw) 0;
+        transition: translate 0.34s cubic-bezier(0.6, 0, 0.85, 0.3);
+      }
+      .fb.fb-home-apart .fb-districts :is(polygon, path) {
+        transition: fill 0.45s ease, fill-opacity 0.3s ease,
+                    transform 0.34s cubic-bezier(0.6, 0, 0.85, 0.3);
+      }
+      .fb.fb-home-apart .fb-districts .fb-shore-w { transform: translateX(calc(-1 * var(--fb-shore-u, 0px))); }
+      .fb.fb-home-apart .fb-districts .fb-shore-e { transform: translateX(var(--fb-shore-u, 0px)); }
+      .fb.fb-home-apart .fb-planbtn,
+      .fb.fb-home-apart .fb-home-games {
+        translate: 0 calc(var(--fb-dock) + 200px);
+        transition: translate 0.36s cubic-bezier(0.6, 0, 0.85, 0.3);
+      }
+      .fb.fb-home-apart .fb-home-games { transition-delay: 0.04s; }
+    }
+    @media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+      .fb.fb-home-on > img.fb-shore-w, .fb.fb-home-on > img.fb-shore-e,
+      .fb.fb-home-on #fb-home-dots > *, .fb.fb-home-on .fb-districts :is(polygon, path),
+      .fb.fb-home-on .fb-planbtn, .fb.fb-home-on .fb-home-games { transition: none; }
+    }
+
     /* ── The form a plan is written in ──
        What, where, when, inside THE sheet. Fields are 16px type, which is
        what keeps iOS from zooming the page in on focus. */
@@ -3930,6 +4011,59 @@ function refreshEtkinlikColumn() {
 
 // Districts no tracing draws at all, and which edge of the city they lie
 // past. Everything else is placed off the tracing itself.
+// ── The two shores (see "THE TWO SHORES" in the stylesheet) ──
+// Which side of the Bosphorus a district is on decides which way it
+// leaves when the whole petek opens. Everything not named here is
+// Avrupa yakası.
+const EAST_SHORE = new Set([
+  'adalar', 'atasehir', 'beykoz', 'cekmekoy', 'kadikoy', 'kartal', 'maltepe',
+  'pendik', 'sancaktepe', 'sile', 'sultanbeyli', 'tuzla', 'umraniye', 'uskudar',
+]);
+function shoreClass(d) { return EAST_SHORE.has(d) ? 'fb-shore-e' : 'fb-shore-w'; }
+// Each traced shape goes with its own shore.
+function markShores(svg) {
+  if (!svg) return;
+  svg.querySelectorAll('polygon, path').forEach(el => {
+    const k = el.getAttribute('data-neighborhood') || el.id || '';
+    el.classList.add(EAST_SHORE.has(k) ? 'fb-shore-e' : 'fb-shore-w');
+  });
+}
+// The drawing is laid twice on the home screen, one copy masked to each
+// shore; the original is the west copy and this makes the east one. Never
+// in `imgs`, so the book's own frame handling never touches it, and
+// hidden by the stylesheet everywhere but a phone's home screen.
+function ensureHomeShores() {
+  if (!HOME_SCREEN || !box) return;
+  const img = imgs[ISTANBUL_SLIDE];
+  if (!img || !img.isConnected) return;
+  img.classList.add('fb-shore-w');
+  let east = box.querySelector(':scope > img.fb-shore-e');
+  if (east && east.previousElementSibling !== img) { east.remove(); east = null; }
+  if (!east) {
+    east = img.cloneNode(false);
+    east.classList.remove('fb-shore-w');
+    east.classList.add('fb-shore-e', 'on');
+    east.alt = '';
+    img.after(east);
+  }
+  if (east.getAttribute('src') !== img.getAttribute('src') && /istanbul-map-mobile/.test(img.getAttribute('src') || '')) {
+    east.setAttribute('src', img.getAttribute('src'));
+  }
+}
+// How far each shore travels: the same length for the drawing (CSS px)
+// and its tracing (the SVG's own user units, which are scaled by the
+// viewBox), so a district never slides off its own drawn coast.
+function shoresPx() {
+  if (!box) return;
+  const px = Math.round(box.clientWidth * 0.72);
+  box.style.setProperty('--fb-shore-px', px + 'px');
+  if (districtLayer) {
+    const m = districtLayer.getScreenCTM();
+    const k = m && m.a ? m.a : 1;
+    districtLayer.style.setProperty('--fb-shore-u', (px / k).toFixed(2) + 'px');
+  }
+}
+
 const HOME_UNDRAWN_SIDE = {
   avcilar: 'l', beylikduzu: 'l', buyukcekmece: 'l', catalca: 'l',
   esenyurt: 'l', silivri: 'l', adalar: 'r',
@@ -4202,6 +4336,8 @@ function placeHomePetek() {
   // Until the drawing is in, the CSS line holds; the measurement belongs
   // to the phone's own drawing and to nothing else.
   if (!img || !img.isConnected || !/istanbul-map-mobile/.test(img.currentSrc || img.src)) return;
+  // The phone's drawing is in: it has a second shore to stand beside it.
+  ensureHomeShores();
   const r = img.getBoundingClientRect();
   const b = box.getBoundingClientRect();
   if (!r.width || !r.height) return;
@@ -4314,6 +4450,7 @@ async function ensureDistrictLayer() {
     districtLayer.setAttribute('preserveAspectRatio', 'xMidYMid slice');
     districtLayer.removeAttribute('width');
     districtLayer.removeAttribute('height');
+    markShores(districtLayer);
   }
   // appendChild MOVES it, which is the point: it has to stay after the
   // frames, and loadFrames appends those on every mount (see
@@ -4388,7 +4525,7 @@ function renderHomePickTag() {
   const side = pt ? (pt.x < rect.width / 2 ? 'l' : 'r') : (HOME_UNDRAWN_SIDE[d] || 'l');
   const bar = document.getElementById('ist-pc-mount');
   const top = bar ? Math.max(0, bar.getBoundingClientRect().bottom - rect.top) : 0;
-  tag.className = 'fb-evedge fb-evedge-' + side + ' fb-picktag';
+  tag.className = 'fb-evedge fb-evedge-' + side + ' fb-picktag fb-shore-' + (side === 'l' ? 'w' : 'e');
   tag.style.top = (top + 28).toFixed(1) + 'px';
   tag.textContent = side === 'l' ? '← ' + nbName(d) : nbName(d) + ' →';
 }
@@ -4505,10 +4642,11 @@ async function renderHomeDots() {
     if (onScreen) {
       const at = ' style="left:' + pt.x.toFixed(1) + 'px;top:' + pt.y.toFixed(1) + 'px"' +
         ' aria-label="' + esc(nb + ' · ' + n) + '">';
+      const sc = ' ' + shoreClass(d);
       dots.push(kind === 'p'
-        ? '<button type="button" class="fb-pldot' + (isToday ? ' t' : '') + (n > 1 ? ' n' : '') + '"' + attrs + at +
+        ? '<button type="button" class="fb-pldot' + sc + (isToday ? ' t' : '') + (n > 1 ? ' n' : '') + '"' + attrs + at +
           '<i></i>' + (n > 1 ? '<b>' + n + '</b>' : '') + '</button>'
-        : '<button type="button" class="fb-evdot' + (isToday ? ' t' : '') + (n > 1 ? ' n' : '') + '"' + attrs + at +
+        : '<button type="button" class="fb-evdot' + sc + (isToday ? ' t' : '') + (n > 1 ? ' n' : '') + '"' + attrs + at +
           (n > 1 ? n : '') + '</button>');
     } else {
       const side = pt ? (pt.x < rect.width / 2 ? 'l' : 'r') : (HOME_UNDRAWN_SIDE[d] || 'l');
@@ -4529,7 +4667,8 @@ async function renderHomeDots() {
   });
   const tag = (e) => {
     const mark = '<i' + (e.kind === 'p' ? ' class="hx"' : '') + '></i>';
-    return '<button type="button" class="fb-evedge fb-evedge-' + e.side + (e.isToday ? ' t' : '') + '"' +
+    // A tag leaves with the edge it stands on.
+    return '<button type="button" class="fb-evedge fb-evedge-' + e.side + ' fb-shore-' + (e.side === 'l' ? 'w' : 'e') + (e.isToday ? ' t' : '') + '"' +
       e.attrs + ' style="top:' + e.y.toFixed(1) + 'px">' +
       (e.side === 'l' ? '← ' + esc(e.nb) + (e.n > 1 ? ' · ' + e.n : '') + mark
                       : mark + esc(e.nb) + (e.n > 1 ? ' · ' + e.n : '') + ' →') + '</button>';
@@ -6079,6 +6218,7 @@ async function paintDistrictMap(fills) {
     districtLayer = document.importNode(svg, true);
     districtLayer.setAttribute('class', 'fb-districts');
     districtLayer.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+    markShores(districtLayer);
     // The file carries neither, but a width/height would beat the CSS
     // box this is stretched to and take the tracing off the drawing.
     districtLayer.removeAttribute('width');
@@ -8556,7 +8696,8 @@ function setHiveWhole(on) {
     // painted late -- late enough that a fade started in the same frame
     // is already over by its first paint, so the wash used to arrive in
     // one jump. Started a frame earlier, it is already moving.
-    if (box) box.classList.add('fb-whole-wash');
+    // The two shores part in the same frame (phones; "THE TWO SHORES").
+    if (box) { shoresPx(); box.classList.add('fb-whole-wash', 'fb-home-apart'); }
     hiveWhole = true;
     hiveWholeRaf = requestAnimationFrame(() => {
       hiveWholeRaf = 0;
@@ -8578,14 +8719,16 @@ function setHiveWhole(on) {
   // Pressed again before the field had even started: nothing to unwind
   // but the wash.
   if (box && !box.classList.contains('fb-whole-on')) {
-    box.classList.remove('fb-whole-wash');
+    box.classList.remove('fb-whole-wash', 'fb-home-apart');
     hiveWhole = false;
     return;
   }
   // The wash leaves AFTER the field, never before it (its own delay, in
   // the stylesheet): a field still fading over a map at full strength is
   // a grid of outlines stamped on the city.
-  if (box) box.classList.remove('fb-whole-wash');
+  // The shores come back on their own delay (the stylesheet's), timed to
+  // the field's inward fade, so the land never lands under its outlines.
+  if (box) box.classList.remove('fb-whole-wash', 'fb-home-apart');
   const ms = (card && card.setHiveWhole) ? card.setHiveWhole(false) : 0;
   hiveWholeTimer = setTimeout(() => {
     hiveWholeTimer = 0;
@@ -8968,6 +9111,7 @@ function unmount() {
   cancelAnimationFrame(hiveWholeRaf);
   hiveWholeRaf = 0;
   hiveWhole = false;
+  if (box) box.classList.remove('fb-whole-wash', 'fb-whole-on', 'fb-home-apart');
   if (window.IstProfileCard && IstProfileCard.setHiveWhole) IstProfileCard.setHiveWhole(false);
   if (window.IstProfileCard && IstProfileCard.releaseHiveAnchor) IstProfileCard.releaseHiveAnchor();
   document.body.classList.remove('fb-petek-on');
