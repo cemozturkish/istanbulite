@@ -2629,19 +2629,32 @@ history entry, no `onOpen`, scroll position kept.
 >   for the scale the petek stands at (`hiveFieldScale`), not the smallest it could ever be.
 >
 > - **On a phone the map PARTS instead of washing out** ("THE TWO SHORES" in project.html's
->   stylesheet). The drawing is laid twice (`ensureHomeShores`; the copy is never in `imgs`),
->   each masked to one shore by `assets/map/istanbul-map-mobile-west.png` / `-east.png` — cut
->   down the middle of the Bosphorus and across the open water by
->   `scripts/make-home-map-sides.py`, re-run if the drawing is redrawn. With the whole petek up
->   (`.fb-home-apart`, set and cleared with the wash) Avrupa yakası leaves to the left and Anadolu
->   yakası to the right, each district's tracing (`markShores`, `EAST_SHORE`) and each dot and
->   tag with its own shore, while the plan button and the games drop under the bottom bar. They
->   come back on a delay timed to the field's inward fade, with a small overshoot. Masks rather
->   than a clip-path because `mask-size: cover` centred is exactly `object-fit: cover`. The tracing
->   moves in its own SVG user units (`--fb-shore-u`, `shoresPx`) and the HTML pieces by
->   `--fb-shore-px`: one length on one curve, so a district never leaves its coast mid-flight.
->   The wash stays as the press target but is clear on a phone, since nothing is left under it.
->   A desktop keeps the wash.
+>   stylesheet). The drawing is laid twice (`ensureHomeShores`), each copy masked to one shore by
+>   `assets/map/istanbul-map-mobile-west.png` / `-east.png` — cut down the middle of the
+>   Bosphorus and across the open water by `scripts/make-home-map-sides.py`, re-run if the
+>   drawing is redrawn. With the whole petek up (`.fb-home-apart`, `partShores` / `closeShores`)
+>   Avrupa yakası leaves to the left and Anadolu yakası to the right, each with its own districts
+>   (`markShores`, `EAST_SHORE`), dots and tags, while the plan button and the games drop under
+>   the bottom bar. They come back on a delay timed to the field's inward fade, with a small
+>   overshoot. Masks rather than a clip-path because `mask-size: cover` centred is exactly
+>   `object-fit: cover`. The wash stays as the press target but is clear on a phone, since
+>   nothing is left under it. A desktop keeps the wash.
+>   - **What moves is a plain box (`.fb-side`), never the drawing — a WebKit rule.** The drawing
+>     carries `filter: url(#ist-map-ink)`, and Safari will not draw an element with an SVG
+>     reference filter that is itself animated: the first version moved the masked, filtered
+>     `<img>` with `translate`, and on an iPhone the map vanished the moment it set off and came
+>     back as a still picture that jumped home (it looked perfect in Chromium). Each copy now
+>     sits in a box with no filter and no mask, its own layer from the start (`will-change`),
+>     moved by `transform`, so the drawing is painted once at rest and the move is the compositor
+>     sliding a finished picture. The book's own frame (`.fb-side-src`) steps back behind the two
+>     only once both have decoded (`.fb-sides-ready`); at rest the screen is pixel-identical to
+>     the frame alone.
+>   - **The tracing travels as a still copy.** The real `.fb-districts` is one SVG the dots are
+>     placed off and a red district's press lands on, so it cannot be in two boxes: for the
+>     move it steps out (`.fb-sides-moving`) and `sideTraces` puts a copy, cut to that shore's
+>     districts and with its ids stripped, in each box, taken again at the start of the way back
+>     so it is the map as it stands. The copies are registered with the drawing by the same box
+>     and the same `xMidYMid slice`, so neither hand-over shows.
 
 **These two swapped places.** The petek used to be the middle lane of slide 12 and the app map
 used to be a layer the logo opened over whatever screen the reader was standing on. The reasoning
