@@ -1805,8 +1805,29 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.955); }
 .ist-hive-cell[data-ev] .ist-hive-glow { transition: opacity 0.25s ease; }
 
 /* ── The whole shape (setHiveWhole, opened by project.html's logo) ──
-   No names: at the size the whole petek is drawn at they would be the
-   only thing on the page, and pressing a hexagon still names that member
-   on the top bar. `visibility` rather than opacity, so it never fights
-   the reveal's own opacity steps. */
-.ist-hive-page.ist-hive-whole .ist-hive-name { visibility: hidden; }
+   Nothing already standing moves (the scale and the reader's place are
+   pinned in JS); what changes is the field around them, which comes into
+   being as a CHAIN: every ring outside the petek that was already there
+   fades in one beat after the ring inside it, so the honeycomb grows
+   outward off the shape the reader was looking at. --ring is each cell's
+   hex distance from the reader, and ring 2 is the first that was not
+   drawn, so it goes first. Closing is the same chain played inward --
+   the far rings go first, and ring 2 last, by HIVE_WHOLE_OUT_MS (620ms)
+   at the latest, rings past 8 all leaving together at once.
+   The two rings that never change are left out of both, so their own
+   transitions (a press, the ring-1 slide) keep no delay. */
+.ist-hive-page.ist-hive-whole .ist-hive-cell:not([data-ring="0"]):not([data-ring="1"]) {
+  transition-delay: calc(max(0, var(--ring) - 2) * 55ms);
+}
+.ist-hive-page.ist-hive-whole-out .ist-hive-cell:not([data-ring="0"]):not([data-ring="1"]) {
+  transition-delay: calc(max(0, 8 - var(--ring)) * 45ms);
+}
+/* No names: at the whole shape they would crowd the drawing, and pressing
+   a hexagon still names that member on the top bar. Faded with the
+   name's own opacity transition rather than snapped out; written after
+   the reveal's own name rules, which are the same weight. */
+.ist-hive-page.ist-hive-whole .ist-hive-name { opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .ist-hive-page.ist-hive-whole .ist-hive-cell:not([data-ring="0"]):not([data-ring="1"]),
+  .ist-hive-page.ist-hive-whole-out .ist-hive-cell:not([data-ring="0"]):not([data-ring="1"]) { transition-delay: 0s; }
+}
