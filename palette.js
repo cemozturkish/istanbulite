@@ -49,9 +49,31 @@
 
   let currentTheme = computeTheme();
 
+  // Night palette ON TRIAL (night.css): `?night=a|b|c` picks one of the
+  // three candidate night palettes and remembers it, `?night=0` puts the
+  // current night back. Same shape as map-ink.js's `?ink=` switch, and
+  // remembered for the same reason: index.html drops the query on its way
+  // to project.html. Only ever matters after sunset.
+  const NIGHT_KEY = 'istanbulite_night';
+  const NIGHTS = new Set(['a', 'b', 'c']);
+  function readNight() {
+    try {
+      const q = new URLSearchParams(location.search).get('night');
+      if (q != null) {
+        if (NIGHTS.has(q)) localStorage.setItem(NIGHT_KEY, q);
+        else localStorage.removeItem(NIGHT_KEY);
+      }
+      const v = localStorage.getItem(NIGHT_KEY);
+      return NIGHTS.has(v) ? v : null;
+    } catch (e) { return null; }
+  }
+  const currentNight = readNight();
+
   function apply() {
     document.documentElement.setAttribute('data-palette', current);
     document.documentElement.setAttribute('data-theme', currentTheme);
+    if (currentNight) document.documentElement.setAttribute('data-night', currentNight);
+    else document.documentElement.removeAttribute('data-night');
     syncThemeColor();
     // The hand-drawn maps read this palette too (map-ink.js). Repainted
     // from here rather than from a watcher of their own, so a sunset
