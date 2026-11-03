@@ -1650,10 +1650,6 @@
   // the reader stands in the MIDDLE of the window rather than on its
   // floor, since the shape grows out in every direction.
   let _hiveWhole = false;
-  // At least this far out is fitted while the whole shape is up, so a
-  // petek of three people opens as a honeycomb around them rather than
-  // as the same seven hexagons it already was.
-  const HIVE_WHOLE_MIN_RING = 3;
   function hiveCeiling() { return _hiveWhole ? Infinity : HIVE_RING_CEILING; }
   // How far the drawing may grow. fitHive still shrinks below this to
   // fit the window; it is a ceiling, not a size.
@@ -1675,6 +1671,9 @@
   // and a miscomputed step must not be allowed to ask for thousands of
   // hexagons.
   const HIVE_FIELD_MAX = 24;
+  // The outermost ring the field gives a wrapper of its own (see
+  // hiveGridHTML); everything further out shares it.
+  const HIVE_FIELD_RING_LAST = 7;
 
   // The drawn hexagon, as geometry rather than as a picture.
   // Traced from assets/frame.png -- a 1024x1536 canvas carrying a
@@ -1726,9 +1725,26 @@
   let _hiveMeasure = {};
   function bustHiveMeasureCache() { _hiveMeasure = {}; }
 
+  // ── The field is built for the scale the petek STANDS at ──
+  // It used to be built for the smallest scale a cell is ever drawn at
+  // (HIVE_MIN_SCALE), which on a phone whose petek stands at ~1.0 is
+  // three times as many hexagons as the screen can show -- ~330 against
+  // ~100 -- and every one of them is a node the whole shape fades in.
+  // On WebKit that was enough work on the press to swallow the wash's own
+  // fade whole (it painted already finished). The whole shape is pinned
+  // at the scale it opened at (setHiveWhole), so the scale of the last
+  // fit is the one the field has to cover, less some slack for a pan.
+  // Before any fit the old floor is used, and a scale that moves by more
+  // than a tenth asks again.
+  function hiveFieldScale() {
+    const s = _hive && _hive.hiveFit && _hive.hiveFit.scale;
+    return s > 0 ? Math.max(HIVE_MIN_SCALE, s * 0.85) : HIVE_MIN_SCALE;
+  }
   function hiveFieldReach() {
-    if (_hiveMeasure.reach) return _hiveMeasure.reach;
-    const r = measureHiveFieldReach();
+    const scale = hiveFieldScale();
+    const c = _hiveMeasure.reach;
+    if (c && Math.abs(c.scale - scale) <= c.scale * 0.1) return c;
+    const r = measureHiveFieldReach(scale);
     // Only cache a real answer: before anything has laid out this returns
     // the 4x4 floor, and caching that would freeze the field at the size
     // it had before the page existed.
@@ -1736,7 +1752,8 @@
     return r;
   }
 
-  function measureHiveFieldReach() {
+  function measureHiveFieldReach(scale) {
+    scale = scale || HIVE_MIN_SCALE;
     const page = document.getElementById('po-hive-page');
     const host = page || document.createElement('div');
     if (!page) {
@@ -1750,8 +1767,8 @@
     const rect = probe.getBoundingClientRect();
     probe.remove();
     if (!page) host.remove();
-    const stepX = rect.width * HIVE_MIN_SCALE;
-    const stepY = rect.height * HIVE_MIN_SCALE;
+    const stepX = rect.width * scale;
+    const stepY = rect.height * scale;
     if (!(stepX > 0) || !(stepY > 0)) return { cols: 4, rows: 4, measured: false }; // before anything has ever laid out
     // On a phone the clip is lifted at the outermost depth, so what has
     // to be covered is the screen itself; on a desktop the drawing is
@@ -1789,7 +1806,9 @@
     const halfW = (phone || !boxW ? Math.max(vpW, 360) : boxW) / 2;
     const halfH = (phone || !boxH ? Math.max(vpH, 640) : boxH) / 2;
     const clamp = (n) => Math.min(HIVE_FIELD_MAX, Math.max(2, Math.ceil(n) + 1));
-    return { cols: clamp(halfW / stepX), rows: clamp(halfH / stepY), measured: true };
+    // The reader is not always the middle of the screen (the home screen
+    // stands them on the floor of a window), so a little more up and down.
+    return { cols: clamp(halfW / stepX), rows: clamp(halfH * 1.1 / stepY), measured: true, scale };
   }
 
   // How much of the window's foot belongs to the page rather than to the
@@ -2295,6 +2314,13 @@
     const minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
     const minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
 
+    // ── The field is drawn in RINGS, one wrapper per ring ──
+    // so the whole shape's chain fades a handful of layers rather than
+    // every hexagon on its own (see .ist-hive-field). The wrappers are
+    // static boxes: each ghost is still placed on the plane, and the plane
+    // is still its offsetParent. Rings past HIVE_FIELD_RING_LAST share the
+    // last wrapper -- they are the far edge, and go together.
+    const field = {};
     const html = items.map(item => {
       const p = hivePos(item.q, item.r, minX, minY);
       // Where it stands on the plane, and how far out it stands from the
@@ -2323,9 +2349,14 @@
         const picked = opts.selected && opts.selected === String(item.member.member_id);
         return hiveMemberCellHTML(item.member, meta, nameSide, status, t, picked);
       }
-      if (item.kind === 'ghost') return hiveGhostCellHTML(meta);
+      if (item.kind === 'ghost') {
+        const band = Math.min(ring, HIVE_FIELD_RING_LAST);
+        field[band] = (field[band] || '') + hiveGhostCellHTML(meta);
+        return '';
+      }
       return hiveEmptyCellHTML(item.dir, meta, (open && open.dir === item.dir) ? open : null, t);
-    }).join('');
+    }).join('') + Object.keys(field).map(band =>
+      `<div class="ist-hive-field" data-ring="${band}" style="--ring: ${band};">${field[band]}</div>`).join('');
 
     const w = `calc(var(--ist-hive-step-x) * ${maxX - minX} + var(--ist-hive-cell-w))`;
     const h = `calc(var(--ist-hive-step-y) * ${maxY - minY} + var(--ist-hive-cell-h))`;
@@ -2416,7 +2447,10 @@
     const page = document.getElementById('po-hive-page');
     if (page) page.classList.toggle('ist-hive-whole', _hiveWhole);
     const ceiling = hiveCeiling();
-    if (mount) mount.querySelectorAll('.ist-hive-cell').forEach(cell => {
+    if (mount) mount.querySelectorAll('.ist-hive-field').forEach(band => {
+      band.classList.toggle('ist-hive-away', (parseInt(band.dataset.ring, 10) || 0) > ceiling);
+    });
+    if (mount) mount.querySelectorAll('.ist-hive-cell:not(.ist-hive-ghost)').forEach(cell => {
       const ring = parseInt(cell.dataset.ring, 10) || 0;
       const away = ring > ceiling;
       cell.classList.toggle('ist-hive-away', away);
@@ -2698,12 +2732,15 @@
     // "measure the whole filled field" pass would be.
     plane.querySelectorAll('.ist-hive-cell, .ist-hive-picker').forEach(cell => {
       const ring = parseInt(cell.dataset.ring, 10) || 0;
-      // On the whole shape everybody is fitted, but of the field only
-      // the first few rings: the field runs off every edge by design and
-      // is hundreds of nodes, so measuring all of it would both shrink
-      // the drawing to nothing and be a reflow storm.
+      // On the whole shape everybody is measured and none of the field:
+      // the scale is pinned (setHiveWhole), so what is measured decides
+      // only whether the drawing can be panned -- and the field runs off
+      // every edge by design. Measured, it made every whole shape
+      // pannable, and that class flips `cursor`, an INHERITED property:
+      // the toggle re-styled every hexagon on the plane (~1000 nodes) on
+      // the very frame the shape opened and again when it closed.
       if (_hiveWhole) {
-        if (cell.classList.contains('ist-hive-ghost') && ring > HIVE_WHOLE_MIN_RING) return;
+        if (cell.classList.contains('ist-hive-ghost')) return;
       } else if (ring > HIVE_RING_CEILING) return;
       // A box with no size reports its offsets as zero — measured, it
       // would drag the required box out to the plane's own origin and

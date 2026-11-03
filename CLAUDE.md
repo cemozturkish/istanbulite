@@ -2580,11 +2580,25 @@ history entry, no `onOpen`, scroll position kept.
 > project.html, `IstProfileCard.setHiveWhole` in profile-card.js). The six-around-you petek is
 > already the home screen, so the logo brings back the parked outermost depth as a switch: the
 > petek's window (`#fb-map`) takes the whole band between the two bars, everybody on the reader's
-> map is drawn with the empty field around them (fitted to at least `HIVE_WHOLE_MIN_RING` rings,
-> names hidden, the reader centred rather than standing on the floor), and everything else on the
+> map is drawn with the empty field around them (names hidden), and everything else on the
 > screen goes quiet under a paper wash (`.fb-whole-scrim`). The logo again, Escape or a press on
 > the wash puts it back. The bars are not washed: pressing a hexagon still names that member on
 > the top bar.
+>
+> - **Nothing already on screen moves, either way.** The scale and the reader's point on the
+>   screen are pinned (`_hiveAnchor`) before the window grows, and every fit while pinned is
+>   placed, never animated, in the same frame as the window change. On the way out the window
+>   goes back to the exact top it had (`hiveWholeTop`) before the pin is released.
+> - **The field arrives as a chain**, ring by ring outward, and leaves inward; the wash comes in
+>   a frame BEFORE the heavy half and leaves AFTER the field, so no outline is ever left over a
+>   bare map.
+> - **Three things keep it smooth on WebKit, and each one fails silently:** the field is grouped
+>   into one `.ist-hive-field` wrapper per ring (a few layers, not one per hexagon); the wrapper
+>   states `pointer-events: none` for good, because toggling an INHERITED property on it
+>   re-styles every hexagon inside; and `.ist-hive-plane` states its own `cursor` for the same
+>   reason, because `.ist-hive-pannable` flips one on the view above it. Together they took the
+>   press frame's style work from ~540ms to ~36ms at 4× CPU throttle. The field is also built
+>   for the scale the petek stands at (`hiveFieldScale`), not the smallest it could ever be.
 
 **These two swapped places.** The petek used to be the middle lane of slide 12 and the app map
 used to be a layer the logo opened over whatever screen the reader was standing on. The reasoning

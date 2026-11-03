@@ -629,6 +629,12 @@
 .ist-hive-page.ist-hive-reveal.ist-hive-reveal-1 .ist-hive-cell:not(.ist-hive-away) { opacity: 1; }
 .ist-hive-page.ist-hive-reveal.ist-hive-reveal-2 .ist-hive-name { opacity: 1; }
 .ist-hive-pannable { cursor: grab; touch-action: none; }
+/* The plane states its own cursor so the grab above stops at it: `cursor`
+   is INHERITED, and without this every flip of .ist-hive-pannable (the
+   whole petek opening and closing flips it) re-styled every hexagon on
+   the plane, ~1000 nodes in one frame. The member and seat buttons carry
+   their own pointer cursor either way. */
+.ist-hive-plane { cursor: default; }
 .ist-hive-pannable:active { cursor: grabbing; }
 /* The drawing itself. Hung off the middle of the window by the caller's
    own cell — fitHive sets the margins, the transform-origin and the
@@ -1807,27 +1813,44 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.955); }
 /* ── The whole shape (setHiveWhole, opened by project.html's logo) ──
    Nothing already standing moves (the scale and the reader's place are
    pinned in JS); what changes is the field around them, which comes into
-   being as a CHAIN: every ring outside the petek that was already there
+   being as a CHAIN: each ring outside the petek that was already there
    fades in one beat after the ring inside it, so the honeycomb grows
-   outward off the shape the reader was looking at. --ring is each cell's
-   hex distance from the reader, and ring 2 is the first that was not
-   drawn, so it goes first. Closing is the same chain played inward --
-   the far rings go first, and ring 2 last, by HIVE_WHOLE_OUT_MS (620ms)
-   at the latest, rings past 8 all leaving together at once.
-   The two rings that never change are left out of both, so their own
-   transitions (a press, the ring-1 slide) keep no delay. */
-.ist-hive-page.ist-hive-whole .ist-hive-cell:not([data-ring="0"]):not([data-ring="1"]) {
-  transition-delay: calc(max(0, var(--ring) - 2) * 55ms);
+   outward off the shape the reader was looking at. --ring is the hex
+   distance from the reader, and ring 2 is the first that was not drawn,
+   so it goes first. Closing is the same chain played inward -- the far
+   rings first and ring 2 last, inside HIVE_WHOLE_OUT_MS (620ms).
+
+   The field fades as RINGS, not as hexagons: hiveGridHTML puts each
+   ring's empty cells in one .ist-hive-field wrapper, so the chain is
+   seven layers rather than a few hundred -- which is what kept WebKit
+   from spending the press frame building one layer per hexagon (it did,
+   and painted the wash's own fade already finished). The few members
+   standing past ring 1 still fade one by one; there are never many.
+   The two rings that never change are left out of both delays, so their
+   own transitions (a press, the ring-1 slide) keep none. */
+/* pointer-events stated here for good, not by .ist-hive-away: it is an
+   INHERITED property, so a wrapper whose value flipped on every toggle
+   re-styled every hexagon inside it -- most of the press frame's cost.
+   The field never takes a press anyway (.ist-hive-ghost). */
+.ist-hive-field { transition: opacity 300ms ease; pointer-events: none; }
+.ist-hive-page.ist-hive-whole :is(.ist-hive-field, .ist-hive-filled):not([data-ring="0"]):not([data-ring="1"]) {
+  transition-delay: calc(max(0, var(--ring) - 2) * 60ms);
 }
-.ist-hive-page.ist-hive-whole-out .ist-hive-cell:not([data-ring="0"]):not([data-ring="1"]) {
-  transition-delay: calc(max(0, 8 - var(--ring)) * 45ms);
+.ist-hive-page.ist-hive-whole-out :is(.ist-hive-field, .ist-hive-filled):not([data-ring="0"]):not([data-ring="1"]) {
+  transition-delay: calc(max(0, 7 - var(--ring)) * 50ms);
 }
 /* No names: at the whole shape they would crowd the drawing, and pressing
    a hexagon still names that member on the top bar. Faded with the
    name's own opacity transition rather than snapped out; written after
    the reveal's own name rules, which are the same weight. */
 .ist-hive-page.ist-hive-whole .ist-hive-name { opacity: 0; pointer-events: none; }
+/* On the way back the names wait for the ring they are printed over:
+   ring 2 is the last to leave (250ms delay + its 320ms fade), and a name
+   back before it reads as type stamped on a fading hexagon. */
+.ist-hive-page.ist-hive-whole-out .ist-hive-name { transition-delay: 400ms; }
 @media (prefers-reduced-motion: reduce) {
-  .ist-hive-page.ist-hive-whole .ist-hive-cell:not([data-ring="0"]):not([data-ring="1"]),
-  .ist-hive-page.ist-hive-whole-out .ist-hive-cell:not([data-ring="0"]):not([data-ring="1"]) { transition-delay: 0s; }
+  .ist-hive-field { transition: none; }
+  .ist-hive-page.ist-hive-whole-out .ist-hive-name { transition-delay: 0s; }
+  .ist-hive-page.ist-hive-whole :is(.ist-hive-field, .ist-hive-filled):not([data-ring="0"]):not([data-ring="1"]),
+  .ist-hive-page.ist-hive-whole-out :is(.ist-hive-field, .ist-hive-filled):not([data-ring="0"]):not([data-ring="1"]) { transition-delay: 0s; }
 }
