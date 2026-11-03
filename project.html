@@ -15,10 +15,10 @@
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <link rel="stylesheet" href="palette.css?v=12">
-  <link rel="stylesheet" href="profile-card.css?v=53">
+  <link rel="stylesheet" href="profile-card.css?v=54">
   <link rel="stylesheet" href="profile-bar.css?v=2">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=65" defer></script>
+  <script src="profile-card.js?v=66" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -1254,10 +1254,13 @@
       background: var(--paper);
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.32s ease;
+      /* Out: held while the field's inward chain runs, then gone by the
+         time the window shrinks (620ms, see setHiveWhole). In: at once. */
+      transition: opacity 0.34s ease 0.26s;
+      will-change: opacity;
       -webkit-tap-highlight-color: transparent;
     }
-    .fb.fb-whole-wash .fb-whole-scrim { opacity: 0.86; pointer-events: auto; }
+    .fb.fb-whole-wash .fb-whole-scrim { opacity: 0.86; pointer-events: auto; transition: opacity 0.3s ease; }
     html .fb.fb-home-on.fb-whole-on #fb-map {
       top: calc(env(safe-area-inset-top) + var(--navbar-h-top, 40px));
       bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px));
@@ -8224,6 +8227,7 @@ function mountPetek() {
 // (IstProfileCard.setHiveWhole); the window and the wash are this page's.
 let hiveWhole = false;
 let hiveWholeTimer = 0;
+let hiveWholeRaf = 0;
 let hiveWholeTop = '';   // the window's resting top, put back on the way out
 // ── Smooth, and nothing that is already there moves ──
 // Opening: profile-card.js pins the drawing to where it stands on the
@@ -8238,19 +8242,46 @@ function setHiveWhole(on) {
   const card = window.IstProfileCard;
   clearTimeout(hiveWholeTimer);
   hiveWholeTimer = 0;
+  cancelAnimationFrame(hiveWholeRaf);
+  hiveWholeRaf = 0;
   if (on) {
     // Whatever card stood open is about the screen being washed out.
     if (homeOpen) closeHomeCard();
-    // Pinned while the window is still its resting size.
-    if (card && card.setHiveWhole) card.setHiveWhole(true);
+    // ── The wash goes first, on a frame of its own ──
+    // Growing the window and lifting the field is the heavy half (style
+    // for every ring, a re-fit), and on WebKit a heavy press frame is
+    // painted late -- late enough that a fade started in the same frame
+    // is already over by its first paint, so the wash used to arrive in
+    // one jump. Started a frame earlier, it is already moving.
+    if (box) box.classList.add('fb-whole-wash');
     hiveWhole = true;
-    const mapEl = document.getElementById('fb-map');
-    if (mapEl && mapEl.style.top) { hiveWholeTop = mapEl.style.top; mapEl.style.top = ''; }
-    if (box) box.classList.add('fb-whole-on', 'fb-whole-wash');
-    if (card && card.refitHive) card.refitHive();
+    hiveWholeRaf = requestAnimationFrame(() => {
+      hiveWholeRaf = 0;
+      if (!hiveWhole || !box) return;
+      // The resting top is kept before anything can re-fit: a fit says
+      // so (ist-hive-fit), and placeHomePetek clears the top while the
+      // whole petek is up.
+      const mapEl = document.getElementById('fb-map');
+      if (mapEl && mapEl.style.top) hiveWholeTop = mapEl.style.top;
+      // Pinned while the window is still its resting size.
+      if (card && card.setHiveWhole) card.setHiveWhole(true);
+      if (mapEl) mapEl.style.top = '';
+      box.classList.add('fb-whole-on');
+      if (card && card.refitHive) card.refitHive();
+    });
     return;
   }
   if (!hiveWhole) return;
+  // Pressed again before the field had even started: nothing to unwind
+  // but the wash.
+  if (box && !box.classList.contains('fb-whole-on')) {
+    box.classList.remove('fb-whole-wash');
+    hiveWhole = false;
+    return;
+  }
+  // The wash leaves AFTER the field, never before it (its own delay, in
+  // the stylesheet): a field still fading over a map at full strength is
+  // a grid of outlines stamped on the city.
   if (box) box.classList.remove('fb-whole-wash');
   const ms = (card && card.setHiveWhole) ? card.setHiveWhole(false) : 0;
   hiveWholeTimer = setTimeout(() => {
@@ -8631,6 +8662,8 @@ function unmount() {
   petekFlag = false;
   clearTimeout(hiveWholeTimer);
   hiveWholeTimer = 0;
+  cancelAnimationFrame(hiveWholeRaf);
+  hiveWholeRaf = 0;
   hiveWhole = false;
   if (window.IstProfileCard && IstProfileCard.setHiveWhole) IstProfileCard.setHiveWhole(false);
   if (window.IstProfileCard && IstProfileCard.releaseHiveAnchor) IstProfileCard.releaseHiveAnchor();
