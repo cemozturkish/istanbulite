@@ -1296,6 +1296,7 @@
       _hiveOutTimer = setTimeout(() => page.classList.remove('ist-hive-whole-out'), HIVE_WHOLE_OUT_MS + 60);
     }
     _hiveWhole = on;
+    if (on) startHiveChain(); else stopHiveChain();
     if (!_hive) { if (!on) _hiveAnchor = null; return on ? 0 : HIVE_WHOLE_OUT_MS; }
     applyHiveLevel(_hive);
     if (document.getElementById('po-hive-view')) fitHive(_hive);
@@ -1657,6 +1658,51 @@
   // floor, since the shape grows out in every direction.
   let _hiveWhole = false;
   function hiveCeiling() { return _hiveWhole ? Infinity : HIVE_RING_CEILING; }
+
+  // ── The whole shape comes in as a CHAIN, ring by ring outward ──
+  // Each ring outside the petek that was already standing is let in one
+  // step after the ring inside it, so the honeycomb visibly grows out of
+  // the reader's own hexagon rather than appearing as one sheet. Timed
+  // HERE, off the first frame after the press, and not as CSS
+  // transition-delays: the press frame is the heavy one (the window
+  // grows, the plane is re-fitted), and on WebKit a delay counted from
+  // the style change is already half spent by the time that frame is
+  // painted, so a short chain arrived as one. Each ring keeps its own
+  // plain fade (.ist-hive-field's transition); all this decides is when
+  // its .ist-hive-away comes off. A ring is due (ring - 2) steps in;
+  // the far edge, HIVE_FIELD_RING_LAST, is the last step, and the few
+  // members standing further out go with it. Closing is untouched -- the
+  // inward chain is the stylesheet's (.ist-hive-whole-out).
+  const HIVE_CHAIN_STEP = 95;
+  let _hiveChain = null;   // { t0 } while the chain runs; t0 is null until its first frame
+  let _hiveChainRaf = 0;
+  function hiveChainEnd() { return (HIVE_FIELD_RING_LAST - HIVE_RING_CEILING - 1) * HIVE_CHAIN_STEP; }
+  function hiveRingDue(ring) {
+    if (!_hiveChain || ring <= HIVE_RING_CEILING) return true;
+    if (_hiveChain.t0 == null) return false;
+    const step = Math.min(ring, HIVE_FIELD_RING_LAST) - HIVE_RING_CEILING - 1;
+    return performance.now() - _hiveChain.t0 >= step * HIVE_CHAIN_STEP;
+  }
+  function stopHiveChain() {
+    cancelAnimationFrame(_hiveChainRaf);
+    _hiveChainRaf = 0;
+    _hiveChain = null;
+  }
+  function startHiveChain() {
+    stopHiveChain();
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    _hiveChain = { t0: null };
+    const tick = () => {
+      _hiveChainRaf = 0;
+      if (!_hiveChain || !_hiveWhole) { _hiveChain = null; return; }
+      if (_hiveChain.t0 == null) _hiveChain.t0 = performance.now();
+      const done = performance.now() - _hiveChain.t0 >= hiveChainEnd();
+      if (done) _hiveChain = null;
+      if (_hive) applyHiveLevel(_hive);
+      if (!done) _hiveChainRaf = requestAnimationFrame(tick);
+    };
+    _hiveChainRaf = requestAnimationFrame(tick);
+  }
   // How far the drawing may grow. fitHive still shrinks below this to
   // fit the window; it is a ceiling, not a size.
   const HIVE_ZOOM = 1.5;
@@ -2495,14 +2541,17 @@
     const page = document.getElementById('po-hive-page');
     if (page) page.classList.toggle('ist-hive-whole', _hiveWhole);
     const ceiling = hiveCeiling();
+    // A ring is drawn when it is inside the ceiling AND, while the whole
+    // shape's chain is still running, its turn has come (hiveRingDue).
+    const away = (ring) => ring > ceiling || !hiveRingDue(ring);
     if (mount) mount.querySelectorAll('.ist-hive-field').forEach(band => {
-      band.classList.toggle('ist-hive-away', (parseInt(band.dataset.ring, 10) || 0) > ceiling);
+      band.classList.toggle('ist-hive-away', away(parseInt(band.dataset.ring, 10) || 0));
     });
     if (mount) mount.querySelectorAll('.ist-hive-cell:not(.ist-hive-ghost)').forEach(cell => {
       const ring = parseInt(cell.dataset.ring, 10) || 0;
-      const away = ring > ceiling;
-      cell.classList.toggle('ist-hive-away', away);
-      if (cell.tagName === 'BUTTON') cell.disabled = away;
+      const isAway = away(ring);
+      cell.classList.toggle('ist-hive-away', isAway);
+      if (cell.tagName === 'BUTTON') cell.disabled = isAway;
     });
   }
 

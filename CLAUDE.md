@@ -2619,7 +2619,11 @@ history entry, no `onOpen`, scroll position kept.
 >   goes back to the exact top it had (`hiveWholeTop`) before the pin is released.
 > - **The field arrives as a chain**, ring by ring outward, and leaves inward; the wash comes in
 >   a frame BEFORE the heavy half and leaves AFTER the field, so no outline is ever left over a
->   bare map.
+>   bare map. The way IN is timed in JS (`startHiveChain` in profile-card.js, one ring every
+>   `HIVE_CHAIN_STEP` = 95ms off the first frame after the press, each with its own 300ms fade),
+>   never as CSS `transition-delay`s: those count from the press frame's style change, the press
+>   frame is the heavy one, and on an iPhone the chain arrived as one sheet. The way out is still
+>   the stylesheet's (`.ist-hive-whole-out`).
 > - **Three things keep it smooth on WebKit, and each one fails silently:** the field is grouped
 >   into one `.ist-hive-field` wrapper per ring (a few layers, not one per hexagon); the wrapper
 >   states `pointer-events: none` for good, because toggling an INHERITED property on it
