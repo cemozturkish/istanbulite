@@ -15,10 +15,10 @@
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <link rel="stylesheet" href="palette.css?v=12">
-  <link rel="stylesheet" href="profile-card.css?v=52">
+  <link rel="stylesheet" href="profile-card.css?v=53">
   <link rel="stylesheet" href="profile-bar.css?v=2">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=64" defer></script>
+  <script src="profile-card.js?v=65" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -1234,13 +1234,15 @@
 
     /* ── THE WHOLE PETEK, behind the logo (setHiveWhole) ──
        Pressing the logo opens the petek's whole shape: its window takes
-       the entire band between the two bars, and everything else on the
-       screen -- the map, the dots, the plan button, the games -- goes
+       the entire band between the two bars (while .fb-whole-on), and
+       everything else on the screen -- the map, the dots, the plan button, the games -- goes
        quiet under a wash of the page's own paper. The petek stands over
        that wash at full strength. Pressing the logo again (or Escape, or
        the wash itself) puts the screen back exactly as it was. The bars
        are not washed: pressing a hexagon names that member on the top
-       bar, and the logo is the way back out.
+       bar, and the logo is the way back out. The wash is its own class
+       (.fb-whole-wash) because on the way out it goes first, and the
+       window only shrinks back once the field has gone (setHiveWhole).
        Written after every other #fb-map rule (and with `html` in front,
        to outrank the app's and the desktop's own) so it wins at every
        width without !important; placeHomePetek's inline top is cleared
@@ -1255,7 +1257,7 @@
       transition: opacity 0.32s ease;
       -webkit-tap-highlight-color: transparent;
     }
-    .fb.fb-whole-on .fb-whole-scrim { opacity: 0.86; pointer-events: auto; }
+    .fb.fb-whole-wash .fb-whole-scrim { opacity: 0.86; pointer-events: auto; }
     html .fb.fb-home-on.fb-whole-on #fb-map {
       top: calc(env(safe-area-inset-top) + var(--navbar-h-top, 40px));
       bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px));
@@ -8221,16 +8223,48 @@ function mountPetek() {
 // back to exactly what it was. The drawing's half is profile-card.js's
 // (IstProfileCard.setHiveWhole); the window and the wash are this page's.
 let hiveWhole = false;
+let hiveWholeTimer = 0;
+let hiveWholeTop = '';   // the window's resting top, put back on the way out
+// ── Smooth, and nothing that is already there moves ──
+// Opening: profile-card.js pins the drawing to where it stands on the
+// SCREEN first, the window then grows round it and is re-fitted in the
+// same frame, so the petek the reader was looking at stays exactly where
+// it was and the field around it fades in ring by ring (the stylesheet's
+// chain). Closing is the same film backwards: the wash and the field go
+// first, outer rings before inner, and only once they have gone does the
+// window shrink back -- onto a drawing that, again, does not move.
 function setHiveWhole(on) {
   on = !!on;
-  if (on === hiveWhole) return;
-  hiveWhole = on;
-  // Whatever card stood open is about the screen being washed out.
-  if (on && homeOpen) closeHomeCard();
-  const mapEl = document.getElementById('fb-map');
-  if (on && mapEl) mapEl.style.top = '';
-  if (box) box.classList.toggle('fb-whole-on', on);
-  if (window.IstProfileCard && IstProfileCard.setHiveWhole) IstProfileCard.setHiveWhole(on);
+  const card = window.IstProfileCard;
+  clearTimeout(hiveWholeTimer);
+  hiveWholeTimer = 0;
+  if (on) {
+    // Whatever card stood open is about the screen being washed out.
+    if (homeOpen) closeHomeCard();
+    // Pinned while the window is still its resting size.
+    if (card && card.setHiveWhole) card.setHiveWhole(true);
+    hiveWhole = true;
+    const mapEl = document.getElementById('fb-map');
+    if (mapEl && mapEl.style.top) { hiveWholeTop = mapEl.style.top; mapEl.style.top = ''; }
+    if (box) box.classList.add('fb-whole-on', 'fb-whole-wash');
+    if (card && card.refitHive) card.refitHive();
+    return;
+  }
+  if (!hiveWhole) return;
+  if (box) box.classList.remove('fb-whole-wash');
+  const ms = (card && card.setHiveWhole) ? card.setHiveWhole(false) : 0;
+  hiveWholeTimer = setTimeout(() => {
+    hiveWholeTimer = 0;
+    hiveWhole = false;
+    // The window goes back to the very box it had, so the ordinary fit
+    // lands on the same scale and place the drawing is already standing
+    // at -- rather than fitting the CSS fallback for a frame and then
+    // being re-cut by placeHomePetek, which made the petek dip and swell.
+    const mapEl = document.getElementById('fb-map');
+    if (mapEl && hiveWholeTop) mapEl.style.top = hiveWholeTop;
+    if (box) box.classList.remove('fb-whole-on');
+    if (card && card.releaseHiveAnchor) card.releaseHiveAnchor();
+  }, ms || 0);
 }
 
 function openPetek() { petekFlag = true; goHome(); setHiveWhole(true); }
@@ -8595,8 +8629,11 @@ function unmount() {
   // the logo does not -- and the logo is on the bar, which outlives this
   // page. The game overlay is body-level outright.
   petekFlag = false;
+  clearTimeout(hiveWholeTimer);
+  hiveWholeTimer = 0;
   hiveWhole = false;
   if (window.IstProfileCard && IstProfileCard.setHiveWhole) IstProfileCard.setHiveWhole(false);
+  if (window.IstProfileCard && IstProfileCard.releaseHiveAnchor) IstProfileCard.releaseHiveAnchor();
   document.body.classList.remove('fb-petek-on');
   closeGameOverlay(true);
   snapFbPageShut();

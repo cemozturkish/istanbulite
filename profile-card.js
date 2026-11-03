@@ -1249,17 +1249,72 @@
   //    takes an early return.
   //  - _hive itself, which is what every in-flight fetch checks itself
   //    against before drawing.
-  // Thrown by the page (project.html's logo). Re-applies the depth to the
-  // nodes already standing and re-fits them -- the plane's own transform
-  // transition is what carries the zoom out and back in.
+  // Thrown by the page (project.html's logo).
+  //
+  // ── NOTHING ALREADY ON SCREEN MOVES ──
+  // Opening does not zoom: the scale and the reader's own place on the
+  // SCREEN are pinned (_hiveAnchor) for as long as the whole shape is up,
+  // so the window growing round the drawing moves none of it, and what
+  // changes is only that the cells further out come into being -- ring by
+  // ring outward, a chain reaction off the petek that was already there
+  // (the delays are the stylesheet's, keyed on --ring). Closing plays the
+  // same chain inward and returns how long it takes, so the page can
+  // shrink the window back only once the field has gone (releaseHiveAnchor).
+  let _hiveAnchor = null;
+  let _hiveOutTimer = 0;
+  const HIVE_WHOLE_OUT_MS = 620;   // the inward wave: see .ist-hive-whole-out
+
+  function hiveAnchorNow(state) {
+    const me = document.querySelector('#po-hive-plane .ist-hive-me');
+    if (!me || !state || !state.hiveFit) return null;
+    const r = me.getBoundingClientRect();
+    if (!r.width) return null;
+    // The cell's own box, not its pressed transform: the press scales
+    // about its centre, so the centre is the same either way.
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2, scale: state.hiveFit.scale };
+  }
+
   function setHiveWhole(on) {
     on = !!on;
-    if (on === _hiveWhole) return;
+    if (on === _hiveWhole) return 0;
+    const page = document.getElementById('po-hive-page');
+    clearTimeout(_hiveOutTimer);
+    if (page) page.classList.remove('ist-hive-whole-out');
+    if (on) {
+      // Pinned while the window is still its resting size -- the one
+      // moment the reader's place on the screen is the place to keep.
+      if (!_hiveAnchor && _hive) _hiveAnchor = hiveAnchorNow(_hive);
+      if (_hive) _hive.hivePan = { x: 0, y: 0 };
+    } else if (page) {
+      page.classList.add('ist-hive-whole-out');
+      _hiveOutTimer = setTimeout(() => page.classList.remove('ist-hive-whole-out'), HIVE_WHOLE_OUT_MS + 60);
+    }
     _hiveWhole = on;
-    if (!_hive) return;
-    _hive.hivePan = { x: 0, y: 0 };
+    if (!_hive) { if (!on) _hiveAnchor = null; return on ? 0 : HIVE_WHOLE_OUT_MS; }
     applyHiveLevel(_hive);
     if (document.getElementById('po-hive-view')) fitHive(_hive);
+    return on ? 0 : HIVE_WHOLE_OUT_MS;
+  }
+
+  // Re-fit against whatever size the window is NOW -- the page calls this
+  // in the same frame it changes the window, so the anchored drawing never
+  // paints a frame in the old place.
+  function refitHive() {
+    if (_hive && document.getElementById('po-hive-view')) fitHive(_hive);
+  }
+
+  // The page has put the window back: unpin, and fit the ordinary way.
+  // The drawing is where an ordinary fit puts it already (it never moved),
+  // so this is a no-op on screen.
+  function releaseHiveAnchor() {
+    if (_hiveWhole) return;
+    _hiveAnchor = null;
+    // Placed, not animated, for the same reason an anchored fit is: the
+    // window has just changed under it in this same frame, and animating
+    // the transform from the anchored value would swing the drawing away
+    // and back.
+    if (_hive) _hive.hiveFitPlace = true;
+    refitHive();
   }
 
   function unmountHivePage() {
@@ -2690,7 +2745,10 @@
     // the width binds first, and the top row clipped in half on a short
     // window like the desktop's band.
     const gap = hiveFootGap(view);
-    const scale = Math.max(HIVE_MIN_SCALE, Math.min(HIVE_ZOOM, vw / reqW, (vh - gap) / reqH));
+    let scale = Math.max(HIVE_MIN_SCALE, Math.min(HIVE_ZOOM, vw / reqW, (vh - gap) / reqH));
+    // Pinned while the whole shape is up or going (see setHiveWhole).
+    const anchor = _hiveAnchor;
+    if (anchor) scale = anchor.scale;
 
     // Scaling about the caller's own cell and then hanging that point off
     // the middle of the window keeps them in the middle at any scale —
@@ -2717,8 +2775,16 @@
     // the line they stand on has moved.
     // The whole shape grows out in every direction, so there the reader
     // stands in the middle of the window instead (see _hiveWhole).
-    const offsetY = _hiveWhole ? 0 : (vhFull - reserve - gap) - vhFull / 2 - belowMe;
-    state.hiveFit = { scale, cx, cy, vw, vh, reqW, reqH, offsetY, vwFull: view.clientWidth, vhFull: view.clientHeight };
+    let offsetX = 0;
+    let offsetY = _hiveWhole ? 0 : (vhFull - reserve - gap) - vhFull / 2 - belowMe;
+    if (anchor) {
+      // Wherever the window now is, put the reader back on the exact
+      // screen point they were on when the whole shape was opened.
+      const vr = view.getBoundingClientRect();
+      offsetX = anchor.x - (vr.left + vw / 2);
+      offsetY = anchor.y - (vr.top + vhFull / 2);
+    }
+    state.hiveFit = { scale, cx, cy, vw, vh, reqW, reqH, offsetX, offsetY, vwFull: view.clientWidth, vhFull: view.clientHeight };
     plane.style.transformOrigin = `${cx}px ${cy}px`;
     // ── A fresh plane is placed, not animated into place ──
     // The plane carries the zoom between depths (a 520ms transform
@@ -2737,13 +2803,16 @@
     // A node this has never fitted has nothing to animate *from* — not
     // even on a level change, where the old scale belonged to a node
     // that no longer exists — so it is placed outright.
-    const fresh = state.hiveFitNode !== plane;
+    // An anchored fit is placed, never animated: it lands in the same
+    // frame as the window change it answers, and the two cancel out.
+    const fresh = state.hiveFitNode !== plane || !!anchor || !!state.hiveFitPlace;
+    state.hiveFitPlace = false;
     state.hiveFitNode = plane;
     // Cleared here rather than never set: the drag below turns the
     // transition off so the plane keeps up with the finger, and this is
     // the one place that knows the drag is over.
     plane.style.transition = fresh ? 'none' : '';
-    plane.style.transform = `translate(${pan.x}px, ${pan.y + offsetY}px) scale(${scale})`;
+    plane.style.transform = `translate(${pan.x + offsetX}px, ${pan.y + offsetY}px) scale(${scale})`;
     plane.style.marginLeft = `${-cx}px`;
     plane.style.marginTop = `${-cy}px`;
     // Panning is only offered when the fit had to give up: a grid that
@@ -2756,7 +2825,7 @@
     view.classList.toggle('ist-hive-pannable', pannable);
     if (!pannable && (pan.x || pan.y)) {
       state.hivePan = { x: 0, y: 0 };
-      plane.style.transform = `translate(0px, ${offsetY}px) scale(${scale})`;
+      plane.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
     }
     // Commit the placement above as this node's starting point before
     // handing the transition back to the stylesheet, so the next fit of
@@ -3028,6 +3097,7 @@
       return {
         x: Math.max(0, (fit.reqW * fit.scale - fit.vw) / 2),
         y: Math.max(0, (fit.reqH * fit.scale - fit.vh) / 2),
+        offsetX: fit.offsetX || 0,
         offsetY: fit.offsetY || 0,
         scale: fit.scale,
       };
@@ -3085,14 +3155,14 @@
       // the plane and all but the last was thrown away. The position is
       // recorded here and written inside a rAF, so the drawing keeps up
       // with the finger on exactly the frames that are drawn.
-      g.want = { x, y, offsetY: sl.offsetY, scale: sl.scale };
+      g.want = { x, y, offsetX: sl.offsetX, offsetY: sl.offsetY, scale: sl.scale };
       if (!g.raf) g.raf = requestAnimationFrame(() => {
         if (!g) return;
         g.raf = 0;
         const el = plane();
         if (!el) return;
         el.style.transition = 'none';
-        el.style.transform = `translate(${g.want.x}px, ${g.want.y + g.want.offsetY}px) scale(${g.want.scale})`;
+        el.style.transform = `translate(${g.want.x + g.want.offsetX}px, ${g.want.y + g.want.offsetY}px) scale(${g.want.scale})`;
       });
     });
 
@@ -4163,6 +4233,8 @@
     mountHivePage,
     unmountHivePage,
     setHiveWhole,
+    refitHive,
+    releaseHiveAnchor,
     revealHivePage,
     playHiveReveal,
     holdHivePage,
