@@ -2576,6 +2576,16 @@ history entry, no `onOpen`, scroll position kept.
 
 ### The petek is behind the logo, and the app map is the middle lane
 
+> **On the one-screen home (`HOME_SCREEN`) the logo opens the WHOLE petek** (`setHiveWhole` in
+> project.html, `IstProfileCard.setHiveWhole` in profile-card.js). The six-around-you petek is
+> already the home screen, so the logo brings back the parked outermost depth as a switch: the
+> petek's window (`#fb-map`) takes the whole band between the two bars, everybody on the reader's
+> map is drawn with the empty field around them (fitted to at least `HIVE_WHOLE_MIN_RING` rings,
+> names hidden, the reader centred rather than standing on the floor), and everything else on the
+> screen goes quiet under a paper wash (`.fb-whole-scrim`). The logo again, Escape or a press on
+> the wash puts it back. The bars are not washed: pressing a hexagon still names that member on
+> the top bar.
+
 **These two swapped places.** The petek used to be the middle lane of slide 12 and the app map
 used to be a layer the logo opened over whatever screen the reader was standing on. The reasoning
 runs the same way in both directions: **the middle screen is the one every other screen is reached

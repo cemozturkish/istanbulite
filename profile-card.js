@@ -1249,6 +1249,19 @@
   //    takes an early return.
   //  - _hive itself, which is what every in-flight fetch checks itself
   //    against before drawing.
+  // Thrown by the page (project.html's logo). Re-applies the depth to the
+  // nodes already standing and re-fits them -- the plane's own transform
+  // transition is what carries the zoom out and back in.
+  function setHiveWhole(on) {
+    on = !!on;
+    if (on === _hiveWhole) return;
+    _hiveWhole = on;
+    if (!_hive) return;
+    _hive.hivePan = { x: 0, y: 0 };
+    applyHiveLevel(_hive);
+    if (document.getElementById('po-hive-view')) fitHive(_hive);
+  }
+
   function unmountHivePage() {
     if (_hive && _hive.hiveBoxObserver) { _hive.hiveBoxObserver.disconnect(); _hive.hiveBoxObserver = null; }
     _hive = null;
@@ -1570,6 +1583,23 @@
   // class at all any more -- there is one depth, so nothing is keyed to
   // which one it is.
   const HIVE_RING_CEILING = 1;
+  // ── THE WHOLE SHAPE, behind the logo ──
+  // The depth the petek used to reach by pulling down, brought back as a
+  // switch the page throws (project.html's İstanbulite logo): every
+  // member on the reader's map, their neighbours' neighbours, and the
+  // field of empty places around all of it. Off, the drawing is the one
+  // depth above and nothing else changes. While it is on, the ceiling is
+  // lifted entirely (hiveCeiling), the names are not drawn -- at the size
+  // the whole shape is drawn at they would be the only thing on the page,
+  // and pressing a hexagon still names that member on the top bar -- and
+  // the reader stands in the MIDDLE of the window rather than on its
+  // floor, since the shape grows out in every direction.
+  let _hiveWhole = false;
+  // At least this far out is fitted while the whole shape is up, so a
+  // petek of three people opens as a honeycomb around them rather than
+  // as the same seven hexagons it already was.
+  const HIVE_WHOLE_MIN_RING = 3;
+  function hiveCeiling() { return _hiveWhole ? Infinity : HIVE_RING_CEILING; }
   // How far the drawing may grow. fitHive still shrinks below this to
   // fit the window; it is a ceiling, not a size.
   const HIVE_ZOOM = 1.5;
@@ -2328,9 +2358,12 @@
   // than the drawing reaches.
   function applyHiveLevel(state) {
     const mount = document.getElementById('po-hive-mount');
+    const page = document.getElementById('po-hive-page');
+    if (page) page.classList.toggle('ist-hive-whole', _hiveWhole);
+    const ceiling = hiveCeiling();
     if (mount) mount.querySelectorAll('.ist-hive-cell').forEach(cell => {
       const ring = parseInt(cell.dataset.ring, 10) || 0;
-      const away = ring > HIVE_RING_CEILING;
+      const away = ring > ceiling;
       cell.classList.toggle('ist-hive-away', away);
       if (cell.tagName === 'BUTTON') cell.disabled = away;
     });
@@ -2602,14 +2635,21 @@
     // ink: fit the wider of the two, and leave a breath after it —
     // anything whose far edge lands exactly on the window's edge reads
     // as clipped rather than fitted.
-    const outriders = (cell) => [...cell.querySelectorAll('.ist-hive-name')];
+    // No names are drawn on the whole shape, so none are fitted.
+    const outriders = (cell) => (_hiveWhole ? [] : [...cell.querySelectorAll('.ist-hive-name')]);
     // The ceiling caps this at 7 cells (the
     // ghost field's hundreds of cells all sit well past it), so this
     // never becomes the offsetLeft/offsetTop reflow storm a real
     // "measure the whole filled field" pass would be.
     plane.querySelectorAll('.ist-hive-cell, .ist-hive-picker').forEach(cell => {
       const ring = parseInt(cell.dataset.ring, 10) || 0;
-      if (ring > HIVE_RING_CEILING) return;
+      // On the whole shape everybody is fitted, but of the field only
+      // the first few rings: the field runs off every edge by design and
+      // is hundreds of nodes, so measuring all of it would both shrink
+      // the drawing to nothing and be a reflow storm.
+      if (_hiveWhole) {
+        if (cell.classList.contains('ist-hive-ghost') && ring > HIVE_WHOLE_MIN_RING) return;
+      } else if (ring > HIVE_RING_CEILING) return;
       // A box with no size reports its offsets as zero — measured, it
       // would drag the required box out to the plane's own origin and
       // shrink the drawing to fit something nobody can see.
@@ -2675,7 +2715,9 @@
     // gap of paper between. The reader is still the fixed point
     // horizontally and still the point everything is scaled about; only
     // the line they stand on has moved.
-    const offsetY = (vhFull - reserve - gap) - vhFull / 2 - belowMe;
+    // The whole shape grows out in every direction, so there the reader
+    // stands in the middle of the window instead (see _hiveWhole).
+    const offsetY = _hiveWhole ? 0 : (vhFull - reserve - gap) - vhFull / 2 - belowMe;
     state.hiveFit = { scale, cx, cy, vw, vh, reqW, reqH, offsetY, vwFull: view.clientWidth, vhFull: view.clientHeight };
     plane.style.transformOrigin = `${cx}px ${cy}px`;
     // ── A fresh plane is placed, not animated into place ──
@@ -4120,6 +4162,7 @@
     closeProfileOverlay,
     mountHivePage,
     unmountHivePage,
+    setHiveWhole,
     revealHivePage,
     playHiveReveal,
     holdHivePage,
