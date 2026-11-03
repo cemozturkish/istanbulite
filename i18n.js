@@ -93,6 +93,22 @@
     'plan.err.full':       { default: 'Aynı anda en fazla 5 planın olabilir. Birini geri alıp yenisini ekle.', more_english: 'You can have at most 5 plans at once. Take one back to add another.' },
     'plan.err.rls':        { default: 'Bu plan kaydedilemedi: günü bu haftanın içinde olmalı.', more_english: "This plan couldn't be saved: its day has to be within this week." },
     'plan.err.missing':    { default: 'Planlar için veritabanı güncellemesi eksik (db/events_v2_plans.sql).', more_english: 'The database update for plans is missing (db/events_v2_plans.sql).' },
+    // Editing a plan (db/events_v3_plan_edit.sql) and the week the plan
+    // button opens (project.html, renderPlanWeek).
+    'plan.edit':           { default: 'Düzenle',              more_english: 'Edit' },
+    'plan.edit.title':     { default: 'Planını düzenle',      more_english: 'Edit your plan' },
+    'plan.edit.moved':     { default: 'Günü, saati ya da ilçesi değişirse gelenlerin cevabı sıfırlanır; peteğine yeniden sorulur.', more_english: "If you change the day, the time or the district, everybody's answer is cleared and your petek is asked again." },
+    'plan.save':           { default: 'Kaydet',               more_english: 'Save' },
+    'plan.saving':         { default: 'Kaydediliyor…',        more_english: 'Saving…' },
+    'plan.back':           { default: '‹ Bu haftam',          more_english: '‹ My week' },
+    'plan.week.title':     { default: 'Bu haftam',            more_english: 'My week' },
+    'plan.week.sub':       { default: 'Gideceğini söylediğin akşamlar ve kendi planların.', more_english: 'The evenings you said you are going to, and your own plans.' },
+    'plan.week.empty':     { default: 'Bu hafta henüz bir yere gideceğini söylemedin. Haritadaki kırmızı ilçelere bak ya da kendi planını yaz.', more_english: "You haven't said you're going anywhere this week yet. Look at the red districts on the map, or write a plan of your own." },
+    'plan.week.going':     { default: 'GİDİYORSUN',           more_english: 'GOING' },
+    'plan.week.mine':      { default: 'PLANIN',               more_english: 'YOUR PLAN' },
+    'plan.week.new':       { default: '+ Yeni plan',          more_english: '+ New plan' },
+    'plan.week.count':     { default: '5 plan hakkından {n} tanesi duruyor.', more_english: '{n} of your 5 plans are up.' },
+    'plan.err.edit.missing': { default: 'Planı düzenlemek için veritabanı güncellemesi eksik (db/events_v3_plan_edit.sql).', more_english: 'The database update for editing plans is missing (db/events_v3_plan_edit.sql).' },
     // Haberler's three fixed category slots (project.html), same object
     // as a Dünya story's own kicker on the parts-bin pages.
     'news.istanbul':       { default: 'İSTANBUL',              more_english: 'ISTANBUL' },
