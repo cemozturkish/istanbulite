@@ -2739,6 +2739,28 @@
     paintHivePicked(state);
   }
 
+  // ── Pressing anywhere else puts your own name back ──
+  // Picking a member used to be undone only by pressing that same hexagon
+  // again, which nobody finds. A press on anything that is not another
+  // member's hexagon, nor the bar carrying their name (that press opens
+  // their profile), steps back out. One listener for the module, guarded
+  // by the live state, so it is inert on every page that has no petek
+  // standing and needs no unbinding when a page is swapped.
+  document.addEventListener('click', (e) => {
+    const st = _hive;
+    if (!st || !st.hiveSelected) return;
+    if (!document.getElementById('po-hive-mount')) return;
+    const t = e.target;
+    if (!t || !t.closest) return;
+    // Another member is pickHiveMember's to toggle; the bar is the second
+    // step of the gesture; the profile sheet opened from it is a surface.
+    if (t.closest('.ist-hive-cell[data-member-id]')) return;
+    if (t.closest('#ist-pc-me, #ist-pc-mount, .ist-sheet-overlay, #member-sheet')) return;
+    st.hiveSelected = null;
+    setBarMember(null);
+    paintHivePicked(st);
+  }, true);
+
   // The page is the drawing, and nothing else. There was a dock along the
   // foot carrying whatever was tapped; both halves of the exchange live
   // inside the hexagons they belong to now (the seat's code in the seat,
