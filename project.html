@@ -975,45 +975,53 @@
       line-height: 1.12;
     }
 
-    /* ── A dot: the evenings in one district ──
-       Filled red is today, a red ring is later this week, and a number
-       is how many there are when one district has several. Drawn at 14px
-       with a finger-sized press area round it (::before). */
+    /* ── A mark: the evenings in one district ──
+       The app's own "ist" logo (assets/ist-mark.png, the app icon with
+       its paper made transparent) stands where the district is. A red
+       halo round it is today, the mark alone is later this week, and a
+       red count badge says how many when one district has several.
+       The button is the finger-sized press area; the drawing is the
+       background. */
     .fb-evdot {
       position: absolute;
-      width: 16px; height: 16px;
-      margin: -8px 0 0 -8px;
+      width: 34px; height: 26px;
+      margin: -13px 0 0 -17px;
       padding: 0;
-      border-radius: 50%;
-      box-sizing: border-box;
-      border: 3px solid var(--ink-red, #B93631);
-      background: var(--lit-hi, #fff);
+      border: 0;
+      background: url('assets/ist-mark.png') center / contain no-repeat;
       color: #fff;
-      font: 800 8px/1 -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
-      display: grid;
-      place-items: center;
+      font: 800 9px/1 -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
       cursor: pointer;
       pointer-events: auto;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-      transition: transform 0.18s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+      transition: transform 0.18s ease, opacity 0.2s ease, filter 0.2s ease;
       -webkit-tap-highlight-color: transparent;
     }
     .fb-evdot::before {
       content: '';
       position: absolute;
-      inset: -14px;
-      border-radius: 50%;
+      inset: -10px;
     }
     .fb-evdot.t {
-      background: var(--ink-red, #B93631);
-      border-color: var(--lit-hi, #fff);
-      box-shadow: 0 0 0 2px var(--ink-red, #B93631), 0 1px 3px rgba(0, 0, 0, 0.35);
+      filter: drop-shadow(0 0 3px var(--ink-red, #B93631)) drop-shadow(0 0 6px var(--ink-red, #B93631));
     }
-    .fb-evdot.n { width: 20px; height: 20px; margin: -10px 0 0 -10px; }
-    .fb-evdot:not(.t).n { color: var(--ink-red, #B93631); }
+    /* The count rides the logo's top-right corner as a small red badge. */
+    .fb-evdot.n::after {
+      content: attr(data-n);
+      position: absolute;
+      top: -6px; right: -6px;
+      min-width: 14px; height: 14px;
+      padding: 0 3px;
+      box-sizing: border-box;
+      border-radius: 7px;
+      background: var(--ink-red, #B93631);
+      color: #fff;
+      display: grid;
+      place-items: center;
+    }
     .fb-evdot.on {
-      transform: scale(1.25);
-      box-shadow: 0 0 0 2px var(--ink-red, #B93631), 0 0 0 9px color-mix(in srgb, var(--ink-red, #B93631) 22%, transparent);
+      transform: scale(1.3);
+      filter: drop-shadow(0 0 4px var(--ink-red, #B93631)) drop-shadow(0 0 9px var(--ink-red, #B93631));
     }
     .fb-evdot.dim, .fb-evedge.dim { opacity: 0.3; }
     /* An evening in a district the drawing does not reach at this width:
@@ -4798,8 +4806,8 @@ async function renderHomeDots() {
       dots.push(kind === 'p'
         ? '<button type="button" class="fb-pldot' + sc + (isToday ? ' t' : '') + (n > 1 ? ' n' : '') + '"' + attrs + at +
           '<i></i>' + (n > 1 ? '<b>' + n + '</b>' : '') + '</button>'
-        : '<button type="button" class="fb-evdot' + sc + (isToday ? ' t' : '') + (n > 1 ? ' n' : '') + '"' + attrs + at +
-          (n > 1 ? n : '') + '</button>');
+        : '<button type="button" class="fb-evdot' + sc + (isToday ? ' t' : '') + (n > 1 ? ' n' : '') + '"' + attrs + (n > 1 ? ' data-n="' + n + '"' : '') + at +
+          '</button>');
     } else {
       const side = pt ? (pt.x < rect.width / 2 ? 'l' : 'r') : (HOME_UNDRAWN_SIDE[d] || 'l');
       const y = pt ? Math.min(Math.max(pt.y, top + 24), floor - 16) : null;
