@@ -3487,16 +3487,9 @@
       if (st) cell.dataset.ev = st; else delete cell.dataset.ev;
       const ev = cell.querySelector('.ist-hive-name-ev');
       if (ev) ev.textContent = st ? hiveEvLabel(st) : '';
-      let pill = cell.querySelector('.ist-hive-kefil-pill');
-      if (st === 'kefil') {
-        if (!pill) {
-          pill = document.createElement('span');
-          pill.className = 'ist-hive-kefil-pill';
-          pill.setAttribute('aria-hidden', 'true');
-          cell.appendChild(pill);
-        }
-        pill.textContent = hiveEvLabel('kefil');
-      } else if (pill) pill.remove();
+      // No KEFİL tag: the red ring says whose evening it is.
+      const pill = cell.querySelector('.ist-hive-kefil-pill');
+      if (pill) pill.remove();
     });
   }
 
