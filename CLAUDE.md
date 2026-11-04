@@ -2631,8 +2631,11 @@ history entry, no `onOpen`, scroll position kept.
 >   `transition-delay`s, and two things keep each fade visible on an iPhone, where the frames
 >   after the press freeze for a few hundred milliseconds and a fade started inside them is shown
 >   already finished (ring 2 used to pop while the rest faded):
->   - **The chain starts once the frames run on time** — two `requestAnimationFrame` intervals
->     in a row under `HIVE_CHAIN_SMOOTH_MS` (34ms), with `HIVE_CHAIN_WAIT` (600ms) as the ceiling.
+>   - **The chain starts WITH the shores, not after them** — counted from the first frame of the
+>     heavy half, the same moment the map starts parting, so the field grows in while the shores
+>     and the buttons are still leaving. It used to wait for two on-time frames (up to 600ms),
+>     which on an iPhone meant the whole 0.34s exit finished first; the priming below is what
+>     keeps each fade visible without that wait.
 >   - **The rings are PRIMED** while the shape is up or leaving
 >     (`.ist-hive-page:is(.ist-hive-whole, .ist-hive-whole-out) .ist-hive-field`): each is a layer
 >     of its own (`will-change: opacity`) and a ring not yet let in stands at opacity 0.01 rather
