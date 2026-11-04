@@ -15,10 +15,10 @@
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=4"></script>
   <link rel="stylesheet" href="palette.css?v=12">
-  <link rel="stylesheet" href="profile-card.css?v=57">
+  <link rel="stylesheet" href="profile-card.css?v=58">
   <link rel="stylesheet" href="profile-bar.css?v=2">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=68" defer></script>
+  <script src="profile-card.js?v=69" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -1344,6 +1344,16 @@
        left to quiet, so it is clear. */
     .fb-side { display: none; }
     @media (max-width: 768px) {
+      /* The paper under the shores is the SEA, not the page. At rest the
+         drawing covers the whole book, so what the reader takes for the
+         home screen's paper is the map's own sea (--map-sea); the book's
+         own --paper only shows once the shores have parted. The two are
+         the same tone in three of the four palette states, and not in
+         mono by day (#f7f7f7 against #ffffff), where the whole petek came
+         up on a white that matched nothing. Without the palette filter
+         the drawing is in its own drawn tones, so the sea is #f7f7f7. */
+      .fb.fb-home-on { background: #f7f7f7; }
+      html.ist-map-ink .fb.fb-home-on { background: var(--map-sea, var(--paper)); }
       .fb.fb-home-on > .fb-side {
         display: block;
         position: absolute;
@@ -8821,9 +8831,15 @@ function setHiveWhole(on) {
     // is already over by its first paint, so the wash used to arrive in
     // one jump. Started a frame earlier, it is already moving.
     // The two shores part in the same frame (phones; "THE TWO SHORES").
+    // TWO frames, not one: a callback asked for here runs in the very next
+    // rendering update, before that update has drawn anything, so with a
+    // single frame the wash and the shores were still drawn in the same
+    // frame as the heavy half -- and on an iPhone the map was first seen
+    // already half gone. The second frame is the one that lets the first
+    // reach the screen, with the shores' slide handed to the compositor.
     if (box) { partShores(); box.classList.add('fb-whole-wash'); }
     hiveWhole = true;
-    hiveWholeRaf = requestAnimationFrame(() => {
+    hiveWholeRaf = requestAnimationFrame(() => { hiveWholeRaf = requestAnimationFrame(() => {
       hiveWholeRaf = 0;
       if (!hiveWhole || !box) return;
       // The resting top is kept before anything can re-fit: a fit says
@@ -8836,7 +8852,7 @@ function setHiveWhole(on) {
       if (mapEl) mapEl.style.top = '';
       box.classList.add('fb-whole-on');
       if (card && card.refitHive) card.refitHive();
-    });
+    }); });
     return;
   }
   if (!hiveWhole) return;
