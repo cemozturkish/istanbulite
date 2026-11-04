@@ -8931,12 +8931,60 @@ function setHiveWhole(on) {
   }, ms || 0);
 }
 
-function openPetek() { petekFlag = true; goHome(); setHiveWhole(true); }
+// ── THE LOGO FILLS WITH THE SEA WHILE THE PETEK STANDS ──
+// The same ten loading-screen drawings the language hold steps through
+// (.fb-hold-frame, see THE LANGUAGE HOLD), played forward as the whole
+// petek opens, left full for as long as it stands, and played back down
+// as it closes -- so the mark says "the petek is up" and is the way out.
+// `held` is true from the first rising frame until the last draining one
+// has gone; the language hold stands off the layer while it is.
+const PETEK_FILL_UP = 900;     // ms, empty -> full
+const PETEK_FILL_DOWN = 700;   // ms, full -> empty
+const petekFill = { held: false, pos: 0, raf: 0, loaded: false };
+function petekFillPreload() {
+  if (petekFill.loaded) return;
+  petekFill.loaded = true;
+  for (let n = 1; n <= 10; n++) { const im = new Image(); im.src = langHoldFrameSrc(n); }
+}
+function petekFillTo(on) {
+  const btn = document.getElementById('fb-logo-btn');
+  if (!btn) return;
+  petekFillPreload();
+  cancelAnimationFrame(petekFill.raf);
+  petekFill.raf = 0;
+  // A hold in progress hands the layer over: its own loop is stopped.
+  cancelLangHold();
+  petekFill.held = true;
+  const from = petekFill.pos || (on ? 1 : 10);
+  const to = on ? 10 : 1;
+  const total = on ? PETEK_FILL_UP : PETEK_FILL_DOWN;
+  const dur = total * Math.abs(to - from) / 9;
+  const t0 = performance.now();
+  let shown = 0;
+  const step = (now) => {
+    const k = dur > 0 ? Math.min(1, (now - t0) / dur) : 1;
+    petekFill.pos = from + (to - from) * k;
+    const n = Math.round(petekFill.pos);
+    if (n !== shown) { shown = n; showHoldFrame(btn, n); }
+    if (k < 1) { petekFill.raf = requestAnimationFrame(step); return; }
+    petekFill.raf = 0;
+    if (!on) {
+      // Fully drained: let the resting fill show through again.
+      petekFill.held = false;
+      petekFill.pos = 0;
+      fadeHoldFrame(btn, 120);
+    }
+  };
+  petekFill.raf = requestAnimationFrame(step);
+}
+
+function openPetek() { petekFlag = true; goHome(); setHiveWhole(true); petekFillTo(true); }
 
 function closePetek() {
   petekFlag = false;
   goHome();
   setHiveWhole(false);
+  petekFillTo(false);
   // A member named on the top bar is named BY the petek (see
   // pickHiveMember in profile-card.js) -- left on it, the bar would go on
   // naming a hexagon that is no longer on the screen.
@@ -9293,6 +9341,12 @@ function unmount() {
   // the logo does not -- and the logo is on the bar, which outlives this
   // page. The game overlay is body-level outright.
   petekFlag = false;
+  // The mark drains at once with the page it belonged to.
+  cancelAnimationFrame(petekFill.raf);
+  petekFill.raf = 0;
+  petekFill.held = false;
+  petekFill.pos = 0;
+  { const lb = document.getElementById('fb-logo-btn'); if (lb) fadeHoldFrame(lb, 0); }
   clearTimeout(hiveWholeTimer);
   hiveWholeTimer = 0;
   cancelAnimationFrame(hiveWholeRaf);
@@ -9518,6 +9572,9 @@ function showHoldFrame(btn, n) {
 function fadeHoldFrame(btn, ms) {
   const frame = btn.querySelector('.fb-hold-frame');
   if (!frame) return;
+  // The petek standing keeps the mark full (see petekFillTo); only its own
+  // drain, which clears `held` first, may take the layer away.
+  if (petekFill.held) return;
   frame.style.transition = 'opacity ' + ms + 'ms linear';
   requestAnimationFrame(() => { frame.style.opacity = '0'; });
 }
@@ -9528,6 +9585,8 @@ function fadeHoldFrame(btn, ms) {
 // wherever the clock actually is.
 function langHoldFrameLoop(startedAt) {
   if (!langHold || !langHold.filling) return;
+  // The mark is already full for the petek: nothing to rise or restart.
+  if (petekFill.held) return;
   const elapsed = performance.now() - startedAt;
   const n = Math.min(LANG_HOLD_FRAME_COUNT,
     1 + Math.floor(elapsed / LANG_HOLD_FRAME_MS));
