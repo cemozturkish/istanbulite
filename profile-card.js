@@ -2237,6 +2237,7 @@
         <div class="ist-hive-glow">
           <div class="ist-pc-cover-avatar ist-hive-frame">
             ${coverBadgesHTML(member)}
+            <i class="ist-hive-edge" aria-hidden="true"></i>
             <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
           </div>
         </div>
@@ -2272,7 +2273,7 @@
       <button type="button" class="ist-hive-cell ist-hive-empty${isOpen ? ' ist-hive-cell-open' : ''}" ${meta}
               data-dir="${dir}" aria-expanded="${isOpen ? 'true' : 'false'}"
               title="${esc(label)}" aria-label="${esc(label)}">
-        <div class="hexframe ist-hive-frame ist-hive-slot">${inner}</div>
+        <div class="hexframe ist-hive-frame ist-hive-slot">${inner}<i class="ist-hive-edge" aria-hidden="true"></i></div>
       </button>
     `;
   }
@@ -2346,6 +2347,7 @@
         <div class="ist-hive-glow">
           <div class="ist-pc-cover-avatar ist-hive-frame">
             ${coverBadgesHTML(profile)}
+            <i class="ist-hive-edge" aria-hidden="true"></i>
             <!-- The art is its own layer inside the frame because the avatar
                  carousels replace its whole innerHTML on every arrow press
                  (see wireHairCarousel and friends, which this page reuses
