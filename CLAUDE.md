@@ -31,7 +31,7 @@ in mind.
 | **The sun meter** | *(removed, not parked)* | The ring chain under the top bar (`skyChartHTML`, `startSky`, `.ist-sky`) and its tour beat are deleted. The sections describing it are history. |
 | **The three-lane strip** | `HOME_SCREEN = true` in `project.html` | The app is ONE screen — see "The home screen" under project.html. The Kahvehane columns are left out of `CAST`, `LANE_MAX` caps the strip at the middle (with `LANE_MIN`, nothing to walk to either side), the wash over the map is off, the book's own drag bails (`onDown`), and both bottom-bar words are hidden (`#fb-nav.fb-home-nav`). |
 | **The petek's day glyph** | `HIVE_DAY_GLYPH = false` in `profile-card.js` | A neighbour's caption is their district, not the two-screen glyph, and nothing asks `hive_member_status`. |
-| **Friends' districts lit** | `FRIEND_DISTRICTS_LIT = true` in `project.html` | ON, and the one to switch off if it looks wrong on a phone: it is the resting fill CLAUDE.md records as "tried and abandoned" for misregistration, brought back behind its own switch. |
+| **Friends' districts lit** | `FRIEND_DISTRICTS_LIT = true` in `project.html` | ON. It is the resting fill that was once abandoned for misregistration; the fills are now cut from the drawing's own faces (see "The fills used to misregister"), so that reason is gone. |
 
 **Members' own plans** ("I'll be here, this day, this time") are built and gated on the database,
 not on a flag: until `db/events_v2_plans.sql` has been run, the plan fetch answers an error, the
@@ -2295,12 +2295,16 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
   opens the same card as its dot, the city's evening first where a district has both kinds.
 - **The FOCUS is solid red and breathes** (`.fb-dist-focus`, the same 1.9s pulse a story's
   countries have on Kütüphane), and the other red districts step back to 38% while there is one.
-  Two things put a district in focus: the open evening's (`homeEventDistrict`), and **the district
-  of the member named on the bar** (`homePickDistrict`) — pressing a hexagon lights where that
-  person lives. `setBarMember` in profile-card.js announces every name it puts up or takes down
-  (`ist-hive-pick`, carrying the member's `neighborhood`), and every clear goes through it, so the
-  map can never keep lighting someone who has left the bar. A district the drawing does not reach
-  gets a red edge tag instead (`renderHomePickTag`), said rather than pressed.
+  Only the open evening's district (`homeEventDistrict`) is ever in focus: **red on this map is for
+  evenings and nothing else.**
+- **The member named on the bar has their district DARK GRAY, held still** (`homePickDistrict`,
+  `HOME_FILL_PICK`) — pressing a hexagon shows where that person lives without saying "there is
+  something on here". It wins over an evening's plain red (or the press would change nothing
+  there), never over the open evening's focus. `setBarMember` in profile-card.js announces every
+  name it puts up or takes down (`ist-hive-pick`, carrying the member's `neighborhood`), and every
+  clear goes through it, so the map can never keep lighting someone who has left the bar. A
+  district the drawing does not reach gets an ink edge tag instead (`renderHomePickTag`), said
+  rather than pressed.
 - **The districts' red is the MAP's at night** (`--fb-home-red` on `.fb`): after sunset
   `--ink-red` is walked down for the night paper and on the night land a red district was all but
   the colour of the ones around it, so the fill takes the drawing's own night red instead.
@@ -3173,21 +3177,24 @@ Four things about it:
   map-ink.js builds its filter with DOM calls. A fetch that fails clears its own promise so a
   later opening retries, and leaves the reader the list, which is the whole result either way.
 
-**Tried and abandoned: a resting fill under the map, coloured by who is on the reader's petek**
-(the own district in red, ring-1 neighbours' districts in gray). The fill sat on the traced SVG
-polygons (`assets/map/istanbul-map-mobile.svg`), while the drawn borders — including the 3D
-"kenar" extrusion — are baked into the map's own PNG underneath; the two never register closely
-enough, and the fill visibly spills past or falls short of the ink around it. Fixing that needs
-the fill itself redrawn to the artwork's actual edges, not a code change, so it was dropped rather
-than shipped looking wrong. `paintDistrictMap`/`clearDistrictMap` and the Anket behaviour above
-are unaffected.
+**The fills used to misregister, and no longer do.** The polygons were the hand-made tracing
+carried over by an affine, and the tracing runs through the middle of the drawn lines and cuts
+across the coasts, so a fill spilled over the 3D "kenar" into the sea on one side and fell short
+of the border on the other. The script now uses the tracing only to decide WHICH district a patch
+of land is: every shape it writes is the flat land face inside that district's drawn double line
+in `istanbul-map-mobile.png`, found by its tone (217 ± 25) and traced round its pixel edges (see
+the script's stage 3). A fill therefore stops exactly at the drawn border. Every patch of land is
+at least 99% inside one traced shape, so the vote is never close; land no traced shape claims
+(Esenyurt, which has no tracing at all) stays unfilled. The desktop's landscape
+`istanbul-map.svg` is still the hand tracing and has not had this done to it.
 
 **The tracing under it** (`assets/map/istanbul-map-mobile.svg`). The portrait
 drawing is not a redraw: it is the landscape `assets/map/istanbul-map.png` scaled and cropped into
 a 9:16 canvas, so the landscape tracing's polygons are carried over by one affine rather than
 hand-traced a second time. `scripts/derive-mobile-map-svg.py` measures that affine against the
 portrait artwork's own ink and rewrites the file; the SVG is **generated**, so a district's outline
-is fixed in `istanbul-map.svg` and the script re-run, never edited in place. Four things about it:
+is fixed in `istanbul-map.svg` and the script re-run, never edited in place — and the outlines
+it writes are the drawing's own faces, not the tracing's (above). Four things about it:
 
 - **The scale is ANISOTROPIC** (`x*0.426353 - 531.17`, `y*0.417929 + 31.53`; `sy/sx` = 0.980). The
   portrait canvas is a squeeze, not a plain zoom — fitting one scale to both axes leaves the

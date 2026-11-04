@@ -1047,13 +1047,14 @@
     .fb-evedge.t i { background: var(--ink-red, #B93631); }
     /* The tag for a member's district the drawing does not reach: said,
        not pressed -- the member is the thing that was pressed. */
-    .fb-evedge.fb-picktag { pointer-events: none; cursor: default; background: var(--ink-red, #B93631); color: #fff; }
+    .fb-evedge.fb-picktag { pointer-events: none; cursor: default; }
 
     /* ── Red districts (paintHomeDistricts) ──
        A district with something on this week is red and pressable; the
-       one in focus (the open evening, or where the member named on the bar
-       lives) is solid red and breathes, the way a story's countries do on
-       Kütüphane, and the rest step back while it does. */
+       open evening's is solid red and breathes, the way a story's
+       countries do on Kütüphane, and the rest step back while it does.
+       Where the member named on the bar lives is dark gray and still --
+       red on this map is for evenings and nothing else. */
     .fb.fb-home-on .fb-districts .fb-dist-ev { pointer-events: auto; cursor: pointer; }
     /* The districts' red is the MAP's, not the street's. After sunset the
        palette walks --ink-red a long way down for the night paper, which
@@ -4208,6 +4209,9 @@ const HOME_RED = 'var(--fb-home-red, var(--ink-red, #B93631))';
 const HOME_FILL_HOME = 'color-mix(in srgb, var(--ink) 38%, transparent)';
 const HOME_FILL_FRIEND = 'color-mix(in srgb, var(--ink) 20%, transparent)';
 const HOME_FILL_EVENT = 'color-mix(in srgb, var(--fb-home-red, var(--ink-red, #B93631)) 78%, transparent)';
+// Where the member named on the bar lives: dark gray, held still. Red on
+// this map means there is somewhere to go, and a friend's home is not that.
+const HOME_FILL_PICK = 'color-mix(in srgb, var(--ink) 62%, transparent)';
 
 let homeEventsPromise = null;
 let homeData = { events: [], plans: [], plansOpen: false, uid: null, going: new Set(), answered: new Map(), failed: false };
@@ -4601,10 +4605,12 @@ async function ensureDistrictLayer() {
 //     how many; the district says "there is somewhere to go here" from
 //     across the room, and it is the bigger thing to press (a press on a
 //     red district opens its card, the same as its dot);
-//   * THE FOCUS, solid red and breathing: the open evening's district and
-//     the district of the member named on the bar (a hexagon pressed on
-//     the petek). While anything is in focus the other red districts step
-//     back, so the one being talked about is the one that reads.
+//   * the district of the member named on the bar (a hexagon pressed on
+//     the petek), DARK GRAY and still -- over an evening's red too, or the
+//     press would change nothing there. Red is for evenings alone;
+//   * THE FOCUS, solid red and breathing: the open evening's district.
+//     While it is in focus the other red districts step back, so the one
+//     being talked about is the one that reads.
 // Lit only while there is something to light.
 function homeEventDistricts() {
   const out = new Set();
@@ -4620,7 +4626,8 @@ async function paintHomeDistricts() {
   const fills = Object.assign({}, FRIEND_DISTRICTS_LIT ? homeFriendFills : {});
   const evs = homeEventDistricts();
   evs.forEach(d => { fills[d] = HOME_FILL_EVENT; });
-  const focus = new Set([homeEventDistrict, homePickDistrict].filter(Boolean));
+  if (homePickDistrict) fills[homePickDistrict] = HOME_FILL_PICK;
+  const focus = new Set([homeEventDistrict].filter(Boolean));
   focus.forEach(d => { fills[d] = HOME_RED; });
   layer.querySelectorAll('polygon, path').forEach(el => {
     const k = districtKeyOf(el);

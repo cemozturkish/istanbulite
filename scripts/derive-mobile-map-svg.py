@@ -25,6 +25,18 @@ Two stages, and the second is the one that matters:
      landing on the borders the reader can see -- rather than a global image
      match that could be a pixel out everywhere and still score well.
 
+  3. SNAPPING TO THE DRAWN FACES. The transformed tracing is good enough to
+     say which district a patch of land belongs to, and not good enough to
+     colour it: it was traced by hand through the middle of the drawn lines,
+     so a fill laid on it spilled over the 3D edge into the sea on one side
+     and fell short of the border on the other. So the shapes written out are
+     not the tracing at all. Every flat patch of land tone in the portrait
+     drawing (the face inside a district's drawn double line) is found, given
+     to whichever traced shape covers most of it, grown one pixel into the
+     line's antialiasing, and traced round its pixel edges. The tracing only
+     decides WHO; the drawing decides WHERE. Every patch so far is at least
+     90% inside one traced shape, so the vote is never close.
+
 The scale comes out ANISOTROPIC by about 2% (sy/sx = 0.980): the portrait
 canvas is not a plain zoom, it is a squeeze. A uniform-scale fit is visibly
 worse (mean 0.79px against 0.61px, p90 2.17px against 1.28px), so the two
@@ -42,8 +54,8 @@ import os, re, sys
 import xml.etree.ElementTree as ET
 
 import numpy as np
-from PIL import Image
-from scipy.ndimage import distance_transform_edt
+from PIL import Image, ImageDraw
+from scipy.ndimage import binary_dilation, distance_transform_edt, label
 from scipy.optimize import minimize
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
@@ -226,6 +238,128 @@ def fit(verbose=True):
     return (sx, sy, tx, ty), (d.mean(), np.percentile(d, 90))
 
 
+# ── snapping to the drawn faces (stage 3) ───────────────────────────────────
+
+FACE = 217                 # the land tone a district's face is drawn in
+FACE_TOL = 25              # how far off it a pixel may be and still be face
+MIN_PIECE = 40             # px; smaller patches are specks of antialiasing
+GROW = 1                   # px into the drawn line, to cover its antialiasing
+SIMPLIFY = 0.7             # px; Douglas-Peucker tolerance on the traced edge
+
+
+def crack_loops(mask):
+    """The boundary of a boolean mask, as closed loops along pixel edges.
+
+    Corner coordinates, clockwise on screen round the foreground. At a vertex
+    two pieces only touch diagonally, the walk turns right first, which keeps
+    them two loops (4-connected) rather than one figure eight.
+    """
+    M = np.pad(mask, 1)
+    nxt = {}
+    ys, xs = np.nonzero(mask)
+    for y, x in zip(ys.tolist(), xs.tolist()):
+        Y, X = y + 1, x + 1
+        if not M[Y - 1, X]: nxt.setdefault((x, y), []).append((x + 1, y))
+        if not M[Y, X + 1]: nxt.setdefault((x + 1, y), []).append((x + 1, y + 1))
+        if not M[Y + 1, X]: nxt.setdefault((x + 1, y + 1), []).append((x, y + 1))
+        if not M[Y, X - 1]: nxt.setdefault((x, y + 1), []).append((x, y))
+    loops = []
+    while nxt:
+        start = next(iter(nxt))
+        a, b = start, nxt[start].pop()
+        if not nxt[start]:
+            del nxt[start]
+        ring = [a]
+        while b != start:
+            ring.append(b)
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            outs = nxt[b]
+            for tx, ty in ((-dy, dx), (dx, dy), (dy, -dx)):
+                t = (b[0] + tx, b[1] + ty)
+                if t in outs:
+                    break
+            outs.remove(t)
+            if not outs:
+                del nxt[b]
+            a, b = b, t
+        loops.append(ring)
+    return loops
+
+
+def signed_area(R):
+    x, y = R[:, 0], R[:, 1]
+    return 0.5 * float((x * np.roll(y, -1) - np.roll(x, -1) * y).sum())
+
+
+def douglas_peucker(P, eps):
+    keep = np.zeros(len(P), bool)
+    keep[0] = keep[-1] = True
+    stack = [(0, len(P) - 1)]
+    while stack:
+        i, j = stack.pop()
+        if j <= i + 1:
+            continue
+        a, ab, seg = P[i], P[j] - P[i], P[i + 1:j]
+        L = np.hypot(*ab)
+        dd = (np.hypot(*(seg - a).T) if L == 0
+              else np.abs(ab[0] * (seg[:, 1] - a[1]) - ab[1] * (seg[:, 0] - a[0])) / L)
+        k = int(np.argmax(dd))
+        if dd[k] > eps:
+            keep[i + 1 + k] = True
+            stack += [(i, i + 1 + k), (i + 1 + k, j)]
+    return P[keep]
+
+
+def simplify_loop(ring, eps=SIMPLIFY):
+    """Douglas-Peucker on a closed loop, split at its two farthest points."""
+    R = np.array(ring, float)
+    j = int(np.argmax(np.hypot(*(R - R[0]).T)))
+    a = douglas_peucker(R[:j + 1], eps)
+    b = douglas_peucker(np.vstack([R[j:], R[:1]]), eps)
+    return np.vstack([a[:-1], b[:-1]])
+
+
+def snap_to_faces(kept):
+    """For each kept shape, the outlines of the drawn faces it owns.
+
+    Returns {index into kept: [Nx2 outline, ...]}, largest first. A shape that
+    owns no face (it lies off the drawing's land) is left out, and is then
+    written as the transformed tracing, unchanged.
+    """
+    g = np.asarray(Image.open(DST_PNG).convert('L')).astype(int)
+    face = np.abs(g - FACE) <= FACE_TOL
+    owner_img = Image.new('I', (W, H), 0)
+    draw = ImageDraw.Draw(owner_img)
+    # Rasterised off each shape's points -- for the one path, its corners and
+    # control points -- which is close enough to decide who owns a patch.
+    for i, (_gid, _tag, _a, _geom, Q) in enumerate(kept):
+        draw.polygon([tuple(p) for p in Q], fill=i + 1)
+    owner = np.asarray(owner_img)
+
+    pieces, n = label(face)
+    masks, worst = {}, 1.0
+    for c in range(1, n + 1):
+        sel = pieces == c
+        if sel.sum() < MIN_PIECE:
+            continue
+        votes = np.bincount(owner[sel])
+        k = int(np.argmax(votes))
+        if k == 0:
+            continue                       # land no traced shape claims
+        worst = min(worst, votes[k] / votes.sum())
+        masks.setdefault(k - 1, np.zeros_like(face))
+        masks[k - 1] |= sel
+
+    out = {}
+    for i, m in masks.items():
+        rings = [simplify_loop(r) for r in crack_loops(binary_dilation(m, iterations=GROW))]
+        if any(signed_area(r) < 0 for r in rings):
+            raise SystemExit('a face has a hole in it; this script writes polygons and cannot draw one')
+        out[i] = sorted(rings, key=lambda r: -abs(signed_area(r)))
+    print('snapped %d shapes to the drawing; the closest vote was %.0f%%' % (len(out), 100 * worst))
+    return out
+
+
 # ── writing ─────────────────────────────────────────────────────────────────
 
 def on_canvas(P):
@@ -247,8 +381,16 @@ HEADER = '''<?xml version="1.0" encoding="UTF-8"?>
      file. The source of truth for the shapes is assets/map/istanbul-map.svg,
      traced 1:1 over the LANDSCAPE assets/map/istanbul-map.png (5046x2300);
      every id, class, data-neighborhood and data-name here is carried over
-     from it untouched, and only the geometry is transformed. Fix a district's
-     outline there, then re-run this.
+     from it untouched. Fix which district is which there, then re-run this.
+
+     THE OUTLINES ARE THE DRAWING'S, NOT THE TRACING'S. The tracing, carried
+     over by the transform below, only decides which district a patch of land
+     belongs to. Each shape written here is the flat land face inside that
+     district's drawn double line in istanbul-map-mobile.png, found by its
+     tone and traced round its pixel edges, so a fill laid on it stops exactly
+     at the drawn border and never spills over the 3D edge into the sea. A
+     district drawn in several pieces has one polygon per piece, the extra
+     ones named id-2, id-3 and carrying the district in data-neighborhood.
 
      Note for editors: no double hyphen anywhere in these comments. This file
      is parsed as XML, not HTML, and XML ends a comment at the first one.
@@ -280,7 +422,7 @@ HEADER = '''<?xml version="1.0" encoding="UTF-8"?>
      whole and clipped by the viewBox, which is what the drawing does too.
 
      fill="none" and no stroke: the artwork is already drawn in the image
-     underneath, these are only the shapes you can point at. The visible
+     underneath, these are only the shapes you can point at and colour. The visible
      tints come from the .neighborhood rules in the page that uses it.
 -->
 '''
@@ -304,7 +446,7 @@ def main():
         inside = ((Q[:, 0] >= 0) & (Q[:, 0] <= W) & (Q[:, 1] >= 0) & (Q[:, 1] <= H)).mean()
         if inside < 0.999:
             partial.append(name)
-        kept.append((gid, tag, attrib, Q if tag == 'polygon' else geom))
+        kept.append((gid, tag, attrib, Q if tag == 'polygon' else geom, Q))
 
     print('kept %d shapes, dropped %d off the crop: %s' % (len(kept), len(dropped), ', '.join(dropped)))
     print('partly on the crop (kept whole, clipped by the viewBox): %s' % ', '.join(partial))
@@ -314,21 +456,33 @@ def main():
     out = [HEADER.format(sx=sx, sy=sy, tx=tx, ty=ty, mean=res_mean, p90=res_p90,
                          dropped=', '.join(dropped),
                          partial=', '.join(partial))]
+    snapped = snap_to_faces(kept)
+    pts_attr = lambda P: ' '.join('%s %s' % (fmt(x), fmt(y)) for x, y in P)
     out.append('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d">\n' % (W, H))
-    for gid, tag, attrib, geom in kept:
+    for i, (gid, tag, attrib, geom, _Q) in enumerate(kept):
         out.append('  <g id="%s">\n' % gid)
-        bits = []
-        for k, v in attrib.items():
-            if k in ('points', 'd'):
-                continue
-            bits.append('%s="%s"' % (k, v))
-            if k == 'id':
-                if tag == 'polygon':
-                    bits.append('points="%s"' % ' '.join(
-                        '%s %s' % (fmt(x), fmt(y)) for x, y in geom))
-                else:
-                    bits.append('d="%s"' % transform_path(geom, sx, sy, tx, ty))
-        out.append('    <%s %s/>\n' % (tag, ' '.join(bits)))
+        rings = snapped.get(i)
+        # A shape that owns a drawn face is written as that face, one polygon
+        # per piece; the extra pieces carry the district in data-neighborhood
+        # (the page reads that before the id, as it already does for Şişli).
+        for n, ring in enumerate(rings or [None]):
+            bits = []
+            for k, v in attrib.items():
+                if k in ('points', 'd'):
+                    continue
+                if k == 'id' and n:
+                    v = '%s-%d' % (v, n + 1)
+                bits.append('%s="%s"' % (k, v))
+                if k == 'id':
+                    if ring is not None:
+                        bits.append('points="%s"' % pts_attr(ring))
+                    elif tag == 'polygon':
+                        bits.append('points="%s"' % pts_attr(geom))
+                    else:
+                        bits.append('d="%s"' % transform_path(geom, sx, sy, tx, ty))
+            if n and 'data-neighborhood' not in attrib:
+                bits.append('data-neighborhood="%s"' % attrib['id'])
+            out.append('    <%s %s/>\n' % ('polygon' if ring is not None else tag, ' '.join(bits)))
         out.append('  </g>\n')
     out.append('</svg>\n')
 
