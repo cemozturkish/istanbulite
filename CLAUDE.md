@@ -2618,12 +2618,25 @@ history entry, no `onOpen`, scroll position kept.
 >   placed, never animated, in the same frame as the window change. On the way out the window
 >   goes back to the exact top it had (`hiveWholeTop`) before the pin is released.
 > - **The field arrives as a chain**, ring by ring outward, and leaves inward; the wash comes in
->   a frame BEFORE the heavy half and leaves AFTER the field, so no outline is ever left over a
->   bare map. The way IN is timed in JS (`startHiveChain` in profile-card.js, one ring every
->   `HIVE_CHAIN_STEP` = 95ms off the first frame after the press, each with its own 300ms fade),
->   never as CSS `transition-delay`s: those count from the press frame's style change, the press
->   frame is the heavy one, and on an iPhone the chain arrived as one sheet. The way out is still
->   the stylesheet's (`.ist-hive-whole-out`).
+>   BEFORE the heavy half and leaves AFTER the field, so no outline is ever left over a bare map.
+>   The heavy half waits **two** frames, not one: a callback asked for in the press handler runs
+>   in the very next rendering update, before that update has drawn anything, so with one frame
+>   the shores were drawn in the same frame as the heavy half and an iPhone first showed the map
+>   already half gone. The way IN is timed in JS (`startHiveChain` in profile-card.js, one ring
+>   every `HIVE_CHAIN_STEP` = 95ms, each with its own 300ms fade), never as CSS
+>   `transition-delay`s, and two things keep each fade visible on an iPhone, where the frames
+>   after the press freeze for a few hundred milliseconds and a fade started inside them is shown
+>   already finished (ring 2 used to pop while the rest faded):
+>   - **The chain starts once the frames run on time** — two `requestAnimationFrame` intervals
+>     in a row under `HIVE_CHAIN_SMOOTH_MS` (34ms), with `HIVE_CHAIN_WAIT` (600ms) as the ceiling.
+>   - **The rings are PRIMED** while the shape is up or leaving
+>     (`.ist-hive-page:is(.ist-hive-whole, .ist-hive-whole-out) .ist-hive-field`): each is a layer
+>     of its own (`will-change: opacity`) and a ring not yet let in stands at opacity 0.01 rather
+>     than 0, so it is painted in the frozen frames after the press instead of in the frame its
+>     fade starts. A fade then only moves an opacity, which is the compositor's. Neither class is
+>     on at rest, so the layers go with the shape.
+>
+>   The way out is still the stylesheet's (`.ist-hive-whole-out`).
 > - **Three things keep it smooth on WebKit, and each one fails silently:** the field is grouped
 >   into one `.ist-hive-field` wrapper per ring (a few layers, not one per hexagon); the wrapper
 >   states `pointer-events: none` for good, because toggling an INHERITED property on it
@@ -2643,6 +2656,12 @@ history entry, no `onOpen`, scroll position kept.
 >   overshoot. Masks rather than a clip-path because `mask-size: cover` centred is exactly
 >   `object-fit: cover`. The wash stays as the press target but is clear on a phone, since
 >   nothing is left under it. A desktop keeps the wash.
+>   - **The paper the shores leave behind is the SEA** (`.fb.fb-home-on { background:
+>     var(--map-sea) }`, `#f7f7f7` without the palette filter). At rest the drawing covers the
+>     whole book, so the home screen's paper IS the map's sea; the book's own `--paper` only shows
+>     once the shores have parted. The two agree in three of the four palette states but not in
+>     mono by day (`#f7f7f7` against `#ffffff`), where the whole petek came up on a white that
+>     matched nothing.
 >   - **What moves is a plain box (`.fb-side`), never the drawing — a WebKit rule.** The drawing
 >     carries `filter: url(#ist-map-ink)`, and Safari will not draw an element with an SVG
 >     reference filter that is itself animated: the first version moved the masked, filtered

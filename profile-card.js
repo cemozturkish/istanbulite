@@ -1673,8 +1673,22 @@
   // the far edge, HIVE_FIELD_RING_LAST, is the last step, and the few
   // members standing further out go with it. Closing is untouched -- the
   // inward chain is the stylesheet's (.ist-hive-whole-out).
+  //
+  // ── And it waits for the phone to be drawing again ──
+  // The frames right after the press are the expensive ones: the window
+  // grows, and every ring of the field is made a layer of its own and
+  // painted while still invisible (.ist-hive-whole primes them, see
+  // profile-card.css). On an iPhone that is a few hundred milliseconds in
+  // which nothing reaches the screen, and a fade started inside it is
+  // shown already finished -- which is how ring 2, the first one out,
+  // arrived as a pop while the rings after it faded. So t0 is not the
+  // first frame after the press but the first one that follows another
+  // on time (two in a row under HIVE_CHAIN_SMOOTH_MS apart), with
+  // HIVE_CHAIN_WAIT as the ceiling for a phone that never gets there.
   const HIVE_CHAIN_STEP = 95;
-  let _hiveChain = null;   // { t0 } while the chain runs; t0 is null until its first frame
+  const HIVE_CHAIN_SMOOTH_MS = 34;
+  const HIVE_CHAIN_WAIT = 600;
+  let _hiveChain = null;   // { t0 } while the chain runs; t0 is null until the frames run on time
   let _hiveChainRaf = 0;
   function hiveChainEnd() { return (HIVE_FIELD_RING_LAST - HIVE_RING_CEILING - 1) * HIVE_CHAIN_STEP; }
   function hiveRingDue(ring) {
@@ -1691,11 +1705,23 @@
   function startHiveChain() {
     stopHiveChain();
     if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const asked = performance.now();
+    let last = 0;
+    let onTime = 0;
     _hiveChain = { t0: null };
-    const tick = () => {
+    const tick = (ts) => {
       _hiveChainRaf = 0;
       if (!_hiveChain || !_hiveWhole) { _hiveChain = null; return; }
-      if (_hiveChain.t0 == null) _hiveChain.t0 = performance.now();
+      if (_hiveChain.t0 == null) {
+        const now = performance.now();
+        onTime = (last && ts - last < HIVE_CHAIN_SMOOTH_MS) ? onTime + 1 : 0;
+        last = ts;
+        if (onTime < 2 && now - asked < HIVE_CHAIN_WAIT) {
+          _hiveChainRaf = requestAnimationFrame(tick);
+          return;
+        }
+        _hiveChain.t0 = now;
+      }
       const done = performance.now() - _hiveChain.t0 >= hiveChainEnd();
       if (done) _hiveChain = null;
       if (_hive) applyHiveLevel(_hive);
