@@ -1581,8 +1581,9 @@ coordinates that say where each paper hangs.
   comb *is* the last guess, and a ghost of the same word behind it is a blur. **The room it takes
   is reserved whether or not one is showing**, in `layoutBoard`'s own budget, or the board would
   resize the first time the reader pressed GİR
-- **The hexagons have a body, and nothing else is framed.** A wash inside each tile's own mask
-  lights its top-left and shades its bottom-right, and the live comb casts one drop shadow as a
+- **The hexagons are flat inside, and nothing else is framed.** A tile is its own fill and
+  nothing more — the light/shade gradient wash that used to sit inside each mask
+  (`.letter-box::before`) is gone on purpose. The live comb still casts one drop shadow as a
   silhouette rather than each tile casting its own (a mask clips a `box-shadow` away). Embedded,
   nothing draws a box around the board or the panel: the sheet is already a bordered window, and
   each frame inside it only added another line a few pixels within the last
