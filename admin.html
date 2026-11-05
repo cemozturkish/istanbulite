@@ -11521,8 +11521,21 @@ function clrCount(key) {
   return st ? Object.keys(st.tokens || {}).length + (st.rules || []).length : 0;
 }
 function clrVariantObj() { return CLR_VARIANTS.find(v => v.key === clr.variant) || CLR_VARIANTS[0]; }
+// The draft and the published row are compared by CONTENT, never as raw
+// JSON text: Postgres stores the row as jsonb, which hands its keys back
+// sorted (by length, then bytes) -- `rules` before `tokens`, tokens in a
+// different order than they were set -- so a palette read back from the
+// database never stringifies the same as the draft it was published from,
+// and the desk said "yayınlanmamış değişiklik var" forever after a reload.
+function clrCanon(v) {
+  if (Array.isArray(v)) return '[' + v.map(clrCanon).join(',') + ']';
+  if (v && typeof v === 'object') {
+    return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + clrCanon(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v);
+}
 function clrDirty() {
-  return JSON.stringify(clrPrune(clr.draft)) !== JSON.stringify(clrPrune(clr.published));
+  return clrCanon(clrPrune(clr.draft)) !== clrCanon(clrPrune(clr.published));
 }
 function clrSaveDraft() {
   try { localStorage.setItem(CLR_DRAFT_KEY, JSON.stringify(clr.draft)); } catch (e) { /* ignore */ }
