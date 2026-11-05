@@ -246,6 +246,15 @@ MIN_PIECE = 40             # px; smaller patches are specks of antialiasing
 GROW = 1                   # px into the drawn line, to cover its antialiasing
 SIMPLIFY = 0.7             # px; Douglas-Peucker tolerance on the traced edge
 
+# ── the rims (stage 4) ──
+# A district's border is drawn as a double line: black, a gray band, black.
+# The rim is that gray band, and only it -- the two black lines stay black.
+# Measured, the band is a thin stripe everywhere it is drawn (at most ~4px
+# from its own middle), coasts included; the 3D side under a coast is pure
+# black, so it is never mistaken for band.
+BAND_LO, BAND_HI = 90, 200 # the band's tone; black is below, the face above
+RIM_REACH = 7              # px from a district's face that its rim may run
+
 
 def crack_loops(mask):
     """The boundary of a boolean mask, as closed loops along pixel edges.
@@ -351,12 +360,43 @@ def snap_to_faces(kept):
         masks[k - 1] |= sel
 
     out = {}
+    snap_to_faces.masks = masks
     for i, m in masks.items():
         rings = [simplify_loop(r) for r in crack_loops(binary_dilation(m, iterations=GROW))]
         if any(signed_area(r) < 0 for r in rings):
             raise SystemExit('a face has a hole in it; this script writes polygons and cannot draw one')
         out[i] = sorted(rings, key=lambda r: -abs(signed_area(r)))
     print('snapped %d shapes to the drawing; the closest vote was %.0f%%' % (len(out), 100 * worst))
+    return out
+
+
+def rims(masks, g):
+    """For each district, the gray band of its own drawn border.
+
+    Every district is outlined on its own -- black, its gray band, then the
+    black line it shares with the neighbour, then the neighbour's band -- so
+    a band pixel belongs to whichever district's face is NEAREST to it, and
+    the shared black line in the middle is where the two meet. RIM_REACH
+    caps how far out that may run, which keeps the shading along a coast
+    (the same tones, under the outline) from being counted as band.
+    Returns {index into kept: [loops]}, written as one even-odd path each,
+    since a rim is a ring with the face's hole in it.
+    """
+    band = (g >= BAND_LO) & (g <= BAND_HI)
+    owner = np.zeros(g.shape, int)
+    for i, m in masks.items():
+        owner[m] = i + 1
+    dist, (iy, ix) = distance_transform_edt(owner == 0, return_indices=True)
+    nearest = owner[iy, ix]
+    out = {}
+    for i in masks:
+        r = band & (nearest == i + 1) & (dist <= RIM_REACH)
+        pieces, n = label(r)
+        sizes = np.bincount(pieces.ravel())
+        r &= np.isin(pieces, [c for c in range(1, n + 1) if sizes[c] >= MIN_PIECE])
+        loops = [simplify_loop(l) for l in crack_loops(r) if len(l) >= 8]
+        if loops:
+            out[i] = loops
     return out
 
 
@@ -484,6 +524,18 @@ def main():
                 bits.append('data-neighborhood="%s"' % attrib['id'])
             out.append('    <%s %s/>\n' % ('polygon' if ring is not None else tag, ' '.join(bits)))
         out.append('  </g>\n')
+    # The rims, after every face so they are drawn over a face's one pixel
+    # of growth into the line. They carry data-rim and no id and no
+    # data-neighborhood on purpose: whatever colours or presses a district
+    # reads those two, and a rim is neither -- the page colours it only
+    # when it means to.
+    g = np.asarray(Image.open(DST_PNG).convert('L')).astype(int)
+    out.append('  <g id="rims">\n')
+    for i, loops in sorted(rims(snap_to_faces.masks, g).items()):
+        d = kept[i][2].get('data-neighborhood') or kept[i][2].get('id')
+        path = ' '.join('M' + ' '.join('%s %s' % (fmt(x), fmt(y)) for x, y in L) + 'Z' for L in loops)
+        out.append('    <path data-rim="%s" fill-rule="evenodd" d="%s"/>\n' % (d, path))
+    out.append('  </g>\n')
     out.append('</svg>\n')
 
     with open(DST_SVG, 'w', encoding='utf-8') as f:
