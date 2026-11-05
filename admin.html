@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=9"></script>
   <script src="map-ink.js?v=10"></script>
-  <script src="palette.js?v=4"></script>
+  <script src="palette.js?v=5"></script>
   <script src="avatar.js?v=5"></script>
   <script src="tbmm.js?v=1"></script>
   <!-- Shared with kahvehane.html so the Kahve tab's live preview reads a
@@ -1348,6 +1348,54 @@
       font-weight: 700;
     }
 
+    /* ── THE PARK — sections the launch app does not carry ──
+       Folded at the foot of the rail (railPark in the script). Still a
+       door: every parked section opens and works, it just is not what an
+       editor is asked to look at every day. */
+    .rail-parked { margin-top: auto; padding-top: 18px; }
+    .rail-parked-toggle {
+      width: 100%;
+      text-align: left;
+      border: 1px dashed var(--rule);
+      background: none;
+      color: var(--muted);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 7px 10px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .rail-parked-toggle::after { content: '+'; font-size: 0.8rem; }
+    .rail-parked.open .rail-parked-toggle::after { content: '–'; }
+    .rail-parked-toggle span { margin-left: auto; margin-right: 8px; opacity: 0.7; }
+    .rail-parked-list { display: flex; flex-direction: column; gap: 1px; padding-top: 4px; }
+    .rail-parked-list .rail-group { padding: 10px 10px 6px; opacity: 0.7; }
+    .admin-tab.parked { color: var(--muted); }
+    .admin-tab.parked.active { color: var(--paper); }
+
+    /* A parked section opened from the park says what it is, once. */
+    .desk-parked-note {
+      display: none;
+      flex-shrink: 0;
+      margin: 10px 18px 0;
+      padding: 7px 12px;
+      border: 1px dashed var(--ink-red);
+      color: var(--ink-red);
+      font-size: 0.72rem;
+      font-style: italic;
+      line-height: 1.4;
+    }
+    body.desk-parked .desk-parked-note { display: block; }
+
+    /* The colour desk takes the baskı board's width: a phone and the
+       panel that paints it, and nothing to drag into a paper. */
+    body.desk-colors .baski-rail { display: none; }
+
     /* ── THE WORK AREA ── */
     .admin-work {
       flex: 1;
@@ -1576,14 +1624,11 @@
        edition needs — each pressable, each landing on the section that
        fixes it.
 
-       THE DEADLINE IS THE SUN, not a timer somebody set. Sunrise
-       renews Kütüphane and sunset renews Kahvehane, so each side has
-       its own press time and the bar counts down to whichever comes
-       first (IstDate.nextEdition) — a real astronomical instant that
-       moves through the year, 13h39m of daylight to set Kahvehane in
-       June, 9h15m in December — rather than a number in a config. An
-       editor watching it is watching the same clock the reader's app
-       is.
+       THE DEADLINE IS MIDNIGHT. There is one paper a day: it goes out
+       whole at the midnight its day begins and stands for 24 hours, so
+       the bar counts down to tonight's midnight and checks tomorrow's
+       paper. (It used to be the sun -- sunrise renewed Kütüphane, sunset
+       renewed Kahvehane. That is gone from the desk for good.)
        ══════════════════════════════════════════════════════════════════ */
     .press-bar {
       flex-shrink: 0;
@@ -1965,10 +2010,8 @@
       border-bottom: 1px solid var(--ink);
       background: var(--paper-banner);
     }
-    /* Each page's own press time, under its name: the two pages of one
-       date do not come out together any more — Kütüphane at that day's
-       sunrise, Kahvehane at its sunset — so the board says which is
-       which, and whether that page is already out, next, or further off. */
+    /* When this paper is out, under the page's name: out now, tonight
+       at midnight, further off, or gone. One paper a day, so one line. */
     .baski-page-when {
       display: block;
       margin-top: 2px;
@@ -1997,6 +2040,20 @@
     }
     /* Kahvehane is Kütüphane turned over (.fb-mirror). */
     .baski-screen.mirror { grid-template-columns: 2fr 3fr; }
+    /* THE HOME SCREEN (BASKI_HOME_SCREEN): the launch app's one screen.
+       The week's evenings are the map -- seven day-boxes where the dots
+       are -- and the two games stand side by side at its foot, the way
+       the two buttons do under the petek. */
+    .baski-screen.home { grid-template-columns: 1fr; }
+    .baski-screen.home .baski-col-etkinlik {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+    .baski-screen.home .baski-col-etkinlik > .baski-slot:first-child { grid-column: 1 / -1; }
+    .baski-screen.home .baski-col-oyun { flex-direction: row; }
+    .baski-screen.home .baski-col-oyun > .baski-slot { flex: 1; min-width: 0; }
+    .baski-datebox .btn.on { background: var(--ink); color: var(--paper); }
     .baski-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     /* The maps. Nothing is curated up here, but a board of six floating
        rectangles is not recognisably the page — both lane screens carry
@@ -2174,6 +2231,294 @@
       .press-formes { flex-basis: 100%; order: 3; padding: 0 10px 8px; border-top: 1px solid var(--rule); padding-top: 8px; }
       .press-tail { margin-left: auto; padding: 6px 14px; border-left: none; }
     }
+
+    /* ══════════════════════════════════════════════════════════════════
+       RENKLER — the colour desk.
+
+       Two columns: the app on a phone at its real size, scaled to the
+       room, and the panel that paints it. The phone is laid out at
+       390×844 and SCALED, never squeezed, so the page inside measures the
+       width a phone reports and lays itself out as a phone.
+       ══════════════════════════════════════════════════════════════════ */
+    .admin-body.clr {
+      grid-template-columns: auto minmax(340px, 560px);
+      justify-content: center;
+      max-width: none;
+      gap: 22px;
+    }
+    .clr-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      min-height: 0;
+      min-width: 0;
+    }
+    .clr-variants {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px;
+      width: 100%;
+      min-width: 300px;
+    }
+    .clr-variants button {
+      position: relative;
+      border: 1px solid var(--ink);
+      background: var(--paper-card);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 7px 26px 7px 30px;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+    }
+    .clr-variants button.on { background: var(--ink); color: var(--paper); }
+    /* A two-tone chip: the state's own paper and ink, so the four read
+       as four places before the words are read. */
+    .clr-variants button i {
+      position: absolute;
+      left: 8px; top: 50%;
+      width: 14px; height: 14px;
+      margin-top: -7px;
+      border: 1px solid currentColor;
+      background: linear-gradient(135deg, var(--chip-paper) 50%, var(--chip-ink) 50%);
+    }
+    .clr-variants button b {
+      position: absolute;
+      right: 6px; top: 50%;
+      transform: translateY(-50%);
+      min-width: 16px;
+      padding: 0 4px;
+      font-size: 0.58rem;
+      line-height: 16px;
+      text-align: center;
+      background: var(--ink-red);
+      color: var(--paper);
+      border-radius: 8px;
+    }
+    .clr-variants button b:empty { display: none; }
+
+    .clr-phone-wrap {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+    .clr-phone {
+      position: absolute;
+      left: 0; top: 0;
+      width: 390px;
+      height: 844px;
+      transform-origin: 0 0;
+      outline: 3px solid var(--ink);
+      outline-offset: 0;
+      border-radius: 2px;
+      background: var(--navbar-ink, #2e2e2e);
+      overflow: hidden;
+    }
+    .clr-phone iframe {
+      position: absolute;
+      inset: 0;
+      width: 390px;
+      height: 844px;
+      border: 0;
+      display: block;
+      background: var(--paper);
+    }
+    /* The pick layer: while "Renk seç" is on it stands over the app and
+       takes every press, so nothing the press lands on fires -- it is
+       read, not run. Off, it lets everything through. */
+    .clr-catch { position: absolute; inset: 0; pointer-events: none; }
+    .clr-phone.picking .clr-catch { pointer-events: auto; cursor: crosshair; }
+    .clr-box {
+      position: absolute;
+      pointer-events: none;
+      box-sizing: border-box;
+      z-index: 2;
+    }
+    .clr-hover { outline: 2px dashed #1f8fff; background: rgba(31, 143, 255, 0.10); }
+    .clr-sel { outline: 2px solid #ff2e88; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.18); }
+    .clr-phone:not(.picking) .clr-sel { box-shadow: none; }
+
+    .clr-pagebar { display: flex; align-items: center; gap: 8px; width: 100%; }
+    .clr-pagebar select { flex: 1; min-width: 0; padding: 6px 8px; font-size: 0.8rem; }
+    .clr-pagebar .btn { padding: 6px 10px; font-size: 0.9rem; }
+    .clr-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      cursor: pointer;
+      white-space: nowrap;
+      font-size: 0.68rem;
+      letter-spacing: 1.5px;
+      color: var(--ink);
+      user-select: none;
+    }
+    .clr-switch input { position: absolute; opacity: 0; pointer-events: none; }
+    .clr-switch-knob {
+      width: 34px; height: 18px;
+      border: 1px solid var(--ink);
+      background: var(--paper);
+      position: relative;
+      transition: background 0.15s;
+    }
+    .clr-switch-knob::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 12px; height: 12px;
+      background: var(--ink);
+      transition: transform 0.15s;
+    }
+    .clr-switch input:checked + .clr-switch-knob { background: var(--ink-red); border-color: var(--ink-red); }
+    .clr-switch input:checked + .clr-switch-knob::after { transform: translateX(16px); background: var(--paper); }
+    .clr-switch input:focus-visible + .clr-switch-knob { outline: 2px solid var(--accent); }
+
+    /* ── The panel ── */
+    .clr-panel {
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 0;
+      overflow: hidden;
+    }
+    .clr-panel > .panel-title { flex-shrink: 0; }
+    .clr-tabs { display: flex; gap: 0; flex-shrink: 0; border-bottom: 1px solid var(--ink); margin: -6px -20px 0; padding: 0 20px; }
+    .clr-tabs button {
+      border: 1px solid transparent;
+      border-bottom: none;
+      background: none;
+      color: var(--muted);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Inter', sans-serif;
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 8px 10px;
+      cursor: pointer;
+      margin-bottom: -1px;
+    }
+    .clr-tabs button.on { color: var(--ink); border-color: var(--ink); background: var(--paper-card); }
+    .clr-pane { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 0 14px; }
+    .clr-pane[hidden] { display: none; }
+    .clr-empty { font-size: 0.8rem; color: var(--muted); font-style: italic; line-height: 1.5; padding: 6px 0; }
+    .clr-empty b { color: var(--ink); font-style: normal; }
+
+    .clr-foot { flex-shrink: 0; border-top: 1px solid var(--ink); margin: 0 -20px; padding: 10px 20px 12px; background: var(--paper-banner); }
+    .clr-foot .btn-row { margin-top: 8px; }
+    .clr-foot .btn { padding: 8px 14px; font-size: 0.74rem; }
+    .clr-status { font-size: 0.72rem; line-height: 1.4; color: var(--muted); }
+    .clr-status b { color: var(--ink-red); font-weight: 700; }
+    .clr-status code { font-size: 0.7rem; }
+
+    /* The picked thing: what it is, where it sits, and what is under it. */
+    .clr-what { margin-bottom: 10px; }
+    .clr-what-name { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.74rem; word-break: break-all; }
+    .clr-what-text { font-size: 0.72rem; color: var(--muted); font-style: italic; margin-top: 2px; }
+    .clr-crumbs, .clr-layers { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; align-items: center; }
+    .clr-crumbs > span, .clr-layers > span {
+      font-size: 0.56rem; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); margin-right: 4px;
+    }
+    .clr-chip {
+      border: 1px solid var(--rule);
+      background: var(--paper);
+      color: var(--ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.64rem;
+      padding: 1px 5px;
+      cursor: pointer;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .clr-chip:hover { border-color: var(--ink); }
+    .clr-chip.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+    .clr-group { margin-top: 12px; }
+    .clr-group-title {
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--ink-red); border-bottom: 1px solid var(--rule); padding-bottom: 3px; margin-bottom: 6px;
+    }
+    .clr-ch { border: 1px solid var(--rule); background: var(--paper); margin-bottom: 6px; padding: 6px 8px; }
+    .clr-ch-head { display: flex; align-items: baseline; gap: 8px; }
+    .clr-ch-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .clr-ch-src {
+      flex: 1; min-width: 0; text-align: right;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.6rem; color: var(--muted);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .clr-ch-note { font-size: 0.66rem; color: var(--muted); font-style: italic; margin-top: 2px; }
+    .clr-others { margin-top: 4px; }
+    .clr-others > summary { font-size: 0.6rem; color: var(--muted); cursor: pointer; letter-spacing: 1px; }
+    .clr-others .clr-ch-src { text-align: left; display: block; }
+
+    /* One editable value: a swatch that is the picker, a name, the value
+       as written, and a reset when it has been changed. */
+    .clr-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+    .clr-row.sub { margin-left: 16px; position: relative; }
+    .clr-row.sub::before {
+      content: '↳'; position: absolute; left: -13px; top: 3px; font-size: 0.7rem; color: var(--muted);
+    }
+    .clr-sw {
+      position: relative;
+      flex-shrink: 0;
+      width: 26px; height: 22px;
+      border: 1px solid var(--ink);
+      background-image: linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%),
+                        linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%);
+      background-size: 8px 8px;
+      background-position: 0 0, 4px 4px;
+      background-color: #fff;
+      cursor: pointer;
+      overflow: hidden;
+    }
+    .clr-sw > i { position: absolute; inset: 0; }
+    .clr-sw input[type="color"] { position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); opacity: 0; cursor: pointer; border: 0; padding: 0; }
+    .clr-sw.ro { cursor: default; }
+    .clr-name { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.68rem; white-space: nowrap; flex-shrink: 0; max-width: 42%; overflow: hidden; text-overflow: ellipsis; }
+    .clr-row input.clr-val {
+      flex: 1; min-width: 0;
+      padding: 3px 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.68rem;
+      background: var(--paper-card);
+    }
+    .clr-row input.clr-val[readonly] { opacity: 0.6; }
+    .clr-row.changed .clr-name::after { content: ' ●'; color: var(--ink-red); }
+    .clr-reset {
+      flex-shrink: 0; border: 1px solid var(--rule); background: none; color: var(--ink-red);
+      font-size: 0.72rem; line-height: 1; padding: 3px 5px; cursor: pointer;
+    }
+    .clr-reset:hover { border-color: var(--ink-red); }
+    .clr-reset[hidden] { display: none; }
+    .clr-srcline { margin-left: 32px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.58rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .clr-row.sub + .clr-srcline { margin-left: 48px; }
+
+    #clr-search { margin-bottom: 8px; padding: 6px 9px; font-size: 0.8rem; }
+    .clr-allgroup > summary {
+      font-size: 0.62rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      cursor: pointer; padding: 6px 0 4px; border-bottom: 1px solid var(--rule); color: var(--ink-red);
+    }
+    .clr-allgroup > summary span { color: var(--muted); font-weight: 400; margin-left: 6px; }
+
+    .clr-changes-list .clr-row { border-bottom: 1px dashed var(--rule); padding-bottom: 5px; }
+    .clr-ch-meta { font-size: 0.6rem; color: var(--muted); margin-left: 32px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .clr-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--rule); }
+    .clr-tools select { width: auto; padding: 5px 8px; font-size: 0.74rem; }
+    .clr-tools .btn { padding: 6px 10px; font-size: 0.66rem; }
+    .clr-css { width: 100%; min-height: 120px; margin-top: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.66rem; }
+
+    @media (max-width: 860px) {
+      .admin-body.clr { grid-template-columns: 1fr; overflow-y: auto; }
+      .clr-phone-wrap { flex: none; height: 70vh; }
+      .clr-panel { min-height: 70vh; }
+    }
   </style>
   <link rel="stylesheet" href="frames.css?v=25">
 </head>
@@ -2227,19 +2572,19 @@
 
   <div class="admin-shell">
 
-  <!-- ── THE RAIL: every section, stacked, grouped by what it is ── -->
+  <!-- ── THE RAIL: every section, stacked, grouped by what it is ──
+       Only what the launch app actually carries stands here. Everything
+       else is PARKED (ADMIN_PARKED in the script): its button is moved,
+       with the group heading it stands under, into the folded
+       "Parktakiler" list at the foot of the rail by railPark(). The
+       markup below is the whole rail as it will be once every section is
+       live again, so unparking a section is deleting its id from that
+       one set. -->
   <nav class="admin-tabs" id="admin-tabs" aria-label="Bölümler">
-    <!-- THE BASKI and the six kinds it is made of. The rail used to be
-         grouped by WHERE a thing shows up (Kütüphane, Kahvehane), which
-         is the reader's question rather than the editor's: an editor
-         does not sit down to change Kütüphane, they sit down to write a
-         haber or to set tonight's paper. So the first group is the paper
-         itself and the kinds that go into it, and the place-groups below
-         keep what is genuinely about a place. -->
     <div class="rail-group">İçerik</div>
-    <button class="admin-tab active" data-tab="news">Haber</button>
+    <button class="admin-tab" data-tab="news">Haber</button>
     <button class="admin-tab" data-tab="worldevents">Olay</button>
-    <button class="admin-tab" data-tab="events">Etkinlik</button>
+    <button class="admin-tab active" data-tab="events">Etkinlik</button>
     <button class="admin-tab" data-tab="games">Oyun</button>
     <button class="admin-tab" data-tab="district-polls">Anket</button>
     <button class="admin-tab" data-tab="mektuplar">Mektup</button>
@@ -2260,9 +2605,14 @@
     <div class="rail-group">Hane</div>
     <button class="admin-tab" data-tab="users">Üyeler</button>
     <button class="admin-tab" data-tab="notifications">Bildirimler</button>
+
+    <div class="rail-group">Görünüm</div>
+    <button class="admin-tab" data-tab="colors">Renkler</button>
   </nav>
 
   <main class="admin-work" id="admin-work">
+
+  <div class="desk-parked-note">Bu bölüm park edildi — uygulamanın ilk sürümünde okuyucuya görünmüyor. Yazılanlar duruyor ve çalışıyor; ileride geri açılınca hepsi yerinde olacak.</div>
 
   <div class="admin-body" id="kutuphane-tab" style="display:none;">
 
@@ -2675,7 +3025,7 @@
        being re-derived from memory a month later. It used to be folded
        under Gelişmiş at the bottom of the Haber form, which is where a
        thing goes to be forgotten. -->
-  <div class="admin-body" id="news-tab">
+  <div class="admin-body" id="news-tab" style="display:none;">
 
     <!-- LEFT: Add Breaking News -->
     <div class="panel">
@@ -2841,19 +3191,20 @@
            The seven-day board below is the same switch seen as a
            calendar; this is it seen as the baskı, which is the one view
            that matches every other kind on this desk. Both write
-           the night's lineup (game_night_slots) and keep game_day_toggles
-           in line with it, so they can never disagree. -->
-      <div class="panel-title">Bu Gecenin Oyunları</div>
+           the day's lineup (game_night_slots — named for nights, it is one
+           row per DAY now) and keep game_day_toggles in line with it, so
+           they can never disagree. -->
+      <div class="panel-title">Günün Oyunları</div>
       <p style="margin-bottom:10px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
         Sağdaki baskıya sürükleyin. İki oyun yuvası var ve her yuvaya istediğiniz
-        oyun konabilir; yuvada olan oyun o gece oynanır, olmayan kapalıdır.
+        oyun konabilir; yuvada olan oyun o gün (gece yarısından gece yarısına) oynanır, olmayan kapalıdır.
       </p>
       <div class="articles-list" id="games-drag-list" style="margin-bottom:22px;"></div>
 
       <!-- Per-day on/off switch, shared by all three games -->
       <div class="panel-title">Oyun Takvimi — Açık / Kapalı</div>
       <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-        Açık = o gecenin iki yuvasından birinde. Bir oyunu açmak onu ilk boş yuvaya
+        Açık = o günün iki yuvasından birinde. Bir oyunu açmak onu ilk boş yuvaya
         koyar; iki yuva doluysa önce birini kapatın. Kapalı oyuna girmeye çalışan
         üyeler "Bugün &lt;Oyun&gt; yok!" uyarısını görür.
       </p>
@@ -2884,18 +3235,18 @@
           <div class="panel-title" style="margin:0 0 14px;">Kelime Havuzu</div>
           <p style="margin-bottom:12px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
             THE POOL, oldest offer first — every word a member has offered and not taken back, whatever
-            day they wrote it. A suggestion is not made for a night and does not expire: it waits here
-            until you place it or until its author withdraws it, so picking tonight's word takes one
+            day they wrote it. A suggestion is not made for a day and does not expire: it waits here
+            until you place it or until its author withdraws it, so picking today's word takes one
             word out of the pool and leaves the rest standing. Choosing one writes it as the selected
-            night's answer AND makes whoever offered it that night's Sözcü — a night is named for the
-            day it BEGINS on, so tonight is today's date even though the game runs past midnight.
+            day's answer AND makes whoever offered it that day's Sözcü. A game's day runs midnight to
+            midnight, the same 24 hours the paper stands for.
             "Havuzdan çıkar" is the one other way a word leaves: it is how you say no to a word you
             are never going to play. Only you can read these; the table is deliberately not
             member-readable, because a suggestion is a candidate answer.
           </p>
           <div class="sozcu-assign-row">
             <div>
-              <label style="margin-top:0;">Gece</label>
+              <label style="margin-top:0;">Gün</label>
               <select id="sw-night"></select>
             </div>
             <button class="btn" id="sw-reload" style="padding:9px 14px;white-space:nowrap;">Yenile</button>
@@ -2909,7 +3260,7 @@
         <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--rule);">
           <div class="panel-title" style="margin:0 0 14px;">Sonraki 7 Gün</div>
           <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-            Status of the next 7 nights' words. "Düzenle" edits a night's word and meaning
+            Status of the next 7 days' words. "Düzenle" edits a day's word and meaning
             directly — including one already picked or already being played — with no deadline,
             the same admin override sozcel.html's own Sözcü Görevi form uses.
           </p>
@@ -3049,13 +3400,13 @@
           Izgarayı hücre hücre kendiniz kurun: bir hücreye tıklayınca açık/kapalı (siyah kare) olarak
           değişir, açık bir hücreye harf yazabilirsiniz. Sistem yatay/dikey kelimelerin numaralarını
           ızgaradan kendisi çıkarır — siz yalnızca ipuçlarını yazarsınız. Oyunu belirli bir gün için
-          açıp kapatmak için yukarıdaki Oyun Takvimi'ni kullanın; bir gece için bulmaca girilmezse o
-          gece Çengel'in içeriği boş kalır.
+          açıp kapatmak için yukarıdaki Oyun Takvimi'ni kullanın; bir gün için bulmaca girilmezse o
+          gün Çengel'in içeriği boş kalır.
         </p>
 
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
           <div style="flex:1;min-width:150px;">
-            <label style="margin-top:0;">Gece (tarih)</label>
+            <label style="margin-top:0;">Gün (tarih)</label>
             <input type="date" id="bz-date">
           </div>
         </div>
@@ -3553,6 +3904,68 @@
 
   </div>
 
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       RENKLER — the admin's own colours, on a live copy of the app.
+
+       Left: the app itself, in an iframe at a phone's own size (so it
+       lays out as a phone, not as a narrow desktop), pressable and
+       swipeable exactly as a member's is. Four buttons pin it to one of
+       the four states the palette can be in, whatever the sun is doing.
+       With "Renk seç" on, a press no longer reaches the app: it picks
+       whatever is under it, and the panel on the right says which colours
+       paint it and lets each one be changed, live. Nothing reaches a
+       member until "Yayınla" (site_palette, db/site_palette.sql); until
+       then the draft lives in this browser.
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="admin-body clr" id="colors-tab" style="display:none;">
+    <div class="clr-stage" id="clr-stage">
+      <div class="clr-variants" id="clr-variants" role="tablist" aria-label="Hâl"></div>
+      <div class="clr-phone-wrap" id="clr-phone-wrap">
+        <div class="clr-phone" id="clr-phone">
+          <iframe id="clr-frame" title="Uygulamanın canlı kopyası" src="about:blank"></iframe>
+          <div class="clr-box clr-hover" id="clr-hover" hidden></div>
+          <div class="clr-box clr-sel" id="clr-selbox" hidden></div>
+          <div class="clr-catch" id="clr-catch"></div>
+        </div>
+      </div>
+      <div class="clr-pagebar">
+        <label class="clr-switch" title="Açıkken bir yere basmak o öğeyi seçer; kapalıyken uygulama normal çalışır">
+          <input type="checkbox" id="clr-pick"><span class="clr-switch-knob"></span><span>Renk seç</span>
+        </label>
+        <select id="clr-page" aria-label="Sayfa">
+          <option value="project.html">Uygulama</option>
+          <option value="sozcel.html">Sözcel</option>
+          <option value="tumcel.html">Tümcel</option>
+          <option value="bulmaca.html">Çengel</option>
+        </select>
+        <button class="btn btn-secondary" id="clr-reload" title="Sayfayı yeniden yükle">&#8635;</button>
+      </div>
+    </div>
+
+    <div class="panel clr-panel">
+      <div class="panel-title">Renkler · <span id="clr-variant-name">—</span></div>
+      <div class="clr-tabs" role="tablist">
+        <button data-pane="sel" class="on">Seçili öğe</button>
+        <button data-pane="all">Tüm renkler</button>
+        <button data-pane="changes">Değişiklikler <span id="clr-count"></span></button>
+      </div>
+      <div class="clr-pane" id="clr-pane-sel"></div>
+      <div class="clr-pane" id="clr-pane-all" hidden>
+        <input type="search" id="clr-search" placeholder="Ara: ink, paper, map, lit…" autocomplete="off">
+        <div id="clr-all"></div>
+      </div>
+      <div class="clr-pane" id="clr-pane-changes" hidden></div>
+      <div class="clr-foot">
+        <div class="clr-status" id="clr-status"></div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="clr-publish">Yayınla</button>
+          <button class="btn btn-secondary" id="clr-revert" title="Taslağı atıp yayındaki renklere dön">Yayındakine dön</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   </main>
 
   <!-- ══════════════════════════════════════════════════════════════════
@@ -3573,14 +3986,15 @@
     <div class="baski-head">
       <div class="baski-head-top">
         <div>
-          <div class="baski-kicker">Sıradaki baskı</div>
+          <div class="baski-kicker">Baskı</div>
           <div class="baski-when" id="baski-when">—</div>
         </div>
-        <div class="baski-count" id="baski-count">––:––:––</div>
+        <div class="baski-count" id="baski-count" title="Yarının sayısının çıkmasına kalan">––:––:––</div>
       </div>
       <div class="baski-datebox">
         <input type="date" id="baski-date"/>
-        <button class="btn btn-secondary" id="baski-today-btn">Sıradaki</button>
+        <button class="btn btn-secondary" id="baski-now-btn" title="Şu an okuyucuda olan sayı">Bugün</button>
+        <button class="btn btn-secondary" id="baski-next-btn" title="Bu gece 00:00'da çıkacak sayı">Yarın</button>
       </div>
       <div class="baski-ahead" id="baski-ahead" hidden></div>
     </div>
@@ -3612,8 +4026,6 @@ async function checkAdmin() {
   const { data: { session } } = await sb.auth.getSession();
   if (session && session.user.email === ADMIN_EMAIL) {
     showAdminPanel(session.user);
-    loadBreakingNews();
-    loadSeries();
     loadUsersTabNeighborhoods();
   }
 }
@@ -3628,6 +4040,11 @@ function showAdminPanel(user) {
   // The third column: the paper itself. Every one of its queries needs
   // the session too, so it is filled here rather than on load.
   baskiRefresh();
+  // The news used to be preloaded here, being the section the desk opened
+  // on. It is parked; the desk opens on the first section still standing,
+  // through the rail's own button so its loader runs exactly once.
+  if (!adminTabParked('news')) { loadBreakingNews(); loadSeries(); }
+  openDefaultTab();
 }
 
 // ── Login ──
@@ -3647,8 +4064,6 @@ document.getElementById('adm-login-btn').addEventListener('click', async () => {
     return;
   }
   showAdminPanel(data.user);
-  loadBreakingNews();
-  loadSeries();
   loadUsersTabNeighborhoods();
 });
 
@@ -3714,26 +4129,94 @@ document.addEventListener('toggle', (e) => {
   else OPEN_BLOCKS.delete(d.dataset.blockKey);
 }, true);
 
+// ══════════════════════════════════════════════════════════════════════
+// WHAT IS PARKED
+//
+// The launch app is four things -- signing up, filling the petek, the
+// daily games and RSVPing to evenings (CLAUDE.md, "Launch state") -- so
+// the desk shows the sections those need and nothing else: Etkinlik, Oyun
+// and Üyeler, plus Renkler. Every other section is PARKED the house way:
+// its markup, its loaders and its handlers are all still here and still
+// work, its button is moved into the folded "Parktakiler" list at the
+// foot of the rail, its formes leave the press bar and its columns leave
+// the baskı board. Unparking a section is deleting its id from this set.
+// ══════════════════════════════════════════════════════════════════════
+const ADMIN_PARKED = new Set([
+  'news', 'worldevents', 'district-polls', 'mektuplar',
+  'kutuphane', 'countries', 'quotes',
+  'kahve',
+  'people', 'politicians', 'tbmm',
+  'notifications',
+]);
+// The section the desk opens on: the first one still standing.
+const ADMIN_DEFAULT_TAB = 'events';
+
+function adminTabParked(tab) { return ADMIN_PARKED.has(tab); }
+
+// Moves every parked button -- under a copy of the group heading it stood
+// beneath -- into one folded list at the foot of the rail, and drops the
+// headings the move left with nothing under them.
+function railPark() {
+  const rail = document.getElementById('admin-tabs');
+  if (!rail || rail.querySelector('.rail-parked')) return;
+  const box = document.createElement('div');
+  box.className = 'rail-parked';
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'rail-parked-toggle';
+  const list = document.createElement('div');
+  list.className = 'rail-parked-list';
+  list.hidden = true;
+  let heading = null, copied = null, n = 0;
+  Array.from(rail.children).forEach(el => {
+    if (el.classList.contains('rail-group')) { heading = el; copied = null; return; }
+    if (!el.classList.contains('admin-tab') || !adminTabParked(el.dataset.tab)) return;
+    if (heading && !copied) {
+      copied = heading.cloneNode(true);
+      list.appendChild(copied);
+    }
+    el.classList.add('parked');
+    list.appendChild(el);
+    n++;
+  });
+  // A heading whose every button went to the park has nothing to head.
+  Array.from(rail.querySelectorAll(':scope > .rail-group')).forEach(h => {
+    const next = h.nextElementSibling;
+    if (!next || next.classList.contains('rail-group')) h.remove();
+  });
+  if (!n) return;
+  toggle.innerHTML = 'Parktakiler <span>' + n + '</span>';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.addEventListener('click', () => {
+    list.hidden = !list.hidden;
+    toggle.setAttribute('aria-expanded', String(!list.hidden));
+    box.classList.toggle('open', !list.hidden);
+  });
+  box.appendChild(toggle);
+  box.appendChild(list);
+  rail.appendChild(box);
+}
+railPark();
+
 // ── Tab switching ──
+// Every section is `<tab>-tab`; the one with a grid of its own (Oyunlar)
+// says so here rather than in a fifteen-line list of display toggles.
+const TAB_DISPLAY = { games: 'grid' };
+let adminCurrentTab = null;
 document.querySelectorAll('.admin-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const tab = btn.dataset.tab;
+    adminCurrentTab = tab;
     document.querySelectorAll('.admin-tab').forEach(b => b.classList.toggle('active', b === btn));
-    document.getElementById('kutuphane-tab').style.display = (tab === 'kutuphane') ? '' : 'none';
-    document.getElementById('mektuplar-tab').style.display = (tab === 'mektuplar') ? '' : 'none';
-    document.getElementById('countries-tab').style.display = (tab === 'countries') ? '' : 'none';
-    document.getElementById('worldevents-tab').style.display = (tab === 'worldevents') ? '' : 'none';
-    document.getElementById('news-tab').style.display = (tab === 'news') ? '' : 'none';
-    document.getElementById('events-tab').style.display = (tab === 'events') ? '' : 'none';
-    document.getElementById('games-tab').style.display = (tab === 'games') ? 'grid' : 'none';
-    document.getElementById('quotes-tab').style.display = (tab === 'quotes') ? '' : 'none';
-    document.getElementById('district-polls-tab').style.display = (tab === 'district-polls') ? '' : 'none';
-    document.getElementById('kahve-tab').style.display = (tab === 'kahve') ? '' : 'none';
-    document.getElementById('people-tab').style.display = (tab === 'people') ? '' : 'none';
-    document.getElementById('politicians-tab').style.display = (tab === 'politicians') ? '' : 'none';
-    document.getElementById('tbmm-tab').style.display = (tab === 'tbmm') ? '' : 'none';
-    document.getElementById('notifications-tab').style.display = (tab === 'notifications') ? '' : 'none';
-    document.getElementById('users-tab').style.display = (tab === 'users') ? '' : 'none';
+    document.querySelectorAll('#admin-work > .admin-body').forEach(body => {
+      const t = body.id.replace(/-tab$/, '');
+      body.style.display = (t === tab) ? (TAB_DISPLAY[t] || '') : 'none';
+    });
+    // The colour desk needs the width the baskı board stands in -- a
+    // phone and the panel that edits it -- and has nothing to drag into it.
+    document.body.classList.toggle('desk-colors', tab === 'colors');
+    // A parked section opened from the park says so, once, at the top.
+    document.body.classList.toggle('desk-parked', adminTabParked(tab));
     if (tab === 'kutuphane') showKutuphaneIndex();
     if (tab === 'mektuplar') { letterBuildAudience().then(letterSyncAudienceVisibility); loadLettersList(); }
     if (tab === 'countries') loadCountriesTab();
@@ -3749,11 +4232,18 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'tbmm') loadTBMMTab();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'users') { loadUsersList(); loadOnboardingToggle(); loadOnboardingCopy(); loadCardFontSizes(); }
+    if (tab === 'colors') colorsOpen(); else colorsClose();
     // The rail's follow-through: shut whatever drawer stood on the section
-    // being left, and aim the phone at the page this section changes.
+    // being left.
     deskOnTab(btn);
   });
 });
+
+function openDefaultTab() {
+  const btn = document.querySelector('.admin-tab[data-tab="' + ADMIN_DEFAULT_TAB + '"]') ||
+              document.querySelector('.admin-tab:not(.parked)');
+  if (btn) btn.click();
+}
 
 // ── Oyunlar tab: sub-nav between Sözcel / Tümcel / Çengel ──
 document.querySelectorAll('.games-subtab').forEach(btn => {
@@ -8578,7 +9068,7 @@ async function toggleGameDay(game, date, currentlyOff) {
   catch (err) { alert('Hata: ' + err.message); return; }
   if (currentlyOff) {
     const free = lineup.indexOf(null);
-    if (free < 0) { alert('O gecenin iki yuvası da dolu — önce bir oyunu kapatın.'); return; }
+    if (free < 0) { alert('O günün iki yuvası da dolu — önce bir oyunu kapatın.'); return; }
     lineup[free] = game;
   } else {
     lineup = lineup.map(g => (g === game ? null : g));
@@ -8612,7 +9102,7 @@ function swNightOptions() {
   // that is exactly when a wrong word most needs replacing.
   for (let off = -1; off <= 5; off++) {
     const iso = IstDate.iso(off);
-    const label = off === 0 ? iso + ' (bu gece)' : (off === -1 ? iso + ' (dün gece)' : iso);
+    const label = off === 0 ? iso + ' (bugün)' : (off === -1 ? iso + ' (dün)' : iso);
     out.push('<option value="' + iso + '"' + (off === 0 ? ' selected' : '') + '>' + label + '</option>');
   }
   sel.innerHTML = out.join('');
@@ -8761,7 +9251,7 @@ async function loadSozcelSuggestions() {
   } catch (err) { /* names are a nicety */ }
 
   const head = already
-    ? '<div class="status-msg ok" style="margin:0 0 6px;">Bu gecenin kelimesi zaten var: <b>' +
+    ? '<div class="status-msg ok" style="margin:0 0 6px;">Bu günün kelimesi zaten var: <b>' +
         escapeHtml(already.word) + '</b> — havuzdan başka birini seçmek onu değiştirir.</div>'
     : '';
   if (!rows.length) {
@@ -8771,7 +9261,7 @@ async function loadSozcelSuggestions() {
   list.innerHTML = head + rows.map(r => {
     const editor = sozEditorHTML({
       context: 'pick', key: r.id, by: r.suggested_by || '',
-      word: r.word, definitionText: r.definition || '', confirmLabel: 'Bu Geceye Koy',
+      word: r.word, definitionText: r.definition || '', confirmLabel: 'Bu Güne Koy',
     });
     return '<div class="sw-row" style="border:1px solid var(--rule);padding:8px 10px;">' +
       '<div style="display:flex;align-items:center;gap:10px;">' +
@@ -9869,19 +10359,39 @@ async function deleteNotification(id) {
 // comment on the kind names it.
 // ══════════════════════════════════════════════════════════════════════
 
-// Which baskı is being set: a DATE, and it names both pages. SUNRISE
-// RENEWS KÜTÜPHANE AND SUNSET RENEWS KAHVEHANE, so the paper dated D is
-// Kütüphane from sunrise on D and Kahvehane from sunset on D — two press
-// times, one date, and no half to pick. (There used to be one: a morning
-// and an evening half of the NEWS, db/breaking_news_v4_akis.sql. The
-// news is Kütüphane's and Kütüphane renews once a day, so it went, and
-// with it the pair of buttons under the date.)
+// Which baskı is being set: a DATE. THERE IS ONE PAPER A DAY: the paper
+// dated D goes out at the midnight D begins and stands for the whole 24
+// hours, everything in it at once. There used to be two clocks -- sunrise
+// renewed Kütüphane and sunset renewed Kahvehane, and before that a
+// morning and an evening half of the news -- and both are gone from the
+// desk for good. The database keeps what they wrote (edition_half is
+// still a column, and the desk still writes 'gun' into it for a cached
+// old reader), it simply no longer means anything here.
 //
 // Null until the first paint resolves it against IstDate, the only clock
-// allowed to answer "what day is it in İstanbul" and "which paper is
-// next" (CLAUDE.md rule 10).
+// allowed to answer "what day is it in İstanbul" (CLAUDE.md rule 10).
 let baskiDate = null;
 let baskiLoadSeq = 0;
+
+// THE DAILY PAPER, in the two numbers the desk needs: today's (the one
+// out now) and the next one -- tomorrow's, out at tonight's midnight.
+// Never IstDate.nextEdition(): that one still knows how to answer in sun
+// terms if content is ever put back on the sun, and the desk has decided
+// it never will be.
+function deskToday() { return IstDate.iso(0); }
+function deskNextPaper() { return { date: IstDate.iso(1), at: IstDate.nextMidnightAt() }; }
+
+// Where a paper stands against the reader's own clock.
+//   live   -- today's: out now, until midnight
+//   next   -- tomorrow's: goes out at tonight's midnight
+//   ahead  -- further off
+//   behind -- an earlier day's
+function baskiState(date) {
+  const today = deskToday();
+  if (date === today) return 'live';
+  if (date < today) return 'behind';
+  return date === IstDate.iso(1) ? 'next' : 'ahead';
+}
 let baskiItems = { haber: [], etkinlik: [], anket: [], oyun: [] };
 let baskiFailed = {};
 let baskiDrag = null;
@@ -9892,11 +10402,50 @@ let baskiDrag = null;
 // set of exactly three. Slots are listed TOP TO BOTTOM, the way the
 // reader reads them — which for Oyunlar means Sözcel first, even though
 // project.html numbers its own slots from the dock up (gameForSlot()).
+// THE LAUNCH APP IS ONE SCREEN (HOME_SCREEN in project.html): the week's
+// evenings as dots on the map, today's two games at its foot. So that is
+// the page the board draws while this is on. BASKI_PAGES below is the
+// three-lane strip it replaced -- Kütüphane and Kahvehane -- kept whole for
+// the day the strip comes back.
+const BASKI_HOME_SCREEN = true;
+// How many days of evenings one paper carries: project.html's HOME_DAYS on
+// the home screen (a week of dots), the strip's Bugün/Yarın/Öbür gün off it.
+const BASKI_EVENT_DAYS = BASKI_HOME_SCREEN ? 7 : 3;
+
+// The event slots, counted from the paper's own day: Bugün, Yarın, then
+// the weekday's own name. Built at render, since they name real days.
+function baskiEventSlots() {
+  const out = [];
+  for (let i = 0; i < BASKI_EVENT_DAYS; i++) {
+    let label = i === 0 ? 'Bugün' : (i === 1 ? 'Yarın' : (i === 2 && !BASKI_HOME_SCREEN ? 'Öbür gün' : ''));
+    if (!label) {
+      label = new Intl.DateTimeFormat('tr-TR', { timeZone: 'UTC', weekday: 'long' })
+        .format(new Date(pressDayISO(baskiDate || deskToday(), i) + 'T12:00:00Z'));
+    }
+    out.push({ id: 'd' + i, label });
+  }
+  return out;
+}
+
+const BASKI_HOME_PAGE = {
+  id: 'home', name: 'Ana ekran', home: true, foot: ['', ''],
+  cols: [
+    { kind: 'etkinlik', title: 'Etkinlikler', note: 'Haritadaki noktalar — bu sayının yedi günü. Kutu: etkinliğin kendi tarihi.',
+      slots: baskiEventSlots },
+    // Two SLOTS, and a slot is not a game (db/game_night_slots.sql).
+    { kind: 'oyun', title: 'Oyunlar', note: 'Haritanın altındaki iki düğme. Her yuvaya herhangi bir oyun.',
+      slots: [
+        { id: 'g0', label: '1. Oyun' },
+        { id: 'g1', label: '2. Oyun' },
+      ] },
+  ],
+};
+
 const BASKI_PAGES = [
   {
     id: 'kutuphane', name: 'Kütüphane', mirror: false, foot: ['KÜTÜP', ''],
     cols: [
-      { kind: 'haber', title: 'Haberler', note: 'Geniş sütun — gün doğumunda çıkar.',
+      { kind: 'haber', title: 'Haberler', note: 'Geniş sütun.',
         slots: [
           { id: 'istanbul', label: 'İstanbul' },
           { id: 'turkiye',  label: 'Türkiye'  },
@@ -9911,7 +10460,7 @@ const BASKI_PAGES = [
       // one, and the board's second rule: it asks exactly what the
       // reader's own loader asks, so a third box here would be a slot
       // the reader can never actually meet.
-      { kind: 'anket', title: 'Anket', note: 'Dar sütun — gün doğumunda çıkar.',
+      { kind: 'anket', title: 'Anket', note: 'Dar sütun.',
         slots: [
           { id: 'a0', label: '1.' },
           { id: 'a1', label: '2.' },
@@ -9923,20 +10472,30 @@ const BASKI_PAGES = [
     cols: [
       // Two SLOTS, and a slot is not a game (db/game_night_slots.sql):
       // either one takes any of the three games, one game per slot.
-      { kind: 'oyun', title: 'Oyunlar', note: 'Dar sütun — gün batımında çıkar. İki yuva, her yuvaya herhangi bir oyun.',
+      { kind: 'oyun', title: 'Oyunlar', note: 'Dar sütun. İki yuva, her yuvaya herhangi bir oyun.',
         slots: [
           { id: 'g0', label: '1. Oyun' },
           { id: 'g1', label: '2. Oyun' },
         ] },
-      { kind: 'etkinlik', title: 'Etkinlikler', note: 'Geniş sütun — gün batımında çıkar; kutu: etkinliğin tarihi.',
-        slots: [
-          { id: 'd0', label: 'Bugün'    },
-          { id: 'd1', label: 'Yarın'    },
-          { id: 'd2', label: 'Öbür gün' },
-        ] },
+      { kind: 'etkinlik', title: 'Etkinlikler', note: 'Geniş sütun; kutu: etkinliğin tarihi.',
+        slots: baskiEventSlots },
     ],
   },
 ];
+
+// Which section each kind is written in -- and so whether it is parked.
+const BASKI_KIND_TAB = { haber: 'news', etkinlik: 'events', anket: 'district-polls', oyun: 'games' };
+function baskiKindLive(kind) { return !adminTabParked(BASKI_KIND_TAB[kind]); }
+
+// The pages the board draws: the home screen, or the strip with the
+// columns of parked sections left out (a page left with no column goes).
+function baskiPagesLive() {
+  const pages = BASKI_HOME_SCREEN ? [BASKI_HOME_PAGE] : BASKI_PAGES;
+  return pages
+    .map(pg => Object.assign({}, pg, { cols: pg.cols.filter(c => baskiKindLive(c.kind)) }))
+    .filter(pg => pg.cols.length);
+}
+function baskiSlotsOf(col) { return typeof col.slots === 'function' ? col.slots() : col.slots; }
 
 // ── The four kinds ──
 // Each answers the same four questions: what exists, which slot a row
@@ -10003,22 +10562,24 @@ const BASKI_KINDS = {
         .order('event_date', { ascending: true })
         .limit(200);
       if (error) throw error;
-      // The three days as the exact +03:00 instants the reader's own
-      // loader compares against. İstanbul carries no DST, so this is
-      // arithmetic rather than a guess.
-      const bounds = [0, 1, 2, 3].map(off =>
-        Date.parse(pressDayISO(date, off) + 'T00:00:00+03:00'));
+      // The paper's days as the exact +03:00 instants the reader's own
+      // loader compares against (homeWindow in project.html). İstanbul
+      // carries no DST, so this is arithmetic rather than a guess.
+      const bounds = [];
+      for (let off = 0; off <= BASKI_EVENT_DAYS; off++) {
+        bounds.push(Date.parse(pressDayISO(date, off) + 'T00:00:00+03:00'));
+      }
       // A member's plan is not loose type for the paper (see loadEventsList).
       return (data || []).filter(ev => ev.audience !== 'petek').map(ev => {
         const t = Date.parse(ev.event_date);
         let slot = null;
-        for (let i = 0; i < 3; i++) if (t >= bounds[i] && t < bounds[i + 1]) slot = 'd' + i;
+        for (let i = 0; i < BASKI_EVENT_DAYS; i++) if (t >= bounds[i] && t < bounds[i + 1]) slot = 'd' + i;
         return {
           id: ev.id, kind: 'etkinlik', title: ev.title, slot,
           inEdition: ev.edition_date === date,
           otherEdition: ev.edition_date && ev.edition_date !== date ? ev.edition_date : null,
           order: ev.edition_order ?? 0,
-          warn: slot ? [] : ['Bu baskının üç gününün dışında'],
+          warn: slot ? [] : ['Bu sayının ' + BASKI_EVENT_DAYS + ' gününün dışında'],
         };
       });
     },
@@ -10126,17 +10687,16 @@ function baskiFind(kind, id) {
 async function baskiRefresh() {
   const dateInput = document.getElementById('baski-date');
   if (!dateInput) return;
-  // The baskı being set is the one going out next. nextEdition() is the
-  // only thing that knows which that is (CLAUDE.md rule 10), and its date
-  // is always a day one of the two pages is next out on: by day it is
-  // today (Kütüphane's is out, Kahvehane's comes at sunset), by night it
-  // is tomorrow (Kütüphane's comes at sunrise).
-  if (!baskiDate) baskiDate = IstDate.nextEdition().date;
+  // The board opens on the paper going out next -- tomorrow's, at
+  // tonight's midnight -- the same one the press bar counts down to.
+  // "Bugün" beside the date is one press away for the paper out now.
+  if (!baskiDate) baskiDate = deskNextPaper().date;
   dateInput.value = baskiDate;
   baskiPaintHead();
 
   const seq = ++baskiLoadSeq;
-  const results = await Promise.all(BASKI_KIND_ORDER.map(async (k) => {
+  // A parked kind is not asked for: its column is not on the board.
+  const results = await Promise.all(BASKI_KIND_ORDER.filter(baskiKindLive).map(async (k) => {
     try { return { k, items: await BASKI_KINDS[k].load(baskiDate), failed: false }; }
     catch (err) { console.error('[baski ' + k + ']', err); return { k, items: [], failed: true }; }
   }));
@@ -10153,82 +10713,58 @@ async function baskiRefresh() {
 }
 
 function baskiPaintHead() {
-  const next = IstDate.nextEdition();
   const whenEl = document.getElementById('baski-when');
   const aheadEl = document.getElementById('baski-ahead');
+  const state = baskiState(baskiDate);
   if (whenEl) {
-    whenEl.textContent = pressEditionName(next.edition) + ' · ' +
-      pressFmtDay(next.at) + ' · ' + pressFmtTime(next.at);
+    const day = pressFmtDay(new Date(baskiDate + 'T12:00:00+03:00'));
+    whenEl.textContent = day + ' · ' + ({
+      live: 'bugünün sayısı, yayında',
+      next: 'yarının sayısı, bu gece 00:00',
+      ahead: 'ileri tarihli',
+      behind: 'geçmiş sayı',
+    })[state];
   }
+  document.getElementById('baski-now-btn')?.classList.toggle('on', state === 'live');
+  document.getElementById('baski-next-btn')?.classList.toggle('on', state === 'next');
   if (!aheadEl) return;
-  // Setting a paper other than the next one out is ordinary; not
-  // noticing you are doing it is the mistake. The three
-  // *_current_edition resolvers hand the reader the NEWEST edition at or
-  // before that side's own day, so a future date is invisible until its
-  // sun comes up (or goes down), and a past one is either still standing
-  // on one side or already superseded on both.
-  const live = baskiSideState('kutuphane', baskiDate) === 'live' ||
-               baskiSideState('kahvehane', baskiDate) === 'live';
-  const ahead = baskiDate > next.date;
-  const behind = baskiDate < next.date;
-  aheadEl.hidden = !(ahead || behind);
-  aheadEl.textContent = ahead
-    ? 'İleri tarihli baskı — o gün gelene kadar okuyucuya çıkmaz.'
-    : (behind
-      ? (live ? 'Bu sayı şu an yayında — okuyucu değişikliği bir sonraki gelişinde görür.'
-              : 'Geçmiş bir baskı. Bugünkü sayı bu değilse okuyucu görmez.')
-      : '');
+  // Setting a paper other than today's or tomorrow's is ordinary; not
+  // noticing you are doing it is the mistake. The *_current_edition
+  // resolvers hand the reader the NEWEST paper at or before today, so a
+  // future one is invisible until its midnight, and a past one is either
+  // still standing (nothing newer was set) or already superseded.
+  aheadEl.hidden = !(state === 'ahead' || state === 'behind' || state === 'live');
+  aheadEl.textContent = state === 'ahead'
+    ? 'İleri tarihli sayı — o günün gece yarısına kadar okuyucuya çıkmaz.'
+    : (state === 'behind'
+      ? 'Geçmiş bir sayı. Sonrasına bir sayı konmadıysa hâlâ okuyucuda olabilir.'
+      : (state === 'live' ? 'Bu sayı şu an okuyucuda — değişiklik okuyucunun bir sonraki gelişinde görünür.' : ''));
 }
 
-// Where one page of a given date stands against the reader's own clock:
-// already superseded ('behind'), the one out now ('live'), or not out
-// yet ('ahead'). The two pages of one date are rarely in the same state:
-// between a sunrise and the sunset after it, today's Kütüphane is out
-// and today's Kahvehane is not.
-function baskiSideState(side, date) {
-  const held = side === 'kutuphane' ? IstDate.kutuphaneDay() : IstDate.kahvehaneDay();
-  return date > held ? 'ahead' : (date < held ? 'behind' : 'live');
-}
-
-// The instant a page of `date` goes out: that day's sunrise for
-// Kütüphane, its sunset for Kahvehane. Asked at noon +03:00 so the sun
-// equation is handed the right İstanbul day whatever the device's zone.
-function baskiSideAt(side, date) {
-  // One content day (IstDate.CONTENT_FOLLOWS_SUN off): both pages of a
-  // date go out together at the midnight that date begins.
-  if (!IstDate.CONTENT_FOLLOWS_SUN) return new Date(date + 'T00:00:00+03:00');
-  const sun = IstDate.sunTimes(new Date(date + 'T12:00:00+03:00'));
-  return side === 'kutuphane' ? sun.sunrise : sun.sunset;
-}
-
-// The line under each page's name: its own press time, and where that
-// page stands -- out now, next, further off, or gone.
-function baskiPageWhenHTML(side) {
-  const at = baskiSideAt(side, baskiDate);
-  const state = baskiSideState(side, baskiDate);
-  const next = IstDate.nextEdition();
-  const word = state === 'live' ? 'yayında'
-    : (state === 'behind' ? 'geçti'
-      : ((next.side === side || next.side === 'both') && next.date === baskiDate ? 'sıradaki' : 'ileride'));
-  const edge = !IstDate.CONTENT_FOLLOWS_SUN ? 'gece yarısı '
-    : (side === 'kutuphane' ? 'gün doğumu ' : 'gün batımı ');
-  return '<span class="baski-page-when">' +
-    edge + escapeHtml(pressFmtTime(at)) +
-    ' · ' + (state === 'live' ? '<b>' + word + '</b>' : word) + '</span>';
+// The line under the page's name: when this paper is out, in one word.
+function baskiPageWhenHTML() {
+  const state = baskiState(baskiDate);
+  const word = ({
+    live: '<b>yayında</b> · gece yarısına kadar',
+    next: 'bu gece 00:00\'da çıkar · 24 saat durur',
+    ahead: 'ileride · o gün 00:00\'da çıkar',
+    behind: 'geçti',
+  })[state];
+  return '<span class="baski-page-when">' + word + '</span>';
 }
 
 // ── Render ──
 function baskiRenderPages() {
   const wrap = document.getElementById('baski-pages');
   if (!wrap) return;
-  wrap.innerHTML = BASKI_PAGES.map(pg => `
-    <div class="baski-page">
-      <h3>${escapeHtml(pg.name)}${baskiPageWhenHTML(pg.id)}</h3>
-      <div class="baski-screen${pg.mirror ? ' mirror' : ''}">
-        <div class="baski-maps"><div class="baski-map"></div><div class="baski-map"></div></div>
+  wrap.innerHTML = baskiPagesLive().map(pg => `
+    <div class="baski-page${pg.home ? ' home' : ''}">
+      <h3>${escapeHtml(pg.name)}${baskiPageWhenHTML()}</h3>
+      <div class="baski-screen${pg.mirror ? ' mirror' : ''}${pg.home ? ' home' : ''}">
+        ${pg.home ? '' : '<div class="baski-maps"><div class="baski-map"></div><div class="baski-map"></div></div>'}
         ${pg.cols.map(col => `
-          <div class="baski-col" data-kind="${col.kind}">
-            ${col.slots.map(sl => baskiSlotHTML(col.kind, sl)).join('')}
+          <div class="baski-col baski-col-${col.kind}" data-kind="${col.kind}">
+            ${baskiSlotsOf(col).map(sl => baskiSlotHTML(col.kind, sl)).join('')}
           </div>
         `).join('')}
         <div class="baski-foot">
@@ -10442,11 +10978,15 @@ async function baskiMove(item, delta) {
 
 // ── The date picker ──
 document.getElementById('baski-date').addEventListener('change', (e) => {
-  baskiDate = e.target.value || IstDate.nextEdition().date;
+  baskiDate = e.target.value || deskNextPaper().date;
   baskiRefresh();
 });
-document.getElementById('baski-today-btn').addEventListener('click', () => {
-  baskiDate = IstDate.nextEdition().date;
+document.getElementById('baski-now-btn').addEventListener('click', () => {
+  baskiDate = deskToday();
+  baskiRefresh();
+});
+document.getElementById('baski-next-btn').addEventListener('click', () => {
+  baskiDate = deskNextPaper().date;
   baskiRefresh();
 });
 
@@ -10472,13 +11012,12 @@ function baskiWatchSources() {
 // answers both on every section: the edition being set, the time left to
 // set it, and one forme per thing that edition needs.
 //
-// THE DEADLINE IS THE SUN. Sunrise renews Kütüphane and sunset renews
-// Kahvehane, so there are two press times a day, one per side, and
-// IstDate.nextEdition() is the one place that knows which of them is next
-// and when -- never a timer, never a stored hour, and never a second copy
-// of the sunrise equation here (CLAUDE.md rule 10). What that buys is an
-// honest deadline that moves through the year: 13h39m of daylight to set
-// Kahvehane in June, 9h15m in December.
+// THE DEADLINE IS MIDNIGHT. There is one paper a day, everything in it at
+// once, out at the midnight its day begins and standing for 24 hours --
+// so the bar always counts down to tonight's midnight and checks
+// tomorrow's paper. (It used to be the sun: sunrise renewed Kütüphane,
+// sunset renewed Kahvehane, two press times a day. That is gone from the
+// desk for good; see deskNextPaper.)
 //
 // THE ONE RULE FOR A FORME: it asks EXACTLY what the reader's own loader
 // asks, against the same tables with the same filters. A forme that
@@ -10487,12 +11026,9 @@ function baskiWatchSources() {
 // empty. Where project.html's loader is the authority, the comment on
 // each check names it.
 //
-// A forme belongs to ONE side's paper: the news and the anket are
-// Kütüphane's and go out at sunrise ('gun'), the evenings and the games
-// are Kahvehane's and go out at sunset ('gece'). One whose side is not
-// the one going to press next is drawn dashed -- the site's own "nothing
-// here" convention -- and says when it goes instead of being dropped, so
-// the bar keeps the same shape all day and an editor learns where to look.
+// A forme whose section is PARKED (ADMIN_PARKED) is not on the bar at all:
+// a red forme for a column the reader never meets is the desk reporting a
+// slot nobody will ever see empty.
 // ═══════════════════════════════════════════════════════════════════════
 
 // The three news buckets, in the reader's own vertical order, and the
@@ -10545,8 +11081,6 @@ const PRESS_FORMES = [
     id: 'haberler',
     name: 'Haberler',
     tab: 'news',
-    // Kütüphane's: the day's paper goes out whole at sunrise.
-    editions: ['gun'],
     // EXACTLY haberlerRows()' own question (project.html), because a
     // forme that asks a looser one reports an edition ready that the
     // reader will open and find empty.
@@ -10558,8 +11092,8 @@ const PRESS_FORMES = [
     // longer the question to ask. The old "holdover" warn went with it:
     // there is no holdover any more, a story simply ages out.
     async check(ctx) {
-      // ctx.date is the Kütüphane day this sunrise opens -- the very
-      // `today` haberlerRows() will be asked with once it is out.
+      // ctx.date is tomorrow's paper -- the very `today` haberlerRows()
+      // will be asked with once it is out at midnight.
       const floor = pressDayShift(ctx.date, -2);
       const { data, error } = await sb.from('breaking_news')
         .select('category, neighborhood, edition_date')
@@ -10592,10 +11126,8 @@ const PRESS_FORMES = [
     id: 'anket',
     name: 'İlçe anketi',
     tab: 'district-polls',
-    // Kütüphane's, so it goes out at sunrise with the news: the column
-    // asks all day and shows its split to whoever has answered. An
-    // inactive board is an empty column either way.
-    editions: ['gun'],
+    // The column asks all day and shows its split to whoever has
+    // answered. An inactive board is an empty column either way.
     async check(ctx) {
       // anketData()'s own question, and both halves of it: in the baskı
       // (db/baski_v1.sql) AND still open. `active` was the whole gate
@@ -10622,14 +11154,16 @@ const PRESS_FORMES = [
     // column and is already up on every section, so a forme has nothing
     // to navigate to but the case of type it is short of.
     tab: 'events',
-    // Kahvehane's: a new baskı of evenings goes out at sunset.
-    editions: ['gece'],
-    // loadEtkinlikActor's own three boxes: day+0, +1, +2 as fixed +03:00
-    // instants (Istanbul carries no DST, so this is exact rather than a
-    // guess) -- counted from the day THIS paper comes out on, since that
-    // is the day the reader will be reading it. ctx.date is the
-    // Kahvehane day this sunset opens, which is what the reader's own
-    // events_current_edition call will be asked with.
+    // homeCityEvents' own question (project.html): the evenings of the
+    // paper in force whose date falls in the BASKI_EVENT_DAYS days from
+    // the paper's own day -- a week of dots on the home screen -- as fixed
+    // +03:00 instants (İstanbul carries no DST, so this is exact rather
+    // than a guess). ctx.date is tomorrow's paper, which is what the
+    // reader's own events_current_edition call will be asked with once it
+    // is out at midnight.
+    //
+    // A day with nothing on is not a fault -- the map simply has fewer
+    // dots -- so only a WEEK with nothing on is red.
     //
     // AND ONLY WHAT IS IN THE BASKI. Since db/baski_v1.sql an evening in
     // the table is not an evening on the paper, so counting the table
@@ -10641,22 +11175,18 @@ const PRESS_FORMES = [
         await sb.rpc('events_current_edition', { p_today: ctx.date });
       if (edErr) throw edErr;
       if (!editionDate) return { state: 'miss', note: 'Sayı çıkmadı' };
-      const labels = ['Bugün', 'Yarın', 'Öbür gün'];
-      const gaps = [];
-      let total = 0;
-      for (let off = 0; off < 3; off++) {
-        const start = new Date(pressDayISO(ctx.date, off) + 'T00:00:00+03:00').toISOString();
-        const end = new Date(pressDayISO(ctx.date, off + 1) + 'T00:00:00+03:00').toISOString();
-        const { count, error } = await sb.from('events')
-          .select('id', { count: 'exact', head: true })
-          .eq('edition_date', editionDate)
-          .gte('event_date', start).lt('event_date', end);
-        if (error) throw error;
-        total += count || 0;
-        if (!count) gaps.push(labels[off]);
-      }
-      if (gaps.length === 3) return { state: 'miss', note: 'Üç gün de boş' };
-      if (gaps.length) return { state: 'miss', note: gaps.join(' · ') + ' boş' };
+      const start = new Date(pressDayISO(ctx.date, 0) + 'T00:00:00+03:00').toISOString();
+      const end = new Date(pressDayISO(ctx.date, BASKI_EVENT_DAYS) + 'T00:00:00+03:00').toISOString();
+      // '*' and a filter in the page rather than a column list: `audience`
+      // (db/events_v2_plans.sql) may not exist yet, and a member's plan is
+      // never in a paper anyway.
+      const { data, error } = await sb.from('events')
+        .select('*')
+        .eq('edition_date', editionDate)
+        .gte('event_date', start).lt('event_date', end);
+      if (error) throw error;
+      const total = (data || []).filter(e => e.audience !== 'petek').length;
+      if (!total) return { state: 'miss', note: 'Bu hafta boş' };
       // Same warning the news forme gives: the reader gets this, and it
       // is not the paper this editor thinks they are setting.
       if (editionDate !== ctx.date) return { state: 'warn', note: editionDate + ' sayısı duruyor' };
@@ -10667,11 +11197,9 @@ const PRESS_FORMES = [
     id: 'sozcel',
     name: 'Sözcel',
     tab: 'games',
-    editions: ['gece'],
-    // The word belongs to the NIGHT, never the calendar date
-    // (db/sozcel_used_answers_v7_game_night.sql) -- and ctx.date already
-    // IS that night: a sunset opens the Kahvehane day of that date, which
-    // is exactly what gameNight() returns from then until the next one.
+    // The word belongs to the game's day (db/sozcel_used_answers_v7_game_night.sql
+    // names it a night; with one paper a day it is the calendar day,
+    // which is what gameNight() returns) -- and ctx.date is that day.
     async check(ctx) {
       if (ctx.gamesOff.has('sozcel')) return { state: 'na', note: 'Yuvada değil' };
       const { data, error } = await sb.from('sozcel_used_answers')
@@ -10688,7 +11216,6 @@ const PRESS_FORMES = [
     id: 'tumcel',
     name: 'Tümcel',
     tab: 'games',
-    editions: ['gece'],
     // Nothing auto-picks a Tümcel puzzle. With no row for the night the
     // page prints "Bugünkü bulmaca henüz hazır değil." and the game
     // cannot be finished. A genuinely red forme.
@@ -10707,7 +11234,6 @@ const PRESS_FORMES = [
     id: 'bulmaca',
     name: 'Çengel',
     tab: 'games',
-    editions: ['gece'],
     // Admin-drawn, one row per night (db/bulmaca_puzzles.sql). With no
     // row the page prints "Bugünkü bulmaca henüz hazır değil." -- red,
     // but only on a night Çengel actually stands in a slot.
@@ -10723,39 +11249,12 @@ const PRESS_FORMES = [
 ];
 
 // ── The clock ──
-// One interval for the page, and it re-asks IstDate.nextEdition() on every
-// tick rather than holding the instant it started with: at the moment a
-// paper goes out the bar has to re-aim itself at the next one, and an
-// admin leaves this page open for hours.
-let pressEdition = null;     // the edition currently being counted down to
+// One interval for the page, and it re-asks deskNextPaper() on every tick
+// rather than holding the instant it started with: at midnight the bar has
+// to re-aim itself at the next paper, and an admin leaves this page open
+// for hours.
+let pressEdition = null;     // the paper currently being counted down to
 let pressTimer = null;
-
-// A press time is one SIDE going out: a sunrise is Kütüphane, a sunset is
-// Kahvehane. Named for the side rather than "sabah/akşam" because that is
-// what an editor has to act on -- which page's slots are due.
-function pressEditionName(ed) {
-  // 'gunluk' is the one paper a day that goes out at midnight, both sides
-  // at once, while the sun is parked for content (IstDate.nextEdition).
-  if (ed === 'gunluk') return 'Günün sayısı';
-  return ed === 'gun' ? 'Kütüphane' : 'Kahvehane';
-}
-
-// Whether a forme is part of the edition being counted down to. A 'gunluk'
-// edition carries both sides, so every forme is.
-function pressFormeApplies(f, ed) {
-  return ed === 'gunluk' || f.editions.indexOf(ed) !== -1;
-}
-
-// Formes for columns the reader no longer meets. The news and the Anket are
-// parked in project.html (NEWS_ENABLED), so a red Haberler forme would be
-// the desk reporting a slot nobody will ever see empty. Their sections and
-// the baskı board still work -- writing for later is fine.
-const PRESS_PARKED = new Set(['haberler', 'anket']);
-
-// What a dashed forme says instead of a check: when its own side goes.
-function pressEditionWhen(ed) {
-  return ed === 'gun' ? 'Gün doğumunda' : 'Gün batımında';
-}
 
 // Day arithmetic on an edition key, in UTC, never through a formatted
 // string (CLAUDE.md rule 10) -- the same helper project.html's own
@@ -10768,7 +11267,7 @@ function pressDayShift(isoDay, days) {
 }
 
 function pressTick() {
-  const next = IstDate.nextEdition();
+  const next = deskNextPaper();
   const bar = document.getElementById('press-bar');
   const countEl = document.getElementById('press-count');
   if (!bar || !countEl) return;
@@ -10776,17 +11275,15 @@ function pressTick() {
   // A paper went out while this page stood open: re-label, and ask the
   // formes again, because what the NEXT edition needs is a different list.
   if (!pressEdition || pressEdition.at.getTime() !== next.at.getTime()) {
-    // The board's own page headings say which side is out and which is
-    // next, so a sun crossing while the desk stands open re-labels them
-    // too -- from the rows already loaded, nothing is re-fetched. Not on
-    // the very first tick: the board has not loaded anything yet.
+    // The board's own heading says which paper is out and which is next,
+    // so a midnight crossing while the desk stands open re-labels it too
+    // -- from the rows already loaded, nothing is re-fetched. Not on the
+    // very first tick: the board has not loaded anything yet.
     if (pressEdition && baskiDate) { baskiPaintHead(); baskiRenderPages(); }
     pressEdition = next;
-    document.getElementById('press-name').textContent = pressEditionName(next.edition);
+    document.getElementById('press-name').textContent = 'Yarının sayısı';
     document.getElementById('press-when').textContent =
-      pressFmtDay(next.at) + ' · ' + pressFmtTime(next.at) +
-      (next.edition === 'gunluk' ? ' (gece yarısı)'
-        : (next.edition === 'gun' ? ' (gün doğumu)' : ' (gün batımı)'));
+      pressFmtDay(next.at) + ' · 00:00 (gece yarısı) · 24 saat durur';
     pressCheck();
   }
 
@@ -10825,7 +11322,7 @@ async function pressCheck() {
   verdict.className = 'press-verdict pending';
   verdict.textContent = 'Bakılıyor';
 
-  const ctx = { edition: pressEdition.edition, date: pressEdition.date, gamesOff: new Set() };
+  const ctx = { date: pressEdition.date, gamesOff: new Set() };
 
   // The night's on/off board, read once for every game forme. Best
   // effort: a toggles table that cannot be read leaves nothing off,
@@ -10833,26 +11330,19 @@ async function pressCheck() {
   // every game off would be a far louder lie than reporting none.
   // A game is off unless it stands in one of the night's two slots
   // (db/game_night_slots.sql) -- the same lineup the reader's column reads.
-  if (ctx.edition !== 'gun') {
-    try {
-      const lineup = await gameLineup(ctx.date);
-      GAME_STATUS_GAMES.forEach(g => { if (lineup.indexOf(g.game) < 0) ctx.gamesOff.add(g.game); });
-    } catch (err) { console.error('[press toggles]', err); }
-  }
+  try {
+    const lineup = await gameLineup(ctx.date);
+    GAME_STATUS_GAMES.forEach(g => { if (lineup.indexOf(g.game) < 0) ctx.gamesOff.add(g.game); });
+  } catch (err) { console.error('[press toggles]', err); }
 
   // Draw every forme at once in its pending state, so the bar has its
   // full width from the first frame and nothing shifts sideways as the
   // answers land one by one.
-  const formes = PRESS_FORMES.filter(f => !PRESS_PARKED.has(f.id));
-  const applicable = formes.filter(f => pressFormeApplies(f, ctx.edition));
-  const shown = formes.map(f => ({
-    def: f,
-    on: pressFormeApplies(f, ctx.edition),
-  }));
-  wrap.innerHTML = shown.map(x => `
-    <button class="press-forme ${x.on ? 'pending' : 'na'}" data-forme="${x.def.id}" ${x.on ? '' : 'disabled'}>
-      <span class="press-forme-name">${escapeHtml(x.def.name)}</span>
-      <span class="press-forme-note">${x.on ? '…' : pressEditionWhen(x.def.editions[0])}</span>
+  const applicable = PRESS_FORMES.filter(f => !adminTabParked(f.tab));
+  wrap.innerHTML = applicable.map(f => `
+    <button class="press-forme pending" data-forme="${f.id}">
+      <span class="press-forme-name">${escapeHtml(f.name)}</span>
+      <span class="press-forme-note">…</span>
     </button>
   `).join('');
 
@@ -10911,6 +11401,1273 @@ function pressStart() {
   if (pressTimer) return;
   pressTick();                 // paints the bar and fires the first check
   pressTimer = setInterval(pressTick, 1000);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// RENKLER — the admin's own colours, on a live copy of the app
+//
+// The admin is looking for a palette, and the only honest way to judge a
+// colour is on the thing it paints. So this section is the app itself --
+// project.html in an iframe at a phone's own size, same origin and so the
+// same session, pressable and swipeable -- pinned to whichever of the four
+// states is being worked on (Palette.preview, palette.js), with a panel
+// beside it that can change any colour it shows.
+//
+// How a press becomes "these are the colours that paint this":
+//   1. With "Renk seç" on, a transparent layer over the iframe takes the
+//      press (so nothing in the app fires) and asks the iframe's document
+//      what stands at that point -- every layer, with pointer-events
+//      forced on for the one read, so a drawing under a pointer-events:none
+//      scrim is still pickable. Invisible layers (opacity 0) are dropped.
+//   2. Every stylesheet rule in that document that matches the element
+//      (and its ::before / ::after) is collected with its specificity and
+//      source order, and the cascade is run per CHANNEL (text, background,
+//      border, shadow, fill, stroke, filter): the winner is what paints it.
+//      `color` is inherited, so when nothing on the element sets it the
+//      walk goes up until something does.
+//   3. Every var(--token) in the winning value is followed to where that
+//      token is actually declared for this element -- :root in this state,
+//      or a rule that re-points it on an ancestor -- and on through its own
+//      var()s, so the chain --paper → --lit-hi → #d8bb93 is laid out and
+//      every link of it is editable.
+//   4. A drawing painted through a map-ink ladder (filter: url(#ist-…)) is
+//      shown as that ladder's tokens: the sea, the land, the ink, the red.
+//
+// What an edit writes (the draft, one per state):
+//   - a token declared on :root           → states[k].tokens['--x']
+//   - a token re-pointed on a selector    → states[k].rules [{sel, prop:'--x'}]
+//   - a colour typed into a rule          → states[k].rules [{sel, prop, val}]
+//     (a rule from a page's own <style> carries `page`, so it lands on that
+//     page only; a rule from a shared stylesheet lands everywhere)
+// palette.js turns that into one <style>. Inline styles set by script are
+// shown but not editable: the next frame of the app would overwrite them.
+// ══════════════════════════════════════════════════════════════════════
+
+const CLR_VARIANTS = [
+  { key: 'mono-light',  palette: 'mono',  theme: 'light', name: 'Siyah-beyaz · Gündüz', chip: ['#ffffff', '#000000'] },
+  { key: 'mono-dark',   palette: 'mono',  theme: 'dark',  name: 'Siyah-beyaz · Gece',   chip: ['#828282', '#101010'] },
+  { key: 'earth-light', palette: 'earth', theme: 'light', name: 'Kahverengi · Gündüz',  chip: ['#eddbd0', '#4C382A'] },
+  { key: 'earth-dark',  palette: 'earth', theme: 'dark',  name: 'Kahverengi · Gece',    chip: ['#7d6553', '#1e150e'] },
+];
+const CLR_W = 390, CLR_H = 844;
+const CLR_DRAFT_KEY = 'istanbulite_palette_draft';
+const CLR_VARIANT_KEY = 'istanbulite_palette_desk_variant';
+const CLR_OVERRIDES_CACHE = 'istanbulite_palette_overrides';   // palette.js's own cache key
+
+const CLR_CHANNELS = [
+  ['color', 'Yazı'], ['background', 'Zemin'], ['border', 'Kenar'], ['outline', 'Dış çizgi'],
+  ['box-shadow', 'Gölge'], ['text-shadow', 'Yazı gölgesi'], ['fill', 'Dolgu'], ['stroke', 'Çizgi'],
+  ['filter', 'Filtre / çizim'], ['decoration', 'Alt çizgi'], ['text-stroke', 'Yazı kenarı'],
+  ['caret-color', 'İmleç'], ['accent-color', 'Vurgu'], ['column-rule', 'Sütun çizgisi'],
+];
+const CLR_CHANNEL_LABEL = Object.fromEntries(CLR_CHANNELS);
+// Inherited channels: when nothing on the element sets it, its parent's does.
+const CLR_INHERITED = new Set(['color', 'fill', 'stroke', 'text-shadow', 'caret-color']);
+
+const CLR_GROUP_NAMES = {
+  ink: 'Mürekkep', paper: 'Kâğıt', page: 'Sayfa', frame: 'Çerçeve', navbar: 'Çubuklar',
+  lit: 'Işıklı yüzeyler', map: 'Harita çizimi', av: 'Avatar çizimi', load: 'Yükleme ekranı',
+  brown: 'Kahve tonları', hexframe: 'Altıgen', fb: 'Uygulama', ist: 'Paylaşılan',
+  accent: 'Vurgu', rule: 'Çizgiler', hairline: 'Çizgiler', whisper: 'Çizgiler', muted: 'Mürekkep',
+};
+
+const clr = {
+  ready: false,
+  variant: null,
+  draft: null,
+  published: null,
+  publishedAt: null,
+  tableMissing: false,
+  picking: false,
+  sel: null,          // { el, win, ox, oy }
+  hover: null,
+  layers: [],
+  scale: 1,
+  pane: 'sel',
+  editors: [],
+  ruleCache: new WeakMap(),
+  boxTimer: null,
+  pushRaf: 0,
+  refreshTimer: 0,
+};
+
+// ── The draft ──────────────────────────────────────────────────────────
+function clrEmpty() { return { v: 1, states: {} }; }
+function clrClone(o) { return JSON.parse(JSON.stringify(o || clrEmpty())); }
+function clrNorm(o) {
+  const d = clrClone(o);
+  if (!d.states || typeof d.states !== 'object') d.states = {};
+  d.v = 1;
+  return d;
+}
+function clrPrune(o) {
+  const d = clrNorm(o);
+  Object.keys(d.states).forEach(k => {
+    const st = d.states[k] || {};
+    if (!Object.keys(st.tokens || {}).length && !(st.rules || []).length) delete d.states[k];
+  });
+  return d;
+}
+function clrState(key) {
+  const k = key || clr.variant;
+  if (!clr.draft.states[k]) clr.draft.states[k] = { tokens: {}, rules: [] };
+  const st = clr.draft.states[k];
+  st.tokens = st.tokens || {};
+  st.rules = st.rules || [];
+  return st;
+}
+function clrCount(key) {
+  const st = clr.draft && clr.draft.states[key];
+  return st ? Object.keys(st.tokens || {}).length + (st.rules || []).length : 0;
+}
+function clrVariantObj() { return CLR_VARIANTS.find(v => v.key === clr.variant) || CLR_VARIANTS[0]; }
+function clrDirty() {
+  return JSON.stringify(clrPrune(clr.draft)) !== JSON.stringify(clrPrune(clr.published));
+}
+function clrSaveDraft() {
+  try { localStorage.setItem(CLR_DRAFT_KEY, JSON.stringify(clr.draft)); } catch (e) { /* ignore */ }
+}
+function clrFindRule(st, sel, prop, page) {
+  return st.rules.findIndex(r => r.sel === sel && r.prop === prop && (r.page || null) === (page || null));
+}
+function clrDraftToken(name) {
+  const st = clr.draft && clr.draft.states[clr.variant];
+  return st && st.tokens && Object.prototype.hasOwnProperty.call(st.tokens, name) ? st.tokens[name] : null;
+}
+function clrDraftRule(sel, prop, page) {
+  const st = clr.draft && clr.draft.states[clr.variant];
+  if (!st || !st.rules) return null;
+  const i = clrFindRule(st, sel, prop, page);
+  return i >= 0 ? st.rules[i].val : null;
+}
+
+// ── The phone ──────────────────────────────────────────────────────────
+function clrPreviewState() {
+  const v = clrVariantObj();
+  return { palette: v.palette, theme: v.theme, overrides: clrPrune(clr.draft) };
+}
+function clrFrame() { return document.getElementById('clr-frame'); }
+
+// Hands the pinned state and the draft to the app (and through it to a
+// game open inside it). Also left on this window, which is where the
+// app's palette.js looks on its very first line -- so a reload paints in
+// the draft from its first frame rather than flashing the live colours.
+function clrPush() {
+  const st = clrPreviewState();
+  window.__istPalettePreview = st;
+  try {
+    const w = clrFrame().contentWindow;
+    if (w && w.Palette && w.Palette.preview) w.Palette.preview(st);
+  } catch (e) { /* not loaded yet */ }
+}
+function clrPushSoon() {
+  if (clr.pushRaf) return;
+  clr.pushRaf = requestAnimationFrame(() => { clr.pushRaf = 0; clrPush(); });
+}
+
+function clrLoadFrame(force) {
+  const frame = clrFrame();
+  const page = document.getElementById('clr-page').value || 'project.html';
+  window.__istPalettePreview = clrPreviewState();
+  if (!force && frame.dataset.page === page) return;
+  frame.dataset.page = page;
+  clrSelect(null);
+  frame.src = page;
+}
+
+function clrUnloadFrame() {
+  const frame = clrFrame();
+  if (!frame || !frame.dataset.page) return;
+  delete frame.dataset.page;
+  clrSetPicking(false);
+  clrSelect(null);
+  frame.src = 'about:blank';
+}
+
+function clrLayout() {
+  const wrap = document.getElementById('clr-phone-wrap');
+  const phone = document.getElementById('clr-phone');
+  if (!wrap || !phone || !wrap.offsetParent) return;
+  // The height decides; the width follows the phone's own proportion.
+  const s = Math.max(0.3, Math.min(1, (wrap.clientHeight - 6) / CLR_H));
+  clr.scale = s;
+  phone.style.transform = 'scale(' + s + ')';
+  wrap.style.width = Math.round(CLR_W * s) + 'px';
+}
+
+// Client coordinates over the pick layer → the iframe's own CSS pixels.
+function clrPoint(e) {
+  const r = document.getElementById('clr-catch').getBoundingClientRect();
+  return { x: (e.clientX - r.left) / clr.scale, y: (e.clientY - r.top) / clr.scale };
+}
+
+// Whether a layer is actually seen: an opacity-0 scrim covering the whole
+// screen is a hit as far as the browser is concerned, and is not what
+// anybody meant to pick.
+function clrVisible(el, win) {
+  let op = 1;
+  for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+    const cs = win.getComputedStyle(n);
+    if (cs.visibility === 'hidden' && n === el) return false;
+    op *= parseFloat(cs.opacity || '1');
+    if (op < 0.04) return false;
+  }
+  return true;
+}
+
+// What stands at (x, y) in the iframe. `deep` forces pointer-events on for
+// the one read, so things the app makes untouchable are still pickable --
+// done only on a press, since it restyles the whole page for an instant.
+// A same-origin iframe inside the app (a game sheet) is walked into.
+function clrHit(x, y, deep) {
+  let win, doc;
+  try { win = clrFrame().contentWindow; doc = win.document; } catch (e) { return null; }
+  let ox = 0, oy = 0;
+  for (let hop = 0; hop < 4 && doc; hop++) {
+    let list = [];
+    try {
+      if (deep) {
+        const st = doc.createElement('style');
+        st.textContent = '*, *::before, *::after { pointer-events: auto !important; }';
+        (doc.head || doc.documentElement).appendChild(st);
+        list = doc.elementsFromPoint(x - ox, y - oy);
+        st.remove();
+      } else {
+        const e = doc.elementFromPoint(x - ox, y - oy);
+        list = e ? [e] : [];
+      }
+    } catch (e) { return null; }
+    list = list.filter(el => el.id !== 'ist-palette-overrides' && clrVisible(el, win));
+    const top = list[0];
+    if (top && top.tagName === 'IFRAME') {
+      try {
+        const cw = top.contentWindow, cd = cw.document;
+        if (cd && cd.documentElement) {
+          const r = top.getBoundingClientRect();
+          ox += r.left + top.clientLeft;
+          oy += r.top + top.clientTop;
+          win = cw; doc = cd;
+          continue;
+        }
+      } catch (e) { /* cross-origin: stop at the frame */ }
+    }
+    return { list, win, doc, ox, oy };
+  }
+  return null;
+}
+
+// Whether a layer paints anything of its own -- a fill, a border, a
+// picture, a shape, its own words. A click lands on the topmost one that
+// does: the full-screen containers the app is built of are transparent,
+// and a press on the map should pick the map, not the box it sits in.
+function clrPaints(el, win) {
+  try {
+    const tag = el.tagName.toLowerCase();
+    if (/^(img|canvas|video|image|use)$/.test(tag)) return true;
+    const cs = win.getComputedStyle(el);
+    if (win.SVGElement && el instanceof win.SVGElement && /^(path|polygon|polyline|rect|circle|ellipse|line|text|tspan)$/.test(tag)) {
+      const f = clrToHex(cs.fill);
+      const st = clrToHex(cs.stroke);
+      return (f && f.alpha > 0.02) || (st && st.alpha > 0.02 && parseFloat(cs.strokeWidth) > 0);
+    }
+    const bg = clrToHex(cs.backgroundColor);
+    if ((bg && bg.alpha > 0.02) || cs.backgroundImage !== 'none') return true;
+    if (cs.boxShadow !== 'none') return true;
+    for (const side of ['Top', 'Right', 'Bottom', 'Left']) {
+      if (parseFloat(cs['border' + side + 'Width']) > 0 && cs['border' + side + 'Style'] !== 'none') {
+        const bc = clrToHex(cs['border' + side + 'Color']);
+        if (bc && bc.alpha > 0.02) return true;
+      }
+    }
+    for (const n of el.childNodes) if (n.nodeType === 3 && n.textContent.trim()) return true;
+    for (const ps of ['::before', '::after']) {
+      const p = win.getComputedStyle(el, ps);
+      if (p.content && p.content !== 'none' && p.content !== 'normal') {
+        const pb = clrToHex(p.backgroundColor);
+        if ((pb && pb.alpha > 0.02) || p.backgroundImage !== 'none') return true;
+      }
+    }
+  } catch (e) { /* treat as painting */ return true; }
+  return false;
+}
+
+function clrRectOf(layer) {
+  try {
+    if (!layer || !layer.el.isConnected) return null;
+    const r = layer.el.getBoundingClientRect();
+    return { x: r.left + layer.ox, y: r.top + layer.oy, w: r.width, h: r.height };
+  } catch (e) { return null; }
+}
+function clrPaintBox(id, layer) {
+  const box = document.getElementById(id);
+  const r = clrRectOf(layer);
+  if (!r || (r.w < 1 && r.h < 1)) { box.hidden = true; return; }
+  box.hidden = false;
+  box.style.left = r.x + 'px';
+  box.style.top = r.y + 'px';
+  box.style.width = Math.max(2, r.w) + 'px';
+  box.style.height = Math.max(2, r.h) + 'px';
+}
+function clrPaintBoxes() {
+  clrPaintBox('clr-hover', clr.picking ? clr.hover : null);
+  clrPaintBox('clr-selbox', clr.sel);
+}
+
+function clrSetPicking(on) {
+  clr.picking = !!on;
+  const cb = document.getElementById('clr-pick');
+  if (cb) cb.checked = clr.picking;
+  document.getElementById('clr-phone').classList.toggle('picking', clr.picking);
+  if (!clr.picking) clr.hover = null;
+  clrPaintBoxes();
+}
+
+// ── Reading the cascade ───────────────────────────────────────────────
+function clrPageOf(doc) {
+  try {
+    const f = (doc.location.pathname.split('/').pop() || 'index.html').replace(/\.html?$/i, '');
+    return f || 'index';
+  } catch (e) { return null; }
+}
+
+// Splits on the commas, semicolons or whatever `sep` is, outside parens,
+// brackets and quotes.
+function clrSplitTop(str, sep) {
+  const out = [];
+  let depth = 0, q = null, cur = '';
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (q) { cur += ch; if (ch === q && str[i - 1] !== '\\') q = null; continue; }
+    if (ch === '"' || ch === "'") { q = ch; cur += ch; continue; }
+    if (ch === '(' || ch === '[') depth++;
+    else if (ch === ')' || ch === ']') depth--;
+    if (ch === sep && depth === 0) { out.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  if (cur.trim()) out.push(cur);
+  return out.map(x => x.trim()).filter(Boolean);
+}
+
+function clrParseDecls(text) {
+  return clrSplitTop(String(text || ''), ';').map(d => {
+    const i = d.indexOf(':');
+    if (i < 1) return null;
+    const prop = d.slice(0, i).trim();
+    let val = d.slice(i + 1).trim();
+    let important = false;
+    if (/!\s*important\s*$/i.test(val)) { important = true; val = val.replace(/!\s*important\s*$/i, '').trim(); }
+    return { prop: prop.startsWith('--') ? prop : prop.toLowerCase(), val, important };
+  }).filter(Boolean);
+}
+
+function clrChannel(prop) {
+  if (prop === 'color') return 'color';
+  if (/^background(-color|-image)?$/.test(prop)) return 'background';
+  if (/^border(-(top|right|bottom|left|block|inline)(-(start|end))?)?(-color)?$/.test(prop)) return 'border';
+  if (/^outline(-color)?$/.test(prop)) return 'outline';
+  if (prop === 'box-shadow') return 'box-shadow';
+  if (prop === 'text-shadow') return 'text-shadow';
+  if (prop === 'fill' || prop === 'stop-color' || prop === 'flood-color') return 'fill';
+  if (prop === 'stroke') return 'stroke';
+  if (prop === 'filter' || prop === '-webkit-filter') return 'filter';
+  if (/^text-decoration(-color)?$/.test(prop)) return 'decoration';
+  if (/^-webkit-text-stroke(-color)?$/.test(prop)) return 'text-stroke';
+  if (prop === 'caret-color' || prop === 'accent-color') return prop;
+  if (/^column-rule(-color)?$/.test(prop)) return 'column-rule';
+  return null;
+}
+
+// Selector specificity as [a, b, c]. :where() counts nothing, :is/:not/
+// :has count their most specific argument, a pseudo-element is a type.
+function clrSpecificity(sel) {
+  let a = 0, b = 0, c = 0;
+  const s = String(sel);
+  let i = 0;
+  const readIdent = () => { const m = /^-?[\w-]+/.exec(s.slice(i)); const t = m ? m[0] : ''; i += t.length; return t; };
+  const readParens = () => {
+    if (s[i] !== '(') return '';
+    let depth = 0, start = i;
+    for (; i < s.length; i++) {
+      if (s[i] === '(') depth++;
+      else if (s[i] === ')') { depth--; if (depth === 0) { i++; break; } }
+    }
+    return s.slice(start + 1, i - 1);
+  };
+  const maxOf = (list) => {
+    let best = [0, 0, 0];
+    clrSplitTop(list, ',').forEach(x => {
+      const sp = clrSpecificity(x);
+      if (sp[0] > best[0] || (sp[0] === best[0] && (sp[1] > best[1] || (sp[1] === best[1] && sp[2] > best[2])))) best = sp;
+    });
+    return best;
+  };
+  while (i < s.length) {
+    const ch = s[i];
+    if (ch === '#') { i++; readIdent(); a++; }
+    else if (ch === '.') { i++; readIdent(); b++; }
+    else if (ch === '[') { while (i < s.length && s[i] !== ']') i++; i++; b++; }
+    else if (ch === ':') {
+      if (s[i + 1] === ':') { i += 2; readIdent(); readParens(); c++; continue; }
+      i++;
+      const name = readIdent().toLowerCase();
+      if (/^(before|after|first-line|first-letter)$/.test(name)) { c++; continue; }
+      if (name === 'where') { readParens(); continue; }
+      if (/^(is|not|has|matches|-webkit-any)$/.test(name)) {
+        const m = maxOf(readParens()); a += m[0]; b += m[1]; c += m[2]; continue;
+      }
+      readParens();
+      b++;
+    }
+    else if (/[a-zA-Z]/.test(ch)) { readIdent(); c++; }
+    else i++;
+  }
+  return [a, b, c];
+}
+
+function clrPart(sel) {
+  const m = /(::[\w-]+|:(?:before|after|first-line|first-letter))$/i.exec(sel);
+  let pseudo = null, base = sel;
+  if (m) {
+    pseudo = m[1].replace(/^:+/, '').toLowerCase();
+    base = sel.slice(0, m.index).trim();
+    if (!base || /[\s>+~]$/.test(base)) base = (base + '*').trim();
+  }
+  return { sel, base, pseudo, spec: clrSpecificity(sel) };
+}
+
+// Every style rule the document is using, flattened, in cascade order,
+// with @media/@supports resolved against the iframe's own window (so the
+// phone's media queries are the ones that count). Cached per document
+// until a sheet is added, removed or switched.
+function clrDocRules(doc, win) {
+  const sheets = Array.from(doc.styleSheets);
+  const sig = sheets.map(sh => { try { return (sh.disabled ? 'x' : '') + sh.cssRules.length + (sh.media ? sh.media.mediaText : ''); } catch (e) { return '?'; } }).join(',');
+  const cached = clr.ruleCache.get(doc);
+  if (cached && cached.sig === sig) return cached.rules;
+  const page = clrPageOf(doc);
+  const rules = [];
+  let order = 0;
+  const walk = (list, info) => {
+    for (const r of list) {
+      if (r.type === 1) {
+        const decls = clrParseDecls(r.style.cssText).filter(d => d.prop.startsWith('--') || clrChannel(d.prop));
+        order++;
+        if (!decls.length) continue;
+        const parts = clrSplitTop(r.selectorText || '', ',').map(clrPart);
+        rules.push({ order, parts, decls, page: info.page, href: info.href });
+      } else if (r.type === 4) {
+        try { if (win.matchMedia(r.media.mediaText).matches) walk(r.cssRules, info); } catch (e) { /* ignore */ }
+      } else if (r.type === 12) {
+        try { if (win.CSS.supports(r.conditionText)) walk(r.cssRules, info); } catch (e) { /* ignore */ }
+      } else if (r.type === 3 && r.styleSheet) {
+        try { walk(r.styleSheet.cssRules, info); } catch (e) { /* ignore */ }
+      } else if (r.cssRules) {
+        try { walk(r.cssRules, info); } catch (e) { /* ignore */ }
+      }
+    }
+  };
+  for (const sh of sheets) {
+    if (sh.disabled) continue;
+    const node = sh.ownerNode;
+    if (node && node.id === 'ist-palette-overrides') continue;
+    try { if (sh.media && sh.media.mediaText && !win.matchMedia(sh.media.mediaText).matches) continue; } catch (e) { /* ignore */ }
+    let list;
+    try { list = sh.cssRules; } catch (e) { continue; }
+    const inline = node && node.tagName === 'STYLE';
+    const href = sh.href ? sh.href.split('/').pop().split('?')[0] : null;
+    walk(list, { page: inline ? page : null, href: inline ? (page + '.html') : href });
+  }
+  clr.ruleCache.set(doc, { sig, rules });
+  return rules;
+}
+
+function clrCmp(x, y) {
+  if (x.important !== y.important) return x.important ? -1 : 1;
+  if (x.inline !== y.inline) return x.inline ? -1 : 1;
+  for (let k = 0; k < 3; k++) if (x.spec[k] !== y.spec[k]) return y.spec[k] - x.spec[k];
+  return y.order - x.order;
+}
+
+const CLR_LIT_RE = /#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})\b|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\([^()]*\)|\b(?:black|white)\b/gi;
+
+// The [start, end) ranges of every var(...) and url(...) in a value, so a
+// literal standing inside one (a var's fallback, a data: URL) is not
+// offered as a colour to edit.
+function clrSkipRanges(val) {
+  const out = [];
+  const re = /\b(var|url)\(/gi;
+  let m;
+  while ((m = re.exec(val))) {
+    let depth = 0, i = m.index + m[0].length - 1;
+    for (; i < val.length; i++) {
+      if (val[i] === '(') depth++;
+      else if (val[i] === ')') { depth--; if (depth === 0) break; }
+    }
+    out.push([m.index, i + 1]);
+    re.lastIndex = i + 1;
+  }
+  return out;
+}
+function clrLiterals(val) {
+  const skip = clrSkipRanges(val);
+  const out = [];
+  let m;
+  CLR_LIT_RE.lastIndex = 0;
+  while ((m = CLR_LIT_RE.exec(val))) {
+    const at = m.index;
+    if (skip.some(([a, b]) => at >= a && at < b)) continue;
+    out.push({ text: m[0], at });
+  }
+  return out;
+}
+function clrReplaceLiteral(val, idx, next) {
+  const lits = clrLiterals(val);
+  const l = lits[idx];
+  if (!l) return val;
+  return val.slice(0, l.at) + next + val.slice(l.at + l.text.length);
+}
+// The var()s a value names, outermost first, fallbacks included -- a
+// fallback var is the one actually used when the first is not defined.
+function clrVarsIn(val) {
+  const out = [];
+  const re = /var\(\s*(--[\w-]+)/g;
+  let m;
+  while ((m = re.exec(String(val || '')))) if (out.indexOf(m[1]) < 0) out.push(m[1]);
+  return out;
+}
+function clrHasColor(val) {
+  return /var\(|currentcolor|url\(\s*["']?#ist-/i.test(val) || clrLiterals(val).length > 0;
+}
+
+// Any CSS colour → { hex, alpha } through the browser's own parser, or
+// null if it is not one colour (a shadow list, a gradient).
+function clrToHex(str) {
+  const v = String(str || '').trim();
+  if (!v || !CSS.supports('color', v)) return null;
+  let probe = document.getElementById('clr-probe');
+  if (!probe) {
+    probe = document.createElement('i');
+    probe.id = 'clr-probe';
+    probe.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;';
+    document.body.appendChild(probe);
+  }
+  probe.style.color = '';
+  probe.style.color = v;
+  const c = getComputedStyle(probe).color;
+  let r, g, b, a = 1, m;
+  if ((m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)/.exec(c))) {
+    r = +m[1]; g = +m[2]; b = +m[3];
+    if (m[4] != null) a = m[4].endsWith('%') ? parseFloat(m[4]) / 100 : +m[4];
+  } else if ((m = /color\(srgb\s+([\d.e-]+)\s+([\d.e-]+)\s+([\d.e-]+)(?:\s*\/\s*([\d.]+%?))?\s*\)/.exec(c))) {
+    r = +m[1] * 255; g = +m[2] * 255; b = +m[3] * 255;
+    if (m[4] != null) a = m[4].endsWith('%') ? parseFloat(m[4]) / 100 : +m[4];
+  } else return null;
+  const h = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+  return { hex: '#' + h(r) + h(g) + h(b), alpha: a, css: c };
+}
+function clrWithAlpha(hex, alpha) {
+  if (alpha == null || alpha >= 0.999) return hex;
+  const n = parseInt(hex.slice(1), 16);
+  return 'rgba(' + ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255) + ', ' + (+alpha.toFixed(3)) + ')';
+}
+
+function clrDescribe(el) {
+  if (!el || el.nodeType !== 1) return '';
+  let s = el.tagName.toLowerCase();
+  if (el.id) s += '#' + el.id;
+  const cls = (typeof el.className === 'string' ? el.className : (el.getAttribute('class') || ''))
+    .split(/\s+/).filter(Boolean).slice(0, 3);
+  if (cls.length) s += '.' + cls.join('.');
+  return s;
+}
+
+// The whole reading for one picked element.
+function clrAnalyze(layer) {
+  const el = layer.el, win = layer.win, doc = el.ownerDocument;
+  const rules = clrDocRules(doc, win);
+  const memo = new Map();
+  const declsFor = (node, pseudo) => {
+    let byPs = memo.get(node);
+    if (!byPs) { byPs = {}; memo.set(node, byPs); }
+    const k = pseudo || '';
+    if (byPs[k]) return byPs[k];
+    const out = [];
+    for (const r of rules) {
+      for (const p of r.parts) {
+        if ((p.pseudo || null) !== (pseudo || null)) continue;
+        let ok = false;
+        try { ok = node.matches(p.base); } catch (e) { ok = false; }
+        if (!ok) continue;
+        r.decls.forEach(d => out.push({
+          prop: d.prop, val: d.val, important: d.important, inline: false,
+          sel: p.sel, spec: p.spec, order: r.order, page: r.page, href: r.href,
+        }));
+      }
+    }
+    if (!pseudo && node.getAttribute && node.getAttribute('style')) {
+      clrParseDecls(node.getAttribute('style')).forEach(d => {
+        if (!d.prop.startsWith('--') && !clrChannel(d.prop)) return;
+        out.push({ prop: d.prop, val: d.val, important: d.important, inline: true,
+          sel: '(satır içi)', spec: [9, 9, 9], order: 1e9, page: null, href: null });
+      });
+    }
+    // SVG presentation attributes: the weakest thing that can paint.
+    if (!pseudo && win.SVGElement && node instanceof win.SVGElement) {
+      ['fill', 'stroke', 'stop-color'].forEach(a => {
+        const v = node.getAttribute(a);
+        if (v) out.push({ prop: a, val: v, important: false, inline: true, attr: true,
+          sel: '(' + a + ' özniteliği)', spec: [-1, 0, 0], order: -1, page: null, href: null });
+      });
+    }
+    byPs[k] = out;
+    return out;
+  };
+
+  const root = doc.documentElement;
+  const resolve = (name, node, depth, seen) => {
+    const out = { name, value: '', src: null, children: [] };
+    try { out.value = win.getComputedStyle(node).getPropertyValue(name).trim(); } catch (e) { /* ignore */ }
+    for (let n = node; n && n.nodeType === 1; n = n.parentElement) {
+      const ds = declsFor(n, null).filter(d => d.prop === name).sort(clrCmp);
+      if (ds.length) { out.src = { node: n, decl: ds[0], root: n === root }; break; }
+    }
+    if (out.src && depth < 5 && !seen.has(name)) {
+      const next = new Set(seen); next.add(name);
+      out.children = clrVarsIn(out.src.decl.val).map(v => resolve(v, out.src.node, depth + 1, next));
+    }
+    return out;
+  };
+
+  const channelRows = (pseudo) => {
+    const rows = [];
+    for (const [ch] of CLR_CHANNELS) {
+      let node = el, ps = pseudo, from = null, cand = null;
+      for (let guard = 0; node && guard < 40; guard++) {
+        const list = declsFor(node, ps).filter(d => clrChannel(d.prop) === ch).sort(clrCmp);
+        if (list.length) { cand = list; break; }
+        if (!CLR_INHERITED.has(ch)) break;
+        if ((ch === 'fill' || ch === 'stroke') && !(win.SVGElement && el instanceof win.SVGElement)) break;
+        if (ps) ps = null; else node = node.parentElement;
+        from = node;
+      }
+      if (!cand) continue;
+      // A picture has no text to colour: an inherited `color` on an <img>
+      // is noise.
+      if (ch === 'color' && from && /^(IMG|CANVAS|VIDEO|IFRAME)$/.test(el.tagName)) continue;
+      const w = cand[0];
+      if (!clrHasColor(w.val)) continue;
+      const ladderId = ch === 'filter' ? ((/url\(\s*["']?#(ist-[\w-]+)/i.exec(w.val) || [])[1] || null) : null;
+      let ladder = null;
+      if (ladderId) {
+        try {
+          const L = (win.IstMapInk && win.IstMapInk.LADDERS || []).find(l => l.id === ladderId);
+          if (L) ladder = L.vars.concat(L.red ? [L.red] : []).map(v => resolve(v, root, 0, new Set()));
+        } catch (e) { /* ignore */ }
+      }
+      rows.push({
+        ch, decl: w, node: node || el, pseudo: ps,
+        inherited: from && from !== el ? from : (pseudo && !ps ? el : null),
+        others: cand.slice(1).filter(d => clrHasColor(d.val)).slice(0, 6),
+        vars: clrVarsIn(w.val).map(v => resolve(v, node || el, 0, new Set())),
+        current: (() => { try { return win.getComputedStyle(el, pseudo ? '::' + pseudo : null).getPropertyValue(ch === 'background' ? 'background-color' : (ch === 'border' ? 'border-top-color' : (ch === 'decoration' ? 'text-decoration-color' : ch))); } catch (e) { return ''; } })(),
+        ladder,
+      });
+    }
+    return rows;
+  };
+
+  const groups = [];
+  groups.push({ title: 'Öğe', rows: channelRows(null) });
+  for (const ps of ['before', 'after']) {
+    let content = 'none';
+    try { content = win.getComputedStyle(el, '::' + ps).content; } catch (e) { /* ignore */ }
+    if (!content || content === 'none' || content === 'normal') continue;
+    const rows = channelRows(ps);
+    if (rows.length) groups.push({ title: '::' + ps, rows });
+  }
+  // Tokens this very element re-points (".fb-page { --paper: var(--lit-hi) }").
+  let own = [];
+  if (el !== root) {
+    const seen = new Set();
+    own = declsFor(el, null).filter(d => d.prop.startsWith('--') && clrHasColor(d.val)).sort(clrCmp)
+      .filter(d => (seen.has(d.prop) ? false : (seen.add(d.prop), true)))
+      .map(d => resolve(d.prop, el, 0, new Set()));
+  }
+  return { groups, own, resolve };
+}
+
+// ── Editing ───────────────────────────────────────────────────────────
+// Every editable value on the panel is an entry in clr.editors, found by
+// its index from the row's own data-ed. That keeps the markup a string and
+// the edit logic in one place.
+function clrEditorFor(desc) { clr.editors.push(desc); return clr.editors.length - 1; }
+
+function clrApply(ed, val) {
+  const st = clrState();
+  if (ed.kind === 'token') {
+    st.tokens[ed.name] = val;
+  } else if (ed.kind === 'rule' || ed.kind === 'literal') {
+    const full = ed.kind === 'literal' ? clrReplaceLiteral(ed.base, ed.index, val) : val;
+    const i = clrFindRule(st, ed.sel, ed.prop, ed.page);
+    const row = { sel: ed.sel, prop: ed.prop, val: full };
+    if (ed.page) row.page = ed.page;
+    if (i >= 0) st.rules[i] = row; else st.rules.push(row);
+    if (ed.kind === 'literal') ed.base = full;
+  } else if (ed.kind === 'tokenlit') {
+    // A literal inside a token's own value (a shadow token's colour).
+    const full = clrReplaceLiteral(ed.base, ed.index, val);
+    st.tokens[ed.name] = full;
+    ed.base = full;
+  }
+  clrSaveDraft();
+  clrPushSoon();
+  clrPaintVariants();
+  clrStatus();
+}
+
+function clrResetEd(ed) {
+  const st = clrState();
+  if (ed.kind === 'token' || ed.kind === 'tokenlit') delete st.tokens[ed.name];
+  else {
+    const i = clrFindRule(st, ed.sel, ed.prop, ed.page);
+    if (i >= 0) st.rules.splice(i, 1);
+  }
+  clrSaveDraft();
+  clrPush();
+  clrPaintVariants();
+  clrStatus();
+  clrRefreshSoon(60);
+}
+
+// One editable row: swatch-picker, name, value as written, reset.
+function clrRowHTML(o) {
+  // o: { name, value (text), swatch (css colour), ed (index|null), pick (index|null),
+  //      changed, sub, ro, title }
+  const hx = o.swatch ? clrToHex(o.swatch) : null;
+  const swatch = hx ? hx.css : 'transparent';
+  return `
+    <div class="clr-row${o.sub ? ' sub' : ''}${o.changed ? ' changed' : ''}" ${o.title ? `title="${escapeHtml(o.title)}"` : ''}>
+      <span class="clr-sw${o.pick == null ? ' ro' : ''}"><i style="background:${escapeHtml(swatch)}"></i>${
+        o.pick != null && hx ? `<input type="color" value="${hx.hex}" data-pick="${o.pick}" data-alpha="${hx.alpha}">` : ''}</span>
+      <span class="clr-name">${escapeHtml(o.name)}</span>
+      <input class="clr-val" type="text" value="${escapeHtml(o.value)}" ${o.ed != null ? `data-ed="${o.ed}"` : 'readonly'} spellcheck="false">
+      <button class="clr-reset" data-reset="${o.ed != null ? o.ed : (o.pick != null ? o.pick : '')}" title="Sıfırla" ${o.changed ? '' : 'hidden'}>&#8634;</button>
+    </div>`;
+}
+
+function clrSrcText(src) {
+  if (!src) return 'tanımsız';
+  const d = src.decl;
+  if (d.inline) return d.attr ? d.sel : 'satır içi — kod atıyor, buradan değişmez';
+  return (src.root ? ':root · ' : '') + d.sel + (d.href ? '  — ' + d.href : '');
+}
+
+// A token, and the chain under it. Editing a link writes where THAT link
+// is declared: on :root it is the state's token, on a selector it is a
+// rule for that selector.
+function clrChainHTML(node, sub) {
+  let ed = null, changed = false, value = '';
+  const src = node.src;
+  if (!src || src.root) {
+    const dv = clrDraftToken(node.name);
+    changed = dv != null;
+    value = changed ? dv : (src ? src.decl.val : node.value);
+    ed = clrEditorFor({ kind: 'token', name: node.name });
+  } else if (src.decl.inline) {
+    value = src.decl.val;
+  } else {
+    const dv = clrDraftRule(src.decl.sel, node.name, src.decl.page);
+    changed = dv != null;
+    value = changed ? dv : src.decl.val;
+    ed = clrEditorFor({ kind: 'rule', sel: src.decl.sel, prop: node.name, page: src.decl.page });
+  }
+  const single = clrToHex(node.value);
+  let html = clrRowHTML({ name: node.name, value, swatch: single ? node.value : null,
+    ed, pick: single ? ed : null, changed, sub, title: node.value });
+  html += `<div class="clr-srcline">${escapeHtml(clrSrcText(src))}${single ? '' : (node.value ? '  = ' + escapeHtml(node.value) : '')}</div>`;
+  // A value that is not one colour (a shadow) still has colours in it.
+  if (!single && ed != null && clr.editors[ed].kind === 'token') {
+    clrLiterals(value).forEach((l, i) => {
+      const e2 = clrEditorFor({ kind: 'tokenlit', name: node.name, base: value, index: i });
+      html += clrRowHTML({ name: '  renk ' + (i + 1), value: l.text, swatch: l.text, ed: null, pick: e2, sub: true });
+    });
+  }
+  if (!changed) node.children.forEach(c => { html += clrChainHTML(c, true); });
+  return html;
+}
+
+function clrChannelHTML(row) {
+  const d = row.decl;
+  const ro = d.inline && !d.attr;
+  const dv = ro ? null : clrDraftRule(d.sel, d.prop, d.page);
+  const effVal = dv != null ? dv : d.val;
+  let html = `<div class="clr-ch">
+    <div class="clr-ch-head">
+      <span class="clr-ch-label">${escapeHtml(CLR_CHANNEL_LABEL[row.ch] || row.ch)}</span>
+      <span class="clr-ch-src" title="${escapeHtml(d.sel + ' { ' + d.prop + ': ' + d.val + ' }')}">${escapeHtml(d.sel)}</span>
+    </div>`;
+  if (row.inherited) {
+    html += `<div class="clr-ch-note">Miras: ${escapeHtml(clrDescribe(row.inherited))}${row.pseudo === null && row.inherited === row.node ? '' : ''}</div>`;
+  }
+  // The declaration itself, editable as written.
+  const declEd = ro || d.attr ? null : clrEditorFor({ kind: 'rule', sel: d.sel, prop: d.prop, page: d.page });
+  html += clrRowHTML({ name: d.prop, value: effVal, swatch: clrToHex(effVal) && !clrVarsIn(effVal).length ? effVal : (row.current || null),
+    ed: declEd, pick: null, changed: dv != null, title: d.sel });
+  if (ro) html += `<div class="clr-ch-note">Bu değer kodla satır içine yazılıyor; buradan değişmez.</div>`;
+  if (/currentcolor/i.test(effVal)) html += `<div class="clr-ch-note">Yazı rengini kullanır — Yazı satırından değişir.</div>`;
+  // The colours typed straight into it.
+  if (!ro && !d.attr) {
+    clrLiterals(effVal).forEach((l, i) => {
+      const e = clrEditorFor({ kind: 'literal', sel: d.sel, prop: d.prop, page: d.page, base: effVal, index: i });
+      html += clrRowHTML({ name: 'renk ' + (i + 1), value: l.text, swatch: l.text, ed: null, pick: e, sub: true });
+    });
+  }
+  // The tokens it reads, each with its chain.
+  if (dv == null) row.vars.forEach(v => { html += clrChainHTML(v, true); });
+  // The drawing's own ladder.
+  if (row.ladder) {
+    html += `<div class="clr-ch-note">Bu bir çizim: tonları aşağıdaki renklerden okunuyor.</div>`;
+    row.ladder.forEach(v => { html += clrChainHTML(v, true); });
+  }
+  if (row.others.length) {
+    html += `<details class="clr-others"><summary>Ezilen ${row.others.length} kural</summary>${
+      row.others.map(o => `<span class="clr-ch-src" title="${escapeHtml(o.val)}">${escapeHtml(o.sel)} — ${escapeHtml(o.prop)}: ${escapeHtml(o.val)}</span>`).join('')
+    }</details>`;
+  }
+  return html + '</div>';
+}
+
+// ── The panes ─────────────────────────────────────────────────────────
+function clrRenderSel() {
+  const pane = document.getElementById('clr-pane-sel');
+  if (!pane) return;
+  if (!clr.sel || !clr.sel.el.isConnected) {
+    clr.sel = null;
+    pane.innerHTML = `<div class="clr-empty">
+      <b>Renk seç</b>'i açın ve telefonda bir şeye basın: onu boyayan renkler burada çıkar ve her biri değiştirilebilir.
+      Kapalıyken uygulama normal çalışır — kaydırın, açın, bir sayfaya gidin, sonra tekrar açıp seçin.<br><br>
+      Ya da <b>Tüm renkler</b>'den bir rengi adıyla bulun. Değişiklik yalnızca seçili hâle yazılır
+      (üstteki dört düğme); dördü ayrı ayrı ayarlanır.</div>`;
+    return;
+  }
+  clr.editors = [];
+  const el = clr.sel.el;
+  let a;
+  try { a = clrAnalyze(clr.sel); } catch (e) {
+    console.error('[renkler analyze]', e);
+    pane.innerHTML = '<div class="clr-empty">Bu öğe okunamadı.</div>';
+    return;
+  }
+  const text = (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const crumbs = [];
+  for (let n = el, i = 0; n && n.nodeType === 1 && i < 7; n = n.parentElement, i++) crumbs.unshift(n);
+  let html = `<div class="clr-what">
+    <div class="clr-what-name">${escapeHtml(clrDescribe(el))}</div>
+    ${text ? `<div class="clr-what-text">“${escapeHtml(text)}”</div>` : ''}
+    <div class="clr-crumbs"><span>Üstler</span>${crumbs.map((n, i) =>
+      `<button class="clr-chip${n === el ? ' on' : ''}" data-crumb="${i}" title="${escapeHtml(clrDescribe(n))}">${escapeHtml(clrDescribe(n))}</button>`).join('')}</div>
+    ${clr.layers.length > 1 ? `<div class="clr-layers"><span>Bu noktada</span>${clr.layers.slice(0, 10).map((l, i) =>
+      `<button class="clr-chip${l.el === el ? ' on' : ''}" data-layer="${i}" title="${escapeHtml(clrDescribe(l.el))}">${i + 1}. ${escapeHtml(clrDescribe(l.el))}</button>`).join('')}</div>` : ''}
+  </div>`;
+  let any = false;
+  a.groups.forEach(g => {
+    if (!g.rows.length) return;
+    any = true;
+    html += `<div class="clr-group"><div class="clr-group-title">${escapeHtml(g.title)}</div>${g.rows.map(clrChannelHTML).join('')}</div>`;
+  });
+  if (a.own.length) {
+    any = true;
+    html += `<div class="clr-group"><div class="clr-group-title">Bu öğenin kendi değişkenleri</div>${
+      a.own.map(n => clrChainHTML(n, false)).join('')}</div>`;
+  }
+  if (!any) {
+    html += `<div class="clr-empty">Bu öğenin kendi rengi yok — altındakini ya da üstündekini seçin (yukarıdaki düğmeler).</div>`;
+  }
+  pane.innerHTML = html;
+  pane._crumbs = crumbs;
+}
+
+// Every :root token the app declares that holds a colour, grouped by its
+// family, for finding a colour by name rather than by pressing it.
+function clrRenderAll() {
+  const box = document.getElementById('clr-all');
+  if (!box) return;
+  let win, doc;
+  try { win = clrFrame().contentWindow; doc = win.document; } catch (e) { win = null; }
+  if (!win || !doc || !doc.documentElement || !doc.styleSheets.length) {
+    box.innerHTML = '<div class="clr-empty">Telefon yüklenince burada listelenir.</div>';
+    return;
+  }
+  clr.editors = clr.pane === 'all' ? [] : clr.editors;
+  const rules = clrDocRules(doc, win);
+  const names = new Set();
+  const rootOnly = /^(?::root|html)(?:\[[^\]]+\]|:root|\.[\w-]+|:not\([^)]*\))*$/i;
+  rules.forEach(r => {
+    if (!r.parts.some(p => !p.pseudo && rootOnly.test(p.base))) return;
+    r.decls.forEach(d => { if (d.prop.startsWith('--')) names.add(d.prop); });
+  });
+  const q = (document.getElementById('clr-search').value || '').trim().toLowerCase();
+  const cs = win.getComputedStyle(doc.documentElement);
+  const fake = { el: doc.documentElement, win, ox: 0, oy: 0 };
+  const a = clrAnalyze(fake);
+  const groups = {};
+  Array.from(names).sort().forEach(n => {
+    const v = cs.getPropertyValue(n).trim();
+    if (!v || !(clrToHex(v) || clrLiterals(v).length)) return;
+    if (q && n.toLowerCase().indexOf(q) < 0 && v.toLowerCase().indexOf(q) < 0) return;
+    const fam = n.replace(/^--/, '').split('-')[0];
+    (groups[fam] = groups[fam] || []).push(n);
+  });
+  const fams = Object.keys(groups).sort((x, y) => {
+    const order = ['ink', 'paper', 'page', 'navbar', 'lit', 'map', 'av', 'frame', 'load', 'brown'];
+    const ix = order.indexOf(x), iy = order.indexOf(y);
+    return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy) || x.localeCompare(y);
+  });
+  if (!fams.length) { box.innerHTML = '<div class="clr-empty">Eşleşen renk yok.</div>'; return; }
+  box.innerHTML = fams.map(f => `
+    <details class="clr-allgroup" ${q || fams.length < 4 ? 'open' : ''} data-block-key="clr-${f}"${OPEN_BLOCKS.has('clr-' + f) ? ' open' : ''}>
+      <summary>${escapeHtml(CLR_GROUP_NAMES[f] || f)}<span>${groups[f].length}</span></summary>
+      ${groups[f].map(n => {
+        const node = a.resolve(n, doc.documentElement, 0, new Set());
+        node.children = [];   // the list is flat; press a thing for its chain
+        return clrChainHTML(node, false);
+      }).join('')}
+    </details>`).join('');
+}
+
+function clrRenderChanges() {
+  const pane = document.getElementById('clr-pane-changes');
+  if (!pane) return;
+  clr.editors = [];
+  const st = clrState();
+  const toks = Object.keys(st.tokens);
+  let html = '';
+  if (!toks.length && !st.rules.length) {
+    html += `<div class="clr-empty">Bu hâlde (<b>${escapeHtml(clrVariantObj().name)}</b>) değişiklik yok.</div>`;
+  } else {
+    html += '<div class="clr-changes-list">';
+    toks.forEach(n => {
+      const ed = clrEditorFor({ kind: 'token', name: n });
+      const v = st.tokens[n];
+      html += clrRowHTML({ name: n, value: v, swatch: clrToHex(v) ? v : null, ed, pick: clrToHex(v) ? ed : null, changed: true });
+      html += `<div class="clr-ch-meta">:root</div>`;
+    });
+    st.rules.forEach(r => {
+      const ed = clrEditorFor({ kind: 'rule', sel: r.sel, prop: r.prop, page: r.page || null });
+      html += clrRowHTML({ name: r.prop, value: r.val, swatch: clrToHex(r.val) ? r.val : null, ed, pick: clrToHex(r.val) ? ed : null, changed: true });
+      html += `<div class="clr-ch-meta" title="${escapeHtml(r.sel)}">${escapeHtml(r.sel)}${r.page ? ' — yalnızca ' + escapeHtml(r.page) + '.html' : ''}</div>`;
+    });
+    html += '</div>';
+  }
+  const others = CLR_VARIANTS.filter(v => v.key !== clr.variant);
+  html += `<div class="clr-tools">
+    <select id="clr-copy-to">${others.map(v => `<option value="${v.key}">${escapeHtml(v.name)}</option>`).join('')}</select>
+    <button class="btn btn-secondary" id="clr-copy-btn" title="Bu hâlin değişikliklerini seçilen hâle de yaz (oradakilerin üstüne)">Şuraya da kopyala</button>
+    <button class="btn btn-danger" id="clr-reset-variant">Bu hâli sıfırla</button>
+    <button class="btn btn-secondary" id="clr-css-btn">CSS'i göster</button>
+  </div>
+  <textarea class="clr-css" id="clr-css" readonly hidden></textarea>`;
+  pane.innerHTML = html;
+}
+
+function clrRenderPanes() {
+  ['sel', 'all', 'changes'].forEach(p => {
+    const el = document.getElementById('clr-pane-' + p);
+    if (el) el.hidden = p !== clr.pane;
+  });
+  document.querySelectorAll('.clr-tabs button').forEach(b => b.classList.toggle('on', b.dataset.pane === clr.pane));
+  if (clr.pane === 'sel') clrRenderSel();
+  else if (clr.pane === 'all') clrRenderAll();
+  else clrRenderChanges();
+}
+
+// Re-read after an edit has landed -- but never while the admin is still
+// dragging a picker or typing into a field: rebuilding the pane would take
+// the very input out from under them.
+function clrRefreshSoon(ms) {
+  clearTimeout(clr.refreshTimer);
+  clr.refreshTimer = setTimeout(() => {
+    const act = document.activeElement;
+    if (act && act.closest && act.closest('.clr-panel') && act.matches('input.clr-val')) return;
+    clrRenderPanes();
+  }, ms == null ? 160 : ms);
+}
+
+function clrPaintVariants() {
+  const box = document.getElementById('clr-variants');
+  if (!box) return;
+  if (!box.children.length) {
+    box.innerHTML = CLR_VARIANTS.map(v =>
+      `<button data-v="${v.key}" style="--chip-paper:${v.chip[0]};--chip-ink:${v.chip[1]}"><i></i>${escapeHtml(v.name)}<b></b></button>`).join('');
+  }
+  box.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('on', b.dataset.v === clr.variant);
+    const n = clrCount(b.dataset.v);
+    b.querySelector('b').textContent = n ? String(n) : '';
+  });
+  const name = document.getElementById('clr-variant-name');
+  if (name) name.textContent = clrVariantObj().name;
+  const total = CLR_VARIANTS.reduce((t, v) => t + clrCount(v.key), 0);
+  const cnt = document.getElementById('clr-count');
+  if (cnt) cnt.textContent = total ? '(' + clrCount(clr.variant) + '/' + total + ')' : '';
+}
+
+function clrFmtWhen(iso) {
+  try {
+    return new Intl.DateTimeFormat('tr-TR', { timeZone: IstDate.TZ, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  } catch (e) { return iso; }
+}
+function clrStatus(msg, isErr) {
+  const el = document.getElementById('clr-status');
+  if (!el) return;
+  if (msg) { el.innerHTML = isErr ? '<b>' + escapeHtml(msg) + '</b>' : escapeHtml(msg); return; }
+  const parts = [];
+  if (clr.tableMissing) {
+    parts.push('<b>Veritabanında site_palette tablosu yok</b> — <code>db/site_palette.sql</code>\'i Supabase\'de çalıştırın. O zamana kadar taslak bu tarayıcıda durur.');
+  } else if (clr.publishedAt) {
+    parts.push('Yayında: ' + escapeHtml(clrFmtWhen(clr.publishedAt)) + '.');
+  } else {
+    parts.push('Henüz yayınlanmış renk yok — site kendi renklerinde.');
+  }
+  parts.push(clrDirty() ? '<b>Yayınlanmamış değişiklik var.</b> Üyeler hâlâ yayındakini görüyor.' : 'Taslak yayındakiyle aynı.');
+  el.innerHTML = parts.join(' ');
+  document.getElementById('clr-publish').disabled = !clrDirty();
+}
+
+async function clrLoadPublished() {
+  const { data, error } = await sb.from('site_palette').select('overrides, updated_at').eq('id', 'live').maybeSingle();
+  if (error) {
+    clr.tableMissing = /PGRST205|42P01/.test(error.code || '') || /does not exist|schema cache/i.test(error.message || '');
+    throw error;
+  }
+  clr.tableMissing = false;
+  clr.published = clrNorm(data ? data.overrides : null);
+  clr.publishedAt = data ? data.updated_at : null;
+}
+
+async function clrPublish() {
+  const btn = document.getElementById('clr-publish');
+  btn.disabled = true;
+  clrStatus('Yayınlanıyor…');
+  const payload = clrPrune(clr.draft);
+  let uid = null;
+  try { const { data } = await sb.auth.getUser(); uid = data && data.user ? data.user.id : null; } catch (e) { /* ignore */ }
+  const now = new Date().toISOString();
+  const { error } = await sb.from('site_palette').upsert({ id: 'live', overrides: payload, updated_by: uid, updated_at: now });
+  if (error) {
+    console.error('[renkler publish]', error);
+    clr.tableMissing = /PGRST205|42P01/.test(error.code || '') || /does not exist|schema cache/i.test(error.message || '');
+    clrStatus(clr.tableMissing ? 'site_palette tablosu yok — db/site_palette.sql\'i çalıştırın.' : 'Yayınlanamadı: ' + (error.message || error.code), true);
+    btn.disabled = false;
+    return;
+  }
+  clr.published = clrClone(payload);
+  clr.publishedAt = now;
+  // The desk itself is in the published colours too, from now.
+  try { localStorage.setItem(CLR_OVERRIDES_CACHE, JSON.stringify(payload)); } catch (e) { /* ignore */ }
+  try { if (window.Palette && Palette.refetch) Palette.refetch(); } catch (e) { /* ignore */ }
+  deskToast('Renkler yayında');
+  clrStatus();
+}
+
+function clrSelect(layer) {
+  clr.sel = layer && layer.el ? layer : null;
+  if (!clr.sel) clr.layers = [];
+  clrPaintBoxes();
+  if (clr.sel && clr.pane !== 'sel') clr.pane = 'sel';
+  clrRenderPanes();
+}
+
+function clrSetVariant(key) {
+  if (!CLR_VARIANTS.some(v => v.key === key)) return;
+  clr.variant = key;
+  try { localStorage.setItem(CLR_VARIANT_KEY, key); } catch (e) { /* ignore */ }
+  clrPush();
+  clrPaintVariants();
+  // The new state's colours have to be on screen before they are read.
+  setTimeout(() => clrRenderPanes(), 60);
+}
+
+function clrInit() {
+  clr.ready = true;
+  let v = null;
+  try { v = localStorage.getItem(CLR_VARIANT_KEY); } catch (e) { /* ignore */ }
+  if (!CLR_VARIANTS.some(x => x.key === v)) {
+    v = (window.Palette ? Palette.current : 'mono') + '-' + (window.Palette ? Palette.currentTheme : 'light');
+    if (!CLR_VARIANTS.some(x => x.key === v)) v = 'mono-light';
+  }
+  clr.variant = v;
+
+  document.getElementById('clr-variants').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-v]');
+    if (b) clrSetVariant(b.dataset.v);
+  });
+  document.getElementById('clr-pick').addEventListener('change', (e) => clrSetPicking(e.target.checked));
+  document.getElementById('clr-page').addEventListener('change', () => clrLoadFrame());
+  document.getElementById('clr-reload').addEventListener('click', () => {
+    try { clrSelect(null); clrFrame().contentWindow.location.reload(); } catch (e) { clrLoadFrame(true); }
+  });
+  clrFrame().addEventListener('load', () => {
+    clrPush();
+    if (clr.pane === 'all') setTimeout(clrRenderAll, 400);
+  });
+
+  // ── The pick layer ──
+  const catchEl = document.getElementById('clr-catch');
+  catchEl.addEventListener('mousemove', (e) => {
+    const p = clrPoint(e);
+    const hit = clrHit(p.x, p.y, false);
+    clr.hover = hit && hit.list[0] ? { el: hit.list[0], win: hit.win, ox: hit.ox, oy: hit.oy } : null;
+    clrPaintBoxes();
+  });
+  catchEl.addEventListener('mouseleave', () => { clr.hover = null; clrPaintBoxes(); });
+  catchEl.addEventListener('click', (e) => {
+    e.preventDefault();
+    const p = clrPoint(e);
+    const hit = clrHit(p.x, p.y, true);
+    if (!hit || !hit.list.length) return;
+    clr.layers = hit.list.map(el => ({ el, win: hit.win, ox: hit.ox, oy: hit.oy }));
+    clrSelect(clr.layers.find(l => clrPaints(l.el, l.win)) || clr.layers[0]);
+  });
+  // The wheel still scrolls whatever is under it, so a long sheet can be
+  // read down to the thing that needs picking without leaving pick mode.
+  catchEl.addEventListener('wheel', (e) => {
+    const p = clrPoint(e);
+    const hit = clrHit(p.x, p.y, false);
+    for (let n = hit && hit.list[0]; n && n.nodeType === 1; n = n.parentElement) {
+      const cs = hit.win.getComputedStyle(n);
+      if (/(auto|scroll)/.test(cs.overflowY) && n.scrollHeight > n.clientHeight + 1) {
+        n.scrollTop += e.deltaY;
+        e.preventDefault();
+        break;
+      }
+    }
+  }, { passive: false });
+
+  // ── The panel ──
+  document.querySelector('.clr-tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-pane]');
+    if (!b) return;
+    clr.pane = b.dataset.pane;
+    clrRenderPanes();
+  });
+  document.getElementById('clr-search').addEventListener('input', () => clrRenderAll());
+
+  const panel = document.querySelector('.clr-panel');
+  panel.addEventListener('click', (e) => {
+    const crumb = e.target.closest('[data-crumb]');
+    if (crumb) {
+      const n = (document.getElementById('clr-pane-sel')._crumbs || [])[+crumb.dataset.crumb];
+      if (n && clr.sel) clrSelect({ el: n, win: clr.sel.win, ox: clr.sel.ox, oy: clr.sel.oy });
+      return;
+    }
+    const lay = e.target.closest('[data-layer]');
+    if (lay) { const l = clr.layers[+lay.dataset.layer]; if (l) clrSelect(l); return; }
+    const reset = e.target.closest('[data-reset]');
+    if (reset && reset.dataset.reset !== '') { const ed = clr.editors[+reset.dataset.reset]; if (ed) clrResetEd(ed); return; }
+    if (e.target.id === 'clr-reset-variant') {
+      if (!confirm(clrVariantObj().name + ' hâlindeki bütün değişiklikler silinsin mi?')) return;
+      delete clr.draft.states[clr.variant];
+      clrSaveDraft(); clrPush(); clrPaintVariants(); clrStatus(); clrRenderPanes();
+      return;
+    }
+    if (e.target.id === 'clr-copy-btn') {
+      const to = document.getElementById('clr-copy-to').value;
+      const src = clrState(), dst = clrState(to);
+      Object.assign(dst.tokens, clrClone(src.tokens));
+      src.rules.forEach(r => {
+        const i = clrFindRule(dst, r.sel, r.prop, r.page || null);
+        if (i >= 0) dst.rules[i] = clrClone(r); else dst.rules.push(clrClone(r));
+      });
+      clrSaveDraft(); clrPaintVariants(); clrStatus();
+      deskToast('Kopyalandı: ' + CLR_VARIANTS.find(v => v.key === to).name);
+      return;
+    }
+    if (e.target.id === 'clr-css-btn') {
+      const ta = document.getElementById('clr-css');
+      ta.hidden = !ta.hidden;
+      ta.value = (window.Palette && Palette.overridesCSS) ? Palette.overridesCSS(clrPrune(clr.draft), null) : JSON.stringify(clrPrune(clr.draft), null, 2);
+      if (!ta.hidden) { ta.focus(); ta.select(); }
+    }
+  });
+  // A picker drags: every step is pushed to the phone, and the row's own
+  // swatch and text follow it, but the pane is not rebuilt until it lets go.
+  panel.addEventListener('input', (e) => {
+    const t = e.target;
+    if (!t.matches('input[type="color"][data-pick]')) return;
+    const ed = clr.editors[+t.dataset.pick];
+    if (!ed) return;
+    const val = clrWithAlpha(t.value, parseFloat(t.dataset.alpha));
+    clrApply(ed, val);
+    const row = t.closest('.clr-row');
+    if (row) {
+      row.classList.add('changed');
+      const sw = row.querySelector('.clr-sw > i'); if (sw) sw.style.background = val;
+      const txt = row.querySelector('input.clr-val'); if (txt && txt.dataset.ed === t.dataset.pick) txt.value = val;
+      else if (txt && txt.readOnly) txt.value = val;
+      const rb = row.querySelector('.clr-reset'); if (rb) rb.hidden = false;
+    }
+  });
+  panel.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.matches('input[type="color"][data-pick]')) { clrRefreshSoon(250); return; }
+    if (t.matches('input.clr-val[data-ed]')) {
+      const ed = clr.editors[+t.dataset.ed];
+      const v = t.value.trim();
+      if (!ed) return;
+      if (!v) clrResetEd(ed); else clrApply(ed, v);
+      t.blur();
+      clrRefreshSoon(120);
+    }
+  });
+  panel.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.matches('input.clr-val[data-ed]')) e.target.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  document.getElementById('clr-publish').addEventListener('click', clrPublish);
+  document.getElementById('clr-revert').addEventListener('click', () => {
+    if (clrDirty() && !confirm('Taslaktaki yayınlanmamış değişiklikler silinsin mi?')) return;
+    clr.draft = clrClone(clr.published);
+    clrSaveDraft(); clrPush(); clrPaintVariants(); clrStatus(); clrRenderPanes();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (adminCurrentTab !== 'colors' || e.target.matches('input, textarea, select')) return;
+    if (e.key === 'Escape') { if (clr.sel) clrSelect(null); else clrSetPicking(false); }
+    if (e.key === 'p' || e.key === 'P') clrSetPicking(!clr.picking);
+  });
+
+  if (window.ResizeObserver) new ResizeObserver(() => clrLayout()).observe(document.getElementById('clr-stage'));
+  window.addEventListener('resize', clrLayout);
+}
+
+async function colorsOpen() {
+  if (!clr.ready) clrInit();
+  try { await clrLoadPublished(); }
+  catch (e) {
+    console.warn('[renkler] site_palette', e && (e.code || e.message));
+    if (!clr.published) clr.published = clrNorm(window.Palette ? Palette.published : null);
+  }
+  if (!clr.draft) {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(CLR_DRAFT_KEY) || 'null'); } catch (e) { d = null; }
+    clr.draft = clrNorm(d || clr.published);
+  }
+  clrPaintVariants();
+  clrStatus();
+  clrRenderPanes();
+  clrLoadFrame();
+  requestAnimationFrame(clrLayout);
+  clearInterval(clr.boxTimer);
+  clr.boxTimer = setInterval(() => { if (clr.sel || clr.hover) clrPaintBoxes(); }, 250);
+}
+
+// Leaving the section unloads the phone: it is a whole second copy of the
+// app, and a hidden iframe laid out at no size is a page that measures
+// itself wrong the moment it is shown again.
+function colorsClose() {
+  if (!clr.ready) return;
+  clearInterval(clr.boxTimer);
+  clrUnloadFrame();
 }
 
 // THE DESK — the rail, the drawers, and the phone
