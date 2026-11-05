@@ -1080,8 +1080,20 @@
        the whole job. The night --ink-red is now the day red only a little
        dimmer, so it reads on the night land as it is and needs no lift. */
     .fb { --fb-home-red: var(--ink-red, #B93631); }
-    .fb-districts polygon, .fb-districts path { transition: fill 0.45s ease, fill-opacity 0.3s ease; }
-    .fb-districts.fb-dist-focusing .fb-dist-ev:not(.fb-dist-focus) { fill-opacity: 0.38; }
+    .fb-districts polygon, .fb-districts path { transition: fill 0.45s ease, fill-opacity 0.3s ease, stroke-opacity 0.3s ease; }
+    /* A red district's border goes red too, a step darker than its fill.
+       The fills stop at the inner edge of the drawn double line, so a
+       stroke centred on that edge covers the inner black line and the
+       gray between (12 viewBox units, the drawing's own pixels) and
+       leaves the neighbour's half of the line black. Only while the fill
+       IS red (fb-dist-red), so the dark gray of a member's district
+       never wears a red rim. */
+    .fb-districts .fb-dist-red {
+      stroke: color-mix(in srgb, var(--fb-home-red, #B93631) 72%, black);
+      stroke-width: 12;
+      stroke-linejoin: round;
+    }
+    .fb-districts.fb-dist-focusing .fb-dist-ev:not(.fb-dist-focus) { fill-opacity: 0.38; stroke-opacity: 0.45; }
     .fb-districts .fb-dist-focus { animation: fb-dist-breathe 1.9s ease-in-out infinite; }
     @keyframes fb-dist-breathe { 0%, 100% { fill-opacity: 1; } 50% { fill-opacity: 0.62; } }
     @media (prefers-reduced-motion: reduce) { .fb-districts .fb-dist-focus { animation: none; } }
@@ -4670,6 +4682,7 @@ async function paintHomeDistricts() {
   layer.querySelectorAll('polygon, path').forEach(el => {
     const k = districtKeyOf(el);
     el.style.fill = fills[k] || '';
+    el.classList.toggle('fb-dist-red', fills[k] === HOME_FILL_EVENT || fills[k] === HOME_RED);
     el.classList.toggle('fb-dist-ev', evs.has(k));
     el.classList.toggle('fb-dist-focus', focus.has(k));
   });
