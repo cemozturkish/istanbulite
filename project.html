@@ -1081,6 +1081,16 @@
        dimmer, so it reads on the night land as it is and needs no lift. */
     .fb { --fb-home-red: var(--ink-red, #B93631); }
     .fb-districts polygon, .fb-districts path { transition: fill 0.45s ease, fill-opacity 0.3s ease; }
+    /* A red district's RIM goes red too, a step darker than its fill: the
+       gray band between the two black lines of its own drawn border, cut
+       out of the drawing as its own shape (data-rim, written by
+       scripts/derive-mobile-map-svg.py). The black lines are the drawing
+       and stay black. Only while the fill IS red (fb-rim-on), so the dark
+       gray of a member's district never wears a red rim; it steps back
+       with its face while another district is in focus. */
+    .fb-districts [data-rim] { fill: transparent; }
+    .fb-districts [data-rim].fb-rim-on { fill: color-mix(in srgb, var(--fb-home-red, #B93631) 72%, black); }
+    .fb-districts.fb-dist-focusing [data-rim].fb-rim-on:not(.fb-rim-focus) { fill-opacity: 0.38; }
     .fb-districts.fb-dist-focusing .fb-dist-ev:not(.fb-dist-focus) { fill-opacity: 0.38; }
     .fb-districts .fb-dist-focus { animation: fb-dist-breathe 1.9s ease-in-out infinite; }
     @keyframes fb-dist-breathe { 0%, 100% { fill-opacity: 1; } 50% { fill-opacity: 0.62; } }
@@ -4128,7 +4138,7 @@ function shoreClass(d) { return EAST_SHORE.has(d) ? 'fb-shore-e' : 'fb-shore-w';
 function markShores(svg) {
   if (!svg) return;
   svg.querySelectorAll('polygon, path').forEach(el => {
-    const k = el.getAttribute('data-neighborhood') || el.id || '';
+    const k = el.getAttribute('data-neighborhood') || el.getAttribute('data-rim') || el.id || '';
     el.classList.add(EAST_SHORE.has(k) ? 'fb-shore-e' : 'fb-shore-w');
   });
 }
@@ -4672,6 +4682,13 @@ async function paintHomeDistricts() {
     el.style.fill = fills[k] || '';
     el.classList.toggle('fb-dist-ev', evs.has(k));
     el.classList.toggle('fb-dist-focus', focus.has(k));
+  });
+  // The rims carry data-rim and nothing districtKeyOf reads, so the loop
+  // above leaves them transparent; they are lit here, only where red.
+  layer.querySelectorAll('[data-rim]').forEach(el => {
+    const k = el.getAttribute('data-rim');
+    el.classList.toggle('fb-rim-on', fills[k] === HOME_FILL_EVENT || fills[k] === HOME_RED);
+    el.classList.toggle('fb-rim-focus', focus.has(k));
   });
   layer.classList.toggle('fb-dist-focusing', focus.size > 0);
   const any = Object.keys(fills).length > 0;
