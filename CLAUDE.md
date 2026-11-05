@@ -26,12 +26,20 @@ in mind.
 | What | Switch | What "off" means |
 |---|---|---|
 | **Content follows the sun** | `CONTENT_FOLLOWS_SUN = false` in `ist-date.js` | `kutuphaneDay()`, `kahvehaneDay()`, `gameNight()`/`gameNightSeed()` are all the İstanbul **calendar day**; every game, evening and caption turns over at **midnight**. `nextGameNight()`/`nextSunrise()` return the next midnight (so every "new word in…" countdown counts to it), and `nextEdition()` returns one `'gunluk'` edition with `side: 'both'` at midnight. **The palette still follows the sun** — `palette.js` reads `isDaytime()` directly and never this flag. The edition notice ("Güneş bugün… doğdu") does not show. |
-| **The news and the Anket** | `NEWS_ENABLED = false` in `project.html` | The Haberler and Anket actors are left out of `CAST` (absent, not idle). The strip stops at the middle lane (`LANE_MIN`), the bar's KÜTÜPHANE word is hidden (`#fb-nav.fb-news-parked`), the day meter stops counting them, and the onboarding tour skips its Kütüphane beats (`__fb.newsEnabled`). In `admin.html`, `PRESS_PARKED` drops their formes from the press bar; the sections and the baskı board still work. |
+| **The news and the Anket** | `NEWS_ENABLED = false` in `project.html` | The Haberler and Anket actors are left out of `CAST` (absent, not idle). The strip stops at the middle lane (`LANE_MIN`), the bar's KÜTÜPHANE word is hidden (`#fb-nav.fb-news-parked`), the day meter stops counting them, and the onboarding tour skips its Kütüphane beats (`__fb.newsEnabled`). In `admin.html` their sections are parked with the rest (`ADMIN_PARKED`, below): no formes, no board columns; the sections still open and work from the park. |
 | **The bars' hexagon shoulders** | `--navbar-top-keep: 100%` and `--navbar-arc: 0px` in `frames.css` | Both bars are plain straight bands. The polygons are unchanged; the shoulder is `34%` / `12px`. Every "clear the raised corners" allowance goes to zero with `--navbar-arc`. |
 | **The sun meter** | *(removed, not parked)* | The ring chain under the top bar (`skyChartHTML`, `startSky`, `.ist-sky`) and its tour beat are deleted. The sections describing it are history. |
 | **The three-lane strip** | `HOME_SCREEN = true` in `project.html` | The app is ONE screen — see "The home screen" under project.html. The Kahvehane columns are left out of `CAST`, `LANE_MAX` caps the strip at the middle (with `LANE_MIN`, nothing to walk to either side), the wash over the map is off, the book's own drag bails (`onDown`), and both bottom-bar words are hidden (`#fb-nav.fb-home-nav`). |
 | **The petek's day glyph** | `HIVE_DAY_GLYPH = false` in `profile-card.js` | A neighbour's caption is their district, not the two-screen glyph, and nothing asks `hive_member_status`. |
 | **Friends' districts lit** | `FRIEND_DISTRICTS_LIT = true` in `project.html` | ON. It is the resting fill that was once abandoned for misregistration; the fills are now cut from the drawing's own faces (see "The fills used to misregister"), so that reason is gone. |
+| **The admin's sections** | `ADMIN_PARKED` in `admin.html` | Haber, Olay, Anket, Mektup, Raflar, Ülkeler, Alıntılar, Kahve Endeksi, Kişiler, Koltuklar, TBMM and Bildirimler are folded into the "Parktakiler" list at the foot of the rail (`railPark`); their formes leave the press bar and their columns leave the baskı board. The desk opens on Etkinlik (`ADMIN_DEFAULT_TAB`). Every parked section still opens and works. |
+
+**Morning and evening editions are retired, not parked.** There is one paper a day: it goes out
+whole at the midnight its İstanbul day begins and stands for 24 hours. The admin desk no longer
+knows any other model (`deskToday` / `deskNextPaper` in admin.html, never `IstDate.nextEdition()`).
+The database keeps everything the two-edition model wrote (`edition_half` and friends stay, and the
+desk still writes `'gun'` into it for a cached old reader). `CONTENT_FOLLOWS_SUN` stays `false` in
+`ist-date.js`; the sun decides the **colours** (gündüz / gece) and nothing else.
 
 **Members' own plans** ("I'll be here, this day, this time") are built and gated on the database,
 not on a flag: until `db/events_v2_plans.sql` has been run, the plan fetch answers an error, the
@@ -115,9 +123,10 @@ The zoom levels tell one story: mahalle → Istanbul → Türkiye, with the user
 
 ### Sunrise renews Kütüphane, sunset renews Kahvehane
 
-> **Parked for launch** (`CONTENT_FOLLOWS_SUN = false` in `ist-date.js`, see "Launch state"): all
-> content currently turns over at midnight, and only the colours follow the sun. What follows is
-> the design the flag restores.
+> **Retired** (`CONTENT_FOLLOWS_SUN = false` in `ist-date.js`, see "Launch state"): it was decided
+> that within 24 hours the paper is the same — all content turns over at midnight, and only the
+> colours follow the sun. The admin desk has dropped the sun model entirely. What follows is kept
+> as the history of the design; do not rebuild morning/evening editions.
 
 The two sides of the app do not share a day. **Kütüphane is the reading side, and its paper comes
 out with the light**: the news and the city's own question (Anket) are renewed at sunrise and stand
@@ -225,7 +234,8 @@ under project.html).
 │                         CONTENT_FOLLOWS_SUN (off for launch) parks every sun-keyed day above
 │                         onto the calendar day; see "Launch state" 
 ├── i18n.js               # TR/EN language toggle
-├── palette.js/.css       # Theme tokens
+├── palette.js/.css       # Theme tokens, plus the admin's published colour overrides
+│                         (site_palette) and the admin phone's preview pin
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
 ├── home-map.js           # Swaps in the hand-painted map for the member's own district
 ├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js,
@@ -486,6 +496,16 @@ supersede the six-slot `hive_slots` and the weekly `hive_codes` of `db/hive_slot
   direction where the cell is free. A bond whose two members end up placed but not adjacent is
   dropped — the shape on screen has to be the truth about who is next to whom.
 
+**Table: `site_palette`** — the admin's own colours (`db/site_palette.sql`). One row, `id = 'live'`,
+whose `overrides` jsonb is `{ v: 1, states: { 'mono-light' | 'mono-dark' | 'earth-light' |
+'earth-dark': { tokens: { '--x': value }, rules: [ { sel, prop, val, page? } ] } } }`, written by
+admin.html's Renkler section. palette.js reads it on every page load with the anon key (so the login
+gate is in the same colours), caches it in localStorage for the next first paint, and turns it into
+one `<style id="ist-palette-overrides">` at `:root:root[data-palette][data-theme]` specificity with
+`!important` — no palette block can outrank it, and the stylesheets themselves are never touched.
+Deleting the row puts the site back to the colours written in the CSS. RLS: readable by `anon` and
+`authenticated`; admin-only writes.
+
 **Table: `app_settings`** — generic admin-managed key/value feature toggle table (`db/app_settings.sql`).
 - `key text pk`, `value boolean`, `updated_by`, `updated_at`.
 - Currently one row: `onboarding_enabled` — global on/off switch for the new-account onboarding flow. Read by `onboarding.js`'s `maybeRun()` (missing row or `value = true` = enabled); a row with `value = false` disables it site-wide. Managed from the "Onboarding" panel at the top of admin.html's Users tab.
@@ -679,6 +699,51 @@ sb.from('articles').delete().eq('id', id)
 
 ### `admin.html` — Admin Dashboard
 - Login restricted to ADMIN_EMAIL
+- **ONLY WHAT THE LAUNCH APP CARRIES STANDS ON THE RAIL** (`ADMIN_PARKED`, see "Launch
+  state"): Etkinlik, Oyun, Üyeler and Renkler. `railPark()` moves every parked button, under a
+  copy of the group heading it stood beneath, into one folded **Parktakiler** list at the foot
+  of the rail; a parked section opened from there says so in a dashed line over it
+  (`.desk-parked-note`). The rail's markup is still the whole rail, so unparking is deleting an
+  id from the set. Tab switching is one loop over `#admin-work > .admin-body` (`TAB_DISPLAY`
+  for the one section with a grid of its own), not a list of fifteen display toggles.
+- **RENKLER — the admin changes any colour on the site, on the app itself**
+  (`#colors-tab`, the `clr*` functions; `db/site_palette.sql`; palette.js's override layer).
+  - **The phone is the live app**: `project.html` in an iframe laid out at 390×844 and SCALED
+    to the room (`clrLayout`), so it measures a phone's width and lays itself out as a phone —
+    pressable and swipeable exactly like a member's. The page picker also opens Sözcel, Tümcel
+    and Çengel (in their embedded mode). Leaving the section unloads it (`colorsClose`): a
+    hidden iframe laid out at no size is a page that measures itself wrong when shown again.
+  - **Four states, worked on separately**: Siyah-beyaz / Kahverengi × Gündüz / Gece. The buttons
+    over the phone PIN it to one (`Palette.preview`), whatever the member's palette and the sun
+    are doing; each carries a count of its own changes. "Şuraya da kopyala" copies one state's
+    changes onto another.
+  - **"Renk seç" (or the P key) turns a press into a pick.** A transparent layer over the
+    iframe takes the press so nothing in the app fires, and asks the iframe what stands there —
+    every layer, with pointer-events forced on for that one read (`clrHit`), invisible ones
+    dropped, and the topmost layer that actually PAINTS something selected (`clrPaints`), so a
+    press on the map picks the drawing rather than the transparent box it sits in. The other
+    layers at that point and the element's ancestors are chips to step to. Off, the app works
+    normally — open a sheet, then switch picking on and pick inside it.
+  - **What paints it is the cascade, run in the page** (`clrAnalyze`): every rule of that
+    document matching the element (and its ::before/::after) is collected with specificity and
+    source order, @media resolved against the iframe's own window, and the winner is found per
+    CHANNEL (Yazı, Zemin, Kenar, Gölge, Dolgu, Çizgi, Filtre…); `color` is followed up to the
+    ancestor that sets it. Every `var(--token)` in the winner is followed to where that token
+    is declared FOR THIS ELEMENT — :root in this state, or a rule re-pointing it on an ancestor
+    — and on through its own var()s, so the whole chain (`--paper → --lit-hi → #d8bb93`) is
+    shown and every link is editable. A drawing painted through a map-ink ladder
+    (`filter: url(#ist-…)`) shows that ladder's tokens: sea, land, ink, red.
+  - **What an edit writes**: a :root token → `states[k].tokens`; a token re-pointed on a
+    selector, or a colour typed straight into a rule → `states[k].rules` `{sel, prop, val,
+    page}` (`page` set when the rule came from a page's own `<style>`, so it lands on that page
+    only). Inline styles set by script are shown read-only — the app's next frame would
+    overwrite them. A colour picker drags live; the pane is not rebuilt until it is let go,
+    since rebuilding would take the picker out from under the mouse.
+  - **Draft → Yayınla.** The draft lives in this browser (`istanbulite_palette_draft`) and is
+    what the phone shows; members see nothing until **Yayınla** upserts site_palette `'live'`.
+    "Yayındakine dön" drops the draft. **Tüm renkler** lists every :root token holding a colour,
+    by family, for finding one by name; **Değişiklikler** lists the state's changes and can
+    show them as CSS, ready to be baked into palette.css once a palette is settled.
 - **WRITING IS NOT PUBLISHING, and the BASKI BOARD is the desk's third column.**
   This is the rule the whole portal is arranged around. A haber, an etkinlik, an anket
   exists from the moment it is written and reaches nobody; it reaches a reader by being
@@ -836,52 +901,47 @@ sb.from('articles').delete().eq('id', id)
     renders up to 300 stories, and a select of all of them inside each of them is 90,000 options
     nobody asked to see. Same rule as `ensureCardCountryPicker`. It offers what the list has
     loaded, so reaching an older story means switching to "Tümü" first.
-- **Launch state:** with `CONTENT_FOLLOWS_SUN` off, `IstDate.nextEdition()` names one
-  `'gunluk'` edition at midnight carrying both sides, so the bar reads "Günün sayısı · … ·
-  00:00 (gece yarısı)", every forme applies (`pressFormeApplies`), and the baskı board's two
-  pages both say "gece yarısı 00:00". `PRESS_PARKED` drops the Haberler and İlçe anketi formes
-  while the news is parked. What follows describes the sun-driven press times the flag restores.
+- **ONE PAPER A DAY.** The paper dated D goes out whole at the midnight D begins and stands for
+  24 hours. The desk's two clocks are `deskToday()` and `deskNextPaper()` (tomorrow's date and
+  tonight's midnight); it never asks `IstDate.nextEdition()`, which still knows how to answer in
+  sun terms. The baskı board opens on tomorrow's paper (the one the press bar counts down to), and
+  **Bugün** / **Yarın** beside its date jump between the paper out now and the next one
+  (`baskiState`: live / next / ahead / behind).
+- **The board draws the HOME SCREEN** while `BASKI_HOME_SCREEN` is on (project.html's
+  `HOME_SCREEN`): one page, "Ana ekran", with seven day-boxes for the week's evenings
+  (`BASKI_EVENT_DAYS` = project.html's `HOME_DAYS`, labelled Bugün, Yarın, then the weekday) and
+  the two game slots side by side at its foot. The three-lane strip's two pages are still in
+  `BASKI_PAGES` for the day it comes back; a column whose section is parked is left out either way
+  (`baskiPagesLive`, `BASKI_KIND_TAB`), and its kind is not even fetched.
 - **THE PRESS BAR — the deadline, and what is still missing from it.** A desk's first
   question is never "which section am I in", it is "when does this go out and is it
   finished". So the band under the masthead answers both, on every section, and never
   scrolls away: the edition being set, the time left to set it, and one **forme** per thing
   that edition needs — each pressable, each landing on the section that fixes it.
-  - **The deadline is the SUN, not a timer somebody set.** Sunrise renews Kütüphane and
-    sunset renews Kahvehane, so there are two press times a day, one per side, and the
-    countdown runs on `IstDate.nextEdition()` — the one place that knows which side goes out
-    next and when (CLAUDE.md rule 10; never a stored hour, and never a second copy of the
-    sunrise equation in this page). The bar names the SIDE (`pressEditionName`: Kütüphane /
-    Kahvehane), because which page's slots are due is what an editor acts on. What the sun
-    buys is a deadline that *moves through the year*: 13h39m of daylight to set Kahvehane in
-    June, 9h15m in December. It is deliberately **not** `nextGameNight()` generalised — that
-    one is always the next **sunset**, because the games are Kahvehane's and a sunrise renews
-    nothing of theirs; this is whichever edge comes first. The date comes straight back out
-    of `editionKey()` at that instant, and it is exactly the day of the side that renews
-    there (`kutuphaneDay` at a sunrise, `kahvehaneDay` at a sunset).
-  - **It re-aims itself.** The tick re-asks `nextEdition()` every second rather than holding
-    the instant it started with: an admin leaves this page open for hours, and the moment a
-    paper goes out the bar has to start counting to the next one — and re-run the check,
-    because what the *next* edition needs is a different list.
+  - **The deadline is MIDNIGHT.** The bar always reads "Yarının sayısı · <date> · 00:00 (gece
+    yarısı) · 24 saat durur" and counts down to tonight's midnight. (It used to be the sun —
+    sunrise renewed Kütüphane, sunset renewed Kahvehane, two press times a day, a forme per
+    side drawn dashed when its side was not next. All of that is gone from the desk.)
+  - **It re-aims itself.** The tick re-asks `deskNextPaper()` every second rather than holding
+    the instant it started with: an admin leaves this page open for hours, and at midnight
+    the bar has to start counting to the next paper — and re-run the check.
+  - **A forme whose section is parked is not on the bar at all** (`adminTabParked(f.tab)`): a
+    red forme for a column the reader never meets is the desk reporting a slot nobody will
+    ever see empty.
   - **THE ONE RULE FOR A FORME: it asks exactly what the reader's own loader asks**, against
     the same tables with the same filters. A forme that invents a looser question is worse
     than no forme at all — it is the desk reporting an edition ready that the reader will
     open and find empty. So Haberler resolves `news_current_edition()` and buckets by
     `edition_date` + `archived_at is null` exactly as `loadHaberlerActorAt` does (a district
-    story is İstanbul here too); Etkinlikler asks `loadEtkinlikActor`'s own three
-    `+03:00` day ranges; the night's word, puzzle and questions are keyed to the **night**
-    and not the calendar date, which is what `ctx.date` already is at a sunset.
+    story is İstanbul here too); Etkinlikler asks `homeCityEvents`' own question — the paper
+    in force, the week from the paper's own day — and is red only for a week with nothing on
+    (a day without an evening is just a map with fewer dots); the day's word and puzzles are
+    keyed to the game's day, which is what `ctx.date` is.
     Where project.html's loader is the authority, the comment on the check names it.
-  - **A forme belongs to ONE side's paper** — Haberler and İlçe anketi are Kütüphane's and go
-    out at sunrise (`editions: ['gun']`), Etkinlikler and the three games are Kahvehane's and
-    go out at sunset (`['gece']`), and the bar is ordered by side. One whose side is not the
-    one going to press next is drawn **dashed**, the site's own "nothing here" convention,
-    and says when it goes instead ("Gün doğumunda" / "Gün batımında", `pressEditionWhen`)
-    rather than being dropped: the bar keeps the same shape all day, so an editor learns
-    where to look instead of re-reading it twice a day.
   - **Four states, and the middle one is the point.** `ok` is set and deliberately quiet — a
     desk full of ticks should read as nothing left to do, not as a wall of decoration.
-    `miss` is red and means *the reader will meet an empty slot*. `na` is the dashed one
-    above. `warn` is the one worth having: a night whose Sözcel word nobody chose (the
+    `miss` is red and means *the reader will meet an empty slot*. `na` is dashed: a game that
+    is not in either of the day's two slots. `warn` is the one worth having: a night whose Sözcel word nobody chose (the
     server picks one from the pool at play time, so it is not broken) or a front page that
     is a **holdover from an earlier day** — `news_current_edition` holds the newest edition
     at or before today, with no timer and no forced rollover, so an editor can go a week
@@ -1718,6 +1778,27 @@ remembered in `localStorage`, so a reload has the right map up before the profil
 confirms it; and the swap is aimed at images whose src *is* `istanbul-map.png`, because Kütüphane's
 Turkey map wears the same `.map-photo` class in the same shared document. Adding a district is a
 file drop plus one id in `PAINTED` — see `assets/map/home/README.md`.
+
+### The admin's colours sit over everything — palette.js's override layer
+
+Every colour on the site can be changed by the admin per state (siyah-beyaz / kahverengi × gündüz
+/ gece) without touching a stylesheet: admin.html's Renkler section publishes `site_palette`, and
+palette.js paints it as one `<style>` element on every page (see the table's own entry). Three
+things about it:
+
+- **It is the LAST word, by specificity and not by order.** Token overrides are
+  `:root:root[data-palette="…"][data-theme="…"] { --x: v !important }`; rule overrides are the
+  rule's own selector with those attributes merged into its first compound when it already starts
+  on the root (`html.ist-map-ink …`), or scoped under the root otherwise (`Palette.scopeSelector`).
+  A page's `<style data-page>` appended later by the router cannot beat it.
+- **A palette edit made here is a draft until it is baked in.** The override layer is how the admin
+  *finds* a palette; once one is settled, its CSS (Değişiklikler → "CSS'i göster") belongs in
+  palette.css / frames.css and the row can be emptied. Do not treat a long-standing override as the
+  source of truth for a token's value — read the row.
+- **The preview pin is the admin's phone and nothing else.** `Palette.preview({ palette, theme,
+  overrides })` pins a window to one state and paints a draft, is never written anywhere, and is
+  handed to same-origin child frames (`window.__istPalettePreview`) so a game opened in the preview
+  is in the same state. `Palette.current` / `currentTheme` report what is on screen, pinned or not.
 
 ### Gece is the lights coming ON — the lit tier in `frames.css`
 

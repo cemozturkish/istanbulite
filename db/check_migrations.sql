@@ -213,7 +213,11 @@ with checks(sira, dosya, aranan, var) as (
     (50, 'db/events_v2_plans.sql',                    'üyelerin planları (events.audience / created_by)',
          pg_temp.has_col('events', 'audience')
          and pg_temp.has_col('events', 'created_by')
-         and pg_temp.has_fn('event_readable'))
+         and pg_temp.has_fn('event_readable')),
+
+    -- ── Kasım: yöneticinin renkleri ──
+    (51, 'db/site_palette.sql',                       'site_palette tablosu (Renkler)',
+         to_regclass('public.site_palette') is not null)
 )
 select
   case when var then '✓ VAR' else '✗ EKSİK' end as durum,

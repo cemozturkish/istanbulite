@@ -40,7 +40,7 @@ kurarken yine de sırayla gerekir.
 | Aile | Sıra |
 |---|---|
 | Profil eklentileri | `avatar_hair` → `avatar_hair_v2`, `avatar_hat`, `avatar_accessory`, `avatar_shirt`, `profile_badges` |
-| Uygulama ayarları | `onboarding`, `app_settings`, `admin_notifications` → `admin_notification_reads` |
+| Uygulama ayarları | `onboarding`, `app_settings`, `admin_notifications` → `admin_notification_reads`; ayrıca **`site_palette`** (yöneticinin Renkler'de yayınladığı renkler — dört hâlin her biri için ayrı) |
 | İlçeler | `neighborhoods_v2_missing_districts` (kuruluş şeması dışında kalan 14 ilçeyi ekler) |
 | Mahalleler | `mahalles` |
 | Etkinlikler | `events` → `event_rsvps` → `baski_v1` → `events_kefil` → `hive_event_interest`, `hive_event_rsvp` → **`events_v2_plans`** (üyenin kendi planı: yalnızca peteğinde ona bağlı olanlar görür) → `events_v3_plan_edit` (üye planını düzenleyebilir; günü, saati ya da ilçesi değişen planın cevapları sıfırlanır) |
