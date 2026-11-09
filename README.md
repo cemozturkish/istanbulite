@@ -90,6 +90,25 @@ Or `npm run cap:open` to also relaunch Xcode.
 - `ios/` — the generated native Xcode project. Committed to source control (standard for Capacitor apps) except for `Pods/`, build output, and other machine-generated artifacts (see `ios/.gitignore`).
 
 
+## iOS App — native (SwiftUI)
+
+`ios-native/` is the app rewritten natively in SwiftUI. It is the launch app that `project.html`
+is today: sign in / kefil signup, the one home screen (the İstanbul map with the week's evenings
+and plans, the petek on the coast, RSVP cards, "+ Bir yere gidiyorum", today's two games), the
+whole petek behind the logo and the language flip on holding it. It talks to the same Supabase
+project over its REST API (no SDK). The three games are still the website's own pages, loaded
+live from istanbulite.net inside a native sheet and signed in with the app's session, so a web
+deploy updates them without an App Store release.
+
+Open `ios-native/Istanbulite.xcodeproj` in Xcode and Run. No npm, no CocoaPods. It keeps the
+bundle id `net.istanbulite.app` and version 2.0, so it ships as the update to the Capacitor app
+in `ios/`, which is left untouched until this one replaces it.
+
+- `Resources/districts.json` is generated from `assets/map/istanbul-map-mobile.svg`; regenerate it
+  if the tracing changes. The images in `Resources/Assets.xcassets` are copies of `assets/`.
+- Debug builds accept the launch argument `-demoHome` (and `-demoCard`) to show the home screen
+  with sample data and no account.
+
 ## Reliability checks
 
 Run `npm test` with Node.js 18 or newer. These dependency-free checks cover loading fallbacks, account-scoped game storage, game closure, picker retries, script syntax, and shared asset versions. They use mocked browser/database objects; device and authenticated integration testing remain separate.

@@ -16,6 +16,7 @@ const EXCLUDE = new Set([
   '.claude',
   'node_modules',
   'ios',
+  'ios-native',
   'android',
   'www',
   'db',
