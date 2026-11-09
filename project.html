@@ -14,7 +14,7 @@
   <script src="i18n.js?v=30"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=5"></script>
-  <link rel="stylesheet" href="palette.css?v=15">
+  <link rel="stylesheet" href="palette.css?v=16">
   <link rel="stylesheet" href="profile-card.css?v=60">
   <link rel="stylesheet" href="profile-bar.css?v=3">
   <script src="avatar.js?v=5" defer></script>
@@ -1321,7 +1321,14 @@
       -webkit-tap-highlight-color: transparent;
     }
     .fb.fb-whole-wash .fb-whole-scrim { opacity: 0.86; pointer-events: auto; transition: opacity 0.3s ease; }
-    html .fb.fb-home-on.fb-whole-on #fb-map {
+    /* The app's selector is spelled out because the app's own plans-on
+       floor (html.ist-native .fb.fb-home-on.fb-plans-on #fb-map, above)
+       outranks the plain one: with a plan of yours standing, the whole
+       petek's window stopped 110px above the bottom bar in the app only,
+       and the field ended there in a straight line. Equal weight, later
+       in the sheet, so this one wins. */
+    html .fb.fb-home-on.fb-whole-on #fb-map,
+    html.ist-native .fb.fb-home-on.fb-whole-on #fb-map {
       top: calc(env(safe-area-inset-top) + var(--navbar-h-top, 40px));
       bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px));
       left: 0; right: 0;
@@ -4822,6 +4829,59 @@ function homeDistrictPoint(d, boxRect) {
   };
 }
 
+// Where a district's mark stands when its centroid is off the screen
+// but a good part of the district is not: the centroid of what IS on
+// screen, its largest shape clipped to `b` (left/right/top/bottom, in
+// the same box coordinates). The app's screen is taller than Safari's
+// (no address bar), so `cover` scales the drawing up and crops the
+// sides harder -- Bakırköy's centroid fell off the left edge while most
+// of the red district was still in plain view, and it got an edge tag
+// instead of the "ist" mark the site shows. Null when too little of it
+// is left to stand a mark on (HOME_DOT_MIN_AREA), which is when the
+// edge tag is the honest answer.
+const HOME_DOT_MIN_AREA = 500;   // px², about a 22px square of land
+function homeDistrictVisiblePoint(d, boxRect, b) {
+  if (!districtLayer) return null;
+  let best = null;
+  districtLayer.querySelectorAll('polygon, path').forEach(el => {
+    if (districtKeyOf(el) !== d || !el.points || !el.points.numberOfItems) return;
+    const m = el.getScreenCTM();
+    if (!m) return;
+    let poly = [];
+    for (let i = 0; i < el.points.numberOfItems; i++) {
+      const p = el.points.getItem(i);
+      poly.push([m.a * p.x + m.c * p.y + m.e - boxRect.left, m.b * p.x + m.d * p.y + m.f - boxRect.top]);
+    }
+    // Sutherland–Hodgman against the four sides of the visible box.
+    const clip = (pts, inside, cut) => {
+      const out = [];
+      for (let i = 0; i < pts.length; i++) {
+        const cur = pts[i], prev = pts[(i + pts.length - 1) % pts.length];
+        const ci = inside(cur), pi = inside(prev);
+        if (ci) { if (!pi) out.push(cut(prev, cur)); out.push(cur); }
+        else if (pi) out.push(cut(prev, cur));
+      }
+      return out;
+    };
+    const atX = (x) => (p, q) => [x, p[1] + (q[1] - p[1]) * (x - p[0]) / (q[0] - p[0])];
+    const atY = (y) => (p, q) => [p[0] + (q[0] - p[0]) * (y - p[1]) / (q[1] - p[1]), y];
+    poly = clip(poly, p => p[0] >= b.left, atX(b.left));
+    if (poly.length) poly = clip(poly, p => p[0] <= b.right, atX(b.right));
+    if (poly.length) poly = clip(poly, p => p[1] >= b.top, atY(b.top));
+    if (poly.length) poly = clip(poly, p => p[1] <= b.bottom, atY(b.bottom));
+    if (poly.length < 3) return;
+    let a = 0, cx = 0, cy = 0;
+    for (let i = 0; i < poly.length; i++) {
+      const p = poly[i], q = poly[(i + 1) % poly.length];
+      const cross = p[0] * q[1] - q[0] * p[1];
+      a += cross; cx += (p[0] + q[0]) * cross; cy += (p[1] + q[1]) * cross;
+    }
+    if (Math.abs(a) / 2 < HOME_DOT_MIN_AREA || (best && Math.abs(a) <= best.a)) return;
+    best = { a: Math.abs(a), x: cx / (3 * a), y: cy / (3 * a) };
+  });
+  return best ? { x: best.x, y: best.y } : null;
+}
+
 // ── The dots ──
 async function renderHomeDots() {
   const layer = document.getElementById('fb-home-dots');
@@ -4854,6 +4914,25 @@ async function renderHomeDots() {
     const n = list.length;
     const nb = nbName(d === 'istanbul' ? null : d);
     let pt = d === 'istanbul' ? null : homeDistrictPoint(d, rect);
+    // Centroid off the screen but the district still in view: stand the
+    // mark on the part that shows (see homeDistrictVisiblePoint), kept a
+    // whole mark's width (plus the ±9 pair offset) inside the edges.
+    if (pt && !(pt.x >= HOME_DOT_EDGE && pt.x <= rect.width - HOME_DOT_EDGE &&
+        pt.y >= top + HOME_DOT_EDGE && pt.y <= rect.height - HOME_DOT_EDGE)) {
+      // Measured against the screen's own edges -- an inset here clipped
+      // away nearly all of Bakırköy, which shows only ~47px wide at the
+      // app's left edge. The mark is then pulled in far enough that the
+      // drawn logo (27px) and the ±9 pair offset stay on screen.
+      const seen = homeDistrictVisiblePoint(d, rect,
+        { left: 0, right: rect.width, top, bottom: rect.height });
+      if (seen) {
+        const inX = HOME_DOT_EDGE + 11, inY = HOME_DOT_EDGE + 2;
+        pt = {
+          x: Math.min(Math.max(seen.x, inX), rect.width - inX),
+          y: Math.min(Math.max(seen.y, top + inY), rect.height - inY),
+        };
+      }
+    }
     // A district carrying both kinds stands them side by side, the
     // evening to the left of the plan, rather than one over the other.
     if (pt && groups.has((kind === 'c' ? 'p' : 'c') + ':' + d)) {
