@@ -5137,15 +5137,32 @@ function placeHomeCard() {
   }
   const w = card.offsetWidth, h = card.offsetHeight;
   const tail = card.querySelector('.fb-evcard-tail');
-  // Above the dot when there is room under the top bar. Otherwise, where
-  // the screen is wide enough, beside it -- so it never comes down over
-  // the petek it is reading out -- and only failing both, below it.
+  // The card is reading the petek out, so it never comes down over it: the
+  // top of the highest hexagon (or name) is the floor the card must end
+  // above. Measured live, since the petek is refitted whenever the box moves.
+  let floor = rect.height - inset;
+  const mapEl = document.getElementById('fb-map');
+  if (mapEl) {
+    let petekTop = Infinity;
+    mapEl.querySelectorAll('.ist-hive-cell').forEach(c => {
+      if ((parseInt(c.dataset.ring, 10) || 0) > 1) return;
+      const r = c.getBoundingClientRect();
+      if (r.width) petekTop = Math.min(petekTop, r.top - rect.top);
+    });
+    if (petekTop < Infinity) floor = Math.min(floor, petekTop - 8);
+  }
+  const maxTop = Math.max(top + 6, floor - h);
+  if (tail) tail.style.display = '';
+  // Preference: above the dot; below it where that still ends over the
+  // petek; beside it; and failing all of those, held in the band above the
+  // petek (the tail is dropped when the card then sits over its own dot).
   const above = y - h - 18 >= top + 6;
+  const below = y + 18 + h <= floor;
   const besideRight = x + 22 + w <= rect.width - inset;
   const besideLeft = x - 22 - w >= inset;
-  if (!above && (besideRight || besideLeft)) {
+  if (!above && !below && (besideRight || besideLeft)) {
     const left = besideRight ? x + 22 : x - 22 - w;
-    const cardTop = Math.min(Math.max(y - h / 2, top + 6), rect.height - h - inset);
+    const cardTop = Math.min(Math.max(y - h / 2, top + 6), maxTop);
     card.style.left = left.toFixed(1) + 'px';
     card.style.top = cardTop.toFixed(1) + 'px';
     if (tail) {
@@ -5156,13 +5173,15 @@ function placeHomeCard() {
     return;
   }
   const left = Math.min(Math.max(x - w / 2, inset), rect.width - inset - w);
-  const cardTop = above ? y - h - 18 : y + 18;
+  const cardTop = Math.min(Math.max(above ? y - h - 18 : y + 18, top + 6), maxTop);
   card.style.left = left.toFixed(1) + 'px';
-  card.style.top = Math.max(top + 6, cardTop).toFixed(1) + 'px';
+  card.style.top = cardTop.toFixed(1) + 'px';
   if (tail) {
-    tail.className = 'fb-evcard-tail ' + (above ? 'dn' : 'up');
+    const sitsOver = y > cardTop - 4 && y < cardTop + h + 4;
+    tail.className = 'fb-evcard-tail ' + (cardTop + h / 2 > y ? 'up' : 'dn');
     tail.style.top = '';
     tail.style.left = Math.min(Math.max(x - left - 6, 10), w - 22).toFixed(1) + 'px';
+    if (sitsOver) tail.style.display = 'none';
   }
 }
 
