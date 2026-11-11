@@ -10083,6 +10083,15 @@ if (!window.__istVirtualNavInjecting) {
   // it is the app itself. A page injected by a virtual navigation has no
   // loading screen in it and none of this runs there.
   if (window.LoadingScreen) resolveLoading = LoadingScreen.start(() => {}, { force: true });
+  // Nobody signed in (a session that expired, or a bookmarked link opened
+  // in a fresh browser): the login screen, not this page. Without it every
+  // signed-in-only fetch here comes back empty and the reader is left on a
+  // bare map with no bar, no petek and no evenings, and no way out of it.
+  // And a session that ends while the page is open goes the same way.
+  IstRouter.requireSession();
+  IstRouter.sb.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') window.location.href = 'index.html';
+  });
   mount();
   window.addEventListener('DOMContentLoaded', () => {
     // `everyWidth`: the desktop layout carries the bar too (see THE
