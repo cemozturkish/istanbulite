@@ -50,7 +50,9 @@ Guideline 1.2): a report copies the plan into `content_reports` for the admin (a
 Şikayetler, `admin_remove_plan`), and a block files a report too and is symmetric through
 `event_readable()` — neither member sees the other's plans. A block also breaks their bond
 regardless of the week's lock and hides each from the other's `hive_map()`
-(`db/plan_reports_blocks_v2_petek.sql`). The rules they enforce are the
+(`db/plan_reports_blocks_v2_petek.sql`); where a hidden member still stands on the shared grid
+(through somebody else's bond) the petek draws a dark, unpressable hexagon from
+`hive_hidden_cells()`. Nobody else's petek changes. The rules they enforce are the
 "Topluluk Kuralları" section of `gizlilik.html`, agreed to at signup.
 
 ---

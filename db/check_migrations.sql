@@ -220,7 +220,8 @@ with checks(sira, dosya, aranan, var) as (
          and to_regprocedure('public.report_plan(uuid,boolean)') is not null
          and to_regprocedure('public.admin_remove_plan(uuid)') is not null),
     (53, 'db/plan_reports_blocks_v2_petek.sql',      'engelleme petekten de çıkarır (hive_break_for_block)',
-         to_regprocedure('public.hive_break_for_block(uuid,uuid)') is not null),
+         to_regprocedure('public.hive_break_for_block(uuid,uuid)') is not null
+         and pg_temp.has_fn('hive_hidden_cells')),
 
     -- ── Kasım: yöneticinin renkleri ──
     (51, 'db/site_palette.sql',                       'site_palette tablosu (Renkler)',

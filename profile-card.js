@@ -1751,6 +1751,8 @@
   // Re-trace this if frame.png is ever redrawn. Like --ist-hive-step-x/y
   // in profile-card.css, it is the drawing's number and not the box's.
   const HIVE_HEX_PATH = 'M 513 1348 L 507 1348 L 307 1230 L 144 1138 L 127 1128 L 124 1122 L 124 876 L 126 796 L 124 492 L 124 410 L 132 404 L 328 294 L 510 186 L 514 188 L 738 320 L 889 404 L 894 408 L 898 414 L 898 659 L 896 747 L 898 1043 L 898 1125 L 878 1138 L 795 1184 L 622 1284 Z M 516 1311 L 527 1306 L 542 1296 L 710 1176 L 737 1156 L 802 1110 L 828 1087 L 838 1069 L 842 1054 L 844 985 L 842 967 L 844 862 L 844 674 L 842 569 L 844 551 L 842 476 L 834 456 L 815 436 L 541 238 L 519 226 L 505 224 L 495 228 L 483 236 L 376 312 L 281 382 L 220 424 L 194 447 L 184 466 L 180 481 L 178 569 L 178 697 L 178 862 L 180 967 L 178 985 L 180 1060 L 190 1081 L 204 1098 L 249 1132 L 278 1150 L 312 1176 L 480 1296 L 495 1306 L 504 1310 Z';
+  // Its outer contour alone, for a hexagon drawn solid (hiveHiddenCellHTML).
+  const HIVE_HEX_SOLID = HIVE_HEX_PATH.slice(0, HIVE_HEX_PATH.indexOf(' M ', 1));
 
   // How far the field has to reach, in cells, for the honeycomb to run
   // off every edge of the screen rather than stopping in mid-air with
@@ -2299,6 +2301,15 @@
   // the div means the box, data-ring, --ring and every rule that reads
   // them behave exactly as they did before this change; only what is
   // drawn inside the box is different.
+  // A place somebody stands in whom the reader is not shown (a block):
+  // the drawn ring over its own outer shape filled dark, so it reads as
+  // taken rather than as a free seat. Not a control -- no press, no name.
+  function hiveHiddenCellHTML(meta) {
+    return `<div class="ist-hive-cell ist-hive-ghost ist-hive-hidden" ${meta} aria-hidden="true">`
+      + `<svg class="ist-hive-frame ist-hive-ghost-ink" viewBox="0 0 1024 1536">`
+      + `<use class="ist-hive-hidden-fill" href="#ist-hive-hex-solid"/><use href="#ist-hive-hex"/></svg></div>`;
+  }
+
   function hiveGhostCellHTML(meta) {
     return `<div class="ist-hive-cell ist-hive-ghost" ${meta} aria-hidden="true">`
       + `<svg class="ist-hive-frame ist-hive-ghost-ink" viewBox="0 0 1024 1536"><use href="#ist-hive-hex"/></svg></div>`;
@@ -2352,15 +2363,21 @@
   function hiveGridHTML(opts) {
     const t = opts.t;
     const cells = (opts.hive && opts.hive.cells) || [];
+    // Somebody stands here and the reader is not shown who (a block, see
+    // fetchHiveMap). Taken like any member's cell -- never a free seat --
+    // and drawn as a dark hexagon that takes no press.
+    const hidden = (opts.hive && opts.hive.hidden) || [];
     const open = opts.open || null;
     const status_ = (opts.hive && opts.hive.status) || new Map();
     const taken = new Set(cells.map(c => `${c.q},${c.r}`));
+    hidden.forEach(c => taken.add(`${c.q},${c.r}`));
     // The caller stands at (0,0) too — a name must not be printed over
     // their frame either.
     const occupied = new Set(taken); occupied.add('0,0');
 
     const items = [{ q: 0, r: 0, kind: 'me' }];
     cells.forEach(c => items.push({ q: c.q, r: c.r, kind: 'member', member: c }));
+    hidden.forEach(c => items.push({ q: c.q, r: c.r, kind: 'hidden' }));
     // Your own free sides: the six seats you can offer.
     const mine = new Set();
     HIVE_DIRS.forEach((v, dir) => {
@@ -2453,6 +2470,7 @@
         const picked = opts.selected && opts.selected === String(item.member.member_id);
         return hiveMemberCellHTML(item.member, meta, nameSide, status, t, picked);
       }
+      if (item.kind === 'hidden') return hiveHiddenCellHTML(meta);
       if (item.kind === 'ghost') {
         const band = Math.min(ring, HIVE_FIELD_RING_LAST);
         field[band] = (field[band] || '') + hiveGhostCellHTML(meta);
@@ -2470,7 +2488,8 @@
     // every entry, and a <defs> left behind in the body would be a second
     // element claiming the same id.
     const defs = `<svg class="ist-hive-defs" width="0" height="0" aria-hidden="true" focusable="false">`
-      + `<defs><path id="ist-hive-hex" d="${HIVE_HEX_PATH}" fill-rule="evenodd"/></defs></svg>`;
+      + `<defs><path id="ist-hive-hex" d="${HIVE_HEX_PATH}" fill-rule="evenodd"/>`
+      + `<path id="ist-hive-hex-solid" d="${HIVE_HEX_SOLID}"/></defs></svg>`;
     return `
       <div class="ist-hive" id="po-hive-view">
         <div class="ist-hive-plane" id="po-hive-plane" style="width: ${w}; height: ${h};">${defs}${html}</div>
@@ -3115,9 +3134,21 @@
   // navigations (mountHivePage seeds the next mount from it).
   let _hiveMap = null;
 
+  // The map, and the places on it the reader is not shown who stands in
+  // (members either side has blocked, db/plan_reports_blocks_v2_petek.sql).
+  // The second is best-effort: a database without the migration has no
+  // such function and simply has nothing hidden.
+  async function fetchHiveMap(sb) {
+    const [map, hid] = await Promise.all([
+      sb.rpc('hive_map'),
+      sb.rpc('hive_hidden_cells').then(r => r, () => ({ data: null })),
+    ]);
+    return { data: map.data, hidden: (hid && !hid.error && hid.data) || [] };
+  }
+
   async function loadHive(state) {
     state.hiveLoaded = true;
-    const { data } = await state.sb.rpc('hive_map');
+    const { data, hidden } = await fetchHiveMap(state.sb);
     // Not this page any more: a swipe away and back mounts a fresh state
     // while this call is still in flight, and the loser must not paint
     // its own (captionless, differently-levelled) petek into the winner's
@@ -3126,7 +3157,7 @@
     // hidden with it. renderHive draws by id, so nothing about the swap
     // stops it.
     if (state !== _hive) return;
-    state.hive = Object.assign({}, state.hive, { cells: data || [] });
+    state.hive = Object.assign({}, state.hive, { cells: data || [], hidden });
     // Kept for the next mount of this page, so a swipe back to Hane
     // draws the petek it left rather than the reader alone for a beat.
     _hiveMap = state.hive;
@@ -3153,9 +3184,9 @@
   }
 
   async function reloadHiveMap(state) {
-    const { data } = await state.sb.rpc('hive_map');
+    const { data, hidden } = await fetchHiveMap(state.sb);
     if (state !== _hive) return;
-    state.hive = Object.assign({}, state.hive, { cells: data || [] });
+    state.hive = Object.assign({}, state.hive, { cells: data || [], hidden });
     _hiveMap = state.hive;
     announceHiveMap(state);
     // With the day glyph parked nothing comes back to re-render the new
