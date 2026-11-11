@@ -4381,8 +4381,19 @@
     renderView();
   }
 
+  // Re-reads the petek after something outside this file changed who is
+  // on it -- a block from a plan card (db/plan_reports_blocks_v2_petek.sql).
+  // Not mounted: the cached map is dropped, so the next mount does not
+  // draw the old petek for a beat before the fetch lands.
+  function refreshHive() {
+    if (_hive && _hive.hiveLoaded) return reloadHiveMap(_hive);
+    _hiveMap = null;
+    return Promise.resolve();
+  }
+
   global.IstProfileCard = {
     mount,
+    refreshHive,
     setPage,
     setBarLayout,
     setBarLevelLabel,
