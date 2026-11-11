@@ -44,7 +44,12 @@ desk still writes `'gun'` into it for a cached old reader). `CONTENT_FOLLOWS_SUN
 **Members' own plans** ("I'll be here, this day, this time") are built and gated on the database,
 not on a flag: until `db/events_v2_plans.sql` has been run, the plan fetch answers an error, the
 "+ BİR YERE GİDİYORUM" button stays hidden and the home screen is exactly what it was without them.
-See "Plans" under "The home screen".
+See "Plans" under "The home screen". A plan is the site's one piece of member-written content another member reads, so it
+carries **Şikayet et / Engelle** under its answer (`db/plan_reports_blocks.sql`, App Store
+Guideline 1.2): a report copies the plan into `content_reports` for the admin (admin.html → Üyeler →
+Şikayetler, `admin_remove_plan`), and a block files a report too and is symmetric through
+`event_readable()` — neither member sees the other's plans. The rules they enforce are the
+"Topluluk Kuralları" section of `gizlilik.html`, agreed to at signup.
 
 ---
 

@@ -1189,6 +1189,15 @@
     /* The creator's own card: one button, and the question it asks first. */
     .fb-evcard-btns.one { grid-template-columns: 1fr; }
     .fb-evcard-ask { font-size: 0.8rem; font-weight: 700; }
+    .fb-evcard-flag {
+      display: flex; justify-content: center; align-items: center; gap: 8px;
+      font-size: 0.72rem; color: var(--muted);
+    }
+    .fb-evcard-flag button {
+      background: none; border: 0; padding: 4px 2px; font: inherit; color: inherit;
+      text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+    }
+    .fb-evcard-flag.done { font-weight: 700; color: var(--ink); }
 
     /* ── A PLAN: a member's own "I'll be here", from the reader's petek ──
        A SOLID RED DOT, where a city evening is a dot with paper in it (a
@@ -5035,7 +5044,7 @@ function renderHomeCard(paint) {
   if (!card || !homeOpen) return;
   // A different evening on the card never inherits the last one's
   // "take it back?" question.
-  if (paint) homeOpen.confirm = false;
+  if (paint) { homeOpen.confirm = false; homeOpen.flag = null; homeOpen.flagged = false; }
   const { list, idx } = homeOpen;
   const ev = list[idx];
   const mine = homeMine(ev.id);
@@ -5070,7 +5079,7 @@ function renderHomeCard(paint) {
           esc(tEv(mine === 'go' ? 'events.youregoing' : 'events.going')) + '</button>' +
         '<button type="button" data-rsvp="no" class="' + (mine === 'no' ? 'on' : '') + '">' +
           esc(tEv('events.notgoing')) + '</button>' +
-      '</div>';
+      '</div>' + planFlagHTML(ev);
   card.classList.toggle('fb-evcard-plan', !!ev._plan);
   // The document is lang="tr", and CSS case-folds by the element's own
   // language: without this an English "I'm going" uppercases to "GOİNG".
@@ -5099,9 +5108,17 @@ function renderHomeCard(paint) {
     homeOpen.confirm = what === 'ask';
     renderHomeCard(false);
   }));
+  card.querySelectorAll('[data-flag]').forEach(b => b.addEventListener('click', () => {
+    const what = b.dataset.flag;
+    if (what === 'send') { flagPlan(ev, homeOpen.flag === 'block'); return; }
+    homeOpen.flag = what === 'cancel' ? null : what;
+    renderHomeCard(false);
+  }));
   card.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
     homeOpen.idx = (homeOpen.idx + Number(b.dataset.step) + list.length) % list.length;
     homeOpen.confirm = false;
+    homeOpen.flag = null;
+    homeOpen.flagged = false;
     renderHomeCard(true);
   }));
   const x = card.querySelector('.fb-evcard-x');
@@ -5224,6 +5241,52 @@ async function takeBackPlan(ev) {
   }
   closeHomeCard();
   refreshHomeDots();
+}
+
+// ── Reporting a plan, blocking its creator (db/plan_reports_blocks.sql) ──
+// A plan is the one thing on the site another member writes for somebody
+// else to read, so it is the one card that carries these two. They sit
+// under the answer, small, because they are not what the card is for --
+// and each asks once before it does anything. A report goes to the admin
+// and leaves the plan where it is; a block files a report too, and the
+// creator's plans leave this reader's map (and this reader's leave
+// theirs) the moment the dots are re-read.
+function planFlagHTML(ev) {
+  if (!ev._plan || ev._mine) return '';
+  if (homeOpen.flagged) return '<div class="fb-evcard-flag done">' + esc(tEv('plan.flag.thanks')) + '</div>';
+  if (homeOpen.flag) {
+    const block = homeOpen.flag === 'block';
+    return '<div class="fb-evcard-ask">' + esc(tEv(block ? 'plan.block.sure' : 'plan.report.sure')) + '</div>' +
+      '<div class="fb-evcard-btns">' +
+        '<button type="button" data-flag="send" class="on">' + esc(tEv(block ? 'plan.block' : 'plan.report')) + '</button>' +
+        '<button type="button" data-flag="cancel">' + esc(tEv('plan.flag.cancel')) + '</button>' +
+      '</div>';
+  }
+  return '<div class="fb-evcard-flag">' +
+    '<button type="button" data-flag="report">' + esc(tEv('plan.report')) + '</button>' +
+    '<span aria-hidden="true">·</span>' +
+    '<button type="button" data-flag="block">' + esc(tEv('plan.block')) + '</button>' +
+  '</div>';
+}
+
+async function flagPlan(ev, block) {
+  const card = document.getElementById('fb-evcard');
+  if (card) card.querySelectorAll('button').forEach(b => { b.disabled = true; });
+  try {
+    const { error } = await IstRouter.sb.rpc('report_plan', { p_event_id: ev.id, p_block: !!block });
+    if (error) throw error;
+  } catch (err) {
+    console.error('[proje plan şikayet]', err);
+    if (homeOpen) { homeOpen.flag = null; renderHomeCard(false); }
+    alert(tEv('plan.flag.err'));
+    return;
+  }
+  if (block) {
+    closeHomeCard();
+    refreshHomeDots();
+    return;
+  }
+  if (homeOpen) { homeOpen.flag = null; homeOpen.flagged = true; renderHomeCard(false); }
 }
 
 // ── + BİR YERE GİDİYORUM ──
