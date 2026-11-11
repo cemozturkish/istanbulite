@@ -89,7 +89,7 @@
     'plan.report':         { default: 'Şikayet et',           more_english: 'Report' },
     'plan.block':          { default: 'Engelle',              more_english: 'Block' },
     'plan.report.sure':    { default: 'Bu plan uygunsuz mu? Yöneticiye bildirilecek.', more_english: 'Is this plan inappropriate? It will be sent to the admin.' },
-    'plan.block.sure':     { default: 'Bu üyeyi engelle? Birbirinizin planlarını artık görmezsiniz; yönetici de haberdar edilir.', more_english: "Block this member? You will no longer see each other's plans, and the admin will be told." },
+    'plan.block.sure':     { default: 'Bu üyeyi engelle? Peteğinden çıkar ve birbirinizin planlarını artık görmezsiniz; yönetici de haberdar edilir.', more_english: "Block this member? They leave your petek, you will no longer see each other's plans, and the admin will be told." },
     'plan.flag.cancel':    { default: 'Vazgeç',               more_english: 'Cancel' },
     'plan.flag.thanks':    { default: 'Bildirildi. Teşekkürler, 24 saat içinde bakacağız.', more_english: "Reported. Thank you, we'll look at it within 24 hours." },
     'plan.flag.err':       { default: 'Gönderilemedi, tekrar dene.', more_english: "Couldn't send it, try again." },

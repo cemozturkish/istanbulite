@@ -48,7 +48,9 @@ See "Plans" under "The home screen". A plan is the site's one piece of member-wr
 carries **Şikayet et / Engelle** under its answer (`db/plan_reports_blocks.sql`, App Store
 Guideline 1.2): a report copies the plan into `content_reports` for the admin (admin.html → Üyeler →
 Şikayetler, `admin_remove_plan`), and a block files a report too and is symmetric through
-`event_readable()` — neither member sees the other's plans. The rules they enforce are the
+`event_readable()` — neither member sees the other's plans. A block also breaks their bond
+regardless of the week's lock and hides each from the other's `hive_map()`
+(`db/plan_reports_blocks_v2_petek.sql`). The rules they enforce are the
 "Topluluk Kuralları" section of `gizlilik.html`, agreed to at signup.
 
 ---
