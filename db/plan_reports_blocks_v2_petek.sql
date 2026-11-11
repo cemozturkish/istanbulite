@@ -18,8 +18,11 @@
 --      grid, so a blocked member can still be standing on it through
 --      somebody else's bond. Their cell stays where it is (moving them
 --      would move a formation other people are standing in) but neither
---      of the two is drawn on the other's map; the seat reads as taken,
---      and a claim on it is refused by the grid as it always was.
+--      of the two is drawn on the other's map. hive_hidden_cells() hands
+--      the client just those positions, which it draws as dark hexagons
+--      nobody can press -- somebody is there, and you are not shown who.
+--      Nobody else's petek changes: only the two members' own bond
+--      breaks, and everyone else still sees everyone.
 --
 -- Blocks made before this migration get step 1 applied at the bottom.
 --
@@ -147,6 +150,37 @@ $$;
 
 revoke all on function public.hive_map() from public;
 grant execute on function public.hive_map() to authenticated;
+
+
+-- ── Where the hidden members stand ────────────────────────────────────
+-- hive_map() leaves a blocked member out, but their cell is still on the
+-- grid, and one standing on a side of the caller's own hexagon would
+-- otherwise read as a free seat that refuses every code. So the client
+-- draws these places as dark hexagons nobody can press. Positions only,
+-- relative to the caller like hive_map(): no id, no name, nothing that
+-- says who is standing there.
+create or replace function public.hive_hidden_cells()
+returns table (q int, r int)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  with me as (
+    select * from public.hive_cells where user_id = auth.uid()
+  )
+  select c.q - me.q, c.r - me.r
+  from me
+  join public.hive_cells c on c.map_id = me.map_id and c.user_id <> me.user_id
+  where exists (
+    select 1 from public.member_blocks k
+    where (k.blocker = me.user_id and k.blocked = c.user_id)
+       or (k.blocker = c.user_id and k.blocked = me.user_id)
+  );
+$$;
+
+revoke all on function public.hive_hidden_cells() from public;
+grant execute on function public.hive_hidden_cells() to authenticated;
 
 
 -- ── Blocks made before this migration ────────────────────────────────
