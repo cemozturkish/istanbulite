@@ -3896,7 +3896,16 @@
 
     <!-- RIGHT: Members List -->
     <div class="panel">
-      <div class="panel-title">Members</div>
+      <div class="panel-title">Şikayetler</div>
+      <div class="setting-row-sub" style="margin-bottom:10px;">
+        Üyelerin şikayet ettiği ya da sahibini engellediği planlar
+        (db/plan_reports_blocks.sql). App Store kuralı: 24 saat içinde bakılmalı.
+      </div>
+      <div class="articles-list" id="reports-list">
+        <div class="empty-state"><span class="spinner"></span></div>
+      </div>
+
+      <div class="panel-title" style="margin-top:22px;">Members</div>
       <div class="articles-list" id="users-list">
         <div class="empty-state"><span class="spinner"></span></div>
       </div>
@@ -4231,7 +4240,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'politicians') loadPoliticiansTab();
     if (tab === 'tbmm') loadTBMMTab();
     if (tab === 'notifications') loadNotifications();
-    if (tab === 'users') { loadUsersList(); loadOnboardingToggle(); loadOnboardingCopy(); loadCardFontSizes(); }
+    if (tab === 'users') { loadReportsList(); loadUsersList(); loadOnboardingToggle(); loadOnboardingCopy(); loadCardFontSizes(); }
     if (tab === 'colors') colorsOpen(); else colorsClose();
     // The rail's follow-through: shut whatever drawer stood on the section
     // being left.
@@ -6371,6 +6380,60 @@ async function saveCardFontRow(rowEl) {
 // ══════════════════════════════════════════
 // Users tab — list
 // ══════════════════════════════════════════
+// ── Şikayetler: reported plans and blocks (db/plan_reports_blocks.sql) ──
+// Open reports first, newest first. A report carries a copy of the plan's
+// words, because the admin cannot read members' plans and a plan is
+// usually gone by the next midnight anyway. "Planı kaldır" deletes the
+// plan if it still stands and closes every report on it; "Kapat" closes
+// just this one.
+async function loadReportsList() {
+  const listEl = document.getElementById('reports-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const { data, error } = await sb.from('content_reports')
+    .select('*').order('resolved_at', { ascending: false, nullsFirst: true })
+    .order('created_at', { ascending: false }).limit(100);
+  if (error) {
+    listEl.innerHTML = '<div class="empty-state">Şikayetler okunamadı: ' + escapeHtml(error.message) +
+      (/content_reports/.test(error.message) ? ' (db/plan_reports_blocks.sql çalıştırıldı mı?)' : '') + '</div>';
+    return;
+  }
+  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">Şikayet yok.</div>'; return; }
+  const ids = [...new Set(data.flatMap(r => [r.reporter, r.reported_user]).filter(Boolean))];
+  const names = {};
+  if (ids.length) {
+    const { data: ps } = await sb.from('profiles').select('id, first_name, last_name').in('id', ids);
+    (ps || []).forEach(p => { names[p.id] = capitalizeName(((p.first_name || '') + ' ' + (p.last_name || '')).trim()) || '(isimsiz)'; });
+  }
+  const when = (t) => t ? new Date(t).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+  listEl.innerHTML = data.map(r => `
+      <div class="article-card"${r.resolved_at ? ' style="opacity:0.55;"' : ''}>
+        <div class="a-neighborhood">${r.reason === 'block' ? 'ENGELLEME' : 'ŞİKAYET'} · ${escapeHtml(when(r.created_at))}${r.resolved_at ? ' · kapandı' : ''}</div>
+        <h4>${escapeHtml(r.title || '(plan metni yok)')}</h4>
+        <p>
+          ${r.location ? escapeHtml(r.location) + ' · ' : ''}${escapeHtml(when(r.event_date))}<br>
+          <span style="color:var(--muted);">Yazan: ${escapeHtml(names[r.reported_user] || '(silinmiş)')} · Bildiren: ${escapeHtml(names[r.reporter] || '(silinmiş)')}</span>
+        </p>
+        ${r.resolved_at ? '' : `<div style="display:flex;gap:8px;">
+          ${r.event_id ? `<button class="btn btn-danger" data-report-remove="${escapeHtml(r.event_id)}">Planı kaldır</button>` : ''}
+          <button class="btn" data-report-close="${escapeHtml(r.id)}">Kapat</button>
+        </div>`}
+      </div>`).join('');
+  listEl.querySelectorAll('[data-report-remove]').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Bu plan herkesten kaldırılsın mı?')) return;
+    b.disabled = true;
+    const { error: e } = await sb.rpc('admin_remove_plan', { p_event_id: b.dataset.reportRemove });
+    if (e) { alert('Kaldırılamadı: ' + e.message); b.disabled = false; return; }
+    loadReportsList();
+  }));
+  listEl.querySelectorAll('[data-report-close]').forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true;
+    const { error: e } = await sb.from('content_reports').update({ resolved_at: new Date().toISOString() }).eq('id', b.dataset.reportClose);
+    if (e) { alert('Kapatılamadı: ' + e.message); b.disabled = false; return; }
+    loadReportsList();
+  }));
+}
+
 async function loadUsersList() {
   const listEl = document.getElementById('users-list');
   listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';

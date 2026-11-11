@@ -214,6 +214,11 @@ with checks(sira, dosya, aranan, var) as (
          pg_temp.has_col('events', 'audience')
          and pg_temp.has_col('events', 'created_by')
          and pg_temp.has_fn('event_readable')),
+    (52, 'db/plan_reports_blocks.sql',                'plan şikayeti ve engelleme (content_reports / member_blocks)',
+         to_regclass('public.content_reports') is not null
+         and to_regclass('public.member_blocks') is not null
+         and to_regprocedure('public.report_plan(uuid,boolean)') is not null
+         and to_regprocedure('public.admin_remove_plan(uuid)') is not null),
 
     -- ── Kasım: yöneticinin renkleri ──
     (51, 'db/site_palette.sql',                       'site_palette tablosu (Renkler)',

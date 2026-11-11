@@ -85,6 +85,14 @@
     'plan.takeback.sure':  { default: 'Bu plan geri alınsın mı?', more_english: 'Take this plan back?' },
     'plan.yes':            { default: 'Evet, geri al',        more_english: 'Yes, take it back' },
     'plan.cancel':         { default: 'Vazgeç',               more_english: 'Keep it' },
+    // Reporting a plan / blocking its creator (db/plan_reports_blocks.sql).
+    'plan.report':         { default: 'Şikayet et',           more_english: 'Report' },
+    'plan.block':          { default: 'Engelle',              more_english: 'Block' },
+    'plan.report.sure':    { default: 'Bu plan uygunsuz mu? Yöneticiye bildirilecek.', more_english: 'Is this plan inappropriate? It will be sent to the admin.' },
+    'plan.block.sure':     { default: 'Bu üyeyi engelle? Birbirinizin planlarını artık görmezsiniz; yönetici de haberdar edilir.', more_english: "Block this member? You will no longer see each other's plans, and the admin will be told." },
+    'plan.flag.cancel':    { default: 'Vazgeç',               more_english: 'Cancel' },
+    'plan.flag.thanks':    { default: 'Bildirildi. Teşekkürler, 24 saat içinde bakacağız.', more_english: "Reported. Thank you, we'll look at it within 24 hours." },
+    'plan.flag.err':       { default: 'Gönderilemedi, tekrar dene.', more_english: "Couldn't send it, try again." },
     'plan.err':            { default: 'Gönderilemedi, tekrar dene.', more_english: "Couldn't send it, try again." },
     'plan.err.what':       { default: 'Ne yapacağını yaz.',   more_english: 'Say what you are doing.' },
     'plan.err.district':   { default: 'Bir ilçe seç.',        more_english: 'Pick a district.' },
@@ -231,7 +239,7 @@
     'auth.birthdistrict':  { default: 'Doğduğun Mahalle',    more_english: 'Where You Were Born' },
     'auth.kefilnote':      { default: 'Kayıt için kefil kodu', more_english: 'Sponsor code required to sign up' },
     'auth.privacypolicy':  { default: 'Gizlilik Politikası',  more_english: 'Privacy Policy' },
-    'auth.privacyagree':   { default: '<a href="gizlilik.html" target="_blank">Gizlilik Politikası</a>nı okudum ve kabul ediyorum.', more_english: 'I have read and accept the <a href="gizlilik.html" target="_blank">Privacy Policy</a>.' },
+    'auth.privacyagree':   { default: '<a href="gizlilik.html" target="_blank">Gizlilik Politikası</a>nı ve <a href="gizlilik.html#kurallar" target="_blank">Topluluk Kuralları</a>nı okudum ve kabul ediyorum.', more_english: 'I have read and accept the <a href="gizlilik.html" target="_blank">Privacy Policy</a> and the <a href="gizlilik.html#rules" target="_blank">Community Rules</a>.' },
 
     // games (shared bits)
     'games.howto':         { default: 'Nasıl Oynanır',       more_english: 'How to Play' },
