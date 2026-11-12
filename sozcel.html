@@ -44,7 +44,7 @@
   <script src="game-locks.js?v=3" defer></script>
   <link rel="stylesheet" href="profile-card.css?v=61">
   <link rel="stylesheet" href="profile-bar.css?v=3" media="(max-width: 768px)">
-  <script src="profile-card.js?v=74" defer></script>
+  <script src="profile-card.js?v=75" defer></script>
   <script src="sheet.js?v=6"></script>
   <link rel="stylesheet" href="sheet.css?v=9">
   <style>
@@ -859,10 +859,38 @@
       z-index: 200;
       gap: 6px;
     }
-    /* Scoreboard inside mobile popup */
-    #score-mobile-overlay .scoreboard-list {
-      width: 100%;
+    /* The scoreboard button opens the reader's PETEK: who on it has played
+       tonight's word (IstProfileCard.paintHiveGameStates). The card is a
+       fixed box so the petek has a window to be fitted into (fitHive). */
+    #score-mobile-overlay .result-card {
+      display: flex;
+      flex-direction: column;
+      height: min(460px, calc(100vh - 32px));
+      overflow: hidden;
+      padding: 18px 8px 8px;
+    }
+    #score-mobile-overlay .score-hive-sub {
+      font-size: 0.72rem;
+      letter-spacing: 0.4px;
+      color: var(--muted);
+    }
+    #score-hive-page {
+      position: relative;
+      flex: 1;
+      min-height: 0;
       margin-top: 6px;
+      /* Nothing rises from under the drawing here (see hiveFootGap). */
+      --ist-hive-foot-gap: 6px;
+    }
+    /* This window is for reading who has played, not for handing out
+       seats: the free sides are left undrawn (still in the layout, so the
+       fit is the one the petek has everywhere else). */
+    #score-hive-page .ist-hive-cell:not(.ist-hive-filled):not(.ist-hive-me) { visibility: hidden; }
+    #score-hive-page > .ist-hive-page {
+      position: absolute;
+      inset: 0;
+      height: auto;
+      --ist-hive-page-pad: 4px;
     }
 
     /* Help popup reuses the result-overlay styling but with body text */
@@ -2115,11 +2143,9 @@
   <div class="result-overlay" id="score-mobile-overlay">
     <div class="result-card">
       <button class="result-close" id="score-mobile-close" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-      <div class="result-title" style="margin-bottom:6px;">Skor Tablosu</div>
-      <div class="scoreboard-countdown" id="scoreboard-countdown-mobile"></div>
-      <ol class="scoreboard-list" id="scoreboard-list-mobile">
-        <li class="scoreboard-empty">Yükleniyor...</li>
-      </ol>
+      <div class="result-title" id="score-hive-title" style="margin-bottom:4px;">Peteğin</div>
+      <div class="score-hive-sub" id="score-hive-sub">Bu geceki Sözcel'i kim oynadı?</div>
+      <div id="score-hive-page"></div>
     </div>
   </div>
 
@@ -5532,15 +5558,36 @@ function showShareToast(msg) {
   const scoreOverlay = document.getElementById('score-mobile-overlay');
   const scoreBtn = document.getElementById('mobile-score-btn');
   const scoreClose = document.getElementById('score-mobile-close');
-  if (scoreBtn && scoreOverlay) {
-    scoreBtn.addEventListener('click', () => scoreOverlay.classList.add('open'));
+  // The button opens the reader's petek with every hexagon saying whether
+  // that member has played tonight's word -- played or not, never a score.
+  // Mounted on every opening (the map and the results are both re-read)
+  // and taken down on closing, so nothing is left fitting itself into a
+  // box that is display: none.
+  function openScoreHive() {
+    scoreOverlay.classList.add('open');
+    const PC = window.IstProfileCard;
+    if (!PC || !PC.mountHivePage || !PC.paintHiveGameStates) return;
+    const en = typeof I18N !== 'undefined' && I18N.lang === 'more_english';
+    document.getElementById('score-hive-title').textContent = en ? 'Your petek' : 'Peteğin';
+    document.getElementById('score-hive-sub').textContent =
+      en ? "Who has played tonight's Sözcel?" : "Bu geceki Sözcel'i kim oynadı?";
+    PC.mountHivePage({ sb, I18N, mountId: 'score-hive-page' });
+    PC.paintHiveGameStates(sb, 'sozcel', dailySeed,
+      en ? { go: 'Played ✓', none: 'Not yet' } : { go: 'Oynadı ✓', none: 'Oynamadı' });
   }
-  if (scoreClose && scoreOverlay) {
-    scoreClose.addEventListener('click', () => scoreOverlay.classList.remove('open'));
+  function closeScoreHive() {
+    scoreOverlay.classList.remove('open');
+    const PC = window.IstProfileCard;
+    if (PC && PC.clearHiveEventStates) PC.clearHiveEventStates();
+    if (PC && PC.unmountHivePage) PC.unmountHivePage();
+    const host = document.getElementById('score-hive-page');
+    if (host) host.innerHTML = '';
   }
+  if (scoreBtn && scoreOverlay) scoreBtn.addEventListener('click', openScoreHive);
+  if (scoreClose && scoreOverlay) scoreClose.addEventListener('click', closeScoreHive);
   if (scoreOverlay) {
     scoreOverlay.addEventListener('click', (e) => {
-      if (e.target === scoreOverlay) scoreOverlay.classList.remove('open');
+      if (e.target === scoreOverlay) closeScoreHive();
     });
   }
 })();
