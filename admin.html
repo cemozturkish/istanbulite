@@ -2604,6 +2604,7 @@
 
     <div class="rail-group">Hane</div>
     <button class="admin-tab" data-tab="users">Üyeler</button>
+    <button class="admin-tab" data-tab="petek">Petek</button>
     <button class="admin-tab" data-tab="notifications">Bildirimler</button>
 
     <div class="rail-group">Görünüm</div>
@@ -3915,6 +3916,30 @@
 
 
   <!-- ══════════════════════════════════════════════════════════════════
+       PETEK — the shared honeycomb, as the admin sees all of it.
+       Members read only their own map (hive_map()); the admin reads every
+       map through admin_hive_* (db/admin_hive.sql) and can take a member
+       out, break one attachment, or empty a whole petek. Nobody's account
+       is touched: a member taken out is simply their own hexagon again.
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="admin-body" id="petek-tab" style="display:none;">
+    <div class="panel" style="grid-column: 1 / -1;">
+      <div class="panel-title">Petek</div>
+      <div class="setting-row-sub" style="margin-bottom:10px;">
+        Üyelerin kurduğu petekler (db/admin_hive.sql). Çıkarılan üye hesabını
+        kaybetmez; yeniden tek altıgen olur ve bir kodla tekrar eklenebilir.
+        Bağı koparmak, üyelerin haftalık kilidine bakmaz.
+      </div>
+      <input type="text" id="petek-filter" placeholder="Üye ara…" style="margin-bottom:12px;"/>
+      <div id="petek-summary" class="setting-row-sub" style="margin-bottom:10px;"></div>
+      <div class="articles-list" id="petek-list">
+        <div class="empty-state"><span class="spinner"></span></div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════════
        RENKLER — the admin's own colours, on a live copy of the app.
 
        Left: the app itself, in an iframe at a phone's own size (so it
@@ -4241,6 +4266,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'tbmm') loadTBMMTab();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'users') { loadReportsList(); loadUsersList(); loadOnboardingToggle(); loadOnboardingCopy(); loadCardFontSizes(); }
+    if (tab === 'petek') loadPetekTab();
     if (tab === 'colors') colorsOpen(); else colorsClose();
     // The rail's follow-through: shut whatever drawer stood on the section
     // being left.
@@ -6433,6 +6459,106 @@ async function loadReportsList() {
     loadReportsList();
   }));
 }
+
+// ══════════════════════════════════════════
+// Petek tab — every map, every member, every bond (db/admin_hive.sql)
+// ══════════════════════════════════════════
+// The hive tables have no client policies, so all of this goes through the
+// admin_hive_* functions. Every write re-reads the whole thing: a desk
+// that can disagree with the database is the one thing this may not be.
+let petekState = { cells: [], bonds: [], profiles: {} };
+
+async function loadPetekTab() {
+  const listEl = document.getElementById('petek-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const [c, b] = await Promise.all([sb.rpc('admin_hive_cells'), sb.rpc('admin_hive_bonds')]);
+  const err = c.error || b.error;
+  if (err) {
+    listEl.innerHTML = '<div class="empty-state">Petek okunamadı: ' + escapeHtml(err.message) +
+      (/admin_hive|function/.test(err.message) ? ' (db/admin_hive.sql çalıştırıldı mı?)' : '') + '</div>';
+    return;
+  }
+  petekState.cells = c.data || [];
+  petekState.bonds = b.data || [];
+  const { count } = await sb.from('profiles').select('id', { count: 'exact', head: true });
+  petekState.memberCount = count || 0;
+  renderPetekList();
+}
+
+function petekName(id) {
+  const c = petekState.cells.find(x => x.user_id === id);
+  const n = c ? capitalizeName(((c.first_name || '') + ' ' + (c.last_name || '')).trim()) : '';
+  return n || '(isimsiz)';
+}
+
+function renderPetekList() {
+  const listEl = document.getElementById('petek-list');
+  const sumEl = document.getElementById('petek-summary');
+  const q = (document.getElementById('petek-filter').value || '').trim().toLocaleLowerCase('tr-TR');
+  const { cells, bonds } = petekState;
+  const maps = {};
+  cells.forEach(c => { (maps[c.map_id] = maps[c.map_id] || []).push(c); });
+  const ids = Object.keys(maps).sort((x, y) => maps[y].length - maps[x].length);
+  sumEl.textContent = ids.length + ' petek · ' + cells.length + ' üye peteğe bağlı' +
+    (petekState.memberCount ? ' · toplam ' + petekState.memberCount + ' üye' : '') +
+    ' · ' + bonds.length + ' bağ';
+  if (!ids.length) { listEl.innerHTML = '<div class="empty-state">Henüz kimse kimseye bağlanmamış.</div>'; return; }
+
+  const html = ids.map(mid => {
+    const members = maps[mid];
+    const nameOf = (c) => capitalizeName(((c.first_name || '') + ' ' + (c.last_name || '')).trim()) || '(isimsiz)';
+    const mine = bonds.filter(x => x.map_id === mid);
+    const hit = !q || members.some(c => nameOf(c).toLocaleLowerCase('tr-TR').includes(q));
+    if (!hit) return '';
+    const rows = members.map(c => {
+      const partners = mine.filter(x => x.a === c.user_id || x.b === c.user_id)
+        .map(x => (x.a === c.user_id ? x.b : x.a));
+      const nb = NEIGHBORHOOD_NAMES[c.neighborhood] || c.neighborhood || '—';
+      const lit = q && nameOf(c).toLocaleLowerCase('tr-TR').includes(q);
+      return `
+        <div style="padding:8px 0;border-top:1px solid var(--rule, rgba(0,0,0,0.15));${lit ? 'font-weight:700;' : ''}">
+          <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;">
+            <div>${escapeHtml(nameOf(c))} <span style="color:var(--muted);">· ${escapeHtml(nb)} · (${c.q}, ${c.r})</span></div>
+            <button class="btn btn-danger" data-petek-remove="${escapeHtml(c.user_id)}">Petekten çıkar</button>
+          </div>
+          ${partners.length ? `<div style="color:var(--muted);font-size:0.8rem;margin-top:4px;">
+            ${partners.map(pid => `${escapeHtml(petekName(pid))}
+              <button class="btn" style="padding:1px 8px;font-size:0.72rem;" data-petek-unbond="${escapeHtml(c.user_id)}|${escapeHtml(pid)}">Bağı kopar</button>`).join(' · ')}
+          </div>` : ''}
+        </div>`;
+    }).join('');
+    return `
+      <div class="article-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div class="a-neighborhood">${members.length} üye · ${mine.length} bağ</div>
+          <button class="btn btn-danger" data-petek-dissolve="${escapeHtml(mid)}">Peteği dağıt</button>
+        </div>
+        ${rows}
+      </div>`;
+  }).join('');
+  listEl.innerHTML = html || '<div class="empty-state">Eşleşen üye yok.</div>';
+
+  const act = async (btn, fn, msg) => {
+    if (!confirm(msg)) return;
+    btn.disabled = true;
+    const { error } = await fn();
+    if (error) { alert('Olmadı: ' + error.message); btn.disabled = false; return; }
+    loadPetekTab();
+  };
+  listEl.querySelectorAll('[data-petek-remove]').forEach(btn => btn.addEventListener('click', () =>
+    act(btn, () => sb.rpc('admin_hive_remove_member', { p_member: btn.dataset.petekRemove }),
+      petekName(btn.dataset.petekRemove) + ' petekten çıkarılsın mı? Tüm bağları ve açık kodları silinir; hesabı kalır.')));
+  listEl.querySelectorAll('[data-petek-unbond]').forEach(btn => btn.addEventListener('click', () => {
+    const [a, b] = btn.dataset.petekUnbond.split('|');
+    act(btn, () => sb.rpc('admin_hive_unbond', { p_a: a, p_b: b }),
+      petekName(a) + ' ile ' + petekName(b) + ' arasındaki bağ koparılsın mı?');
+  }));
+  listEl.querySelectorAll('[data-petek-dissolve]').forEach(btn => btn.addEventListener('click', () =>
+    act(btn, () => sb.rpc('admin_hive_dissolve_map', { p_map: btn.dataset.petekDissolve }),
+      'Bu petek tamamen dağıtılsın mı? İçindeki herkes tek altıgene döner.')));
+}
+document.getElementById('petek-filter')?.addEventListener('input', () => renderPetekList());
 
 async function loadUsersList() {
   const listEl = document.getElementById('users-list');
