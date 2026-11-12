@@ -3498,6 +3498,29 @@
     applyHiveEventStates();
   }
 
+  // ── Who has played tonight's game, on the hexagons ──
+  // The same recolouring as an evening's guest list, asked a different
+  // question (sozcel.html's scoreboard button): 'go' is a member who has
+  // FINISHED the night's game (attempts >= 1, the reading every other
+  // surface uses), 'none' one who has not. Played or not is all it says --
+  // never a score, never the guesses. The words are the caller's (labels:
+  // { go, none }), and the reader's own hexagon is read off the same rows
+  // as everybody else's.
+  async function paintHiveGameStates(sb, game, seed, labels) {
+    const token = {};
+    _hiveEv = { game, kefilId: null, mine: null, states: new Map(), labels: labels || {}, token };
+    applyHiveEventStates();
+    let rows = [];
+    try {
+      const { data, error } = await sb.from('game_results')
+        .select('user_id').eq('game', game).eq('date', seed).gte('attempts', 1);
+      if (!error && data) rows = data;
+    } catch (e) { return; }
+    if (!_hiveEv || _hiveEv.token !== token) return;   // closed or replaced meanwhile
+    rows.forEach(r => _hiveEv.states.set(String(r.user_id), 'go'));
+    applyHiveEventStates();
+  }
+
   // The reader answered: their own hexagon follows at once.
   function setHiveEventMine(mine) {
     if (!_hiveEv) return;
@@ -3534,12 +3557,12 @@
       if (_hiveEv) {
         const id = cell.dataset.me ? meId : String(cell.dataset.memberId || '');
         if (id && _hiveEv.kefilId && id === String(_hiveEv.kefilId)) st = 'kefil';
-        else if (cell.dataset.me) st = _hiveEv.mine || 'none';
+        else if (cell.dataset.me && !_hiveEv.labels) st = _hiveEv.mine || 'none';
         else st = _hiveEv.states.get(id) || 'none';
       }
       if (st) cell.dataset.ev = st; else delete cell.dataset.ev;
       const ev = cell.querySelector('.ist-hive-name-ev');
-      if (ev) ev.textContent = st ? hiveEvLabel(st) : '';
+      if (ev) ev.textContent = !st ? '' : (_hiveEv.labels ? (_hiveEv.labels[st] || '') : hiveEvLabel(st));
       // No KEFİL tag: the red ring says whose evening it is.
       const pill = cell.querySelector('.ist-hive-kefil-pill');
       if (pill) pill.remove();
@@ -4448,6 +4471,7 @@
     paintHiveEventStates,
     setHiveEventMine,
     clearHiveEventStates,
+    paintHiveGameStates,
     hiveMapCells,
     initMemberSheet,
     openMemberSheet,

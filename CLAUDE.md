@@ -1569,6 +1569,13 @@ coordinates that say where each paper hangs.
   clip it, and a centred overflow has no scrollbar to recover it. `fitSozcuLine()` keeps
   the "Günün Sözcüsü: …" credit on **one line** at any name length — it must never wrap,
   because a second line moves the keyboard and re-flows the board under the reader's thumb
+- **The scoreboard button opens the reader's PETEK, not a ranking** (`#score-mobile-overlay`,
+  `openScoreHive`). The petek is mounted into the popup (`mountHivePage`, `mountId:
+  'score-hive-page'`) and every hexagon says whether that member has FINISHED tonight's word
+  (`IstProfileCard.paintHiveGameStates(sb, 'sozcel', dailySeed, labels)` — the evening guest
+  list's own `data-ev` recolouring: red ring and "Oynadı ✓", or dimmed and "Oynamadı"). Played or
+  not is all it says, never a score or a guess. It is mounted on every opening and unmounted on
+  closing, and the free seats are left undrawn there.
 - **Two combs, one plane: the word, and the last guess behind it** (`.syl-stack`,
   `renderGhostBoard`). The board shows only the letters that *locked*, so everything else the
   reader had just tried vanished the moment it was read out — the pips say how many guesses are
