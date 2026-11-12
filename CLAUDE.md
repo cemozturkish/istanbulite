@@ -715,6 +715,13 @@ sb.from('articles').delete().eq('id', id)
   (`.desk-parked-note`). The rail's markup is still the whole rail, so unparking is deleting an
   id from the set. Tab switching is one loop over `#admin-work > .admin-body` (`TAB_DISPLAY`
   for the one section with a grid of its own), not a list of fifteen display toggles.
+- **PETEK — the admin sees and edits every map** (`#petek-tab`, `loadPetekTab`;
+  `db/admin_hive.sql`). The hive tables have no client policies, so the desk reads and writes
+  them only through admin-checked SECURITY DEFINER functions: `admin_hive_cells` /
+  `admin_hive_bonds` (everything), `admin_hive_remove_member` (bonds, cell and open seat codes go;
+  the account stays), `admin_hive_unbond` (ignores the week lock members are held to) and
+  `admin_hive_dissolve_map`. A removal that cuts a petek in two gives each piece a map of its
+  own (`hive_resplit_map`), so what members see stays the truth about who is connected.
 - **RENKLER — the admin changes any colour on the site, on the app itself**
   (`#colors-tab`, the `clr*` functions; `db/site_palette.sql`; palette.js's override layer).
   - **The phone is the live app**: `project.html` in an iframe laid out at 390×844 and SCALED
