@@ -3475,16 +3475,19 @@
   // as everybody else's.
   async function paintHiveGameStates(sb, game, seed, labels) {
     const token = {};
-    _hiveEv = { game, kefilId: null, mine: null, states: new Map(), labels: labels || {}, token };
+    _hiveEv = { game, kefilId: null, mine: null, states: new Map(), results: new Map(), labels: labels || {}, token };
     applyHiveEventStates();
     let rows = [];
     try {
       const { data, error } = await sb.from('game_results')
-        .select('user_id').eq('game', game).eq('date', seed).gte('attempts', 1);
+        .select('user_id, won, attempts, guesses').eq('game', game).eq('date', seed).gte('attempts', 1);
       if (!error && data) rows = data;
     } catch (e) { return; }
     if (!_hiveEv || _hiveEv.token !== token) return;   // closed or replaced meanwhile
-    rows.forEach(r => _hiveEv.states.set(String(r.user_id), 'go'));
+    rows.forEach(r => {
+      _hiveEv.states.set(String(r.user_id), 'go');
+      _hiveEv.results.set(String(r.user_id), r);
+    });
     applyHiveEventStates();
   }
 
@@ -3513,11 +3516,27 @@
     return v && v !== key ? v : fallback;
   }
 
+  // The share grid of a finished Sözcel (same squares as sozcel.html's
+  // buildShareText): score on the first line, then one row per guess.
+  // Rows from before the guesses column existed print the score alone.
+  function hiveGameResultText(r) {
+    const head = (r.won ? r.attempts : 'X') + '/6';
+    const grid = Array.isArray(r.guesses)
+      ? r.guesses.map(row => (row || []).map(x =>
+          x === 'correct' ? '🟫' : x === 'present' ? '🟧' : '⬜').join('')).join('\n')
+      : '';
+    return grid ? head + '\n' + grid : head;
+  }
+
   function applyHiveEventStates() {
     const mount = document.getElementById('po-hive-mount');
     if (!mount) return;
     const page = document.getElementById('po-hive-page');
-    if (page) page.classList.toggle('ist-hive-ev-on', !!_hiveEv);
+    if (page) {
+      page.classList.toggle('ist-hive-ev-on', !!_hiveEv);
+      // A game's petek prints the shared result grid where the name was.
+      page.classList.toggle('ist-hive-game-on', !!(_hiveEv && _hiveEv.game));
+    }
     const meId = _hive && _hive.user ? String(_hive.user.id) : null;
     mount.querySelectorAll('.ist-hive-cell[data-member-id], .ist-hive-cell[data-me]').forEach(cell => {
       let st = null;
@@ -3529,7 +3548,11 @@
       }
       if (st) cell.dataset.ev = st; else delete cell.dataset.ev;
       const ev = cell.querySelector('.ist-hive-name-ev');
-      if (ev) ev.textContent = !st ? '' : (_hiveEv.labels ? (_hiveEv.labels[st] || '') : hiveEvLabel(st));
+      if (ev) {
+        const res = (st && _hiveEv.results && cell.dataset.memberId)
+          ? _hiveEv.results.get(String(cell.dataset.memberId)) : null;
+        ev.textContent = !st ? '' : (res ? hiveGameResultText(res) : (_hiveEv.labels ? (_hiveEv.labels[st] || '') : hiveEvLabel(st)));
+      }
       // No KEFİL tag: the red ring says whose evening it is.
       const pill = cell.querySelector('.ist-hive-kefil-pill');
       if (pill) pill.remove();
