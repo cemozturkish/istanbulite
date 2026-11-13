@@ -2389,6 +2389,13 @@
     // is still its offsetParent. Rings past HIVE_FIELD_RING_LAST share the
     // last wrapper -- they are the far edge, and go together.
     const field = {};
+    // The backing layer: one enlarged solid hexagon behind every place that
+    // is a person or a seat, drawn BEFORE every cell so it is under all of
+    // them. Overlapping, the copies merge into one straight-edged slab the
+    // shape of the whole petek. It is its own layer rather than a pseudo on
+    // each cell because a neighbour's backing would otherwise paint over
+    // the previous cell's hexagon.
+    let back = '';
     const html = items.map(item => {
       const p = hivePos(item.q, item.r, minX, minY);
       // Where it stands on the plane, and how far out it stands from the
@@ -2405,6 +2412,10 @@
       const side = (item.q + item.r / 2) < 0 ? 'left' : 'right';
       const meta = `style="left: calc(var(--ist-hive-step-x) * ${p.x}); top: calc(var(--ist-hive-step-y) * ${p.y}); --ring: ${ring};" `
         + `data-ring="${ring}"` + (ring === 1 ? ` data-side="${side}"` : '');
+      if (item.kind !== 'ghost') {
+        back += `<svg class="ist-hive-back" ${meta} viewBox="0 0 1024 1536" aria-hidden="true">`
+          + `<use href="#ist-hive-hex-solid"/></svg>`;
+      }
       if (item.kind === 'me') return hiveMeCellHTML(opts, meta, open, t);
       if (item.kind === 'member') {
         // Named only if they are touching the reader — see nameCells above.
@@ -2439,7 +2450,7 @@
       + `<path id="ist-hive-hex-solid" d="${HIVE_HEX_SOLID}"/></defs></svg>`;
     return `
       <div class="ist-hive" id="po-hive-view">
-        <div class="ist-hive-plane" id="po-hive-plane" style="width: ${w}; height: ${h};">${defs}${html}</div>
+        <div class="ist-hive-plane" id="po-hive-plane" style="width: ${w}; height: ${h};">${defs}<div class="ist-hive-backing">${back}</div>${html}</div>
       </div>
     `;
   }
@@ -2522,6 +2533,9 @@
     const away = (ring) => ring > ceiling || !hiveRingDue(ring);
     if (mount) mount.querySelectorAll('.ist-hive-field').forEach(band => {
       band.classList.toggle('ist-hive-away', away(parseInt(band.dataset.ring, 10) || 0));
+    });
+    if (mount) mount.querySelectorAll('.ist-hive-back').forEach(b => {
+      b.classList.toggle('ist-hive-away', away(parseInt(b.dataset.ring, 10) || 0));
     });
     if (mount) mount.querySelectorAll('.ist-hive-cell:not(.ist-hive-ghost)').forEach(cell => {
       const ring = parseInt(cell.dataset.ring, 10) || 0;
