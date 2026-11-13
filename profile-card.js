@@ -2396,6 +2396,10 @@
     // each cell because a neighbour's backing would otherwise paint over
     // the previous cell's hexagon.
     let back = '';
+    // The same shapes again, darker and stroked, all drawn before every fill:
+    // what shows past the fills' outer edge is the slab's stroke, with no
+    // lines inside it where two hexagons meet.
+    let edge = '';
     const html = items.map(item => {
       const p = hivePos(item.q, item.r, minX, minY);
       // Where it stands on the plane, and how far out it stands from the
@@ -2413,6 +2417,8 @@
       const meta = `style="left: calc(var(--ist-hive-step-x) * ${p.x}); top: calc(var(--ist-hive-step-y) * ${p.y}); --ring: ${ring};" `
         + `data-ring="${ring}"` + (ring === 1 ? ` data-side="${side}"` : '');
       if (item.kind !== 'ghost') {
+        edge += `<svg class="ist-hive-back ist-hive-back-edge" ${meta} viewBox="0 0 1024 1536" aria-hidden="true">`
+          + `<use href="#ist-hive-hex-solid"/></svg>`;
         back += `<svg class="ist-hive-back" ${meta} viewBox="0 0 1024 1536" aria-hidden="true">`
           + `<use href="#ist-hive-hex-solid"/></svg>`;
       }
@@ -2450,7 +2456,7 @@
       + `<path id="ist-hive-hex-solid" d="${HIVE_HEX_SOLID}"/></defs></svg>`;
     return `
       <div class="ist-hive" id="po-hive-view">
-        <div class="ist-hive-plane" id="po-hive-plane" style="width: ${w}; height: ${h};">${defs}<div class="ist-hive-backing">${back}</div>${html}</div>
+        <div class="ist-hive-plane" id="po-hive-plane" style="width: ${w}; height: ${h};">${defs}<div class="ist-hive-backing">${edge}${back}</div>${html}</div>
       </div>
     `;
   }
