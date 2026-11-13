@@ -2693,6 +2693,27 @@
              old sozcel_sozcul_assignments flow below it is gone. What
              stays is the 7-day board underneath, which is now where a
              night already picked can be corrected directly. -->
+        <!-- ── SÖZCÜ ATAMA: who is the night's Sözcü, chosen ahead of time ──
+             sozcel_sozcul_assignments (db/sozcel_sozcul_assignments.sql):
+             sozcel.html already reads it, so an assigned member gets the
+             Sözcü Görevi form for that day. -->
+        <div style="margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid var(--rule);">
+          <div class="panel-title" style="margin:0 0 14px;">Sözcü Ataması</div>
+          <div class="sozcu-assign-row">
+            <div>
+              <label style="margin-top:0;">Gün</label>
+              <select id="sa-date"></select>
+            </div>
+            <div>
+              <label style="margin-top:0;">Üye</label>
+              <select id="sa-user"></select>
+            </div>
+            <button class="btn" id="sa-save" style="padding:9px 14px;white-space:nowrap;">Ata</button>
+          </div>
+          <div id="sa-list" style="display:flex;flex-direction:column;gap:6px;margin-top:12px;"></div>
+          <div class="status-msg" id="sa-status" style="margin-top:8px;"></div>
+        </div>
+
         <div style="margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid var(--rule);">
           <div class="panel-title" style="margin:0 0 14px;">Kelime Havuzu</div>
           <p style="margin-bottom:12px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
@@ -3674,7 +3695,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'worldevents') loadWorldEventsTab();
     if (tab === 'news') { loadSeries(); loadBreakingNews(); }
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventKefilOptions(); loadEventsList(); }
-    if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); initSozcelSuggestions(); loadBulmacaPuzzles(); }
+    if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); initSozcelSuggestions(); initSozcuAssign(); loadBulmacaPuzzles(); }
     if (tab === 'quotes') loadQuotesList();
     if (tab === 'district-polls') loadDistrictPollsList();
     if (tab === 'kahve') loadCoffeeList();
@@ -8712,6 +8733,69 @@ function swNightOptions() {
     out.push('<option value="' + iso + '"' + (off === 0 ? ' selected' : '') + '>' + label + '</option>');
   }
   sel.innerHTML = out.join('');
+}
+
+
+// ── Sözcü Ataması: who is a night's Sözcü, chosen ahead of time ──
+// Writes sozcel_sozcul_assignments (one row per game_date). sozcel.html
+// reads it to give the assigned member the Sözcü Görevi form that day.
+let _saWired = false;
+let _saNames = {};
+async function initSozcuAssign() {
+  const dateSel = document.getElementById('sa-date');
+  const userSel = document.getElementById('sa-user');
+  if (!dateSel || !userSel) return;
+  if (!_saWired) {
+    _saWired = true;
+    const out = [];
+    for (let off = 0; off <= 13; off++) {
+      const iso = IstDate.iso(off);
+      out.push('<option value="' + iso + '">' + iso + (off === 0 ? ' (bugün)' : '') + '</option>');
+    }
+    dateSel.innerHTML = out.join('');
+    const { data: profs } = await sb.from('profiles')
+      .select('id, first_name, last_name').order('first_name');
+    _saNames = {};
+    (profs || []).forEach(p => {
+      _saNames[p.id] = capitalizeName(((p.first_name || '') + ' ' + (p.last_name || '')).trim()) || 'İsimsiz';
+    });
+    userSel.innerHTML = (profs || []).map(p =>
+      '<option value="' + p.id + '">' + escapeHtml(_saNames[p.id]) + '</option>').join('');
+    document.getElementById('sa-save').addEventListener('click', saveSozcuAssign);
+    document.getElementById('sa-list').addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-sa-del]');
+      if (!b) return;
+      const { error } = await sb.from('sozcel_sozcul_assignments').delete().eq('game_date', b.dataset.saDel);
+      if (error) { alert('Hata: ' + error.message); return; }
+      loadSozcuAssign();
+    });
+  }
+  loadSozcuAssign();
+}
+async function loadSozcuAssign() {
+  const list = document.getElementById('sa-list');
+  if (!list) return;
+  const { data, error } = await sb.from('sozcel_sozcul_assignments')
+    .select('game_date, user_id').gte('game_date', IstDate.iso(0)).order('game_date');
+  if (error) { list.innerHTML = '<div class="empty-state">' + escapeHtml(error.message) + '</div>'; return; }
+  list.innerHTML = (data || []).length ? data.map(a =>
+    '<div class="day-tag ok" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+    '<span>' + escapeHtml(a.game_date) + ' — ' + escapeHtml(_saNames[a.user_id] || a.user_id) + '</span>' +
+    '<button class="btn btn-secondary" data-sa-del="' + escapeHtml(a.game_date) + '">Kaldır</button></div>').join('')
+    : '<div class="empty-state">Atama yok.</div>';
+}
+async function saveSozcuAssign() {
+  const st = document.getElementById('sa-status');
+  const date = document.getElementById('sa-date').value;
+  const user = document.getElementById('sa-user').value;
+  if (!date || !user) return;
+  const { data: { session } } = await sb.auth.getSession();
+  const { error } = await sb.from('sozcel_sozcul_assignments').upsert(
+    [{ game_date: date, user_id: user, assigned_by: session ? session.user.id : null }],
+    { onConflict: 'game_date' });
+  st.textContent = error ? error.message : 'Atandı.';
+  st.className = 'status-msg ' + (error ? 'err' : 'ok');
+  loadSozcuAssign();
 }
 
 // ── Shared word/syllable/meaning editor ──
