@@ -908,7 +908,7 @@
         speech: lines.pickHair, pick: true },
       { inSheet: true, target: '#po-shirt-prev, #po-shirt-next',
         speech: lines.pickShirt, pick: true },
-      { inSheet: true, target: '.ist-pc-cover-pick-col', all: true, speech: lines.senDone },
+      { inSheet: true, target: '#po-avatar-steps', speech: lines.senDone },
       { target: '#profile-overlay .ist-sheet-close', speech: lines.closeSheet, sheet: 'close' },
       // ── 2. The home screen, walked rather than pulled ──
       // Each part arrives on the beat that names it. A `wait` beat hands

@@ -152,6 +152,12 @@
 /* The scrolling half of the sheet. Absolute-positioned chrome (the
    close button) sits outside it, so it stays pinned while this scrolls. */
 .ist-sheet-body {
+  /* border-box, and it matters: the body is 100% of the sheet AND
+     padded, so sized as a content box it stood taller than the sheet by
+     its own padding and the sheet's overflow cut that much off the end
+     of anything long enough to scroll -- the last buttons of a profile
+     could not be reached. */
+  box-sizing: border-box;
   height: 100%;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -179,6 +185,32 @@
   width: 22px;
   height: 22px;
   display: block;
+}
+
+/* ── A sheet that scrolls keeps its top row ──
+   The close button is pinned while the body scrolls, which on a short
+   sheet is all that is needed. On one long enough to scroll (your own
+   profile) the content ran up UNDER the button -- a box's corner and a
+   line of type passing behind a floating cross. .ist-sheet-head lays a
+   strip of the sheet's own paper across that row, over the body and
+   under the button, so what scrolls is cut off cleanly on the line the
+   button stands on. The body's own top padding (40px on a phone, 48px
+   above) already starts the content below it, so nothing is hidden at
+   rest. Opt-in: a sheet whose body is not padded (a game's iframe) has
+   content of its own on that row. */
+.ist-sheet.ist-sheet-head::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
+  z-index: 1;
+  background: var(--frame-bg);
+  pointer-events: none;
+}
+@media (max-width: 768px) {
+  .ist-sheet.ist-sheet-head::before { height: 40px; }
 }
 
 /* Below ~1240px the window isn't wide enough for a centred 680px sheet
