@@ -4114,6 +4114,17 @@
     _ovAvatarMsgTimer = setTimeout(() => el.classList.remove('show'), 5000);
   }
 
+  // Every copy of the reader's avatar that carries the preview id. The
+  // petek (mounted early and kept shut) draws the reader's own hexagon
+  // with this same id, so getElementById alone finds ITS copy first and
+  // the sheet's cover never repainted until reopened. Paint them all.
+  function paintAvatarPreviews(html, locked) {
+    document.querySelectorAll('#po-avatar-preview').forEach(el => {
+      el.innerHTML = html;
+      el.classList.toggle('locked', !!locked);
+    });
+  }
+
   // Wires the hair row's prev/next arrows. Browsing is purely local — `idx`
   // tracks whatever hair is currently shown, independent of what's actually
   // saved — and each step immediately picks it (hair is never locked, so
@@ -4131,8 +4142,7 @@
 
     function render() {
       const hair = AVATAR_HAIR_OPTIONS[idx].value;
-      previewEl.innerHTML = avatarPreviewHTML(hair, state.avatarHat, state.avatarAccessory, state.avatarShirt, false);
-      previewEl.classList.remove('locked');
+      paintAvatarPreviews(avatarPreviewHTML(hair, state.avatarHat, state.avatarAccessory, state.avatarShirt, false), false);
       setStepValue('hair', AVATAR_HAIR_OPTIONS[idx], false, state.I18N);
     }
 
@@ -4162,8 +4172,7 @@
     function render() {
       const opt = AVATAR_HAT_OPTIONS[idx];
       const locked = !!opt.requiresSozcuCount && (state.sozcuCount || 0) < opt.requiresSozcuCount;
-      previewEl.innerHTML = avatarPreviewHTML(state.avatarHair, opt.value, state.avatarAccessory, state.avatarShirt, locked);
-      previewEl.classList.toggle('locked', locked);
+      paintAvatarPreviews(avatarPreviewHTML(state.avatarHair, opt.value, state.avatarAccessory, state.avatarShirt, locked), locked);
       setStepValue('hat', opt, locked, state.I18N);
     }
 
@@ -4192,8 +4201,7 @@
     function render() {
       const opt = AVATAR_ACCESSORY_OPTIONS[idx];
       const locked = !!opt.locked;
-      previewEl.innerHTML = avatarPreviewHTML(state.avatarHair, state.avatarHat, opt.value, state.avatarShirt, locked);
-      previewEl.classList.toggle('locked', locked);
+      paintAvatarPreviews(avatarPreviewHTML(state.avatarHair, state.avatarHat, opt.value, state.avatarShirt, locked), locked);
       setStepValue('accessory', opt, locked, state.I18N);
     }
 
@@ -4223,8 +4231,7 @@
 
     function render() {
       const shirt = AVATAR_SHIRT_OPTIONS[idx].value;
-      previewEl.innerHTML = avatarPreviewHTML(state.avatarHair, state.avatarHat, state.avatarAccessory, shirt, false);
-      previewEl.classList.remove('locked');
+      paintAvatarPreviews(avatarPreviewHTML(state.avatarHair, state.avatarHat, state.avatarAccessory, shirt, false), false);
       setStepValue('shirt', AVATAR_SHIRT_OPTIONS[idx], false, state.I18N);
     }
 
