@@ -170,9 +170,22 @@
     'lang.default':        { default: 'Daha Türkçe',           more_english: 'More Turkish' },
     'lang.more_english':   { default: 'Daha İngilizce',        more_english: 'More English' },
     'profile.colortheme':  { default: 'Renk',                more_english: 'Color' },
+    // The two palettes, named (the chips under Renk on the profile sheet).
+    'profile.palette.mono':  { default: 'Siyah-Beyaz',       more_english: 'Black & White' },
+    'profile.palette.earth': { default: 'Kahverengi',        more_english: 'Brown' },
+    // The avatar's rows on the profile sheet: one per part that has
+    // something to choose between (see avatarStepsHTML in profile-card.js).
+    'profile.avatar':           { default: 'Avatar',         more_english: 'Avatar' },
+    'profile.avatar.hat':       { default: 'Şapka',          more_english: 'Hat' },
+    'profile.avatar.hair':      { default: 'Saç',            more_english: 'Hair' },
+    'profile.avatar.accessory': { default: 'Aksesuar',       more_english: 'Accessory' },
+    'profile.avatar.shirt':     { default: 'Tişört',         more_english: 'Shirt' },
+    'profile.avatar.prev':      { default: 'Önceki',         more_english: 'Previous' },
+    'profile.avatar.next':      { default: 'Sonraki',        more_english: 'Next' },
     'profile.kefil':       { default: 'KEFİL',               more_english: 'SPONSOR' },
     'profile.account':     { default: 'Hesap',               more_english: 'Account' },
     'profile.referralcode':{ default: 'Kefalet Kodu',        more_english: 'Sponsor Code' },
+    'profile.referralcode.hint': { default: 'Kefil olduğun kişi kayıt olurken bu kodu girer.', more_english: 'Someone you vouch for enters this code when they sign up.' },
     'profile.sponsoredcount':{ default: 'Kefil Olduğu',      more_english: 'Vouched For' },
     'profile.sozcucount': { default: 'Sözcü Olduğu',       more_english: 'Sözcü Picks' },
     'profile.eventkefilcount': { default: 'Etkinlik Kefili',  more_english: 'Events Sponsored' },

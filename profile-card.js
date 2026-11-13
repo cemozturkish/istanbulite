@@ -44,10 +44,10 @@
   // Anahane's own profile is therefore the cover alone: who you are,
   // nothing else.
   //
-  // Nothing here scrolls: each page's profile fits inside the sheet the
-  // way a politician's does (see .profile-overlay-body in
-  // profile-card.css). Adding a block to a page means checking it still
-  // fits, not adding a scrollbar.
+  // The sheet is set in the house type (ui.css) at its real size and
+  // scrolls inside itself like every other sheet when a page's blocks
+  // run past the window -- it used to shrink every line until the whole
+  // of it fitted, which is how it came to be set in 8px type.
   const PROFILE_SECTIONS = {
     anahane:   { hive: false, week: false, account: false, settings: false },
     kahvehane: { hive: false, week: true,  account: false, settings: false },
@@ -290,18 +290,18 @@
   // value, so an option added here alone is offered in the picker and then
   // refused on save (db/avatar_shirt_v2_white.sql).
   const AVATAR_SHIRT_OPTIONS = [
-    { value: null,    label: 'Beyaz Tişört' },
-    { value: 'black', label: 'Siyah Tişört' },
+    { value: null,    label: 'Beyaz Tişört', short: 'Beyaz', en: 'White' },
+    { value: 'black', label: 'Siyah Tişört', short: 'Siyah', en: 'Black' },
   ];
 
   // Hair overlays for the layered avatar (bald base + optional transparent
   // hair PNG on top — see avatar.js). `null` is kel (bald, no overlay).
   const AVATAR_HAIR_OPTIONS = [
-    { value: null,        label: 'Kel' },
-    { value: 'buzz',      label: 'Çok kısa saç' },
-    { value: 'short',     label: 'Kısa saç' },
-    { value: 'long',      label: 'Uzun saç' },
-    { value: 'curly-long', label: 'Kıvırcık uzun saç' },
+    { value: null,        label: 'Kel',               short: 'Kel',      en: 'Bald' },
+    { value: 'buzz',      label: 'Çok kısa saç',      short: 'Çok kısa', en: 'Buzz' },
+    { value: 'short',     label: 'Kısa saç',          short: 'Kısa',     en: 'Short' },
+    { value: 'long',      label: 'Uzun saç',          short: 'Uzun',     en: 'Long' },
+    { value: 'curly-long', label: 'Kıvırcık uzun saç', short: 'Kıvırcık', en: 'Curly' },
   ];
 
   // Hat overlays — a second, independent layer stacked on top of hair (see
@@ -309,7 +309,7 @@
   // reward is the 'crown' hat (used to be a single full-image override
   // before profiles.avatar_hat existed — see db/avatar_hat.sql).
   const AVATAR_HAT_OPTIONS = [
-    { value: null,    label: 'Yok' },
+    { value: null,    label: 'Yok', short: 'Yok', en: 'None' },
     // 'crown' is parked, not deleted: assets/avatar/hat-crown.png was
     // never actually drawn, so offering it let a member "unlock" a hat
     // that then rendered as nothing (avatar.js's hat ? <img> : '' quietly
@@ -324,8 +324,8 @@
   // here is unconditional — there's no unlock path yet, it's just not
   // available to anyone until that's designed (see db/avatar_accessory.sql).
   const AVATAR_ACCESSORY_OPTIONS = [
-    { value: null,       label: 'Yok' },
-    { value: 'glasses',  label: 'Gözlük', locked: true },
+    { value: null,       label: 'Yok',    short: 'Yok',    en: 'None' },
+    { value: 'glasses',  label: 'Gözlük', short: 'Gözlük', en: 'Glasses', locked: true },
   ];
 
   // Cover badges (rozetler) — image stickers the user can place on the
@@ -485,9 +485,9 @@
     const count = (sponsoredList || []).length;
     if (count === 0) {
       return `
-        <div class="ist-pc-info-row">
-          <div class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</div>
-          <div class="ist-pc-info-value">0 ${esc(t('profile.people'))}</div>
+        <div class="ui-row">
+          <div class="ui-row-k">${esc(t('profile.sponsoredcount'))}</div>
+          <div class="ui-row-v">0 ${esc(t('profile.people'))}</div>
         </div>
       `;
     }
@@ -498,9 +498,9 @@
     }).join('');
     return `
       <details class="ist-pc-sponsored-row">
-        <summary class="ist-pc-info-row">
-          <span class="ist-pc-info-label">${esc(t('profile.sponsoredcount'))}</span>
-          <span class="ist-pc-info-value">${count} ${esc(t('profile.people'))}</span>
+        <summary class="ui-row">
+          <span class="ui-row-k">${esc(t('profile.sponsoredcount'))}</span>
+          <span class="ui-row-v">${count} ${esc(t('profile.people'))}</span>
         </summary>
         <ul class="ist-pc-sponsored-list">${items}</ul>
       </details>
@@ -749,28 +749,6 @@
     }).join('');
 
     return `<div class="ist-pc-weekgrid">${header}${rows}</div>`;
-  }
-
-  // Wires a range input to its tick labels: clicking a tick jumps the
-  // slider, dragging the slider highlights the nearest tick.
-  function syncTicks(sliderId, ticksId) {
-    const slider = document.getElementById(sliderId);
-    const ticks = document.getElementById(ticksId);
-    if (!slider || !ticks) return;
-    const update = () => {
-      const v = parseInt(slider.value, 10);
-      ticks.querySelectorAll('span').forEach(s => {
-        s.classList.toggle('active', parseInt(s.dataset.idx, 10) === v);
-      });
-    };
-    slider.addEventListener('input', update);
-    ticks.querySelectorAll('span').forEach(s => {
-      s.addEventListener('click', () => {
-        slider.value = s.dataset.idx;
-        slider.dispatchEvent(new Event('input'));
-      });
-    });
-    update();
   }
 
   // Module-level state so a page can call setPage() to re-render the card
@@ -1048,7 +1026,7 @@
     el.hidden = true;
     el.innerHTML = `
       <div class="ist-sheet-backdrop" id="profile-overlay-backdrop"></div>
-      <div class="ist-sheet profile-overlay-sheet" id="profile-overlay-sheet">
+      <div class="ist-sheet ist-sheet-head profile-overlay-sheet" id="profile-overlay-sheet">
         <button type="button" class="ist-sheet-close" id="profile-overlay-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
         <div class="ist-sheet-body profile-overlay-body" id="profile-overlay-body"></div>
       </div>
@@ -1071,10 +1049,10 @@
     if (_ov.avatarHat === undefined) _ov.avatarHat = _ov.profile?.avatar_hat || null;
     if (_ov.avatarAccessory === undefined) _ov.avatarAccessory = _ov.profile?.avatar_accessory || null;
     if (_ov.avatarShirt === undefined) _ov.avatarShirt = _ov.profile?.avatar_shirt || null;
-    // Settings page opens in read-only "info" mode every time — Kişiselleştir
-    // switches it into the editable avatar-arrows + sliders mode (see
-    // settingsPageHTML/coverHTML), Kaydet saves and the page reload resets
-    // this back to false on its own.
+    // On a parts-bin page the sheet opens read-only every time and
+    // Kişiselleştir turns the avatar's rows on (see settingsPageHTML /
+    // avatarStepsHTML). There is nothing to save: each row and the
+    // palette chips commit the moment they are pressed.
     //
     // Except where this sheet IS Sen (`sen` in PROFILE_SECTIONS): the
     // depth it replaced had the arrows standing on the hexagon with
@@ -1083,36 +1061,7 @@
     renderOverlayBody();
     document.getElementById('profile-overlay-body').scrollTop = 0;
     IstSheet.open('profile-overlay');
-    // open() has unhidden it and set its top, so it can be measured now.
-    fitOverlayType();
   }
-
-  // ── The page fits, on every phone ──
-  // This sheet does not scroll (see .profile-overlay-body): its type is
-  // stated against one unit, --po-u, which follows the screen's WIDTH
-  // (profile-card.css). A width says nothing about the height left between
-  // the top bar and the tab bar, though -- and a short phone, or Safari
-  // with its toolbar up, left the last button (Hesabımı Sil) standing
-  // behind the tab bar, where nothing could press it. So once the page is
-  // laid out, the unit is stepped down until the whole of it fits: every
-  // line shrinks together, never one block on its own. Past PO_U_MIN it
-  // stops and the body's own overflow is the safety valve.
-  const PO_U_MIN = 13;
-  function fitOverlayType() {
-    const ov = document.getElementById('profile-overlay');
-    const body = document.getElementById('profile-overlay-body');
-    if (!ov || !body || ov.hidden) return;
-    ov.style.removeProperty('--po-u');
-    if (!window.matchMedia('(max-width: 768px)').matches || !body.clientHeight) return;
-    const probe = body.querySelector('.ist-pc-cover-name');
-    let u = probe ? parseFloat(getComputedStyle(probe).fontSize) / 1.05 : 0;
-    if (!u) return;
-    while (body.scrollHeight > body.clientHeight + 1 && u > PO_U_MIN) {
-      u = Math.max(PO_U_MIN, u - 0.5);
-      ov.style.setProperty('--po-u', u + 'px');
-    }
-  }
-  window.addEventListener('resize', () => fitOverlayType());
 
   function closeProfileOverlay() {
     IstSheet.close('profile-overlay');
@@ -1130,7 +1079,6 @@
     const show = sectionsFor(_ov.page);
     body.classList.toggle('profile-overlay-centred', !show.week && !show.account && !show.settings);
     wireSettingsEvents(_ov);
-    fitOverlayType();
   }
 
   // ── THE PETEK PAGE ──
@@ -1370,7 +1318,7 @@
     el.hidden = true;
     el.innerHTML = `
       <div class="ist-sheet-backdrop" id="member-sheet-backdrop"></div>
-      <div class="ist-sheet" id="member-sheet-sheet" role="dialog" aria-modal="true">
+      <div class="ist-sheet ist-sheet-head" id="member-sheet-sheet" role="dialog" aria-modal="true">
         <button type="button" class="ist-sheet-close" id="member-sheet-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
         <div class="ist-sheet-body ist-member-body" id="member-sheet-body"></div>
       </div>
@@ -1424,12 +1372,26 @@
 
     const fullName = capitalizeName(`${data.first_name || ''} ${data.last_name || ''}`.trim()) || 'İsimsiz Üye';
     const nb = data.neighborhood ? (NB_NAMES[data.neighborhood] || data.neighborhood) : '—';
+    // Where they live and how long they have been here are one line under
+    // the name -- the two facts a profile leads with (see "Trust and the
+    // earned avatar"), in the same place on this sheet and on your own.
+    const lang = (I18N.isEnglish && I18N.isEnglish()) ? 'en' : 'tr';
     body.innerHTML = `
-      ${coverHTML({ profile: data, avatarUrl: data.avatar_url, avatarHair: data.avatar_hair, avatarHat: data.avatar_hat, avatarAccessory: data.avatar_accessory, avatarShirt: data.avatar_shirt, displayName: fullName, metaText: nb })}
-      ${weekGridHTML(weekStatus, I18N)}
-      <div class="ist-member-since">
-        <div>${I18N.formatMemberSince(data.joined_at)}</div>
-        ${kefilName ? `<div class="ist-member-kefil">${I18N.t('profile.kefil')}: <button type="button" class="kefil-link" data-user-id="${kefilId}">${esc(kefilName)}</button></div>` : ''}
+      <div class="po" lang="${lang}">
+        ${coverHTML({ profile: data, avatarUrl: data.avatar_url, avatarHair: data.avatar_hair, avatarHat: data.avatar_hat, avatarAccessory: data.avatar_accessory, avatarShirt: data.avatar_shirt, displayName: fullName, metaPlace: nb, metaText: I18N.formatMemberSince(data.joined_at) })}
+        <section class="po-sec">
+          <div class="ui-label">${esc(I18N.t('profile.thisweek'))}</div>
+          <div class="ui-box po-week">${weekGridHTML(weekStatus, I18N)}</div>
+        </section>
+        ${kefilName ? `
+        <section class="po-sec">
+          <div class="ui-box ui-rows">
+            <div class="ui-row">
+              <div class="ui-row-k">${esc(I18N.t('profile.kefil'))}</div>
+              <div class="ui-row-v"><button type="button" class="kefil-link" data-user-id="${kefilId}">${esc(kefilName)}</button></div>
+            </div>
+          </div>
+        </section>` : ''}
       </div>
     `;
   }
@@ -1467,21 +1429,13 @@
   // editable omitted) so both surfaces render badges identically — the
   // popup just doesn't wire up dragging or avatar-picking on top of it.
   //
-  // When editable AND customizing, the avatar sits between two flanking
-  // columns of uniform prev/next arrows — a left column of four "prev"
-  // arrows and a right column of four "next" arrows, each stacked
-  // top-to-bottom as hat, hair, accessory, shirt (see wireHatCarousel/
-  // wireHairCarousel/wireAccessoryCarousel/wireShirtCarousel) — all the
-  // same size, so no category reads as more "primary" than another. When
-  // editable but not customizing, it's just a plain read-only avatar — same
-  // as the non-editable popup — until Kişiselleştir turns the arrows on
-  // (see settingsPageHTML). The arrow columns hang outside the frame in
-  // both cases (absolutely positioned, see .ist-pc-cover-pick-col), so the
-  // pano stickers sit on stays the exact same size and place whether or
-  // not they're showing. `sozcuCount` is only
-  // needed in the customizing case, to know whether the locked Sözcü hat
-  // should show unlocked (the accessory row's lock is unconditional — see
-  // AVATAR_ACCESSORY_OPTIONS — so it doesn't need it).
+  // When editable AND customizing, the art layer is the live preview the
+  // four pickers render into (#po-avatar-preview). The pickers themselves
+  // are not on the cover any more: they used to be two columns of
+  // unlabelled arrows hanging either side of the frame, four pairs with
+  // nothing to say which pair was the hair and which the shirt. They are
+  // labelled rows under the name now (see avatarStepsHTML), and the cover
+  // is the same block whether or not it is being changed.
   function coverBadgesHTML(profile) {
     return normalizedCoverBadges(profile).map(p => {
       const badge = BADGES.find(b => b.id === p.id);
@@ -1491,13 +1445,21 @@
   }
 
   function coverHTML(opts) {
-    const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText, editable, customizing, sozcuCount } = opts;
+    const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText, metaPlace, editable, customizing, sozcuCount } = opts;
+    // The line under the name: where they live, then (where the caller
+    // has it) how long they have been a member. A district is a Turkish
+    // name whatever language the sheet is in, so it carries its own lang
+    // -- uppercased as English, Şişli prints "ŞIŞLI".
+    const metaHTML = [
+      metaPlace ? `<span lang="tr">${esc(metaPlace)}</span>` : '',
+      metaText ? esc(metaText) : '',
+    ].filter(Boolean).join(' · ');
     const badgesHTML = coverBadgesHTML(profile);
     // The avatar art layer. It is always its own element inside the frame
     // (never the frame box itself) because the carousels replace its whole
     // innerHTML on every arrow press — sharing a parent with the stickers
     // would wipe them (see .ist-pc-cover-art in profile-card.css).
-    let artHTML, arrowsHTML = '';
+    let artHTML;
     if (editable && customizing) {
       const hairOpt = AVATAR_HAIR_OPTIONS[hairOptionIndex(avatarHair)];
       const hatOpt = AVATAR_HAT_OPTIONS[hatOptionIndex(avatarHat)];
@@ -1505,20 +1467,6 @@
       const shirtOpt = AVATAR_SHIRT_OPTIONS[shirtOptionIndex(avatarShirt)];
       const title = `${hairOpt.label} · ${hatOpt.label} · ${accessoryOpt.label} · ${shirtOpt.label}`;
       artHTML = `<div class="ist-pc-cover-art" id="po-avatar-preview" title="${esc(title)}">${avatarPreviewHTML(avatarHair, avatarHat, avatarAccessory, avatarShirt, false)}</div>`;
-      arrowsHTML = `
-        <div class="ist-pc-cover-pick-col ist-pc-cover-pick-prev">
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-prev" aria-label="Önceki şapka">${ARROW_ICON_LEFT}</button>
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-prev" aria-label="Önceki saç">${ARROW_ICON_LEFT}</button>
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-prev" aria-label="Önceki aksesuar">${ARROW_ICON_LEFT}</button>
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-prev" aria-label="Önceki tişört">${ARROW_ICON_LEFT}</button>
-        </div>
-        <div class="ist-pc-cover-pick-col ist-pc-cover-pick-next">
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hat-next" aria-label="Sonraki şapka">${ARROW_ICON_RIGHT}</button>
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-hair-next" aria-label="Sonraki saç">${ARROW_ICON_RIGHT}</button>
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-accessory-next" aria-label="Sonraki aksesuar">${ARROW_ICON_RIGHT}</button>
-          <button type="button" class="ist-pc-cover-pick-arrow" id="po-shirt-next" aria-label="Sonraki tişört">${ARROW_ICON_RIGHT}</button>
-        </div>
-      `;
     } else {
       artHTML = `<div class="ist-pc-cover-art">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>`;
     }
@@ -1528,14 +1476,13 @@
     return `
       <div class="ist-pc-cover${editable ? ' ist-pc-cover-editable' : ''}${customizingClass}">
         <div class="ist-pc-cover-picker">
-          ${arrowsHTML}
           <div class="ist-pc-cover-avatar"${editable ? ' id="po-cover"' : ''}>
             ${badgesHTML}
             ${artHTML}
           </div>
         </div>
-        <div class="ist-pc-cover-name">${esc(displayName)}</div>
-        <div class="ist-pc-cover-meta">${esc(metaText)}</div>
+        <h2 class="ist-pc-cover-name ui-h">${esc(displayName)}</h2>
+        <div class="ist-pc-cover-meta ui-label ui-quiet">${metaHTML}</div>
       </div>
     `;
   }
@@ -3918,116 +3865,151 @@
   // vertical space on mobile — see BADGES/buildBadgePicker/toggleCoverBadge
   // above, kept intact so it can be re-added later; already-placed cover
   // badges still render via coverHTML.
+  // One labelled row per part of the avatar that has something to choose
+  // between: what it is on the left, the choice between two arrows on
+  // the right. A part with a single option (the hat, while its only
+  // drawn value is "none") gets no row -- two arrows that lead nowhere
+  // are a control that is broken. The ids are the ones the four
+  // wire*Carousel functions and the onboarding tour already look for.
+  const AVATAR_STEPS = [
+    { key: 'hat',       label: 'profile.avatar.hat',       options: () => AVATAR_HAT_OPTIONS,       index: (st) => hatOptionIndex(st.avatarHat) },
+    { key: 'hair',      label: 'profile.avatar.hair',      options: () => AVATAR_HAIR_OPTIONS,      index: (st) => hairOptionIndex(st.avatarHair) },
+    { key: 'accessory', label: 'profile.avatar.accessory', options: () => AVATAR_ACCESSORY_OPTIONS, index: (st) => accessoryOptionIndex(st.avatarAccessory) },
+    { key: 'shirt',     label: 'profile.avatar.shirt',     options: () => AVATAR_SHIRT_OPTIONS,     index: (st) => shirtOptionIndex(st.avatarShirt) },
+  ];
+  const LOCK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" '
+    + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10"></rect>'
+    + '<path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>';
+
+  // What stands between a stepper's arrows: the option's short name in
+  // the reader's language, with a lock beside one that cannot be worn.
+  function stepValueHTML(opt, locked, I18N) {
+    const en = I18N && I18N.isEnglish && I18N.isEnglish();
+    const name = (en ? opt.en : opt.short) || opt.label;
+    return esc(name) + (locked ? `<span class="po-step-lock">${LOCK_ICON}</span>` : '');
+  }
+  function setStepValue(key, opt, locked, I18N) {
+    const el = document.getElementById(`po-${key}-val`);
+    if (el) el.innerHTML = stepValueHTML(opt, locked, I18N);
+  }
+
+  function avatarStepsHTML(state) {
+    const t = (k) => (state.I18N && state.I18N.t) ? state.I18N.t(k) : k;
+    const rows = AVATAR_STEPS.filter(s => s.options().length > 1).map(s => {
+      const opt = s.options()[s.index(state)];
+      const name = t(s.label);
+      return `
+        <div class="ui-row">
+          <div class="ui-row-k" id="po-${s.key}-lab">${esc(name)}</div>
+          <div class="ui-step po-step" role="group" aria-labelledby="po-${s.key}-lab">
+            <button type="button" class="ui-step-btn" id="po-${s.key}-prev" aria-label="${esc(t('profile.avatar.prev'))}">${ARROW_ICON_LEFT}</button>
+            <span class="ui-step-v" id="po-${s.key}-val" aria-live="polite">${stepValueHTML(opt, false, state.I18N)}</span>
+            <button type="button" class="ui-step-btn" id="po-${s.key}-next" aria-label="${esc(t('profile.avatar.next'))}">${ARROW_ICON_RIGHT}</button>
+          </div>
+        </div>`;
+    }).join('');
+    if (!rows) return '';
+    return `
+      <section class="po-sec">
+        <div class="ui-label">${esc(t('profile.avatar'))}</div>
+        <div class="ui-box ui-rows po-steps" id="po-avatar-steps">${rows}</div>
+        <div class="ist-pc-avatar-msg ui-note ui-err" id="po-avatar-msg" role="status" aria-live="polite"></div>
+      </section>`;
+  }
+
+  // ── YOUR OWN PROFILE ──
+  // Read top to bottom: who you are (the cover), what you look like
+  // (the avatar's rows, and the colours of the app), the code you hand
+  // to somebody you are vouching for, and then the account -- the facts
+  // first, the two ways out last. Every block is the house's own
+  // (ui.css): a red label over a box of rows. Which blocks a page shows
+  // is PROFILE_SECTIONS'.
   function settingsPageHTML(state) {
     const { I18N, user, profile, sozcuCount, sponsoredList, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
     const show = sectionsFor(state.page);
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
     const lastName = profile?.last_name || '';
-    const displayName = `${firstName} ${lastName}`.trim() || user.email.split('@')[0];
+    const displayName = capitalizeName(`${firstName} ${lastName}`.trim()) || user.email.split('@')[0];
     const yasadigiIlce = profile?.neighborhood || '';
     const dogumYeri = profile?.birth_place || '';
     const phone = profile?.phone || '';
     const referralCode = profile?.referral_code || '';
     const palettePref = normalizePalette(profile?.palette_pref);
-    const paletteLabel = PALETTE_VALUES.indexOf(palettePref) === 1 ? 'Kahverengi' : 'Siyah-Beyaz';
 
     const yasadigiDisplay = yasadigiIlce ? (NB_NAMES[yasadigiIlce] || yasadigiIlce) : '—';
     const dogumDisplay = dogumYeri ? (NB_NAMES[dogumYeri] || dogumYeri) : '—';
-    const joinedDate = I18N.formatDate(user.created_at, { year: 'numeric', month: 'long', day: 'numeric' });
+    const since = I18N.formatMemberSince(profile?.joined_at || user.created_at);
     const kefilLabel = kefilOfUser
       ? esc(capitalizeName(`${kefilOfUser.first_name||''} ${kefilOfUser.last_name||''}`.trim()) || t('profile.unnamed'))
       : '';
+    const row = (k, v) => `
+            <div class="ui-row">
+              <div class="ui-row-k">${esc(k)}</div>
+              <div class="ui-row-v">${v}</div>
+            </div>`;
+    const chip = (value, key) => `<button type="button" class="ui-chip" role="radio" data-palette="${value}" aria-checked="${palettePref === value}">${esc(t(key))}</button>`;
 
+    // CSS uppercases by the element's language and the document is
+    // lang="tr" whatever the reader chose, so the sheet says which it is
+    // in ("Sign out" would otherwise print "SİGN OUT").
+    const lang = (I18N.isEnglish && I18N.isEnglish()) ? 'en' : 'tr';
     return `
-      <div class="ist-pc-settings-grid">
-        <div class="ist-pc-settings-col ist-pc-settings-left">
-          ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaText: yasadigiDisplay, editable: true, customizing, sozcuCount })}
-          <div class="ist-pc-avatar-msg" id="po-avatar-msg" role="status" aria-live="polite"></div>
+      <div class="po" lang="${lang}">
+        ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaPlace: yasadigiDisplay, metaText: since, editable: true, customizing, sozcuCount })}
 
-          ${show.week ? `
-          <div class="ist-pc-section-title">${esc(t('profile.thisweek'))}</div>
-          <div id="po-weekgrid-mount"></div>
-          ` : ''}
-        </div>
+        ${customizing ? avatarStepsHTML(state) : ''}
 
-        <div class="ist-pc-settings-col ist-pc-settings-right">
-          ${show.account ? `
-          <div class="ist-pc-section-title">${esc(t('profile.account'))}</div>
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.email'))}</div>
-            <div class="ist-pc-info-value">${esc(user.email)}</div>
+        ${show.settings ? `
+        <section class="po-sec">
+          <div class="ui-label" id="po-palette-lab">${esc(t('profile.colortheme'))}</div>
+          <div class="ui-chips ui-fill" id="po-palette" role="radiogroup" aria-labelledby="po-palette-lab">
+            ${chip('mono', 'profile.palette.mono')}
+            ${chip('earth', 'profile.palette.earth')}
           </div>
-          ${phone ? `
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.phone') || 'Telefon')}</div>
-            <div class="ist-pc-info-value">${esc(phone)}</div>
-          </div>` : ''}
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.birthplace'))}</div>
-            <div class="ist-pc-info-value">${esc(dogumDisplay)}</div>
-          </div>
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.membership'))}</div>
-            <div class="ist-pc-info-value">${esc(joinedDate)}</div>
-          </div>
-          ${kefilOfUser ? `
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.kefil'))}</div>
-            <div class="ist-pc-info-value">${kefilLabel}</div>
-          </div>` : ''}
-          ${sponsoredListHTML(sponsoredList, t)}
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.eventkefilcount'))}</div>
-            <div class="ist-pc-info-value">${state.eventKefilCount ?? 0} ${esc(t('profile.times'))}</div>
-          </div>
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.sozcucount'))}</div>
-            <div class="ist-pc-info-value">${sozcuCount ?? 0} ${esc(t('profile.times'))}</div>
-          </div>
-          ${referralCode ? `
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.referralcode'))}</div>
-            <div class="ist-pc-info-value">
-              <span class="ist-pc-code">${esc(referralCode)}</span>
-              <button type="button" class="ist-pc-copy" id="po-copy">${esc(t('profile.copy'))}</button>
-            </div>
-          </div>` : ''}
-          ` : ''}
+          ${customizing ? '' : `<button type="button" class="ui-btn ui-ghost ui-block po-customize" id="po-customize">${esc(t('profile.customize'))}</button>`}
+          <div class="ui-note ui-err po-msg" id="po-palette-msg" role="status"></div>
+        </section>` : ''}
 
-          ${show.settings ? `
-          <div class="ist-pc-section-title">${esc(t('profile.tab.ayarlar'))}</div>
-          ${customizing ? `
-          <div class="ist-pc-field">
-            <div class="ist-pc-label">${esc(t('profile.colortheme'))}</div>
-            <input class="ist-pc-slider" id="po-palette" type="range" min="0" max="1" step="1" value="${PALETTE_VALUES.indexOf(palettePref)}">
-            <div class="ist-pc-ticks" id="po-palette-ticks">
-              <span data-idx="0">Siyah-Beyaz</span>
-              <span data-idx="1">Kahverengi</span>
-            </div>
+        ${show.week ? `
+        <section class="po-sec">
+          <div class="ui-label">${esc(t('profile.thisweek'))}</div>
+          <div class="ui-box po-week" id="po-weekgrid-mount"></div>
+        </section>` : ''}
+
+        ${show.account && referralCode ? `
+        <section class="po-sec">
+          <div class="ui-label">${esc(t('profile.referralcode'))}</div>
+          <div class="ui-box po-code">
+            <span class="ui-code">${esc(referralCode)}</span>
+            <button type="button" class="ui-btn ui-ghost ui-small" id="po-copy">${esc(t('profile.copy'))}</button>
           </div>
-          ` : `
-          <div class="ist-pc-info-row">
-            <div class="ist-pc-info-label">${esc(t('profile.colortheme'))}</div>
-            <div class="ist-pc-info-value">${esc(paletteLabel)}</div>
+          <p class="ui-note">${esc(t('profile.referralcode.hint'))}</p>
+        </section>` : ''}
+
+        ${show.account ? `
+        <section class="po-sec">
+          <div class="ui-label">${esc(t('profile.account'))}</div>
+          <div class="ui-box ui-rows">
+            ${row(t('profile.email'), esc(user.email))}
+            ${phone ? row(t('profile.phone'), esc(phone)) : ''}
+            ${row(t('profile.birthplace'), esc(dogumDisplay))}
+            ${kefilOfUser ? row(t('profile.kefil'), kefilLabel) : ''}
+            ${sponsoredListHTML(sponsoredList, t)}
+            ${row(t('profile.eventkefilcount'), `${state.eventKefilCount ?? 0} ${esc(t('profile.times'))}`)}
+            ${row(t('profile.sozcucount'), `${sozcuCount ?? 0} ${esc(t('profile.times'))}`)}
           </div>
-          `}
-          <div class="ist-pc-actions">
-            <button type="button" class="ist-pc-save" id="po-save">${esc(customizing ? t('profile.save') : t('profile.customize'))}</button>
-          </div>
-          <div class="ist-pc-msg" id="po-save-msg"></div>
-          ` : ''}
-        </div>
+        </section>
+
+        <section class="po-sec po-out">
+          <button type="button" class="ui-btn ui-ghost ui-block" id="po-signout">${esc(t('profile.signout'))}</button>
+          <button type="button" class="ui-link po-delete" id="po-delete-account">${esc(t('profile.deleteaccount'))}</button>
+          <div class="ui-note ui-err po-msg" id="po-save-msg" role="status"></div>
+        </section>` : ''}
       </div>
-
-      ${show.account ? `<button type="button" class="ist-pc-signout" id="po-signout">${esc(t('profile.signout'))}</button>` : ''}
-      ${show.account ? `<button type="button" class="ist-pc-delete-account" id="po-delete-account">${esc(t('profile.deleteaccount'))}</button>` : ''}
     `;
   }
 
-  // Wires every interactive piece of the combined settings page in one
-  // pass (cover dragging + avatar carousel live on the same cover now, so
-  // both always need wiring together — there's no more per-tab split).
   function wireSettingsEvents(state) {
     const { sb, I18N, user } = state;
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
@@ -4049,20 +4031,16 @@
         if (m) m.innerHTML = weekGridHTML(status, I18N);
       });
     }
-    const saveBtn = document.getElementById('po-save');
-    if (saveBtn) saveBtn.addEventListener('click', () => {
-      if (state.customizing) {
-        saveSettings(state);
-      } else {
-        state.customizing = true;
-        renderOverlayBody();
-      }
+    const customizeBtn = document.getElementById('po-customize');
+    if (customizeBtn) customizeBtn.addEventListener('click', () => {
+      state.customizing = true;
+      renderOverlayBody();
     });
+    wirePaletteChips(state);
     // The same three actions the petek's Sen depth carries — see
     // wireCopyCode/doSignOut/doDeleteAccount above for why the behaviour
     // is shared and the ids are not.
     wireCopyCode(document.getElementById('po-copy'), state);
-    syncTicks('po-palette', 'po-palette-ticks');
     const signoutBtn = document.getElementById('po-signout');
     if (signoutBtn) signoutBtn.addEventListener('click', () => doSignOut(sb));
     const deleteBtn = document.getElementById('po-delete-account');
@@ -4070,51 +4048,46 @@
       () => doDeleteAccount(state, deleteBtn, document.getElementById('po-save-msg')));
   }
 
-  // Saves the settings page's only editable field — palette/appearance.
+  // ── The palette is chosen by pressing it ──
+  // Two chips, and the one pressed is the app's colours from that
+  // instant: Palette.setPalette repaints the page, the maps and the
+  // avatars in the same frame (it is the same call a sunset makes), and
+  // the choice is written to the profile behind it. It used to be a
+  // two-stop slider, a Kaydet button and a page reload -- three steps and
+  // a blank screen for a choice between two things. A write that fails
+  // puts the old colours back and says so.
   // Language is set by holding the logo (see "Hold the logo and the app
-  // changes language" in project.html), not from this page. Ad/Soyad/
-  // Yaşadığı İlçe are read-only for now (see the comment above the info
-  // rows in settingsPageHTML), so there's nothing else to send.
-  async function saveSettings(state) {
-    const { sb, I18N, user } = state;
-    const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
-    const msgEl = document.getElementById('po-save-msg');
-    const btn = document.getElementById('po-save');
-    // The slider only exists on the page that renders the settings block
-    // (see PROFILE_SECTIONS) -- elsewhere Kaydet is saving avatar picks
-    // alone, so the preference keeps whatever is already stored.
-    const sliderValue = (id, values, fallback) => {
-      const el = document.getElementById(id);
-      if (!el) return fallback;
-      return values[parseInt(el.value, 10)] || values[0];
-    };
-    const newPalette = sliderValue('po-palette', PALETTE_VALUES, normalizePalette(state.profile?.palette_pref));
-
-    const payload = {
-      palette_pref: newPalette,
-    };
-
-    btn.textContent = t('profile.saving');
-    btn.disabled = true;
-    msgEl.textContent = '';
-
-    try {
-      const { data, error } = await sb.from('profiles').update(payload).eq('id', user.id).select('id');
-      if (error) throw error;
-      if (!data || data.length === 0) throw new Error('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
-      // Cache the new palette locally so the reload starts in the right
-      // colors instead of flashing the old one. Light/dark isn't stored
-      // here at all any more — the sun decides that (see palette.js).
-      if (global.Palette) {
-        global.Palette.setPalette(newPalette);
+  // changes language" in project.html), not from this page.
+  function wirePaletteChips(state) {
+    const group = document.getElementById('po-palette');
+    if (!group) return;
+    const { sb, user } = state;
+    const msgEl = document.getElementById('po-palette-msg');
+    const paint = (v) => group.querySelectorAll('.ui-chip').forEach(c =>
+      c.setAttribute('aria-checked', String(c.dataset.palette === v)));
+    group.addEventListener('click', async (e) => {
+      const chip = e.target.closest('.ui-chip');
+      if (!chip) return;
+      const next = normalizePalette(chip.dataset.palette);
+      const prev = normalizePalette(state.profile?.palette_pref);
+      if (next === prev) return;
+      paint(next);
+      if (global.Palette) global.Palette.setPalette(next);
+      if (state.profile) state.profile.palette_pref = next;
+      if (msgEl) msgEl.textContent = '';
+      try {
+        const { data, error } = await sb.from('profiles').update({ palette_pref: next }).eq('id', user.id).select('id');
+        if (error) throw error;
+        if (!data || data.length === 0) throw new Error('Profil kaydı bulunamadı. Yönetici ile iletişime geçin.');
+      } catch (err) {
+        // Only if the reader has not already pressed something else.
+        if (normalizePalette(state.profile?.palette_pref) !== next) return;
+        paint(prev);
+        if (global.Palette) global.Palette.setPalette(prev);
+        if (state.profile) state.profile.palette_pref = prev;
+        if (msgEl) msgEl.textContent = (err && err.message) || 'Kaydedilemedi.';
       }
-      setTimeout(() => window.location.reload(), 400);
-    } catch (err) {
-      btn.textContent = t('profile.save');
-      btn.disabled = false;
-      msgEl.textContent = (err && err.message) || 'Kaydedilemedi.';
-      msgEl.style.color = 'var(--accent)';
-    }
+    });
   }
 
   let _ovAvatarMsgTimer = null;
@@ -4146,6 +4119,7 @@
       const hair = AVATAR_HAIR_OPTIONS[idx].value;
       previewEl.innerHTML = avatarPreviewHTML(hair, state.avatarHat, state.avatarAccessory, state.avatarShirt, false);
       previewEl.classList.remove('locked');
+      setStepValue('hair', AVATAR_HAIR_OPTIONS[idx], false, state.I18N);
     }
 
     function step(delta) {
@@ -4176,6 +4150,7 @@
       const locked = !!opt.requiresSozcuCount && (state.sozcuCount || 0) < opt.requiresSozcuCount;
       previewEl.innerHTML = avatarPreviewHTML(state.avatarHair, opt.value, state.avatarAccessory, state.avatarShirt, locked);
       previewEl.classList.toggle('locked', locked);
+      setStepValue('hat', opt, locked, state.I18N);
     }
 
     function step(delta) {
@@ -4205,6 +4180,7 @@
       const locked = !!opt.locked;
       previewEl.innerHTML = avatarPreviewHTML(state.avatarHair, state.avatarHat, opt.value, state.avatarShirt, locked);
       previewEl.classList.toggle('locked', locked);
+      setStepValue('accessory', opt, locked, state.I18N);
     }
 
     function step(delta) {
@@ -4235,6 +4211,7 @@
       const shirt = AVATAR_SHIRT_OPTIONS[idx].value;
       previewEl.innerHTML = avatarPreviewHTML(state.avatarHair, state.avatarHat, state.avatarAccessory, shirt, false);
       previewEl.classList.remove('locked');
+      setStepValue('shirt', AVATAR_SHIRT_OPTIONS[idx], false, state.I18N);
     }
 
     function step(delta) {

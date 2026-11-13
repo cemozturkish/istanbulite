@@ -908,7 +908,7 @@
         speech: lines.pickHair, pick: true },
       { inSheet: true, target: '#po-shirt-prev, #po-shirt-next',
         speech: lines.pickShirt, pick: true },
-      { inSheet: true, target: '.ist-pc-cover-pick-col', all: true, speech: lines.senDone },
+      { inSheet: true, target: '#po-avatar-steps', speech: lines.senDone },
       { target: '#profile-overlay .ist-sheet-close', speech: lines.closeSheet, sheet: 'close' },
       // ── 2. The home screen, walked rather than pulled ──
       // Each part arrives on the beat that names it. A `wait` beat hands
@@ -1154,6 +1154,28 @@
         actionLabel: COPY.continueLabel[lang],
         onAction: () => { closePassthrough(); advance(); },
       });
+      // The avatar's pickers are rows under the name now, and on a short
+      // phone the lowest of them stands where this pane does. A row the
+      // reader is being asked to press may not be under the line asking
+      // for it, so the sheet is scrolled by exactly the overlap: once
+      // now (a second pick finds the sheet already at rest) and once
+      // after the sheet's own 0.55s slide has finished.
+      if (b.inSheet) {
+        requestAnimationFrame(() => liftClearOfPane(b.target));
+        setTimeout(() => liftClearOfPane(b.target), 650);
+      }
+    }
+
+    function liftClearOfPane(sel) {
+      const body = document.getElementById('profile-overlay-body');
+      const pane = document.getElementById('ist-onb-pane');
+      const els = sel ? document.querySelectorAll(sel) : [];
+      if (!body || !pane || !els.length || !pane.classList.contains('show')) return;
+      const paneTop = pane.getBoundingClientRect().top;
+      let bottom = 0;
+      els.forEach(e => { bottom = Math.max(bottom, e.getBoundingClientRect().bottom); });
+      const over = Math.ceil(bottom + 14 - paneTop);
+      if (over > 0) body.scrollTop += over;
     }
 
     // A pull beat: dim stays, the book goes live, and arrival is the advance.
