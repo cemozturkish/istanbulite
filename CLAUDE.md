@@ -225,6 +225,8 @@ under project.html).
 ├── bulmaca.html          # Turkish daily mini crossword
 ├── admin.html            # Admin dashboard (admin-only)
 ├── router.js             # Shared shell: single Supabase client, the two tabs + the zoom stack, virtual navigation, clock
+├── ui.css                # THE HOUSE COMPONENTS: the type scale and the controls every member
+│                         surface is built from — see "Site-wide defaults"
 ├── sheet.css/.js         # THE sheet: the one page that rises from the bottom — see "Site-wide defaults"
 ├── profile-card.js/.css  # Profile bar, the petek, avatar, badges — shared across pages
 ├── profile-bar.css       # THE TOP BAR's own styles — each page's <link media> says which widths
@@ -244,7 +246,8 @@ under project.html).
 │                         onto the calendar day; see "Launch state" 
 ├── i18n.js               # TR/EN language toggle
 ├── palette.js/.css       # Theme tokens, plus the admin's published colour overrides
-│                         (site_palette) and the admin phone's preview pin
+│                         (site_palette) and the admin phone's preview pin. palette.css also
+│                         declares the one typeface (Inter, assets/fonts/) and --font-ui / --font-mono
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
 ├── home-map.js           # Swaps in the hand-painted map for the member's own district
 ├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js,
@@ -598,6 +601,11 @@ sb.from('articles').delete().eq('id', id)
 
 ### `index.html` — Login Gate
 - Login / kefil-code signup screen only — no content of its own anymore
+- **It is the loading curtain with a form on it**: the curtain's ground and first frame (so it
+  reads the same `--load-*` ladder, palette.css), and the house's own fields, button and links
+  (ui.css) worn inverted by re-pointing `--ink` / `--lit-hi` on `#login-overlay`. It centres when
+  there is room and scrolls from the top when there is not (the sign-up form on a short phone);
+  `data-panel` on the overlay says which form is up, and the logo steps back for the long one
 - Once a session exists (or right after sign-in), redirects to `project.html` — the flip book,
   which is the app (it used to be `anahane.html`)
 
@@ -1647,6 +1655,53 @@ If it is, use it as it is — do not restate its geometry, its transition or its
 own stylesheet, and do not invent a second version "just for this page". If the default is wrong
 for everyone, change the default.
 
+### One typeface and one set of components — `--font-ui` + `ui.css`
+
+**The whole site is set in Inter, on every platform**, through one token: `--font-ui`
+(palette.css, the one stylesheet every page loads), with `--font-mono` for a code. Every
+`font-family` on the site reads one of the two — never a literal stack. It used to be
+`-apple-system, …, 'Segoe UI', 'Inter'`, which is three typefaces (San Francisco on an iPhone,
+Segoe UI on Windows, Inter on Android), so the same screen was a different face per device. The
+files are the app's own (`assets/fonts/`, two variable subsets — Turkish needs latin-ext), declared
+for the **whole weight axis (100–900)**: declared as 300–700, every 800 and 900 the stylesheets
+ask for was silently drawn at 700. `index.html` and `project.html` preload both.
+
+**`ui.css` is the house style, stated once.** The look is the home screen's — ink on paper, square
+corners, a 2px ink border, a 5px foot on what is pressed (it thins and the face sinks 3px), and
+the one red for a section's label and for what is urgent. A member-facing surface is built from
+these classes and adds only its own layout; it does not restate a heading, a label, a field or a
+button:
+
+| Class | What it is |
+|---|---|
+| `.ui-h` | a sheet's or page's title — 1.35rem / 900 / -0.01em |
+| `.ui-title` · `.ui-body` · `.ui-sub` · `.ui-note` (`.ui-err`) | a card's headline (1rem/800) · running text (0.92rem) · the line under a title (0.85rem muted) · a footnote or an error (0.8rem) |
+| `.ui-label` (`.ui-quiet`) | the UPPERCASE label, 0.66rem / 800 / 0.14em — red names a section, quiet names a row |
+| `.ui-field` | an input or a select: 16px (iOS zooms below that), 2px ink |
+| `.ui-btn` (`.ui-ghost`, `.ui-danger`, `.ui-small`, `.ui-block`) | every button: 0.78rem / 800 / 0.14em. Plain is the primary — one per screen |
+| `.ui-link` | a button that is only words (the way back) |
+| `.ui-chips` > `.ui-chip` (`.on` / `aria-checked`) | one choice out of a few; the chosen one is inked |
+| `.ui-box` (`.ui-foot`, `.ui-rail`) · `.ui-empty` | the card · the dashed "nothing here" |
+| `.ui-rows` > `.ui-row` > `.ui-row-k` + `.ui-row-v` | a list of facts in a box, hairline between |
+| `.ui-step` | a value walked with two arrows (the avatar's rows) |
+| `.ui-code` | a code that is read out or copied |
+
+Three things about it:
+
+- **Colours are the page's own tokens** (`--ink`, `--muted`, `--ink-red`, `--lit-hi` for a raised
+  face), so a component follows the palette and the sun without naming either — and a surface on
+  a different ground re-points the tokens once instead of restyling anything. The login gate does
+  exactly that: on its dark ground `--ink` is the logo's light tone and `--lit-hi` the ground.
+- **Uppercase is CSS's, so a surface says its language.** The document is `lang="tr"` whatever
+  the reader chose; a block whose text may be English carries its own `lang` (the profile sheet's
+  `.po`, the plan form, the privacy page's English half), and a district's name inside an English
+  block carries `lang="tr"` (uppercased as English, Şişli prints "ŞIŞLI").
+- **Who wears it today:** the plan sheet and week (project.html — where the style was first
+  drawn), your own profile and another member's (`.po` in profile-card.css), the login gate, the
+  privacy page, Tümcel's tiles and buttons, Çengel's grid and buttons. Onboarding and Sözcel's
+  dialogs state the same numbers in their own inks. The parts-bin pages and admin.html are not
+  converted; a part lifted out of the bin is converted as it is lifted.
+
 ### THE sheet — `sheet.css` + `sheet.js`
 
 Every surface that opens *over* a page rises from the bottom centre of the window as the same
@@ -1748,6 +1803,13 @@ geometry and no centred modal anywhere on the site.
     over in exactly the place it left off.
 - **Chrome:** background/border come from `frames.css`'s `.ist-sheet` rule (2px ink border, no
   bottom border, no shadow).
+- **The body is `border-box`.** It is 100% of the sheet *and* padded; as a content box it stood
+  taller than the sheet by its own padding, and the sheet's overflow cut that much off the end of
+  anything long enough to scroll.
+- **A sheet that scrolls opts into `.ist-sheet-head`** (on `.ist-sheet`): a strip of the sheet's
+  own paper across the close button's row, over the body and under the button, so scrolled
+  content is cut off on that line instead of passing behind a floating cross. Your own profile,
+  a member's and the plan sheet wear it; a game's sheet (an unpadded iframe) does not.
 
 ### The phone's hero line — `--map-hero-end`
 
@@ -4145,6 +4207,12 @@ those are the two beats (`pickHair`, `pickShirt`), each lighting just that categ
 arrows (`#po-hair-prev, #po-hair-next` / `#po-shirt-prev, #po-shirt-next`). Adding a category later
 is adding a beat the same way, once it is genuinely open.
 
+**The arrows are rows under the name now** (see "Your own profile"), so on a short phone the lowest
+row stands where the tour's pane does. A pick beat therefore scrolls the sheet by exactly the
+overlap (`liftClearOfPane`: once at once, once after the sheet's 0.55s slide) — a row the reader is
+asked to press may not be under the line asking for it. The beat that follows them lights the
+whole box (`#po-avatar-steps`).
+
 **A pick beat never advances on a press, and browsing is the whole point of it.** It used to be an
 `act` beat that ended the moment either arrow was pressed once — which was exactly wrong for a
 choice with more than one real option, since a reader who wanted to look through all four hairstyles
@@ -4429,18 +4497,36 @@ stays: its body-level overlay markup, and every listener its script ever bound t
 
 ### Your own profile — one page, three versions (`PROFILE_SECTIONS`)
 
-The profile card opens your profile as the sheet above, but **what it contains depends on which of
-the three pages you opened it from** (`PROFILE_SECTIONS` in `profile-card.js`): the cover (frame,
-avatar, name, district) shows on all three; the week's game grid is Kahvehane's; your account and
-settings — with the Kişiselleştir and Çıkış Yap buttons that act on them — are Kütüphane's.
-Anahane's is the cover and nothing else, and so is `project`'s.
+The profile card opens your profile as the sheet above, and **what it contains depends on the
+page it was opened from** (`PROFILE_SECTIONS` in `profile-card.js`). On `project` — the app — it is
+**Sen**, the whole of it (`sen: true`, so it opens ready to change): pressing your own name on the
+top bar is where a member's avatar, colours, kefil code and account live. The parts-bin pages keep
+their own subsets (cover only on Anahane and Mahalle, the week's games on Kahvehane, the account
+behind a Kişiselleştir button on Kütüphane).
 
-**Which means this sheet is not where a member's account lives any more.** These are all parts-bin
-pages: project.html is the app, its own entry here is cover-only, and nothing links to Kütüphane —
-so the account block below is, in practice, unreachable. What a member can actually *do* to their
-account (kefil code, Çıkış Yap, Hesabımı Sil) is printed on the petek's innermost depth instead; see
-the petek's own section. Turning a parts-bin page back on is what makes this sheet's account block
-reachable again, and the two share one implementation precisely so that day needs no second copy.
+It is one column (`.po`, `settingsPageHTML`), every block the house's own — a red label over a box
+(see "One typeface and one set of components"):
+
+1. **The cover** (`coverHTML`): the hexagon, the name as the sheet's title, and one quiet line —
+   the district, then "MART 2025'TEN BERİ ÜYE". Another member's sheet opens on the same block.
+2. **Avatar** (`avatarStepsHTML`, `AVATAR_STEPS`): one labelled row per part that has something
+   to choose between — the part's name, then the choice between two arrows (`.ui-step`), saved
+   the moment it is pressed. A part with a single option (the hat, while its only value is
+   "none") gets **no row**; a locked option shows a lock beside its name. They used to be two
+   columns of unlabelled arrows hanging either side of the frame. The ids (`#po-hair-prev` …)
+   are the ones the four `wire*Carousel` functions and the onboarding tour look for.
+3. **Renk**: two chips, and the one pressed IS the app's colours from that instant
+   (`wirePaletteChips` → `Palette.setPalette`, the same repaint a sunset makes), written to the
+   profile behind it and put back if the write fails. It was a two-stop slider, a Kaydet button
+   and a page reload.
+4. **Kefalet kodu**: the code in a box of its own with Kopyala, and one line saying what it is for.
+5. **Hesap**: the facts as rows (e-posta, telefon, doğum yeri, kefil, kefil olduğu — which opens —
+   etkinlik kefili, sözcü olduğu), then **Çıkış Yap** as a button and **Hesabımı Sil** as the quiet
+   red line under it: there, findable, and not what a thumb lands on.
+
+**It scrolls inside itself, like every other sheet.** It used to be forbidden to: every line was
+stated against one unit (`--po-u`) that was stepped down until the whole page fitted
+(`fitOverlayType`), which on a real phone set the account in 8px type. Both are gone.
 
 ### The petek (`IstProfileCard.mountHivePage`)
 
@@ -4785,9 +4871,7 @@ way under the finger and springs back when released, `.ist-hive-cell-pressing`) 
 pointer events rather than `:active`, which sticks after a tap on iOS — the same reason Kütüphane's
 cards press the way they do.
 
-Nothing on this page scrolls, and neither does any of the three profile sets: each fits the room it
-is given, the way a politician's page does. If a new block stops fitting, drop a block — do not turn
-the page into a scroller.
+Nothing on the petek's own page scrolls. (The profile sheet does — see "Your own profile".)
 
 ### Another member's profile — `IstProfileCard.initMemberSheet({ sb, I18N })`
 
@@ -4847,6 +4931,9 @@ after the page it belongs to.
 3. **No build tools:** Do not add npm, webpack, vite, or any bundler.
 4. **Vanilla DOM:** Use `document.querySelector`, `innerHTML`, `addEventListener` — standard DOM APIs.
 5. **CSS variables:** Use the grayscale design tokens (`--ink`, `--paper`, `--accent`, etc.) for consistency.
+   **Type is a token too:** `font-family: var(--font-ui)` (or `--font-mono`), never a literal
+   stack, and a size/weight from ui.css's scale — a new surface is built from the `.ui-*`
+   components (see "One typeface and one set of components"), not from numbers of its own.
 6. **Turkish language:** UI labels and content are primarily in Turkish. Match existing patterns.
 7. **Supabase SDK v2:** All database and auth calls go through `const sb = supabase.createClient(...)`.
 8. **Inline comments:** Add comments in English above significant code blocks.
@@ -4874,7 +4961,7 @@ after the page it belongs to.
     learned a new `data-i18n` key prints the key itself (`HANE.PETEK`) because the cached `i18n.js`
     has never heard of it, and a button wired to a brand-new function silently throws. The shared
     files carry a version query (`i18n.js?v=2`, `profile-card.js?v=2`, `profile-card.css?v=2`,
-    `loading-screen.js?v=2`, `sheet.js?v=2`); changing one of them means bumping its number **in
+    `loading-screen.js?v=2`, `sheet.js?v=2`, `ui.css?v=1`); changing one of them means bumping its number **in
     every page at once**. All pages must spell the URL identically — `router.js`'s `loadScriptOnce` matches on
     the exact `src` string, so one page left on `i18n.js` while another says `i18n.js?v=3` makes a
     swipe load and re-execute the module a second time.

@@ -1049,10 +1049,10 @@
     if (_ov.avatarHat === undefined) _ov.avatarHat = _ov.profile?.avatar_hat || null;
     if (_ov.avatarAccessory === undefined) _ov.avatarAccessory = _ov.profile?.avatar_accessory || null;
     if (_ov.avatarShirt === undefined) _ov.avatarShirt = _ov.profile?.avatar_shirt || null;
-    // Settings page opens in read-only "info" mode every time — Kişiselleştir
-    // switches it into the editable avatar-arrows + sliders mode (see
-    // settingsPageHTML/coverHTML), Kaydet saves and the page reload resets
-    // this back to false on its own.
+    // On a parts-bin page the sheet opens read-only every time and
+    // Kişiselleştir turns the avatar's rows on (see settingsPageHTML /
+    // avatarStepsHTML). There is nothing to save: each row and the
+    // palette chips commit the moment they are pressed.
     //
     // Except where this sheet IS Sen (`sen` in PROFILE_SECTIONS): the
     // depth it replaced had the arrows standing on the hexagon with
