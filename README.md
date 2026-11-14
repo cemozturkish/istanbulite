@@ -114,3 +114,12 @@ in `ios/`, which is left untouched until this one replaces it.
 Run `npm test` with Node.js 18 or newer. These dependency-free checks cover loading fallbacks, account-scoped game storage, game closure, picker retries, script syntax, and shared asset versions. They use mocked browser/database objects; device and authenticated integration testing remain separate.
 
 Game saves now carry the member ID in their local-storage key. Existing unowned local saves are ignored; authenticated remote progress is still restored when available.
+
+## Universal Links — istanbulite.net opens the app
+
+A tapped `istanbulite.net` link opens the installed app instead of Safari. Two halves, both needed:
+`.well-known/apple-app-site-association` on the site (`_config.yml` makes GitHub Pages' Jekyll
+publish the dot-folder), and the `applinks:istanbulite.net` Associated Domains entitlement in both
+Xcode projects (`ios/App/App/App.entitlements`, `ios-native/Istanbulite/Istanbulite.entitlements`).
+`admin.html` and `gizlilik.html` are excluded and stay in the browser. It only takes effect in a
+build that carries the entitlement, and Apple's CDN can take up to a day to pick up the file.
