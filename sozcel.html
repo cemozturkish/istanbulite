@@ -43,9 +43,9 @@
   <link rel="stylesheet" href="palette.css?v=17">
   <link rel="stylesheet" href="ui.css?v=1">
   <script src="game-locks.js?v=3" defer></script>
-  <link rel="stylesheet" href="profile-card.css?v=66">
+  <link rel="stylesheet" href="profile-card.css?v=67">
   <link rel="stylesheet" href="profile-bar.css?v=3" media="(max-width: 768px)">
-  <script src="profile-card.js?v=79" defer></script>
+  <script src="profile-card.js?v=80" defer></script>
   <script src="sheet.js?v=6"></script>
   <link rel="stylesheet" href="sheet.css?v=10">
   <style>
@@ -866,13 +866,21 @@
     #score-mobile-overlay .result-card {
       display: flex;
       flex-direction: column;
-      height: min(460px, calc(100vh - 32px));
+      height: min(640px, calc(100vh - 32px));
       overflow: hidden;
       padding: 18px 8px 8px;
     }
+    /* The week's top five over the petek: the board says who is ahead in
+       the city, the petek under it how the reader's own people did tonight. */
+    #score-top-list { flex-shrink: 0; margin: 0 6px; text-align: left; }
+    #score-top-list .scoreboard-item { padding: 4px 10px; }
     #score-mobile-overlay .score-hive-sub {
-      font-size: 0.85rem;
-      color: var(--muted);
+      margin-top: 12px;
+      font-size: 0.66rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-red);
     }
     #score-hive-page {
       position: relative;
@@ -2147,8 +2155,9 @@
   <div class="result-overlay" id="score-mobile-overlay">
     <div class="result-card">
       <button class="result-close" id="score-mobile-close" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-      <div class="result-title" id="score-hive-title" style="margin-bottom:4px;">Peteğin</div>
-      <div class="score-hive-sub" id="score-hive-sub">Bu geceki Sözcel'i kim oynadı?</div>
+      <div class="result-title" id="score-top-title" style="margin-bottom:6px;">Haftanın Skor Tahtası</div>
+      <ol class="scoreboard-list" id="score-top-list"></ol>
+      <div class="score-hive-sub" id="score-hive-sub">Peteğin bu geceki Sözcel'de</div>
       <div id="score-hive-page"></div>
     </div>
   </div>
@@ -5562,19 +5571,34 @@ function showShareToast(msg) {
   const scoreOverlay = document.getElementById('score-mobile-overlay');
   const scoreBtn = document.getElementById('mobile-score-btn');
   const scoreClose = document.getElementById('score-mobile-close');
-  // The button opens the reader's petek with every hexagon saying whether
-  // that member has played tonight's word -- played or not, never a score.
+  // The button opens the week's top five and, under it, the reader's petek
+  // with every hexagon saying how that member did on tonight's word.
   // Mounted on every opening (the map and the results are both re-read)
   // and taken down on closing, so nothing is left fitting itself into a
   // box that is display: none.
+  // The week's board, cut to its first five (the same model and rows as
+  // the desktop column's, IstScoreboard).
+  const SCORE_TOP_N = 5;
+  async function loadScoreTop(en) {
+    const list = document.getElementById('score-top-list');
+    if (!list) return;
+    const empty = (msg) => { list.innerHTML = `<li class="scoreboard-empty">${msg}</li>`; };
+    empty(en ? 'Loading...' : 'Yükleniyor...');
+    const { rows, error } = await IstScoreboard.weekly(sb);
+    if (error || !rows) return empty(en ? 'Could not load the scores' : 'Skorlar yüklenemedi');
+    if (!rows.length) return empty(en ? 'No points yet this week' : 'Bu hafta henüz puan yok');
+    list.innerHTML = IstScoreboard.rowsHTML(rows.slice(0, SCORE_TOP_N), { districtNames: neighborhoodNames });
+  }
   function openScoreHive() {
     scoreOverlay.classList.add('open');
     const PC = window.IstProfileCard;
     if (!PC || !PC.mountHivePage || !PC.paintHiveGameStates) return;
     const en = typeof I18N !== 'undefined' && I18N.lang === 'more_english';
-    document.getElementById('score-hive-title').textContent = en ? 'Your petek' : 'Peteğin';
-    document.getElementById('score-hive-sub').textContent =
-      en ? "Who has played tonight's Sözcel?" : "Bu geceki Sözcel'i kim oynadı?";
+    document.getElementById('score-top-title').textContent = I18N.t('games.weeklyscoreboard');
+    const sub = document.getElementById('score-hive-sub');
+    sub.lang = en ? 'en' : 'tr';
+    sub.textContent = en ? "Your petek in tonight's Sözcel" : "Peteğin bu geceki Sözcel'de";
+    loadScoreTop(en);
     PC.mountHivePage({ sb, I18N, mountId: 'score-hive-page' });
     PC.paintHiveGameStates(sb, 'sozcel', dailySeed,
       en ? { go: 'Played ✓', none: 'Not yet' } : { go: 'Oynadı ✓', none: 'Oynamadı' });

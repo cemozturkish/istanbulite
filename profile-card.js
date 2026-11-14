@@ -3469,10 +3469,11 @@
   // The same recolouring as an evening's guest list, asked a different
   // question (sozcel.html's scoreboard button): 'go' is a member who has
   // FINISHED the night's game (attempts >= 1, the reading every other
-  // surface uses), 'none' one who has not. Played or not is all it says --
-  // never a score, never the guesses. The words are the caller's (labels:
-  // { go, none }), and the reader's own hexagon is read off the same rows
-  // as everybody else's.
+  // surface uses), 'none' one who has not. A member who has finished
+  // also has their result drawn where their name was (hiveGameResultHTML):
+  // the score and the colours of each guess, never the letters. The words
+  // are the caller's (labels: { go, none }), and the reader's own hexagon
+  // is read off the same rows as everybody else's.
   async function paintHiveGameStates(sb, game, seed, labels) {
     const token = {};
     _hiveEv = { game, kefilId: null, mine: null, states: new Map(), results: new Map(), labels: labels || {}, token };
@@ -3516,16 +3517,20 @@
     return v && v !== key ? v : fallback;
   }
 
-  // The share grid of a finished Sözcel (same squares as sozcel.html's
-  // buildShareText): score on the first line, then one row per guess.
-  // Rows from before the guesses column existed print the score alone.
-  function hiveGameResultText(r) {
-    const head = (r.won ? r.attempts : 'X') + '/6';
-    const grid = Array.isArray(r.guesses)
-      ? r.guesses.map(row => (row || []).map(x =>
-          x === 'correct' ? '🟫' : x === 'present' ? '🟧' : '⬜').join('')).join('\n')
-      : '';
-    return grid ? head + '\n' + grid : head;
+  // A finished Sözcel, drawn in the game's own terms: the score, then one
+  // row of small hexagons per guess -- ink for a letter in its place, the
+  // house red for a right letter in the wrong place, a pale one for a
+  // miss (profile-card.css, .ist-hive-gg). The statuses are the fixed
+  // words sozcel.html records, so they are safe as class names. Rows from
+  // before the guesses column existed print the score alone.
+  function hiveGameResultHTML(r) {
+    const head = `<span class="ist-hive-gg-score">${r.won ? Number(r.attempts) || '' : 'X'}/6</span>`;
+    if (!Array.isArray(r.guesses)) return head;
+    const cls = { correct: 'c', present: 'p' };
+    const rows = r.guesses.map(row => '<span class="ist-hive-gg-row">' +
+      (Array.isArray(row) ? row : []).map(x => `<i class="${cls[x] || 'a'}"></i>`).join('') +
+      '</span>').join('');
+    return `${head}<span class="ist-hive-gg">${rows}</span>`;
   }
 
   function applyHiveEventStates() {
@@ -3551,7 +3556,8 @@
       if (ev) {
         const res = (st && _hiveEv.results && cell.dataset.memberId)
           ? _hiveEv.results.get(String(cell.dataset.memberId)) : null;
-        ev.textContent = !st ? '' : (res ? hiveGameResultText(res) : (_hiveEv.labels ? (_hiveEv.labels[st] || '') : hiveEvLabel(st)));
+        if (res) ev.innerHTML = hiveGameResultHTML(res);
+        else ev.textContent = !st ? '' : (_hiveEv.labels ? (_hiveEv.labels[st] || '') : hiveEvLabel(st));
       }
       // No KEFİL tag: the red ring says whose evening it is.
       const pill = cell.querySelector('.ist-hive-kefil-pill');
