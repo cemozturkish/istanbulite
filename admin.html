@@ -1901,7 +1901,7 @@
     .clr-easy-reset[hidden] { display: none; }
     .clr-easy-range {
       grid-column: 1 / -1; width: 100%; height: 18px; margin: 2px 0 0;
-      -webkit-appearance: none; appearance: none; background: linear-gradient(to right, #000, #fff);
+      -webkit-appearance: none; appearance: none; background: linear-gradient(to right, #000, #fff);  /* re-tinted per row to its own hue */
       border: 1px solid var(--ink); cursor: pointer;
     }
     .clr-easy-range::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 24px; background: var(--ink-red); border: 2px solid var(--paper, #fff); box-shadow: 0 0 0 1px var(--ink); }
@@ -11013,31 +11013,53 @@ const CLR_EASY = [
   { label: 'Üst ve alt çubuk', tokens: ['--navbar-ink'], probe: 'var(--navbar-ink)' },
 ];
 
-function clrGrayHex(pct) {
-  const v = Math.max(0, Math.min(255, Math.round(pct * 2.55)));
-  const h = v.toString(16).padStart(2, '0');
-  return '#' + h + h + h;
+// A slider is BRIGHTNESS, not a gray: it keeps the hue the site already
+// paints that thing in (gray on Siyah-beyaz, brown on Kahverengi) and
+// walks only its lightness, 0 black → 100 white. Each item's own hue is
+// remembered per state (CLR_EASY_BASE_KEY), because a colour pushed all
+// the way to black or white no longer carries one to be read back.
+const CLR_EASY_BASE_KEY = 'istanbulite_palette_easy_base';
+const CLR_EARTH_FALLBACK = { h: 25, s: 29 };   // the earth palette's own ink brown
+
+function clrRgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  let h = 0, s = 0;
+  if (mx !== mn) {
+    const d = mx - mn;
+    s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h *= 60;
+  }
+  return { h, s: s * 100, l: l * 100 };
+}
+function clrHslHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  const x = v => Math.max(0, Math.min(255, Math.round(v * 255))).toString(16).padStart(2, '0');
+  return '#' + x(f(0)) + x(f(8)) + x(f(4));
 }
 // A computed colour (rgb(), rgba() or Chrome's color(srgb …) for a
-// color-mix) → 0..100 lightness, a translucent one seen over white.
-function clrGrayPct(css) {
+// color-mix) → {r,g,b}, a translucent one seen over white.
+function clrParseRgb(css) {
   if (!css) return null;
   let r, g, b, a = 1, m;
   if ((m = /rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.]+))?/i.exec(css))) {
     r = +m[1]; g = +m[2]; b = +m[3]; if (m[4] != null) a = +m[4];
-  } else if ((m = /color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?/i.exec(css))) {
+  } else if ((m = /color\(srgb\s+([\d.e-]+)\s+([\d.e-]+)\s+([\d.e-]+)(?:\s*\/\s*([\d.]+))?/i.exec(css))) {
     r = m[1] * 255; g = m[2] * 255; b = m[3] * 255; if (m[4] != null) a = +m[4];
   } else return null;
-  const lum = (r + g + b) / 3;
-  return Math.round((lum * a + 255 * (1 - a)) / 2.55);
+  const o = v => v * a + 255 * (1 - a);
+  return { r: o(r), g: o(g), b: o(b) };
 }
-function clrHexPct(hex) {
+function clrHexHsl(hex) {
   const t = clrToHex(hex);
   if (!t) return null;
   const n = parseInt(t.hex.slice(1, 7), 16);
-  return Math.round((((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255)) / 3 / 2.55);
+  return clrRgbToHsl((n >> 16) & 255, (n >> 8) & 255, n & 255);
 }
-// What the phone paints this with right now (draft included).
+// What the phone paints this with right now (draft included), as HSL.
 function clrEasyRead(item) {
   try {
     const doc = clrFrame().contentWindow.document;
@@ -11045,35 +11067,65 @@ function clrEasyRead(item) {
     const probe = doc.createElement('span');
     probe.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;color:' + item.probe;
     doc.documentElement.appendChild(probe);
-    const c = doc.defaultView.getComputedStyle(probe).color;
+    const c = clrParseRgb(doc.defaultView.getComputedStyle(probe).color);
     probe.remove();
-    return clrGrayPct(c);
+    return c ? clrRgbToHsl(c.r, c.g, c.b) : null;
   } catch (e) { return null; }
 }
-function clrEasyOwn(item) {
-  const st = clr.draft && clr.draft.states[clr.variant];
+function clrEasyOwn(item, key) {
+  const st = clr.draft && clr.draft.states[key || clr.variant];
   const v = st && st.tokens ? st.tokens[item.tokens[0]] : null;
   return v == null ? null : v;
+}
+function clrEasyBases() {
+  if (!clr.easyBases) {
+    try { clr.easyBases = JSON.parse(localStorage.getItem(CLR_EASY_BASE_KEY) || '{}') || {}; } catch (e) { clr.easyBases = {}; }
+  }
+  return clr.easyBases;
+}
+function clrEasyKeepBase(key, i, hsl) {
+  const all = clrEasyBases();
+  (all[key] = all[key] || {})[i] = { h: Math.round(hsl.h * 10) / 10, s: Math.round(hsl.s * 10) / 10 };
+  try { localStorage.setItem(CLR_EASY_BASE_KEY, JSON.stringify(all)); } catch (e) { /* ignore */ }
+}
+// The hue a slider keeps in a given state. Mono is gray by definition; an
+// earth state never looked at yet borrows the hue of an earth state that
+// has been, or the palette's own brown.
+function clrEasyBase(key, i) {
+  const all = clrEasyBases();
+  if (all[key] && all[key][i]) return all[key][i];
+  if (key.startsWith('mono')) return { h: 0, s: 0 };
+  const sib = Object.keys(all).find(k => k.startsWith('earth') && all[k][i]);
+  return sib ? all[sib][i] : CLR_EARTH_FALLBACK;
+}
+function clrEasyHex(key, i, pct) {
+  const b = clrEasyBase(key, i);
+  return clrHslHex(b.h, b.s, pct);
 }
 function clrRenderEasy() {
   const pane = document.getElementById('clr-pane-easy');
   if (!pane) return;
-  let html = `<p class="clr-easy-note">Kaydırıcıyı sola çekersen koyulaşır, sağa çekersen açılır. Telefonda hemen görünür; üyeler <b>Yayınla</b>'ya basana kadar görmez. Şu an <b>${escapeHtml(clrVariantObj().name)}</b> hâlini değiştiriyorsun (telefonun üstündeki düğmelerden seç).</p>
+  let html = `<p class="clr-easy-note">Her kaydırıcı o şeyin <b>parlaklığı</b>: rengi aynı kalır, sola çekersen koyulaşır, sağa çekersen açılır. Telefonda hemen görünür; üyeler <b>Yayınla</b>'ya basana kadar görmez. Şu an <b>${escapeHtml(clrVariantObj().name)}</b> hâlini değiştiriyorsun (telefonun üstündeki düğmelerden seç).</p>
     <label class="clr-easy-all"><input type="checkbox" id="clr-easy-all"${clr.easyAll ? ' checked' : ''}> Dört hâlin hepsine birden uygula</label>`;
   CLR_EASY.forEach((it, i) => {
     if (it.group) { html += `<div class="clr-easy-group">${escapeHtml(it.group)}</div>`; return; }
     const own = clrEasyOwn(it);
-    let pct = own != null ? clrHexPct(own) : null;
-    if (pct == null) pct = clrEasyRead(it);
-    if (pct == null) pct = 50;
+    // The site's own colour (nothing of ours on it yet) is what fixes the
+    // hue; one of our own values only stands in for it if nothing did.
+    const now = clrEasyRead(it);
+    const hasBase = (clrEasyBases()[clr.variant] || {})[i];
+    if (now && (own == null || !hasBase) && !clr.variant.startsWith('mono')) clrEasyKeepBase(clr.variant, i, now);
+    let pct = own != null ? (clrHexHsl(own) || {}).l : (now ? now.l : null);
+    pct = pct == null ? 50 : Math.round(pct);
     html += `<div class="clr-easy-row${own != null ? ' changed' : ''}" data-easy="${i}">
       <div class="clr-easy-name"><span class="clr-easy-lbl">${escapeHtml(it.label)}</span>${it.sub ? `<small>${escapeHtml(it.sub)}</small>` : ''}</div>
       <div class="clr-easy-side">
         <button class="clr-easy-reset" data-easy-reset="${i}"${own != null ? '' : ' hidden'} title="Sitenin kendi rengine dön">sıfırla</button>
         <span class="clr-easy-pct">%${pct}</span>
-        <span class="clr-easy-sw" style="background:${clrGrayHex(pct)}"></span>
+        <span class="clr-easy-sw" style="background:${clrEasyHex(clr.variant, i, pct)}"></span>
       </div>
-      <input type="range" class="clr-easy-range" min="0" max="100" step="1" value="${pct}" data-easy-range="${i}" aria-label="${escapeHtml(it.label)}">
+      <input type="range" class="clr-easy-range" min="0" max="100" step="1" value="${pct}" data-easy-range="${i}" aria-label="${escapeHtml(it.label)}"
+        style="background:linear-gradient(to right, ${clrEasyHex(clr.variant, i, 0)}, ${clrEasyHex(clr.variant, i, 50)}, ${clrEasyHex(clr.variant, i, 100)})">
     </div>`;
   });
   pane.innerHTML = html;
@@ -11082,8 +11134,10 @@ function clrEasyKeys() { return clr.easyAll ? CLR_VARIANTS.map(v => v.key) : [cl
 function clrEasySet(i, pct) {
   const it = CLR_EASY[i];
   if (!it || !it.tokens) return;
-  const hex = clrGrayHex(pct);
-  clrEasyKeys().forEach(k => { const st = clrState(k); it.tokens.forEach(t => { st.tokens[t] = hex; }); });
+  clrEasyKeys().forEach(k => {
+    const st = clrState(k), hex = clrEasyHex(k, i, pct);
+    it.tokens.forEach(t => { st.tokens[t] = hex; });
+  });
   clrSaveDraft();
   clrPushSoon();
   clrPaintVariants();
@@ -11104,11 +11158,11 @@ function clrWireEasy() {
   pane.addEventListener('input', (e) => {
     const t = e.target;
     if (!t.matches('[data-easy-range]')) return;
-    const pct = +t.value;
-    clrEasySet(+t.dataset.easyRange, pct);
+    const pct = +t.value, i = +t.dataset.easyRange;
+    clrEasySet(i, pct);
     const row = t.closest('.clr-easy-row');
     row.classList.add('changed');
-    row.querySelector('.clr-easy-sw').style.background = clrGrayHex(pct);
+    row.querySelector('.clr-easy-sw').style.background = clrEasyHex(clr.variant, i, pct);
     row.querySelector('.clr-easy-pct').textContent = '%' + pct;
     row.querySelector('.clr-easy-reset').hidden = false;
   });
