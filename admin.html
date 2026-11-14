@@ -1887,6 +1887,26 @@
     .clr-tabs button.on { color: var(--ink); border-color: var(--ink); background: var(--paper-card); }
     .clr-pane { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 0 14px; }
     .clr-pane[hidden] { display: none; }
+    /* ── Basit: one gray slider per named thing ── */
+    .clr-easy-note { font-size: 0.8rem; color: var(--muted); line-height: 1.5; margin: 0 0 10px; }
+    .clr-easy-all { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 700; margin: 0 0 14px; cursor: pointer; }
+    .clr-easy-group { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-red); margin: 16px 0 6px; }
+    .clr-easy-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--hairline, #ddd); }
+    .clr-easy-name { font-size: 0.86rem; font-weight: 700; }
+    .clr-easy-name small { display: block; font-weight: 400; color: var(--muted); font-size: 0.74rem; }
+    .clr-easy-side { display: flex; align-items: center; gap: 8px; }
+    .clr-easy-sw { width: 26px; height: 26px; border: 2px solid var(--ink); background: #888; }
+    .clr-easy-pct { font-size: 0.74rem; color: var(--muted); width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+    .clr-easy-reset { font-size: 0.72rem; background: none; border: 0; color: var(--ink-red); cursor: pointer; padding: 0; text-decoration: underline; }
+    .clr-easy-reset[hidden] { display: none; }
+    .clr-easy-range {
+      grid-column: 1 / -1; width: 100%; height: 18px; margin: 2px 0 0;
+      -webkit-appearance: none; appearance: none; background: linear-gradient(to right, #000, #fff);
+      border: 1px solid var(--ink); cursor: pointer;
+    }
+    .clr-easy-range::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 24px; background: var(--ink-red); border: 2px solid var(--paper, #fff); box-shadow: 0 0 0 1px var(--ink); }
+    .clr-easy-range::-moz-range-thumb { width: 10px; height: 22px; background: var(--ink-red); border: 2px solid var(--paper, #fff); border-radius: 0; }
+    .clr-easy-row.changed .clr-easy-lbl::after { content: ' •'; color: var(--ink-red); }
     .clr-empty { font-size: 0.8rem; color: var(--muted); font-style: italic; line-height: 1.5; padding: 6px 0; }
     .clr-empty b { color: var(--ink); font-style: normal; }
 
@@ -3462,11 +3482,13 @@
     <div class="panel clr-panel">
       <div class="panel-title">Renkler · <span id="clr-variant-name">—</span></div>
       <div class="clr-tabs" role="tablist">
-        <button data-pane="sel" class="on">Seçili öğe</button>
+        <button data-pane="easy" class="on">Basit</button>
+        <button data-pane="sel">Seçili öğe</button>
         <button data-pane="all">Tüm renkler</button>
         <button data-pane="changes">Değişiklikler <span id="clr-count"></span></button>
       </div>
-      <div class="clr-pane" id="clr-pane-sel"></div>
+      <div class="clr-pane" id="clr-pane-easy"></div>
+      <div class="clr-pane" id="clr-pane-sel" hidden></div>
       <div class="clr-pane" id="clr-pane-all" hidden>
         <input type="search" id="clr-search" placeholder="Ara: ink, paper, map, lit…" autocomplete="off">
         <div id="clr-all"></div>
@@ -10095,7 +10117,8 @@ const clr = {
   hover: null,
   layers: [],
   scale: 1,
-  pane: 'sel',
+  pane: 'easy',
+  easyAll: false,
   editors: [],
   ruleCache: new WeakMap(),
   boxTimer: null,
@@ -10960,6 +10983,144 @@ function clrRenderAll() {
     </details>`).join('');
 }
 
+// ── Basit: plain gray sliders ─────────────────────────────────────────
+// The admin's own words for the grays on the home screen, each one a
+// slider from black to white. A slider writes one or more :root tokens
+// into the same draft the rest of this section writes (so Yayınla,
+// Değişiklikler and the four states all work on it unchanged). `probe` is
+// the CSS the app itself paints that thing with, read back through a
+// hidden element in the phone to put the slider where the colour is now.
+const CLR_EASY = [
+  { group: 'Petek' },
+  { label: 'Arka plan', sub: 'ekranın zemini — haritadaki deniz de bu', tokens: ['--map-sea'], probe: 'var(--map-sea)' },
+  { label: 'Peteğin arkasındaki alan', sub: 'altıgenlerin arkasındaki büyük gri alan', tokens: ['--ist-hive-back-fill'],
+    probe: 'var(--ist-hive-back-fill, color-mix(in srgb, var(--lit, var(--paper-card, var(--paper))) 80%, var(--ink, #000)))' },
+  { label: 'O alanın kenar çizgisi', sub: 'arka alanın dış çizgisi', tokens: ['--ist-hive-back-stroke'],
+    probe: 'var(--ist-hive-back-stroke, color-mix(in srgb, var(--lit, var(--paper-card, var(--paper))) 52%, var(--ink, #000)))' },
+  { label: 'Senin çerçeven', sub: 'ortadaki altıgen', tokens: ['--ist-hive-ring-me'], probe: 'var(--ist-hive-ring-me)' },
+  { label: 'Arkadaşlarının çerçevesi', sub: 'bağlı olduğun kişiler', tokens: ['--ist-hive-ring-bonded'], probe: 'var(--ist-hive-ring-bonded)' },
+  { label: 'Diğer üyelerin çerçevesi', sub: 'petekte olup sana bağlı olmayanlar', tokens: ['--ist-hive-ring-other'], probe: 'var(--ist-hive-ring-other)' },
+  { label: 'Boş yerlerin çerçevesi', sub: '"+" olan boş altıgenler', tokens: ['--ist-hive-ring-open'], probe: 'var(--ist-hive-ring-open)' },
+  { label: 'Avatarların arkası', sub: 'altıgenin içi, yüzün arkası', tokens: ['--av-backdrop'], probe: 'var(--av-backdrop)' },
+  { group: 'Harita' },
+  { label: 'Kara', sub: 'ilçelerin rengi', tokens: ['--map-land'], probe: 'var(--map-land)' },
+  { label: 'Karanın yan yüzü', sub: 'kıyıdaki kalın 3D kenar', tokens: ['--map-edge'], probe: 'var(--map-edge)' },
+  { label: 'Sınır çizgileri', sub: 'haritanın çizgileri', tokens: ['--map-ink'], probe: 'var(--map-ink)' },
+  { label: 'Senin ilçen', tokens: ['--home-fill-home'], probe: 'var(--home-fill-home, color-mix(in srgb, var(--ink) 38%, transparent))' },
+  { label: 'Arkadaşlarının ilçeleri', tokens: ['--home-fill-friend'], probe: 'var(--home-fill-friend, color-mix(in srgb, var(--ink) 20%, transparent))' },
+  { label: 'Seçilen kişinin ilçesi', sub: 'bir altıgene basınca', tokens: ['--home-fill-pick'], probe: 'var(--home-fill-pick, color-mix(in srgb, var(--ink) 62%, transparent))' },
+  { group: 'Çubuklar' },
+  { label: 'Üst ve alt çubuk', tokens: ['--navbar-ink'], probe: 'var(--navbar-ink)' },
+];
+
+function clrGrayHex(pct) {
+  const v = Math.max(0, Math.min(255, Math.round(pct * 2.55)));
+  const h = v.toString(16).padStart(2, '0');
+  return '#' + h + h + h;
+}
+// A computed colour (rgb(), rgba() or Chrome's color(srgb …) for a
+// color-mix) → 0..100 lightness, a translucent one seen over white.
+function clrGrayPct(css) {
+  if (!css) return null;
+  let r, g, b, a = 1, m;
+  if ((m = /rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.]+))?/i.exec(css))) {
+    r = +m[1]; g = +m[2]; b = +m[3]; if (m[4] != null) a = +m[4];
+  } else if ((m = /color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?/i.exec(css))) {
+    r = m[1] * 255; g = m[2] * 255; b = m[3] * 255; if (m[4] != null) a = +m[4];
+  } else return null;
+  const lum = (r + g + b) / 3;
+  return Math.round((lum * a + 255 * (1 - a)) / 2.55);
+}
+function clrHexPct(hex) {
+  const t = clrToHex(hex);
+  if (!t) return null;
+  const n = parseInt(t.hex.slice(1, 7), 16);
+  return Math.round((((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255)) / 3 / 2.55);
+}
+// What the phone paints this with right now (draft included).
+function clrEasyRead(item) {
+  try {
+    const doc = clrFrame().contentWindow.document;
+    if (!doc || !doc.documentElement) return null;
+    const probe = doc.createElement('span');
+    probe.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;color:' + item.probe;
+    doc.documentElement.appendChild(probe);
+    const c = doc.defaultView.getComputedStyle(probe).color;
+    probe.remove();
+    return clrGrayPct(c);
+  } catch (e) { return null; }
+}
+function clrEasyOwn(item) {
+  const st = clr.draft && clr.draft.states[clr.variant];
+  const v = st && st.tokens ? st.tokens[item.tokens[0]] : null;
+  return v == null ? null : v;
+}
+function clrRenderEasy() {
+  const pane = document.getElementById('clr-pane-easy');
+  if (!pane) return;
+  let html = `<p class="clr-easy-note">Kaydırıcıyı sola çekersen koyulaşır, sağa çekersen açılır. Telefonda hemen görünür; üyeler <b>Yayınla</b>'ya basana kadar görmez. Şu an <b>${escapeHtml(clrVariantObj().name)}</b> hâlini değiştiriyorsun (telefonun üstündeki düğmelerden seç).</p>
+    <label class="clr-easy-all"><input type="checkbox" id="clr-easy-all"${clr.easyAll ? ' checked' : ''}> Dört hâlin hepsine birden uygula</label>`;
+  CLR_EASY.forEach((it, i) => {
+    if (it.group) { html += `<div class="clr-easy-group">${escapeHtml(it.group)}</div>`; return; }
+    const own = clrEasyOwn(it);
+    let pct = own != null ? clrHexPct(own) : null;
+    if (pct == null) pct = clrEasyRead(it);
+    if (pct == null) pct = 50;
+    html += `<div class="clr-easy-row${own != null ? ' changed' : ''}" data-easy="${i}">
+      <div class="clr-easy-name"><span class="clr-easy-lbl">${escapeHtml(it.label)}</span>${it.sub ? `<small>${escapeHtml(it.sub)}</small>` : ''}</div>
+      <div class="clr-easy-side">
+        <button class="clr-easy-reset" data-easy-reset="${i}"${own != null ? '' : ' hidden'} title="Sitenin kendi rengine dön">sıfırla</button>
+        <span class="clr-easy-pct">%${pct}</span>
+        <span class="clr-easy-sw" style="background:${clrGrayHex(pct)}"></span>
+      </div>
+      <input type="range" class="clr-easy-range" min="0" max="100" step="1" value="${pct}" data-easy-range="${i}" aria-label="${escapeHtml(it.label)}">
+    </div>`;
+  });
+  pane.innerHTML = html;
+}
+function clrEasyKeys() { return clr.easyAll ? CLR_VARIANTS.map(v => v.key) : [clr.variant]; }
+function clrEasySet(i, pct) {
+  const it = CLR_EASY[i];
+  if (!it || !it.tokens) return;
+  const hex = clrGrayHex(pct);
+  clrEasyKeys().forEach(k => { const st = clrState(k); it.tokens.forEach(t => { st.tokens[t] = hex; }); });
+  clrSaveDraft();
+  clrPushSoon();
+  clrPaintVariants();
+  clrStatus();
+}
+function clrEasyReset(i) {
+  const it = CLR_EASY[i];
+  if (!it || !it.tokens) return;
+  clrEasyKeys().forEach(k => { const st = clrState(k); it.tokens.forEach(t => { delete st.tokens[t]; }); });
+  clrSaveDraft();
+  clrPush();
+  clrPaintVariants();
+  clrStatus();
+  setTimeout(clrRenderEasy, 150);
+}
+function clrWireEasy() {
+  const pane = document.getElementById('clr-pane-easy');
+  pane.addEventListener('input', (e) => {
+    const t = e.target;
+    if (!t.matches('[data-easy-range]')) return;
+    const pct = +t.value;
+    clrEasySet(+t.dataset.easyRange, pct);
+    const row = t.closest('.clr-easy-row');
+    row.classList.add('changed');
+    row.querySelector('.clr-easy-sw').style.background = clrGrayHex(pct);
+    row.querySelector('.clr-easy-pct').textContent = '%' + pct;
+    row.querySelector('.clr-easy-reset').hidden = false;
+  });
+  pane.addEventListener('change', (e) => {
+    if (e.target.id === 'clr-easy-all') clr.easyAll = e.target.checked;
+  });
+  pane.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-easy-reset]');
+    if (b) clrEasyReset(+b.dataset.easyReset);
+  });
+}
+
 function clrRenderChanges() {
   const pane = document.getElementById('clr-pane-changes');
   if (!pane) return;
@@ -10996,12 +11157,13 @@ function clrRenderChanges() {
 }
 
 function clrRenderPanes() {
-  ['sel', 'all', 'changes'].forEach(p => {
+  ['easy', 'sel', 'all', 'changes'].forEach(p => {
     const el = document.getElementById('clr-pane-' + p);
     if (el) el.hidden = p !== clr.pane;
   });
   document.querySelectorAll('.clr-tabs button').forEach(b => b.classList.toggle('on', b.dataset.pane === clr.pane));
-  if (clr.pane === 'sel') clrRenderSel();
+  if (clr.pane === 'easy') clrRenderEasy();
+  else if (clr.pane === 'sel') clrRenderSel();
   else if (clr.pane === 'all') clrRenderAll();
   else clrRenderChanges();
 }
@@ -11135,6 +11297,7 @@ function clrInit() {
   clrFrame().addEventListener('load', () => {
     clrPush();
     if (clr.pane === 'all') setTimeout(clrRenderAll, 400);
+    if (clr.pane === 'easy') setTimeout(clrRenderEasy, 400);
   });
 
   // ── The pick layer ──
@@ -11177,6 +11340,7 @@ function clrInit() {
     clrRenderPanes();
   });
   document.getElementById('clr-search').addEventListener('input', () => clrRenderAll());
+  clrWireEasy();
 
   const panel = document.querySelector('.clr-panel');
   panel.addEventListener('click', (e) => {
