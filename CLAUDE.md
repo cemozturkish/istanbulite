@@ -1584,13 +1584,18 @@ coordinates that say where each paper hangs.
   clip it, and a centred overflow has no scrollbar to recover it. `fitSozcuLine()` keeps
   the "Günün Sözcüsü: …" credit on **one line** at any name length — it must never wrap,
   because a second line moves the keyboard and re-flows the board under the reader's thumb
-- **The scoreboard button opens the reader's PETEK, not a ranking** (`#score-mobile-overlay`,
-  `openScoreHive`). The petek is mounted into the popup (`mountHivePage`, `mountId:
-  'score-hive-page'`) and every hexagon says whether that member has FINISHED tonight's word
-  (`IstProfileCard.paintHiveGameStates(sb, 'sozcel', dailySeed, labels)` — the evening guest
-  list's own `data-ev` recolouring: red ring and "Oynadı ✓", or dimmed and "Oynamadı"). Played or
-  not is all it says, never a score or a guess. It is mounted on every opening and unmounted on
-  closing, and the free seats are left undrawn there.
+- **The scoreboard button opens the week's TOP FIVE over the reader's PETEK** (`#score-mobile-overlay`,
+  `openScoreHive`). The board (`#score-top-list`, `loadScoreTop`) is the weekly Sözcel board's own
+  model and rows (`IstScoreboard.weekly` / `rowsHTML`), cut to five. Under it the petek is mounted
+  into the popup (`mountHivePage`, `mountId: 'score-hive-page'`) and every hexagon says how that
+  member did on tonight's word (`IstProfileCard.paintHiveGameStates(sb, 'sozcel', dailySeed, labels)`
+  — the evening guest list's own `data-ev` recolouring): a red ring for a member who has FINISHED,
+  dimmed and "Oynamadı" for one who has not. A finished member's result is drawn where their name
+  was (`hiveGameResultHTML`, `.ist-hive-gg`): the score, then one row of small regular hexagons per
+  guess in Sözcel's own inks — `--tile-correct` (ink) for a letter in its place, `--tile-present`
+  (red) for a right letter in the wrong place, pale for a miss. Colours only, never the letters,
+  and not the share button's emoji. Mounted on every opening and unmounted on closing; the free
+  seats are left undrawn there.
 - **Two combs, one plane: the word, and the last guess behind it** (`.syl-stack`,
   `renderGhostBoard`). The board shows only the letters that *locked*, so everything else the
   reader had just tried vanished the moment it was read out — the pips say how many guesses are
