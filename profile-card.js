@@ -1388,7 +1388,7 @@
           <div class="ui-box ui-rows">
             <div class="ui-row">
               <div class="ui-row-k">${esc(I18N.t('profile.kefil'))}</div>
-              <div class="ui-row-v"><button type="button" class="kefil-link" data-user-id="${kefilId}">${esc(kefilName)}</button></div>
+              <div class="ui-row-v"><button type="button" class="kefil-link" data-user-id="${kefilId}">${esc(kefilName.toLocaleUpperCase("tr-TR"))}</button></div>
             </div>
           </div>
         </section>` : ''}
@@ -1481,7 +1481,7 @@
             ${artHTML}
           </div>
         </div>
-        <h2 class="ist-pc-cover-name ui-h">${esc(displayName)}</h2>
+        <h2 class="ist-pc-cover-name ui-h">${esc(String(displayName || "").toLocaleUpperCase("tr-TR"))}</h2>
         <div class="ist-pc-cover-meta ui-label ui-quiet">${metaHTML}</div>
       </div>
     `;
