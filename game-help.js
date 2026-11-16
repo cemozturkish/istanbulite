@@ -122,9 +122,15 @@
       }
       .gh-btn img { width: 30px; height: 30px; display: block; }
       .gh-btn:hover { opacity: 0.6; }
+      /* The game window's own paper (--frame-bg), not --paper: the
+         sheet the game stands in is --frame-bg, and so is the strip at
+         its foot where the logo overhangs the bottom bar (frames.css,
+         "A game embedded in project.html's game sheet"). On --paper the
+         page was a shade off that strip, which read as a band across
+         the bottom with the text sliced off at its edge. */
       .gh-page {
         position: fixed; inset: 0; z-index: 1000;
-        background: var(--paper); color: var(--ink);
+        background: var(--frame-bg, var(--paper)); color: var(--ink);
         font-family: var(--font-ui);
         display: flex; flex-direction: column;
       }
@@ -143,8 +149,13 @@
       .gh-body {
         flex: 1 1 auto; min-height: 0; overflow-y: auto;
         -webkit-overflow-scrolling: touch;
-        padding: 6px 20px 28px;
+        padding: 6px 20px 40px;
         max-width: 560px; width: 100%; margin: 0 auto; box-sizing: border-box;
+        /* What runs past the foot of the window dissolves into it rather
+           than being cut through a line of type; the padding above is
+           what lets the last line come to rest clear of the fade. */
+        -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+        mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
       }
       .gh-body .ui-body { margin: 0 0 10px; }
       .gh-body .ui-h { margin: 4px 0 12px; }

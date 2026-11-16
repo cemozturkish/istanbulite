@@ -1612,7 +1612,7 @@ coordinates that say where each paper hangs.
   `GAME_STATUS_GAMES` in admin.html); the migration widens every `game` CHECK and
   `admin_set_game_lineup` to take `'guncel'`.
 - **"Nasıl oynanır" is one page for all four games** (`game-help.js`, loaded on each game page as
-  `<script src="game-help.js?v=1" data-game="…" defer>`). The game being played is described first
+  `<script src="game-help.js?v=2" data-game="…" defer>`). The game being played is described first
   and in full; the other three follow in a sentence or two each, so a member meets every game by
   name even though only two stand in the lineup on any night. All the copy lives in that one file
   (Sözcel's long text is read from `sozcel.help.*` in i18n.js); a page with its own `#help-btn`
