@@ -1,6 +1,6 @@
 // Shared game-lock logic.
 // Add `<script src="game-locks.js"></script>` to any page with a
-// `.game-link[data-game="…"]` nav (sozcel, tumcel, bulmaca/Çengel, kahvehane).
+// `.game-link[data-game="…"]` nav (sozcel, tumcel, bulmaca/Çengel, guncel, kahvehane).
 // Then call `applyGameLocks(sb)` once `sb` is initialised.
 //
 // Rules:
@@ -13,7 +13,7 @@
 //     locked for everyone.
 
 (function () {
-  const GAME_LABELS = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Çengel' };
+  const GAME_LABELS = { sozcel: 'Sözcel', tumcel: 'Tümcel', bulmaca: 'Çengel', guncel: 'Güncel' };
   const ALL_GAMES = Object.keys(GAME_LABELS);
   // The admin owns the off-switch, so it isn't pointed at them: switching a
   // game off and then being unable to open it to check what everyone else

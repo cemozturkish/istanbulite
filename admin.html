@@ -996,6 +996,37 @@
 
     /* ── ÇENGEL — the hand-drawn grid editor ── */
     .bz-dims { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+
+    /* ── Güncel: sixteen events, each with the day it really happened ──
+       A row is its number, the Turkish text, the English text and the
+       date; the tag at its end is what the game will say about it,
+       worked out from the date the same way guncel.html does. */
+    .gn-rows { display: flex; flex-direction: column; gap: 6px; }
+    .gn-row {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1.4fr) minmax(0, 1fr) 140px 112px;
+      gap: 6px;
+      align-items: center;
+    }
+    .gn-row input { margin: 0; }
+    .gn-row .gn-n { font-size: 0.7rem; font-weight: 700; color: var(--muted); text-align: right; }
+    .gn-row .gn-tag {
+      font-size: 0.62rem; font-weight: 800; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--muted); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .gn-row .gn-tag.ans { color: var(--paper); background: var(--ink-red); padding: 3px 6px; }
+    .gn-row .gn-tag.bad { color: var(--ink-red); }
+    .gn-count { font-size: 0.78rem; font-weight: 700; padding-bottom: 8px; }
+    .gn-count.bad { color: var(--ink-red); }
+    @media (max-width: 900px) {
+      .gn-row { grid-template-columns: 24px minmax(0, 1fr) 130px; }
+      .gn-row .gn-n { grid-column: 1; grid-row: 1; }
+      .gn-row .gn-tr { grid-column: 2; grid-row: 1; }
+      .gn-row .gn-d { grid-column: 3; grid-row: 1; }
+      .gn-row .gn-en { grid-column: 2 / -1; grid-row: 2; }
+      .gn-row .gn-tag { grid-column: 2 / -1; grid-row: 3; }
+    }
     .bz-dims > div { display: flex; flex-direction: column; }
     .bz-dims input[type="number"] { width: 70px; }
     .bz-grid-wrap { overflow-x: auto; margin-bottom: 16px; }
@@ -2776,6 +2807,7 @@
         <button class="games-subtab active" data-subtab="sozcel">Sözcel</button>
         <button class="games-subtab" data-subtab="tumcel">Tümcel</button>
         <button class="games-subtab" data-subtab="bulmaca">Çengel</button>
+        <button class="games-subtab" data-subtab="guncel">Güncel</button>
       </div>
 
       <!-- SÖZCEL -->
@@ -3020,6 +3052,51 @@
         <div style="margin-top:24px;">
           <div class="panel-title" style="margin:0 0 14px;">Mevcut Bulmacalar</div>
           <div class="articles-list" id="bz-list">
+            <div class="empty-state"><span class="spinner"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GÜNCEL: "which of these happened yesterday?" -->
+      <div class="games-subpanel" id="games-guncel-panel" style="display:none;">
+        <div class="panel-title" id="gn-form-mode-label">Yeni Güncel Tahtası</div>
+        <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
+          16 olay yazın ve her birinin gerçekten olduğu tarihi girin. Tarihi oyun gününden bir gün
+          önce (ya da oyun gününün kendisi) olanlar doğru cevaptır — onları ayrıca işaretlemeniz
+          gerekmez. Diğerlerine basan üye "Bu geçen yıl oldu" gibi gerçek zamanını görür ve bir can
+          kaybeder. Olay metni kısa olsun: dört sütunlu bir telefon ekranına sığmalı.
+        </p>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;">
+          <div style="flex:1;min-width:150px;">
+            <label style="margin-top:0;">Oyun günü</label>
+            <input type="date" id="gn-date">
+          </div>
+          <div class="gn-count" id="gn-count"></div>
+        </div>
+        <input type="hidden" id="gn-editing-date">
+
+        <details class="sources-block" style="margin-bottom:12px;">
+          <summary class="sources-label">Toplu yapıştır</summary>
+          <p style="font-size:0.75rem;color:var(--muted);margin:8px 0;">
+            Her satıra bir olay: <code>YYYY-AA-GG | Olay metni | English text (isteğe bağlı)</code>.
+            Yapıştırılan satırlar baştan itibaren doldurulur.
+          </p>
+          <textarea id="gn-bulk" rows="6" placeholder="2026-11-15 | Galata Köprüsü'nde ... | ..."></textarea>
+          <button class="btn btn-secondary" id="gn-bulk-btn" type="button" style="margin-top:6px;">Satırlara dağıt</button>
+        </details>
+
+        <div class="gn-rows" id="gn-rows"></div>
+
+        <div class="btn-row" style="margin-top:20px;">
+          <button class="btn btn-primary" id="gn-submit-btn">Tahtayı Kaydet</button>
+          <button class="btn btn-secondary" id="gn-cancel-btn" style="display:none;">İptal</button>
+        </div>
+        <div class="status-msg" id="gn-form-status"></div>
+
+        <div style="margin-top:24px;">
+          <div class="panel-title" style="margin:0 0 14px;">Mevcut Tahtalar</div>
+          <div class="articles-list" id="gn-list">
             <div class="empty-state"><span class="spinner"></span></div>
           </div>
         </div>
@@ -3560,6 +3637,7 @@
           <option value="sozcel.html">Sözcel</option>
           <option value="tumcel.html">Tümcel</option>
           <option value="bulmaca.html">Çengel</option>
+          <option value="guncel.html">Güncel</option>
         </select>
         <button class="btn btn-secondary" id="clr-reload" title="Sayfayı yeniden yükle">&#8635;</button>
       </div>
@@ -3803,7 +3881,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'worldevents') loadWorldEventsTab();
     if (tab === 'news') { loadSeries(); loadBreakingNews(); }
     if (tab === 'events') { loadEventsNeighborhoods(); loadEventKefilOptions(); loadEventsList(); }
-    if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); initSozcelSuggestions(); initSozcuAssign(); loadBulmacaPuzzles(); }
+    if (tab === 'games') { loadGameStatusBoard(); loadSozcelSchedule(); loadTumcelPuzzles(); initSozcelSuggestions(); initSozcuAssign(); loadBulmacaPuzzles(); loadGuncelPuzzles(); }
     if (tab === 'quotes') loadQuotesList();
     if (tab === 'district-polls') loadDistrictPollsList();
     if (tab === 'kahve') loadCoffeeList();
@@ -3826,7 +3904,7 @@ function openDefaultTab() {
   if (btn) btn.click();
 }
 
-// ── Oyunlar tab: sub-nav between Sözcel / Tümcel / Çengel ──
+// ── Oyunlar tab: sub-nav between Sözcel / Tümcel / Çengel / Güncel ──
 document.querySelectorAll('.games-subtab').forEach(btn => {
   btn.addEventListener('click', () => {
     const sub = btn.dataset.subtab;
@@ -3834,6 +3912,7 @@ document.querySelectorAll('.games-subtab').forEach(btn => {
     document.getElementById('games-sozcel-panel').style.display = (sub === 'sozcel') ? '' : 'none';
     document.getElementById('games-tumcel-panel').style.display = (sub === 'tumcel') ? '' : 'none';
     document.getElementById('games-bulmaca-panel').style.display = (sub === 'bulmaca') ? '' : 'none';
+    document.getElementById('games-guncel-panel').style.display = (sub === 'guncel') ? '' : 'none';
   });
 });
 
@@ -9101,6 +9180,7 @@ const GAME_STATUS_GAMES = [
   { game: 'sozcel', label: 'Sözcel' },
   { game: 'tumcel', label: 'Tümcel' },
   { game: 'bulmaca', label: 'Çengel' },
+  { game: 'guncel', label: 'Güncel' },
 ];
 
 // ── A night's lineup: which game stands in which of the two slots ──
@@ -10457,6 +10537,222 @@ async function deleteBulmacaPuzzle(date) {
 // of this block runs at parse time against DOM already on the page.
 bzRenderGrid();
 bzRenderClues();
+
+// ══════════════════════════════════════════
+// GÜNCEL — sixteen events, "which of these happened yesterday?"
+// db/guncel_puzzles.sql. One row per day, keyed by `puzzle_date`. Each
+// card carries the day it really happened, and that date is the whole
+// of its answer: a card dated the day before the board's own day (or the
+// day itself) is one the reader should press. Nothing else is stored,
+// so this editor and guncel.html work the answers out of the same fact
+// and can never disagree about them. gnWhen is guncel.html's whenOf,
+// Turkish only.
+// ══════════════════════════════════════════
+const GN_CARDS = 16;
+let gnCards = Array.from({ length: GN_CARDS }, () => ({ text: '', text_en: '', date: '' }));
+
+function gnDayNum(s) {
+  const [y, m, d] = String(s).split('-').map(Number);
+  return Math.round(Date.UTC(y, m - 1, d) / 86400000);
+}
+function gnWhen(board, date) {
+  if (!board || !date) return null;
+  const days = gnDayNum(board) - gnDayNum(date);
+  const [py, pm] = board.split('-').map(Number);
+  const [ey, em] = date.split('-').map(Number);
+  if (days === 1) return { answer: true, label: 'Dün · cevap' };
+  if (days === 0) return { answer: true, label: 'Bugün · cevap' };
+  if (days < 0) return { answer: false, bad: true, label: 'İleri tarih!' };
+  if (days === 2) return { answer: false, label: 'Evvelsi gün' };
+  if (days <= 6) return { answer: false, label: days + ' gün önce' };
+  if (days <= 13) return { answer: false, label: 'Geçen hafta' };
+  if (days <= 30) return { answer: false, label: Math.floor(days / 7) + ' hafta önce' };
+  if (days < 365) {
+    const m = (py * 12 + pm) - (ey * 12 + em);
+    return { answer: false, label: m <= 1 ? 'Geçen ay' : m + ' ay önce' };
+  }
+  const y = py - ey;
+  return { answer: false, label: y <= 1 ? 'Geçen yıl' : y + ' yıl önce' };
+}
+
+function gnRenderRows() {
+  const wrap = document.getElementById('gn-rows');
+  wrap.innerHTML = gnCards.map((c, i) => `
+    <div class="gn-row" data-i="${i}">
+      <span class="gn-n">${i + 1}</span>
+      <input type="text" class="gn-tr" maxlength="90" placeholder="Olay (Türkçe)" value="${escapeHtml(c.text)}">
+      <input type="text" class="gn-en" maxlength="90" placeholder="Event (English, optional)" value="${escapeHtml(c.text_en || '')}">
+      <input type="date" class="gn-d" value="${escapeHtml(c.date)}">
+      <span class="gn-tag"></span>
+    </div>`).join('');
+  gnPaintTags();
+}
+
+// The tags and the count, re-read off the form: what the game will say
+// about each card on the day the board is for.
+function gnPaintTags() {
+  const board = document.getElementById('gn-date').value;
+  let n = 0;
+  document.querySelectorAll('#gn-rows .gn-row').forEach(row => {
+    const c = gnCards[Number(row.dataset.i)];
+    const tag = row.querySelector('.gn-tag');
+    const w = gnWhen(board, c.date);
+    tag.className = 'gn-tag' + (w && w.answer ? ' ans' : '') + (w && w.bad ? ' bad' : '');
+    tag.textContent = w ? w.label : (c.date ? 'Oyun günü seçin' : '—');
+    if (w && w.answer) n++;
+  });
+  const count = document.getElementById('gn-count');
+  count.textContent = board ? `Cevap sayısı: ${n} / ${GN_CARDS}` : '';
+  count.classList.toggle('bad', !!board && (n < 1 || n > 8));
+}
+
+document.getElementById('gn-rows').addEventListener('input', (e) => {
+  const row = e.target.closest('.gn-row');
+  if (!row) return;
+  const c = gnCards[Number(row.dataset.i)];
+  if (e.target.classList.contains('gn-tr')) c.text = e.target.value;
+  else if (e.target.classList.contains('gn-en')) c.text_en = e.target.value;
+  else if (e.target.classList.contains('gn-d')) { c.date = e.target.value; gnPaintTags(); }
+});
+document.getElementById('gn-date').addEventListener('input', gnPaintTags);
+
+// Paste many at once: "YYYY-MM-DD | text | english", one per line, from
+// the first row on.
+document.getElementById('gn-bulk-btn').addEventListener('click', () => {
+  const lines = document.getElementById('gn-bulk').value.split('\n').map(l => l.trim()).filter(Boolean);
+  let i = 0;
+  for (const line of lines) {
+    if (i >= GN_CARDS) break;
+    const parts = line.split('|').map(p => p.trim());
+    let date = '', text = '', en = '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(parts[0])) { date = parts[0]; text = parts[1] || ''; en = parts[2] || ''; }
+    else { text = parts[0]; en = parts[1] || ''; }
+    if (!text) continue;
+    gnCards[i++] = { text, text_en: en, date };
+  }
+  gnRenderRows();
+});
+
+function resetGuncelForm() {
+  gnCards = Array.from({ length: GN_CARDS }, () => ({ text: '', text_en: '', date: '' }));
+  document.getElementById('gn-date').value = '';
+  document.getElementById('gn-editing-date').value = '';
+  document.getElementById('gn-bulk').value = '';
+  gnRenderRows();
+  document.getElementById('gn-form-mode-label').textContent = 'Yeni Güncel Tahtası';
+  document.getElementById('gn-cancel-btn').style.display = 'none';
+  document.getElementById('gn-submit-btn').textContent = 'Tahtayı Kaydet';
+}
+
+function fillGuncelForm(p) {
+  document.getElementById('gn-date').value = p.puzzle_date;
+  document.getElementById('gn-editing-date').value = p.puzzle_date;
+  gnCards = Array.from({ length: GN_CARDS }, (_, i) => {
+    const c = (p.cards || [])[i] || {};
+    return { text: c.text || '', text_en: c.text_en || '', date: c.date || '' };
+  });
+  gnRenderRows();
+  document.getElementById('gn-form-mode-label').textContent = 'Güncel Tahtasını Düzenle';
+  document.getElementById('gn-cancel-btn').style.display = 'inline-block';
+  document.getElementById('gn-submit-btn').textContent = 'Güncelle';
+  document.querySelector('#games-tab .panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.getElementById('gn-cancel-btn').addEventListener('click', resetGuncelForm);
+
+document.getElementById('gn-submit-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('gn-form-status');
+  const btn = document.getElementById('gn-submit-btn');
+  const board = document.getElementById('gn-date').value;
+  const editingDate = document.getElementById('gn-editing-date').value;
+  const fail = (msg) => { statusEl.textContent = msg; statusEl.className = 'status-msg err'; };
+
+  if (!board) return fail('Oyun gününü seçin.');
+  const cards = gnCards.map(c => ({
+    text: c.text.trim(),
+    text_en: (c.text_en || '').trim() || null,
+    date: c.date,
+  }));
+  const missing = cards.findIndex(c => !c.text || !c.date);
+  if (missing >= 0) return fail(`${missing + 1}. olayın metni ya da tarihi eksik — 16'sı da dolu olmalı.`);
+  const future = cards.findIndex(c => gnDayNum(c.date) > gnDayNum(board));
+  if (future >= 0) return fail(`${future + 1}. olayın tarihi oyun gününden sonra.`);
+  const n = cards.filter(c => gnWhen(board, c.date).answer).length;
+  if (n < 1) return fail('Hiç cevap yok: en az bir olay oyun gününden bir gün önce olmalı.');
+  if (n > 8) return fail(`${n} cevap çok fazla — en çok 8 olsun ki tahta bir bulmaca olsun.`);
+
+  statusEl.textContent = '';
+  statusEl.className = 'status-msg';
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  let result;
+  if (editingDate && editingDate !== board) {
+    result = await sb.from('guncel_puzzles').insert([{ puzzle_date: board, cards }]);
+    if (!result.error) await sb.from('guncel_puzzles').delete().eq('puzzle_date', editingDate);
+  } else if (editingDate) {
+    result = await sb.from('guncel_puzzles').update({ cards }).eq('puzzle_date', editingDate);
+  } else {
+    result = await sb.from('guncel_puzzles').insert([{ puzzle_date: board, cards }]);
+  }
+  btn.textContent = editingDate ? 'Güncelle' : 'Tahtayı Kaydet';
+
+  if (result.error) {
+    const e = result.error;
+    if (e.code === '42P01' || e.code === 'PGRST205') return fail('Tablo yok. Önce db/guncel_puzzles.sql çalıştırılmalı.');
+    if (e.code === '23505') return fail('O gün için zaten bir tahta var — listeden düzenleyin.');
+    return fail(e.message);
+  }
+  statusEl.textContent = editingDate ? 'Güncellendi!' : 'Kaydedildi!';
+  statusEl.className = 'status-msg ok';
+  resetGuncelForm();
+  loadGuncelPuzzles();
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+});
+
+async function loadGuncelPuzzles() {
+  const listEl = document.getElementById('gn-list');
+  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const { data, error } = await sb.from('guncel_puzzles')
+    .select('puzzle_date, cards')
+    .order('puzzle_date', { ascending: false })
+    .limit(20);
+  if (error) {
+    const hint = (error.code === '42P01' || error.code === 'PGRST205') ? 'Önce db/guncel_puzzles.sql çalıştırılmalı.' : error.message;
+    listEl.innerHTML = '<div class="empty-state">Yüklenemedi: ' + escapeHtml(hint) + '</div>';
+    return;
+  }
+  if (!data || !data.length) { listEl.innerHTML = '<div class="empty-state">Henüz tahta eklenmemiş.</div>'; return; }
+  listEl.innerHTML = data.map(p => {
+    const cards = Array.isArray(p.cards) ? p.cards : [];
+    const ans = cards.filter(c => { const w = gnWhen(p.puzzle_date, c.date); return w && w.answer; });
+    return `
+      <div class="article-card">
+        <div class="a-neighborhood">${escapeHtml(p.puzzle_date)}</div>
+        <h4 style="font-size:0.8rem;line-height:1.4;">${ans.length} cevap: ${ans.map(c => escapeHtml(c.text)).join(' · ')}</h4>
+        <div class="card-actions">
+          <button class="btn-edit" data-gn-edit="${escapeHtml(p.puzzle_date)}">Edit</button>
+          <button class="btn-del"  data-gn-del="${escapeHtml(p.puzzle_date)}">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+  listEl.querySelectorAll('[data-gn-edit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = data.find(r => r.puzzle_date === btn.dataset.gnEdit);
+      if (p) fillGuncelForm(p);
+    });
+  });
+  listEl.querySelectorAll('[data-gn-del]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const date = btn.dataset.gnDel;
+      if (!confirm(`${date} tarihli Güncel tahtasını sil? Bu işlem geri alınamaz.`)) return;
+      const { error: delErr } = await sb.from('guncel_puzzles').delete().eq('puzzle_date', date);
+      if (delErr) { alert('Silinemedi: ' + delErr.message); return; }
+      loadGuncelPuzzles();
+    });
+  });
+}
+
+gnRenderRows();
 
 // ══════════════════════════════════════════
 // Notifications tab

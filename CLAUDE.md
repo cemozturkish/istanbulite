@@ -228,6 +228,7 @@ under project.html).
 ├── sozcel.html           # Turkish Wordle-style daily word game
 ├── tumcel.html           # Turkish quote-fragment Connections-style daily game (replaced Bağlantılar)
 ├── bulmaca.html          # Turkish daily mini crossword
+├── guncel.html           # Güncel: "which of these happened yesterday?" — 16 events, 4 lives
 ├── admin.html            # Admin dashboard (admin-only)
 ├── router.js             # Shared shell: single Supabase client, the two tabs + the zoom stack, virtual navigation, clock
 ├── ui.css                # THE HOUSE COMPONENTS: the type scale and the controls every member
@@ -1593,6 +1594,25 @@ coordinates that say where each paper hangs.
   the same reason. The grid size is no longer fixed at 5×5: `ROWS`/`COLS` come off the
   row's own `rows`/`cols` columns, so an admin-drawn puzzle can be any size the editor
   allows (3–12 per side)
+
+### `guncel.html` — Güncel
+- The fourth game: sixteen events on a 4×4 board, and the question **"Hangileri dün oldu?"**. A
+  few happened yesterday; the rest happened earlier. A press is the answer at once: a right one is
+  inked and stamped DÜN, a wrong one says when it really happened ("Bu geçen yıl oldu", with the
+  date) and costs one of **four lives**. Find all of yesterday's before the lives run out.
+- **One row per day in `guncel_puzzles`** (`db/guncel_puzzles.sql`), keyed by `puzzle_date` like
+  Tümcel and Çengel. Each card is `{ text, text_en, date }` and **the date is the whole answer**:
+  a card dated the day before the board's day (or the day itself) is one to press. Nothing stores
+  which cards are answers, so the game (`whenOf`) and the admin's editor (`gnWhen`) work it out of
+  the same fact and cannot disagree. 1–8 answers per board, enforced at the admin form.
+- Built from admin.html's Oyunlar → **Güncel** panel (16 rows: text, optional English, the real
+  date; each row shows what the game will say about it, and a bulk paste fills the rows). It is
+  one of the four games the lineup can stand in a slot (`GAME_CATALOG` in project.html,
+  `GAME_STATUS_GAMES` in admin.html); the migration widens every `game` CHECK and
+  `admin_set_game_lineup` to take `'guncel'`.
+- Results are the usual two rows in `game_results`: `attempts: 0` on the first press, then a win's
+  `1 + mistakes` (a clean board is 1) or a loss's `5`. Unlike the other three it carries no
+  parts-bin chrome at all: it only ever stands inside project.html's game sheet.
 
 ### `sozcel.html` — Word Game
 - Turkish Wordle variant
