@@ -1541,21 +1541,34 @@
        rail (.ui-box.ui-foot.ui-rail), because each one is pressed: an
        evening opens on the map, a plan of the reader's own opens for
        editing. */
-    .fb-week-sub { margin: -4px 0 8px; }
-    .fb-week-day { display: grid; gap: 8px; margin-top: 10px; padding: 10px 12px 12px; border: 2px solid var(--ink); }
-    .fb-week-day.open { cursor: pointer; -webkit-tap-highlight-color: transparent; }
-    .fb-week-dh { display: flex; justify-content: space-between; align-items: center; margin: 0; }
-    .fb-week-dh b { font-size: 1.1rem; font-weight: 900; color: var(--ink); }
+    .fb-week-sub { margin: -4px 0 4px; }
+    /* The week fits the sheet: no scrolling, the seven days share the
+       height. The day is a box a shade off the paper, and a transparent
+       button over all of it is what starts a plan for that day. */
+    .ist-sheet-body:has(> .fb-week) { overflow: hidden; display: flex; flex-direction: column; }
+    .fb-week { flex: 1 1 auto; min-height: 0; width: 100%; display: flex; flex-direction: column; gap: 6px; }
+    .fb-week .fb-plan-h { text-transform: uppercase; margin: 0; }
+    .fb-week-day {
+      position: relative; flex: 1 1 0; min-height: 0; overflow: hidden;
+      display: flex; flex-direction: column; justify-content: center; gap: 6px;
+      padding: 6px 12px; border: 2px solid var(--ink);
+      background: color-mix(in srgb, var(--ink) 7%, var(--paper));
+    }
+    .fb-week-hit {
+      position: absolute; inset: 0; z-index: 0; width: 100%; padding: 0; border: 0; margin: 0;
+      background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .fb-week-hit:active { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+    .fb-week-dh { position: relative; margin: 0; pointer-events: none; }
+    .fb-week-row { position: relative; z-index: 1; }
     .fb-plan-fixed { font-size: 0.95rem; font-weight: 800; padding: 6px 0; }
-    .fb-week-day.none { border-style: dashed; border-color: var(--muted); }
-    .fb-week-none { margin: 0; font-size: 0.8rem; color: var(--muted); }
     .fb-week-day.t .fb-week-dh { color: var(--ink-red, #B93631); }
     .fb-week-row {
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: center;
       gap: 12px;
-      padding: 10px 12px 9px 16px;
+      padding: 6px 12px 5px 16px;
       text-align: left;
       font: inherit;
       cursor: pointer;
@@ -5312,9 +5325,9 @@ function renderPlanWeek() {
     // or not anything is on it.
     // Pressing the day itself (not one of its rows) starts a plan for that
     // day, so the form never has to ask which day it is.
-    html += '<section class="fb-week-day' + (k === 0 ? ' t' : '') + (today.length ? '' : ' none') + (full ? '' : ' open') + '" data-k="' + k + '">' +
-      '<h3 class="ui-label ui-quiet fb-week-dh"><span>' + esc(planWeekDayHead(k)) + '</span>' + (full ? '' : '<b aria-hidden="true">+</b>') + '</h3>' +
-      (today.length ? '' : '<p class="fb-week-none">' + esc(tEv('plan.week.none')) + '</p>') +
+    html += '<section class="fb-week-day' + (k === 0 ? ' t' : '') + (today.length ? '' : ' none') + '" data-k="' + k + '">' +
+      (full ? '' : '<button type="button" class="fb-week-hit" data-k="' + k + '" aria-label="' + esc(planWeekDayHead(k)) + '"></button>') +
+      '<h3 class="ui-label ui-quiet fb-week-dh">' + esc(planWeekDayHead(k)) + '</h3>' +
       today.map(ev => {
         const own = ev._plan && ev._mine;
         const where = nbName(ev.neighborhood) + (ev._plan && ev.location ? ' · ' + ev.location : '');
@@ -5349,9 +5362,8 @@ function renderPlanWeek() {
     closePlanForm();
     openHomeCard(row.dataset.k, row.dataset.d, ev.id);
   }));
-  if (!full) body.querySelectorAll('.fb-week-day').forEach(sec => sec.addEventListener('click', e => {
-    if (e.target.closest('.fb-week-row')) return;
-    openPlanForm(null, 'week', Number(sec.dataset.k));
+  body.querySelectorAll('.fb-week-hit').forEach(hit => hit.addEventListener('click', () => {
+    openPlanForm(null, 'week', Number(hit.dataset.k));
   }));
 }
 function openPlanWeek() {
