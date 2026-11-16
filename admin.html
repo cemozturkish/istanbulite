@@ -2023,7 +2023,14 @@
 
     @media (max-width: 860px) {
       .admin-body.clr { grid-template-columns: 1fr; overflow-y: auto; }
+      /* Stacked (a flex column under 768px), the stage and the panel must
+         keep their own heights: shrunk to fit the screen, the stage's box
+         came out shorter than the phone drawn in it, and the phone -- which
+         is absolutely placed -- hung down over the panel below. */
+      .admin-body.clr > .clr-stage,
+      .admin-body.clr > .clr-panel { flex-shrink: 0; }
       .clr-phone-wrap { flex: none; height: 70vh; }
+      .clr-variants { min-width: 0; }
       .clr-panel { min-height: 70vh; }
     }
   </style>
@@ -10243,7 +10250,9 @@ function clrLayout() {
   const phone = document.getElementById('clr-phone');
   if (!wrap || !phone || !wrap.offsetParent) return;
   // The height decides; the width follows the phone's own proportion.
-  const s = Math.max(0.3, Math.min(1, (wrap.clientHeight - 6) / CLR_H));
+  // On a narrow screen the width can bind first: never wider than the stage.
+  const stageW = wrap.parentElement ? wrap.parentElement.clientWidth : Infinity;
+  const s = Math.max(0.3, Math.min(1, (wrap.clientHeight - 6) / CLR_H, (stageW - 6) / CLR_W));
   clr.scale = s;
   phone.style.transform = 'scale(' + s + ')';
   wrap.style.width = Math.round(CLR_W * s) + 'px';
