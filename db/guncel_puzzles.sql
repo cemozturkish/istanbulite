@@ -66,10 +66,16 @@ create trigger set_guncel_puzzles_updated_at
 
 -- ── Let 'guncel' through every fence a game key stands behind ──
 -- The existing CHECKs were declared inline, so their names are whatever
--- Postgres generated. Find each one by what it says (it names 'tumcel')
--- rather than guessing its name, drop it, and put back one that also
--- names 'guncel'. game_state is not in db/ at all (it was created by
--- hand), so it is only touched if it exists and was fenced to begin with.
+-- Postgres generated, and their wording is whatever Postgres normalised
+-- it to. So each one is found by the COLUMN it checks (`game`), never by
+-- its name or its text, dropped, and replaced by one that also allows
+-- 'guncel'. The first version of this file matched on the text naming
+-- 'tumcel', missed the live game_results constraint, and then collided
+-- with it by name (42710) -- matching on the column cannot miss.
+-- game_state is not in db/ at all (it was created by hand), so it is only
+-- touched if it exists and had a check on `game` to begin with.
+-- Safe to run more than once: the constraints it adds are themselves
+-- checks on `game`, so a second run drops and re-adds them.
 do $$
 declare
   r record;
@@ -79,15 +85,22 @@ begin
     select c.conrelid::regclass as tbl, c.conname, c.conrelid
     from pg_constraint c
     where c.contype = 'c'
-      and c.conrelid = any (array[
-        to_regclass('public.game_results'),
-        to_regclass('public.game_day_toggles'),
-        to_regclass('public.game_night_slots'),
-        to_regclass('public.game_state')
-      ])
-      and pg_get_constraintdef(c.oid) ilike '%tumcel%'
+      and c.conrelid in (
+        select t::oid from unnest(array[
+          to_regclass('public.game_results'),
+          to_regclass('public.game_day_toggles'),
+          to_regclass('public.game_night_slots'),
+          to_regclass('public.game_state')
+        ]) as t where t is not null
+      )
+      and exists (
+        select 1 from pg_attribute a
+        where a.attrelid = c.conrelid
+          and a.attname = 'game'
+          and a.attnum = any (c.conkey)
+      )
   loop
-    if r.conrelid = to_regclass('public.game_state') then
+    if r.conrelid = to_regclass('public.game_state')::oid then
       state_was_fenced := true;
     end if;
     execute format('alter table %s drop constraint %I', r.tbl, r.conname);
