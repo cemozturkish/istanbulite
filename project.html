@@ -4261,8 +4261,8 @@ let homeBondKey = null;         // who they are, as last seen -- see homeFriends
 // the same guest list on the petek. Its creator may take it back; nobody
 // may change it. It leaves at the midnight after its day only because the
 // home screen never asks for anything older than today.
-// The upper bound is the server's, too: at most PLAN_MAX standing at once.
-const PLAN_MAX = 5;
+// One plan of a member's own per day, and nothing else limits them: the
+// server's insert policy says the same (db/events_v5_plan_per_day.sql).
 
 // ── HOW FAR A PLAN TRAVELS (db/events_v4_plan_reach.sql) ──
 // The three stops of the slider in the form, nearest first, counted in
@@ -4443,9 +4443,10 @@ function homeEventsData() {
   return homeEventsPromise;
 }
 
-// How many of the reader's own plans are standing, against PLAN_MAX.
-function homeMyPlanCount() {
-  return (homeData.plans || []).filter(p => p._mine).length;
+// The reader's own plan on day k (0 = today), or null: a day holds one.
+function homeOwnPlanOnDay(k) {
+  const day = IstDate.iso(k);
+  return (homeData.plans || []).find(p => p._mine && homeEventDay(p) === day) || null;
 }
 
 // 'go' | 'no' | null -- where the reader stands on one evening.
@@ -5487,8 +5488,6 @@ function renderPlanWeek() {
   if (!body) return;
   planEditing = null;
   const rows = planWeekRows();
-  const mineCount = homeMyPlanCount();
-  const full = mineCount >= PLAN_MAX;
   let html = '';
   for (let k = 0; k < HOME_DAYS; k++) {
     const day = IstDate.iso(k);
@@ -5498,7 +5497,7 @@ function renderPlanWeek() {
     // Pressing the day itself (not one of its rows) starts a plan for that
     // day, so the form never has to ask which day it is.
     html += '<section class="fb-week-day' + (k === 0 ? ' t' : '') + (today.length ? '' : ' none') + '" data-k="' + k + '">' +
-      (full ? '' : '<button type="button" class="fb-week-hit" data-k="' + k + '" aria-label="' + esc(planWeekDayHead(k)) + '"></button>') +
+      ('<button type="button" class="fb-week-hit" data-k="' + k + '" aria-label="' + esc(planWeekDayHead(k)) + '"></button>') +
       '<h3 class="ui-label ui-quiet fb-week-dh">' + esc(planWeekDayHead(k)) + '</h3>' +
       today.map(ev => {
         const own = ev._plan && ev._mine;
@@ -5524,7 +5523,6 @@ function renderPlanWeek() {
       '<h2 class="ui-h fb-plan-h">' + esc(tEv('plan.week.title')) + '</h2>' +
       '<p class="ui-sub fb-week-sub">' + esc(tEv('plan.week.sub')) + '</p>' +
       html +
-      '<p class="ui-note fb-plan-who">' + esc(tEv(full ? 'plan.err.full' : 'plan.week.count')).replace('{n}', '<b>' + mineCount + '</b>') + '</p>' +
     '</div>';
   body.scrollTop = 0;
   const sheetBody = body.closest('.ist-sheet-body') || body;
@@ -5539,7 +5537,9 @@ function renderPlanWeek() {
     openHomeCard(row.dataset.k, row.dataset.d, ev.id);
   }));
   body.querySelectorAll('.fb-week-hit').forEach(hit => hit.addEventListener('click', () => {
-    openPlanForm(null, 'week', Number(hit.dataset.k));
+    const k = Number(hit.dataset.k);
+    // A day that already holds a plan of the reader's own opens it.
+    openPlanForm(homeOwnPlanOnDay(k), 'week', k);
   }));
 }
 function openPlanWeek() {
@@ -5572,11 +5572,14 @@ function openPlanForm(ev, from, dayK) {
     d = { what: editing.title || '', nb: editing.neighborhood, place: editing.location || '',
           day: k, time: eventTimeOnly(editing.event_date), reach: planReachIndex(editing.reach) };
   }
-  const day = Number.isInteger(d.day) ? Math.min(d.day, HOME_DAYS - 1) : 0;
+  // A new plan opened from a day's rectangle has that day fixed and no day
+  // chips; editing keeps the chips so a plan can still be moved.
+  const fixedDay = !editing && Number.isInteger(dayK) ? Math.min(dayK, HOME_DAYS - 1) : null;
+  const day = fixedDay !== null ? fixedDay : (Number.isInteger(d.day) ? Math.min(d.day, HOME_DAYS - 1) : 0);
   const reach = Number.isInteger(d.reach) ? Math.max(0, Math.min(d.reach, PLAN_REACH.length - 1)) : 0;
   const reachNames = PLAN_REACH.map(r => tEv('plan.reach.' + r));
   const nb = d.nb || homeMeNb || 'kadikoy';
-  const full = !editing && homeMyPlanCount() >= PLAN_MAX;
+  const full = false;
   const days = Array.from({ length: HOME_DAYS }, (_, k) =>
     '<button type="button" role="radio" aria-checked="' + (k === day) + '" data-day="' + k + '"' +
     ' class="ui-chip' + (k === day ? ' on' : '') + '">' + esc(planDayLabel(k)) + '</button>').join('');
@@ -5704,7 +5707,7 @@ function closePlanForm() {
 function planErrorText(err) {
   const code = err && err.code;
   if (code === 'PLAN_NO_ROW') return tEv('plan.err.edit.missing');
-  if (code === '42501') return tEv(!planEditing && homeMyPlanCount() >= PLAN_MAX ? 'plan.err.full' : 'plan.err.rls');
+  if (code === '42501') return tEv('plan.err.rls');
   if (code === 'PGRST204' || code === '42703') return tEv('plan.err.missing');
   return tEv('plan.err');
 }
@@ -5730,7 +5733,7 @@ async function submitPlan(e) {
   const at = new Date(IstDate.iso(v.day) + 'T' + time + ':00+03:00');
   if (isNaN(at.getTime())) { say('plan.err.time'); return; }
   if (at.getTime() < Date.now() - 60000) { say('plan.err.past'); return; }
-  if (!editing && homeMyPlanCount() >= PLAN_MAX) { say('plan.err.full'); return; }
+  if (!editing && homeOwnPlanOnDay(v.day)) { say('plan.err.full'); return; }
   const uid = await doneUid();
   if (!uid) { say('plan.err'); return; }
   if (errEl) errEl.hidden = true;
