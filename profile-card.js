@@ -254,7 +254,8 @@
 
   function normalizePalette(v) { return v === 'earth' ? 'earth' : 'mono'; }
 
-  // The three games the weekly grid can ever show a row for. Which of them
+  // The games the weekly grid shows a row for (Çengel is left out of the
+  // profile on purpose; its results are still recorded). Which of them
   // actually ran on a given NIGHT is not a fixed weekday pattern — it is
   // the admin's own per-night lineup (game_night_slots) minus whatever they
   // switched off (game_day_toggles), exactly as project.html's Oyunlar
@@ -262,7 +263,6 @@
   const GAME_LABELS = {
     sozcel:  'Sözcel',
     tumcel:  'Tümcel',
-    bulmaca: 'Çengel',
   };
   // Mirrors project.html's own GAME_DEFAULT_LINEUP and admin.html's copy —
   // what a night with no game_night_slots rows falls back to.
