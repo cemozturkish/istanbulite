@@ -176,7 +176,22 @@
     }
     .gn-card.gn-hit .gn-w,
     .gn-card.gn-miss .gn-w,
+    .gn-card.gn-told .gn-w,
     .gn-card.gn-left .gn-w { display: block; }
+    /* The day itself, under the stamp, on every card that turned out not
+       to be yesterday's -- "8 YIL ÖNCE" says how far, this says when. */
+    .gn-d {
+      display: none;
+      flex: none;
+      font-size: 0.56rem;
+      font-weight: 600;
+      line-height: 1;
+      letter-spacing: 0.02em;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .gn-card.gn-miss .gn-d,
+    .gn-card.gn-told .gn-d { display: block; }
 
     /* Yesterday's, found: inked, and stamped with the day. */
     .gn-card.gn-hit {
@@ -205,9 +220,17 @@
     }
     .gn-card.gn-left .gn-w { color: var(--ink-red); border: 1.5px solid var(--ink-red); }
 
-    /* Everything else, once the game is over, quiets down so the
-       answers are what the eye lands on. */
-    .gn-over .gn-card:not(.gn-hit):not(.gn-left):not(.gn-miss) { opacity: 0.45; }
+    /* Once the game is over, every card nobody pressed says when it
+       really happened too. Quieter than a wrong press (which was the
+       reader's own answer and keeps the red), so the answers are still
+       what the eye lands on: a plain muted frame and a muted stamp. */
+    .gn-card.gn-told {
+      background: transparent;
+      color: var(--muted);
+      border-color: var(--muted);
+      border-bottom-width: 2px;
+    }
+    .gn-card.gn-told .gn-w { color: var(--muted); border: 1.5px solid var(--muted); }
 
     @keyframes gn-shake {
       0%, 100% { translate: 0 0; }
@@ -367,6 +390,13 @@ function longDate(s) {
     { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
+// The compact form a card has room for: 29.10.2018 (29/10/2018 in English).
+function shortDate(s) {
+  const p = ymd(s);
+  return new Date(Date.UTC(p.y, p.m - 1, p.d)).toLocaleDateString(en() ? 'en-GB' : 'tr-TR',
+    { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
+}
+
 function isAnswer(i) { return whenOf(puzzle.cards[i].date).answer; }
 function answers() { return puzzle.cards.map((_, i) => i).filter(isAnswer); }
 function mistakes() { return picks.filter(i => !isAnswer(i)).length; }
@@ -405,7 +435,7 @@ function renderHead() {
 
 function cardState(i) {
   if (picks.includes(i)) return isAnswer(i) ? 'gn-hit' : 'gn-miss';
-  if (over && isAnswer(i)) return 'gn-left';
+  if (over) return isAnswer(i) ? 'gn-left' : 'gn-told';
   return '';
 }
 
@@ -419,7 +449,8 @@ function renderGrid() {
     return '<button type="button" class="gn-card ' + st + '" data-i="' + i + '"' +
       ((st || over) ? ' disabled' : '') + ' lang="' + (en() && c.text_en ? 'en' : 'tr') + '">' +
       '<span class="gn-t">' + esc(cardText(c)) + '</span>' +
-      '<span class="gn-w">' + esc(upper(w.stamp)) + '</span></button>';
+      '<span class="gn-w">' + esc(upper(w.stamp)) + '</span>' +
+      '<span class="gn-d">' + esc(shortDate(c.date)) + '</span></button>';
   }).join('');
   requestAnimationFrame(fitAll);
 }
@@ -470,7 +501,7 @@ function paintOver() {
     ? esc(L('Tebrikler! Hepsini buldun.', 'Well done! You found them all.')) +
       '<small>' + esc(L(mistakes() ? mistakes() + ' yanlış' : 'Hiç yanlış yok', mistakes() ? mistakes() + ' wrong' : 'Not one wrong')) + '</small>'
     : esc(L('Canın bitti.', 'Out of lives.')) +
-      '<small>' + esc(L('Kırmızı çerçeveli olanlar da oldu.', 'The ones ringed in red happened too.')) + '</small>',
+      '<small>' + esc(L('Kırmızı çerçeveliler de dün oldu.', 'The ones ringed in red happened yesterday too.')) + '</small>',
     !won);
   $('gn-reset').textContent = IstDate.untilNextNight({ prefixTr: 'Yeni Güncel', prefixEn: 'New Güncel in' });
 }
