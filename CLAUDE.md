@@ -239,6 +239,7 @@ under project.html).
 │                         get the bar
 ├── onboarding.js/.css    # New-account onboarding — project.html ONLY (see its own section)
 ├── game-locks.js         # Per-day game on/off enforcement (games are otherwise independent)
+├── game-help.js          # NASIL OYNANIR: one help page for all four games, the open one first and in full
 ├── event-interest.js     # "İlgimi çekti": the verdict Kahvehane's event deck records, Hane reads
 ├── coffee-index.js       # Kahve Endeksi live evaluation: opening hours + scheduled discounts
 ├── ist-date.js           # THE Istanbul clock: every daily roll-over/date key derives from it,
@@ -1610,6 +1611,13 @@ coordinates that say where each paper hangs.
   one of the four games the lineup can stand in a slot (`GAME_CATALOG` in project.html,
   `GAME_STATUS_GAMES` in admin.html); the migration widens every `game` CHECK and
   `admin_set_game_lineup` to take `'guncel'`.
+- **"Nasıl oynanır" is one page for all four games** (`game-help.js`, loaded on each game page as
+  `<script src="game-help.js?v=1" data-game="…" defer>`). The game being played is described first
+  and in full; the other three follow in a sentence or two each, so a member meets every game by
+  name even though only two stand in the lineup on any night. All the copy lives in that one file
+  (Sözcel's long text is read from `sozcel.help.*` in i18n.js); a page with its own `#help-btn`
+  (Sözcel) keeps it, any other gets one made in the top-right corner, on the back arrow's line.
+  Sözcel also prints its name on that line now, the way Güncel does.
 - Results are the usual two rows in `game_results`: `attempts: 0` on the first press, then a win's
   `1 + mistakes` (a clean board is 1) or a loss's `5`. Unlike the other three it carries no
   parts-bin chrome at all: it only ever stands inside project.html's game sheet.
