@@ -300,6 +300,118 @@ select.ui-field {
   text-overflow: ellipsis;
 }
 
+/* ── Stops ── one value out of a few that lie ALONG something (how far a
+   plan travels: peteğim → peteğimin peteği → İstanbul), walked by
+   dragging the thumb along a rail, pressing near a stop, or the arrow
+   keys. Choices that are merely different (a day, a palette) are chips;
+   these are a slider because the order IS the meaning.
+
+   Markup: .ui-stops[role=slider] > .ui-stops-rail (> .ui-stops-fill,
+   .ui-stops-tick × n with --i, .ui-stops-thumb) + .ui-stops-names
+   (> .ui-stops-name × n with --i). --ui-stops-n is how many stops there
+   are; --ui-stops-at is where the thumb stands, in stops -- a fraction
+   while it is being dragged. The rail runs between the first and the
+   last stop's CENTRES (--ui-stops-pad, half the thumb, in from each
+   end), so the thumb lands exactly on every tick at any width. The
+   behaviour is the page's own (project.html, wireStops). */
+.ui-stops {
+  --ui-stops-n: 3;
+  --ui-stops-at: 0;
+  --ui-stops-pad: 15px;
+  --ui-stops-x: calc(var(--ui-stops-pad) + (100% - 2 * var(--ui-stops-pad)) * var(--ui-stops-at) / (var(--ui-stops-n) - 1));
+  display: grid;
+  gap: 6px;
+  padding: 2px 0;
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+.ui-stops:focus-visible { outline: 2px solid var(--ink-red, #B93631); outline-offset: 4px; }
+.ui-stops-rail { position: relative; height: 36px; }
+.ui-stops-rail::before,
+.ui-stops-fill {
+  content: '';
+  position: absolute;
+  top: 50%;
+  height: 8px;
+  margin-top: -4px;
+  box-sizing: border-box;
+}
+.ui-stops-rail::before {
+  left: var(--ui-stops-pad);
+  right: var(--ui-stops-pad);
+  border: 2px solid var(--ink);
+  background: var(--lit-hi, #fff);
+}
+.ui-stops-fill {
+  left: var(--ui-stops-pad);
+  width: calc(var(--ui-stops-x) - var(--ui-stops-pad));
+  background: var(--ink);
+  transition: width 0.18s ease;
+}
+.ui-stops-tick {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--ui-stops-pad) + (100% - 2 * var(--ui-stops-pad)) * var(--i) / (var(--ui-stops-n) - 1));
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  box-sizing: border-box;
+  border: 2px solid var(--ink);
+  background: var(--lit-hi, #fff);
+}
+.ui-stops-tick.on { background: var(--ink); }
+/* The thumb is the house's pressed thing: a paper face on a 5px foot,
+   which thins and sinks while it is held. */
+.ui-stops-thumb {
+  position: absolute;
+  top: 50%;
+  left: var(--ui-stops-x);
+  width: calc(2 * var(--ui-stops-pad));
+  height: calc(2 * var(--ui-stops-pad));
+  margin: calc(-1 * var(--ui-stops-pad)) 0 0 calc(-1 * var(--ui-stops-pad));
+  box-sizing: border-box;
+  border: 2px solid var(--ink);
+  border-bottom-width: 5px;
+  background: var(--lit-hi, #fff);
+  transition: left 0.18s ease, border-bottom-width 0.1s ease, transform 0.1s ease;
+}
+.ui-stops-thumb::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 8px; height: 8px;
+  margin: -4px 0 0 -4px;
+  background: var(--ink);
+}
+.ui-stops-drag .ui-stops-thumb { border-bottom-width: 2px; transform: translateY(3px); }
+.ui-stops-drag .ui-stops-thumb,
+.ui-stops-drag .ui-stops-fill { transition-property: border-bottom-width, transform; }
+.ui-stops-names {
+  position: relative;
+  height: 1.3em;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ui-stops-name {
+  position: absolute;
+  top: 0;
+  left: calc(var(--ui-stops-pad) + (100% - 2 * var(--ui-stops-pad)) * var(--i) / (var(--ui-stops-n) - 1));
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+/* The ends are ranged to the ends, so a long name never hangs off the box. */
+.ui-stops-name:first-child { left: 0; transform: none; }
+.ui-stops-name:last-child { left: auto; right: 0; transform: none; }
+.ui-stops-name.on { color: var(--ink); }
+
 /* ── Code ── a code that is read out or copied: a kefil code. */
 .ui-code {
   font-family: var(--font-mono);
@@ -311,5 +423,5 @@ select.ui-field {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ui-btn, .ui-step-btn { transition: none; }
+  .ui-btn, .ui-step-btn, .ui-stops-thumb, .ui-stops-fill { transition: none; }
 }
