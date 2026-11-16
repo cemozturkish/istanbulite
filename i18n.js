@@ -98,7 +98,7 @@
     'plan.err.district':   { default: 'Bir ilçe seç.',        more_english: 'Pick a district.' },
     'plan.err.time':       { default: 'Bir saat seç.',        more_english: 'Pick a time.' },
     'plan.err.past':       { default: 'Bu saat geçti.',       more_english: 'That time has already passed.' },
-    'plan.err.full':       { default: 'Aynı anda en fazla 5 planın olabilir. Birini geri alıp yenisini ekle.', more_english: 'You can have at most 5 plans at once. Take one back to add another.' },
+    'plan.err.full':       { default: 'Bu güne zaten bir planın var.', more_english: 'You already have a plan for this day.' },
     'plan.err.rls':        { default: 'Bu plan kaydedilemedi: günü bu haftanın içinde olmalı.', more_english: "This plan couldn't be saved: its day has to be within this week." },
     'plan.err.missing':    { default: 'Planlar için veritabanı güncellemesi eksik (db/events_v2_plans.sql).', more_english: 'The database update for plans is missing (db/events_v2_plans.sql).' },
     // Editing a plan (db/events_v3_plan_edit.sql) and the week the plan
