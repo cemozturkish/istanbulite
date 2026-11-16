@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=9"></script>
   <script src="router.js?v=15"></script>
-  <script src="i18n.js?v=33"></script>
+  <script src="i18n.js?v=34"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=5"></script>
   <!-- The one typeface, asked for before the stylesheet that names it has
@@ -1542,7 +1542,9 @@
        evening opens on the map, a plan of the reader's own opens for
        editing. */
     .fb-week-sub { margin: -4px 0 8px; }
-    .fb-week-day { display: grid; gap: 8px; margin-top: 10px; }
+    .fb-week-day { display: grid; gap: 8px; margin-top: 10px; padding: 10px 12px 12px; border: 2px solid var(--ink); }
+    .fb-week-day.none { border-style: dashed; border-color: var(--muted); }
+    .fb-week-none { margin: 0; font-size: 0.8rem; color: var(--muted); }
     .fb-week-day.t .fb-week-dh { color: var(--ink-red, #B93631); }
     .fb-week-row {
       display: grid;
@@ -5302,9 +5304,11 @@ function renderPlanWeek() {
   for (let k = 0; k < HOME_DAYS; k++) {
     const day = IstDate.iso(k);
     const today = rows.filter(ev => homeEventDay(ev) === day);
-    if (!today.length) continue;
-    html += '<section class="fb-week-day' + (k === 0 ? ' t' : '') + '">' +
+    // Every day of the week gets its own rectangle, top to bottom, whether
+    // or not anything is on it.
+    html += '<section class="fb-week-day' + (k === 0 ? ' t' : '') + (today.length ? '' : ' none') + '">' +
       '<h3 class="ui-label ui-quiet fb-week-dh">' + esc(planWeekDayHead(k)) + '</h3>' +
+      (today.length ? '' : '<p class="fb-week-none">' + esc(tEv('plan.week.none')) + '</p>') +
       today.map(ev => {
         const own = ev._plan && ev._mine;
         const where = nbName(ev.neighborhood) + (ev._plan && ev.location ? ' · ' + ev.location : '');
@@ -5324,7 +5328,7 @@ function renderPlanWeek() {
     '<div class="fb-plan fb-week" lang="' + (planEnglish() ? 'en' : 'tr') + '">' +
       '<h2 class="ui-h fb-plan-h">' + esc(tEv('plan.week.title')) + '</h2>' +
       '<p class="ui-sub fb-week-sub">' + esc(tEv('plan.week.sub')) + '</p>' +
-      (html || '<p class="ui-empty fb-week-empty">' + esc(tEv('plan.week.empty')) + '</p>') +
+      html +
       '<button type="button" class="ui-btn ui-block fb-plan-go" id="fb-week-new"' + (full ? ' disabled' : '') + '>' +
         esc(tEv('plan.week.new')) + '</button>' +
       '<p class="ui-note fb-plan-who">' + esc(tEv(full ? 'plan.err.full' : 'plan.week.count')).replace('{n}', '<b>' + mineCount + '</b>') + '</p>' +

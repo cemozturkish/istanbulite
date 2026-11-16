@@ -111,6 +111,7 @@
     'plan.back':           { default: '‹ Bu haftam',          more_english: '‹ My week' },
     'plan.week.title':     { default: 'Bu haftam',            more_english: 'My week' },
     'plan.week.sub':       { default: 'Gideceğini söylediğin akşamlar ve kendi planların.', more_english: 'The evenings you said you are going to, and your own plans.' },
+    'plan.week.none':      { default: 'Plan yok', more_english: 'Nothing planned' },
     'plan.week.empty':     { default: 'Bu hafta henüz bir yere gideceğini söylemedin. Haritadaki kırmızı ilçelere bak ya da kendi planını yaz.', more_english: "You haven't said you're going anywhere this week yet. Look at the red districts on the map, or write a plan of your own." },
     'plan.week.going':     { default: 'GİDİYORSUN',           more_english: 'GOING' },
     'plan.week.mine':      { default: 'PLANIN',               more_english: 'YOUR PLAN' },
