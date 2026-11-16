@@ -2033,6 +2033,70 @@
       .clr-variants { min-width: 0; }
       .clr-panel { min-height: 70vh; }
     }
+
+    /* ── PETEK: the drawing, and moving a member on it ──
+       Each petek is drawn as its own honeycomb (renderPetekBoard), one
+       hexagon per member, with a short bar across the edge of every two
+       members who are attached. Holding a hexagon lifts it; dragging it
+       shows where it would land and what that would do to the bonds
+       before anything is written (db/admin_hive_v2_move.sql). The page
+       must not scroll, select text or open a callout under a finger that
+       is holding a hexagon, hence the three no-ops on the drawing. */
+    .pk-board { margin: 6px 0 10px; }
+    .pk-svg {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      max-height: 70vh;
+      height: auto;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      overflow: visible;
+    }
+    .pk-cell { cursor: grab; }
+    .pk-cell .pk-hex {
+      fill: var(--paper-card, var(--paper));
+      stroke: var(--ink);
+      stroke-width: 1.6;
+      transition: transform 0.18s ease;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    .pk-cell text {
+      fill: var(--ink);
+      font-family: var(--font-ui);
+      font-weight: 700;
+      text-anchor: middle;
+      pointer-events: none;
+    }
+    .pk-cell .pk-sub { font-weight: 400; fill: var(--muted); }
+    .pk-cell.pk-lit .pk-hex { stroke: var(--ink-red); stroke-width: 3; }
+    /* Being held: the hexagon sinks a little while the hold is counted,
+       so the press says it has been felt before the drag begins. */
+    .pk-cell.pk-arming .pk-hex { transform: scale(0.9); }
+    .pk-cell.pk-origin { opacity: 0.25; }
+    .pk-cell.pk-falls { opacity: 0.4; }
+    .pk-cell.pk-falls .pk-hex { stroke-dasharray: 4 3; stroke: var(--ink-red); }
+    .pk-cell.pk-landing .pk-hex { stroke: var(--ink-red); stroke-width: 3; stroke-dasharray: 5 3; }
+    .pk-cell.pk-swapped .pk-hex { stroke: var(--ink-red); stroke-width: 2.4; }
+    .pk-ghost { fill: transparent; stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .pk-ghost.pk-ok { stroke: var(--muted); }
+    .pk-ghost.pk-hot { fill: color-mix(in srgb, var(--ink-red) 14%, transparent); stroke: var(--ink-red); stroke-width: 2.4; }
+    .pk-ghost.pk-hot.pk-bad { fill: transparent; stroke: var(--muted); }
+    .pk-bond { stroke: var(--ink); stroke-linecap: round; }
+    .pk-bond.pk-new { stroke: var(--ink-red); }
+    .pk-float { pointer-events: none; opacity: 0.85; }
+    /* Over a place it can land on, the landing hexagon says where and the
+       floating copy only says "held": no second name over the first. */
+    .pk-float.pk-snap { opacity: 0.35; }
+    .pk-float.pk-snap text { display: none; }
+    .pk-float .pk-hex { fill: var(--paper); stroke: var(--ink-red); stroke-width: 3; }
+    .pk-float text { fill: var(--ink); font-family: var(--font-ui); font-weight: 700; text-anchor: middle; }
+    .pk-board.pk-dragging .pk-cell { cursor: grabbing; }
+    .pk-note { font-size: 0.78rem; color: var(--muted); text-align: center; margin-top: 6px; min-height: 1.2em; }
+    .pk-note b { color: var(--ink); }
+    .pk-note .pk-red { color: var(--ink-red); font-weight: 700; }
   </style>
   <link rel="stylesheet" href="frames.css?v=27">
 </head>
@@ -3444,6 +3508,15 @@
         Üyelerin kurduğu petekler (db/admin_hive.sql). Çıkarılan üye hesabını
         kaybetmez; yeniden tek altıgen olur ve bir kodla tekrar eklenebilir.
         Bağı koparmak, üyelerin haftalık kilidine bakmaz.
+      </div>
+      <div class="setting-row-sub" style="margin-bottom:10px;">
+        <b>Taşımak için</b> bir üyenin altıgenini basılı tut ve sürükle
+        (db/admin_hive_v2_move.sql). Boş bir yere bırakırsan oraya geçer;
+        başka bir üyenin üstüne bırakırsan ikisi yer değiştirir. Taşınan üye
+        yeni yerinde yanında duran herkese bağlanır, artık yanında olmadığı
+        kişilerle bağı kopar; birbirini engellemiş iki üye bağlanmaz. Hiç bağı
+        kalmayan petekten düşer. Bırakmadan önce ne olacağı çizimin altında
+        yazar, onaylamadan hiçbir şey değişmez.
       </div>
       <input type="text" id="petek-filter" placeholder="Üye ara…" style="margin-bottom:12px;"/>
       <div id="petek-summary" class="setting-row-sub" style="margin-bottom:10px;"></div>
@@ -5944,10 +6017,13 @@ async function loadReportsList() {
 // that can disagree with the database is the one thing this may not be.
 let petekState = { cells: [], bonds: [], profiles: {} };
 
-async function loadPetekTab() {
+// `quiet` re-reads without putting the spinner up first: after a move the
+// list is redrawn where it stands, so the page does not jump back to the
+// top under the admin's hand.
+async function loadPetekTab(opts) {
   const listEl = document.getElementById('petek-list');
   if (!listEl) return;
-  listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  if (!(opts && opts.quiet)) listEl.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
   const [c, b] = await Promise.all([sb.rpc('admin_hive_cells'), sb.rpc('admin_hive_bonds')]);
   const err = c.error || b.error;
   if (err) {
@@ -6010,10 +6086,17 @@ function renderPetekList() {
           <div class="a-neighborhood">${members.length} üye · ${mine.length} bağ</div>
           <button class="btn btn-danger" data-petek-dissolve="${escapeHtml(mid)}">Peteği dağıt</button>
         </div>
+        ${pkBoardHTML(mid)}
         ${rows}
       </div>`;
   }).join('');
   listEl.innerHTML = html || '<div class="empty-state">Eşleşen üye yok.</div>';
+
+  listEl.querySelectorAll('.pk-board').forEach(board => {
+    const mid = board.dataset.map;
+    const lit = q ? maps[mid].filter(c => petekName(c.user_id).toLocaleLowerCase('tr-TR').includes(q)).map(c => c.user_id) : [];
+    pkSetup(board, maps[mid], bonds.filter(x => x.map_id === mid), lit);
+  });
 
   const act = async (btn, fn, msg) => {
     if (!confirm(msg)) return;
@@ -6035,6 +6118,421 @@ function renderPetekList() {
       'Bu petek tamamen dağıtılsın mı? İçindeki herkes tek altıgene döner.')));
 }
 document.getElementById('petek-filter')?.addEventListener('input', () => renderPetekList());
+
+// ── The drawing, and moving a member on it (db/admin_hive_v2_move.sql) ──
+// Every petek card carries its honeycomb: one hexagon per member, a short
+// bar across the edge of every two who are attached. Holding a hexagon
+// lifts it (a mouse may also simply start dragging); the drag shows where
+// it would land and what that does to the bonds, and nothing is written
+// until the drop is confirmed. The rule for the bonds is the server's
+// (admin_hive_move) and pkOutcome restates it only to preview it: a moved
+// member is attached to everybody it lands beside, a bond whose two ends
+// are no longer side by side breaks, and whoever is left holding no bond
+// steps off. Blocks are the one thing the preview cannot know (the admin
+// does not read member_blocks), so the desk re-reads after every move and
+// draws what the database actually did.
+//
+// The packing is the members' own (hivePos in profile-card.js): pointy
+// hexagons, a row 1.5 radii below the last and offset half a cell across,
+// with the six neighbours of HIVE_DIRS.
+const PK_R = 30;                 // a hexagon's radius, in drawing units
+const PK_SCALE = 1.3;            // px per drawing unit at full size (smaller only when the card is narrower)
+const PK_SQ3 = Math.sqrt(3);
+const PK_DIRS = [[0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1]];
+const PK_HOLD_MS = 320;          // how long a press is held before the hexagon lifts
+const PK_SLOP = 8;               // px a finger may wander while the hold is being counted
+const PK_MOVE_ERR = {
+  not_placed: 'Bu üye artık hiçbir petekte değil.',
+  same_place: 'Üye zaten orada duruyor.',
+  alone: 'Orada yanında kimse olmazdı, üye petekten düşerdi. Bilerek çıkarmak için "Petekten çıkar"ı kullan.',
+};
+
+function pkKey(q, r) { return q + ',' + r; }
+function pkBondKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
+function pkCenter(q, r) { return { x: PK_R * PK_SQ3 * (q + r / 2), y: PK_R * 1.5 * r }; }
+function pkAdjacent(a, b) {
+  const dq = a.q - b.q, dr = a.r - b.r;
+  return Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr) === 2;
+}
+function pkHexPoints(cx, cy, rad) {
+  const pts = [];
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 180 * (60 * i - 90);
+    pts.push((cx + rad * Math.cos(a)).toFixed(1) + ',' + (cy + rad * Math.sin(a)).toFixed(1));
+  }
+  return pts.join(' ');
+}
+// A point on the drawing → the hexagon it falls in (cube rounding).
+function pkPixelToHex(x, y) {
+  const qf = (PK_SQ3 / 3 * x - y / 3) / PK_R;
+  const rf = (2 / 3 * y) / PK_R;
+  const sf = -qf - rf;
+  let q = Math.round(qf), r = Math.round(rf);
+  const s = Math.round(sf);
+  const dq = Math.abs(q - qf), dr = Math.abs(r - rf), ds = Math.abs(s - sf);
+  if (dq > dr && dq > ds) q = -r - s;
+  else if (dr > ds) r = -q - s;
+  return { q, r };
+}
+
+function pkBoardHTML(mid) {
+  return `<div class="pk-board" data-map="${escapeHtml(mid)}">
+    <svg class="pk-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Petek"></svg>
+    <div class="pk-note"></div>
+  </div>`;
+}
+
+// What dropping `id` on (tq, tr) would do — the same three steps
+// admin_hive_move takes, run on this board's own copy of the petek.
+function pkOutcome(d, id, tq, tr) {
+  const from = d.pos.get(id);
+  if (!from) return null;
+  if (from.q === tq && from.r === tr) return { same: true, id };
+  const other = d.members.find(c => c.user_id !== id && c.q === tq && c.r === tr);
+  const otherId = other ? other.user_id : null;
+  const next = new Map(d.pos);
+  next.set(id, { q: tq, r: tr });
+  if (otherId) next.set(otherId, { q: from.q, r: from.r });
+  const moved = otherId ? [id, otherId] : [id];
+  const target = { q: tq, r: tr };
+  const alone = ![...next].some(([m, p]) => m !== id && pkAdjacent(p, target));
+
+  const now = new Set(d.bonds.map(b => pkBondKey(b.a, b.b)));
+  const broken = [...now].filter(k => {
+    const [a, b] = k.split('|');
+    return (moved.includes(a) || moved.includes(b)) && !pkAdjacent(next.get(a), next.get(b));
+  });
+  const after = new Set([...now].filter(k => !broken.includes(k)));
+  const made = [];
+  moved.forEach(mv => next.forEach((p, m) => {
+    if (m === mv || !pkAdjacent(p, next.get(mv))) return;
+    const k = pkBondKey(mv, m);
+    if (!after.has(k)) { after.add(k); made.push(k); }
+  }));
+
+  // Whoever holds no bond steps off; whatever is left may be in pieces.
+  const links = new Map();
+  const link = (a, b) => { if (!links.has(a)) links.set(a, []); links.get(a).push(b); };
+  after.forEach(k => { const [a, b] = k.split('|'); link(a, b); link(b, a); });
+  const falls = [...next.keys()].filter(m => !links.has(m));
+  let pieces = 0;
+  const seen = new Set();
+  links.forEach((_, m) => {
+    if (seen.has(m)) return;
+    pieces++;
+    const stack = [m];
+    seen.add(m);
+    while (stack.length) {
+      (links.get(stack.pop()) || []).forEach(n => { if (!seen.has(n)) { seen.add(n); stack.push(n); } });
+    }
+  });
+  return { id, otherId, next, alone, broken, made, after, falls, pieces };
+}
+
+// The same outcome in words: as HTML under the drawing, as plain text in
+// the confirmation.
+function pkSummary(o, html) {
+  const esc = html ? escapeHtml : (s) => s;
+  const nm = (m) => esc(petekName(m));
+  const pair = (k) => k.split('|').map(nm).join('–');
+  const red = (s) => html ? `<span class="pk-red">${s}</span>` : s;
+  const b = (s) => html ? `<b>${s}</b>` : s;
+  const lines = [o.otherId
+    ? b(nm(o.id)) + ' ile ' + b(nm(o.otherId)) + ' yer değiştirir.'
+    : b(nm(o.id)) + ' buraya taşınır.'];
+  if (o.made.length) lines.push(red('Yeni bağ: ') + o.made.map(pair).join(', '));
+  if (o.broken.length) lines.push('Kopacak bağ: ' + o.broken.map(pair).join(', '));
+  if (o.falls.length) lines.push(red('Petekten düşecek: ') + o.falls.map(nm).join(', '));
+  if (o.pieces > 1) lines.push(red('Petek ' + o.pieces + ' parçaya bölünecek.'));
+  if (!o.made.length && !o.broken.length) lines.push('Bağlar değişmez.');
+  return lines.join(html ? '<br>' : '\n');
+}
+
+function pkCellSVG(c, p, cls) {
+  const ctr = pkCenter(p.q, p.r);
+  const full = petekName(c.user_id);
+  const words = full.split(/\s+/);
+  const clip = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+  const first = clip(words[0] || '', 8);
+  const rest = words.slice(1).map(w => (w ? w[0] + '.' : '')).join(' ');
+  const nb = NEIGHBORHOOD_NAMES[c.neighborhood] || c.neighborhood || '';
+  return `<g class="${cls.join(' ')}" data-id="${escapeHtml(c.user_id)}">
+    <title>${escapeHtml(full + (nb ? ' · ' + nb : ''))}</title>
+    <polygon class="pk-hex" points="${pkHexPoints(ctr.x, ctr.y, PK_R * 0.92)}"/>
+    <text x="${ctr.x.toFixed(1)}" y="${(ctr.y + (rest ? -1 : 3.5)).toFixed(1)}" font-size="10">${escapeHtml(first)}</text>
+    ${rest ? `<text class="pk-sub" x="${ctr.x.toFixed(1)}" y="${(ctr.y + 10).toFixed(1)}" font-size="8.5">${escapeHtml(rest)}</text>` : ''}
+  </g>`;
+}
+
+function pkFloatSVG(d) {
+  const g = d.drag;
+  const c = d.members.find(m => m.user_id === g.id);
+  const name = c ? (petekName(c.user_id).split(/\s+/)[0] || '') : '';
+  const snap = g.outcome && !g.outcome.same && !g.outcome.alone;
+  return `<g class="pk-float${snap ? ' pk-snap' : ''}" transform="translate(${g.pt.x.toFixed(1)} ${g.pt.y.toFixed(1)})">
+    <polygon class="pk-hex" points="${pkHexPoints(0, 0, PK_R * 0.92)}"/>
+    <text x="0" y="3.5" font-size="10">${escapeHtml(name.length > 8 ? name.slice(0, 7) + '…' : name)}</text>
+  </g>`;
+}
+
+// Draws one board from its state: the petek as it stands, or — while a
+// hexagon is held over a place, or while its drop waits to be confirmed —
+// the petek as that drop would leave it.
+function pkRender(board) {
+  const d = board._pk;
+  const svg = board.querySelector('svg');
+  const note = board.querySelector('.pk-note');
+  const g = d.drag;
+  const live = !!(g && g.live);
+  const o = (live && g.outcome) || d.pending || null;
+  const preview = !!(o && !o.same && !o.alone);
+  const posOf = (m) => (preview ? o.next.get(m) : d.pos.get(m));
+
+  let ghosts = '';
+  if (live) {
+    d.ring.forEach(cell => {
+      const ctr = pkCenter(cell.q, cell.r);
+      const k = pkKey(cell.q, cell.r);
+      const ok = g.valid.has(k);
+      const hot = g.tk === k;
+      ghosts += `<polygon class="pk-ghost${ok ? ' pk-ok' : ''}${hot ? ' pk-hot' + (ok ? '' : ' pk-bad') : ''}" points="${pkHexPoints(ctr.x, ctr.y, PK_R * 0.92)}"/>`;
+    });
+  }
+
+  const cells = d.members.map(c => {
+    const cls = ['pk-cell'];
+    if (d.lit.has(c.user_id)) cls.push('pk-lit');
+    const dragging = (live || d.pending) && o && c.user_id === o.id;
+    if (dragging) cls.push(preview ? 'pk-landing' : 'pk-origin');
+    else if (live && c.user_id === g.id) cls.push('pk-origin');
+    if (preview && c.user_id === o.otherId) cls.push('pk-swapped');
+    if (preview && o.falls.includes(c.user_id)) cls.push('pk-falls');
+    return pkCellSVG(c, posOf(c.user_id), cls);
+  }).join('');
+
+  const keys = preview ? [...o.after] : d.bonds.map(b => pkBondKey(b.a, b.b));
+  const bars = keys.map(k => {
+    const [a, b] = k.split('|');
+    const pa = posOf(a), pb = posOf(b);
+    if (!pa || !pb || !pkAdjacent(pa, pb)) return '';
+    const ca = pkCenter(pa.q, pa.r), cb = pkCenter(pb.q, pb.r);
+    const at = (t) => ({ x: ca.x + (cb.x - ca.x) * t, y: ca.y + (cb.y - ca.y) * t });
+    const p1 = at(0.32), p2 = at(0.68);
+    const fresh = preview && o.made.includes(k);
+    return `<line class="pk-bond${fresh ? ' pk-new' : ''}" x1="${p1.x.toFixed(1)}" y1="${p1.y.toFixed(1)}" x2="${p2.x.toFixed(1)}" y2="${p2.y.toFixed(1)}" stroke-width="5"/>`;
+  }).join('');
+
+  svg.innerHTML = ghosts + cells + bars + (live ? pkFloatSVG(d) : '');
+
+  if (d.busy) note.textContent = 'Kaydediliyor…';
+  else if (preview) note.innerHTML = pkSummary(o, true);
+  else if (live && o && o.same) note.textContent = 'Yerine geri bırakırsan hiçbir şey değişmez.';
+  else if (live && o && o.alone) note.innerHTML = '<span class="pk-red">Burada yanında kimse olmaz — buraya bırakılamaz.</span>';
+  else if (live) note.textContent = 'Bırakacağın yerin üstüne getir…';
+  else note.textContent = d.members.length > 1 ? 'Bir altıgeni basılı tut ve sürükle.' : '';
+}
+
+// Only the floating copy moves under the pointer between two places; the
+// rest of the drawing is redrawn when the place under it changes.
+function pkMoveFloat(board) {
+  const g = board._pk.drag;
+  const el = board.querySelector('.pk-float');
+  if (el && g) el.setAttribute('transform', `translate(${g.pt.x.toFixed(1)} ${g.pt.y.toFixed(1)})`);
+}
+
+function pkSetup(board, members, bonds, lit) {
+  const d = {
+    members,
+    bonds,
+    lit: new Set(lit || []),
+    pos: new Map(members.map(c => [c.user_id, { q: c.q, r: c.r }])),
+    drag: null,
+    pending: null,
+    busy: false,
+  };
+  board._pk = d;
+
+  // Where a hexagon may be dropped: every member's place (a swap) and every
+  // empty place touching the petek. Fixed for the board's lifetime, so the
+  // drawing never re-frames itself under a held hexagon.
+  const taken = new Set(members.map(c => pkKey(c.q, c.r)));
+  const ring = new Map();
+  members.forEach(c => PK_DIRS.forEach(([dq, dr]) => {
+    const k = pkKey(c.q + dq, c.r + dr);
+    if (!taken.has(k)) ring.set(k, { q: c.q + dq, r: c.r + dr });
+  }));
+  d.ring = [...ring.values()];
+  d.cand = new Set([...taken, ...ring.keys()]);
+
+  const all = [...members.map(c => ({ q: c.q, r: c.r })), ...d.ring];
+  const xs = all.map(c => pkCenter(c.q, c.r).x), ys = all.map(c => pkCenter(c.q, c.r).y);
+  const pad = PK_R * 1.15;
+  const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+  const w = Math.max(...xs) + pad - x0, h = Math.max(...ys) + pad - y0;
+  const svg = board.querySelector('svg');
+  svg.setAttribute('viewBox', `${x0.toFixed(1)} ${y0.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`);
+  svg.setAttribute('width', Math.round(w * PK_SCALE));
+  svg.setAttribute('height', Math.round(h * PK_SCALE));
+  pkRender(board);
+  if (members.length > 1) pkWire(board);
+}
+
+function pkWire(board) {
+  const d = board._pk;
+  const svg = board.querySelector('svg');
+  let arm = null;   // a press being held, not yet lifted
+
+  const toSvg = (cx, cy) => {
+    const m = svg.getScreenCTM();
+    if (!m) return { x: 0, y: 0 };
+    const p = new DOMPoint(cx, cy).matrixTransform(m.inverse());
+    return { x: p.x, y: p.y };
+  };
+  const disarm = () => {
+    if (!arm) return;
+    clearTimeout(arm.timer);
+    if (arm.el) arm.el.classList.remove('pk-arming');
+    arm = null;
+  };
+  // The hold is over: the hexagon comes off the drawing and follows the
+  // pointer. Capture goes to the svg itself, which outlives every redraw.
+  const lift = () => {
+    if (!arm) return;
+    const id = arm.id;
+    const valid = new Set();
+    d.cand.forEach(k => {
+      const [q, r] = k.split(',').map(Number);
+      const o = pkOutcome(d, id, q, r);
+      if (o && !o.same && !o.alone) valid.add(k);
+    });
+    d.drag = { id, pointerId: arm.pointerId, live: true, pt: toSvg(arm.cx, arm.cy), tk: '', outcome: null, valid };
+    try { svg.setPointerCapture(arm.pointerId); } catch (_) {}
+    clearTimeout(arm.timer);
+    arm = null;
+    board.classList.add('pk-dragging');
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch (_) {} }
+    pkRender(board);
+  };
+  const cancel = () => {
+    disarm();
+    if (!d.drag) return;
+    d.drag = null;
+    board.classList.remove('pk-dragging');
+    pkRender(board);
+  };
+  board._pkCancel = cancel;
+
+  svg.addEventListener('pointerdown', (e) => {
+    if (d.drag || d.pending || d.busy || arm) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const el = e.target.closest('.pk-cell');
+    if (!el) return;
+    if (e.pointerType === 'mouse') {
+      // No text selection behind a mouse drag, and the moves keep coming
+      // even if the pointer leaves the drawing before it lifts.
+      e.preventDefault();
+      try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+    arm = { id: el.dataset.id, pointerId: e.pointerId, type: e.pointerType, el,
+            x0: e.clientX, y0: e.clientY, cx: e.clientX, cy: e.clientY };
+    el.classList.add('pk-arming');
+    arm.timer = setTimeout(lift, PK_HOLD_MS);
+  });
+
+  svg.addEventListener('pointermove', (e) => {
+    if (arm && e.pointerId === arm.pointerId) {
+      arm.cx = e.clientX; arm.cy = e.clientY;
+      if (Math.hypot(e.clientX - arm.x0, e.clientY - arm.y0) > PK_SLOP) {
+        // A finger that wanders before the hold is up is scrolling the
+        // page; a mouse that does is simply dragging sooner.
+        if (arm.type === 'mouse') lift(); else disarm();
+      }
+      return;
+    }
+    const g = d.drag;
+    if (!g || !g.live || e.pointerId !== g.pointerId) return;
+    g.pt = toSvg(e.clientX, e.clientY);
+    const h = pkPixelToHex(g.pt.x, g.pt.y);
+    const k = pkKey(h.q, h.r);
+    const tk = d.cand.has(k) ? k : '';
+    if (tk !== g.tk) {
+      g.tk = tk;
+      g.outcome = tk ? pkOutcome(d, g.id, h.q, h.r) : null;
+      pkRender(board);
+    } else {
+      pkMoveFloat(board);
+    }
+  });
+
+  const finish = (e, drop) => {
+    if (arm && e.pointerId === arm.pointerId) { disarm(); return; }
+    const g = d.drag;
+    if (!g || e.pointerId !== g.pointerId) return;
+    const o = drop ? g.outcome : null;
+    d.drag = null;
+    board.classList.remove('pk-dragging');
+    if (!o || o.same || o.alone) { pkRender(board); return; }
+    // The petek is drawn as the drop would leave it while the question is
+    // asked; confirm() blocks, so it waits for that frame to be painted.
+    d.pending = o;
+    pkRender(board);
+    requestAnimationFrame(() => setTimeout(() => {
+      const ok = confirm(pkSummary(o, false) + '\n\nOnaylıyor musun?');
+      d.pending = null;
+      if (ok) pkCommit(board, o);
+      else pkRender(board);
+    }, 30));
+  };
+  svg.addEventListener('pointerup', (e) => finish(e, true));
+  svg.addEventListener('pointercancel', (e) => finish(e, false));
+  // Only the svg's own capture ending counts. Moving the capture from the
+  // hexagon a touch started on (implicit capture) to the svg fires this
+  // on that hexagon, and it bubbles up here — that is not the drag ending.
+  svg.addEventListener('lostpointercapture', (e) => {
+    if (e.target === svg && d.drag && e.pointerId === d.drag.pointerId) finish(e, false);
+  });
+
+  // A held hexagon must not scroll the page. iOS keeps sending a touch to
+  // the element it started on even once a redraw has taken that element
+  // out of the document — where a listener on the svg no longer hears it —
+  // so the blocking listener is put on the touch's own target.
+  svg.addEventListener('touchstart', (e) => {
+    const t = e.target;
+    const block = (ev) => { if (d.drag && d.drag.live && ev.cancelable) ev.preventDefault(); };
+    const done = () => {
+      t.removeEventListener('touchmove', block);
+      t.removeEventListener('touchend', done);
+      t.removeEventListener('touchcancel', done);
+    };
+    t.addEventListener('touchmove', block, { passive: false });
+    t.addEventListener('touchend', done);
+    t.addEventListener('touchcancel', done);
+  }, { passive: true });
+  svg.addEventListener('contextmenu', (e) => { if (e.target.closest('.pk-cell')) e.preventDefault(); });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('.pk-board.pk-dragging').forEach(b => b._pkCancel && b._pkCancel());
+});
+
+async function pkCommit(board, o) {
+  const d = board._pk;
+  d.busy = true;
+  pkRender(board);
+  const t = o.next.get(o.id);
+  const { data, error } = await sb.rpc('admin_hive_move', { p_member: o.id, p_q: t.q, p_r: t.r });
+  d.busy = false;
+  if (error) {
+    alert('Olmadı: ' + error.message +
+      (/admin_hive_move|function/.test(error.message) ? '\n(db/admin_hive_v2_move.sql çalıştırıldı mı?)' : ''));
+  } else if (data !== 'ok') {
+    alert(PK_MOVE_ERR[data] || ('Olmadı: ' + data));
+  } else {
+    deskToast(o.otherId ? 'Yer değiştirdiler' : 'Taşındı');
+  }
+  loadPetekTab({ quiet: true });
+}
 
 async function loadUsersList() {
   const listEl = document.getElementById('users-list');
