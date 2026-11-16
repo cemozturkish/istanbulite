@@ -54,6 +54,11 @@ regardless of the week's lock and hides each from the other's `hive_map()`
 (through somebody else's bond) the petek draws a dark, unpressable hexagon from
 `hive_hidden_cells()`. Nobody else's petek changes. The rules they enforce are the
 "Topluluk Kuralları" section of `gizlilik.html`, agreed to at signup.
+**How far a plan travels is its creator's choice, per plan**: a three-stop slider in the form —
+**Peteğim · Peteğimin peteği · İstanbul** — counted in bonds, where İstanbul is the big petek
+(everybody joined to the creator by any chain of bonds), never every member
+(`db/events_v4_plan_reach.sql`, see "How far a plan travels" under "Plans"). Gated the same way:
+until that file has been run there is no slider and every plan reaches one bond, as before.
 
 ---
 
@@ -355,7 +360,8 @@ The anon key is intentionally public (read-only for authenticated users). Row-le
 > which is the first time a letter has been addressed to anyone in particular), `events_v2_plans` + `events_v3_plan_edit`
 > (members' own plans — `events.audience` / `created_by` and `event_readable()`, which lets a
 > `'petek'` row be read only by its creator and the members attached to them; see "Plans" under
-> the home screen), and more). When in
+> the home screen), `events_v4_plan_reach` (`events.reach` — how many bonds out a plan travels,
+> `event_readable(audience, created_by, reach)`, `plan_reach_counts()`), and more). When in
 > doubt, read the relevant `db/` file
 > — it is the source of truth.
 
@@ -1689,6 +1695,7 @@ button:
 | `.ui-box` (`.ui-foot`, `.ui-rail`) · `.ui-empty` | the card · the dashed "nothing here" |
 | `.ui-rows` > `.ui-row` > `.ui-row-k` + `.ui-row-v` | a list of facts in a box, hairline between |
 | `.ui-step` | a value walked with two arrows (the avatar's rows) |
+| `.ui-stops` | one value out of a few that lie ALONG something, dragged on a rail (a plan's reach); behaviour is the page's (`wireStops`) |
 | `.ui-code` | a code that is read out or copied |
 
 Three things about it:
@@ -2493,16 +2500,20 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
 #### Plans — a member saying where they will be (`db/events_v2_plans.sql`)
 
 A plan is "I'll be at this place, this day, this time", put up by a member and shown **only to the
-members attached to them on the petek**. It is the events app at its smallest: one person going
-out, and the people who know them finding out.
+members joined to them on the petek** — one bond out by default, further if they pull it out (see
+"How far a plan travels" below). It is the events app at its smallest: one person going out, and
+the people who know them finding out.
 
 - **It is a row in `events`, not a table of its own**, so the card, the RSVP and the petek's
   guest-list colours work on it unchanged. `audience` says which kind a row is: `'city'` (the
   default — every row before the migration, the admin's evenings, curated through a baskı) or
   `'petek'` (a member's plan, never in a baskı: the check constraint keeps its `edition_date` null,
   so `events_current_edition()` never sees one). `created_by` is the member.
-- **Who reads a plan is one function, `public.event_readable(audience, created_by)`**, used by
-  the events SELECT policy: the creator, and anybody with a row in `hive_bonds` with them.
+- **Who reads a plan is one function, `public.event_readable(audience, created_by, reach)`**, used
+  by the events SELECT policy: the creator, and anybody within the plan's reach along `hive_bonds`
+  (one bond for `'petek'`, which is every plan written before the slider; see below). The
+  two-argument version is dropped by `db/events_v4_plan_reach.sql`, so a policy re-created from an
+  older file fails loudly instead of quietly narrowing every plan.
   **Attached, not adjacent** — two members can stand next to each other on the grid without a bond
   (a third member's attachment put them there), and saying where you will be is personal: the fence
   is the people you actually handed a code to. The **admin reads none through the client** (no
@@ -2545,9 +2556,11 @@ out, and the people who know them finding out.
   both kinds stands them side by side. Markers are keyed by kind AND district (`data-k` /
   `data-d`, `homeOpen.kind`), and `openHomeCard(kind, d, id)` can open on a given plan.
 - **The card** prints the creator as "KEFİL: BEŞİKTAŞ'TAN AYŞE · PETEĞİNDEN" for a friend's plan
-  (`eventKefilHTML(k, 'plan.kefil')`), and "SENİN PLANIN · PETEĞİN GÖRÜYOR" with DÜZENLE and
-  GERİ AL on the reader's own — the creator does not RSVP to their own plan; their hexagon is
-  painted as its kefil.
+  (`eventKefilHTML(k, 'plan.kefil')`) — "PETEĞİNİN PETEĞİNDEN" / "BÜYÜK PETEKTEN" when the creator
+  is not attached to the reader and the plan reached them further out (`planFromKey`; attached
+  wins whatever the plan's reach) — and "SENİN PLANIN · PETEĞİN GÖRÜYOR" (or PETEĞİNİN PETEĞİ /
+  İSTANBUL, `planYoursKey`) with DÜZENLE and GERİ AL on the reader's own — the creator does not
+  RSVP to their own plan; their hexagon is painted as its kefil.
 - **+ BİR YERE GİDİYORUM** (`#fb-planbtn`) stands under the petek, above the games (in the games'
   column on a desktop), and only once `homeData.plansOpen`: `.fb-plans-on` on the book takes the
   same room off the petek's window in the same frame. It opens **the reader's WEEK** in THE sheet
@@ -2559,9 +2572,37 @@ out, and the people who know them finding out.
   (`openPlanForm(ev, from)`) with "‹ Bu haftam" to go back, and a saved edit made from the list
   returns to the list. The form asks what (`title`), where (district select of all 39, fetched from `neighborhoods`
   — `nbName()` uses the same names everywhere on this screen — plus an optional place,
-  `location`), when (the seven days the map shows as chips, then a time), and how many people will
-  see it (`homeAttached`, the `bonded` cells of the reader's own map — exactly who
-  `event_readable()` lets in).
+  `location`), when (the seven days the map shows as chips, then a time), who sees it (the reach
+  slider, below) and how many people that is (`plan_reach_counts()`; without the slider,
+  `homeAttached`, the `bonded` cells of the reader's own map — exactly who `event_readable()` lets
+  in).
+- **How far a plan travels** (`db/events_v4_plan_reach.sql`, `events.reach`, `PLAN_REACH`). The
+  form's **KİM GÖRSÜN** is a three-stop slider (ui.css's `.ui-stops`, wired by `wireStops`):
+  **Peteğim** (`'petek'`, one bond — the members attached to the creator), **Peteğimin peteği**
+  (`'petek2'`, two bonds at most) and **İstanbul** (`'istanbul'`, any number of bonds — the big
+  petek). İstanbul is NOT every member: a member nobody on the creator's petek is attached to, by
+  any route, still does not see it; that is what a city evening (`audience = 'city'`) is for.
+  - **Distance is counted in BONDS, never cells** (`hive_reaches(from, to, hops)`, internal, no
+    grant to anyone since it answers about any two members). Adjacency on the grid is not
+    attachment, and a map can hold two halves no longer joined (a block breaks a bond without
+    re-splitting the map), so the map is only a quick "no" before the walk. Blocks win at every
+    distance.
+  - **Null `reach` is `'petek'`**: every plan written before the column, and any written by a
+    cached old script, reaches exactly as far as it always did. An unknown value fails narrow
+    (`plan_reach_hops`).
+  - **The slider is gated on `plan_reach_counts()`** (`homePlanReach`): the function, the column
+    and the wider fence arrive in one file, so `PGRST202` means no slider and no `reach` sent;
+    any other failure keeps the slider without numbers. The function hands the reader three counts
+    and no names — the same people `event_readable()` would let in, counted.
+  - **A new plan always starts on Peteğim.** Being seen further is something the reader pulls a
+    plan out to, never something inherited from the last plan; only the half-typed draft keeps a
+    position. Moving the slider rewrites, live, what the stop means, how many it reaches and the
+    send button (Peteğime / Peteğimin peteğine / İstanbul'a duyur).
+  - **Narrowing a plan takes back what it gave**: `plan_moved_clear_answers` clears the answers of
+    members a changed `reach` no longer reaches (widening clears nothing), or the creator's petek
+    would go on showing people as going to an evening they can no longer see. The edit form says so
+    (`plan.edit.narrow`). The reader's week marks each of their own plans with who sees it
+    (`plan.sees.*`).
 - **A bond made on the petek re-reads the plans** (`homeBondKey` in `homeFriendsFromMap`): who
   may see whose plans IS the attachments, so a code claimed in front of the reader has to bring
   the new neighbour's plans in at once. Compared against the last map seen, so a remount that

@@ -118,6 +118,30 @@
     'plan.week.new':       { default: '+ Yeni plan',          more_english: '+ New plan' },
     'plan.week.count':     { default: '5 plan hakkından {n} tanesi duruyor.', more_english: '{n} of your 5 plans are up.' },
     'plan.err.edit.missing': { default: 'Planı düzenlemek için veritabanı güncellemesi eksik (db/events_v3_plan_edit.sql).', more_english: 'The database update for editing plans is missing (db/events_v3_plan_edit.sql).' },
+    // How far a plan travels (db/events_v4_plan_reach.sql): the three
+    // stops of the slider in the plan form, counted in bonds. İstanbul is
+    // the big petek -- everybody joined to the creator by any chain of
+    // bonds -- never every member.
+    'plan.reach':          { default: 'Kim görsün',           more_english: 'Who sees it' },
+    'plan.reach.petek':    { default: 'Peteğim',              more_english: 'My petek' },
+    'plan.reach.petek2':   { default: 'Peteğimin peteği',     more_english: "My petek's petek" },
+    'plan.reach.istanbul': { default: 'İstanbul',             more_english: 'İstanbul' },
+    'plan.reach.say.petek':    { default: 'Peteğinde sana elden bağlı olanlar.', more_english: 'The people attached to you on your petek, hand to hand.' },
+    'plan.reach.say.petek2':   { default: 'Onlar ve onların peteğindekiler: sana en fazla iki bağ uzaktaki herkes.', more_english: 'Them, and the people on their petek: everyone up to two bonds away from you.' },
+    'plan.reach.say.istanbul': { default: 'Büyük petekte sana bir yoldan bağlı olan herkes, ne kadar uzakta olursa olsun. Bütün üyeler değil.', more_english: 'Everyone joined to you on the big petek by any chain of bonds, however far. Not every member.' },
+    'plan.reach.n':        { default: '{n} kişi bunu haritasında görecek. Günü bitince gece yarısı kendiliğinden kalkar.', more_english: '{n} people will see this on their map. It comes down by itself at midnight after its day.' },
+    'plan.reach.n0':       { default: 'Şimdilik bunu yalnız sen göreceksin. Günü bitince gece yarısı kendiliğinden kalkar.', more_english: 'For now only you will see this. It comes down by itself at midnight after its day.' },
+    'plan.reach.nq':       { default: 'Günü bitince gece yarısı kendiliğinden kalkar.', more_english: 'It comes down by itself at midnight after its day.' },
+    'plan.send.petek2':    { default: 'Peteğimin peteğine duyur', more_english: "Tell my petek's petek" },
+    'plan.send.istanbul':  { default: 'İstanbul’a duyur',     more_english: 'Tell İstanbul' },
+    'plan.edit.narrow':    { default: 'Kimin göreceğini daraltırsan, artık göremeyenlerin cevabı silinir.', more_english: 'If you narrow who sees it, the answers of the people who no longer can are cleared.' },
+    'plan.yours.petek2':   { default: 'SENİN PLANIN · PETEĞİNİN PETEĞİ GÖRÜYOR', more_english: "YOUR PLAN · YOUR PETEK'S PETEK SEES IT" },
+    'plan.yours.istanbul': { default: 'SENİN PLANIN · İSTANBUL GÖRÜYOR', more_english: 'YOUR PLAN · İSTANBUL SEES IT' },
+    'plan.sees.petek':     { default: 'Peteğin görüyor',      more_english: 'Your petek sees it' },
+    'plan.sees.petek2':    { default: 'Peteğinin peteği görüyor', more_english: "Your petek's petek sees it" },
+    'plan.sees.istanbul':  { default: 'İstanbul görüyor',     more_english: 'İstanbul sees it' },
+    'plan.frompetek2':     { default: 'PETEĞİNİN PETEĞİNDEN', more_english: "FROM YOUR PETEK'S PETEK" },
+    'plan.fromistanbul':   { default: 'BÜYÜK PETEKTEN',       more_english: 'FROM THE BIG PETEK' },
     // Haberler's three fixed category slots (project.html), same object
     // as a Dünya story's own kicker on the parts-bin pages.
     'news.istanbul':       { default: 'İSTANBUL',              more_english: 'ISTANBUL' },
