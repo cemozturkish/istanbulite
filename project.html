@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=9"></script>
   <script src="router.js?v=15"></script>
-  <script src="i18n.js?v=34"></script>
+  <script src="i18n.js?v=35"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=5"></script>
   <!-- The one typeface, asked for before the stylesheet that names it has
@@ -19,11 +19,11 @@
   <link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/inter-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="palette.css?v=17">
-  <link rel="stylesheet" href="ui.css?v=1">
+  <link rel="stylesheet" href="ui.css?v=2">
   <link rel="stylesheet" href="profile-card.css?v=68">
   <link rel="stylesheet" href="profile-bar.css?v=3">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=81" defer></script>
+  <script src="profile-card.js?v=82" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -1526,7 +1526,9 @@
     .fb-plan-two { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 8px; }
     .fb-plan-when { display: grid; gap: 8px; }
     .fb-plan-time { width: 9rem; }
+    .fb-plan-reach { margin-top: 2px; }
     .fb-plan-who { margin-top: 10px; }
+    .fb-plan-moved { margin-top: -2px; }
     .fb-plan-err { margin-top: 4px; }
     .fb-plan-err[hidden] { display: none; }
     .fb-plan-go { margin-top: 8px; }
@@ -1567,6 +1569,7 @@
     .fb-week-tx { min-width: 0; display: grid; gap: 2px; }
     .fb-week-tx b { font-size: 0.92rem; font-weight: 800; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .fb-week-tx i { font-style: normal; font-size: 0.72rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fb-week-tx .fb-week-sees { color: var(--ink); font-weight: 700; }
     .fb-week-st {
       display: grid; justify-items: end; gap: 3px;
       font-size: 0.6rem; font-weight: 800; letter-spacing: 0.12em;
@@ -4226,13 +4229,14 @@ const HOME_FILL_EVENT = HOME_RED;
 const HOME_FILL_PICK = 'var(--home-fill-pick, color-mix(in srgb, var(--ink) 62%, transparent))';
 
 let homeEventsPromise = null;
-let homeData = { events: [], plans: [], plansOpen: false, uid: null, going: new Set(), answered: new Map(), failed: false };
+let homeData = { events: [], plans: [], plansOpen: false, reachOpen: false, reachCounts: null, uid: null, going: new Set(), answered: new Map(), failed: false };
 let homeOpen = null;            // { kind, district, list, idx } while a card stands open
 let homeFriendFills = {};       // neighborhood -> fill, from the petek's map
 let homeEventDistrict = null;   // the open evening's district, painted red
 let homePickDistrict = null;    // the district of the member named on the bar
 let homeMeNb = null;            // the reader's own district, off the petek's map
 let homeAttached = 0;           // how many members are attached to the reader
+let homeBondedIds = new Set();  // and who they are, for a plan card's "from your petek"
 let homeBondKey = null;         // who they are, as last seen -- see homeFriendsFromMap
 
 // ── A MEMBER'S PLAN (db/events_v2_plans.sql) ──
@@ -4246,6 +4250,22 @@ let homeBondKey = null;         // who they are, as last seen -- see homeFriends
 // home screen never asks for anything older than today.
 // The upper bound is the server's, too: at most PLAN_MAX standing at once.
 const PLAN_MAX = 5;
+
+// ── HOW FAR A PLAN TRAVELS (db/events_v4_plan_reach.sql) ──
+// The three stops of the slider in the form, nearest first, counted in
+// BONDS: the members attached to the creator, those and the members
+// attached to them, and everybody joined to the creator by any chain of
+// bonds -- the big petek, which is what "İstanbul" means here, never
+// every member. The value is the row's own `reach`; null is 'petek',
+// which is what every plan written before the slider still is. A new
+// plan always starts on the nearest stop: being seen further is
+// something the reader pulls it out to, never something they inherit
+// from the last plan they wrote.
+const PLAN_REACH = ['petek', 'petek2', 'istanbul'];
+function planReachIndex(reach) {
+  const i = PLAN_REACH.indexOf(reach || 'petek');
+  return i < 0 ? 0 : i;
+}
 
 // Every district's own name, the 14 the hardcoded table never carried
 // included. NB_NAMES is the fallback until (or unless) this lands.
@@ -4329,6 +4349,26 @@ async function homePlanRows() {
   }
 }
 
+// How far each stop of the slider reaches for THIS reader: three counts,
+// no names (plan_reach_counts). It is also what says the slider exists at
+// all -- the function, the `reach` column and the wider fence arrive in
+// one migration, so a database that does not know the function
+// (PGRST202) has no slider and every plan stays on the petek, exactly as
+// it was. Any other failure leaves the slider up without its numbers.
+async function homePlanReach() {
+  try {
+    const { data, error } = await IstRouter.sb.rpc('plan_reach_counts');
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+    return { open: true, counts: row ? { petek: n(row.petek), petek2: n(row.petek2), istanbul: n(row.istanbul) } : null };
+  } catch (err) {
+    if (err && err.code === 'PGRST202') return { open: false, counts: null };
+    console.warn('[proje plan erişim]', err && (err.code || err.message));
+    return { open: true, counts: null };
+  }
+}
+
 // The week's evenings and the petek's plans, with each one's kefil and
 // where the reader already stands on them. One fetch, shared by the dots,
 // the card and the tour; dropped when the side renews, the language
@@ -4336,15 +4376,18 @@ async function homePlanRows() {
 function homeEventsData() {
   if (homeEventsPromise) return homeEventsPromise;
   homeEventsPromise = (async () => {
-    const out = { events: [], plans: [], plansOpen: false, uid: null, going: new Set(), answered: new Map(), failed: false };
-    const [city, plans, uid] = await Promise.all([
+    const out = { events: [], plans: [], plansOpen: false, reachOpen: false, reachCounts: null, uid: null, going: new Set(), answered: new Map(), failed: false };
+    const [city, plans, uid, reach] = await Promise.all([
       homeCityEvents().catch(err => { console.error('[proje ev]', err); out.failed = true; return []; }),
       homePlanRows(),
       doneUid().catch(() => null),
+      homePlanReach(),
     ]);
     out.events = city;
     out.plans = plans.rows;
     out.plansOpen = plans.open;
+    out.reachOpen = plans.open && reach.open;
+    out.reachCounts = reach.counts;
     out.uid = uid || null;
     out.plans.forEach(p => { p._plan = true; p._mine = !!uid && String(p.created_by) === String(uid); });
     const all = out.events.concat(out.plans);
@@ -4714,6 +4757,7 @@ function homeFriendsFromMap(detail) {
   if (detail && detail.meNb) homeMeNb = detail.meNb;
   const bonded = cells.filter(c => c && c.bonded);
   homeAttached = bonded.length;
+  homeBondedIds = new Set(bonded.map(c => String(c.member_id)));
   // And WHOSE plans the reader may see is those same attachments, so a
   // bond made since the plans were read (a code claimed on the petek in
   // front of them) has to bring the new neighbour's plans in now, not on
@@ -4933,6 +4977,20 @@ function markHomeDots() {
   });
 }
 
+// What a plan's card says about how it travelled. Somebody attached to
+// the reader is "from your petek" whatever the plan's reach; anybody
+// else reached them along it, which is all the page knows of the chain
+// between them (the database decided they may read it).
+function planFromKey(ev) {
+  if (homeBondedIds.has(String(ev.created_by))) return 'plan.frompetek';
+  const r = PLAN_REACH[planReachIndex(ev.reach)];
+  return r === 'petek2' ? 'plan.frompetek2' : r === 'istanbul' ? 'plan.fromistanbul' : 'plan.frompetek';
+}
+function planYoursKey(ev) {
+  const r = PLAN_REACH[planReachIndex(ev.reach)];
+  return r === 'petek' ? 'plan.yours' : 'plan.yours.' + r;
+}
+
 // ── The card ──
 // `kind` is which marker was pressed: 'c' a city evening, 'p' a plan.
 // `id`, when given, opens on that one rather than the first in the stack.
@@ -4974,11 +5032,12 @@ function renderHomeCard(paint) {
   // words, and where it is (the place they named) is its second line.
   const desc = ev._plan ? (ev.location || '') : (newsText(ev, 'description') || '');
   // Who stands behind it: the admin's assigned kefil for a city evening;
-  // for a plan, its creator -- named as coming from the reader's petek,
-  // or, on the creator's own card, said back to them as theirs.
+  // for a plan, its creator -- named by how they reached the reader (one
+  // of their own petek, or further out along the plan's reach), or, on
+  // the creator's own card, said back to them with how far it travels.
   const kef = ev._plan
-    ? (ev._mine ? esc(tEv('plan.yours'))
-                : eventKefilHTML(ev._kefil, 'plan.kefil') + ' · ' + esc(tEv('plan.frompetek')))
+    ? (ev._mine ? esc(tEv(planYoursKey(ev)))
+                : eventKefilHTML(ev._kefil, 'plan.kefil') + ' · ' + esc(tEv(planFromKey(ev))))
     : eventKefilHTML(ev._kefil);
   // The creator cannot say whether they are going to their own plan --
   // they said so by putting it up. What they can do is change it
@@ -5265,10 +5324,123 @@ function planDistrictOptions(names, selected) {
     .map(id => '<option value="' + esc(id) + '"' + (id === selected ? ' selected' : '') + '>' + esc(names[id]) + '</option>')
     .join('');
 }
-function planWhoLine() {
-  const n = homeAttached;
-  if (!n) return esc(tEv('plan.who0'));
-  return esc(tEv('plan.who')).replace('{n}', '<b>' + n + '</b>');
+// Who will see the plan. Without the slider (a database that predates
+// db/events_v4_plan_reach.sql) it is the one ring it always was; with it,
+// what the stop means and how many it reaches for this reader -- the
+// nearest stop falling back to the petek's own count while the numbers
+// are not in, and the two further ones saying no number rather than a
+// wrong one.
+function planWhoLine(idx) {
+  if (!homeData.reachOpen) {
+    const n = homeAttached;
+    if (!n) return esc(tEv('plan.who0'));
+    return esc(tEv('plan.who')).replace('{n}', '<b>' + n + '</b>');
+  }
+  const r = PLAN_REACH[idx] || 'petek';
+  const counts = homeData.reachCounts;
+  let n = counts && Number.isFinite(counts[r]) ? counts[r] : null;
+  if (n == null && r === 'petek') n = homeAttached;
+  const say = esc(tEv('plan.reach.say.' + r));
+  if (n == null) return say + ' ' + esc(tEv('plan.reach.nq'));
+  if (!n) return say + ' ' + esc(tEv('plan.reach.n0'));
+  return say + ' ' + esc(tEv('plan.reach.n')).replace('{n}', '<b>' + n + '</b>');
+}
+function planSendKey(idx) {
+  const r = PLAN_REACH[idx] || 'petek';
+  return r === 'petek' ? 'plan.send' : 'plan.send.' + r;
+}
+
+// ── A slider of stops (ui.css's .ui-stops) ──
+// Dragged, pressed near a stop, or walked with the arrow keys. A press
+// that turns into a vertical move is the sheet's scroll and changes
+// nothing (touch-action: pan-y hands it to the page, and a value is only
+// taken once the move is clearly sideways or the finger lifts where it
+// went down). While it is dragged the thumb follows the finger and the
+// nearest stop is taken live -- onInput fires each time it changes, so
+// what the form says about it moves with the thumb -- and on release it
+// settles onto that stop.
+function stopsHTML(names, idx, { id, cls, labelId }) {
+  const n = names.length;
+  return '<div class="ui-stops' + (cls ? ' ' + cls : '') + '" id="' + id + '" role="slider" tabindex="0" aria-labelledby="' + labelId + '"' +
+      ' aria-valuemin="0" aria-valuemax="' + (n - 1) + '" aria-valuenow="' + idx + '"' +
+      ' aria-valuetext="' + esc(names[idx]) + '" data-value="' + idx + '"' +
+      ' style="--ui-stops-n: ' + n + '; --ui-stops-at: ' + idx + '">' +
+    '<div class="ui-stops-rail" aria-hidden="true"><i class="ui-stops-fill"></i>' +
+      names.map((_, i) => '<i class="ui-stops-tick' + (i <= idx ? ' on' : '') + '" style="--i: ' + i + '"></i>').join('') +
+      '<b class="ui-stops-thumb"></b></div>' +
+    '<div class="ui-stops-names" aria-hidden="true">' +
+      names.map((nm, i) => '<span class="ui-stops-name' + (i === idx ? ' on' : '') + '" style="--i: ' + i + '">' + esc(nm) + '</span>').join('') +
+    '</div>' +
+  '</div>';
+}
+function wireStops(el, names, onInput) {
+  if (!el) return;
+  const n = names.length;
+  const rail = el.querySelector('.ui-stops-rail');
+  const ticks = el.querySelectorAll('.ui-stops-tick');
+  const labels = el.querySelectorAll('.ui-stops-name');
+  let value = Number(el.dataset.value) || 0;
+  let press = null;
+  const clamp = (v) => Math.max(0, Math.min(n - 1, v));
+  const paint = (at) => {
+    el.style.setProperty('--ui-stops-at', String(at));
+    const v = Math.round(at);
+    ticks.forEach((t, i) => t.classList.toggle('on', i <= at + 0.001));
+    labels.forEach((l, i) => l.classList.toggle('on', i === v));
+  };
+  const take = (v) => {
+    v = clamp(v);
+    if (v === value) return;
+    value = v;
+    el.dataset.value = String(v);
+    el.setAttribute('aria-valuenow', String(v));
+    el.setAttribute('aria-valuetext', names[v]);
+    if (onInput) onInput(v);
+  };
+  const atX = (x) => {
+    const r = rail.getBoundingClientRect();
+    const pad = parseFloat(getComputedStyle(el).getPropertyValue('--ui-stops-pad')) || 15;
+    const span = Math.max(1, r.width - 2 * pad);
+    return clamp((x - r.left - pad) / span * (n - 1));
+  };
+  const settle = () => { el.classList.remove('ui-stops-drag'); paint(value); };
+  el.addEventListener('pointerdown', (e) => {
+    if (e.button != null && e.button > 0) return;
+    press = { id: e.pointerId, x: e.clientX, y: e.clientY, drag: false };
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!press || e.pointerId !== press.id) return;
+    if (!press.drag) {
+      const dx = Math.abs(e.clientX - press.x), dy = Math.abs(e.clientY - press.y);
+      if (dx < 5 || dx < dy) return;
+      press.drag = true;
+      el.classList.add('ui-stops-drag');
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+    const at = atX(e.clientX);
+    paint(at);
+    take(Math.round(at));
+  });
+  const end = (e, commit) => {
+    if (!press || e.pointerId !== press.id) return;
+    const wasDrag = press.drag;
+    press = null;
+    if (!wasDrag && commit) take(Math.round(atX(e.clientX)));
+    settle();
+  };
+  el.addEventListener('pointerup', (e) => end(e, true));
+  el.addEventListener('pointercancel', (e) => end(e, false));
+  el.addEventListener('keydown', (e) => {
+    const step = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 }[e.key];
+    let v = null;
+    if (step) v = value + step;
+    else if (e.key === 'Home') v = 0;
+    else if (e.key === 'End') v = n - 1;
+    if (v == null) return;
+    e.preventDefault();
+    take(v);
+    settle();
+  });
 }
 
 // ── BU HAFTAM: what the plan button opens ──
@@ -5318,13 +5490,17 @@ function renderPlanWeek() {
       today.map(ev => {
         const own = ev._plan && ev._mine;
         const where = nbName(ev.neighborhood) + (ev._plan && ev.location ? ' · ' + ev.location : '');
+        // A plan of the reader's own also says how far it travels, on a
+        // line of its own (the place line is cut short when it runs long).
+        const sees = own && homeData.reachOpen ? tEv('plan.sees.' + PLAN_REACH[planReachIndex(ev.reach)]) : '';
         const title = ev._plan ? ev.title : newsText(ev, 'title');
         const tag = own ? tEv('plan.week.mine') : tEv('plan.week.going');
         return '<button type="button" class="ui-box ui-foot ui-rail fb-week-row' + (own ? ' own' : '') + '"' +
           ' data-act="' + (own ? 'edit' : 'show') + '" data-id="' + esc(ev.id) + '"' +
           ' data-k="' + (ev._plan ? 'p' : 'c') + '" data-d="' + esc(ev.neighborhood || 'istanbul') + '">' +
           '<span class="fb-week-tm">' + esc(eventTimeOnly(ev.event_date)) + '</span>' +
-          '<span class="fb-week-tx"><b>' + esc(title) + '</b><i>' + esc(where) + '</i></span>' +
+          '<span class="fb-week-tx"><b>' + esc(title) + '</b><i>' + esc(where) + '</i>' +
+            (sees ? '<i class="fb-week-sees">' + esc(sees) + '</i>' : '') + '</span>' +
           '<span class="fb-week-st">' + esc(tag) + (own ? '<em>' + esc(tEv('plan.edit')) + ' ›</em>' : '') + '</span>' +
         '</button>';
       }).join('') +
@@ -5382,12 +5558,11 @@ function openPlanForm(ev, from, dayK) {
     let k = 0;
     for (let i = 0; i < HOME_DAYS; i++) if (IstDate.iso(i) === dayIso) k = i;
     d = { what: editing.title || '', nb: editing.neighborhood, place: editing.location || '',
-          day: k, time: eventTimeOnly(editing.event_date) };
+          day: k, time: eventTimeOnly(editing.event_date), reach: planReachIndex(editing.reach) };
   }
-  // A new plan opened from a day's rectangle has that day fixed and no day
-  // chips; editing keeps the chips so a plan can still be moved.
-  const fixedDay = !editing && Number.isInteger(dayK) ? Math.min(dayK, HOME_DAYS - 1) : null;
-  const day = fixedDay !== null ? fixedDay : (Number.isInteger(d.day) ? Math.min(d.day, HOME_DAYS - 1) : 0);
+  const day = Number.isInteger(d.day) ? Math.min(d.day, HOME_DAYS - 1) : 0;
+  const reach = Number.isInteger(d.reach) ? Math.max(0, Math.min(d.reach, PLAN_REACH.length - 1)) : 0;
+  const reachNames = PLAN_REACH.map(r => tEv('plan.reach.' + r));
   const nb = d.nb || homeMeNb || 'kadikoy';
   const full = !editing && homeMyPlanCount() >= PLAN_MAX;
   const days = Array.from({ length: HOME_DAYS }, (_, k) =>
@@ -5415,11 +5590,19 @@ function openPlanForm(ev, from, dayK) {
         '<input class="ui-field fb-plan-time" id="fb-plan-time" type="time" step="300" required' +
           ' aria-label="' + esc(tEv('plan.time')) + '" value="' + esc(d.time || planDefaultTime(day)) + '">' +
       '</div>' +
-      '<p class="ui-note fb-plan-who">' + (editing ? esc(tEv('plan.edit.moved')) : planWhoLine()) + '</p>' +
+      (homeData.reachOpen
+        ? '<div class="ui-label fb-plan-lab" id="fb-plan-reach-lab">' + esc(tEv('plan.reach')) + '</div>' +
+          stopsHTML(reachNames, reach, { id: 'fb-plan-reach', cls: 'fb-plan-reach', labelId: 'fb-plan-reach-lab' })
+        : '') +
+      '<p class="ui-note fb-plan-who" id="fb-plan-who">' +
+        (editing && !homeData.reachOpen ? esc(tEv('plan.edit.moved')) : planWhoLine(reach)) + '</p>' +
+      (editing && homeData.reachOpen
+        ? '<p class="ui-note fb-plan-moved">' + esc(tEv('plan.edit.moved')) + ' ' + esc(tEv('plan.edit.narrow')) + '</p>'
+        : '') +
       '<p class="ui-note ui-err fb-plan-err" id="fb-plan-err" role="alert"' + (full ? '' : ' hidden') + '>' +
         (full ? esc(tEv('plan.err.full')) : '') + '</p>' +
       '<button type="submit" class="ui-btn ui-block fb-plan-go" id="fb-plan-go"' + (full ? ' disabled' : '') + '>' +
-        esc(tEv(editing ? 'plan.save' : 'plan.send')) + '</button>' +
+        esc(tEv(editing ? 'plan.save' : planSendKey(reach))) + '</button>' +
     '</form>';
   const sheetBody = body.closest('.ist-sheet-body') || body;
   sheetBody.scrollTop = 0;
@@ -5442,6 +5625,14 @@ function openPlanForm(ev, from, dayK) {
   const time = form.querySelector('#fb-plan-time');
   if (time) time.addEventListener('input', () => { time.dataset.touched = '1'; });
   if (d.time && time) time.dataset.touched = '1';
+  // Pulling the plan further out says, as it goes, who that is and how
+  // many -- and a new plan's button says where it is being sent.
+  wireStops(form.querySelector('#fb-plan-reach'), reachNames, (v) => {
+    const who = form.querySelector('#fb-plan-who');
+    if (who) who.innerHTML = planWhoLine(v);
+    const go = form.querySelector('#fb-plan-go');
+    if (go && !planEditing && !go.disabled) go.textContent = tEv(planSendKey(v));
+  });
   form.addEventListener('submit', submitPlan);
   // The district list may still be the 25 the page carries; the other 14
   // are put in the moment the table lands, keeping whatever was picked.
@@ -5467,7 +5658,9 @@ function readPlanForm() {
   if (!form) return null;
   const on = form.querySelector('[data-day].on');
   const time = form.querySelector('#fb-plan-time');
+  const reach = form.querySelector('#fb-plan-reach');
   return {
+    reach: reach ? Number(reach.dataset.value) || 0 : 0,
     what: (form.querySelector('#fb-plan-what') || {}).value || '',
     nb: (form.querySelector('#fb-plan-nb') || {}).value || '',
     place: (form.querySelector('#fb-plan-place') || {}).value || '',
@@ -5537,6 +5730,10 @@ async function submitPlan(e) {
     location: v.place.trim() || null,
     event_date: at.toISOString(),
   };
+  // Only where the slider was shown: a database without the column would
+  // refuse the whole row for it, and an edit made without the slider
+  // leaves the plan's reach as it stands.
+  if (homeData.reachOpen) row.reach = PLAN_REACH[v.reach] || 'petek';
   let id = editing ? editing.id : null;
   try {
     if (editing) {
@@ -5555,7 +5752,7 @@ async function submitPlan(e) {
   } catch (err) {
     console.error('[proje plan]', err);
     go.disabled = false;
-    go.textContent = tEv(editing ? 'plan.save' : 'plan.send');
+    go.textContent = tEv(editing ? 'plan.save' : planSendKey(v.reach));
     say(null, planErrorText(err));
     return;
   }
