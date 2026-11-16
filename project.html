@@ -1564,7 +1564,7 @@
     .fb-week .fb-plan-h { text-transform: uppercase; margin: 0; }
     .fb-week-day {
       position: relative; flex: 1 1 auto; min-height: min-content;
-      display: flex; flex-direction: column; justify-content: center; gap: 6px;
+      display: flex; flex-direction: column; justify-content: flex-start; gap: 6px;
       padding: 8px 12px; border: 2px solid var(--ink);
       background: color-mix(in srgb, var(--ink) 9%, transparent);
     }
@@ -1573,7 +1573,10 @@
       background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent;
     }
     .fb-week-hit:active { background: color-mix(in srgb, var(--ink) 10%, transparent); }
-    .fb-week-dh { position: relative; margin: 0; pointer-events: none; }
+    .fb-week-dh {
+      position: relative; margin: 0; pointer-events: none;
+      display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    }
     .fb-week-row { position: relative; z-index: 1; }
     .fb-plan-fixed { font-size: 0.95rem; font-weight: 800; padding: 6px 0; }
     .fb-week-day.none { border: 2px dashed var(--ink); }
@@ -5333,6 +5336,11 @@ const PLAN_WD = {
   tr: ['PZR', 'PZT', 'SAL', 'ÇRŞ', 'PRŞ', 'CUM', 'CMT'],
   en: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'],
 };
+// The week list has the room for the whole name; the form's chips do not.
+const PLAN_WD_FULL = {
+  tr: ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'],
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+};
 function planEnglish() { return !!(window.I18N && I18N.isEnglish && I18N.isEnglish()); }
 // Today, tomorrow, then the weekday -- exactly the days the map shows.
 // The weekday is arithmetic on the İstanbul date's own numbers, never a
@@ -5498,11 +5506,20 @@ function planWeekRows() {
     .filter(ev => (ev._plan && ev._mine) || homeData.going.has(ev.id))
     .sort((a, b) => new Date(a.event_date) - new Date(b.event_date));
 }
-function planWeekDayHead(k) {
+// A day's box names the day in its top-left corner -- spelled out, never
+// the chip's abbreviation -- and its date in the top-right one.
+function planWeekDayName(k) {
+  if (k === 0 || k === 1) return planDayLabel(k);
+  const [y, m, d] = IstDate.iso(k).split('-').map(Number);
+  return PLAN_WD_FULL[planEnglish() ? 'en' : 'tr'][new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+}
+function planWeekDayDate(k) {
   const loc = planEnglish() ? 'en-GB' : 'tr-TR';
   const noon = new Date(IstDate.iso(k) + 'T12:00:00+03:00');
-  const date = noon.toLocaleDateString(loc, { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long' });
-  return planDayLabel(k) + ' · ' + date;
+  return noon.toLocaleDateString(loc, { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long' });
+}
+function planWeekDayHead(k) {
+  return planWeekDayName(k) + ' · ' + planWeekDayDate(k);
 }
 function renderPlanWeek() {
   const body = document.getElementById('fb-plan-body');
@@ -5519,7 +5536,8 @@ function renderPlanWeek() {
     // day, so the form never has to ask which day it is.
     html += '<section class="fb-week-day' + (k === 0 ? ' t' : '') + (today.length ? '' : ' none') + '" data-k="' + k + '">' +
       ('<button type="button" class="fb-week-hit" data-k="' + k + '" aria-label="' + esc(planWeekDayHead(k)) + '"></button>') +
-      '<h3 class="ui-label ui-quiet fb-week-dh">' + esc(planWeekDayHead(k)) + '</h3>' +
+      '<h3 class="ui-label ui-quiet fb-week-dh"><span>' + esc(planWeekDayName(k)) + '</span>' +
+        '<span>' + esc(planWeekDayDate(k)) + '</span></h3>' +
       today.map(ev => {
         const own = ev._plan && ev._mine;
         const where = nbName(ev.neighborhood) + (ev._plan && ev.location ? ' · ' + ev.location : '');
