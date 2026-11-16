@@ -1090,12 +1090,13 @@
        gray band between the two black lines of its own drawn border, cut
        out of the drawing as its own shape (data-rim, written by
        scripts/derive-mobile-map-svg.py). The black lines are the drawing
-       and stay black. Only while the fill IS red (fb-rim-on), so the dark
-       gray of a member's district never wears a red rim; it steps back
-       with its face while another district is in focus. */
+       and stay black. A gray district (the member named on the bar, the
+       reader's own, a friend's) gets a darker gray rim the same way,
+       written inline by paintHomeDistricts; only a red rim (fb-rim-ev)
+       steps back with its face while another district is in focus. */
     .fb-districts [data-rim] { fill: transparent; }
-    .fb-districts [data-rim].fb-rim-on { fill: color-mix(in srgb, var(--fb-home-red, #B93631) 72%, black); }
-    .fb-districts.fb-dist-focusing [data-rim].fb-rim-on:not(.fb-rim-focus) { fill-opacity: 0.38; }
+    .fb-districts [data-rim].fb-rim-ev { fill: color-mix(in srgb, var(--fb-home-red, #B93631) 72%, black); }
+    .fb-districts.fb-dist-focusing [data-rim].fb-rim-ev:not(.fb-rim-focus) { fill-opacity: 0.38; }
     .fb-districts.fb-dist-focusing .fb-dist-ev:not(.fb-dist-focus) { fill-opacity: 0.38; }
     .fb-districts .fb-dist-focus { animation: fb-dist-breathe 1.9s ease-in-out infinite; }
     @keyframes fb-dist-breathe { 0%, 100% { fill-opacity: 1; } 50% { fill-opacity: 0.62; } }
@@ -4706,10 +4707,18 @@ async function paintHomeDistricts() {
   });
   // The rims carry data-rim and nothing districtKeyOf reads, so the loop
   // above leaves them transparent; they are lit here, only where red.
+  // Every lit district wears its rim a step darker than its own fill --
+  // red for an evening, and the grays (the member named on the bar, the
+  // reader's own, a friend's) a dark gray of their own, so a highlighted
+  // district's border is highlighted with it.
   layer.querySelectorAll('[data-rim]').forEach(el => {
     const k = el.getAttribute('data-rim');
-    el.classList.toggle('fb-rim-on', fills[k] === HOME_RED);
+    const f = fills[k];
+    const red = f === HOME_RED;
+    el.classList.toggle('fb-rim-on', !!f);
+    el.classList.toggle('fb-rim-ev', red);
     el.classList.toggle('fb-rim-focus', focus.has(k));
+    el.style.fill = f && !red ? `color-mix(in srgb, ${f} 55%, black)` : '';
   });
   layer.classList.toggle('fb-dist-focusing', focus.size > 0);
   const any = Object.keys(fills).length > 0;
