@@ -43,6 +43,7 @@
   <link rel="stylesheet" href="palette.css?v=17">
   <link rel="stylesheet" href="ui.css?v=2">
   <script src="game-locks.js?v=4" defer></script>
+  <script src="game-help.js?v=1" data-game="sozcel" defer></script>
   <link rel="stylesheet" href="profile-card.css?v=68">
   <link rel="stylesheet" href="profile-bar.css?v=3" media="(max-width: 768px)">
   <script src="profile-card.js?v=82" defer></script>
@@ -901,29 +902,24 @@
       --ist-hive-page-pad: 4px;
     }
 
-    /* Help popup reuses the result-overlay styling but with body text */
-    .help-body {
-      text-align: left;
-      font-size: 0.82rem;
-      line-height: 1.55;
-      color: var(--ink);
-      margin-bottom: 16px;
+    /* The game's name on the floating buttons' own line, centred between
+       the back arrow on the left and the controls on the right -- the
+       same line, label and red Güncel prints its name in. Only inside
+       the app's game sheet (the only way a game is ever opened); it
+       stands in the row the board already keeps clear (52px of panel
+       padding), so nothing about the board's layout moves for it. */
+    .sz-title { display: none; }
+    body.embedded-game .sz-title {
+      display: block;
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      line-height: 38px;
+      z-index: 150;
+      pointer-events: none;
+      white-space: nowrap;
     }
-    .help-body p { margin-bottom: 10px; }
-    .help-body .swatch {
-      display: inline-block;
-      width: 14px;
-      height: 14px;
-      vertical-align: -2px;
-      margin-right: 6px;
-      border: 1px solid var(--rule);
-    }
-    .help-body .swatch.correct { background: var(--tile-correct); border-color: var(--tile-correct); }
-    .help-body .swatch.present { background: var(--tile-present); border-color: var(--tile-present); }
-    /* Empty, not paper-coloured: the help sheet stands on --paper-card, so
-       a --paper swatch was a faintly wrong-coloured square where the board
-       now shows nothing at all. */
-    .help-body .swatch.absent { background: transparent; border-color: var(--tile-absent-ink); opacity: 0.5; }
 
     /* The board's own row. It used to pair a vertical attempt list on the
        left with the syllable skeleton on the right; the pips have moved
@@ -2061,6 +2057,8 @@
         });
       }
     </script>
+    <!-- The game's name, on the buttons' own line, the way Güncel prints it. -->
+    <div class="sz-title ui-label" aria-hidden="true">Sözcel</div>
     <div class="game-controls-left" id="game-controls-left">
       <button class="game-ctrl-btn icon-btn" id="mobile-score-btn" type="button" aria-label="Skor Tablosu" title="Skor Tablosu"><img class="ctrl-icon" src="assets/ranking.png" alt=""></button>
     </div>
@@ -2131,25 +2129,6 @@
     </div>
   </div>
   <div class="share-toast" id="share-toast"></div>
-
-  <!-- How-to-play popup -->
-  <div class="result-overlay" id="help-overlay">
-    <div class="result-card">
-      <button class="result-close" id="help-close" type="button" aria-label="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
-      <div class="result-title" style="margin-bottom:14px;" data-i18n="games.howto">Nasıl Oynanır</div>
-      <div class="help-body">
-        <p data-i18n="sozcel.help.intro">Gizli Türkçe sözcüğü <strong>altı denemede</strong> bulun. Sözcük, hecelerine ayrılmış petek düzeninde gösterilir — her hece bir alt basamakta başlar. Doğru yerde bulduğun bir harf kutusuna kilitlenir ve sonraki denemelerde öyle kalır; sen sadece kalan harfleri girersin.</p>
-        <p data-i18n="sozcel.help.hints">Zorlanırsan yalnız değilsin: 2. yanlış tahminden sonra kelimenin kökeninin dili, 4. yanlıştan sonra sözcük türü (isim, sıfat…), 5. yanlıştan sonra da o günün Sözcüsünün kelimeye verdiği anlam ipucu olarak gösterilir.</p>
-        <p data-i18n="sozcel.help.colors">Her tahminin ardından kutular renklenir:</p>
-        <p>
-          <span class="swatch correct"></span> <span data-i18n="sozcel.help.green2">Harf doğru ve doğru yerde.</span><br>
-          <span class="swatch present"></span> <span data-i18n="sozcel.help.yellow2">Harf sözcükte var ama yanlış yerde.</span><br>
-          <span class="swatch absent"></span> <span data-i18n="sozcel.help.gray2">Harf sözcükte yok.</span>
-        </p>
-        <p data-i18n="sozcel.help.daily">Her gün yeni bir sözcük gelir. Türkçe <strong>İ/I</strong> ayrımına dikkat edin.</p>
-      </div>
-    </div>
-  </div>
 
   <!-- Mobile scoreboard popup -->
   <div class="result-overlay" id="score-mobile-overlay">
@@ -5543,27 +5522,15 @@ function showShareToast(msg) {
   });
 })();
 
-// ── Top-right share + help buttons ──
+// ── Top-right share button ──
 (function initTopControls() {
   const shareBtn = document.getElementById('share-btn');
   if (shareBtn) shareBtn.addEventListener('click', () => {
     if (shareBtn.disabled) return;
     showResultPopup(lastResultWon);
   });
-  const helpOverlay = document.getElementById('help-overlay');
-  const helpBtn = document.getElementById('help-btn');
-  const helpClose = document.getElementById('help-close');
-  if (helpBtn && helpOverlay) {
-    helpBtn.addEventListener('click', () => helpOverlay.classList.add('open'));
-  }
-  if (helpClose && helpOverlay) {
-    helpClose.addEventListener('click', () => helpOverlay.classList.remove('open'));
-  }
-  if (helpOverlay) {
-    helpOverlay.addEventListener('click', (e) => {
-      if (e.target === helpOverlay) helpOverlay.classList.remove('open');
-    });
-  }
+  // The help button (#help-btn) is wired by game-help.js: one page that
+  // describes all four games, Sözcel first.
 })();
 
 // ── Mobile top-left button: scoreboard ──
