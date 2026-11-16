@@ -736,6 +736,25 @@ sb.from('articles').delete().eq('id', id)
   the account stays), `admin_hive_unbond` (ignores the week lock members are held to) and
   `admin_hive_dissolve_map`. A removal that cuts a petek in two gives each piece a map of its
   own (`hive_resplit_map`), so what members see stays the truth about who is connected.
+  - **Every petek is DRAWN on its card, and a member is moved by holding their hexagon and
+    dragging it** (`pkSetup` / `pkRender` / `pkWire`, `admin_hive_move` in
+    `db/admin_hive_v2_move.sql`). Dropped on an empty place touching the petek, the member
+    moves there; dropped on another member, the two swap. **The bonds follow the drawing**:
+    a moved member is attached to everybody it now stands beside, a bond whose two ends are
+    no longer side by side breaks, two members either of whom blocked the other are never
+    attached (`hive_pair_blocked`), and whoever is left holding no bond steps off
+    (`hive_tidy_map`). A drop where nobody would stand beside the member is refused
+    (`alone`) — "Petekten çıkar" is the way to do that on purpose.
+  - **Nothing is written until the drop is confirmed.** While a hexagon is held, the card
+    draws the petek as the drop would leave it — new bonds in red, members who would fall off
+    dashed — and says it in words under the drawing (`pkOutcome` restates the server's rule
+    only to preview it; blocks are the one thing it cannot know, so the desk re-reads after
+    every move).
+  - A finger must HOLD (`PK_HOLD_MS`) before the hexagon lifts, so a swipe over the drawing
+    still scrolls the desk; a mouse may also simply start dragging. Once lifted the page must
+    not scroll, and on iOS that needs the `touchmove` blocker on **the touch's own target**:
+    a redraw takes that element out of the document, and a detached node's touch events no
+    longer reach a listener on the svg.
 - **RENKLER — the admin changes any colour on the site, on the app itself**
   (`#colors-tab`, the `clr*` functions; `db/site_palette.sql`; palette.js's override layer).
   - **The phone is the live app**: `project.html` in an iframe laid out at 390×844 and SCALED

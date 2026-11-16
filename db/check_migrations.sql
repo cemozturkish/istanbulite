@@ -229,7 +229,14 @@ with checks(sira, dosya, aranan, var) as (
 
     -- ── Kasım: yöneticinin renkleri ──
     (51, 'db/site_palette.sql',                       'site_palette tablosu (Renkler)',
-         to_regclass('public.site_palette') is not null)
+         to_regclass('public.site_palette') is not null),
+
+    -- ── Kasım: yöneticinin peteği ──
+    (55, 'db/admin_hive.sql',                         'yönetici peteği okur/düzenler (admin_hive_*)',
+         pg_temp.has_fn('admin_hive_cells')
+         and to_regprocedure('public.admin_hive_unbond(uuid,uuid)') is not null),
+    (56, 'db/admin_hive_v2_move.sql',                 'yönetici petekte üyeyi sürükleyip taşır (admin_hive_move)',
+         to_regprocedure('public.admin_hive_move(uuid,integer,integer)') is not null)
 )
 select
   case when var then '✓ VAR' else '✗ EKSİK' end as durum,

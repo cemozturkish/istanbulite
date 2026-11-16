@@ -54,7 +54,7 @@ kurarken yine de sırayla gerekir.
 | Oyunlar | `game_results` → **`game_results_v2_guesses`**; `game_day_toggles`, `sozcel_sozcul_assignments`, `tumcel_puzzles`, `tumcel_quote_suggestions` → `tumcel_quote_suggestions_v2_category`, `quotes`; ayrıca `daily_questions` → **`daily_questions_v2_drop`** (oyunlar arası soru/kilit kaldırıldı — bkz. `neighborhood_polls`) |
 | Öneri havuzu | `sozcel_word_suggestions` → **`sozcel_word_suggestions_v2_standing_pool`** (öneri bir geceye değil havuza yapılır: seçilene ya da üye geri alana kadar durur) |
 | Sözcel'in günün kelimesi | `sozcel_used_answers` → `_v2` → `_v3_fix_insert_rls` → `_v4_syllables` → `_v5_server_pick` → **`_v6_admin_override`** |
-| Petek | `hive_slots` → `hive_slots_v2_sunday_week` → `hive_slots_v3_mutual_permanent` → `hive_lattice_v4` → **`hive_slot_codes_v5`** |
+| Petek | `hive_slots` → `hive_slots_v2_sunday_week` → `hive_slots_v3_mutual_permanent` → `hive_lattice_v4` → **`hive_slot_codes_v5`**; yönetici için `admin_hive` → `admin_hive_v2_move` (admin.html → Petek'te üyeyi basılı tutup sürükleyerek taşımak/yer değiştirmek; taşınan üye yeni yanındakilere bağlanır, yanında olmadığı kişilerle bağı kopar) |
 
 ## Petek zinciri hakkında bir not
 
