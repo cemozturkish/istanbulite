@@ -1981,6 +1981,18 @@
       .map(w => `<span class="ist-hive-w">${esc(w)}</span>`).join(' ');
   }
 
+  // A name is never more than two lines: the given names on the first
+  // (one unbreakable run, shrunk by fitHiveWords if it is wider than the
+  // track), the surname on the second. Three words on three lines stood
+  // the label so tall that, centred on its hexagon, its top reached up
+  // into the cell above it.
+  function hiveNameLinesHTML(text) {
+    const words = String(text || '').split(/\s+/).filter(Boolean);
+    if (words.length <= 2) return hiveWordsHTML(words.join(' '));
+    return `<span class="ist-hive-w">${esc(words.slice(0, -1).join(' '))}</span> `
+      + `<span class="ist-hive-w">${esc(words[words.length - 1])}</span>`;
+  }
+
   // Shrinks every word wider than its name's track to exactly fit it. In
   // em, against the name's own size, so the answer holds at any scale the
   // plane is drawn at (the plane is one transform; layout px are untouched
@@ -2021,7 +2033,7 @@
     // and the district steps aside for it.
     return `
       <span class="ist-hive-name ist-hive-name-${side}">
-        <span class="ist-hive-name-label">${hiveWordsHTML(hiveMemberName(member))}</span>
+        <span class="ist-hive-name-label">${hiveNameLinesHTML(hiveMemberName(member))}</span>
         ${sub}<span class="ist-hive-name-ev"></span>
       </span>`;
   }
