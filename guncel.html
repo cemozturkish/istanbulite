@@ -314,6 +314,7 @@ let puzzle = null;      // { puzzle_date, cards: [{ text, text_en, date }] }
 let order = [];         // card indices in the order this reader sees them
 let picks = [];         // card indices pressed, in the order pressed
 let over = false;
+let recorded = false;   // whether this board's completion row is known to be in game_results
 let userNeighborhood = null;
 
 const $ = (id) => document.getElementById(id);
@@ -505,8 +506,12 @@ async function press(i) {
         '<small>' + esc(longDate(c.date)) + '</small>',
       !right);
   }
+  // The result goes first, then the board: saved finished but unrecorded,
+  // a sheet closed in between would reopen on a done board while the app
+  // (which reads game_results) still counts the game unplayed. The saved
+  // state carries whether the row landed, so a reopen retries if it did not.
+  if (over) recorded = await recordResult();
   await saveState();
-  if (over) await recordResult();
 }
 
 $('gn-grid').addEventListener('click', (e) => {
@@ -545,10 +550,17 @@ async function markStarted() {
   } catch (e) {}
 }
 
+// Idempotent: it may be run again on a reopen (see restoreState), so it
+// first asks whether this member already has a finished row for the day.
+// Answers whether the row is known to be there.
 async function recordResult() {
   try {
     const { data: { session } } = await gameStorage.session();
-    if (!session) return;
+    if (!session) return false;
+    const { data: had, error: hadErr } = await sb.from('game_results').select('id')
+      .eq('user_id', session.user.id).eq('game', GAME).eq('date', SEED)
+      .gte('attempts', 1).limit(1);
+    if (!hadErr && had && had.length) return true;
     const won = found() === answers().length;
     const row = {
       user_id: session.user.id, game: GAME, date: SEED,
@@ -558,13 +570,14 @@ async function recordResult() {
     let { error } = await sb.from('game_results').insert([row]);
     // A database without game_results_v2 has no `guesses` column; the
     // result itself matters more than the pattern.
-    if (error) { delete row.guesses; await sb.from('game_results').insert([row]); }
-  } catch (e) {}
+    if (error) { delete row.guesses; ({ error } = await sb.from('game_results').insert([row])); }
+    return !error;
+  } catch (e) { return false; }
 }
 
 // ── Saving the board ──
 async function saveState() {
-  const state = { order, picks, over };
+  const state = { order, picks, over, recorded };
   await gameStorage.set(SAVE_KEY, JSON.stringify(state));
   try {
     const { data: { session } } = await gameStorage.session();
@@ -598,6 +611,7 @@ async function restoreState() {
     order = s.order;
     picks = s.picks;
     over = !!s.over || found() === answers().length || mistakes() >= LIVES;
+    recorded = !!s.recorded;
     return true;
   } catch (e) { return false; }
 }
@@ -655,8 +669,14 @@ async function init() {
     order = shuffled(CARD_COUNT);
     picks = [];
     over = false;
+    recorded = false;
   }
   renderAll();
+  // A finished board whose result never reached game_results (the sheet
+  // was closed while it was being sent): send it now.
+  if (over && !recorded) {
+    recordResult().then(ok => { if (ok) { recorded = true; saveState(); } });
+  }
   if (!over) setStatus(esc(L('Dün olduğunu düşündüğün olaya bas.', 'Press an event you think happened yesterday.')));
 }
 
