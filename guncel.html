@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/favicon.png">
+  <meta charset="UTF-8">
+  <!-- A game is not a page: it is only ever opened inside project.html's own
+       overlay, so a top-level hit on this URL never renders and is replaced
+       by the app (see sozcel.html's "A GAME IS NOT A PAGE, AND THIS URL IS
+       NOT A DOOR" for the whole of why, and for why it is `replace` and why
+       it stands first in the head). Embedded it is a no-op. -->
+  <script>
+    if (window.self === window.top) location.replace('project.html');
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#2e2e2e">
+  <title>Güncel — istanbulite.net</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="ist-date.js?v=9"></script>
+  <script src="game-storage.js?v=1"></script>
+  <script src="i18n.js?v=35"></script>
+  <script src="map-ink.js?v=10"></script>
+  <script src="palette.js?v=5"></script>
+  <link rel="stylesheet" href="palette.css?v=17">
+  <link rel="stylesheet" href="ui.css?v=2">
+  <script src="game-locks.js?v=4" defer></script>
+  <link rel="stylesheet" href="frames.css?v=27">
+  <style>
+    /* ══════════════════════════════════════════════════════════════
+       GÜNCEL — "which of these happened yesterday?"
+
+       Sixteen events on a 4×4 board (db/guncel_puzzles.sql). A few of
+       them happened yesterday; the rest happened earlier. A press is the
+       answer, at once: a right one is inked and stamped DÜN, a wrong one
+       says when it really happened ("GEÇEN YIL") and costs one of four
+       lives. Find all of yesterday's before the lives run out.
+
+       Only ever opened inside project.html's game sheet, so this page
+       carries none of the parts-bin chrome the other three games still
+       hide behind body.embedded-game: the sheet is the window, and what
+       stands in it is the board.
+       ══════════════════════════════════════════════════════════════ */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      position: fixed;
+      touch-action: manipulation;
+    }
+    body {
+      font-family: var(--font-ui);
+      background: var(--paper);
+      color: var(--ink);
+    }
+
+    /* The same back arrow, inset and drawn size as the other three games
+       embedded (see sozcel.html's "ONE ROW, ONE LINE, ONE BOX SIZE"). */
+    .game-back-btn {
+      position: absolute;
+      top: 10px;
+      left: 14px;
+      z-index: 50;
+      width: 38px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+    }
+    .game-back-btn .back-icon { width: 30px; height: 30px; display: block; }
+    .game-back-btn:hover { opacity: 0.6; }
+
+    .gn-page {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px 14px 16px;
+      max-width: 620px;
+      margin: 0 auto;
+    }
+
+    .gn-head {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      flex: none;
+    }
+    /* The game's name stands on the back arrow's own line, so the
+       question under it starts as high as the page allows. */
+    .gn-head .ui-label { line-height: 38px; }
+    .gn-head .ui-h { font-size: 1.3rem; line-height: 1.2; }
+    .gn-meta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      min-height: 22px;
+    }
+    .gn-lives { display: flex; gap: 4px; }
+    .gn-lives span {
+      font-size: 1.05rem;
+      line-height: 1;
+      color: var(--ink-red);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .gn-lives span.lost { opacity: 0.18; transform: scale(0.85); }
+
+    /* ── The board ──
+       Four rows that share whatever the sheet leaves, so the board is
+       always the whole of the middle of the page and never scrolls: a
+       card's text is fitted to its card (fitCard), not the other way
+       round. */
+    .gn-grid {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-rows: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .gn-card {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      padding: 6px 5px;
+      background: var(--lit-hi, #fff);
+      color: var(--ink);
+      border: 2px solid var(--ink);
+      border-bottom-width: 5px;
+      font: inherit;
+      text-align: center;
+      cursor: pointer;
+      overflow: hidden;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: border-bottom-width 0.1s ease, transform 0.1s ease,
+                  background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+    /* The press, driven by pointer events rather than :active (which
+       sticks after a tap on iOS): the face sinks into its own foot. */
+    .gn-card.pressing { border-bottom-width: 2px; transform: translateY(3px); }
+    .gn-card:disabled { cursor: default; }
+    .gn-t {
+      flex: 0 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.22;
+      overflow-wrap: normal;
+      hyphens: manual;
+    }
+    /* Only when a word will not fit even at the smallest size is it
+       allowed to break (see fitCard): a word split in two is harder to
+       read than one set a size smaller. */
+    .gn-t.gn-break { overflow-wrap: anywhere; }
+    .gn-w {
+      display: none;
+      flex: none;
+      align-self: center;
+      font-size: 0.58rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      line-height: 1.15;
+      padding: 3px 4px 2px;
+      max-width: 100%;
+    }
+    .gn-card.gn-hit .gn-w,
+    .gn-card.gn-miss .gn-w,
+    .gn-card.gn-left .gn-w { display: block; }
+
+    /* Yesterday's, found: inked, and stamped with the day. */
+    .gn-card.gn-hit {
+      background: var(--ink);
+      color: var(--lit-hi, #fff);
+      border-color: var(--ink);
+    }
+    .gn-card.gn-hit .gn-w { background: var(--ink-red); color: #fff; }
+
+    /* A wrong press: the card steps back to the paper and says when the
+       thing really happened, in the red the stamp is printed in. */
+    .gn-card.gn-miss {
+      background: transparent;
+      color: var(--muted);
+      border-style: dashed;
+      border-color: var(--muted);
+      border-bottom-width: 2px;
+    }
+    .gn-card.gn-miss .gn-w { color: var(--ink-red); border: 1.5px solid var(--ink-red); }
+
+    /* Out of lives: what was yesterday's and was never found is shown,
+       ringed in red but not inked -- it is the answer, not a find. */
+    .gn-card.gn-left {
+      border-color: var(--ink-red);
+      border-bottom-width: 2px;
+    }
+    .gn-card.gn-left .gn-w { color: var(--ink-red); border: 1.5px solid var(--ink-red); }
+
+    /* Everything else, once the game is over, quiets down so the
+       answers are what the eye lands on. */
+    .gn-over .gn-card:not(.gn-hit):not(.gn-left):not(.gn-miss) { opacity: 0.45; }
+
+    @keyframes gn-shake {
+      0%, 100% { translate: 0 0; }
+      20% { translate: -5px 0; }
+      40% { translate: 5px 0; }
+      60% { translate: -4px 0; }
+      80% { translate: 4px 0; }
+    }
+    .gn-card.shake { animation: gn-shake 0.35s ease; }
+    @keyframes gn-pop {
+      0% { scale: 1; }
+      45% { scale: 1.06; }
+      100% { scale: 1; }
+    }
+    .gn-card.pop { animation: gn-pop 0.32s ease; }
+
+    .gn-foot {
+      flex: none;
+      min-height: 46px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+    }
+    .gn-status { font-size: 0.92rem; font-weight: 700; line-height: 1.3; }
+    .gn-status.bad { color: var(--ink-red); }
+    .gn-status small {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--muted);
+    }
+
+    /* A night with no board, or a game switched off: one dashed frame
+       in the middle of the page, the site's own "nothing here". */
+    .gn-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+    }
+    .gn-empty .ui-empty { max-width: 320px; }
+
+    @media (min-width: 769px) {
+      .gn-t { font-size: 14px; }
+      .gn-grid { gap: 8px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .gn-card.shake, .gn-card.pop { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <a href="project.html" class="game-back-btn" aria-label="Geri" title="Geri"><img class="back-icon" src="assets/back.png" alt=""></a>
+
+  <div class="gn-page" id="gn-page">
+    <header class="gn-head">
+      <div class="ui-label">Güncel</div>
+      <h1 class="ui-h" id="gn-q" lang="tr">Hangileri dün oldu?</h1>
+      <p class="ui-sub" id="gn-sub"></p>
+      <div class="gn-meta"><div class="gn-lives" id="gn-lives" aria-live="polite"></div></div>
+    </header>
+    <div class="gn-grid" id="gn-grid" role="group"></div>
+    <div class="gn-foot">
+      <div class="gn-status" id="gn-status" aria-live="polite"></div>
+      <div class="ui-note" id="gn-reset"></div>
+    </div>
+  </div>
+
+<script>
+// Closing is the parent's job: the page asks project.html to put its
+// sheet away rather than navigating this iframe anywhere.
+document.querySelector('.game-back-btn').addEventListener('click', (e) => {
+  if (window.self === window.top) return;
+  e.preventDefault();
+  parent.postMessage('ist-close-game-overlay', '*');
+});
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+
+const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
+const ADMIN_EMAIL = 'cemwozturk@gmail.com';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const gameStorage = IstGameStorage.create(sb);
+
+const GAME = 'guncel';
+const LIVES = 4;
+const CARD_COUNT = 16;
+
+// The day being played, in both shapes (see ist-date.js): the padded ISO
+// key is what guncel_puzzles.puzzle_date and every relative date below
+// are worked out against; the unpadded seed is what game_results.date,
+// game_state.date and the local save key are written in.
+const NIGHT = IstDate.gameNight();
+const SEED = IstDate.gameNightSeed();
+const SAVE_KEY = 'guncel_state_' + SEED;
+const STARTED_KEY = 'guncel_started_' + SEED;
+
+let puzzle = null;      // { puzzle_date, cards: [{ text, text_en, date }] }
+let order = [];         // card indices in the order this reader sees them
+let picks = [];         // card indices pressed, in the order pressed
+let over = false;
+let userNeighborhood = null;
+
+const $ = (id) => document.getElementById(id);
+const en = () => !!(window.I18N && I18N.isEnglish && I18N.isEnglish());
+const L = (tr, eng) => (en() ? eng : tr);
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// CSS uppercases by the element's language and the document is lang="tr",
+// so an English stamp is uppercased here rather than by the stylesheet.
+const upper = (s) => (en() ? s.toUpperCase() : s.toLocaleUpperCase('tr-TR'));
+
+// ── WHEN IT REALLY HAPPENED ──
+// Everything about a card's answer comes off its own date, measured from
+// the puzzle's day: whether it is an answer at all (yesterday, or the day
+// itself), and the words a wrong press is told. Day counts are taken in
+// UTC between two calendar dates, so no time zone can move them.
+function ymd(s) { const [y, m, d] = String(s).split('-').map(Number); return { y, m, d }; }
+function dayNumber(s) { const p = ymd(s); return Math.round(Date.UTC(p.y, p.m - 1, p.d) / 86400000); }
+
+function whenOf(cardDate) {
+  const days = dayNumber(NIGHT_DAY()) - dayNumber(cardDate);
+  const P = ymd(NIGHT_DAY()), E = ymd(cardDate);
+  if (days === 1) return { answer: true,  stamp: L('Dün', 'Yesterday'), phrase: L('dün', 'yesterday') };
+  if (days === 0) return { answer: true,  stamp: L('Bugün', 'Today'),   phrase: L('bugün', 'today') };
+  if (days < 0)   return { answer: false, stamp: L('İleride', 'Not yet'), phrase: L('henüz olmadı', "hasn't happened yet") };
+  if (days === 2) return { answer: false, stamp: L('Evvelsi gün', '2 days ago'), phrase: L('evvelsi gün', 'the day before yesterday') };
+  if (days <= 6)  return { answer: false, stamp: L(days + ' gün önce', days + ' days ago'), phrase: L(days + ' gün önce', days + ' days ago') };
+  if (days <= 13) return { answer: false, stamp: L('Geçen hafta', 'Last week'), phrase: L('geçen hafta', 'last week') };
+  if (days <= 30) {
+    const w = Math.floor(days / 7);
+    return { answer: false, stamp: L(w + ' hafta önce', w + ' weeks ago'), phrase: L(w + ' hafta önce', w + ' weeks ago') };
+  }
+  if (days < 365) {
+    const m = (P.y * 12 + P.m) - (E.y * 12 + E.m);
+    if (m <= 1) return { answer: false, stamp: L('Geçen ay', 'Last month'), phrase: L('geçen ay', 'last month') };
+    return { answer: false, stamp: L(m + ' ay önce', m + ' months ago'), phrase: L(m + ' ay önce', m + ' months ago') };
+  }
+  const y = P.y - E.y;
+  if (y <= 1) return { answer: false, stamp: L('Geçen yıl', 'Last year'), phrase: L('geçen yıl', 'last year') };
+  return { answer: false, stamp: L(y + ' yıl önce', y + ' years ago'), phrase: L(y + ' yıl önce', y + ' years ago') };
+}
+// The puzzle's own day, once it has loaded -- the row's date rather than
+// the clock's, so a board opened a minute before midnight is still
+// measured from the day it belongs to.
+function NIGHT_DAY() { return (puzzle && puzzle.puzzle_date) || NIGHT; }
+
+function longDate(s) {
+  const p = ymd(s);
+  return new Date(Date.UTC(p.y, p.m - 1, p.d)).toLocaleDateString(en() ? 'en-GB' : 'tr-TR',
+    { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+function isAnswer(i) { return whenOf(puzzle.cards[i].date).answer; }
+function answers() { return puzzle.cards.map((_, i) => i).filter(isAnswer); }
+function mistakes() { return picks.filter(i => !isAnswer(i)).length; }
+function found() { return picks.filter(isAnswer).length; }
+function cardText(c) { return (en() && c.text_en) ? c.text_en : c.text; }
+
+// "16 olaydan 4'ü" -- the Turkish suffix after a numeral follows how the
+// numeral is SAID, so it is looked up rather than built.
+const TR_OF = { 1: "1'i", 2: "2'si", 3: "3'ü", 4: "4'ü", 5: "5'i", 6: "6'sı", 7: "7'si", 8: "8'i", 9: "9'u", 10: "10'u" };
+
+function question() {
+  const ds = answers().map(i => dayNumber(NIGHT_DAY()) - dayNumber(puzzle.cards[i].date));
+  const today = ds.includes(0), yday = ds.includes(1);
+  if (today && yday) return L('Hangileri dün ya da bugün oldu?', 'Which of these happened yesterday or today?');
+  if (today) return L('Hangileri bugün oldu?', 'Which of these happened today?');
+  return L('Hangileri dün oldu?', 'Which of these happened yesterday?');
+}
+
+// ── Painting ──
+function renderLives() {
+  const lost = mistakes();
+  let html = '';
+  for (let i = 0; i < LIVES; i++) html += '<span' + (i < LIVES - lost ? '' : ' class="lost"') + '>♥</span>';
+  $('gn-lives').innerHTML = html;
+  $('gn-lives').setAttribute('aria-label', L((LIVES - lost) + ' can kaldı', (LIVES - lost) + ' lives left'));
+}
+
+function renderHead() {
+  const n = answers().length;
+  $('gn-q').textContent = question();
+  $('gn-q').lang = en() ? 'en' : 'tr';
+  $('gn-sub').textContent = L(
+    CARD_COUNT + ' olaydan ' + (TR_OF[n] || n) + ' · ' + found() + '/' + n + ' bulundu',
+    n + ' of these ' + CARD_COUNT + ' · ' + found() + '/' + n + ' found');
+}
+
+function cardState(i) {
+  if (picks.includes(i)) return isAnswer(i) ? 'gn-hit' : 'gn-miss';
+  if (over && isAnswer(i)) return 'gn-left';
+  return '';
+}
+
+function renderGrid() {
+  const grid = $('gn-grid');
+  grid.classList.toggle('gn-over', over);
+  grid.innerHTML = order.map(i => {
+    const c = puzzle.cards[i];
+    const st = cardState(i);
+    const w = whenOf(c.date);
+    return '<button type="button" class="gn-card ' + st + '" data-i="' + i + '"' +
+      ((st || over) ? ' disabled' : '') + ' lang="' + (en() && c.text_en ? 'en' : 'tr') + '">' +
+      '<span class="gn-t">' + esc(cardText(c)) + '</span>' +
+      '<span class="gn-w">' + esc(upper(w.stamp)) + '</span></button>';
+  }).join('');
+  requestAnimationFrame(fitAll);
+}
+
+// A card's text is fitted to its card: the largest size, stepping down,
+// at which every line stands inside the box. The board never scrolls.
+// A word wider than the card counts as not fitting too, so the size
+// steps down before any word is split; only a word too long for the
+// card even at the smallest size is let break.
+const FIT_MIN = 9;
+function fitCard(card) {
+  const t = card.querySelector('.gn-t');
+  if (!t) return;
+  const max = window.matchMedia('(min-width: 769px)').matches ? 14 : 13;
+  const over = () => card.scrollHeight > card.clientHeight + 1 ||
+    t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1;
+  t.classList.remove('gn-break');
+  let size = max;
+  t.style.fontSize = size + 'px';
+  while (size > FIT_MIN && over()) {
+    size -= 0.5;
+    t.style.fontSize = size + 'px';
+  }
+  if (over()) {
+    t.classList.add('gn-break');
+    size = max;
+    t.style.fontSize = size + 'px';
+    while (size > FIT_MIN && over()) {
+      size -= 0.5;
+      t.style.fontSize = size + 'px';
+    }
+  }
+}
+function fitAll() { document.querySelectorAll('.gn-card').forEach(fitCard); }
+let _fitT = null;
+window.addEventListener('resize', () => { clearTimeout(_fitT); _fitT = setTimeout(fitAll, 80); });
+
+function setStatus(html, bad) {
+  const el = $('gn-status');
+  el.innerHTML = html;
+  el.classList.toggle('bad', !!bad);
+}
+
+function paintOver() {
+  if (!over) { $('gn-reset').textContent = ''; return; }
+  const won = found() === answers().length;
+  setStatus(won
+    ? esc(L('Tebrikler! Hepsini buldun.', 'Well done! You found them all.')) +
+      '<small>' + esc(L(mistakes() ? mistakes() + ' yanlış' : 'Hiç yanlış yok', mistakes() ? mistakes() + ' wrong' : 'Not one wrong')) + '</small>'
+    : esc(L('Canın bitti.', 'Out of lives.')) +
+      '<small>' + esc(L('Kırmızı çerçeveli olanlar da oldu.', 'The ones ringed in red happened too.')) + '</small>',
+    !won);
+  $('gn-reset').textContent = IstDate.untilNextNight({ prefixTr: 'Yeni Güncel', prefixEn: 'New Güncel in' });
+}
+
+function renderAll() {
+  renderHead();
+  renderLives();
+  renderGrid();
+  paintOver();
+}
+
+// ── A press is the answer ──
+async function press(i) {
+  if (over || picks.includes(i)) return;
+  picks.push(i);
+  markStarted();
+  const c = puzzle.cards[i];
+  const w = whenOf(c.date);
+  const right = w.answer;
+  const total = answers().length;
+  if (found() === total || mistakes() >= LIVES) over = true;
+
+  renderAll();
+  const card = document.querySelector('.gn-card[data-i="' + i + '"]');
+  if (card) {
+    card.classList.add(right ? 'pop' : 'shake');
+    setTimeout(() => card.classList.remove('pop', 'shake'), 400);
+  }
+  if (!over) {
+    setStatus(right
+      ? esc(L('Evet — bu ' + w.phrase + ' oldu.', 'Yes — this happened ' + w.phrase + '.'))
+      : esc(L('Bu ' + w.phrase + ' oldu.', 'This happened ' + w.phrase + '.')) +
+        '<small>' + esc(longDate(c.date)) + '</small>',
+      !right);
+  }
+  await saveState();
+  if (over) await recordResult();
+}
+
+$('gn-grid').addEventListener('click', (e) => {
+  const card = e.target.closest('.gn-card');
+  if (!card || card.disabled) return;
+  press(Number(card.dataset.i));
+});
+// The press look: the face sinks under the finger and comes back up.
+$('gn-grid').addEventListener('pointerdown', (e) => {
+  const card = e.target.closest('.gn-card');
+  if (card && !card.disabled) card.classList.add('pressing');
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(t =>
+  $('gn-grid').addEventListener(t, () => {
+    document.querySelectorAll('.gn-card.pressing').forEach(c => c.classList.remove('pressing'));
+  }, true));
+
+// ── Results ──
+// One "started" row on the first press (attempts 0), one finished row at
+// the end -- the same two-row shape every other game writes, so "played
+// means finished" (attempts >= 1) reads this game the same way. A win's
+// attempts is 1 + its mistakes (a clean board is 1); a loss is LIVES + 1.
+let _starting = false;
+async function markStarted() {
+  if (_starting) return;
+  _starting = true;
+  try {
+    if (await gameStorage.get(STARTED_KEY)) return;
+    await gameStorage.set(STARTED_KEY, '1');
+    const { data: { session } } = await gameStorage.session();
+    if (!session) return;
+    await sb.from('game_results').insert([{
+      user_id: session.user.id, game: GAME, date: SEED,
+      attempts: 0, won: false, neighborhood: userNeighborhood,
+    }]);
+  } catch (e) {}
+}
+
+async function recordResult() {
+  try {
+    const { data: { session } } = await gameStorage.session();
+    if (!session) return;
+    const won = found() === answers().length;
+    const row = {
+      user_id: session.user.id, game: GAME, date: SEED,
+      attempts: won ? mistakes() + 1 : LIVES + 1, won, neighborhood: userNeighborhood,
+      guesses: picks.map(i => (isAnswer(i) ? 'correct' : 'absent')),
+    };
+    let { error } = await sb.from('game_results').insert([row]);
+    // A database without game_results_v2 has no `guesses` column; the
+    // result itself matters more than the pattern.
+    if (error) { delete row.guesses; await sb.from('game_results').insert([row]); }
+  } catch (e) {}
+}
+
+// ── Saving the board ──
+async function saveState() {
+  const state = { order, picks, over };
+  await gameStorage.set(SAVE_KEY, JSON.stringify(state));
+  try {
+    const { data: { session } } = await gameStorage.session();
+    if (!session) return;
+    await sb.from('game_state').upsert({
+      user_id: session.user.id, game: GAME, date: SEED, state,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,game,date' });
+  } catch (e) {}
+}
+
+async function restoreState() {
+  let raw = await gameStorage.get(SAVE_KEY);
+  if (!raw) {
+    try {
+      const { data: { session } } = await gameStorage.session();
+      if (session) {
+        const { data } = await sb.from('game_state').select('state')
+          .eq('user_id', session.user.id).eq('game', GAME).eq('date', SEED).maybeSingle();
+        if (data && data.state) raw = JSON.stringify(data.state);
+      }
+    } catch (e) {}
+  }
+  if (!raw) return false;
+  try {
+    const s = JSON.parse(raw);
+    const valid = (a) => Array.isArray(a) && a.every(i => Number.isInteger(i) && i >= 0 && i < CARD_COUNT);
+    // A save from a board the admin has since changed (a different
+    // number of cards, or indices out of range) is not this board.
+    if (!valid(s.order) || s.order.length !== CARD_COUNT || !valid(s.picks)) return false;
+    order = s.order;
+    picks = s.picks;
+    over = !!s.over || found() === answers().length || mistakes() >= LIVES;
+    return true;
+  } catch (e) { return false; }
+}
+
+function shuffled(n) {
+  const a = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function showEmpty(tr, eng) {
+  $('gn-q').textContent = 'Güncel';
+  $('gn-sub').textContent = '';
+  $('gn-lives').innerHTML = '';
+  const grid = $('gn-grid');
+  grid.outerHTML = '<div class="gn-empty" id="gn-grid"><div class="ui-empty">' + esc(L(tr, eng)) + '</div></div>';
+}
+
+// ── Opening ──
+async function init() {
+  let session = null, isAdmin = false;
+  try {
+    session = (await sb.auth.getSession()).data.session;
+    if (session) {
+      isAdmin = session.user.email === ADMIN_EMAIL;
+      I18N.syncFromSupabase(sb, session.user.id);
+      Palette.syncFromSupabase(sb, session.user.id);
+      const { data: p } = await sb.from('profiles').select('neighborhood').eq('id', session.user.id).maybeSingle();
+      userNeighborhood = (p && p.neighborhood) || null;
+    }
+  } catch (e) {}
+
+  // The admin's off-switch for the day (game_day_toggles). The admin owns
+  // the switch and is never locked out by it -- see game-locks.js.
+  try {
+    if (!isAdmin && window.IstGameLocks) {
+      const off = await IstGameLocks.offGamesToday(sb);
+      if (off.has(GAME)) { showEmpty('Bugün Güncel yok!', 'No Güncel today!'); return; }
+    }
+  } catch (e) {}
+
+  try {
+    const { data, error } = await sb.from('guncel_puzzles').select('*').eq('puzzle_date', NIGHT).maybeSingle();
+    if (!error && data && Array.isArray(data.cards) && data.cards.length === CARD_COUNT) puzzle = data;
+  } catch (e) {}
+  if (!puzzle) {
+    showEmpty('Bugünkü Güncel henüz hazır değil.', "Today's Güncel isn't ready yet.");
+    return;
+  }
+
+  if (!(await restoreState())) {
+    order = shuffled(CARD_COUNT);
+    picks = [];
+    over = false;
+  }
+  renderAll();
+  if (!over) setStatus(esc(L('Dün olduğunu düşündüğün olaya bas.', 'Press an event you think happened yesterday.')));
+}
+
+// Everything the language decides is re-drawn when it changes: the
+// question, the stamps, the English halves of the cards.
+if (window.I18N && I18N.onChange) I18N.onChange(() => { if (puzzle) { renderAll(); if (!over) setStatus(''); } });
+
+// game-locks.js is deferred, and deferred scripts have all run by
+// DOMContentLoaded.
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
