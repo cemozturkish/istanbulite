@@ -1543,6 +1543,10 @@
        editing. */
     .fb-week-sub { margin: -4px 0 8px; }
     .fb-week-day { display: grid; gap: 8px; margin-top: 10px; padding: 10px 12px 12px; border: 2px solid var(--ink); }
+    .fb-week-day.open { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .fb-week-dh { display: flex; justify-content: space-between; align-items: center; margin: 0; }
+    .fb-week-dh b { font-size: 1.1rem; font-weight: 900; color: var(--ink); }
+    .fb-plan-fixed { font-size: 0.95rem; font-weight: 800; padding: 6px 0; }
     .fb-week-day.none { border-style: dashed; border-color: var(--muted); }
     .fb-week-none { margin: 0; font-size: 0.8rem; color: var(--muted); }
     .fb-week-day.t .fb-week-dh { color: var(--ink-red, #B93631); }
@@ -5306,8 +5310,10 @@ function renderPlanWeek() {
     const today = rows.filter(ev => homeEventDay(ev) === day);
     // Every day of the week gets its own rectangle, top to bottom, whether
     // or not anything is on it.
-    html += '<section class="fb-week-day' + (k === 0 ? ' t' : '') + (today.length ? '' : ' none') + '">' +
-      '<h3 class="ui-label ui-quiet fb-week-dh">' + esc(planWeekDayHead(k)) + '</h3>' +
+    // Pressing the day itself (not one of its rows) starts a plan for that
+    // day, so the form never has to ask which day it is.
+    html += '<section class="fb-week-day' + (k === 0 ? ' t' : '') + (today.length ? '' : ' none') + (full ? '' : ' open') + '" data-k="' + k + '">' +
+      '<h3 class="ui-label ui-quiet fb-week-dh"><span>' + esc(planWeekDayHead(k)) + '</span>' + (full ? '' : '<b aria-hidden="true">+</b>') + '</h3>' +
       (today.length ? '' : '<p class="fb-week-none">' + esc(tEv('plan.week.none')) + '</p>') +
       today.map(ev => {
         const own = ev._plan && ev._mine;
@@ -5329,8 +5335,6 @@ function renderPlanWeek() {
       '<h2 class="ui-h fb-plan-h">' + esc(tEv('plan.week.title')) + '</h2>' +
       '<p class="ui-sub fb-week-sub">' + esc(tEv('plan.week.sub')) + '</p>' +
       html +
-      '<button type="button" class="ui-btn ui-block fb-plan-go" id="fb-week-new"' + (full ? ' disabled' : '') + '>' +
-        esc(tEv('plan.week.new')) + '</button>' +
       '<p class="ui-note fb-plan-who">' + esc(tEv(full ? 'plan.err.full' : 'plan.week.count')).replace('{n}', '<b>' + mineCount + '</b>') + '</p>' +
     '</div>';
   body.scrollTop = 0;
@@ -5345,8 +5349,10 @@ function renderPlanWeek() {
     closePlanForm();
     openHomeCard(row.dataset.k, row.dataset.d, ev.id);
   }));
-  const go = body.querySelector('#fb-week-new');
-  if (go) go.addEventListener('click', () => openPlanForm(null, 'week'));
+  if (!full) body.querySelectorAll('.fb-week-day').forEach(sec => sec.addEventListener('click', e => {
+    if (e.target.closest('.fb-week-row')) return;
+    openPlanForm(null, 'week', Number(sec.dataset.k));
+  }));
 }
 function openPlanWeek() {
   const overlay = document.getElementById('fb-plan-overlay');
@@ -5360,7 +5366,7 @@ function openPlanWeek() {
 // `ev` is a plan of the reader's own to edit (db/events_v3_plan_edit.sql),
 // or null for a new one. `from` is 'week' when the list opened it, which
 // is where a saved edit goes back to and what "‹ Bu haftam" returns to.
-function openPlanForm(ev, from) {
+function openPlanForm(ev, from, dayK) {
   const overlay = document.getElementById('fb-plan-overlay');
   const body = document.getElementById('fb-plan-body');
   if (!overlay || !body || !homeData.plansOpen) return;
@@ -5378,14 +5384,17 @@ function openPlanForm(ev, from) {
     d = { what: editing.title || '', nb: editing.neighborhood, place: editing.location || '',
           day: k, time: eventTimeOnly(editing.event_date) };
   }
-  const day = Number.isInteger(d.day) ? Math.min(d.day, HOME_DAYS - 1) : 0;
+  // A new plan opened from a day's rectangle has that day fixed and no day
+  // chips; editing keeps the chips so a plan can still be moved.
+  const fixedDay = !editing && Number.isInteger(dayK) ? Math.min(dayK, HOME_DAYS - 1) : null;
+  const day = fixedDay !== null ? fixedDay : (Number.isInteger(d.day) ? Math.min(d.day, HOME_DAYS - 1) : 0);
   const nb = d.nb || homeMeNb || 'kadikoy';
   const full = !editing && homeMyPlanCount() >= PLAN_MAX;
   const days = Array.from({ length: HOME_DAYS }, (_, k) =>
     '<button type="button" role="radio" aria-checked="' + (k === day) + '" data-day="' + k + '"' +
     ' class="ui-chip' + (k === day ? ' on' : '') + '">' + esc(planDayLabel(k)) + '</button>').join('');
   body.innerHTML =
-    '<form class="fb-plan" id="fb-plan-form" novalidate lang="' + (planEnglish() ? 'en' : 'tr') + '">' +
+    '<form class="fb-plan" id="fb-plan-form" novalidate data-fixed-day="' + (fixedDay === null ? '' : fixedDay) + '" lang="' + (planEnglish() ? 'en' : 'tr') + '">' +
       '<button type="button" class="ui-link fb-plan-back" id="fb-plan-back">' + esc(tEv('plan.back')) + '</button>' +
       '<h2 class="ui-h fb-plan-h">' + esc(tEv(editing ? 'plan.edit.title' : 'plan.title')) + '</h2>' +
       '<label class="ui-label fb-plan-lab" for="fb-plan-what">' + esc(tEv('plan.what')) + '</label>' +
@@ -5400,7 +5409,9 @@ function openPlanForm(ev, from) {
       '</div>' +
       '<div class="ui-label fb-plan-lab" id="fb-plan-when-lab">' + esc(tEv('plan.when')) + '</div>' +
       '<div class="fb-plan-when">' +
-        '<div class="ui-chips fb-plan-days" role="radiogroup" aria-labelledby="fb-plan-when-lab">' + days + '</div>' +
+        (fixedDay === null
+          ? '<div class="ui-chips fb-plan-days" role="radiogroup" aria-labelledby="fb-plan-when-lab">' + days + '</div>'
+          : '<div class="fb-plan-fixed">' + esc(planWeekDayHead(fixedDay)) + '</div>') +
         '<input class="ui-field fb-plan-time" id="fb-plan-time" type="time" step="300" required' +
           ' aria-label="' + esc(tEv('plan.time')) + '" value="' + esc(d.time || planDefaultTime(day)) + '">' +
       '</div>' +
@@ -5460,7 +5471,7 @@ function readPlanForm() {
     what: (form.querySelector('#fb-plan-what') || {}).value || '',
     nb: (form.querySelector('#fb-plan-nb') || {}).value || '',
     place: (form.querySelector('#fb-plan-place') || {}).value || '',
-    day: on ? Number(on.dataset.day) : 0,
+    day: on ? Number(on.dataset.day) : (form.dataset.fixedDay !== '' && form.dataset.fixedDay != null ? Number(form.dataset.fixedDay) : 0),
     time: time && time.dataset.touched ? time.value : '',
   };
 }
