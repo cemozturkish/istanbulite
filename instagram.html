@@ -96,7 +96,7 @@
 
 <div class="top">
   <!-- The page's version, printed so a cached old copy can be told apart. -->
-  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 5</small></h1>
+  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 6</small></h1>
   <label>Oyun günü <input type="date" id="g-date"></label>
   <button class="btn" id="refill">Verilerden doldur</button>
   <button class="btn" id="save-all">Üçünü indir</button>
@@ -971,17 +971,23 @@
   // (supabase/functions/tdk). Answers { entries, reached }: entries is null
   // when the word is not there, reached false when neither route answered.
   let tdkDirectOk = true;
+  // TDK is often slow; a request that has not answered in 8s is given up on,
+  // or one stalled fetch would hold the whole fill.
+  const timed = (ms) => { const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal; };
   async function tdk(word) {
     const list = (j) => Array.isArray(j) && j.length ? j : null;
     if (tdkDirectOk) {
       try {
-        const r = await fetch('https://sozluk.gov.tr/gts?ara=' + encodeURIComponent(word));
+        const r = await fetch('https://sozluk.gov.tr/gts?ara=' + encodeURIComponent(word), { signal: timed(8000) });
         if (r.ok) return { entries: list(await r.json()), reached: true };
       } catch (e) { tdkDirectOk = false; }
     }
     if (sb && session) {
       try {
-        const { data, error } = await sb.functions.invoke('tdk', { body: { word } });
+        const { data, error } = await Promise.race([
+          sb.functions.invoke('tdk', { body: { word } }),
+          new Promise(res => setTimeout(() => res({ error: 'timeout' }), 10000))
+        ]);
         if (!error) return { entries: list(typeof data === 'string' ? JSON.parse(data) : data), reached: true };
       } catch (e) {}
     }
@@ -1174,9 +1180,17 @@
     return S;
   }
   const FILLS = [['Sözcük', fillWord], ['Skor', fillBoard], ['İkinci oyun', fillSecond]];
-  async function fillDay(D, S, N) {
+  // Each post gets 30s; one that has not finished by then is reported and
+  // the next one is read, so a stalled request never leaves the page hanging.
+  async function fillDay(D, S, N, onStep) {
     for (const [name, fn] of FILLS) {
-      try { await fn(D, S, N); } catch (e) { N.push(`<span class="warn">${name}: okunamadı (${(e && e.message) || e}).</span>`); }
+      if (onStep) onStep(name);
+      try {
+        const late = new Promise((_, rej) => setTimeout(() => rej(new Error('30 saniyede cevap gelmedi')), 30000));
+        await Promise.race([fn(D, S, N), late]);
+      } catch (e) {
+        N.push(`<span class="warn">${name}: okunamadı (${(e && (e.message || e.code)) || e}).</span>`);
+      }
     }
     S.filledFor = D;
     return S;
@@ -1189,7 +1203,7 @@
     notes.length = 0;
     say('Veriler okunuyor…');
     Object.assign(state, blankDay(D));
-    await fillDay(D, state, notes);
+    await fillDay(D, state, notes, (name) => say(`Veriler okunuyor: ${name}…`));
     save(); fillForm(); render();
     const hm = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' }).format(new Date());
     say(`<b>${dayLabel(fromIso(D))}</b> verileriyle dolduruldu (${hm}). Elle değiştirdiklerin kalır; “Verilerden doldur” baştan yazar.` +
