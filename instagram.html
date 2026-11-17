@@ -140,7 +140,7 @@
       </div>
       <div class="row2">
         <label class="f"><span>Renk</span><select data-k="p1.color" class="color-pick"></select></label>
-        <label class="f"><span>Logonun içi</span><select data-k="p1.logo" class="logo-pick"></select></label>
+        <label class="f"><span>Logo</span><select data-k="p1.logo" class="logo-pick"></select></label>
       </div>
     </div>
     <div class="preview"><canvas width="1080" height="1350"></canvas><div class="actions"></div></div>
@@ -162,7 +162,7 @@
       </div>
       <div class="row2">
         <label class="f"><span>Renk</span><select data-k="p2.color" class="color-pick"></select></label>
-        <label class="f"><span>Logonun içi</span><select data-k="p2.logo" class="logo-pick"></select></label>
+        <label class="f"><span>Logo</span><select data-k="p2.logo" class="logo-pick"></select></label>
       </div>
     </div>
     <div class="preview"><canvas width="1080" height="1350"></canvas><div class="actions"></div></div>
@@ -192,7 +192,7 @@
       </div>
       <div class="row2">
         <label class="f"><span>Renk</span><select data-k="p3.color" class="color-pick"></select></label>
-        <label class="f"><span>Logonun içi</span><select data-k="p3.logo" class="logo-pick"></select></label>
+        <label class="f"><span>Logo</span><select data-k="p3.logo" class="logo-pick"></select></label>
       </div>
     </div>
     <div class="preview"><canvas width="1080" height="1350"></canvas><div class="actions"></div></div>
@@ -225,25 +225,26 @@
       rule: 'rgba(255,255,255,0.55)', accent: INK, hex: INK, hexText: '#fff',
       track: 'rgba(0,0,0,0.16)', bar: 'rgba(22,22,22,0.42)', barLead: INK, hair: 'rgba(255,255,255,0.35)',
       faint: 'rgba(255,255,255,0.6)', card: '#fff', cardEdge: INK, cardText: INK, cardMuted: '#6b6b6b',
-      flag: INK, cardLabel: RED, key: 'red', logo: 'white', foot: 'rgba(255,255,255,0.85)'
+      flag: INK, cardLabel: RED, key: 'red', logo: 'red-white', foot: 'rgba(255,255,255,0.85)'
     },
     dark: {
       name: 'Koyu', bg: '#2e2e2e', fg: '#fff', sub: 'rgba(255,255,255,0.62)', kick: RED,
       rule: 'rgba(255,255,255,0.22)', accent: RED, hex: RED, hexText: '#fff',
       track: 'rgba(255,255,255,0.10)', bar: 'rgba(185,54,49,0.65)', barLead: RED, hair: 'rgba(255,255,255,0.22)',
       faint: 'rgba(255,255,255,0.55)', card: '#fff', cardEdge: '#0d0d0d', cardText: INK, cardMuted: '#6b6b6b',
-      flag: RED, cardLabel: RED, key: 'dark', logo: 'red', foot: 'rgba(255,255,255,0.7)'
+      flag: RED, cardLabel: RED, key: 'dark', logo: 'white-red', foot: 'rgba(255,255,255,0.7)'
     },
     light: {
       name: 'Açık', bg: '#f3f2ee', fg: INK, sub: '#6b6b6b', kick: RED,
       rule: INK, accent: RED, hex: INK, hexText: '#fff',
       track: 'rgba(0,0,0,0.09)', bar: 'rgba(185,54,49,0.6)', barLead: RED, hair: INK,
       faint: '#6b6b6b', card: '#fff', cardEdge: INK, cardText: INK, cardMuted: '#6b6b6b',
-      flag: RED, cardLabel: RED, key: 'light', logo: 'black', foot: INK
+      flag: RED, cardLabel: RED, key: 'light', logo: 'white-black', foot: INK
     }
   };
-  // The wordmark's fill is different on each colour, so the three logos in a
-  // row never repeat: white on the red post, red on the dark, black on the light.
+  // The wordmark's own colours per post: red inside a white edge on the red
+  // post, white inside a black edge on the light one, white inside a red edge
+  // on the dark one.
   const ORDER = ['red', 'dark', 'light'];
   // The column scheme's colours, post by post: the word red (it continues the
   // account's red column), the scoreboard light (the white phone column), the
@@ -443,9 +444,17 @@
     dark:  { red: '#0d0d0d', white: '#0d0d0d', black: '#ffffff' }
   };
   let curPost = 1;
+  // A logo choice is "fill" or "fill-ring" (e.g. "red-white"): the fill alone
+  // takes the ring from LOGO_RING, a named ring overrides it.
+  function logoColors(t) {
+    const v = val(`p${curPost}.logo`) || t.logo;
+    const [fill, ring] = v.split('-');
+    const f = LOGO_FILL[fill] ? fill : 'white';
+    return [LOGO_FILL[f], ring && LOGO_FILL[ring] ? LOGO_FILL[ring] : LOGO_RING[t.key][f]];
+  }
   function footer(ctx, t) {
-    const fill = val(`p${curPost}.logo`) || t.logo;
-    const h = 62, img = wordmark(LOGO_FILL[fill], LOGO_RING[t.key][fill]);
+    const [fill, ring] = logoColors(t);
+    const h = 62, img = wordmark(fill, ring);
     const w = h * img.width / img.height, y = H - M - h + 6;
     ctx.drawImage(img, M - 4, y, w, h);
     font(ctx, 800, 21); ctx.fillStyle = t.foot;
@@ -710,8 +719,15 @@
     p.ctx = p.canvas.getContext('2d');
   });
   document.querySelectorAll('.logo-pick').forEach(s => {
-    s.innerHTML = '<option value="">Renge göre</option><option value="red">Kırmızı</option>' +
-      '<option value="white">Beyaz</option><option value="black">Siyah</option>';
+    const N = { red: 'Kırmızı', white: 'Beyaz', black: 'Siyah' };
+    let html = '<option value="">Renge göre</option>';
+    ['red', 'white', 'black'].forEach(f => {
+      html += `<option value="${f}">${N[f]} içi</option>`;
+      ['red', 'white', 'black'].filter(r => r !== f).forEach(r => {
+        html += `<option value="${f}-${r}">${N[f]} içi, ${N[r].toLocaleLowerCase('tr-TR')} kenar</option>`;
+      });
+    });
+    s.innerHTML = html;
   });
   document.querySelectorAll('.color-pick').forEach(s => {
     s.innerHTML = '<option value="auto">Renk düzenine göre</option>' +
