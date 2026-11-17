@@ -34,6 +34,8 @@ const EXCLUDE = new Set([
   // admin.html), which is where it is actually used; shipping it inside the
   // App Store bundle only adds weight to every member's download.
   'admin.html',
+  // The daily Instagram templates (instagram.html) are an admin's tool too.
+  'instagram.html',
 ]);
 
 function copyRecursive(src, dest) {
