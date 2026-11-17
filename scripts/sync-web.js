@@ -20,6 +20,7 @@ const EXCLUDE = new Set([
   'android',
   'www',
   'db',
+  'supabase',
   'scripts',
   'CLAUDE.md',
   'README.md',

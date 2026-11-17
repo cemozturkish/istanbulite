@@ -32,7 +32,7 @@ in mind.
 | **The three-lane strip** | `HOME_SCREEN = true` in `project.html` | The app is ONE screen — see "The home screen" under project.html. The Kahvehane columns are left out of `CAST`, `LANE_MAX` caps the strip at the middle (with `LANE_MIN`, nothing to walk to either side), the wash over the map is off, the book's own drag bails (`onDown`), and both bottom-bar words are hidden (`#fb-nav.fb-home-nav`). |
 | **The petek's day glyph** | `HIVE_DAY_GLYPH = false` in `profile-card.js` | A neighbour's caption is their district, not the two-screen glyph, and nothing asks `hive_member_status`. |
 | **Friends' districts lit** | `FRIEND_DISTRICTS_LIT = true` in `project.html` | ON. It is the resting fill that was once abandoned for misregistration; the fills are now cut from the drawing's own faces (see "The fills used to misregister"), so that reason is gone. |
-| **The admin's sections** | `ADMIN_PARKED` in `admin.html` | Haber, Olay, Anket, Mektup, Raflar, Ülkeler, Alıntılar, Kahve Endeksi, Kişiler, Koltuklar, TBMM and Bildirimler are folded into the "Parktakiler" list at the foot of the rail (`railPark`); their formes leave the press bar and their columns leave the baskı board. The desk opens on Etkinlik (`ADMIN_DEFAULT_TAB`). Every parked section still opens and works. |
+| **The admin's sections** | `ADMIN_PARKED` in `admin.html` | Haber, Olay, Anket, Mektup, Raflar, Ülkeler, Alıntılar, Kahve Endeksi, Kişiler, Koltuklar, TBMM and Balon (the old login mascot bubble, `admin_notifications`) are folded into the "Parktakiler" list at the foot of the rail (`railPark`); their formes leave the press bar and their columns leave the baskı board. The desk opens on Etkinlik (`ADMIN_DEFAULT_TAB`). Every parked section still opens and works. |
 
 **Morning and evening editions are retired, not parked.** There is one paper a day: it goes out
 whole at the midnight its İstanbul day begins and stands for 24 hours. The admin desk no longer
@@ -1704,6 +1704,38 @@ git diff            # Check changes before committing
 ```
 
 ---
+
+## Push notifications — `push.js` + `db/push_notifications.sql` + `supabase/functions/send-push`
+
+iOS lock-screen pushes, and **only four kinds, each about a real person going to a real place**:
+a plan that reaches you is put up (`plan_new` — the plan's own reach and blocks decide who,
+through `hive_reaches`, the fence `event_readable()` uses), somebody joins your plan
+(`plan_join`), an evening or plan you are going to is about to start (`event_reminder`, also to a
+plan's creator), and the admin's own announcement. **Never add a retention push** ("you haven't
+opened the app", streaks, "see what you missed") — that is the notification pressure "remind,
+don't retain" names as an anti-goal.
+
+- **Everything but the last hop is SQL.** Triggers on `events` / `event_rsvps` and the
+  `push-reminders` cron job call `push_enqueue()`, which checks the switches, picks the member's
+  language, renders the admin's template and applies quiet hours (`send_after`) before a row ever
+  lands in `push_outbox`. `dedupe_key` (unique per member) is what stops a second push about the
+  same thing. The `push-send` cron job calls the Edge Function only while something is due; it
+  claims rows with `push_claim()` (skip-locked, so overlapping runs never double-send) and talks
+  to APNs with an ES256 provider token. Dead tokens are deleted. Setup is
+  `supabase/functions/send-push/README.md`.
+- **The admin controls it from admin.html → Bildirimler** (`#push-tab`, `loadPushTab`): the master
+  switch, quiet hours, the reminder's lead time, each kind on/off with its TR/EN title and body
+  (`{name} {title} {place} {day} {time}`, previewed live by `pushRender`, which mirrors
+  `push_render()`), an announcement, a test to the admin's own phone, and a log.
+- **The admin still reads no plan.** `push_outbox` has no client policies; the log is
+  `admin_push_log()`, which blanks the text of `plan_new` / `plan_join` and names no recipient.
+- **The app asks once onboarding is behind the member** (`startPush` in project.html): the
+  launch onboarding runs on never shows iOS's permission question; the next launch does. A tap
+  on a push about an evening or plan re-reads the week (`refreshHomeDots`) and opens its card.
+  Signing out unregisters the device (`IstPush.unregister`, profile-card.js). The web never
+  loads the plugin; every `IstPush` call is a no-op there.
+- **Native:** `@capacitor/push-notifications`, `aps-environment` in `App.entitlements`, and the
+  two `didRegisterForRemoteNotifications…` forwards in `AppDelegate.swift`.
 
 ## Site-wide defaults
 
